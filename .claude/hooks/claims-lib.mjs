@@ -97,19 +97,19 @@ export const ledgerDirOf = (repoRoot) => join(CLAIMS_DIR, slugOf(repoRoot));
 
 let _psCache = null;
 let _psOk = false;
-/** Tek `ps` snapshot'ı: pid → {ppid, start, comm}. Yalnız yavaş yolda çağrılır. */
+/** Tek `ps` snapshot'ı: pid → {ppid, state, start, comm}. Yalnız yavaş yolda çağrılır. */
 export function psSnapshot() {
   if (_psCache) return _psCache;
   const m = new Map();
   try {
-    const r = spawnSync("ps", ["-axo", "pid=,ppid=,lstart=,comm="], {
+    const r = spawnSync("ps", ["-axo", "pid=,ppid=,stat=,lstart=,comm="], {
       encoding: "utf8",
       maxBuffer: 8 << 20,
     });
     for (const line of (r.stdout || "").split("\n")) {
-      const mt = line.match(/^\s*(\d+)\s+(\d+)\s+(\S+\s+\S+\s+\d+\s+\S+\s+\d+)\s+(.*)$/);
+      const mt = line.match(/^\s*(\d+)\s+(\d+)\s+(\S+)\s+(\S+\s+\S+\s+\d+\s+\S+\s+\d+)\s+(.*)$/);
       if (!mt) continue;
-      m.set(+mt[1], { ppid: +mt[2], start: mt[3].trim(), comm: mt[4].trim() });
+      m.set(+mt[1], { ppid: +mt[2], state: mt[3], start: mt[4].trim(), comm: mt[5].trim() });
     }
   } catch {
     /* aşağıda _psOk=false → ölçüm YOK hükmü */
@@ -162,6 +162,10 @@ export function procAlive(pid, procStart) {
   if (!_psOk) return true; // ölçüm yok → hüküm yok (kilidi koru)
   const p = ps.get(+pid);
   if (!p) return false; // süreç yok → gerçekten ölü
+  // Zombi süreç PID tablosunda görünür ama artık iş yapamaz. Onu canlı saymak, sahibi
+  // crash eden claim'i sonsuza dek tutar ve wait kuyruğunu dondurur. Parent henüz reap
+  // etmemiş olsa bile `stat=Z...` süreç işlevsel olarak ölüdür.
+  if (String(p.state || "").startsWith("Z")) return false;
   if (procStart && p.start && normStart(p.start) !== normStart(procStart)) return false; // pid geri dönüşmüş
   return true;
 }
