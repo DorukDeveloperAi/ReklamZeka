@@ -1,0 +1,35 @@
+{
+  "$sema": "ReklamZeka proje kanıt sözleşmesi. İnsan yazar; Rotacı yalnız okur. Komutlar argv dizisidir ve kabuk içermez.",
+  "girisler": [
+    {
+      "ad": "urun-temeli",
+      "sinif": "hizli",
+      "cmd": ["node", "scripts/check-project-foundation.mjs"],
+      "timeoutSn": 30
+    },
+    {
+      "ad": "teknik-hizli",
+      "sinif": "hizli",
+      "cmd": ["npm", "run", "check:quick"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "production-build",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "build"],
+      "timeoutSn": 300
+    },
+    {
+      "ad": "production-audit",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:security"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "eszamanli-regresyon",
+      "sinif": "tam",
+      "cmd": ["node", ".claude/skills/eszamanli/proof/proof.mjs"],
+      "timeoutSn": 240
+    }
+  ]
+}

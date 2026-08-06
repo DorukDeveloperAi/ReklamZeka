@@ -27,6 +27,15 @@
   "isSayisi": 2,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-06",
-  "planlar": [],
-  "damga": "8d1193389e91"
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 1,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 2,
+      "asamaToplam": 7,
+      "siradaki": "03-veri platformu"
+    }
+  ],
+  "damga": "7364f760c2c4"
 }

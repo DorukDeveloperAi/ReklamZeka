@@ -19,14 +19,21 @@
 
 ## Amaç ve kapsam
 
-*(İlk vizyon koşusunda doldurulur: proje nedir, bu şartname hangi davranış alanlarını
-tanımlar, nihai durumda kullanıcıya ne sunulur.)*
+ReklamZeka; ajansların ve şirket içi pazarlama ekiplerinin ücretli medya verisini tek
+bir yerde görmesini, kanıtı açıklanabilir içgörüler üretmesini ve alınacak aksiyonları
+insan onayıyla yönetmesini sağlayan çok kiracılı bir karar destek ürünüdür. İlk ürün
+Meta Ads ve Google Ads için salt-okunur veri toplama, ortak metrik modeli, performans
+ve anomali görünümü, açıklanabilir öneriler ve paylaşılabilir raporlar sunar.
+
+İlk sürüm reklam hesabında otomatik değişiklik yapmaz. Bütçe, teklif, kampanya durumu
+ve kreatif yayınlama gibi geri alınması zor aksiyonlar ancak ayrı bir yetkilendirme
+ve kullanıcı onayı tasarımı tamamlandıktan sonra değerlendirilir.
 
 ## Şartname bölümleri (vizyon/)
 
 | # | bölüm | kapsadığı davranış alanı | durum |
 |---|---|---|---|
-| — | *(ilk vizyon koşusunda açılır)* | | |
+| 1 | [ürün ve MVP kapsamı](vizyon/1-urun-ve-mvp.md) | kullanıcı, değer, veri, içgörü, güvenlik ve başarı | başlangıç şartnamesi |
 
 ## İstek envanteri (istek/)
 

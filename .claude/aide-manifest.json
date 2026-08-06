@@ -380,5 +380,8 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-06T10:42:28.559Z"
+  "updatedAt": "2026-08-06T15:14:54.925Z",
+  "yerelKazanir": [
+    ".claude/hooks/claims-lib.mjs"
+  ]
 }

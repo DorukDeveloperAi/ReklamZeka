@@ -11,4 +11,12 @@
 > Ne istendiği + neden — tek paragraf, kullanıcı sesi esas.
 > ```
 
-*(envanter boş — ilk girişler vizyon koşusunda (/vizyoner) doğar)*
+<!-- uy:hedef/tek-ekranda-reklam-zekasi -->
+## Ücretli medya kararlarını tek ekranda toplamak
+boy: epik
+Ajans ve şirket içi pazarlama ekipleri, dağınık reklam platformlarında veri aramak yerine ortak metriklerle mevcut durumu görebilmeli, sapmaları anlayabilmeli ve hangi aksiyonun neden önerildiğini kanıtıyla inceleyebilmelidir.
+
+<!-- uy:hedef/guvenli-karar-destegi -->
+## Güvenli ve denetlenebilir karar desteği sağlamak
+boy: orta
+Sistem reklam hesabında kendiliğinden değişiklik yapmak yerine öneriyi, dayandığı veriyi, güven seviyesini ve olası etkisini göstermeli; tüm kullanıcı kararları denetlenebilir olmalıdır.

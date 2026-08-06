@@ -1,0 +1,196 @@
+{
+  "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
+  "damga": "c7d890617a53",
+  "plans": [
+    {
+      "slug": "proje",
+      "v": 1,
+      "title": "ReklamZeka MVP",
+      "kategori": "proje",
+      "ust": null,
+      "durum": "SÜRÜYOR",
+      "kunye": {
+        "hedef": "ReklamZeka, iki reklam platformundan salt-okunur veri alan ve açıklanabilir öneri sunan güvenli bir pilot ürüne dönüşür.",
+        "kritiklik": "yüksek",
+        "aciliyet": "normal",
+        "hacim": "epik",
+        "oncelik": 2,
+        "puan": 9,
+        "eksik": [],
+        "oturum": "ot:2026-08-06/reklamzeka-baslangic"
+      },
+      "asamaToplam": 7,
+      "asamaKapali": 2,
+      "checklistAcik": 9,
+      "checklistKapali": 8,
+      "sonTur": {
+        "baslik": "2026-08-06 — teknik-temel",
+        "yapilan": "ADR-0001, Next.js 16 App Router uygulaması, health API, PostgreSQL/Drizzle başlangıç şeması, migration, Vitest ve GitHub Actions hızlı kapısı kuruldu."
+      },
+      "siradaki": {
+        "no": "03",
+        "ad": "veri platformu"
+      },
+      "goal": "/goal plans/proje/v1/asama-03-veri-platformu.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
+      "depli": true,
+      "hazir": [
+        {
+          "no": "03",
+          "ad": "veri platformu",
+          "goal": "/goal plans/proje/v1/asama-03-veri-platformu.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
+          "kosum": {
+            "tur": "tek-ajan"
+          }
+        },
+        {
+          "no": "04",
+          "ad": "kiracı güvenliği",
+          "goal": "/goal plans/proje/v1/asama-04-kiraci-guvenligi.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
+          "kosum": {
+            "tur": "tek-ajan"
+          }
+        }
+      ],
+      "bekleyen": [
+        {
+          "no": "05",
+          "ad": "performans deneyimi",
+          "bekledigi": [
+            "03",
+            "04"
+          ]
+        },
+        {
+          "no": "06",
+          "ad": "içgörü motoru",
+          "bekledigi": [
+            "03",
+            "04"
+          ]
+        },
+        {
+          "no": "07",
+          "ad": "rapor ve pilot",
+          "bekledigi": [
+            "05",
+            "06"
+          ]
+        }
+      ],
+      "baslangiclar": [
+        "01"
+      ],
+      "master": "plans/proje/v1/MASTER.md"
+    }
+  ],
+  "legacy": [],
+  "todo": {
+    "acik": 9,
+    "kaynak": {
+      "chk": 9,
+      "elle": 0,
+      "hukum": 0,
+      "kunye": 0,
+      "oturum": 0
+    },
+    "muaf": [
+      "alerts.jsonl",
+      "parked işler",
+      "doctor fix:",
+      "teslim onar:",
+      "kaptan task'ları"
+    ],
+    "maddeler": [
+      {
+        "ref": "td:chk/proje/a03",
+        "tur": "chk",
+        "metin": "**A03** İdempotent kanonik reklam veri akışı.",
+        "plan": "proje",
+        "asama": "03",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/a04",
+        "tur": "chk",
+        "metin": "**A04** Kimlik, üyelik, sır ve audit sınırları.",
+        "plan": "proje",
+        "asama": "04",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/a05",
+        "tur": "chk",
+        "metin": "**A05** Kaynaklı ve taze dashboard deneyimi.",
+        "plan": "proje",
+        "asama": "05",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/a06",
+        "tur": "chk",
+        "metin": "**A06** Açıklanabilir, sürümlü öneri motoru.",
+        "plan": "proje",
+        "asama": "06",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/a07",
+        "tur": "chk",
+        "metin": "**A07** Paylaşım, geri bildirim, gözlem ve pilot raporu.",
+        "plan": "proje",
+        "asama": "07",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h863b65",
+        "tur": "chk",
+        "metin": "Tüm aşamalar KAPALI ve kanıt yolları STATE.md'de",
+        "plan": "proje",
+        "asama": null,
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h2bf4cf",
+        "tur": "chk",
+        "metin": "Hızlı ve tam kanıt sınıfları temiz",
+        "plan": "proje",
+        "asama": null,
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h38f65e",
+        "tur": "chk",
+        "metin": "Pilot başarı ölçütleri raporlandı",
+        "plan": "proje",
+        "asama": null,
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/he09db3",
+        "tur": "chk",
+        "metin": "İlanlı muafiyetler yeniden doğrulandı",
+        "plan": "proje",
+        "asama": null,
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      }
+    ]
+  }
+}
