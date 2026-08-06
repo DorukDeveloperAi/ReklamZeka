@@ -1,0 +1,10 @@
+{
+  "$comment": "aide kit — kaptan sabah brifingi otomasyonu. `bun /Users/ybg/dev/agent-ide/packages/maestro/bin/zamanla.mjs add --agent global:kaptan --task 'Sabah brifingi: tüm projelerde nerede kaldık + önerilen adımlar; telegram reply aracı varsa gönder.' --every 24h --title 'kaptan sabah brifingi'` eşdeğeri; jobs/'a kopyalanmaz, zamanla CLI'siyle örneklenir. NOT: agent payload'ı `aide agent run` üzerinden koşar ve açık bir `aide` tmux oturumu gerektirir; aide kapalıysa alternatif tetik: `--text '/kaptan brifing' --session <uzun-ömürlü-pane>`.",
+  "schema": 1,
+  "payload": {
+    "kind": "agent",
+    "ref": "global:kaptan",
+    "task": "Sabah brifingi: tüm projelerde nerede kaldık + önerilen adımlar; telegram reply aracı varsa gönder."
+  },
+  "trigger": { "every": { "interval": "24h" } }
+}
