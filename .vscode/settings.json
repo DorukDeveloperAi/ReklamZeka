@@ -1,0 +1,12 @@
+{
+    "workbench.colorCustomizations": {
+        "titleBar.activeBackground": "#DEDEDE",
+        "titleBar.activeForeground": "#1A1917",
+        "titleBar.inactiveBackground": "#DEDEDE",
+        "titleBar.inactiveForeground": "#1A1917",
+        "activityBarBadge.background": "#DEDEDE",
+        "activityBarBadge.foreground": "#1A1917",
+        "statusBarItem.remoteBackground": "#DEDEDE",
+        "statusBarItem.remoteForeground": "#1A1917"
+    }
+}
