@@ -7,8 +7,10 @@ const root = resolve(import.meta.dirname, "..");
 const failures = [];
 for (const path of [
   "src/reports/share.ts", "src/operations/monitor.ts", "src/pilot/report.ts",
+  "src/reports/demo-share.ts", "tests/report-runtime.test.ts", "tests/report-http.test.ts",
   "tests/report-pilot.test.ts", "tests/mvp-journey.test.ts", "tests/field-pilot-input.test.ts", "tests/fixtures/pilot.json", "docs/RUNBOOKS.md",
-  "src/pilot/field-input.ts", "scripts/generate-field-pilot-report.ts", "scripts/check-field-pilot.mjs",
+  "src/pilot/field-input.ts", "scripts/preflight-field-pilot.ts", "scripts/generate-field-pilot-report.ts", "scripts/check-field-pilot.mjs",
+  "src/pilot/telemetry.ts", "tests/pilot-telemetry.test.ts", "docs/pilot/field-pilot.telemetry.template.json",
   "docs/PILOT-READINESS.md", "docs/qa/pilot-readiness.json",
   "src/app/pilot/page.tsx", "src/app/pilot/journey.ts", "src/app/reports/demo/page.tsx",
   "scripts/check-pilot-web.mjs", "tests/pilot-web-journey.test.ts",

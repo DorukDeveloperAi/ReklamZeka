@@ -42,7 +42,7 @@
 - [ ] **A07** Paylaşım, geri bildirim, gözlem ve pilot raporu.
   - [x] T07.1 — İmzalı/süreli/iptal edilebilir salt-okunur rapor ve CSV · kanıt: `npm run check:pilot-readiness`
   - [x] T07.2 — Sync/kota/içgörü alarmı, recovery ve runbook'lar · kanıt: operations suite
-  - [ ] T07.3 — Gerçek 3 çalışma alanı/10 hesap saha pilotu (`field_pilot`); fixture web yolculuğu, attestation ve üretici hazır, gerçek veri bekliyor
+  - [ ] T07.3 — Gerçek 3 çalışma alanı/10 hesap saha pilotu (`field_pilot`); fixture web yolculuğu, anonim telemetri dönüştürücüsü, attestation ve üretici hazır, gerçek veri bekliyor
 
 ## Roadmap kapanışı
 - [ ] Tüm aşamalar KAPALI ve kanıt yolları STATE.md'de

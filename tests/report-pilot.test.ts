@@ -52,6 +52,21 @@ describe("read-only report sharing", () => {
     service.revoke("share-a");
     expect(() => service.verify(token, "2026-08-06T12:10:00Z")).toThrowError(expect.objectContaining({ code: "revoked" }));
   });
+
+  it("authorizes and audits revocation without recording the bearer token", () => {
+    const memberships: readonly WorkspaceMembership[] = [
+      { userId: "analyst-a", workspaceId: "workspace-a", role: "analyst" },
+    ];
+    const service = new ShareLinkService(randomBytes(32));
+    const audit = new AppendOnlyAuditLog();
+    const token = service.createAuthorized({ userId: "analyst-a" }, memberships, audit, {
+      shareId: "share-revoke", workspaceId: "workspace-a", snapshotId: "snapshot-a",
+      expiresAt: "2026-08-06T13:00:00Z",
+    }, "2026-08-06T12:00:00Z");
+    service.revokeAuthorized({ userId: "analyst-a" }, memberships, audit, token, "2026-08-06T12:10:00Z");
+    expect(audit.list("workspace-a").map((event) => event.action)).toEqual(["report.shared", "report.revoked"]);
+    expect(JSON.stringify(audit.list("workspace-a"))).not.toContain(token);
+  });
 });
 
 describe("operational alarms", () => {

@@ -11,6 +11,7 @@ import {
   type PilotFeedback,
   type PilotStep,
 } from "./journey";
+import { DemoShareControls } from "./demo-share-controls";
 
 function money(value: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(value / 100);
@@ -25,7 +26,7 @@ function StepContent({ step, feedback }: { step: PilotStep; feedback: PilotFeedb
   if (step === "sync") return <><span className="eyebrow">İLK SENKRONİZASYON</span><h1>Kaynak izi korunarak tamamlandı</h1><p>Cursor checkpoint, retry ve içerik hash'iyle aynı veri yeniden işlendiğinde kayıt çoğalmaz.</p><dl className="pilot-facts"><div><dt>Durum</dt><dd>Tamamlandı</dd></div><div><dt>Kaynak</dt><dd>Meta + Google</dd></div><div><dt>Tazelik</dt><dd>4 saat</dd></div></dl></>;
   if (step === "dashboard") return <><span className="eyebrow">7 GÜNLÜK GENEL BAKIŞ</span><h1>İki kanal, aynı kanonik görünüm</h1><p>Para birimi, saat dilimi ve attribution penceresi toplamların yanında görünür kalır.</p><div className="pilot-metrics"><article><span>Harcama</span><strong>{money(performance.current.spendMinor)}</strong></article><article><span>Dönüşüm</span><strong>{performance.current.conversions}</strong></article><article><span>ROAS</span><strong>{performance.current.roas?.toFixed(2)}×</strong></article></div><Link className="quiet-link" href="/dashboard">Detaylı dashboard'u aç</Link></>;
   if (step === "insights") return <><span className="eyebrow">AÇIKLANABİLİR İÇGÖRÜ</span><h1>{insights[0]?.title ?? "Güvenilir sapma bulunmadı"}</h1>{insights[0] ? <><p>{insights[0].explanation}</p><div className="pilot-proof"><strong>Kanıt ve güven</strong><span>{insights[0].evidence.metric} · eşik {insights[0].evidence.threshold} · güven %{Math.round(insights[0].confidence.score * 100)}</span></div><p><strong>Sonraki güvenli adım:</strong> {insights[0].recommendedAction}</p><nav className="feedback-actions" aria-label="İçgörü geri bildirimi"><Link href="?step=insights&feedback=helpful" aria-current={feedback === "helpful" ? "true" : undefined}>Yararlı</Link><Link href="?step=insights&feedback=unhelpful" aria-current={feedback === "unhelpful" ? "true" : undefined}>Yararsız</Link><Link href="?step=insights&feedback=acted" aria-current={feedback === "acted" ? "true" : undefined}>Aksiyon alındı</Link></nav>{feedback ? <p role="status" className="feedback-status">Geri bildirim kaydedildi: {feedback}</p> : null}</> : null}</>;
-  return <><span className="eyebrow">PAYLAŞIM</span><h1>Salt-okunur rapor hazır</h1><p>Rapor aynı dashboard snapshot'ını, tazelik ve kaynak bilgisini taşır; süreli bağlantı iptal edilebilir.</p><div className="pilot-proof"><strong>Paylaşım politikası</strong><span>read_only · 24 saat · snapshot bağlı · audit kaydı açık</span></div><Link className="primary-link" href="/reports/demo">Paylaşılan raporu aç <span aria-hidden="true">→</span></Link></>;
+  return <><span className="eyebrow">PAYLAŞIM</span><h1>Salt-okunur rapor hazır</h1><p>Rapor aynı dashboard snapshot'ını, tazelik ve kaynak bilgisini taşır; süreli bağlantı iptal edilebilir.</p><div className="pilot-proof"><strong>Paylaşım politikası</strong><span>read_only · 24 saat · snapshot bağlı · audit kaydı açık</span></div><DemoShareControls /><Link className="quiet-link" href="/reports/demo">İmzasız görsel önizlemeyi aç</Link></>;
 }
 
 export default async function PilotPage({ searchParams }: { searchParams: Promise<{ step?: string; feedback?: string }> }) {
@@ -38,6 +39,6 @@ export default async function PilotPage({ searchParams }: { searchParams: Promis
     <div className="pilot-progress" role="progressbar" aria-label="Pilot yolculuğu" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pilotProgress(step) * 100)}><span style={{ width: `${pilotProgress(step) * 100}%` }} /></div>
     <nav className="pilot-steps" aria-label="Pilot adımları">{PILOT_STEPS.map((item, index) => <Link key={item} href={`?step=${item}`} aria-current={item === step ? "step" : undefined} data-complete={index < PILOT_STEPS.indexOf(step)}>{PILOT_STEP_LABELS[item]}</Link>)}</nav>
     <section className="pilot-stage" aria-label="Aktif pilot adımı"><StepContent step={step} feedback={feedback} /></section>
-    <footer className="pilot-actions">{step !== "session" ? <Link href={`?step=${PILOT_STEPS[PILOT_STEPS.indexOf(step) - 1]}`}>← Geri</Link> : <span />}{next ? <Link className="pilot-next" href={`?step=${next}`}>{PILOT_STEP_LABELS[next]} →</Link> : <Link className="pilot-next" href="/reports/demo">Raporu görüntüle →</Link>}</footer>
+    <footer className="pilot-actions">{step !== "session" ? <Link href={`?step=${PILOT_STEPS[PILOT_STEPS.indexOf(step) - 1]}`}>← Geri</Link> : <span />}{next ? <Link className="pilot-next" href={`?step=${next}`}>{PILOT_STEP_LABELS[next]} →</Link> : <Link className="pilot-next" href="/reports/demo">Önizlemeyi görüntüle →</Link>}</footer>
   </main>;
 }

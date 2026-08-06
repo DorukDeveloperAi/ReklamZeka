@@ -19,8 +19,13 @@
 ### 2026-08-06 — rapor-ve-pilot-hazirlik
 - Yapılan: İmzalı/süreli/iptal edilebilir salt-okunur paylaşım, CSV export, dört operasyon alarmı/runbook'u ve pilot ölçüm motoru kuruldu.
 - Kullanıcı yolculuğu: `/pilot` altında demo oturumu → çalışma alanı → kaynak → sync → dashboard → içgörü/feedback → salt-okunur rapor akışı eklendi; bu yüzey fixture tabanlıdır.
+- Tarayıcı kanıtı: 1280 ve 390 px üzerinde yedi adım, feedback ve `read_only` rapor PASS; console error 0 (`docs/qa/a07-pilot-browser-evidence.json`).
+- Paylaşım yaşam döngüsü: HMAC URL oluşturma → dinamik rapor/CSV → audit bağlı iptal; geçerli rapor `200`, iptal/bozuk sayfa `404`, iptal CSV `410`. Tarayıcı sürüşünde bulunan bundle-sınırı hata tanıma regresyonu kod tabanlı guard ile kapatıldı.
+- Bearer URL sınırı: paylaşılan HTML production yanıtında `private, no-store`, `no-referrer`, `nosniff`, `DENY` frame ve `noindex` başlıkları doğrulandı.
 - Ara kanıt: `npm run check:pilot-readiness`; 3 çalışma alanı/10 hesap fixture readiness → tazelik %100, medyan aktivasyon 10,5 dk, yararlı/aksiyon %75, kritik olay 0.
 - Ek hazırlık: Gerçek hesap attestation doğrulaması, SHA-256 provenance, üzerine yazmayan rapor üreticisi ve `npm run check:field-pilot` kapısı hazırlandı.
+- Ölçüm hattı: Anonim bağlantı/dashboard/sync/feedback/güvenlik olaylarını sıra bağımsız ve idempotent biçimde saha raporu aggregate'ına dönüştüren telemetri yolu eklendi; manuel JSON fallback olarak kaldı.
+- Operasyon: `npm run pilot:field-preflight -- <input>` resmi kanıtı yazmadan aynı eşikleri ve provenance hash'ini sınar.
 - Açık kalan / bloker: Bunlar sentetik hazırlık verileridir. A07 ancak gerçek pilot `field_pilot` modunda aynı eşikleri geçtiğinde kapanabilir.
 
 ### 2026-08-06 — icgoru-motoru

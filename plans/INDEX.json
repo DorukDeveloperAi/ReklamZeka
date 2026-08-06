@@ -1,6 +1,6 @@
 {
   "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
-  "damga": "0f75b827e963",
+  "damga": "996b785824e1",
   "plans": [
     {
       "slug": "proje",
@@ -81,7 +81,7 @@
       {
         "ref": "td:chk/proje/t07.3",
         "tur": "chk",
-        "metin": "T07.3 — Gerçek 3 çalışma alanı/10 hesap saha pilotu (`field_pilot`); attestation/üretici hazır, gerçek veri bekliyor",
+        "metin": "T07.3 — Gerçek 3 çalışma alanı/10 hesap saha pilotu (`field_pilot`); fixture web yolculuğu, anonim telemetri dönüştürücüsü, attestation ve üretici hazır, gerçek veri bekliyor",
         "plan": "proje",
         "asama": "07",
         "kapatan": [],

@@ -6,6 +6,7 @@ export type AuditAction =
   | "sync.started"
   | "sync.completed"
   | "report.shared"
+  | "report.revoked"
   | "insight.feedback";
 
 export type AuditEventInput = Readonly<{

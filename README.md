@@ -10,8 +10,12 @@ hedefleyen çok kiracılı reklam karar destek ürünüdür.
   açıklanabilir içgörü motoru kanıt kapılarından geçti.
 - Meta/Google fixture adapter'ları ve CSV connector aynı sürümlü günlük metrik modeline
   idempotent akar; MVP connector sınırı salt-okunurdur.
-- `/dashboard`, `/api/dashboard` ve `/api/insights` üretim derlemesinde çalışır.
+- `/pilot`, `/dashboard`, `/reports/demo`, `/api/dashboard` ve `/api/insights` üretim derlemesinde çalışır.
+- Yedi adımlı fixture pilot yolculuğu 1280/390 px tarayıcı sürüşünden geçti; bu kanıt
+  gerçek saha pilotu olarak etiketlenmez.
 - Süreli/iptal edilebilir salt-okunur rapor, audit ve operasyon alarm çekirdeği hazırdır.
+- `REPORT_SIGNING_KEY` yapılandırıldığında pilot yüzeyi gerçek HMAC URL üretir; dinamik
+  rapor ve CSV aynı bearer tokenı doğrular, iptal sonrası erişimi reddeder.
 - A07 teknik pilot hazırlığı PASS; gerçek 3 çalışma alanı/10 hesap `field_pilot` ölçümü
   tamamlanmadan roadmap kapanmaz.
 
@@ -22,7 +26,20 @@ npm ci
 npm run dev
 ```
 
-Uygulama: `http://localhost:3000` · demo dashboard: `http://localhost:3000/dashboard`
+Uygulama: `http://localhost:3000` · pilot yolculuğu: `http://localhost:3000/pilot` ·
+demo dashboard: `http://localhost:3000/dashboard`
+
+İmzalı demo paylaşımı için `.env.local` içinde standart base64 biçiminde en az 32 byte
+anahtar tanımlayın:
+
+```bash
+openssl rand -base64 32
+```
+
+Üretilen değeri `REPORT_SIGNING_KEY` olarak kaydedin. Aynı deployment'ın tüm replica'ları
+aynı anahtarı kullanmalıdır; anahtar rotasyonu mevcut bağlantıları geçersiz kılar. Demo
+runtime'ındaki iptal listesi süreç-içidir; kalıcı production iptali ADR-0005 uyarınca
+veritabanı kaydı gerektirir.
 
 ## Kaynaklar
 
@@ -42,6 +59,7 @@ npm run check:data
 npm run check:security-boundaries
 npm run check:experience
 npm run check:insights
+npm run check:pilot-web
 npm run check:pilot-readiness
 npm run build
 npm run check:security
@@ -50,9 +68,12 @@ npm run check:security
 Gerçek pilot özeti üretimi:
 
 ```bash
+npm run pilot:field-preflight -- path/to/field-input.json
 npm run pilot:field-report -- path/to/field-input.json docs/qa/field-pilot.json
 npm run check:field-pilot
 ```
 
 Ham pilot girdisi repoya alınmaz. Şema ve attestation talimatı
 [`docs/pilot/README.md`](docs/pilot/README.md) içindedir.
+Önerilen telemetri yolu, anonim bağlantı/dashboard/sync/feedback/güvenlik olaylarını
+deterministik aggregate ölçülere dönüştürür; manuel aggregate şablonu yalnız fallback'tir.

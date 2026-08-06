@@ -116,6 +116,19 @@ tbody th { font-size: .92rem; }
 .pilot-metrics article { padding: 22px; }
 .pilot-metrics strong { display: block; margin-top: 18px; font-size: clamp(1.8rem, 4vw, 3rem); letter-spacing: -.045em; }
 .pilot-stage > .quiet-link { display: inline-block; margin-top: 24px; }
+.share-controls { max-width: 760px; margin-top: 28px; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+.share-controls h2 { margin: 0 0 10px; font-size: 1rem; }
+.share-controls > p { color: var(--muted); line-height: 1.5; }
+.share-controls button { padding: 11px 14px; border: 0; border-radius: 10px; color: #10120d; background: var(--lime); font: inherit; font-weight: 750; cursor: pointer; }
+.share-controls button:disabled { cursor: wait; opacity: .62; }
+.share-result { display: grid; gap: 14px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.share-result > span { color: var(--muted); font-size: .86rem; }
+.share-result nav, .report-footer nav { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.share-result a { color: var(--ink); text-underline-offset: 4px; }
+.share-controls .danger-button { color: #ffd7d4; border: 1px solid rgba(255, 105, 97, .5); background: rgba(255, 105, 97, .08); }
+.share-message { margin-bottom: 0; color: var(--lime) !important; }
+.share-message[role="alert"] { color: #ff938b !important; }
+.share-controls button:focus-visible, .share-result a:focus-visible { outline: 3px solid var(--lime); outline-offset: 3px; }
 .feedback-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
 .feedback-actions a { padding: 9px 13px; border: 1px solid var(--line); border-radius: 99px; color: var(--muted); text-decoration: none; }
 .feedback-actions a[aria-current="true"] { color: #10120d; border-color: var(--lime); background: var(--lime); }
@@ -133,6 +146,8 @@ tbody th { font-size: .92rem; }
 .report-insights small { color: #77786f; overflow-wrap: anywhere; }
 .report-footer { margin-top: 52px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); }
 .report-footer a { color: var(--ink); }
+.report-unavailable { max-width: 850px; }
+.report-unavailable > p { max-width: 680px; color: var(--muted); font-size: 1.15rem; }
 
 @media (max-width: 760px) {
   .pilot-shell, .report-shell { width: min(100% - 28px, 1120px); padding-top: 24px; }
@@ -141,5 +156,7 @@ tbody th { font-size: .92rem; }
   .pilot-stage { min-height: 490px; padding-top: 54px; }
   .pilot-facts, .source-grid, .pilot-metrics { grid-template-columns: 1fr; }
   .pilot-facts div { min-width: 0; }
+  .report-source { flex-direction: column; }
   .report-header, .report-footer { align-items: flex-start; flex-direction: column; }
+  .share-result nav, .report-footer nav { align-items: flex-start; flex-direction: column; }
 }

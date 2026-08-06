@@ -54,4 +54,18 @@ describe("field pilot input", () => {
     ];
     expect(() => validateFieldPilotInput({ ...validInput(), workspaces: invalidWorkspaces })).toThrow(/yinelenen account id/);
   });
+
+  it("rejects identifying IDs and timestamps outside the measurement window", () => {
+    expect(() => validateFieldPilotInput({
+      ...validInput(),
+      workspaces: [{ ...workspaces[0]!, id: "client@example.com" }, ...workspaces.slice(1)],
+    })).toThrow(/anonim kimlik/);
+    expect(() => validateFieldPilotInput({
+      ...validInput(),
+      workspaces: [{
+        ...workspaces[0]!,
+        accounts: [{ ...workspaces[0]!.accounts[0]!, lastSyncedAt: "2026-08-06T09:00:00Z" }, ...workspaces[0]!.accounts.slice(1)],
+      }, ...workspaces.slice(1)],
+    })).toThrow(/lastSyncedAt bağlantıdan önce/);
+  });
 });

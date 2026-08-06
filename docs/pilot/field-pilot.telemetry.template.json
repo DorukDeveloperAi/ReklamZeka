@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "mode": "field_pilot",
+  "asOf": "YYYY-MM-DDTHH:mm:ssZ",
+  "attestation": {
+    "preparedBy": "Gerçek veriyi doğrulayan ekip kimliği",
+    "preparedAt": "YYYY-MM-DDTHH:mm:ssZ",
+    "sourceDescription": "Anonim production/pilot telemetri dışa aktarımı",
+    "confirmsRealAccounts": false
+  },
+  "events": []
+}

@@ -31,9 +31,13 @@ Temiz ortamda migration → seed/connector → dashboard → içgörü → feedb
 
 ## Ara kapanış kanıtı
 
-- T07.1 tamam: imzalı, süreli, iptal edilebilir salt-okunur paylaşım ve CSV sözleşmesi.
+- T07.1 tamam: ortam anahtarıyla imzalı, süreli, iptal edilebilir dinamik salt-okunur
+  paylaşım ve aynı tokenı doğrulayan CSV yüzeyi; iptal/bozuk imza HTTP sınırları kanıtlı.
 - T07.2 tamam: dört alarm, açık/çözüldü geçişi ve `docs/RUNBOOKS.md`.
 - T07.3 teknik hazırlık tamam: `fixture_readiness` modunda 3 çalışma alanı/10 hesap eşikleri PASS.
-- Girişten rapora yedi adımlı fixture yolculuğu `/pilot` altında hazır; ayrı yapısal/test kapısı `npm run check:pilot-web`.
+- Girişten rapora yedi adımlı fixture yolculuğu `/pilot` altında hazır; ayrı kapı `npm run check:pilot-web` ve 1280/390 tarayıcı kanıtı `docs/qa/a07-pilot-browser-evidence.json`.
 - Field pilot attestation şeması, rapor üreticisi ve `check:field-pilot` kapısı hazır.
+- Anonim saha telemetrisi bağlantı/dashboard/sync/feedback/güvenlik olaylarından deterministik,
+  idempotent pilot aggregate'ı üretir; e-posta biçimli/sözleşme dışı kimlik ve eksik olay zinciri reddedilir.
+- Yazma yapmayan `pilot:field-preflight` eşikleri resmi, üzerine yazılmaz kanıt üretilmeden sınar.
 - Açık: aynı ölçüm gerçek kullanıcı verisiyle `field_pilot` modunda koşmadan A07 kapanmaz.

@@ -4,7 +4,7 @@ import type { Insight } from "@/insights/schema";
 import { authorizeWorkspace, type Actor, type WorkspaceMembership } from "@/security/authorization";
 import type { AppendOnlyAuditLog } from "@/security/audit";
 
-type ShareClaims = Readonly<{
+export type ShareClaims = Readonly<{
   shareId: string;
   workspaceId: string;
   snapshotId: string;
@@ -17,6 +17,17 @@ export class ShareLinkError extends Error {
     super(message);
     this.name = "ShareLinkError";
   }
+}
+
+const SHARE_ERROR_CODES = new Set(["invalid", "expired", "revoked", "snapshot_mismatch"]);
+
+export function isShareLinkError(error: unknown): error is ShareLinkError {
+  return error instanceof ShareLinkError || Boolean(
+    error && typeof error === "object"
+    && (error as { name?: unknown }).name === "ShareLinkError"
+    && typeof (error as { code?: unknown }).code === "string"
+    && SHARE_ERROR_CODES.has((error as { code: string }).code),
+  );
 }
 
 function signature(payload: string, secret: Buffer): string {
@@ -83,6 +94,28 @@ export class ShareLinkService {
 
   revoke(shareId: string): void {
     this.revoked.add(shareId);
+  }
+
+  revokeAuthorized(
+    actor: Actor,
+    memberships: readonly WorkspaceMembership[],
+    audit: AppendOnlyAuditLog,
+    token: string,
+    now: string,
+  ): ShareClaims {
+    const claims = this.verify(token, now);
+    authorizeWorkspace(actor, claims.workspaceId, "report:share", memberships);
+    this.revoke(claims.shareId);
+    audit.append({
+      workspaceId: claims.workspaceId,
+      actorId: actor.userId,
+      action: "report.revoked",
+      resourceType: "report_share",
+      resourceId: claims.shareId,
+      occurredAt: now,
+      metadata: { snapshotId: claims.snapshotId, access: "read_only" },
+    });
+    return claims;
   }
 }
 
