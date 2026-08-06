@@ -4,15 +4,20 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const adrPath = resolve(root, "docs/ADR/0001-teknik-temel.md");
+const adrPaths = [
+  resolve(root, "docs/ADR/0001-teknik-temel.md"),
+  resolve(root, "docs/ADR/0002-kanonik-reklam-verisi.md"),
+];
 const migrationDir = resolve(root, "drizzle");
 const failures = [];
 
-if (!existsSync(adrPath)) failures.push("ADR-0001 yok");
-else {
-  const adr = readFileSync(adrPath, "utf8");
-  for (const heading of ["## Bağlam", "## Karar", "## Gerekçe", "## Alternatifler", "## Sonuçlar"]) {
-    if (!adr.includes(heading)) failures.push(`ADR bölümü eksik: ${heading}`);
+for (const adrPath of adrPaths) {
+  if (!existsSync(adrPath)) failures.push(`ADR yok: ${adrPath}`);
+  else {
+    const adr = readFileSync(adrPath, "utf8");
+    for (const heading of ["## Bağlam", "## Karar", "## Gerekçe", "## Alternatifler", "## Sonuçlar"]) {
+      if (!adr.includes(heading)) failures.push(`ADR bölümü eksik (${adrPath}): ${heading}`);
+    }
   }
 }
 
@@ -22,6 +27,11 @@ for (const rel of [
   "src/db/schema.ts",
   "tests/health.test.ts",
   "tests/schema.test.ts",
+  "tests/data-platform.test.ts",
+  "src/domain/ads/canonical.ts",
+  "src/connectors/contract.ts",
+  "src/connectors/csv.ts",
+  "src/ingest/run-ingest.ts",
   ".github/workflows/ci.yml",
   "drizzle.config.ts",
 ]) {

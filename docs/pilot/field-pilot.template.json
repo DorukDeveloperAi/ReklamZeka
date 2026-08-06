@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "mode": "field_pilot",
+  "asOf": "YYYY-MM-DDTHH:mm:ssZ",
+  "attestation": {
+    "preparedBy": "Gerçek veriyi doğrulayan kişi/ekip",
+    "preparedAt": "YYYY-MM-DDTHH:mm:ssZ",
+    "sourceDescription": "Verinin alındığı production/pilot sistemleri",
+    "confirmsRealAccounts": false
+  },
+  "workspaces": []
+}

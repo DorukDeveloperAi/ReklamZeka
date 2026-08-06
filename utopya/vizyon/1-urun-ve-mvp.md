@@ -9,7 +9,7 @@
 
 **Kabul:** Bir pilot kullanıcı iki farklı kaynak hesabını aynı çalışma alanında görürken müşteri sınırları karışmadan son 7/30/90 gün performansını karşılaştırabilir.
 
-▸ bugün nerede: ürün kodu yok; bu gereksinim ana roadmap'e bağlandı.
+▸ bugün nerede: fixture tabanlı pilot yolculuğu ve çok kaynaklı dashboard hazır; gerçek pilot üyelikleri ve canlı hesap verisi bekliyor.
 
 <!-- uy:urun-ve-mvp/veri-sozlesmesi -->
 ## Veri toplama ve ortak model
@@ -21,7 +21,7 @@
 
 **Kabul:** Aynı fixture iki kez işlendiğinde kanonik kayıt sayısı değişmez; türetilen metrikler beklenen formüllerle eşleşir.
 
-▸ bugün nerede: connector ve kanonik şema henüz yok.
+▸ bugün nerede: Meta/Google fixture adapter'ları, CSV fallback, kanonik şema ve idempotent ingest hazır; canlı OAuth/API bağlantıları pilot ortamında bağlanacak.
 
 <!-- uy:urun-ve-mvp/icgoru-sozlesmesi -->
 ## İçgörü ve öneri sözleşmesi
@@ -32,7 +32,7 @@
 
 **Kabul:** Her öneri aynı veri snapshot'ı ve hesaplama sürümüyle yeniden üretilebilir; kaynağı olmayan öneri şema kapısından geçemez.
 
-▸ bugün nerede: karar sözleşmesi tanımlı, motor yok.
+▸ bugün nerede: dört deterministik kural, kaynak/güven/sürüm kanıtı, API görünümü ve idempotent feedback hazır.
 
 <!-- uy:urun-ve-mvp/deneyim -->
 ## MVP kullanıcı deneyimi
@@ -43,7 +43,7 @@
 
 **Kabul:** Temel pilot senaryosu otomatik tarayıcı testiyle girişten paylaşılabilir rapora kadar tamamlanır.
 
-▸ bugün nerede: uygulama yüzeyi yok.
+▸ bugün nerede: yedi adımlı fixture pilot yüzeyi, responsive dashboard, veri durumları, içgörü/feedback ve salt-okunur demo rapor hazır; canlı giriş ve bağlantı kurulumu saha ortamında bağlanacak.
 
 <!-- uy:urun-ve-mvp/guvenlik -->
 ## Güvenlik ve denetlenebilirlik
@@ -54,7 +54,7 @@
 
 **Kabul:** Yetkisiz kiracı erişimi entegrasyon testlerinde reddedilir; sır taraması fixture tokenlarının log ve hata çıktısına sızmadığını kanıtlar.
 
-▸ bugün nerede: güvenlik ilkeleri tanımlı, uygulama yok.
+▸ bugün nerede: merkezi tenant policy, şifreli sır kasası, redaksiyon ve hash-zincirli audit sınırı hazır; canlı IdP/PostgreSQL RLS entegrasyonu pilot ortamına ait.
 
 <!-- uy:urun-ve-mvp/pilot-basari -->
 ## Pilot başarı ölçütleri
@@ -66,4 +66,4 @@
 
 **Kabul:** Pilot ölçüm raporu veri tazeliği, aktivasyon süresi, öneri geri bildirimi ve açık güvenlik olaylarını çalışma alanı bazında gösterir.
 
-▸ bugün nerede: ölçüm altyapısı ve pilot yok.
+▸ bugün nerede: fixture readiness 3 çalışma alanı/10 hesap için eşikleri geçiyor; attestation, rapor üreticisi ve saha kapısı hazır, fakat gerçek kullanıcı pilotu henüz koşmadı.

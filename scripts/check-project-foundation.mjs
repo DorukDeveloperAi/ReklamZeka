@@ -46,7 +46,11 @@ if (failures.length === 0) {
   const state = text("plans/proje/v1/STATE.md");
   if (!/\| 01 \| ürün temeli \| KAPALI \|/.test(state)) failures.push("roadmap aşama 01 kapanmamış");
   if (!/\| 02 \| teknik temel \| KAPALI \|/.test(state)) failures.push("roadmap aşama 02 kapanmamış");
-  if (!/\| 03 \| veri platformu \| AÇIK \|/.test(state)) failures.push("roadmap sıradaki aşama 03 değil");
+  for (const phase of ["03", "04", "05", "06", "07"]) {
+    if (!new RegExp(`\\| ${phase} \\| .+ \\| (AÇIK|KAPALI|BLOKE) \\|`).test(state)) {
+      failures.push(`roadmap aşama ${phase} durum satırı eksik`);
+    }
+  }
 
   const evidence = JSON.parse(text(".claude/kanit.json"));
   if (!Array.isArray(evidence.girisler) || !evidence.girisler.some((x) => x.ad === "urun-temeli")) {

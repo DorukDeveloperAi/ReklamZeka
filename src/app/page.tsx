@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const principles = [
   ["Birleşik görünüm", "Meta Ads ve Google Ads verisini kaynak bağını kaybetmeden ortak metriklerde karşılaştır."],
   ["Açıklanabilir içgörü", "Her sapmanın zaman aralığını, karşılaştırmasını, güvenini ve kanıtını gör."],
@@ -16,7 +18,11 @@ export default function Home() {
         </p>
         <div className="status" role="status">
           <span className="pulse" aria-hidden="true" />
-          Ürün temeli hazır · Teknik altyapı kuruluyor
+          Teknik MVP hazır · Kontrollü saha pilotu sırada
+        </div>
+        <div className="hero-actions">
+          <Link className="primary-link" href="/pilot">Pilot yolculuğunu başlat <span aria-hidden="true">→</span></Link>
+          <Link className="quiet-link" href="/dashboard">Doğrudan dashboard'u aç</Link>
         </div>
       </section>
 

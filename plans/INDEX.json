@@ -1,6 +1,6 @@
 {
   "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
-  "damga": "c7d890617a53",
+  "damga": "0f75b827e963",
   "plans": [
     {
       "slug": "proje",
@@ -20,63 +20,30 @@
         "oturum": "ot:2026-08-06/reklamzeka-baslangic"
       },
       "asamaToplam": 7,
-      "asamaKapali": 2,
-      "checklistAcik": 9,
-      "checklistKapali": 8,
+      "asamaKapali": 6,
+      "checklistAcik": 6,
+      "checklistKapali": 26,
       "sonTur": {
-        "baslik": "2026-08-06 — teknik-temel",
-        "yapilan": "ADR-0001, Next.js 16 App Router uygulaması, health API, PostgreSQL/Drizzle başlangıç şeması, migration, Vitest ve GitHub Actions hızlı kapısı kuruldu."
+        "baslik": "2026-08-06 — rapor-ve-pilot-hazirlik",
+        "yapilan": "İmzalı/süreli/iptal edilebilir salt-okunur paylaşım, CSV export, dört operasyon alarmı/runbook'u ve pilot ölçüm motoru kuruldu."
       },
       "siradaki": {
-        "no": "03",
-        "ad": "veri platformu"
+        "no": "07",
+        "ad": "rapor ve pilot"
       },
-      "goal": "/goal plans/proje/v1/asama-03-veri-platformu.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
+      "goal": "/goal plans/proje/v1/asama-07-rapor-ve-pilot.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
       "depli": true,
       "hazir": [
         {
-          "no": "03",
-          "ad": "veri platformu",
-          "goal": "/goal plans/proje/v1/asama-03-veri-platformu.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
-          "kosum": {
-            "tur": "tek-ajan"
-          }
-        },
-        {
-          "no": "04",
-          "ad": "kiracı güvenliği",
-          "goal": "/goal plans/proje/v1/asama-04-kiraci-guvenligi.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
-          "kosum": {
-            "tur": "tek-ajan"
-          }
-        }
-      ],
-      "bekleyen": [
-        {
-          "no": "05",
-          "ad": "performans deneyimi",
-          "bekledigi": [
-            "03",
-            "04"
-          ]
-        },
-        {
-          "no": "06",
-          "ad": "içgörü motoru",
-          "bekledigi": [
-            "03",
-            "04"
-          ]
-        },
-        {
           "no": "07",
           "ad": "rapor ve pilot",
-          "bekledigi": [
-            "05",
-            "06"
-          ]
+          "goal": "/goal plans/proje/v1/asama-07-rapor-ve-pilot.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
+          "kosum": {
+            "tur": "tek-ajan"
+          }
         }
       ],
+      "bekleyen": [],
       "baslangiclar": [
         "01"
       ],
@@ -85,9 +52,9 @@
   ],
   "legacy": [],
   "todo": {
-    "acik": 9,
+    "acik": 6,
     "kaynak": {
-      "chk": 9,
+      "chk": 6,
       "elle": 0,
       "hukum": 0,
       "kunye": 0,
@@ -102,49 +69,19 @@
     ],
     "maddeler": [
       {
-        "ref": "td:chk/proje/a03",
-        "tur": "chk",
-        "metin": "**A03** İdempotent kanonik reklam veri akışı.",
-        "plan": "proje",
-        "asama": "03",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/a04",
-        "tur": "chk",
-        "metin": "**A04** Kimlik, üyelik, sır ve audit sınırları.",
-        "plan": "proje",
-        "asama": "04",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/a05",
-        "tur": "chk",
-        "metin": "**A05** Kaynaklı ve taze dashboard deneyimi.",
-        "plan": "proje",
-        "asama": "05",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/a06",
-        "tur": "chk",
-        "metin": "**A06** Açıklanabilir, sürümlü öneri motoru.",
-        "plan": "proje",
-        "asama": "06",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
         "ref": "td:chk/proje/a07",
         "tur": "chk",
         "metin": "**A07** Paylaşım, geri bildirim, gözlem ve pilot raporu.",
+        "plan": "proje",
+        "asama": "07",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/t07.3",
+        "tur": "chk",
+        "metin": "T07.3 — Gerçek 3 çalışma alanı/10 hesap saha pilotu (`field_pilot`); attestation/üretici hazır, gerçek veri bekliyor",
         "plan": "proje",
         "asama": "07",
         "kapatan": [],

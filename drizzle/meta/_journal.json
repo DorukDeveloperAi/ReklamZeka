@@ -8,6 +8,34 @@
       "when": 1786030070524,
       "tag": "20260806152750_tough_blazing_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786031396914,
+      "tag": "20260806154956_slippery_johnny_blaze",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786031612416,
+      "tag": "20260806155332_vengeful_chimera",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786032617903,
+      "tag": "20260806161017_free_rocket_racer",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786032848806,
+      "tag": "20260806161408_boring_cable",
+      "breakpoints": true
     }
   ]
 }

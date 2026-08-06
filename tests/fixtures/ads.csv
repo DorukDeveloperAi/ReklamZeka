@@ -1,0 +1,2 @@
+source_row_id,source_updated_at,account_id,account_name,campaign_id,campaign_name,metric_date,currency,timezone,attribution_model,attribution_click_days,attribution_view_days,spend,impressions,clicks,conversions,conversion_value
+csv-row-2026-08-01,2026-08-02T03:00:00.000Z,csv-account-1,"Ana, Hesap",csv-campaign-1,Yaz Kampanyası,2026-08-01,TRY,Europe/Istanbul,last_click,7,0,123.45,10000,250,12.5,456.78

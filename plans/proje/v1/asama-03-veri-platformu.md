@@ -4,6 +4,7 @@ kosum: tek-ajan
 # Aşama 03 — Veri platformu (v1)
 
 > Roadmap: [MASTER.md](MASTER.md) · Bağımlı: 02
+> Durum: **KAPALI** · 2026-08-06
 
 ## SONUÇ
 
@@ -27,3 +28,10 @@ kanonik modele idempotent akar; tazelik ve senkronizasyon hataları ölçülür.
 ## Doğrulama
 
 Kanonik metrik golden fixture'ları, idempotency, retry ve gecikmiş veri senaryoları tam kanıt girişine bağlanır.
+
+## Kapanış kanıtı
+
+- `npm run check:data` — 2 dosya / 6 test, Drizzle şema kontrolü temiz.
+- `npm run check:quick` — foundation, mimari, typecheck ve 3 dosya / 7 test temiz.
+- `drizzle/20260806154956_slippery_johnny_blaze.sql` — hesap, kampanya, günlük metrik ve sync run kalıcılık sözleşmesi.
+- `docs/ADR/0002-kanonik-reklam-verisi.md` — grain, para, attribution, salt-okunur scope ve idempotency kararları.

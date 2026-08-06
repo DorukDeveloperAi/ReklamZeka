@@ -20,6 +20,42 @@
       "timeoutSn": 300
     },
     {
+      "ad": "veri-platformu",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:data"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "kiraci-guvenligi",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:security-boundaries"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "performans-deneyimi",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:experience"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "icgoru-motoru",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:insights"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "pilot-web-yolculugu",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:pilot-web"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "pilot-hazirlik",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:pilot-readiness"],
+      "timeoutSn": 120
+    },
+    {
       "ad": "production-audit",
       "sinif": "tam",
       "cmd": ["npm", "run", "check:security"],

@@ -1,0 +1,24 @@
+[
+  [
+    {
+      "id": "google-row-2026-08-01",
+      "updatedAt": "2026-08-02T03:00:00.000Z",
+      "payload": {
+        "customer_id": "google-account-1",
+        "customer_name": "Ana Hesap",
+        "campaign_id": "google-campaign-1",
+        "campaign_name": "Yaz Kampanyası",
+        "segments_date": "2026-08-01",
+        "currency_code": "TRY",
+        "timezone": "Europe/Istanbul",
+        "cost_micros": "123450000",
+        "impressions": "10000",
+        "clicks": "250",
+        "conversions": "12.5",
+        "conversions_value_micros": "456780000",
+        "attribution_model": "data_driven",
+        "attribution_click_days": "7"
+      }
+    }
+  ]
+]

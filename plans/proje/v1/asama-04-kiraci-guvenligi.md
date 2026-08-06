@@ -4,6 +4,7 @@ kosum: tek-ajan
 # Aşama 04 — Kiracı güvenliği (v1)
 
 > Roadmap: [MASTER.md](MASTER.md) · Bağımlı: 02
+> Durum: **KAPALI** · 2026-08-06
 
 ## SONUÇ
 
@@ -27,3 +28,10 @@ olayları sunucu tarafı sınırlarla korunur; çapraz kiracı ve sır sızınt�
 ## Doğrulama
 
 Yetki matrisi, tenant escape, secret scan ve audit bütünlüğü tek tam kanıt kümesinde çalışır.
+
+## Kapanış kanıtı
+
+- `npm run check:security-boundaries` — yapısal kapı, 2 dosya / 7 test ve Drizzle kontrolü temiz.
+- `tests/security-boundaries.test.ts` — rol matrisi, çapraz kiracı, şifreleme, scope, redaksiyon ve audit hash zinciri.
+- `drizzle/20260806155332_vengeful_chimera.sql` — şifreli sır ve append-only audit kalıcılığı.
+- `docs/ADR/0003-kiraci-ve-sir-guvenligi.md` — sunucu policy, AES-256-GCM, scope ve audit kararları.

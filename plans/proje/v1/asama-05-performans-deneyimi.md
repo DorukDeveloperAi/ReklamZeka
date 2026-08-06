@@ -4,6 +4,7 @@ kosum: tek-ajan
 # Aşama 05 — Performans deneyimi (v1)
 
 > Roadmap: [MASTER.md](MASTER.md) · Bağımlı: 03, 04
+> Durum: **KAPALI** · 2026-08-06
 
 ## SONUÇ
 
@@ -27,3 +28,10 @@ karşılaştırmayı, para birimini, attribution'ı ve veri tazeliğini erişile
 ## Doğrulama
 
 Fixture tabanlı tarayıcı senaryosu girişten kampanya detayına kadar ekran görüntüsü ve JSON kanıtı üretir.
+
+## Kapanış kanıtı
+
+- `npm run check:experience` — yedi durum fixture'ı ve kanonik/API golden testleri temiz.
+- `docs/qa/a05-browser-evidence.json` — 1280/820/390 viewport, erişilebilir roller,
+  tablo taşması ve hata kurtarma etkileşimi PASS.
+- `npm run build` — `/dashboard` ile `/api/dashboard` production derlemesinde temiz.
