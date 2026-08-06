@@ -10,10 +10,10 @@ const required = [
   "utopya/KUZEY.md",
   "utopya/KURALLAR.md",
   "utopya/vizyon/1-urun-ve-mvp.md",
-  "plans/proje/v1/MASTER.md",
-  "plans/proje/v1/CHECKLIST.md",
-  "plans/proje/v1/REQUIREMENTS.md",
-  "plans/proje/v1/STATE.md",
+  "plans/proje/v2/MASTER.md",
+  "plans/proje/v2/CHECKLIST.md",
+  "plans/proje/v2/REQUIREMENTS.md",
+  "plans/proje/v2/STATE.md",
   ".claude/kanit.json",
 ];
 
@@ -43,11 +43,16 @@ if (failures.length === 0) {
   }
   if (/\*\(İlk vizyon koşusunda doldurulur/.test(text("utopya/KUZEY.md"))) failures.push("KUZEY amaç alanı hâlâ placeholder");
 
-  const state = text("plans/proje/v1/STATE.md");
+  const state = text("plans/proje/v2/STATE.md");
   if (!/\| 01 \| ürün temeli \| KAPALI \|/.test(state)) failures.push("roadmap aşama 01 kapanmamış");
   if (!/\| 02 \| teknik temel \| KAPALI \|/.test(state)) failures.push("roadmap aşama 02 kapanmamış");
   for (const phase of ["03", "04", "05", "06", "07"]) {
-    if (!new RegExp(`\\| ${phase} \\| .+ \\| (AÇIK|KAPALI|BLOKE) \\|`).test(state)) {
+    if (!new RegExp(`\\| ${phase} \\| .+ \\| (AÇIK|DEVAM|KAPALI|BLOKE) \\|`).test(state)) {
+      failures.push(`roadmap aşama ${phase} durum satırı eksik`);
+    }
+  }
+  for (const phase of ["08", "09", "10", "11", "12", "13", "14"]) {
+    if (!new RegExp(`\\| ${phase} \\| .+ \\| (AÇIK|DEVAM|KAPALI|BLOKE) \\|`).test(state)) {
       failures.push(`roadmap aşama ${phase} durum satırı eksik`);
     }
   }

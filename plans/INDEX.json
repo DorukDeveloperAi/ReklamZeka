@@ -1,48 +1,91 @@
 {
   "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
-  "damga": "d372cc9fdddb",
+  "damga": "cb9d35877304",
   "plans": [
     {
       "slug": "proje",
       "v": 2,
-      "title": "ReklamZeka Analiz Platformu",
+      "title": "ReklamZeka Meta Reklam İşletim Sistemi",
       "kategori": "proje",
       "ust": null,
-      "durum": "?",
+      "durum": "SÜRÜYOR",
       "kunye": {
-        "hedef": null,
+        "hedef": "ReklamZeka; Meta portföyünü doğru bağlamda anlayan, kullanıcı",
         "kritiklik": "yüksek",
         "aciliyet": "normal",
         "hacim": "epik",
         "oncelik": 2,
         "puan": 9,
-        "eksik": [
-          "Hedef"
-        ],
-        "oturum": null
+        "eksik": [],
+        "oturum": "ot:2026-08-06/reklamzeka-baslangic"
       },
-      "asamaToplam": 0,
-      "asamaKapali": 0,
-      "checklistAcik": 20,
-      "checklistKapali": 0,
+      "asamaToplam": 14,
+      "asamaKapali": 6,
+      "checklistAcik": 71,
+      "checklistKapali": 14,
       "sonTur": null,
-      "siradaki": null,
-      "goal": null,
-      "depli": false,
-      "hazir": [],
-      "bekleyen": [],
-      "baslangiclar": [],
+      "siradaki": {
+        "no": "08",
+        "ad": "Meta dijital ikizi"
+      },
+      "goal": "/goal plans/proje/v2/asama-08-meta-dijital-ikizi.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
+      "depli": true,
+      "hazir": [
+        {
+          "no": "08",
+          "ad": "Meta dijital ikizi",
+          "goal": "/goal plans/proje/v2/asama-08-meta-dijital-ikizi.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
+          "kosum": {
+            "tur": "tek-ajan"
+          }
+        }
+      ],
+      "bekleyen": [
+        {
+          "no": "09",
+          "ad": "kategori ve talimat",
+          "bekledigi": [
+            "08"
+          ]
+        },
+        {
+          "no": "11",
+          "ad": "bütçe planlama",
+          "bekledigi": [
+            "09",
+            "10"
+          ]
+        },
+        {
+          "no": "13",
+          "ad": "eylem valfi ve rutin",
+          "bekledigi": [
+            "10–12"
+          ]
+        },
+        {
+          "no": "14",
+          "ad": "kontrol merkezi",
+          "bekledigi": [
+            "07",
+            "09–13"
+          ]
+        }
+      ],
+      "baslangiclar": [
+        "01"
+      ],
       "master": "plans/proje/v2/MASTER.md"
     }
   ],
   "legacy": [],
   "todo": {
-    "acik": 21,
+    "acik": 71,
     "kaynak": {
-      "chk": 20,
+      "chk": 71,
       "elle": 0,
       "hukum": 0,
-      "kunye": 1,
+      "kunye": 0,
       "oturum": 0
     },
     "muaf": [
@@ -54,214 +97,714 @@
     ],
     "maddeler": [
       {
-        "ref": "td:chk/proje/hd782e7",
+        "ref": "td:chk/proje/a07",
         "tur": "chk",
-        "metin": "Sürümlü şablon ve draft/published/archived yaşam döngüsü",
-        "plan": "proje",
-        "asama": "01",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h6a8f89",
-        "tur": "chk",
-        "metin": "Güvenli kural DSL ve negatif parser matrisi",
-        "plan": "proje",
-        "asama": "01",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/he93c16",
-        "tur": "chk",
-        "metin": "Rolling/fixed/calendar timeframe + comparison resolver",
-        "plan": "proje",
-        "asama": "01",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/hcfd66e",
-        "tur": "chk",
-        "metin": "Workspace rol policy ve audit olayları",
-        "plan": "proje",
-        "asama": "01",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/he095e2",
-        "tur": "chk",
-        "metin": "Schedule sözleşmesi ve IANA timezone doğrulaması",
-        "plan": "proje",
-        "asama": "02",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h678768",
-        "tur": "chk",
-        "metin": "DST/misfire/concurrency politikası",
-        "plan": "proje",
-        "asama": "02",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h75b646",
-        "tur": "chk",
-        "metin": "İdempotent run ledger ve retry sınıfları",
-        "plan": "proje",
-        "asama": "02",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h3e48f5",
-        "tur": "chk",
-        "metin": "Manuel run ile scheduled run aynı yürütücüyü kullanır",
-        "plan": "proje",
-        "asama": "02",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/hee1137",
-        "tur": "chk",
-        "metin": "Narrative-only prompt envelope",
-        "plan": "proje",
-        "asama": "03",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h8d143f",
-        "tur": "chk",
-        "metin": "Finding bağlı çıktı şeması ve claim validator",
-        "plan": "proje",
-        "asama": "03",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h1b2ca7",
-        "tur": "chk",
-        "metin": "Injection/secret/tool/tenant negatif matrisi",
-        "plan": "proje",
-        "asama": "03",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/haefd9f",
-        "tur": "chk",
-        "metin": "Model, prompt ve sampling sürüm kaydı",
-        "plan": "proje",
-        "asama": "03",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h19647c",
-        "tur": "chk",
-        "metin": "Şablon liste/editör/dry-run/yayın akışı",
-        "plan": "proje",
-        "asama": "04",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/hd323ee",
-        "tur": "chk",
-        "metin": "Timeframe, comparison ve schedule editörü",
-        "plan": "proje",
-        "asama": "04",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h8b9ce6",
-        "tur": "chk",
-        "metin": "Run geçmişi, durum, hata ve yeniden çalıştırma",
-        "plan": "proje",
-        "asama": "04",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h43c0fb",
-        "tur": "chk",
-        "metin": "Responsive/a11y browser E2E",
-        "plan": "proje",
-        "asama": "04",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h68d663",
-        "tur": "chk",
-        "metin": "Kota, alarm, runbook ve maliyet guardrail'leri",
-        "plan": "proje",
-        "asama": "05",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h838d34",
-        "tur": "chk",
-        "metin": "Migration/backfill ve feature flag",
-        "plan": "proje",
-        "asama": "05",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h550965",
-        "tur": "chk",
-        "metin": "Güvenlik ve production build kapıları",
-        "plan": "proje",
-        "asama": "05",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/hc88b1d",
-        "tur": "chk",
-        "metin": "Kontrollü workspace rollout ve feedback raporu",
-        "plan": "proje",
-        "asama": "05",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:kunye/proje",
-        "tur": "kunye",
-        "metin": "proje v2 — künye eksik: Hedef",
+        "metin": "**A07 — rapor ve saha pilotu**",
         "plan": "proje",
         "asama": null,
         "kapatan": [],
         "kapatAdayi": false,
-        "onar": "plans/proje/v2/MASTER.md üst bloğuna ekle: Hedef: <tek cümle>"
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h20b84a",
+        "tur": "chk",
+        "metin": "Gerçek 3 workspace/10 hesap `field_pilot` kanıtı.",
+        "plan": "proje",
+        "asama": null,
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h16c55a",
+        "tur": "chk",
+        "metin": "Secret reference/migration ve read/write scope ayrımı.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h871fea",
+        "tur": "chk",
+        "metin": "Account/campaign/adset/ad/creative tam entity şeması ve raw provenance.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h142d75",
+        "tur": "chk",
+        "metin": "Multi-business connection, account group ve account-level permission/capability modeli.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hf4f8bc",
+        "tur": "chk",
+        "metin": "Facebook Page, Instagram, pixel/dataset, app/WhatsApp destination asset graph.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h1dd69c",
+        "tur": "chk",
+        "metin": "Meta config, targeting özeti, budget owner ve legacy objective mapping.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h0abde7",
+        "tur": "chk",
+        "metin": "Geniş metrik/action/action-value/breakdown kataloğu.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hb95318",
+        "tur": "chk",
+        "metin": "Inventory/creative/insights parçalı sync, adaptive page/date slice ve resume.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd9b688",
+        "tur": "chk",
+        "metin": "Snapshot diff ve external/manual intervention timeline olayı.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h1b5b8d",
+        "tur": "chk",
+        "metin": "Capability/data-quality raporu ve Meta read-only E2E.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h6f6a7e",
+        "tur": "chk",
+        "metin": "Category definition, çoklu assignment, evidence/confidence/manual lock.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h4b2cdd",
+        "tur": "chk",
+        "metin": "Kullanıcı tanımlı dimension, single/multi cardinality ve entity-level kataloğu.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hf87f05",
+        "tur": "chk",
+        "metin": "Meta/internal selector ve mapping preview motoru.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hc6456c",
+        "tur": "chk",
+        "metin": "Category profile: analysis/rule/budget/transfer/schedule/action/creative policy bundle bağları.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/haf478f",
+        "tur": "chk",
+        "metin": "Campaign→adset→ad→creative inheritance, child override ve effective-context snapshot.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h2ff773",
+        "tur": "chk",
+        "metin": "Strict instruction/policy DSL ve negatif parser matrisi.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h668d7c",
+        "tur": "chk",
+        "metin": "Raw natural-language → normalized draft + assumption/question/impact preview.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h9fb5fd",
+        "tur": "chk",
+        "metin": "Precedence/inheritance/suppression/PARKED_CONFLICT resolver.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h346e65",
+        "tur": "chk",
+        "metin": "Versioned draft/publish/pause/archive ve rol/audit API'leri.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h763206",
+        "tur": "chk",
+        "metin": "Başlangıç objective/internal kategori playbook seti.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h8ca7a8",
+        "tur": "chk",
+        "metin": "Kategori coverage/unmatched/conflict/impact dashboard ve güvenli archive akışı.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h837c80",
+        "tur": "chk",
+        "metin": "Meta config + çoklu internal category + policy composition.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h43db1a",
+        "tur": "chk",
+        "metin": "Tam metrik kataloğu; additive/non-additive/ratio formülleri.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hcc55fe",
+        "tur": "chk",
+        "metin": "Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h6d598c",
+        "tur": "chk",
+        "metin": "Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/ha5e060",
+        "tur": "chk",
+        "metin": "Hierarchical driver ve creative fatigue/config diagnostics.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hf0c5b9",
+        "tur": "chk",
+        "metin": "Analysis run ledger, dry-run API ve deterministic replay.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h39f892",
+        "tur": "chk",
+        "metin": "Envelope, allocation, target ve planned/committed/actual/forecast şemaları.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h0cb8c1",
+        "tur": "chk",
+        "metin": "CBO/ABO budget owner ve parent-child reconciliation.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h14ff56",
+        "tur": "chk",
+        "metin": "Protected floor/fixed allocation ve transfer allow/deny/within-group.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h2de05b",
+        "tur": "chk",
+        "metin": "Pacing/forecast, min sample, learning, cap ve cooldown guard'ları.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h6b0943",
+        "tur": "chk",
+        "metin": "Fixed/proportional/priority/ladder deterministic allocation.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hc63432",
+        "tur": "chk",
+        "metin": "Keep/conservative/target-seeking simülasyon ve constraint trace.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd8dcc6",
+        "tur": "chk",
+        "metin": "Versioned proposal ledger/API; artış approval zorunluluğu.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/he961f5",
+        "tur": "chk",
+        "metin": "PolicyId/simulationId bağlı genişletilmiş envelope ve claim validator.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h22cbf5",
+        "tur": "chk",
+        "metin": "Natural-language instruction translator ve ambiguity eval seti.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hcec6ae",
+        "tur": "chk",
+        "metin": "Salt-okur advisor ledger, import/DB saldırı testi ve maliyet/redaksiyon.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h76c76a",
+        "tur": "chk",
+        "metin": "Karar defteri/context budget ve deterministic fallback.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/haa9d1e",
+        "tur": "chk",
+        "metin": "Injection/cross-tenant/secret/action-bypass tam negatif matrisi.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h3eb00b",
+        "tur": "chk",
+        "metin": "Model-agnostic AgentProvider/model registry ve deterministic fixture provider.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/he3a766",
+        "tur": "chk",
+        "metin": "OpenAI/Anthropic adapter parity, quota/cost/fallback ve run audit.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h339de4",
+        "tur": "chk",
+        "metin": "Tenant-scoped Streamable HTTP MCP server, OAuth ve read/proposal tool ayrımı.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd19bf6",
+        "tur": "chk",
+        "metin": "Codex/Claude MCP conformance; raw Meta writer/execute tool expose edilmez.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h58ef40",
+        "tur": "chk",
+        "metin": "Dashboard agent console: provider/model, streaming/cancel, citations/tool trace/proposal cards.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h9be15e",
+        "tur": "chk",
+        "metin": "Typed Meta writer allowlist; raw Graph write yok.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd515f4",
+        "tur": "chk",
+        "metin": "Campaign/adset/ad pause/activate eligibility ve parent/effective-status matrisi.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd8c3cb",
+        "tur": "chk",
+        "metin": "Campaign/adset budget owner write; ad-level budget negatif testi.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/k0-k4",
+        "tur": "chk",
+        "metin": "K0–K4 valve, account allowlist, caps, kill switch ve çift anahtar.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h925a45",
+        "tur": "chk",
+        "metin": "Approval state machine, expiry, stale-plan ve separation of duties.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h9b0b2d",
+        "tur": "chk",
+        "metin": "Idempotent execute, Meta error taxonomy, read-after-write ve rollback.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h000c67",
+        "tur": "chk",
+        "metin": "Hourly/daily/weekly/monthly/after-sync scheduler; DST/misfire/idempotency.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h17c1bc",
+        "tur": "chk",
+        "metin": "Sync→analyze→plan→approval agentic routine; otomatik execute yok.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h67739b",
+        "tur": "chk",
+        "metin": "External intervention reconcile ve sandbox/shadow rollout.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h17a640",
+        "tur": "chk",
+        "metin": "Manual/assisted/automated-read/policy-automated mode inheritance ve kill switch.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h908106",
+        "tur": "chk",
+        "metin": "Multi-account batch plan; account-bazlı approval/execute/partial recovery.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hb8d4e8",
+        "tur": "chk",
+        "metin": "Bugün/portfolio hiyerarşi ve internal/Meta filtreler.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd7b228",
+        "tur": "chk",
+        "metin": "Account-group switcher, multi-account connection health ve Page/Instagram asset graph.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/he405ed",
+        "tur": "chk",
+        "metin": "Kategori/talimat stüdyosu ve raw/normalized/version/conflict görünümü.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/he6f118",
+        "tur": "chk",
+        "metin": "Analiz stüdyosu: template/dry-run/publish/schedule/history.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hb498ac",
+        "tur": "chk",
+        "metin": "Bütçe stüdyosu: envelope/lock/target/forecast/simulation.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h86fc64",
+        "tur": "chk",
+        "metin": "Approval inbox, automation run, verify/rollback ve tek timeline.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h7a9216",
+        "tur": "chk",
+        "metin": "Mevcut creative library + context/performance karşılaştırması.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h3aff1a",
+        "tur": "chk",
+        "metin": "Owner/admin/analyst/operator/viewer rol E2E.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h13fad8",
+        "tur": "chk",
+        "metin": "1280/820/390, keyboard/screen-reader ve hata/partial/conflict E2E.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h3d7380",
+        "tur": "chk",
+        "metin": "Kota/alert/deadman/kill-switch/runbook ve staged rollout KPI raporu.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h987e94",
+        "tur": "chk",
+        "metin": "Codex/Claude/dashboard agent session, model/provider trace ve action queue handoff UI.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/a07-2",
+        "tur": "chk",
+        "metin": "A07 gerçek saha pilotu tamamlandı.",
+        "plan": "proje",
+        "asama": null,
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/a08-a14",
+        "tur": "chk",
+        "metin": "A08–A14 kabul/kanıtları temiz.",
+        "plan": "proje",
+        "asama": null,
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd72c59",
+        "tur": "chk",
+        "metin": "Production security/build/DB/browser ve Meta sandbox kapıları temiz.",
+        "plan": "proje",
+        "asama": null,
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hcbb68b",
+        "tur": "chk",
+        "metin": "Production write ayrı kullanıcı onayı ve sınırlı cohort ile açıldı.",
+        "plan": "proje",
+        "asama": null,
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
       }
     ]
   }

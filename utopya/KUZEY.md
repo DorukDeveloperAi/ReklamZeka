@@ -25,16 +25,18 @@ insan onayıyla yönetmesini sağlayan çok kiracılı bir karar destek ürünü
 Meta Ads ve Google Ads için salt-okunur veri toplama, ortak metrik modeli, performans
 ve anomali görünümü, açıklanabilir öneriler ve paylaşılabilir raporlar sunar.
 
-İlk sürüm reklam hesabında otomatik değişiklik yapmaz. Bütçe, teklif, kampanya durumu
-ve kreatif yayınlama gibi geri alınması zor aksiyonlar ancak ayrı bir yetkilendirme
-ve kullanıcı onayı tasarımı tamamlandıktan sonra değerlendirilir.
+İlk sürüm reklam hesabında otomatik değişiklik yapmaz. Nihai ürün; kullanıcının
+iç kampanya kategorilerini ve talimatlarını, Meta kampanya→reklam seti→reklam→kreatif
+yapısını, zaman serisini ve bütçe taahhütlerini birlikte değerlendirir. Bütçe ve durum
+değişiklikleri ancak ayrı scope, dry-run, etki önizleme, risk valfi, insan onayı,
+idempotency, read-after-write ve geri alma tasarımı tamamlandıktan sonra açılır.
 
 ## Şartname bölümleri (vizyon/)
 
 | # | bölüm | kapsadığı davranış alanı | durum |
 |---|---|---|---|
 | 1 | [ürün ve MVP kapsamı](vizyon/1-urun-ve-mvp.md) | kullanıcı, değer, veri, içgörü, güvenlik ve başarı | başlangıç şartnamesi |
-| 2 | [analiz platformu](vizyon/2-analiz-platformu.md) | kampanya amacı, şablon, kural, timeframe, schedule ve prompt eklentisi | yeni şartname |
+| 2 | [Meta reklam işletim sistemi](vizyon/2-analiz-platformu.md) | dijital ikiz, kategori/talimat, analiz, bütçe, prompt, schedule, eylem ve kontrol merkezi | genişletilmiş şartname |
 
 ## İstek envanteri (istek/)
 

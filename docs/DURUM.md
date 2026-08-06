@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 9708bbbd13bc -->
+<!-- durum-damga: 5a88b997bd1d -->
 
 ## Künye
 
@@ -32,7 +32,7 @@
 
 | plan | v | durum | aşama | sıradaki |
 |---|---|---|---|---|
-| `proje` | 2 | ? | 0/0 | — |
+| `proje` | 2 | SÜRÜYOR | 6/14 | 08-Meta dijital ikizi |
 
 ---
 

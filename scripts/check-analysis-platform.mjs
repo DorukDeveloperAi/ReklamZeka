@@ -14,8 +14,22 @@ const required = [
   "tests/prompt-envelope.test.ts",
   "docs/ADR/0006-kullanici-tanimli-analiz-ve-prompt.md",
   "docs/ADR/0007-kampanya-amacina-duyarli-analiz.md",
+  "docs/ADR/0008-meta-dijital-ikiz-ve-ic-kategori.md",
+  "docs/ADR/0009-kullanici-talimatlari-ve-policy-onceligi.md",
+  "docs/ADR/0010-meta-write-valfi-ve-agentic-sinir.md",
+  "docs/ADR/0011-model-agnostic-agent-ve-mcp.md",
+  "docs/discovery/2026-08-06-meta-operating-system.md",
+  "docs/product/internal-category-model.md",
+  "docs/architecture/model-agnostic-agent-interface.md",
   "plans/proje/v2/MASTER.md",
   "plans/proje/v2/REQUIREMENTS.md",
+  "plans/proje/v2/asama-08-meta-dijital-ikizi.md",
+  "plans/proje/v2/asama-09-kategori-talimat.md",
+  "plans/proje/v2/asama-10-zamansal-analiz.md",
+  "plans/proje/v2/asama-11-butce-planlama.md",
+  "plans/proje/v2/asama-12-prompt-advisor.md",
+  "plans/proje/v2/asama-13-eylem-otomasyon.md",
+  "plans/proje/v2/asama-14-kontrol-merkezi.md",
 ];
 
 for (const path of required) if (!existsSync(resolve(root, path))) failures.push(`eksik: ${path}`);
@@ -32,6 +46,10 @@ if (failures.length === 0) {
   const prompt = readFileSync(resolve(root, "src/analyses/prompt-envelope.ts"), "utf8");
   for (const boundary of ["untrusted_data", "allowedFindingIds", "prohibitions", "validateNarrativeOutput"]) {
     if (!prompt.includes(boundary)) failures.push(`prompt sınırı eksik: ${boundary}`);
+  }
+  const internalCategory = readFileSync(resolve(root, "docs/product/internal-category-model.md"), "utf8");
+  for (const boundary of ["CategoryDimension", "CategoryProfile", "manual_locked", "PARKED_CONFLICT", "effective-context snapshot"]) {
+    if (!internalCategory.includes(boundary)) failures.push(`iç kategori sözleşmesi eksik: ${boundary}`);
   }
 }
 

@@ -12,7 +12,7 @@
 
 <!-- uy:ilke/insan-onayi -->
 ## Reklam hesabı değişikliklerinde insan onayı
-Ürün ilk sürümde reklam platformlarında bütçe, teklif, durum veya kreatif değişikliği yapmaz; ileride eklenecek her yazma yeteneği açık yetki, değişiklik önizlemesi, insan onayı, idempotency anahtarı ve geri alma planı taşır.
+Ürün ilk sürümde reklam platformlarında bütçe, teklif, durum veya kreatif değişikliği yapmaz; ileride eklenecek her yazma yeteneği açık yetki, değişiklik önizlemesi, insan onayı, idempotency anahtarı ve geri alma planı taşır. İlk production profili approval-only'dır; schedule, agent, expiry veya alt scope bu kilidi kendiliğinden genişletemez.
 
 <!-- uy:ilke/kaynak-korunur -->
 ## Kaynak ve hesaplama izi korunur
@@ -33,3 +33,27 @@ Bir kampanyanın başarısı, doğrulanmış amacı ve optimizasyon olayı bilin
 <!-- uy:ilke/prompt-politikayi-degistiremez -->
 ## Kullanıcı promptu platform politikasını değiştiremez
 Kullanıcı anlatım tercihi system/developer talimatına doğrudan eklenmez; tenant, veri, araç, timeframe, kanıt ve reklam hesabına yazmama sınırlarını genişletemez. Model yalnız deterministik finding kayıtlarını kanıt kimliğiyle açıklayabilir.
+
+<!-- uy:ilke/talimat-once-ama-guvenlik-ustu-degil -->
+## Kullanıcı talimatı explicit ve izlenebilirdir
+Kilitli kullanıcı talimatı metrik tavsiyesinden önceliklidir; fakat platform ve hukuk, tenant güvenliği ve sistem hard-safety sınırlarını aşamaz.
+
+<!-- uy:ilke/eylem-valften-gecer -->
+## Para harcayan her yol tek valften geçer
+Agent, prompt, schedule veya dashboard ayrıcalıklı write yolu açamaz; her Meta eylemi aynı typed executor, risk, onay, tavan, idempotency ve verify zincirinden geçer.
+
+<!-- uy:ilke/onay-atomiktir -->
+## Onay atomiktir, paket onayı varsayılmaz
+Bir öneri paketi yalnız ilgili eylemleri birlikte gösterir; creative/post identity, campaign/adset yapısı, bütçe, create/publish ve activate kararları ayrı action unit ve ayrı onay kaydıdır. Bir satırın onayı sibling veya downstream satırı onaylayamaz; toplu seçim açık kullanıcı işlemi olmalıdır.
+
+<!-- uy:ilke/uretim-draft-only -->
+## Üretilen reklam önce taslaktır
+Mevcut reklam ve gönderiler önceliklidir. Yeni reklam/kreatif üretimi yalnız açık kullanıcı talebiyle, nadiren yapılır; model çıktısı içerik/spec onayı, platform create/publish onayı ve aktivasyon onayı olmadan Meta'ya yazılamaz.
+
+<!-- uy:ilke/model-motoru-degistiremez -->
+## Model seçimi domain hükmünü değiştiremez
+OpenAI, Anthropic veya başka provider yalnız talimat çevirisi ve kanıtlı anlatım/advisor katmanıdır; classification, policy precedence, analiz formülü, bütçe constraint'i ve action authorization modelsiz deterministik motorların sorumluluğudur.
+
+<!-- uy:ilke/hesap-ve-asset-izolasyonu -->
+## Hesap ve asset yetkisi ayrı korunur
+Toplu portföy görünümü veya hesap grubu; child reklam hesabının currency, timezone, capability, permission, budget cap, approval ve rate-limit sınırını birleştirip aşamaz.

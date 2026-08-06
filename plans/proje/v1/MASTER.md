@@ -1,5 +1,8 @@
 # ReklamZeka MVP — MASTER (v1)
 
+> **Tarihsel sürüm:** Kümülatif kanonik ana plan [v2 MASTER](../v2/MASTER.md)'dır.
+> Bu dosya v1 kabul/kanıt geçmişini değişmeden korur.
+
 > Üretici: /plan-kur uyumlu başlangıç · Tarih: 2026-08-06 · Kaynak görev: "iyileştirmelerini ekle ve planı hayata geçirelim"
 > Kategori: proje · Üst: —
 > Kritiklik: yüksek · Aciliyet: normal · Hacim: epik

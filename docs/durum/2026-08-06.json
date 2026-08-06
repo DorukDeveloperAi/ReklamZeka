@@ -31,11 +31,11 @@
     {
       "slug": "proje",
       "v": 2,
-      "durum": "?",
-      "asamaKapali": 0,
-      "asamaToplam": 0,
-      "siradaki": null
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "9708bbbd13bc"
+  "damga": "5a88b997bd1d"
 }

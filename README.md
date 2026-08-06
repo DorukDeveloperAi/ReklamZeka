@@ -46,8 +46,9 @@ veritabanı kaydı gerektirir.
 - [Ürün brifi](docs/URUN-BRIFI.md)
 - [Kutup yıldızı](utopya/KUZEY.md)
 - [MVP şartnamesi](utopya/vizyon/1-urun-ve-mvp.md)
-- [Ana roadmap](plans/proje/v1/MASTER.md)
-- [Güncel plan durumu](plans/proje/v1/STATE.md)
+- [Kanonik ana roadmap](plans/proje/v2/MASTER.md)
+- [Güncel plan durumu](plans/proje/v2/STATE.md)
+- [Tarihsel v1 planı](plans/proje/v1/MASTER.md)
 - [Pilot hazırlık ve saha giriş kılavuzu](docs/PILOT-READINESS.md)
 - [Operasyon runbook'ları](docs/RUNBOOKS.md)
 
