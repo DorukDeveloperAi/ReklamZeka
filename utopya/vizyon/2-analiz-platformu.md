@@ -156,7 +156,8 @@ bundle'daki diğer satırları onaylamaz.
 - Bugün, Portföy, Talimatlar, Analizler, Bütçe, Onaylar, Timeline, Kreatifler ve
   Otomasyon/Ayarlar yüzeyleri tek rol-bazlı dashboardda bulunur.
 - Kreatifler yüzeyi yayındaki reklam metnini ve post kaynağını okur; bağlı Instagram/Page
-  gönderisini promotion taslağına dönüştürür. Yeni reklam üretimi nadir/ileri opt-in draft'tır.
+  gönderisini yayınlanmış PromotionTemplate ve ön ayarlı AudiencePreset ile promotion
+  taslağına dönüştürür. Yeni metin/görsel/video/creative üretimi yoktur.
 - Varsayılanlar ve playbook'lar sade form sunar; ileri selector/DSL progressive disclosure'dır.
 - Raw ve normalized talimat, inheritance/conflict, affected entities, version history,
   simulation, approval ve verify/rollback görünür.
@@ -177,6 +178,10 @@ ayrı yönetebilir; creative spec değişince eski onay stale olur.
   tool broker, output validator, maliyet ve run ledger sözleşmesiyle kullanır.
 - ReklamZeka Streamable HTTP MCP server sunar; Codex ve Claude aynı tenant-scoped read ve
   draft/proposal tools'a bağlanır, raw Meta writer veya execute tool alamaz.
+- ReklamZeka OpenAI/Anthropic model API'si veya API key'i kullanmaz; Codex CLI/VS Code ve
+  Claude Code kendi açık yerel login/session'ıyla localhost/STDIO MCP'ye bağlanır.
+- Dashboard local session hub olarak config/health, selected-context handoff, proposal ve
+  action queue correlation gösterir; aynı iş session içinden sürdürülebilir.
 - Manual, assisted, automated-read ve scheduled-plan planlama modları execution autonomy'den
   ayrıdır; approval-only varsayılandır. Yalnız explicit policy-limited profilde cap'li K1/K2
   otomatik olabilir, K3/K4 insan onaylı kalır.
@@ -187,5 +192,5 @@ ayrı yönetebilir; creative spec değişince eski onay stale olur.
 kullanır; provider değişimi deterministic finding/budget/action eligibility'yi değiştirmez;
 hiçbir agent onay/valf olmadan Meta write gerçekleştiremez.
 
-▸ bugün nerede: model-agnostic/MCP mimarisi ve gereksinimler tanımlı; provider adapter,
-MCP server, agent console ve hybrid-mode executor henüz uygulanmadı.
+▸ bugün nerede: model-agnostic local CLI/MCP mimarisi ve gereksinimler tanımlı; local MCP,
+session handoff/hub, companion human-presence ve hybrid-mode executor henüz uygulanmadı.

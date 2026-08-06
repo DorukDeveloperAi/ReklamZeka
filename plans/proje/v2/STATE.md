@@ -74,12 +74,26 @@
   destination, actor, post/media identity ve dynamic varyant provenance eklendi.
 - Bağlı Instagram/Page gönderisini mevcut veya yeni uygun ad-set yapısında öne çıkarma,
   ownership/capability/preflight ile K4 typed action bundle olarak A13'e alındı.
-- Yeni reklam/kreatif üretimi kapsam dışından çıkarıldı; nadir, açık kullanıcı talebine
-  bağlı, immutable draft ve ayrı içerik→create/publish→activate onay zinciri olarak sınırlandı.
+- Düzeltme: yeni reklam/kreatif üretimi yapılmayacak. Yalnız yayındaki metin okunur ve
+  mevcut post frozen identity/content ile şablonlu promotion'a referans olur.
+- PromotionTemplate + immutable AudiencePreset internal category/account/actor/post
+  selector'ıyla resolve edilir; agent hedef kitle veya creative üretemez.
 - Planlama modu execution autonomy'den ayrıldı. Varsayılan/ilk rollout `approval_only`;
   K1–K4 her write action unit tek tek onaylanır, expiry veya child scope yetkiyi genişletmez.
 - Bundle gruplama/dependency yüzeyidir; authorization ve audit atomik action unit'tadır.
   Kaynaklar: ADR-0012 ve `docs/architecture/creative-and-approval-operations.md`.
+
+## 2026-08-06 — dashboard ile ortak yerel AI CLI session modeli
+
+- Provider API adapter kapsamdan çıkarıldı. ReklamZeka OpenAI/Anthropic model API key'i
+  saklamaz/çağırmaz; Meta Graph connector ayrı kalır.
+- Codex CLI/VS Code, Claude Code ve ek MCP-capable CLI kendi login/session'ıyla localhost
+  Streamable HTTP veya project STDIO ReklamZeka MCP'ye bağlanır.
+- Dashboard local session hub; config/health, selected entity/timeframe handoff, tool/citation,
+  proposal ve action queue correlation gösterir. Açık session aynı backend state'ini kullanır.
+- Session içi insan onayı model tool'u değildir; local companion TTY/passkey ile tek
+  ActionUnit/spec'e bağlı HumanPresenceGrant üretir. Kaynaklar: ADR-0011 ve
+  `docs/architecture/local-cli-agent-bridge.md`.
 
 ## Sıradaki uygulama
 

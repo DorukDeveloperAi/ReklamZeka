@@ -23,7 +23,10 @@ zaman içinde analiz, bütçe planlama ve kontrollü aksiyon yönetimidir.
 - A13 risk kademeli Meta action valve, scheduler ve agentic routine.
 - A14 tek sade kontrol merkezi ve staged rollout.
 - Yayındaki reklam metni/dynamic creative/post envanteri; mevcut Instagram/Page gönderisini
-  promotion taslağına dönüştürme ve nadir yeni reklam/kreatif draft akışı.
+  yayınlanmış PromotionTemplate + ön ayarlı AudiencePreset ile promotion taslağına dönüştürme.
+- Yeni creative/metin/medya ve serbest targeting üretmeme sınırı.
+- Provider API adapter yerine Codex CLI/VS Code, Claude Code ve ek local AI CLI'ların ortak
+  localhost/STDIO MCP, dashboard handoff/session hub ve human-presence companion mimarisi.
 - Planlama otomasyonundan ayrı varsayılan `approval_only` execution lock ve bundle içindeki
   her Meta mutation için atomik approve/reject/request-changes.
 

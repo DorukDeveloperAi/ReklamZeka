@@ -79,12 +79,17 @@ Bir workspace birden fazla business connection, reklam hesabı, Facebook Page, I
 <!-- uy:yetenek/model-agnostic-agent -->
 ## Model-agnostic agent ve MCP
 boy: epik
-Core reklam motorları modelsiz çalışmalı; dashboard assistant, Codex, Claude ve gelecekteki agent'lar aynı tenant-scoped MCP/tool, output validation, audit ve action valve sözleşmesini kullanabilmelidir.
+Core reklam motorları modelsiz çalışmalı; ReklamZeka model-provider API'si veya API key'i
+kullanmadan açık Codex CLI/VS Code, Claude Code ve gelecekteki yerel AI CLI session'ları
+aynı tenant-scoped MCP/tool, handoff, output validation, audit ve action valve sözleşmesini kullanabilmelidir.
 
 <!-- uy:yetenek/hibrit-reklam-operasyonu -->
 ## Manuel, agent destekli ve policy-otomatik işletim
 boy: epik
-Kullanıcı manual, assisted, automated-read veya sınırlı policy-automated mod seçebilmeli; campaign/adset/ad durumunu ve campaign/adset bütçesini dashboarddan önizleme, onay, execute, verify ve rollback zinciriyle yönetebilmelidir.
+Kullanıcı planlama için manual, assisted, automated-read veya scheduled-plan; execution
+için approval-only veya sınırlı policy-limited profil seçebilmeli; campaign/adset/ad durumu
+ve campaign/adset bütçesini dashboarddan veya human-presence'lı local companion CLI'dan
+önizleme, onay, execute, verify ve rollback zinciriyle yönetebilmelidir.
 
 <!-- uy:yetenek/yayindaki-reklam-metni -->
 ## Yayındaki reklam metni ve creative gerçeği
@@ -100,16 +105,23 @@ Kullanıcı bağlı Instagram veya Page gönderisini seçebilmeli; sahiplik/uygu
 campaign-adset, bütçe, identity ve destination preflight'ından sonra promotion taslağı
 oluşturabilmeli; yaratım ve aktivasyon ayrı onaylarla tek valften geçmelidir.
 
-<!-- uy:yetenek/nadir-yeni-reklam -->
-## Nadir ve kontrollü yeni reklam üretimi
-boy: epik
-Kullanıcı açıkça istediğinde verilen asset/metinden veya üretici modelden yeni reklam
-taslağı oluşturulabilmeli; içerik/spec sürümü ayrı onaylanmadan publish, publish ayrı
-onaylanmadan activate edilememeli ve üretim hiçbir zaman sürekli/onaysız olmamalıdır.
-
 <!-- uy:yetenek/atomik-approval-only -->
 ## Atomik approval-only otonomi valfi
 boy: epik
 Sistem ilk ve varsayılan dönemde tüm Meta write eylemlerini approval-only tutmalı; bir
 öneri paketindeki creative/post, yapı, bütçe, create/publish ve activate satırları ayrı
 approve/reject/request-changes almalı, toplu onay yalnız açık kullanıcı seçimi olmalıdır.
+
+<!-- uy:yetenek/promotion-template-audience -->
+## Promotion şablonu ve ön ayarlı hedef kitle
+boy: epik
+Kullanıcı existing-post promotion için internal kategori/hesap/actor/post türü selector'ı,
+objective/optimization, destination/placement, budget/schedule ve immutable audience preset
+bağı olan sürümlü şablon tanımlayabilmeli; agent şablonu anlayıp seçebilmeli fakat targeting üretememelidir.
+
+<!-- uy:yetenek/yerel-ai-cli-session -->
+## Dashboard ile ortak yerel AI CLI session'ı
+boy: epik
+Kullanıcı dashboardda seçtiği kampanya/post/timeframe bağlamını açık Codex CLI/VS Code,
+Claude Code veya ek MCP CLI session'ına aktarabilmeli; session'da yapılan analiz/proposal
+aynı dashboard inbox/timeline'a yazılmalı ve provider model API anahtarı gerekmemelidir.

@@ -6,8 +6,8 @@ Kabul — 2026-08-06
 
 ## Bağlam
 
-Kullanıcı yayındaki reklam metinlerini görmek, bağlı Instagram gönderisini reklam olarak
-öne çıkarmak, nadiren yeni reklam üretmek ve ilk dönemde tüm Meta değişikliklerini tek
+Kullanıcı yayındaki reklam metinlerini görmek, bağlı Instagram gönderisini ön ayarlı hedef
+kitle ve şablonla reklam olarak öne çıkarmak ve ilk dönemde tüm Meta değişikliklerini tek
 tek onaylamak istiyor. Mevcut plan creative'i read-only tutuyor ve bundle onayının
 granülerliği ile geçici otonomi kilidini yeterince tanımlamıyordu.
 
@@ -16,9 +16,10 @@ granülerliği ile geçici otonomi kilidini yeterince tanımlamıyordu.
 - Creative dijital ikizi effective copy, CTA/destination, actor, post/media identity,
   dynamic variants ve field-level provenance taşır.
 - Mevcut Instagram/Page post promotion K4 typed action bundle'dır; ownership,
-  permission, promotion capability, objective/placement/destination ve budget preflight ister.
-- Yeni reklam/kreatif üretimi nadir opt-in `CreativeDraftVersion`dır; model doğrudan
-  publish/activate edemez.
+  permission, promotion capability, yayınlanmış PromotionTemplate+AudiencePreset,
+  objective/placement/destination ve budget preflight ister.
+- Sistem yeni reklam metni, görseli, videosu veya creative varyantı üretmez/değiştirmez;
+  agent targeting uyduramaz.
 - Action bundle yalnız dependency ve sunum kabıdır. Her mutation ayrı `ActionUnit` ve
   ayrı approve/reject/request-changes/execute/audit kaydıdır.
 - Planlama modu execution autonomy'den ayrılır. Default/ilk rollout `approval_only`dır;
@@ -29,6 +30,6 @@ granülerliği ile geçici otonomi kilidini yeterince tanımlamıyordu.
 ## Sonuçlar
 
 Kullanıcı agent ve schedule'ın hazırlık hızından yararlanırken nihai kontrolü korur.
-Existing-post ve nadir üretim aynı valf/timeline'a girer; ayrı gizli writer yolu oluşmaz.
+Existing-post promotion aynı valf/timeline'a girer; ayrı gizli writer yolu oluşmaz.
 Karşılığında dependency DAG, granular approval UI, capability preflight ve daha ayrıntılı
 creative provenance modeli gerekir.

@@ -47,8 +47,12 @@ Agent, prompt, schedule veya dashboard ayrıcalıklı write yolu açamaz; her Me
 Bir öneri paketi yalnız ilgili eylemleri birlikte gösterir; creative/post identity, campaign/adset yapısı, bütçe, create/publish ve activate kararları ayrı action unit ve ayrı onay kaydıdır. Bir satırın onayı sibling veya downstream satırı onaylayamaz; toplu seçim açık kullanıcı işlemi olmalıdır.
 
 <!-- uy:ilke/uretim-draft-only -->
-## Üretilen reklam önce taslaktır
-Mevcut reklam ve gönderiler önceliklidir. Yeni reklam/kreatif üretimi yalnız açık kullanıcı talebiyle, nadiren yapılır; model çıktısı içerik/spec onayı, platform create/publish onayı ve aktivasyon onayı olmadan Meta'ya yazılamaz.
+## Yeni creative veya hedef kitle üretilmez
+Sistem mevcut reklam metnini okur ve yalnız seçili mevcut gönderiyi yayınlanmış promotion şablonu ile immutable audience preset üzerinden reklamlaştırır. Model yeni metin/görsel/video/creative veya targeting spec üretemez ve değiştiremez.
+
+<!-- uy:ilke/model-api-yok -->
+## Agent yerel CLI oturumudur, provider API entegrasyonu değildir
+ReklamZeka OpenAI/Anthropic model API anahtarı saklamaz ve model API'si çağırmaz. Codex CLI/VS Code, Claude Code veya diğer yerel istemci kendi login/session'ıyla ortak MCP'ye bağlanır; Meta Graph bağlantısı ayrı güvenlik sınırıdır.
 
 <!-- uy:ilke/model-motoru-degistiremez -->
 ## Model seçimi domain hükmünü değiştiremez
