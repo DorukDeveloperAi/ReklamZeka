@@ -69,6 +69,11 @@ destination, actor, post/media/creative ID ve dynamic asset-feed varyantlarını
 çıkar. Linked Instagram/Page post-media inventory ownership, permission, promotion
 capability, media/lifecycle ve last-seen taşır. Eksik alan uydurulmaz; preview URL'si süreli proxy'dir.
 
+### T08.11 — Raw retention, disconnect ve veri yaşam döngüsü
+L0 raw payload için configurable retention/encryption, provenance hash ve purge job;
+connection revoke/disconnect, token invalidation, export/delete request ve orphaned local
+data durumu. Audit silinmez; kullanıcı verisi retention/policy'ye göre silinir veya anonimleşir.
+
 ## Kabul ve kanıt
 
 - Gerçek portföyde isim/ID/token basmadan entity ve metric coverage raporu.
@@ -82,6 +87,8 @@ capability, media/lifecycle ve last-seen taşır. Eksik alan uydurulmaz; preview
   dynamic varyantlar tek metinmiş gibi ezilmez.
 - Promotion uygun ve uygun olmayan bağlı Instagram/Page gönderileri sebepli ayrılır;
   bu aşamada hiçbir post promotion/write yapılmaz.
+- Disconnect tokenı kullanılamaz yapar; retention run'ı raw payloadı policy'ye göre temizler,
+  başka workspace verisine dokunmaz.
 
 ## Risk / durma
 

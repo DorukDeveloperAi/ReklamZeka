@@ -13,7 +13,8 @@ oldu/ne gerekiyor”; ayrıntılar drill-down ve ileri ayarlardadır.
 1. **Bugün:** veri durumu, riskler, bulgular, bekleyen onaylar, bütçe pacing.
 2. **Portföy:** business/connection/account-group/account/Page/Instagram asset graph ve
    account→campaign→adset→ad→creative; Meta/iç kategori filtreleri.
-3. **Talimatlar:** raw+normalized, inheritance, conflict, affected entities, version history.
+3. **Guidance ve Talimatlar:** kritik sohbet, raw owner wording, kaynak/best-practice,
+   scoped cards/sets, applied/conflict, progressive policy ve version history.
 4. **Analizler:** template/edit/dry-run/publish/schedule/run history.
 5. **Bütçe:** envelope, allocation, protected transfer, target, forecast, simulation.
 6. **Onaylar:** bundle→action unit, dependency, risk, before/after, creative/post preview,
@@ -25,6 +26,7 @@ oldu/ne gerekiyor”; ayrıntılar drill-down ve ileri ayarlardadır.
    scope, roles, quota, kill switch ve Meta capability.
 10. **Yerel AI session'ları:** Codex CLI/VS Code, Claude Code ve ek MCP CLI config/health,
     selected-context handoff, citations/tool trace, proposal ve approval queue correlation.
+11. **Practice Lab:** AdvisedPractice candidate/trial/outcome/standardization review ve artifact linkleri.
 
 ## Task'lar
 
@@ -40,11 +42,14 @@ varyantlar ad/adset/campaign performansıyla birlikte görünür.
 
 ### T14.3 — Category/instruction studio
 Kategori CRUD, selector builder, name mapping preview, manual lock; natural text input,
-normalized diff, conflict/impact preview, publish/pause/archive.
+kritik agent interview, live GuidanceCard paneli, source/scope/topic binding, owner wording
+ve agent synthesis; guidance publish kolay, policy promotion semantic diff/replay/impact ister.
 
 ### T14.4 — Analysis ve budget studio
 Objective/category playbook composition, timeframe/comparison, rules, dry-run; envelope,
-allocation, transfer locks, targets ve üçten fazla olmayan bütçe alternatifi.
+allocation, transfer locks, targets ve üçten fazla olmayan bütçe alternatifi. AnalysisAgenda
+pass seçici, applied guidance pack, category-by-category görünüm, cadence/experiment history
+ve act/test/observe/no-change sonucu progressive disclosure ile görünür.
 
 ### T14.5 — Approval, automation ve timeline
 Queue bundle'ı atomik satırlara açar; her unit approve/reject/request-changes, dependency,
@@ -57,8 +62,10 @@ Owner/admin/analyst/operator/viewer; tenant negative; keyboard/screen reader; 12
 loading/empty/partial/stale/error/conflict/approval/execute states.
 
 ### T14.7 — Operasyon ve rollout
-Sync/action/advisor quotas, cost budget, alerts, deadman, rate headroom, kill switch, runbooks,
-feature flags ve staged cohort. Rollback başarısızsa write otomatik kapanır.
+Sync/action/advisor run ve context budgets, alerts, deadman, Meta rate headroom, kill switch,
+runbooks, feature flags ve staged cohort. Varsa CLI usage/cost telemetrisi opsiyonel ve
+istemci-kaynaklıdır; provider faturalaması ReklamZeka sorumluluğu değildir. Rollback
+başarısızsa write otomatik kapanır.
 
 ### T14.8 — Başarı ölçümü
 Classification correction, policy conflict, useful finding, proposal acceptance, prevented
@@ -88,6 +95,16 @@ Planlama otomasyonu ile execution autonomy yan yana fakat ayrı görünür. Defa
 risk sınıfları gösterilir. Gevşetme ayrı yetkili confirmation/policy publish ister;
 zaman aşımı fail-closed kalır.
 
+### T14.13 — Practice Lab ve standardization review
+Practice scope/steps/evidence/cadence/exceptions; trial vakaları ve outcomes; validated/
+conditional/rejected hükmü. Review, feature/agenda/playbook/guidance/policy/human-judgment
+decomposition'ını ve her standardized artifact diff/linkini gösterir. Tek tık sessiz rule yoktur.
+
+### T14.14 — In-app analysis inbox
+Scheduled/manual analysis run sonucu Today/inbox'a idempotent card olarak düşer; unread/read/
+acknowledged, stale/superseded ve deep-link taşır. İlk incrementte e-posta/Slack/webhook yok;
+external channel ayrı capability/rollout kararıdır.
+
 ## Kabul ve kanıt
 
 - Kullanıcı bir kampanyayı bulur, category/instruction ekler, dry-run analiz ve bütçe
@@ -102,3 +119,8 @@ zaman aşımı fail-closed kalır.
 - Kullanıcı existing-post bundle'ında yalnız istediği satırları onaylar; bağımlı ama
   onaysız satır uygulanmaz ve toplu onay varsayılan değildir.
 - Approval-only kilidi açıkken scheduled-plan öneri üretir fakat hiçbir Meta write çalıştırmaz.
+- Kullanıcı sohbetle global/category/topic guidance set oluşturur, historical rehearsal'da
+  aşırı uyarı/hamle sayısını görür ve yalnız seçili clause'u hard policy'ye yükseltir.
+- Bir AdvisedPractice outcome ile trial edilir; standardization review practice'in yalnız
+  uygun parçasını agenda/feature yapar, business nuance guidance olarak kalabilir.
+- Scheduled run bir kez in-app inbox'a teslim edilir; duplicate fire duplicate card üretmez.

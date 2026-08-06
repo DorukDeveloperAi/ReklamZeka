@@ -18,6 +18,10 @@ bir proje değil, aynı ürünün A08–A14 devamıdır. v1 dosyaları tarihsel 
 korunur. A07'nin gerçek saha pilotu beklenirken teknik olarak bağımsız A08 işleri
 ilerleyebilir; eksik saha girdisi yeni ürün geliştirmesini bloke etmez.
 
+Ürünün bütün görüşmelerden damıtılmış kısa davranış doktrini
+[kanonik ürün distilasyonu](../../../docs/product/reklamzeka-product-distillation.md)dır.
+O belge “ne/neden/nasıl davranır”ı; bu MASTER ise “hangi sırayla teslim edilir”i yönetir.
+
 ## Ürün tezi
 
 ReklamZeka yalnız metrik gösteren veya serbest prompt çalıştıran bir pano değildir.
@@ -25,8 +29,10 @@ Sistem beş katmanı tek izde birleştirir:
 
 1. **Meta dijital ikizi:** hesap → kampanya → reklam seti → reklam → kreatif/post; yayındaki gerçek metin ve kimlik dahil.
 2. **Bağlam:** Meta objective/optimization/budget yapısı + kullanıcının çoklu iç kategorileri.
-3. **Politika:** doğal dil ve yapılandırılmış talimatlar, hedefler, istisnalar ve bütçe kuralları.
-4. **Zamanlı karar:** tazelik/attribution/learning/cooldown farkında deterministik analiz ve plan.
+3. **Guidance + politika:** şahsi yaklaşım, kaynaklı Meta best-practice, hedef/istisna ve
+   deney notları; yalnız gerektiğinde deterministik kurala yükseltilir.
+4. **Zamanlı karar:** tazelik/attribution/learning/cooldown farkında kanıtlı analiz,
+   stabil karar temposu ve gerektiğinde deterministik plan.
 5. **Kontrollü eylem:** öneri → simülasyon → onay → valf → Meta write → read-after-write → izleme/geri alma.
 
 LLM/agent; talimatı anlamlandırır, bağlamı açıklar ve taslak hareket planı
@@ -41,8 +47,9 @@ valfinden geçer. Prompt tek başına Meta yazma yetkisi vermez.
   idempotent ve rate-limit duyarlı senkronlanır.
 - Her kampanya Meta objective'i, legacy objective'i, funnel/optimization bağlamı ve
   sıfır veya daha fazla kullanıcı iç kategorisiyle kanıtlı sınıflandırılır.
-- Kullanıcı talimatlarını ham metin + normalize politika olarak görür, etkilediği
-  nesneleri önizler, sürümler, yayınlar, durdurur, düzenler ve silebilir/arşivleyebilir.
+- Kullanıcı doğal dil talimat/guidance'ını agent ile kritik müzakerede geliştirir; kendi
+  yaklaşımını kaynaklı Meta best-practice'leriyle karşılaştırır, scope/başlık/category
+  bağlarıyla sürümler ve yalnız seçtiği maddeleri enforceable policy'ye yükseltir.
 - Aynı kampanya; amacı, bütçe modeli, bölge/dil/kitle, Meta özellikleri,
   iç kategorileri, mevcut kreatifleri ve zaman içindeki hamleleri birlikte analiz edilir.
 - Yayındaki reklamların birincil metin, başlık, açıklama, CTA, hedef URL, post/media
@@ -53,6 +60,17 @@ valfinden geçer. Prompt tek başına Meta yazma yetkisi vermez.
 - Bütçe planı hesap/kategori/bölge/kampanya taban-tabana ve tavanlara, sabit tahsis,
   transfer yasağı, hedef KPI, minimum örneklem, pacing ve cooldown'a uyar.
 - Zamanlanmış ve anık analiz aynı versioned executor'ı kullanır; duplicate fire tek run'dır.
+- Agent analizde global→account group/account→Meta objective→internal category→entity→
+  topic→decision history guidance setlerini sıralı getirir; kullanılan/bastırılan/çelişen
+  talimat ve kaynaklar görünürdür.
+- Decision cadence ve experiment ledger; yetersiz/settle olmamış veri, learning/cooldown,
+  observation window ve aynı öneriyi tekrarlama sınırlarıyla hiperaktif optimizasyonu önler;
+  `no-change` geçerli bir karardır.
+- Ham Meta satırları modele taşınmaz; L0 raw→L1 canonical→L2 feature→L3 window/rollup→
+  L4 evidence→L5 compact context pipeline'ı ve frozen EffectiveCampaignContext kullanılır.
+- Agentic sohbetten çıkan tekrar kullanılabilir yöntemler `AdvisedPractice` olarak trial/
+  outcome ile izlenir; yalnız explicit StandardizationReview sonrası uygun parçaları feature,
+  agenda, playbook, cadence veya policy'ye dönüşür.
 - Her öneri ve eylem snapshot, kural/talimat, önceki/yeni değer, onay, Meta sonucu ve
   sonrası performans penceresine bağlı timeline kaydı taşır.
 - Varsayılan mod dry-run ve workspace genelinde **approval-only autonomy lock**'tır.
@@ -123,9 +141,21 @@ snapshot'lar; sonraki kategori düzenlemesi tarihsel hükmü değiştirmez.
 
 ## Talimat ve politika modeli
 
-Kullanıcı talimatı hem düz metin hem yapılandırılmış form olabilir. Düz metin
-doğrudan yürütülmez; agent bunu versioned politika taslağına çevirir, yorumunu ve
-etkilenecek nesneleri gösterir, kullanıcı yayınlar. Politika türleri:
+Kullanıcı talimatı hem düz metin hem yapılandırılmış form olabilir. Sistem bunu iki ayrı
+yaşam döngüsünde tutar:
+
+1. **Guidance yolu:** kullanıcının raw anlatımı, kişisel stratejisi, örneği, sorusu,
+   kaynaklı Meta best-practice'i, gözlem ve experiment outcome'u; strict DSL zorunlu
+   olmadan versioned/scoped guidance card veya guidance set olur. Agent analiz, hipotez,
+   anlatım ve proposal önceliğinde kullanabilir; doğrudan hard constraint/write yetkisi olamaz.
+2. **Enforceable policy yolu:** bütçe taban/tavanı, transfer yasağı, approval zorunluluğu
+   veya action eligibility gibi yürütmeyi bağlayan madde; typed taslak, semantic diff,
+   historical replay, etki/çatışma preview ve kullanıcı yayını ister.
+
+Olgunluk: `G0 raw conversation → G1 scoped guidance → G2 reviewed guidance set/playbook →
+G3 typed policy/rule/template → G4 automation-eligible`. G2→G3 ve G3→G4 otomatik değildir.
+
+Policy türleri:
 
 - `hard_constraint`: mutlak taban/tavan, sabit tahsis, transfer yasağı.
 - `target`: KPI/hedef hacim/hedef maliyet ve zaman ufku.
@@ -140,6 +170,70 @@ kilitli talimatı → bütçe taahhüdü → entity istisnası → iç kategori 
 Meta objective playbook'u → metrik kuralı → agent tavsiyesi. Aynı kademede daha
 spesifik scope ve sonra daha yeni yayın sürümü kazanır. Çözülemeyen çatışma
 `PARKED_CONFLICT` olur; sistem varsayım yapmaz.
+
+Guidance otoritesi policy precedence'dan ayrı görünür: `owner_statement`, kaynaklı
+`official_meta_guidance`, business strategy, observed result, experiment outcome ve
+operating note aynı kartta eritilmez. Agent uyum/çatışma/bilinmeyeni açıklar. Resmi Meta
+guidance link/doküman, captured/reviewed tarih, applicable scope ve freshness taşımadan
+“best practice” diye sunulamaz. Kullanıcının business-specific istisnası korunur; platform/
+hukuk ve hard safety sınırını aşamaz.
+
+### Guidance erişimi ve sıralı analiz gündemi
+
+Her GuidanceCard global, account group/account, internal category, Meta objective/funnel/
+optimization, lifecycle, campaign/adset/ad/creative/post, PromotionTemplate ve topic heading
+boyutlarından birden fazlasına bağlanabilir. İlk önce deterministic scope filtresi, sonra
+relevance ranking çalışır; semantic arama yalnız keşif/ranking içindir, enforcement değildir.
+
+Agent varsayılan olarak şu sırayı izler: genel veri/portföy → group/account → objective/
+funnel → internal category'ler kategori kategori → campaign → ad set → ad/creative/post →
+bütçe/pacing → geçmiş test/karar → `act/test/observe/no-change`. Kullanıcı agenda sırasını
+veya yalnız belirli category/group/başlık alt kümesini seçebilir. Her tur `EffectiveGuidancePack`
+ile applied/suppressed/conflicting/missing kartları ve source reason'larını snapshot'lar.
+
+### Stabil test ve karar temposu
+
+`DecisionCadenceProfile`; data-settle delay, minimum observation window, learning/cooldown,
+entity başına karar/hamle sıklığı, evidence threshold, aynı öneriyi tekrarlama cooldown'u ve
+emergency exception taşır. `ExperimentRecord`; hipotez, baseline, tek ana değişken, primary
+metric, guardrail, minimum sample/window, stop condition ve winner/loser/inconclusive sonucu
+saklar. Agent sürekli değişiklik önermek zorunda değildir; “izle” ve “değişiklik yapma”
+başarılı çıktılardır. Write'ı sınırlayan cadence maddeleri action açılmadan G3 policy olur.
+
+### AdvisedPractice ve standardizasyon keşfi
+
+Agentic müzakerede owner yaklaşımı, kaynaklı Meta practice ve deterministic evidence'dan
+çıkan tekrar kullanılabilir yöntem `AdvisedPractice`tır; official best-practice veya
+enforceable policy değildir. Yaşam döngüsü `candidate→reviewed→trial→validated|conditional|
+rejected→standardization_candidate→standardized|retired` olur.
+
+StandardizationReview tekrar sayısı, karar/outcome tutarlılığı, false positive/negative,
+kategori/objective stabilitesi, veri güvenilirliği, operator effort ve risk düzeyini inceler.
+Practice parçalara ayrılabilir: data check deterministik feature, soru sırası AnalysisAgenda,
+iş nüansı guidance, harcama kararı insan onayı olarak kalabilir. Sistem sohbetten sessiz
+kural öğrenmez. En düşük riskli standardizasyon önce; enforceable policy ve otomasyon en sondur.
+
+## Veri işleme ve EffectiveCampaignContext
+
+Agent ham tablo üzerinde serbest reasoning yapmaz. Tek Postgres tabanlı pipeline:
+
+1. **L0 source/raw:** API payload/hash/version; configurable retention, modele yok.
+2. **L1 canonical facts:** entity/config/daily insights/post/ad text.
+3. **L2 deterministic features:** KPI, pacing, contribution, quality, owner/config consistency.
+4. **L3 windows/rollups:** rolling/calendar/lifetime/learning/action-relative trend/cohort/pre-post.
+5. **L4 evidence graph:** finding/driver/blocker/guidance-policy-cadence bağlantıları.
+6. **L5 compact agent context:** agenda pass'e göre kaynaklı özet ve bounded drill-down.
+
+Her run `EffectiveCampaignContext` snapshot'lar: Meta identity/config, categories,
+EffectiveGuidancePack, enforceable policies, cadence, budget/targets, data quality/features,
+action/experiment/advised-practice/outcome history ve tüm resolver/catalog/formula sürümleri.
+Top-down pass bounded bottom-up driver drill-down ile desteklenir. İlk altyapı modular
+monolith + PostgreSQL + DB-backed worker/materialized rollup'tur; vector DB, ClickHouse,
+event bus ve ayrı feature service ölçülmüş ihtiyaç olmadan yoktur.
+
+Meta proxy metriklerine ek optional `BusinessOutcomeSignal` manual/CSV ile qualified lead,
+appointment, sale/revenue ve invalid lead taşıyabilir. Canlı CRM connector ileriki iştir;
+ilk read/analysis dilimini bloke etmez.
 
 ## Analiz ve zaman modeli
 
@@ -212,11 +306,10 @@ execute anahtarı ister. Approval yürütme değildir.
 
 ### Model-agnostic agent ve dashboard bağlantısı
 
-Deterministik sync/classification/analysis/budget/policy/action motorları hiçbir model SDK'sı
-import etmez. Model katmanı `AgentProvider` sözleşmesine takılır: structured generation,
-tool use, streaming, context/cost limits ve cancellation capability'leri ilan edilir.
-OpenAI, Anthropic veya gelecekteki sağlayıcı adapter'ı aynı envelope/output validator/
-tool broker/run ledger yolunu kullanır; model değişikliği policy ya da motor sonucunu değiştirmez.
+Deterministik sync/classification/metric/budget/policy/action motorları hiçbir model SDK'sı
+import etmez. Agent yeteneği uygulama içi provider adapter'ından değil, kullanıcının yerel
+AI CLI session'ının ortak MCP tool broker/output validator/run ledger yoluna bağlanmasından
+gelir. CLI veya model değişikliği policy ya da motor sonucunu değiştirmez.
 
 ReklamZeka iki entegrasyon yüzeyi sunar:
 
@@ -244,8 +337,9 @@ araçlarıyla bağlanır.
 Codex/Claude Code oturum hafızası sistem kaynağı değildir; kategori, talimat, promotion
 template/audience preset, schedule,
 karar ve action state'i ReklamZeka veritabanında sürümlüdür. MCP OAuth token'ı workspace,
-role, account group, tool scope ve expiry'ye bağlıdır; her tool call agent provider,
-model, session, actor ve correlation ID ile audit edilir.
+role, account group, tool scope ve expiry'ye bağlıdır; her tool call client kind/version,
+session, actor ve correlation ID ile audit edilir. Model/usage bilgisi yalnız istemci güvenilir
+biçimde sunarsa opsiyonel telemetridir.
 
 Session içinden dashboardla eşdeğer okuma, analiz, şablon seçimi ve proposal hazırlama
 mümkündür. İnsan onayı agent tool çağrısı sayılmaz: dashboard veya yerel `reklamzeka`
@@ -289,10 +383,10 @@ ayrı rol ve ayrı adımdır.
 | 06 | içgörü motoru | v1 — KAPALI | 03,04 | [v1 A06](../v1/asama-06-icgoru-motoru.md) |
 | 07 | rapor ve saha pilotu | v1 — DEVAM; fixture hazır, gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak | 05,06 | [v1 A07](../v1/asama-07-rapor-ve-pilot.md) |
 | 08 | Meta dijital ikizi | tam hiyerarşi, config, yayındaki reklam metni/post/kreatif, insights ve timeline snapshot'ları | 03,04 | [asama-08-meta-dijital-ikizi.md](asama-08-meta-dijital-ikizi.md) |
-| 09 | kategori ve talimat sistemi | iç kategori, mapping, doğal dil politika taslağı, miras/çatışma | 08 | [asama-09-kategori-talimat.md](asama-09-kategori-talimat.md) |
-| 10 | zamansal analiz motoru | objective/category aware trend, anomali, pacing, pre/post ve cohort analizi | 06,08,09 | [asama-10-zamansal-analiz.md](asama-10-zamansal-analiz.md) |
+| 09 | kategori, guidance ve talimat sistemi | iç kategori, etkileşimli guidance/best-practice, progressive policy, mapping ve miras/çatışma | 08 | [asama-09-kategori-talimat.md](asama-09-kategori-talimat.md) |
+| 10 | zamansal analiz motoru | sıralı general/group/objective/category/entity analysis, trend/anomali/pacing/pre-post, cadence ve experiment | 06,08,09 | [asama-10-zamansal-analiz.md](asama-10-zamansal-analiz.md) |
 | 11 | bütçe planlama | constraint tabanlı tahsis, korunan bütçe, forecast ve simülasyon | 09,10 | [asama-11-butce-planlama.md](asama-11-butce-planlama.md) |
-| 12 | model-agnostic local agent bridge | güvenli talimat çevirisi, yerel CLI/MCP session handoff, kanıt bağlı anlatım ve plan taslağı; model API yok | 09,10,11 | [asama-12-prompt-advisor.md](asama-12-prompt-advisor.md) |
+| 12 | model-agnostic local agent bridge | kritik analitik sohbet, guidance retrieval/context assembly, yerel CLI/MCP handoff ve kanıt bağlı proposal; model API yok | 09,10,11 | [asama-12-prompt-advisor.md](asama-12-prompt-advisor.md) |
 | 13 | eylem valfi ve rutin | atomik onaylı Meta write, şablon+audience preset'li mevcut post promotion, scheduler, verify/rollback | 04,10,11,12 | [asama-13-eylem-otomasyon.md](asama-13-eylem-otomasyon.md) |
 | 14 | kontrol merkezi ve rollout | sade dashboard, local CLI session hub, satır-bazlı approval inbox, post-promotion akışı ve timeline | 07,09–13 | [asama-14-kontrol-merkezi.md](asama-14-kontrol-merkezi.md) |
 
@@ -304,6 +398,26 @@ v1 A06 ────────────────▲                  v1 A
 
 Uygulama sırası: **A08 → A09 → A10 → A11 → A12 → A13 → A14**.
 Gerçek write scope A13'ten önce ReklamZeka'ya taşınmaz.
+
+### Kademeli vertical slice teslimi
+
+Stage dosyaları domain sahipliğini, aşağıdaki slice'lar gerçek teslim sırasını tanımlar:
+
+1. **S0 güvenli temel — tamam:** v1 read-only/tenant/audit/dashboard/insight/report.
+2. **S1 Meta Read Mirror:** minimum A08 + L0/L1; hiyerarşi, config, budget owner,
+   insights, live ad text/post, quality. Tek hesap→ikinci hesap isolation; write 0.
+3. **S2 Decision Room:** L2–L5, EffectiveCampaignContext, categories, Guidance/AdvisedPractice,
+   AnalysisAgenda/cadence/experiment/outcome, local CLI read/draft, in-app inbox; write 0.
+4. **S3 Budget Lab:** envelope/target/protected allocation/pacing/forecast/simulation;
+   proposal/approval queue var, Meta write 0.
+5. **S4 Approval-only Operations:** tek hesap+tek action type; atomik human approval,
+   execute/verify/platform delivery/rollback. Kanıtla status/budget kapsamı genişler.
+6. **S5 Existing-post Promotion:** template+audience preset, K4 bundle, platform review/delivery.
+7. **S6 Selective Standardization:** validated AdvisedPractice'ten önce feature/agenda/
+   playbook/guardrail; policy-limited K1/K2 yalnız en son ve ayrı kanıtla.
+
+Bilerek ertelenenler: vector DB/knowledge graph, data warehouse/event bus, microservice ağı,
+canlı CRM connector, external notification kanalları, K3/K4 otomasyonu ve kara-kutu optimizer.
 
 ## /goal komutları
 
@@ -320,11 +434,14 @@ Gerçek write scope A13'ten önce ReklamZeka'ya taşınmaz.
 ## Global güvenlik ve sadelik kuralları
 
 - Tek policy motoru, tek timeline, tek action valve ve tek run executor; paralel karar yolları yok.
-- Yeni kategori/kural/şablon kod değişikliği olmadan versioned tanım verisiyle eklenir.
-- Kullanıcı serbest kod/SQL/cron çalıştıramaz; düz metin yalnız taslak politikaya dönüşür.
+- Yeni kategori/guidance/rule/şablon kod değişikliği olmadan versioned tanım verisiyle eklenir.
+- Kullanıcı serbest kod/SQL/cron çalıştıramaz; düz metin guidance olarak kullanılabilir,
+  fakat enforceable policy/action yetkisi olmak için typed promotion sürecinden geçer.
 - Prompt/model deterministic finding, bütçe constraint veya action authorization kaynağı değildir.
 - Meta sırrı kopyalanmaz/loglanmaz; secret reference ve en az yetki ilkesi kullanılır.
 - Büyük Meta sorguları entity/level/date slice olarak ayrılır; cursor, usage ve backoff izlenir.
+- Agent L4/L5 ile başlar; raw L0 görmez, L1–L3'e yalnız bounded typed drill-down yapar.
+- İlk uygulama modular monolith+Postgres'tir; yeni altyapı ancak ölçülen latency/hacim eşiğiyle ADR alır.
 - Mevcut kreatif ve yayındaki reklam metinleri okunur. Mevcut post promotion desteklenir;
   sistem yeni reklam metni, görseli, videosu veya creative varyantı üretmez.
 - Agent hedef kitle uyduramaz veya serbest targeting yazamaz; promotion yalnız yayınlanmış
@@ -343,7 +460,14 @@ Gerçek write scope A13'ten önce ReklamZeka'ya taşınmaz.
 - **Bütçe zararı:** dry-run, protected allocation, tavan/cooldown, açık onay, read-after-write.
 - **Meta rate limit/payload:** ayrı sync kuyrukları, adaptive page/date slice, usage headroom.
 - **Attribution/lag:** tarihsel snapshot, veri-settle delay ve sonuç penceresi; erken karar bastırılır.
-- **Agent yanlış anlaması:** raw talimat + normalize taslak + etki önizleme + insan yayını.
+- **Meta proxy yanılgısı:** optional business outcome signal; eksik eşlemede nitelikli sonuç hükmü yok.
+- **Write başarı ≠ delivery:** platform review/delivery state ayrı izlenir; rejection outcome'dur.
+- **Agent yanlış anlaması:** raw owner wording + ayrı agent sentezi/kaynaklar; enforceable
+  promotion'da normalize taslak + semantic diff + replay/etki önizleme + insan yayını.
+- **Aşırı katı tasarım:** natural-language guidance lane, progressive formalization ve
+  Postgres metadata/full-text başlangıcı; yalnız olgun/enforceable maddeler DSL olur.
+- **Hiperaktif optimizasyon:** cadence, settle/learning/cooldown, max action frequency,
+  experiment ledger ve zorunlu no-change değerlendirmesi.
 - **Elle Meta müdahalesi:** snapshot diff `external_change` olayı üretir, otomasyon cooldown/park olur.
 - **Karmaşık UI:** varsayılanlar ve playbook'lar; ileri ayarlar açılır katmanda, tek iş akışı.
 - **Yanlış kreatif/post yayını:** linked-asset capability, preview, içerik+kimlik+destination
@@ -353,8 +477,12 @@ Gerçek write scope A13'ten önce ReklamZeka'ya taşınmaz.
 
 → [REQUIREMENTS.md](REQUIREMENTS.md) · [CHECKLIST.md](CHECKLIST.md) ·
 [STATE.md](STATE.md) · [REVIZYON.md](REVIZYON.md) ·
+[Kanonik ürün distilasyonu](../../../docs/product/reklamzeka-product-distillation.md) ·
 [Meta keşif raporu](../../../docs/discovery/2026-08-06-meta-operating-system.md) ·
 [İç kategori sözleşmesi](../../../docs/product/internal-category-model.md) ·
 [Model-agnostic agent mimarisi](../../../docs/architecture/model-agnostic-agent-interface.md) ·
 [Creative ve atomik onay sözleşmesi](../../../docs/architecture/creative-and-approval-operations.md) ·
 [Yerel CLI session bridge](../../../docs/architecture/local-cli-agent-bridge.md)
+· [Guidance ve kademeli katılaştırma](../../../docs/architecture/guidance-deliberation-and-progressive-formalization.md)
+· [L0–L5 analiz pipeline'ı](../../../docs/architecture/analysis-processing-pipeline.md)
+· [Uçtan uca gap review](../../../docs/discovery/2026-08-06-end-to-end-gap-review.md)

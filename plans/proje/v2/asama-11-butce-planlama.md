@@ -47,6 +47,11 @@ satisfied/violated/suppressed policies, affected entities ve belirsizlik taşır
 Input run/snapshot/policy versions, proposal status draft/approved/expired/superseded,
 line items ve approval requirement. Aynı fingerprint duplicate plan yaratmaz.
 
+### T11.8 — İş sonucu hedefi ve proxy sınırı
+Meta lead/purchase proxy ile optional qualified lead/appointment/revenue signal ayrı target
+source taşır. Mapping/freshness/coverage yetersizse target-seeking plan bastırılır veya
+yalnız Meta-proxy etiketiyle simüle edilir; agent business outcome uyduramaz.
+
 ## Kabul ve kanıt
 
 - Protected region sabit kalırken kalan bütçe uygun havuzda dağıtılır.

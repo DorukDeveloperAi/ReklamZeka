@@ -31,6 +31,26 @@ destek ürünüdür. İlk sürüm salt-okunurdur; öneriyi açıklar, hesabı ku
 
 Bu sınırlar ürünün nihai yönünü yasaklamaz; ilk pilotun güvenli ve ölçülebilir kalmasını sağlar.
 
+## Nihai ürün yönü
+
+MVP sonrasında ReklamZeka; kullanıcının şahsi reklam yaklaşımını, kaynaklı Meta
+best-practice bilgisini, internal category/objective bağlamını ve geçmiş experiment/
+decision sonuçlarını açık yerel AI CLI session'ıyla kritik bir analitik sohbette birleştirir.
+Doğal dil önce kolay bulunan, scoped GuidanceSet olur; her fikir baştan strict kurala
+zorlanmaz. Yalnız bütçe, approval veya action eligibility'yi bağlayacak olgun clause
+historical replay ve impact preview ile typed policy'ye yükseltilir.
+
+Analiz general→group/account→objective→internal category→entity→topic→history sıralı
+agenda ile çalışır. Settle/observation/learning/cooldown ve deney kaydı gereksiz hiperaktif
+kararları bastırır; `no-change` geçerli bir sonuçtur. Bu nihai yönün kanonik ayrıntısı
+[Meta reklam işletim sistemi vizyonunda](../utopya/vizyon/2-analiz-platformu.md) ve
+[v2 ana planda](../plans/proje/v2/MASTER.md) bulunur.
+
+Agentic sohbette birlikte geliştirilen yöntemler önce AdvisedPractice olarak trial/outcome
+ile izlenir; feature, agenda, playbook, policy veya automation'a sessizce dönüşmez. Ürün
+modular monolith+PostgreSQL ile Meta Read Mirror, Decision Room, Budget Lab, approval-only
+operations, existing-post promotion ve selective standardization dilimleriyle geliştirilir.
+
 ## Başarı
 
 Ürün; pilot kullanıcıların iki platformdaki hesabı tek müşteri görünümünde güvenle

@@ -2,6 +2,9 @@
 
 > Ana plan kümülatiftir. `[x]` yalnız kanıtlı teslimi, `[ ]` kalan işi gösterir.
 
+- [x] Bütün ürün görüşmelerini vizyon, davranış sözleşmesi, yetki paylaşımı, kullanıcı
+  yolculukları ve S0–S6 teslim kapılarıyla birleştiren kanonik ürün distilasyonu.
+
 ## v1 mirası
 
 - [x] **A01 — ürün temeli:** ürün şartnamesi, roadmap ve kanıt zinciri.
@@ -25,6 +28,7 @@
 - [ ] Facebook Page, Instagram, pixel/dataset, app/WhatsApp destination asset graph.
 - [ ] Yayındaki ad copy/spec extraction: primary text/headline/description/caption/CTA/destination/dynamic variants.
 - [ ] Bağlı Instagram/Page post-media inventory, ownership/promotion capability ve güvenli preview.
+- [ ] L0 raw retention/encryption/purge ile connection revoke/disconnect/export/delete lifecycle.
 - [ ] Meta config, targeting özeti, budget owner ve legacy objective mapping.
 - [ ] Geniş metrik/action/action-value/breakdown kataloğu.
 - [ ] Inventory/creative/insights parçalı sync, adaptive page/date slice ve resume.
@@ -45,6 +49,10 @@
 - [ ] Başlangıç objective/internal kategori playbook seti.
 - [ ] Kategori coverage/unmatched/conflict/impact dashboard ve güvenli archive akışı.
 - [ ] PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run.
+- [ ] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi.
+- [ ] Owner statement + official Meta source + experiment/observation provenance ve freshness.
+- [ ] G0→G4 progressive formalization, semantic diff, historical replay ve impact preview.
+- [ ] AdvisedPractice candidate→trial→outcome→standardization lifecycle ve decomposition review.
 
 ## A10 — Zamansal analiz
 
@@ -56,6 +64,12 @@
 - [ ] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.
 - [ ] Hierarchical driver ve creative fatigue/config diagnostics.
 - [ ] Analysis run ledger, dry-run API ve deterministic replay.
+- [ ] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
+- [ ] EffectiveGuidancePack scope filter/ranking/context-budget ve source/conflict trace.
+- [ ] DecisionCadenceProfile, no-change/repeat suppression ve ExperimentRecord lifecycle.
+- [ ] L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.
+- [ ] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
+- [ ] Optional manual/CSV BusinessOutcomeSignal ve Meta-proxy mapping guard.
 
 ## A11 — Bütçe planlama
 
@@ -66,6 +80,7 @@
 - [ ] Fixed/proportional/priority/ladder deterministic allocation.
 - [ ] Keep/conservative/target-seeking simülasyon ve constraint trace.
 - [ ] Versioned proposal ledger/API; artış approval zorunluluğu.
+- [ ] Business outcome target/proxy ayrımı ve yetersiz mapping suppression.
 
 ## A12 — Prompt ve advisor
 
@@ -83,6 +98,11 @@
 - [ ] Session register/heartbeat, dashboard context handoff ve proposal correlation.
 - [ ] Local `reklamzeka` companion ile TTY/passkey HumanPresenceGrant ve ayrı approve/execute.
 - [ ] MCP-capable CLI config ve güvenli allowlist LocalCliAdapter extension point.
+- [ ] Kritik guidance interview, owner+Meta best-practice+evidence karşılaştırması ve eval seti.
+- [ ] Guidance retrieval/context tools ve source/freshness/best-practice claim guard.
+- [ ] Act/test/observe/no-change + cadence ihlali proposal suppression eval'i.
+- [ ] L4/L5 compact context, bounded drill-down ve raw L0 access negatifleri.
+- [ ] draft_advised_practice authority boundary ve standardization bypass negatifleri.
 
 ## A13 — Eylem valfi, scheduler ve rutin
 
@@ -102,6 +122,7 @@
 - [ ] Mevcut Instagram/Page gönderisinden template+audience preset'li promotion preflight ve K4 bundle.
 - [ ] Yeni metin/görsel/video/creative üretmeme boundary ve negatif testleri.
 - [ ] Creative/post spec hash değişiminde stale approval ve yeniden onay.
+- [ ] Meta request/write verify ile platform review/delivery effective state ayrımı.
 
 ## A14 — Kontrol merkezi ve rollout
 
@@ -119,6 +140,10 @@
 - [ ] Kota/alert/deadman/kill-switch/runbook ve staged rollout KPI raporu.
 - [ ] Codex CLI/VS Code/Claude Code local session hub, config/health/handoff ve action queue UI.
 - [ ] Satır-bazlı partial approval inbox ve planlama modu/otonomi kilidi kontrol paneli.
+- [ ] Kritik sohbet + live guidance cards + scope/topic binding + promote-to-policy studio.
+- [ ] AnalysisAgenda, applied guidance, cadence/experiment ve no-change UI yolculuğu.
+- [ ] Practice Lab candidate/trial/outcome/decomposition/standardized artifact UI.
+- [ ] Scheduled analysis in-app inbox ve duplicate-delivery/read-state E2E.
 
 ## Ana plan kapanışı
 

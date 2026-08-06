@@ -22,6 +22,18 @@
 | 13 | eylem valfi ve rutin | AÇIK | 04,10–12 | planlandı; write kapalı |
 | 14 | kontrol merkezi | AÇIK | 07,09–13 | planlandı |
 
+## 2026-08-06 — bütün görüşmelerin kanonik ürün distilasyonu
+
+- Konuşmalardaki ürün niyeti, sınırlar, iç kategori/talimat modeli, analiz ve prompt
+  assembly, bütçe, otonomi, creative/post, dashboard/CLI ve standardizasyon kararları tek
+  davranış doktrininde birleştirildi.
+- “Vizyon / davranış / teslim / açık iş” otoritesi ayrıldı: KUZEY nihai istek, product
+  distillation çalışma modeli, MASTER teslim sırası, REQUIREMENTS kabul hükümleri,
+  CHECKLIST açık işler ve STATE gerçekleşen durumdur.
+- A08–A14 domain stage'leri korunurken S1 içi beş küçük increment ve her S1–S6 diliminin
+  amaç/çıkış kapısı açıklandı. Güncel uygulama odağı değişmedi: S1 Meta Read Mirror.
+- Kaynak: `docs/product/reklamzeka-product-distillation.md`.
+
 ## 2026-08-06 — ana plan konsolidasyonu ve Meta keşfi
 
 - Düzeltme: analiz kapsamı paralel mini-v2 olmaktan çıkarıldı; v1'in A01–A07
@@ -50,12 +62,13 @@
 - Status eylemleri campaign/adset/ad; budget eylemleri yalnız gerçek budget owner campaign/
   adset seviyesidir. Ad-level budget strict şema hatası; activate parent/effective status,
   review/issues ve schedule eligibility ister.
-- Core motorlar modelsiz; `AgentProvider` ile OpenAI/Anthropic adapter, dashboard agent
-  console ve vendor-neutral Streamable HTTP MCP server A12 kapsamına alındı.
+- İlk tasarımda `AgentProvider` ile OpenAI/Anthropic adapter düşünülmüştü; sonraki kullanıcı
+  kararıyla bu kapsam kaldırıldı. Güncel A12 local Codex/Claude Code/diğer CLI + MCP modelidir.
 - Codex/Claude MCP read ve draft/proposal tools kullanabilir; raw Meta writer/execute tool
   alamaz. Approval ve execute application role + A13 valfi + ayrı worker'da kalır.
-- Manual, assisted, automated-read ve policy-automated modlar tanımlandı. Yalnız explicit
-  izinli/cap'li K1/K2 policy-otomatik; K3 artış/activate ve K4 yapısal insan onaylı.
+- Planlama için manual/assisted/automated-read/scheduled-plan; execution için approval-only/
+  policy-limited ayrımı tanımlandı. Yalnız açık cap'li K1/K2 policy-limited olabilir;
+  K3 artış/activate ve K4 yapısal insan onaylı.
 - Kaynaklar: [model-agnostic mimari](../../../docs/architecture/model-agnostic-agent-interface.md),
   ADR-0011 ve resmi Codex/Anthropic MCP dokümanları.
 
@@ -95,7 +108,41 @@
   ActionUnit/spec'e bağlı HumanPresenceGrant üretir. Kaynaklar: ADR-0011 ve
   `docs/architecture/local-cli-agent-bridge.md`.
 
+## 2026-08-06 — agentic guidance ve kademeli katılaştırma
+
+- Talimat modeli iki lane oldu: doğal dil owner strategy/Meta best-practice/observation/
+  experiment önce scoped GuidanceCard/Set; yalnız enforceable clause typed G3 policy.
+- G0 raw→G1 scoped→G2 reviewed→G3 deterministic→G4 automation maturity tanımlandı;
+  G2→G3 semantic diff, historical replay, conflict/impact preview ve kullanıcı onayı ister.
+- Retrieval global→account group/account→objective/funnel→internal category→entity→topic→
+  history deterministic scope filter ve bounded relevance ranking ile EffectiveGuidancePack üretir.
+- Versioned AnalysisAgenda top-down pass ve finding-bazlı bounded drill-down; kullanıcı
+  kategori/grup/başlık subset'i seçebilir.
+- DecisionCadenceProfile ve ExperimentRecord settle/observation/learning/cooldown/repeat
+  guard'ları, act/test/observe/no-change ve inconclusive sonucu ile hiperaktiviteyi bastırır.
+- Başlangıç storage Postgres metadata/JSON/full-text; vector DB erken kapsam değildir.
+  Kaynaklar: ADR-0013 ve `docs/architecture/guidance-deliberation-and-progressive-formalization.md`.
+
+## 2026-08-06 — uçtan uca gap review ve verimli dikey teslim
+
+- Ham Meta verisinden agent bağlamına L0 raw→L1 canonical→L2 feature→L3 window→L4
+  evidence→L5 compact context pipeline'ı ve frozen `EffectiveCampaignContext` eklendi.
+- Agent L4/L5 ile başlar; L1–L3 bounded typed drill-down'dır, L0 raw erişimi yoktur.
+- Agentic sohbet çıktısı `AdvisedPractice` yaşam döngüsüne alınır; sessiz öğrenme yoktur.
+  `StandardizationReview` yalnız uygun parçayı feature/agenda/playbook/guidance/policy veya
+  human judgment olarak ayırır.
+- Optional manual/CSV `BusinessOutcomeSignal`, Meta async review/delivery state'i, raw
+  retention/disconnect ve in-app scheduled-analysis inbox boşlukları kapatıldı.
+- Teslim sırası S1 Meta Read Mirror→S2 Decision Room→S3 Budget Lab→S4 approval-only
+  operations→S5 existing-post promotion→S6 selective standardization olarak sabitlendi.
+- İlk mimari modular monolith+PostgreSQL+DB worker; vector DB, warehouse, event bus,
+  microservice, canlı CRM ve external notification ölçüm/ayrı karar olmadan eklenmez.
+  Kaynaklar: ADR-0014, `docs/architecture/analysis-processing-pipeline.md` ve
+  `docs/discovery/2026-08-06-end-to-end-gap-review.md`.
+
 ## Sıradaki uygulama
 
-**A08/T08.1–T08.3:** secret reference kararı, Meta entity/config şeması ve budget-owner
-resolver. A13'e kadar production write scope veya writer ReklamZeka'ya taşınmaz.
+**Slice 1 / Meta Read Mirror:** A08/T08.1–T08.3 ile secret reference, Meta entity/config
+şeması ve budget-owner resolver; ardından günlük insights/data-quality/L0–L1. Tek gerçek
+hesapla başlayıp ikinci hesap isolation kanıtıyla kapanır. A13'e kadar production write
+scope veya writer ReklamZeka'ya taşınmaz.

@@ -54,7 +54,52 @@ Hesap, kampanya, reklam seti, reklam ve mevcut kreatifler Meta konfigürasyonu, 
 <!-- uy:yetenek/ic-kategori-ve-talimat -->
 ## İç kategori ve kullanıcı talimatı
 boy: epik
-Kullanıcı çoklu iç kategorileri isim ve Meta özellikleriyle eşleyebilmeli; düz metin veya yapılandırılmış talimatını etki ve çatışma önizlemesiyle sürümleyebilmelidir.
+Kullanıcı çoklu iç kategorileri isim ve Meta özellikleriyle eşleyebilmeli; düz metin
+talimatını strict DSL zorunlu olmadan scoped guidance olarak sürümleyebilmeli ve yalnız
+seçtiği enforceable maddeleri etki/çatışma/replay önizlemesiyle policy'ye yükseltebilmelidir.
+
+<!-- uy:yetenek/agentic-guidance-deliberation -->
+## Kritik agentic guidance ve best-practice müzakeresi
+boy: epik
+Kullanıcı analiz/strateji/promotion şablonu oluştururken agent ile amaç, öncelik, istisna,
+kanıt eşiği, observation/cooldown ve no-change koşullarını tartışabilmeli; kendi anlatımları,
+kaynaklı Meta best-practice, gerçek kampanya kanıtı ve experiment sonuçları yan yana
+değerlendirilerek sade, sürümlü GuidanceSet oluşmalıdır.
+
+<!-- uy:yetenek/cok-kapsamli-guidance-erisim -->
+## Genel, grup, kategori ve başlık bazlı guidance erişimi
+boy: epik
+Guidance global, account-group/account, Meta objective/funnel, internal category, lifecycle,
+campaign/adset/ad/creative/post, PromotionTemplate ve topic heading'e bağlanabilmeli; agent
+analizi sırayla yürütürken ilgili setleri kaynak/scope nedeni ve conflictleriyle getirebilmelidir.
+
+<!-- uy:yetenek/stabil-karar-ve-test -->
+## Stabil karar temposu ve tutarlı deney
+boy: epik
+Sistem data settle, minimum observation, learning/cooldown, max karar/hamle sıklığı ve tekrar
+sınırlarıyla hiperaktif optimizasyonu önlemeli; act/test/observe/no-change seçeneklerini ve
+hypothesis→baseline→metric/guardrail→window→winner/loser/inconclusive deney kaydını desteklemelidir.
+
+<!-- uy:yetenek/advised-practice-standardization -->
+## AdvisedPractice ve seçici standardizasyon
+boy: epik
+Agentic sohbette geliştirilen tekrar kullanılabilir yöntem candidate/trial/outcome olarak
+izlenebilmeli; outcome ve kullanıcı review'u sonrası hesaplanabilir feature, agenda/playbook,
+guidance, typed policy veya insan muhakemesi parçalarına ayrılarak standardize edilebilmelidir.
+
+<!-- uy:yetenek/deterministik-on-isleme-context -->
+## Deterministik ön işleme ve kompakt agent context
+boy: epik
+Ham reklam verisi raw→canonical→feature→window/rollup→evidence→compact context hattında
+işlenmeli; agent frozen EffectiveCampaignContext ve bounded drill-down kullanmalı, raw
+payload dump alamamalı ve aynı sürümler replay edilebilir sonuç üretmelidir.
+
+<!-- uy:yetenek/business-outcome-signal -->
+## Gerçek iş sonucu sinyali
+boy: orta
+Meta proxy metriklerine ek olarak qualified lead, appointment, sale/revenue ve invalid lead
+manual/CSV kaynakla bağlanabilmeli; mapping yetersizse sistem bunları Meta conversion ile
+eş anlamlı saymamalı, canlı CRM connector'ı daha sonraki ayrı increment olmalıdır.
 
 <!-- uy:yetenek/butce-planlama-ve-koruma -->
 ## Bütçe planlama ve korunan tahsis

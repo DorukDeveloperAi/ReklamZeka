@@ -38,6 +38,26 @@ Kullanıcı anlatım tercihi system/developer talimatına doğrudan eklenmez; te
 ## Kullanıcı talimatı explicit ve izlenebilirdir
 Kilitli kullanıcı talimatı metrik tavsiyesinden önceliklidir; fakat platform ve hukuk, tenant güvenliği ve sistem hard-safety sınırlarını aşamaz.
 
+<!-- uy:ilke/guidance-policy-ayrimi -->
+## Guidance esnek, harcama kuralı deterministiktir
+Kullanıcının doğal dil stratejisi strict DSL olmadan scoped guidance olarak analizde kullanılabilir; fakat soft guidance bütçe hard constraint'i, approval veya action authorization olamaz. Yalnız kullanıcı tarafından replay/impact ile G3 policy'ye yükseltilmiş madde yürütmeyi bağlayabilir.
+
+<!-- uy:ilke/kaynakli-best-practice -->
+## Best-practice kaynaklı ve tarihli olmalıdır
+Agent model hafızasını resmi Meta best-practice gibi sunamaz. Official guidance source ref, applicable scope, captured/review-by tarihi ve freshness taşır; kullanıcı istisnası ayrı provenance ile korunur.
+
+<!-- uy:ilke/hiperaktif-olma -->
+## Sistem değişiklik üretmek için değişiklik üretmez
+No-change ve observe geçerli kararlardır. Settle olmamış veri, learning/cooldown, yetersiz observation veya yeni kanıt olmadan sistem aynı öneriyi tekrarlamaz; deney ve karar temposu tutarlı olmalıdır.
+
+<!-- uy:ilke/sessiz-ogrenme-yok -->
+## Sohbetten sessiz kural öğrenilmez
+Agentic sohbet AdvisedPractice candidate üretebilir fakat outcome ve açık StandardizationReview olmadan algoritma, policy veya otomasyon değişemez. Bir practice bütünüyle rule yapılmak zorunda değildir; insan muhakemesi olarak kalan kısım açıkça korunur.
+
+<!-- uy:ilke/karmasiklik-kazanilir -->
+## Altyapı karmaşıklığı ölçülerek kazanılır
+İlk çözüm modular monolith, PostgreSQL ve DB-backed worker'dır. Vector database, data warehouse, event bus, microservice veya kara-kutu optimizer yalnız ölçülen hacim/latency/kalite eşiği ve ADR ile eklenebilir; olası gelecek ihtiyaç tek başına gerekçe değildir.
+
 <!-- uy:ilke/eylem-valften-gecer -->
 ## Para harcayan her yol tek valften geçer
 Agent, prompt, schedule veya dashboard ayrıcalıklı write yolu açamaz; her Meta eylemi aynı typed executor, risk, onay, tavan, idempotency ve verify zincirinden geçer.
@@ -56,7 +76,7 @@ ReklamZeka OpenAI/Anthropic model API anahtarı saklamaz ve model API'si çağı
 
 <!-- uy:ilke/model-motoru-degistiremez -->
 ## Model seçimi domain hükmünü değiştiremez
-OpenAI, Anthropic veya başka provider yalnız talimat çevirisi ve kanıtlı anlatım/advisor katmanıdır; classification, policy precedence, analiz formülü, bütçe constraint'i ve action authorization modelsiz deterministik motorların sorumluluğudur.
+Codex, Claude Code veya başka yerel AI CLI yalnız talimat çevirisi, kanıtlı anlatım ve proposal hazırlama istemcisidir; classification, policy precedence, analiz formülü, bütçe constraint'i, promotion template/audience resolution ve action authorization modelsiz deterministik motorların sorumluluğudur.
 
 <!-- uy:ilke/hesap-ve-asset-izolasyonu -->
 ## Hesap ve asset yetkisi ayrı korunur

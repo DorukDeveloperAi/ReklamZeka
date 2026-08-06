@@ -87,6 +87,12 @@ destination + targetAdSet + budgetPlanVersion`
 üzerindedir. Bunlardan biri değişince yalnız etkilenen unit ve downstream approval stale
 olur; yeniden preview ve açık onay gerekir. Eski onay yeni kopyaya taşınmaz.
 
+### T13.14 — Platform review ve delivery state
+Meta request accepted/read-after-write verified, platform review pending/approved/rejected/
+limited ve delivery effective ayrı state/event'tir. Existing-post create başarılı olsa bile
+review/delivery effective olmadan “yayında” sayılmaz. Rejection reason, düzeltme/park ve
+ayrı approved recovery proposal'ı timeline'a bağlanır.
+
 ## Kabul ve kanıt
 
 - Tek anahtar, DB flag veya prompt write açamaz; K3 onaysız reddedilir.
@@ -101,3 +107,4 @@ olur; yeniden preview ve açık onay gerekir. Eski onay yeni kopyaya taşınmaz.
   budget/create/activate bağımlılığı Meta write'ını durdurur.
 - Promotion template/audience preset eksik veya belirsizse proposal create-ready değildir;
   yeni metin/creative üretme talebi kapsam dışı reason code ile reddedilir.
+- Write verified fakat platform review pending/rejected senaryosu yanlış verified-delivery üretmez.

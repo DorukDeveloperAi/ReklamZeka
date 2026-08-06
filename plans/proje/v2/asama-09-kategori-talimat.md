@@ -6,8 +6,9 @@ kosum: tek-ajan
 ## SONUÇ
 
 Kullanıcı kampanya/adset/ad/kreatifleri birden çok iç kategoriyle tanımlar; isim ve
-Meta özellikleriyle otomatik eşleme kurar. Düz metin talimatı ham haliyle korunur,
-strict politika taslağına çevrilir, etki/çatışma önizlemesinden sonra yayınlanır.
+Meta özellikleriyle otomatik eşleme kurar. Düz metin talimatı önce esnek, scoped ve
+retrievable guidance olarak kullanılabilir; yalnız yürütmeyi bağlayacak maddeler strict
+policy'ye etki/çatışma/replay önizlemesiyle yükseltilir.
 
 ## Normatif model
 
@@ -17,6 +18,8 @@ strict politika taslağına çevrilir, etki/çatışma önizlemesinden sonra yay
 - `CategoryProfile`: analysis/rule/instruction/budget/transfer/schedule/action/creative bundle refs.
 - `Selector`: AND grupları, sınırlı OR; raw regex yerine güvenli glob/name pattern.
 - `Instruction`: rawText + normalizedPolicy + scope + priority + reason + lifecycle.
+- `GuidanceSource/Card/Set/Binding`: raw owner statement, sourced Meta guidance,
+  strategy/observation/experiment; topic/scope/version/review ve analysis agenda bağları.
 - `Policy`: hard_constraint/target/preference/exception/prohibition/approval/schedule.
 - `PromotionTemplate`: selector/alias + Meta objective/optimization + actor/destination +
   placement + naming/tracking + reuse/create policy + budget/schedule + AudiencePresetVersion.
@@ -40,8 +43,10 @@ Metric/value/unit/window/operator, allocation/transfer/cap/floor, protect/fix, a
 schedule ve effective dates. Kod/SQL/raw Graph/raw cron alanları negatif parser'da reddedilir.
 
 ### T09.4 — Doğal dil → taslak politika
-Agent raw talimatı değiştirmeden normalize eder; varsayım, ambiguity, missing unit/scope,
-conflict ve affected-entity preview döner. Kullanıcı onayı olmadan published olmaz.
+Agent raw talimatı değiştirmeden önce G0/G1 guidance card/set taslağı oluşturabilir; scope,
+topic, source, must/should/consider/avoid/question, varsayım ve conflict gösterir. Hard
+constraint/action yetkisi istenirse ayrı G3 typed policy taslağı, missing unit/scope,
+affected-entity, historical replay ve impact preview döner. G2→G3 kullanıcı onaysız olmaz.
 
 ### T09.5 — Policy resolver
 Inheritance, specificity, priority, version, effective time; satisfied/violated/suppressed/
@@ -77,6 +82,28 @@ budget/schedule varsayılanları ve zorunlu immutable audience preset. Publish d
 affected entity ve Meta capability preview ister. Agent targeting üretmez; yalnız uygun
 yayınlanmış template/preset sürümünü sebepli önerir, belirsizde kullanıcı seçimi ister.
 
+### T09.12 — Guidance registry ve çoklu binding
+GuidanceSource/Card/Set/Binding şemaları; global→account-group/account→objective/funnel/
+optimization→internal category/lifecycle→campaign/adset/ad/creative/post→PromotionTemplate
+→topic. Raw kullanıcı sözü ile agent sentezi ve official source ayrı, versioned ve aranabilir.
+
+### T09.13 — Best-practice source governance
+Official Meta card'ı source URL/doküman ref, captured/reviewed/review-by date, applicable
+scope ve platform/API version note olmadan official yayınlanamaz. Stale card needs-review;
+güncelleme tarihsel decision run'ını değiştirmez. Kullanıcı exception/rationale yanına bağlanır.
+
+### T09.14 — Progressive formalization
+G0 raw note→G1 scoped guidance→G2 reviewed set/playbook→G3 typed policy/rule/template→G4
+automation eligibility. Promotion wizard semantic diff, kaybolan nüans, historical replay,
+affected entities/conflicts ve rollback gösterir. Guidance kolay publish edilir; G3/G4 zor kapıdır.
+
+### T09.15 — AdvisedPractice ve StandardizationReview
+Agentic müzakereden problem/scope/required inputs/steps/rationale/cadence/exceptions/evidence/
+confidence taşıyan practice candidate çıkar. `candidate→reviewed→trial→validated|conditional|
+rejected→standardization_candidate→standardized|retired`. Review practice'i feature,
+AnalysisAgenda, playbook, cadence, guidance, typed policy ve human-judgment parçalarına
+ayırır; outcome olmadan standardize/automation-eligible olamaz.
+
 ## Kabul ve kanıt
 
 - Aynı entity üç kategori taşır; isim değişse manual lock korunur.
@@ -89,3 +116,8 @@ yayınlanmış template/preset sürümünü sebepli önerir, belirsizde kullanı
 - Conflict deterministik `PARKED_CONFLICT`; prompt sonucu policy'yi değiştiremez.
 - “Bu gönderiyi X bölge lead şablonuyla öne çıkar” aynı template+audience sürümünü resolve
   eder; iki eş template veya eksik preset varsa proposal publish-ready değildir.
+- Kullanıcı uzun bir doğal dil stratejisini strict form doldurmadan kategori+başlık guidance'ı
+  olarak kaydeder; analizde kaynak/scope reason ile geri gelir, action yetkisi vermez.
+- Official Meta best-practice ve owner exception birleşip kaybolmaz; agent çatışmayı yan yana gösterir.
+- Trial sonucu olmayan AdvisedPractice yalnız candidate/reviewed kalır; sistem sohbetten
+  sessizce rule oluşturmaz.

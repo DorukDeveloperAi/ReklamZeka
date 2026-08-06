@@ -29,6 +29,24 @@ zaman içinde analiz, bütçe planlama ve kontrollü aksiyon yönetimidir.
   localhost/STDIO MCP, dashboard handoff/session hub ve human-presence companion mimarisi.
 - Planlama otomasyonundan ayrı varsayılan `approval_only` execution lock ve bundle içindeki
   her Meta mutation için atomik approve/reject/request-changes.
+- Strict-policy-first yaklaşımı iki kanala ayrıldı: doğal dil/scoped/retrievable GuidanceSet
+  başlangıç varsayılanı; yalnız enforceable clause replay/impact ile typed policy'ye yükselir.
+- Owner yaklaşımı + kaynaklı Meta best-practice + campaign evidence + experiment outcome
+  için kritik agentic deliberation, general/group/objective/internal-category/entity/topic
+  retrieval ve versioned AnalysisAgenda.
+- Decision cadence, learning/cooldown/observation/repeat guard, act/test/observe/no-change ve
+  winner/loser/inconclusive experiment ledger ile anti-hyperactivity tasarımı.
+- L0–L5 deterministik ön işleme, frozen EffectiveCampaignContext ve context-budget/bounded
+  drill-down ile ham veri/token yükünü sınırlayan analiz kanıt pipeline'ı.
+- Agentic görüşmelerden versioned AdvisedPractice; outcome-backed trial ve açık
+  StandardizationReview ile yalnız uygun parçayı feature/agenda/playbook/guidance/policy'ye
+  dönüştürme, sessiz öğrenmeme sınırı.
+- Optional manual/CSV business outcome signal, Meta write doğrulamasından ayrı async
+  review/delivery durumu, raw retention/disconnect ve in-app scheduled-analysis inbox.
+- A08–A14 yatay paketini tek seferde kurmak yerine Meta Read Mirror→Decision Room→Budget
+  Lab→approval-only operations→existing-post promotion→selective standardization dikey sırası.
+- Modular monolith+PostgreSQL+DB worker başlangıç sınırı; vector DB/warehouse/event bus/
+  microservice/canlı CRM/external notification ancak ölçülen ihtiyaç ve ayrı kararla.
 
 ## Çelişki düzeltmesi
 

@@ -1,6 +1,6 @@
 {
   "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
-  "damga": "cb9d35877304",
+  "damga": "614e6bc1b077",
   "plans": [
     {
       "slug": "proje",
@@ -21,7 +21,7 @@
       },
       "asamaToplam": 14,
       "asamaKapali": 6,
-      "checklistAcik": 71,
+      "checklistAcik": 106,
       "checklistKapali": 14,
       "sonTur": null,
       "siradaki": {
@@ -80,9 +80,9 @@
   ],
   "legacy": [],
   "todo": {
-    "acik": 71,
+    "acik": 106,
     "kaynak": {
-      "chk": 71,
+      "chk": 106,
       "elle": 0,
       "hukum": 0,
       "kunye": 0,
@@ -150,6 +150,36 @@
         "ref": "td:chk/proje/hf4f8bc",
         "tur": "chk",
         "metin": "Facebook Page, Instagram, pixel/dataset, app/WhatsApp destination asset graph.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hcad3c6",
+        "tur": "chk",
+        "metin": "Yayındaki ad copy/spec extraction: primary text/headline/description/caption/CTA/destination/dynamic variants.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h53917f",
+        "tur": "chk",
+        "metin": "Bağlı Instagram/Page post-media inventory, ownership/promotion capability ve güvenli preview.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/l0",
+        "tur": "chk",
+        "metin": "L0 raw retention/encryption/purge ile connection revoke/disconnect/export/delete lifecycle.",
         "plan": "proje",
         "asama": "08",
         "kapatan": [],
@@ -317,6 +347,56 @@
         "onar": null
       },
       {
+        "ref": "td:chk/proje/h36429c",
+        "tur": "chk",
+        "metin": "PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h7b6132",
+        "tur": "chk",
+        "metin": "GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h095098",
+        "tur": "chk",
+        "metin": "Owner statement + official Meta source + experiment/observation provenance ve freshness.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/g0",
+        "tur": "chk",
+        "metin": "G0→G4 progressive formalization, semantic diff, historical replay ve impact preview.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd13a94",
+        "tur": "chk",
+        "metin": "AdvisedPractice candidate→trial→outcome→standardization lifecycle ve decomposition review.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
         "ref": "td:chk/proje/h837c80",
         "tur": "chk",
         "metin": "Meta config + çoklu internal category + policy composition.",
@@ -370,6 +450,66 @@
         "ref": "td:chk/proje/hf0c5b9",
         "tur": "chk",
         "metin": "Analysis run ledger, dry-run API ve deterministic replay.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h458649",
+        "tur": "chk",
+        "metin": "Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h01f46d",
+        "tur": "chk",
+        "metin": "EffectiveGuidancePack scope filter/ranking/context-budget ve source/conflict trace.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h8b2551",
+        "tur": "chk",
+        "metin": "DecisionCadenceProfile, no-change/repeat suppression ve ExperimentRecord lifecycle.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/l0-l5",
+        "tur": "chk",
+        "metin": "L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h2c48df",
+        "tur": "chk",
+        "metin": "Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd3b659",
+        "tur": "chk",
+        "metin": "Optional manual/CSV BusinessOutcomeSignal ve Meta-proxy mapping guard.",
         "plan": "proje",
         "asama": "10",
         "kapatan": [],
@@ -447,6 +587,16 @@
         "onar": null
       },
       {
+        "ref": "td:chk/proje/h580e41",
+        "tur": "chk",
+        "metin": "Business outcome target/proxy ayrımı ve yetersiz mapping suppression.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
         "ref": "td:chk/proje/he961f5",
         "tur": "chk",
         "metin": "PolicyId/simulationId bağlı genişletilmiş envelope ve claim validator.",
@@ -467,9 +617,9 @@
         "onar": null
       },
       {
-        "ref": "td:chk/proje/hcec6ae",
+        "ref": "td:chk/proje/h149c30",
         "tur": "chk",
-        "metin": "Salt-okur advisor ledger, import/DB saldırı testi ve maliyet/redaksiyon.",
+        "metin": "Salt-okur local-session/advisor ledger, import/DB saldırı testi ve redaksiyon.",
         "plan": "proje",
         "asama": "12",
         "kapatan": [],
@@ -497,9 +647,9 @@
         "onar": null
       },
       {
-        "ref": "td:chk/proje/h3eb00b",
+        "ref": "td:chk/proje/hff54c2",
         "tur": "chk",
-        "metin": "Model-agnostic AgentProvider/model registry ve deterministic fixture provider.",
+        "metin": "LocalAgentClient/session contract ve modelsiz deterministic fixture client.",
         "plan": "proje",
         "asama": "12",
         "kapatan": [],
@@ -507,9 +657,9 @@
         "onar": null
       },
       {
-        "ref": "td:chk/proje/he3a766",
+        "ref": "td:chk/proje/h76738f",
         "tur": "chk",
-        "metin": "OpenAI/Anthropic adapter parity, quota/cost/fallback ve run audit.",
+        "metin": "No-model-API boundary: ReklamZeka'da OpenAI/Anthropic key, SDK veya model network call yok.",
         "plan": "proje",
         "asama": "12",
         "kapatan": [],
@@ -517,9 +667,9 @@
         "onar": null
       },
       {
-        "ref": "td:chk/proje/h339de4",
+        "ref": "td:chk/proje/hd44902",
         "tur": "chk",
-        "metin": "Tenant-scoped Streamable HTTP MCP server, OAuth ve read/proposal tool ayrımı.",
+        "metin": "Localhost Streamable HTTP + project STDIO MCP; auth ve read/proposal tool ayrımı.",
         "plan": "proje",
         "asama": "12",
         "kapatan": [],
@@ -527,9 +677,9 @@
         "onar": null
       },
       {
-        "ref": "td:chk/proje/hd19bf6",
+        "ref": "td:chk/proje/h5d9115",
         "tur": "chk",
-        "metin": "Codex/Claude MCP conformance; raw Meta writer/execute tool expose edilmez.",
+        "metin": "Codex CLI/VS Code + Claude Code MCP conformance; raw writer/human grant expose edilmez.",
         "plan": "proje",
         "asama": "12",
         "kapatan": [],
@@ -537,9 +687,79 @@
         "onar": null
       },
       {
-        "ref": "td:chk/proje/h58ef40",
+        "ref": "td:chk/proje/h0200e6",
         "tur": "chk",
-        "metin": "Dashboard agent console: provider/model, streaming/cancel, citations/tool trace/proposal cards.",
+        "metin": "Session register/heartbeat, dashboard context handoff ve proposal correlation.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h937c5b",
+        "tur": "chk",
+        "metin": "Local `reklamzeka` companion ile TTY/passkey HumanPresenceGrant ve ayrı approve/execute.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/ha7e250",
+        "tur": "chk",
+        "metin": "MCP-capable CLI config ve güvenli allowlist LocalCliAdapter extension point.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/ha40175",
+        "tur": "chk",
+        "metin": "Kritik guidance interview, owner+Meta best-practice+evidence karşılaştırması ve eval seti.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h74010b",
+        "tur": "chk",
+        "metin": "Guidance retrieval/context tools ve source/freshness/best-practice claim guard.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hf8fe34",
+        "tur": "chk",
+        "metin": "Act/test/observe/no-change + cadence ihlali proposal suppression eval'i.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/l4",
+        "tur": "chk",
+        "metin": "L4/L5 compact context, bounded drill-down ve raw L0 access negatifleri.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hae87bb",
+        "tur": "chk",
+        "metin": "draft_advised_practice authority boundary ve standardization bypass negatifleri.",
         "plan": "proje",
         "asama": "12",
         "kapatan": [],
@@ -637,9 +857,9 @@
         "onar": null
       },
       {
-        "ref": "td:chk/proje/h17a640",
+        "ref": "td:chk/proje/h7cd99e",
         "tur": "chk",
-        "metin": "Manual/assisted/automated-read/policy-automated mode inheritance ve kill switch.",
+        "metin": "Manual/assisted/automated-read/scheduled-plan + approval-only/policy-limited inheritance ve kill switch.",
         "plan": "proje",
         "asama": "13",
         "kapatan": [],
@@ -650,6 +870,66 @@
         "ref": "td:chk/proje/h908106",
         "tur": "chk",
         "metin": "Multi-account batch plan; account-bazlı approval/execute/partial recovery.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd8a307",
+        "tur": "chk",
+        "metin": "Varsayılan workspace `approval_only` autonomy lock; expiry/child scope fail-closed.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hdd1197",
+        "tur": "chk",
+        "metin": "ActionBundle→atomik ActionUnit dependency DAG, tek tek approve/reject/request-changes.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/ha9ca7f",
+        "tur": "chk",
+        "metin": "Mevcut Instagram/Page gönderisinden template+audience preset'li promotion preflight ve K4 bundle.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hf0b1da",
+        "tur": "chk",
+        "metin": "Yeni metin/görsel/video/creative üretmeme boundary ve negatif testleri.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hba96e9",
+        "tur": "chk",
+        "metin": "Creative/post spec hash değişiminde stale approval ve yeniden onay.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/ha8b583",
+        "tur": "chk",
+        "metin": "Meta request/write verify ile platform review/delivery effective state ayrımı.",
         "plan": "proje",
         "asama": "13",
         "kapatan": [],
@@ -727,6 +1007,26 @@
         "onar": null
       },
       {
+        "ref": "td:chk/proje/he5cdef",
+        "tur": "chk",
+        "metin": "Yayındaki reklam metni/dynamic variant/CTA/destination/post kaynağı explorer'ı.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h748424",
+        "tur": "chk",
+        "metin": "Instagram/Page post seçici, PromotionTemplate/AudiencePreset ve existing-post guided flow.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
         "ref": "td:chk/proje/h3aff1a",
         "tur": "chk",
         "metin": "Owner/admin/analyst/operator/viewer rol E2E.",
@@ -757,9 +1057,59 @@
         "onar": null
       },
       {
-        "ref": "td:chk/proje/h987e94",
+        "ref": "td:chk/proje/h4b0ecb",
         "tur": "chk",
-        "metin": "Codex/Claude/dashboard agent session, model/provider trace ve action queue handoff UI.",
+        "metin": "Codex CLI/VS Code/Claude Code local session hub, config/health/handoff ve action queue UI.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd6d304",
+        "tur": "chk",
+        "metin": "Satır-bazlı partial approval inbox ve planlama modu/otonomi kilidi kontrol paneli.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h9781dc",
+        "tur": "chk",
+        "metin": "Kritik sohbet + live guidance cards + scope/topic binding + promote-to-policy studio.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h15ef9e",
+        "tur": "chk",
+        "metin": "AnalysisAgenda, applied guidance, cadence/experiment ve no-change UI yolculuğu.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h0c8a74",
+        "tur": "chk",
+        "metin": "Practice Lab candidate/trial/outcome/decomposition/standardized artifact UI.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h2c9b81",
+        "tur": "chk",
+        "metin": "Scheduled analysis in-app inbox ve duplicate-delivery/read-state E2E.",
         "plan": "proje",
         "asama": "14",
         "kapatan": [],

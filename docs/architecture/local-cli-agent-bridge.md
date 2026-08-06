@@ -26,8 +26,10 @@ kullanır. Session çıktısı dashboarda kopyalanmaz; zaten aynı backend'e ID 
 
 1. Kullanıcı dashboardda account/campaign/ad/post ve timeframe seçer.
 2. “CLI'da devam et” kısa ömürlü `HandoffContext` üretir.
-3. Açık session `get_handoff_context` ile aynı seçimi alır.
-4. Agent analiz/promotion template seçeneklerini okur ve proposal üretir.
+3. Açık session `get_handoff_context` ile aynı seçimi, ardından frozen
+   `EffectiveCampaignContext` özetini alır.
+4. Agent L4/L5 kanıtla başlar; gerekirse bounded L1–L3 drill-down yapar ve analiz/promotion
+   template seçeneklerini okuyup proposal üretir.
 5. Proposal dashboard inbox'ta aynı correlation ID ile görünür.
 
 Handoff veri snapshot'ı değil, scoped referans ve version setidir. Session her aracı
@@ -69,4 +71,9 @@ proposal preview'da kaynak olarak görünür; birden fazla adayda kullanıcı se
 - session token workspace/role/tool scope/expiry ve OS user'a bağlı;
 - Meta token ve provider login/session dosyaları MCP response/log'a girmez;
 - arbitrary CLI command, raw Graph, raw SQL, approval grant mint tool'u yok;
+- L0 raw payload/dump yok; context bütçesi ve typed drill-down sınırı tüm client'larda aynı;
 - dashboard/CLI aynı approval-only ve action valve sonucunu alır.
+
+Session bir konuşmadan GuidanceCard veya AdvisedPractice taslağı çıkarabilir. Bunlar
+dashboard Practice Lab'de versioned review/outcome görmeden standardize, publish veya
+enforceable policy olamaz; conversation memory kalıcı öğrenme kaynağı değildir.

@@ -65,8 +65,13 @@ CategoryAssignment
 
 CategoryProfile
   analysisPlaybookRefs[]
+  guidanceSetRefs[]
+  advisedPracticeRefs[]
+  analysisAgendaRef?
+  decisionCadenceRef?
   ruleAndInstructionRefs[]
   budgetEnvelopeOrPoolRef?
+  businessOutcomeBindingRef?
   transferPolicyRefs[]
   scheduleRefs[]
   actionPolicyRefs[]
@@ -122,15 +127,17 @@ Bir kategori aşağıdaki davranışların varsayılanı veya hard constraint'i 
 
 | alan | kategori etkisi |
 |---|---|
-| analiz | KPI, diagnostic, guardrail, min sample, cohort, timeframe |
-| değerlendirme | başarı/hedef, dikkat soruları, karar kılavuzu |
+| analiz | KPI, diagnostic, guardrail, min sample, cohort, timeframe, guidance set, agenda, advised practice |
+| değerlendirme | başarı/hedef, dikkat soruları, karar kılavuzu, decision cadence |
 | bütçe | pool, floor/cap/fixed/reserve, transfer allow/deny, allocation weight |
 | zaman | data-settle delay, learning/cooldown, schedule ve outcome window |
 | aksiyon | pause/activate/increase/decrease izni, cap ve approver |
 | kreatif | beklenen dil/format/CTA/destination; mevcut asset karşılaştırması |
 | rapor | kategori cohort'u, owner ve öncelikli bölümler |
 
-Kategori profile'ları sistem safety veya locked entity instruction'ı ezemez.
+Kategori profile'ları sistem safety veya locked entity instruction'ı ezemez. Profile'a bağlı
+natural-language guidance analiz/advisor için retrievable'dır; action eligibility'yi ancak
+ayrıca G3 typed policy'ye yükseltilmiş clause etkileyebilir.
 
 ## 7. Somut senaryolar
 
@@ -158,6 +165,8 @@ kreatif rotasyonu veya inceleme önerisi approval kuyruğuna gider.
 
 - dimension ve kategori kataloğu; draft/published/archived version;
 - kategori profile'ına bağlı analiz, bütçe, schedule, action ve creative politikaları;
+- kategoriye bağlı guidance sets, advised practices, owner/Meta sources, analysis agenda,
+  decision cadence ve varsa business outcome binding;
 - coverage, unmatched, low-confidence ve cardinality conflict sayıları;
 - assignment listesi ve “neden bu kategoride” evidence'i;
 - campaign→child inheritance ve override trace;
@@ -176,3 +185,7 @@ etki preview ve replacement/disable kararı olmadan arşiv tamamlanmaz.
 5. Parent/child override trace ve effective-context snapshot yeniden üretilebilir.
 6. Protected-budget senaryosunda metrik tavsiyesi hard constraint'i ezemez.
 7. Kullanıcı kategori/profile/mapping'i görür, preview eder, sürümler ve arşivler.
+8. Kategori analizinde ilgili guidance card'lar scope/source reason ile gelir; soft guidance
+   hard constraint gibi uygulanmaz.
+9. Kategoriye bağlı AdvisedPractice yalnız yaşam döngüsü ve kanıtıyla önerilir; kullanıcı
+   kararı olmadan typed policy veya otomasyona dönüşmez.

@@ -44,9 +44,13 @@ veritabanı kaydı gerektirir.
 ## Kaynaklar
 
 - [Ürün brifi](docs/URUN-BRIFI.md)
+- [Kanonik ürün distilasyonu](docs/product/reklamzeka-product-distillation.md)
 - [Kutup yıldızı](utopya/KUZEY.md)
 - [MVP şartnamesi](utopya/vizyon/1-urun-ve-mvp.md)
 - [Kanonik ana roadmap](plans/proje/v2/MASTER.md)
+- [Agentic guidance ve kademeli policy mimarisi](docs/architecture/guidance-deliberation-and-progressive-formalization.md)
+- [L0–L5 analiz pipeline'ı](docs/architecture/analysis-processing-pipeline.md)
+- [Uçtan uca gap review ve vertical slice sırası](docs/discovery/2026-08-06-end-to-end-gap-review.md)
 - [Güncel plan durumu](plans/proje/v2/STATE.md)
 - [Tarihsel v1 planı](plans/proje/v1/MASTER.md)
 - [Pilot hazırlık ve saha giriş kılavuzu](docs/PILOT-READINESS.md)

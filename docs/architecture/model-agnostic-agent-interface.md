@@ -77,14 +77,32 @@ Araçlar:
 - `list_live_ad_creatives`, `list_promotable_posts`, `get_creative_preview`;
 - `list_promotion_templates`, `get_audience_preset`, `preview_post_promotion`;
 - `resolve_effective_policies`, `run_dry_analysis`, `get_findings`, `get_timeline`;
+- `get_effective_campaign_context`, `get_metric_drivers`, `compare_timeframes`;
+- `compare_category_cohort`, `get_pre_post_action`, `get_business_outcome_signals`;
+- `search_guidance`, `get_effective_guidance_pack`, `get_analysis_agenda`;
+- `get_decision_cadence`, `get_experiment_history`, `draft_guidance_set`;
+- `list_advised_practices`, `draft_advised_practice`, `draft_standardization_review`;
+- `promote_guidance_to_policy` (yalnız gated taslak/impact preview);
 - `get_budget_state`, `simulate_budget_plan`, `get_action_status`;
 - `draft_instruction_policy`, `propose_category_assignment`;
 - `create_budget_plan_proposal`, `create_existing_post_promotion_proposal`;
 - `create_action_proposal`, `request_human_approval`.
 
+Agent L4/L5 kompakt context ile başlar. L1–L3'e yalnız tenant-scoped, typed ve bütçeli
+drill-down araçlarıyla iner; L0 raw payload/dump aracı yoktur. `moreAvailable`, truncation
+nedeni ve context version/hash görünürdür.
+
 Yeni creative/metin üretme, asset upload, raw Graph, token read veya writer tool'u yoktur.
 Promotion proposal yalnız yayınlanmış `PromotionTemplate + AudiencePresetVersion` seçer;
 agent targeting spec oluşturamaz/değiştiremez.
+
+Guidance retrieval önce deterministic tenant/scope/topic filtresi, ardından bounded
+relevance ranking kullanır. Natural-language guidance analiz ve proposal framing'ine
+girebilir; hard constraint veya approval/action authorization'a yalnız typed G3 policy
+olarak yükseltildikten sonra girer. Agent official Meta best-practice iddiasını sourceRef/
+freshness olmadan üretemez ve her tur act/test/observe/no-change seçeneklerini değerlendirir.
+Agent sohbetten AdvisedPractice taslağı çıkarabilir; outcome doğrulaması, standardization
+review ve kullanıcı yayını olmadan bunu feature, agenda, policy veya automation'a çeviremez.
 
 ## Dashboard session hub
 
@@ -114,3 +132,5 @@ lock, human-presence ve A13 action valve birbirinden bağımsız üç kapıdır.
 5. Session proposal'ı dashboardda aynı ID ve atomik action unit'larla görünür.
 6. HumanPresenceGrant yalnız kullanıcı companion/UI yolundan ve tek unit/spec için geçerlidir.
 7. AI CLI kapalıyken scheduled deterministic analysis/plan/approval queue çalışır.
+8. L0 raw erişimi reddedilir; aynı frozen EffectiveCampaignContext client'tan bağımsızdır.
+9. AdvisedPractice taslağı sessizce standardize/publish edilemez.
