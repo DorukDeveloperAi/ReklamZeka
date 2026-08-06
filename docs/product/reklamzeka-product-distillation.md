@@ -40,6 +40,8 @@ aynı anda doğru ele alınmasını ister:
 2. **Meta sınıflandırması ile iç kategoriyi karıştırma.** Objective ve optimization
    platform gerçeğidir; hizmet, bölge, dil, kampanya rolü, bütçe havuzu ve koruma sınıfı
    kullanıcının işletme gerçeğidir. Karar ikisinin bileşiminden çıkar.
+   Mecra da bağımsız eksendir: ilk derin işletim sistemi Meta içindir; gelecekte başka
+   mecralar ortak portföye eklenebilir ama platform-native semantics generic tipe ezilmez.
 3. **Esnek düşünce, deterministik sınır.** Agent yorumlar, soru sorar ve plan taslağı
    hazırlar. Metrik, policy precedence, bütçe uzlaşması, yetki, onay ve Meta write valfi
    deterministiktir.
@@ -106,6 +108,11 @@ Bilgi dört farklı otoritede tutulur ve tek bir prompt metninde eritilmez:
 - **Sourced practice:** kaynak/tarih/scope/freshness taşıyan official Meta guidance.
 - **Policy:** bütçe, yasak, cap, approval veya action eligibility'yi bağlayan typed hüküm.
 - **AdvisedPractice:** agent ile birlikte geliştirilen ve denenmeye değer yöntem.
+
+Kullanıcı bunları düz metinle anlatabilir veya yapılandırılmış alanları doğrudan
+düzenleyebilir. Raw owner wording ile agent sentezi ayrı korunur. Dashboardda scope,
+uygulandığı kampanyalar, sürüm, conflict ve geçmiş etkisi görünür; edit yeni sürüm üretir,
+archive tarihsel run'ı silmez. Hard delete yalnız veri yaşam döngüsü politikasına tabidir.
 
 Olgunluk `G0 raw → G1 scoped guidance → G2 reviewed set/playbook → G3 typed
 policy/rule/template → G4 automation-eligible`dır. Geçiş otomatik değildir. G2→G3;
@@ -207,6 +214,8 @@ ReklamZeka OpenAI/Anthropic API key'i saklamaz ve model API'si çağırmaz. Yere
 login/session'ıyla localhost Streamable HTTP veya project STDIO MCP'ye bağlanır. Agent read
 ve draft/proposal araçlarını kullanır; raw Meta writer, approval grant veya execute aracı
 alamaz. Session içi gerçek onay dashboard veya TTY/passkey doğrulamalı companion yoludur.
+Dashboarddaki entity/timeframe/category seçimi kısa ömürlü handoff ile session'a geçer;
+session'da oluşan taslak aynı ID ile dashboard inbox ve timeline'da görünür.
 
 ## 5. Prompt/context eklentisinin doğru kurgusu
 
@@ -268,6 +277,9 @@ Sistem yeni reklam metni, görseli, videosu veya creative varyantı üretmez. Ya
 - post identity/content hash değişirse onayı stale yapar.
 
 Agent serbest targeting JSON yazamaz. Birden çok template adayı varsa kullanıcı seçer.
+Template'ler ID yanında kullanıcı alias'ı, açıklama, örnek ifade ve category/account/actor
+binding'i taşır; “TR saç ekimi remarketing post boost” gibi niyet doğal dille doğru
+yayınlanmış şablona resolve edilebilir, belirsizlikte otomatik seçim yapılmaz.
 
 ## 9. Çok hesap ve izolasyon
 
@@ -292,6 +304,9 @@ A07 gerçek 3 workspace/10 account saha kanıtı kapanışa kadar açıktır; S1
 ### S1 — Meta Read Mirror — şimdi
 
 **Amaç:** Tek gerçek hesapta eksiksiz ve güvenilir read mirror; ardından ikinci hesapta izolasyon.
+
+Güncel uygulanabilir alt plan:
+[Slice 01 — Meta Read Mirror](../../plans/proje/v2/slice-01-meta-read-mirror.md).
 
 İncrement sırası:
 

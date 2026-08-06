@@ -31,6 +31,7 @@ const required = [
   "docs/architecture/guidance-deliberation-and-progressive-formalization.md",
   "docs/architecture/analysis-processing-pipeline.md",
   "plans/proje/v2/MASTER.md",
+  "plans/proje/v2/slice-01-meta-read-mirror.md",
   "plans/proje/v2/REQUIREMENTS.md",
   "plans/proje/v2/asama-08-meta-dijital-ikizi.md",
   "plans/proje/v2/asama-09-kategori-talimat.md",

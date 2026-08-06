@@ -51,6 +51,7 @@ veritabanı kaydı gerektirir.
 - [Agentic guidance ve kademeli policy mimarisi](docs/architecture/guidance-deliberation-and-progressive-formalization.md)
 - [L0–L5 analiz pipeline'ı](docs/architecture/analysis-processing-pipeline.md)
 - [Uçtan uca gap review ve vertical slice sırası](docs/discovery/2026-08-06-end-to-end-gap-review.md)
+- [Aktif S1 Meta Read Mirror yürütme planı](plans/proje/v2/slice-01-meta-read-mirror.md)
 - [Güncel plan durumu](plans/proje/v2/STATE.md)
 - [Tarihsel v1 planı](plans/proje/v1/MASTER.md)
 - [Pilot hazırlık ve saha giriş kılavuzu](docs/PILOT-READINESS.md)
