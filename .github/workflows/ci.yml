@@ -19,6 +19,7 @@ jobs:
       - run: npm run check:security-boundaries
       - run: npm run check:experience
       - run: npm run check:insights
+      - run: npm run check:analysis-platform
       - run: npm run check:pilot-web
       - run: npm run check:pilot-readiness
       - run: npm run db:check

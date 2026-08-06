@@ -30,12 +30,12 @@
   "planlar": [
     {
       "slug": "proje",
-      "v": 1,
-      "durum": "SÜRÜYOR",
-      "asamaKapali": 6,
-      "asamaToplam": 7,
-      "siradaki": "07-rapor ve pilot"
+      "v": 2,
+      "durum": "?",
+      "asamaKapali": 0,
+      "asamaToplam": 0,
+      "siradaki": null
     }
   ],
-  "damga": "6d98bcc2497e"
+  "damga": "9708bbbd13bc"
 }

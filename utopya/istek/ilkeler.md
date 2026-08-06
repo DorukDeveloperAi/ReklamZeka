@@ -25,3 +25,11 @@ Bağlantılar mümkün olan en dar salt-okunur kapsamla kurulur; kimlik bilgiler
 <!-- uy:ilke/kanit-once -->
 ## Öneriden önce kanıt
 Bir içgörü veri kalitesi veya örneklem yetersizliği nedeniyle güvenilir değilse sistem kesin öneri üretmek yerine belirsizliği ve eksik kanıtı gösterir.
+
+<!-- uy:ilke/kampanya-amaci-once -->
+## Değerlendirmeden önce kampanya amacı
+Bir kampanyanın başarısı, doğrulanmış amacı ve optimizasyon olayı bilinmeden tek bir genel KPI ile hükme bağlanamaz. Amaç eşlemesi belirsizse sistem kullanıcı onayı ister; farklı amaçların KPI'larını doğrudan sıralamaz.
+
+<!-- uy:ilke/prompt-politikayi-degistiremez -->
+## Kullanıcı promptu platform politikasını değiştiremez
+Kullanıcı anlatım tercihi system/developer talimatına doğrudan eklenmez; tenant, veri, araç, timeframe, kanıt ve reklam hesabına yazmama sınırlarını genişletemez. Model yalnız deterministik finding kayıtlarını kanıt kimliğiyle açıklayabilir.

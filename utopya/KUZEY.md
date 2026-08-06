@@ -34,6 +34,7 @@ ve kullanıcı onayı tasarımı tamamlandıktan sonra değerlendirilir.
 | # | bölüm | kapsadığı davranış alanı | durum |
 |---|---|---|---|
 | 1 | [ürün ve MVP kapsamı](vizyon/1-urun-ve-mvp.md) | kullanıcı, değer, veri, içgörü, güvenlik ve başarı | başlangıç şartnamesi |
+| 2 | [analiz platformu](vizyon/2-analiz-platformu.md) | kampanya amacı, şablon, kural, timeframe, schedule ve prompt eklentisi | yeni şartname |
 
 ## İstek envanteri (istek/)
 

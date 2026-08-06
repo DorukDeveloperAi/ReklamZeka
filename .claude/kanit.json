@@ -44,6 +44,12 @@
       "timeoutSn": 120
     },
     {
+      "ad": "analiz-platformu",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:analysis-platform"],
+      "timeoutSn": 120
+    },
+    {
       "ad": "pilot-web-yolculugu",
       "sinif": "tam",
       "cmd": ["npm", "run", "check:pilot-web"],

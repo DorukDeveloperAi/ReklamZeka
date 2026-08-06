@@ -1,63 +1,48 @@
 {
   "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
-  "damga": "996b785824e1",
+  "damga": "d372cc9fdddb",
   "plans": [
     {
       "slug": "proje",
-      "v": 1,
-      "title": "ReklamZeka MVP",
+      "v": 2,
+      "title": "ReklamZeka Analiz Platformu",
       "kategori": "proje",
       "ust": null,
-      "durum": "SÜRÜYOR",
+      "durum": "?",
       "kunye": {
-        "hedef": "ReklamZeka, iki reklam platformundan salt-okunur veri alan ve açıklanabilir öneri sunan güvenli bir pilot ürüne dönüşür.",
+        "hedef": null,
         "kritiklik": "yüksek",
         "aciliyet": "normal",
         "hacim": "epik",
         "oncelik": 2,
         "puan": 9,
-        "eksik": [],
-        "oturum": "ot:2026-08-06/reklamzeka-baslangic"
+        "eksik": [
+          "Hedef"
+        ],
+        "oturum": null
       },
-      "asamaToplam": 7,
-      "asamaKapali": 6,
-      "checklistAcik": 6,
-      "checklistKapali": 26,
-      "sonTur": {
-        "baslik": "2026-08-06 — rapor-ve-pilot-hazirlik",
-        "yapilan": "İmzalı/süreli/iptal edilebilir salt-okunur paylaşım, CSV export, dört operasyon alarmı/runbook'u ve pilot ölçüm motoru kuruldu."
-      },
-      "siradaki": {
-        "no": "07",
-        "ad": "rapor ve pilot"
-      },
-      "goal": "/goal plans/proje/v1/asama-07-rapor-ve-pilot.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
-      "depli": true,
-      "hazir": [
-        {
-          "no": "07",
-          "ad": "rapor ve pilot",
-          "goal": "/goal plans/proje/v1/asama-07-rapor-ve-pilot.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
-          "kosum": {
-            "tur": "tek-ajan"
-          }
-        }
-      ],
+      "asamaToplam": 0,
+      "asamaKapali": 0,
+      "checklistAcik": 20,
+      "checklistKapali": 0,
+      "sonTur": null,
+      "siradaki": null,
+      "goal": null,
+      "depli": false,
+      "hazir": [],
       "bekleyen": [],
-      "baslangiclar": [
-        "01"
-      ],
-      "master": "plans/proje/v1/MASTER.md"
+      "baslangiclar": [],
+      "master": "plans/proje/v2/MASTER.md"
     }
   ],
   "legacy": [],
   "todo": {
-    "acik": 6,
+    "acik": 21,
     "kaynak": {
-      "chk": 6,
+      "chk": 20,
       "elle": 0,
       "hukum": 0,
-      "kunye": 0,
+      "kunye": 1,
       "oturum": 0
     },
     "muaf": [
@@ -69,64 +54,214 @@
     ],
     "maddeler": [
       {
-        "ref": "td:chk/proje/a07",
+        "ref": "td:chk/proje/hd782e7",
         "tur": "chk",
-        "metin": "**A07** Paylaşım, geri bildirim, gözlem ve pilot raporu.",
+        "metin": "Sürümlü şablon ve draft/published/archived yaşam döngüsü",
         "plan": "proje",
-        "asama": "07",
+        "asama": "01",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/proje/t07.3",
+        "ref": "td:chk/proje/h6a8f89",
         "tur": "chk",
-        "metin": "T07.3 — Gerçek 3 çalışma alanı/10 hesap saha pilotu (`field_pilot`); fixture web yolculuğu, anonim telemetri dönüştürücüsü, attestation ve üretici hazır, gerçek veri bekliyor",
+        "metin": "Güvenli kural DSL ve negatif parser matrisi",
         "plan": "proje",
-        "asama": "07",
+        "asama": "01",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/proje/h863b65",
+        "ref": "td:chk/proje/he93c16",
         "tur": "chk",
-        "metin": "Tüm aşamalar KAPALI ve kanıt yolları STATE.md'de",
+        "metin": "Rolling/fixed/calendar timeframe + comparison resolver",
+        "plan": "proje",
+        "asama": "01",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hcfd66e",
+        "tur": "chk",
+        "metin": "Workspace rol policy ve audit olayları",
+        "plan": "proje",
+        "asama": "01",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/he095e2",
+        "tur": "chk",
+        "metin": "Schedule sözleşmesi ve IANA timezone doğrulaması",
+        "plan": "proje",
+        "asama": "02",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h678768",
+        "tur": "chk",
+        "metin": "DST/misfire/concurrency politikası",
+        "plan": "proje",
+        "asama": "02",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h75b646",
+        "tur": "chk",
+        "metin": "İdempotent run ledger ve retry sınıfları",
+        "plan": "proje",
+        "asama": "02",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h3e48f5",
+        "tur": "chk",
+        "metin": "Manuel run ile scheduled run aynı yürütücüyü kullanır",
+        "plan": "proje",
+        "asama": "02",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hee1137",
+        "tur": "chk",
+        "metin": "Narrative-only prompt envelope",
+        "plan": "proje",
+        "asama": "03",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h8d143f",
+        "tur": "chk",
+        "metin": "Finding bağlı çıktı şeması ve claim validator",
+        "plan": "proje",
+        "asama": "03",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h1b2ca7",
+        "tur": "chk",
+        "metin": "Injection/secret/tool/tenant negatif matrisi",
+        "plan": "proje",
+        "asama": "03",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/haefd9f",
+        "tur": "chk",
+        "metin": "Model, prompt ve sampling sürüm kaydı",
+        "plan": "proje",
+        "asama": "03",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h19647c",
+        "tur": "chk",
+        "metin": "Şablon liste/editör/dry-run/yayın akışı",
+        "plan": "proje",
+        "asama": "04",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd323ee",
+        "tur": "chk",
+        "metin": "Timeframe, comparison ve schedule editörü",
+        "plan": "proje",
+        "asama": "04",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h8b9ce6",
+        "tur": "chk",
+        "metin": "Run geçmişi, durum, hata ve yeniden çalıştırma",
+        "plan": "proje",
+        "asama": "04",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h43c0fb",
+        "tur": "chk",
+        "metin": "Responsive/a11y browser E2E",
+        "plan": "proje",
+        "asama": "04",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h68d663",
+        "tur": "chk",
+        "metin": "Kota, alarm, runbook ve maliyet guardrail'leri",
+        "plan": "proje",
+        "asama": "05",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h838d34",
+        "tur": "chk",
+        "metin": "Migration/backfill ve feature flag",
+        "plan": "proje",
+        "asama": "05",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h550965",
+        "tur": "chk",
+        "metin": "Güvenlik ve production build kapıları",
+        "plan": "proje",
+        "asama": "05",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hc88b1d",
+        "tur": "chk",
+        "metin": "Kontrollü workspace rollout ve feedback raporu",
+        "plan": "proje",
+        "asama": "05",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:kunye/proje",
+        "tur": "kunye",
+        "metin": "proje v2 — künye eksik: Hedef",
         "plan": "proje",
         "asama": null,
         "kapatan": [],
         "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h2bf4cf",
-        "tur": "chk",
-        "metin": "Hızlı ve tam kanıt sınıfları temiz",
-        "plan": "proje",
-        "asama": null,
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/h38f65e",
-        "tur": "chk",
-        "metin": "Pilot başarı ölçütleri raporlandı",
-        "plan": "proje",
-        "asama": null,
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/proje/he09db3",
-        "tur": "chk",
-        "metin": "İlanlı muafiyetler yeniden doğrulandı",
-        "plan": "proje",
-        "asama": null,
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
+        "onar": "plans/proje/v2/MASTER.md üst bloğuna ekle: Hedef: <tek cümle>"
       }
     ]
   }
