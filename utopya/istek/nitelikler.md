@@ -11,4 +11,20 @@
 > Bu seviyenin ne anlama geldiği + neden önemli olduğu — tek paragraf.
 > ```
 
-*(envanter boş — ilk girişler vizyon koşusunda (/vizyoner) doğar)*
+<!-- uy:nitelik/brief-baglilik -->
+## Brief bağlılığı mutlaktır
+esik: brief'e bağlanamayan öneri sayısı = 0 (şema kısıtı + test)
+Rastgele AI fikri istemiyorum: her skor ve öneri hangi brief'e, hangi metriğe, hangi
+eşiğe dayandığını söylemek zorunda; söyleyemeyen kayıt sistemde var olamamalı.
+
+<!-- uy:nitelik/paused-garanti -->
+## PAUSED garantisi test edilmiş olmalı
+esik: ACTIVE-create engeli + PAUSED zorunluluğu birim testleri sürekli yeşil; canlı provada geri-okuma PAUSED
+Platformun varsayılanına güvenmiyorum; yeni nesnenin PAUSED doğduğu benim kodumun
+garantisi olmalı ve bu garanti hem testte hem canlı geri-okumada kanıtlanmalı.
+
+<!-- uy:nitelik/gate-temiz -->
+## Governance kapıları hep temiz
+esik: agac.mjs --gate PASS + pytest yeşil + terminoloji lint'i temiz (CI'da)
+Plan ağacı, oturum defteri ve kod tabanı her an denetlenebilir durumda olmalı; bayat
+INDEX, künyesiz plan, çıplak terim kullanımı birikmeden kapıda yakalanmalı.

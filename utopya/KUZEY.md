@@ -19,14 +19,27 @@
 
 ## Amaç ve kapsam
 
-*(İlk vizyon koşusunda doldurulur: proje nedir, bu şartname hangi davranış alanlarını
-tanımlar, nihai durumda kullanıcıya ne sunulur.)*
+ReklamZeka, Doruk Sağlık Grubu'nun Meta reklam operasyonu için **brief-temelli,
+kontrol-öncelikli, sürekli çalışan bir reklam yardımcı ajanıdır**. Nihai durumda
+kullanıcıya sunulan: Meta reklam verisi kayıpsız kendi ambarında durur; her İç Kampanya
+kullanıcının brief'ine ve amaç kapsamından türeyen rubriğe göre iki düzeyde (birim +
+portföy) değerlendirilir; bütçe/portföy önerileri gerekçeli diff'ler olarak onay
+kuyruğuna düşer; Meta'ya dokunan her yazma insan onayından geçer ve append-only karar
+günlüğüyle izlenir; digest bir ürün olarak üretilip kanallara (Telegram, panel, …)
+dağıtılır; metin yazarlığı kısıtlarını kullanıcı koyar, sistem mekanik uygular. AI
+vardır ama otonom değildir; brief'e bağlanamayan öneri üretilmez. Bu şartname beş
+davranış alanını tanımlar: veri edinimi, brief yargısı, insan hakimiyeti, uyum güveni,
+açık uçlu büyüme.
 
 ## Şartname bölümleri (vizyon/)
 
 | # | bölüm | kapsadığı davranış alanı | durum |
 |---|---|---|---|
-| — | *(ilk vizyon koşusunda açılır)* | | |
+| 1 | [veri-gercegi](vizyon/1-veri-gercegi.md) | Meta verisinin kayıpsız, dayanıklı, eşleme-bütün edinimi | taslak (2026-08-06) |
+| 2 | [brief-yargisi](vizyon/2-brief-yargisi.md) | brief'e/rubriğe bağlı iki-düzey değerlendirme; ölçülemeyen dürüstlüğü | taslak (2026-08-06) |
+| 3 | [insan-hakimiyeti](vizyon/3-insan-hakimiyeti.md) | diff→onay hattı, PAUSED garantisi, karar günlüğü, digest=ürün | taslak (2026-08-06) |
+| 4 | [uyum-guveni](vizyon/4-uyum-guveni.md) | kullanıcı-tanımlı metin kural motoru, pasif başlangıç paketi, KVKK sınırı | taslak (2026-08-06) |
+| 5 | [acik-uclu-buyume](vizyon/5-acik-uclu-buyume.md) | dikey-agnostik motor, konfigle genişleme, CRM v2 kapısı | taslak (2026-08-06) |
 
 ## İstek envanteri (istek/)
 

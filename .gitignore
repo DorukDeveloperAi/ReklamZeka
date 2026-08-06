@@ -1,0 +1,7 @@
+__pycache__/
+*.egg-info/
+.venv/
+warehouse.db
+config/settings.yaml
+*.env
+.env*

@@ -11,4 +11,25 @@
 > Ne istendiği + neden — tek paragraf, kullanıcı sesi esas.
 > ```
 
-*(envanter boş — ilk girişler vizyon koşusunda (/vizyoner) doğar)*
+<!-- uy:hedef/mvp-salt-okuma-dongusu -->
+## MVP: salt-okuma değerlendirme döngüsü ayakta
+boy: orta
+Meta verim günlük çekilsin, iki zıt ailem (Marka Doktor boost dünyası ve Satış dönüşüm
+dünyası) Sheets'te tanımlı olsun, gerçek İç Kampanyalarım eşlenmiş olsun ve her gün
+brief-gerekçeli skorlarla bir digest alayım — hiçbir yazma olmadan; önce doğru yargı,
+sonra yazma yetkisi.
+
+<!-- uy:hedef/onayli-yazma-hatti -->
+## Onaylı yazma hattı: diff'ten PAUSED nesneye
+boy: orta
+Sistemin ürettiği her öneriyi panelde/CLI'da diff olarak görüp tek tek onaylayayım;
+onayladığım işlem Meta'da açıkça PAUSED üretilsin, geri-okumayla doğrulansın, karar
+günlüğüne işlensin ve gerekirse geri alınabilsin — aktivasyon her zaman benim ayrı
+insan eylemim kalsın.
+
+<!-- uy:hedef/butce-danismani -->
+## Bütçe tahsis danışmanı
+boy: orta
+Bütçesi kategoriye tanımlı İç Kampanya portföylerinde, kategori amacını maksimize eden
+bütçe kaydırma önerilerini (marjinal verime dayalı, Advantage+ durumunu bozmayan)
+gerekçeli diff'ler olarak alayım; hiçbiri onayımsız uygulanmasın.

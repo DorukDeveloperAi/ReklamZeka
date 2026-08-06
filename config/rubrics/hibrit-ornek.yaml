@@ -1,0 +1,6 @@
+# Hibrit amaç kapsamı örneği — bileşik skor (MASTER §5)
+# Yeni hibrit = yeni YAML + AMAC_KAPSAMLARI sekmesine satır; kod değişmez.
+goal_scope: bilinirlik_takipci_hibrit
+composite_weights:
+  bilinirlik: 0.6
+  takipci: 0.4
