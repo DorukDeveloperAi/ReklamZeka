@@ -70,6 +70,7 @@ export class MetaConnectionService {
       graphApiVersion: input.graphApiVersion ?? META_GRAPH_API_VERSION,
       accessMode: "read_only",
       status: "active",
+      lifecycleGeneration: 1,
       secretReference: input.secretReference,
       capabilitySnapshot: null,
       createdAt: timestamp,
@@ -114,7 +115,10 @@ export class MetaConnectionService {
       capabilitySnapshot: snapshot,
       updatedAt: snapshot.capturedAt,
     });
-    await this.options.connections.save(updated);
+    await this.options.connections.save(updated, {
+      expectedLifecycleGeneration: connection.lifecycleGeneration,
+      expectedStatus: "active",
+    });
     this.options.audit.append({
       workspaceId,
       actorId: membership.userId,
@@ -173,12 +177,16 @@ export class MetaConnectionService {
     const updated: MetaConnection = Object.freeze({
       ...connection,
       status: target,
+      lifecycleGeneration: connection.lifecycleGeneration + 1,
       capabilitySnapshot: connection.capabilitySnapshot,
       updatedAt: timestamp,
       disconnectedAt: target === "disconnected" ? timestamp : connection.disconnectedAt,
       revokedAt: target === "revoked" ? timestamp : connection.revokedAt,
     });
-    await this.options.connections.save(updated);
+    await this.options.connections.save(updated, {
+      expectedLifecycleGeneration: connection.lifecycleGeneration,
+      expectedStatus: connection.status,
+    });
     this.options.audit.append({
       workspaceId,
       actorId: membership.userId,
@@ -205,8 +213,12 @@ export class MetaConnectionService {
     await this.options.connections.save(Object.freeze({
       ...connection,
       status: "invalid",
+      lifecycleGeneration: connection.lifecycleGeneration + 1,
       updatedAt: timestamp,
-    }));
+    }), {
+      expectedLifecycleGeneration: connection.lifecycleGeneration,
+      expectedStatus: "active",
+    });
     this.options.audit.append({
       workspaceId: connection.workspaceId,
       actorId,

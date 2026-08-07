@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { AuthorizationError, type WorkspaceMembership } from "@/security/authorization";
 import { AppendOnlyAuditLog } from "@/security/audit";
 import { ConnectorError } from "@/connectors/contract";
-import { InMemoryMetaConnectionRepository } from "@/connectors/meta/connection-repository";
+import {
+  InMemoryMetaConnectionRepository,
+  MetaConnectionConflictError,
+} from "@/connectors/meta/connection-repository";
 import { MetaConnectionLifecycleError, MetaConnectionService } from "@/connectors/meta/connection-service";
 import { inspectMetaConnection } from "@/connectors/meta/doctor";
 import { MetaGraphClient, type MetaFetch } from "@/connectors/meta/graph-client";
@@ -11,6 +14,9 @@ import {
   InMemoryMetaSecretRepository,
   MetaSecretAccessError,
 } from "@/connectors/meta/secret-repository";
+import { DrizzleEnvironmentMetaSecretRepository } from "@/connectors/meta/environment-secret-drizzle-repository";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type * as databaseSchema from "@/db/schema";
 
 const fixtureToken = "fixture-sensitive-meta-token";
 const principalId = "1234567890123456";
@@ -178,6 +184,8 @@ describe("Meta connection lifecycle boundary", () => {
     await expect(secrets.resolve(reference, { workspaceId: "workspace-a", connectionId })).rejects.toBeInstanceOf(MetaSecretAccessError);
     await expect(service.doctor({ userId: "admin-a" }, "workspace-a", connectionId)).rejects.toBeInstanceOf(MetaConnectionLifecycleError);
     expect(audit.list("workspace-a").at(-1)?.metadata).toMatchObject({ secretUsable: false, upstreamTokenInvalidated: false, writeOperations: 0 });
+    await expect(service.disconnect({ userId: "admin-a" }, "workspace-a", connectionId))
+      .resolves.toMatchObject({ status: "disconnected", lifecycleGeneration: 2 });
   });
 
   it("destroys a revoked local reference without pretending to call Meta's writer surface", async () => {
@@ -188,6 +196,22 @@ describe("Meta connection lifecycle boundary", () => {
     const result = await service.revoke({ userId: "admin-a" }, "workspace-a", connectionId);
     expect(result).toMatchObject({ upstreamTokenInvalidated: false, reason: "read_only_boundary", connection: { status: "revoked" } });
     await expect(secrets.resolve(reference, { workspaceId: "workspace-a", connectionId })).rejects.toBeInstanceOf(MetaSecretAccessError);
+    await expect(service.revoke({ userId: "admin-a" }, "workspace-a", connectionId))
+      .resolves.toMatchObject({ upstreamTokenInvalidated: false, connection: { status: "revoked", lifecycleGeneration: 2 } });
+  });
+
+  it("rejects a stale lifecycle save after a guarded close", async () => {
+    const { secrets, connections, service } = setup();
+    const connectionId = "connection-race";
+    const reference = secrets.store({ workspaceId: "workspace-a", connectionId }, fixtureToken);
+    await service.register({ actor: { userId: "admin-a" }, workspaceId: "workspace-a", connectionId, displayName: "A", secretReference: reference });
+    const stale = await connections.find("workspace-a", connectionId);
+    await service.disconnect({ userId: "admin-a" }, "workspace-a", connectionId);
+
+    await expect(connections.save({ ...stale, displayName: "stale doctor" }, {
+      expectedLifecycleGeneration: stale.lifecycleGeneration,
+      expectedStatus: "active",
+    })).rejects.toBeInstanceOf(MetaConnectionConflictError);
   });
 
   it("allows a disconnected reference to be destroyed by a later local revoke", async () => {
@@ -226,5 +250,15 @@ describe("transitional environment secret reference", () => {
     await expect(secrets.resolve(reference, scope)).resolves.toBe("token-v1");
     environment.META_ACCESS_TOKEN = "token-v2";
     await expect(secrets.resolve(reference, scope)).resolves.toBe("token-v2");
+  });
+
+  it("uses deterministic restart-durable references and rejects non-allowlisted env bindings", () => {
+    const database = {} as NodePgDatabase<typeof databaseSchema>;
+    const first = new DrizzleEnvironmentMetaSecretRepository(database, { META_ACCESS_TOKEN: "one" });
+    const restarted = new DrizzleEnvironmentMetaSecretRepository(database, { META_ACCESS_TOKEN: "two" });
+    const scope = { workspaceId: "workspace-a", connectionId: "connection-a" };
+    expect(restarted.reference(scope)).toEqual(first.reference(scope));
+    expect(() => first.reference(scope, "DATABASE_URL")).toThrow(MetaSecretAccessError);
+    expect(() => first.reference(scope, "NEXT_PUBLIC_META_ACCESS_TOKEN")).toThrow(MetaSecretAccessError);
   });
 });

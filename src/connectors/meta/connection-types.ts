@@ -22,6 +22,7 @@ export type MetaSecretReference = Readonly<{
   id: string;
   provider: "environment" | "memory";
   keyVersion: number;
+  bindingName?: string;
 }>;
 
 export type MetaCapabilityEvidence = Readonly<{
@@ -54,6 +55,7 @@ export type MetaConnection = Readonly<{
   graphApiVersion: string;
   accessMode: "read_only";
   status: MetaConnectionStatus;
+  lifecycleGeneration: number;
   secretReference: MetaSecretReference;
   capabilitySnapshot: MetaCapabilitySnapshot | null;
   createdAt: string;

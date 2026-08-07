@@ -8,7 +8,10 @@ export class MetaConnectionNotFoundError extends Error {
 }
 
 export interface MetaConnectionRepository {
-  save(connection: MetaConnection): Promise<void>;
+  save(connection: MetaConnection, guard?: Readonly<{
+    expectedLifecycleGeneration: number;
+    expectedStatus: MetaConnection["status"];
+  }>): Promise<void>;
   find(workspaceId: string, connectionId: string): Promise<MetaConnection>;
   list(workspaceId: string): Promise<readonly MetaConnection[]>;
 }
@@ -16,9 +19,17 @@ export interface MetaConnectionRepository {
 export class InMemoryMetaConnectionRepository implements MetaConnectionRepository {
   private readonly connections = new Map<string, MetaConnection>();
 
-  async save(connection: MetaConnection): Promise<void> {
+  async save(connection: MetaConnection, guard?: Readonly<{
+    expectedLifecycleGeneration: number;
+    expectedStatus: MetaConnection["status"];
+  }>): Promise<void> {
     const existing = this.connections.get(connection.id);
     if (existing && existing.workspaceId !== connection.workspaceId) throw new MetaConnectionNotFoundError();
+    if (guard && (!existing
+      || existing.lifecycleGeneration !== guard.expectedLifecycleGeneration
+      || existing.status !== guard.expectedStatus)) {
+      throw new MetaConnectionConflictError();
+    }
     this.connections.set(connection.id, structuredClone(connection));
   }
 
@@ -32,5 +43,12 @@ export class InMemoryMetaConnectionRepository implements MetaConnectionRepositor
     return [...this.connections.values()]
       .filter((connection) => connection.workspaceId === workspaceId)
       .map((connection) => structuredClone(connection));
+  }
+}
+
+export class MetaConnectionConflictError extends Error {
+  constructor() {
+    super("Meta connection lifecycle changed concurrently");
+    this.name = "MetaConnectionConflictError";
   }
 }

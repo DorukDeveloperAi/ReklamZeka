@@ -2,6 +2,7 @@ import {
   type AnyPgColumn,
   bigint,
   boolean,
+  check,
   date,
   doublePrecision,
   index,
@@ -15,6 +16,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const membershipRole = pgEnum("membership_role", ["owner", "admin", "analyst", "viewer"]);
 export const sourcePlatform = pgEnum("source_platform", ["meta_ads", "google_ads", "csv"]);
@@ -107,10 +109,7 @@ export const workspaces = pgTable("workspaces", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/**
- * Secret-free connection metadata. Credentials remain in connection_secrets and
- * are deliberately not exposed through this relation.
- */
+/** Secret-free connection and binding metadata. Credential values stay in the server environment. */
 export const metaConnections = pgTable("meta_connections", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
@@ -126,7 +125,15 @@ export const metaConnections = pgTable("meta_connections", {
   capabilityCheckedAt: timestamp("capability_checked_at", { withTimezone: true }),
   tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
   dataAccessExpiresAt: timestamp("data_access_expires_at", { withTimezone: true }),
+  secretReferenceId: text("secret_reference_id"),
+  secretProvider: text("secret_provider"),
+  secretKeyVersion: integer("secret_key_version"),
+  secretBindingName: text("secret_binding_name"),
+  secretDisabledAt: timestamp("secret_disabled_at", { withTimezone: true }),
+  secretDestroyedAt: timestamp("secret_destroyed_at", { withTimezone: true }),
+  lifecycleGeneration: integer("lifecycle_generation").notNull().default(1),
   disconnectedAt: timestamp("disconnected_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -135,6 +142,36 @@ export const metaConnections = pgTable("meta_connections", {
     table.externalConnectionKey,
   ),
   index("meta_connections_workspace_status_idx").on(table.workspaceId, table.status),
+  check("meta_connections_lifecycle_generation_positive", sql`${table.lifecycleGeneration} >= 1`),
+  check("meta_connections_secret_metadata_complete", sql`
+    (
+      ${table.secretReferenceId} is null
+      and ${table.secretProvider} is null
+      and ${table.secretKeyVersion} is null
+      and ${table.secretBindingName} is null
+    ) or (
+      ${table.secretReferenceId} is not null
+      and ${table.secretProvider} = 'environment'
+      and ${table.secretKeyVersion} >= 1
+      and ${table.secretBindingName} is not null
+    )
+  `),
+  check("meta_connections_destroy_implies_disabled", sql`
+    ${table.secretDestroyedAt} is null or ${table.secretDisabledAt} is not null
+  `),
+  check("meta_connections_lifecycle_consistent", sql`
+    ${table.secretReferenceId} is null or (
+      (
+        ${table.status} = 'revoked'
+        and ${table.secretDisabledAt} is not null
+        and ${table.secretDestroyedAt} is not null
+        and ${table.revokedAt} is not null
+      ) or (
+        ${table.status} <> 'revoked'
+        and ${table.revokedAt} is null
+      )
+    )
+  `),
 ]);
 
 export const memberships = pgTable("memberships", {
