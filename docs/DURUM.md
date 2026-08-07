@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 8a37fe34eb51 -->
+<!-- durum-damga: 12ebf063ff34 -->
 
 ## Künye
 
@@ -14,13 +14,16 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 35 |
+| iş commit'i (tüm geçmiş) | 38 |
 | ilk / son iş | 2026-08-06 / 2026-08-07 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-07 | `feat` | secure local runtime and practice lifecycle | `ec1eff7a4` |
+| 2026-08-07 | `feat` | connect read model and analysis data | `5ef5e0145` |
+| 2026-08-07 | `fix` | harden schedule and observation boundaries | `fa106d121` |
 | 2026-08-07 | `feat` | persist versioned schedules and inbox | `920083baf` |
 | 2026-08-07 | `feat` | add deterministic findings and ledger binding | `af656e3c5` |
 | 2026-08-07 | `feat` | persist and orchestrate decision room | `4d0a37fd7` |
@@ -33,18 +36,15 @@
 | 2026-08-07 | `feat` | add workspace tombstone boundary | `4260f37f4` |
 | 2026-08-07 | `feat` | persist secure connection lifecycle | `4759f711a` |
 | 2026-08-07 | `feat` | define safe data lifecycle boundary | `71978fe8e` |
-| 2026-08-07 | `feat` | classify external snapshot changes | `4542aa6b5` |
-| 2026-08-07 | `docs` | close S1.4 evidence gate | `1fd18b530` |
-| 2026-08-07 | `test` | prove live S1.4 persistence | `019cd6d7f` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 23
+- `feat        ` ████████████████████████ 25
 - `test        ` ████ 4
 - `docs        ` ███ 3
 - `?           ` ██ 2
+- `fix         ` ██ 2
 - `security    ` ██ 2
-- `fix         ` █ 1
 
 ## Planlar
 

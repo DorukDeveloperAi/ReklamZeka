@@ -4,6 +4,33 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "ec1eff7a4",
+      "tarih": "2026-08-07",
+      "konu": "feat(decision): secure local runtime and practice lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "5ef5e0145",
+      "tarih": "2026-08-07",
+      "konu": "feat(decision): connect read model and analysis data",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "fa106d121",
+      "tarih": "2026-08-07",
+      "konu": "fix(decision): harden schedule and observation boundaries",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
       "hash": "920083baf",
       "tarih": "2026-08-07",
       "konu": "feat(decision): persist versioned schedules and inbox",
@@ -110,39 +137,12 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "4542aa6b5",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): classify external snapshot changes",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "1fd18b530",
-      "tarih": "2026-08-07",
-      "konu": "docs(meta): close S1.4 evidence gate",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "019cd6d7f",
-      "tarih": "2026-08-07",
-      "konu": "test(meta): prove live S1.4 persistence",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 23
+      "adet": 25
     },
     {
       "kapsam": "test",
@@ -157,15 +157,15 @@
       "adet": 2
     },
     {
-      "kapsam": "security",
+      "kapsam": "fix",
       "adet": 2
     },
     {
-      "kapsam": "fix",
-      "adet": 1
+      "kapsam": "security",
+      "adet": 2
     }
   ],
-  "isSayisi": 35,
+  "isSayisi": 38,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "8a37fe34eb51"
+  "damga": "12ebf063ff34"
 }

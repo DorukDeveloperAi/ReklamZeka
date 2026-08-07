@@ -143,7 +143,7 @@ function ref(value: unknown): string {
   return value;
 }
 
-function validateAssets(
+export function validateDecisionRoomAnalysisRuntimeAssets(
   input: Parameters<DecisionRoomAnalysisPort["execute"]>[0],
   assets: DecisionRoomAnalysisRuntimeAssets,
 ): void {
@@ -305,7 +305,7 @@ export class DecisionRoomDeterministicAnalysisRuntime implements DecisionRoomAna
       if (error instanceof DecisionRoomAnalysisRuntimeError) throw error;
       throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
     }
-    validateAssets(input, prepared);
+    validateDecisionRoomAnalysisRuntimeAssets(input, prepared);
 
     const evaluated = [] as Array<Readonly<{
       check: DecisionRoomAnalysisRuntimeCheck;
