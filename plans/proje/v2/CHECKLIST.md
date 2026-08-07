@@ -39,7 +39,17 @@
 - [x] Meta config/targeting özeti, CBO/ABO budget-owner resolver ve versioned legacy
   objective mapping çekirdeği.
 - [ ] Geniş metrik/action/action-value/breakdown kataloğu.
+  - [x] Extensible metric contract; additive/non-additive/derived, action/action-value,
+    attribution ve availability provenance çekirdeği.
+  - [ ] Canlı field catalog, breakdown uyumluluk matrisi ve gerçek payload coverage.
 - [ ] Inventory/creative/insights parçalı sync, adaptive page/date slice ve resume.
+  - [x] Deterministik planner, bağımsız stream/slice state, bounded retry, adaptive page,
+    idempotency, partial success ve durable cursor restore.
+  - [x] Portfolio/stream/run/slice/daily-insight persistence şeması, transaction adapter,
+    somut Drizzle repository ve hash-only replay ledger.
+  - [x] GET-only Graph transport; hierarchy/creative-post/insight edge, cursor ve usage
+    headroom binding'i; canlı sınırlı smoke'ta 0 write.
+  - [ ] Migration uygulanmış kalıcı PostgreSQL worker restart/partial-run E2E.
 - [ ] Snapshot diff ve external/manual intervention timeline olayı.
 - [ ] Capability/data-quality raporu ve Meta read-only E2E.
   - [x] Canlı inventory/capability smoke: 5 hesap, 22 Page, 8 Instagram, 422 campaign,

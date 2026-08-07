@@ -524,6 +524,28 @@ export const metaSyncSlices = pgTable("meta_sync_slices", {
 ]);
 
 /**
+ * Hash-only replay ledger. Canonical payloads live in the digital-twin/insight
+ * tables; this ledger only lets a restarted worker distinguish unchanged input.
+ */
+export const metaSyncRecordLedger = pgTable("meta_sync_record_ledger", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  metaConnectionId: uuid("meta_connection_id").notNull().references(() => metaConnections.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull().references(() => adAccounts.id, { onDelete: "cascade" }),
+  streamType: metaSyncStreamType("stream_type").notNull(),
+  entityLevel: metaInsightEntityLevel("entity_level"),
+  recordIdentity: text("record_identity").notNull(),
+  snapshotHash: text("snapshot_hash").notNull(),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  uniqueIndex("meta_sync_record_ledger_workspace_connection_identity_unique").on(
+    table.workspaceId, table.metaConnectionId, table.recordIdentity,
+  ),
+  index("meta_sync_record_ledger_account_stream_idx").on(table.adAccountId, table.streamType),
+]);
+
+/**
  * One canonical daily Meta entity snapshot. Null currency/timezone/window never
  * means a default: fieldAvailability records unsupported or permission gaps.
  */

@@ -5,6 +5,7 @@ import {
   metaDailyInsightMetrics,
   metaDailyInsights,
   metaPortfolioSyncRuns,
+  metaSyncRecordLedger,
   metaSyncRuns,
   metaSyncSlices,
   metaSyncStreams,
@@ -23,9 +24,9 @@ function fixture(): MetaDailyInsightInput {
 describe("Meta sync persistence schema", () => {
   it("keeps parent run, independent stream, slice and canonical daily insight identities explicit", () => {
     expect([
-      metaPortfolioSyncRuns, metaSyncStreams, metaSyncRuns, metaSyncSlices, metaDailyInsights, metaDailyInsightMetrics,
+      metaPortfolioSyncRuns, metaSyncStreams, metaSyncRuns, metaSyncSlices, metaSyncRecordLedger, metaDailyInsights, metaDailyInsightMetrics,
     ].map(getTableName)).toEqual([
-      "meta_portfolio_sync_runs", "meta_sync_streams", "meta_sync_runs", "meta_sync_slices", "meta_daily_insights", "meta_daily_insight_metrics",
+      "meta_portfolio_sync_runs", "meta_sync_streams", "meta_sync_runs", "meta_sync_slices", "meta_sync_record_ledger", "meta_daily_insights", "meta_daily_insight_metrics",
     ]);
     expect(getTableColumns(metaSyncStreams)).toMatchObject({
       workspaceId: expect.anything(), metaConnectionId: expect.anything(), adAccountId: expect.anything(),
@@ -36,6 +37,10 @@ describe("Meta sync persistence schema", () => {
     expect(getTableColumns(metaSyncSlices)).toMatchObject({
       entityLevel: expect.anything(), dateStart: expect.anything(), dateStop: expect.anything(), cursor: expect.anything(),
       checkpoint: expect.anything(), attemptCount: expect.anything(), retryAt: expect.anything(), errorClassification: expect.anything(),
+    });
+    expect(getTableColumns(metaSyncRecordLedger)).toMatchObject({
+      workspaceId: expect.anything(), metaConnectionId: expect.anything(), adAccountId: expect.anything(),
+      streamType: expect.anything(), recordIdentity: expect.anything(), snapshotHash: expect.anything(),
     });
     expect(getTableColumns(metaDailyInsights)).toMatchObject({
       entityLevel: expect.anything(), dateStart: expect.anything(), dateStop: expect.anything(), attributionLabel: expect.anything(),

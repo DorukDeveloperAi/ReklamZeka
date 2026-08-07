@@ -14,7 +14,7 @@
 | 05 | performans deneyimi | KAPALI | 03,04 | `check:experience` + browser QA |
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
-| 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1 read-only connection sözleşmesi ve S1.2 digital-twin core kanıtlı; S1.3 parçalı sync sırada |
+| 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.3 kodu ve canlı GET transport kanıtlı; migration uygulanmış PostgreSQL restart kabulü sırada |
 | 09 | kategori ve talimat | AÇIK | 08 | requirement/precedence tasarımı tamam; uygulama sırada |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
 | 11 | bütçe planlama | AÇIK | 09,10 | planlandı |
@@ -173,9 +173,33 @@
 - Bilinçli açık iş: kalıcı Postgres connection/secret adapter'ı, explicit revoked timestamp
   persistence ve rotating secret devri S1.5 lifecycle kapanışına kadar tamamlanacak.
 
+## 2026-08-07 — S1.3 parçalı sync runtime ve persistence çekirdeği
+
+- Inventory, creative/post ve insights için bağımsız parent/stream/account/slice/cursor
+  korelasyonlu read-sync runtime; deterministik date planner, adaptive page size, bounded
+  retry+jitter, hata sınıflandırması, partial success ve cursor'dan resume eklendi.
+- Meta'ya özel portfolio run, stream, run, slice/checkpoint, daily insight ve extensible metric
+  tabloları non-destructive migration ile eklendi. Additive/non-additive/derived ayrımı,
+  attribution/currency/timezone provenance ve sebepli unavailable alanları sözleşmeye alındı.
+- Runtime ile persistence arasına all-or-nothing transaction adapter ve somut Drizzle/PostgreSQL
+  repository bağlandı. Her sayfa/slice ilerlemesi durable olur; yeni runtime aynı cursor'dan
+  hydrate/resume eder. `creative_post` runtime adı DB'deki `creative` enum'una açık mapping ile
+  çevrilir. Hash-only replay ledger raw payload kopyalamadan restart idempotency'sini korur.
+- Entegrasyon testi, ilk sayfası kaydedilmiş bir run'ın yanlışlıkla `failed` sayıldığını yakaladı;
+  parent status artık cursor ilerlemesini `partial` olarak korur.
+- Birleşik kanıt: 23 test dosyası/107 test, typecheck, Drizzle check, security-boundary ve
+  production build temiz. Canlı Meta smoke yeniden 5 hesap/22 Page/8 Instagram/422 campaign/
+  1.108 ad set/4.620 ad, 0 hata ve `writeOperations=0` verdi; git/bundle secret eşleşmesi 0.
+- GET-only Graph transport inventory hierarchy, creative/post ve daily insight edge'lerine
+  bağlandı; usage header headroom ve cursor pagination runtime'a aktarılıyor. Canlı sınırlı
+  transport smoke 5 hesap keşfetti, account+creative+insight sorgularını 0 write ile tamamladı.
+- Açık S1.3 çevresel kabul işi: bu workspace'te `DATABASE_URL` yapılandırılmadığı ve yerel
+  PostgreSQL doğrulanamadığı için migration uygulanmış DB worker üzerinde restart/partial-run E2E.
+
 ## Sıradaki uygulama
 
-**Slice 1 / Meta Read Mirror — S1.3:** inventory, creative/post ve insights için ayrı,
-resumable read-sync run'ları; adaptive pagination/backoff, date slicing, idempotent upsert
-ve partial-success kanıtı. Sonrasında S1.4 asset/content mirror ve S1.5 lifecycle/iki hesap
-isolation kapanışı gelir. A13'e kadar production write scope veya writer ReklamZeka'ya taşınmaz.
+**Slice 1 / Meta Read Mirror — S1.3 çevresel kabul:** migration uygulanmış PostgreSQL worker
+üzerinde restart/partial-run E2E alarak kodu production persistence ile doğrula. Sonrasında
+S1.4 asset/content mirror ve S1.5
+lifecycle/iki hesap isolation kapanışı gelir. A13'e kadar production write scope veya writer
+ReklamZeka'ya taşınmaz.

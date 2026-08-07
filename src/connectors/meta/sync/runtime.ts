@@ -1,8 +1,15 @@
 import { ConnectorError } from "@/connectors/contract";
 import { META_SYNC_STREAMS, stableHash, type MetaParentSyncRun, type MetaReadRequest, type MetaReadTransport, type MetaStreamRun, type MetaSyncError, type MetaSyncErrorReason, type MetaSyncRecord, type MetaSyncSlice } from "./types";
+import type { MetaSyncDurableKey, MetaSyncDurablePersistence } from "./persistence-adapter";
 
 type MutableStreamRun = { -readonly [Key in keyof MetaStreamRun]: MetaStreamRun[Key] } & { completedSliceIds: string[]; cursorBySlice: Record<string, { cursor: string | null; cursorId: string; updatedAt: string }> };
 type MutableParentRun = { -readonly [Key in keyof MetaParentSyncRun]: MetaParentSyncRun[Key] } & { streamRunIds: string[] };
+
+export type MetaSyncStoreSnapshot = Readonly<{
+  parents: readonly MetaParentSyncRun[];
+  streams: readonly MetaStreamRun[];
+  records: readonly MetaSyncRecord[];
+}>;
 
 export class InMemoryMetaSyncStore {
   private readonly parents = new Map<string, MutableParentRun>();
@@ -21,6 +28,18 @@ export class InMemoryMetaSyncStore {
     this.records.set(record.identity, { ...record, firstSeenAt: old.firstSeenAt }); return "updated";
   }
   values(): readonly MetaSyncRecord[] { return [...this.records.values()].sort((a, b) => a.identity.localeCompare(b.identity)); }
+  snapshot(): MetaSyncStoreSnapshot {
+    return {
+      parents: [...this.parents.values()].map((run) => structuredClone(run)),
+      streams: [...this.streams.values()].map((run) => structuredClone(run)),
+      records: this.values().map((record) => structuredClone(record)),
+    };
+  }
+  restore(snapshot: MetaSyncStoreSnapshot): void {
+    for (const parent of snapshot.parents) this.parents.set(parent.id, structuredClone(parent) as MutableParentRun);
+    for (const stream of snapshot.streams) this.streams.set(stream.id, structuredClone(stream) as MutableStreamRun);
+    for (const record of snapshot.records) this.records.set(record.identity, structuredClone(record));
+  }
 }
 
 export type MetaSyncRuntimeOptions = Readonly<{
@@ -31,6 +50,7 @@ export type MetaSyncRuntimeOptions = Readonly<{
   random?: () => number;
   maxAttempts?: number;
   minPageSize?: number;
+  persistence?: MetaSyncDurablePersistence;
 }>;
 export type MetaSyncResult = Readonly<{ parentRun: MetaParentSyncRun; streamRuns: readonly MetaStreamRun[]; inserted: number; updated: number; unchanged: number; writeNetworkCalls: 0 }>;
 
@@ -68,7 +88,19 @@ export class MetaPartialReadSyncRuntime {
   }
 
   async run(input: Readonly<{ parentRunId: string; workspaceId: string; connectionId: string; plan: readonly MetaSyncSlice[] }>): Promise<MetaSyncResult> {
+    const durableKey: MetaSyncDurableKey = {
+      parentRunId: input.parentRunId,
+      workspaceId: input.workspaceId,
+      connectionId: input.connectionId,
+    };
     let parent = this.store.parent(input.parentRunId) as MutableParentRun | undefined;
+    if (!parent && this.options.persistence) {
+      const snapshot = await this.options.persistence.restore(durableKey);
+      if (snapshot) {
+        this.store.restore(snapshot);
+        parent = this.store.parent(input.parentRunId) as MutableParentRun | undefined;
+      }
+    }
     if (!parent) {
       parent = { id: input.parentRunId, workspaceId: input.workspaceId, connectionId: input.connectionId, status: "running", streamRunIds: [] };
       for (const slice of input.plan) {
@@ -77,6 +109,7 @@ export class MetaPartialReadSyncRuntime {
         if (!this.store.stream(id)) this.store.saveStream({ id, parentRunId: input.parentRunId, stream: slice.stream, accountId: slice.accountId, status: "pending", completedSliceIds: [], cursorBySlice: {}, error: null });
       }
       parent.streamRunIds.sort(); this.store.saveParent(parent);
+      await this.persist(durableKey);
     }
     let inserted = 0; let updated = 0; let unchanged = 0;
     for (const streamName of META_SYNC_STREAMS) for (const streamId of parent.streamRunIds) {
@@ -86,20 +119,26 @@ export class MetaPartialReadSyncRuntime {
       stream.status = "running"; stream.error = null;
       for (const slice of slices) {
         if (stream.completedSliceIds.includes(slice.id)) continue;
-        const outcome = await this.processSlice(parent, stream, slice);
+        const outcome = await this.processSlice(parent, stream, slice, durableKey);
         inserted += outcome.inserted; updated += outcome.updated; unchanged += outcome.unchanged;
-        if (!outcome.completed) { stream.status = "partial"; stream.error = outcome.error; this.store.saveStream(stream); break; }
+        if (!outcome.completed) { stream.status = "partial"; stream.error = outcome.error; this.store.saveStream(stream); await this.persist(durableKey); break; }
       }
       if (stream.completedSliceIds.length === slices.length) { stream.status = "completed"; stream.error = null; }
       this.store.saveStream(stream);
+      await this.persist(durableKey);
     }
     const streams = this.store.streamsFor(parent.id);
-    parent.status = streams.every((stream) => stream.status === "completed") ? "completed" : streams.some((stream) => stream.completedSliceIds.length > 0) ? "partial" : "failed";
+    parent.status = streams.every((stream) => stream.status === "completed")
+      ? "completed"
+      : streams.some((stream) => stream.completedSliceIds.length > 0 || Object.keys(stream.cursorBySlice).length > 0)
+        ? "partial"
+        : "failed";
     this.store.saveParent(parent);
+    await this.persist(durableKey);
     return { parentRun: this.store.parent(parent.id)!, streamRuns: this.store.streamsFor(parent.id), inserted, updated, unchanged, writeNetworkCalls: 0 };
   }
 
-  private async processSlice(parent: MutableParentRun, stream: MutableStreamRun, slice: MetaSyncSlice): Promise<{ completed: boolean; inserted: number; updated: number; unchanged: number; error: MetaSyncError | null }> {
+  private async processSlice(parent: MutableParentRun, stream: MutableStreamRun, slice: MetaSyncSlice, durableKey: MetaSyncDurableKey): Promise<{ completed: boolean; inserted: number; updated: number; unchanged: number; error: MetaSyncError | null }> {
     let cursor = stream.cursorBySlice[slice.id]?.cursor ?? null;
     let pageSize = slice.pageSize;
     let inserted = 0; let updated = 0; let unchanged = 0;
@@ -110,6 +149,8 @@ export class MetaPartialReadSyncRuntime {
       if ("error" in pageResult) {
         if (pageResult.error.reason === "reduce_data" || pageResult.error.reason === "rate_limited") pageSize = Math.max(this.minPageSize, Math.floor(pageSize / 2));
         stream.cursorBySlice[slice.id] = { cursor, cursorId, updatedAt: this.now().toISOString() };
+        this.store.saveStream(stream);
+        await this.persist(durableKey);
         return { completed: false, inserted, updated, unchanged, error: pageResult.error };
       }
       const page = pageResult.page;
@@ -119,15 +160,32 @@ export class MetaPartialReadSyncRuntime {
       for (const payload of page.records) {
         const externalId = typeof payload.id === "string" ? payload.id : stableHash(payload);
         const identity = `${parent.workspaceId}:${parent.connectionId}:${slice.accountId}:${slice.stream}:${slice.entityLevel}:${slice.dateStart ?? "all"}:${slice.dateStop ?? "all"}:${externalId}`;
-        const outcome = this.store.upsert({ identity, snapshotHash: stableHash(payload), payload, firstSeenAt: this.now().toISOString(), lastSeenAt: this.now().toISOString() });
+        const outcome = this.store.upsert({
+          identity,
+          accountId: slice.accountId,
+          stream: slice.stream,
+          entityLevel: slice.entityLevel,
+          snapshotHash: stableHash(payload),
+          payload,
+          firstSeenAt: this.now().toISOString(),
+          lastSeenAt: this.now().toISOString(),
+        });
         if (outcome === "inserted") inserted += 1; else if (outcome === "updated") updated += 1; else unchanged += 1;
       }
       cursor = page.nextCursor;
       stream.cursorBySlice[slice.id] = { cursor, cursorId: stableHash({ sliceId: slice.id, cursor }), updatedAt: this.now().toISOString() };
+      this.store.saveStream(stream);
+      await this.persist(durableKey);
       pageSize = this.nextPageSize(pageSize, page.usageHeadroom);
     } while (cursor !== null);
     stream.completedSliceIds.push(slice.id);
+    this.store.saveStream(stream);
+    await this.persist(durableKey);
     return { completed: true, inserted, updated, unchanged, error: null };
+  }
+
+  private async persist(key: MetaSyncDurableKey): Promise<void> {
+    await this.options.persistence?.persist(key, this.store.snapshot());
   }
 
   private nextPageSize(size: number, headroom: number): number { return headroom < 0.2 ? Math.max(this.minPageSize, Math.floor(size / 2)) : headroom > 0.7 ? Math.min(500, size + Math.max(1, Math.floor(size / 4))) : size; }

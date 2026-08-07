@@ -1,0 +1,71 @@
+import { ConnectorError } from "@/connectors/contract";
+import { MetaGraphClient } from "@/connectors/meta/graph-client";
+import type { MetaReadPage, MetaReadRequest, MetaReadTransport } from "./types";
+
+type GraphPage = Readonly<{
+  data?: readonly Readonly<Record<string, unknown>>[];
+  paging?: Readonly<{ cursors?: Readonly<{ after?: string }> }>;
+}>;
+
+const INVENTORY_FIELDS = {
+  account: "id,name,currency,timezone_name,account_status,business",
+  campaign: "id,name,status,effective_status,objective,buying_type,special_ad_categories,daily_budget,lifetime_budget,updated_time",
+  ad_set: "id,name,status,effective_status,campaign_id,optimization_goal,billing_event,bid_strategy,bid_amount,daily_budget,lifetime_budget,attribution_spec,promoted_object,updated_time",
+  ad: "id,name,status,effective_status,campaign_id,adset_id,creative{id},updated_time",
+} as const;
+
+function inventoryPath(accountId: string, level: MetaReadRequest["entityLevel"]): string {
+  if (level === "account") return `/${accountId}`;
+  return `/${accountId}/${level === "ad_set" ? "adsets" : `${level}s`}`;
+}
+
+/** GET-only Graph binding for the deterministic S1.3 planner. */
+export class MetaGraphSyncTransport implements MetaReadTransport {
+  constructor(private readonly client: MetaGraphClient) {}
+
+  async get(request: MetaReadRequest): Promise<MetaReadPage> {
+    if (request.method !== "GET") throw new ConnectorError("invalid_data", "Meta sync transport yalnız GET kabul eder", false);
+    if (request.stream === "insights") return this.insights(request);
+    if (request.stream === "creative_post") return this.creativePost(request);
+    return this.inventory(request);
+  }
+
+  private async inventory(request: MetaReadRequest): Promise<MetaReadPage> {
+    const response = await this.client.getWithUsage<GraphPage | Readonly<Record<string, unknown>>>(
+      inventoryPath(request.accountId, request.entityLevel),
+      { fields: INVENTORY_FIELDS[request.entityLevel], limit: String(request.limit), ...(request.cursor ? { after: request.cursor } : {}) },
+    );
+    if (request.entityLevel === "account") {
+      const row = response.data as Readonly<Record<string, unknown>>;
+      if (typeof row.id !== "string") throw new ConnectorError("invalid_data", "Meta account yanıtı kimlik içermiyor", false);
+      return { records: [row], nextCursor: null, usageHeadroom: response.usageHeadroom };
+    }
+    return this.page(response.data as GraphPage, response.usageHeadroom);
+  }
+
+  private async creativePost(request: MetaReadRequest): Promise<MetaReadPage> {
+    const response = await this.client.getWithUsage<GraphPage>(`/${request.accountId}/ads`, {
+      fields: "id,name,status,effective_status,campaign_id,adset_id,creative{id,name,title,body,object_story_id,effective_object_story_id,instagram_permalink_url,object_story_spec,asset_feed_spec}",
+      limit: String(request.limit), ...(request.cursor ? { after: request.cursor } : {}),
+    });
+    return this.page(response.data, response.usageHeadroom);
+  }
+
+  private async insights(request: MetaReadRequest): Promise<MetaReadPage> {
+    if (!request.dateStart || !request.dateStop) throw new ConnectorError("invalid_data", "Insight slice tarih aralığı zorunludur", false);
+    const response = await this.client.getWithUsage<GraphPage>(`/${request.accountId}/insights`, {
+      fields: "account_id,campaign_id,adset_id,ad_id,date_start,date_stop,spend,impressions,reach,clicks,actions,action_values",
+      level: request.entityLevel,
+      time_range: JSON.stringify({ since: request.dateStart, until: request.dateStop }),
+      time_increment: "1",
+      limit: String(request.limit),
+      ...(request.cursor ? { after: request.cursor } : {}),
+    });
+    return this.page(response.data, response.usageHeadroom);
+  }
+
+  private page(page: GraphPage, headroom: number): MetaReadPage {
+    if (!Array.isArray(page.data)) throw new ConnectorError("invalid_data", "Meta sync liste yanıtı data dizisi içermiyor", false);
+    return { records: page.data, nextCursor: page.paging?.cursors?.after ?? null, usageHeadroom: headroom };
+  }
+}

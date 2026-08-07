@@ -12,6 +12,23 @@ type GraphPage<T> = Readonly<{
   summary?: Readonly<{ total_count?: number }>;
 }>;
 
+export type MetaGraphResponse<T> = Readonly<{ data: T; usageHeadroom: number }>;
+
+function usageHeadroom(headers: Headers): number {
+  const percentages: number[] = [];
+  for (const header of ["x-app-usage", "x-ad-account-usage"]) {
+    const value = headers.get(header);
+    if (!value) continue;
+    try {
+      const parsed = JSON.parse(value) as Record<string, unknown>;
+      for (const entry of Object.values(parsed)) if (typeof entry === "number" && Number.isFinite(entry)) percentages.push(entry);
+    } catch {
+      // A malformed optional usage header must not make valid entity data disappear.
+    }
+  }
+  return percentages.length ? Math.max(0, Math.min(1, 1 - Math.max(...percentages) / 100)) : 0.5;
+}
+
 function retryAfterMilliseconds(response: Response): number | undefined {
   const value = response.headers.get("retry-after");
   if (!value) return undefined;
@@ -48,6 +65,10 @@ export class MetaGraphClient {
   }
 
   async get<T>(path: string, params: Readonly<Record<string, string>> = {}): Promise<T> {
+    return (await this.getWithUsage<T>(path, params)).data;
+  }
+
+  async getWithUsage<T>(path: string, params: Readonly<Record<string, string>> = {}): Promise<MetaGraphResponse<T>> {
     return withConnectorRetry(async () => {
       const url = new URL(`${META_GRAPH_ORIGIN}/${this.graphApiVersion}/${path.replace(/^\//, "")}`);
       for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
@@ -65,7 +86,7 @@ export class MetaGraphClient {
       }
       if (!response.ok) throw connectorErrorFor(response);
       try {
-        return await response.json() as T;
+        return { data: await response.json() as T, usageHeadroom: usageHeadroom(response.headers) };
       } catch {
         throw new ConnectorError("invalid_data", "Meta geçersiz JSON döndürdü", false);
       }

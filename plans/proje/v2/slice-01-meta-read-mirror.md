@@ -22,8 +22,14 @@ Bu dosya yalnız güncel teslim dilimini yönetir. A08 domain şartnamesinin min
   canonical modeli ve deterministik CBO/ABO budget-owner resolver testli.
 - **Canlı read kanıtı:** 5 ad account, 22 Page, 8 Instagram, 422 campaign, 1.108 ad set,
   4.620 ad; tüm hesaplarda son-7-gün insight erişimi, 0 hata ve 0 write.
-- **Aktif increment S1.3:** parçalı ve resumable read sync. S1.4/S1.5 henüz kapanmadı;
-  schema varlığı canlı asset/content sync veya lifecycle kapanışı sayılmaz.
+- **S1.3 core tamam:** parçalı/resumable runtime, persistence schema, metric contract,
+  transaction adapter, somut Drizzle repository ve hash-only replay ledger fixture/golden
+  testli. Her sayfa/slice durable olur ve yeni runtime cursor'dan hydrate edilir.
+- **GET-only Graph binding tamam:** inventory hierarchy, creative/post ve insight edge'leri,
+  cursor pagination ve usage headroom gerçek Meta'da sınırlı smoke ile 0 write doğrulandı.
+- **Aktif S1.3 çevresel kabul:** migration uygulanmış PostgreSQL worker üzerinde
+  restart/partial-run E2E almak. Bu workspace'te henüz `DATABASE_URL` yok. S1.4/S1.5 henüz
+  kapanmadı; schema/contract varlığı canlı asset-content sync veya lifecycle kapanışı sayılmaz.
 
 ## Değişmez sınırlar
 

@@ -52,7 +52,16 @@ export type MetaStreamRun = Readonly<{
   error: MetaSyncError | null;
 }>;
 export type MetaParentSyncRun = Readonly<{ id: string; workspaceId: string; connectionId: string; status: MetaSyncStatus; streamRunIds: readonly string[] }>;
-export type MetaSyncRecord = Readonly<{ identity: string; snapshotHash: string; payload: Readonly<Record<string, unknown>>; firstSeenAt: string; lastSeenAt: string }>;
+export type MetaSyncRecord = Readonly<{
+  identity: string;
+  accountId: string;
+  stream: MetaSyncStream;
+  entityLevel: MetaEntityLevel;
+  snapshotHash: string;
+  payload: Readonly<Record<string, unknown>>;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}>;
 
 export function stableHash(value: unknown): string {
   const normalize = (entry: unknown): unknown => Array.isArray(entry)
