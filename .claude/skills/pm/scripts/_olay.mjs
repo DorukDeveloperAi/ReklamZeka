@@ -14,7 +14,9 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-export const KATMANLAR = ["happy", "pm", "kaptan", "daemon"];
+// "maestro-cli" ve "pano" (otonomi-kokpiti:12) — KANON `packages/core/src/olay-log.ts`.
+// Bu dosya onun AYNASIDIR; sapması `core/test/olay-log.test.ts` (3) ile çivilidir.
+export const KATMANLAR = ["happy", "pm", "kaptan", "daemon", "maestro-cli", "pano"];
 export const TURLER = ["event", "error"];
 export const SINIFLAR = ["kopru", "dagitim", "kapi", "mutabakat", "turetme", "agentic"];
 export const ALAN_SIRASI = ["ts", "katman", "tur", "sinif", "olay", "baglam"];

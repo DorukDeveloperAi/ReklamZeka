@@ -172,7 +172,7 @@
       "pkg": "skill:kaptan"
     },
     ".claude/skills/kaptan/scripts/_olay.mjs": {
-      "hash": "f65fc67d5f498c22",
+      "hash": "1de1019af2b7d790",
       "pkg": "skill:kaptan"
     },
     ".claude/skills/kaptan/proof/proof.mjs": {
@@ -212,7 +212,7 @@
       "pkg": "skill:pm"
     },
     ".claude/skills/pm/scripts/_olay.mjs": {
-      "hash": "f65fc67d5f498c22",
+      "hash": "1de1019af2b7d790",
       "pkg": "skill:pm"
     },
     ".claude/skills/pm/scripts/kurallar.mjs": {
@@ -312,7 +312,7 @@
       "pkg": "skill:devam"
     },
     ".claude/hooks/claims-lib.mjs": {
-      "hash": "eeb6371692343110",
+      "hash": "572b331198164f44",
       "pkg": "hook:eszamanli-guard"
     },
     ".claude/hooks/claim-guard.mjs": {
@@ -380,9 +380,8 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-07T09:20:04.849Z",
+  "updatedAt": "2026-08-07T09:22:52.933Z",
   "yerelKazanir": [
-    ".claude/hooks/claims-lib.mjs",
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",
     "utopya/istek/hedefler.md",
