@@ -1,5 +1,9 @@
 import { ConnectorError } from "@/connectors/contract";
 import { MetaGraphClient } from "@/connectors/meta/graph-client";
+import {
+  META_INSIGHT_CAPABILITY_CATALOG_VERSION,
+  planMetaInsightQuery,
+} from "@/domain/meta/insights/capability-catalog";
 import type { MetaReadPage, MetaReadRequest, MetaReadTransport } from "./types";
 import { META_INVENTORY_FIELD_CATALOG_VERSION } from "./inventory-materialization";
 
@@ -68,15 +72,27 @@ export class MetaGraphSyncTransport implements MetaReadTransport {
 
   private async insights(request: MetaReadRequest): Promise<MetaReadPage> {
     if (!request.dateStart || !request.dateStop) throw new ConnectorError("invalid_data", "Insight slice tarih aralığı zorunludur", false);
-    const response = await this.client.getWithUsage<GraphPage>(`/${request.accountId}/insights`, {
-      fields: "account_id,campaign_id,adset_id,ad_id,date_start,date_stop,spend,impressions,reach,clicks,actions,action_values",
+    if (request.entityLevel === "account") throw new ConnectorError("invalid_data", "Insight sync account seviyesi planlamaz", false);
+    const plan = planMetaInsightQuery({
+      graphApiVersion: this.client.graphApiVersion,
       level: request.entityLevel,
+      metrics: ["spendMinor", "impressions", "reach", "clicks", "conversions", "revenueMinor"],
+      attribution: { mode: "account_default" },
+      timeIncrement: 1,
+      // Connection doctor owns permission verification. This fixed value tells the pure
+      // planner which already-authorized read capability this transport is invoking.
+      grantedPermissions: ["ads_read"],
+    });
+    if (plan.status !== "planned") {
+      throw new ConnectorError("invalid_data", `Meta insight capability planı kullanılamıyor: ${plan.reasonCode}`, false);
+    }
+    const response = await this.client.getWithUsage<GraphPage>(`/${request.accountId}/insights`, {
+      ...plan.parameters,
       time_range: JSON.stringify({ since: request.dateStart, until: request.dateStop }),
-      time_increment: "1",
       limit: String(request.limit),
       ...(request.cursor ? { after: request.cursor } : {}),
     });
-    return this.page(response.data, response.usageHeadroom);
+    return this.page(response.data, response.usageHeadroom, META_INSIGHT_CAPABILITY_CATALOG_VERSION);
   }
 
   private page(page: GraphPage, headroom: number, fieldCatalogVersion?: string): MetaReadPage {

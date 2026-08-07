@@ -78,7 +78,31 @@ describe("Meta S1.3 runtime persistence integration", () => {
     expect(calls[0]?.method).toBe("GET");
     expect(calls[0]?.url.pathname).toBe("/v23.0/act_fixture/insights");
     expect(calls[0]?.url.searchParams.get("level")).toBe("campaign");
-    expect(page).toMatchObject({ nextCursor: "next-page", usageHeadroom: 0.75 });
+    expect(calls[0]?.url.searchParams.get("action_breakdowns")).toBe("action_type");
+    expect(calls[0]?.url.searchParams.get("use_account_attribution_setting")).toBe("true");
+    expect(page).toMatchObject({
+      nextCursor: "next-page",
+      usageHeadroom: 0.75,
+      fieldCatalogVersion: "meta-graph-v23-insight-capabilities/1.0.0",
+    });
+  });
+
+  it("maps the canonical ad_set level to the Graph adset spelling through the capability plan", async () => {
+    let graphLevel = "";
+    const fetchImpl = async (input: string | URL) => {
+      graphLevel = new URL(input).searchParams.get("level") ?? "";
+      return new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+    const transport = new MetaGraphSyncTransport(new MetaGraphClient("fixture-token", fetchImpl));
+    await transport.get({
+      method: "GET", stream: "insights", accountId: "act_fixture", entityLevel: "ad_set",
+      dateStart: "2026-08-01", dateStop: "2026-08-01", cursor: null, limit: 5,
+      correlation: { parentRunId: "run", streamRunId: "stream", accountId: "act_fixture", sliceId: "slice", cursorId: "cursor" },
+    });
+    expect(graphLevel).toBe("adset");
   });
 
   it("requests the live-verified v23 creative/post field catalog without rejected fields", async () => {
