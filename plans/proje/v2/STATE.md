@@ -200,9 +200,9 @@
 
 ## Sıradaki uygulama
 
-**Slice 3 / Budget Lab:** envelope, planned/committed/actual/forecast ayrımı, protected
-allocation/transfer matrisi ve deterministic pacing/simulation çekirdeğini aç. Production
-write scope veya writer S4'e kadar ReklamZeka'ya taşınmaz.
+**Slice 4 / Approval-only Operations:** typed action plan, K0–K4 risk sınıfı, varsayılan
+`approval_only` autonomy valve, tek tek approve/reject/request-changes ve stale/expiry
+korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-write kapısından sonra açılır.
 
 ## 2026-08-07 — S1.4 asset/content mirror kapanışı
 
@@ -490,3 +490,18 @@ write scope veya writer S4'e kadar ReklamZeka'ya taşınmaz.
   decode olsalar bile reddeder; canonical re-encode negatif testi tam suite içinde geçer.
 - S3 read kesiti hazırdır. Sıradaki increment explicit dry-run/draft command + audit ve ardından
   S4 approval-only action valve tasarımıdır; production Meta writer hâlâ yoktur.
+
+## 2026-08-07 — S3 Budget Lab draft ve audit kapanışı
+
+- `budget_lab_dry_run` aynı deterministic proposal motorunu kullanır fakat proposal/audit
+  persistence portunu çağırmaz; yalnız exact frozen context'i salt okuyabilir. `budget_lab_save_draft`
+  append-only proposal ile `budget.draft_saved` audit olayını tek outer transaction'da commit eder.
+- Ayrı `budget_lab:draft` local capability scope'u vardır. Workspace ve actor server-bound'dır;
+  owner/admin/analyst draft oluşturabilir, viewer proposal/context erişiminden önce reddedilir.
+  Exact intent, same-origin cookie, bounded JSON ve strict proposal shape fail-closed çalışır.
+- Idempotent aynı taslak ikinci proposal veya audit üretmez. Agent/dashboard çıktısı public-safe'dir;
+  approve, execute ve Meta writer authority/capability'leri false kalır. Yeni tablo veya migration
+  gerekmedi; mevcut append-only `audit_events` zinciri kullanıldı.
+- Canlı Supabase kabulü proposal+audit görünürlüğü, idempotent replay ve outer rollback sonrası
+  sıfır geçici satırı doğruladı. Kanıt: 92 test dosyası/540 test; production build, security,
+  secret ve Drizzle kapıları temiz. S3 kapanmıştır; sıradaki dilim S4 approval-only operations'tır.

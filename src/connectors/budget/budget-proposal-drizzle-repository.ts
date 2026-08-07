@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { and, asc, desc, eq, lt, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
@@ -289,6 +289,47 @@ export class DrizzleBudgetProposalRepository implements BudgetFrozenContextPort,
       })));
       await this.assertAlternatives(transaction, inserted[0], proposal);
       return Object.freeze({ outcome: "inserted" as const });
+    });
+  }
+
+  async appendDraft(input: Readonly<{ proposal: BudgetProposal; actorId: string; occurredAt: string }>): Promise<Readonly<{
+    outcome: "inserted" | "unchanged";
+    auditAppended: boolean;
+  }>> {
+    if (!verifyBudgetProposal(input.proposal) || !UUID.test(input.actorId)
+      || !/^\d{4}-\d{2}-\d{2}T.*Z$/.test(input.occurredAt) || !Number.isFinite(Date.parse(input.occurredAt))) {
+      throw new BudgetProposalRepositoryError("invalid_input");
+    }
+    return this.database.transaction(async (transaction) => {
+      const persisted = await new DrizzleBudgetProposalRepository(transaction).append(input.proposal);
+      if (persisted.outcome === "unchanged") return Object.freeze({ outcome: "unchanged" as const, auditAppended: false });
+      await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`audit:${input.proposal.scope.workspaceId}`}, 0))`);
+      const previousHash = resultRows<{ event_hash: string }>(await transaction.execute(sql`
+        select event_hash from audit_events
+        where workspace_id = ${input.proposal.scope.workspaceId}::uuid
+        order by occurred_at desc, created_at desc, id desc limit 1
+      `))[0]?.event_hash ?? "GENESIS";
+      // Preserve the existing audit envelope field order so the JSON/SHA-256
+      // chain can be verified by the same deterministic reconstruction.
+      const event = Object.freeze({
+        workspaceId: input.proposal.scope.workspaceId, actorId: input.actorId,
+        action: "budget.draft_saved", resourceType: "budget_proposal", resourceId: input.proposal.proposalRef,
+        occurredAt: new Date(input.occurredAt).toISOString(),
+        metadata: Object.freeze({ seriesRef: input.proposal.seriesRef, revision: input.proposal.revision, mode: "draft" }),
+        id: randomUUID(), previousHash,
+      });
+      const eventHash = createHash("sha256").update(JSON.stringify(event)).digest("hex");
+      await transaction.execute(sql`
+        insert into audit_events (
+          id, workspace_id, actor_id, action, resource_type, resource_id,
+          metadata, previous_hash, event_hash, occurred_at
+        ) values (
+          ${event.id}::uuid, ${event.workspaceId}::uuid, ${event.actorId}::uuid,
+          ${event.action}, ${event.resourceType}, ${event.resourceId},
+          ${JSON.stringify(event.metadata)}::jsonb, ${event.previousHash}, ${eventHash}, ${event.occurredAt}::timestamptz
+        )
+      `);
+      return Object.freeze({ outcome: "inserted" as const, auditAppended: true });
     });
   }
 

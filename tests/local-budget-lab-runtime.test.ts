@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createLocalBudgetLabRouteHandler } from "@/server/local-budget-lab-runtime";
+import { createLocalBudgetLabPostHandler, createLocalBudgetLabRouteHandler } from "@/server/local-budget-lab-runtime";
 import { localDecisionRoomConfig, type LocalDecisionRoomEnvironment } from "@/server/local-decision-room-runtime";
 import { LOCAL_SESSION_COOKIE, mintLocalSessionCapability } from "@/security/local-session-capability";
 
@@ -32,6 +32,14 @@ function request(value: string) {
   } });
 }
 
+function postRequest(value: string, intent = "budget-lab-save-draft") {
+  return new Request("http://localhost:3000/api/budget-lab", { method: "POST", headers: {
+    Host: "localhost:3000", Origin: "http://localhost:3000", "Sec-Fetch-Site": "same-origin",
+    "Content-Type": "application/json", "X-ReklamZeka-Intent": intent,
+    Cookie: `${LOCAL_SESSION_COOKIE}=${encodeURIComponent(value)}`,
+  }, body: JSON.stringify({ command: {} }) });
+}
+
 describe("local Budget Lab route", () => {
   it("requires its separate read scope and returns a real empty tenant result", async () => {
     const minted = token();
@@ -59,5 +67,22 @@ describe("local Budget Lab route", () => {
     expect((await handler(request(damaged))).status).toBe(503);
     expect(database.execute).not.toHaveBeenCalled();
     expect(database.select).not.toHaveBeenCalled();
+  });
+
+  it("uses a separate draft scope, enforces same-origin, and denies viewers before proposal access", async () => {
+    const minted = token();
+    const claims = mintLocalSessionCapability({ kind: "session", workspaceId, workspaceRef: "workspace_local", userId,
+      readerRef: "reader_local_owner", osUid: process.getuid!(), issuedAt: Math.floor(Date.now() / 1000) - 1,
+      expiresAt: Math.floor(Date.now() / 1000) + 300 }, signingKey).claims;
+    expect(claims.scopes[0]).toBe("budget_lab:draft");
+    const database = { execute: vi.fn(async () => ({ rows: [{ workspace_id: workspaceId, user_id: userId, role: "viewer", lifecycle_state: "active" }] })), select: vi.fn(), transaction: vi.fn() };
+    const POST = createLocalBudgetLabPostHandler({ database: database as never, config: localDecisionRoomConfig(environment())! });
+    expect((await POST(postRequest(minted))).status).toBe(403);
+    expect(database.select).not.toHaveBeenCalled();
+    expect(database.transaction).not.toHaveBeenCalled();
+
+    const untrusted = postRequest(minted);
+    untrusted.headers.set("Origin", "http://evil.invalid");
+    expect((await POST(untrusted)).status).toBe(503);
   });
 });

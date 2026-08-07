@@ -6,7 +6,8 @@ export type WorkspaceAction =
   | "data:read"
   | "sync:run"
   | "insight:feedback"
-  | "report:share";
+  | "report:share"
+  | "budget:draft";
 
 export type Actor = Readonly<{ userId: string }>;
 export type WorkspaceMembership = Readonly<{
@@ -19,12 +20,14 @@ const ROLE_ACTIONS: Readonly<Record<WorkspaceRole, ReadonlySet<WorkspaceAction>>
   owner: new Set([
     "workspace:manage", "member:manage", "connection:manage", "data:read",
     "sync:run", "insight:feedback", "report:share",
+    "budget:draft",
   ]),
   admin: new Set([
     "member:manage", "connection:manage", "data:read", "sync:run",
     "insight:feedback", "report:share",
+    "budget:draft",
   ]),
-  analyst: new Set(["data:read", "sync:run", "insight:feedback", "report:share"]),
+  analyst: new Set(["data:read", "sync:run", "insight:feedback", "report:share", "budget:draft"]),
   viewer: new Set(["data:read"]),
 };
 

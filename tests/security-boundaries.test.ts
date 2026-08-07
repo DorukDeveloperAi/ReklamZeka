@@ -31,11 +31,12 @@ describe("workspace authorization boundary", () => {
     const actions: readonly WorkspaceAction[] = [
       "workspace:manage", "member:manage", "connection:manage", "data:read",
       "sync:run", "insight:feedback", "report:share",
+      "budget:draft",
     ];
     const expected: Record<WorkspaceRole, readonly WorkspaceAction[]> = {
       owner: actions,
       admin: actions.filter((action) => action !== "workspace:manage"),
-      analyst: ["data:read", "sync:run", "insight:feedback", "report:share"],
+      analyst: ["data:read", "sync:run", "insight:feedback", "report:share", "budget:draft"],
       viewer: ["data:read"],
     };
     for (const role of Object.keys(expected) as WorkspaceRole[]) {

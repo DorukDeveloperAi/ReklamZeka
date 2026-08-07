@@ -11,7 +11,8 @@ export type AuditAction =
   | "sync.completed"
   | "report.shared"
   | "report.revoked"
-  | "insight.feedback";
+  | "insight.feedback"
+  | "budget.draft_saved";
 
 export type AuditEventInput = Readonly<{
   workspaceId: string;

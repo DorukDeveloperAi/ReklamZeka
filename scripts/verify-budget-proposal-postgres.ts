@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 import { buildEffectiveCampaignContext } from "@/analyses/effective-campaign-context";
+import { BudgetLabDraftService } from "@/application/budget-lab-draft-service";
 import { BudgetProposalService, type BudgetProposalInput } from "@/application/budget-proposal-service";
 import { DrizzleEffectiveCampaignContextRepository } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
 import { DrizzleBudgetProposalRepository } from "@/connectors/budget/budget-proposal-drizzle-repository";
@@ -21,6 +22,7 @@ const database = drizzle(pool, { schema });
 const rollback = Symbol("rollback");
 const workspaceId = randomUUID();
 const foreignWorkspaceId = randomUUID();
+const actorId = randomUUID();
 const connectionId = randomUUID();
 const sourceId = randomUUID();
 const accountId = randomUUID();
@@ -31,6 +33,7 @@ const now = "2026-08-07T12:00:00.000Z";
 const evidence = {
   tablesApplied: false, exactContextBinding: false, mappingSuppression: false,
   mappingIndependentScenarios: false, idempotency: false, revisionChain: false,
+  draftAuditAtomic: false, draftIdempotency: false,
   publicProjectionSafe: false, crossTenantBlocked: false, immutableRows: false,
   rlsAndGrants: false, metaCalls: 0, executionCalls: 0, temporaryRowsCommitted: true,
 };
@@ -82,6 +85,7 @@ try {
       { id: workspaceId, name: "Budget proposal verifier" },
       { id: foreignWorkspaceId, name: "Foreign budget proposal verifier" },
     ]);
+    await transaction.insert(schema.users).values({ id: actorId, email: `budget-verifier-${actorId}@example.invalid` });
     await transaction.insert(schema.metaConnections).values({
       id: connectionId, workspaceId, externalConnectionKey: "budget-verifier", displayName: "Budget verifier",
       graphApiVersion: "v1", fieldCatalogVersion: "fields-v1", status: "active",
@@ -150,6 +154,23 @@ try {
       idempotencyKey: "budget.verifier.r2", createdAt: "2026-08-07T13:30:00.000Z",
     });
     evidence.revisionChain = second.proposal.revision === 2;
+    const draftService = new BudgetLabDraftService(repository, repository);
+    const draftCommand = {
+      ...base,
+      scope: { adAccountId: accountId, campaignId, contextHash: context.contextHash },
+      seriesRef: "budget.series.draft-verifier", revision: 1, previousProposalHash: "GENESIS",
+      idempotencyKey: "budget.verifier.draft.r1", createdAt: "2026-08-07T14:00:00.000Z",
+    } as const;
+    const draft = await draftService.saveDraft(workspaceId, actorId, "2026-08-07T14:00:01.000Z", draftCommand);
+    const replay = await draftService.saveDraft(workspaceId, actorId, "2026-08-07T14:00:02.000Z", draftCommand);
+    const auditRows = rows(await transaction.execute(sql`
+      select action, resource_id, previous_hash, event_hash from audit_events
+      where workspace_id = ${workspaceId}::uuid and action = 'budget.draft_saved'
+    `));
+    evidence.draftAuditAtomic = draft.persistence === "inserted" && draft.auditAppended
+      && auditRows.length === 1 && auditRows[0]?.resource_id === draft.proposal.proposalRef
+      && typeof auditRows[0]?.previous_hash === "string" && typeof auditRows[0]?.event_hash === "string";
+    evidence.draftIdempotency = replay.persistence === "unchanged" && !replay.auditAppended && auditRows.length === 1;
     const publicView = await repository.loadPublic({ workspaceId, seriesRef: base.seriesRef });
     const serialized = JSON.stringify(publicView);
     evidence.publicProjectionSafe = ![workspaceId, accountId, campaignId, context.contextHash,
@@ -184,8 +205,10 @@ try {
 
 const residual = rows(await database.execute(sql`
   select (select count(*)::int from workspaces where id in (${workspaceId}::uuid, ${foreignWorkspaceId}::uuid))
+    + (select count(*)::int from users where id = ${actorId}::uuid)
     + (select count(*)::int from budget_proposal_versions where workspace_id = ${workspaceId}::uuid)
-    + (select count(*)::int from budget_proposal_alternatives where workspace_id = ${workspaceId}::uuid) as count
+    + (select count(*)::int from budget_proposal_alternatives where workspace_id = ${workspaceId}::uuid)
+    + (select count(*)::int from audit_events where workspace_id = ${workspaceId}::uuid) as count
 `))[0];
 evidence.temporaryRowsCommitted = Number(residual?.count) !== 0;
 await pool.end();

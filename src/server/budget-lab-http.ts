@@ -58,3 +58,42 @@ export function createBudgetLabHttpHandler(input: Readonly<{
     }
   };
 }
+
+export function createBudgetLabPostHandler(input: Readonly<{
+  contract: BudgetLabAgentContract;
+  resolvePrincipal(request: Request): Promise<TrustedDecisionRoomPrincipal | null>;
+}>) {
+  return async function POST(request: Request) {
+    try {
+      const intent = request.headers.get("x-reklamzeka-intent");
+      if (intent !== "budget-lab-dry-run" && intent !== "budget-lab-save-draft"
+        || request.headers.get("content-type")?.toLowerCase() !== "application/json") throw new BudgetLabReadError("invalid_input");
+      const length = request.headers.get("content-length");
+      if (length !== null && (!/^\d+$/.test(length) || Number(length) > 100_000)) throw new BudgetLabReadError("invalid_input");
+      const text = await request.text();
+      if (Buffer.byteLength(text, "utf8") > 100_000) throw new BudgetLabReadError("invalid_input");
+      let body: unknown;
+      try {
+        body = JSON.parse(text) as unknown;
+      } catch {
+        throw new BudgetLabReadError("invalid_input");
+      }
+      if (!body || typeof body !== "object" || Array.isArray(body)
+        || Object.keys(body).length !== 1 || !("command" in body)
+        || !body.command || typeof body.command !== "object" || Array.isArray(body.command)) {
+        throw new BudgetLabReadError("invalid_input");
+      }
+      const principal = await input.resolvePrincipal(request);
+      if (!principal) throw new AuthorizationError();
+      const call: BudgetLabAgentCall = {
+        name: intent === "budget-lab-dry-run" ? "budget_lab_dry_run" : "budget_lab_save_draft",
+        arguments: { command: (body as { command: never }).command },
+      };
+      return NextResponse.json(await input.contract.execute(principal, call), { headers: {
+        ...HEADERS, "X-ReklamZeka-Access-Mode": "draft-only",
+      } });
+    } catch (reason) {
+      return failure(reason);
+    }
+  };
+}

@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "@/db/schema";
 import { localDecisionRoomConfig } from "@/server/local-decision-room-runtime";
-import { budgetLabNotConfiguredResponse, createLocalBudgetLabRouteHandler } from "@/server/local-budget-lab-runtime";
+import { budgetLabNotConfiguredResponse, createLocalBudgetLabPostHandler, createLocalBudgetLabRouteHandler } from "@/server/local-budget-lab-runtime";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,7 +29,10 @@ function configuredHandler() {
       pool.on("error", () => undefined);
       runtimeDatabase = drizzle(pool, { schema });
     }
-    return createLocalBudgetLabRouteHandler({ database: runtimeDatabase, config });
+    return {
+      GET: createLocalBudgetLabRouteHandler({ database: runtimeDatabase, config }),
+      POST: createLocalBudgetLabPostHandler({ database: runtimeDatabase, config }),
+    };
   } catch {
     return null;
   }
@@ -39,5 +42,12 @@ export function GET(): ReturnType<typeof budgetLabNotConfiguredResponse>;
 export function GET(request: Request): Promise<Response> | Response;
 export function GET(request?: Request) {
   const handler = configuredHandler();
-  return handler && request ? handler(request) : budgetLabNotConfiguredResponse();
+  return handler && request ? handler.GET(request) : budgetLabNotConfiguredResponse();
+}
+
+export function POST(): ReturnType<typeof budgetLabNotConfiguredResponse>;
+export function POST(request: Request): Promise<Response> | Response;
+export function POST(request?: Request) {
+  const handler = configuredHandler();
+  return handler && request ? handler.POST(request) : budgetLabNotConfiguredResponse();
 }

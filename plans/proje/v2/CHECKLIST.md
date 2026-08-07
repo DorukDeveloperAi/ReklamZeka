@@ -155,7 +155,8 @@
   revision/hash/idempotency, alternatives ve public-safe projection.
 - [x] Budget Lab tenant-bound keyset agent/GET/dashboard read API; unavailable/empty/error/
   list/detail, before-after, mapping ve trace özeti; fixture canlı sonuç olarak kullanılmaz.
-- [ ] Budget Lab draft proposal command/audit; artış approval S4'te zorunlu olacaktır.
+- [x] Budget Lab explicit dry-run ve append-only draft proposal command; ayrı draft scope,
+  owner/admin/analyst yetkisi, viewer denial, idempotency ve proposal+audit atomik transaction.
 - [x] Saf business outcome target/Meta proxy ayrımı; provenance/scope/timeframe/evidence/review
   kapıları ve eksik/ambiguous/stale mapping suppression.
 - [x] Target mapping→scenario application binding ve persisted proposal trace; mapping-ready
@@ -219,7 +220,9 @@
 - [ ] Bütçe stüdyosu: envelope/lock/target/forecast/simulation.
   - [x] Gerçek proposal ledger salt-okunur list/detail, before-after, mapping/suppression ve
     trace summary; ayrı `budget_lab:read` local-session scope'u.
-  - [ ] Kural/target edit, dry-run compose ve draft persistence akışı.
+  - [ ] Kural/target edit akışı.
+  - [x] Explicit dry-run compose ve append-only draft persistence; aynı transaction'da audit,
+    public-safe çıktı ve approval/execute/Meta-write yetkisi `false`.
 - [ ] Approval inbox, automation run, verify/rollback ve tek timeline.
 - [ ] Mevcut creative library + context/performance karşılaştırması.
 - [ ] Yayındaki reklam metni/dynamic variant/CTA/destination/post kaynağı explorer'ı.

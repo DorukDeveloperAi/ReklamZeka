@@ -132,7 +132,7 @@ export function localDecisionRoomConfig(environment: LocalDecisionRoomEnvironmen
 export function assertTrustedLocalDecisionRoomRequest(
   request: Request,
   config: LocalDecisionRoomConfig,
-  operation: "read" | "mark_read",
+  operation: "read" | "mark_read" | "draft",
   credential: "cookie" | "bearer" = "cookie",
 ): void {
   let url: URL;
@@ -156,7 +156,10 @@ export function assertTrustedLocalDecisionRoomRequest(
   if (operation === "mark_read" && request.headers.get("x-reklamzeka-intent") !== "mark-inbox-read") {
     throw new LocalDecisionRoomBoundaryError("untrusted_request");
   }
-  if (operation === "mark_read" && credential === "cookie"
+  if (operation === "draft" && !["budget-lab-dry-run", "budget-lab-save-draft"].includes(
+    request.headers.get("x-reklamzeka-intent") ?? "",
+  )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  if ((operation === "mark_read" || operation === "draft") && credential === "cookie"
     && (origin !== config.origin || fetchSite !== "same-origin")) {
     throw new LocalDecisionRoomBoundaryError("untrusted_request");
   }
@@ -165,7 +168,7 @@ export function assertTrustedLocalDecisionRoomRequest(
 function authenticate(
   request: Request,
   config: LocalDecisionRoomConfig,
-  operation: "read" | "mark_read",
+  operation: "read" | "mark_read" | "draft",
 ): Readonly<{ claims: LocalSessionClaims; credential: "cookie" | "bearer" }> {
   const bearer = bearerToken(request);
   const cookie = cookieToken(request);
@@ -179,7 +182,7 @@ function authenticate(
     key: config.signingKey,
     now: Math.floor(Date.now() / 1000),
     osUid,
-    requiredScope: operation === "read" ? "decision_room:read" : "decision_room:mark_read",
+    requiredScope: operation === "read" ? "decision_room:read" : operation === "draft" ? "budget_lab:draft" : "decision_room:mark_read",
     expected: config,
   });
   return Object.freeze({ claims, credential });
@@ -241,6 +244,17 @@ export async function resolveTrustedLocalReadPrincipal(input: Readonly<{
     expected: input.config,
   });
   assertTrustedLocalDecisionRoomRequest(input.request, input.config, "read", authenticated.credential);
+  return bindPrincipal(input.database, input.config);
+}
+
+export async function resolveTrustedLocalDraftPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  const authenticated = authenticate(input.request, input.config, "draft");
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", authenticated.credential);
   return bindPrincipal(input.database, input.config);
 }
 
