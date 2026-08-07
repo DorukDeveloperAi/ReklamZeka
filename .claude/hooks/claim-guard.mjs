@@ -437,9 +437,11 @@ function main() {
   // write modu: Edit | Write | NotebookEdit
   const fp = ti.file_path || ti.notebook_path;
   if (!fp) return pass();
+  let kendiClaimim = false;
   for (const c of claims) {
     if (L.ownerMatch(c, me)) {
       kalpAt(c); // kendi claim'in → tazele, geç
+      if (L.claimCoversPath(c, fp, root, resMap)) kendiClaimim = true;
       continue;
     }
     if (L.claimCoversPath(c, fp, root, resMap)) {
@@ -447,6 +449,18 @@ function main() {
       if (!cyc) markWanted(root, c, me, null);
       olayDeny(root, c, me, cyc ? "dosya yazımı · DÖNGÜ (deadlock)" : "dosya yazımı");
       return deny(denyText(c, root, cyc, me));
+    }
+  }
+  // MÜKERRER EMEK ÖLÇÜMÜ — kapı DEĞİL, defter. Buraya düşen yazım GEÇER; tek yaptığımız
+  // "bu oturum bu dosyaya claim ALMADAN dokundu" olgusunu bir kez kaydetmek. İki farklı
+  // oturum aynı yola claim'siz dokunduysa mükerrer emek RİSKİ vardır ve bugüne dek bu
+  // hiçbir yerde görünmüyordu (ölçülen kayıp: aynı zombi yaması iki kez yazıldı, biri
+  // merge'de çöpe gitti). Rapor: `claim.mjs mukerrer`.
+  if (!kendiClaimim) {
+    try {
+      L.olayClaimsiz?.(root, me?.sessionId, fp); // yol normalizasyonu kütüphanede
+    } catch {
+      /* yut — ölçü ASLA yazımı etkilemez */
     }
   }
   return pass();

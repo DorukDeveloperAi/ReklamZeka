@@ -1557,3 +1557,64 @@ export function claimCoversBash(claim, command, resMap, repoRoot, cwd) {
 export function ledgerExists() {
   return existsSync(CLAIMS_DIR);
 }
+
+/* ──────────────── MÜKERRER EMEK ÖLÇÜMÜ (2026-08-07) ────────────────
+ *
+ * ÖLÇÜLEN ARIZA: 2026-08-07'de iki oturum aynı yamayı (`procAlive` zombi kuralı) BAĞIMSIZ
+ * olarak yazdı; merge çakıştı ve bir implementasyon çöpe gitti. Kilit sistemi DOSYAYI korur,
+ * NİYETİ korumaz — ve kimse yazmadan önce claim almamıştı, dolayısıyla iki oturumun aynı işe
+ * girdiği hiçbir yerde GÖRÜNMÜYORDU. Görünmeyen bir israf, ölçülmeyen bir israftır.
+ *
+ * ÖLÇÜ: bir oturumun bir dosyaya **claim'siz İLK yazımı** bir olaydır (`tip: "claimsiz"`).
+ * Aynı yol için farklı oturumlardan ≥2 kayıt = mükerrer emek RİSKİ. Hüküm değil sinyal:
+ * iki oturum aynı dosyayı meşru sebeplerle de düzenlemiş olabilir — rapor bunu söyler.
+ *
+ * NEDEN "İLK": her yazımı yazmak defteri şişirirdi (7 oturum × yüzlerce Edit). Ölçünün
+ * ihtiyacı olan şey SAYI değil KÜME: hangi oturum hangi dosyaya dokundu. Oturum başına
+ * küçük bir "dokunulan" seti bunu O(1) tutar; defter yalnız ilk temasla büyür.
+ *
+ * KAPI DEĞİL, DEFTER: bu yol hiçbir yazımı engellemez ve hiçbir kararı değiştirmez.
+ * Hatası yutulur (defter kararı ASLA değiştirmez — 05.4 ile aynı ilke). */
+
+/** Bu oturum bu yola DAHA ÖNCE dokundu mu? Dokunmadıysa işaretler ve `true` döner. */
+export function ilkDokunus(repoRoot, sessionId, yol) {
+  try {
+    if (!sessionId || !yol) return false;
+    const sid8 = String(sessionId).slice(0, 8);
+    const dir = join(ledgerDirOf(repoRoot), "dokunulan");
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const p = join(dir, `${sid8}.json`);
+    let set = [];
+    try {
+      const ham = JSON.parse(readFileSync(p, "utf8"));
+      if (Array.isArray(ham)) set = ham;
+    } catch {
+      /* yok ∨ bozuk → boş küme; bozuk dosya ölçümü DURDURMAZ */
+    }
+    if (set.includes(yol)) return false;
+    set.push(yol);
+    // TAVAN: patolojik bir oturum defteri şişirmesin. Aşılırsa en eskiler düşer — ölçü
+    // yaklaşıktır ve bunu İLAN EDER (kesin sayım bu ölçünün amacı değil, küme örtüşmesi).
+    if (set.length > 500) set = set.slice(-500);
+    writeFileSync(p, JSON.stringify(set), { mode: 0o600 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Claim'siz ilk yazımı deftere düşür. Yazım ZATEN geçmiştir; bu satır yalnız ölçüdür.
+ *
+ *  Yol repo-GÖRELİ normalize edilir: iki oturumun aynı dosyayı farklı mutlak yollarla
+ *  (symlink · worktree) yazması küme örtüşmesini kaçırırdı. Repo dışı yol ölçülmez —
+ *  bu ölçünün konusu paylaşılan repo yüzeyidir. */
+export function olayClaimsiz(repoRoot, sessionId, absYol, why = "claim'siz ilk yazım") {
+  try {
+    const rel = relative(repoRoot, canonicalPath(absYol));
+    if (!rel || rel.startsWith("..") || rel.startsWith(sep)) return; // repo dışı → konu dışı
+    if (!ilkDokunus(repoRoot, sessionId, rel)) return;
+    yazOlay(repoRoot, { tip: "claimsiz", key: rel, engellenen: sessionId, why });
+  } catch {
+    /* yut */
+  }
+}
