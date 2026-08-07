@@ -6,6 +6,7 @@ import {
   PromotionPreflightSurface,
   requestExistingPostPromotionCatalog,
   requestExistingPostPromotionPreflight,
+  requestExistingPostPromotionProposalDraft,
   type PromotionPreflightCatalog,
 } from "@/app/dashboard/promotion-preflight-panel";
 import type {
@@ -66,7 +67,7 @@ const result = {
   authority: { ephemeral: true, canPersistProposal: false, canApprove: false, canExecute: false, canWriteMeta: false, canGenerateCreative: false },
 } satisfies ExistingPostPromotionPreflightResult;
 
-const callbacks = { onRetry: vi.fn(), onChange: vi.fn(), onEvaluate: vi.fn() };
+const callbacks = { onRetry: vi.fn(), onChange: vi.fn(), onEvaluate: vi.fn(), onDraft: vi.fn() };
 
 describe("Existing-post promotion preflight dashboard", () => {
   it("fails closed without a trusted option catalog and never renders mock selectors", () => {
@@ -116,12 +117,33 @@ describe("Existing-post promotion preflight dashboard", () => {
     expect(html).toContain("₺1.200");
     expect(html).toContain(selection.promotionTemplateRef);
     expect(html).toContain(selection.audiencePresetRef);
-    expect(html).toContain("Persist: kapalı");
+    expect(html).toContain("Preflight persist: kapalı");
     expect(html).toContain("Approval: kapalı");
     expect(html).toContain("Execute: kapalı");
     expect(html).toContain("Meta write: kapalı");
     expect(html).toContain("Creative generation: kapalı");
+    expect(html).toContain("Tek ActionUnit onay taslağı oluştur");
     expect(html).not.toContain(">Onayla<");
+  });
+
+  it("creates only an explicit single-unit K4 draft and rejects unsafe authority", async () => {
+    const draft = { contractVersion: "existing-post-promotion-proposal/1.0.0", outcome: "inserted",
+      proposalRef: "bundle_promotion_primary", actionUnitRefs: ["unit_promotion_primary"],
+      preflightRef: "promotion_preflight_aaaaaaaaaaaaaaaaaaaaaaaa", disposition: "approval_required", risk: "K4",
+      authority: { canApprove: false, canExecute: false, canWriteMeta: false, canGenerateCreative: false, canChangeTargeting: false } } as const;
+    const envelope = { contractVersion: "existing-post-promotion-draft/1.0.0", result: draft,
+      authority: { canApprove: false, canExecute: false, canWriteMeta: false, canGenerateCreative: false, canChangeTargeting: false } };
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(envelope), { status: 201 }));
+    await expect(requestExistingPostPromotionProposalDraft(fetcher as typeof fetch, selection)).resolves.toEqual(draft);
+    expect(fetcher).toHaveBeenCalledWith("/api/existing-post-promotion-preflight", expect.objectContaining({
+      method: "POST", credentials: "same-origin",
+      headers: expect.objectContaining({ "X-ReklamZeka-Intent": "existing-post-promotion-proposal-draft" }),
+      body: JSON.stringify({ selection }),
+    }));
+    const unsafe = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...envelope,
+      authority: { ...envelope.authority, canExecute: true } }), { status: 201 }));
+    await expect(requestExistingPostPromotionProposalDraft(unsafe as typeof fetch, selection))
+      .rejects.toThrow("Güvenli öneri taslağı sözleşmesi doğrulanamadı");
   });
 
   it("posts one exact ref-only selection and rejects an unsafe authority response", async () => {

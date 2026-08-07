@@ -6,6 +6,7 @@ import type {
   ExistingPostPromotionPreflightRequest,
   ExistingPostPromotionPreflightResult,
 } from "@/application/existing-post-promotion-preflight-service";
+import type { ExistingPostPromotionProposalResult } from "@/application/existing-post-promotion-proposal-service";
 import {
   parseExistingPostPromotionCatalogResult,
   type ExistingPostPromotionCatalog as PromotionPreflightCatalog,
@@ -24,6 +25,8 @@ export type PromotionPreflightSurfaceState =
     selection: Partial<ExistingPostPromotionPreflightRequest>;
     result: ExistingPostPromotionPreflightResult | null;
     evaluating: boolean;
+    drafting?: boolean;
+    draftResult?: ExistingPostPromotionProposalResult | null;
     message: string | null;
   }>;
 
@@ -121,6 +124,53 @@ export async function requestExistingPostPromotionPreflight(
   return payload.result;
 }
 
+export async function requestExistingPostPromotionProposalDraft(
+  fetcher: typeof fetch,
+  selection: ExistingPostPromotionPreflightRequest,
+): Promise<ExistingPostPromotionProposalResult> {
+  const response = await fetcher("/api/existing-post-promotion-preflight", {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "X-ReklamZeka-Intent": "existing-post-promotion-proposal-draft",
+    },
+    body: JSON.stringify({ selection }),
+  });
+  const payload = await response.json() as Readonly<{
+    contractVersion?: unknown;
+    result?: ExistingPostPromotionProposalResult;
+    authority?: Readonly<Record<string, unknown>>;
+    error?: Readonly<{ message?: string }>;
+  }>;
+  const result = payload.result;
+  const authority = payload.authority;
+  const ref = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
+  const resultAuthority = result?.authority;
+  const exactKeys = (value: unknown, keys: readonly string[]) => Boolean(value && typeof value === "object"
+    && !Array.isArray(value) && Object.keys(value).length === keys.length
+    && Object.keys(value).every((key) => keys.includes(key)));
+  if (!response.ok || !exactKeys(payload, ["contractVersion", "result", "authority"])
+    || payload.contractVersion !== "existing-post-promotion-draft/1.0.0" || !result || !authority
+    || !exactKeys(result, ["contractVersion", "outcome", "proposalRef", "actionUnitRefs", "preflightRef", "disposition", "risk", "authority"])
+    || !exactKeys(authority, ["canApprove", "canExecute", "canWriteMeta", "canGenerateCreative", "canChangeTargeting"])
+    || !exactKeys(resultAuthority, ["canApprove", "canExecute", "canWriteMeta", "canGenerateCreative", "canChangeTargeting"])
+    || result.contractVersion !== "existing-post-promotion-proposal/1.0.0"
+    || !["inserted", "unchanged"].includes(result.outcome) || !ref.test(result.proposalRef)
+    || !Array.isArray(result.actionUnitRefs) || result.actionUnitRefs.length !== 1 || !ref.test(result.actionUnitRefs[0]!)
+    || !ref.test(result.preflightRef) || result.disposition !== "approval_required" || result.risk !== "K4"
+    || authority.canApprove !== false || authority.canExecute !== false || authority.canWriteMeta !== false
+    || authority.canGenerateCreative !== false || authority.canChangeTargeting !== false
+    || !resultAuthority || resultAuthority.canApprove !== false || resultAuthority.canExecute !== false
+    || resultAuthority.canWriteMeta !== false || resultAuthority.canGenerateCreative !== false
+    || resultAuthority.canChangeTargeting !== false) {
+    if (!response.ok) throw new Error(payload.error?.message ?? "Öneri taslağı oluşturulamadı.");
+    throw new Error("Güvenli öneri taslağı sözleşmesi doğrulanamadı.");
+  }
+  return result;
+}
+
 export async function requestExistingPostPromotionCatalog(fetcher: typeof fetch): Promise<PromotionPreflightCatalog> {
   const response = await fetcher("/api/existing-post-promotion-preflight", {
     method: "GET", credentials: "same-origin", cache: "no-store",
@@ -146,12 +196,13 @@ export function PromotionPreflightSurface(props: Readonly<{
   onRetry(): void;
   onChange(key: SelectionKey, value: string): void;
   onEvaluate(): void;
+  onDraft(): void;
 }>) {
   const ready = props.state.status === "ready" ? props.state : null;
   const preview = ready?.result?.proposalPreview ?? null;
   return <>
     <section className={styles.pageHero}>
-      <div><span className={styles.kicker}>EXISTING POST PROMOTION · K4 PREFLIGHT</span><h1>Mevcut gönderiyi, kilitli şablon ve hedef kitleyle değerlendirin.</h1><p>Yalnız yayınlanmış Page/Instagram gönderileri ve sunucunun sunduğu referanslar kullanılabilir. Bu yüzey kreatif üretmez, hedef kitleyi değiştirmez, taslak kaydetmez, onaylamaz veya Meta’ya yazmaz.</p></div>
+      <div><span className={styles.kicker}>EXISTING POST PROMOTION · K4 PREFLIGHT</span><h1>Mevcut gönderiyi, kilitli şablon ve hedef kitleyle değerlendirin.</h1><p>Yalnız yayınlanmış Page/Instagram gönderileri ve sunucunun sunduğu referanslar kullanılabilir. Ön kontrol kendiliğinden taslak kaydetmez; ayrı komut yalnız K4 onay kuyruğu taslağı oluşturabilir. Kreatif üretme, hedef kitle değiştirme, onaylama ve Meta write kapalıdır.</p></div>
       <span className={styles.readOnlyBadge}>EPHEMERAL · APPROVAL REQUIRED</span>
     </section>
     {props.state.status === "loading" ? <section className={`${styles.panel} ${styles.promotionPreflightState}`} role="status"><strong>Kaynak doğrulanıyor</strong><h2>Yayınlanmış şablonlar ve mevcut gönderiler bekleniyor.</h2><p>Serbest ID, ham targeting veya kreatif alanı açılmaz.</p></section> : null}
@@ -174,7 +225,9 @@ export function PromotionPreflightSurface(props: Readonly<{
           {ready.result.reasons.length ? <div className={styles.promotionPreflightReasons}>{ready.result.reasons.map((item) => <p key={`${item.source}:${item.code}`}><span>{item.source}</span><strong>{item.code}</strong><i data-disposition={item.disposition}>{item.disposition}</i></p>)}</div> : <p className={styles.promotionPreflightClear}>Şablon, preset, Meta uygunluğu ve aktif guidance kontrollerinde engel bulunmadı.</p>}
           {preview ? <div className={styles.promotionBeforeAfter}><div><span>Önce</span><strong>Mevcut gönderi · değişmez</strong><small>{ready.selection.postRef}</small></div><b>→</b><div><span>Sonra</span><strong>K4 reklam önerisi · approval_required</strong><small>{preview.actorType} · {money(preview.budget.amountMinor, preview.budget.currency)} / {preview.budget.kind === "daily" ? "gün" : "dönem"}</small></div></div> : null}
           {preview ? <dl className={styles.promotionPreflightFacts}><div><dt>Şablon</dt><dd>{ready.selection.promotionTemplateRef}</dd></div><div><dt>Immutable preset</dt><dd>{ready.selection.audiencePresetRef}</dd></div><div><dt>Timeframe</dt><dd>{timestamp(preview.timeframe.startAt, preview.timeframe.timezone)}{preview.timeframe.endAt ? ` → ${timestamp(preview.timeframe.endAt, preview.timeframe.timezone)} · ${preview.timeframe.durationDays} gün` : " → sürekli"}</dd></div><div><dt>Risk / durum</dt><dd>{preview.risk} · {preview.disposition}</dd></div></dl> : null}
-          <footer><span>Persist: kapalı</span><span>Approval: kapalı</span><span>Execute: kapalı</span><span>Meta write: kapalı</span><span>Creative generation: kapalı</span></footer>
+          {preview && !ready.draftResult ? <button disabled={ready.drafting} onClick={props.onDraft}>{ready.drafting ? "Taslak oluşturuluyor…" : "Tek ActionUnit onay taslağı oluştur"}</button> : null}
+          {ready.draftResult ? <div className={styles.promotionPreflightClear} role="status"><strong>Onay kuyruğu taslağı hazır</strong><p>{ready.draftResult.proposalRef} · {ready.draftResult.actionUnitRefs[0]} · {ready.draftResult.outcome}</p></div> : null}
+          <footer><span>Preflight persist: kapalı</span><span>Approval: kapalı</span><span>Execute: kapalı</span><span>Meta write: kapalı</span><span>Creative generation: kapalı</span></footer>
         </>}
       </section>
     </div> : null}
@@ -193,7 +246,7 @@ export function PromotionPreflightPanel() {
     setState({ status: "loading" });
     try {
       const catalog = await requestExistingPostPromotionCatalog(fetch);
-      setState({ status: "ready", catalog, selection: {}, result: null, evaluating: false, message: null });
+      setState({ status: "ready", catalog, selection: {}, result: null, evaluating: false, drafting: false, draftResult: null, message: null });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Öne çıkarma seçim kataloğu alınamadı.";
       setState({ status: error && typeof error === "object" && "unavailable" in error ? "unavailable" : "error", message });
@@ -212,7 +265,7 @@ export function PromotionPreflightPanel() {
         const template = current.catalog.templates.find((item) => item.ref === value);
         next.audiencePresetRef = template?.requiredAudiencePresetRef;
       }
-      return { ...current, selection: next, result: null, message: null };
+      return { ...current, selection: next, result: null, draftResult: null, message: null };
     });
   }, []);
 
@@ -227,5 +280,19 @@ export function PromotionPreflightPanel() {
     }
   }, [requiredPreset, selection, state.status]);
 
-  return <PromotionPreflightSurface state={state} onRetry={() => void load()} onChange={change} onEvaluate={() => void evaluate()} />;
+  const draft = useCallback(async () => {
+    if (state.status !== "ready" || state.result?.status !== "ready_for_approval_proposal"
+      || !state.result.proposalPreview || !isComplete(selection)) return;
+    setState((current) => current.status === "ready" ? { ...current, drafting: true, message: null } : current);
+    try {
+      const draftResult = await requestExistingPostPromotionProposalDraft(fetch, selection);
+      setState((current) => current.status === "ready" ? { ...current, drafting: false, draftResult, message: null } : current);
+    } catch (error) {
+      setState((current) => current.status === "ready" ? { ...current, drafting: false,
+        message: error instanceof Error ? error.message : "Öneri taslağı oluşturulamadı." } : current);
+    }
+  }, [selection, state]);
+
+  return <PromotionPreflightSurface state={state} onRetry={() => void load()} onChange={change}
+    onEvaluate={() => void evaluate()} onDraft={() => void draft()} />;
 }

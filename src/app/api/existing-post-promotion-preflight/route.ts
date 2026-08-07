@@ -9,6 +9,7 @@ import {
 } from "@/server/local-existing-post-promotion-catalog-runtime";
 import { localDecisionRoomConfig } from "@/server/local-decision-room-runtime";
 import { createLocalExistingPostPromotionPreflightRouteHandler } from "@/server/local-existing-post-promotion-preflight-runtime";
+import { createLocalExistingPostPromotionProposalDraftRouteHandler } from "@/server/local-existing-post-promotion-proposal-draft-runtime";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -51,7 +52,9 @@ export function POST(request: Request): Promise<Response> | Response;
 export function POST(request?: Request) {
   const configured = configuredRuntime();
   return configured && request
-    ? createLocalExistingPostPromotionPreflightRouteHandler(configured)(request)
+    ? request.headers.get("x-reklamzeka-intent") === "existing-post-promotion-proposal-draft"
+      ? createLocalExistingPostPromotionProposalDraftRouteHandler(configured)(request)
+      : createLocalExistingPostPromotionPreflightRouteHandler(configured)(request)
     : existingPostPromotionPreflightNotConfiguredResponse();
 }
 

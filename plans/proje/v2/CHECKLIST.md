@@ -254,6 +254,11 @@
   - [x] Exact 10-ref dashboard seçimini tenant-bound PostgreSQL mirror/registry üzerinden yeniden çözen,
     ayrı cookie-only `promotion_preflight:read` POST runtime'ı; account→campaign→ad-set, actor→post,
     canonical hash/link ve schedule/budget doğrulaması, kanıtsız compatibility'de fail-closed sonuç.
+  - [x] Ayrı `promotion_proposal:draft` capability ve `promotion:draft` workspace yetkili explicit
+    draft intent'i; exact seçimi yeniden preflight eder, viewer/bearer/proxy/override'ı reddeder ve
+    immutable server materializer yokken sıfır queue write ile `material_unavailable` kalır.
+  - [ ] Canonical private materializer: template/preset/binding + post/object-story binding + approval
+    policy/plan/action context'i kanıtlı kaynaktan kurup mevcut proposal service/queue repository'ye bağlama.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.
 - [ ] Owner/admin/analyst/operator/viewer rol E2E.
 - [ ] 1280/820/390, keyboard/screen-reader ve hata/partial/conflict E2E.

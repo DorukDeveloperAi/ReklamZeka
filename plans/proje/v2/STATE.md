@@ -683,3 +683,20 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Odaklı doğrulama 10 dosya/39 test, typecheck ve diff-check'te temizdir. Sıradaki increment aynı immutable
   context'i yeniden çözerek explicit proposal draft oluşturmak ve oluşan tek ActionUnit'i mevcut approval
   inbox'ta ayrı ayrı onaylanabilir hale getirmektir. Production Meta writer kapalıdır.
+
+## 2026-08-07 — S5.4b explicit proposal-draft kapısı
+
+- `promotion_proposal:draft` local-session capability'si ve `promotion:draft` workspace action'ı ayrıldı;
+  owner/admin/analyst taslak isteyebilir, viewer isteyemez. Same-origin cookie ve ayrı explicit intent
+  gerekir; bearer, proxy, caller workspace, genişletilmiş body ve serbest budget/targeting alanı reddedilir.
+- Draft coordinator exact 10 ref'i S5.4a gerçek Drizzle resolver'ı üzerinden yeniden preflight eder.
+  Yalnız `ready_for_approval_proposal` sonucu server-private submit portuna ilerleyebilir. Dashboard bu
+  explicit komutu ayrı düğmeyle sunar ve dönen tek K4 ActionUnit sonucunda approval/execute/Meta-write/
+  creative-generation yetkilerinin kapalı olduğunu tekrar doğrular.
+- Canlı submit portu bilinçli olarak `material_unavailable` durumundadır ve queue transaction kabiliyeti
+  taşımaz. Çünkü canonical belgeler public resolver'da redakte edilir; verified platform post/object-story
+  binding, frozen plan, approval policy ve action context için henüz tek bir kanıtlı private materializer
+  yoktur. Ayrıca beş compatibility alanı kanıtsız `unknown` kaldığından gerçek preflight hazır sayılmaz.
+- Sahte creative binding, targeting, preset, policy veya plan üretilmedi. Mevcut saf proposal service ve
+  append-only queue repository hazır ve testlidir; sıradaki dilim private materializer/evidence kaynağını
+  kurup bu porta bağlayacak. O zamana kadar endpoint 409/503 ile fail-closed ve sıfır business/Meta write'dır.
