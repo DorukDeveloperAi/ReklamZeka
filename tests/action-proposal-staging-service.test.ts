@@ -27,6 +27,7 @@ const policy: ApprovalPolicy = {
   ],
   grantConsumerRoles: ["owner"],
   separationOfDutiesRisks: ["K3", "K4"],
+  maximumProposalLifetimeSeconds: 86_400,
   maximumGrantLifetimeSeconds: 300,
 };
 
@@ -237,6 +238,16 @@ describe("ActionProposalStagingService", () => {
       .toThrowError(expect.objectContaining({ code: "invalid_input" }));
     expect(() => new ActionProposalStagingService({ ...policy, requesterRoles: ["owner"] }).stage(input()))
       .toThrowError(expect.objectContaining({ code: "approval_policy_rejected" }));
+  });
+
+  it("proposal expiry'yi grant ömründen bağımsız reviewed policy sınırında tutar", () => {
+    const exact = input([unit("unit_exact_lifetime", pause())]);
+    expect(() => new ActionProposalStagingService({ ...policy, maximumProposalLifetimeSeconds: 86_400 }).stage(exact))
+      .not.toThrow();
+    expect(() => new ActionProposalStagingService({ ...policy, maximumProposalLifetimeSeconds: 86_399 }).stage(exact))
+      .toThrowError(expect.objectContaining({ code: "invalid_input" }));
+    expect(() => new ActionProposalStagingService({ ...policy, maximumGrantLifetimeSeconds: 1 }).stage(exact))
+      .not.toThrow();
   });
 
   it("hata mesajında raw input ayrıntısını yansıtmaz", () => {

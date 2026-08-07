@@ -404,7 +404,10 @@ export class ActionProposalStagingService {
     const requester = normalizeRequester(raw.requester);
     const proposedAt = instant(raw.proposedAt);
     const expiresAt = instant(raw.expiresAt);
-    if (expiresAt <= proposedAt || !Array.isArray(raw.units) || raw.units.length < 1 || raw.units.length > 200) fail("invalid_input");
+    const proposalLifetimeMilliseconds = Date.parse(expiresAt) - Date.parse(proposedAt);
+    if (expiresAt <= proposedAt
+      || proposalLifetimeMilliseconds > this.approvalPolicy.maximumProposalLifetimeSeconds * 1_000
+      || !Array.isArray(raw.units) || raw.units.length < 1 || raw.units.length > 200) fail("invalid_input");
 
     const unitKeys = new Set<string>();
     const actionPlanHashes = new Set<string>();

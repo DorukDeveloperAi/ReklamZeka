@@ -51,7 +51,8 @@ function initial(): ApprovalLifecycle {
       version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_queue", revision: 1,
       autonomyMode: "approval_only", requesterRoles: ["operator"],
       approverRoles: [{ risk: "K2", roles: ["owner"] }], grantConsumerRoles: ["owner"],
-      separationOfDutiesRisks: ["K3"], maximumGrantLifetimeSeconds: 300,
+      separationOfDutiesRisks: ["K3"], maximumProposalLifetimeSeconds: 86_400,
+      maximumGrantLifetimeSeconds: 300,
     },
     initializedAt: "2026-08-07T18:00:00.000Z", eventRef: "event_initialized",
   }).lifecycle;

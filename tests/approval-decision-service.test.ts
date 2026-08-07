@@ -43,7 +43,8 @@ function lifecycle(requesterRef = "actor_operator"): ApprovalLifecycle {
     policy: {
       version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_approval", revision: 1,
       requesterRoles: ["operator"], approverRoles: [{ risk: "K3", roles: ["owner", "admin"] }],
-      grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K3"], maximumGrantLifetimeSeconds: 300,
+      grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K3"], maximumProposalLifetimeSeconds: 86_400,
+      maximumGrantLifetimeSeconds: 300,
     },
     initializedAt: "2026-08-07T18:00:01.000Z", eventRef: "event_initialized",
   }).lifecycle;

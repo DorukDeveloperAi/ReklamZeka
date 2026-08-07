@@ -15,7 +15,8 @@ const policy: ApprovalPolicy = {
   version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_promotion", revision: 1,
   autonomyMode: "approval_only", requesterRoles: ["operator"],
   approverRoles: [{ risk: "K4", roles: ["owner", "admin"] }], grantConsumerRoles: ["owner"],
-  separationOfDutiesRisks: ["K4"], maximumGrantLifetimeSeconds: 300,
+  separationOfDutiesRisks: ["K4"], maximumProposalLifetimeSeconds: 86_400,
+  maximumGrantLifetimeSeconds: 300,
 };
 
 function fixture(): ExistingPostPromotionPreflightInput {

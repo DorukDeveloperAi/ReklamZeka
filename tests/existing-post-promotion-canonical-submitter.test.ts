@@ -56,7 +56,8 @@ function compatibility(hash: string, status: "confirmed" | "unknown" | "rejected
 function policy(): ExistingPostPromotionPolicyResolution { return {
   approvalPolicy: { version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "approval_policy_published", revision: 4,
     autonomyMode: "approval_only", requesterRoles: ["owner"], approverRoles: [{ risk: "K4", roles: ["owner", "admin"] }],
-    grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K4"], maximumGrantLifetimeSeconds: 300 },
+    grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K4"], maximumProposalLifetimeSeconds: 3_600,
+    maximumGrantLifetimeSeconds: 300 },
   rules: [{ ruleRef: "autonomy_workspace_reviewed", workspaceRef: principal.workspaceRef,
     scope: { level: "workspace", ref: principal.workspaceRef }, mode: "approval_only", state: "published",
     effectiveFrom: "2026-08-07T10:00:00.000Z", expiresAt: null, killSwitch: false, maximumActionsPerRun: 1 }],
@@ -102,6 +103,22 @@ describe("existing-post canonical materializer submit port", () => {
   it("requires a published approval/protection policy resolution and performs zero queue writes when absent", async () => {
     const api = harness({ policy: null });
     await expect(api.submitter.submitResolved({ principal, selection })).rejects.toMatchObject({ code: "policy_unavailable" });
+    expect(api.queue.appendInitial).not.toHaveBeenCalled();
+  });
+
+  it("rejects expiry beyond the reviewed proposal lifetime independently of grant lifetime", async () => {
+    const api = harness({ policy: { ...policy(), proposalExpiresAt: "2026-08-07T13:00:00.001Z",
+      approvalPolicy: { ...policy().approvalPolicy, maximumGrantLifetimeSeconds: 86_400 } } });
+    await expect(api.submitter.submitResolved({ principal, selection }))
+      .rejects.toMatchObject({ code: "policy_unavailable" });
+    expect(api.queue.appendInitial).not.toHaveBeenCalled();
+  });
+
+  it("retains the submitter's seven-day technical hard cap", async () => {
+    const api = harness({ policy: { ...policy(), proposalExpiresAt: "2026-08-14T12:00:00.001Z",
+      approvalPolicy: { ...policy().approvalPolicy, maximumProposalLifetimeSeconds: 604_800 } } });
+    await expect(api.submitter.submitResolved({ principal, selection }))
+      .rejects.toMatchObject({ code: "policy_unavailable" });
     expect(api.queue.appendInitial).not.toHaveBeenCalled();
   });
 

@@ -89,7 +89,8 @@ const policy = {
   version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_promotion", revision: 1,
   autonomyMode: "approval_only" as const, requesterRoles: ["operator" as const],
   approverRoles: [{ risk: "K4" as const, roles: ["owner" as const] }], grantConsumerRoles: ["owner" as const],
-  separationOfDutiesRisks: ["K4" as const], maximumGrantLifetimeSeconds: 300,
+  separationOfDutiesRisks: ["K4" as const], maximumProposalLifetimeSeconds: 86_400,
+  maximumGrantLifetimeSeconds: 300,
 };
 
 describe("PromotionTemplate + AudiencePreset core", () => {

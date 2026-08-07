@@ -34,7 +34,8 @@ const policy: ApprovalPolicy = {
   version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_queue", revision: 1,
   autonomyMode: "approval_only", requesterRoles: ["operator"],
   approverRoles: [{ risk: "K2", roles: ["owner"] }, { risk: "K3", roles: ["owner"] }],
-  grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K3"], maximumGrantLifetimeSeconds: 300,
+  grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K3"], maximumProposalLifetimeSeconds: 86_400,
+  maximumGrantLifetimeSeconds: 300,
 };
 
 function rule(): AutonomyRule {
@@ -111,7 +112,8 @@ function trustedDefinitions(patch: { workspaceRef?: string; policyRef?: string; 
     policy: { version: ACTION_APPROVAL_POLICY_VERSION, policyRef: patch.policyRef ?? "policy_existing_post", revision: 1,
       autonomyMode: "approval_only", requesterRoles: ["owner"],
       approverRoles: [{ risk: "K4", roles: ["owner", "admin"] }], grantConsumerRoles: ["owner"],
-      separationOfDutiesRisks: ["K4"], maximumGrantLifetimeSeconds: 300 },
+      separationOfDutiesRisks: ["K4"], maximumProposalLifetimeSeconds: 86_400,
+      maximumGrantLifetimeSeconds: 300 },
     effectiveFrom: "2026-08-07T10:00:00.000Z", expiresAt: patch.expiresAt ?? null,
     normalizedBy: { actorRef: "actor_analyst", role: "analyst" } });
   const published = publishApprovalPolicy({ draft, actor: { actorRef: "actor_owner", role: "owner" },
@@ -344,9 +346,30 @@ describe("DrizzleActionProposalQueueRepository", () => {
     expect(database.table(schema.actionProposalBundles)).toHaveLength(0);
   });
 
+  it("rejects historical snapshot replay when the proposal lifetime field differs from its trusted hash", async () => {
+    const trusted = trustedDefinitions();
+    const proposal = stagedPromotion(trusted.published.policy);
+    for (const policyPayload of [
+      { ...proposal.lifecycle.policy, maximumProposalLifetimeSeconds: 43_200 },
+      Object.fromEntries(Object.entries(proposal.lifecycle.policy)
+        .filter(([key]) => key !== "maximumProposalLifetimeSeconds")),
+    ]) {
+      const database = new AtomicQueueDatabase();
+      database.setTable(schema.approvalPolicyDefinitionRevisions, definitionRows(trusted.definitions));
+      database.setTable(schema.actionApprovalPolicySnapshots, [{ id: "50000000-0000-4000-8000-000000000002",
+        workspaceId, sourceDefinitionId: trustedDefinitionId,
+        sourceDefinitionCanonicalHash: trusted.published.canonicalHash,
+        policyRef: trusted.published.policyRef, revision: trusted.published.revision,
+        policyHash: trusted.published.policyHash, policyPayload }]);
+      await expect(new DrizzleActionProposalQueueRepository(database as never, workspaceId).appendInitial(proposal))
+        .rejects.toEqual(expect.objectContaining({ code: "policy_conflict" }));
+      expect(database.table(schema.actionProposalBundles)).toHaveLength(0);
+    }
+  });
+
   it("permits only a no-write historical exact replay before trusted lookup and creates no new authority rows", async () => {
     const trusted = trustedDefinitions();
-    const arbitrary = stagedPromotion({ ...trusted.published.policy, maximumGrantLifetimeSeconds: 600 });
+    const arbitrary = stagedPromotion({ ...trusted.published.policy, maximumProposalLifetimeSeconds: 172_800 });
     const database = new AtomicQueueDatabase();
     database.setTable(schema.actionProposalBundles, [{
       id: "60000000-0000-4000-8000-000000000001", workspaceId,

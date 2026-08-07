@@ -128,9 +128,13 @@ function roles<T extends ActionActorRole>(value: unknown, allowed: readonly Acti
 function normalizePolicy(value: unknown, policyRef: string, revision: number): ResolvedApprovalPolicy {
   const hasAutonomyMode = Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.hasOwn(value, "autonomyMode"));
   exact(value, ["version", "policyRef", "revision", ...(hasAutonomyMode ? ["autonomyMode"] : []),
-    "requesterRoles", "approverRoles", "grantConsumerRoles", "separationOfDutiesRisks", "maximumGrantLifetimeSeconds"]);
+    "requesterRoles", "approverRoles", "grantConsumerRoles", "separationOfDutiesRisks",
+    "maximumProposalLifetimeSeconds", "maximumGrantLifetimeSeconds"]);
   if (value.version !== ACTION_APPROVAL_POLICY_VERSION || (value.autonomyMode ?? "approval_only") !== "approval_only"
     || value.policyRef !== policyRef || value.revision !== revision
+    || !Number.isSafeInteger(value.maximumProposalLifetimeSeconds)
+    || (value.maximumProposalLifetimeSeconds as number) < 1
+    || (value.maximumProposalLifetimeSeconds as number) > 604_800
     || !Number.isSafeInteger(value.maximumGrantLifetimeSeconds)
     || (value.maximumGrantLifetimeSeconds as number) < 1 || (value.maximumGrantLifetimeSeconds as number) > 86_400
     || !Array.isArray(value.approverRoles) || !Array.isArray(value.separationOfDutiesRisks)
@@ -153,6 +157,7 @@ function normalizePolicy(value: unknown, policyRef: string, revision: number): R
     approverRoles: Object.freeze(approverRoles),
     grantConsumerRoles: roles<ActionApprovalRole>(value.grantConsumerRoles, APPROVER_ROLES),
     separationOfDutiesRisks: Object.freeze([...(value.separationOfDutiesRisks as ActionRisk[])].sort()),
+    maximumProposalLifetimeSeconds: value.maximumProposalLifetimeSeconds as number,
     maximumGrantLifetimeSeconds: value.maximumGrantLifetimeSeconds as number,
   };
   return deepFreeze({ ...core, policyHash: digest(core) });

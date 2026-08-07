@@ -80,6 +80,7 @@ function start(source = bundle()): ApprovalLifecycle {
       ],
       grantConsumerRoles: ["owner", "admin"],
       separationOfDutiesRisks: ["K3", "K4"],
+      maximumProposalLifetimeSeconds: 86_400,
       maximumGrantLifetimeSeconds: 300,
     },
     initializedAt: "2026-08-07T10:01:00.000Z",
@@ -153,7 +154,8 @@ describe("ActionUnit approval lifecycle", () => {
       policy: {
         version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_analyst_request", revision: 1,
         requesterRoles: ["analyst"], approverRoles: [{ risk: "K3", roles: ["owner"] }],
-        grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K3"], maximumGrantLifetimeSeconds: 300,
+        grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K3"], maximumProposalLifetimeSeconds: 86_400,
+        maximumGrantLifetimeSeconds: 300,
       },
       initializedAt: "2026-08-07T10:01:00Z", eventRef: "event_analyst_request",
     }).lifecycle;
@@ -165,7 +167,8 @@ describe("ActionUnit approval lifecycle", () => {
       policy: {
         version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_bad_approver", revision: 1,
         requesterRoles: ["analyst"], approverRoles: [{ risk: "K3", roles: ["analyst"] as never }],
-        grantConsumerRoles: ["owner"], separationOfDutiesRisks: [], maximumGrantLifetimeSeconds: 300,
+        grantConsumerRoles: ["owner"], separationOfDutiesRisks: [], maximumProposalLifetimeSeconds: 86_400,
+        maximumGrantLifetimeSeconds: 300,
       },
       initializedAt: "2026-08-07T10:01:00Z", eventRef: "event_bad_approver",
     })).toThrowError(expect.objectContaining({ code: "invalid_input" }));
@@ -243,7 +246,8 @@ describe("ActionUnit approval lifecycle", () => {
       policy: {
         version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_strict", revision: 1,
         requesterRoles: ["owner"], approverRoles: [{ risk: "K3", roles: ["owner"] }],
-        grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K3"], maximumGrantLifetimeSeconds: 300,
+        grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K3"], maximumProposalLifetimeSeconds: 86_400,
+        maximumGrantLifetimeSeconds: 300,
       },
       initializedAt: "2026-08-07T10:01:00Z", eventRef: "event_same_actor",
     }).lifecycle;

@@ -2805,6 +2805,9 @@ export const actionApprovalPolicySnapshots = pgTable("action_approval_policy_sna
     and (${table.policyPayload} #>> '{revision}')::integer = ${table.revision}
     and ${table.policyPayload} #>> '{policyHash}' = ${table.policyHash}
     and ${table.policyPayload} #>> '{autonomyMode}' = 'approval_only'
+    and ${table.policyPayload} ? 'maximumProposalLifetimeSeconds'
+    and jsonb_typeof(${table.policyPayload} #> '{maximumProposalLifetimeSeconds}') = 'number'
+    and (${table.policyPayload} #>> '{maximumProposalLifetimeSeconds}')::integer between 1 and 604800
   `),
   check("action_approval_policy_snapshots_no_authority", sql`
     not jsonb_path_exists(${table.policyPayload}, '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(actionauthority|executionauthority|writeauthority|writeenabled|canexecute|canwrite|approvalgranted|grant|authorization)$" flag "i")')
@@ -3655,6 +3658,9 @@ export const approvalPolicyDefinitionRevisions = pgTable("approval_policy_defini
     and jsonb_typeof(${table.policyPayload} #> '{approverRoles}') = 'array'
     and jsonb_typeof(${table.policyPayload} #> '{grantConsumerRoles}') = 'array'
     and jsonb_typeof(${table.policyPayload} #> '{separationOfDutiesRisks}') = 'array'
+    and ${table.policyPayload} ? 'maximumProposalLifetimeSeconds'
+    and jsonb_typeof(${table.policyPayload} #> '{maximumProposalLifetimeSeconds}') = 'number'
+    and (${table.policyPayload} #>> '{maximumProposalLifetimeSeconds}')::integer between 1 and 604800
     and (${table.policyPayload} #>> '{maximumGrantLifetimeSeconds}')::integer between 1 and 86400
   `),
   check("approval_policy_definition_revisions_artifact_exact", sql`

@@ -64,6 +64,7 @@ export type ApprovalPolicy = Readonly<{
   approverRoles: readonly Readonly<{ risk: ActionRisk; roles: readonly ActionApprovalRole[] }>[];
   grantConsumerRoles: readonly ActionApprovalRole[];
   separationOfDutiesRisks: readonly ActionRisk[];
+  maximumProposalLifetimeSeconds: number;
   maximumGrantLifetimeSeconds: number;
 }>;
 
@@ -301,10 +302,12 @@ function normalizePolicy(candidate: ApprovalPolicy): ResolvedApprovalPolicy {
   exact(candidate, [
     "version", "policyRef", "revision", ...(Object.hasOwn(candidate, "autonomyMode") ? ["autonomyMode"] : []),
     "requesterRoles", "approverRoles", "grantConsumerRoles", "separationOfDutiesRisks",
-    "maximumGrantLifetimeSeconds",
+    "maximumProposalLifetimeSeconds", "maximumGrantLifetimeSeconds",
   ]);
   if (candidate.version !== ACTION_APPROVAL_POLICY_VERSION || (candidate.autonomyMode ?? "approval_only") !== "approval_only"
     || !Number.isSafeInteger(candidate.revision) || candidate.revision < 1
+    || !Number.isSafeInteger(candidate.maximumProposalLifetimeSeconds)
+    || candidate.maximumProposalLifetimeSeconds < 1 || candidate.maximumProposalLifetimeSeconds > 604_800
     || !Number.isSafeInteger(candidate.maximumGrantLifetimeSeconds)
     || candidate.maximumGrantLifetimeSeconds < 1 || candidate.maximumGrantLifetimeSeconds > 86_400
     || !Array.isArray(candidate.approverRoles) || !Array.isArray(candidate.separationOfDutiesRisks)
@@ -327,6 +330,7 @@ function normalizePolicy(candidate: ApprovalPolicy): ResolvedApprovalPolicy {
     approverRoles: freeze(approverRoles),
     grantConsumerRoles: normalizeRoles(candidate.grantConsumerRoles, APPROVER_ROLES),
     separationOfDutiesRisks: freeze([...candidate.separationOfDutiesRisks].sort()),
+    maximumProposalLifetimeSeconds: candidate.maximumProposalLifetimeSeconds,
     maximumGrantLifetimeSeconds: candidate.maximumGrantLifetimeSeconds,
   };
   return freeze({ ...core, policyHash: digest(core) });

@@ -104,7 +104,9 @@ export class ExistingPostPromotionCanonicalSubmitter {
       || policy.approvalPolicy.autonomyMode !== "approval_only" || policy.protection.changeDisposition !== "allowed"
       || policy.protection.policyRefs.length === 0 || !Number.isFinite(proposalExpiry)
       || new Date(policy.proposalExpiresAt).toISOString() !== policy.proposalExpiresAt
-      || proposalExpiry <= now.valueOf() || proposalExpiry > now.valueOf() + 7 * 86_400_000) {
+      || proposalExpiry <= now.valueOf()
+      || proposalExpiry > now.valueOf() + policy.approvalPolicy.maximumProposalLifetimeSeconds * 1_000
+      || proposalExpiry > now.valueOf() + 7 * 86_400_000) {
       throw new ExistingPostPromotionCanonicalSubmitError("policy_unavailable");
     }
     const planHash = digest({ selectionHash, evidenceSelectionHash, templateHash: material.template.templateHash, presetHash: material.preset.presetHash,
