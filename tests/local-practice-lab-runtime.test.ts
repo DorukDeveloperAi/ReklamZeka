@@ -46,7 +46,7 @@ describe("local Practice Lab route", () => {
       kind: "session", workspaceId, workspaceRef: "workspace_local", userId,
       readerRef: "reader_local_owner", osUid: process.getuid!(), issuedAt: now, expiresAt: now + 300,
     }, signingKey).claims;
-    expect(claims.scopes).toEqual(["decision_room:mark_read", "decision_room:read", "practice_lab:read"]);
+    expect(claims.scopes).toEqual(["budget_lab:read", "decision_room:mark_read", "decision_room:read", "practice_lab:read"]);
     const transaction = vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
       execute: vi.fn()
         .mockResolvedValueOnce({ rows: [{ id: workspaceId }] })
@@ -80,7 +80,8 @@ describe("local Practice Lab route", () => {
       database: database as never,
       config: localDecisionRoomConfig(environment())!,
     });
-    const response = await handler(request(`${token().slice(0, -1)}x`));
+    const valid = token();
+    const response = await handler(request(`${valid.slice(0, -1)}${valid.endsWith("x") ? "y" : "x"}`));
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({
       error: {

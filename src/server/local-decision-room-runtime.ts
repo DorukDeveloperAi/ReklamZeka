@@ -228,7 +228,7 @@ export async function resolveTrustedLocalReadPrincipal(input: Readonly<{
   request: Request;
   database: Pick<Database, "execute">;
   config: LocalDecisionRoomConfig;
-  requiredScope: Extract<LocalSessionScope, "decision_room:read" | "practice_lab:read">;
+  requiredScope: Extract<LocalSessionScope, "budget_lab:read" | "decision_room:read" | "practice_lab:read">;
 }>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
   exactKeys(input, ["request", "database", "config", "requiredScope"]);
   const authenticated = authenticate(input.request, input.config, "read");

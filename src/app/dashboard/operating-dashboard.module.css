@@ -440,6 +440,51 @@
 .practiceDraft p { margin: 6px 0; color: var(--rz-muted); font-size: .59rem; }
 .practiceDraft small { display: block; margin-top: 13px; color: var(--rz-blue); font-size: .52rem; }
 
+.budgetLabState { display: grid; place-items: start; gap: 9px; min-height: 230px; padding: 26px; }
+.budgetLabState > strong { color: var(--rz-amber); font: 750 .59rem ui-monospace, monospace; text-transform: uppercase; }
+.budgetLabState h2 { max-width: 760px; margin: 2px 0; font-size: 1.08rem; }
+.budgetLabState p { max-width: 720px; margin: 0; color: var(--rz-muted); font-size: .65rem; line-height: 1.55; }
+.budgetLabState button { padding: 8px 11px; border: 1px solid var(--rz-line-strong); border-radius: 8px; background: var(--rz-surface-3); color: var(--rz-text); cursor: pointer; font-size: .61rem; }
+.budgetLabWorkspace { display: grid; grid-template-columns: minmax(280px, .7fr) minmax(0, 1.65fr); gap: 10px; align-items: start; }
+.budgetLabIndex { overflow: hidden; }
+.budgetLabIndex > div:last-child { display: grid; }
+.budgetLabIndex > div > button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; width: 100%; padding: 15px 17px; border: 0; border-bottom: 1px solid var(--rz-line); background: transparent; color: var(--rz-text); text-align: left; cursor: pointer; }
+.budgetLabIndex > div > button[data-active="true"] { background: rgba(184,242,84,.055); box-shadow: inset 2px 0 var(--rz-green); }
+.budgetLabIndex button span { display: grid; gap: 6px; min-width: 0; }
+.budgetLabIndex button strong { overflow-wrap: anywhere; font-size: .65rem; }
+.budgetLabIndex button small { color: var(--rz-muted); font-size: .52rem; line-height: 1.45; }
+.budgetLabIndex button i { color: var(--rz-blue); font: 700 .48rem ui-monospace, monospace; text-transform: uppercase; }
+.budgetLabDetail { overflow: hidden; }
+.budgetLabDetail > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px; border-bottom: 1px solid var(--rz-line); }
+.budgetLabDetail > header h2 { margin: 7px 0; overflow-wrap: anywhere; font-size: 1.15rem; }
+.budgetLabDetail > header p { margin: 0; color: var(--rz-muted); font-size: .54rem; overflow-wrap: anywhere; }
+.budgetLabFacts { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--rz-line); }
+.budgetLabFacts > div { display: grid; gap: 6px; padding: 16px 20px; border-right: 1px solid var(--rz-line); }
+.budgetLabFacts > div:last-child { border-right: 0; }
+.budgetLabFacts span { color: var(--rz-dim); font-size: .49rem; text-transform: uppercase; }
+.budgetLabFacts strong { font-size: .64rem; text-transform: uppercase; }
+.budgetLabFacts small { overflow-wrap: anywhere; color: var(--rz-muted); font-size: .52rem; }
+.budgetAlternativeList { display: grid; gap: 10px; padding: 16px; }
+.budgetAlternativeList > article { overflow: hidden; border: 1px solid var(--rz-line); border-radius: 10px; background: rgba(255,255,255,.012); }
+.budgetAlternativeList article > header { display: flex; justify-content: space-between; gap: 12px; padding: 13px 15px; border-bottom: 1px solid var(--rz-line); }
+.budgetAlternativeList article > header strong { overflow-wrap: anywhere; font-size: .65rem; }
+.budgetAlternativeList article > header span { color: var(--rz-green); font: 700 .5rem ui-monospace, monospace; }
+.budgetAlternativeList article > p { margin: 0; padding: 15px; color: var(--rz-muted); font-size: .6rem; line-height: 1.5; }
+.budgetBeforeAfter { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 15px; border-bottom: 1px solid var(--rz-line); }
+.budgetBeforeAfter > div { display: grid; gap: 5px; }
+.budgetBeforeAfter > div:last-child { text-align: right; }
+.budgetBeforeAfter span { color: var(--rz-dim); font-size: .5rem; text-transform: uppercase; }
+.budgetBeforeAfter strong { font-size: .72rem; }
+.budgetAlternativeList dl { display: grid; grid-template-columns: repeat(2, 1fr); margin: 0; border-bottom: 1px solid var(--rz-line); }
+.budgetAlternativeList dl > div { display: grid; gap: 5px; padding: 12px 15px; border-right: 1px solid var(--rz-line); border-bottom: 1px solid var(--rz-line); }
+.budgetAlternativeList dt { color: var(--rz-dim); font-size: .49rem; text-transform: uppercase; }
+.budgetAlternativeList dd { margin: 0; overflow-wrap: anywhere; color: var(--rz-muted); font-size: .56rem; }
+.budgetAllocationRows { display: grid; padding: 4px 15px 12px; }
+.budgetAllocationRows p { display: grid; grid-template-columns: 80px minmax(0, 1fr) auto; gap: 10px; align-items: center; margin: 0; padding: 9px 0; border-bottom: 1px solid var(--rz-line); }
+.budgetAllocationRows p:last-child { border-bottom: 0; }
+.budgetAllocationRows span, .budgetAllocationRows small { color: var(--rz-muted); font-size: .52rem; }
+.budgetAllocationRows strong { overflow-wrap: anywhere; font-size: .58rem; }
+
 .sourceFooter { display: flex; justify-content: space-between; gap: 20px; padding: 13px 36px 22px; color: var(--rz-dim); font-size: .54rem; }
 .toast { position: fixed; right: 24px; bottom: 24px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: min(440px, calc(100% - 32px)); padding: 12px 14px; border: 1px solid rgba(184,242,84,.28); border-radius: 11px; background: #182018; box-shadow: 0 18px 60px rgba(0,0,0,.4); z-index: 50; }
 .toast > span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 99px; color: #111; background: var(--rz-green); font-weight: 900; }
@@ -464,6 +509,7 @@
   .metaInventoryColumns { grid-template-columns: 1fr; }
   .decisionRoomList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .practiceLabWorkspace { grid-template-columns: 1fr; }
+  .budgetLabWorkspace { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 780px) {
@@ -523,6 +569,9 @@
   .practiceLabFacts > div { border-right: 0; border-bottom: 1px solid var(--rz-line); }
   .practiceLabNarrative { grid-template-columns: 1fr; }
   .practiceLabNarrative article { border-right: 0; border-bottom: 1px solid var(--rz-line); }
+  .budgetLabDetail > header { flex-direction: column; }
+  .budgetLabFacts { grid-template-columns: 1fr; }
+  .budgetLabFacts > div { border-right: 0; border-bottom: 1px solid var(--rz-line); }
 }
 
 @media (max-width: 480px) {
@@ -534,6 +583,11 @@
   .budgetHero > div:first-child { grid-template-columns: 1fr; }
   .bigProgress { grid-column: auto; }
   .beforeAfter { grid-template-columns: 1fr; }
+  .budgetBeforeAfter { grid-template-columns: 1fr; }
+  .budgetBeforeAfter > span { transform: rotate(90deg); text-align: center; }
+  .budgetBeforeAfter > div:last-child { text-align: left; }
+  .budgetAlternativeList dl { grid-template-columns: 1fr; }
+  .budgetAllocationRows p { grid-template-columns: 1fr; }
   .beforeAfter > span { transform: rotate(90deg); text-align: center; }
   .beforeAfter > div:last-child { text-align: left; }
   .approvalList h2 { min-height: 0; }

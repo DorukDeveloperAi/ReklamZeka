@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 12ebf063ff34 -->
+<!-- durum-damga: 94aa783c259a -->
 
 ## Künye
 
@@ -14,13 +14,17 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 38 |
+| iş commit'i (tüm geçmiş) | 42 |
 | ilk / son iş | 2026-08-06 / 2026-08-07 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-07 | `feat` | persist advisory proposal revisions | `a56c7834e` |
+| 2026-08-07 | `feat` | compose scenarios and guard proxy mapping | `f960369f5` |
+| 2026-08-07 | `feat` | add deterministic planning cores | `047001fc8` |
+| 2026-08-07 | `feat` | close analysis assets and practice lab read | `7e0d1b08e` |
 | 2026-08-07 | `feat` | secure local runtime and practice lifecycle | `ec1eff7a4` |
 | 2026-08-07 | `feat` | connect read model and analysis data | `5ef5e0145` |
 | 2026-08-07 | `fix` | harden schedule and observation boundaries | `fa106d121` |
@@ -32,16 +36,12 @@
 | 2026-08-07 | `feat` | add category guidance timeframe cores | `fe851692f` |
 | 2026-08-07 | `docs` | start S2 Decision Room | `542fb451c` |
 | 2026-08-07 | `feat` | close S1 read mirror trust gate | `4014834a0` |
-| 2026-08-07 | `feat` | build change snapshots from mirror | `6e1f9d52f` |
-| 2026-08-07 | `feat` | add workspace tombstone boundary | `4260f37f4` |
-| 2026-08-07 | `feat` | persist secure connection lifecycle | `4759f711a` |
-| 2026-08-07 | `feat` | define safe data lifecycle boundary | `71978fe8e` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 25
-- `test        ` ████ 4
-- `docs        ` ███ 3
+- `feat        ` ████████████████████████ 29
+- `test        ` ███ 4
+- `docs        ` ██ 3
 - `?           ` ██ 2
 - `fix         ` ██ 2
 - `security    ` ██ 2

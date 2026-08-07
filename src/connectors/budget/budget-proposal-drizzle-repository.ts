@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, lt, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import {
@@ -160,6 +160,7 @@ export function projectBudgetProposal(proposal: BudgetProposal) {
         result: Object.freeze({
           status: alternative.result.status,
           reason: alternative.result.reason,
+          currency: alternative.result.pacing.amounts.currency,
           before: Object.freeze({
             ...alternative.result.before,
             allocations: alternative.result.before.allocations.map((item) => ({
@@ -171,6 +172,14 @@ export function projectBudgetProposal(proposal: BudgetProposal) {
             allocations: alternative.result.after.allocations.map((item) => ({
               ...item, ref: publicRef("allocation", item.ref),
             })),
+          }),
+          traceSummary: Object.freeze({
+            constraintStatus: alternative.result.constraint.status,
+            constraintReason: alternative.result.constraint.reason,
+            pacingStatus: alternative.result.pacing.adjustment.status,
+            pacingSuppressionReasons: Object.freeze([...alternative.result.pacing.adjustment.suppressionReasons]),
+            stepCount: alternative.result.constraint.trace.length + alternative.result.pacing.trace.length,
+            stages: Object.freeze([...new Set(alternative.result.constraint.trace.map((step) => step.stage))]),
           }),
           actionAuthority: "none" as const,
         }),
@@ -313,5 +322,38 @@ export class DrizzleBudgetProposalRepository implements BudgetFrozenContextPort,
     const proposal = proposalFromRow(row);
     await this.assertAlternatives(this.database, row, proposal);
     return projectBudgetProposal(proposal);
+  }
+
+  async listPublic(input: Readonly<{
+    workspaceId: string;
+    before: Readonly<{ createdAt: string; proposalRef: string }> | null;
+    limit: number;
+  }>): Promise<readonly PublicBudgetProposal[]> {
+    if (!UUID.test(input.workspaceId) || !Number.isInteger(input.limit) || input.limit < 1 || input.limit > 101
+      || input.before !== null && (!/^\d{4}-\d{2}-\d{2}T.*Z$/.test(input.before.createdAt)
+        || !Number.isFinite(Date.parse(input.before.createdAt))
+        || !/^budget_proposal_[a-f0-9]{20}$/.test(input.before.proposalRef))) {
+      throw new BudgetProposalRepositoryError("invalid_input");
+    }
+    await assertWorkspace(this.database, input.workspaceId, false);
+    const boundary = input.before === null ? undefined : or(
+      lt(schema.budgetProposalVersions.proposedAt, new Date(input.before.createdAt)),
+      and(
+        eq(schema.budgetProposalVersions.proposedAt, new Date(input.before.createdAt)),
+        lt(schema.budgetProposalVersions.proposalRef, input.before.proposalRef),
+      ),
+    );
+    const rows = await this.database.select().from(schema.budgetProposalVersions).where(and(
+      eq(schema.budgetProposalVersions.workspaceId, input.workspaceId),
+      ...(boundary ? [boundary] : []),
+    )).orderBy(
+      desc(schema.budgetProposalVersions.proposedAt),
+      desc(schema.budgetProposalVersions.proposalRef),
+    ).limit(input.limit);
+    return Object.freeze(await Promise.all(rows.map(async (row) => {
+      const proposal = proposalFromRow(row);
+      await this.assertAlternatives(this.database, row, proposal);
+      return projectBudgetProposal(proposal);
+    })));
   }
 }

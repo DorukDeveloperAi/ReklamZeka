@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MetaInventoryApiError, MetaInventorySnapshot } from "@/connectors/meta/types";
 import { DecisionRoomPanel } from "./decision-room-panel";
+import { BudgetLabPanel } from "./budget-lab-panel";
 import { PracticeLabPanel } from "./practice-lab-panel";
 import styles from "./operating-dashboard.module.css";
 
@@ -121,7 +122,6 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
   const selectedRule = rules.find((rule) => rule.id === selectedRuleId) ?? rules[0]!;
   const [ruleDraft, setRuleDraft] = useState<string>(selectedRule.text);
   const [ruleSaved, setRuleSaved] = useState(true);
-  const [scenario, setScenario] = useState("Dengeli koruma");
   const [approvalState, setApprovalState] = useState<Record<string, ApprovalState>>({});
   const [autonomy, setAutonomy] = useState<Record<string, string>>({ analysis: "Otomatik", recommendation: "Otomatik", decrease: "Onaya sun", increase: "Onaya sun", pause: "Onaya sun", create: "Her zaman manuel" });
   const [agentMessages, setAgentMessages] = useState<Array<{ from: "agent" | "user"; text: string }>>([
@@ -270,18 +270,6 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
     </>;
   }
 
-  function renderBudgets() {
-    return <>
-      <section className={styles.pageHero}><div><span className={styles.kicker}>BUDGET LAB</span><h1>Bütçeyi verime göre değil, taahhütlerle birlikte yönetin.</h1><p>Planlanan, gerçekleşen ve tahmin edilen bütçe; kategori floor'ları ve transfer yasaklarıyla aynı yerde.</p></div><button className={styles.primaryButton} onClick={() => setToast(`${scenario} senaryosu deterministik olarak yeniden hesaplandı.`)}>Senaryoyu hesapla</button></section>
-      <section className={styles.budgetHero}><div><span>Ağustos bütçe zarfı</span><strong>₺128.000</strong><small>₺43.650 harcandı · ₺84.350 kaldı</small><div className={styles.bigProgress}><i style={{ width: "34%" }} /></div></div><div><label htmlFor="scenario">Planlama yaklaşımı</label><select id="scenario" value={scenario} onChange={(event) => setScenario(event.target.value)}><option>Dengeli koruma</option><option>Conservative</option><option>Target-seeking</option></select><small>En fazla üç açıklanabilir alternatif</small></div></section>
-      <section className={styles.panel}><header className={styles.panelHeader}><div><span className={styles.kicker}>KATEGORİ TAHSİSİ</span><h2>Korunan bütçe ve pacing</h2></div><StatusPill tone="good">Constraint ihlali 0</StatusPill></header><div className={styles.budgetRows}>{[
-        ["İstanbul · Doktor tanıtım", "₺42.000", "₺38.000 floor", "No-transfer", "74%"],
-        ["GCC · Uluslararası hasta", "₺51.000", "₺45.000 target", "Within-group", "63%"],
-        ["TR · Marka koruma", "₺35.000", "₺30.000 floor", "No-pause", "48%"],
-      ].map((row) => <article key={row[0]}><div><strong>{row[0]}</strong><small>{row[3]}</small></div><div><span>Plan</span><strong>{row[1]}</strong></div><div><span>Koruma</span><strong>{row[2]}</strong></div><div className={styles.budgetBar}><i style={{ width: row[4] }} /><small>{row[4]} pace</small></div><button onClick={() => setToast(`${row[0]} için bütçe kuralı editöre açıldı.`)}>Düzenle</button></article>)}</div></section>
-    </>;
-  }
-
   function renderRules() {
     return <>
       <section className={styles.pageHero}><div><span className={styles.kicker}>RULES & PLAYBOOKS</span><h1>İşletme yaklaşımınız görünür, düzenlenebilir ve sürümlü.</h1><p>Düz metin guidance kolayca saklanır; harcama veya yetkiyi bağlayan policy ancak review ve yayınla çalışır.</p></div><button className={styles.primaryButton} onClick={() => navigate("agent")}>✦ Agent ile kural tasarla</button></section>
@@ -370,7 +358,7 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
     return <><section className={styles.pageHero}><div><span className={styles.kicker}>APPEND-ONLY TIMELINE</span><h1>Veri, karar ve hareket aynı kronolojide.</h1><p>Sync'ten outcome'a kadar bizim ve Meta üzerindeki harici değişikliklerin tamamı tek izde.</p></div><button className={styles.secondaryButton}>Filtrele</button></section><section className={styles.panel}><div className={styles.timeline}>{timeline.map((event) => <article key={`${event.time}-${event.title}`}><time>{event.time}</time><span className={styles.timelineDot} data-type={event.type} /><div><StatusPill tone="neutral">{event.type}</StatusPill><h2>{event.title}</h2><p>{event.detail}</p><small>{event.actor}</small></div><button aria-label={`${event.title} detayını aç`}>→</button></article>)}</div></section></>;
   }
 
-  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? renderBudgets() : activeView === "rules" ? renderRules() : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? renderApprovals() : renderTimeline();
+  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel /> : activeView === "rules" ? renderRules() : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? renderApprovals() : renderTimeline();
 
   return <main className={styles.appShell}>
     <aside className={styles.sidebar}>
@@ -382,7 +370,7 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
       <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button className={styles.workspacePicker} onClick={() => navigate("meta")}><span className={styles.avatar}>DM</span><span><strong>Demo Marka</strong><small>{metaInventory ? `${metaInventory.summary.adAccounts} Meta hesabı` : "Meta kontrol ediliyor"}</small></span><i>⌄</i></button><div className={styles.topActions}><button aria-label="Ara">⌕</button><button aria-label="Bildirimler">♢<i>{pendingApprovals}</i></button><button className={styles.autonomyButton} onClick={() => navigate("agent")}><span className={styles.liveDot} /> approval_only <i>⌄</i></button><button className={styles.profileButton}>AY</button></div></header>
       <div className={styles.mobileNav}>{navGroups.flatMap((group) => group.items).map((item) => <button key={item.id} data-active={activeView === item.id} onClick={() => navigate(item.id)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</div>
       <div className={styles.content} aria-label={activeTitle}>{content}</div>
-      <footer className={styles.sourceFooter}><span>{activeView === "meta" && metaInventory ? `Canlı Meta Graph · ${formatMetaTime(metaInventory.refreshedAt)} · ${metaInventory.connection.accessMode}` : activeView === "decision-room" ? "Decision Room read model · canlı kaynak bağlanmadan fixture kullanılmaz" : activeView === "practice-lab" ? "Practice Lab read model · append-only lifecycle doğrulaması" : `Demo snapshot · ${model.currency} · ${model.timezone} · ${model.attribution}`}</span><span>{activeView === "meta" ? "Kimlikler maskeli · token server-only · write connector yok" : activeView === "decision-room" ? "Server-bound workspace · bounded cursor · action authority yok" : activeView === "practice-lab" ? "Public-safe projection · draft ephemeral · promotion/automation/action yok" : "Deterministik veriler mevcut fixture/API'dan; operasyon bağlamı ürün vizyonu demosudur."}</span></footer>
+      <footer className={styles.sourceFooter}><span>{activeView === "meta" && metaInventory ? `Canlı Meta Graph · ${formatMetaTime(metaInventory.refreshedAt)} · ${metaInventory.connection.accessMode}` : activeView === "decision-room" ? "Decision Room read model · canlı kaynak bağlanmadan fixture kullanılmaz" : activeView === "practice-lab" ? "Practice Lab read model · append-only lifecycle doğrulaması" : activeView === "budgets" ? "Budget Lab read model · doğrulanmış proposal ledger" : `Demo snapshot · ${model.currency} · ${model.timezone} · ${model.attribution}`}</span><span>{activeView === "meta" ? "Kimlikler maskeli · token server-only · write connector yok" : activeView === "decision-room" ? "Server-bound workspace · bounded cursor · action authority yok" : activeView === "practice-lab" ? "Public-safe projection · draft ephemeral · promotion/automation/action yok" : activeView === "budgets" ? "Public-safe projection · draft/approval/execute/Meta yok" : "Deterministik veriler mevcut fixture/API'dan; operasyon bağlamı ürün vizyonu demosudur."}</span></footer>
     </section>
     {toast ? <div className={styles.toast} role="status"><span>✓</span><p>{toast}</p><button onClick={() => setToast(null)} aria-label="Bildirimi kapat">×</button></div> : null}
   </main>;

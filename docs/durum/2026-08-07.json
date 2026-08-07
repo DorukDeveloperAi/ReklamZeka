@@ -4,6 +4,42 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "a56c7834e",
+      "tarih": "2026-08-07",
+      "konu": "feat(budget): persist advisory proposal revisions",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "f960369f5",
+      "tarih": "2026-08-07",
+      "konu": "feat(budget): compose scenarios and guard proxy mapping",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "047001fc8",
+      "tarih": "2026-08-07",
+      "konu": "feat(budget): add deterministic planning cores",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7e0d1b08e",
+      "tarih": "2026-08-07",
+      "konu": "feat(decision): close analysis assets and practice lab read",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "ec1eff7a4",
       "tarih": "2026-08-07",
       "konu": "feat(decision): secure local runtime and practice lifecycle",
@@ -101,48 +137,12 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "6e1f9d52f",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): build change snapshots from mirror",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "4260f37f4",
-      "tarih": "2026-08-07",
-      "konu": "feat(security): add workspace tombstone boundary",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "4759f711a",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): persist secure connection lifecycle",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "71978fe8e",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): define safe data lifecycle boundary",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 25
+      "adet": 29
     },
     {
       "kapsam": "test",
@@ -165,7 +165,7 @@
       "adet": 2
     }
   ],
-  "isSayisi": 38,
+  "isSayisi": 42,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "12ebf063ff34"
+  "damga": "94aa783c259a"
 }
