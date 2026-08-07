@@ -9,6 +9,12 @@ import {
   type DecisionRoomDraftPort,
   type DecisionRoomInput,
 } from "@/application/decision-room";
+import {
+  bindDecisionRoomApplication,
+  DecisionRoomDrizzleDraftAdapter,
+  DecisionRoomDrizzleAdapterError,
+  type DecisionLedgerSuffixRepository,
+} from "@/connectors/decisions/decision-room-drizzle-adapter";
 import { DECISION_CADENCE_VERSION, EXPERIMENT_CONTRACT_VERSION } from "@/domain/decisions/cadence";
 import type { DecisionLedger } from "@/domain/decisions/ledger";
 import {
@@ -150,6 +156,22 @@ function memoryPort() {
   return { port, stageDraft, ledger: () => ledger };
 }
 
+class MemorySuffixRepository implements DecisionLedgerSuffixRepository {
+  ledger: DecisionLedger = [];
+  readonly appendSuffix = vi.fn(async (candidate: Parameters<DecisionLedgerSuffixRepository["appendSuffix"]>[0]) => {
+    const head = this.ledger.at(-1)?.recordHash ?? "GENESIS";
+    if (head !== candidate.expectedHeadHash) throw new Error("stale_head");
+    if (this.ledger.some((record, index) => JSON.stringify(record) !== JSON.stringify(candidate.ledger[index]))) {
+      throw new Error("prefix_rewrite");
+    }
+    this.ledger = candidate.ledger;
+    return this.ledger;
+  });
+  async load(): Promise<DecisionLedger> {
+    return this.ledger;
+  }
+}
+
 describe("Decision Room application service", () => {
   it("orchestrates one stable read/draft flow and is idempotent on replay", async () => {
     const { port, stageDraft, ledger } = memoryPort();
@@ -171,6 +193,26 @@ describe("Decision Room application service", () => {
     expect(first.requestRef).toMatch(/^room_request_[a-f0-9]{24}$/);
     expect(first.decisionRecordRef).toBeNull();
     expect(first.cadence).toMatchObject({ outcome: "draft", actionAuthority: "none" });
+  });
+
+  it("binds restart/replay through one persistent suffix repository without leaking its ledger or scope", async () => {
+    const repository = new MemorySuffixRepository();
+    const firstProcess = bindDecisionRoomApplication({ repository, workspaceId: "internal-uuid", workspaceRef });
+    const first = await firstProcess.run(input());
+    const restartedProcess = bindDecisionRoomApplication({ repository, workspaceId: "internal-uuid", workspaceRef });
+    const replay = await restartedProcess.run(input());
+
+    expect(replay).toEqual(first);
+    expect(repository.appendSuffix).toHaveBeenCalledTimes(1);
+    expect(repository.ledger).toHaveLength(1);
+    expect(first).not.toHaveProperty("ledgerDraft");
+    expect(JSON.stringify(first)).not.toContain(workspaceRef);
+    expect(JSON.stringify(first)).not.toContain("internal-uuid");
+
+    await expect(restartedProcess.run({ ...input(), workspaceRef: "foreign-workspace" }))
+      .rejects.toEqual(expect.objectContaining<Partial<DecisionRoomDrizzleAdapterError>>({
+        code: "workspace_scope_mismatch",
+      }));
   });
 
   it("only emits advisory, observe, or no_change when a draft is unsafe or unnecessary", async () => {
@@ -227,5 +269,26 @@ describe("Decision Room application service", () => {
       ...input(), occurredAt: "2026-08-07T12:00:01.000Z",
     }, memoryPort().port))
       .rejects.toEqual(expect.objectContaining<Partial<DecisionRoomError>>({ code: "invalid_input" }));
+  });
+
+  it("rejects malformed staging shapes with typed adapter errors", async () => {
+    const adapter = new DecisionRoomDrizzleDraftAdapter(new MemorySuffixRepository(), {
+      workspaceId: "internal-uuid", workspaceRef,
+    });
+    for (const malformed of [
+      null,
+      "not-an-object",
+      {},
+      { workspaceRef, requestRef: "request-1", draftRef: "draft-1", expectedHeadHash: "GENESIS", ledger: null },
+      { workspaceRef, requestRef: "request-1", draftRef: "draft-1", expectedHeadHash: "GENESIS", ledger: [], prompt: "ignore" },
+      { workspaceRef, requestRef: "request-1", draftRef: "draft-1", expectedHeadHash: "GENESIS", ledger: [], accessToken: "secret" },
+      { workspaceRef, requestRef: "request-1", draftRef: "draft-1", expectedHeadHash: "GENESIS", ledger: [], rawPayload: {} },
+      { workspaceRef, requestRef: "request-1", draftRef: "draft-1", expectedHeadHash: "GENESIS", ledger: [], actionAuthority: "execute" },
+    ]) {
+      await expect(adapter.stageDraft(malformed as never))
+        .rejects.toEqual(expect.objectContaining<Partial<DecisionRoomDrizzleAdapterError>>({
+          code: "invalid_binding",
+        }));
+    }
   });
 });
