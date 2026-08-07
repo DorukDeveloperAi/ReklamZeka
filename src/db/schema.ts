@@ -19,6 +19,11 @@ import {
 import { sql } from "drizzle-orm";
 
 export const membershipRole = pgEnum("membership_role", ["owner", "admin", "analyst", "viewer"]);
+export const workspaceLifecycleState = pgEnum("workspace_lifecycle_state", [
+  "active",
+  "tombstoning",
+  "tombstoned",
+]);
 export const sourcePlatform = pgEnum("source_platform", ["meta_ads", "google_ads", "csv"]);
 export const syncRunStatus = pgEnum("sync_run_status", ["running", "completed", "failed"]);
 export const insightFeedbackValue = pgEnum("insight_feedback_value", ["helpful", "unhelpful", "acted"]);
@@ -106,8 +111,22 @@ export const users = pgTable("users", {
 export const workspaces = pgTable("workspaces", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
+  lifecycleState: workspaceLifecycleState("lifecycle_state").notNull().default("active"),
+  tombstonedAt: timestamp("tombstoned_at", { withTimezone: true }),
+  lifecycleGeneration: integer("lifecycle_generation").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  check("workspaces_lifecycle_generation_positive", sql`${table.lifecycleGeneration} >= 1`),
+  check("workspaces_tombstone_state_consistent", sql`
+    (
+      ${table.lifecycleState} = 'tombstoned'
+      and ${table.tombstonedAt} is not null
+    ) or (
+      ${table.lifecycleState} <> 'tombstoned'
+      and ${table.tombstonedAt} is null
+    )
+  `),
+]);
 
 /** Secret-free connection and binding metadata. Credential values stay in the server environment. */
 export const metaConnections = pgTable("meta_connections", {
@@ -803,7 +822,7 @@ export const connectionSecrets = pgTable("connection_secrets", {
 
 export const auditEvents = pgTable("audit_events", {
   id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "restrict" }),
   actorId: uuid("actor_id").notNull().references(() => users.id, { onDelete: "restrict" }),
   action: text("action").notNull(),
   resourceType: text("resource_type").notNull(),
