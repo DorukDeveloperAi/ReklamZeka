@@ -200,6 +200,9 @@
   - [x] Decision Room daily/weekly timezone+DST, skip/run_once catch-up ve duplicate-slot çekirdeği.
   - [x] Immutable schedule revision, exact hierarchy binding ve kalıcı lease/run store.
   - [x] Bounded daily/weekly worker tick, partial isolation, concurrent suppression ve exact revision cursor guard'ı.
+  - [x] Meta read-sync için DB-derived workspace+connection adayları, claim/lease sonrası exact revalidation,
+    deterministik fire/parent-run kimliği, bounded concurrency/retry ve bağlantı-bazlı partial isolation saf
+    worker çekirdeği. DB schedule/lease adapterı ve scheduler aktivasyonu henüz yoktur.
   - [ ] Hourly/monthly/after-sync schedule türleri.
 - [ ] Sync→analyze→plan→approval agentic routine; otomatik execute yok.
 - [ ] External intervention reconcile ve sandbox/shadow rollout.

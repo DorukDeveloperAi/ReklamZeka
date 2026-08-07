@@ -793,3 +793,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   rollerinde sıfır tablo grant'i, sıfır schema-create ve sıfır public routine-execute grant'i doğrulandı.
 - Bir sonraki zorunlu kapı: trusted action guardrail/protection policy kaynağını ve saf resolver'ını kurmak,
   proposal expiry kaynağını çözmek ve ancak ardından private submitter'ı route'a takmaktır.
+
+## 2026-08-07 — S5.4c2-E güvenli scheduled Meta read-sync worker çekirdeği
+
+- Periyodik salt-okunur Meta mirror için aday kapsamı local session veya env workspace'ten değil, yalnız
+  DB-derived aktif workspace+connection schedule portundan alan bounded worker eklendi. Her logical fire
+  atomik claim/lease ister; claim sonrasında exact connection revision ve timeframe yeniden doğrulanır.
+- Fire ve parent-run kimliği deterministiktir. Eşzamanlılık, batch, retry/backoff ve lease süreleri üstten
+  sınırlıdır; bağlantı hataları birbirinden izole edilir. Public sonuç yalnız hashlenmiş ref, allowlisted
+  reason code ve aggregate count taşır; token, Meta ID, DB ID veya provider hata metni taşımaz.
+- Çekirdek action authority vermez ve Meta write çağrısı yapmaz. DB schedule/lease adapterı, per-connection
+  secret binding, account bootstrap, `after_sync` outbox ve scheduler aktivasyonu bilinçli olarak açık
+  bırakıldı. 138 test dosyasında 825 test, production build, security/secret ve Drizzle kontrolleri geçti.
