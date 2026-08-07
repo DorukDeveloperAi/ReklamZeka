@@ -19,6 +19,15 @@ export type ApprovalQueueDashboardState =
 
 type Envelope<T> = Readonly<{ result: T }>;
 type ErrorEnvelope = Readonly<{ error?: Readonly<{ message?: string }> }>;
+type DecisionKind = "approve" | "reject" | "request_changes";
+type DecisionControl = Readonly<{
+  busy: boolean;
+  confirmed: boolean;
+  error: string | null;
+  notice: string | null;
+  setConfirmed(value: boolean): void;
+  decide(kind: DecisionKind): void;
+}>;
 
 const ACTION_LABELS: Readonly<Record<ApprovalQueueRecord["actionType"], string>> = {
   status_pause: "Duraklatma önerisi",
@@ -71,6 +80,49 @@ function valuePair(change: ApprovalQueueRecord["beforeAfter"]) {
   };
 }
 
+export async function recordApprovalDecision(
+  fetcher: typeof fetch,
+  input: Readonly<{ unitRef: string; kind: DecisionKind }>,
+): Promise<Readonly<{ state: string }>> {
+  const intent = input.kind === "approve" ? "approval-queue-approve"
+    : input.kind === "reject" ? "approval-queue-reject" : "approval-queue-request-changes";
+  const reasonCode = input.kind === "approve" ? "human.confirmed"
+    : input.kind === "reject" ? "human.rejected" : "human.changes_requested";
+  const challengeResponse = await fetcher("/api/approval-queue", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "approval-queue-confirm-human-presence" },
+    body: JSON.stringify({ unitRef: input.unitRef, action: input.kind }),
+  });
+  const challengePayload = await challengeResponse.json() as Readonly<{
+    challenge?: Readonly<{ unitRef?: string; action?: string; proof?: string }>;
+    error?: Readonly<{ message?: string }>;
+  }>;
+  if (!challengeResponse.ok || challengePayload.challenge?.unitRef !== input.unitRef
+    || challengePayload.challenge.action !== input.kind || typeof challengePayload.challenge.proof !== "string") {
+    throw new Error(challengePayload.error?.message ?? "İnsan onayı doğrulanamadı.");
+  }
+  const decisionResponse = await fetcher("/api/approval-queue", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": intent },
+    body: JSON.stringify({ unitRef: input.unitRef, reasonCode, humanPresenceProof: challengePayload.challenge.proof }),
+  });
+  const decisionPayload = await decisionResponse.json() as Readonly<{
+    decision?: Readonly<{ unitRef?: string; state?: string }>;
+    authority?: Readonly<{ canExecute?: boolean; canWriteMeta?: boolean }>;
+    error?: Readonly<{ message?: string }>;
+  }>;
+  if (!decisionResponse.ok || decisionPayload.decision?.unitRef !== input.unitRef
+    || decisionPayload.authority?.canExecute !== false || decisionPayload.authority.canWriteMeta !== false
+    || typeof decisionPayload.decision.state !== "string") {
+    throw new Error(decisionPayload.error?.message ?? "Karar kaydedilemedi; kuyruğu yenileyin.");
+  }
+  return Object.freeze({ state: decisionPayload.decision.state });
+}
+
 function toneForStatus(status: ApprovalQueueRecord["status"]) {
   if (status === "awaiting_approval" || status === "proposed") return "warning";
   if (status === "approved" || status === "verified") return "good";
@@ -82,16 +134,17 @@ export function ApprovalQueueReadSurface(props: Readonly<{
   state: ApprovalQueueDashboardState;
   onRetry(): void;
   onSelect(item: ApprovalQueueRecord): void;
+  decision?: DecisionControl;
 }>) {
   const ready = props.state.status === "ready" ? props.state : null;
   return <>
     <section className={styles.pageHero}>
-      <div><span className={styles.kicker}>APPROVAL INBOX · VERIFIED READ MODEL</span><h1>Hareket adaylarını, yetki vermeden inceleyin.</h1><p>Bu görünüm onay kuyruğunu ve dondurulmuş karar izini okur. Onay, red, grant, execute ve Meta write bu aşamada kapalıdır.</p></div>
-      <span className={styles.readOnlyBadge}>READ ONLY · NO META WRITE</span>
+      <div><span className={styles.kicker}>APPROVAL INBOX · HUMAN DECISION</span><h1>Hareket adaylarını tek tek inceleyin ve karar verin.</h1><p>Her karar exact ActionUnit'e bağlanır ve macOS sistem diyaloğunda ayrıca doğrulanır. Onay execute değildir; Meta write kapalıdır.</p></div>
+      <span className={styles.readOnlyBadge}>DECISION RECORD · NO META WRITE</span>
     </section>
 
     <section className={styles.approvalSafetyStrip} aria-label="Onay kuyruğu yetki sınırları">
-      <span>Onay kapalı</span><span>Execute kapalı</span><span>Meta write kapalı</span><strong>GET-only</strong>
+      <span>Tekil insan kararı</span><span>Execute kapalı</span><span>Meta write kapalı</span><strong>approval_only</strong>
     </section>
 
     {props.state.status === "loading" ? <section className={`${styles.panel} ${styles.approvalQueueState}`} role="status"><span className={styles.liveDot} /><h2>Onay kuyruğu okunuyor</h2><p>Tenant kapsamı, public-safe projection ve ActionUnit bütünlüğü sunucuda doğrulanıyor.</p></section> : null}
@@ -111,27 +164,44 @@ export function ApprovalQueueReadSurface(props: Readonly<{
           </button>;
         })}</div>
       </section>
-      <ApprovalQueueDetail item={ready.selected} loading={ready.detailLoading} />
+      <ApprovalQueueDetail item={ready.selected} loading={ready.detailLoading} decision={props.decision} />
     </div> : null}
   </>;
 }
 
-function ApprovalQueueDetail({ item, loading }: Readonly<{ item: ApprovalQueueRecord | null; loading: boolean }>) {
+function ApprovalQueueDetail({ item, loading, decision }: Readonly<{
+  item: ApprovalQueueRecord | null;
+  loading: boolean;
+  decision?: DecisionControl;
+}>) {
   if (loading) return <section className={`${styles.panel} ${styles.approvalQueueState}`} role="status"><span className={styles.liveDot} /><h2>ActionUnit detayı doğrulanıyor</h2><p>Liste özeti ile detay kontratı eşleştiriliyor.</p></section>;
   if (!item) return <section className={`${styles.panel} ${styles.approvalQueueState}`}><strong>Kayıt seçin</strong><h2>Önce/sonra, otonomi izi ve bağımlılıklar burada açılır.</h2><p>Tam kimlikler, hash, token, prompt ve ham Meta payload bu yüzeye çıkmaz.</p></section>;
   const values = valuePair(item.beforeAfter);
   return <section className={`${styles.panel} ${styles.approvalQueueDetail}`}>
-    <header><div><span className={styles.kicker}>{ENTITY_LABELS[item.entity.type].toUpperCase()} · {item.risk}</span><h2>{ACTION_LABELS[item.actionType]}</h2><p>{item.entity.label ?? item.entity.ref} · {item.accountRef}</p></div><span className={styles.readOnlyBadge}>NO APPROVAL · NO EXECUTE</span></header>
+    <header><div><span className={styles.kicker}>{ENTITY_LABELS[item.entity.type].toUpperCase()} · {item.risk}</span><h2>{ACTION_LABELS[item.actionType]}</h2><p>{item.entity.label ?? item.entity.ref} · {item.accountRef}</p></div><span className={styles.readOnlyBadge}>NO EXECUTE · NO META WRITE</span></header>
     <div className={styles.approvalQueueFacts}><div><span>Durum</span><strong data-tone={toneForStatus(item.status)}>{STATUS_LABELS[item.status]}</strong><small>{item.summaryCode.replaceAll("_", " ")}</small></div><div><span>Otonomi kararı</span><strong>{item.autonomy.decision.replaceAll("_", " ")}</strong><small>{item.autonomy.profileRef}</small></div><div><span>Geçerlilik</span><strong>{timestamp(item.expiresAt)}</strong><small>Oluşturuldu: {timestamp(item.createdAt)}</small></div></div>
     <section className={styles.approvalQueueChange} aria-label={`${values.field} önce ve sonra`}><span>{values.field}</span><div><p><small>Önce</small><strong>{values.before}</strong></p><i>→</i><p><small>Sonra</small><strong>{values.after}</strong></p></div></section>
     <div className={styles.approvalQueueTrace}><h3>Otonomi izi</h3>{item.autonomy.trace.map((step, index) => <article key={`${step.scope}-${index}`}><span>{index + 1}</span><p><strong>{step.scope}</strong><small>{step.decision.replaceAll("_", " ")} · {step.reasonCode.replaceAll("_", " ")}</small></p></article>)}</div>
     <div className={styles.approvalQueueDependencies}><h3>Bağımlılıklar</h3>{item.dependencies.length === 0 ? <p>Bağımlılık yok.</p> : item.dependencies.map((dependency) => <p key={dependency.unitRef}><span>{dependency.unitRef}</span><strong>{STATUS_LABELS[dependency.status]}</strong></p>)}</div>
-    <footer><span>Approval grant üretilmez</span><span>Meta çağrısı yapılmaz</span></footer>
+    {item.status === "awaiting_approval" && decision ? <section className={styles.approvalDecisionBox} aria-label="Tekil insan kararı">
+      <h3>Bu ActionUnit için karar ver</h3>
+      <label><input type="checkbox" checked={decision.confirmed} disabled={decision.busy} onChange={(event) => decision.setConfirmed(event.target.checked)} />
+        <span>{values.field}: <strong>{values.before}</strong> → <strong>{values.after}</strong> değişimini inceledim. Kararın execute veya Meta write yapmadığını anlıyorum.</span>
+      </label>
+      {decision.error ? <p role="alert">{decision.error}</p> : null}
+      {decision.notice ? <p role="status">{decision.notice}</p> : null}
+      <div><button disabled={!decision.confirmed || decision.busy} onClick={() => decision.decide("reject")}>Reddet</button><button disabled={!decision.confirmed || decision.busy} onClick={() => decision.decide("request_changes")}>Değişiklik iste</button><button className={styles.primaryButton} disabled={!decision.confirmed || decision.busy} onClick={() => decision.decide("approve")}>{decision.busy ? "Sistem onayı bekleniyor…" : "Onayla"}</button></div>
+    </section> : null}
+    <footer><span>Onay yalnız approval evidence kaydıdır</span><span>Meta çağrısı yapılmaz</span></footer>
   </section>;
 }
 
 export function ApprovalQueuePanel() {
   const [state, setState] = useState<ApprovalQueueDashboardState>({ status: "loading" });
+  const [decisionBusy, setDecisionBusy] = useState(false);
+  const [decisionConfirmed, setDecisionConfirmed] = useState(false);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setState({ status: "loading" });
@@ -153,6 +223,9 @@ export function ApprovalQueuePanel() {
   useEffect(() => { void load(); }, [load]);
 
   const select = useCallback(async (summary: ApprovalQueueRecord) => {
+    setDecisionConfirmed(false);
+    setDecisionError(null);
+    setDecisionNotice(null);
     setState((current) => current.status === "ready" ? { ...current, selected: summary, detailLoading: true } : current);
     try {
       const query = new URLSearchParams({ view: "detail", unitRef: summary.unitRef });
@@ -168,5 +241,32 @@ export function ApprovalQueuePanel() {
     }
   }, []);
 
-  return <ApprovalQueueReadSurface state={state} onRetry={() => void load()} onSelect={(item) => void select(item)} />;
+  const decide = useCallback(async (kind: DecisionKind) => {
+    if (state.status !== "ready" || !state.selected || state.selected.status !== "awaiting_approval"
+      || !decisionConfirmed || decisionBusy) return;
+    const unitRef = state.selected.unitRef;
+    setDecisionBusy(true);
+    setDecisionError(null);
+    setDecisionNotice("macOS sistem onayı bekleniyor…");
+    try {
+      await recordApprovalDecision(fetch, { unitRef, kind });
+      setDecisionNotice("Karar kaydedildi. Meta üzerinde değişiklik yapılmadı.");
+      setDecisionConfirmed(false);
+      await load();
+    } catch (error) {
+      setDecisionNotice(null);
+      setDecisionError(error instanceof Error ? error.message : "Karar güvenli biçimde kaydedilemedi.");
+    } finally {
+      setDecisionBusy(false);
+    }
+  }, [decisionBusy, decisionConfirmed, load, state]);
+
+  return <ApprovalQueueReadSurface state={state} onRetry={() => void load()} onSelect={(item) => void select(item)} decision={{
+    busy: decisionBusy,
+    confirmed: decisionConfirmed,
+    error: decisionError,
+    notice: decisionNotice,
+    setConfirmed: setDecisionConfirmed,
+    decide: (kind) => void decide(kind),
+  }} />;
 }

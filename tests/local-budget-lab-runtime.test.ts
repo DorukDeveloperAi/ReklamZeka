@@ -75,7 +75,7 @@ describe("local Budget Lab route", () => {
       readerRef: "reader_local_owner", osUid: process.getuid!(), issuedAt: Math.floor(Date.now() / 1000) - 1,
       expiresAt: Math.floor(Date.now() / 1000) + 300 }, signingKey).claims;
     expect(claims.scopes).toEqual([
-      "approval_queue:read", "budget_lab:draft", "budget_lab:read",
+      "approval_queue:decide", "approval_queue:read", "budget_lab:draft", "budget_lab:read",
       "decision_room:mark_read", "decision_room:read", "practice_lab:read",
     ]);
     const database = { execute: vi.fn(async () => ({ rows: [{ workspace_id: workspaceId, user_id: userId, role: "viewer", lifecycle_state: "active" }] })), select: vi.fn(), transaction: vi.fn() };

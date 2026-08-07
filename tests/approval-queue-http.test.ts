@@ -7,7 +7,7 @@ import {
   type ApprovalQueueRecord,
   type ApprovalQueueRepository,
 } from "@/application/approval-queue-read-service";
-import { GET as disabledGet } from "@/app/api/approval-queue/route";
+import { GET as disabledGet, POST as disabledPost } from "@/app/api/approval-queue/route";
 import {
   approvalQueueNotConfiguredResponse,
   createApprovalQueueHttpHandler,
@@ -118,7 +118,7 @@ describe("Approval Queue GET-only HTTP boundary", () => {
     expect(JSON.stringify(await response.json())).not.toContain("private database detail");
   });
 
-  it("fails closed when route assembly is absent and exports no mutation handler", async () => {
+  it("fails closed when read or concrete human-decision route assembly is absent", async () => {
     for (const response of [disabledGet(), approvalQueueNotConfiguredResponse()]) {
       expect(response.status).toBe(503);
       expect(response.headers.get("x-reklamzeka-action-authority")).toBe("none");
@@ -127,5 +127,8 @@ describe("Approval Queue GET-only HTTP boundary", () => {
         message: "Onay Kuyruğu çalışma alanı ve yerel kimlik bağlama katmanı henüz etkin değil.",
       } });
     }
+    const post = disabledPost();
+    expect(post.status).toBe(503);
+    expect(post.headers.get("x-reklamzeka-action-authority")).toBe("none");
   });
 });

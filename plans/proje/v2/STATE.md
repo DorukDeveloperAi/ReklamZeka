@@ -569,3 +569,30 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: 102 test dosyası/626 test, production build, security boundary, Drizzle ve npm audit temiz.
   Sıradaki increment insan-varlığı kanıtlı append-only approve/reject/request-changes mutation'ıdır;
   approval yine execute olmayacak ve production Meta writer kapalı kalacaktır.
+
+## 2026-08-07 — S4.3 insan kararı ve append-only approval evidence
+
+- Tek `ActionUnit` için approve/reject/request_changes uygulama servisi ve ayrı
+  `approval_queue:decide` local-session scope'u eklendi. Karar endpoint'i yalnız HttpOnly cookie,
+  exact same-origin, proxy/bearer/CSRF reddi, exact intent ve bounded JSON kabul eder; caller workspace,
+  actor, wildcard veya bundle-level karar veremez. Viewer/analyst karar veremez; policy rolü ve
+  separation-of-duties domain içinde yeniden uygulanır.
+- Human-presence iki aşamalıdır. Exact actor/workspace/unit/action için dışarıdan güvenilir ceremony
+  başarılı olursa 60 saniyelik process-local ve tek-kullanımlık proof üretilir. macOS adapter'ı shell
+  kullanmadan sistem diyaloğu açar; vazgeçme, timeout, restart veya platform uyumsuzluğu fail-closed'dur.
+  Dashboard ayrıca exact before→after satırını işaretleyerek teyit ister; toplu karar kontrolü yoktur.
+- Repository proposal lifecycle'ını transaction içinde kilit altında replay eder, expected trace ve
+  frozen freshness hash'lerini doğrular, human proof'u ancak bundan sonra tüketir ve domain kararını
+  aynı transaction içinde bir kez hesaplar. Böylece load/approve arası TOCTOU yoktur. Exact replay
+  idempotent, farklı içerik conflict'tir.
+- `action_approval_decision_events` ve `action_approval_evidence_grants` append-only tabloları eklendi.
+  Approval grant yalnız `approval_evidence_only`, tek-kullanımlık, henüz tüketilmemiş ve
+  `canExecute=false` biçimindedir; public API grant materyalini döndürmez. Read model karar event'lerini
+  replay ederek approved/rejected/changes_requested ile cascade dependency durumlarını gösterir.
+- Migration gerçek Supabase'e uygulandı. Canlı kabul proposal+decision insert/replay/immutability,
+  RLS+revoke, exact rows, tombstone ve rollback temizliğini doğruladı; `metaCalls=0`,
+  `executionCalls=0`. Güvenlik sonucu 62/62 tabloda RLS ve API rollerinde sıfır tablo/schema-create/
+  routine-execute yetkisidir.
+- Kanıt: 108 test dosyası/658 test, production build, security boundary, Drizzle, npm audit ve secret
+  artifact kapıları temiz. Approval hâlâ execute değildir; grant consumption ve production Meta writer
+  ayrıca, açık kullanıcı rollout kararı olmadan açılmayacaktır.

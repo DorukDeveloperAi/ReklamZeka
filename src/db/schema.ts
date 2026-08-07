@@ -2718,3 +2718,203 @@ export const actionProposalInitialEvents = pgTable("action_proposal_initial_even
     and ${table.reasonCode} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
   `),
 ]);
+
+/**
+ * One immutable human decision command and its complete pure transition evidence.
+ * A row is approval evidence only: it cannot be consumed or executed.
+ */
+export const actionApprovalDecisionEvents = pgTable("action_approval_decision_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  bundleId: uuid("bundle_id").notNull(),
+  unitId: uuid("unit_id").notNull(),
+  ordinal: integer("ordinal").notNull(),
+  commandRef: text("command_ref").notNull(),
+  commandKind: text("command_kind").notNull(),
+  unitRef: text("unit_ref").notNull(),
+  unitHash: text("unit_hash").notNull(),
+  actorRef: text("actor_ref").notNull(),
+  actorRole: text("actor_role").notNull(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }).notNull(),
+  reasonCode: text("reason_code").notNull(),
+  commandHash: text("command_hash").notNull(),
+  freshnessHash: text("freshness_hash").notNull(),
+  lifecycleBeforeHash: text("lifecycle_before_hash").notNull(),
+  lifecycleAfterHash: text("lifecycle_after_hash").notNull(),
+  traceAfterHash: text("trace_after_hash").notNull(),
+  commandPayload: jsonb("command_payload").$type<Record<string, unknown>>().notNull(),
+  eventPayloads: jsonb("event_payloads").$type<readonly Record<string, unknown>[]>().notNull(),
+  executionAuthority: text("execution_authority").notNull().default("none"),
+  executionPerformed: boolean("execution_performed").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("action_approval_decision_events_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("action_approval_decision_events_bundle_ordinal_unique")
+    .on(table.workspaceId, table.bundleId, table.ordinal),
+  uniqueIndex("action_approval_decision_events_bundle_unit_unique")
+    .on(table.workspaceId, table.bundleId, table.unitId),
+  uniqueIndex("action_approval_decision_events_workspace_command_unique").on(table.workspaceId, table.commandRef),
+  uniqueIndex("action_approval_decision_events_workspace_hash_unique").on(table.workspaceId, table.commandHash),
+  index("action_approval_decision_events_bundle_idx").on(table.workspaceId, table.bundleId, table.ordinal),
+  index("action_approval_decision_events_unit_idx").on(table.unitId),
+  foreignKey({
+    columns: [table.workspaceId, table.bundleId],
+    foreignColumns: [actionProposalBundles.workspaceId, actionProposalBundles.id],
+    name: "action_approval_decision_events_bundle_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.bundleId, table.unitId, table.unitRef],
+    foreignColumns: [
+      actionProposalUnits.workspaceId,
+      actionProposalUnits.bundleId,
+      actionProposalUnits.id,
+      actionProposalUnits.unitRef,
+    ],
+    name: "action_approval_decision_events_unit_scope_fk",
+  }).onDelete("cascade"),
+  check("action_approval_decision_events_ordinal_positive", sql`${table.ordinal} >= 1`),
+  check("action_approval_decision_events_identity", sql`
+    ${table.commandRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.unitRef} ~ '^action_unit_[a-f0-9]{20}$'
+    and ${table.actorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.actorRole} in ('owner', 'admin', 'operator')
+    and ${table.reasonCode} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+    and ${table.commandKind} in ('approve', 'reject', 'request_changes')
+  `),
+  check("action_approval_decision_events_hash_formats", sql`
+    ${table.unitHash} ~ '^[a-f0-9]{64}$'
+    and ${table.commandHash} ~ '^[a-f0-9]{64}$'
+    and ${table.freshnessHash} ~ '^[a-f0-9]{64}$'
+    and ${table.lifecycleBeforeHash} ~ '^[a-f0-9]{64}$'
+    and ${table.lifecycleAfterHash} ~ '^[a-f0-9]{64}$'
+    and ${table.traceAfterHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("action_approval_decision_events_exact", sql`
+    jsonb_typeof(${table.commandPayload}) = 'object'
+    and ${table.commandPayload} #>> '{commandRef}' = ${table.commandRef}
+    and ${table.commandPayload} #>> '{kind}' = ${table.commandKind}
+    and ${table.commandPayload} #>> '{unitRef}' = ${table.unitRef}
+    and ${table.commandPayload} #>> '{actor,actorRef}' = ${table.actorRef}
+    and ${table.commandPayload} #>> '{actor,role}' = ${table.actorRole}
+    and (${table.commandPayload} #>> '{decidedAt}')::timestamptz = ${table.decidedAt}
+    and ${table.commandPayload} #>> '{reasonCode}' = ${table.reasonCode}
+    and jsonb_typeof(${table.commandPayload} #> '{freshness}') = 'array'
+    and jsonb_typeof(${table.eventPayloads}) = 'array'
+    and jsonb_array_length(${table.eventPayloads}) >= 1
+    and ${table.executionAuthority} = 'none'
+    and ${table.executionPerformed} = false
+  `),
+  check("action_approval_decision_events_approval_shape", sql`
+    (${table.commandKind} = 'approve'
+      and ${table.commandPayload} #>> '{authorization,humanPresence}' = 'true'
+      and ${table.commandPayload} #>> '{authorization,canExecute}' = 'false'
+      and ${table.commandPayload} ? 'grantRef')
+    or (${table.commandKind} in ('reject', 'request_changes')
+      and not (${table.commandPayload} ? 'authorization')
+      and not (${table.commandPayload} ? 'grantRef'))
+  `),
+  check("action_approval_decision_events_no_authority", sql`
+    not jsonb_path_exists(${table.commandPayload} - 'authorization', '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(actionauthority|executionauthority|writeauthority|writeenabled|canexecute|canwrite|approvalgranted|execute|write)$" flag "i")')
+    and not jsonb_path_exists(${table.eventPayloads}, '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(actionauthority|writeauthority|writeenabled|canexecute|canwrite|approvalgranted|grant|authorization|execute|write)$" flag "i")')
+  `),
+  check("action_approval_decision_events_no_forbidden_material", sql`
+    (${table.commandPayload}::text || ${table.eventPayloads}::text)
+      !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
+  `),
+]);
+
+/** Immutable, unconsumed approval evidence. It explicitly carries no execution authority. */
+export const actionApprovalEvidenceGrants = pgTable("action_approval_evidence_grants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  bundleId: uuid("bundle_id").notNull(),
+  unitId: uuid("unit_id").notNull(),
+  decisionEventId: uuid("decision_event_id").notNull(),
+  grantRef: text("grant_ref").notNull(),
+  unitRef: text("unit_ref").notNull(),
+  unitHash: text("unit_hash").notNull(),
+  scopeHash: text("scope_hash").notNull(),
+  planRef: text("plan_ref").notNull(),
+  planRevision: integer("plan_revision").notNull(),
+  planHash: text("plan_hash").notNull(),
+  approverRef: text("approver_ref").notNull(),
+  approverRole: text("approver_role").notNull(),
+  approvedAt: timestamp("approved_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  grantHash: text("grant_hash").notNull(),
+  grantPayload: jsonb("grant_payload").$type<Record<string, unknown>>().notNull(),
+  capability: text("capability").notNull().default("approval_evidence_only"),
+  canExecute: boolean("can_execute").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("action_approval_evidence_grants_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("action_approval_evidence_grants_decision_unique").on(table.workspaceId, table.decisionEventId),
+  uniqueIndex("action_approval_evidence_grants_bundle_unit_unique")
+    .on(table.workspaceId, table.bundleId, table.unitId),
+  uniqueIndex("action_approval_evidence_grants_workspace_ref_unique").on(table.workspaceId, table.grantRef),
+  uniqueIndex("action_approval_evidence_grants_workspace_hash_unique").on(table.workspaceId, table.grantHash),
+  index("action_approval_evidence_grants_bundle_idx").on(table.workspaceId, table.bundleId),
+  index("action_approval_evidence_grants_unit_idx").on(table.unitId),
+  foreignKey({
+    columns: [table.workspaceId, table.bundleId],
+    foreignColumns: [actionProposalBundles.workspaceId, actionProposalBundles.id],
+    name: "action_approval_evidence_grants_bundle_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.bundleId, table.unitId, table.unitRef],
+    foreignColumns: [
+      actionProposalUnits.workspaceId,
+      actionProposalUnits.bundleId,
+      actionProposalUnits.id,
+      actionProposalUnits.unitRef,
+    ],
+    name: "action_approval_evidence_grants_unit_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.decisionEventId],
+    foreignColumns: [actionApprovalDecisionEvents.workspaceId, actionApprovalDecisionEvents.id],
+    name: "action_approval_evidence_grants_decision_scope_fk",
+  }).onDelete("cascade"),
+  check("action_approval_evidence_grants_identity", sql`
+    ${table.grantRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.unitRef} ~ '^action_unit_[a-f0-9]{20}$'
+    and ${table.planRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.approverRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.approverRole} in ('owner', 'admin', 'operator')
+    and ${table.planRevision} >= 1
+  `),
+  check("action_approval_evidence_grants_hash_formats", sql`
+    ${table.unitHash} ~ '^[a-f0-9]{64}$'
+    and ${table.scopeHash} ~ '^[a-f0-9]{64}$'
+    and ${table.planHash} ~ '^[a-f0-9]{64}$'
+    and ${table.grantHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("action_approval_evidence_grants_exact", sql`
+    jsonb_typeof(${table.grantPayload}) = 'object'
+    and ${table.grantPayload} #>> '{version}' = 'action-approval-grant/1.0.0'
+    and ${table.grantPayload} #>> '{grantRef}' = ${table.grantRef}
+    and ${table.grantPayload} #>> '{unitRef}' = ${table.unitRef}
+    and ${table.grantPayload} #>> '{unitHash}' = ${table.unitHash}
+    and ${table.grantPayload} #>> '{scopeHash}' = ${table.scopeHash}
+    and ${table.grantPayload} #>> '{planRef}' = ${table.planRef}
+    and (${table.grantPayload} #>> '{planRevision}')::integer = ${table.planRevision}
+    and ${table.grantPayload} #>> '{planHash}' = ${table.planHash}
+    and ${table.grantPayload} #>> '{approver,actorRef}' = ${table.approverRef}
+    and ${table.grantPayload} #>> '{approver,role}' = ${table.approverRole}
+    and (${table.grantPayload} #>> '{approvedAt}')::timestamptz = ${table.approvedAt}
+    and (${table.grantPayload} #>> '{expiresAt}')::timestamptz = ${table.expiresAt}
+    and ${table.grantPayload} #>> '{grantHash}' = ${table.grantHash}
+    and ${table.grantPayload} #>> '{singleUse}' = 'true'
+    and ${table.grantPayload} #> '{consumedAt}' = 'null'::jsonb
+    and ${table.grantPayload} #> '{consumedBy}' = 'null'::jsonb
+    and ${table.grantPayload} #>> '{capability}' = 'approval_evidence_only'
+    and ${table.grantPayload} #>> '{canExecute}' = 'false'
+    and ${table.capability} = 'approval_evidence_only'
+    and ${table.canExecute} = false
+    and ${table.expiresAt} > ${table.approvedAt}
+  `),
+  check("action_approval_evidence_grants_no_forbidden_material", sql`
+    ${table.grantPayload}::text
+      !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
+  `),
+]);

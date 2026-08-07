@@ -194,7 +194,7 @@
 - [ ] K0–K4 valve, account allowlist, caps, kill switch ve çift anahtar.
   - [x] Saf K0–K4 typed action sınıflandırması; workspace default `approval_only`, scoped
     en-dar resolver, expiry/conflict/child-widening/kill-switch ve budget/protection guard'ları.
-- [ ] Approval state machine, expiry, stale-plan ve separation of duties.
+- [x] Approval state machine, expiry, stale-plan ve separation of duties.
 - [ ] Idempotent execute, Meta error taxonomy, read-after-write ve rollback.
 - [ ] Hourly/daily/weekly/monthly/after-sync scheduler; DST/misfire/idempotency.
   - [x] Decision Room daily/weekly timezone+DST, skip/run_once catch-up ve duplicate-slot çekirdeği.
@@ -236,7 +236,8 @@
   - [x] Restart-durable awaiting-approval veri modeli ve public-safe read contract.
   - [x] Tenant-bound Drizzle read adapter, ayrı `approval_queue:read` kapsamlı GET API ve
     fixture'sız dashboard list/detail inbox bağlantısı.
-  - [ ] İnsan-varlığı kanıtlı approve/reject/request-changes mutation katmanı.
+  - [x] İnsan-varlığı kanıtlı, tek-ActionUnit approve/reject/request-changes mutation katmanı;
+    macOS sistem diyaloğu, kısa ömürlü tek-kullanımlık proof ve atomik append-only karar kaydı.
 - [ ] Mevcut creative library + context/performance karşılaştırması.
 - [ ] Yayındaki reklam metni/dynamic variant/CTA/destination/post kaynağı explorer'ı.
 - [ ] Instagram/Page post seçici, PromotionTemplate/AudiencePreset ve existing-post guided flow.

@@ -190,6 +190,13 @@
       "when": 1786124137889,
       "tag": "20260807173537_action_proposal_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1786125873464,
+      "tag": "20260807180433_fixed_tarantula",
+      "breakpoints": true
     }
   ]
 }

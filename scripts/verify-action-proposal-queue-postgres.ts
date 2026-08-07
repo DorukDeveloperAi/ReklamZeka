@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 import { ActionProposalStagingService } from "@/application/action-proposal-staging-service";
+import { DrizzleActionApprovalDecisionRepository } from "@/connectors/actions/action-approval-decision-drizzle-repository";
 import { DrizzleActionProposalQueueRepository } from "@/connectors/actions/action-proposal-queue-drizzle-repository";
 import * as schema from "@/db/schema";
 import { ACTION_APPROVAL_POLICY_VERSION } from "@/domain/actions/approval-lifecycle";
@@ -16,6 +17,7 @@ if (!databaseUrl) throw new Error("DATABASE_URL yapılandırılmadı");
 const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 20_000 });
 const database = drizzle(pool, { schema });
 const migrationPath = "drizzle/20260807173537_action_proposal_queue.sql";
+const decisionMigrationPath = "drizzle/20260807180433_fixed_tarantula.sql";
 const rollback = Symbol("rollback");
 const workspaceId = randomUUID();
 const connectionId = randomUUID();
@@ -23,7 +25,9 @@ const sourceId = randomUUID();
 const accountId = randomUUID();
 const campaignId = randomUUID();
 const evidence = { tablesApplied: false, inserted: false, exactReplay: false, immutable: false,
-  rlsAndGrants: false, exactRows: false, rollbackClean: false, metaCalls: 0, executionCalls: 0 };
+  decisionTablesApplied: false, decisionInserted: false, decisionExactReplay: false,
+  decisionImmutable: false, rlsAndGrants: false, exactRows: false, rollbackClean: false,
+  metaCalls: 0, executionCalls: 0 };
 
 const rows = (result: unknown): readonly Record<string, unknown>[] => result && typeof result === "object"
   && "rows" in result && Array.isArray(result.rows) ? result.rows as readonly Record<string, unknown>[] : [];
@@ -32,8 +36,11 @@ const stable = (value: unknown): unknown => Array.isArray(value) ? value.map(sta
     .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, child]) => [key, stable(child)])) : value;
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(stable(value))).digest("hex");
 
-async function applyEphemeralMigration(transaction: Parameters<Parameters<typeof database.transaction>[0]>[0]) {
-  const source = readFileSync(migrationPath, "utf8");
+async function applyEphemeralMigration(
+  transaction: Parameters<Parameters<typeof database.transaction>[0]>[0],
+  path: string,
+) {
+  const source = readFileSync(path, "utf8");
   for (const statement of source.split("--> statement-breakpoint").map((value) => value.trim()).filter(Boolean)) {
     await transaction.execute(sql.raw(statement));
   }
@@ -80,7 +87,7 @@ try {
     const present = [applied?.bundles, applied?.units, applied?.dependencies, applied?.policies, applied?.events]
       .filter(Boolean).length;
     if (present === 0) {
-      await applyEphemeralMigration(transaction);
+      await applyEphemeralMigration(transaction, migrationPath);
       applied = rows(await transaction.execute(sql`
         select to_regclass('public.action_proposal_bundles')::text as bundles,
           to_regclass('public.action_proposal_units')::text as units,
@@ -94,6 +101,22 @@ try {
     evidence.tablesApplied = Boolean(applied?.bundles && applied?.units && applied?.dependencies
       && applied?.policies && applied?.events);
     if (!evidence.tablesApplied) throw new Error("Action proposal queue migration doğrulanamadı");
+    let decisionTables = rows(await transaction.execute(sql`
+      select to_regclass('public.action_approval_decision_events')::text as decisions,
+        to_regclass('public.action_approval_evidence_grants')::text as grants
+    `))[0];
+    const decisionPresent = [decisionTables?.decisions, decisionTables?.grants].filter(Boolean).length;
+    if (decisionPresent === 0) {
+      await applyEphemeralMigration(transaction, decisionMigrationPath);
+      decisionTables = rows(await transaction.execute(sql`
+        select to_regclass('public.action_approval_decision_events')::text as decisions,
+          to_regclass('public.action_approval_evidence_grants')::text as grants
+      `))[0];
+    } else if (decisionPresent !== 2) {
+      throw new Error("Action approval decision şeması kısmi uygulanmış");
+    }
+    evidence.decisionTablesApplied = Boolean(decisionTables?.decisions && decisionTables?.grants);
+    if (!evidence.decisionTablesApplied) throw new Error("Action approval decision migration doğrulanamadı");
     await transaction.insert(schema.workspaces).values({ id: workspaceId, name: "Action queue verifier" });
     await transaction.insert(schema.metaConnections).values({
       id: connectionId, workspaceId, externalConnectionKey: "action-queue-verifier", displayName: "Verifier",
@@ -113,27 +136,70 @@ try {
     const repository = new DrizzleActionProposalQueueRepository(transaction as never, workspaceId);
     evidence.inserted = (await repository.appendInitial(proposal)).outcome === "inserted";
     evidence.exactReplay = (await repository.appendInitial(proposal)).outcome === "unchanged";
+    const decisionRepository = new DrizzleActionApprovalDecisionRepository(transaction as never, workspaceId);
+    const snapshot = await decisionRepository.loadForDecision({ workspaceId, unitRef: proposal.bundle.units[0]!.unitRef });
+    if (!snapshot) throw new Error("Decision snapshot bulunamadı");
+    const command = {
+      kind: "approve" as const,
+      commandRef: "decision_verifier",
+      unitRef: proposal.bundle.units[0]!.unitRef,
+      actor: { actorRef: "actor_owner", role: "owner" as const },
+      decidedAt: "2026-08-07T18:01:00.000Z",
+      reasonCode: "approved_after_review",
+      freshness: snapshot.freshness,
+      authorization: {
+        authorizationRef: "presence_verifier", unitRef: proposal.bundle.units[0]!.unitRef,
+        unitHash: proposal.bundle.units[0]!.unitHash, scopeHash: proposal.bundle.units[0]!.scopeHash,
+        actor: { actorRef: "actor_owner", role: "owner" as const },
+        issuedAt: "2026-08-07T18:00:30.000Z", expiresAt: "2026-08-07T18:02:00.000Z",
+        humanPresence: true as const, canExecute: false as const,
+      },
+      grantRef: "grant_verifier",
+    };
+    const decided = await decisionRepository.decideAtomically({
+      workspaceId, unitRef: command.unitRef, expectedTraceHash: snapshot.lifecycle.traceHash,
+      buildCommand: async () => command,
+    });
+    evidence.decisionInserted = decided.outcome === "inserted"
+      && decided.executionAuthority === "none" && decided.executionPerformed === false
+      && decided.lifecycle.units[0]?.grant?.canExecute === false;
+    const replayed = await new DrizzleActionApprovalDecisionRepository(transaction as never, workspaceId).decideAtomically({
+      workspaceId, unitRef: command.unitRef, expectedTraceHash: decided.traceHash,
+      buildCommand: async () => command,
+    });
+    evidence.decisionExactReplay = replayed.outcome === "unchanged";
     const counts = rows(await transaction.execute(sql`
       select (select count(*)::int from action_proposal_bundles where workspace_id = ${workspaceId}::uuid) as bundles,
         (select count(*)::int from action_proposal_units where workspace_id = ${workspaceId}::uuid) as units,
-        (select count(*)::int from action_proposal_initial_events where workspace_id = ${workspaceId}::uuid) as events
+        (select count(*)::int from action_proposal_initial_events where workspace_id = ${workspaceId}::uuid) as events,
+        (select count(*)::int from action_approval_decision_events where workspace_id = ${workspaceId}::uuid) as decisions,
+        (select count(*)::int from action_approval_evidence_grants where workspace_id = ${workspaceId}::uuid) as grants
     `))[0];
-    evidence.exactRows = counts?.bundles === 1 && counts?.units === 1 && counts?.events === 1;
+    evidence.exactRows = counts?.bundles === 1 && counts?.units === 1 && counts?.events === 1
+      && counts?.decisions === 1 && counts?.grants === 1;
     try {
       await transaction.transaction(async (savepoint) => {
         await savepoint.execute(sql`update action_proposal_units set initial_state = 'approved' where workspace_id = ${workspaceId}::uuid`);
       });
     }
     catch { evidence.immutable = true; }
+    try {
+      await transaction.transaction(async (savepoint) => {
+        await savepoint.execute(sql`update action_approval_evidence_grants set can_execute = true where workspace_id = ${workspaceId}::uuid`);
+      });
+    }
+    catch { evidence.decisionImmutable = true; }
     const security = rows(await transaction.execute(sql`
       select count(*) filter (where c.relrowsecurity)::int as rls_count,
         (select count(*)::int from information_schema.role_table_grants where table_schema = 'public'
-          and table_name like 'action_proposal_%' and grantee in ('anon', 'authenticated')) as api_grants
+          and (table_name like 'action_proposal_%' or table_name like 'action_approval_%')
+          and grantee in ('anon', 'authenticated')) as api_grants
       from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'public' and c.relname in ('action_approval_policy_snapshots', 'action_proposal_bundles',
-        'action_proposal_units', 'action_proposal_dependencies', 'action_proposal_initial_events')
+        'action_proposal_units', 'action_proposal_dependencies', 'action_proposal_initial_events',
+        'action_approval_decision_events', 'action_approval_evidence_grants')
     `))[0];
-    evidence.rlsAndGrants = security?.rls_count === 5 && security?.api_grants === 0;
+    evidence.rlsAndGrants = security?.rls_count === 7 && security?.api_grants === 0;
     throw rollback;
   });
 } catch (error) { if (error !== rollback) throw error; }

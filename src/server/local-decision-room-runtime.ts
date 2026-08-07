@@ -132,7 +132,7 @@ export function localDecisionRoomConfig(environment: LocalDecisionRoomEnvironmen
 export function assertTrustedLocalDecisionRoomRequest(
   request: Request,
   config: LocalDecisionRoomConfig,
-  operation: "read" | "mark_read" | "draft",
+  operation: "read" | "mark_read" | "draft" | "decide",
   credential: "cookie" | "bearer" = "cookie",
 ): void {
   let url: URL;
@@ -159,7 +159,12 @@ export function assertTrustedLocalDecisionRoomRequest(
   if (operation === "draft" && !["budget-lab-dry-run", "budget-lab-save-draft"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
-  if ((operation === "mark_read" || operation === "draft") && credential === "cookie"
+  if (operation === "decide" && ![
+    "approval-queue-confirm-human-presence", "approval-queue-approve", "approval-queue-reject", "approval-queue-request-changes",
+  ].includes(
+    request.headers.get("x-reklamzeka-intent") ?? "",
+  )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  if ((operation === "mark_read" || operation === "draft" || operation === "decide") && credential === "cookie"
     && (origin !== config.origin || fetchSite !== "same-origin")) {
     throw new LocalDecisionRoomBoundaryError("untrusted_request");
   }
@@ -168,12 +173,13 @@ export function assertTrustedLocalDecisionRoomRequest(
 function authenticate(
   request: Request,
   config: LocalDecisionRoomConfig,
-  operation: "read" | "mark_read" | "draft",
+  operation: "read" | "mark_read" | "draft" | "decide",
 ): Readonly<{ claims: LocalSessionClaims; credential: "cookie" | "bearer" }> {
   const bearer = bearerToken(request);
   const cookie = cookieToken(request);
   if ((bearer === null) === (cookie === null)) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   const credential = bearer === null ? "cookie" as const : "bearer" as const;
+  if (operation === "decide" && credential !== "cookie") throw new LocalDecisionRoomBoundaryError("untrusted_request");
   const token = bearer ?? cookie!;
   const osUid = typeof process.getuid === "function" ? process.getuid() : -1;
   if (osUid < 0) throw new LocalDecisionRoomBoundaryError("untrusted_request");
@@ -182,7 +188,8 @@ function authenticate(
     key: config.signingKey,
     now: Math.floor(Date.now() / 1000),
     osUid,
-    requiredScope: operation === "read" ? "decision_room:read" : operation === "draft" ? "budget_lab:draft" : "decision_room:mark_read",
+    requiredScope: operation === "read" ? "decision_room:read" : operation === "draft" ? "budget_lab:draft"
+      : operation === "decide" ? "approval_queue:decide" : "decision_room:mark_read",
     expected: config,
   });
   return Object.freeze({ claims, credential });
@@ -255,6 +262,18 @@ export async function resolveTrustedLocalDraftPrincipal(input: Readonly<{
   exactKeys(input, ["request", "database", "config"]);
   const authenticated = authenticate(input.request, input.config, "draft");
   assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", authenticated.credential);
+  return bindPrincipal(input.database, input.config);
+}
+
+/** Cookie-only approval mutation binding; membership is re-read every request. */
+export async function resolveTrustedLocalApprovalDecisionPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  const authenticated = authenticate(input.request, input.config, "decide");
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "decide", authenticated.credential);
   return bindPrincipal(input.database, input.config);
 }
 

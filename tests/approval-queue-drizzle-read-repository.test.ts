@@ -53,6 +53,7 @@ function sourceRow(patch: Record<string, unknown> = {}) {
     policy_snapshot_id: policyId,
     proposed_at: "2026-08-07T13:00:00.000Z",
     expires_at: "2026-08-08T13:00:00.000Z",
+    current_event_type: null,
     action_plan_payload: budgetPlan(),
     dependencies: [{ unit_ref: "action_unit_cccccccccccccccccccc", status: "awaiting_approval" }],
     ...patch,
@@ -130,6 +131,17 @@ describe("Approval Queue Drizzle read repository", () => {
       .get({ workspaceId, unitRef })).resolves.toBeNull();
   });
 
+  it("projects append-only decision and dependency event state instead of the initial fixture state", async () => {
+    const fixture = database([sourceRow({
+      current_event_type: "unit_approved",
+      dependencies: [{ unit_ref: "action_unit_cccccccccccccccccccc", status: "changes_requested" }],
+    })]);
+    const result = await new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId)
+      .get({ workspaceId, unitRef });
+    expect(result).toMatchObject({ status: "approved", dependencies: [{ status: "changes_requested" }] });
+    expect(fixture.queries[0]?.sql).toContain("jsonb_array_elements(decision.event_payloads)");
+  });
+
   it("rejects cross-tenant access and malformed inputs before database I/O", async () => {
     const fixture = database();
     const repository = new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId);
@@ -149,7 +161,8 @@ describe("Approval Queue Drizzle read repository", () => {
   it.each([
     ["cross-level entity binding", () => sourceRow({ campaign_id: null, ad_set_id: campaignId })],
     ["forged plan payload", () => sourceRow({ action_plan_payload: { ...budgetPlan(), execute: true } })],
-    ["unsupported dependency state", () => sourceRow({ dependencies: [{ unit_ref: "action_unit_cccccccccccccccccccc", status: "approved" }] })],
+    ["unsupported dependency state", () => sourceRow({ dependencies: [{ unit_ref: "action_unit_cccccccccccccccccccc", status: "executing" }] })],
+    ["unsupported decision event", () => sourceRow({ current_event_type: "approval_grant_consumed" })],
     ["duplicate dependencies", () => sourceRow({ dependencies: [
       { unit_ref: "action_unit_cccccccccccccccccccc", status: "awaiting_approval" },
       { unit_ref: "action_unit_cccccccccccccccccccc", status: "awaiting_approval" },

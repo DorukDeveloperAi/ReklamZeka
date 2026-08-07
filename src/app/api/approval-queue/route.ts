@@ -6,12 +6,18 @@ import {
   approvalQueueNotConfiguredResponse,
   createLocalApprovalQueueRouteHandler,
 } from "@/server/local-approval-queue-runtime";
+import {
+  approvalDecisionNotConfiguredResponse,
+  createLocalApprovalDecisionRouteHandlers,
+} from "@/server/local-approval-decision-runtime";
 import { localDecisionRoomConfig } from "@/server/local-decision-room-runtime";
+import { MacOsHumanPresenceCeremony } from "@/security/macos-human-presence-ceremony";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 let runtimeDatabase: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let runtimeDecisionHandlers: ReturnType<typeof createLocalApprovalDecisionRouteHandlers> | null = null;
 
 function configuredHandler() {
   try {
@@ -39,16 +45,33 @@ function configuredHandler() {
       pool.on("error", () => undefined);
       runtimeDatabase = drizzle(pool, { schema });
     }
-    return createLocalApprovalQueueRouteHandler({ database: runtimeDatabase, config });
+    if (!runtimeDecisionHandlers && process.platform === "darwin") {
+      runtimeDecisionHandlers = createLocalApprovalDecisionRouteHandlers({
+        database: runtimeDatabase,
+        config,
+        ceremony: new MacOsHumanPresenceCeremony(),
+      });
+    }
+    return {
+      GET: createLocalApprovalQueueRouteHandler({ database: runtimeDatabase, config }),
+      POST: runtimeDecisionHandlers?.POST ?? null,
+    };
   } catch {
     return null;
   }
 }
 
-// No POST/PATCH/PUT/DELETE export exists: approval decisions and execution stay closed.
 export function GET(): ReturnType<typeof approvalQueueNotConfiguredResponse>;
 export function GET(request: Request): Promise<Response> | Response;
 export function GET(request?: Request) {
   const handler = configuredHandler();
-  return handler && request ? handler(request) : approvalQueueNotConfiguredResponse();
+  return handler && request ? handler.GET(request) : approvalQueueNotConfiguredResponse();
+}
+
+// POST records one human-confirmed decision. It never consumes a grant or executes Meta.
+export function POST(): ReturnType<typeof approvalDecisionNotConfiguredResponse>;
+export function POST(request: Request): Promise<Response> | Response;
+export function POST(request?: Request) {
+  const handler = configuredHandler();
+  return handler?.POST && request ? handler.POST(request) : approvalDecisionNotConfiguredResponse();
 }

@@ -43,6 +43,7 @@ type SourceRow = Readonly<{
   policy_snapshot_id: unknown;
   proposed_at: unknown;
   expires_at: unknown;
+  current_event_type: unknown;
   action_plan_payload: unknown;
   dependencies: unknown;
 }>;
@@ -197,15 +198,32 @@ function dependencies(value: unknown): ApprovalQueueRecord["dependencies"] {
     exact(raw, ["unit_ref", "status"]);
     const dependency = raw as DependencySource;
     if (typeof dependency.unit_ref !== "string" || !UNIT_REF.test(dependency.unit_ref) || seen.has(dependency.unit_ref)
-      || dependency.status !== "awaiting_approval") fail("corrupt_store");
+      || !["awaiting_approval", "approved", "rejected", "changes_requested", "expired", "stale",
+        "superseded", "dependency_failed"].includes(dependency.status as string)) fail("corrupt_store");
     seen.add(dependency.unit_ref);
-    return Object.freeze({ unitRef: dependency.unit_ref, status: "awaiting_approval" as const });
+    return Object.freeze({ unitRef: dependency.unit_ref, status: dependency.status as ApprovalQueueRecord["status"] });
   }));
+}
+
+function currentStatus(eventType: unknown): ApprovalQueueRecord["status"] {
+  if (eventType === null) return "awaiting_approval";
+  const statuses: Readonly<Record<string, ApprovalQueueRecord["status"]>> = Object.freeze({
+    unit_approved: "approved",
+    unit_rejected: "rejected",
+    unit_changes_requested: "changes_requested",
+    unit_expired: "expired",
+    unit_stale: "stale",
+    unit_superseded: "superseded",
+    unit_dependency_failed: "dependency_failed",
+  });
+  if (typeof eventType !== "string" || !Object.hasOwn(statuses, eventType)) fail("corrupt_store");
+  return statuses[eventType]!;
 }
 
 function mapRow(row: SourceRow, workspaceId: string): ApprovalQueueRecord {
   exact(row, ["unit_ref", "bundle_ref", "initial_state", "risk", "action_type", "ad_account_id", "campaign_id",
-    "ad_set_id", "ad_id", "policy_snapshot_id", "proposed_at", "expires_at", "action_plan_payload", "dependencies"]);
+    "ad_set_id", "ad_id", "policy_snapshot_id", "proposed_at", "expires_at", "current_event_type",
+    "action_plan_payload", "dependencies"]);
   if (typeof row.unit_ref !== "string" || !UNIT_REF.test(row.unit_ref)
     || typeof row.bundle_ref !== "string" || !BUNDLE_REF.test(row.bundle_ref)
     || row.initial_state !== "awaiting_approval" || typeof row.risk !== "string"
@@ -232,7 +250,7 @@ function mapRow(row: SourceRow, workspaceId: string): ApprovalQueueRecord {
   return Object.freeze({
     unitRef: row.unit_ref,
     bundleRef: row.bundle_ref,
-    status: "awaiting_approval",
+    status: currentStatus(row.current_event_type),
     risk: row.risk as "K2" | "K3",
     actionType,
     accountRef: publicRef("account", workspaceId, row.ad_account_id),
@@ -281,19 +299,41 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
     const result = rows(await this.database.execute(sql`
       select unit.unit_ref, bundle.bundle_ref, unit.initial_state, unit.risk, unit.action_type,
         unit.ad_account_id, unit.campaign_id, unit.ad_set_id, unit.ad_id,
-        bundle.policy_snapshot_id, unit.proposed_at, unit.expires_at, unit.action_plan_payload,
+        bundle.policy_snapshot_id, unit.proposed_at, unit.expires_at,
+        current_event.event_type as current_event_type, unit.action_plan_payload,
         coalesce((
-          select jsonb_agg(jsonb_build_object('unit_ref', edge.dependency_unit_ref, 'status', dependency.initial_state)
+          select jsonb_agg(jsonb_build_object('unit_ref', edge.dependency_unit_ref, 'status',
+            case dependency_event.event_type
+              when 'unit_approved' then 'approved' when 'unit_rejected' then 'rejected'
+              when 'unit_changes_requested' then 'changes_requested' when 'unit_expired' then 'expired'
+              when 'unit_stale' then 'stale' when 'unit_superseded' then 'superseded'
+              when 'unit_dependency_failed' then 'dependency_failed' else dependency.initial_state end)
             order by edge.dependency_unit_ref)
           from action_proposal_dependencies edge
           join action_proposal_units dependency
             on dependency.workspace_id = edge.workspace_id and dependency.bundle_id = edge.bundle_id
             and dependency.id = edge.dependency_unit_id and dependency.unit_ref = edge.dependency_unit_ref
+          left join lateral (
+            select event.value ->> 'eventType' as event_type
+            from action_approval_decision_events decision
+            cross join lateral jsonb_array_elements(decision.event_payloads) event(value)
+            where decision.workspace_id = dependency.workspace_id and decision.bundle_id = dependency.bundle_id
+              and event.value ->> 'unitRef' = dependency.unit_ref
+            order by decision.ordinal desc, (event.value ->> 'sequence')::integer desc limit 1
+          ) dependency_event on true
           where edge.workspace_id = unit.workspace_id and edge.bundle_id = unit.bundle_id and edge.unit_id = unit.id
         ), '[]'::jsonb) as dependencies
       from action_proposal_units unit
       join action_proposal_bundles bundle
         on bundle.workspace_id = unit.workspace_id and bundle.id = unit.bundle_id
+      left join lateral (
+        select event.value ->> 'eventType' as event_type
+        from action_approval_decision_events decision
+        cross join lateral jsonb_array_elements(decision.event_payloads) event(value)
+        where decision.workspace_id = unit.workspace_id and decision.bundle_id = unit.bundle_id
+          and event.value ->> 'unitRef' = unit.unit_ref
+        order by decision.ordinal desc, (event.value ->> 'sequence')::integer desc limit 1
+      ) current_event on true
       where unit.workspace_id = ${this.workspaceId}::uuid
         and (${beforeAt}::timestamptz is null
           or (unit.proposed_at, unit.unit_ref) < (${beforeAt}::timestamptz, ${beforeRef}::text))
@@ -310,19 +350,41 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
     const result = rows(await this.database.execute(sql`
       select unit.unit_ref, bundle.bundle_ref, unit.initial_state, unit.risk, unit.action_type,
         unit.ad_account_id, unit.campaign_id, unit.ad_set_id, unit.ad_id,
-        bundle.policy_snapshot_id, unit.proposed_at, unit.expires_at, unit.action_plan_payload,
+        bundle.policy_snapshot_id, unit.proposed_at, unit.expires_at,
+        current_event.event_type as current_event_type, unit.action_plan_payload,
         coalesce((
-          select jsonb_agg(jsonb_build_object('unit_ref', edge.dependency_unit_ref, 'status', dependency.initial_state)
+          select jsonb_agg(jsonb_build_object('unit_ref', edge.dependency_unit_ref, 'status',
+            case dependency_event.event_type
+              when 'unit_approved' then 'approved' when 'unit_rejected' then 'rejected'
+              when 'unit_changes_requested' then 'changes_requested' when 'unit_expired' then 'expired'
+              when 'unit_stale' then 'stale' when 'unit_superseded' then 'superseded'
+              when 'unit_dependency_failed' then 'dependency_failed' else dependency.initial_state end)
             order by edge.dependency_unit_ref)
           from action_proposal_dependencies edge
           join action_proposal_units dependency
             on dependency.workspace_id = edge.workspace_id and dependency.bundle_id = edge.bundle_id
             and dependency.id = edge.dependency_unit_id and dependency.unit_ref = edge.dependency_unit_ref
+          left join lateral (
+            select event.value ->> 'eventType' as event_type
+            from action_approval_decision_events decision
+            cross join lateral jsonb_array_elements(decision.event_payloads) event(value)
+            where decision.workspace_id = dependency.workspace_id and decision.bundle_id = dependency.bundle_id
+              and event.value ->> 'unitRef' = dependency.unit_ref
+            order by decision.ordinal desc, (event.value ->> 'sequence')::integer desc limit 1
+          ) dependency_event on true
           where edge.workspace_id = unit.workspace_id and edge.bundle_id = unit.bundle_id and edge.unit_id = unit.id
         ), '[]'::jsonb) as dependencies
       from action_proposal_units unit
       join action_proposal_bundles bundle
         on bundle.workspace_id = unit.workspace_id and bundle.id = unit.bundle_id
+      left join lateral (
+        select event.value ->> 'eventType' as event_type
+        from action_approval_decision_events decision
+        cross join lateral jsonb_array_elements(decision.event_payloads) event(value)
+        where decision.workspace_id = unit.workspace_id and decision.bundle_id = unit.bundle_id
+          and event.value ->> 'unitRef' = unit.unit_ref
+        order by decision.ordinal desc, (event.value ->> 'sequence')::integer desc limit 1
+      ) current_event on true
       where unit.workspace_id = ${this.workspaceId}::uuid and unit.unit_ref = ${input.unitRef}
       limit 2
     `));
