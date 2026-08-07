@@ -81,6 +81,33 @@ describe("Meta S1.3 runtime persistence integration", () => {
     expect(page).toMatchObject({ nextCursor: "next-page", usageHeadroom: 0.75 });
   });
 
+  it("requests the live-verified v23 creative/post field catalog without rejected fields", async () => {
+    let requestedFields = "";
+    const fetchImpl = async (input: string | URL, init?: RequestInit) => {
+      const url = new URL(input);
+      requestedFields = url.searchParams.get("fields") ?? "";
+      expect(init?.method).toBe("GET");
+      return new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+    const transport = new MetaGraphSyncTransport(new MetaGraphClient("fixture-token", fetchImpl));
+
+    await transport.get({
+      method: "GET", stream: "creative_post", accountId: "act_fixture", entityLevel: "ad",
+      dateStart: null, dateStop: null, cursor: null, limit: 25,
+      correlation: { parentRunId: "run", streamRunId: "stream", accountId: "act_fixture", sliceId: "slice", cursorId: "cursor" },
+    });
+
+    expect(requestedFields).toContain("effective_instagram_story_id");
+    expect(requestedFields).toContain("effective_instagram_media_id");
+    expect(requestedFields).toContain("call_to_action_type");
+    expect(requestedFields).toContain("link_url");
+    expect(requestedFields).not.toContain("link_description");
+    expect(requestedFields).not.toContain("caption");
+  });
+
   it("restores a durable cursor in a fresh runtime and resumes without replaying page one", async () => {
     const transactions = new TransactionFixture();
     const persistence = new TransactionBackedMetaSyncPersistenceAdapter(transactions);

@@ -14,6 +14,16 @@ const INVENTORY_FIELDS = {
   ad: "id,name,status,effective_status,campaign_id,adset_id,creative{id},updated_time",
 } as const;
 
+const CREATIVE_POST_FIELDS = [
+  "id",
+  "name",
+  "status",
+  "effective_status",
+  "campaign_id",
+  "adset_id",
+  "creative{id,name,title,body,call_to_action_type,link_url,object_type,object_story_id,effective_object_story_id,effective_instagram_story_id,effective_instagram_media_id,instagram_permalink_url,object_story_spec,asset_feed_spec}",
+].join(",");
+
 function inventoryPath(accountId: string, level: MetaReadRequest["entityLevel"]): string {
   if (level === "account") return `/${accountId}`;
   return `/${accountId}/${level === "ad_set" ? "adsets" : `${level}s`}`;
@@ -45,7 +55,7 @@ export class MetaGraphSyncTransport implements MetaReadTransport {
 
   private async creativePost(request: MetaReadRequest): Promise<MetaReadPage> {
     const response = await this.client.getWithUsage<GraphPage>(`/${request.accountId}/ads`, {
-      fields: "id,name,status,effective_status,campaign_id,adset_id,creative{id,name,title,body,object_story_id,effective_object_story_id,instagram_permalink_url,object_story_spec,asset_feed_spec}",
+      fields: CREATIVE_POST_FIELDS,
       limit: String(request.limit), ...(request.cursor ? { after: request.cursor } : {}),
     });
     return this.page(response.data, response.usageHeadroom);
