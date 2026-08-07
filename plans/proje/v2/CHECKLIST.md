@@ -311,9 +311,10 @@
   - [x] Preflight/protection ortak canonical existing-post action builder/hash; reviewed approval/autonomy/guardrail
     ve authentic category/geo evidence'i birleştiren fail-closed private policy adapterı. Requester membership,
     kill-switch, protection disposition ve bütün bilinen expiry kaynakları bağlı; freshness default'u yok.
-  - [ ] Trusted protection policy resolver + reviewed proposal lifetime ile canonical submitter'ı production
-    Drizzle composition üzerinden route'a bağlama; çekirdek adapter hazır, authoritative freshness registry/factory,
-    gerçek policy publish ve route wiring yok.
+  - [x] Evidence freshness'i reviewed ApprovalPolicy alanından türeten request-bound Drizzle submitter ve cookie-only
+    proposal-draft route composition'ı; principal/membership exact binding, yalnız append-only queue, Meta writer yok.
+  - [ ] Kullanıcı-reviewed gerçek ApprovalPolicy/AutonomyRule/Guardrail/compatibility bundle'ını yayınlama ve
+    dashboard üzerinden proposal→satır-bazlı approval canlı E2E; hiçbir business policy seed edilmedi.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.
 - [ ] Owner/admin/analyst/operator/viewer rol E2E.
 - [ ] 1280/820/390, keyboard/screen-reader ve hata/partial/conflict E2E.

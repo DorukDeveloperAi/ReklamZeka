@@ -77,7 +77,10 @@ log veya bildirim payload'ına eklenmez.
   deadman/alert ve timezone/misfire kabulü ayrı olarak tamamlanmalıdır. Caller'dan workspace, connection, account,
   token veya adapter alınmamalıdır.
 - Existing-post proposal policy composition'ında evidence freshness için sessiz varsayılan kullanılmaz.
-  `resolveNotBefore` yalnız reviewed server configuration/registry'den gelmelidir; request body, model çıktısı,
-  template etiketi veya audience preset freshness kanıtı değildir. Kaynak yoksa adapter `null` döner ve queue yazımı
-  yapılmaz. Proposal expiry; approval definition, uygulanan autonomy rule, eşleşen guardrail revision, binding ve
-  maximum proposal lifetime bitişlerinin en erkenini aşmamalıdır.
+  `maximumProtectionEvidenceAgeSeconds` yalnız published/reviewed ApprovalPolicy'den gelir; request body, model
+  çıktısı, template etiketi veya audience preset freshness kaynağı değildir. Alan yoksa/geçersizse adapter `null`
+  döner ve queue yazımı yapılmaz. Proposal expiry; approval definition, uygulanan autonomy rule, eşleşen guardrail
+  revision, binding ve maximum proposal lifetime bitişlerinin en erkenini aşmamalıdır.
+- Protection-evidence-age migration'ı policy definition veya queue snapshot satırı bulursa otomatik backfill yerine
+  durur. Her policy açıkça reviewed yeni revision olarak hazırlanmalıdır. Uygulamadan sonra
+  `npm run verify:action-proposal-queue-db` ve `npm run verify:supabase-security` birlikte çalıştırılır.

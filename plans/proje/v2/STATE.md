@@ -947,3 +947,24 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Tam kapı 156 test dosyasında 994 test, production build, architecture/security/secret ve Drizzle kontrolleriyle
   geçti. Sonraki dilim authoritative evidence-freshness configuration, request-bound Drizzle composition ve ancak
   sonra dashboard proposal POST→queue E2E'dir.
+
+## 2026-08-08 — S5.4c3-L reviewed freshness ve request-bound proposal route
+
+- Protection evidence freshness yeni bir registry açmadan reviewed ApprovalPolicy içine zorunlu
+  `maximumProtectionEvidenceAgeSeconds` alanı olarak bağlandı. Exact/canonical policy hash'i ve queue snapshot'ı
+  1–604.800 saniye aralığını zorunlu kılar; proposal/grant lifetime'dan bağımsızdır. `notBefore`, evaluatedAt'ten
+  bu reviewed süre çıkarılarak server içinde türetilir; request/model/template/preset freshness enjekte edemez.
+- Migration policy/queue tablolarında önceden satır varsa otomatik backfill yerine durur; seed/default yoktur. Canlı
+  tablolar boşken uygulandı. Ardından 75/75 RLS ve sıfır API table grant/schema-create/public routine-execute yüzeyi
+  ile proposal/decision insert, replay, immutability ve rollback temizliği geçti; Meta ve execution çağrısı sıfırdı.
+- Request-bound Drizzle submitter; canonical material resolver, published compatibility registry, reviewed policy,
+  autonomy, authentic category/geo evidence, guardrail resolver ve append-only proposal queue'yu tek server
+  composition'da kurar. Membership ile principal workspace/user eşleşmezse daha repository kurulmadan reddedilir;
+  composition approval/grant/execution/Meta transport metodu sunmaz.
+- Cookie-only proposal-draft route artık placeholder yerine bu gerçek composition'ı kullanır. Mevcut durumda gerçek
+  published ApprovalPolicy/AutonomyRule/Guardrail/compatibility seti seed edilmediği için canlı öneri yine fail-closed
+  503/sıfır queue kalır. Route yalnız bütün reviewed materyal ve evidence mevcutsa append-only approval proposal
+  oluşturabilir; approve/execute veya Meta write yapamaz.
+- Tam kapı 158 test dosyasında 1003 test, production build, architecture/security/secret ve Drizzle kontrolleriyle
+  geçti. Sonraki ürün dilimi policy/rule/guardrail oluşturma-yayınlama stüdyosu ve örnek bir kullanıcı-reviewed
+  K4 policy bundle ile dashboard proposal→satır-bazlı approval E2E kabulüdür.
