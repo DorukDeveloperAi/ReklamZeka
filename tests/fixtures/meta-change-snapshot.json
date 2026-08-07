@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "workspaceId": "workspace-private-123456",
+  "externalAccountId": "act_123456789012345",
+  "capturedAt": "2026-08-07T08:00:00.000Z",
+  "campaigns": [
+    {
+      "externalCampaignId": "campaign_123456789012345",
+      "configuredStatus": { "state": "known", "value": "ACTIVE" },
+      "effectiveStatus": { "state": "known", "value": "ACTIVE" },
+      "campaignBudgetOptimization": { "state": "known", "value": true },
+      "dailyBudgetMinor": { "state": "known", "value": 100000 },
+      "lifetimeBudgetMinor": { "state": "known", "value": null }
+    }
+  ],
+  "adSets": [
+    {
+      "externalAdSetId": "adset_123456789012345",
+      "externalCampaignId": "campaign_123456789012345",
+      "configuredStatus": { "state": "known", "value": "ACTIVE" },
+      "effectiveStatus": { "state": "known", "value": "ACTIVE" },
+      "dailyBudgetMinor": { "state": "known", "value": null },
+      "lifetimeBudgetMinor": { "state": "known", "value": null },
+      "targetingSignature": { "state": "known", "value": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+    }
+  ],
+  "ads": [
+    {
+      "externalAdId": "ad_123456789012345",
+      "externalAdSetId": "adset_123456789012345",
+      "externalCampaignId": "campaign_123456789012345",
+      "configuredStatus": { "state": "known", "value": "ACTIVE" },
+      "effectiveStatus": { "state": "known", "value": "ACTIVE" },
+      "creativeBindingSignature": { "state": "known", "value": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+    }
+  ]
+}
