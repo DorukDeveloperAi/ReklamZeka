@@ -1,18 +1,204 @@
 {
-  "campaign": {
-    "externalId": "cmp-golden-1",
-    "budgetOptimizationEnabled": true,
-    "dailyBudgetMinor": 15000,
-    "lifetimeBudgetMinor": null
+  "schemaVersion": 1,
+  "workspaceId": "workspace-golden",
+  "connectionExternalKey": "connection-golden",
+  "account": {
+    "externalAccountId": "act_100",
+    "name": "Golden Account",
+    "currency": "TRY",
+    "timezone": "Europe/Istanbul",
+    "configuredStatus": "ACTIVE",
+    "effectiveStatus": "ACTIVE",
+    "trace": {
+      "rawPayloadHash": "sha256:account",
+      "sourceUpdatedAt": "2026-08-01T09:00:00.000Z",
+      "fetchedAt": "2026-08-01T09:05:00.000Z",
+      "sourceGraphVersion": "v23.0",
+      "fieldCatalogVersion": "meta-v23-core-1",
+      "provenance": { "endpoint": "/act_100" }
+    }
   },
-  "adSet": {
-    "externalId": "set-golden-1",
-    "dailyBudgetMinor": null,
-    "lifetimeBudgetMinor": null
-  },
-  "hierarchy": {
-    "campaigns": [{ "externalId": "cmp-golden-1", "parentExternalId": null }],
-    "adSets": [{ "externalId": "set-golden-1", "parentExternalId": "cmp-golden-1" }],
-    "ads": [{ "externalId": "ad-golden-1", "parentExternalId": "set-golden-1" }]
-  }
+  "campaigns": [
+    {
+      "externalCampaignId": "cmp_200",
+      "externalAccountId": "act_100",
+      "name": "Lead Campaign",
+      "configuredStatus": "ACTIVE",
+      "effectiveStatus": "ACTIVE",
+      "objectiveSource": "OUTCOME_LEADS",
+      "legacyObjectiveSource": "LEAD_GENERATION",
+      "canonicalObjective": "LEADS",
+      "objectiveMappingVersion": "objective-map-1",
+      "buyingType": "AUCTION",
+      "bidStrategy": "LOWEST_COST_WITHOUT_CAP",
+      "specialAdCategories": [],
+      "advantagePlusEnabled": false,
+      "campaignBudgetOptimization": true,
+      "dailyBudgetMinor": 250000,
+      "lifetimeBudgetMinor": null,
+      "trace": {
+        "rawPayloadHash": "sha256:campaign",
+        "sourceUpdatedAt": "2026-08-01T09:01:00.000Z",
+        "fetchedAt": "2026-08-01T09:05:00.000Z",
+        "sourceGraphVersion": "v23.0",
+        "fieldCatalogVersion": "meta-v23-core-1",
+        "provenance": { "endpoint": "/cmp_200" }
+      }
+    }
+  ],
+  "adSets": [
+    {
+      "externalAdSetId": "set_301",
+      "externalCampaignId": "cmp_200",
+      "externalAccountId": "act_100",
+      "name": "Istanbul",
+      "configuredStatus": "ACTIVE",
+      "effectiveStatus": "ACTIVE",
+      "optimizationGoal": "LEAD_GENERATION",
+      "billingEvent": "IMPRESSIONS",
+      "bidStrategy": null,
+      "bidAmountMinor": null,
+      "costCapMinor": null,
+      "dailyBudgetMinor": null,
+      "lifetimeBudgetMinor": null,
+      "attributionSpec": [{ "event_type": "CLICK_THROUGH", "window_days": 7 }],
+      "promotedObject": { "page_id": "page_600" },
+      "targetingSummary": { "geo": ["TR-34"], "age": [25, 55], "placements": ["instagram"] },
+      "targetingSignature": "targeting:istanbul-v1",
+      "trace": {
+        "rawPayloadHash": "sha256:adset-301",
+        "sourceUpdatedAt": "2026-08-01T09:02:00.000Z",
+        "fetchedAt": "2026-08-01T09:05:00.000Z",
+        "sourceGraphVersion": "v23.0",
+        "fieldCatalogVersion": "meta-v23-core-1",
+        "provenance": { "endpoint": "/set_301" }
+      }
+    },
+    {
+      "externalAdSetId": "set_300",
+      "externalCampaignId": "cmp_200",
+      "externalAccountId": "act_100",
+      "name": "Bursa",
+      "configuredStatus": "PAUSED",
+      "effectiveStatus": "PAUSED",
+      "optimizationGoal": "LEAD_GENERATION",
+      "billingEvent": "IMPRESSIONS",
+      "bidStrategy": null,
+      "bidAmountMinor": null,
+      "costCapMinor": null,
+      "dailyBudgetMinor": null,
+      "lifetimeBudgetMinor": null,
+      "attributionSpec": [{ "event_type": "CLICK_THROUGH", "window_days": 7 }],
+      "promotedObject": { "page_id": "page_600" },
+      "targetingSummary": { "geo": ["TR-16"], "age": [25, 55], "placements": ["facebook"] },
+      "targetingSignature": "targeting:bursa-v1",
+      "trace": {
+        "rawPayloadHash": "sha256:adset-300",
+        "sourceUpdatedAt": "2026-08-01T09:02:00.000Z",
+        "fetchedAt": "2026-08-01T09:05:00.000Z",
+        "sourceGraphVersion": "v23.0",
+        "fieldCatalogVersion": "meta-v23-core-1",
+        "provenance": { "endpoint": "/set_300" }
+      }
+    }
+  ],
+  "ads": [
+    {
+      "externalAdId": "ad_400",
+      "externalAdSetId": "set_301",
+      "externalCampaignId": "cmp_200",
+      "externalAccountId": "act_100",
+      "externalCreativeId": "creative_500",
+      "name": "Existing post ad",
+      "configuredStatus": "ACTIVE",
+      "effectiveStatus": "ACTIVE",
+      "trackingSpecs": [{ "action.type": ["lead"] }],
+      "reviewFeedback": null,
+      "trace": {
+        "rawPayloadHash": "sha256:ad-400",
+        "sourceUpdatedAt": "2026-08-01T09:03:00.000Z",
+        "fetchedAt": "2026-08-01T09:05:00.000Z",
+        "sourceGraphVersion": "v23.0",
+        "fieldCatalogVersion": "meta-v23-core-1",
+        "provenance": { "endpoint": "/ad_400" }
+      }
+    }
+  ],
+  "creatives": [
+    {
+      "externalCreativeId": "creative_500",
+      "externalAccountId": "act_100",
+      "externalPostId": "post_700",
+      "actorExternalAssetId": "page_600",
+      "name": "Golden creative",
+      "sourceType": "existing_post",
+      "primaryText": "Mevcut gönderi metni",
+      "headline": "Bilgi alın",
+      "description": null,
+      "caption": null,
+      "callToActionType": "LEARN_MORE",
+      "destinationUrl": "https://example.invalid/lead",
+      "creativeFormat": "SINGLE_IMAGE",
+      "contentProvenance": { "primaryText": "object_story_spec.link_data.message" },
+      "dynamicVariants": [],
+      "trace": {
+        "rawPayloadHash": "sha256:creative-500",
+        "sourceUpdatedAt": "2026-08-01T09:03:00.000Z",
+        "fetchedAt": "2026-08-01T09:05:00.000Z",
+        "sourceGraphVersion": "v23.0",
+        "fieldCatalogVersion": "meta-v23-core-1",
+        "provenance": { "endpoint": "/creative_500" }
+      }
+    }
+  ],
+  "posts": [
+    {
+      "externalPostId": "post_700",
+      "actorExternalAssetId": "page_600",
+      "externalMediaId": "media_701",
+      "mediaType": "IMAGE",
+      "permalink": "https://www.instagram.com/p/example/",
+      "trace": {
+        "rawPayloadHash": "sha256:post-700",
+        "sourceUpdatedAt": "2026-08-01T08:00:00.000Z",
+        "fetchedAt": "2026-08-01T09:05:00.000Z",
+        "sourceGraphVersion": "v23.0",
+        "fieldCatalogVersion": "meta-v23-core-1",
+        "provenance": { "endpoint": "/post_700" }
+      }
+    }
+  ],
+  "assets": [
+    {
+      "externalAssetId": "page_600",
+      "assetType": "facebook_page",
+      "displayName": "Golden Page",
+      "orphanReason": null,
+      "trace": {
+        "rawPayloadHash": "sha256:page-600",
+        "sourceUpdatedAt": "2026-08-01T08:00:00.000Z",
+        "fetchedAt": "2026-08-01T09:05:00.000Z",
+        "sourceGraphVersion": "v23.0",
+        "fieldCatalogVersion": "meta-v23-core-1",
+        "provenance": { "endpoint": "/page_600" }
+      }
+    }
+  ],
+  "assetEdges": [
+    {
+      "sourceEntityType": "campaign",
+      "sourceExternalId": "cmp_200",
+      "targetExternalAssetId": "page_600",
+      "relationship": "promoted_object",
+      "orphanReason": null,
+      "trace": {
+        "rawPayloadHash": "sha256:edge-campaign-page",
+        "sourceUpdatedAt": null,
+        "fetchedAt": "2026-08-01T09:05:00.000Z",
+        "sourceGraphVersion": "v23.0",
+        "fieldCatalogVersion": "meta-v23-core-1",
+        "provenance": { "sourceField": "promoted_object.page_id" }
+      }
+    }
+  ]
 }

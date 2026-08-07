@@ -13,6 +13,18 @@ hesap kanıtından sonra ikinci hesapta tenant/account izolasyonu doğrulanır.
 Bu dosya yalnız güncel teslim dilimini yönetir. A08 domain şartnamesinin minimum değer
 üreten sırasıdır; S2 category/analysis veya A13 write kapsamını öne çekmez.
 
+## Güncel ilerleme — 2026-08-07
+
+- **S1.1 çekirdek sözleşme tamam:** read-only connection service, capability doctor,
+  workspace authorization, redacted public model, environment/in-memory secret reference,
+  lifecycle ve append-only audit testli. Kalıcı DB adapter ve secret rotation S1.5'e açık.
+- **S1.2 tamam:** non-destructive digital-twin migration, full hierarchy/content/asset
+  canonical modeli ve deterministik CBO/ABO budget-owner resolver testli.
+- **Canlı read kanıtı:** 5 ad account, 22 Page, 8 Instagram, 422 campaign, 1.108 ad set,
+  4.620 ad; tüm hesaplarda son-7-gün insight erişimi, 0 hata ve 0 write.
+- **Aktif increment S1.3:** parçalı ve resumable read sync. S1.4/S1.5 henüz kapanmadı;
+  schema varlığı canlı asset/content sync veya lifecycle kapanışı sayılmaz.
+
 ## Değişmez sınırlar
 
 - Meta write import'u, management operation ve action proposal yok.

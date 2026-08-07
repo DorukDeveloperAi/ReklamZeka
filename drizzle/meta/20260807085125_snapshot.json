@@ -1,5 +1,5 @@
 {
-  "id": "6f79be4b-f2da-46d4-ae5f-9cf613a3b33c",
+  "id": "8c90597b-0e51-443f-adf2-ca87e2d85014",
   "prevId": "661cd963-e5b7-4920-b607-5b7c0ad039d9",
   "version": "7",
   "dialect": "postgresql",
@@ -63,6 +63,36 @@
           "primaryKey": false,
           "notNull": false
         },
+        "account_status": {
+          "name": "account_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "permission_snapshot": {
+          "name": "permission_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "capability_snapshot": {
+          "name": "capability_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unsupported_fields": {
+          "name": "unsupported_fields",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "spend_cap_minor": {
+          "name": "spend_cap_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
         "source_updated_at": {
           "name": "source_updated_at",
           "type": "timestamp with time zone",
@@ -73,11 +103,30 @@
           "name": "fetched_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "now()"
         },
         "raw_payload_hash": {
           "name": "raw_payload_hash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_graph_version": {
+          "name": "source_graph_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "field_catalog_version": {
+          "name": "field_catalog_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provenance": {
+          "name": "provenance",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -228,14 +277,38 @@
           "primaryKey": false,
           "notNull": false
         },
-        "objective": {
-          "name": "objective",
+        "status_issues": {
+          "name": "status_issues",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unsupported_fields": {
+          "name": "unsupported_fields",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "objective_source": {
+          "name": "objective_source",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "legacy_objective": {
-          "name": "legacy_objective",
+        "legacy_objective_source": {
+          "name": "legacy_objective_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "canonical_objective": {
+          "name": "canonical_objective",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "objective_mapping_version": {
+          "name": "objective_mapping_version",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -246,16 +319,27 @@
           "primaryKey": false,
           "notNull": false
         },
+        "bid_strategy": {
+          "name": "bid_strategy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "special_ad_categories": {
           "name": "special_ad_categories",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
+          "notNull": false
         },
-        "budget_optimization_enabled": {
-          "name": "budget_optimization_enabled",
-          "type": "integer",
+        "advantage_plus_enabled": {
+          "name": "advantage_plus_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_budget_optimization": {
+          "name": "campaign_budget_optimization",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false
         },
@@ -271,9 +355,21 @@
           "primaryKey": false,
           "notNull": false
         },
-        "budget_currency": {
-          "name": "budget_currency",
-          "type": "text",
+        "budget_remaining_minor": {
+          "name": "budget_remaining_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "start_at": {
+          "name": "start_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stop_at": {
+          "name": "stop_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -287,11 +383,30 @@
           "name": "fetched_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "now()"
         },
         "raw_payload_hash": {
           "name": "raw_payload_hash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_graph_version": {
+          "name": "source_graph_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "field_catalog_version": {
+          "name": "field_catalog_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provenance": {
+          "name": "provenance",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -933,6 +1048,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "meta_connection_id": {
+          "name": "meta_connection_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "platform": {
           "name": "platform",
           "type": "source_platform",
@@ -993,6 +1114,42 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "data_sources_meta_connection_external_unique": {
+          "name": "data_sources_meta_connection_external_unique",
+          "columns": [
+            {
+              "expression": "meta_connection_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "external_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "data_sources_meta_connection_idx": {
+          "name": "data_sources_meta_connection_idx",
+          "columns": [
+            {
+              "expression": "meta_connection_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1007,6 +1164,19 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "data_sources_meta_connection_id_meta_connections_id_fk": {
+          "name": "data_sources_meta_connection_id_meta_connections_id_fk",
+          "tableFrom": "data_sources",
+          "tableTo": "meta_connections",
+          "columnsFrom": [
+            "meta_connection_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -1422,6 +1592,172 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.meta_ad_creative_bindings": {
+      "name": "meta_ad_creative_bindings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "workspace_id": {
+          "name": "workspace_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ad_id": {
+          "name": "ad_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creative_id": {
+          "name": "creative_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "post_id": {
+          "name": "post_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "binding_payload_hash": {
+          "name": "binding_payload_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provenance": {
+          "name": "provenance",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "disappeared_at": {
+          "name": "disappeared_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "meta_ad_creative_bindings_ad_creative_unique": {
+          "name": "meta_ad_creative_bindings_ad_creative_unique",
+          "columns": [
+            {
+              "expression": "ad_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "creative_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "meta_ad_creative_bindings_workspace_idx": {
+          "name": "meta_ad_creative_bindings_workspace_idx",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "meta_ad_creative_bindings_workspace_id_workspaces_id_fk": {
+          "name": "meta_ad_creative_bindings_workspace_id_workspaces_id_fk",
+          "tableFrom": "meta_ad_creative_bindings",
+          "tableTo": "workspaces",
+          "columnsFrom": [
+            "workspace_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "meta_ad_creative_bindings_ad_id_meta_ads_id_fk": {
+          "name": "meta_ad_creative_bindings_ad_id_meta_ads_id_fk",
+          "tableFrom": "meta_ad_creative_bindings",
+          "tableTo": "meta_ads",
+          "columnsFrom": [
+            "ad_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "meta_ad_creative_bindings_creative_id_meta_creatives_id_fk": {
+          "name": "meta_ad_creative_bindings_creative_id_meta_creatives_id_fk",
+          "tableFrom": "meta_ad_creative_bindings",
+          "tableTo": "meta_creatives",
+          "columnsFrom": [
+            "creative_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "meta_ad_creative_bindings_post_id_meta_posts_id_fk": {
+          "name": "meta_ad_creative_bindings_post_id_meta_posts_id_fk",
+          "tableFrom": "meta_ad_creative_bindings",
+          "tableTo": "meta_posts",
+          "columnsFrom": [
+            "post_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.meta_ad_sets": {
       "name": "meta_ad_sets",
       "schema": "",
@@ -1445,8 +1781,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "ad_campaign_id": {
-          "name": "ad_campaign_id",
+        "campaign_id": {
+          "name": "campaign_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -1472,6 +1808,18 @@
         "effective_status": {
           "name": "effective_status",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_issues": {
+          "name": "status_issues",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unsupported_fields": {
+          "name": "unsupported_fields",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -1517,15 +1865,9 @@
           "primaryKey": false,
           "notNull": false
         },
-        "budget_currency": {
-          "name": "budget_currency",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attribution_setting": {
-          "name": "attribution_setting",
-          "type": "text",
+        "attribution_spec": {
+          "name": "attribution_spec",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -1541,6 +1883,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "targeting_signature": {
+          "name": "targeting_signature",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "start_at": {
+          "name": "start_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "end_at": {
+          "name": "end_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "source_updated_at": {
           "name": "source_updated_at",
           "type": "timestamp with time zone",
@@ -1551,11 +1911,30 @@
           "name": "fetched_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "now()"
         },
         "raw_payload_hash": {
           "name": "raw_payload_hash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_graph_version": {
+          "name": "source_graph_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "field_catalog_version": {
+          "name": "field_catalog_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provenance": {
+          "name": "provenance",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": true
         },
@@ -1578,6 +1957,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
@@ -1602,26 +1988,17 @@
           "method": "btree",
           "with": {}
         },
-        "meta_ad_sets_campaign_idx": {
-          "name": "meta_ad_sets_campaign_idx",
-          "columns": [
-            {
-              "expression": "ad_campaign_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "meta_ad_sets_workspace_idx": {
-          "name": "meta_ad_sets_workspace_idx",
+        "meta_ad_sets_workspace_campaign_idx": {
+          "name": "meta_ad_sets_workspace_campaign_idx",
           "columns": [
             {
               "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "campaign_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1660,12 +2037,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "meta_ad_sets_ad_campaign_id_ad_campaigns_id_fk": {
-          "name": "meta_ad_sets_ad_campaign_id_ad_campaigns_id_fk",
+        "meta_ad_sets_campaign_id_ad_campaigns_id_fk": {
+          "name": "meta_ad_sets_campaign_id_ad_campaigns_id_fk",
           "tableFrom": "meta_ad_sets",
           "tableTo": "ad_campaigns",
           "columnsFrom": [
-            "ad_campaign_id"
+            "campaign_id"
           ],
           "columnsTo": [
             "id"
@@ -1703,8 +2080,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "ad_campaign_id": {
-          "name": "ad_campaign_id",
+        "campaign_id": {
+          "name": "campaign_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -1714,6 +2091,12 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "creative_id": {
+          "name": "creative_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "external_ad_id": {
           "name": "external_ad_id",
@@ -1739,9 +2122,27 @@
           "primaryKey": false,
           "notNull": false
         },
-        "creative_external_id": {
-          "name": "creative_external_id",
-          "type": "text",
+        "status_issues": {
+          "name": "status_issues",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unsupported_fields": {
+          "name": "unsupported_fields",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "review_feedback": {
+          "name": "review_feedback",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tracking_specs": {
+          "name": "tracking_specs",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -1755,11 +2156,30 @@
           "name": "fetched_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "now()"
         },
         "raw_payload_hash": {
           "name": "raw_payload_hash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_graph_version": {
+          "name": "source_graph_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "field_catalog_version": {
+          "name": "field_catalog_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provenance": {
+          "name": "provenance",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": true
         },
@@ -1782,6 +2202,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
@@ -1806,26 +2233,17 @@
           "method": "btree",
           "with": {}
         },
-        "meta_ads_ad_set_idx": {
-          "name": "meta_ads_ad_set_idx",
-          "columns": [
-            {
-              "expression": "ad_set_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "meta_ads_workspace_idx": {
-          "name": "meta_ads_workspace_idx",
+        "meta_ads_workspace_ad_set_idx": {
+          "name": "meta_ads_workspace_ad_set_idx",
           "columns": [
             {
               "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ad_set_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1864,12 +2282,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "meta_ads_ad_campaign_id_ad_campaigns_id_fk": {
-          "name": "meta_ads_ad_campaign_id_ad_campaigns_id_fk",
+        "meta_ads_campaign_id_ad_campaigns_id_fk": {
+          "name": "meta_ads_campaign_id_ad_campaigns_id_fk",
           "tableFrom": "meta_ads",
           "tableTo": "ad_campaigns",
           "columnsFrom": [
-            "ad_campaign_id"
+            "campaign_id"
           ],
           "columnsTo": [
             "id"
@@ -1888,6 +2306,19 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "meta_ads_creative_id_meta_creatives_id_fk": {
+          "name": "meta_ads_creative_id_meta_creatives_id_fk",
+          "tableFrom": "meta_ads",
+          "tableTo": "meta_creatives",
+          "columnsFrom": [
+            "creative_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -1914,52 +2345,75 @@
           "primaryKey": false,
           "notNull": true
         },
-        "connection_data_source_id": {
-          "name": "connection_data_source_id",
+        "meta_connection_id": {
+          "name": "meta_connection_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "from_asset_id": {
-          "name": "from_asset_id",
+        "ad_account_id": {
+          "name": "ad_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_entity_type": {
+          "name": "source_entity_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_external_id": {
+          "name": "source_external_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_asset_id": {
+          "name": "target_asset_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "to_asset_id": {
-          "name": "to_asset_id",
-          "type": "uuid",
+        "relationship": {
+          "name": "relationship",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "edge_type": {
-          "name": "edge_type",
-          "type": "meta_asset_edge_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "metadata": {
-          "name": "metadata",
+        "capability_snapshot": {
+          "name": "capability_snapshot",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
-        "source_updated_at": {
-          "name": "source_updated_at",
-          "type": "timestamp with time zone",
+        "orphan_reason": {
+          "name": "orphan_reason",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "fetched_at": {
-          "name": "fetched_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
         },
         "raw_payload_hash": {
           "name": "raw_payload_hash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_graph_version": {
+          "name": "source_graph_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "field_catalog_version": {
+          "name": "field_catalog_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provenance": {
+          "name": "provenance",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": true
         },
@@ -1982,38 +2436,38 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "disappearance_reason": {
-          "name": "disappearance_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
-        "meta_asset_edges_unique": {
-          "name": "meta_asset_edges_unique",
+        "meta_asset_edges_source_target_relationship_unique": {
+          "name": "meta_asset_edges_source_target_relationship_unique",
           "columns": [
             {
-              "expression": "connection_data_source_id",
+              "expression": "meta_connection_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "from_asset_id",
+              "expression": "source_entity_type",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "to_asset_id",
+              "expression": "source_external_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "edge_type",
+              "expression": "target_asset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "relationship",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2024,8 +2478,8 @@
           "method": "btree",
           "with": {}
         },
-        "meta_asset_edges_workspace_from_idx": {
-          "name": "meta_asset_edges_workspace_from_idx",
+        "meta_asset_edges_workspace_account_idx": {
+          "name": "meta_asset_edges_workspace_account_idx",
           "columns": [
             {
               "expression": "workspace_id",
@@ -2034,28 +2488,7 @@
               "nulls": "last"
             },
             {
-              "expression": "from_asset_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "meta_asset_edges_workspace_to_idx": {
-          "name": "meta_asset_edges_workspace_to_idx",
-          "columns": [
-            {
-              "expression": "workspace_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "to_asset_id",
+              "expression": "ad_account_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2081,12 +2514,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "meta_asset_edges_connection_data_source_id_data_sources_id_fk": {
-          "name": "meta_asset_edges_connection_data_source_id_data_sources_id_fk",
+        "meta_asset_edges_meta_connection_id_meta_connections_id_fk": {
+          "name": "meta_asset_edges_meta_connection_id_meta_connections_id_fk",
           "tableFrom": "meta_asset_edges",
-          "tableTo": "data_sources",
+          "tableTo": "meta_connections",
           "columnsFrom": [
-            "connection_data_source_id"
+            "meta_connection_id"
           ],
           "columnsTo": [
             "id"
@@ -2094,12 +2527,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "meta_asset_edges_from_asset_id_meta_assets_id_fk": {
-          "name": "meta_asset_edges_from_asset_id_meta_assets_id_fk",
+        "meta_asset_edges_ad_account_id_ad_accounts_id_fk": {
+          "name": "meta_asset_edges_ad_account_id_ad_accounts_id_fk",
           "tableFrom": "meta_asset_edges",
-          "tableTo": "meta_assets",
+          "tableTo": "ad_accounts",
           "columnsFrom": [
-            "from_asset_id"
+            "ad_account_id"
           ],
           "columnsTo": [
             "id"
@@ -2107,12 +2540,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "meta_asset_edges_to_asset_id_meta_assets_id_fk": {
-          "name": "meta_asset_edges_to_asset_id_meta_assets_id_fk",
+        "meta_asset_edges_target_asset_id_meta_assets_id_fk": {
+          "name": "meta_asset_edges_target_asset_id_meta_assets_id_fk",
           "tableFrom": "meta_asset_edges",
           "tableTo": "meta_assets",
           "columnsFrom": [
-            "to_asset_id"
+            "target_asset_id"
           ],
           "columnsTo": [
             "id"
@@ -2144,8 +2577,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "connection_data_source_id": {
-          "name": "connection_data_source_id",
+        "meta_connection_id": {
+          "name": "meta_connection_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -2169,9 +2602,39 @@
           "primaryKey": false,
           "notNull": false
         },
-        "capability": {
-          "name": "capability",
+        "permission_snapshot": {
+          "name": "permission_snapshot",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "capability_snapshot": {
+          "name": "capability_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unsupported_fields": {
+          "name": "unsupported_fields",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "configured_status": {
+          "name": "configured_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "effective_status": {
+          "name": "effective_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "orphan_reason": {
+          "name": "orphan_reason",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -2185,11 +2648,30 @@
           "name": "fetched_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "now()"
         },
         "raw_payload_hash": {
           "name": "raw_payload_hash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_graph_version": {
+          "name": "source_graph_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "field_catalog_version": {
+          "name": "field_catalog_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provenance": {
+          "name": "provenance",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": true
         },
@@ -2213,11 +2695,12 @@
           "primaryKey": false,
           "notNull": false
         },
-        "disappearance_reason": {
-          "name": "disappearance_reason",
-          "type": "text",
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
@@ -2225,7 +2708,7 @@
           "name": "meta_assets_connection_type_external_unique",
           "columns": [
             {
-              "expression": "connection_data_source_id",
+              "expression": "meta_connection_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2284,12 +2767,192 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "meta_assets_connection_data_source_id_data_sources_id_fk": {
-          "name": "meta_assets_connection_data_source_id_data_sources_id_fk",
+        "meta_assets_meta_connection_id_meta_connections_id_fk": {
+          "name": "meta_assets_meta_connection_id_meta_connections_id_fk",
           "tableFrom": "meta_assets",
-          "tableTo": "data_sources",
+          "tableTo": "meta_connections",
           "columnsFrom": [
-            "connection_data_source_id"
+            "meta_connection_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.meta_connections": {
+      "name": "meta_connections",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "workspace_id": {
+          "name": "workspace_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "external_connection_key": {
+          "name": "external_connection_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "external_business_id": {
+          "name": "external_business_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "graph_api_version": {
+          "name": "graph_api_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "field_catalog_version": {
+          "name": "field_catalog_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "meta_connection_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "granted_scopes": {
+          "name": "granted_scopes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "enabled_capabilities": {
+          "name": "enabled_capabilities",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "capability_snapshot": {
+          "name": "capability_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "capability_checked_at": {
+          "name": "capability_checked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_expires_at": {
+          "name": "token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data_access_expires_at": {
+          "name": "data_access_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "disconnected_at": {
+          "name": "disconnected_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "meta_connections_workspace_external_key_unique": {
+          "name": "meta_connections_workspace_external_key_unique",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "external_connection_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "meta_connections_workspace_status_idx": {
+          "name": "meta_connections_workspace_status_idx",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "meta_connections_workspace_id_workspaces_id_fk": {
+          "name": "meta_connections_workspace_id_workspaces_id_fk",
+          "tableFrom": "meta_connections",
+          "tableTo": "workspaces",
+          "columnsFrom": [
+            "workspace_id"
           ],
           "columnsTo": [
             "id"
@@ -2327,44 +2990,62 @@
           "primaryKey": false,
           "notNull": true
         },
+        "post_id": {
+          "name": "post_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actor_asset_id": {
+          "name": "actor_asset_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "external_creative_id": {
           "name": "external_creative_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "source_type": {
           "name": "source_type",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "effective_primary_text": {
-          "name": "effective_primary_text",
+        "primary_text": {
+          "name": "primary_text",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "effective_headline": {
-          "name": "effective_headline",
+        "headline": {
+          "name": "headline",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "effective_description": {
-          "name": "effective_description",
+        "description": {
+          "name": "description",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "effective_caption": {
-          "name": "effective_caption",
+        "caption": {
+          "name": "caption",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "call_to_action": {
-          "name": "call_to_action",
+        "call_to_action_type": {
+          "name": "call_to_action_type",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -2375,17 +3056,17 @@
           "primaryKey": false,
           "notNull": false
         },
-        "post_external_id": {
-          "name": "post_external_id",
+        "creative_format": {
+          "name": "creative_format",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "actor_external_id": {
-          "name": "actor_external_id",
-          "type": "text",
+        "content_provenance": {
+          "name": "content_provenance",
+          "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "dynamic_variants": {
           "name": "dynamic_variants",
@@ -2394,12 +3075,23 @@
           "notNull": true,
           "default": "'[]'::jsonb"
         },
-        "field_provenance": {
-          "name": "field_provenance",
+        "unsupported_fields": {
+          "name": "unsupported_fields",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
+          "notNull": false
+        },
+        "configured_status": {
+          "name": "configured_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "effective_status": {
+          "name": "effective_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "source_updated_at": {
           "name": "source_updated_at",
@@ -2411,11 +3103,30 @@
           "name": "fetched_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "now()"
         },
         "raw_payload_hash": {
           "name": "raw_payload_hash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_graph_version": {
+          "name": "source_graph_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "field_catalog_version": {
+          "name": "field_catalog_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provenance": {
+          "name": "provenance",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": true
         },
@@ -2438,6 +3149,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
@@ -2462,11 +3180,17 @@
           "method": "btree",
           "with": {}
         },
-        "meta_creatives_workspace_idx": {
-          "name": "meta_creatives_workspace_idx",
+        "meta_creatives_workspace_post_idx": {
+          "name": "meta_creatives_workspace_post_idx",
           "columns": [
             {
               "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "post_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2503,6 +3227,259 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "meta_creatives_post_id_meta_posts_id_fk": {
+          "name": "meta_creatives_post_id_meta_posts_id_fk",
+          "tableFrom": "meta_creatives",
+          "tableTo": "meta_posts",
+          "columnsFrom": [
+            "post_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "meta_creatives_actor_asset_id_meta_assets_id_fk": {
+          "name": "meta_creatives_actor_asset_id_meta_assets_id_fk",
+          "tableFrom": "meta_creatives",
+          "tableTo": "meta_assets",
+          "columnsFrom": [
+            "actor_asset_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.meta_posts": {
+      "name": "meta_posts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "workspace_id": {
+          "name": "workspace_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "meta_connection_id": {
+          "name": "meta_connection_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_asset_id": {
+          "name": "actor_asset_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_post_id": {
+          "name": "external_post_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "external_media_id": {
+          "name": "external_media_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "media_type": {
+          "name": "media_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "permalink": {
+          "name": "permalink",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "configured_status": {
+          "name": "configured_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "effective_status": {
+          "name": "effective_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unsupported_fields": {
+          "name": "unsupported_fields",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_updated_at": {
+          "name": "source_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fetched_at": {
+          "name": "fetched_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "raw_payload_hash": {
+          "name": "raw_payload_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_graph_version": {
+          "name": "source_graph_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "field_catalog_version": {
+          "name": "field_catalog_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provenance": {
+          "name": "provenance",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "disappeared_at": {
+          "name": "disappeared_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "meta_posts_connection_external_unique": {
+          "name": "meta_posts_connection_external_unique",
+          "columns": [
+            {
+              "expression": "meta_connection_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "external_post_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "meta_posts_workspace_actor_idx": {
+          "name": "meta_posts_workspace_actor_idx",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "actor_asset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "meta_posts_workspace_id_workspaces_id_fk": {
+          "name": "meta_posts_workspace_id_workspaces_id_fk",
+          "tableFrom": "meta_posts",
+          "tableTo": "workspaces",
+          "columnsFrom": [
+            "workspace_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "meta_posts_meta_connection_id_meta_connections_id_fk": {
+          "name": "meta_posts_meta_connection_id_meta_connections_id_fk",
+          "tableFrom": "meta_posts",
+          "tableTo": "meta_connections",
+          "columnsFrom": [
+            "meta_connection_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "meta_posts_actor_asset_id_meta_assets_id_fk": {
+          "name": "meta_posts_actor_asset_id_meta_assets_id_fk",
+          "tableFrom": "meta_posts",
+          "tableTo": "meta_assets",
+          "columnsFrom": [
+            "actor_asset_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -2989,19 +3966,6 @@
         "viewer"
       ]
     },
-    "public.meta_asset_edge_type": {
-      "name": "meta_asset_edge_type",
-      "schema": "public",
-      "values": [
-        "campaign_promotes",
-        "ad_set_promotes",
-        "ad_uses_creative",
-        "creative_uses_actor",
-        "creative_promotes_object",
-        "creative_uses_asset",
-        "post_has_media"
-      ]
-    },
     "public.meta_asset_type": {
       "name": "meta_asset_type",
       "schema": "public",
@@ -3012,29 +3976,17 @@
         "dataset",
         "app",
         "whatsapp_account",
-        "destination",
-        "post",
-        "media"
+        "destination"
       ]
     },
-    "public.meta_budget_owner_level": {
-      "name": "meta_budget_owner_level",
-      "schema": "public",
-      "values": [
-        "campaign",
-        "ad_set",
-        "unknown"
-      ]
-    },
-    "public.meta_entity_status": {
-      "name": "meta_entity_status",
+    "public.meta_connection_status": {
+      "name": "meta_connection_status",
       "schema": "public",
       "values": [
         "active",
-        "paused",
-        "archived",
-        "deleted",
-        "unknown"
+        "disconnected",
+        "revoked",
+        "invalid"
       ]
     },
     "public.source_platform": {

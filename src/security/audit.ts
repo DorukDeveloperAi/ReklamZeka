@@ -3,6 +3,9 @@ import { createHash, randomUUID } from "node:crypto";
 export type AuditAction =
   | "connection.created"
   | "connection.rotated"
+  | "connection.doctor_checked"
+  | "connection.disconnected"
+  | "connection.revoked"
   | "connection.inventory_refreshed"
   | "sync.started"
   | "sync.completed"

@@ -23,17 +23,28 @@
 - [x] Yan projedeki tokenın değeri ifşa/kopya edilmeden geçerlilik, scope ve Graph v23 read smoke'u.
 - [x] Gerçek cache portföy entity/metric coverage ve payload/rate-limit keşfi.
 - [ ] Secret reference/migration ve read/write scope ayrımı.
-- [ ] Account/campaign/adset/ad/creative tam entity şeması ve raw provenance.
+  - [x] Read-only connection lifecycle, capability doctor, environment secret reference,
+    public redaction ve management-scope-disabled sözleşmesi.
+  - [ ] Kalıcı Postgres connection/secret adapter'ı, revoked timestamp persistence ve
+    rotating secret devri.
+- [x] Account/campaign/adset/ad/creative/post çekirdek entity şeması, raw hash/provenance,
+  first/last seen ve soft disappearance.
 - [ ] Multi-business connection, account group ve account-level permission/capability modeli.
 - [ ] Facebook Page, Instagram, pixel/dataset, app/WhatsApp destination asset graph.
+  - [x] Asset ve edge canonical şeması, capability/provenance/orphan alanları.
+  - [ ] Parçalı canlı sync, ownership/capability çözümlemesi ve iki hesap kanıtı.
 - [ ] Yayındaki ad copy/spec extraction: primary text/headline/description/caption/CTA/destination/dynamic variants.
 - [ ] Bağlı Instagram/Page post-media inventory, ownership/promotion capability ve güvenli preview.
 - [ ] L0 raw retention/encryption/purge ile connection revoke/disconnect/export/delete lifecycle.
-- [ ] Meta config, targeting özeti, budget owner ve legacy objective mapping.
+- [x] Meta config/targeting özeti, CBO/ABO budget-owner resolver ve versioned legacy
+  objective mapping çekirdeği.
 - [ ] Geniş metrik/action/action-value/breakdown kataloğu.
 - [ ] Inventory/creative/insights parçalı sync, adaptive page/date slice ve resume.
 - [ ] Snapshot diff ve external/manual intervention timeline olayı.
 - [ ] Capability/data-quality raporu ve Meta read-only E2E.
+  - [x] Canlı inventory/capability smoke: 5 hesap, 22 Page, 8 Instagram, 422 campaign,
+    1.108 ad set, 4.620 ad, 0 hata ve 0 write.
+  - [ ] Kalıcı sync coverage/freshness/data-quality raporu ve iki hesap isolation E2E.
 
 ## A09 — İç kategori ve talimat
 

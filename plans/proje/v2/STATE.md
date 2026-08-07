@@ -14,7 +14,7 @@
 | 05 | performans deneyimi | KAPALI | 03,04 | `check:experience` + browser QA |
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
-| 08 | Meta dijital ikizi | AÇIK | 03,04 | live/cached discovery tamam; connector/schema uygulaması sırada |
+| 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1 read-only connection sözleşmesi ve S1.2 digital-twin core kanıtlı; S1.3 parçalı sync sırada |
 | 09 | kategori ve talimat | AÇIK | 08 | requirement/precedence tasarımı tamam; uygulama sırada |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
 | 11 | bütçe planlama | AÇIK | 09,10 | planlandı |
@@ -44,7 +44,8 @@
 - Yan proje `/Users/ybg/dev/meta-adsmanager-ai` incelendi: real read client, hierarchy,
   creative raw spec, 3-level insights, rule/flow, valve/audit desenleri yeniden kullanılabilir.
 - Token değeri gösterilmeden `doctor` smoke: geçerli; Graph v23 `/me` ve config hesabı
-  erişilebilir; dry-run ve writer kapalı. Token ReklamZeka dosyalarına kopyalanmadı.
+  erişilebilir; dry-run ve writer kapalı. 7 Ağustos'ta token yalnız git-dışı, `0600`
+  izinli `.env.local` secret kaynağına alındı; geçici/riskli credential olarak işaretli.
 - Canlı geniş sorgu Meta `reduce amount of data`, sonra request-limit verdi. Karar:
   inventory/creative/insights ayrı stream; level/date slice; usage headroom/adaptive page.
 - Mevcut gerçek cache anonim kapsamı: 419 campaign, 1.096 ad set, 4.560 ad,
@@ -152,9 +153,29 @@
 - `/dashboard` ve `/reports/demo` aynı Operating Dashboard deneyimini gösterir; imzalı
   paylaşılan raporlar ayrı salt-okunur `ReportView` sözleşmesini korur.
 
+## 2026-08-07 — S1.1 bağlantı sınırı ve S1.2 Meta dijital ikiz çekirdeği
+
+- Workspace-scoped, read-only `MetaConnectionService`; public redaction, capability doctor,
+  disconnect/revoke/invalid lifecycle, environment/in-memory secret reference ve append-only
+  audit sözleşmeleri eklendi. Graph istemcisi yalnız GET kullanır; management grant'leri
+  etkin veya doğrulanmış write yetkisi sayılmaz.
+- Secret-free `meta_connections` ve account→campaign→ad set→ad→creative/post şeması;
+  Page/Instagram/pixel/dataset/app/WhatsApp asset graph'ı, provenance, configured/effective
+  status, first/last seen ve soft disappearance alanları non-destructive migration ile eklendi.
+- Deterministik CBO/ABO budget-owner resolver ad-level budget'ı reddeder; eksik veya çelişkili
+  durumlarda sebepli `unknown` döndürür. Replay, hierarchy, orphan, cross-account ve provenance
+  negatifleri golden fixture ile kanıtlandı.
+- Birleşik kanıt: 20 test dosyası/90 test, typecheck, Drizzle check, security-boundary ve
+  production build temiz. Canlı read-only smoke: 5 reklam hesabı, 22 Page, 8 bağlı Instagram,
+  422 campaign, 1.108 ad set, 4.620 ad; 0 kısmi hata ve `writeOperations=0`.
+- Secret taraması: git geçmişi, çalışma ağacı ve production bundle eşleşmesi `0`; `.env.local`
+  modu `0600`. Token 23 Eylül 2026 12:15 TSİ'ye kadar geçerli görünür.
+- Bilinçli açık iş: kalıcı Postgres connection/secret adapter'ı, explicit revoked timestamp
+  persistence ve rotating secret devri S1.5 lifecycle kapanışına kadar tamamlanacak.
+
 ## Sıradaki uygulama
 
-**Slice 1 / Meta Read Mirror:** A08/T08.1–T08.3 ile secret reference, Meta entity/config
-şeması ve budget-owner resolver; ardından günlük insights/data-quality/L0–L1. Tek gerçek
-hesapla başlayıp ikinci hesap isolation kanıtıyla kapanır. A13'e kadar production write
-scope veya writer ReklamZeka'ya taşınmaz.
+**Slice 1 / Meta Read Mirror — S1.3:** inventory, creative/post ve insights için ayrı,
+resumable read-sync run'ları; adaptive pagination/backoff, date slicing, idempotent upsert
+ve partial-success kanıtı. Sonrasında S1.4 asset/content mirror ve S1.5 lifecycle/iki hesap
+isolation kapanışı gelir. A13'e kadar production write scope veya writer ReklamZeka'ya taşınmaz.
