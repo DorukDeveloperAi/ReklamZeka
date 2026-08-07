@@ -24,8 +24,14 @@ const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$/;
 const SESSION = /^session_[a-f0-9]{32}$/;
 const NONCE = /^[a-f0-9]{64}$/;
 const TOKEN = /^rzs1\.([A-Za-z0-9_-]{64,2048})\.([A-Za-z0-9_-]{43})$/;
+export const LOCAL_SESSION_RUNTIME_SCOPES: readonly LocalSessionScope[] = Object.freeze([
+  "approval_queue:decide", "approval_queue:read", "autonomy_rules:draft", "autonomy_rules:read",
+  "policy_bundle:draft", "policy_bundle:publish", "policy_bundle:read", "budget_lab:draft", "budget_lab:read",
+  "decision_room:mark_read", "decision_room:read", "practice_lab:read", "promotion_catalog:read",
+  "promotion_preflight:read", "promotion_proposal:draft",
+]);
 export const LOCAL_SESSION_SCOPES: readonly LocalSessionScope[] = Object.freeze([
-  "approval_queue:decide", "approval_queue:read", "autonomy_rules:read", "autonomy_rules:draft", "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish", "budget_lab:draft", "budget_lab:read", "decision_room:read", "decision_room:mark_read", "practice_lab:read", "promotion_catalog:read", "promotion_preflight:read", "promotion_proposal:draft", "local_session:bootstrap",
+  ...LOCAL_SESSION_RUNTIME_SCOPES, "local_session:bootstrap",
 ]);
 const SCOPES = new Set<LocalSessionScope>(LOCAL_SESSION_SCOPES);
 
@@ -72,8 +78,7 @@ function validClaims(value: unknown): LocalSessionClaims {
     || !Number.isSafeInteger(value.osUid) || (value.osUid as number) < 0
     || (value.expiresAt as number) <= (value.issuedAt as number)) fail();
   const scopes = [...value.scopes] as LocalSessionScope[];
-  const expected = value.kind === "bootstrap" ? ["local_session:bootstrap"]
-    : ["approval_queue:decide", "approval_queue:read", "autonomy_rules:draft", "autonomy_rules:read", "policy_bundle:draft", "policy_bundle:publish", "policy_bundle:read", "budget_lab:draft", "budget_lab:read", "decision_room:mark_read", "decision_room:read", "practice_lab:read", "promotion_catalog:read", "promotion_preflight:read", "promotion_proposal:draft"];
+  const expected = value.kind === "bootstrap" ? ["local_session:bootstrap"] : LOCAL_SESSION_RUNTIME_SCOPES;
   if (JSON.stringify(scopes) !== JSON.stringify(expected)) fail();
   return Object.freeze({ ...(value as unknown as LocalSessionClaims), scopes: Object.freeze(scopes) });
 }
@@ -104,9 +109,7 @@ export function mintLocalSessionCapability(input: Readonly<{
     workspaceRef: input.workspaceRef,
     userId: input.userId.toLowerCase(),
     readerRef: input.readerRef,
-    scopes: input.kind === "bootstrap"
-      ? ["local_session:bootstrap"] as const
-      : ["approval_queue:decide", "approval_queue:read", "autonomy_rules:draft", "autonomy_rules:read", "policy_bundle:draft", "policy_bundle:publish", "policy_bundle:read", "budget_lab:draft", "budget_lab:read", "decision_room:mark_read", "decision_room:read", "practice_lab:read", "promotion_catalog:read", "promotion_preflight:read", "promotion_proposal:draft"] as const,
+    scopes: input.kind === "bootstrap" ? ["local_session:bootstrap"] as const : LOCAL_SESSION_RUNTIME_SCOPES,
     issuedAt: input.issuedAt,
     expiresAt: input.expiresAt,
     osUid: input.osUid,
