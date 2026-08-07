@@ -628,7 +628,7 @@
 .policyReadiness { overflow: hidden; }
 .policyReadiness .panelHeader > span { color: var(--rz-red); font: 800 .56rem ui-monospace, monospace; }
 .policyReadiness .panelHeader > span[data-ready="true"] { color: var(--rz-green); }
-.policyReadiness > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.policyReadiness > div { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .policyReadiness article { display: grid; gap: 7px; min-height: 92px; padding: 15px 18px; border-right: 1px solid var(--rz-line); }
 .policyReadiness article:last-child { border-right: 0; }
 .policyReadiness article span, .policyReadiness article small { color: var(--rz-muted); font-size: .54rem; }

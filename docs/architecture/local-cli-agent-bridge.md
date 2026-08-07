@@ -74,6 +74,12 @@ proposal preview'da kaynak olarak görünür; birden fazla adayda kullanıcı se
 - L0 raw payload/dump yok; context bütçesi ve typed drill-down sınırı tüm client'larda aynı;
 - dashboard/CLI aynı approval-only ve action valve sonucunu alır.
 
+K4 policy görünürlüğü server-private `policy_bundle_read` adapter'ı üzerinden sağlanır.
+Adapter yeni bir public HTTP route açmaz; CLI/MCP broker'ın süreli local capability'sini ve
+her çağrıda yeniden okunan workspace üyeliğini kullanır. Agent aynı ApprovalPolicy,
+Guardrail, katalog ve readiness projeksiyonunu görür, ancak dashboard draft yetkisini
+devralamaz ve policy mutasyonu yapamaz.
+
 ### İlk yerel dashboard session bağlaması
 
 İlk üretim read-model bağlaması tek kullanıcı makinesinde açıkça etkinleştirilen, sabit

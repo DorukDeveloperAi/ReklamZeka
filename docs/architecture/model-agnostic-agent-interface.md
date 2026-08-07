@@ -153,6 +153,8 @@ Araçlar:
 - `get_effective_campaign_context`, `get_metric_drivers`, `compare_timeframes`;
 - `compare_category_cohort`, `get_pre_post_action`, `get_business_outcome_signals`;
 - `search_guidance`, `get_effective_guidance_pack`, `get_analysis_agenda`;
+- `policy_bundle_read` (K4 ApprovalPolicy/Guardrail revision feed, scope catalog ve
+  selection-bound readiness; draft/publish/approve/grant/execute yetkisi yoktur);
 - `get_decision_cadence`, `get_experiment_history`, `draft_guidance_set`;
 - `list_advised_practices`, `draft_advised_practice`, `draft_standardization_review`;
 - `promote_guidance_to_policy` (yalnız gated taslak/impact preview);
@@ -168,6 +170,14 @@ nedeni ve context version/hash görünürdür.
 Yeni creative/metin üretme, asset upload, raw Graph, token read veya writer tool'u yoktur.
 Promotion proposal yalnız yayınlanmış `PromotionTemplate + AudiencePresetVersion` seçer;
 agent targeting spec oluşturamaz/değiştiremez.
+
+`policy_bundle_read`, dashboard K4 Policy Bundle Studio ile aynı application read servisini
+kullanır. Dashboarddaki kullanıcı rolü taslak oluşturmaya izin verse bile agent zarfında
+`canDraft`, `canPublish`, `canDisable`, `canApproveAction`, `canGrant`, `canExecute` ve
+`canWriteMeta` daima `false` döner. Çıktıda yalnız public ref/projeksiyonlar bulunur;
+workspace/database/Meta ID, hash, actor ref ve raw targeting bulunmaz. Scope-free görünüm
+yalnız bundle hazırlığını bildirir; gerçek proposal uygunluğu compatibility ve authentic
+evidence ile somut seçim başına yeniden değerlendirilir.
 
 Guidance retrieval önce deterministic tenant/scope/topic filtresi, ardından bounded
 relevance ranking kullanır. Natural-language guidance analiz ve proposal framing'ine

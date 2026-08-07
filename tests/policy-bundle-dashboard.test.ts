@@ -7,12 +7,13 @@ import { createApprovalPolicyDraftBody, createGuardrailPolicyDraftBody,
 import type { PolicyBundleStudioResult } from "@/application/policy-bundle-studio-service";
 
 const result: PolicyBundleStudioResult = {
-  contractVersion: "policy-bundle-studio/1.0.0", approvalPolicies: [], guardrails: [],
+  contractVersion: "policy-bundle-studio/1.1.0", approvalPolicies: [], guardrails: [],
   scopeCatalog: { accounts: [{ ref: "account_doruk", label: "Doruk Hospital" }],
     adSets: [{ ref: "adset_doruk", label: "TR Leads", accountRef: "account_doruk", campaignRef: "campaign_doruk" }],
     internalCategories: [{ ref: "category_hair", label: "Saç ekimi" }] },
   readiness: { approvalPolicy: "missing", guardrail: "missing", workspaceAutonomy: "missing",
-    authenticEvidence: "evaluated_per_proposal", proposalReady: false },
+    authenticEvidence: "evaluated_per_proposal", compatibility: "evaluated_per_selection",
+    policyBundleReady: false, proposalReady: false },
   authority: { canDraft: true, canPublish: false, canDisable: false, canApproveAction: false,
     canGrant: false, canExecute: false, canWriteMeta: false },
 };
@@ -20,7 +21,8 @@ const result: PolicyBundleStudioResult = {
 describe("K4 Policy Bundle dashboard", () => {
   it("renders source-backed empty readiness without fake business defaults or action controls", () => {
     const html = renderToStaticMarkup(createElement(PolicyBundleStudioSurface, { result, onReload: vi.fn() }));
-    expect(html).toContain("Öneri üretim zinciri hazır değil"); expect(html).toContain("NOT READY");
+    expect(html).toContain("Politika kapısı hazır değil"); expect(html).toContain("NOT READY");
+    expect(html).toContain("Compatibility"); expect(html).toContain("Seçim anında");
     expect(html).toContain("Doruk Hospital"); expect(html).toContain("Saç ekimi");
     expect(html).toContain("Kampanya ref"); expect(html).toContain("readOnly");
     expect(html).toContain("Henüz K4 politika taslağı yok");

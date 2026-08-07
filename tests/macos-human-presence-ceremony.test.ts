@@ -38,4 +38,16 @@ describe("macOS human-presence ceremony", () => {
     await expect(new MacOsHumanPresenceCeremony(run, "darwin").confirm({ ...input, unitRef: "act_12345" })).resolves.toBe(false);
     expect(run).not.toHaveBeenCalled();
   });
+
+  it("renders an exact policy-publication warning without exposing policy payloads", async () => {
+    const run = vi.fn(async (_file: string, _args: readonly string[], _options: Readonly<{
+      timeout: number; maxBuffer: number; encoding: "utf8";
+    }>) => ({ stdout: "confirmed\n" }));
+    await expect(new MacOsHumanPresenceCeremony(run, "darwin").confirm({ ...input,
+      unitRef: "policy_unit_bbbbbbbbbbbbbbbbbbbb", action: "publish_approval_policy" })).resolves.toBe(true);
+    const message = run.mock.calls[0]![1].at(-1)!;
+    expect(message).toContain("ONAY POLİTİKASINI YAYINLA");
+    expect(message).toContain("Meta üzerinde değişiklik veya execute yapmaz");
+    expect(message).not.toMatch(/canonical|payload|targeting/i);
+  });
 });

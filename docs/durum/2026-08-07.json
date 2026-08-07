@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "04be8a651",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
       "hash": "8c9e8295b",
       "tarih": "2026-08-08",
       "konu": "docs(roadmap): record K4 policy studio gate",
@@ -128,15 +137,6 @@
       "kapsam": [
         "test"
       ]
-    },
-    {
-      "hash": "49eefd3a0",
-      "tarih": "2026-08-08",
-      "konu": "feat(meta): wire geo evidence and scheduled sync",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -157,7 +157,7 @@
       "adet": 3
     }
   ],
-  "isSayisi": 91,
+  "isSayisi": 92,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -170,5 +170,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "0851e360a10e"
+  "damga": "ace67330e0b8"
 }

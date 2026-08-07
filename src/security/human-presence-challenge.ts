@@ -11,7 +11,7 @@ type Challenge = Readonly<{
   workspaceId: string;
   actorRef: string;
   unitRef: string;
-  action: ApprovalDecisionKind;
+  action: HumanPresenceAction;
   issuedAt: string;
   expiresAt: string;
 }>;
@@ -24,9 +24,14 @@ export class HumanPresenceChallengeError extends Error {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const UNIT_REF = /^action_unit_[a-f0-9]{20}$/;
+const UNIT_REF = /^(?:action|policy)_unit_[a-f0-9]{20}$/;
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const PROOF = /^presence_[A-Za-z0-9_-]{32,160}$/;
+const ACTIONS = Object.freeze([
+  "approve", "reject", "request_changes", "publish_approval_policy", "publish_guardrail_policy",
+] as const);
+
+export type HumanPresenceAction = typeof ACTIONS[number];
 
 function rejected(): never { throw new HumanPresenceChallengeError(); }
 function digest(value: string): string { return createHash("sha256").update(value).digest("hex"); }
@@ -44,14 +49,14 @@ export class SingleUseHumanPresenceChallengeStore implements HumanPresenceAuthor
     workspaceId: string;
     actorRef: string;
     unitRef: string;
-    action: ApprovalDecisionKind;
+    action: HumanPresenceAction;
     now: string;
     lifetimeSeconds?: number;
   }>): Readonly<{ proof: string; expiresAt: string }> {
     const now = Date.parse(input.now);
     const lifetime = input.lifetimeSeconds ?? 60;
     if (!UUID.test(input.workspaceId) || !REF.test(input.actorRef) || !UNIT_REF.test(input.unitRef)
-      || !["approve", "reject", "request_changes"].includes(input.action)
+      || !ACTIONS.includes(input.action)
       || !Number.isFinite(now) || new Date(now).toISOString() !== input.now
       || !Number.isSafeInteger(lifetime) || lifetime < 10 || lifetime > 120) rejected();
     const proof = `presence_${randomBytes(32).toString("base64url")}`;
@@ -78,7 +83,7 @@ export class SingleUseHumanPresenceChallengeStore implements HumanPresenceAuthor
     workspaceId: string;
     actorRef: string;
     unitRef: string;
-    action: ApprovalDecisionKind;
+    action: HumanPresenceAction;
     now: string;
   }>): Promise<HumanPresenceEvidence> {
     if (!PROOF.test(input.proof)) rejected();

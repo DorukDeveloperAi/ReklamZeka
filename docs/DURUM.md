@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 0851e360a10e -->
+<!-- durum-damga: ace67330e0b8 -->
 
 ## Künye
 
@@ -14,13 +14,14 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 91 |
+| iş commit'i (tüm geçmiş) | 92 |
 | ilk / son iş | 2026-08-06 / 2026-08-08 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-08 | `docs` | refresh deterministic project state | `04be8a651` |
 | 2026-08-08 | `docs` | record K4 policy studio gate | `8c9e8295b` |
 | 2026-08-08 | `feat` | add K4 policy bundle studio | `9e54284ac` |
 | 2026-08-08 | `feat` | add K4 policy bundle drafts | `f725a7f47` |
@@ -35,7 +36,6 @@
 | 2026-08-08 | `feat` | bind proposal lifetime policy | `522bc0e4c` |
 | 2026-08-08 | `docs` | record geo and scheduler proof | `ede2072c7` |
 | 2026-08-08 | `test` | verify live geo inventory wiring | `0d7eabaa7` |
-| 2026-08-08 | `feat` | wire geo evidence and scheduled sync | `49eefd3a0` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 

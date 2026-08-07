@@ -10,7 +10,7 @@ import { createApprovalPolicyDraft, reviseApprovalPolicyDraft,
 import type { AutonomyRule } from "@/domain/actions/autonomy-valve";
 import { authorizeWorkspace, type WorkspaceMembership } from "@/security/authorization";
 
-export const POLICY_BUNDLE_STUDIO_VERSION = "policy-bundle-studio/1.0.0" as const;
+export const POLICY_BUNDLE_STUDIO_VERSION = "policy-bundle-studio/1.1.0" as const;
 
 export type ApprovalPolicyDraftRequest = Readonly<{
   kind: "approval_policy";
@@ -96,7 +96,10 @@ export type PolicyBundleStudioResult = Readonly<{
     guardrail: "missing" | "draft" | "published" | "disabled" | "inactive" | "ambiguous";
     workspaceAutonomy: "missing" | "published_approval_only";
     authenticEvidence: "evaluated_per_proposal";
-    proposalReady: boolean;
+    compatibility: "evaluated_per_selection";
+    policyBundleReady: boolean;
+    /** Always false in the scope-free studio; only a concrete selection can prove this. */
+    proposalReady: false;
   }>;
   authority: PolicyBundleStudioAuthority;
 }>;
@@ -228,8 +231,9 @@ export class PolicyBundleStudioService {
       guardrails: Object.freeze(source.guardrails.map(guardrailProjection)), scopeCatalog: publicCatalog(source.catalog),
       readiness: Object.freeze({ approvalPolicy, guardrail, workspaceAutonomy,
         authenticEvidence: "evaluated_per_proposal" as const,
-        proposalReady: approvalPolicy === "published" && guardrail === "published"
-          && workspaceAutonomy === "published_approval_only" }),
+        compatibility: "evaluated_per_selection" as const,
+        policyBundleReady: approvalPolicy === "published" && guardrail === "published"
+          && workspaceAutonomy === "published_approval_only", proposalReady: false as const }),
       authority: authority(membership.role !== "viewer") });
   }
 

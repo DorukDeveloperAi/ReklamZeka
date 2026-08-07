@@ -27,4 +27,15 @@ describe("single-use human presence challenge", () => {
     await expect(store.consume({ ...binding, proof: expired.proof, now: "2026-08-07T19:00:10.000Z" }))
       .rejects.toBeInstanceOf(HumanPresenceChallengeError);
   });
+
+  it("supports a separately action-bound policy publication unit without widening execution authority", async () => {
+    const store = new SingleUseHumanPresenceChallengeStore();
+    const policy = { workspaceId, actorRef: "actor_owner", unitRef: "policy_unit_bbbbbbbbbbbbbbbbbbbb",
+      action: "publish_guardrail_policy" as const };
+    const challenge = store.issue({ ...policy, now: "2026-08-07T19:00:00.000Z", lifetimeSeconds: 10 });
+    await expect(store.consume({ ...policy, action: "publish_approval_policy", proof: challenge.proof,
+      now: "2026-08-07T19:00:01.000Z" })).rejects.toBeInstanceOf(HumanPresenceChallengeError);
+    await expect(store.consume({ ...policy, proof: challenge.proof, now: "2026-08-07T19:00:02.000Z" }))
+      .rejects.toBeInstanceOf(HumanPresenceChallengeError);
+  });
 });

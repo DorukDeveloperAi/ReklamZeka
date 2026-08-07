@@ -19,7 +19,7 @@ const emptyGuardrail: GuardrailForm = { policyRef: "", accountRef: "", adSetRef:
   denyAction: false, denyClauseRef: "", effectiveFrom: "", expiresAt: "", sourceGuidanceRefs: "" };
 const statusLabel = { missing: "Eksik", draft: "Taslak", published: "Yayınlanmış", disabled: "Devre dışı",
   inactive: "Etkin değil", ambiguous: "Çakışmalı", published_approval_only: "Approval only",
-  evaluated_per_proposal: "Öneri anında" } as const;
+  evaluated_per_proposal: "Öneri anında", evaluated_per_selection: "Seçim anında" } as const;
 
 function iso(value: string): string { return new Date(value).toISOString(); }
 function positiveSeconds(value: string, multiplier: number): number {
@@ -28,7 +28,7 @@ function positiveSeconds(value: string, multiplier: number): number {
 function resultIsSafe(value: unknown): value is PolicyBundleStudioResult {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const result = value as Partial<PolicyBundleStudioResult>;
-  return result.contractVersion === "policy-bundle-studio/1.0.0" && Array.isArray(result.approvalPolicies)
+  return result.contractVersion === "policy-bundle-studio/1.1.0" && Array.isArray(result.approvalPolicies)
     && Array.isArray(result.guardrails) && Boolean(result.scopeCatalog) && Boolean(result.readiness)
     && Boolean(result.authority) && result.authority?.canPublish === false && result.authority.canDisable === false
     && result.authority.canApproveAction === false && result.authority.canGrant === false
@@ -96,9 +96,9 @@ export function PolicyBundleStudioSurface({ result, onReload }: Readonly<{
   const readiness = result.readiness;
   return <div className={styles.policyBundleStack}>
     <section className={`${styles.panel} ${styles.policyReadiness}`}>
-      <header className={styles.panelHeader}><div><span className={styles.kicker}>K4 READINESS</span><h2>{readiness.proposalReady ? "Öneri üretim zinciri hazır" : "Öneri üretim zinciri hazır değil"}</h2></div><span data-ready={readiness.proposalReady}>{readiness.proposalReady ? "READY" : "NOT READY"}</span></header>
-      <div>{[["ApprovalPolicy", readiness.approvalPolicy], ["Guardrail", readiness.guardrail], ["Workspace autonomy", readiness.workspaceAutonomy], ["Authentic evidence", readiness.authenticEvidence]].map(([label, value]) => <article key={label}><span>{label}</span><strong>{statusLabel[value as keyof typeof statusLabel]}</strong><small>{value}</small></article>)}</div>
-      <p>Taslaklar çalışma motoruna dahil edilmez. Hazır durumu ancak etkin, tekil politika seti ve approval-only workspace kuralı birlikte varsa oluşur.</p>
+      <header className={styles.panelHeader}><div><span className={styles.kicker}>K4 POLICY GATE</span><h2>{readiness.policyBundleReady ? "Politika kapısı hazır" : "Politika kapısı hazır değil"}</h2></div><span data-ready={readiness.policyBundleReady}>{readiness.policyBundleReady ? "POLICY READY" : "NOT READY"}</span></header>
+      <div>{[["ApprovalPolicy", readiness.approvalPolicy], ["Guardrail", readiness.guardrail], ["Workspace autonomy", readiness.workspaceAutonomy], ["Authentic evidence", readiness.authenticEvidence], ["Compatibility", readiness.compatibility]].map(([label, value]) => <article key={label}><span>{label}</span><strong>{statusLabel[value as keyof typeof statusLabel]}</strong><small>{value}</small></article>)}</div>
+      <p>Taslaklar çalışma motoruna dahil edilmez. Bu stüdyo yalnız politika kapısını ölçer; tam proposal readiness, authentic evidence ve beş compatibility boyutu gerçek seçim hash’iyle preflight anında doğrulandıktan sonra oluşur.</p>
     </section>
     <div className={styles.policyBundleGrid}>
       <section className={`${styles.panel} ${styles.policyDraftForm}`}><header><span className={styles.kicker}>APPROVAL POLICY · K4</span><h2>Onay yaşam döngüsü taslağı</h2><p>Alanlar bilinçli olarak boş. Değerleri kritik analitik görüşmede birlikte belirleyeceğiz.</p></header>

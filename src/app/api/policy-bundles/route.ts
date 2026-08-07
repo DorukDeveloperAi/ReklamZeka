@@ -2,6 +2,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 import * as schema from "@/db/schema";
+import { MacOsHumanPresenceCeremony } from "@/security/macos-human-presence-ceremony";
 import { localDecisionRoomConfig } from "@/server/local-decision-room-runtime";
 import { createLocalPolicyBundleStudioHandlers } from "@/server/local-policy-bundle-studio-runtime";
 import { policyBundleStudioNotConfiguredResponse } from "@/server/policy-bundle-studio-http";
@@ -9,6 +10,7 @@ import { policyBundleStudioNotConfiguredResponse } from "@/server/policy-bundle-
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 let database: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let runtimeHandlers: ReturnType<typeof createLocalPolicyBundleStudioHandlers> | null = null;
 function handlers() { try {
   const environment = { DATABASE_URL: process.env.DATABASE_URL,
     REKLAMZEKA_LOCAL_SESSION_ENABLED: process.env.REKLAMZEKA_LOCAL_SESSION_ENABLED,
@@ -21,7 +23,10 @@ function handlers() { try {
   const config = localDecisionRoomConfig(environment); if (!config) return null;
   if (!database) { const pool = new Pool({ connectionString: environment.DATABASE_URL, max: 2,
     statement_timeout: 10_000, allowExitOnIdle: true }); database = drizzle(pool, { schema }); }
-  return createLocalPolicyBundleStudioHandlers({ database, config });
+  if (!runtimeHandlers) runtimeHandlers = createLocalPolicyBundleStudioHandlers({
+    database, config, ceremony: new MacOsHumanPresenceCeremony(),
+  });
+  return runtimeHandlers;
 } catch { return null; } }
 export function GET(request?: Request) { const found = handlers();
   return found && request ? found.GET(request) : policyBundleStudioNotConfiguredResponse(); }

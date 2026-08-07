@@ -132,7 +132,7 @@ export function localDecisionRoomConfig(environment: LocalDecisionRoomEnvironmen
 export function assertTrustedLocalDecisionRoomRequest(
   request: Request,
   config: LocalDecisionRoomConfig,
-  operation: "read" | "mark_read" | "draft" | "decide",
+  operation: "read" | "mark_read" | "draft" | "decide" | "publish",
   credential: "cookie" | "bearer" = "cookie",
 ): void {
   let url: URL;
@@ -164,7 +164,11 @@ export function assertTrustedLocalDecisionRoomRequest(
   ].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
-  if ((operation === "mark_read" || operation === "draft" || operation === "decide") && credential === "cookie"
+  if (operation === "publish" && ![
+    "policy-bundle-confirm-human-presence", "policy-bundle-publish-approval-policy",
+    "policy-bundle-publish-guardrail-policy",
+  ].includes(request.headers.get("x-reklamzeka-intent") ?? "")) throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  if ((operation === "mark_read" || operation === "draft" || operation === "decide" || operation === "publish") && credential === "cookie"
     && (origin !== config.origin || fetchSite !== "same-origin")) {
     throw new LocalDecisionRoomBoundaryError("untrusted_request");
   }
@@ -238,7 +242,7 @@ export async function resolveTrustedLocalReadPrincipal(input: Readonly<{
   request: Request;
   database: Pick<Database, "execute">;
   config: LocalDecisionRoomConfig;
-  requiredScope: Extract<LocalSessionScope, "approval_queue:read" | "budget_lab:read" | "decision_room:read" | "practice_lab:read" | "promotion_catalog:read" | "promotion_preflight:read" | "promotion_proposal:draft">;
+  requiredScope: Extract<LocalSessionScope, "approval_queue:read" | "budget_lab:read" | "decision_room:read" | "policy_bundle:read" | "practice_lab:read" | "promotion_catalog:read" | "promotion_preflight:read" | "promotion_proposal:draft">;
 }>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
   exactKeys(input, ["request", "database", "config", "requiredScope"]);
   const authenticated = authenticate(input.request, input.config, "read");
@@ -291,7 +295,7 @@ export async function resolveTrustedLocalPolicyBundlePrincipal(input: Readonly<{
   request: Request;
   database: Pick<Database, "execute">;
   config: LocalDecisionRoomConfig;
-  requiredScope: Extract<LocalSessionScope, "policy_bundle:read" | "policy_bundle:draft">;
+  requiredScope: Extract<LocalSessionScope, "policy_bundle:read" | "policy_bundle:draft" | "policy_bundle:publish">;
 }>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
   exactKeys(input, ["request", "database", "config", "requiredScope"]);
   if (bearerToken(input.request) !== null || cookieToken(input.request) === null) {
@@ -303,7 +307,8 @@ export async function resolveTrustedLocalPolicyBundlePrincipal(input: Readonly<{
     expected: input.config,
   });
   assertTrustedLocalDecisionRoomRequest(input.request, input.config,
-    input.requiredScope === "policy_bundle:read" ? "read" : "draft", "cookie");
+    input.requiredScope === "policy_bundle:read" ? "read"
+      : input.requiredScope === "policy_bundle:draft" ? "draft" : "publish", "cookie");
   return bindPrincipal(input.database, input.config);
 }
 

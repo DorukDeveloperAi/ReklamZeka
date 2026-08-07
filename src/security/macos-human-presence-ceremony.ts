@@ -2,11 +2,15 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 const executeFile = promisify(execFile);
-const UNIT_REF = /^action_unit_[a-f0-9]{20}$/;
+import type { HumanPresenceAction } from "@/security/human-presence-challenge";
+
+const UNIT_REF = /^(?:action|policy)_unit_[a-f0-9]{20}$/;
 const ACTION_LABELS = Object.freeze({
   approve: "ONAYLA",
   reject: "REDDET",
   request_changes: "DEĞİŞİKLİK İSTE",
+  publish_approval_policy: "ONAY POLİTİKASINI YAYINLA",
+  publish_guardrail_policy: "KORUMA POLİTİKASINI YAYINLA",
 });
 
 /**
@@ -14,12 +18,12 @@ const ACTION_LABELS = Object.freeze({
  * ActionUnit reference enters the prompt. Cancel, timeout, or a non-macOS host
  * fails closed and never mints a presence proof.
  */
-type ConfirmationInput = Readonly<{
+export type HumanPresenceConfirmationInput = Readonly<{
   request: Request;
   workspaceId: string;
   actorRef: string;
   unitRef: string;
-  action: "approve" | "reject" | "request_changes";
+  action: HumanPresenceAction;
 }>;
 type CeremonyRunner = (file: string, args: readonly string[], options: Readonly<{
   timeout: number;
@@ -33,7 +37,7 @@ export class MacOsHumanPresenceCeremony {
     return { stdout: result.stdout };
   }, private readonly platform: NodeJS.Platform = process.platform) {}
 
-  async confirm(input: ConfirmationInput): Promise<boolean> {
+  async confirm(input: HumanPresenceConfirmationInput): Promise<boolean> {
     if (this.platform !== "darwin" || !UNIT_REF.test(input.unitRef)
       || !Object.hasOwn(ACTION_LABELS, input.action)) return false;
     const action = ACTION_LABELS[input.action];

@@ -46,7 +46,8 @@ describe("K4 Policy Bundle Studio read + draft", () => {
     const result = await harness().service.list(principal);
     expect(result).toMatchObject({ approvalPolicies: [], guardrails: [], readiness: {
       approvalPolicy: "missing", guardrail: "missing", workspaceAutonomy: "published_approval_only",
-      authenticEvidence: "evaluated_per_proposal", proposalReady: false },
+      authenticEvidence: "evaluated_per_proposal", compatibility: "evaluated_per_selection",
+      policyBundleReady: false, proposalReady: false },
     authority: { canDraft: true, canPublish: false, canApproveAction: false, canExecute: false, canWriteMeta: false } });
     expect(result.scopeCatalog).toEqual({ accounts: catalog.accounts, adSets: catalog.adSets,
       internalCategories: catalog.internalCategories });

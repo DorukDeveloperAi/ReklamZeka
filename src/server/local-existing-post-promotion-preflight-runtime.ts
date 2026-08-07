@@ -2,8 +2,9 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { ExistingPostPromotionPreflightAgentContract } from "@/application/existing-post-promotion-preflight-agent-contract";
 import { ExistingPostPromotionPublicPreflightService } from "@/application/existing-post-promotion-preflight-service";
-import { DrizzleExistingPostPromotionPreflightRepository } from "@/connectors/meta/promotion/existing-post-promotion-preflight-drizzle-repository";
 import * as schema from "@/db/schema";
+import { createDrizzleExistingPostPromotionCompatibilityPreflight } from
+  "@/server/existing-post-promotion-compatibility-preflight-runtime";
 import { createExistingPostPromotionPreflightHttpHandler, existingPostPromotionPreflightNotConfiguredResponse } from "@/server/existing-post-promotion-preflight-http";
 import { resolveTrustedLocalReadPrincipal, type LocalDecisionRoomConfig } from "@/server/local-decision-room-runtime";
 
@@ -19,7 +20,8 @@ export function createLocalExistingPostPromotionPreflightRouteHandler(input: Rea
       const bound = await resolveTrustedLocalReadPrincipal({ request, database: input.database, config: input.config,
         requiredScope: "promotion_preflight:read" });
       const contract = new ExistingPostPromotionPreflightAgentContract(
-        new ExistingPostPromotionPublicPreflightService(new DrizzleExistingPostPromotionPreflightRepository(input.database)),
+        new ExistingPostPromotionPublicPreflightService(createDrizzleExistingPostPromotionCompatibilityPreflight({
+          database: input.database as Database, principal: bound.principal })),
         [bound.membership],
       );
       return createExistingPostPromotionPreflightHttpHandler({ contract, origin: input.config.origin,
