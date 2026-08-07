@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "@/db/schema";
 import { assertHashOnlyMetaPersistence } from "@/domain/meta/data-lifecycle";
@@ -70,6 +70,13 @@ export interface MetaChangeTimelinePersistenceTransaction {
 
 export interface MetaChangeTimelinePersistenceStore {
   transaction<T>(work: (transaction: MetaChangeTimelinePersistenceTransaction) => Promise<T>): Promise<T>;
+  loadLatestSnapshot(scope: MetaChangePersistenceScope): Promise<Readonly<{
+    workspaceId: string;
+    connectionId: string;
+    adAccountId: string;
+    externalAccountId: string;
+    canonicalPayload: unknown;
+  }> | null>;
 }
 
 export type MetaChangeTimelinePersistenceResult = Readonly<{
@@ -93,6 +100,20 @@ export class MetaChangeTimelinePersistenceError extends Error {
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function stableJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableJson);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => [key, stableJson(child)]));
+  }
+  return value;
+}
+
+function equalJson(left: unknown, right: unknown): boolean {
+  return JSON.stringify(stableJson(left)) === JSON.stringify(stableJson(right));
 }
 
 function snapshotRef(snapshotHash: string): string {
@@ -207,8 +228,8 @@ function validateTimeline(
       || change.entityRef !== expected.entityRef
       || change.entityType !== expected.entityType
       || change.field !== expected.field
-      || JSON.stringify(change.before) !== JSON.stringify(expected.before)
-      || JSON.stringify(change.after) !== JSON.stringify(expected.after)
+      || !equalJson(change.before, expected.before)
+      || !equalJson(change.after, expected.after)
       || change.classification !== expected.classification
       || change.correlatedActionRef !== expected.correlatedActionRef
       || !/^ref_[a-f0-9]{20}$/.test(change.changeRef)
@@ -307,6 +328,38 @@ export class MetaChangeTimelinePersistenceService {
       });
     });
   }
+
+  /** Server-private restart boundary. Never expose this canonical payload to UI/agent/logs. */
+  async loadLatestSnapshot(scope: MetaChangePersistenceScope): Promise<CanonicalMetaChangeSnapshot | null> {
+    if (!scope.workspaceId || !scope.connectionId || !scope.adAccountId) {
+      throw new MetaChangeTimelinePersistenceError("invalid_input");
+    }
+    const stored = await this.store.loadLatestSnapshot(scope);
+    if (!stored) return null;
+    if (
+      stored.workspaceId !== scope.workspaceId
+      || stored.connectionId !== scope.connectionId
+      || stored.adAccountId !== scope.adAccountId
+      || !stored.canonicalPayload
+      || typeof stored.canonicalPayload !== "object"
+    ) throw new MetaChangeTimelinePersistenceError("scope_mismatch");
+    const persisted = stored.canonicalPayload as CanonicalMetaChangeSnapshot;
+    const { snapshotHash, ...persistedCore } = persisted;
+    const snapshot = {
+      ...(stableJson(persistedCore) as Omit<CanonicalMetaChangeSnapshot, "snapshotHash">),
+      snapshotHash,
+    } as CanonicalMetaChangeSnapshot;
+    try {
+      // A self-diff is a side-effect-free authenticity and canonical hash check.
+      diffMetaChangeSnapshots({ previous: snapshot, current: snapshot });
+    } catch {
+      throw new MetaChangeTimelinePersistenceError("hash_mismatch");
+    }
+    if (snapshot.workspaceId !== scope.workspaceId || snapshot.externalAccountId !== stored.externalAccountId) {
+      throw new MetaChangeTimelinePersistenceError("scope_mismatch");
+    }
+    return snapshot;
+  }
 }
 
 function sameEvent(
@@ -321,8 +374,8 @@ function sameEvent(
     && stored.entityRef === expected.entityRef
     && stored.entityType === expected.entityType
     && stored.field === expected.field
-    && JSON.stringify(stored.beforeValue) === JSON.stringify(expected.beforeValue)
-    && JSON.stringify(stored.afterValue) === JSON.stringify(expected.afterValue)
+    && equalJson(stored.beforeValue, expected.beforeValue)
+    && equalJson(stored.afterValue, expected.afterValue)
     && stored.classification === expected.classification
     && stored.correlatedActionRef === expected.correlatedActionRef
     && stored.timelineHash === expected.timelineHash
@@ -389,8 +442,8 @@ export class DrizzleMetaChangeTimelinePersistenceStore implements MetaChangeTime
           || candidate.schemaVersion !== row.schemaVersion
           || candidate.fieldCatalogVersion !== row.fieldCatalogVersion
           || candidate.capturedAt.toISOString() !== row.capturedAt
-          || JSON.stringify(candidate.canonicalPayload) !== JSON.stringify(row.canonicalPayload)
-          || JSON.stringify(candidate.safeAggregate) !== JSON.stringify(row.safeAggregate)
+          || !equalJson(candidate.canonicalPayload, row.canonicalPayload)
+          || !equalJson(candidate.safeAggregate, row.safeAggregate)
         ) throw new MetaChangeTimelinePersistenceError("replay_conflict");
         return { id: candidate.id, publicRef: candidate.publicRef, inserted: false };
       },
@@ -436,5 +489,36 @@ export class DrizzleMetaChangeTimelinePersistenceStore implements MetaChangeTime
         return inserted.length;
       },
     }));
+  }
+
+  async loadLatestSnapshot(scope: MetaChangePersistenceScope) {
+    const rows = await this.database.select({
+      workspaceId: schema.metaChangeSnapshots.workspaceId,
+      connectionId: schema.metaChangeSnapshots.metaConnectionId,
+      adAccountId: schema.metaChangeSnapshots.adAccountId,
+      externalAccountId: schema.adAccounts.externalAccountId,
+      canonicalPayload: schema.metaChangeSnapshots.canonicalPayload,
+    }).from(schema.metaChangeSnapshots)
+      .innerJoin(schema.adAccounts, and(
+        eq(schema.metaChangeSnapshots.adAccountId, schema.adAccounts.id),
+        eq(schema.metaChangeSnapshots.workspaceId, schema.adAccounts.workspaceId),
+      ))
+      .innerJoin(schema.dataSources, and(
+        eq(schema.adAccounts.dataSourceId, schema.dataSources.id),
+        eq(schema.dataSources.workspaceId, scope.workspaceId),
+        eq(schema.dataSources.metaConnectionId, scope.connectionId),
+      ))
+      .where(and(
+        eq(schema.metaChangeSnapshots.workspaceId, scope.workspaceId),
+        eq(schema.metaChangeSnapshots.metaConnectionId, scope.connectionId),
+        eq(schema.metaChangeSnapshots.adAccountId, scope.adAccountId),
+      ))
+      .orderBy(
+        desc(schema.metaChangeSnapshots.capturedAt),
+        desc(schema.metaChangeSnapshots.persistedAt),
+        desc(schema.metaChangeSnapshots.id),
+      )
+      .limit(1);
+    return rows[0] ?? null;
   }
 }

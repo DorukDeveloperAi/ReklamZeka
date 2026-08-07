@@ -49,6 +49,7 @@ CREATE TABLE "meta_change_snapshots" (
 ALTER TABLE "meta_change_events" ADD CONSTRAINT "meta_change_events_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "meta_change_events" ADD CONSTRAINT "meta_change_events_meta_connection_id_meta_connections_id_fk" FOREIGN KEY ("meta_connection_id") REFERENCES "public"."meta_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "meta_change_events" ADD CONSTRAINT "meta_change_events_ad_account_id_ad_accounts_id_fk" FOREIGN KEY ("ad_account_id") REFERENCES "public"."ad_accounts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "meta_change_snapshots_id_scope_unique" ON "meta_change_snapshots" USING btree ("id","workspace_id","meta_connection_id","ad_account_id");--> statement-breakpoint
 ALTER TABLE "meta_change_events" ADD CONSTRAINT "meta_change_events_previous_snapshot_scope_fk" FOREIGN KEY ("previous_snapshot_id","workspace_id","meta_connection_id","ad_account_id") REFERENCES "public"."meta_change_snapshots"("id","workspace_id","meta_connection_id","ad_account_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "meta_change_events" ADD CONSTRAINT "meta_change_events_current_snapshot_scope_fk" FOREIGN KEY ("current_snapshot_id","workspace_id","meta_connection_id","ad_account_id") REFERENCES "public"."meta_change_snapshots"("id","workspace_id","meta_connection_id","ad_account_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "meta_change_snapshots" ADD CONSTRAINT "meta_change_snapshots_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -62,7 +63,6 @@ CREATE INDEX "meta_change_events_connection_idx" ON "meta_change_events" USING b
 CREATE INDEX "meta_change_events_account_idx" ON "meta_change_events" USING btree ("ad_account_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "meta_change_snapshots_scope_hash_unique" ON "meta_change_snapshots" USING btree ("workspace_id","meta_connection_id","ad_account_id","snapshot_hash");--> statement-breakpoint
 CREATE UNIQUE INDEX "meta_change_snapshots_scope_public_ref_unique" ON "meta_change_snapshots" USING btree ("workspace_id","meta_connection_id","ad_account_id","public_ref");--> statement-breakpoint
-CREATE UNIQUE INDEX "meta_change_snapshots_id_scope_unique" ON "meta_change_snapshots" USING btree ("id","workspace_id","meta_connection_id","ad_account_id");--> statement-breakpoint
 CREATE INDEX "meta_change_snapshots_scope_captured_idx" ON "meta_change_snapshots" USING btree ("workspace_id","meta_connection_id","ad_account_id","captured_at");--> statement-breakpoint
 CREATE INDEX "meta_change_snapshots_connection_idx" ON "meta_change_snapshots" USING btree ("meta_connection_id");--> statement-breakpoint
 CREATE INDEX "meta_change_snapshots_account_idx" ON "meta_change_snapshots" USING btree ("ad_account_id");--> statement-breakpoint

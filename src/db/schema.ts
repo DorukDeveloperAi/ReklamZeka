@@ -410,8 +410,8 @@ export const metaPosts = pgTable("meta_posts", {
 
 /**
  * Hash-only evidence for a canonical Meta hierarchy observation. The canonical
- * entity payload remains server-private and is rebuilt from the read mirror;
- * this table intentionally stores no Meta external IDs or ad content.
+ * entity payload remains server-private. It contains the minimum tracked Meta
+ * IDs needed for restart recovery, but never ad content, tokens or raw payloads.
  */
 export const metaChangeSnapshots = pgTable("meta_change_snapshots", {
   id: uuid("id").primaryKey().defaultRandom(),

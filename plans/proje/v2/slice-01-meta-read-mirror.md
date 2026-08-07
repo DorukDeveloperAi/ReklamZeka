@@ -34,9 +34,11 @@ Bu dosya yalnız güncel teslim dilimini yönetir. A08 domain şartnamesinin min
   bağlandı. İki gerçek hesaplı geçici kabulde 79 asset/79 edge, 1.179 bağlı post/media,
   6 reklam metni/post bağı, 4 creative ve 6 binding; 3 durable checkpoint, izole partial
   hata, tam cleanup ve `0` Meta write doğrulandı.
-- **Aktif S1.5:** trust/readiness'in saf motoru ve Drizzle evidence adapter'ı hazır; canlı
-  iki hesap SQL raporu eksik insights'i `not_ready` bıraktı. Lifecycle, retention,
-  snapshot diff/external-change ve nihai iki-hesap izolasyon kapısı sırada.
+- **S1.5 ve Slice 01 kapalı:** trust/readiness eksikleri sebepli ve fail-closed gösteriyor;
+  kalıcı connection/secret lifecycle, hash-only raw retention, workspace tombstone,
+  restart-durable snapshot diff ve doğrulanmış action-ledger dışı `external_change`
+  timeline tamamlandı. İki hesap scope izolasyonu, replay/restart, 32/32 RLS ve `0` Meta
+  write kanıtlandı. Sıradaki dilim S2 Decision Room'dur.
 
 ## Değişmez sınırlar
 
@@ -143,6 +145,17 @@ Yapılacaklar:
 **Çıkış kapısı:** İki hesap birbirinin permission/currency/timezone/result state'ini ezmez;
 disconnect sonrası secret kullanılamaz; retention yalnız hedef workspace verisini işler;
 coverage eksikleri sebeplidir; Meta write network call sayısı `0`dır.
+
+**Kanıt (2026-08-07):** `verify:meta-change-timeline-db`,
+`verify:workspace-tombstone-db` ve `verify:supabase-security` geçti. Canonical tracked
+snapshot server-private olarak kalıcıdır ve restart sonrası en yeni authentic snapshot
+geri yüklenir; event satırları dış Meta kimliği, reklam metni, token veya raw payload
+taşımaz. Replay satır çoğaltmaz, unknown gözlem değişiklik uydurmaz, hesaplar arası scope
+reddedilir ve composite FK çapraz-scope snapshot bağını DB seviyesinde engeller. Yalnız
+exact ve `verified` action-ledger eşleşmesi `internal_expected` olabilir. Workspace
+tombstone 28 veri tablosunu explicit allowlist ile temizler, audit zincirini ve tombstone
+kaydını korur; yabancı workspace değişmez. Tüm DB kabulleri rollback ile geçici veri
+bırakmadan tamamlandı. Supabase sonucu 32 tablo/32 RLS, API tablo grant'i `0`dır.
 
 ## Uygulama ve kanıt disiplini
 

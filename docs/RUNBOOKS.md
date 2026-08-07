@@ -27,6 +27,14 @@ log veya bildirim payload'ına eklenmez.
   `npm run verify:meta-post-media-db`, ardından gerçek ve salt-okunur iki hesap kanıtı için
   `npm run verify:meta-s14-live-db`. Son komut geçici workspace kurar ve `finally` içinde
   hedefli olarak temizler; yalnız aggregate/maskeli kanıt basar.
+- S1.5 lifecycle kabul sırası: `npm run verify:meta-change-timeline-db`,
+  `npm run verify:workspace-tombstone-db`, ardından `npm run verify:supabase-security`.
+  Timeline testi replay/restart, unknown, iki hesap scope ve composite FK'yi; tombstone
+  testi explicit purge, audit korunumu, hard-delete engeli ve foreign-workspace izolasyonunu
+  transaction rollback içinde doğrular.
+- Yeni workspace-owned tablo eklendiğinde tombstone allowlist testi kasıtlı olarak kırılır.
+  Tablo ancak FK-safe inspect/delete sırasına açıkça eklenip PostgreSQL rollback kabulü
+  yeniden geçtikten sonra lifecycle kapsamına alınmış sayılır.
 - Canlı kabulte `wrong_actor`, eksik actor alanının tahmin edilmeyeceği anlamına gelir;
   ilgili kayıt park edilir. `permission_missing/unsupported/partial` sıfıra veya başarıya
   çevrilmez ve trust/readiness raporunda sebepli eksik olarak kalır.

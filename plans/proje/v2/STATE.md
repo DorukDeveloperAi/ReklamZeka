@@ -14,7 +14,7 @@
 | 05 | performans deneyimi | KAPALI | 03,04 | `check:experience` + browser QA |
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
-| 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.4 kapalı; canlı GET→PostgreSQL iki hesap kanıtlı, S1.5 trust/lifecycle sırada |
+| 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.5 ve Slice 01 kapalı; geniş field/breakdown kataloğu, multi-business grouping ve export/rotation ileri işi açık |
 | 09 | kategori ve talimat | AÇIK | 08 | requirement/precedence tasarımı tamam; uygulama sırada |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
 | 11 | bütçe planlama | AÇIK | 09,10 | planlandı |
@@ -200,10 +200,10 @@
 
 ## Sıradaki uygulama
 
-**Slice 1 / Meta Read Mirror — S1.5 trust, lifecycle ve iki hesap kapanışı:** Kalıcı
-connection/secret lifecycle, hash-only raw-retention varsayılanı, audit tombstone, snapshot
-diff/`external_change`, operational alert ve nihai iki-hesap coverage/isolation kanıtını
-tamamla. A13'e kadar production write scope veya writer ReklamZeka'ya taşınmaz.
+**Slice 2 / Decision Room:** İç kategori/talimat registry'sini ve effective-context
+resolver'ı, timeframe-aware deterministic analysis ile birleştir; agent yalnız L4/L5
+kanıt paketinden finding/proposal üretsin. A13'e kadar production write scope veya writer
+ReklamZeka'ya taşınmaz.
 
 ## 2026-08-07 — S1.4 asset/content mirror kapanışı
 
@@ -217,3 +217,20 @@ tamamla. A13'e kadar production write scope veya writer ReklamZeka'ya taşınmaz
 - Trust/readiness saf motoru ve Drizzle adapter'ı iki hesap üzerinde gerçek SQL okudu; public
   çıktı teknik ID/metin/token taşımadı ve eksik insights nedeniyle doğru biçimde `not_ready`
   kaldı. Tam trust/lifecycle çıkış kapısı S1.5'tedir.
+
+## 2026-08-07 — S1.5 trust, lifecycle ve değişim timeline kapanışı
+
+- Meta connection/secret metadata'sı PostgreSQL'de restart-durable hale getirildi; secret
+  değeri DB'ye yazılmıyor, environment allowlist dışı binding reddediliyor. Disconnect,
+  revoke/destroy ve invalid lifecycle fail-closed ve workspace-scoped çalışıyor.
+- Varsayılan raw retention `hash_only/0 gün`; workspace silme hard-delete yerine audit'i
+  koruyan tombstone akışıdır. Explicit 28-tablo purge allowlist'i, revision/TTL/application
+  approval ve foreign-workspace izolasyonu gerçek PostgreSQL rollback kabulünde geçti.
+- Config/status/budget/targeting/creative-binding canonical snapshot'ı server-private ve
+  restart-durable saklanıyor. Unknown gözlem change uydurmuyor; yalnız exact `verified`
+  action-ledger korelasyonu `internal_expected`, diğer değişiklik `external_change` oluyor.
+- Timeline replay idempotent; en yeni authentic snapshot restart sonrası geri yükleniyor;
+  composite scope FK hesaplar arası snapshot bağını engelliyor ve public sonuçlar maskeli.
+- Kanıt: 39 test dosyası/202 test, production build, audit 0 zafiyet; timeline ve tombstone
+  PostgreSQL kabulleri geçici veri bırakmadan geçti. Supabase 32/32 RLS, API role table
+  grant'i 0 ve public routine execute grant'i 0. Meta write yolu halen kapalıdır.

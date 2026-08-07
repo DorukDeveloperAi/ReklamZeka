@@ -45,6 +45,23 @@ class MemoryStore implements MetaChangeTimelinePersistenceStore {
   readonly snapshots = new Map<string, MetaChangeSnapshotPersistenceRow & { id: string }>();
   readonly events = new Map<string, MetaChangeEventPersistenceRow>();
 
+  async loadLatestSnapshot(scope: MetaChangePersistenceScope) {
+    const rows = [...this.snapshots.values()].filter((row) =>
+      row.workspaceId === scope.workspaceId
+      && row.connectionId === scope.connectionId
+      && row.adAccountId === scope.adAccountId)
+      .sort((left, right) => right.capturedAt.localeCompare(left.capturedAt));
+    const row = rows[0];
+    const externalAccountId = this.accounts.get(scope.adAccountId);
+    return row && externalAccountId ? {
+      workspaceId: row.workspaceId,
+      connectionId: row.connectionId,
+      adAccountId: row.adAccountId,
+      externalAccountId,
+      canonicalPayload: row.canonicalPayload,
+    } : null;
+  }
+
   transaction<T>(work: (transaction: MetaChangeTimelinePersistenceTransaction) => Promise<T>): Promise<T> {
     const snapshotsBefore = new Map(this.snapshots);
     const eventsBefore = new Map(this.events);
@@ -101,6 +118,8 @@ describe("Meta change timeline persistence", () => {
     expect(replay).toMatchObject({ insertedSnapshots: 0, insertedEvents: 0, eventCount: 1, replay: true });
     expect(store.snapshots.size).toBe(2);
     expect(store.events.size).toBe(1);
+    const restarted = new MetaChangeTimelinePersistenceService(store);
+    await expect(restarted.loadLatestSnapshot(scope())).resolves.toEqual(current);
 
     const publicJson = JSON.stringify(first);
     const eventJson = JSON.stringify([...store.events.values()]);
