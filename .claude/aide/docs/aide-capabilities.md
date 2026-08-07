@@ -87,8 +87,10 @@ KAZANIR) · `--yerel-sil` · `--benimse`. K5/Model B: şablon kurulumdan beri DE
 **BOOT** sistemin AYAKTA OLMASININ ön koşuludur — deterministik, tmux'suz, **sistem kapalıyken de
 koşar**; şalter AYRI: `aide boot durum|simdi|doctor|sinif|kapat|ac`. **K1:** `BOOT ⟺ (a) sistemin
 ayakta olması ona bağlı ∧ (b) deterministik ∧ (c) tmux gerektirmez`; biri düşerse iş MAESTRO'dur.
-Manifest **sekiz adım, SIRA SÖZLEŞMEDİR** (`tasima-once → sync-auto → filing-donan → filing-yaz →
-oturum-kapat → claudemd-bekci → susturulmus-nabiz → tasima-sonra`; son ikisi BEKÇİ — bulgu = ALARM).
+Manifest **on adım, SIRA SÖZLEŞMEDİR** (`tasima-once → sync-auto → sync-ev → filing-donan →
+filing-yaz → oturum-kapat → kilit-nobet → claudemd-bekci → susturulmus-nabiz → tasima-sonra`;
+son üçü BEKÇİ — bulgu = ALARM). **Dağıtım İKİ adımdır:** `sync-auto` registry + `~/dev` keşfini,
+`sync-ev` **evi** (`~/.claude`) kapsar — ev hiçbir türetilmiş taramanın içinde değildir.
 **`aide sistem kapat` boot'u DURDURMAZ** · **borç bırakan her sonuç HATADIR**.
 Detay: `/Users/ybg/dev/agent-ide/docs/boot-katmani.md`
 
