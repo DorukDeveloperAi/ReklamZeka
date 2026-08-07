@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "211d67333",
+      "tarih": "2026-08-07",
+      "konu": "chore(turev): 2. merge sonrası türevleri yeniden üret",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
       "hash": "03716c2fc",
       "tarih": "2026-08-07",
       "konu": "merge: uzak ile birleştir (2. tur)",
@@ -60,19 +69,19 @@
       "adet": 2
     },
     {
-      "kapsam": "merge",
+      "kapsam": "chore",
       "adet": 2
     },
     {
-      "kapsam": "chore",
-      "adet": 1
+      "kapsam": "merge",
+      "adet": 2
     },
     {
       "kapsam": "feat",
       "adet": 1
     }
   ],
-  "isSayisi": 6,
+  "isSayisi": 7,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -93,5 +102,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "3f4ee5736a62"
+  "damga": "4dfbc7ed6483"
 }
