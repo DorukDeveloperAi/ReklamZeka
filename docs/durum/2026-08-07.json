@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "bc46bb7a7",
+      "tarih": "2026-08-07",
+      "konu": "feat: complete Meta digital twin core contract",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "fa74d5a3a",
       "tarih": "2026-08-07",
       "konu": "feat: add read-only Meta access inventory",
@@ -34,10 +43,10 @@
     },
     {
       "kapsam": "feat",
-      "adet": 1
+      "adet": 2
     }
   ],
-  "isSayisi": 3,
+  "isSayisi": 4,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -50,5 +59,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "600820352f79"
+  "damga": "c4846c532cef"
 }

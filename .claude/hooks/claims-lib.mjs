@@ -161,10 +161,14 @@ export function procAlive(pid, procStart) {
   const ps = psSnapshot();
   if (!_psOk) return true; // ölçüm yok → hüküm yok (kilidi koru)
   const p = ps.get(+pid);
+  return procKaydiCanli(p, procStart);
+}
+
+/** Snapshot kaydından işlevsel canlılık: zombi PID tablosunda dursa da iş yapamaz. */
+export function procKaydiCanli(p, procStart) {
   if (!p) return false; // süreç yok → gerçekten ölü
-  // Zombi süreç PID tablosunda görünür ama artık iş yapamaz. Onu canlı saymak, sahibi
-  // crash eden claim'i sonsuza dek tutar ve wait kuyruğunu dondurur. Parent henüz reap
-  // etmemiş olsa bile `stat=Z...` süreç işlevsel olarak ölüdür.
+  // Parent henüz reap etmemiş olsa bile Z... süreç işlevsel olarak ölüdür; canlı saymak,
+  // sahibi crash eden claim'i sonsuza dek tutar ve wait kuyruğunu dondurur.
   if (String(p.state || "").startsWith("Z")) return false;
   if (procStart && p.start && normStart(p.start) !== normStart(procStart)) return false; // pid geri dönüşmüş
   return true;
