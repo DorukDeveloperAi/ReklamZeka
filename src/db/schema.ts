@@ -3217,6 +3217,128 @@ export const autonomyRuleRevisions = pgTable("autonomy_rule_revisions", {
   `),
 ]);
 
+/** Reviewed, append-only ApprovalPolicy definitions; never approval or execution authority by themselves. */
+export const approvalPolicyDefinitionRevisions = pgTable("approval_policy_definition_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceRef: text("workspace_ref").notNull(),
+  policyRef: text("policy_ref").notNull(),
+  revision: integer("revision").notNull(),
+  previousHash: text("previous_hash"),
+  schemaVersion: text("schema_version").notNull(),
+  actionType: text("action_type").notNull(),
+  risk: text("risk").notNull(),
+  state: text("state").notNull(),
+  effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  normalizedByActorRef: text("normalized_by_actor_ref").notNull(),
+  normalizedByRole: text("normalized_by_role").notNull(),
+  publishedByActorRef: text("published_by_actor_ref"),
+  publishedByRole: text("published_by_role"),
+  publicationDecisionRef: text("publication_decision_ref"),
+  publicationReasonRef: text("publication_reason_ref"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  disabledByActorRef: text("disabled_by_actor_ref"),
+  disabledByRole: text("disabled_by_role"),
+  disableDecisionRef: text("disable_decision_ref"),
+  disableReasonRef: text("disable_reason_ref"),
+  disabledAt: timestamp("disabled_at", { withTimezone: true }),
+  policyHash: text("policy_hash").notNull(),
+  canonicalHash: text("canonical_hash").notNull(),
+  policyPayload: jsonb("policy_payload").$type<Record<string, unknown>>().notNull(),
+  artifactPayload: jsonb("artifact_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("approval_policy_definition_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("approval_policy_definition_revisions_workspace_ref_revision_unique")
+    .on(table.workspaceId, table.policyRef, table.revision),
+  uniqueIndex("approval_policy_definition_revisions_workspace_hash_unique").on(table.workspaceId, table.canonicalHash),
+  index("approval_policy_definition_revisions_resolve_idx")
+    .on(table.workspaceId, table.actionType, table.risk, table.state, table.policyRef, table.revision),
+  check("approval_policy_definition_revisions_identity", sql`
+    ${table.schemaVersion} = 'approval-policy-definition/1.0.0'
+    and ${table.revision} between 1 and 1000000
+    and ${table.workspaceRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.policyRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.normalizedByActorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ((${table.revision} = 1 and ${table.previousHash} is null)
+      or (${table.revision} > 1 and ${table.previousHash} ~ '^[a-f0-9]{64}$'))
+    and ${table.policyHash} ~ '^[a-f0-9]{64}$' and ${table.canonicalHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("approval_policy_definition_revisions_applicability", sql`
+    ${table.actionType} = 'existing_post_promotion' and ${table.risk} = 'K4'
+  `),
+  check("approval_policy_definition_revisions_lifecycle", sql`
+    ${table.state} in ('draft', 'published', 'disabled')
+    and ${table.normalizedByRole} in ('owner', 'admin', 'analyst')
+    and (${table.expiresAt} is null or ${table.expiresAt} > ${table.effectiveFrom})
+    and ((${table.state} = 'draft' and ${table.publishedByActorRef} is null and ${table.publishedByRole} is null
+      and ${table.publicationDecisionRef} is null and ${table.publicationReasonRef} is null and ${table.publishedAt} is null
+      and ${table.disabledByActorRef} is null and ${table.disabledByRole} is null
+      and ${table.disableDecisionRef} is null and ${table.disableReasonRef} is null and ${table.disabledAt} is null)
+      or (${table.state} = 'published' and ${table.publishedByActorRef} is not null
+        and ${table.publishedByRole} in ('owner', 'admin') and ${table.publicationDecisionRef} is not null
+        and ${table.publicationReasonRef} is not null and ${table.publishedAt} is not null
+        and ${table.disabledByActorRef} is null and ${table.disabledByRole} is null
+        and ${table.disableDecisionRef} is null and ${table.disableReasonRef} is null and ${table.disabledAt} is null)
+      or (${table.state} = 'disabled' and ${table.publishedByActorRef} is not null
+        and ${table.publishedByRole} in ('owner', 'admin') and ${table.publicationDecisionRef} is not null
+        and ${table.publicationReasonRef} is not null and ${table.publishedAt} is not null
+        and ${table.disabledByActorRef} is not null and ${table.disabledByRole} in ('owner', 'admin')
+        and ${table.disableDecisionRef} is not null and ${table.disableReasonRef} is not null
+        and ${table.disabledAt} is not null and ${table.disabledAt} >= ${table.publishedAt}))
+  `),
+  check("approval_policy_definition_revisions_policy_exact", sql`
+    jsonb_typeof(${table.policyPayload}) = 'object'
+    and ${table.policyPayload} #>> '{version}' = 'action-approval-policy/1.0.0'
+    and ${table.policyPayload} #>> '{policyRef}' = ${table.policyRef}
+    and (${table.policyPayload} #>> '{revision}')::integer = ${table.revision}
+    and ${table.policyPayload} #>> '{autonomyMode}' = 'approval_only'
+    and jsonb_typeof(${table.policyPayload} #> '{requesterRoles}') = 'array'
+    and jsonb_typeof(${table.policyPayload} #> '{approverRoles}') = 'array'
+    and jsonb_typeof(${table.policyPayload} #> '{grantConsumerRoles}') = 'array'
+    and jsonb_typeof(${table.policyPayload} #> '{separationOfDutiesRisks}') = 'array'
+    and (${table.policyPayload} #>> '{maximumGrantLifetimeSeconds}')::integer between 1 and 86400
+  `),
+  check("approval_policy_definition_revisions_artifact_exact", sql`
+    jsonb_typeof(${table.artifactPayload}) = 'object'
+    and ${table.artifactPayload} #>> '{version}' = ${table.schemaVersion}
+    and ${table.artifactPayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+    and ${table.artifactPayload} #>> '{policyRef}' = ${table.policyRef}
+    and (${table.artifactPayload} #>> '{revision}')::integer = ${table.revision}
+    and (${table.artifactPayload} #>> '{previousHash}') is not distinct from ${table.previousHash}
+    and ${table.artifactPayload} #>> '{applicability,actionType}' = ${table.actionType}
+    and ${table.artifactPayload} #>> '{applicability,risk}' = ${table.risk}
+    and ${table.artifactPayload} #>> '{state}' = ${table.state}
+    and (${table.artifactPayload} #>> '{effectiveFrom}')::timestamptz = ${table.effectiveFrom}
+    and (${table.artifactPayload} #>> '{expiresAt}')::timestamptz is not distinct from ${table.expiresAt}
+    and ${table.artifactPayload} #> '{policy}' = ${table.policyPayload}
+    and ${table.artifactPayload} #>> '{policyHash}' = ${table.policyHash}
+    and ${table.artifactPayload} #>> '{canonicalHash}' = ${table.canonicalHash}
+    and ${table.artifactPayload} #>> '{provenance,normalizedByActorRef}' = ${table.normalizedByActorRef}
+    and ${table.artifactPayload} #>> '{provenance,normalizedByRole}' = ${table.normalizedByRole}
+    and (${table.artifactPayload} #>> '{provenance,publishedByActorRef}') is not distinct from ${table.publishedByActorRef}
+    and (${table.artifactPayload} #>> '{provenance,publishedByRole}') is not distinct from ${table.publishedByRole}
+    and (${table.artifactPayload} #>> '{provenance,publicationDecisionRef}') is not distinct from ${table.publicationDecisionRef}
+    and (${table.artifactPayload} #>> '{provenance,publicationReasonRef}') is not distinct from ${table.publicationReasonRef}
+    and (${table.artifactPayload} #>> '{provenance,publishedAt}')::timestamptz is not distinct from ${table.publishedAt}
+    and (${table.artifactPayload} #>> '{provenance,disabledByActorRef}') is not distinct from ${table.disabledByActorRef}
+    and (${table.artifactPayload} #>> '{provenance,disabledByRole}') is not distinct from ${table.disabledByRole}
+    and (${table.artifactPayload} #>> '{provenance,disableDecisionRef}') is not distinct from ${table.disableDecisionRef}
+    and (${table.artifactPayload} #>> '{provenance,disableReasonRef}') is not distinct from ${table.disableReasonRef}
+    and (${table.artifactPayload} #>> '{provenance,disabledAt}')::timestamptz is not distinct from ${table.disabledAt}
+    and ${table.artifactPayload} #>> '{authority,canApprove}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canGrant}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canExecute}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canWriteMeta}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canPromoteGuidance}' = 'false'
+  `),
+  check("approval_policy_definition_revisions_no_forbidden_material", sql`
+    (${table.policyPayload}::text || ${table.artifactPayload}::text)
+      !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json)|free[_-]?text|authorization|approvalgranted)"[[:space:]]*:'
+  `),
+]);
+
 /**
  * One generic append-only registry for reviewed Meta compatibility mappings and
  * exact selection evidence. Mapping artifacts describe identity only; they do

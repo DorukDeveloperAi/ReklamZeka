@@ -218,6 +218,13 @@
       "when": 1786132876908,
       "tag": "20260807200116_petite_madame_hydra",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1786134071898,
+      "tag": "20260807202111_clean_bishop",
+      "breakpoints": true
     }
   ]
 }

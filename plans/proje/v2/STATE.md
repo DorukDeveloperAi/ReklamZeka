@@ -766,3 +766,20 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   kapsamındadır. Migration bağlı Supabase'e uygulandı; canlı kontrolde 68/68 tablo RLS, API rollerinde sıfır
   tablo grant'i, sıfır schema-create ve sıfır public routine-execute grant'i doğrulandı. Sıradaki dilim
   selection evidence'ı kanonik private proposal materializer'a bağlamaktır.
+
+## 2026-08-07 — S5.4c2-B/C/D production read composition ve reviewed proposal policy
+
+- Production salt-okunur sync composition noktası canonical inventory writer ile durable cursor store'u
+  aynı runtime'a enjekte eder. Workspace, connection, account ve secret caller girdisi değildir; trusted
+  server scope portundan ve tenant-bound DB bağlarından çözülür. Güvenilir scheduler/route principal'ı henüz
+  olmadığı için public inventory GET'i DB-yazan sync'e çevrilmedi ve canlı sync tetiklenmedi.
+- Existing-post canonical submitter exact 10 ref'i yeniden çözer; template/preset/binding, post/source,
+  ad-set ve campaign snapshot hash'lerinden ayrı evidence selection hash üretir. Beş compatibility boyutu
+  exact published/fresh evidence ile confirmed değilse veya trusted approval/protection/autonomy materyali
+  eksikse queue write sıfırdır. Submitter live route'a bağlı değildir ve `material_unavailable` kalır.
+- ApprovalPolicy için append-only, hash-linked ve düzenlenebilir definition registry eklendi. Draft→publish,
+  published/disabled→new draft→publish ve published→disabled revision'ları; exact K4 existing-post rol/SoD/
+  grant-consumer/lifetime payload'ı ve ayrı publish/disable kanıtı taşır. Resolver tüm zinciri doğrular,
+  draft'ı authority saymaz ve yalnız exact-one active published policy döndürür; hiçbir policy seed edilmedi.
+- Bir sonraki zorunlu kapı: queue policy snapshot'ını reviewed registry source revision FK/hash'ine bağlamak,
+  protection policy kaynağını çözmek ve ancak ardından private submitter'ı route'a takmaktır.

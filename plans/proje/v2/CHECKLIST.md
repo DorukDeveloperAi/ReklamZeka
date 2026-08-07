@@ -269,8 +269,15 @@
     registry; empty/partial/stale/conflict protection `unknown`, action/policy/Meta authority yok.
   - [x] Organic post ile existing-ad kaynağını ayıran versioned `sourceBinding`; organik gönderide creative
     kimliği/üretimi yok, source/post/object-story kanıtı action hash'ine bağlı ve legacy ref sentezlenmiyor.
-  - [ ] Canonical private materializer: template/preset/binding + post/object-story binding + approval
-    policy/plan/action context'i kanıtlı kaynaktan kurup mevcut proposal service/queue repository'ye bağlama.
+  - [x] Caller scope almayan production read-sync composition; canonical inventory + durable cursor aynı
+    runtime'da, güvenilir scheduler principal'ı olmadığı için public GET ve canlı sync kapalı.
+  - [x] Exact material/snapshot hash'lerinden evidence selection üreten private canonical submitter çekirdeği;
+    compatibility/policy/protection/autonomy eksikliğinde zero queue ve live route bağlantısı kapalı.
+  - [x] Exact K4 existing-post ApprovalPolicy payload'ı için append-only/hash-linked reviewed registry;
+    revise/publish/disable, exact-one active resolver, forced RLS/API revoke ve seed yok.
+  - [ ] Queue policy snapshot'ını reviewed source policy revision FK/hash'ine bağlama ve arbitrary lifecycle
+    policy snapshot girişini reddetme.
+  - [ ] Trusted protection policy resolver + proposal expiry kaynağıyla canonical submitter'ı route'a bağlama.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.
 - [ ] Owner/admin/analyst/operator/viewer rol E2E.
 - [ ] 1280/820/390, keyboard/screen-reader ve hata/partial/conflict E2E.
