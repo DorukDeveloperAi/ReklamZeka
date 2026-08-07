@@ -175,7 +175,8 @@
 - [ ] Karar defteri/context budget ve deterministic fallback.
 - [ ] Injection/cross-tenant/secret/action-bypass tam negatif matrisi.
 - [ ] LocalAgentClient/session contract ve modelsiz deterministic fixture client.
-- [ ] No-model-API boundary: ReklamZeka'da OpenAI/Anthropic key, SDK veya model network call yok.
+- [x] No-model-API boundary: runtime source, package scripts ve direct/transitive dependency yüzeyinde
+  OpenAI/Anthropic key, SDK veya doğrudan model endpoint'i fail-closed CI checker + negatif fixture matrisiyle yasak.
 - [ ] Localhost Streamable HTTP + project STDIO MCP; auth ve read/proposal tool ayrımı.
 - [ ] Codex CLI/VS Code + Claude Code MCP conformance; raw writer/human grant expose edilmez.
 - [ ] Session register/heartbeat, dashboard context handoff ve proposal correlation.

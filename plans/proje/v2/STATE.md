@@ -1024,3 +1024,13 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   seviyelerinde sekiz probe gerçek satır döndürdü. Son kanıt 11 GET, 0 write, 66 istenen field slotunun 63'ü,
   üç satırda `actions` ve sıfır satırda `action_values` gösterdi. Sonuç dürüstçe `partial_coverage`; eksik üç alan
   ve gözlenmeyen `action_values` açık gap'tir. DB/schema, Meta write veya ham ID/payload/log eklenmedi.
+
+## 2026-08-08 — A12 no-model-API CI sınırı
+
+- ReklamZeka runtime'ına doğrudan OpenAI/Anthropic entegrasyonu eklenmesini engelleyen deterministik repository
+  checker eklendi. `src/`, `scripts/`, package script'leri ve package-lock dahil direct/transitive dependency yüzeyi;
+  provider SDK/import, `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` ve doğrudan provider API host'larında fail-closed olur.
+- Dokümantasyondaki mimari açıklamalar, Codex CLI/Claude Code adları ve ayrı Meta Graph connector'ı yanlış pozitif
+  üretmez. Checker kendi kaynak içeriğini veya secret değeri hata çıktısına basmaz; yalnız dosya/ihlal sınıfını verir.
+  On iki test temiz repo ile import, scoped SDK, env, endpoint, package script, manifest, lock-only transitive ve
+  eksik-root negatiflerini doğrular. Ana `npm test`/CI zincirine bağlandı; network, DB veya secret erişimi yapmaz.

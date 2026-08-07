@@ -32,7 +32,12 @@ Sync, category/effective context, policy, timeframe/metric/finding, budget, prom
 template resolution, action eligibility/risk/approval, scheduler ve timeline paketleri
 model SDK'sı import etmez. ReklamZeka runtime'ında `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
 ve provider Responses/Messages çağrısı yoktur. Modelsiz fixture client tüm deterministic
-akışı CI'da çalıştırır.
+akışı CI'da çalıştırmak için sıradaki ayrı uygulama dilimidir; bu checker onun yerine geçmez.
+
+Bu değişmez `npm run check:model-api-boundary` ile repository seviyesinde uygulanır. Checker runtime
+kaynaklarını, package script'lerini ve direct/transitive dependency yüzeyini tarar; provider SDK/import,
+API-key env adı veya doğrudan model endpoint'i CI'ı durdurur. Dokümantasyon ve kendi login/session'ıyla
+çalışan yerel CLI istemcileri bu runtime sınırının dışındadır.
 
 Yerel Codex/Claude Code ürünleri kendi servisleriyle haberleşebilir; bu trafik ve kimlik
 bilgisi ilgili CLI'nın sorumluluğudur, ReklamZeka'nın model entegrasyonu değildir.
