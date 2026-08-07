@@ -3232,6 +3232,138 @@ export const autonomyRuleRevisions = pgTable("autonomy_rule_revisions", {
   `),
 ]);
 
+/**
+ * Tenant-bound, append-only action guardrail policy revisions. Guidance is
+ * provenance only; these records grant no approval, execution, or Meta authority.
+ */
+export const actionGuardrailPolicyRevisions = pgTable("action_guardrail_policy_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceRef: text("workspace_ref").notNull(),
+  policyRef: text("policy_ref").notNull(),
+  revision: integer("revision").notNull(),
+  previousHash: text("previous_hash"),
+  schemaVersion: text("schema_version").notNull(),
+  state: text("state").notNull(),
+  effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  defaultDisposition: text("default_disposition").notNull(),
+  actionTypes: jsonb("action_types").$type<readonly string[]>().notNull(),
+  accountRefs: jsonb("account_refs").$type<readonly string[]>().notNull(),
+  campaignRefs: jsonb("campaign_refs").$type<readonly string[]>().notNull(),
+  entities: jsonb("entities").$type<readonly Record<string, unknown>[]>().notNull(),
+  internalCategoryRefs: jsonb("internal_category_refs").$type<readonly string[]>().notNull(),
+  geoRefs: jsonb("geo_refs").$type<readonly string[]>().notNull(),
+  clauses: jsonb("clauses").$type<readonly Record<string, unknown>[]>().notNull(),
+  normalizedByActorRef: text("normalized_by_actor_ref").notNull(),
+  normalizedByRole: text("normalized_by_role").notNull(),
+  sourceGuidanceRefs: jsonb("source_guidance_refs").$type<readonly string[]>().notNull().default([]),
+  publishedByActorRef: text("published_by_actor_ref"),
+  publishedByRole: text("published_by_role"),
+  publicationDecisionRef: text("publication_decision_ref"),
+  publicationReasonRef: text("publication_reason_ref"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  disabledByActorRef: text("disabled_by_actor_ref"),
+  disabledByRole: text("disabled_by_role"),
+  disableDecisionRef: text("disable_decision_ref"),
+  disableReasonRef: text("disable_reason_ref"),
+  disabledAt: timestamp("disabled_at", { withTimezone: true }),
+  canonicalHash: text("canonical_hash").notNull(),
+  artifactPayload: jsonb("artifact_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("action_guardrail_policy_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("action_guardrail_policy_revisions_workspace_ref_revision_unique")
+    .on(table.workspaceId, table.policyRef, table.revision),
+  uniqueIndex("action_guardrail_policy_revisions_workspace_hash_unique").on(table.workspaceId, table.canonicalHash),
+  index("action_guardrail_policy_revisions_resolve_idx")
+    .on(table.workspaceId, table.state, table.policyRef, table.revision),
+  check("action_guardrail_policy_revisions_identity", sql`
+    ${table.schemaVersion} = 'action-guardrail-policy/1.0.0'
+    and ${table.revision} between 1 and 1000000
+    and ${table.workspaceRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.policyRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.normalizedByActorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ((${table.revision} = 1 and ${table.previousHash} is null)
+      or (${table.revision} > 1 and ${table.previousHash} ~ '^[a-f0-9]{64}$'))
+    and ${table.canonicalHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("action_guardrail_policy_revisions_lifecycle", sql`
+    ${table.state} in ('draft', 'published', 'disabled')
+    and ${table.normalizedByRole} in ('owner', 'admin', 'analyst')
+    and ${table.defaultDisposition} = 'allow_if_no_matching_deny'
+    and (${table.expiresAt} is null or ${table.expiresAt} > ${table.effectiveFrom})
+    and ((${table.state} = 'draft' and ${table.publishedByActorRef} is null and ${table.publishedByRole} is null
+      and ${table.publicationDecisionRef} is null and ${table.publicationReasonRef} is null and ${table.publishedAt} is null
+      and ${table.disabledByActorRef} is null and ${table.disabledByRole} is null
+      and ${table.disableDecisionRef} is null and ${table.disableReasonRef} is null and ${table.disabledAt} is null)
+      or (${table.state} = 'published' and ${table.publishedByActorRef} is not null
+        and ${table.publishedByRole} in ('owner', 'admin') and ${table.publicationDecisionRef} is not null
+        and ${table.publicationReasonRef} is not null and ${table.publishedAt} is not null
+        and ${table.disabledByActorRef} is null and ${table.disabledByRole} is null
+        and ${table.disableDecisionRef} is null and ${table.disableReasonRef} is null and ${table.disabledAt} is null)
+      or (${table.state} = 'disabled' and ${table.publishedByActorRef} is not null
+        and ${table.publishedByRole} in ('owner', 'admin') and ${table.publicationDecisionRef} is not null
+        and ${table.publicationReasonRef} is not null and ${table.publishedAt} is not null
+        and ${table.disabledByActorRef} is not null and ${table.disabledByRole} in ('owner', 'admin')
+        and ${table.disableDecisionRef} is not null and ${table.disableReasonRef} is not null
+        and ${table.disabledAt} is not null and ${table.disabledAt} >= ${table.publishedAt}))
+  `),
+  check("action_guardrail_policy_revisions_selector_clauses", sql`
+    jsonb_typeof(${table.actionTypes}) = 'array' and jsonb_array_length(${table.actionTypes}) between 1 and 5
+    and not jsonb_path_exists(${table.actionTypes}, '$[*] ? (@ != "status_pause" && @ != "status_activate" && @ != "budget_decrease" && @ != "budget_increase" && @ != "existing_post_promotion")')
+    and jsonb_typeof(${table.accountRefs}) = 'array' and jsonb_array_length(${table.accountRefs}) <= 500
+    and jsonb_typeof(${table.campaignRefs}) = 'array' and jsonb_array_length(${table.campaignRefs}) <= 500
+    and jsonb_typeof(${table.entities}) = 'array' and jsonb_array_length(${table.entities}) <= 500
+    and jsonb_typeof(${table.internalCategoryRefs}) = 'array' and jsonb_array_length(${table.internalCategoryRefs}) <= 500
+    and jsonb_typeof(${table.geoRefs}) = 'array' and jsonb_array_length(${table.geoRefs}) <= 500
+    and jsonb_typeof(${table.clauses}) = 'array' and jsonb_array_length(${table.clauses}) <= 500
+    and jsonb_typeof(${table.sourceGuidanceRefs}) = 'array' and jsonb_array_length(${table.sourceGuidanceRefs}) <= 500
+  `),
+  check("action_guardrail_policy_revisions_payload_exact", sql`
+    jsonb_typeof(${table.artifactPayload}) = 'object'
+    and ${table.artifactPayload} #>> '{version}' = ${table.schemaVersion}
+    and ${table.artifactPayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+    and ${table.artifactPayload} #>> '{policyRef}' = ${table.policyRef}
+    and (${table.artifactPayload} #>> '{revision}')::integer = ${table.revision}
+    and (${table.artifactPayload} #>> '{previousHash}') is not distinct from ${table.previousHash}
+    and ${table.artifactPayload} #>> '{state}' = ${table.state}
+    and (${table.artifactPayload} #>> '{effectiveFrom}')::timestamptz = ${table.effectiveFrom}
+    and (${table.artifactPayload} #>> '{expiresAt}')::timestamptz is not distinct from ${table.expiresAt}
+    and ${table.artifactPayload} #>> '{defaultDisposition}' = ${table.defaultDisposition}
+    and ${table.artifactPayload} #> '{selector,actionTypes}' = ${table.actionTypes}
+    and ${table.artifactPayload} #> '{selector,accountRefs}' = ${table.accountRefs}
+    and ${table.artifactPayload} #> '{selector,campaignRefs}' = ${table.campaignRefs}
+    and ${table.artifactPayload} #> '{selector,entities}' = ${table.entities}
+    and ${table.artifactPayload} #> '{selector,internalCategoryRefs}' = ${table.internalCategoryRefs}
+    and ${table.artifactPayload} #> '{selector,geoRefs}' = ${table.geoRefs}
+    and ${table.artifactPayload} #> '{clauses}' = ${table.clauses}
+    and ${table.artifactPayload} #>> '{provenance,normalizedByActorRef}' = ${table.normalizedByActorRef}
+    and ${table.artifactPayload} #>> '{provenance,normalizedByRole}' = ${table.normalizedByRole}
+    and ${table.artifactPayload} #> '{provenance,sourceGuidanceRefs}' = ${table.sourceGuidanceRefs}
+    and (${table.artifactPayload} #>> '{provenance,publishedByActorRef}') is not distinct from ${table.publishedByActorRef}
+    and (${table.artifactPayload} #>> '{provenance,publishedByRole}') is not distinct from ${table.publishedByRole}
+    and (${table.artifactPayload} #>> '{provenance,publicationDecisionRef}') is not distinct from ${table.publicationDecisionRef}
+    and (${table.artifactPayload} #>> '{provenance,publicationReasonRef}') is not distinct from ${table.publicationReasonRef}
+    and (${table.artifactPayload} #>> '{provenance,publishedAt}')::timestamptz is not distinct from ${table.publishedAt}
+    and (${table.artifactPayload} #>> '{provenance,disabledByActorRef}') is not distinct from ${table.disabledByActorRef}
+    and (${table.artifactPayload} #>> '{provenance,disabledByRole}') is not distinct from ${table.disabledByRole}
+    and (${table.artifactPayload} #>> '{provenance,disableDecisionRef}') is not distinct from ${table.disableDecisionRef}
+    and (${table.artifactPayload} #>> '{provenance,disableReasonRef}') is not distinct from ${table.disableReasonRef}
+    and (${table.artifactPayload} #>> '{provenance,disabledAt}')::timestamptz is not distinct from ${table.disabledAt}
+    and ${table.artifactPayload} #>> '{authority,canApprove}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canExecute}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canWriteMeta}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canGrantApproval}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canPromoteGuidance}' = 'false'
+    and ${table.artifactPayload} #>> '{canonicalHash}' = ${table.canonicalHash}
+  `),
+  check("action_guardrail_policy_revisions_no_forbidden_material", sql`
+    ${table.artifactPayload}::text
+      !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json)|free[_-]?text|authorization|approvalgranted)"[[:space:]]*:'
+  `),
+]);
+
 /** Reviewed, append-only ApprovalPolicy definitions; never approval or execution authority by themselves. */
 export const approvalPolicyDefinitionRevisions = pgTable("approval_policy_definition_revisions", {
   id: uuid("id").primaryKey().defaultRandom(),

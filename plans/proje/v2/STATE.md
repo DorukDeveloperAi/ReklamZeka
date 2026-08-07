@@ -818,3 +818,24 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   Policy-set, evidence hash'leri ve normalize edilmiş action/evidence bağlamı canonical resolution hash'ine
   bağlıdır. Registry persistence, authentic category/affected-geo evidence materializer ve submitter wiring
   bir sonraki ayrı dilimdir; gerçek kural veya izin seed edilmemiştir.
+
+## 2026-08-08 — S5.4c3-G guardrail registry ve authentic protection evidence sınırı
+
+- ActionGuardrailPolicy için tenant-bound, append-only PostgreSQL revision registry ve Drizzle repository
+  eklendi. Repository aktif workspace kilidi altında contiguous hash/lifecycle zinciri yazar; çözümlemede
+  state filtresi kullanmadan tüm chain'i okuyup saf resolver'a verir. Forced RLS, Data API revoke, UPDATE
+  engeli, canonical payload/lifecycle/authority CHECK'leri ve tombstone purge kapsamı migration'a bağlıdır.
+- Server-private protection evidence materializer exact workspace/account/campaign/entity scope, freshness,
+  source revision ve snapshot hash'lerini deterministic evidence hash'ine bağlar. Caller scope extension,
+  missing/ambiguous/stale/cross-tenant/empty kaynak ve port arızası ayrı reason code'larla fail-closed kalır;
+  approve/execute/Meta-write/grant capability'lerinin tamamı false'dur.
+- Mevcut versioned category assignment + frozen effective context internal kategori için authoritative kaynaktır.
+  Buna karşılık `meta_ad_sets.targeting_summary`, opaque targeting signature, audience preset, guidance veya
+  serbest metin tek başına “fiilen etkilenen bölge” kanıtı değildir. Canonical affected-geo snapshot fact'i
+  revision/source hash'iyle persist edilene kadar production geo adapter yazılmayacak ve sonuç `unknown`
+  kalacaktır. Hiçbir gerçek guardrail/policy değeri seed edilmedi.
+- S1.4 canlı kabul paketi yeniden geçti: 5 hesap, 79 asset/79 edge, 1.179 linked post/media ve örneklenen
+  30 reklamın 30'unda copy+post identity; iki hesaplı persistence kabulünde 6 copy/post binding, 4 creative,
+  6 binding ve 3 durable checkpoint doğrulandı. Meta write network çağrısı her iki kabulde de `0`dır.
+- Migration öncesi tam kapı: 142 test dosyasında 861 test, production build, security/secret ve Drizzle
+  kontrolleri geçti. Canlı Supabase migration ve security proof bir sonraki adımdır.

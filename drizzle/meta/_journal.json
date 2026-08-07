@@ -232,6 +232,13 @@
       "when": 1786135203140,
       "tag": "20260807204003_unusual_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1786136345722,
+      "tag": "20260807205905_action_guardrail_policy",
+      "breakpoints": true
     }
   ]
 }
