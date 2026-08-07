@@ -763,4 +763,6 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   bağlanır. Boş, eksik, stale, conflict, tombstoned veya review süresi dolmuş kanıt `unknown` kalır.
 - Registry hiçbir gerçek mapping/policy/allowed seed içermez ve action, approval, policy ya da Meta-write
   yetkisi vermez. PostgreSQL katmanı forced RLS, API revoke, lifecycle/payload CHECK'leri ve tombstone purge
-  kapsamındadır. Sıradaki dilim selection evidence'ı kanonik private proposal materializer'a bağlamaktır.
+  kapsamındadır. Migration bağlı Supabase'e uygulandı; canlı kontrolde 68/68 tablo RLS, API rollerinde sıfır
+  tablo grant'i, sıfır schema-create ve sıfır public routine-execute grant'i doğrulandı. Sıradaki dilim
+  selection evidence'ı kanonik private proposal materializer'a bağlamaktır.
