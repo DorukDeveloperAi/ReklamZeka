@@ -1,8 +1,7 @@
 # aide — bu projenin agentic altyapı envanteri
 
-> **ÇEKİRDEK envanter.** Her oturumun HER isteğine girer; yalnız *davranışı değiştiren*i
-> taşır — ayrıntı `Detay:` işaretçilerinde, **gerekince okunur.** Kurulum `aide sync`
-> (yerel düzenlemenin akıbeti §11 · `aide sync --kuru` önce gösterir).
+> **ÇEKİRDEK envanter.** Her oturumun HER isteğine girer; yalnız *davranışı değiştiren*i taşır —
+> ayrıntı `Detay:` işaretçilerinde, **gerekince okunur.** Kurulum `aide sync` (§11).
 > Kod kanoniktir: `/Users/ybg/dev/agent-ide/docs/`.
 
 ## Bu projede kullanılabilir yetenekler
@@ -48,14 +47,10 @@ Uzun/yıkıcı bir **yazımdan önce** kaynağı claim'le, bitince bırak; başk
 yazımı `claim-guard` REDDEDER. `C=~/.claude/skills/eszamanli/scripts/claim.mjs` →
 `node $C status|claim|release --res <k>`
 
-- **DENY yiyince BEKLEME, İŞİ PARÇALA:** bloke kaynağa dokunan adımlar B, kalanı A;
-  A'yı şimdi yap, B için `node $C wait --res <k>` (`run_in_background` — çıkınca kaynak
-  SENİNDİR) ya da oturum kapanacaksa `node $C devret --res <k> --gorev "<B>"` (Maestro ölse de
-  kalıcı devir işareti taşır).
-- **Limit uyarısı alırsan kilidini BIRAK/DEVRET:** `node $C limit-devir` — askıdaki bir sahip
-  bütün kuyruğu dondurur.
-- Canlılık **pid**'le ölçülür → kilidi **ELLE SİLME** · kapı **YAZIMI** ölçer, adı anmayı
-  değil · kilit **yazım penceresinde** alınır, ölçüm süresince değil.
+- **DENY yiyince BEKLEME, İŞİ PARÇALA:** bloke adımlar B, kalanı A; A'yı şimdi yap, B için
+  `node $C wait --res <k>` (`run_in_background`) ya da oturum kapanıyorsa `devret --gorev "<B>"`.
+- **Limit uyarısında kilidini BIRAK/DEVRET** (`node $C limit-devir`) — askıdaki sahip kuyruğu dondurur.
+- Canlılık **pid**'le ölçülür → kilidi **ELLE SİLME** · kapı **YAZIMI** ölçer, adı anmayı değil.
 
 Detay: `/Users/ybg/dev/agent-ide/docs/claim-anahtarlari.md`
 
@@ -65,17 +60,12 @@ Detay: `/Users/ybg/dev/agent-ide/docs/claim-anahtarlari.md`
 ateşler. Yüzey (`~/.claude/skills/plan-organizatoru/scripts/`):
 `agac.mjs --durum|--gate|--todo|--kunye` · `oturum.mjs tohumla|bu|durum|devir|acilis|global`.
 
-- `plans/INDEX.*` ve `plans/TODO.md` **ASLA elle yazılmaz** (tek yazar `agac.mjs`); `proje`
-  slug'ı REZERVEDİR (ana plan tektir).
-- **Her plan künye taşır** (`Kategori·Üst·Kritiklik·Aciliyet·Hacim·Hedef`; `oncelik` P0–P3
-  TÜREVDİR) ve **kaynak oturumunu beyan eder** (`> Oturum: ot:<YYYY-MM-DD>/<slug>`) —
-  eksikse ADVISORY, **biçimi/değeri geçersizse gate FAIL**.
-- **Terfi asimetriktir:** oturum todo'su proje düzeyine kendiliğinden çıkmaz; planlar
-  istisnasız roadmap'e işler.
-- **Oturum devri çift uçlu:** SessionEnd `devir` yazar, SessionStart `acilis` sarkık işi
-  ≤12 satır enjekte eder — BİLGİ verir, DAYATMAZ. **Üçüncü uç OTURUM KASASI:** o an AÇIK
-  sekmelerin fotoğrafı + yeniden başlatma komutu `plans/oturumlar/kasa/`'ya düşer
-  (`soft-resume/scripts/kasa.mjs list|baslat` · özet HASATtır, üretilmez).
+- `plans/INDEX.*` + `plans/TODO.md` **ASLA elle yazılmaz** (tek yazar `agac.mjs`); `proje` slug'ı REZERVE.
+- **Her plan künye taşır** (`Kategori·Üst·Kritiklik·Aciliyet·Hacim·Hedef`) ve **kaynak oturumunu beyan
+  eder** (`> Oturum: ot:<YYYY-MM-DD>/<slug>`) — eksikse ADVISORY, **biçimi geçersizse gate FAIL**.
+- **Terfi asimetriktir:** oturum todo'su projeye kendiliğinden çıkmaz; planlar istisnasız roadmap'e işler.
+- **Oturum devri çift uçlu** (SessionEnd `devir` · SessionStart `acilis` — BİLGİ verir, DAYATMAZ);
+  üçüncü uç OTURUM KASASI (`soft-resume/scripts/kasa.mjs list|baslat`).
 
 Detay: `/Users/ybg/dev/agent-ide/docs/plan-katmani.md` (künye §4b · TODO §4c · oturum §4d)
 
@@ -88,39 +78,31 @@ Rotacı'nın da TAVANIDIR. Detay: `/Users/ybg/dev/agent-ide/docs/rotaci.md`
 
 ### 11. Alet katmanı — kit = taşınabilirlik
 Aletler **Claude'a değil PROJEYE** aittir: kanon repodadır (`/Users/ybg/dev/agent-ide/packages/kit/`),
-`~/.claude` ve `<proje>/.claude` **projeksiyondur**. `aide sync --project ~` · `--kuru` ·
-`--yerel <rel>` (yerel KAZANIR) · `--yerel-sil` · `--benimse`. **Kanonu ŞABLON taşır** —
-kalıcı değişikliği `packages/kit/templates/`'e işle. K5/Model B: şablon kurulumdan beri
-DEĞİŞTİYSE kanon iner (eski hal `sync-yedek/`'e), DURDUYSA yerel kalır, takipsize
-dokunulmaz · **kapat ≠ sil**. Detay: `/Users/ybg/dev/agent-ide/docs/kit.md`
+`~/.claude` ve `<proje>/.claude` **projeksiyondur**. **Kanonu ŞABLON taşır** — kalıcı değişikliği
+`packages/kit/templates/`'e işle. `aide sync --project ~` · `--kuru` · `--yerel <rel>` (yerel
+KAZANIR) · `--yerel-sil` · `--benimse`. K5/Model B: şablon kurulumdan beri DEĞİŞTİYSE kanon iner
+(eski hal `sync-yedek/`'e), DURDUYSA yerel kalır · **kapat ≠ sil**. Detay: `/Users/ybg/dev/agent-ide/docs/kit.md`
 
 ### 12. Boot katmanı — makine ayaktayken koşan asgari çekirdek
-**BOOT** sistemin AYAKTA OLMASININ ön koşuludur — deterministik, tmux'suz, **sistem
-kapalıyken de koşar** (MAESTRO işlerini `aide sistem kapat` durdurur).
-`aide boot durum|simdi|doctor|sinif|kapat|ac` — şalter AYRI.
-**K1:** `BOOT ⟺ (a) sistemin ayakta olması ona bağlı ∧ (b) deterministik ∧ (c) tmux
-gerektirmez`; biri düşerse iş MAESTRO'dur. Manifest **sekiz adım, SIRA SÖZLEŞMEDİR**:
-`tasima-once → sync-auto → filing-donan → filing-yaz → oturum-kapat → claudemd-bekci →
-susturulmus-nabiz → tasima-sonra` (son ikisi BEKÇİ: bulgu = ALARM, park YOK).
-**`aide sistem kapat` boot'u DURDURMAZ** · **borç bırakan her sonuç HATADIR** (`aide tasima`:
-commit→fetch→merge→push; çakışmayı motor ÇÖZMEZ). Detay: `/Users/ybg/dev/agent-ide/docs/boot-katmani.md`
+**BOOT** sistemin AYAKTA OLMASININ ön koşuludur — deterministik, tmux'suz, **sistem kapalıyken de
+koşar**; şalter AYRI: `aide boot durum|simdi|doctor|sinif|kapat|ac`. **K1:** `BOOT ⟺ (a) sistemin
+ayakta olması ona bağlı ∧ (b) deterministik ∧ (c) tmux gerektirmez`; biri düşerse iş MAESTRO'dur.
+Manifest **sekiz adım, SIRA SÖZLEŞMEDİR** (`tasima-once → sync-auto → filing-donan → filing-yaz →
+oturum-kapat → claudemd-bekci → susturulmus-nabiz → tasima-sonra`; son ikisi BEKÇİ — bulgu = ALARM).
+**`aide sistem kapat` boot'u DURDURMAZ** · **borç bırakan her sonuç HATADIR**.
+Detay: `/Users/ybg/dev/agent-ide/docs/boot-katmani.md`
 
 ### 13. Kurulum + FILING — dosyayı BAĞLAYAN ve bilgiyi TAŞIYAN halkalar
 `aide sync` DOSYA dağıtır; **`aide kurulum` onu sisteme BAĞLAR** (hook kayıtları · model
 zinciri · PATH) — kayıtsız hook **ölü metindir** ve belirtisi yoktur. **FILING** projenin
 kararlarını (hesaba bağlı `~/.claude`'dadırlar) `<proje>/.claude/filing/`'e git-izli
 yansıtır: **klasör kanondur, `~/.claude` çalışan kopya.**
-`aide kurulum [--kuru]|doctor` · `aide filing durum|<boş>=yaz|donan|kapsam|doktor|teshis`
-· `aide kurulum --hepsi`. Yeni profil: `/Users/ybg/dev/agent-ide/bin/aide-kurulum`.
-
-**Fiiller kasten farklı:** `yaz` TAM AYNAdır (silme de yansır — YIKICI), `donan` eksiği
-doldurur ve **ASLA ezmez/silmez** · **SIRA sözleşmedir** (`filing-donan` ÖNCE) · **sır kapısı
-`yaz`ın içindedir** · HAZIR = içerik kanonda **∧** taşıyıcı git · kurulum **ADDITIVE +
-idempotent + yedekli**, bozuk `settings.json` EZİLMEZ.
-
+`aide kurulum [--kuru]|doctor|--hepsi` · `aide filing durum|<boş>=yaz|donan|kapsam|doktor|teshis`.
+**Fiiller kasten farklı:** `yaz` TAM AYNAdır (silme de yansır — YIKICI), `donan` eksiği doldurur ve
+**ASLA ezmez/silmez** · **SIRA sözleşmedir** (`filing-donan` ÖNCE) · **sır kapısı `yaz`ın içindedir**
+· kurulum ADDITIVE + idempotent + yedekli, bozuk `settings.json` EZİLMEZ.
 Detay: `/Users/ybg/dev/agent-ide/docs/kurulum-katmani.md` · `/Users/ybg/dev/agent-ide/docs/filing-katmani.md` ·
-`/Users/ybg/dev/agent-ide/docs/vscode-yuzeyi.md` · `/Users/ybg/dev/agent-ide/docs/vscode-statusbar-sozlesmesi.md` ·
-`/Users/ybg/dev/agent-ide/docs/proje-panosu.md`
+`/Users/ybg/dev/agent-ide/docs/vscode-yuzeyi.md` · `/Users/ybg/dev/agent-ide/docs/proje-panosu.md`
 
 ### 14. Commit sözleşmesi + DURUM logu — geçmişi araştırılabilir tutar
 **İki sınıf:** **İŞ** commit'ini insan/Claude yazar ("neden"i bilir → sözleşmeye tabi);
@@ -130,21 +112,26 @@ elle düzenleme sapmadır). Diffin tekrarı YASAK · kapsam zorunlu · **12 sat�
 Detay (zincir DIŞI — gerekince oku): `.claude/aide/docs/commit-sozlesmesi.md` ·
 `/Users/ybg/dev/agent-ide/docs/durum-logu.md`
 
-### 15. Seviye 0 — aide KAPALIYKEN de duran taban (envanter + kapı)
+### 15. Vendor katmanı — tek kanon, ürüne özel çerçeve
+Kanon (`packages/kit/` + `hooks-registry.json` + `.claude/filing/`) ikinci bir ajan ürününe
+(**Codex**) **deterministik, 0-token** projekte edilir; artefaktı aynı filing'e geri akar.
+**Şalter varsayılan KAPALI** — kapalıyken tek bayt yazılmaz. Üç katman: **yol** (`vendorRel`,
+`kit.json` DEĞİŞMEZ) · **içerik** (projektör) · **kayıt** (`settings.json` ⊕ `hooks.json`).
+Bir hook ikinci ürüne ancak **açık beyanla** iner; **kayıtsız hook ölü metindir, DOSYASIZ kayıt
+ondan da kötüdür** → kapı ikisini birlikte ölçer.
+`aide vendor durum|ac|kapat|doctor`. Detay: `/Users/ybg/dev/agent-ide/docs/vendor-katmani.md`
+
+### 16. Seviye 0 — aide KAPALIYKEN de duran taban (envanter + kapı)
 Bu tabanı **aide taşımaz, DENETLER · ONARIR · İKAME ETMEZ**. Ne olduğu Seviye 0 maddesinde
-(yukarıda); burada **ölçeni** var: `aide seviye0` envanteri her yüzeyin **sınıfını ·
-taşıyıcısını · şalterini** ve `[kayıt][dosya]` rozetini basar — **kayıtsız hook ölü metindir
-ve BELİRTİSİ YOKTUR** (ölçüldü: üçüncü taraf bir yazar `settings.json → hooks`tan `Stop`
-anahtarını komple sildi, dört seviye-0 kaydı sessizce öldü). `aide seviye0 --gate` exit 1
-verirse çare TEK ve idempotenttir: **`aide kurulum`**. Uçtan uca kanıt `surus` sınıfındadır
-(`aide kanit --artefakt-kontrol` tazeliğini ölçer), çünkü ön koşulu makinenin hâlidir.
+(yukarıda); burada **ölçeni** var: `aide seviye0` envanteri her yüzeyin **sınıfını · taşıyıcısını ·
+şalterini** ve `[kayıt][dosya]` rozetini basar — **kayıtsız hook ölü metindir ve BELİRTİSİ YOKTUR**
+(ölçüldü: bir üçüncü-taraf yazar `settings.json → hooks`tan `Stop`u silince dört seviye-0 kaydı
+sessizce öldü). `aide seviye0 --gate` exit 1 verirse çare TEK ve idempotenttir: **`aide kurulum`**.
 Detay: `/Users/ybg/dev/agent-ide/docs/seviye-0.md`
 
 ## Terimler
 
-Kanon **`.claude/aide/docs/terimler.md`** (zincirde). Birinci kural: **otomatik olan her şey
-deterministik mi agentic mi SÖYLER** — motor·kapı·bekçi·doctor = LLM'siz, 0 token;
-ajan·koşucu = LLM.
+Kanon **`.claude/aide/docs/terimler.md`** (zincirde) — birinci kuralı orada.
 
 ## Sözleşmeler
 - Maestro ile temas YALNIZ `/Users/ybg/dev/agent-ide/jobs/` şeması + `zamanla` CLI üzerinden; meşgul
