@@ -3104,3 +3104,115 @@ export const actionApprovalEvidenceGrants = pgTable("action_approval_evidence_gr
       !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
   `),
 ]);
+
+/**
+ * Append-only normalized autonomy rules. Guidance references are provenance only;
+ * publication always carries an explicit owner/admin decision and grants no execution authority.
+ */
+export const autonomyRuleRevisions = pgTable("autonomy_rule_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  ruleRef: text("rule_ref").notNull(),
+  revision: integer("revision").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  workspaceRef: text("workspace_ref").notNull(),
+  scopeLevel: text("scope_level").notNull(),
+  scopeRef: text("scope_ref"),
+  entityLevel: text("entity_level"),
+  actionType: text("action_type"),
+  mode: text("mode").notNull(),
+  state: text("state").notNull(),
+  effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  killSwitch: boolean("kill_switch").notNull().default(false),
+  maximumActionsPerRun: integer("maximum_actions_per_run"),
+  normalizedByActorRef: text("normalized_by_actor_ref").notNull(),
+  normalizedByRole: text("normalized_by_role").notNull(),
+  sourceGuidanceRefs: jsonb("source_guidance_refs").$type<readonly string[]>().notNull().default([]),
+  publishedByActorRef: text("published_by_actor_ref"),
+  publishedByRole: text("published_by_role"),
+  publicationDecisionRef: text("publication_decision_ref"),
+  publicationReasonRef: text("publication_reason_ref"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  canonicalHash: text("canonical_hash").notNull(),
+  artifactPayload: jsonb("artifact_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("autonomy_rule_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("autonomy_rule_revisions_workspace_ref_revision_unique")
+    .on(table.workspaceId, table.ruleRef, table.revision),
+  uniqueIndex("autonomy_rule_revisions_workspace_hash_unique").on(table.workspaceId, table.canonicalHash),
+  index("autonomy_rule_revisions_workspace_state_ref_revision_idx")
+    .on(table.workspaceId, table.state, table.ruleRef, table.revision),
+  check("autonomy_rule_revisions_identity", sql`
+    ${table.revision} >= 1 and ${table.revision} <= 1000000
+    and ${table.schemaVersion} = 'autonomy-rule-artifact/1.0.0'
+    and ${table.ruleRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.workspaceRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.normalizedByActorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.canonicalHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("autonomy_rule_revisions_mode_state", sql`
+    ${table.mode} in ('denied', 'approval_only', 'policy_limited')
+    and ${table.state} in ('draft', 'published', 'disabled')
+    and ${table.normalizedByRole} in ('owner', 'admin', 'analyst')
+    and (${table.maximumActionsPerRun} is null or ${table.maximumActionsPerRun} between 1 and 1000000)
+    and (not ${table.killSwitch} or ${table.mode} = 'denied')
+    and (${table.expiresAt} is null or ${table.expiresAt} > ${table.effectiveFrom})
+  `),
+  check("autonomy_rule_revisions_scope", sql`
+    (${table.scopeLevel} = 'action_type' and ${table.scopeRef} is null and ${table.entityLevel} is null
+      and ${table.actionType} in ('no_change', 'internal_annotation', 'status_pause', 'status_activate',
+        'budget_decrease', 'budget_increase', 'existing_post_promotion'))
+    or (${table.scopeLevel} = 'entity' and ${table.scopeRef} is not null
+      and ${table.entityLevel} in ('campaign', 'adset', 'ad') and ${table.actionType} is null)
+    or (${table.scopeLevel} in ('workspace', 'account_group', 'account', 'internal_category', 'campaign')
+      and ${table.scopeRef} is not null and ${table.entityLevel} is null and ${table.actionType} is null
+      and (${table.scopeLevel} <> 'workspace' or ${table.scopeRef} = ${table.workspaceRef}))
+  `),
+  check("autonomy_rule_revisions_publication", sql`
+    (${table.state} = 'draft' and ${table.publishedByActorRef} is null and ${table.publishedByRole} is null
+      and ${table.publicationDecisionRef} is null and ${table.publicationReasonRef} is null and ${table.publishedAt} is null)
+    or (${table.state} in ('published', 'disabled') and ${table.publishedByActorRef} is not null
+      and ${table.publishedByRole} in ('owner', 'admin') and ${table.publicationDecisionRef} is not null
+      and ${table.publicationReasonRef} is not null and ${table.publishedAt} is not null)
+  `),
+  check("autonomy_rule_revisions_guidance_metadata", sql`
+    jsonb_typeof(${table.sourceGuidanceRefs}) = 'array'
+    and jsonb_array_length(${table.sourceGuidanceRefs}) <= 100
+  `),
+  check("autonomy_rule_revisions_payload_exact", sql`
+    jsonb_typeof(${table.artifactPayload}) = 'object'
+    and ${table.artifactPayload} #>> '{version}' = ${table.schemaVersion}
+    and ${table.artifactPayload} #>> '{ruleRef}' = ${table.ruleRef}
+    and (${table.artifactPayload} #>> '{revision}')::integer = ${table.revision}
+    and ${table.artifactPayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+    and ${table.artifactPayload} #>> '{scope,level}' = ${table.scopeLevel}
+    and (${table.artifactPayload} #>> '{scope,ref}') is not distinct from ${table.scopeRef}
+    and (${table.artifactPayload} #>> '{scope,entityLevel}') is not distinct from ${table.entityLevel}
+    and (${table.artifactPayload} #>> '{scope,actionType}') is not distinct from ${table.actionType}
+    and ${table.artifactPayload} #>> '{mode}' = ${table.mode}
+    and ${table.artifactPayload} #>> '{state}' = ${table.state}
+    and (${table.artifactPayload} #>> '{effectiveFrom}')::timestamptz = ${table.effectiveFrom}
+    and (${table.artifactPayload} #>> '{expiresAt}')::timestamptz is not distinct from ${table.expiresAt}
+    and (${table.artifactPayload} #>> '{killSwitch}')::boolean = ${table.killSwitch}
+    and (${table.artifactPayload} #>> '{maximumActionsPerRun}')::integer is not distinct from ${table.maximumActionsPerRun}
+    and ${table.artifactPayload} #>> '{provenance,normalizedByActorRef}' = ${table.normalizedByActorRef}
+    and ${table.artifactPayload} #>> '{provenance,normalizedByRole}' = ${table.normalizedByRole}
+    and ${table.artifactPayload} #> '{provenance,sourceGuidanceRefs}' = ${table.sourceGuidanceRefs}
+    and (${table.artifactPayload} #>> '{provenance,publishedByActorRef}') is not distinct from ${table.publishedByActorRef}
+    and (${table.artifactPayload} #>> '{provenance,publishedByRole}') is not distinct from ${table.publishedByRole}
+    and (${table.artifactPayload} #>> '{provenance,publicationDecisionRef}') is not distinct from ${table.publicationDecisionRef}
+    and (${table.artifactPayload} #>> '{provenance,publicationReasonRef}') is not distinct from ${table.publicationReasonRef}
+    and (${table.artifactPayload} #>> '{provenance,publishedAt}')::timestamptz is not distinct from ${table.publishedAt}
+    and ${table.artifactPayload} #>> '{canonicalHash}' = ${table.canonicalHash}
+    and ${table.artifactPayload} #>> '{authority,canExecute}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canWriteMeta}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canGrantApproval}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canPromoteGuidance}' = 'false'
+  `),
+  check("autonomy_rule_revisions_no_forbidden_material", sql`
+    ${table.artifactPayload}::text
+      !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json)|free[_-]?text)"[[:space:]]*:'
+  `),
+]);

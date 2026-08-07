@@ -206,6 +206,9 @@
 - [ ] Manual/assisted/automated-read/scheduled-plan + approval-only/policy-limited inheritance ve kill switch.
 - [ ] Multi-account batch plan; account-bazlı approval/execute/partial recovery.
 - [x] Varsayılan workspace `approval_only` autonomy lock; expiry/child scope fail-closed saf çekirdek.
+- [x] Workspace/account-group/account/internal-category/campaign/entity/action-type scoped, sürümlü ve
+  append-only AutonomyRule registry; analyst draft, yalnız owner/admin explicit publish/disable,
+  guidance provenance-only, RLS/API-revoke/tombstone ve canonical hash doğrulaması.
 - [x] ActionBundle→atomik ActionUnit dependency DAG, tek tek approve/reject/request-changes saf
   yaşam döngüsü; approval execute değildir ve grant exact/single-use'dur.
 - [x] Typed action plan→approval-required staging; exact plan/action/context/policy hash'i,

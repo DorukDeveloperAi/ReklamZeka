@@ -703,3 +703,24 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Guidance advisory-only kalır: `block` veya `review_required` dili preflight'ta yalnız insan incelemesi
   gerektiren `unknown` sonuç üretir. Hard block/confirmed uyumluluk ancak açıkça yayınlanmış typed policy,
   reviewed compatibility catalog ve deterministik evidence tarafından üretilebilir.
+
+## 2026-08-07 — S5.4c1 autonomy rule registry çekirdeği
+
+- Mevcut saf autonomy valve ile aynı scope/mode sözleşmesini kullanan `AutonomyRuleArtifact` eklendi.
+  Workspace, account-group, account, internal-category, campaign, entity ve action-type kapsamları;
+  `denied`, `approval_only`, `policy_limited`; effective/expiry, kill-switch ve run-cap alanları canonical
+  hash'e bağlıdır. Draft/published/disabled revision'ları değişmez ve sıra atlayamaz.
+- Analyst normalized draft hazırlayabilir; yalnız owner/admin açık decision/reason ref'iyle publish veya
+  disable edebilir. Guidance ref'leri sadece provenance'dır; artifact ve repository guidance promotion,
+  approval grant, execute veya Meta transport yetkisi taşımaz. Ham/free-text talimat action context'e
+  sokulmaz; özgün metin mevcut guidance source/card yaşam döngüsünde kalır.
+- PostgreSQL repository aktif workspace row lock altında exact replay'i `unchanged` döndürür; revision,
+  transition, corrupt store, inactive workspace ve cross-tenant workspace ref hatalarını fail-closed
+  reddeder. Resolver draft'ları dışarı çıkarmaz ve action valve'a yalnız published/disabled typed rule verir.
+- Yeni tablo forced RLS, API role revoke, append-only UPDATE trigger, payload/authority/provenance CHECK'leri
+  ve kontrollü tombstone purge kapsamına sahiptir. Polymorphic opaque scope ref'lerinin account/campaign/
+  entity relational ownership'u registry'de FK ile kanıtlanmaz; action-context materializer exact tenant
+  mirror üzerinden yeniden doğrulamak zorundadır.
+- Migration bağlı Supabase'e uygulandı. Canlı güvenlik sonucu 67/67 tabloda RLS, API rollerinde sıfır tablo
+  grant'i, sıfır schema-create ve sıfır public routine-execute grant'idir; henüz hiçbir autonomy rule kaydı
+  veya business/Meta mutation oluşturulmadı.
