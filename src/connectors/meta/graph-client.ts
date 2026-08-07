@@ -2,7 +2,7 @@ import { ConnectorError } from "@/connectors/contract";
 import { withConnectorRetry } from "@/connectors/retry";
 
 export const META_GRAPH_API_VERSION = "v23.0";
-const META_GRAPH_BASE_URL = `https://graph.facebook.com/${META_GRAPH_API_VERSION}`;
+const META_GRAPH_ORIGIN = "https://graph.facebook.com";
 
 export type MetaFetch = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
@@ -33,22 +33,36 @@ function connectorErrorFor(response: Response): ConnectorError {
 }
 
 export class MetaGraphClient {
+  readonly graphApiVersion: string;
+
   constructor(
     private readonly token: string,
     private readonly fetchImpl: MetaFetch = fetch,
+    options: Readonly<{ graphApiVersion?: string }> = {},
   ) {
     if (!token.trim()) throw new ConnectorError("authentication", "Meta access token yapılandırılmadı", false);
+    this.graphApiVersion = options.graphApiVersion ?? META_GRAPH_API_VERSION;
+    if (!/^v\d+\.\d+$/.test(this.graphApiVersion)) {
+      throw new ConnectorError("invalid_data", "Meta Graph API sürümü geçersiz", false);
+    }
   }
 
   async get<T>(path: string, params: Readonly<Record<string, string>> = {}): Promise<T> {
     return withConnectorRetry(async () => {
-      const url = new URL(`${META_GRAPH_BASE_URL}/${path.replace(/^\//, "")}`);
+      const url = new URL(`${META_GRAPH_ORIGIN}/${this.graphApiVersion}/${path.replace(/^\//, "")}`);
       for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-      const response = await this.fetchImpl(url, {
-        method: "GET",
-        cache: "no-store",
-        headers: { Authorization: `Bearer ${this.token}`, Accept: "application/json" },
-      });
+      let response: Response;
+      try {
+        response = await this.fetchImpl(url, {
+          method: "GET",
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${this.token}`, Accept: "application/json" },
+        });
+      } catch {
+        // Fetch implementations may include the complete request URL or Authorization
+        // header in their native errors. Never let that material cross this boundary.
+        throw new ConnectorError("transient", "Meta ağına güvenli bağlantı kurulamadı", true);
+      }
       if (!response.ok) throw connectorErrorFor(response);
       try {
         return await response.json() as T;
