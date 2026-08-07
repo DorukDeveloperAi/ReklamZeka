@@ -1,6 +1,6 @@
 {
   "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
-  "damga": "f7bd5a542d88",
+  "damga": "19791d05d659",
   "plans": [
     {
       "slug": "proje",
@@ -21,8 +21,8 @@
       },
       "asamaToplam": 14,
       "asamaKapali": 6,
-      "checklistAcik": 106,
-      "checklistKapali": 15,
+      "checklistAcik": 111,
+      "checklistKapali": 16,
       "sonTur": null,
       "siradaki": {
         "no": "08",
@@ -80,9 +80,9 @@
   ],
   "legacy": [],
   "todo": {
-    "acik": 106,
+    "acik": 111,
     "kaynak": {
-      "chk": 106,
+      "chk": 111,
       "elle": 0,
       "hukum": 0,
       "kunye": 0,
@@ -767,6 +767,26 @@
         "onar": null
       },
       {
+        "ref": "td:chk/proje/h5f4daf",
+        "tur": "chk",
+        "metin": "ReklamZeka OrchestratorProfile ve altı vendor-agnostic skill manifesti/conformance eval'i.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h93deb4",
+        "tur": "chk",
+        "metin": "RuleCoach owner+Meta source+evidence+conflict deliberation ve publish-bypass negatifleri.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
         "ref": "td:chk/proje/h9be15e",
         "tur": "chk",
         "metin": "Typed Meta writer allowlist; raw Graph write yok.",
@@ -930,6 +950,16 @@
         "ref": "td:chk/proje/ha8b583",
         "tur": "chk",
         "metin": "Meta request/write verify ile platform review/delivery effective state ayrımı.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h0d94d6",
+        "tur": "chk",
+        "metin": "Action type/risk + account/category/campaign/entity scoped effective-autonomy resolver ve trace.",
         "plan": "proje",
         "asama": "13",
         "kapatan": [],
@@ -1110,6 +1140,26 @@
         "ref": "td:chk/proje/h2c9b81",
         "tur": "chk",
         "metin": "Scheduled analysis in-app inbox ve duplicate-delivery/read-state E2E.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h52d78e",
+        "tur": "chk",
+        "metin": "Operating Dashboard gerçek backend state'iyle responsive/browser E2E.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h30d52a",
+        "tur": "chk",
+        "metin": "Orchestrator skill/context/autonomy/handoff çalışma alanı ve dashboard↔CLI E2E.",
         "plan": "proje",
         "asama": "14",
         "kapatan": [],

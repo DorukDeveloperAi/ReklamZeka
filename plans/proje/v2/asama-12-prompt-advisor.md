@@ -111,6 +111,17 @@ Agent L4/L5 ile başlar; `drill_down_entity`, `compare_timeframes`, `get_metric_
 budget kullanır. `draft_advised_practice` candidate/trial üretebilir; validate/standardize/
 promote yetkisi yoktur. Raw L0 dump ve sınırsız context talebi reddedilir.
 
+### T12.19 — ReklamZeka Orchestrator ve vendor-agnostic skill pack
+Kalıcı `OrchestratorProfile` ile kısa ömürlü client/session ayrılır. CampaignContextResolver,
+AnalysisDirector, BudgetSteward, RuleCoach, DecisionCadenceGuard ve ActionProposalBuilder;
+version, allowed context/tools/output, negative capabilities, eval set ve audit name taşır.
+Codex/Claude değişimi skill semantiğini veya deterministic eligibility'yi değiştirmez.
+
+### T12.20 — Rule Coach ortak tasarım akışı
+Kullanıcının genel/category/campaign hassasiyetini raw wording ile alır; ilgili geçmiş
+guidance/policy/practice, official Meta source, evidence ve conflict'i getirir. Guidance
+taslağı, bağlayıcı policy adayı ve insan muhakemesi ayrı çıktı olur; publish yetkisi yoktur.
+
 ## Kabul ve kanıt
 
 - Codex CLI/VS Code ve Claude Code aynı MCP tool/schema setiyle aynı frozen context'i okur.

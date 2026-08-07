@@ -103,6 +103,8 @@
 - [ ] Act/test/observe/no-change + cadence ihlali proposal suppression eval'i.
 - [ ] L4/L5 compact context, bounded drill-down ve raw L0 access negatifleri.
 - [ ] draft_advised_practice authority boundary ve standardization bypass negatifleri.
+- [ ] ReklamZeka OrchestratorProfile ve altı vendor-agnostic skill manifesti/conformance eval'i.
+- [ ] RuleCoach owner+Meta source+evidence+conflict deliberation ve publish-bypass negatifleri.
 
 ## A13 — Eylem valfi, scheduler ve rutin
 
@@ -123,6 +125,7 @@
 - [ ] Yeni metin/görsel/video/creative üretmeme boundary ve negatif testleri.
 - [ ] Creative/post spec hash değişiminde stale approval ve yeniden onay.
 - [ ] Meta request/write verify ile platform review/delivery effective state ayrımı.
+- [ ] Action type/risk + account/category/campaign/entity scoped effective-autonomy resolver ve trace.
 
 ## A14 — Kontrol merkezi ve rollout
 
@@ -144,6 +147,9 @@
 - [ ] AnalysisAgenda, applied guidance, cadence/experiment ve no-change UI yolculuğu.
 - [ ] Practice Lab candidate/trial/outcome/decomposition/standardized artifact UI.
 - [ ] Scheduled analysis in-app inbox ve duplicate-delivery/read-state E2E.
+- [x] Operating Dashboard + Orchestrator çift-yüzey bilgi mimarisi ve etkileşimli demo kabuğu.
+- [ ] Operating Dashboard gerçek backend state'iyle responsive/browser E2E.
+- [ ] Orchestrator skill/context/autonomy/handoff çalışma alanı ve dashboard↔CLI E2E.
 
 ## Ana plan kapanışı
 

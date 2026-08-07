@@ -37,6 +37,79 @@ akışı CI'da çalıştırır.
 Yerel Codex/Claude Code ürünleri kendi servisleriyle haberleşebilir; bu trafik ve kimlik
 bilgisi ilgili CLI'nın sorumluluğudur, ReklamZeka'nın model entegrasyonu değildir.
 
+## ReklamZeka Orchestrator profili
+
+Orchestrator bir model adı veya tek conversation değildir. ReklamZeka'da versioned kalıcı
+bir `OrchestratorProfile`; Codex CLI/VS Code, Claude Code veya diğer istemci ise geçici bir
+`AgentSession` runtime'ıdır. Profile şunları taşır:
+
+```text
+OrchestratorProfile
+  id, workspaceScope, version, lifecycle
+  skillManifestRefs[]
+  defaultAnalysisAgendaRef
+  defaultDecisionCadenceRef
+  allowedToolCatalogVersion
+  autonomyProfileRef
+  safety/outputContractVersion
+```
+
+Conversation memory kategori, guidance, policy, practice, autonomy veya action state'inin
+kaynağı olamaz. Session profile/context version'larını okur; kalıcı değişiklik typed draft,
+review ve publish yoluyla application state'e yazılır.
+
+### Vendor-agnostic skill manifesti
+
+```text
+AgentSkillManifest
+  id, name, version, lifecycle
+  purpose, allowedIntents[]
+  requiredContextRefs[], optionalContextRefs[]
+  allowedReadTools[], allowedDraftTools[]
+  outputSchemas[], citationRequirements[]
+  negativeCapabilities[]
+  evalSuiteRef, owner, changelog
+```
+
+İlk skill pack:
+
+1. `CampaignContextResolver`: Meta hierarchy/config, internal categories, history ve
+   EffectiveCampaignContext'i açıklar; sınıflandırmayı sessiz publish etmez.
+2. `AnalysisDirector`: AnalysisAgenda, timeframe, L4/L5 kanıt ve bounded drill-down ile
+   act/test/observe/no-change turu yürütür.
+3. `BudgetSteward`: envelope, target, pacing, protected allocation ve constraint trace ile
+   en fazla üç simülasyon üretir; write yapmaz.
+4. `RuleCoach`: owner wording + mevcut talimat + kaynaklı Meta practice + evidence/conflict
+   üzerinden guidance/policy/practice ayrımını kullanıcıyla kurar; publish yapmaz.
+5. `DecisionCadenceGuard`: settle/learning/cooldown/repeat ve experiment guard'larını
+   uygular; hiperaktif öneriyi bastırır.
+6. `ActionProposalBuilder`: typed ActionUnit taslağı, before/after, risk, dependency ve
+   resolved autonomy trace üretir; approve/execute edemez.
+
+Skill manifestleri aynı MCP tool/schema üzerinde client-conformance testinden geçer. Model
+veya vendor değişimi allowed tools, output validator, policy precedence ya da action
+eligibility'yi değiştiremez.
+
+### Scoped autonomy çözümü
+
+Otonomi tek sayı değildir. Resolver şu girdilerden **en dar izni** seçer:
+
+```text
+workspace ceiling
+∩ action type + K0–K4 risk
+∩ account/account-group profile
+∩ internal category profile
+∩ campaign/entity override
+∩ effective interval + kill switch
+= EffectiveAutonomyDecision
+```
+
+Action family'leri en az `analysis`, `recommendation`, `budget_down`, `budget_up`,
+`pause`, `activate`, `existing_post_promotion` olarak ayrılır. Örneğin analiz ve öneri
+otomatik; budget decrease/pause onaya sun; budget increase/activate/post promotion her
+zaman manuel olabilir. Alt scope veya session üst scope'u genişletemez. Her proposal hangi
+binding'in sonucu daralttığını ve `manual|approval_required|policy_limited` hükmünü taşır.
+
 ## Neden MCP-first
 
 MCP, farklı yerel agent istemcilerine aynı read/proposal araçlarını verir. Codex'in aynı
@@ -112,6 +185,12 @@ devam et” butonu handoff üretir; açık session bunu MCP ile çeker. Session'
 aynı application inbox ve timeline'da görünür. Conversation memory kalıcı policy/template/
 approval state'in kaynağı değildir.
 
+Operating Dashboard ana navigation'ı Today/decision queue, portfolio/context, scheduled
+analysis, budget lab, rules/playbooks, Orchestrator, approval inbox ve timeline'dır.
+Orchestrator çalışma alanı ayrıca aktif skill pack, frozen context, effective autonomy
+matrisi ve dashboard↔CLI correlation'ı gösterir. Kural editörü raw owner wording ile agent
+sentezini ayırır; “taslağı kaydet”, “review”, “publish” ve “automation eligible” aynı işlem değildir.
+
 ## Session içinden insan onayı
 
 Agent tool çağrısı insan onayı değildir. Dashboard veya yerel `reklamzeka approve/execute`
@@ -134,3 +213,5 @@ lock, human-presence ve A13 action valve birbirinden bağımsız üç kapıdır.
 7. AI CLI kapalıyken scheduled deterministic analysis/plan/approval queue çalışır.
 8. L0 raw erişimi reddedilir; aynı frozen EffectiveCampaignContext client'tan bağımsızdır.
 9. AdvisedPractice taslağı sessizce standardize/publish edilemez.
+10. Aynı profile/context/tool catalog ile client değişimi skill output schema ve eligibility'yi değiştirmez.
+11. Action/category/campaign autonomy binding'inde child scope daha özgür sonuç üretemez.

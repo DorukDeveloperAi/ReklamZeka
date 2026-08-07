@@ -217,6 +217,35 @@ alamaz. Session içi gerçek onay dashboard veya TTY/passkey doğrulamalı compa
 Dashboarddaki entity/timeframe/category seçimi kısa ömürlü handoff ile session'a geçer;
 session'da oluşan taslak aynı ID ile dashboard inbox ve timeline'da görünür.
 
+Bu iki yüzey ayrı ürün değildir:
+
+- **Operating Dashboard** periyodik sync→ön işleme→kanıt→karar kuyruğunun kalıcı kontrol
+  yüzeyidir. Kullanıcı bütçeyi, kampanya context'ini, scheduled analysis'i, guidance/policy
+  metnini, approval satırlarını, otonomi profilini ve timeline'ı burada görür/düzenler.
+- **ReklamZeka Orchestrator Agent** dashboardun konuşmalı çalışma ortağıdır. Uzun ömürlü
+  agent profili; vendor-neutral skill catalog, tool yetkileri, safety contract ve varsayılan
+  çalışma yöntemini taşır. Codex/Claude conversation ise kısa ömürlü session'dır ve sistem
+  kaynağı değildir.
+
+İlk Orchestrator skill pack'i altı rolü ayrı ama compose edilebilir tanımlar:
+
+1. `CampaignContextResolver`: Meta hiyerarşisi + iç kategori + geçmiş bağlamı;
+2. `AnalysisDirector`: agenda, timeframe, driver ve kanıtlı karar turu;
+3. `BudgetSteward`: hedef, pacing, koruma ve constraint tabanlı senaryo;
+4. `RuleCoach`: kullanıcı hassasiyetini guidance/policy/practice olarak birlikte netleştirme;
+5. `DecisionCadenceGuard`: learning/cooldown/no-change ve test istikrarı;
+6. `ActionProposalBuilder`: otonomi profiline göre draft, proposal veya approval satırı.
+
+Skill, prompt fragmanı değil versioned capability manifestidir: hangi context/tool/output
+tiplerini kullanabildiği ve neleri yapamadığı tanımlıdır. Vendor değişimi bu sözleşmeyi,
+effective context'i veya action eligibility'yi değiştirmez.
+
+Otonomi tek global seviye değildir. Effective autonomy; workspace üst sınırı ile action
+type/risk, account, internal category, campaign/entity ve süreli override'ın en dar
+bileşimidir. Örneğin analiz otomatik, bütçe önerisi otomatik, bütçe write/pause onaylı,
+post promotion her zaman manuel olabilir. Alt scope özgürlüğü genişletemez; agent aktif
+seviyeyi her proposal'da açıklar.
+
 ## 5. Prompt/context eklentisinin doğru kurgusu
 
 Kullanıcı talimatı ana sistem prompt'una kontrolsüz enjeksiyon değildir. Her agent turu

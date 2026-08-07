@@ -50,6 +50,20 @@ CLI kendi login/session'ıyla localhost/STDIO MCP'ye bağlanır. Session içinde
 agent tool çağrısı değil, dashboard veya yerel human-presence doğrulamalı companion yoludur.
 Meta Graph veri ve reklam eylemi bağlantısı bu model-provider sınırından ayrıdır.
 
+Ana ürün deneyimi bir **Operating Dashboard + ReklamZeka Orchestrator Agent** ikilisidir.
+Dashboard periyodik veri, deterministik ön işleme, kampanya/bütçe/kural yönetimi, scheduled
+analysis, approval inbox ve timeline'ın kalıcı yüzeyidir. Orchestrator aynı state üzerinde
+Campaign Context Resolver, Analysis Director, Budget Steward, Rule Coach, Decision Cadence
+Guard ve Action Proposal Builder rollerini vendor-agnostic skill'ler olarak kullanır.
+Kullanıcı bu agent ile yalnız analiz yapmaz; kendi hassasiyetini ilgili Meta context ve
+kaynaklı practice'lerle birlikte guidance/policy/practice haline getirirken de çalışır.
+
+Otonomi tek bir aç/kapa düğmesi değildir: analiz, öneri, bütçe azaltma/artırma, pause/
+activate ve post promotion gibi action türleri; workspace/account/internal category/
+campaign scope'u ve risk sınıfına göre ayrı sınırlandırılır. Alt scope üst sınırdan daha
+özgür olamaz. Dashboard aktif effective autonomy'yi gösterir; agent her proposal'da neden
+otomatik çalıştığını veya neden onaya sunduğunu açıklar.
+
 Kullanıcının şahsi strateji/anlatımları ile kaynaklı Meta best-practice bilgisi, yerel
 agent session'ında kritik ve karşılaştırmalı bir sohbetle GuidanceCard/Set olarak gelişir.
 Her düşünce ilk günden katı kurala çevrilmez: doğal dil guidance global, hesap grubu/hesap,

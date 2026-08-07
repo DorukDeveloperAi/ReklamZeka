@@ -105,6 +105,17 @@ Scheduled/manual analysis run sonucu Today/inbox'a idempotent card olarak düşe
 acknowledged, stale/superseded ve deep-link taşır. İlk incrementte e-posta/Slack/webhook yok;
 external channel ayrı capability/rollout kararıdır.
 
+### T14.15 — Operating Dashboard ana kabuğu
+Kalıcı navigation: Today/decision queue, campaign context, scheduled analysis, budget lab,
+rules/playbooks, Orchestrator, approval inbox ve timeline. Summary-first görünüm veri
+freshness/coverage, effective autonomy, öncelikli kararlar ve bütçe durumunu ilk ekranda
+gösterir; derin ayarlar progressive disclosure'dır.
+
+### T14.16 — Orchestrator çalışma alanı
+Aktif Codex/Claude/diğer MCP session health, selected context/handoff, skill pack, tool ve
+citation trace, effective autonomy matrisi, konuşma/draft/proposal correlation. Dashboard
+conversation transcript'i policy state saymaz; kalıcı değişiklik typed draft/version üretir.
+
 ## Kabul ve kanıt
 
 - Kullanıcı bir kampanyayı bulur, category/instruction ekler, dry-run analiz ve bütçe

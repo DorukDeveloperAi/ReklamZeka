@@ -135,6 +135,8 @@
 | R-12.17 | Model hafızasından gelen iddia source ref olmadan official Meta best-practice olarak etiketlenemez; stale guidance needs-review olur. | unsupported-best-practice negatives |
 | R-12.18 | Agent L4/L5 compact context ile başlar; L1–L3'e yalnız bounded typed drill-down ve explicit context budget/moreAvailable üzerinden iner, L0 raw dump alamaz. | context-budget/raw-access negatives |
 | R-12.19 | Agent AdvisedPractice candidate/trial draft edebilir ama validation/standardization/policy promotion kararı veremez; outcome ve kullanıcı review ister. | practice authority boundary |
+| R-12.20 | ReklamZeka Orchestrator vendor-agnostic kalıcı agent profile'dır; CampaignContextResolver, AnalysisDirector, BudgetSteward, RuleCoach, DecisionCadenceGuard ve ActionProposalBuilder skill manifestleri versioned input/context/tool/output/negative-capability taşır. | skill-manifest/client-conformance suite |
+| R-12.21 | RuleCoach owner wording, mevcut scoped guidance/policy, official Meta source, deterministic evidence ve conflictleri kritik görüşmede ayrı gösterir; sohbet tek başına publish/authorization yapamaz. | rule-coach deliberation/security E2E |
 
 ## A13 — Eylem valfi, scheduler ve rutin
 
@@ -159,6 +161,7 @@
 | R-13.17 | Sistem yeni metin/görsel/video/creative varyantı üretmez veya değiştirmez; existing-post promotion yalnız frozen post identity/content hash'ini referanslar. | no-creative-generation/import/network negatives |
 | R-13.18 | Post-promotion preview'i frozen postContentHash+actor+template+audiencePreset+destination+adSet+budget sürümüne bağlıdır; biri değişince ilgili/downstream approval stale olur. | post-promotion approval invalidation matrix |
 | R-13.19 | Meta request/read-after-write başarısı ile platform review ve delivery effective durumu ayrıdır; pending/rejected/limited state'leri timeline ve recovery taşır. | async-review/delivery state E2E |
+| R-13.20 | Effective autonomy workspace üst sınırı ile action type/risk, account, internal category, campaign/entity ve süreli override'ın en dar bileşimidir; child scope genişletemez ve proposal resolved trace taşır. | scoped-autonomy lattice/bypass suite |
 
 ## A14 — Kontrol merkezi ve rollout
 
@@ -185,6 +188,8 @@
 | R-14.19 | Analysis ekranı agenda pass'lerini, applied guidance pack'i, cadence/experiment geçmişini ve no-change gerekçesini progressive disclosure ile gösterir. | guided-analysis journey E2E |
 | R-14.20 | Practice Lab candidate/trial/outcome/standardization review, decomposition ve standardized artifact linklerini gösterir; sessiz promotion yoktur. | advised-practice studio E2E |
 | R-14.21 | Scheduled analysis sonucu ilk incrementte in-app inbox/Today görünümüne idempotent teslim edilir; external notification kanalları ayrı rollout'tur. | in-app delivery/read-state E2E |
+| R-14.22 | Operating Dashboard Today, portfolio/context, analysis schedules, budget lab, rules/playbooks, Orchestrator, approval inbox ve timeline'ı tek kalıcı navigation altında toplar; summary ilk ekranda karar ve veri güvenini gösterir. | operating-dashboard responsive/browser E2E |
+| R-14.23 | Orchestrator workspace aktif client/session, frozen context, skill pack, tool/citation trace, effective autonomy ve aynı-ID dashboard↔CLI handoff/proposal durumunu gösterir. | orchestrator-workspace handoff E2E |
 
 ## Kapsam dışı / ayrı karar isteyen
 

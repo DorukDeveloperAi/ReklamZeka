@@ -7,6 +7,8 @@ const root = resolve(import.meta.dirname, "..");
 const failures = [];
 const required = [
   "src/app/dashboard/page.tsx",
+  "src/app/dashboard/operating-dashboard.tsx",
+  "src/app/dashboard/operating-dashboard.module.css",
   "src/app/dashboard/fixture-state.ts",
   "src/app/api/dashboard/route.ts",
   "tests/performance-experience.test.ts",
@@ -15,6 +17,10 @@ const required = [
 for (const path of required) if (!existsSync(resolve(root, path))) failures.push(`eksik: ${path}`);
 
 if (failures.length === 0) {
+  const operatingDashboard = readFileSync(resolve(root, "src/app/dashboard/operating-dashboard.tsx"), "utf8");
+  for (const boundary of ["Orchestrator Agent", "Kurallar & akışlar", "approval_only", "Taslağı kaydet", "Onaylandı · execute bekliyor", "Demo modunda Meta execute kapalı"]) {
+    if (!operatingDashboard.includes(boundary)) failures.push(`operating dashboard sınırı eksik: ${boundary}`);
+  }
   const evidence = JSON.parse(readFileSync(resolve(root, "docs/qa/a05-browser-evidence.json"), "utf8"));
   const widths = evidence.viewports.map((viewport) => viewport.width);
   if (JSON.stringify(widths) !== JSON.stringify([1280, 820, 390])) failures.push("üç viewport kanıtı eksik");

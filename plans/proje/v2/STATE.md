@@ -140,6 +140,18 @@
   Kaynaklar: ADR-0014, `docs/architecture/analysis-processing-pipeline.md` ve
   `docs/discovery/2026-08-06-end-to-end-gap-review.md`.
 
+## 2026-08-07 — Operating Dashboard ve Orchestrator demo çerçevesi
+
+- Eski salt-okunur demo raporu, günlük işletim odaklı Today/portfolio/analysis/budget/
+  rules/Orchestrator/approval/timeline navigasyonuna sahip etkileşimli demo kabuğuna çevrildi.
+- Demo mevcut kanonik dashboard snapshot'ından temel metrikleri kullanır; kampanya context,
+  rule edit, budget scenario, autonomy matrix, agent chat ve approval state ürün davranışı
+  prototipidir, production Meta write veya tamamlanmış backend capability kanıtı değildir.
+- Kalıcı `ReklamZeka OrchestratorProfile` ile Codex/Claude runtime session ayrımı; altı
+  vendor-agnostic skill ve action/category/campaign scoped effective autonomy planlara eklendi.
+- `/dashboard` ve `/reports/demo` aynı Operating Dashboard deneyimini gösterir; imzalı
+  paylaşılan raporlar ayrı salt-okunur `ReportView` sözleşmesini korur.
+
 ## Sıradaki uygulama
 
 **Slice 1 / Meta Read Mirror:** A08/T08.1–T08.3 ile secret reference, Meta entity/config

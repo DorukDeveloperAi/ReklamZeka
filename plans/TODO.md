@@ -2,10 +2,10 @@
 
 > **TÜREV — elle düzenlenmez.** Tek yazar `agac.mjs` (motor · deterministik · 0 token).
 > Elle madde buraya değil **`TODO-ELLE.md`**'ye yazılır.
-> Damga: `f7bd5a542d88` · Kaynak: CHECKLIST(açık) · TODO-ELLE.md · HUKUM.md(EKSİK/STUCK) · künye-eksikleri · sarkık-oturum
+> Damga: `19791d05d659` · Kaynak: CHECKLIST(açık) · TODO-ELLE.md · HUKUM.md(EKSİK/STUCK) · künye-eksikleri · sarkık-oturum
 > İLANLI MUAF (bu listeye GİRMEZ, her birinin kendi kanalı var): alerts.jsonl · parked işler · doctor fix: · teslim onar: · kaptan task'ları
 
-**106 açık madde** · plansız: 0 · chk: 106 · elle: 0 · hüküm: 0 · künye: 0 · oturum: 0
+**111 açık madde** · plansız: 0 · chk: 111 · elle: 0 · hüküm: 0 · künye: 0 · oturum: 0
 
 ## Plansız maddeler — plan-üretim adayları (0)
 
@@ -19,7 +19,7 @@ _yok_
 
 _yok_
 
-## Plan checklist maddeleri (106) — künye önceliği sırasında
+## Plan checklist maddeleri (111) — künye önceliği sırasında
 
 
 ### proje v2 · P2
@@ -90,6 +90,8 @@ _yok_
 - [ ] [12] Act/test/observe/no-change + cadence ihlali proposal suppression eval'i. `td:chk/proje/hf8fe34`
 - [ ] [12] L4/L5 compact context, bounded drill-down ve raw L0 access negatifleri. `td:chk/proje/l4`
 - [ ] [12] draft_advised_practice authority boundary ve standardization bypass negatifleri. `td:chk/proje/hae87bb`
+- [ ] [12] ReklamZeka OrchestratorProfile ve altı vendor-agnostic skill manifesti/conformance eval'i. `td:chk/proje/h5f4daf`
+- [ ] [12] RuleCoach owner+Meta source+evidence+conflict deliberation ve publish-bypass negatifleri. `td:chk/proje/h93deb4`
 - [ ] [13] Typed Meta writer allowlist; raw Graph write yok. `td:chk/proje/h9be15e`
 - [ ] [13] Campaign/adset/ad pause/activate eligibility ve parent/effective-status matrisi. `td:chk/proje/hd515f4`
 - [ ] [13] Campaign/adset budget owner write; ad-level budget negatif testi. `td:chk/proje/hd8c3cb`
@@ -107,6 +109,7 @@ _yok_
 - [ ] [13] Yeni metin/görsel/video/creative üretmeme boundary ve negatif testleri. `td:chk/proje/hf0b1da`
 - [ ] [13] Creative/post spec hash değişiminde stale approval ve yeniden onay. `td:chk/proje/hba96e9`
 - [ ] [13] Meta request/write verify ile platform review/delivery effective state ayrımı. `td:chk/proje/ha8b583`
+- [ ] [13] Action type/risk + account/category/campaign/entity scoped effective-autonomy resolver ve trace. `td:chk/proje/h0d94d6`
 - [ ] [14] Bugün/portfolio hiyerarşi ve internal/Meta filtreler. `td:chk/proje/hb8d4e8`
 - [ ] [14] Account-group switcher, multi-account connection health ve Page/Instagram asset graph. `td:chk/proje/hd7b228`
 - [ ] [14] Kategori/talimat stüdyosu ve raw/normalized/version/conflict görünümü. `td:chk/proje/he405ed`
@@ -125,6 +128,8 @@ _yok_
 - [ ] [14] AnalysisAgenda, applied guidance, cadence/experiment ve no-change UI yolculuğu. `td:chk/proje/h15ef9e`
 - [ ] [14] Practice Lab candidate/trial/outcome/decomposition/standardized artifact UI. `td:chk/proje/h0c8a74`
 - [ ] [14] Scheduled analysis in-app inbox ve duplicate-delivery/read-state E2E. `td:chk/proje/h2c9b81`
+- [ ] [14] Operating Dashboard gerçek backend state'iyle responsive/browser E2E. `td:chk/proje/h52d78e`
+- [ ] [14] Orchestrator skill/context/autonomy/handoff çalışma alanı ve dashboard↔CLI E2E. `td:chk/proje/h30d52a`
 - [ ] A07 gerçek saha pilotu tamamlandı. `td:chk/proje/a07-2`
 - [ ] A08–A14 kabul/kanıtları temiz. `td:chk/proje/a08-a14`
 - [ ] Production security/build/DB/browser ve Meta sandbox kapıları temiz. `td:chk/proje/hd72c59`

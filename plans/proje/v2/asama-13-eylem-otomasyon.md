@@ -93,6 +93,12 @@ limited ve delivery effective ayrı state/event'tir. Existing-post create başar
 review/delivery effective olmadan “yayında” sayılmaz. Rejection reason, düzeltme/park ve
 ayrı approved recovery proposal'ı timeline'a bağlanır.
 
+### T13.15 — Action ve kampanya bağlamına göre autonomy resolver
+Workspace üst sınırı; action type/risk, account, internal category, campaign/entity ve
+expiring override ile en dar izin olarak çözülür. `analysis`, `recommendation`, `budget_down`,
+`budget_up`, `pause/activate`, `post_promotion` ayrı olabilir. Proposal resolved autonomy
+trace taşır; child scope ve agent session üst sınırı genişletemez.
+
 ## Kabul ve kanıt
 
 - Tek anahtar, DB flag veya prompt write açamaz; K3 onaysız reddedilir.

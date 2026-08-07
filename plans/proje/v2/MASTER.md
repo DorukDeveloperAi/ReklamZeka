@@ -347,6 +347,18 @@ companion CLI, TTY/passkey ile kısa ömürlü `HumanPresenceGrant` üretir. Bö
 aynı terminal akışında her `ActionUnit`ı ayrı onaylayıp execute edebilir; model bu grant'i
 oluşturamaz, sibling satıra taşıyamaz veya approval-only kilidini gevşetemez.
 
+`ReklamZeka Orchestrator` ürünün kalıcı, vendor-agnostic agent profilidir; Codex CLI/VS
+Code, Claude Code veya başka MCP client yalnız runtime session'dır. İlk skill pack:
+CampaignContextResolver, AnalysisDirector, BudgetSteward, RuleCoach, DecisionCadenceGuard
+ve ActionProposalBuilder. Her skill versioned input/context/tool/output/negative-capability
+manifesti taşır; skill adı prompt içine serbest metin ekleyerek yetki oluşturmaz.
+
+Operating Dashboard bu agentın kontrol yüzeyidir: Today/decision queue, portfolio/context,
+scheduled analysis, budget lab, rules/playbooks, Orchestrator session, approval inbox ve
+timeline. Kullanıcı bir dashboard seçimini session'a handoff eder; session proposal'ı aynı
+ID ile dashboarda döner. Guidance/policy editleri ve autonomy değişiklikleri kalıcı state'te
+sürümlenir, conversation memory'de tutulmaz.
+
 ### Hibrit işletim ve otonomi kilidi
 
 Tetikleme/planlama biçimi ile Meta'ya yazma otonomisi ayrı ayarlardır. Böylece schedule
@@ -365,6 +377,12 @@ otomatik olarak yetkiyi genişletmez. İleride kullanıcı ayrı bir policy sür
 kilidi açıkça kaldırırsa `policy_limited` yalnız izinli/cap'li K1/K2'yi çalıştırabilir.
 K3/K4 her profilde insan onaylı kalır. Workspace/account/category/entity seviyesinde daha
 alt scope yalnız otonomiyi daraltabilir. Global ve hesap bazlı kill switch vardır.
+
+Effective autonomy yalnız workspace profilinden okunmaz. Resolver sırayla action type/risk,
+account, internal category, campaign/entity ve süreli override'ı uygular; sonuç en dar izin
+olur. Böylece aynı agent analizi otomatik çalıştırabilir, budget/pause proposal'ını onaya
+sunabilir ve K4 post promotion'ı her zaman manuel bırakabilir. Her proposal resolved
+autonomy trace ve gerekçe taşır.
 
 Approval kuyruğu `ActionBundle → ActionUnit[]` gösterir. Her unit before/after, creative/post
 preview, hedef entity, bütçe etkisi, kanıt/policy izi, risk, dependency, expiry ve stale

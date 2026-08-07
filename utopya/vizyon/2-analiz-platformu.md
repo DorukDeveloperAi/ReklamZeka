@@ -232,6 +232,16 @@ ayrı yönetebilir; creative spec değişince eski onay stale olur.
   otomatik olabilir, K3/K4 insan onaylı kalır.
 - Campaign/adset/ad pause/activate; campaign/adset budget action'ları doğru entity ve parent/
   budget-owner eligibility ile aynı dashboard/valf/timeline zincirinden geçer.
+- ReklamZeka Orchestrator kalıcı bir vendor-agnostic agent profile'dır; Codex/Claude
+  yalnız session runtime'ıdır. CampaignContextResolver, AnalysisDirector, BudgetSteward,
+  RuleCoach, DecisionCadenceGuard ve ActionProposalBuilder capability manifestleri ayrı
+  sürümlenir, compose edilir ve tool/output sınırları taşır.
+- RuleCoach kullanıcının genel, kategori veya kampanya özelindeki hassasiyetlerini mevcut
+  owner guidance, kaynaklı Meta practice, deterministic evidence ve conflictlerle birlikte
+  netleştirir; sohbetten sessiz policy yayınlamaz.
+- Effective autonomy action type+risk ile workspace/account/internal-category/campaign/entity
+  scope'larının en dar bileşimidir. Analiz/öneri otomatikken bütçe write/pause onaylı,
+  post promotion her zaman manuel olabilir; child scope otonomiyi genişletemez.
 
 **Kabul:** Codex, Claude Code ve dashboard aynı frozen context/proposal/action ID'lerini
 kullanır; CLI değişimi deterministic finding/budget/action eligibility'yi değiştirmez;
@@ -239,6 +249,8 @@ hiçbir agent onay/valf olmadan Meta write gerçekleştiremez.
 
 ▸ bugün nerede: model-agnostic local CLI/MCP mimarisi ve gereksinimler tanımlı; local MCP,
 session handoff/hub, companion human-presence ve hybrid-mode executor henüz uygulanmadı.
+Operating Dashboard + Orchestrator bilgi mimarisi etkileşimli demo olarak uygulandı;
+gösterilen agent/bütçe/kural eylemleri demo state'idir, production motor kanıtı değildir.
 
 <!-- uy:analiz-platformu/kademeli-teslim -->
 ## Kademeli ve verimli teslim

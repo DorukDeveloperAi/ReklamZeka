@@ -61,6 +61,10 @@ if (failures.length === 0) {
   for (const boundary of ["CategoryDimension", "CategoryProfile", "guidanceSetRefs", "advisedPracticeRefs", "manual_locked", "PARKED_CONFLICT", "effective-context snapshot"]) {
     if (!internalCategory.includes(boundary)) failures.push(`iç kategori sözleşmesi eksik: ${boundary}`);
   }
+  const agentInterface = readFileSync(resolve(root, "docs/architecture/model-agnostic-agent-interface.md"), "utf8");
+  for (const boundary of ["OrchestratorProfile", "AgentSkillManifest", "RuleCoach", "EffectiveAutonomyDecision", "existing_post_promotion"]) {
+    if (!agentInterface.includes(boundary)) failures.push(`orchestrator sözleşmesi eksik: ${boundary}`);
+  }
   const guidance = readFileSync(resolve(root, "docs/architecture/guidance-deliberation-and-progressive-formalization.md"), "utf8");
   for (const boundary of ["GuidanceSource", "EffectiveGuidancePack", "AnalysisAgendaVersion", "DecisionCadenceProfile", "AdvisedPractice", "StandardizationReview", "no-change", "G0", "G4"]) {
     if (!guidance.includes(boundary)) failures.push(`guidance sözleşmesi eksik: ${boundary}`);
@@ -74,7 +78,7 @@ if (failures.length === 0) {
     if (!distillation.includes(boundary)) failures.push(`ürün distilasyonu sınırı eksik: ${boundary}`);
   }
   const requirements = readFileSync(resolve(root, "plans/proje/v2/REQUIREMENTS.md"), "utf8");
-  for (const boundary of ["R-G23", "R-G24", "R-G25", "R-G26", "R-09.20", "R-09.21", "R-10.13", "R-10.14", "R-10.16", "R-12.18", "R-12.19", "R-14.20", "R-14.21"]) {
+  for (const boundary of ["R-G23", "R-G24", "R-G25", "R-G26", "R-09.20", "R-09.21", "R-10.13", "R-10.14", "R-10.16", "R-12.18", "R-12.19", "R-12.20", "R-12.21", "R-13.20", "R-14.20", "R-14.21", "R-14.22", "R-14.23"]) {
     if (!requirements.includes(boundary)) failures.push(`guidance requirement eksik: ${boundary}`);
   }
 }

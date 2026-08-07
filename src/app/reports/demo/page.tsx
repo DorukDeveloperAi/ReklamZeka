@@ -1,22 +1,24 @@
 import { dashboardResponse } from "@/app/api/dashboard/route";
-import { insightsResponse } from "@/app/api/insights/route";
-import { buildSharedReport } from "@/reports/share";
-import { DEMO_REPORT_SNAPSHOT_ID, DEMO_REPORT_WORKSPACE_ID } from "@/reports/demo-share";
-import { ReportView } from "../report-view";
+import { OperatingDashboard, type OperatingDashboardModel } from "@/app/dashboard/operating-dashboard";
 
 export const metadata = {
   robots: { index: false, follow: false },
 };
 
 export default function DemoReportPage() {
-  const performance = dashboardResponse(7, "delayed").snapshot;
-  const insights = insightsResponse(7, "delayed");
-  const report = buildSharedReport({
-    shareId: "demo-preview",
-    workspaceId: DEMO_REPORT_WORKSPACE_ID,
-    snapshotId: DEMO_REPORT_SNAPSHOT_ID,
-    expiresAt: "9999-12-31T23:59:59.999Z",
-    access: "read_only",
-  }, DEMO_REPORT_SNAPSHOT_ID, performance, insights);
-  return <ReportView report={report} eyebrow="SALT-OKUNUR DEMO ÖNİZLEME" expiryText="Önizleme bağlantısı · süre uygulanmaz" />;
+  const snapshot = dashboardResponse(7, "ready").snapshot;
+  const current = snapshot.current;
+  const model: OperatingDashboardModel = {
+    periodDays: 7,
+    spend: new Intl.NumberFormat("tr-TR", { style: "currency", currency: snapshot.currency, maximumFractionDigits: 0 }).format(current.spendMinor / 100),
+    conversions: current.conversions,
+    cpa: current.cpaMinor === null ? "—" : new Intl.NumberFormat("tr-TR", { style: "currency", currency: snapshot.currency, maximumFractionDigits: 2 }).format(current.cpaMinor / 100),
+    roas: current.roas === null ? "—" : `${current.roas.toFixed(2)}×`,
+    freshnessHours: snapshot.freshness.hours ?? 0,
+    freshnessLabel: "güncel",
+    currency: snapshot.currency,
+    timezone: snapshot.timezone,
+    attribution: snapshot.attributionLabels.join(" · "),
+  };
+  return <OperatingDashboard model={model} />;
 }
