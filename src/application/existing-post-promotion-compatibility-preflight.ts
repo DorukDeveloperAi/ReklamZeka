@@ -51,7 +51,7 @@ export class ExistingPostPromotionCompatibilityPreflightRepository implements Ex
     let resolution: Awaited<ReturnType<ExistingPostPromotionCompatibilityPort["resolve"]>>;
     try { resolution = await this.compatibility.resolve(evidenceSelectionHash, evaluatedAt); }
     catch { return unresolved(context); }
-    if (resolution.selectionHash !== evidenceSelectionHash || !HASH.test(resolution.resolutionHash)
+    if (resolution.selectionHash !== evidenceSelectionHash
       || resolution.dimensions.length !== META_COMPATIBILITY_DIMENSIONS.length
       || new Set(resolution.dimensions.map((item) => item.dimension)).size !== META_COMPATIBILITY_DIMENSIONS.length
       || META_COMPATIBILITY_DIMENSIONS.some((dimension) => !resolution.dimensions.some((item) => item.dimension === dimension))) {
