@@ -27,9 +27,11 @@ Bu dosya yalnız güncel teslim dilimini yönetir. A08 domain şartnamesinin min
   testli. Her sayfa/slice durable olur ve yeni runtime cursor'dan hydrate edilir.
 - **GET-only Graph binding tamam:** inventory hierarchy, creative/post ve insight edge'leri,
   cursor pagination ve usage headroom gerçek Meta'da sınırlı smoke ile 0 write doğrulandı.
-- **Aktif S1.3 çevresel kabul:** migration uygulanmış PostgreSQL worker üzerinde
-  restart/partial-run E2E almak. Bu workspace'te henüz `DATABASE_URL` yok. S1.4/S1.5 henüz
-  kapanmadı; schema/contract varlığı canlı asset-content sync veya lifecycle kapanışı sayılmaz.
+- **S1.3 kapalı:** Supabase PostgreSQL 17'ye sekiz migration/29 public tablo uygulandı;
+  transaction/session pooler SSL bağlantıları ve yeni connection/runtime ile durable
+  `partial`→cursor restore→`completed` kabulü geçti. Geçici E2E workspace'i cascade silindi.
+- **Aktif S1.4:** canlı asset/content mirror. S1.5 henüz kapanmadı; schema/contract varlığı
+  canlı asset-content sync veya lifecycle kapanışı sayılmaz.
 
 ## Değişmez sınırlar
 

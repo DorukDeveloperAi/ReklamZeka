@@ -26,6 +26,8 @@
     "check:quick": "npm test && npm run db:check",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
+    "db:migrate": "drizzle-kit migrate",
+    "verify:meta-sync-db": "tsx scripts/verify-meta-sync-postgres.ts",
     "check:security": "npm audit --omit=dev"
   },
   "engines": {
@@ -40,6 +42,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
+    "@types/pg": "^8.20.4",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitest/coverage-v8": "^4.1.10",
