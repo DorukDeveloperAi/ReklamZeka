@@ -505,3 +505,23 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Canlı Supabase kabulü proposal+audit görünürlüğü, idempotent replay ve outer rollback sonrası
   sıfır geçici satırı doğruladı. Kanıt: 92 test dosyası/540 test; production build, security,
   secret ve Drizzle kapıları temiz. S3 kapanmıştır; sıradaki dilim S4 approval-only operations'tır.
+
+## 2026-08-07 — S4 typed action, autonomy ve atomik approval çekirdekleri
+
+- Saf action plan motoru `no_change/internal_annotation`, campaign/adset/ad pause-activate,
+  resolved campaign/adset budget değişimi ve S5 için existing-post placeholder'ını K0–K4'e
+  deterministik ayırır. Ad-level budget ve raw Graph action şema sınırında reddedilir.
+- Effective autonomy workspace→account group→account→internal category→campaign→entity→action
+  scope'larını en dar biçimde çözer. Varsayılan `approval_only`; expiry genişletmez, child widening,
+  aynı scope conflict, kill switch, cap eksikliği ve protected/unresolved kapsam fail-closed'dur.
+  K3/K4 daima insan onayı ister; hiçbir çıktı execute/write/grant/raw-Graph capability'si taşımaz.
+- Immutable ActionBundle yalnız dependency DAG ve sunum kabıdır. Her ActionUnit ayrı approve,
+  reject veya request-changes alır; downstream failure cascade edilir. Approval exact plan/unit/
+  scope/source/context/spec hash'ine bağlı, kısa ömürlü ve tek kullanımlık evidence grant üretir;
+  grant tüketimi bile execute değildir.
+- Lifecycle duplicate event/grant ref, attacker-rehashed sahte actor/consumer/decision state,
+  stale/expired/superseded spec, wildcard, sibling/bundle approval, dependency cycle ve SoD bypass
+  girişlerini reddeder. Analyst proposal sahibi olabilir fakat approver/consumer olamaz.
+- Kanıt: 94 test dosyası/578 test, production build ve secret kapısı temiz. Bu dilim saf ve
+  persistence'sızdır; Meta network/write `0`. Sıradaki increment append-only action/autonomy
+  persistence ve public-safe approval queue read modelidir; approval mutation ve writer hâlâ kapalıdır.

@@ -192,6 +192,8 @@
 - [ ] Campaign/adset/ad pause/activate eligibility ve parent/effective-status matrisi.
 - [ ] Campaign/adset budget owner write; ad-level budget negatif testi.
 - [ ] K0–K4 valve, account allowlist, caps, kill switch ve çift anahtar.
+  - [x] Saf K0–K4 typed action sınıflandırması; workspace default `approval_only`, scoped
+    en-dar resolver, expiry/conflict/child-widening/kill-switch ve budget/protection guard'ları.
 - [ ] Approval state machine, expiry, stale-plan ve separation of duties.
 - [ ] Idempotent execute, Meta error taxonomy, read-after-write ve rollback.
 - [ ] Hourly/daily/weekly/monthly/after-sync scheduler; DST/misfire/idempotency.
@@ -203,13 +205,14 @@
 - [ ] External intervention reconcile ve sandbox/shadow rollout.
 - [ ] Manual/assisted/automated-read/scheduled-plan + approval-only/policy-limited inheritance ve kill switch.
 - [ ] Multi-account batch plan; account-bazlı approval/execute/partial recovery.
-- [ ] Varsayılan workspace `approval_only` autonomy lock; expiry/child scope fail-closed.
-- [ ] ActionBundle→atomik ActionUnit dependency DAG, tek tek approve/reject/request-changes.
+- [x] Varsayılan workspace `approval_only` autonomy lock; expiry/child scope fail-closed saf çekirdek.
+- [x] ActionBundle→atomik ActionUnit dependency DAG, tek tek approve/reject/request-changes saf
+  yaşam döngüsü; approval execute değildir ve grant exact/single-use'dur.
 - [ ] Mevcut Instagram/Page gönderisinden template+audience preset'li promotion preflight ve K4 bundle.
 - [ ] Yeni metin/görsel/video/creative üretmeme boundary ve negatif testleri.
 - [ ] Creative/post spec hash değişiminde stale approval ve yeniden onay.
 - [ ] Meta request/write verify ile platform review/delivery effective state ayrımı.
-- [ ] Action type/risk + account/category/campaign/entity scoped effective-autonomy resolver ve trace.
+- [x] Action type/risk + account/category/campaign/entity scoped effective-autonomy resolver ve trace saf çekirdeği.
 
 ## A14 — Kontrol merkezi ve rollout
 
