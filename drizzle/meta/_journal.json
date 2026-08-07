@@ -43,6 +43,13 @@
       "when": 1786092685281,
       "tag": "20260807085125_mature_penance",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786094176373,
+      "tag": "20260807091616_chunky_sauron",
+      "breakpoints": true
     }
   ]
 }

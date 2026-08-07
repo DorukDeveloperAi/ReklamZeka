@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "workspaceId": "workspace-a",
+  "metaConnectionId": "connection-a",
+  "adAccountId": "account-a",
+  "entityLevel": "campaign",
+  "externalEntityId": "campaign-1",
+  "dateStart": "2026-08-01",
+  "dateStop": "2026-08-01",
+  "attributionLabel": "7d_click_1d_view",
+  "attributionWindow": { "clickDays": 7, "viewDays": 1 },
+  "currency": "TRY",
+  "timezone": "Europe/Istanbul",
+  "sourceRevision": "10",
+  "sourcePayloadHash": "sha256:campaign-1-r10",
+  "sourceUpdatedAt": "2026-08-02T03:00:00.000Z",
+  "metricProvenance": { "graphApiVersion": "v23.0", "fieldCatalogVersion": "meta-insights-v1" },
+  "metrics": [
+    { "metricKey": "spend", "aggregation": "additive", "valueMinor": 125000, "currency": "TRY", "provenance": { "field": "spend" } },
+    { "metricKey": "impressions", "aggregation": "additive", "valueDecimal": "12000", "provenance": { "field": "impressions" } },
+    { "metricKey": "reach", "aggregation": "non_additive", "valueDecimal": "9000", "provenance": { "field": "reach" } },
+    { "metricKey": "clicks", "aggregation": "additive", "valueDecimal": "300", "provenance": { "field": "clicks" } },
+    { "metricKey": "actions", "actionType": "lead", "aggregation": "additive", "valueDecimal": "12", "provenance": { "field": "actions", "actionType": "lead" } },
+    { "metricKey": "action_values", "actionType": "purchase", "aggregation": "additive", "valueMinor": 500000, "currency": "TRY", "provenance": { "field": "action_values", "actionType": "purchase" } },
+    { "metricKey": "ctr", "aggregation": "derived", "valueDecimal": "0.025", "provenance": { "formulaVersion": "ctr-v1", "numerator": "clicks", "denominator": "impressions" } }
+  ]
+}
