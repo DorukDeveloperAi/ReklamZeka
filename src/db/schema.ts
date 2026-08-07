@@ -102,6 +102,23 @@ export const metaSyncErrorClassification = pgEnum("meta_sync_error_classificatio
   "validation",
   "cancelled",
 ]);
+export const categoryCardinality = pgEnum("category_cardinality", ["single", "multi"]);
+export const categoryEntityLevel = pgEnum("category_entity_level", [
+  "campaign",
+  "ad_set",
+  "ad",
+  "creative",
+]);
+export const categoryAssignmentOperation = pgEnum("category_assignment_operation", [
+  "add",
+  "override",
+  "deny",
+]);
+export const categoryAssignmentSource = pgEnum("category_assignment_source", [
+  "manual",
+  "agent",
+  "deterministic",
+]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -293,6 +310,7 @@ export const adCampaigns = pgTable("ad_campaigns", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("ad_campaigns_account_external_unique").on(table.adAccountId, table.externalCampaignId),
+  uniqueIndex("ad_campaigns_id_workspace_unique").on(table.id, table.workspaceId),
   index("ad_campaigns_workspace_idx").on(table.workspaceId),
 ]);
 
@@ -332,6 +350,7 @@ export const metaAdSets = pgTable("meta_ad_sets", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("meta_ad_sets_account_external_unique").on(table.adAccountId, table.externalAdSetId),
+  uniqueIndex("meta_ad_sets_id_workspace_unique").on(table.id, table.workspaceId),
   index("meta_ad_sets_workspace_campaign_idx").on(table.workspaceId, table.campaignId),
 ]);
 
@@ -564,6 +583,7 @@ export const metaCreatives = pgTable("meta_creatives", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("meta_creatives_account_external_unique").on(table.adAccountId, table.externalCreativeId),
+  uniqueIndex("meta_creatives_id_workspace_unique").on(table.id, table.workspaceId),
   index("meta_creatives_workspace_post_idx").on(table.workspaceId, table.postId),
   index("meta_creatives_post_idx").on(table.postId),
   index("meta_creatives_actor_asset_idx").on(table.actorAssetId),
@@ -596,8 +616,207 @@ export const metaAds = pgTable("meta_ads", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("meta_ads_account_external_unique").on(table.adAccountId, table.externalAdId),
+  uniqueIndex("meta_ads_id_workspace_unique").on(table.id, table.workspaceId),
   index("meta_ads_workspace_ad_set_idx").on(table.workspaceId, table.adSetId),
   index("meta_ads_creative_idx").on(table.creativeId),
+]);
+
+/** A versioned, workspace-owned axis in the internal campaign taxonomy. */
+export const categoryDimensions = pgTable("category_dimensions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  key: text("key").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  cardinality: categoryCardinality("cardinality").notNull(),
+  allowedEntityLevels: categoryEntityLevel("allowed_entity_levels").array().notNull(),
+  version: integer("version").notNull().default(1),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("category_dimensions_workspace_key_version_unique").on(
+    table.workspaceId,
+    table.key,
+    table.version,
+  ),
+  uniqueIndex("category_dimensions_workspace_active_key_unique")
+    .on(table.workspaceId, table.key)
+    .where(sql`${table.archivedAt} is null`),
+  uniqueIndex("category_dimensions_id_workspace_unique").on(table.id, table.workspaceId),
+  index("category_dimensions_workspace_archive_idx").on(table.workspaceId, table.archivedAt),
+  check("category_dimensions_key_format", sql`${table.key} ~ '^[a-z][a-z0-9_]{0,63}$'`),
+  check("category_dimensions_version_positive", sql`${table.version} >= 1`),
+  check(
+    "category_dimensions_allowed_levels_nonempty",
+    sql`coalesce(array_length(${table.allowedEntityLevels}, 1), 0) >= 1`,
+  ),
+]);
+
+/** A versioned value belonging to one category dimension. */
+export const categoryDefinitions = pgTable("category_definitions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  dimensionId: uuid("dimension_id").notNull(),
+  key: text("key").notNull(),
+  label: text("label").notNull(),
+  description: text("description"),
+  version: integer("version").notNull().default(1),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.dimensionId, table.workspaceId],
+    foreignColumns: [categoryDimensions.id, categoryDimensions.workspaceId],
+    name: "category_definitions_dimension_scope_fk",
+  }).onDelete("cascade"),
+  uniqueIndex("category_definitions_workspace_dimension_key_version_unique").on(
+    table.workspaceId,
+    table.dimensionId,
+    table.key,
+    table.version,
+  ),
+  uniqueIndex("category_definitions_workspace_dimension_active_key_unique")
+    .on(table.workspaceId, table.dimensionId, table.key)
+    .where(sql`${table.archivedAt} is null`),
+  uniqueIndex("category_definitions_id_dimension_workspace_unique").on(
+    table.id,
+    table.dimensionId,
+    table.workspaceId,
+  ),
+  index("category_definitions_dimension_archive_idx").on(table.dimensionId, table.archivedAt),
+  check("category_definitions_key_format", sql`${table.key} ~ '^[a-z][a-z0-9_]{0,63}$'`),
+  check("category_definitions_version_positive", sql`${table.version} >= 1`),
+]);
+
+function categoryAssignmentRevisionScope(): [AnyPgColumn, AnyPgColumn, AnyPgColumn] {
+  return [categoryAssignments.id, categoryAssignments.workspaceId, categoryAssignments.dimensionId];
+}
+
+/**
+ * One immutable assignment revision. Active rows at each hierarchy node are
+ * folded by the deterministic resolver; historical rows remain addressable by
+ * id + version for frozen analysis context.
+ */
+export const categoryAssignments = pgTable("category_assignments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  dimensionId: uuid("dimension_id").notNull(),
+  definitionId: uuid("definition_id").notNull(),
+  entityLevel: categoryEntityLevel("entity_level").notNull(),
+  campaignId: uuid("campaign_id"),
+  adSetId: uuid("ad_set_id"),
+  adId: uuid("ad_id"),
+  creativeId: uuid("creative_id"),
+  operation: categoryAssignmentOperation("operation").notNull(),
+  source: categoryAssignmentSource("source").notNull(),
+  manualLock: boolean("manual_lock").notNull().default(false),
+  evidence: jsonb("evidence").$type<readonly Readonly<{
+    kind: string;
+    ref: string;
+    observedAt?: string;
+  }>[]>().notNull(),
+  confidence: doublePrecision("confidence").notNull(),
+  version: integer("version").notNull().default(1),
+  supersedesAssignmentId: uuid("supersedes_assignment_id"),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.definitionId, table.dimensionId, table.workspaceId],
+    foreignColumns: [
+      categoryDefinitions.id,
+      categoryDefinitions.dimensionId,
+      categoryDefinitions.workspaceId,
+    ],
+    name: "category_assignments_definition_scope_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.campaignId, table.workspaceId],
+    foreignColumns: [adCampaigns.id, adCampaigns.workspaceId],
+    name: "category_assignments_campaign_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.adSetId, table.workspaceId],
+    foreignColumns: [metaAdSets.id, metaAdSets.workspaceId],
+    name: "category_assignments_ad_set_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.adId, table.workspaceId],
+    foreignColumns: [metaAds.id, metaAds.workspaceId],
+    name: "category_assignments_ad_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.creativeId, table.workspaceId],
+    foreignColumns: [metaCreatives.id, metaCreatives.workspaceId],
+    name: "category_assignments_creative_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.supersedesAssignmentId, table.workspaceId, table.dimensionId],
+    foreignColumns: categoryAssignmentRevisionScope(),
+    name: "category_assignments_supersedes_scope_fk",
+  }).onDelete("restrict"),
+  uniqueIndex("category_assignments_id_workspace_dimension_unique").on(
+    table.id,
+    table.workspaceId,
+    table.dimensionId,
+  ),
+  uniqueIndex("category_assignments_campaign_active_value_unique")
+    .on(table.workspaceId, table.dimensionId, table.campaignId, table.definitionId)
+    .where(sql`${table.archivedAt} is null and ${table.campaignId} is not null`),
+  uniqueIndex("category_assignments_ad_set_active_value_unique")
+    .on(table.workspaceId, table.dimensionId, table.adSetId, table.definitionId)
+    .where(sql`${table.archivedAt} is null and ${table.adSetId} is not null`),
+  uniqueIndex("category_assignments_ad_active_value_unique")
+    .on(table.workspaceId, table.dimensionId, table.adId, table.definitionId)
+    .where(sql`${table.archivedAt} is null and ${table.adId} is not null`),
+  uniqueIndex("category_assignments_creative_active_value_unique")
+    .on(table.workspaceId, table.dimensionId, table.creativeId, table.definitionId)
+    .where(sql`${table.archivedAt} is null and ${table.creativeId} is not null`),
+  index("category_assignments_workspace_dimension_idx").on(
+    table.workspaceId,
+    table.dimensionId,
+    table.archivedAt,
+  ),
+  index("category_assignments_definition_idx").on(table.definitionId),
+  index("category_assignments_supersedes_idx").on(table.supersedesAssignmentId),
+  check("category_assignments_version_positive", sql`${table.version} >= 1`),
+  check("category_assignments_confidence_range", sql`${table.confidence} >= 0 and ${table.confidence} <= 1`),
+  check(
+    "category_assignments_manual_lock_source",
+    sql`not ${table.manualLock} or ${table.source} = 'manual'`,
+  ),
+  check(
+    "category_assignments_evidence_nonempty",
+    sql`jsonb_typeof(${table.evidence}) = 'array' and jsonb_array_length(${table.evidence}) >= 1`,
+  ),
+  check("category_assignments_entity_consistent", sql`
+    (
+      ${table.entityLevel} = 'campaign'
+      and ${table.campaignId} is not null
+      and ${table.adSetId} is null
+      and ${table.adId} is null
+      and ${table.creativeId} is null
+    ) or (
+      ${table.entityLevel} = 'ad_set'
+      and ${table.campaignId} is null
+      and ${table.adSetId} is not null
+      and ${table.adId} is null
+      and ${table.creativeId} is null
+    ) or (
+      ${table.entityLevel} = 'ad'
+      and ${table.campaignId} is null
+      and ${table.adSetId} is null
+      and ${table.adId} is not null
+      and ${table.creativeId} is null
+    ) or (
+      ${table.entityLevel} = 'creative'
+      and ${table.campaignId} is null
+      and ${table.adSetId} is null
+      and ${table.adId} is null
+      and ${table.creativeId} is not null
+    )
+  `),
 ]);
 
 export const metaAssetEdges = pgTable("meta_asset_edges", {

@@ -13,6 +13,22 @@ açıklar ve draft öneri üretir. `observe` ve `no-change` birinci sınıf sonu
 Bu slice A09, A10, A12 ve A14'ün yalnız ilk değer üreten kesitidir. Policy enforcement,
 bütçe simülasyonu ve Meta write sırasıyla S3 ve S4'e aittir.
 
+## Güncel ilerleme — 2026-08-07
+
+- **S2.1 persistence/domain core hazır:** üç tablo migration'ı Supabase'e uygulandı;
+  dimension/definition/assignment, manual lock, child add/override/deny, kesintisiz path,
+  frozen replay ve `parked_conflict` resolver'ı testli. Repository/application API ve
+  gerçek iki-workspace CRUD/restart kabulü çıkış kapısı için açık.
+- **S2.2 saf guidance core hazır:** provenance türleri ayrık, official source governance,
+  deterministic scope/precedence/conflict/context budget ve guidance-only authority testli.
+  PostgreSQL registry ve analysis-run pack snapshot binding'i açık.
+- **S2.3 resolver/contract core hazır:** rolling/fixed/calendar/lifetime/learning/action-
+  relative, DST/weekday/previous-year ve forged-window doğrulaması; deterministik analysis
+  run/record ID, snapshot/context ref ve sebepli insufficient-data sözleşmesi testli.
+  Metrik formül/aggregation kataloğu ve L2 materialization açık.
+- **Birleşik kanıt:** 44 test dosyası/246 test, production build, audit 0; PostgreSQL
+  tombstone kabulü temiz ve Supabase 35/35 RLS, API table grant'i `0`. Meta write kapalı.
+
 ## Değişmez sınırlar
 
 - Guidance, agent anlatımı veya prompt hard constraint/action yetkisi vermez.

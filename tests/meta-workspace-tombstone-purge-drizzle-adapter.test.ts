@@ -34,7 +34,7 @@ describe("explicit workspace tombstone purge adapter", () => {
 
     expect(evidence.candidateCount).toBe(1);
     expect(evidence.revision).toMatch(/^[a-f0-9]{64}$/);
-    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(28);
+    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(31);
     const allSchemaTables = Object.values(schema)
       .flatMap((value) => isTable(value) ? [getTableName(value)] : [])
       .sort();
@@ -80,13 +80,19 @@ describe("explicit workspace tombstone purge adapter", () => {
     expect(result).toEqual({ purgedRowCount: 0, membershipCount: 0 });
     expect(inspectCalls).toBe(3);
     const deletes = statements.filter((statement) => statement.includes("delete from"));
-    expect(deletes).toHaveLength(28);
+    expect(deletes).toHaveLength(31);
     expect(deletes.findIndex((statement) => statement.includes("delete from meta_daily_insight_metrics")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from meta_daily_insights where")));
     expect(deletes.findIndex((statement) => statement.includes("delete from meta_ad_creative_bindings")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from meta_creatives where")));
     expect(deletes.findIndex((statement) => statement.includes("delete from meta_change_events")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from meta_change_snapshots")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from category_assignments")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from category_definitions")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from category_definitions")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from category_dimensions")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from category_assignments")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from ad_campaigns")));
     expect(deletes.at(-1)).toContain("memberships");
     expect(deletes.join("\n")).not.toMatch(/delete from (?:workspaces|audit_events|users|meta_connections)(?:\s|$)/);
   });

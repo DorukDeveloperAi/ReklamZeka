@@ -31,6 +31,9 @@ const ids = {
   account: randomUUID(),
   campaign: randomUUID(),
   adSet: randomUUID(),
+  categoryDimension: randomUUID(),
+  categoryDefinition: randomUUID(),
+  categoryAssignment: randomUUID(),
   asset: randomUUID(),
   post: randomUUID(),
   previousSnapshot: randomUUID(),
@@ -130,6 +133,20 @@ try {
       id: ids.adSet, workspaceId: ids.workspace, adAccountId: ids.account, campaignId: ids.campaign,
       externalAdSetId: "e2e-adset", name: "E2E ad set", rawPayloadHash: "hash-adset",
       sourceGraphVersion: "v23.0", fieldCatalogVersion: "e2e", provenance: {},
+    });
+    await transaction.insert(schema.categoryDimensions).values({
+      id: ids.categoryDimension, workspaceId: ids.workspace, key: "internal_campaign_type",
+      name: "Internal campaign type", cardinality: "single", allowedEntityLevels: ["campaign", "ad_set"],
+    });
+    await transaction.insert(schema.categoryDefinitions).values({
+      id: ids.categoryDefinition, workspaceId: ids.workspace, dimensionId: ids.categoryDimension,
+      key: "brand_protection", label: "Marka koruma",
+    });
+    await transaction.insert(schema.categoryAssignments).values({
+      id: ids.categoryAssignment, workspaceId: ids.workspace, dimensionId: ids.categoryDimension,
+      definitionId: ids.categoryDefinition, entityLevel: "campaign", campaignId: ids.campaign,
+      operation: "add", source: "manual", manualLock: true,
+      evidence: [{ kind: "owner_instruction", ref: "e2e:category" }], confidence: 1,
     });
     await transaction.insert(schema.metaAssets).values({
       id: ids.asset, workspaceId: ids.workspace, metaConnectionId: ids.connection,

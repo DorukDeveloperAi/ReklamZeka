@@ -234,3 +234,19 @@ ReklamZeka'ya taşınmaz.
 - Kanıt: 39 test dosyası/202 test, production build, audit 0 zafiyet; timeline ve tombstone
   PostgreSQL kabulleri geçici veri bırakmadan geçti. Supabase 32/32 RLS, API role table
   grant'i 0 ve public routine execute grant'i 0. Meta write yolu halen kapalıdır.
+
+## 2026-08-07 — S2 Decision Room ilk çekirdekleri
+
+- S2 için sekiz incrementli yürütme planı açıldı; kategori/guidance/timeframe ilk üç
+  bağımsız çekirdek olarak, write ve bütçe kapsamı açılmadan geliştirildi.
+- Category dimension/definition/assignment PostgreSQL şeması; manual lock, evidence,
+  confidence, version/archive ve campaign→adset→ad→creative add/override/deny resolver'ı
+  eklendi. Single belirsizlik ve kilit ihlali `parked_conflict`; frozen replay deterministik.
+- Guidance registry owner/official/strategy/observation/experiment provenance'ını ayırır;
+  official Meta kaynağı metadata olmadan yayınlanamaz. Scope/precedence/conflict/freshness
+  ve context budget tekrarlanabilir; pack policy/action/approval yetkisi taşımaz.
+- Timeframe resolver rolling/fixed/calendar/lifetime/learning/action-relative pencereleri,
+  IANA timezone/DST ve comparison'ları çözer. Forged/future/uyumsuz pencere analysis ID'sine
+  girmeden reddedilir; insufficient data sebepsiz finding olmaz.
+- Kanıt: 44 test dosyası/246 test, production build ve audit 0. Supabase 35/35 RLS,
+  API role table grant'i 0; tombstone allowlist 31 workspace-owned tabloyu FK-safe kapsar.
