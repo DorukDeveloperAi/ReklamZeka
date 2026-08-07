@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: a2bb551676cb -->
+<!-- durum-damga: 0851e360a10e -->
 
 ## Künye
 
@@ -14,34 +14,34 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 78 |
+| iş commit'i (tüm geçmiş) | 91 |
 | ilk / son iş | 2026-08-06 / 2026-08-08 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-08 | `docs` | record K4 policy studio gate | `8c9e8295b` |
+| 2026-08-08 | `feat` | add K4 policy bundle studio | `9e54284ac` |
+| 2026-08-08 | `feat` | add K4 policy bundle drafts | `f725a7f47` |
+| 2026-08-08 | `docs` | record proposal route gate | `c8f18d412` |
+| 2026-08-08 | `feat` | wire promotion proposal composition | `d3d65adbc` |
+| 2026-08-08 | `feat` | bind reviewed evidence freshness | `1ff863f10` |
+| 2026-08-08 | `feat` | compose category evidence adapter | `1181f5eda` |
+| 2026-08-08 | `docs` | record policy composition gate | `2454cd2dd` |
+| 2026-08-08 | `feat` | compose promotion policy evidence | `af2d3e95e` |
+| 2026-08-08 | `docs` | record proposal lifetime proof | `05b4c35c8` |
+| 2026-08-08 | `feat` | compose private scheduled sync tick | `1635dd6cd` |
+| 2026-08-08 | `feat` | bind proposal lifetime policy | `522bc0e4c` |
+| 2026-08-08 | `docs` | record geo and scheduler proof | `ede2072c7` |
 | 2026-08-08 | `test` | verify live geo inventory wiring | `0d7eabaa7` |
 | 2026-08-08 | `feat` | wire geo evidence and scheduled sync | `49eefd3a0` |
-| 2026-08-08 | `docs` | record affected geo live proof | `3e11209d4` |
-| 2026-08-08 | `fix` | order affected geo composite keys | `0561270bd` |
-| 2026-08-08 | `feat` | persist affected geo evidence | `1d09a729e` |
-| 2026-08-08 | `feat` | normalize verified affected geo | `3b04b6e53` |
-| 2026-08-08 | `feat` | materialize authentic category evidence | `1fbbffa15` |
-| 2026-08-08 | `test` | verify redacted targeting shape | `ffe0a4af3` |
-| 2026-08-08 | `test` | verify live guardrail persistence | `8eb5aa279` |
-| 2026-08-08 | `docs` | record guardrail migration proof | `cca08c94f` |
-| 2026-08-08 | `feat` | persist reviewed protection guardrails | `2aa61423d` |
-| 2026-08-07 | `feat` | resolve reviewed budget guardrails | `57e8d1455` |
-| 2026-08-07 | `feat` | orchestrate bounded scheduled read sync | `08ea8c27b` |
-| 2026-08-07 | `docs` | record trusted policy migration proof | `50e14029a` |
-| 2026-08-07 | `feat` | bind proposal snapshots to reviewed policies | `d77d7341b` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 43
-- `docs        ` █████ 9
-- `test        ` ███ 5
+- `feat        ` ████████████████████████ 41
+- `docs        ` ███████ 12
+- `test        ` ██ 4
 - `fix         ` ██ 3
 
 ## Planlar
