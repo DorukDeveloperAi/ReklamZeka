@@ -149,9 +149,12 @@
 - [x] Protected floor/fixed allocation ve transfer allow/deny/within-group saf motoru.
 - [x] Pacing/forecast, freshness/coverage/min sample/attribution/learning/cap/cooldown saf guard'ları.
 - [x] Fixed/proportional/priority/ladder deterministic allocation ve exact integer-weight rounding.
-- [ ] Keep/conservative/target-seeking simülasyon ve constraint trace.
+- [x] Saf keep/conservative/target-seeking (en fazla üç explicit alternatif), frozen input,
+  before/after, pacing+constraint trace ve suppression/no-change/unsatisfied preservation.
 - [ ] Versioned proposal ledger/API; artış approval zorunluluğu.
-- [ ] Business outcome target/proxy ayrımı ve yetersiz mapping suppression.
+- [x] Saf business outcome target/Meta proxy ayrımı; provenance/scope/timeframe/evidence/review
+  kapıları ve eksik/ambiguous/stale mapping suppression.
+- [ ] Target mapping→scenario application binding ve persisted proposal trace.
 
 ## A12 — Prompt ve advisor
 

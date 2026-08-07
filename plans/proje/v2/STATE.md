@@ -447,3 +447,15 @@ write scope veya writer S4'e kadar ReklamZeka'ya taşınmaz.
   trace ile bastırır; retrieval observation'dan önce olamaz.
 - Üç çekirdek de saf/advisory'dir; action authority `none`, persistence ve Meta network/write
   yoktur. Sıradaki increment simulation/proposal composition ve append-only persistence'tır.
+
+## 2026-08-07 — S3 Budget Lab senaryo ve hedef/proxy kapısı
+
+- BudgetScenario composer aynı frozen ref/hash üzerinde en fazla üç benzersiz, tamamen explicit
+  `keep / conservative / target_seeking` alternatifi üretir. Before/after, pacing ve constraint
+  trace'leri kayıpsızdır; suppressed/no-change/unsatisfied sonuçlar öneriye çevrilmez. Pacing
+  suppression üst disposition olarak korunur, alt constraint sonucu yalnız açıklama olarak kalır.
+- OutcomeProxyMapping iş sonucu hedefini Meta proxy metriğinden kesin ayırır. Category/objective/
+  timeframe scope, provenance, sample, coverage, proxy lag, confidence, review ve freshness birlikte
+  değerlendirilir; mapping yoksa, eski/yetersizse veya birden fazla uygunsa seçim yapılmaz.
+- Bu çekirdekler de saf ve advisory-only'dir. Sıradaki increment mapping→scenario application
+  binding, append-only proposal persistence ve Budget Lab read API/dashboard kesitidir.
