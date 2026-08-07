@@ -286,6 +286,27 @@ export async function resolveTrustedLocalAutonomyRulePrincipal(input: Readonly<{
   return bindPrincipal(input.database, input.config);
 }
 
+/** Cookie-only, separately scoped K4 Policy Bundle Studio binding. */
+export async function resolveTrustedLocalPolicyBundlePrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+  requiredScope: Extract<LocalSessionScope, "policy_bundle:read" | "policy_bundle:draft">;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config", "requiredScope"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null) {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  verifyLocalSessionCapability({
+    token: cookieToken(input.request)!, key: input.config.signingKey, now: Math.floor(Date.now() / 1000),
+    osUid: typeof process.getuid === "function" ? process.getuid() : -1, requiredScope: input.requiredScope,
+    expected: input.config,
+  });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config,
+    input.requiredScope === "policy_bundle:read" ? "read" : "draft", "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
 /** Cookie-only approval mutation binding; membership is re-read every request. */
 export async function resolveTrustedLocalApprovalDecisionPrincipal(input: Readonly<{
   request: Request;

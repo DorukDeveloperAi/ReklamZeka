@@ -176,4 +176,39 @@ export class DrizzleActionGuardrailPolicyRepository {
       }
     });
   }
+
+  /** Server-private revision feed. Public services must omit hashes and provenance actor refs. */
+  async listArtifacts(): Promise<readonly ActionGuardrailPolicyRevision[]> {
+    return this.database.transaction(async (transaction) => {
+      await lockWorkspace(transaction, this.workspaceId, "share");
+      const stored = rows<Row>(await transaction.execute(sql`
+        select id, workspace_ref, policy_ref, revision, previous_hash, state, canonical_hash, artifact_payload
+        from action_guardrail_policy_revisions
+        where workspace_id = ${this.workspaceId}::uuid
+        order by policy_ref, revision desc
+        limit 1001
+      `));
+      if (stored.length > 1000) fail("corrupt_store");
+      const revisions = stored.map(validateRow);
+      if (revisions.some((revision) => revision.workspaceRef !== this.workspaceRef)) fail("corrupt_store");
+      return Object.freeze(revisions);
+    });
+  }
+
+  async latestArtifact(policyRef: string): Promise<ActionGuardrailPolicyRevision | null> {
+    if (!REF.test(policyRef)) fail("invalid_input");
+    return this.database.transaction(async (transaction) => {
+      await lockWorkspace(transaction, this.workspaceId, "share");
+      const stored = rows<Row>(await transaction.execute(sql`
+        select id, workspace_ref, policy_ref, revision, previous_hash, state, canonical_hash, artifact_payload
+        from action_guardrail_policy_revisions
+        where workspace_id = ${this.workspaceId}::uuid and policy_ref = ${policyRef}
+        order by revision desc limit 1
+      `));
+      if (!stored[0]) return null;
+      const revision = validateRow(stored[0]);
+      if (revision.workspaceRef !== this.workspaceRef || revision.policyRef !== policyRef) fail("corrupt_store");
+      return revision;
+    });
+  }
 }

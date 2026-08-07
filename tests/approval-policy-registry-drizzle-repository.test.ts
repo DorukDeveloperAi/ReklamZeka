@@ -135,6 +135,21 @@ describe("Drizzle reviewed ApprovalPolicy registry", () => {
     expect(new PgDialect().sqlToQuery(db.execute.mock.calls[0]![0]).sql).toContain("for share");
   });
 
+  it("lists and selects server-private artifacts while rechecking tenant and policy bindings", async () => {
+    const definition = draft();
+    const listed = database([{ rows: [{ id: workspaceId, lifecycle_state: "active" }] }, { rows: [row(definition)] }]);
+    await expect(new DrizzleApprovalPolicyRegistryRepository(listed as never, workspaceId, workspaceRef).listArtifacts())
+      .resolves.toEqual([definition]);
+    expect(new PgDialect().sqlToQuery(listed.execute.mock.calls[1]![0]).sql).toContain("limit 1001");
+    const latest = database([{ rows: [{ id: workspaceId, lifecycle_state: "active" }] }, { rows: [row(definition)] }]);
+    await expect(new DrizzleApprovalPolicyRegistryRepository(latest as never, workspaceId, workspaceRef)
+      .latestArtifact(definition.policyRef)).resolves.toEqual(definition);
+    const wrongPolicy = draft({ policyRef: "policy_other" });
+    const corrupt = database([{ rows: [{ id: workspaceId, lifecycle_state: "active" }] }, { rows: [row(wrongPolicy)] }]);
+    await expect(new DrizzleApprovalPolicyRegistryRepository(corrupt as never, workspaceId, workspaceRef)
+      .latestArtifact(definition.policyRef)).rejects.toMatchObject({ code: "corrupt_store" });
+  });
+
   it("fails closed for no policy, ambiguity, cross-tenant, inactive workspace, and corrupt rows", async () => {
     const empty = database([{ rows: [{ id: workspaceId, lifecycle_state: "active" }] }, { rows: [] }]);
     await expect(new DrizzleApprovalPolicyRegistryRepository(empty as never, workspaceId, workspaceRef)
@@ -165,7 +180,7 @@ describe("Drizzle reviewed ApprovalPolicy registry", () => {
 
   it("exposes no approval, grant, execution, snapshot, or Meta method", () => {
     expect(Object.getOwnPropertyNames(DrizzleApprovalPolicyRegistryRepository.prototype).sort())
-      .toEqual(["append", "constructor", "resolveExistingPostPolicy"]);
+      .toEqual(["append", "constructor", "latestArtifact", "listArtifacts", "resolveExistingPostPolicy"]);
     expect(() => new DrizzleApprovalPolicyRegistryRepository({} as never, "invalid", workspaceRef))
       .toThrow(ApprovalPolicyRegistryRepositoryError);
   });

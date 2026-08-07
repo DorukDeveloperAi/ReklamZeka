@@ -92,6 +92,21 @@ describe("Drizzle ActionGuardrailPolicy registry", () => {
       .resolves.toMatchObject({ disposition: "unresolved", reasonCodes: ["policy_set_missing"] });
   });
 
+  it("lists and selects server-private artifacts while rechecking policy bindings", async () => {
+    const revision = draft();
+    const listed = database([{ rows: [{ id: workspaceId, lifecycle_state: "active" }] }, { rows: [row(revision)] }]);
+    await expect(new DrizzleActionGuardrailPolicyRepository(listed as never, workspaceId, workspaceRef).listArtifacts())
+      .resolves.toEqual([revision]);
+    expect(new PgDialect().sqlToQuery(listed.execute.mock.calls[1]![0]).sql).toContain("limit 1001");
+    const latest = database([{ rows: [{ id: workspaceId, lifecycle_state: "active" }] }, { rows: [row(revision)] }]);
+    await expect(new DrizzleActionGuardrailPolicyRepository(latest as never, workspaceId, workspaceRef)
+      .latestArtifact(revision.policyRef)).resolves.toEqual(revision);
+    const wrongPolicy = draft("guardrail_other");
+    const corrupt = database([{ rows: [{ id: workspaceId, lifecycle_state: "active" }] }, { rows: [row(wrongPolicy)] }]);
+    await expect(new DrizzleActionGuardrailPolicyRepository(corrupt as never, workspaceId, workspaceRef)
+      .latestArtifact(revision.policyRef)).rejects.toMatchObject({ code: "corrupt_store" });
+  });
+
   it("fails closed for omitted, corrupt, and cross-tenant stored chains", async () => {
     const source = draft(); const active = publish(source);
     for (const stored of [
@@ -126,7 +141,7 @@ describe("Drizzle ActionGuardrailPolicy registry", () => {
 
   it("exposes no mutation authority beyond append and no evidence materializer", () => {
     expect(Object.getOwnPropertyNames(DrizzleActionGuardrailPolicyRepository.prototype).sort())
-      .toEqual(["append", "constructor", "resolve"]);
+      .toEqual(["append", "constructor", "latestArtifact", "listArtifacts", "resolve"]);
     expect(() => new DrizzleActionGuardrailPolicyRepository({} as never, "invalid", workspaceRef))
       .toThrow(ActionGuardrailPolicyRepositoryError);
   });

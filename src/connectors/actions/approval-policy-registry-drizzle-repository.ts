@@ -196,4 +196,41 @@ export class DrizzleApprovalPolicyRegistryRepository {
         effectiveFrom: sourceDefinition.effectiveFrom, expiresAt: sourceDefinition.expiresAt }) });
     });
   }
+
+  /** Server-private revision feed. Public services must project hashes and actor refs away. */
+  async listArtifacts(): Promise<readonly ApprovalPolicyDefinitionRevision[]> {
+    return this.database.transaction(async (transaction) => {
+      await lockWorkspace(transaction, this.workspaceId, "share");
+      const result = rows<Row>(await transaction.execute(sql`
+        select id, workspace_ref, policy_ref, revision, previous_hash, state, policy_hash, canonical_hash, artifact_payload
+        from approval_policy_definition_revisions
+        where workspace_id = ${this.workspaceId}::uuid
+          and action_type = 'existing_post_promotion' and risk = 'K4'
+        order by policy_ref, revision desc
+        limit 1001
+      `));
+      if (result.length > 1000) fail("corrupt_store");
+      const definitions = result.map(validateRow);
+      if (definitions.some((definition) => definition.workspaceRef !== this.workspaceRef)) fail("corrupt_store");
+      return Object.freeze(definitions);
+    });
+  }
+
+  async latestArtifact(policyRef: string): Promise<ApprovalPolicyDefinitionRevision | null> {
+    if (!REF.test(policyRef)) fail("invalid_input");
+    return this.database.transaction(async (transaction) => {
+      await lockWorkspace(transaction, this.workspaceId, "share");
+      const result = rows<Row>(await transaction.execute(sql`
+        select id, workspace_ref, policy_ref, revision, previous_hash, state, policy_hash, canonical_hash, artifact_payload
+        from approval_policy_definition_revisions
+        where workspace_id = ${this.workspaceId}::uuid and policy_ref = ${policyRef}
+          and action_type = 'existing_post_promotion' and risk = 'K4'
+        order by revision desc limit 1
+      `));
+      if (!result[0]) return null;
+      const definition = validateRow(result[0]);
+      if (definition.workspaceRef !== this.workspaceRef || definition.policyRef !== policyRef) fail("corrupt_store");
+      return definition;
+    });
+  }
 }
