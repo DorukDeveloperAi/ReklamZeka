@@ -14,6 +14,10 @@ import {
   type StagedActionProposal,
 } from "@/application/action-proposal-staging-service";
 import { ACTION_PLAN_VERSION, type ActionPlan } from "@/domain/actions/autonomy-valve";
+import {
+  resolvePublishedExistingPostPolicy,
+  type ApprovalPolicyDefinitionRevision,
+} from "@/domain/actions/approval-policy-registry";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -171,6 +175,55 @@ type AuthenticScope = Readonly<{
   adId: string | null;
 }>;
 
+type TrustedPolicySource = Readonly<{
+  definitionId: string;
+  canonicalHash: string;
+}>;
+
+function requiresTrustedExistingPostPolicy(lifecycle: ApprovalLifecycle): boolean {
+  return lifecycle.bundle.units.some((unit) => unit.scope.actionType === "existing_post_promotion" && unit.risk === "K4");
+}
+
+async function resolveTrustedExistingPostPolicy(
+  database: QueueDatabase,
+  workspaceId: string,
+  workspaceRef: string,
+  lifecycle: ApprovalLifecycle,
+  evaluatedAt: string,
+): Promise<TrustedPolicySource> {
+  const definitionRows = await database.select({
+    id: schema.approvalPolicyDefinitionRevisions.id,
+    artifactPayload: schema.approvalPolicyDefinitionRevisions.artifactPayload,
+  }).from(schema.approvalPolicyDefinitionRevisions).where(and(
+    eq(schema.approvalPolicyDefinitionRevisions.workspaceId, workspaceId),
+    eq(schema.approvalPolicyDefinitionRevisions.actionType, "existing_post_promotion"),
+    eq(schema.approvalPolicyDefinitionRevisions.risk, "K4"),
+  )).limit(1001);
+  if (definitionRows.length > 1000) throw new ActionProposalQueueRepositoryError("corrupt_store");
+  let resolved: ReturnType<typeof resolvePublishedExistingPostPolicy>;
+  try {
+    resolved = resolvePublishedExistingPostPolicy({
+      workspaceRef,
+      evaluatedAt,
+      definitions: definitionRows.map((row) => row.artifactPayload as ApprovalPolicyDefinitionRevision),
+    });
+  } catch {
+    throw new ActionProposalQueueRepositoryError("policy_conflict");
+  }
+  const sourceRows = definitionRows.filter((row) => row.artifactPayload
+    && typeof row.artifactPayload === "object"
+    && (row.artifactPayload as ApprovalPolicyDefinitionRevision).canonicalHash === resolved.source.canonicalHash
+    && (row.artifactPayload as ApprovalPolicyDefinitionRevision).revision === resolved.source.revision);
+  if (sourceRows.length !== 1 || !UUID.test(sourceRows[0]!.id)) {
+    throw new ActionProposalQueueRepositoryError("corrupt_store");
+  }
+  const trustedPolicy = Object.freeze({ ...resolved.policy, policyHash: resolved.policyHash });
+  if (digest(trustedPolicy) !== digest(lifecycle.policy)) {
+    throw new ActionProposalQueueRepositoryError("policy_conflict");
+  }
+  return Object.freeze({ definitionId: sourceRows[0]!.id, canonicalHash: resolved.source.canonicalHash });
+}
+
 async function authenticScope(
   database: QueueDatabase,
   workspaceId: string,
@@ -246,6 +299,12 @@ export class DrizzleActionProposalQueueRepository {
         return Object.freeze({ outcome: "unchanged" as const, lifecycleHash });
       }
 
+      const trustedPolicySource = requiresTrustedExistingPostPolicy(lifecycle)
+        ? await resolveTrustedExistingPostPolicy(
+          transaction, this.workspaceId, workspaceRef, lifecycle, initializedAt,
+        )
+        : null;
+
       const policyRows = await transaction.select().from(schema.actionApprovalPolicySnapshots).where(and(
         eq(schema.actionApprovalPolicySnapshots.workspaceId, this.workspaceId),
         eq(schema.actionApprovalPolicySnapshots.policyRef, lifecycle.policy.policyRef),
@@ -255,13 +314,19 @@ export class DrizzleActionProposalQueueRepository {
       let policySnapshotId: string;
       if (policyRows[0]) {
         if (policyRows[0].policyHash !== lifecycle.policy.policyHash
-          || digest(policyRows[0].policyPayload) !== digest(lifecycle.policy)) {
+          || digest(policyRows[0].policyPayload) !== digest(lifecycle.policy)
+          || trustedPolicySource !== null && (
+            policyRows[0].sourceDefinitionId !== trustedPolicySource.definitionId
+            || policyRows[0].sourceDefinitionCanonicalHash !== trustedPolicySource.canonicalHash
+          )) {
           throw new ActionProposalQueueRepositoryError("policy_conflict");
         }
         policySnapshotId = policyRows[0].id;
       } else {
         const insertedPolicy = await transaction.insert(schema.actionApprovalPolicySnapshots).values({
           workspaceId: this.workspaceId,
+          sourceDefinitionId: trustedPolicySource?.definitionId ?? null,
+          sourceDefinitionCanonicalHash: trustedPolicySource?.canonicalHash ?? null,
           policyRef: lifecycle.policy.policyRef,
           revision: lifecycle.policy.revision,
           schemaVersion: lifecycle.policy.version,

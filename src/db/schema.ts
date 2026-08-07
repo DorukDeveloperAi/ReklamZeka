@@ -2557,6 +2557,8 @@ export const promotionTemplateBindingCategories = pgTable("promotion_template_bi
 export const actionApprovalPolicySnapshots = pgTable("action_approval_policy_snapshots", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  sourceDefinitionId: uuid("source_definition_id"),
+  sourceDefinitionCanonicalHash: text("source_definition_canonical_hash"),
   policyRef: text("policy_ref").notNull(),
   revision: integer("revision").notNull(),
   schemaVersion: text("schema_version").notNull(),
@@ -2569,9 +2571,22 @@ export const actionApprovalPolicySnapshots = pgTable("action_approval_policy_sna
     .on(table.workspaceId, table.policyRef, table.revision),
   uniqueIndex("action_approval_policy_snapshots_workspace_hash_unique")
     .on(table.workspaceId, table.policyRef, table.policyHash),
+  index("action_approval_policy_snapshots_source_definition_idx").on(table.workspaceId, table.sourceDefinitionId),
   index("action_approval_policy_snapshots_workspace_created_idx").on(table.workspaceId, table.createdAt),
+  foreignKey({
+    columns: [table.workspaceId, table.sourceDefinitionId, table.policyRef, table.revision,
+      table.policyHash, table.sourceDefinitionCanonicalHash],
+    foreignColumns: [approvalPolicyDefinitionRevisions.workspaceId, approvalPolicyDefinitionRevisions.id,
+      approvalPolicyDefinitionRevisions.policyRef, approvalPolicyDefinitionRevisions.revision,
+      approvalPolicyDefinitionRevisions.policyHash, approvalPolicyDefinitionRevisions.canonicalHash],
+    name: "action_approval_policy_snapshots_source_definition_scope_fk",
+  }).onDelete("restrict"),
   check("action_approval_policy_snapshots_revision_positive", sql`${table.revision} >= 1`),
   check("action_approval_policy_snapshots_hash_format", sql`${table.policyHash} ~ '^[a-f0-9]{64}$'`),
+  check("action_approval_policy_snapshots_source_definition_exact", sql`
+    (${table.sourceDefinitionId} is null and ${table.sourceDefinitionCanonicalHash} is null)
+    or (${table.sourceDefinitionId} is not null and ${table.sourceDefinitionCanonicalHash} ~ '^[a-f0-9]{64}$')
+  `),
   check("action_approval_policy_snapshots_identity", sql`
     ${table.schemaVersion} = 'action-approval-policy/1.0.0'
     and ${table.policyRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
@@ -3250,6 +3265,9 @@ export const approvalPolicyDefinitionRevisions = pgTable("approval_policy_defini
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("approval_policy_definition_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("approval_policy_definition_revisions_snapshot_source_unique").on(
+    table.workspaceId, table.id, table.policyRef, table.revision, table.policyHash, table.canonicalHash,
+  ),
   uniqueIndex("approval_policy_definition_revisions_workspace_ref_revision_unique")
     .on(table.workspaceId, table.policyRef, table.revision),
   uniqueIndex("approval_policy_definition_revisions_workspace_hash_unique").on(table.workspaceId, table.canonicalHash),

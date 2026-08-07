@@ -783,5 +783,12 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   draft'ı authority saymaz ve yalnız exact-one active published policy döndürür; hiçbir policy seed edilmedi.
   Migration Supabase'e uygulandı; canlı kontrolde 69/69 tablo RLS ve API rollerinde sıfır tablo grant'i,
   sıfır schema-create ve sıfır public routine-execute grant'i doğrulandı.
-- Bir sonraki zorunlu kapı: queue policy snapshot'ını reviewed registry source revision FK/hash'ine bağlamak,
-  protection policy kaynağını çözmek ve ancak ardından private submitter'ı route'a takmaktır.
+- Queue ApprovalPolicy snapshot'ı artık source definition kimliği ve canonical hash'iyle reviewed registry
+  revision'ına exact tenant-bound composite FK üzerinden bağlıdır. K4 existing-post yeni proposal yazımı aynı
+  transaction içinde tüm definition zincirini doğrular; arbitrary, cross-tenant, ambiguous, draft, disabled,
+  expired veya kaynaksız policy zero-write fail-closed kalır. Canlı migration öncesinde ilgili iki tabloda da
+  kayıt olmadığı salt-okunur sayımla doğrulandı; tarihsel exact replay yalnız hiçbir yeni kayıt üretmeyen
+  `unchanged` yolunda korunur. 137 test dosyasında 819 test, production build, security/secret ve Drizzle
+  kontrolleri geçti.
+- Bir sonraki zorunlu kapı: trusted action guardrail/protection policy kaynağını ve saf resolver'ını kurmak,
+  proposal expiry kaynağını çözmek ve ancak ardından private submitter'ı route'a takmaktır.

@@ -14,13 +14,21 @@ import {
   initializeApprovalLifecycle,
   type ApprovalPolicy,
 } from "@/domain/actions/approval-lifecycle";
-import { buildActionPlan, type ActionPlan, type ActionValveContext, type AutonomyRule, type TypedActionIntent } from "@/domain/actions/autonomy-valve";
+import {
+  createApprovalPolicyDraft,
+  disableApprovalPolicy,
+  publishApprovalPolicy,
+  type ApprovalPolicyDefinitionRevision,
+} from "@/domain/actions/approval-policy-registry";
+import { buildActionPlan, EXISTING_POST_SOURCE_BINDING_VERSION,
+  type ActionPlan, type ActionValveContext, type AutonomyRule, type TypedActionIntent } from "@/domain/actions/autonomy-valve";
 import * as schema from "@/db/schema";
 
 const workspaceId = "00000000-0000-4000-8000-000000000001";
 const accountId = "10000000-0000-4000-8000-000000000001";
 const campaignId = "20000000-0000-4000-8000-000000000001";
 const adSetId = "30000000-0000-4000-8000-000000000001";
+const trustedDefinitionId = "40000000-0000-4000-8000-000000000001";
 
 const policy: ApprovalPolicy = {
   version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_queue", revision: 1,
@@ -95,6 +103,55 @@ function stagedBudget() {
       summary: { safety: "public_safe", before: { label: "Önce", value: "100 TRY" },
         after: { label: "Sonra", value: "90 TRY" }, evidence: [{ evidenceRef: "evidence_budget", label: "Bütçe kanıtı" }] } }],
   });
+}
+
+function trustedDefinitions(patch: { workspaceRef?: string; policyRef?: string; expiresAt?: string | null } = {}) {
+  const workspaceRef = patch.workspaceRef ?? "workspace_alpha";
+  const draft = createApprovalPolicyDraft({ workspaceRef,
+    policy: { version: ACTION_APPROVAL_POLICY_VERSION, policyRef: patch.policyRef ?? "policy_existing_post", revision: 1,
+      autonomyMode: "approval_only", requesterRoles: ["owner"],
+      approverRoles: [{ risk: "K4", roles: ["owner", "admin"] }], grantConsumerRoles: ["owner"],
+      separationOfDutiesRisks: ["K4"], maximumGrantLifetimeSeconds: 300 },
+    effectiveFrom: "2026-08-07T10:00:00.000Z", expiresAt: patch.expiresAt ?? null,
+    normalizedBy: { actorRef: "actor_analyst", role: "analyst" } });
+  const published = publishApprovalPolicy({ draft, actor: { actorRef: "actor_owner", role: "owner" },
+    decisionRef: "decision_publish_policy", reasonRef: "reason_reviewed",
+    publishedAt: "2026-08-07T10:30:00.000Z" });
+  return { draft, published, definitions: [draft, published] as const };
+}
+
+function stagedPromotion(approvalPolicy: ApprovalPolicy) {
+  const action: TypedActionIntent = {
+    kind: "existing_post_promotion", entity: { level: "adset", ref: "adset_67890" }, placeholderOnly: true,
+    postRef: "post_existing", postContentHash: "1".repeat(64), actorRef: "actor_page",
+    sourceBinding: { version: EXISTING_POST_SOURCE_BINDING_VERSION, kind: "organic_post_binding",
+      sourceRef: "source_page_post", sourceHash: "2".repeat(64), postIdentityHash: "3".repeat(64),
+      objectStorySpecHash: "4".repeat(64) },
+    promotionTemplateVersionRef: "template_version_one", audiencePresetVersionRef: "audience_version_one",
+    destinationRef: "destination_site", budgetPlanVersionRef: "budget_plan_one", timeframeRef: "timeframe_week",
+    scheduleMode: "fixed_duration", durationDays: 7,
+  };
+  const actionPlan = buildActionPlan(action, context(action.entity));
+  return new ActionProposalStagingService(approvalPolicy).stage({
+    plan: { planRef: "plan_promotion", revision: 1, planHash: "e".repeat(64) },
+    workspaceRef: "workspace_alpha", accountRef: "act_12345",
+    requester: { actorRef: "actor_owner", role: "owner" },
+    proposedAt: "2026-08-07T18:00:00.000Z", expiresAt: "2026-08-08T18:00:00.000Z",
+    units: [{ unitKey: "unit_promotion", plan: { planRef: "plan_promotion", revision: 1, planHash: "e".repeat(64) },
+      actionPlan, workspaceRef: "workspace_alpha", accountRef: "act_12345", entityRef: action.entity.ref,
+      actionType: actionPlan.actionType, risk: actionPlan.risk, actionHash: digest(actionPlan.action), dependencies: [],
+      summary: { safety: "public_safe", before: { label: "Önce", value: "Organik gönderi" },
+        after: { label: "Sonra", value: "Onay bekleyen öne çıkarma" },
+        evidence: [{ evidenceRef: "evidence_promotion", label: "Kaynak doğrulandı" }] } }],
+  });
+}
+
+function definitionRows(definitions: readonly ApprovalPolicyDefinitionRevision[]) {
+  return definitions.map((definition, index) => ({
+    id: index === definitions.length - 1 ? trustedDefinitionId
+      : `40000000-0000-4000-8000-${String(index + 2).padStart(12, "0")}`,
+    artifactPayload: definition,
+  }));
 }
 
 function stable(value: unknown): unknown {
@@ -226,6 +283,84 @@ describe("DrizzleActionProposalQueueRepository", () => {
     database.table(schema.actionProposalBundles)[0]!.stagingHash = "f".repeat(64);
     await expect(new DrizzleActionProposalQueueRepository(database as never, workspaceId).appendInitial(proposal))
       .rejects.toEqual(expect.objectContaining<Partial<ActionProposalQueueRepositoryError>>({ code: "idempotency_conflict" }));
+  });
+
+  it("binds K4 existing-post policy snapshots only to the exact published-active trusted definition", async () => {
+    const trusted = trustedDefinitions();
+    const database = new AtomicQueueDatabase();
+    database.setTable(schema.approvalPolicyDefinitionRevisions, definitionRows(trusted.definitions));
+    const proposal = stagedPromotion(trusted.published.policy);
+    const repository = new DrizzleActionProposalQueueRepository(database as never, workspaceId);
+    await expect(repository.appendInitial(proposal)).resolves.toMatchObject({ outcome: "inserted" });
+    expect(database.table(schema.actionApprovalPolicySnapshots)).toEqual([expect.objectContaining({
+      sourceDefinitionId: trustedDefinitionId,
+      sourceDefinitionCanonicalHash: trusted.published.canonicalHash,
+      policyRef: trusted.published.policyRef, revision: trusted.published.revision,
+      policyHash: trusted.published.policyHash, policyPayload: proposal.lifecycle.policy,
+    })]);
+    await expect(repository.appendInitial(proposal)).resolves.toMatchObject({ outcome: "unchanged" });
+    expect(database.table(schema.actionProposalBundles)).toHaveLength(1);
+  });
+
+  it("performs zero queue writes when trusted K4 source is missing, ambiguous, mismatched, cross-tenant, draft, disabled, or expired", async () => {
+    const trusted = trustedDefinitions();
+    const other = trustedDefinitions({ policyRef: "policy_other" });
+    const disabled = disableApprovalPolicy({ current: trusted.published, actor: { actorRef: "actor_admin", role: "admin" },
+      decisionRef: "decision_disable_policy", reasonRef: "reason_retired", disabledAt: "2026-08-07T11:00:00.000Z" });
+    const expired = trustedDefinitions({ policyRef: "policy_expired", expiresAt: "2026-08-07T17:00:00.000Z" });
+    const crossTenant = trustedDefinitions({ workspaceRef: "workspace_other", policyRef: "policy_cross_tenant" });
+    const arbitraryPolicy = { ...trusted.published.policy, maximumGrantLifetimeSeconds: 600 };
+    const cases = [
+      { definitions: [], proposal: stagedPromotion(trusted.published.policy) },
+      { definitions: [...trusted.definitions, ...other.definitions], proposal: stagedPromotion(trusted.published.policy) },
+      { definitions: trusted.definitions, proposal: stagedPromotion(arbitraryPolicy) },
+      { definitions: crossTenant.definitions, proposal: stagedPromotion(crossTenant.published.policy) },
+      { definitions: [trusted.draft], proposal: stagedPromotion(trusted.draft.policy) },
+      { definitions: [...trusted.definitions, disabled], proposal: stagedPromotion(disabled.policy) },
+      { definitions: expired.definitions, proposal: stagedPromotion(expired.published.policy) },
+    ] as const;
+    for (const entry of cases) {
+      const database = new AtomicQueueDatabase();
+      database.setTable(schema.approvalPolicyDefinitionRevisions, definitionRows(entry.definitions));
+      await expect(new DrizzleActionProposalQueueRepository(database as never, workspaceId).appendInitial(entry.proposal))
+        .rejects.toEqual(expect.objectContaining({ code: "policy_conflict" }));
+      expect(database.table(schema.actionApprovalPolicySnapshots)).toHaveLength(0);
+      expect(database.table(schema.actionProposalBundles)).toHaveLength(0);
+      expect(database.table(schema.actionProposalUnits)).toHaveLength(0);
+    }
+  });
+
+  it("rejects a legacy or mismatched existing snapshot without exact trusted source provenance", async () => {
+    const trusted = trustedDefinitions();
+    const proposal = stagedPromotion(trusted.published.policy);
+    const database = new AtomicQueueDatabase();
+    database.setTable(schema.approvalPolicyDefinitionRevisions, definitionRows(trusted.definitions));
+    database.setTable(schema.actionApprovalPolicySnapshots, [{ id: "50000000-0000-4000-8000-000000000001",
+      workspaceId, sourceDefinitionId: null, sourceDefinitionCanonicalHash: null,
+      policyRef: trusted.published.policyRef, revision: trusted.published.revision,
+      policyHash: trusted.published.policyHash, policyPayload: proposal.lifecycle.policy }]);
+    await expect(new DrizzleActionProposalQueueRepository(database as never, workspaceId).appendInitial(proposal))
+      .rejects.toEqual(expect.objectContaining({ code: "policy_conflict" }));
+    expect(database.table(schema.actionProposalBundles)).toHaveLength(0);
+  });
+
+  it("permits only a no-write historical exact replay before trusted lookup and creates no new authority rows", async () => {
+    const trusted = trustedDefinitions();
+    const arbitrary = stagedPromotion({ ...trusted.published.policy, maximumGrantLifetimeSeconds: 600 });
+    const database = new AtomicQueueDatabase();
+    database.setTable(schema.actionProposalBundles, [{
+      id: "60000000-0000-4000-8000-000000000001", workspaceId,
+      bundleRef: arbitrary.lifecycle.bundle.bundleRef, planRef: arbitrary.lifecycle.bundle.plan.planRef,
+      planRevision: arbitrary.lifecycle.bundle.plan.revision, lifecycleHash: digest(arbitrary.lifecycle),
+      bundleHash: arbitrary.lifecycle.bundle.bundleHash, traceHash: arbitrary.lifecycle.traceHash,
+      stagingHash: arbitrary.stagingHash, idempotencyKey: arbitrary.idempotencyKey,
+    }]);
+    await expect(new DrizzleActionProposalQueueRepository(database as never, workspaceId).appendInitial(arbitrary))
+      .resolves.toEqual({ outcome: "unchanged", lifecycleHash: digest(arbitrary.lifecycle) });
+    expect(database.table(schema.actionProposalBundles)).toHaveLength(1);
+    expect(database.table(schema.actionApprovalPolicySnapshots)).toHaveLength(0);
+    expect(database.table(schema.actionProposalUnits)).toHaveLength(0);
+    expect(database.table(schema.actionProposalInitialEvents)).toHaveLength(0);
   });
 
   it("fails closed for malformed authority input, missing authentic scope, and partial insert", async () => {

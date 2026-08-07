@@ -1,6 +1,6 @@
 {
-  "id": "92d576f6-1bb6-4b24-937c-680eab400c21",
-  "prevId": "12b07da1-59c3-4cb3-b3fc-7989c9907e84",
+  "id": "2a093649-6743-4d49-bbe9-9e2a10990fcc",
+  "prevId": "92d576f6-1bb6-4b24-937c-680eab400c21",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -784,6 +784,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "source_definition_id": {
+          "name": "source_definition_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_definition_canonical_hash": {
+          "name": "source_definition_canonical_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "policy_ref": {
           "name": "policy_ref",
           "type": "text",
@@ -898,6 +910,27 @@
           "method": "btree",
           "with": {}
         },
+        "action_approval_policy_snapshots_source_definition_idx": {
+          "name": "action_approval_policy_snapshots_source_definition_idx",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "source_definition_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "action_approval_policy_snapshots_workspace_created_idx": {
           "name": "action_approval_policy_snapshots_workspace_created_idx",
           "columns": [
@@ -933,6 +966,29 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "action_approval_policy_snapshots_source_definition_scope_fk": {
+          "name": "action_approval_policy_snapshots_source_definition_scope_fk",
+          "tableFrom": "action_approval_policy_snapshots",
+          "tableTo": "approval_policy_definition_revisions",
+          "columnsFrom": [
+            "workspace_id",
+            "source_definition_id",
+            "policy_ref",
+            "revision",
+            "policy_hash",
+            "source_definition_canonical_hash"
+          ],
+          "columnsTo": [
+            "workspace_id",
+            "id",
+            "policy_ref",
+            "revision",
+            "policy_hash",
+            "canonical_hash"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -946,6 +1002,10 @@
         "action_approval_policy_snapshots_hash_format": {
           "name": "action_approval_policy_snapshots_hash_format",
           "value": "\"action_approval_policy_snapshots\".\"policy_hash\" ~ '^[a-f0-9]{64}$'"
+        },
+        "action_approval_policy_snapshots_source_definition_exact": {
+          "name": "action_approval_policy_snapshots_source_definition_exact",
+          "value": "\n    (\"action_approval_policy_snapshots\".\"source_definition_id\" is null and \"action_approval_policy_snapshots\".\"source_definition_canonical_hash\" is null)\n    or (\"action_approval_policy_snapshots\".\"source_definition_id\" is not null and \"action_approval_policy_snapshots\".\"source_definition_canonical_hash\" ~ '^[a-f0-9]{64}$')\n  "
         },
         "action_approval_policy_snapshots_identity": {
           "name": "action_approval_policy_snapshots_identity",
@@ -4080,6 +4140,51 @@
             },
             {
               "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "approval_policy_definition_revisions_snapshot_source_unique": {
+          "name": "approval_policy_definition_revisions_snapshot_source_unique",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "policy_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "revision",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "policy_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "canonical_hash",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
