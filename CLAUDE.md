@@ -6,6 +6,12 @@
 
 Bu proje `aide` tarafından yönetiliyor. Yetenek envanteri (`aide sync` ile tazelenir):
 
+> **Kit sınırı:** Bu proje AIDE kitinin yalnız tüketicisidir. `/Users/ybg/dev/agent-ide`
+> dışındaki hiçbir AIDE kit kaynağı veya kit projeksiyonu burada değiştirilmez; kit/sync
+> sapmaları bu projede düzeltme işi değildir. Kalıcı kit değişikliği yalnız `agent-ide`
+> projesinde yapılır. `utopya/` ise ReklamZeka'ya ait yerel proje içeriğidir; şablondan
+> farkı beklenir ve sync uyarısı olarak ele alınmaz.
+
 @.claude/docs/model-policy.md
 @utopya/KUZEY.md
 @utopya/KURALLAR.md

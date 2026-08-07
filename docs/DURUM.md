@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: ffdb0b1de75f -->
+<!-- durum-damga: f7ec8bfe4f44 -->
 
 ## Künye
 
@@ -14,21 +14,25 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 3 |
+| iş commit'i (tüm geçmiş) | 7 |
 | ilk / son iş | 2026-08-06 / 2026-08-07 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-07 | `feat` | integrate durable partial sync | `b69f5ee8a` |
+| 2026-08-07 | `feat` | add resumable insights persistence contract | `a3dca0912` |
+| 2026-08-07 | `feat` | add resumable partial read sync runtime | `a2962124d` |
+| 2026-08-07 | `feat` | establish Meta read mirror core | `23124e1ee` |
 | 2026-08-07 | `feat` | add read-only Meta access inventory | `fa74d5a3a` |
 | 2026-08-06 | `—` | vscode ayarları eklendi | `03d03c538` |
 | 2026-08-06 | `—` | aide iskelesi + filing katmanı kuruldu (yeni proje) | `0d2239dda` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `?           ` ████████████████████████ 2
-- `feat        ` ████████████ 1
+- `feat        ` ████████████████████████ 5
+- `?           ` ██████████ 2
 
 ## Planlar
 

@@ -4,6 +4,42 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "b69f5ee8a",
+      "tarih": "2026-08-07",
+      "konu": "feat(meta): integrate durable partial sync",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "a3dca0912",
+      "tarih": "2026-08-07",
+      "konu": "feat(meta): add resumable insights persistence contract",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "a2962124d",
+      "tarih": "2026-08-07",
+      "konu": "feat(meta): add resumable partial read sync runtime",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "23124e1ee",
+      "tarih": "2026-08-07",
+      "konu": "feat: establish Meta read mirror core",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "fa74d5a3a",
       "tarih": "2026-08-07",
       "konu": "feat: add read-only Meta access inventory",
@@ -29,15 +65,15 @@
   ],
   "kapsamDagilimi": [
     {
-      "kapsam": "?",
-      "adet": 2
+      "kapsam": "feat",
+      "adet": 5
     },
     {
-      "kapsam": "feat",
-      "adet": 1
+      "kapsam": "?",
+      "adet": 2
     }
   ],
-  "isSayisi": 3,
+  "isSayisi": 7,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -50,5 +86,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "ffdb0b1de75f"
+  "damga": "f7ec8bfe4f44"
 }
