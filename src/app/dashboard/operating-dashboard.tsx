@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { MetaInventoryApiError, MetaInventorySnapshot } from "@/connectors/meta/types";
 import styles from "./operating-dashboard.module.css";
 
 export type OperatingDashboardModel = Readonly<{
@@ -16,7 +17,7 @@ export type OperatingDashboardModel = Readonly<{
   attribution: string;
 }>;
 
-type ViewId = "today" | "campaigns" | "analysis" | "budgets" | "rules" | "agent" | "approvals" | "timeline";
+type ViewId = "today" | "campaigns" | "analysis" | "budgets" | "rules" | "agent" | "approvals" | "timeline" | "meta";
 type ApprovalState = "pending" | "approved" | "rejected";
 type RuleCard = Readonly<{
   id: string;
@@ -38,6 +39,7 @@ const navGroups: ReadonlyArray<Readonly<{ label: string; items: ReadonlyArray<Re
   ] },
   { label: "Yönetim", items: [
     { id: "rules", label: "Kurallar & akışlar", icon: "≡" },
+    { id: "meta", label: "Meta bağlantısı", icon: "◎" },
     { id: "agent", label: "Orchestrator Agent", icon: "✦", badge: "●" },
     { id: "approvals", label: "Onay kuyruğu", icon: "✓", badge: "3" },
     { id: "timeline", label: "Timeline", icon: "↺" },
@@ -98,6 +100,15 @@ function StatusPill({ children, tone = "neutral" }: { children: React.ReactNode;
   return <span className={styles.statusPill} data-tone={tone}>{children}</span>;
 }
 
+function formatMetaTime(value: string | null) {
+  if (!value) return "Bilinmiyor";
+  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(value));
+}
+
+function compactNumber(value: number | null) {
+  return value === null ? "—" : new Intl.NumberFormat("tr-TR").format(value);
+}
+
 export function OperatingDashboard({ model }: { model: OperatingDashboardModel }) {
   const [activeView, setActiveView] = useState<ViewId>("today");
   const [selectedCampaign, setSelectedCampaign] = useState<string>(campaigns[0].id);
@@ -114,10 +125,38 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
   ]);
   const [agentInput, setAgentInput] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [metaInventory, setMetaInventory] = useState<MetaInventorySnapshot | null>(null);
+  const [metaLoading, setMetaLoading] = useState(true);
+  const [metaError, setMetaError] = useState<string | null>(null);
 
   const pendingApprovals = approvalItems.filter((item) => !approvalState[item.id]).length;
   const currentCampaign = campaigns.find((campaign) => campaign.id === selectedCampaign) ?? campaigns[0];
   const activeTitle = useMemo(() => navGroups.flatMap((group) => group.items).find((item) => item.id === activeView)?.label ?? "Bugün", [activeView]);
+
+  const refreshMetaInventory = useCallback(async (announce = false) => {
+    setMetaLoading(true);
+    setMetaError(null);
+    try {
+      const response = await fetch("/api/meta/inventory", { cache: "no-store" });
+      if (!response.ok) {
+        const payload = await response.json() as MetaInventoryApiError;
+        throw new Error(payload.error?.message ?? "Meta envanteri yenilenemedi");
+      }
+      const snapshot = await response.json() as MetaInventorySnapshot;
+      setMetaInventory(snapshot);
+      if (announce) setToast(`Meta envanteri yenilendi: ${snapshot.summary.adAccounts} hesap · ${snapshot.summary.pages} sayfa · ${snapshot.audit.writeOperations} write.`);
+    } catch (error) {
+      setMetaError(error instanceof Error ? error.message : "Meta envanteri yenilenemedi");
+    } finally {
+      setMetaLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshMetaInventory();
+    const timer = window.setInterval(() => void refreshMetaInventory(), 15 * 60_000);
+    return () => window.clearInterval(timer);
+  }, [refreshMetaInventory]);
 
   function navigate(view: ViewId) {
     setActiveView(view);
@@ -266,23 +305,80 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
     </>;
   }
 
+  function renderMetaConnection() {
+    if (!metaInventory) {
+      return <>
+        <section className={styles.pageHero}><div><span className={styles.kicker}>META READ MIRROR</span><h1>Meta erişim envanteri hazırlanıyor.</h1><p>Token yalnız sunucu tarafında okunur; dashboard ve agent bağlamına hiçbir zaman eklenmez.</p></div><button className={styles.primaryButton} disabled={metaLoading} onClick={() => void refreshMetaInventory(true)}>{metaLoading ? "Kontrol ediliyor…" : "Yeniden dene"}</button></section>
+        <section className={`${styles.panel} ${styles.metaEmpty}`}><StatusPill tone={metaError ? "danger" : "neutral"}>{metaError ? "Bağlantı hatası" : "Salt okunur keşif"}</StatusPill><h2>{metaError ?? "Meta Graph yanıtı bekleniyor"}</h2><p>Hiçbir kampanya, bütçe, reklam seti veya reklam değiştirilmiyor.</p></section>
+      </>;
+    }
+
+    const inventory = metaInventory;
+    return <>
+      <section className={styles.pageHero}>
+        <div><span className={styles.kicker}>META READ MIRROR · {inventory.connection.graphApiVersion}</span><h1>Hangi varlığa erişebildiğimiz açık ve doğrulanmış.</h1><p>İzin kapsamı, canlı erişim ve ReklamZeka’da etkin yetenek birbirinden ayrıdır. Tam Meta ID’leri bu yüzeye çıkmaz.</p></div>
+        <button className={styles.primaryButton} disabled={metaLoading} onClick={() => void refreshMetaInventory(true)}>{metaLoading ? "Yenileniyor…" : "Envanteri yenile"}</button>
+      </section>
+
+      {inventory.connection.securityStatus === "temporary_exposed" ? <section className={styles.securityBanner}><span>!</span><div><strong>Geçici ve riskli kimlik bilgisi</strong><p>Bu token daha önce terminal çıktısında göründü. Salt okunur kullanım zorlanıyor; ilk bakım adımı token rotasyonu olmalı.</p></div><StatusPill tone="warning">Rotation gerekli</StatusPill></section> : null}
+
+      <section className={styles.metaMetricGrid} aria-label="Meta erişim özeti">
+        <article><span>Reklam hesabı</span><strong>{inventory.summary.adAccounts}</strong><small>{inventory.summary.accountsWithCampaigns} hesapta kampanya var</small></article>
+        <article><span>Facebook sayfası</span><strong>{inventory.summary.pages}</strong><small>pages_show_list ile doğrulandı</small></article>
+        <article><span>Bağlı Instagram</span><strong>{inventory.summary.linkedInstagramAccounts}</strong><small>Profesyonel hesap ilişkisi</small></article>
+        <article><span>Kampanya / Ad set / Ad</span><strong>{compactNumber(inventory.summary.campaigns)}</strong><small>{compactNumber(inventory.summary.adSets)} ad set · {compactNumber(inventory.summary.ads)} reklam</small></article>
+      </section>
+
+      <section className={styles.metaConnectionBar}>
+        <div><span className={styles.liveDot} /><p><strong>Token geçerli · read_only</strong><small>Son kontrol {formatMetaTime(inventory.refreshedAt)}</small></p></div>
+        <div><span>Sona erme</span><strong>{formatMetaTime(inventory.connection.expiresAt)}</strong></div>
+        <div><span>Sonraki otomatik kontrol</span><strong>{formatMetaTime(inventory.nextAutomaticRefreshAt)}</strong></div>
+        <div><span>Audit</span><strong>{inventory.audit.action} · {inventory.audit.writeOperations} write</strong></div>
+      </section>
+
+      <section className={styles.panel}>
+        <header className={styles.panelHeader}><div><span className={styles.kicker}>CAPABILITY MATRIX</span><h2>Yetki, doğrulama ve etkinlik</h2></div><StatusPill tone="good">GET-only connector</StatusPill></header>
+        <div className={styles.capabilityTable} role="table" aria-label="Meta yetenekleri">
+          <div className={styles.capabilityHead} role="row"><span>Yetenek</span><span>Token izni</span><span>Canlı doğrulama</span><span>ReklamZeka’da etkin</span><span>Açıklama</span></div>
+          {inventory.capabilities.map((capability) => <div className={styles.capabilityRow} role="row" key={capability.id}><strong>{capability.label}</strong><StatusPill tone={capability.granted ? "good" : "neutral"}>{capability.granted ? "Var" : "Yok"}</StatusPill><StatusPill tone={capability.verified ? "info" : "neutral"}>{capability.verified ? "Doğrulandı" : "Çalıştırılmadı"}</StatusPill><StatusPill tone={capability.enabled ? "good" : "danger"}>{capability.enabled ? "Açık" : "Kapalı"}</StatusPill><small>{capability.note}</small></div>)}
+        </div>
+      </section>
+
+      <div className={styles.metaInventoryColumns}>
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}><div><span className={styles.kicker}>AD ACCOUNTS</span><h2>Erişilebilir reklam hesapları</h2></div><span>{inventory.accounts.length} hesap</span></header>
+          <div className={styles.metaAccountList}>{inventory.accounts.map((account) => <details key={account.id}><summary><div><strong>{account.name}</strong><small>{account.id} · {account.currency ?? "—"} · {account.timezone ?? "—"}</small></div><StatusPill tone={account.status === "ACTIVE" ? "good" : "warning"}>{account.status}</StatusPill><div><strong>{compactNumber(account.campaignCount)}</strong><small>kampanya</small></div></summary><div className={styles.metaAccountDetail}><dl><div><dt>Campaign</dt><dd>{compactNumber(account.campaignCount)}</dd></div><div><dt>Ad set</dt><dd>{compactNumber(account.adSetCount)}</dd></div><div><dt>Ad</dt><dd>{compactNumber(account.adCount)}</dd></div><div><dt>Insights</dt><dd>{account.insightAccess.verified ? `${account.insightAccess.dateStart ?? "7g"} → ${account.insightAccess.dateStop ?? "bugün"}` : "Doğrulanamadı"}</dd></div></dl>{account.campaignExamples.length ? <div><span className={styles.kicker}>KAMPANYA ÖRNEKLERİ</span>{account.campaignExamples.map((campaign) => <p key={campaign.id}><strong>{campaign.name}</strong><small>{campaign.status} · {campaign.objective ?? "objective yok"} · {campaign.id}</small></p>)}</div> : <p>Bu hesapta kampanya bulunamadı.</p>}{account.adCopyExamples.some((ad) => ad.body || ad.title || ad.instagramPermalink) ? <div><span className={styles.kicker}>OKUNABİLEN REKLAM METİNLERİ</span>{account.adCopyExamples.filter((ad) => ad.body || ad.title || ad.instagramPermalink).slice(0, 2).map((ad) => <blockquote key={ad.id}><strong>{ad.title ?? ad.name}</strong><p>{ad.body ?? "Metin yok; mevcut gönderi bağlantısı okunabiliyor."}</p>{ad.instagramPermalink ? <a href={ad.instagramPermalink} target="_blank" rel="noreferrer">Instagram gönderisini aç ↗</a> : null}</blockquote>)}</div> : null}</div></details>)}</div>
+        </section>
+
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}><div><span className={styles.kicker}>PAGES & INSTAGRAM</span><h2>Sayfa bağlantıları</h2></div><StatusPill tone="info">{inventory.summary.linkedInstagramAccounts} IG bağlı</StatusPill></header>
+          <div className={styles.metaPageList}>{inventory.pages.map((page) => <article key={page.id}><div><strong>{page.name}</strong><small>{page.category ?? "Kategori yok"} · {page.id}</small></div><div><span>{page.followers === null ? "—" : compactNumber(page.followers)}</span><small>takipçi</small></div>{page.instagram ? <div className={styles.instagramIdentity}><span>◎</span><p><strong>@{page.instagram.username ?? "kullanıcı-adı-yok"}</strong><small>{page.instagram.name ?? page.instagram.id}</small></p></div> : <StatusPill tone="neutral">IG bağı yok</StatusPill>}</article>)}</div>
+        </section>
+      </div>
+
+      {inventory.errors.length || metaError ? <section className={styles.metaErrors}><strong>Kısmi erişim notları</strong>{metaError ? <p>{metaError}</p> : null}{inventory.errors.map((error) => <p key={`${error.resource}-${error.message}`}><span>{error.resource}</span>{error.message}</p>)}</section> : null}
+
+      <section className={styles.scopeDisclosure}><div><span>Token kapsamları</span><p>{inventory.connection.grantedScopes.join(" · ")}</p></div><strong>Scope ≠ execute yetkisi</strong></section>
+    </>;
+  }
+
   function renderTimeline() {
     return <><section className={styles.pageHero}><div><span className={styles.kicker}>APPEND-ONLY TIMELINE</span><h1>Veri, karar ve hareket aynı kronolojide.</h1><p>Sync'ten outcome'a kadar bizim ve Meta üzerindeki harici değişikliklerin tamamı tek izde.</p></div><button className={styles.secondaryButton}>Filtrele</button></section><section className={styles.panel}><div className={styles.timeline}>{timeline.map((event) => <article key={`${event.time}-${event.title}`}><time>{event.time}</time><span className={styles.timelineDot} data-type={event.type} /><div><StatusPill tone="neutral">{event.type}</StatusPill><h2>{event.title}</h2><p>{event.detail}</p><small>{event.actor}</small></div><button aria-label={`${event.title} detayını aç`}>→</button></article>)}</div></section></>;
   }
 
-  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "budgets" ? renderBudgets() : activeView === "rules" ? renderRules() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? renderApprovals() : renderTimeline();
+  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "budgets" ? renderBudgets() : activeView === "rules" ? renderRules() : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? renderApprovals() : renderTimeline();
 
   return <main className={styles.appShell}>
     <aside className={styles.sidebar}>
       <div className={styles.brand}><span>RZ</span><div><strong>ReklamZeka</strong><small>Operating System</small></div><i>DEMO</i></div>
       <nav aria-label="Ana navigasyon">{navGroups.map((group) => <div key={group.label}><span>{group.label}</span>{group.items.map((item) => <button key={item.id} data-active={activeView === item.id} onClick={() => navigate(item.id)}><Icon name={item.icon} /><strong>{item.label}</strong>{item.badge ? <i data-live={item.badge === "●"}>{item.badge === "3" && item.id === "approvals" ? pendingApprovals : item.badge}</i> : null}</button>)}</div>)}</nav>
-      <div className={styles.sidebarFooter}><span className={styles.liveDot} /><div><strong>Meta Mirror</strong><small>{model.freshnessLabel} · read-only</small></div><button aria-label="Bağlantı ayarları">•••</button></div>
+      <div className={styles.sidebarFooter}><span className={styles.liveDot} /><div><strong>Meta Mirror</strong><small>{metaInventory ? `${metaInventory.summary.adAccounts} hesap · read-only` : `${model.freshnessLabel} · kontrol ediliyor`}</small></div><button aria-label="Bağlantı ayarları" onClick={() => navigate("meta")}>•••</button></div>
     </aside>
     <section className={styles.workspace}>
-      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button className={styles.workspacePicker}><span className={styles.avatar}>DM</span><span><strong>Demo Marka</strong><small>4 Meta hesabı</small></span><i>⌄</i></button><div className={styles.topActions}><button aria-label="Ara">⌕</button><button aria-label="Bildirimler">♢<i>{pendingApprovals}</i></button><button className={styles.autonomyButton} onClick={() => navigate("agent")}><span className={styles.liveDot} /> approval_only <i>⌄</i></button><button className={styles.profileButton}>AY</button></div></header>
+      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button className={styles.workspacePicker} onClick={() => navigate("meta")}><span className={styles.avatar}>DM</span><span><strong>Demo Marka</strong><small>{metaInventory ? `${metaInventory.summary.adAccounts} Meta hesabı` : "Meta kontrol ediliyor"}</small></span><i>⌄</i></button><div className={styles.topActions}><button aria-label="Ara">⌕</button><button aria-label="Bildirimler">♢<i>{pendingApprovals}</i></button><button className={styles.autonomyButton} onClick={() => navigate("agent")}><span className={styles.liveDot} /> approval_only <i>⌄</i></button><button className={styles.profileButton}>AY</button></div></header>
       <div className={styles.mobileNav}>{navGroups.flatMap((group) => group.items).map((item) => <button key={item.id} data-active={activeView === item.id} onClick={() => navigate(item.id)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</div>
       <div className={styles.content} aria-label={activeTitle}>{content}</div>
-      <footer className={styles.sourceFooter}><span>Demo snapshot · {model.currency} · {model.timezone} · {model.attribution}</span><span>Deterministik veriler mevcut fixture/API'dan; operasyon bağlamı ürün vizyonu demosudur.</span></footer>
+      <footer className={styles.sourceFooter}><span>{activeView === "meta" && metaInventory ? `Canlı Meta Graph · ${formatMetaTime(metaInventory.refreshedAt)} · ${metaInventory.connection.accessMode}` : `Demo snapshot · ${model.currency} · ${model.timezone} · ${model.attribution}`}</span><span>{activeView === "meta" ? "Kimlikler maskeli · token server-only · write connector yok" : "Deterministik veriler mevcut fixture/API'dan; operasyon bağlamı ürün vizyonu demosudur."}</span></footer>
     </section>
     {toast ? <div className={styles.toast} role="status"><span>✓</span><p>{toast}</p><button onClick={() => setToast(null)} aria-label="Bildirimi kapat">×</button></div> : null}
   </main>;

@@ -4,12 +4,12 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "bfe9b9fce",
+      "hash": "fa74d5a3a",
       "tarih": "2026-08-07",
-      "konu": "merge: uzak ile birleştir — kayıpsız (türev yeniden üretilir, içerik birleşimle korunur)",
+      "konu": "feat: add read-only Meta access inventory",
       "tur": "is",
       "kapsam": [
-        "merge"
+        "feat"
       ]
     },
     {
@@ -33,7 +33,7 @@
       "adet": 2
     },
     {
-      "kapsam": "merge",
+      "kapsam": "feat",
       "adet": 1
     }
   ],
@@ -48,15 +48,7 @@
       "asamaKapali": 6,
       "asamaToplam": 14,
       "siradaki": "08-Meta dijital ikizi"
-    },
-    {
-      "slug": "reklamzeka-sistemi",
-      "v": 2,
-      "durum": "AÇIK",
-      "asamaKapali": 0,
-      "asamaToplam": 10,
-      "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "f5bf14502d13"
+  "damga": "ffdb0b1de75f"
 }

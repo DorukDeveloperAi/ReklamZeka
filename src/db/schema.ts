@@ -17,6 +17,10 @@ export const membershipRole = pgEnum("membership_role", ["owner", "admin", "anal
 export const sourcePlatform = pgEnum("source_platform", ["meta_ads", "google_ads", "csv"]);
 export const syncRunStatus = pgEnum("sync_run_status", ["running", "completed", "failed"]);
 export const insightFeedbackValue = pgEnum("insight_feedback_value", ["helpful", "unhelpful", "acted"]);
+export const metaEntityStatus = pgEnum("meta_entity_status", ["active", "paused", "archived", "deleted", "unknown"]);
+export const metaBudgetOwnerLevel = pgEnum("meta_budget_owner_level", ["campaign", "ad_set", "unknown"]);
+export const metaAssetType = pgEnum("meta_asset_type", ["facebook_page", "instagram_account", "pixel", "dataset", "app", "whatsapp_account", "destination", "post", "media"]);
+export const metaAssetEdgeType = pgEnum("meta_asset_edge_type", ["campaign_promotes", "ad_set_promotes", "ad_uses_creative", "creative_uses_actor", "creative_promotes_object", "creative_uses_asset", "post_has_media"]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -65,6 +69,14 @@ export const adAccounts = pgTable("ad_accounts", {
   name: text("name").notNull(),
   currency: text("currency").notNull(),
   timezone: text("timezone").notNull(),
+  configuredStatus: text("configured_status"),
+  effectiveStatus: text("effective_status"),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }),
+  rawPayloadHash: text("raw_payload_hash"),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  disappearedAt: timestamp("disappeared_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("ad_accounts_source_external_unique").on(table.dataSourceId, table.externalAccountId),
@@ -77,10 +89,149 @@ export const adCampaigns = pgTable("ad_campaigns", {
   adAccountId: uuid("ad_account_id").notNull().references(() => adAccounts.id, { onDelete: "cascade" }),
   externalCampaignId: text("external_campaign_id").notNull(),
   name: text("name").notNull(),
+  configuredStatus: text("configured_status"),
+  effectiveStatus: text("effective_status"),
+  objective: text("objective"),
+  legacyObjective: text("legacy_objective"),
+  buyingType: text("buying_type"),
+  specialAdCategories: jsonb("special_ad_categories").$type<readonly string[]>().notNull().default([]),
+  budgetOptimizationEnabled: integer("budget_optimization_enabled"),
+  dailyBudgetMinor: bigint("daily_budget_minor", { mode: "number" }),
+  lifetimeBudgetMinor: bigint("lifetime_budget_minor", { mode: "number" }),
+  budgetCurrency: text("budget_currency"),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }),
+  rawPayloadHash: text("raw_payload_hash"),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  disappearedAt: timestamp("disappeared_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("ad_campaigns_account_external_unique").on(table.adAccountId, table.externalCampaignId),
   index("ad_campaigns_workspace_idx").on(table.workspaceId),
+]);
+
+export const metaAdSets = pgTable("meta_ad_sets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull().references(() => adAccounts.id, { onDelete: "cascade" }),
+  adCampaignId: uuid("ad_campaign_id").notNull().references(() => adCampaigns.id, { onDelete: "cascade" }),
+  externalAdSetId: text("external_ad_set_id").notNull(),
+  name: text("name").notNull(),
+  configuredStatus: text("configured_status"),
+  effectiveStatus: text("effective_status"),
+  optimizationGoal: text("optimization_goal"),
+  billingEvent: text("billing_event"),
+  bidStrategy: text("bid_strategy"),
+  bidAmountMinor: bigint("bid_amount_minor", { mode: "number" }),
+  costCapMinor: bigint("cost_cap_minor", { mode: "number" }),
+  dailyBudgetMinor: bigint("daily_budget_minor", { mode: "number" }),
+  lifetimeBudgetMinor: bigint("lifetime_budget_minor", { mode: "number" }),
+  budgetCurrency: text("budget_currency"),
+  attributionSetting: text("attribution_setting"),
+  promotedObject: jsonb("promoted_object").$type<Record<string, unknown>>(),
+  targetingSummary: jsonb("targeting_summary").$type<Record<string, unknown>>(),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+  rawPayloadHash: text("raw_payload_hash").notNull(),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  disappearedAt: timestamp("disappeared_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("meta_ad_sets_account_external_unique").on(table.adAccountId, table.externalAdSetId),
+  index("meta_ad_sets_campaign_idx").on(table.adCampaignId),
+  index("meta_ad_sets_workspace_idx").on(table.workspaceId),
+]);
+
+export const metaAds = pgTable("meta_ads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull().references(() => adAccounts.id, { onDelete: "cascade" }),
+  adCampaignId: uuid("ad_campaign_id").notNull().references(() => adCampaigns.id, { onDelete: "cascade" }),
+  adSetId: uuid("ad_set_id").notNull().references(() => metaAdSets.id, { onDelete: "cascade" }),
+  externalAdId: text("external_ad_id").notNull(),
+  name: text("name").notNull(),
+  configuredStatus: text("configured_status"),
+  effectiveStatus: text("effective_status"),
+  creativeExternalId: text("creative_external_id"),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+  rawPayloadHash: text("raw_payload_hash").notNull(),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  disappearedAt: timestamp("disappeared_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("meta_ads_account_external_unique").on(table.adAccountId, table.externalAdId),
+  index("meta_ads_ad_set_idx").on(table.adSetId),
+  index("meta_ads_workspace_idx").on(table.workspaceId),
+]);
+
+export const metaCreatives = pgTable("meta_creatives", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull().references(() => adAccounts.id, { onDelete: "cascade" }),
+  externalCreativeId: text("external_creative_id").notNull(),
+  sourceType: text("source_type"),
+  effectivePrimaryText: text("effective_primary_text"),
+  effectiveHeadline: text("effective_headline"),
+  effectiveDescription: text("effective_description"),
+  effectiveCaption: text("effective_caption"),
+  callToAction: text("call_to_action"),
+  destinationUrl: text("destination_url"),
+  postExternalId: text("post_external_id"),
+  actorExternalId: text("actor_external_id"),
+  dynamicVariants: jsonb("dynamic_variants").$type<readonly Record<string, unknown>[]>().notNull().default([]),
+  fieldProvenance: jsonb("field_provenance").$type<Record<string, string>>().notNull().default({}),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+  rawPayloadHash: text("raw_payload_hash").notNull(),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  disappearedAt: timestamp("disappeared_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("meta_creatives_account_external_unique").on(table.adAccountId, table.externalCreativeId),
+  index("meta_creatives_workspace_idx").on(table.workspaceId),
+]);
+
+export const metaAssets = pgTable("meta_assets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  connectionDataSourceId: uuid("connection_data_source_id").notNull().references(() => dataSources.id, { onDelete: "cascade" }),
+  assetType: metaAssetType("asset_type").notNull(),
+  externalAssetId: text("external_asset_id").notNull(),
+  displayName: text("display_name"),
+  capability: jsonb("capability").$type<Record<string, unknown>>(),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+  rawPayloadHash: text("raw_payload_hash").notNull(),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  disappearedAt: timestamp("disappeared_at", { withTimezone: true }),
+  disappearanceReason: text("disappearance_reason"),
+}, (table) => [
+  uniqueIndex("meta_assets_connection_type_external_unique").on(table.connectionDataSourceId, table.assetType, table.externalAssetId),
+  index("meta_assets_workspace_type_idx").on(table.workspaceId, table.assetType),
+]);
+
+export const metaAssetEdges = pgTable("meta_asset_edges", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  connectionDataSourceId: uuid("connection_data_source_id").notNull().references(() => dataSources.id, { onDelete: "cascade" }),
+  fromAssetId: uuid("from_asset_id").notNull().references(() => metaAssets.id, { onDelete: "cascade" }),
+  toAssetId: uuid("to_asset_id").notNull().references(() => metaAssets.id, { onDelete: "cascade" }),
+  edgeType: metaAssetEdgeType("edge_type").notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+  rawPayloadHash: text("raw_payload_hash").notNull(),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  disappearedAt: timestamp("disappeared_at", { withTimezone: true }),
+  disappearanceReason: text("disappearance_reason"),
+}, (table) => [
+  uniqueIndex("meta_asset_edges_unique").on(table.connectionDataSourceId, table.fromAssetId, table.toAssetId, table.edgeType),
+  index("meta_asset_edges_workspace_from_idx").on(table.workspaceId, table.fromAssetId),
+  index("meta_asset_edges_workspace_to_idx").on(table.workspaceId, table.toAssetId),
 ]);
 
 export const dailyAdMetrics = pgTable("daily_ad_metrics", {
