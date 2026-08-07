@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 4dfbc7ed6483 -->
+<!-- durum-damga: 754a4fd24415 -->
 
 ## Künye
 
@@ -14,13 +14,14 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 7 |
+| iş commit'i (tüm geçmiş) | 8 |
 | ilk / son iş | 2026-08-06 / 2026-08-07 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-07 | `chore` | utopya iskeletleri kalıcı YEREL ilan edildi | `8bbeef3c0` |
 | 2026-08-07 | `chore` | 2. merge sonrası türevleri yeniden üret | `211d67333` |
 | 2026-08-07 | `merge` | uzak ile birleştir (2. tur) | `03716c2fc` |
 | 2026-08-07 | `chore` | merge sonrası türevleri üreticiden yeniden üret (agac.mjs INDEX/TODO + DURUM) | `1927e26a3` |
@@ -31,10 +32,10 @@
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `?           ` ████████████████████████ 2
-- `chore       ` ████████████████████████ 2
-- `merge       ` ████████████████████████ 2
-- `feat        ` ████████████ 1
+- `chore       ` ████████████████████████ 3
+- `?           ` ████████████████ 2
+- `merge       ` ████████████████ 2
+- `feat        ` ████████ 1
 
 ## Planlar
 

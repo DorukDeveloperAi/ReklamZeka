@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "8bbeef3c0",
+      "tarih": "2026-08-07",
+      "konu": "chore(kit): utopya iskeletleri kalıcı YEREL ilan edildi",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
       "hash": "211d67333",
       "tarih": "2026-08-07",
       "konu": "chore(turev): 2. merge sonrası türevleri yeniden üret",
@@ -65,11 +74,11 @@
   ],
   "kapsamDagilimi": [
     {
-      "kapsam": "?",
-      "adet": 2
+      "kapsam": "chore",
+      "adet": 3
     },
     {
-      "kapsam": "chore",
+      "kapsam": "?",
       "adet": 2
     },
     {
@@ -81,7 +90,7 @@
       "adet": 1
     }
   ],
-  "isSayisi": 7,
+  "isSayisi": 8,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -102,5 +111,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "4dfbc7ed6483"
+  "damga": "754a4fd24415"
 }
