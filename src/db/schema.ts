@@ -35,6 +35,39 @@ export const metaAssetType = pgEnum("meta_asset_type", [
   "whatsapp_account",
   "destination",
 ]);
+export const metaAssetOwnershipKind = pgEnum("meta_asset_ownership_kind", [
+  "owned",
+  "shared",
+  "linked",
+  "accessible",
+  "unknown",
+]);
+export const metaPromotionEligibilityStatus = pgEnum("meta_promotion_eligibility_status", [
+  "not_evaluated",
+  "eligible",
+  "ineligible",
+  "unknown",
+]);
+export const metaAssetDiscoveryResource = pgEnum("meta_asset_discovery_resource", [
+  "ad_accounts",
+  "pages",
+  "pixels",
+  "datasets",
+  "apps",
+  "whatsapp_business_accounts",
+]);
+export const metaAssetDiscoverySourceType = pgEnum("meta_asset_discovery_source_type", [
+  "connection",
+  "ad_account",
+  "business",
+]);
+export const metaAssetDiscoveryStatus = pgEnum("meta_asset_discovery_status", [
+  "verified",
+  "empty",
+  "permission_missing",
+  "unsupported",
+  "unavailable",
+]);
 export const metaSyncRunStatus = pgEnum("meta_sync_run_status", [
   "pending",
   "running",
@@ -248,6 +281,10 @@ export const metaAssets = pgTable("meta_assets", {
   assetType: metaAssetType("asset_type").notNull(),
   externalAssetId: text("external_asset_id").notNull(),
   displayName: text("display_name"),
+  username: text("username"),
+  ownershipKind: metaAssetOwnershipKind("ownership_kind").notNull().default("unknown"),
+  ownerBusinessExternalId: text("owner_business_external_id"),
+  ownershipEvidence: text("ownership_evidence"),
   permissionSnapshot: jsonb("permission_snapshot").$type<readonly string[]>(),
   capabilitySnapshot: jsonb("capability_snapshot").$type<Record<string, unknown>>(),
   unsupportedFields: jsonb("unsupported_fields").$type<readonly Record<string, unknown>[]>(),
@@ -282,6 +319,15 @@ export const metaPosts = pgTable("meta_posts", {
   externalMediaId: text("external_media_id"),
   mediaType: text("media_type"),
   permalink: text("permalink"),
+  sourceMessage: text("source_message"),
+  sourceCaption: text("source_caption"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  promotionEligibilityStatus: metaPromotionEligibilityStatus("promotion_eligibility_status")
+    .notNull()
+    .default("not_evaluated"),
+  promotionEligibilityReason: text("promotion_eligibility_reason"),
+  promotionEligibilityEvaluatedAt: timestamp("promotion_eligibility_evaluated_at", { withTimezone: true }),
+  contentHash: text("content_hash"),
   configuredStatus: text("configured_status"),
   effectiveStatus: text("effective_status"),
   unsupportedFields: jsonb("unsupported_fields").$type<readonly Record<string, unknown>[]>(),
@@ -298,6 +344,7 @@ export const metaPosts = pgTable("meta_posts", {
 }, (table) => [
   uniqueIndex("meta_posts_connection_external_unique").on(table.metaConnectionId, table.externalPostId),
   index("meta_posts_workspace_actor_idx").on(table.workspaceId, table.actorAssetId),
+  index("meta_posts_actor_asset_idx").on(table.actorAssetId),
 ]);
 
 export const metaCreatives = pgTable("meta_creatives", {
@@ -334,6 +381,8 @@ export const metaCreatives = pgTable("meta_creatives", {
 }, (table) => [
   uniqueIndex("meta_creatives_account_external_unique").on(table.adAccountId, table.externalCreativeId),
   index("meta_creatives_workspace_post_idx").on(table.workspaceId, table.postId),
+  index("meta_creatives_post_idx").on(table.postId),
+  index("meta_creatives_actor_asset_idx").on(table.actorAssetId),
 ]);
 
 export const metaAds = pgTable("meta_ads", {
@@ -364,6 +413,7 @@ export const metaAds = pgTable("meta_ads", {
 }, (table) => [
   uniqueIndex("meta_ads_account_external_unique").on(table.adAccountId, table.externalAdId),
   index("meta_ads_workspace_ad_set_idx").on(table.workspaceId, table.adSetId),
+  index("meta_ads_creative_idx").on(table.creativeId),
 ]);
 
 export const metaAssetEdges = pgTable("meta_asset_edges", {
@@ -393,6 +443,43 @@ export const metaAssetEdges = pgTable("meta_asset_edges", {
     table.relationship,
   ),
   index("meta_asset_edges_workspace_account_idx").on(table.workspaceId, table.adAccountId),
+  index("meta_asset_edges_ad_account_idx").on(table.adAccountId),
+  index("meta_asset_edges_target_asset_idx").on(table.targetAssetId),
+]);
+
+/** Durable outcome of each bounded Graph asset-discovery edge. */
+export const metaAssetDiscoveries = pgTable("meta_asset_discoveries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  metaConnectionId: uuid("meta_connection_id").notNull().references(() => metaConnections.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").references(() => adAccounts.id, { onDelete: "cascade" }),
+  discoveryKey: text("discovery_key").notNull(),
+  resource: metaAssetDiscoveryResource("resource").notNull(),
+  sourceType: metaAssetDiscoverySourceType("source_type").notNull(),
+  sourceExternalId: text("source_external_id"),
+  status: metaAssetDiscoveryStatus("status").notNull(),
+  reason: text("reason"),
+  itemCount: integer("item_count").notNull().default(0),
+  sourceEdge: text("source_edge").notNull(),
+  rawPayloadHash: text("raw_payload_hash").notNull(),
+  sourceGraphVersion: text("source_graph_version").notNull(),
+  fieldCatalogVersion: text("field_catalog_version").notNull(),
+  provenance: jsonb("provenance").$type<Record<string, unknown>>().notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("meta_asset_discoveries_workspace_connection_key_unique").on(
+    table.workspaceId,
+    table.metaConnectionId,
+    table.discoveryKey,
+  ),
+  index("meta_asset_discoveries_connection_status_idx").on(
+    table.metaConnectionId,
+    table.status,
+  ),
+  index("meta_asset_discoveries_ad_account_idx").on(table.adAccountId),
 ]);
 
 export const metaAdCreativeBindings = pgTable("meta_ad_creative_bindings", {
@@ -409,6 +496,8 @@ export const metaAdCreativeBindings = pgTable("meta_ad_creative_bindings", {
 }, (table) => [
   uniqueIndex("meta_ad_creative_bindings_ad_creative_unique").on(table.adId, table.creativeId),
   index("meta_ad_creative_bindings_workspace_idx").on(table.workspaceId),
+  index("meta_ad_creative_bindings_creative_idx").on(table.creativeId),
+  index("meta_ad_creative_bindings_post_idx").on(table.postId),
 ]);
 
 /**
