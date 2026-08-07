@@ -87,6 +87,7 @@ async function discoverEdge<T>(
     resource: MetaAssetDiscovery["resource"];
     sourceType: MetaAssetDiscovery["sourceType"];
     sourceExternalId: string | null;
+    fetchedAt: string;
   }>,
 ): Promise<DiscoveryResult<T>> {
   try {
@@ -100,17 +101,20 @@ async function discoverEdge<T>(
         status: rows.length ? "verified" : "empty",
         reason: null,
         itemCount: rows.length,
+        provenance: provenance(input.path, rows, input.fetchedAt, client.graphApiVersion),
       },
     };
   } catch (error) {
+    const failure = failureStatus(error);
     return {
       rows: [],
       discovery: {
         resource: input.resource,
         sourceType: input.sourceType,
         sourceExternalId: input.sourceExternalId,
-        ...failureStatus(error),
+        ...failure,
         itemCount: 0,
+        provenance: provenance(input.path, failure, input.fetchedAt, client.graphApiVersion),
       },
     };
   }
@@ -201,6 +205,7 @@ export async function discoverMetaAssetMirror(
     resource: "ad_accounts",
     sourceType: "connection",
     sourceExternalId: null,
+    fetchedAt,
   });
   discoveries.push(accountResult.discovery);
   const accounts = validRows(accountResult.rows);
@@ -211,6 +216,7 @@ export async function discoverMetaAssetMirror(
     resource: "pages",
     sourceType: "connection",
     sourceExternalId: null,
+    fetchedAt,
   });
   discoveries.push(pageResult.discovery);
   for (const page of validRows(pageResult.rows)) {
@@ -278,6 +284,7 @@ export async function discoverMetaAssetMirror(
       resource: "pixels",
       sourceType: "ad_account",
       sourceExternalId: account.id,
+      fetchedAt,
     });
     discoveries.push(pixelResult.discovery);
     for (const pixel of validRows(pixelResult.rows)) {
@@ -333,6 +340,7 @@ export async function discoverMetaAssetMirror(
         resource: descriptor.resource,
         sourceType: "business",
         sourceExternalId: business.id,
+        fetchedAt,
       });
       discoveries.push(result.discovery);
       for (const rawAsset of validRows(result.rows)) {

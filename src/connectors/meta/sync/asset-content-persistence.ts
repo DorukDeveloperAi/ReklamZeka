@@ -1,4 +1,9 @@
-import type { CanonicalMetaAssetMirrorSnapshot, MetaAssetEdge, MetaMirroredAsset } from "@/domain/meta/asset-mirror";
+import type {
+  CanonicalMetaAssetMirrorSnapshot,
+  MetaAssetDiscovery,
+  MetaAssetEdge,
+  MetaMirroredAsset,
+} from "@/domain/meta/asset-mirror";
 import type { MetaAdContentExtraction } from "@/domain/meta/content/extract";
 import { stableHash } from "./types";
 
@@ -91,6 +96,14 @@ export type MetaAssetEdgeRow = Readonly<{
   sourceRevision: string;
 }>;
 
+export type MetaAssetDiscoveryRow = Readonly<{
+  workspaceId: string;
+  connectionId: string;
+  adAccountId: string | null;
+  discovery: MetaAssetDiscovery;
+  sourceRevision: string;
+}>;
+
 export type MetaContentRow = Readonly<{
   workspaceId: string;
   connectionId: string;
@@ -105,6 +118,7 @@ export interface MetaAssetContentTransaction {
    * and updated replaces canonical fields only for a newer/equal revision.
    */
   upsertAssets(rows: readonly MetaAssetRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
+  upsertDiscoveries(rows: readonly MetaAssetDiscoveryRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
   upsertEdges(rows: readonly MetaAssetEdgeRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
   upsertContent(rows: readonly MetaContentRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
   /** Resolves actor/post references within this workspace + connection only. */
@@ -127,6 +141,7 @@ export interface MetaAssetContentRepository {
 
 export interface MetaAssetContentMapper {
   asset(scope: ResolvedMetaAssetContentScope, asset: MetaMirroredAsset): MetaAssetRow;
+  discovery(scope: ResolvedMetaAssetContentScope, discovery: MetaAssetDiscovery): MetaAssetDiscoveryRow;
   edge(scope: ResolvedMetaAssetContentScope, edge: MetaAssetEdge): MetaAssetEdgeRow;
   content(scope: ResolvedMetaAssetContentScope, record: MetaAdContentRecord): MetaContentRow;
 }
@@ -142,6 +157,15 @@ export const defaultMetaAssetContentMapper: MetaAssetContentMapper = {
     connectionId: scope.connectionId,
     asset,
     sourceRevision: asset.provenance.fetchedAt,
+  }),
+  discovery: (scope, discovery) => ({
+    workspaceId: scope.workspaceId,
+    connectionId: scope.connectionId,
+    adAccountId: discovery.sourceType === "ad_account" && discovery.sourceExternalId
+      ? scope.accountIdByExternalId.get(discovery.sourceExternalId) ?? null
+      : null,
+    discovery,
+    sourceRevision: discovery.provenance.fetchedAt,
   }),
   edge: (scope, edge) => ({
     workspaceId: scope.workspaceId,
@@ -269,6 +293,13 @@ export class MetaAssetContentPersistenceRun {
     page.content.forEach(validateRecord);
 
     const assets = page.assetSnapshot?.assets.map((asset) => this.mapper.asset(this.scope, asset)) ?? [];
+    const discoveries = page.assetSnapshot?.discoveries.map((discovery) => {
+      const row = this.mapper.discovery(this.scope, discovery);
+      if (discovery.sourceType === "ad_account" && !row.adAccountId) {
+        throw persistenceError("cross_account", "Asset discovery run kapsamı dışındaki reklam hesabına ait");
+      }
+      return row;
+    }) ?? [];
     const edges = page.assetSnapshot?.edges.map((edge) => {
       const row = this.mapper.edge(this.scope, edge);
       if (edge.sourceType === "ad_account" && !row.adAccountId) {
@@ -277,13 +308,16 @@ export class MetaAssetContentPersistenceRun {
       return row;
     }) ?? [];
     const content = page.content.map((record) => this.mapper.content(this.scope, record));
-    const recordCount = assets.length + edges.length + content.length;
+    const recordCount = assets.length + discoveries.length + edges.length + content.length;
 
     return this.repository.transaction(async (transaction) => {
       const summary: Record<MetaCanonicalWriteOutcome, number> = {
         inserted: 0, updated: 0, unchanged: 0, stale: 0,
       };
       for (const batch of chunks(assets, this.batchSize)) addOutcomes(summary, await transaction.upsertAssets(batch));
+      for (const batch of chunks(discoveries, this.batchSize)) {
+        addOutcomes(summary, await transaction.upsertDiscoveries(batch));
+      }
       for (const batch of chunks(edges, this.batchSize)) addOutcomes(summary, await transaction.upsertEdges(batch));
       await transaction.validateReferences(content);
       for (const batch of chunks(content, this.batchSize)) addOutcomes(summary, await transaction.upsertContent(batch));

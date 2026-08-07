@@ -45,7 +45,21 @@ function assetSnapshot(overrides: Partial<MetaAssetMirrorSnapshotInput> = {}) {
       relationship: "has_access_to_page",
       provenance: { sourceEdge: "/act-1", fetchedAt, sourceGraphVersion: "v24.0", fieldCatalogVersion: "assets-v1", rawPayloadHash: hash },
     }],
-    discoveries: [],
+    discoveries: [{
+      resource: "pages",
+      sourceType: "connection",
+      sourceExternalId: null,
+      status: "verified",
+      reason: null,
+      itemCount: 1,
+      provenance: {
+        sourceEdge: "/me/accounts",
+        fetchedAt,
+        sourceGraphVersion: "v24.0",
+        fieldCatalogVersion: "assets-v1",
+        rawPayloadHash: hash,
+      },
+    }],
     fetchedAt,
     writeOperations: 0,
     ...overrides,
@@ -101,6 +115,14 @@ class FakeRepository implements MetaAssetContentRepository {
         this.batches.push(rows.length);
         for (const row of rows) this.knownActors.add(row.asset.externalAssetId);
         return rows.map((row) => this.upsert(`asset:${row.asset.assetType}:${row.asset.externalAssetId}`, row.sourceRevision, row.asset.provenance.rawPayloadHash));
+      },
+      upsertDiscoveries: async (rows) => {
+        this.batches.push(rows.length);
+        return rows.map((row) => this.upsert(
+          `discovery:${row.discovery.sourceType}:${row.discovery.sourceExternalId ?? "connection"}:${row.discovery.resource}`,
+          row.sourceRevision,
+          row.discovery.provenance.rawPayloadHash,
+        ));
       },
       upsertEdges: async (rows) => {
         this.batches.push(rows.length);
@@ -158,8 +180,8 @@ describe("Meta asset/content persistence run", () => {
     const repository = new FakeRepository();
     const run = await MetaAssetContentPersistenceRun.begin({ repository, scope, batchSize: 250 });
     const page = { sliceKey: "creative:1", cursor: "after-1", checkpoint: { page: 1 }, assetSnapshot: assetSnapshot(), content: [contentRecord()] };
-    expect(await run.writePage(page)).toMatchObject({ inserted: 3, updated: 0, unchanged: 0, stale: 0, cursor: "after-1", recordCount: 3 });
-    expect(await run.writePage(page)).toMatchObject({ inserted: 0, unchanged: 3 });
+    expect(await run.writePage(page)).toMatchObject({ inserted: 4, updated: 0, unchanged: 0, stale: 0, cursor: "after-1", recordCount: 4 });
+    expect(await run.writePage(page)).toMatchObject({ inserted: 0, unchanged: 4 });
     expect(repository.resolveCalls).toBe(1);
     expect(repository.transactionCalls).toBe(2);
     expect(repository.checkpointCalls).toBe(2);

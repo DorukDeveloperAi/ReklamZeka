@@ -70,6 +70,7 @@ export type MetaAssetDiscovery = Readonly<{
   status: "verified" | "empty" | "permission_missing" | "unsupported" | "unavailable";
   reason: string | null;
   itemCount: number;
+  provenance: MetaAssetProvenance;
 }>;
 
 export type MetaAssetMirrorSnapshotInput = Readonly<{
@@ -165,6 +166,19 @@ export function normalizeMetaAssetMirror(
       throw new MetaAssetMirrorValidationError("orphan_edge", edge.sourceExternalId, "Asset edge reklam hesabı snapshot içinde yok");
     }
     assertProvenance(edge.provenance, `${edge.sourceExternalId}:${edge.targetExternalAssetId}`);
+  }
+  for (const discovery of input.discoveries) {
+    if (!Number.isInteger(discovery.itemCount) || discovery.itemCount < 0) {
+      throw new MetaAssetMirrorValidationError(
+        "invalid_snapshot",
+        discovery.resource,
+        "Discovery item count negatif olamaz",
+      );
+    }
+    assertProvenance(
+      discovery.provenance,
+      `${discovery.sourceType}:${discovery.sourceExternalId ?? "connection"}:${discovery.resource}`,
+    );
   }
 
   const canonical = stableValue({
