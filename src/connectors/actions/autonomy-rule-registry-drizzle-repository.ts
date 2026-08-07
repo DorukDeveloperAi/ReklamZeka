@@ -197,4 +197,49 @@ export class DrizzleAutonomyRuleRegistryRepository {
       return resolveAutonomyRules({ workspaceRef: this.workspaceRef, artifacts });
     });
   }
+
+  /** Server-private revision feed. Callers must project before crossing an HTTP boundary. */
+  async listArtifacts(): Promise<readonly AutonomyRuleArtifact[]> {
+    return this.database.transaction(async (transaction) => {
+      await lockActiveWorkspace(transaction, this.workspaceId, "share");
+      const result = rows<{ artifact_payload: unknown }>(await transaction.execute(sql`
+        select artifact_payload from autonomy_rule_revisions
+        where workspace_id = ${this.workspaceId}::uuid
+        order by rule_ref, revision desc
+        limit 1001
+      `));
+      if (result.length > 1000) fail("corrupt_store");
+      try {
+        return Object.freeze(result.map((row) => {
+          const artifact = assertValidAutonomyRuleArtifact(row.artifact_payload);
+          if (artifact.workspaceRef !== this.workspaceRef) fail("workspace_scope_mismatch");
+          return artifact;
+        }));
+      } catch (reason) {
+        if (reason instanceof AutonomyRuleRegistryRepositoryError) throw reason;
+        fail("corrupt_store");
+      }
+    });
+  }
+
+  async latestArtifact(ruleRef: string): Promise<AutonomyRuleArtifact | null> {
+    if (!REF.test(ruleRef)) fail("invalid_input");
+    return this.database.transaction(async (transaction) => {
+      await lockActiveWorkspace(transaction, this.workspaceId, "share");
+      const result = rows<{ artifact_payload: unknown }>(await transaction.execute(sql`
+        select artifact_payload from autonomy_rule_revisions
+        where workspace_id = ${this.workspaceId}::uuid and rule_ref = ${ruleRef}
+        order by revision desc limit 1
+      `));
+      if (!result[0]) return null;
+      try {
+        const artifact = assertValidAutonomyRuleArtifact(result[0].artifact_payload);
+        if (artifact.workspaceRef !== this.workspaceRef || artifact.ruleRef !== ruleRef) fail("workspace_scope_mismatch");
+        return artifact;
+      } catch (reason) {
+        if (reason instanceof AutonomyRuleRegistryRepositoryError) throw reason;
+        fail("corrupt_store");
+      }
+    });
+  }
 }

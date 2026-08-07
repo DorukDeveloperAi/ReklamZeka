@@ -33,6 +33,9 @@ export type MetaReadPage = Readonly<{
   records: readonly Readonly<Record<string, unknown>>[];
   nextCursor: string | null;
   usageHeadroom: number;
+  /** Server-private source metadata; required by canonical inventory materialization. */
+  sourceGraphVersion?: string;
+  fieldCatalogVersion?: string;
 }>;
 
 export interface MetaReadTransport {

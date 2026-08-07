@@ -596,6 +596,31 @@
 .promotionPreflightFacts dd { margin: 0; overflow-wrap: anywhere; color: var(--rz-muted); font-size: .54rem; }
 .promotionPreflightPreview > footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; padding: 14px 18px; }
 .promotionPreflightPreview > footer span { padding: 6px 8px; border: 1px solid var(--rz-line); border-radius: 99px; color: var(--rz-muted); font-size: .5rem; }
+.autonomyStudioState { display: grid; gap: 10px; min-height: 180px; padding: 24px; color: var(--rz-muted); }
+.autonomyStudioState button { width: max-content; padding: 8px 11px; border: 1px solid var(--rz-line); border-radius: 8px; background: var(--rz-surface-3); color: var(--rz-text); }
+.autonomyStudioGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+.autonomyStudioList { overflow: hidden; }
+.autonomyStudioList > p { padding: 18px; color: var(--rz-muted); font-size: .62rem; }
+.autonomyStudioList > article { padding: 15px 18px; border-bottom: 1px solid var(--rz-line); }
+.autonomyStudioList article header { display: flex; justify-content: space-between; gap: 10px; }
+.autonomyStudioList article header strong { font-size: .65rem; overflow-wrap: anywhere; }
+.autonomyStudioList article header span { color: var(--rz-green); font: 700 .5rem ui-monospace, monospace; text-transform: uppercase; }
+.autonomyStudioList article > p { margin: 8px 0; color: var(--rz-muted); font-size: .55rem; }
+.autonomyStudioList dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; }
+.autonomyStudioList dt { color: var(--rz-dim); font-size: .47rem; text-transform: uppercase; }
+.autonomyStudioList dd { margin: 3px 0 0; font-size: .53rem; }
+.autonomyStudioForm > header { padding: 18px; border-bottom: 1px solid var(--rz-line); }
+.autonomyStudioForm h2 { margin: 7px 0; font-size: 1rem; }
+.autonomyStudioForm header p, .autonomyStudioForm > p { margin: 0; color: var(--rz-muted); font-size: .55rem; }
+.autonomyStudioForm > div { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; padding: 18px; }
+.autonomyStudioForm label { display: grid; gap: 5px; color: var(--rz-dim); font-size: .5rem; text-transform: uppercase; }
+.autonomyStudioForm input, .autonomyStudioForm select { min-height: 35px; padding: 0 8px; border: 1px solid var(--rz-line); border-radius: 7px; color: var(--rz-text); background: var(--rz-surface-3); }
+.autonomyStudioForm .autonomyKillSwitch { grid-template-columns: auto 1fr; align-items: center; }
+.autonomyStudioForm .autonomyKillSwitch input { min-height: auto; }
+.autonomyStudioForm footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 18px; border-top: 1px solid var(--rz-line); }
+.autonomyStudioForm footer small { color: var(--rz-muted); font-size: .52rem; }
+.autonomyStudioForm button { padding: 8px 11px; border: 1px solid var(--rz-line); border-radius: 8px; background: var(--rz-surface-3); color: var(--rz-text); }
+.autonomyStudioForm > p { padding: 12px 18px; border-top: 1px solid var(--rz-line); }
 
 .sourceFooter { display: flex; justify-content: space-between; gap: 20px; padding: 13px 36px 22px; color: var(--rz-dim); font-size: .54rem; }
 .toast { position: fixed; right: 24px; bottom: 24px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: min(440px, calc(100% - 32px)); padding: 12px 14px; border: 1px solid rgba(184,242,84,.28); border-radius: 11px; background: #182018; box-shadow: 0 18px 60px rgba(0,0,0,.4); z-index: 50; }
@@ -624,6 +649,7 @@
   .budgetLabWorkspace { grid-template-columns: 1fr; }
   .approvalQueueWorkspace { grid-template-columns: 1fr; }
   .promotionPreflightWorkspace { grid-template-columns: 1fr; }
+  .autonomyStudioGrid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 780px) {
@@ -692,6 +718,7 @@
   .budgetLabFacts { grid-template-columns: 1fr; }
   .budgetLabFacts > div { border-right: 0; border-bottom: 1px solid var(--rz-line); }
   .promotionPreflightFields { grid-template-columns: 1fr; }
+  .autonomyStudioForm > div { grid-template-columns: 1fr; }
   .promotionPreflightForm footer { grid-template-columns: 1fr; }
 }
 

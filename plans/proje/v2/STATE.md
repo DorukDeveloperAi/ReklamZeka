@@ -724,3 +724,18 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Migration bağlı Supabase'e uygulandı. Canlı güvenlik sonucu 67/67 tabloda RLS, API rollerinde sıfır tablo
   grant'i, sıfır schema-create ve sıfır public routine-execute grant'idir; henüz hiçbir autonomy rule kaydı
   veya business/Meta mutation oluşturulmadı.
+
+## 2026-08-07 — S5.4c2-A kanonik Meta inventory materializer
+
+- Campaign, ad set ve ad Graph sayfaları strict field-catalog sürümüyle L1 kanonik kayıtlara çevrilir.
+  Hiyerarşi, tenant ve connection/account kapsamı PostgreSQL yazımından önce yeniden doğrulanır; ham Graph
+  payload'ı saklanmaz, yalnız bounded alanlar, reasoned-unknown listesi, kaynak revision/priority ve hash
+  provenance'ı tutulur. Objective mapping ve creative referansı kanıt yoksa uydurulmaz.
+- Sayfa yazımı cursor/checkpoint ilerlemesinden önce ve kısa transaction içinde gerçekleşir. Meta
+  `updated_time` kanıtı fetch-time fallback'ten yüksek önceliklidir; replay/stale sayfa daha güvenilir
+  canonical veriyi ezemez. Disappearance yalnız terminal pagination sayfasında, aynı gözlem run'ında hiç
+  görülmeyen ve daha yeni fetch'e ait olmayan nesneler için işaretlenir.
+- Persistence veya doğrulama hatası redakte edilmiş, retry edilmeyen slice hatasıyla fail-closed kalır ve
+  cursor ilerlemez. Entegrasyon opsiyonel port olarak hazırdır; repoda production sync factory olmadığı için
+  canlı runtime wiring/sync yapılmadı. Bu dilim compatibility'yi doğrulamaz, Meta network write içermez ve
+  proposal materializer'ı açmaz.

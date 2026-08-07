@@ -7,6 +7,7 @@ import { BudgetLabPanel } from "./budget-lab-panel";
 import { PracticeLabPanel } from "./practice-lab-panel";
 import { ApprovalQueuePanel } from "./approval-queue-panel";
 import { PromotionPreflightPanel } from "./promotion-preflight-panel";
+import { AutonomyStudioPanel } from "./autonomy-studio-panel";
 import styles from "./operating-dashboard.module.css";
 
 export type OperatingDashboardModel = Readonly<{
@@ -22,7 +23,7 @@ export type OperatingDashboardModel = Readonly<{
   attribution: string;
 }>;
 
-type ViewId = "today" | "campaigns" | "analysis" | "decision-room" | "practice-lab" | "budgets" | "rules" | "agent" | "approvals" | "promotions" | "timeline" | "meta";
+type ViewId = "today" | "campaigns" | "analysis" | "decision-room" | "practice-lab" | "budgets" | "rules" | "autonomy" | "agent" | "approvals" | "promotions" | "timeline" | "meta";
 type RuleCard = Readonly<{
   id: string;
   kind: string;
@@ -44,6 +45,7 @@ const navGroups: ReadonlyArray<Readonly<{ label: string; items: ReadonlyArray<Re
   ] },
   { label: "Yönetim", items: [
     { id: "rules", label: "Kurallar & akışlar", icon: "≡" },
+    { id: "autonomy", label: "Autonomy Studio", icon: "◉" },
     { id: "practice-lab", label: "Practice Lab", icon: "◈" },
     { id: "meta", label: "Meta bağlantısı", icon: "◎" },
     { id: "agent", label: "Orchestrator Agent", icon: "✦", badge: "●" },
@@ -346,7 +348,7 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
     return <><section className={styles.pageHero}><div><span className={styles.kicker}>APPEND-ONLY TIMELINE</span><h1>Veri, karar ve hareket aynı kronolojide.</h1><p>Sync'ten outcome'a kadar bizim ve Meta üzerindeki harici değişikliklerin tamamı tek izde.</p></div><button className={styles.secondaryButton}>Filtrele</button></section><section className={styles.panel}><div className={styles.timeline}>{timeline.map((event) => <article key={`${event.time}-${event.title}`}><time>{event.time}</time><span className={styles.timelineDot} data-type={event.type} /><div><StatusPill tone="neutral">{event.type}</StatusPill><h2>{event.title}</h2><p>{event.detail}</p><small>{event.actor}</small></div><button aria-label={`${event.title} detayını aç`}>→</button></article>)}</div></section></>;
   }
 
-  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel /> : activeView === "rules" ? renderRules() : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? <ApprovalQueuePanel /> : activeView === "promotions" ? <PromotionPreflightPanel /> : renderTimeline();
+  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel /> : activeView === "rules" ? renderRules() : activeView === "autonomy" ? <AutonomyStudioPanel /> : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? <ApprovalQueuePanel /> : activeView === "promotions" ? <PromotionPreflightPanel /> : renderTimeline();
 
   return <main className={styles.appShell}>
     <aside className={styles.sidebar}>

@@ -158,7 +158,7 @@ export function assertTrustedLocalDecisionRoomRequest(
   }
   if (operation === "draft" && !["budget-lab-dry-run", "budget-lab-save-draft"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
-  )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  ) && request.headers.get("x-reklamzeka-intent") !== "autonomy-rule-create-draft") throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if (operation === "decide" && ![
     "approval-queue-confirm-human-presence", "approval-queue-approve", "approval-queue-reject", "approval-queue-request-changes",
   ].includes(
@@ -262,6 +262,27 @@ export async function resolveTrustedLocalDraftPrincipal(input: Readonly<{
   exactKeys(input, ["request", "database", "config"]);
   const authenticated = authenticate(input.request, input.config, "draft");
   assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", authenticated.credential);
+  return bindPrincipal(input.database, input.config);
+}
+
+/** Cookie-only, separately scoped Autonomy Studio binding. */
+export async function resolveTrustedLocalAutonomyRulePrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+  requiredScope: Extract<LocalSessionScope, "autonomy_rules:read" | "autonomy_rules:draft">;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config", "requiredScope"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null) {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  verifyLocalSessionCapability({
+    token: cookieToken(input.request)!, key: input.config.signingKey, now: Math.floor(Date.now() / 1000),
+    osUid: typeof process.getuid === "function" ? process.getuid() : -1, requiredScope: input.requiredScope,
+    expected: input.config,
+  });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config,
+    input.requiredScope === "autonomy_rules:read" ? "read" : "draft", "cookie");
   return bindPrincipal(input.database, input.config);
 }
 

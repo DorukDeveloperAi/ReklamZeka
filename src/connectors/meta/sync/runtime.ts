@@ -1,6 +1,7 @@
 import { ConnectorError } from "@/connectors/contract";
 import { META_SYNC_STREAMS, stableHash, type MetaParentSyncRun, type MetaReadRequest, type MetaReadTransport, type MetaStreamRun, type MetaSyncError, type MetaSyncErrorReason, type MetaSyncRecord, type MetaSyncSlice } from "./types";
 import type { MetaSyncDurableKey, MetaSyncDurablePersistence } from "./persistence-adapter";
+import { MetaInventoryMaterializationError, parseMetaInventoryPage, type MetaInventoryPagePersistencePort } from "./inventory-materialization";
 
 type MutableStreamRun = { -readonly [Key in keyof MetaStreamRun]: MetaStreamRun[Key] } & { completedSliceIds: string[]; cursorBySlice: Record<string, { cursor: string | null; cursorId: string; updatedAt: string }> };
 type MutableParentRun = { -readonly [Key in keyof MetaParentSyncRun]: MetaParentSyncRun[Key] } & { streamRunIds: string[] };
@@ -51,6 +52,7 @@ export type MetaSyncRuntimeOptions = Readonly<{
   maxAttempts?: number;
   minPageSize?: number;
   persistence?: MetaSyncDurablePersistence;
+  inventoryPagePersistence?: MetaInventoryPagePersistencePort;
 }>;
 export type MetaSyncResult = Readonly<{ parentRun: MetaParentSyncRun; streamRuns: readonly MetaStreamRun[]; inserted: number; updated: number; unchanged: number; writeNetworkCalls: 0 }>;
 
@@ -88,6 +90,7 @@ export class MetaPartialReadSyncRuntime {
   }
 
   async run(input: Readonly<{ parentRunId: string; workspaceId: string; connectionId: string; plan: readonly MetaSyncSlice[] }>): Promise<MetaSyncResult> {
+    const observedAt = this.now().toISOString();
     const durableKey: MetaSyncDurableKey = {
       parentRunId: input.parentRunId,
       workspaceId: input.workspaceId,
@@ -119,7 +122,7 @@ export class MetaPartialReadSyncRuntime {
       stream.status = "running"; stream.error = null;
       for (const slice of slices) {
         if (stream.completedSliceIds.includes(slice.id)) continue;
-        const outcome = await this.processSlice(parent, stream, slice, durableKey);
+        const outcome = await this.processSlice(parent, stream, slice, durableKey, observedAt);
         inserted += outcome.inserted; updated += outcome.updated; unchanged += outcome.unchanged;
         if (!outcome.completed) { stream.status = "partial"; stream.error = outcome.error; this.store.saveStream(stream); await this.persist(durableKey); break; }
       }
@@ -138,7 +141,7 @@ export class MetaPartialReadSyncRuntime {
     return { parentRun: this.store.parent(parent.id)!, streamRuns: this.store.streamsFor(parent.id), inserted, updated, unchanged, writeNetworkCalls: 0 };
   }
 
-  private async processSlice(parent: MutableParentRun, stream: MutableStreamRun, slice: MetaSyncSlice, durableKey: MetaSyncDurableKey): Promise<{ completed: boolean; inserted: number; updated: number; unchanged: number; error: MetaSyncError | null }> {
+  private async processSlice(parent: MutableParentRun, stream: MutableStreamRun, slice: MetaSyncSlice, durableKey: MetaSyncDurableKey, observedAt: string): Promise<{ completed: boolean; inserted: number; updated: number; unchanged: number; error: MetaSyncError | null }> {
     let cursor = stream.cursorBySlice[slice.id]?.cursor ?? null;
     let pageSize = slice.pageSize;
     let inserted = 0; let updated = 0; let unchanged = 0;
@@ -157,6 +160,28 @@ export class MetaPartialReadSyncRuntime {
       if (!Array.isArray(page.records) || typeof page.usageHeadroom !== "number" || page.usageHeadroom < 0 || page.usageHeadroom > 1) {
         return { completed: false, inserted, updated, unchanged, error: { reason: "malformed_response", retryable: false, message: "Meta page records/headroom sözleşmesini karşılamıyor" } };
       }
+      if (this.options.inventoryPagePersistence && slice.stream === "inventory" && slice.entityLevel !== "account") {
+        try {
+          if (!page.sourceGraphVersion || !page.fieldCatalogVersion) {
+            throw new MetaInventoryMaterializationError("invalid_page", "Inventory provenance metadata eksik");
+          }
+          await this.options.inventoryPagePersistence.writePage(parseMetaInventoryPage({
+            workspaceId: parent.workspaceId, connectionId: parent.connectionId,
+            externalAccountId: slice.accountId, parentRunId: parent.id,
+            sliceId: slice.id, cursorId, entityLevel: slice.entityLevel, observedAt,
+            sourceGraphVersion: page.sourceGraphVersion, fieldCatalogVersion: page.fieldCatalogVersion,
+            terminal: page.nextCursor === null, records: page.records,
+          }));
+        } catch (error) {
+          return { completed: false, inserted, updated, unchanged, error: {
+            reason: error instanceof MetaInventoryMaterializationError ? "malformed_response" : "unknown",
+            retryable: false,
+            message: error instanceof MetaInventoryMaterializationError
+              ? "Meta inventory canonical materialization doğrulaması başarısız"
+              : "Meta inventory canonical kaydı güvenli biçimde tamamlanamadı",
+          } };
+        }
+      }
       for (const payload of page.records) {
         const externalId = typeof payload.id === "string" ? payload.id : stableHash(payload);
         const identity = `${parent.workspaceId}:${parent.connectionId}:${slice.accountId}:${slice.stream}:${slice.entityLevel}:${slice.dateStart ?? "all"}:${slice.dateStop ?? "all"}:${externalId}`;
@@ -166,7 +191,9 @@ export class MetaPartialReadSyncRuntime {
           stream: slice.stream,
           entityLevel: slice.entityLevel,
           snapshotHash: stableHash(payload),
-          payload,
+          // Canonical inventory persistence already holds the validated fields;
+          // the generic restart ledger needs only identity and hash evidence.
+          payload: this.options.inventoryPagePersistence && slice.stream === "inventory" ? {} : payload,
           firstSeenAt: this.now().toISOString(),
           lastSeenAt: this.now().toISOString(),
         });

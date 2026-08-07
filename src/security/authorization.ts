@@ -8,7 +8,9 @@ export type WorkspaceAction =
   | "insight:feedback"
   | "report:share"
   | "budget:draft"
-  | "promotion:draft";
+  | "promotion:draft"
+  | "autonomy_rules:read"
+  | "autonomy_rules:draft";
 
 export type Actor = Readonly<{ userId: string }>;
 export type WorkspaceMembership = Readonly<{
@@ -21,15 +23,15 @@ const ROLE_ACTIONS: Readonly<Record<WorkspaceRole, ReadonlySet<WorkspaceAction>>
   owner: new Set([
     "workspace:manage", "member:manage", "connection:manage", "data:read",
     "sync:run", "insight:feedback", "report:share",
-    "budget:draft", "promotion:draft",
+    "budget:draft", "promotion:draft", "autonomy_rules:read", "autonomy_rules:draft",
   ]),
   admin: new Set([
     "member:manage", "connection:manage", "data:read", "sync:run",
     "insight:feedback", "report:share",
-    "budget:draft", "promotion:draft",
+    "budget:draft", "promotion:draft", "autonomy_rules:read", "autonomy_rules:draft",
   ]),
-  analyst: new Set(["data:read", "sync:run", "insight:feedback", "report:share", "budget:draft", "promotion:draft"]),
-  viewer: new Set(["data:read"]),
+  analyst: new Set(["data:read", "sync:run", "insight:feedback", "report:share", "budget:draft", "promotion:draft", "autonomy_rules:read", "autonomy_rules:draft"]),
+  viewer: new Set(["data:read", "autonomy_rules:read"]),
 };
 
 export class AuthorizationError extends Error {

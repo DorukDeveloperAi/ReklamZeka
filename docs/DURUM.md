@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 617556df49f6 -->
+<!-- durum-damga: d776521613eb -->
 
 ## Künye
 
@@ -14,13 +14,18 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 50 |
+| iş commit'i (tüm geçmiş) | 55 |
 | ilk / son iş | 2026-08-06 / 2026-08-07 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-07 | `feat` | persist reviewed rule revisions | `2223c8181` |
+| 2026-08-07 | `fix` | keep guidance advisory-only | `5bb9ac8e3` |
+| 2026-08-07 | `feat` | guard explicit proposal drafts | `07ecdf47f` |
+| 2026-08-07 | `feat` | resolve guided preflight server-side | `4b46821f2` |
+| 2026-08-07 | `feat` | connect trusted catalog and proposals | `ad7bd6baa` |
 | 2026-08-07 | `feat` | persist immutable registry | `69c30d6da` |
 | 2026-08-07 | `feat` | add immutable existing-post preflight | `68163e504` |
 | 2026-08-07 | `feat` | record human approval decisions | `c97235925` |
@@ -31,19 +36,14 @@
 | 2026-08-07 | `test` | prove local read boundary | `ca6e2febc` |
 | 2026-08-07 | `feat` | persist advisory proposal revisions | `a56c7834e` |
 | 2026-08-07 | `feat` | compose scenarios and guard proxy mapping | `f960369f5` |
-| 2026-08-07 | `feat` | add deterministic planning cores | `047001fc8` |
-| 2026-08-07 | `feat` | close analysis assets and practice lab read | `7e0d1b08e` |
-| 2026-08-07 | `feat` | secure local runtime and practice lifecycle | `ec1eff7a4` |
-| 2026-08-07 | `feat` | connect read model and analysis data | `5ef5e0145` |
-| 2026-08-07 | `fix` | harden schedule and observation boundaries | `fa106d121` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 36
+- `feat        ` ████████████████████████ 40
 - `test        ` ███ 5
 - `docs        ` ██ 3
+- `fix         ` ██ 3
 - `?           ` █ 2
-- `fix         ` █ 2
 - `security    ` █ 2
 
 ## Planlar

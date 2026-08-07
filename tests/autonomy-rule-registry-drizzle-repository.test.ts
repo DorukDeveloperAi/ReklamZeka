@@ -131,9 +131,17 @@ describe("Drizzle Autonomy Rule Registry", () => {
     expect(new PgDialect().sqlToQuery(db.execute.mock.calls[0]![0]).sql).toContain("for share");
   });
 
+  it("reads the latest artifact with limit one even when a rule has multiple revisions", async () => {
+    const artifact = published();
+    const db = database([{ rows: [{ id: workspaceId, lifecycle_state: "active" }] }, { rows: [{ artifact_payload: artifact }] }]);
+    const result = await new DrizzleAutonomyRuleRegistryRepository(db as never, workspaceId, workspaceRef).latestArtifact(artifact.ruleRef);
+    expect(result).toEqual(artifact);
+    expect(new PgDialect().sqlToQuery(db.execute.mock.calls[1]![0]).sql).toMatch(/order by revision desc limit 1/i);
+  });
+
   it("exposes no approval grant, execution, guidance promotion, or Meta transport method", () => {
     expect(Object.getOwnPropertyNames(DrizzleAutonomyRuleRegistryRepository.prototype).sort())
-      .toEqual(["append", "constructor", "resolve"]);
+      .toEqual(["append", "constructor", "latestArtifact", "listArtifacts", "resolve"]);
     expect(() => new DrizzleAutonomyRuleRegistryRepository({} as never, "foreign", workspaceRef))
       .toThrow(AutonomyRuleRegistryRepositoryError);
   });

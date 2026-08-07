@@ -4,6 +4,51 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "2223c8181",
+      "tarih": "2026-08-07",
+      "konu": "feat(autonomy): persist reviewed rule revisions",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "5bb9ac8e3",
+      "tarih": "2026-08-07",
+      "konu": "fix(promotions): keep guidance advisory-only",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "07ecdf47f",
+      "tarih": "2026-08-07",
+      "konu": "feat(promotions): guard explicit proposal drafts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4b46821f2",
+      "tarih": "2026-08-07",
+      "konu": "feat(promotions): resolve guided preflight server-side",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ad7bd6baa",
+      "tarih": "2026-08-07",
+      "konu": "feat(promotions): connect trusted catalog and proposals",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "69c30d6da",
       "tarih": "2026-08-07",
       "konu": "feat(promotions): persist immutable registry",
@@ -92,57 +137,12 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "047001fc8",
-      "tarih": "2026-08-07",
-      "konu": "feat(budget): add deterministic planning cores",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "7e0d1b08e",
-      "tarih": "2026-08-07",
-      "konu": "feat(decision): close analysis assets and practice lab read",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "ec1eff7a4",
-      "tarih": "2026-08-07",
-      "konu": "feat(decision): secure local runtime and practice lifecycle",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "5ef5e0145",
-      "tarih": "2026-08-07",
-      "konu": "feat(decision): connect read model and analysis data",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "fa106d121",
-      "tarih": "2026-08-07",
-      "konu": "fix(decision): harden schedule and observation boundaries",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 36
+      "adet": 40
     },
     {
       "kapsam": "test",
@@ -153,11 +153,11 @@
       "adet": 3
     },
     {
-      "kapsam": "?",
-      "adet": 2
+      "kapsam": "fix",
+      "adet": 3
     },
     {
-      "kapsam": "fix",
+      "kapsam": "?",
       "adet": 2
     },
     {
@@ -165,7 +165,7 @@
       "adet": 2
     }
   ],
-  "isSayisi": 50,
+  "isSayisi": 55,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "617556df49f6"
+  "damga": "d776521613eb"
 }

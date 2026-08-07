@@ -260,6 +260,9 @@
   - [x] Ayrı `promotion_proposal:draft` capability ve `promotion:draft` workspace yetkili explicit
     draft intent'i; exact seçimi yeniden preflight eder, viewer/bearer/proxy/override'ı reddeder ve
     immutable server materializer yokken sıfır queue write ile `material_unavailable` kalır.
+  - [x] Campaign/ad set/ad Graph sayfalarını tenant-bound PostgreSQL aynaya raw payload saklamadan yazan,
+    source-priority/revision replay korumalı ve cursor öncesi fail-closed çalışan kanonik inventory
+    materializer portu. Production sync factory/live wiring henüz yoktur; compatibility kanıtı sayılmaz.
   - [ ] Canonical private materializer: template/preset/binding + post/object-story binding + approval
     policy/plan/action context'i kanıtlı kaynaktan kurup mevcut proposal service/queue repository'ye bağlama.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.

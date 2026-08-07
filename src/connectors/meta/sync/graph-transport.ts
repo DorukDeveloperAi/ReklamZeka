@@ -1,6 +1,7 @@
 import { ConnectorError } from "@/connectors/contract";
 import { MetaGraphClient } from "@/connectors/meta/graph-client";
 import type { MetaReadPage, MetaReadRequest, MetaReadTransport } from "./types";
+import { META_INVENTORY_FIELD_CATALOG_VERSION } from "./inventory-materialization";
 
 type GraphPage = Readonly<{
   data?: readonly Readonly<Record<string, unknown>>[];
@@ -48,9 +49,13 @@ export class MetaGraphSyncTransport implements MetaReadTransport {
     if (request.entityLevel === "account") {
       const row = response.data as Readonly<Record<string, unknown>>;
       if (typeof row.id !== "string") throw new ConnectorError("invalid_data", "Meta account yanıtı kimlik içermiyor", false);
-      return { records: [row], nextCursor: null, usageHeadroom: response.usageHeadroom };
+      return {
+        records: [row], nextCursor: null, usageHeadroom: response.usageHeadroom,
+        sourceGraphVersion: this.client.graphApiVersion,
+        fieldCatalogVersion: META_INVENTORY_FIELD_CATALOG_VERSION,
+      };
     }
-    return this.page(response.data as GraphPage, response.usageHeadroom);
+    return this.page(response.data as GraphPage, response.usageHeadroom, META_INVENTORY_FIELD_CATALOG_VERSION);
   }
 
   private async creativePost(request: MetaReadRequest): Promise<MetaReadPage> {
@@ -74,8 +79,14 @@ export class MetaGraphSyncTransport implements MetaReadTransport {
     return this.page(response.data, response.usageHeadroom);
   }
 
-  private page(page: GraphPage, headroom: number): MetaReadPage {
+  private page(page: GraphPage, headroom: number, fieldCatalogVersion?: string): MetaReadPage {
     if (!Array.isArray(page.data)) throw new ConnectorError("invalid_data", "Meta sync liste yanıtı data dizisi içermiyor", false);
-    return { records: page.data, nextCursor: page.paging?.cursors?.after ?? null, usageHeadroom: headroom };
+    return {
+      records: page.data,
+      nextCursor: page.paging?.cursors?.after ?? null,
+      usageHeadroom: headroom,
+      sourceGraphVersion: this.client.graphApiVersion,
+      ...(fieldCatalogVersion ? { fieldCatalogVersion } : {}),
+    };
   }
 }
