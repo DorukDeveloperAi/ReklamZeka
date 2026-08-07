@@ -354,7 +354,117 @@ export const metaAdSets = pgTable("meta_ad_sets", {
 }, (table) => [
   uniqueIndex("meta_ad_sets_account_external_unique").on(table.adAccountId, table.externalAdSetId),
   uniqueIndex("meta_ad_sets_id_workspace_unique").on(table.id, table.workspaceId),
+  uniqueIndex("meta_ad_sets_workspace_hierarchy_unique")
+    .on(table.workspaceId, table.id, table.campaignId, table.adAccountId),
   index("meta_ad_sets_workspace_campaign_idx").on(table.workspaceId, table.campaignId),
+]);
+
+/** Immutable canonical affected-geo observation header; contains hashes and refs only, never raw targeting. */
+export const metaAffectedGeoSnapshots = pgTable("meta_affected_geo_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull(),
+  campaignId: uuid("campaign_id").notNull(),
+  adSetId: uuid("ad_set_id").notNull(),
+  workspaceRef: text("workspace_ref").notNull(),
+  accountRef: text("account_ref").notNull(),
+  campaignRef: text("campaign_ref").notNull(),
+  adSetRef: text("ad_set_ref").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  sourceKind: text("source_kind").notNull(),
+  status: text("status").notNull(),
+  sourceGraphVersion: text("source_graph_version").notNull(),
+  fieldCatalogVersion: text("field_catalog_version").notNull(),
+  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+  observationRunRef: text("observation_run_ref").notNull(),
+  sliceRef: text("slice_ref").notNull(),
+  pageRef: text("page_ref").notNull(),
+  rawPayloadHash: text("raw_payload_hash").notNull(),
+  sourceGeoSubtreeHash: text("source_geo_subtree_hash").notNull(),
+  snapshotHash: text("snapshot_hash").notNull(),
+  itemCount: integer("item_count").notNull(),
+  locationTypeCount: integer("location_type_count").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("meta_affected_geo_snapshots_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("meta_affected_geo_snapshots_workspace_hash_unique").on(table.workspaceId, table.snapshotHash),
+  uniqueIndex("meta_affected_geo_snapshots_exact_source_unique").on(
+    table.workspaceId, table.adSetId, table.capturedAt, table.rawPayloadHash, table.sourceGeoSubtreeHash,
+    table.sourceGraphVersion, table.fieldCatalogVersion,
+  ),
+  index("meta_affected_geo_snapshots_scope_time_idx")
+    .on(table.workspaceId, table.adAccountId, table.campaignId, table.adSetId, table.capturedAt),
+  foreignKey({
+    columns: [table.workspaceId, table.adSetId, table.campaignId, table.adAccountId],
+    foreignColumns: [metaAdSets.workspaceId, metaAdSets.id, metaAdSets.campaignId, metaAdSets.adAccountId],
+    name: "meta_affected_geo_snapshots_workspace_hierarchy_fk",
+  }).onDelete("cascade"),
+  check("meta_affected_geo_snapshots_contract", sql`
+    ${table.schemaVersion} = 'meta-affected-geo-country-snapshot/1.0.0'
+    and ${table.sourceKind} = 'canonical_meta_affected_geo_snapshot'
+    and ${table.status} = 'known'
+    and ${table.sourceGraphVersion} = 'v23.0'
+    and ${table.fieldCatalogVersion} ~ '^[A-Za-z0-9][A-Za-z0-9./_-]{0,127}$'
+    and ${table.itemCount} between 1 and 250
+    and ${table.locationTypeCount} between 1 and 2
+  `),
+  check("meta_affected_geo_snapshots_refs", sql`
+    ${table.workspaceRef} ~ '^workspace_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.accountRef} ~ '^account_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.campaignRef} ~ '^campaign_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.adSetRef} ~ '^adset_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.observationRunRef} ~ '^observation_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.sliceRef} ~ '^slice_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.pageRef} ~ '^page_[a-z0-9][a-z0-9_.:-]{0,126}$'
+  `),
+  check("meta_affected_geo_snapshots_hashes", sql`
+    ${table.rawPayloadHash} ~ '^[a-f0-9]{64}$'
+    and ${table.sourceGeoSubtreeHash} ~ '^[a-f0-9]{64}$'
+    and ${table.snapshotHash} ~ '^[a-f0-9]{64}$'
+  `),
+]);
+
+/** Canonical included geo refs only; country codes, names, addresses and coordinates never enter this table. */
+export const metaAffectedGeoSnapshotItems = pgTable("meta_affected_geo_snapshot_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull(),
+  snapshotId: uuid("snapshot_id").notNull(),
+  polarity: text("polarity").notNull(),
+  geoType: text("geo_type").notNull(),
+  geoRef: text("geo_ref").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("meta_affected_geo_snapshot_items_identity_unique")
+    .on(table.workspaceId, table.snapshotId, table.polarity, table.geoType, table.geoRef),
+  index("meta_affected_geo_snapshot_items_workspace_snapshot_idx").on(table.workspaceId, table.snapshotId),
+  foreignKey({
+    columns: [table.workspaceId, table.snapshotId],
+    foreignColumns: [metaAffectedGeoSnapshots.workspaceId, metaAffectedGeoSnapshots.id],
+    name: "meta_affected_geo_snapshot_items_workspace_snapshot_fk",
+  }).onDelete("cascade"),
+  check("meta_affected_geo_snapshot_items_contract", sql`
+    ${table.polarity} = 'included' and ${table.geoType} = 'country'
+    and ${table.geoRef} ~ '^geo_[a-f0-9]{64}$'
+  `),
+]);
+
+/** Verified location-type vocabulary is kept separately from geo identity items. */
+export const metaAffectedGeoSnapshotLocationTypes = pgTable("meta_affected_geo_snapshot_location_types", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull(),
+  snapshotId: uuid("snapshot_id").notNull(),
+  locationType: text("location_type").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("meta_affected_geo_snapshot_location_types_identity_unique")
+    .on(table.workspaceId, table.snapshotId, table.locationType),
+  index("meta_affected_geo_snapshot_location_types_workspace_snapshot_idx").on(table.workspaceId, table.snapshotId),
+  foreignKey({
+    columns: [table.workspaceId, table.snapshotId],
+    foreignColumns: [metaAffectedGeoSnapshots.workspaceId, metaAffectedGeoSnapshots.id],
+    name: "meta_affected_geo_snapshot_location_types_workspace_snapshot_fk",
+  }).onDelete("cascade"),
+  check("meta_affected_geo_snapshot_location_types_contract", sql`${table.locationType} in ('home', 'recent')`),
 ]);
 
 export const metaAssets = pgTable("meta_assets", {

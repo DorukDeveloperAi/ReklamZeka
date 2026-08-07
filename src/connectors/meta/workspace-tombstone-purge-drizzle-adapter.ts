@@ -29,6 +29,9 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "ad_accounts",
   "ad_campaigns",
   "meta_ad_sets",
+  "meta_affected_geo_snapshots",
+  "meta_affected_geo_snapshot_items",
+  "meta_affected_geo_snapshot_location_types",
   "category_dimensions",
   "category_definitions",
   "category_assignments",
@@ -142,6 +145,15 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'meta_ad_sets', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from meta_ad_sets where workspace_id = ${workspaceId}::uuid
+      union all select 'meta_affected_geo_snapshots', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from meta_affected_geo_snapshots where workspace_id = ${workspaceId}::uuid
+      union all select 'meta_affected_geo_snapshot_items', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from meta_affected_geo_snapshot_items where workspace_id = ${workspaceId}::uuid
+      union all select 'meta_affected_geo_snapshot_location_types', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from meta_affected_geo_snapshot_location_types where workspace_id = ${workspaceId}::uuid
       union all select 'category_dimensions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from category_dimensions where workspace_id = ${workspaceId}::uuid
@@ -423,6 +435,9 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from category_assignments where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_definitions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_dimensions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from meta_affected_geo_snapshot_items where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from meta_affected_geo_snapshot_location_types where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from meta_affected_geo_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_ad_sets where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from ad_campaigns where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_assets where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

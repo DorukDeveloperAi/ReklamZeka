@@ -34,7 +34,7 @@ describe("explicit workspace tombstone purge adapter", () => {
 
     expect(evidence.candidateCount).toBe(1);
     expect(evidence.revision).toMatch(/^[a-f0-9]{64}$/);
-    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(66);
+    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(69);
     const allSchemaTables = Object.values(schema)
       .flatMap((value) => isTable(value) ? [getTableName(value)] : [])
       .sort();
@@ -80,7 +80,7 @@ describe("explicit workspace tombstone purge adapter", () => {
     expect(result).toEqual({ purgedRowCount: 0, membershipCount: 0 });
     expect(inspectCalls).toBe(3);
     const deletes = statements.filter((statement) => statement.includes("delete from"));
-    expect(deletes).toHaveLength(66);
+    expect(deletes).toHaveLength(69);
     expect(deletes.findIndex((statement) => statement.includes("delete from action_proposal_dependencies")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from action_proposal_units")));
     expect(deletes.findIndex((statement) => statement.includes("delete from action_proposal_units")))
@@ -89,6 +89,12 @@ describe("explicit workspace tombstone purge adapter", () => {
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from action_approval_policy_snapshots")));
     expect(deletes.findIndex((statement) => statement.includes("delete from action_approval_policy_snapshots")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from approval_policy_definition_revisions")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from meta_affected_geo_snapshot_items")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from meta_affected_geo_snapshots")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from meta_affected_geo_snapshot_location_types")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from meta_affected_geo_snapshots")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from meta_affected_geo_snapshots")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from meta_ad_sets")));
     expect(deletes.findIndex((statement) => statement.includes("delete from promotion_template_binding_categories")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from promotion_template_bindings")));
     expect(deletes.findIndex((statement) => statement.includes("delete from promotion_template_bindings")))

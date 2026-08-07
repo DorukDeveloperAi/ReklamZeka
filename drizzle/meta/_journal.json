@@ -239,6 +239,13 @@
       "when": 1786136345722,
       "tag": "20260807205905_action_guardrail_policy",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1786137874437,
+      "tag": "20260807212434_meta_affected_geo_persistence",
+      "breakpoints": true
     }
   ]
 }
