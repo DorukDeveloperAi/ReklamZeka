@@ -133,7 +133,8 @@ export function verifyLocalSessionCapability(input: Readonly<{
   } catch {
     fail();
   }
-  if (actualSignature.byteLength !== expectedSignature.byteLength
+  if (actualSignature.toString("base64url") !== match[2]
+    || actualSignature.byteLength !== expectedSignature.byteLength
     || !timingSafeEqual(actualSignature, expectedSignature)) fail();
   let decoded: unknown;
   try {

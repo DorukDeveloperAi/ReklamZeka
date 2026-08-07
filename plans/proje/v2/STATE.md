@@ -475,3 +475,18 @@ write scope veya writer S4'e kadar ReklamZeka'ya taşınmaz.
 - Canlı kanıt: exact context/mapping suppression/idempotency/revision/cross-tenant/immutability/
   public-redaction bütün bayraklar true, geçici satır `0`, Meta/execution çağrısı `0`;
   Supabase 55/55 RLS ve API table grant `0`. Sırada Budget Lab read API/dashboard vardır.
+
+## 2026-08-07 — S3 Budget Lab gerçek read yüzeyi
+
+- Budget proposal repository tenant-bound keyset list/detail ve bounded trace summary üretir.
+  Model-agnostic `budget_lab_list/get`, GET-only `/api/budget-lab` ve dashboard aynı public-safe
+  projeksiyonu kullanır. Ayrı `budget_lab:read` scope'u her request'te aktif üyelikle doğrulanır.
+- Dashboard Bütçeler sekmesindeki eski demo planları kaldırıldı. Gerçek source unavailable,
+  empty, error, list/detail, before-after, mapping ve suppression/trace durumları ayrıdır;
+  draft/approval/execute/Meta write yoktur.
+- Test kanıtı 90 dosya/532 test, build/security/secret/Drizzle kapıları temizdir. Browser QA'da
+  unavailable state fixture göstermedi; 1280/820/390 genişliklerinde yatay overflow `0`.
+- Local capability doğrulaması non-canonical base64url HMAC imzalarını byte olarak aynı değere
+  decode olsalar bile reddeder; canonical re-encode negatif testi tam suite içinde geçer.
+- S3 read kesiti hazırdır. Sıradaki increment explicit dry-run/draft command + audit ve ardından
+  S4 approval-only action valve tasarımıdır; production Meta writer hâlâ yoktur.

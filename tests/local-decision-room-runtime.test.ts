@@ -149,6 +149,18 @@ describe("local Decision Room principal boundary", () => {
       token: `${valid.slice(0, -1)}x`, key: signingKey, now, osUid: process.getuid!(),
       requiredScope: "decision_room:read", expected: config,
     })).toThrow();
+    const [prefix, payload, signature] = valid.split(".");
+    const decodedSignature = Buffer.from(signature!, "base64url");
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const lastIndex = alphabet.indexOf(signature!.at(-1)!);
+    const nonCanonicalLast = alphabet[(lastIndex & 0b111100) | ((lastIndex + 1) & 0b000011)]!;
+    const nonCanonical = `${prefix}.${payload}.${signature!.slice(0, -1)}${nonCanonicalLast}`;
+    expect(Buffer.from(nonCanonicalLast === signature!.at(-1) ? signature! : `${signature!.slice(0, -1)}${nonCanonicalLast}`, "base64url"))
+      .toEqual(decodedSignature);
+    expect(() => verifyLocalSessionCapability({
+      token: nonCanonical, key: signingKey, now, osUid: process.getuid!(),
+      requiredScope: "decision_room:read", expected: config,
+    })).toThrow();
     expect(() => verifyLocalSessionCapability({
       token: sessionToken({ workspaceId: "33333333-3333-4333-a333-333333333333" }),
       key: signingKey, now, osUid: process.getuid!(), requiredScope: "decision_room:read", expected: config,
