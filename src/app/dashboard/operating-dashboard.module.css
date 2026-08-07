@@ -621,6 +621,47 @@
 .autonomyStudioForm footer small { color: var(--rz-muted); font-size: .52rem; }
 .autonomyStudioForm button { padding: 8px 11px; border: 1px solid var(--rz-line); border-radius: 8px; background: var(--rz-surface-3); color: var(--rz-text); }
 .autonomyStudioForm > p { padding: 12px 18px; border-top: 1px solid var(--rz-line); }
+.studioTabs { display: flex; gap: 6px; margin: -10px 0 18px; padding: 5px; width: fit-content; border: 1px solid var(--rz-line); border-radius: 10px; background: var(--rz-surface); }
+.studioTabs button { min-height: 34px; padding: 0 12px; border: 0; border-radius: 7px; color: var(--rz-muted); background: transparent; font-size: .63rem; cursor: pointer; }
+.studioTabs button[data-active="true"] { color: var(--rz-text); background: var(--rz-surface-3); box-shadow: inset 0 0 0 1px var(--rz-line); }
+.policyBundleStack { display: grid; gap: 10px; }
+.policyReadiness { overflow: hidden; }
+.policyReadiness .panelHeader > span { color: var(--rz-red); font: 800 .56rem ui-monospace, monospace; }
+.policyReadiness .panelHeader > span[data-ready="true"] { color: var(--rz-green); }
+.policyReadiness > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.policyReadiness article { display: grid; gap: 7px; min-height: 92px; padding: 15px 18px; border-right: 1px solid var(--rz-line); }
+.policyReadiness article:last-child { border-right: 0; }
+.policyReadiness article span, .policyReadiness article small { color: var(--rz-muted); font-size: .54rem; }
+.policyReadiness article strong { font-size: .72rem; }
+.policyReadiness article small { font-family: ui-monospace, monospace; }
+.policyReadiness > p { margin: 0; padding: 12px 18px; border-top: 1px solid var(--rz-line); color: var(--rz-muted); font-size: .56rem; }
+.policyBundleGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+.policyDraftForm { overflow: hidden; }
+.policyDraftForm > header { padding: 18px; border-bottom: 1px solid var(--rz-line); }
+.policyDraftForm h2 { margin: 7px 0; font-size: 1rem; }
+.policyDraftForm header p, .policyDraftForm aside { margin: 0; color: var(--rz-muted); font-size: .56rem; line-height: 1.5; }
+.policyFields { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; padding: 18px; }
+.policyFields > label { display: grid; gap: 5px; color: var(--rz-dim); font-size: .5rem; text-transform: uppercase; }
+.policyFields input, .policyFields select { width: 100%; min-height: 35px; padding: 0 8px; border: 1px solid var(--rz-line); border-radius: 7px; color: var(--rz-text); background: var(--rz-surface-3); }
+.policyFields input:read-only { color: var(--rz-muted); }
+.policyFields fieldset { min-width: 0; margin: 0; padding: 9px; border: 1px solid var(--rz-line); border-radius: 7px; }
+.policyFields legend { padding: 0 4px; color: var(--rz-dim); font-size: .49rem; text-transform: uppercase; }
+.policyFields fieldset label { display: inline-flex; align-items: center; gap: 5px; margin: 5px 10px 0 0; color: var(--rz-muted); font-size: .53rem; }
+.policyFields fieldset input, .policyFields .policyCheckbox input { width: auto; min-height: auto; }
+.policyFields .policyCheckbox { display: flex; grid-template-columns: auto 1fr; align-items: center; flex-direction: row; color: var(--rz-muted); text-transform: none; }
+.policyDraftForm aside { padding: 11px 18px; border-top: 1px solid var(--rz-line); color: var(--rz-blue); }
+.policyDraftForm footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-top: 1px solid var(--rz-line); }
+.policyDraftForm footer small { max-width: 60%; color: var(--rz-muted); font-size: .51rem; line-height: 1.45; }
+.policyDraftForm footer button { flex: none; padding: 8px 11px; border: 1px solid var(--rz-line); border-radius: 8px; background: var(--rz-surface-3); color: var(--rz-text); }
+.policyDraftForm footer button:disabled { opacity: .42; }
+.policyNotice { margin: 0; padding: 12px 15px; border: 1px solid rgba(123,198,255,.25); border-radius: 9px; color: var(--rz-blue); background: rgba(123,198,255,.05); font-size: .58rem; }
+.policyRevisionFeed { overflow: hidden; }
+.policyRevisionFeed > p { margin: 0; padding: 18px; color: var(--rz-muted); font-size: .6rem; }
+.policyRevisionFeed > div { display: grid; }
+.policyRevisionFeed article { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 12px 18px; border-bottom: 1px solid var(--rz-line); }
+.policyRevisionFeed article strong { overflow-wrap: anywhere; font-size: .63rem; }
+.policyRevisionFeed article span { color: var(--rz-muted); font-size: .53rem; }
+.policyRevisionFeed article em { color: var(--rz-amber); font: 700 .5rem ui-monospace, monospace; font-style: normal; text-transform: uppercase; }
 
 .sourceFooter { display: flex; justify-content: space-between; gap: 20px; padding: 13px 36px 22px; color: var(--rz-dim); font-size: .54rem; }
 .toast { position: fixed; right: 24px; bottom: 24px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: min(440px, calc(100% - 32px)); padding: 12px 14px; border: 1px solid rgba(184,242,84,.28); border-radius: 11px; background: #182018; box-shadow: 0 18px 60px rgba(0,0,0,.4); z-index: 50; }
@@ -650,6 +691,7 @@
   .approvalQueueWorkspace { grid-template-columns: 1fr; }
   .promotionPreflightWorkspace { grid-template-columns: 1fr; }
   .autonomyStudioGrid { grid-template-columns: 1fr; }
+  .policyBundleGrid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 780px) {
@@ -662,6 +704,9 @@
   .mobileBrand strong { font-size: .76rem; }
   .topActions > button:not(.autonomyButton):not(.profileButton) { display: none; }
   .topActions .autonomyButton { max-width: 145px; font-size: .56rem; }
+  .policyReadiness > div { grid-template-columns: 1fr 1fr; }
+  .policyReadiness article:nth-child(2) { border-right: 0; }
+  .policyReadiness article:nth-child(-n+2) { border-bottom: 1px solid var(--rz-line); }
   .mobileNav { position: sticky; top: 51px; display: flex; gap: 4px; padding: 7px 12px; overflow-x: auto; border-bottom: 1px solid var(--rz-line); background: rgba(10,13,12,.95); z-index: 14; scrollbar-width: none; }
   .mobileNav button { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; min-height: 34px; padding: 0 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--rz-muted); font-size: .58rem; }
   .mobileNav button[data-active="true"] { color: var(--rz-text); border-color: var(--rz-line); background: var(--rz-surface-3); }
@@ -719,6 +764,7 @@
   .budgetLabFacts > div { border-right: 0; border-bottom: 1px solid var(--rz-line); }
   .promotionPreflightFields { grid-template-columns: 1fr; }
   .autonomyStudioForm > div { grid-template-columns: 1fr; }
+  .policyFields { grid-template-columns: 1fr; }
   .promotionPreflightForm footer { grid-template-columns: 1fr; }
 }
 
