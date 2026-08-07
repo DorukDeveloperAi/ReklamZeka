@@ -4,6 +4,11 @@ import type {
   AuthenticCategoryEvidencePort,
   ProtectionEvidenceScope,
 } from "@/application/existing-post-promotion-protection-evidence-materializer";
+import { DrizzleEffectiveCampaignContextRepository } from
+  "@/connectors/analyses/effective-campaign-context-drizzle-repository";
+import { DrizzleCategoryRegistryRepository } from "@/connectors/categories/category-registry-drizzle-repository";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import * as schema from "@/db/schema";
 import type { StoredEffectiveCampaignContext } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
 import type { EffectiveCategoryResolution } from "@/domain/categories/registry";
 import type { CategoryHierarchyTarget } from "@/domain/categories/service";
@@ -158,4 +163,18 @@ export class AuthenticCategoryEvidenceAdapter implements AuthenticCategoryEviden
       return [];
     }
   }
+}
+
+/** Production composition; construction performs no query and exposes no category mutation method. */
+export function createDrizzleAuthenticCategoryEvidenceAdapter(input: Readonly<{
+  database: NodePgDatabase<typeof schema>;
+  workspaceId: string;
+  workspaceRef: string;
+}>): AuthenticCategoryEvidencePort {
+  return new AuthenticCategoryEvidenceAdapter(
+    new DrizzleEffectiveCampaignContextRepository(input.database),
+    new DrizzleCategoryRegistryRepository(input.database),
+    input.workspaceId,
+    input.workspaceRef,
+  );
 }

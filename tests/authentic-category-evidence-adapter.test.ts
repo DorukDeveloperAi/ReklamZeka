@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ProtectionEvidenceScope } from "@/application/existing-post-promotion-protection-evidence-materializer";
 import {
   AuthenticCategoryEvidenceAdapter,
+  createDrizzleAuthenticCategoryEvidenceAdapter,
   type EffectiveCategoryContextEvidenceReader,
   type FrozenCategoryEvidenceReader,
 } from "@/connectors/actions/authentic-category-evidence-adapter";
@@ -84,6 +85,14 @@ function harness(stored: StoredEffectiveCampaignContext | null = record()) {
 }
 
 describe("AuthenticCategoryEvidenceAdapter", () => {
+  it("constructs the production Drizzle composition without querying or exposing mutation methods", () => {
+    const database = Object.freeze({ select: vi.fn(), insert: vi.fn(), update: vi.fn(), execute: vi.fn(), transaction: vi.fn() });
+    const adapter = createDrizzleAuthenticCategoryEvidenceAdapter({ database: database as never,
+      workspaceId, workspaceRef: scope.workspaceRef });
+    expect(database.select).not.toHaveBeenCalled(); expect(database.execute).not.toHaveBeenCalled();
+    expect(Object.getOwnPropertyNames(Object.getPrototypeOf(adapter)).sort()).toEqual(["constructor", "resolveCandidates"]);
+  });
+
   it("materializes one scoped candidate from current hash-valid frozen category evidence", async () => {
     const { adapter, contexts, categories } = harness();
 
