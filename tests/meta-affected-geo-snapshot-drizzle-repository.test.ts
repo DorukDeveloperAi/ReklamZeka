@@ -74,7 +74,8 @@ describe("Drizzle canonical Meta affected-geo persistence", () => {
   it("returns unchanged only when header and every child exactly reconstruct the snapshot", async () => {
     const value = snapshot();
     const db = database([{ rows: [{ id: workspaceId, lifecycle_state: "active" }] }, { rows: [{ id: adSetId }] },
-      { rows: [row(value)] }, { rows: itemRows(value) }, { rows: locationRows(value) }]);
+      { rows: [row(value, { captured_at: "2026-08-08 12:00:00+00" })] },
+      { rows: itemRows(value) }, { rows: locationRows(value) }]);
     await expect(new DrizzleMetaAffectedGeoSnapshotRepository(db as never, workspaceId).append(binding(value)))
       .resolves.toEqual({ outcome: "unchanged", snapshotId, snapshotHash: value.snapshotHash });
   });

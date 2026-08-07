@@ -104,9 +104,13 @@ function stable(value: unknown): unknown {
 }
 function digest(value: unknown): string { return createHash("sha256").update(JSON.stringify(stable(value))).digest("hex"); }
 function canonicalInstant(value: unknown): string | null {
-  if (value instanceof Date && Number.isFinite(value.valueOf())) return value.toISOString();
   if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) return null;
   const normalized = new Date(value).toISOString(); return normalized === value ? normalized : null;
+}
+function storedInstant(value: unknown): string | null {
+  if (value instanceof Date && Number.isFinite(value.valueOf())) return value.toISOString();
+  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) return null;
+  return new Date(value).toISOString();
 }
 function validRef(value: unknown, prefix: string): value is string {
   return typeof value === "string" && value.startsWith(prefix) && REF.test(value);
@@ -159,7 +163,7 @@ function reconstruct(row: SnapshotRow, items: readonly ItemRow[], locations: rea
     sourceKind: row.source_kind,
     status: row.status,
     scope: { workspaceRef: row.workspace_ref, accountRef: row.account_ref, campaignRef: row.campaign_ref, adSetRef: row.ad_set_ref },
-    capturedAt: canonicalInstant(row.captured_at),
+    capturedAt: storedInstant(row.captured_at),
     source: { sourceGraphVersion: row.source_graph_version, fieldCatalogVersion: row.field_catalog_version,
       observationRunRef: row.observation_run_ref, sliceRef: row.slice_ref, pageRef: row.page_ref,
       rawPayloadHash: row.raw_payload_hash, sourceGeoSubtreeHash: row.source_geo_subtree_hash },

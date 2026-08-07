@@ -57,3 +57,7 @@ log veya bildirim payload'ına eklenmez.
   ülke kodu, region/city/custom ID, isim, koordinat, adres veya raw targeting değeri basılmaz. Canonical country
   normalizer yalnız bu canary ile doğrulanmış exact included-country + `home/recent` biçimini kabul eder; diğer
   coğrafya biçimleri canlı kanıt ve ayrı reviewed adapter gelene kadar `unknown` kalır.
+- Affected-geo migration sonrası `npm run verify:meta-affected-geo-db` çalıştırılır. Kabul; geçici workspace ve
+  Meta hiyerarşisi içinde canonical snapshot append/replay/restart-resolve ile UPDATE trigger'ını sınar, sonra
+  bütün satırları rollback eder. Çıktıda raw targeting veya ülke değeri bulunmaz; Meta network/write sayısı sıfırdır.
+- Ardından `npm run verify:supabase-security` ile yeni tablolar dahil RLS ve Data API grant yüzeyi doğrulanır.

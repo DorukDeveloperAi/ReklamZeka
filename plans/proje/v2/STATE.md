@@ -860,3 +860,24 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   grant'i, sıfır schema-create ve sıfır public routine-execute grant'i doğrulandı. Rollback'li canlı
   PostgreSQL kabulünde draft→published append, restart-durable resolve ve UPDATE append-only trigger'ı
   geçti; geçici workspace/policy satırlarının tamamı temizlendi.
+
+## 2026-08-08 — S5.4c3-H immutable affected-geo registry ve scheduler production boundary
+
+- Canonical affected-geo için tenant-composite Meta hierarchy FK'li immutable snapshot header, hash-only country
+  item ve ayrı verified `home/recent` location-type tabloları eklendi. Exact Graph/catalog/capture zamanı ile
+  observation/slice/page/raw/subtree/snapshot hash provenance'ı saklanır; ülke kodu/adı, adres, koordinat, serbest
+  metin veya raw targeting persist edilmez. Eksik/kısmi/bozuk/ambiguous/cross-tenant child zinciri fail-closed'dur.
+- Private inventory extraction boundary raw AdSet payload hash'ini doğrular; workspace/connection/account/campaign/
+  adset ile run/slice/cursor/page kimliklerini typed digest ref'lere çevirir. Yalnız verified `v23.0` exact country
+  + `home/recent` şekli known olur. Ham Meta ID veya targeting çıktı sözleşmesine taşınmaz ve tüm authority false'dur.
+- Meta read-sync scheduled worker için server-derived sabit scope'lu production service factory ve typed/redakte
+  retry classifier eklendi. Caller workspace/account/token ekleyemez; route, cron, gerçek network veya Meta write
+  aktivasyonu yoktur. DB schedule registry/lease adapterı halen sonraki ayrı dilimdir.
+- Migration generator'ın composite FK'den önce gerekli unique indexi üretmemesi ilk canlı uygulamayı atomik olarak
+  durdurdu; hiçbir tablo/satır kısmi kalmadı. Bağımlılık sırası regresyon testiyle düzeltildikten sonra migration
+  uygulandı. Canlı güvenlik kabulü 73/73 tabloda RLS, API rollerinde sıfır tablo grant'i, sıfır schema-create ve
+  sıfır public routine-execute grant'i gösterdi. Rollback'li PostgreSQL kabulünde insert, idempotent replay,
+  restart-durable exact resolve ve append-only UPDATE reddi geçti; geçici satırların tamamı temizlendi.
+- Tam kapı: 149 test dosyasında 941 test, production build, security/secret ve Drizzle kontrolleri geçti. Production
+  Graph field catalog/runtime persistence ve AuthenticAffectedGeoEvidence wiring yapılmadığı için gerçek proposal
+  akışında geo kanıtı halen fail-closed `unknown`; hiçbir kural/policy/approval veya Meta writer etkinleşmedi.

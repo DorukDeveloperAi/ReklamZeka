@@ -202,7 +202,10 @@
   - [x] Bounded daily/weekly worker tick, partial isolation, concurrent suppression ve exact revision cursor guard'ı.
   - [x] Meta read-sync için DB-derived workspace+connection adayları, claim/lease sonrası exact revalidation,
     deterministik fire/parent-run kimliği, bounded concurrency/retry ve bağlantı-bazlı partial isolation saf
-    worker çekirdeği. DB schedule/lease adapterı ve scheduler aktivasyonu henüz yoktur.
+    worker çekirdeği.
+  - [x] Server-derived sabit scope'lu production service factory ve redakte typed retry classifier; caller
+    workspace/account/token enjeksiyonu, public route/cron ve Meta write yok.
+  - [ ] Meta read-sync DB schedule registry + atomik lease adapterı ve scheduler aktivasyonu.
   - [ ] Hourly/monthly/after-sync schedule türleri.
 - [ ] Sync→analyze→plan→approval agentic routine; otomatik execute yok.
 - [ ] External intervention reconcile ve sandbox/shadow rollout.
@@ -294,8 +297,10 @@
     koleksiyonu ile `home/recent` location-type biçimi doğrulandı, targeting değerleri/logları ve Meta write yok.
   - [x] Versioned ve saf canonical affected-geo country normalizer; exact country + `home/recent` dışında,
     region/city/custom/exclusion/travel biçimlerinde tüm snapshot fail-closed `unknown`, hiçbir authority yok.
-  - [ ] Canonical affected-geo immutable snapshot/item persistence ve production inventory adapterı; doğrulanmamış
-    country dışı şekiller canlı kanıt görülene kadar `unknown`.
+  - [x] Canonical affected-geo immutable snapshot/item persistence, hash-only ülke item'ları, ayrı `home/recent`
+    vocabulary, private inventory extraction adapterı, forced RLS/API revoke ve rollback'li canlı DB kabulü.
+  - [ ] Graph inventory field catalog + transactional runtime persistence wiring ve AuthenticAffectedGeoEvidence
+    production adapterı; doğrulanmamış country dışı şekiller canlı kanıt görülene kadar `unknown`.
   - [ ] Trusted protection policy resolver + proposal expiry kaynağıyla canonical submitter'ı route'a bağlama.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.
 - [ ] Owner/admin/analyst/operator/viewer rol E2E.
