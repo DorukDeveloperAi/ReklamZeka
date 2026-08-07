@@ -134,6 +134,13 @@
       "when": 1786109040258,
       "tag": "20260807132400_robust_red_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786110471824,
+      "tag": "20260807134751_handy_nekra",
+      "breakpoints": true
     }
   ]
 }

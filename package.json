@@ -37,6 +37,7 @@
     "verify:workspace-tombstone-db": "tsx scripts/verify-workspace-tombstone-postgres.ts",
     "verify:category-registry-db": "tsx scripts/verify-category-registry-postgres.ts",
     "verify:guidance-registry-db": "tsx scripts/verify-guidance-registry-postgres.ts",
+    "verify:effective-campaign-context-db": "tsx scripts/verify-effective-campaign-context-postgres.ts",
     "verify:supabase-security": "tsx scripts/verify-supabase-security.ts",
     "check:security": "npm audit --omit=dev"
   },

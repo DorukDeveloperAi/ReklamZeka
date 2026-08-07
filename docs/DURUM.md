@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: a75943e13650 -->
+<!-- durum-damga: ed568d607b27 -->
 
 ## Künye
 
@@ -14,13 +14,17 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 27 |
+| iş commit'i (tüm geçmiş) | 31 |
 | ilk / son iş | 2026-08-06 / 2026-08-07 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-07 | `feat` | persist category guidance and context cores | `243884110` |
+| 2026-08-07 | `feat` | add category guidance timeframe cores | `fe851692f` |
+| 2026-08-07 | `docs` | start S2 Decision Room | `542fb451c` |
+| 2026-08-07 | `feat` | close S1 read mirror trust gate | `4014834a0` |
 | 2026-08-07 | `feat` | build change snapshots from mirror | `6e1f9d52f` |
 | 2026-08-07 | `feat` | add workspace tombstone boundary | `4260f37f4` |
 | 2026-08-07 | `feat` | persist secure connection lifecycle | `4759f711a` |
@@ -32,18 +36,14 @@
 | 2026-08-07 | `feat` | persist S1.4 mirror in Postgres | `91fa14241` |
 | 2026-08-07 | `test` | cover live linked post inventory | `d6346a57a` |
 | 2026-08-07 | `feat` | mirror linked Page and Instagram posts | `6c586b990` |
-| 2026-08-07 | `fix` | persist asset discovery evidence | `ddf971314` |
-| 2026-08-07 | `feat` | add bounded content persistence and post eligibility | `704f1ce6c` |
-| 2026-08-07 | `feat` | persist Meta asset and post evidence | `74f30ef6c` |
-| 2026-08-07 | `test` | add live S1.4 read acceptance | `09c8add40` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 17
-- `test        ` ██████ 4
-- `?           ` ███ 2
-- `security    ` ███ 2
-- `docs        ` █ 1
+- `feat        ` ████████████████████████ 20
+- `test        ` █████ 4
+- `?           ` ██ 2
+- `docs        ` ██ 2
+- `security    ` ██ 2
 - `fix         ` █ 1
 
 ## Planlar

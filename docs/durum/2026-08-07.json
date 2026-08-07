@@ -4,6 +4,42 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "243884110",
+      "tarih": "2026-08-07",
+      "konu": "feat(decision): persist category guidance and context cores",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "fe851692f",
+      "tarih": "2026-08-07",
+      "konu": "feat(decision): add category guidance timeframe cores",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "542fb451c",
+      "tarih": "2026-08-07",
+      "konu": "docs(plan): start S2 Decision Room",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "4014834a0",
+      "tarih": "2026-08-07",
+      "konu": "feat(meta): close S1 read mirror trust gate",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "6e1f9d52f",
       "tarih": "2026-08-07",
       "konu": "feat(meta): build change snapshots from mirror",
@@ -101,48 +137,12 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "ddf971314",
-      "tarih": "2026-08-07",
-      "konu": "fix(meta): persist asset discovery evidence",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "704f1ce6c",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): add bounded content persistence and post eligibility",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "74f30ef6c",
-      "tarih": "2026-08-07",
-      "konu": "feat(db): persist Meta asset and post evidence",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "09c8add40",
-      "tarih": "2026-08-07",
-      "konu": "test(meta): add live S1.4 read acceptance",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 17
+      "adet": 20
     },
     {
       "kapsam": "test",
@@ -153,19 +153,19 @@
       "adet": 2
     },
     {
-      "kapsam": "security",
+      "kapsam": "docs",
       "adet": 2
     },
     {
-      "kapsam": "docs",
-      "adet": 1
+      "kapsam": "security",
+      "adet": 2
     },
     {
       "kapsam": "fix",
       "adet": 1
     }
   ],
-  "isSayisi": 27,
+  "isSayisi": 31,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "a75943e13650"
+  "damga": "ed568d607b27"
 }

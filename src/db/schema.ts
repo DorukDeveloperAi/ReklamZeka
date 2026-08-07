@@ -178,6 +178,7 @@ export const metaConnections = pgTable("meta_connections", {
     table.workspaceId,
     table.externalConnectionKey,
   ),
+  uniqueIndex("meta_connections_workspace_id_unique").on(table.workspaceId, table.id),
   index("meta_connections_workspace_status_idx").on(table.workspaceId, table.status),
   check("meta_connections_lifecycle_generation_positive", sql`${table.lifecycleGeneration} >= 1`),
   check("meta_connections_secret_metadata_complete", sql`
@@ -271,6 +272,7 @@ export const adAccounts = pgTable("ad_accounts", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("ad_accounts_source_external_unique").on(table.dataSourceId, table.externalAccountId),
+  uniqueIndex("ad_accounts_workspace_id_unique").on(table.workspaceId, table.id),
   index("ad_accounts_workspace_idx").on(table.workspaceId),
 ]);
 
@@ -311,6 +313,7 @@ export const adCampaigns = pgTable("ad_campaigns", {
 }, (table) => [
   uniqueIndex("ad_campaigns_account_external_unique").on(table.adAccountId, table.externalCampaignId),
   uniqueIndex("ad_campaigns_id_workspace_unique").on(table.id, table.workspaceId),
+  uniqueIndex("ad_campaigns_workspace_id_unique").on(table.workspaceId, table.id),
   index("ad_campaigns_workspace_idx").on(table.workspaceId),
 ]);
 
@@ -978,6 +981,165 @@ export const guidanceSets = pgTable("guidance_sets", {
     or (${table.reviewStatus} = 'archived' and ${table.archivedAt} is not null)
   `),
   check("guidance_sets_record_hash_format", sql`${table.recordHash} ~ '^[a-f0-9]{64}$'`),
+]);
+
+/** Immutable, server-private L5 analysis context snapshots. */
+export const effectiveCampaignContexts = pgTable("effective_campaign_contexts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  identityHash: text("identity_hash").notNull(),
+  contextHash: text("context_hash").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  metaConnectionId: uuid("meta_connection_id").notNull(),
+  adAccountId: uuid("ad_account_id").notNull(),
+  campaignId: uuid("campaign_id").notNull(),
+  connectionRef: text("connection_ref").notNull(),
+  accountRef: text("account_ref").notNull(),
+  campaignRef: text("campaign_ref").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityRef: text("entity_ref").notNull(),
+  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+  snapshotRefs: jsonb("snapshot_refs").$type<readonly string[]>().notNull(),
+  contextPayload: jsonb("context_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.metaConnectionId],
+    foreignColumns: [metaConnections.workspaceId, metaConnections.id],
+    name: "effective_campaign_contexts_connection_scope_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.workspaceId, table.adAccountId],
+    foreignColumns: [adAccounts.workspaceId, adAccounts.id],
+    name: "effective_campaign_contexts_account_scope_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.workspaceId, table.campaignId],
+    foreignColumns: [adCampaigns.workspaceId, adCampaigns.id],
+    name: "effective_campaign_contexts_campaign_scope_fk",
+  }).onDelete("restrict"),
+  uniqueIndex("effective_campaign_contexts_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("effective_campaign_contexts_workspace_identity_unique").on(table.workspaceId, table.identityHash),
+  uniqueIndex("effective_campaign_contexts_workspace_hash_unique").on(table.workspaceId, table.contextHash),
+  index("effective_campaign_contexts_workspace_entity_captured_idx")
+    .on(table.workspaceId, table.entityType, table.entityRef, table.capturedAt),
+  index("effective_campaign_contexts_workspace_campaign_idx")
+    .on(table.workspaceId, table.campaignRef, table.capturedAt),
+  index("effective_campaign_contexts_connection_idx").on(table.metaConnectionId),
+  index("effective_campaign_contexts_account_idx").on(table.adAccountId),
+  index("effective_campaign_contexts_campaign_idx").on(table.campaignId),
+  check("effective_campaign_contexts_hashes_format", sql`
+    ${table.identityHash} ~ '^[a-f0-9]{64}$' and ${table.contextHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("effective_campaign_contexts_schema_version", sql`${table.schemaVersion} = 'effective-campaign-context/1.0.0'`),
+  check("effective_campaign_contexts_entity_type", sql`${table.entityType} in ('campaign', 'ad_set', 'ad', 'creative')`),
+  check("effective_campaign_contexts_required_refs", sql`
+    btrim(${table.connectionRef}) <> '' and btrim(${table.accountRef}) <> ''
+    and btrim(${table.campaignRef}) <> '' and btrim(${table.entityRef}) <> ''
+  `),
+  check("effective_campaign_contexts_snapshots_nonempty", sql`
+    jsonb_typeof(${table.snapshotRefs}) = 'array' and jsonb_array_length(${table.snapshotRefs}) >= 1
+  `),
+  check("effective_campaign_contexts_payload_object", sql`jsonb_typeof(${table.contextPayload}) = 'object'`),
+  check("effective_campaign_contexts_payload_scope_exact", sql`(
+    ${table.contextPayload} #>> '{workspaceId}' = ${table.workspaceId}::text
+    and ${table.contextPayload} #>> '{schemaVersion}' = ${table.schemaVersion}
+    and ${table.contextPayload} #>> '{contextHash}' = ${table.contextHash}
+    and (${table.contextPayload} #>> '{capturedAt}')::timestamptz = ${table.capturedAt}
+    and ${table.contextPayload} #>> '{identity,connectionRef}' = ${table.connectionRef}
+    and ${table.contextPayload} #>> '{identity,accountRef}' = ${table.accountRef}
+    and ${table.contextPayload} #>> '{identity,campaignRef}' = ${table.campaignRef}
+    and ${table.contextPayload} #>> '{identity,entityType}' = ${table.entityType}
+    and ${table.contextPayload} #>> '{identity,entityRef}' = ${table.entityRef}
+    and ${table.contextPayload} #> '{data,snapshotRefs}' = ${table.snapshotRefs}
+  ) is true`),
+  check("effective_campaign_contexts_no_forbidden_material", sql`
+    ${table.contextPayload}::text !~* '"[^"[:space:]]*(token|secret)"[[:space:]]*:'
+    and ${table.contextPayload}::text !~* '"authorization"[[:space:]]*:'
+    and ${table.contextPayload}::text !~* '"[^"[:space:]]*raw[_-]?(payload|request|response|json)"[[:space:]]*:'
+    and ${table.contextPayload}::text !~* '"([^"[:space:]]*agent[_-]?)?narration"[[:space:]]*:'
+  `),
+  check("effective_campaign_contexts_no_authority", sql`(
+    jsonb_typeof(${table.contextPayload} #> '{capabilities}') = 'object'
+    and (${table.contextPayload} #> '{capabilities}') ?& array[
+      'containsRawL0', 'canAuthorizeAction', 'canExecuteWrite'
+    ]
+    and ${table.contextPayload} #> '{capabilities,containsRawL0}' = 'false'::jsonb
+    and ${table.contextPayload} #> '{capabilities,canAuthorizeAction}' = 'false'::jsonb
+    and ${table.contextPayload} #> '{capabilities,canExecuteWrite}' = 'false'::jsonb
+    and ${table.contextPayload}::text !~* '"(canAuthorizeAction|canExecuteWrite|canEnforcePolicy|canAlterApproval)"[[:space:]]*:[[:space:]]*true'
+  ) is true`),
+]);
+
+/** Exact source component/version references used for selective context invalidation. */
+export const effectiveCampaignContextComponents = pgTable("effective_campaign_context_components", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  contextId: uuid("context_id").notNull(),
+  componentType: text("component_type").notNull(),
+  componentRef: text("component_ref").notNull(),
+  componentVersion: text("component_version").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.contextId],
+    foreignColumns: [effectiveCampaignContexts.workspaceId, effectiveCampaignContexts.id],
+    name: "effective_campaign_context_components_context_scope_fk",
+  }).onDelete("cascade"),
+  uniqueIndex("effective_campaign_context_components_exact_unique")
+    .on(table.contextId, table.componentType, table.componentRef, table.componentVersion),
+  index("effective_campaign_context_components_lookup_idx")
+    .on(table.workspaceId, table.componentType, table.componentRef, table.componentVersion),
+  index("effective_campaign_context_components_context_idx").on(table.contextId),
+  check("effective_campaign_context_components_type", sql`${table.componentType} in (
+    'source_snapshot', 'category_resolution', 'guidance_pack', 'meta_catalog',
+    'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
+    'timeframe_resolver'
+  )`),
+  check("effective_campaign_context_components_required", sql`
+    btrim(${table.componentRef}) <> '' and btrim(${table.componentVersion}) <> ''
+  `),
+]);
+
+/** Append-only invalidation facts. They never mutate historical context payloads. */
+export const effectiveCampaignContextInvalidations = pgTable("effective_campaign_context_invalidations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  eventHash: text("event_hash").notNull(),
+  componentType: text("component_type").notNull(),
+  componentRef: text("component_ref").notNull(),
+  componentVersion: text("component_version").notNull(),
+  scopeKind: text("scope_kind").notNull(),
+  entityType: text("entity_type"),
+  entityRef: text("entity_ref"),
+  reasonCode: text("reason_code").notNull(),
+  observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("effective_campaign_context_invalidations_workspace_event_unique")
+    .on(table.workspaceId, table.eventHash),
+  index("effective_campaign_context_invalidations_component_idx")
+    .on(table.workspaceId, table.componentType, table.componentRef, table.componentVersion),
+  index("effective_campaign_context_invalidations_entity_idx")
+    .on(table.workspaceId, table.entityType, table.entityRef, table.observedAt),
+  check("effective_campaign_context_invalidations_hash_format", sql`${table.eventHash} ~ '^[a-f0-9]{64}$'`),
+  check("effective_campaign_context_invalidations_type", sql`${table.componentType} in (
+    'source_snapshot', 'category_resolution', 'guidance_pack', 'meta_catalog',
+    'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
+    'timeframe_resolver'
+  )`),
+  check("effective_campaign_context_invalidations_required", sql`
+    btrim(${table.componentRef}) <> '' and btrim(${table.componentVersion}) <> ''
+  `),
+  check("effective_campaign_context_invalidations_entity_scope", sql`
+    (${table.scopeKind} = 'workspace_component' and ${table.entityType} is null and ${table.entityRef} is null)
+    or (${table.scopeKind} = 'exact_entity_component'
+      and ${table.entityType} in ('campaign', 'ad_set', 'ad', 'creative')
+      and ${table.entityRef} is not null and btrim(${table.entityRef}) <> '')
+  `),
+  check("effective_campaign_context_invalidations_reason", sql`
+    ${table.reasonCode} in ('source_changed', 'source_removed', 'manual_rebuild')
+  `),
 ]);
 
 export const metaAssetEdges = pgTable("meta_asset_edges", {
