@@ -40,13 +40,14 @@ describe("local existing-post promotion catalog runtime", () => {
     const execute = vi.fn()
       .mockResolvedValueOnce({ rows: [{ workspace_id: workspaceId, user_id: userId, role: "viewer", lifecycle_state: "active" }] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
     const response = await createLocalExistingPostPromotionCatalogRouteHandler({ database: { execute } as never, config })(request());
     expect(response.status).toBe(200);
     expect(response.headers.get("x-reklamzeka-access-mode")).toBe("read-only-catalog");
-    await expect(response.json()).resolves.toMatchObject({ catalog: { accounts: [], actors: [], posts: [], templates: [] },
+    await expect(response.json()).resolves.toMatchObject({ catalog: { accounts: [], actors: [], posts: [], adSets: [], templates: [] },
       authority: { readOnly: true, canPersist: false, canExecute: false, canWriteMeta: false } });
-    expect(execute).toHaveBeenCalledTimes(3);
+    expect(execute).toHaveBeenCalledTimes(4);
   });
 
   it("rejects bearer credentials before membership or catalog storage is touched", async () => {

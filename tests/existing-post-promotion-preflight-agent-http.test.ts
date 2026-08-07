@@ -11,7 +11,7 @@ const origin = "http://localhost:3000";
 const workspaceId = "11111111-1111-4111-a111-111111111111";
 const principal = Object.freeze({ actor: Object.freeze({ userId: "user_owner" }), workspaceId, workspaceRef: "workspace_local", readerRef: "reader_owner" });
 const selection: ExistingPostPromotionPreflightRequest = {
-  accountRef: "account_primary", actorRef: "actor_instagram", postRef: "post_existing",
+  accountRef: "account_primary", adSetRef: "adset_primary", actorRef: "actor_instagram", postRef: "post_existing",
   promotionTemplateRef: "template_messages", audiencePresetRef: "audience_doruk", budgetPlanRef: "budget_safe",
   timeframeRef: "timeframe_week", objectiveRef: "objective_messages", internalCategoryRef: "category_healthcare",
 };

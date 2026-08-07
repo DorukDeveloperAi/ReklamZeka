@@ -603,9 +603,10 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   binding'leri canonical hash'e bağlı ve yayınlandıktan sonra değişmezdir. Bütçe sınırları kayan nokta
   sayıya çevrilmeden scale-normalized `BigInt` ile karşılaştırılır; template zorunlu preset, objective,
   optimization, destination, placement, tracking, budget owner ve timeframe politikasını taşır.
-- Saf preflight yalnız ownership/permission/capability'si doğrulanmış mevcut Page/Instagram gönderisi,
-  frozen content hash ve mevcut creative binding kabul eder. Post içeriği, creative binding, template veya
-  preset revision değişikliği preflight/action kimliğini değiştirir. Çıktı K4 `approval_required`
+- Saf preflight yalnız ownership/permission/capability'si doğrulanmış mevcut Page/Instagram gönderisi ve
+  frozen content hash kabul eder. Organik gönderinin daha önce reklam creative'ine bağlanmış olması gerekmez;
+  proposal aşamasında platform post/object-story kimliği immutable olarak dondurulur. Post içeriği, bu bağ,
+  template veya preset revision değişikliği preflight/action kimliğini değiştirir. Çıktı K4 `approval_required`
   placeholder'dır; targeting değiştirme, creative üretme, approve, execute ve Meta write kapalıdır.
 - Public-safe model-agnostic sözleşme yalnız exact ref seçimi kabul eder; account/actor/post/category/
   objective/budget/timeframe ile destination/optimization/placement/special-category/tracking ve aktif
@@ -661,3 +662,24 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Canlı Supabase katalog okuması gerçek boş durum döndürdü; `metaWrites=0`, `businessMutations=0`.
   Sıradaki increment server-resolved POST context repository'si, dashboard'dan proposal oluşturma ve
   mevcut tek-ActionUnit approval inbox'a uçtan uca bağlantıdır.
+
+## 2026-08-07 — S5.4a server-resolved existing-post preflight
+
+- Dashboard seçimine mevcut reklam seti eklendi; hesap değişince reklam seti seçimi temizlenir. Public
+  preflight artık account, ad-set, actor, post, template, preset, budget, timeframe, objective ve internal
+  category olmak üzere exact 10 opak ref ister. İstemciden Meta ID, targeting, raw payload veya workspace
+  seçimi kabul edilmez.
+- Ayrı Drizzle resolver seçimi aktif connection ve tenant içinde yeniden çözer; account→campaign→ad-set,
+  actor→post, binding→category ve varsa binding→campaign bağlarını doğrular. Preset/template/binding
+  belgeleri canonical constructor ve persisted hash'lerle tekrar sınanır. Organik post için önceden reklam
+  creative binding'i aranmaz; gönderi kimliği ve içerik hash'i dondurulur.
+- `promotion_preflight:read` ayrı local-session kapsamıdır. POST runtime same-origin cookie ister; bearer,
+  proxy ve caller workspace override'ı storage erişiminden önce reddedilir. Preflight ephemeral'dir:
+  persist/approve/execute/Meta-write/creative-generation yetkilerinin tamamı false kalır.
+- Fixed-duration ve continuous schedule ayrı modellenir; continuous için uydurma bitiş tarihi üretilmez.
+  Budget minor-unit dönüşümü exact'tir. Paused veya hiyerarşik olarak paused reklam seti aktif sayılmaz;
+  durum kanıtı yoksa `unknown` kalır. Destination/optimization/placement/special-category/tracking için
+  kanıt kaynağı henüz bağlı olmadığından gerçek kaynak `unknown` döndürür ve approval preview üretmez.
+- Odaklı doğrulama 10 dosya/39 test, typecheck ve diff-check'te temizdir. Sıradaki increment aynı immutable
+  context'i yeniden çözerek explicit proposal draft oluşturmak ve oluşan tek ActionUnit'i mevcut approval
+  inbox'ta ayrı ayrı onaylanabilir hale getirmektir. Production Meta writer kapalıdır.

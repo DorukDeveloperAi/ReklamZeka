@@ -251,6 +251,9 @@
     ayrı cookie-only `promotion_catalog:read` runtime'ı ve truncation/corruption fail-closed kontrolleri.
   - [x] Pure K4 preflight sonucunu mevcut append-only approval queue'ya atomik/idempotent kaydeden,
     creative binding + schedule/timeframe'i action hash'ine bağlayan proposal persistence köprüsü.
+  - [x] Exact 10-ref dashboard seçimini tenant-bound PostgreSQL mirror/registry üzerinden yeniden çözen,
+    ayrı cookie-only `promotion_preflight:read` POST runtime'ı; account→campaign→ad-set, actor→post,
+    canonical hash/link ve schedule/budget doğrulaması, kanıtsız compatibility'de fail-closed sonuç.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.
 - [ ] Owner/admin/analyst/operator/viewer rol E2E.
 - [ ] 1280/820/390, keyboard/screen-reader ve hata/partial/conflict E2E.

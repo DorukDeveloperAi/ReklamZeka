@@ -11,7 +11,7 @@ import {
 const workspaceId = "11111111-1111-4111-a111-111111111111";
 const principal = Object.freeze({ actor: Object.freeze({ userId: "user_owner" }), workspaceId, workspaceRef: "workspace_local", readerRef: "reader_owner" });
 const selection: ExistingPostPromotionPreflightRequest = Object.freeze({
-  accountRef: "account_primary", actorRef: "actor_instagram", postRef: "post_existing",
+  accountRef: "account_primary", adSetRef: "adset_primary", actorRef: "actor_instagram", postRef: "post_existing",
   promotionTemplateRef: "template_messages", audiencePresetRef: "audience_doruk",
   budgetPlanRef: "budget_safe", timeframeRef: "timeframe_week", objectiveRef: "objective_messages",
   internalCategoryRef: "category_healthcare",
@@ -21,6 +21,7 @@ function context(): ExistingPostPromotionPreflightContext {
   return {
     workspaceId, workspaceRef: "workspace_local",
     account: { ref: selection.accountRef, externalId: "act_123456", ownership: "confirmed" },
+    adSet: { ref: selection.adSetRef, accountRef: selection.accountRef, campaignRef: "campaign_primary", state: "active" },
     actor: {
       ref: selection.actorRef, type: "instagram", externalId: "178414000000001",
       ownership: "confirmed", permission: "confirmed", advertisingCapability: "supported",
@@ -42,7 +43,9 @@ function context(): ExistingPostPromotionPreflightContext {
       internalCategoryRefs: [selection.internalCategoryRef],
     },
     budgetPlan: { ref: selection.budgetPlanRef, state: "active", kind: "daily", currency: "TRY", amountMinor: 25_000 },
-    timeframe: { ref: selection.timeframeRef, state: "active", startAt: "2026-08-10T00:00:00.000Z", endAt: "2026-08-17T00:00:00.000Z", timezone: "Europe/Istanbul" },
+    timeframe: { ref: selection.timeframeRef, state: "active", scheduleMode: "fixed_duration",
+      startAt: "2026-08-10T00:00:00.000Z", endAt: "2026-08-17T00:00:00.000Z",
+      timezone: "Europe/Istanbul", durationDays: 7 },
     objective: { ref: selection.objectiveRef, state: "active" },
     internalCategory: { ref: selection.internalCategoryRef, state: "active" },
     guidance: [{
@@ -93,6 +96,18 @@ describe("existing-post promotion preflight service", () => {
     expect(await service(page).service.evaluate(principal, selected)).toMatchObject({
       status: "ready_for_approval_proposal", proposalPreview: { actorType: "page", risk: "K4" },
     });
+  });
+
+  it("represents a continuous schedule without inventing an end date", async () => {
+    const value = context();
+    const continuous: ExistingPostPromotionPreflightContext = {
+      ...value,
+      timeframe: { ...value.timeframe, scheduleMode: "continuous", endAt: null, durationDays: null },
+    };
+    const result = await service(continuous).service.evaluate(principal, selection);
+    expect(result).toMatchObject({ status: "ready_for_approval_proposal", proposalPreview: {
+      timeframe: { scheduleMode: "continuous", endAt: null, durationDays: null },
+    } });
   });
 
   it("blocks ownership, actor/post mismatch, objective, audience, budget, timeframe and guidance incompatibilities", async () => {

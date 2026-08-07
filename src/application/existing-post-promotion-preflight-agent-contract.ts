@@ -38,7 +38,7 @@ export class ExistingPostPromotionPreflightAgentContract {
     authorizeWorkspace(principal.actor, principal.workspaceId, "data:read", this.memberships);
     exact(call, ["name", "arguments"]);
     if (call.name !== "existing_post_promotion_preflight") throw new ExistingPostPromotionPublicPreflightError("invalid_input");
-    exact(call.arguments, ["accountRef", "actorRef", "postRef", "promotionTemplateRef", "audiencePresetRef", "budgetPlanRef", "timeframeRef", "objectiveRef", "internalCategoryRef"]);
+    exact(call.arguments, ["accountRef", "adSetRef", "actorRef", "postRef", "promotionTemplateRef", "audiencePresetRef", "budgetPlanRef", "timeframeRef", "objectiveRef", "internalCategoryRef"]);
     if (Object.values(call.arguments).some((value) => typeof value !== "string" || !REF.test(value)
       || /(token|secret|prompt|raw)/i.test(value))) throw new ExistingPostPromotionPublicPreflightError("invalid_input");
     return Object.freeze({
@@ -59,9 +59,9 @@ export const EXISTING_POST_PROMOTION_AGENT_TOOLS = Object.freeze([Object.freeze(
   inputSchema: Object.freeze({
     type: "object",
     additionalProperties: false,
-    required: Object.freeze(["accountRef", "actorRef", "postRef", "promotionTemplateRef", "audiencePresetRef", "budgetPlanRef", "timeframeRef", "objectiveRef", "internalCategoryRef"]),
+    required: Object.freeze(["accountRef", "adSetRef", "actorRef", "postRef", "promotionTemplateRef", "audiencePresetRef", "budgetPlanRef", "timeframeRef", "objectiveRef", "internalCategoryRef"]),
     properties: Object.freeze({
-      accountRef: refProperty(), actorRef: refProperty(), postRef: refProperty(), promotionTemplateRef: refProperty(),
+      accountRef: refProperty(), adSetRef: refProperty(), actorRef: refProperty(), postRef: refProperty(), promotionTemplateRef: refProperty(),
       audiencePresetRef: refProperty(), budgetPlanRef: refProperty(), timeframeRef: refProperty(),
       objectiveRef: refProperty(), internalCategoryRef: refProperty(),
     }),

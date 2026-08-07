@@ -16,6 +16,7 @@ import { POST as unavailablePreflightPost } from "@/app/api/existing-post-promot
 
 const selection = {
   accountRef: "account_doruk",
+  adSetRef: "adset_doruk_leads",
   actorRef: "actor_doruk_ig",
   postRef: "post_existing_01",
   promotionTemplateRef: "promotion_template_leads",
@@ -30,6 +31,8 @@ const catalog = {
   accounts: [{ ref: selection.accountRef, label: "Doruk Hospital" }],
   actors: [{ ref: selection.actorRef, label: "@dorukhastaneleri · Instagram", accountRef: selection.accountRef, type: "instagram" }],
   posts: [{ ref: selection.postRef, label: "Yayınlanmış gönderi · 6 Ağu", actorRef: selection.actorRef }],
+  adSets: [{ ref: selection.adSetRef, label: "TR · Lead · Mesaj", accountRef: selection.accountRef,
+    campaignRef: "campaign_doruk_leads" }],
   templates: [{
     ref: selection.promotionTemplateRef,
     label: "Lead · mevcut IG gönderisi · v3",
@@ -57,7 +60,8 @@ const result = {
     actorType: "instagram",
     postFingerprintRef: "post_fingerprint_aaaaaaaaaaaaaaaa",
     budget: { kind: "daily", currency: "TRY", amountMinor: 120_000 },
-    timeframe: { startAt: "2026-08-08T06:00:00.000Z", endAt: "2026-08-15T06:00:00.000Z", timezone: "Europe/Istanbul", durationDays: 7 },
+    timeframe: { scheduleMode: "fixed_duration", startAt: "2026-08-08T06:00:00.000Z",
+      endAt: "2026-08-15T06:00:00.000Z", timezone: "Europe/Istanbul", durationDays: 7 },
   },
   authority: { ephemeral: true, canPersistProposal: false, canApprove: false, canExecute: false, canWriteMeta: false, canGenerateCreative: false },
 } satisfies ExistingPostPromotionPreflightResult;

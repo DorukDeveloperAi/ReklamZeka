@@ -60,6 +60,12 @@ type PostRow = Readonly<{
   media_type: string | null;
   published_at: Date | string;
 }>;
+type AdSetRow = Readonly<{
+  ad_set_id: string;
+  ad_set_name: string;
+  account_id: string;
+  campaign_id: string;
+}>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,94}$/;
@@ -118,13 +124,20 @@ function relationPayload(row: RegistryRow, workspaceId: string): Readonly<{ acco
   return Object.freeze({ accountRef: expectedAccount, actorRef: expectedActor });
 }
 
-type CanonicalRegistryDocuments = Readonly<{
+export type CanonicalPromotionRegistryDocuments = Readonly<{
   preset: AudiencePresetRevision;
   template: PromotionTemplateRevision;
   binding: PromotionTemplateBinding;
 }>;
 
-function canonicalDocuments(row: RegistryRow): CanonicalRegistryDocuments {
+export function canonicalPromotionRegistryDocuments(row: Readonly<{
+  binding_payload: unknown; binding_hash: string;
+  template_ref: string; template_revision: number; template_payload: unknown; template_hash: string;
+  preset_ref: string; preset_revision: number; preset_payload: unknown; preset_hash: string;
+  category_ref: string; objective_ref: string; budget_plan_ref: string;
+  budget_kind: "daily" | "lifetime"; budget_currency: string; budget_default: string;
+  timeframe_ref: string; schedule_mode: "continuous" | "fixed_duration"; duration_days: number | null;
+}>): CanonicalPromotionRegistryDocuments {
   try {
     const presetCandidate = record(row.preset_payload) as unknown as AudiencePresetRevision;
     const { presetHash, ...presetInput } = presetCandidate;
@@ -186,6 +199,7 @@ export class DrizzleExistingPostPromotionCatalogRepository implements ExistingPo
     if (!UUID.test(input.workspaceId)) fail("invalid_input");
     let registryRows: readonly RegistryRow[];
     let postRows: readonly PostRow[];
+    let adSetRows: readonly AdSetRow[];
     try {
       registryRows = rows<RegistryRow>(await this.database.execute(sql`
         select account.id as account_id, account.name as account_name,
@@ -252,15 +266,39 @@ export class DrizzleExistingPostPromotionCatalogRepository implements ExistingPo
         order by post.published_at desc, post.id
         limit 1001
       `));
+      adSetRows = rows<AdSetRow>(await this.database.execute(sql`
+        select ad_set.id as ad_set_id, ad_set.name as ad_set_name,
+          account.id as account_id, campaign.id as campaign_id
+        from meta_ad_sets ad_set
+        join ad_accounts account
+          on account.workspace_id = ad_set.workspace_id and account.id = ad_set.ad_account_id
+        join ad_campaigns campaign
+          on campaign.workspace_id = ad_set.workspace_id and campaign.id = ad_set.campaign_id
+          and campaign.ad_account_id = ad_set.ad_account_id
+        where ad_set.workspace_id = ${input.workspaceId}::uuid
+          and ad_set.disappeared_at is null and campaign.disappeared_at is null and account.disappeared_at is null
+          and ad_set.raw_payload_hash ~ '^[a-f0-9]{64}$'
+          and coalesce(lower(ad_set.configured_status), '') not in ('deleted', 'archived')
+          and coalesce(lower(ad_set.effective_status), '') not in ('deleted', 'archived')
+          and exists (
+            select 1 from promotion_template_bindings active_binding
+            where active_binding.workspace_id = ad_set.workspace_id
+              and active_binding.ad_account_id = ad_set.ad_account_id
+              and active_binding.effective_from <= current_timestamp
+              and (active_binding.expires_at is null or active_binding.expires_at > current_timestamp)
+          )
+        order by ad_set.name, ad_set.id
+        limit 1001
+      `));
     } catch (reason) {
       if (reason instanceof ExistingPostPromotionCatalogError) throw reason;
       fail("source_unavailable");
     }
 
-    if (registryRows.length > 10000 || postRows.length > 1000) fail("source_unavailable");
+    if (registryRows.length > 10000 || postRows.length > 1000 || adSetRows.length > 1000) fail("source_unavailable");
 
-    const documents = new Map<RegistryRow, CanonicalRegistryDocuments>();
-    for (const row of registryRows) documents.set(row, canonicalDocuments(row));
+    const documents = new Map<RegistryRow, CanonicalPromotionRegistryDocuments>();
+    for (const row of registryRows) documents.set(row, canonicalPromotionRegistryDocuments(row));
 
     const latestRevision = new Map<string, number>();
     for (const row of registryRows) {
@@ -352,7 +390,18 @@ export class DrizzleExistingPostPromotionCatalogRepository implements ExistingPo
         label: label(`${network} gönderisi · ${row.media_type ?? "medya"} · ${publicDate(row.published_at)}`, "Yayınlanmış mevcut gönderi") }));
     }
 
-    return Object.freeze({ accounts: sorted(accounts.values()), actors: sorted(actors.values()), posts: sorted(posts.values()),
+    const adSets = new Map<string, ExistingPostPromotionCatalog["adSets"][number]>();
+    for (const row of adSetRows) {
+      if (!UUID.test(row.ad_set_id) || !UUID.test(row.account_id) || !UUID.test(row.campaign_id)) fail("unsafe_source");
+      const accountRef = promotionRegistryPublicRef("account", input.workspaceId, row.account_id);
+      if (!accounts.has(accountRef)) continue;
+      if (adSets.size >= 100) fail("source_unavailable");
+      const adSetRef = promotionRegistryPublicRef("adset", input.workspaceId, row.ad_set_id);
+      adSets.set(adSetRef, Object.freeze({ ref: adSetRef, label: label(row.ad_set_name, "Mevcut reklam seti"), accountRef,
+        campaignRef: promotionRegistryPublicRef("campaign", input.workspaceId, row.campaign_id) }));
+    }
+
+    return Object.freeze({ accounts: sorted(accounts.values()), actors: sorted(actors.values()), posts: sorted(posts.values()), adSets: sorted(adSets.values()),
       templates: Object.freeze(templates), audiencePresets: sorted(presets.values()), internalCategories: sorted(categories.values()),
       objectives: sorted(objectives.values()), budgetPlans: sorted(budgets.values()), timeframes: sorted(timeframes.values()) });
   }

@@ -6,7 +6,7 @@ import { createExistingPostPromotionCatalogHttpHandler } from "@/server/existing
 const origin = "http://localhost:3000";
 const workspaceId = "11111111-1111-4111-a111-111111111111";
 const principal = { actor: { userId: "user_owner" }, workspaceId, workspaceRef: "workspace_local", readerRef: "reader_owner" } as const;
-const empty = { accounts: [], actors: [], posts: [], templates: [], audiencePresets: [], internalCategories: [], objectives: [], budgetPlans: [], timeframes: [] } as const;
+const empty = { accounts: [], actors: [], posts: [], adSets: [], templates: [], audiencePresets: [], internalCategories: [], objectives: [], budgetPlans: [], timeframes: [] } as const;
 
 function request(extra: Record<string, string> = {}) {
   return new Request(`${origin}/api/existing-post-promotion-preflight`, { headers: {

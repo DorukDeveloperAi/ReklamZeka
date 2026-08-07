@@ -8,6 +8,7 @@ export type ExistingPostPromotionCatalog = Readonly<{
   accounts: readonly PromotionCatalogOption[];
   actors: readonly Readonly<PromotionCatalogOption & { accountRef: string; type: "page" | "instagram" }>[];
   posts: readonly Readonly<PromotionCatalogOption & { actorRef: string }>[];
+  adSets: readonly Readonly<PromotionCatalogOption & { accountRef: string; campaignRef: string }>[];
   templates: readonly Readonly<PromotionCatalogOption & {
     accountRefs: readonly string[];
     actorRefs: readonly string[];
@@ -88,6 +89,7 @@ function freezeCatalog(catalog: ExistingPostPromotionCatalog): ExistingPostPromo
     accounts: options(catalog.accounts),
     actors: Object.freeze(catalog.actors.map((item) => Object.freeze({ ...item }))),
     posts: Object.freeze(catalog.posts.map((item) => Object.freeze({ ...item }))),
+    adSets: Object.freeze(catalog.adSets.map((item) => Object.freeze({ ...item }))),
     templates: Object.freeze(catalog.templates.map((item) => Object.freeze({ ...item,
       accountRefs: Object.freeze([...item.accountRefs]), actorRefs: Object.freeze([...item.actorRefs]),
       internalCategoryRefs: Object.freeze([...item.internalCategoryRefs]), objectiveRefs: Object.freeze([...item.objectiveRefs]),
@@ -98,8 +100,8 @@ function freezeCatalog(catalog: ExistingPostPromotionCatalog): ExistingPostPromo
 }
 
 export function validateExistingPostPromotionCatalog(value: unknown): ExistingPostPromotionCatalog {
-  exact(value, ["accounts", "actors", "posts", "templates", "audiencePresets", "internalCategories", "objectives", "budgetPlans", "timeframes"]);
-  const keys = ["accounts", "actors", "posts", "templates", "audiencePresets", "internalCategories", "objectives", "budgetPlans", "timeframes"] as const;
+  exact(value, ["accounts", "actors", "posts", "adSets", "templates", "audiencePresets", "internalCategories", "objectives", "budgetPlans", "timeframes"]);
+  const keys = ["accounts", "actors", "posts", "adSets", "templates", "audiencePresets", "internalCategories", "objectives", "budgetPlans", "timeframes"] as const;
   for (const key of keys) boundedArray(value[key]);
   const raw = value as Record<typeof keys[number], readonly unknown[]>;
   for (const item of raw.accounts) option(item);
@@ -116,6 +118,10 @@ export function validateExistingPostPromotionCatalog(value: unknown): ExistingPo
     exact(item, ["ref", "label", "actorRef"]);
     if (!safeRef(item.ref) || !safeLabel(item.label) || !safeRef(item.actorRef)) fail("unsafe_source");
   }
+  for (const item of raw.adSets) {
+    exact(item, ["ref", "label", "accountRef", "campaignRef"]);
+    if (!safeRef(item.ref) || !safeLabel(item.label) || !safeRef(item.accountRef) || !safeRef(item.campaignRef)) fail("unsafe_source");
+  }
   for (const item of raw.templates) {
     exact(item, ["ref", "label", "accountRefs", "actorRefs", "internalCategoryRefs", "objectiveRefs", "requiredAudiencePresetRef"]);
     if (!safeRef(item.ref) || !safeLabel(item.label) || !safeRef(item.requiredAudiencePresetRef)) fail("unsafe_source");
@@ -123,12 +129,13 @@ export function validateExistingPostPromotionCatalog(value: unknown): ExistingPo
     if (!item.accountRefs.length || !item.actorRefs.length || !item.internalCategoryRefs.length || !item.objectiveRefs.length) fail("unsafe_source");
   }
   const catalog = value as unknown as ExistingPostPromotionCatalog;
-  for (const group of [catalog.accounts, catalog.actors, catalog.posts, catalog.templates, catalog.audiencePresets,
+  for (const group of [catalog.accounts, catalog.actors, catalog.posts, catalog.adSets, catalog.templates, catalog.audiencePresets,
     catalog.internalCategories, catalog.objectives, catalog.budgetPlans, catalog.timeframes]) uniqueRefs(group);
   const refs = <T extends PromotionCatalogOption>(items: readonly T[]) => new Set(items.map((item) => item.ref));
   const accountRefs = refs(catalog.accounts); const actorRefs = refs(catalog.actors); const presetRefs = refs(catalog.audiencePresets);
   const categoryRefs = refs(catalog.internalCategories); const objectiveRefs = refs(catalog.objectives);
   if (catalog.actors.some((item) => !accountRefs.has(item.accountRef)) || catalog.posts.some((item) => !actorRefs.has(item.actorRef))
+    || catalog.adSets.some((item) => !accountRefs.has(item.accountRef))
     || catalog.templates.some((item) => !presetRefs.has(item.requiredAudiencePresetRef)
       || item.accountRefs.some((ref) => !accountRefs.has(ref)) || item.actorRefs.some((ref) => !actorRefs.has(ref))
       || item.internalCategoryRefs.some((ref) => !categoryRefs.has(ref)) || item.objectiveRefs.some((ref) => !objectiveRefs.has(ref)))) fail("unsafe_source");

@@ -13,6 +13,7 @@ export const EXISTING_POST_PROMOTION_PUBLIC_PREFLIGHT_VERSION = "existing-post-p
 
 export type ExistingPostPromotionPreflightRequest = Readonly<{
   accountRef: string;
+  adSetRef: string;
   actorRef: string;
   postRef: string;
   promotionTemplateRef: string;
@@ -29,6 +30,7 @@ export type ExistingPostPromotionPreflightContext = Readonly<{
   workspaceId: string;
   workspaceRef: string;
   account: Readonly<{ ref: string; externalId: string; ownership: EligibilityFact }>;
+  adSet: Readonly<{ ref: string; accountRef: string; campaignRef: string; state: ResourceState }>;
   actor: Readonly<{
     ref: string;
     type: PromotionActorType;
@@ -58,8 +60,8 @@ export type ExistingPostPromotionPreflightContext = Readonly<{
     actorTypes: readonly Exclude<PromotionActorType, "unsupported">[];
     budgetKinds: readonly ("daily" | "lifetime")[];
     currencies: readonly string[];
-    minimumBudgetMinor: number;
-    maximumBudgetMinor: number;
+    minimumBudgetMinor: number | null;
+    maximumBudgetMinor: number | null;
     minimumDurationDays: number;
     maximumDurationDays: number;
     compatibility: Readonly<{
@@ -84,7 +86,15 @@ export type ExistingPostPromotionPreflightContext = Readonly<{
     currency: string;
     amountMinor: number;
   }>;
-  timeframe: Readonly<{ ref: string; state: ResourceState; startAt: string; endAt: string; timezone: string }>;
+  timeframe: Readonly<{
+    ref: string;
+    state: ResourceState;
+    scheduleMode: "continuous" | "fixed_duration";
+    startAt: string | null;
+    endAt: string | null;
+    timezone: string;
+    durationDays: number | null;
+  }>;
   objective: Readonly<{ ref: string; state: ResourceState }>;
   internalCategory: Readonly<{ ref: string; state: ResourceState }>;
   guidance: readonly Readonly<{
@@ -107,7 +117,7 @@ export type ExistingPostPromotionPreflightRepository = Readonly<{
 
 export type PromotionPreflightReason = Readonly<{
   code: string;
-  source: "binding" | "meta_eligibility" | "template" | "audience_preset" | "budget_plan" | "timeframe" | "objective" | "internal_category" | "guidance";
+  source: "binding" | "meta_eligibility" | "ad_set" | "template" | "audience_preset" | "budget_plan" | "timeframe" | "objective" | "internal_category" | "guidance";
   disposition: "blocked" | "unknown";
 }>;
 
@@ -124,7 +134,13 @@ export type ExistingPostPromotionPreflightResult = Readonly<{
     actorType: "page" | "instagram";
     postFingerprintRef: string;
     budget: Readonly<{ kind: "daily" | "lifetime"; currency: string; amountMinor: number }>;
-    timeframe: Readonly<{ startAt: string; endAt: string; timezone: string; durationDays: number }>;
+    timeframe: Readonly<{
+      scheduleMode: "continuous" | "fixed_duration";
+      startAt: string;
+      endAt: string | null;
+      timezone: string;
+      durationDays: number | null;
+    }>;
   }> | null;
   authority: Readonly<{
     ephemeral: true;
@@ -199,18 +215,19 @@ function refList(value: unknown, maximum = 100): asserts value is readonly strin
 }
 
 function validateContext(value: ExistingPostPromotionPreflightContext): void {
-  exactSource(value, ["workspaceId", "workspaceRef", "account", "actor", "post", "template", "audiencePreset", "budgetPlan", "timeframe", "objective", "internalCategory", "guidance"]);
+  exactSource(value, ["workspaceId", "workspaceRef", "account", "adSet", "actor", "post", "template", "audiencePreset", "budgetPlan", "timeframe", "objective", "internalCategory", "guidance"]);
   exactSource(value.account, ["ref", "externalId", "ownership"]);
+  exactSource(value.adSet, ["ref", "accountRef", "campaignRef", "state"]);
   exactSource(value.actor, ["ref", "type", "externalId", "ownership", "permission", "advertisingCapability"]);
   exactSource(value.post, ["ref", "actorRef", "identity", "externalPostId", "actorExternalId", "lifecycle", "contentHash", "promotionCapability"]);
   exactSource(value.template, ["ref", "state", "requiredAudiencePresetRef", "accountRefs", "actorRefs", "internalCategoryRefs", "objectiveRefs", "actorTypes", "budgetKinds", "currencies", "minimumBudgetMinor", "maximumBudgetMinor", "minimumDurationDays", "maximumDurationDays", "compatibility"]);
   exactSource(value.template.compatibility, ["destination", "optimization", "placement", "specialCategory", "tracking"]);
   exactSource(value.audiencePreset, ["ref", "state", "accountRefs", "actorTypes", "internalCategoryRefs"]);
   exactSource(value.budgetPlan, ["ref", "state", "kind", "currency", "amountMinor"]);
-  exactSource(value.timeframe, ["ref", "state", "startAt", "endAt", "timezone"]);
+  exactSource(value.timeframe, ["ref", "state", "scheduleMode", "startAt", "endAt", "timezone", "durationDays"]);
   exactSource(value.objective, ["ref", "state"]);
   exactSource(value.internalCategory, ["ref", "state"]);
-  for (const item of [value.account.ref, value.actor.ref, value.post.ref, value.post.actorRef, value.template.ref,
+  for (const item of [value.account.ref, value.adSet.ref, value.adSet.accountRef, value.adSet.campaignRef, value.actor.ref, value.post.ref, value.post.actorRef, value.template.ref,
     value.audiencePreset.ref, value.budgetPlan.ref, value.timeframe.ref, value.objective.ref, value.internalCategory.ref]) {
     if (typeof item !== "string" || !REF.test(item)) fail("unsafe_source");
   }
@@ -228,7 +245,7 @@ function validateContext(value: ExistingPostPromotionPreflightContext): void {
     || !(["supported", "denied", "unsupported", "unknown"] as const).includes(value.post.promotionCapability)
     || !(["known", "missing", "unknown"] as const).includes(value.post.identity)
     || !(["published", "not_published", "deleted", "unknown"] as const).includes(value.post.lifecycle)) fail("unsafe_source");
-  for (const state of [value.template.state, value.audiencePreset.state, value.budgetPlan.state,
+  for (const state of [value.adSet.state, value.template.state, value.audiencePreset.state, value.budgetPlan.state,
     value.timeframe.state, value.objective.state, value.internalCategory.state]) {
     if (!(["active", "inactive", "unknown"] as const).includes(state)) fail("unsafe_source");
   }
@@ -239,12 +256,17 @@ function validateContext(value: ExistingPostPromotionPreflightContext): void {
     || !Array.isArray(value.audiencePreset.actorTypes) || value.audiencePreset.actorTypes.some((item) => item !== "page" && item !== "instagram")
     || !Array.isArray(value.template.budgetKinds) || value.template.budgetKinds.some((item) => item !== "daily" && item !== "lifetime")
     || !Array.isArray(value.template.currencies) || value.template.currencies.some((item) => typeof item !== "string" || !/^[A-Z]{3}$/.test(item))
-    || !Number.isSafeInteger(value.template.minimumBudgetMinor) || value.template.minimumBudgetMinor < 0
-    || !Number.isSafeInteger(value.template.maximumBudgetMinor) || value.template.maximumBudgetMinor < value.template.minimumBudgetMinor
+    || value.template.minimumBudgetMinor !== null && (!Number.isSafeInteger(value.template.minimumBudgetMinor) || value.template.minimumBudgetMinor < 0)
+    || value.template.maximumBudgetMinor !== null && (!Number.isSafeInteger(value.template.maximumBudgetMinor) || value.template.maximumBudgetMinor < 0)
+    || value.template.minimumBudgetMinor !== null && value.template.maximumBudgetMinor !== null
+      && value.template.maximumBudgetMinor < value.template.minimumBudgetMinor
     || !Number.isSafeInteger(value.template.minimumDurationDays) || value.template.minimumDurationDays < 1
     || !Number.isSafeInteger(value.template.maximumDurationDays) || value.template.maximumDurationDays < value.template.minimumDurationDays
     || !["daily", "lifetime"].includes(value.budgetPlan.kind) || !/^[A-Z]{3}$/.test(value.budgetPlan.currency)
     || !Number.isSafeInteger(value.budgetPlan.amountMinor) || value.budgetPlan.amountMinor < 0
+    || !["continuous", "fixed_duration"].includes(value.timeframe.scheduleMode)
+    || value.timeframe.durationDays !== null && (!Number.isSafeInteger(value.timeframe.durationDays)
+      || value.timeframe.durationDays < 1 || value.timeframe.durationDays > 366)
     || !Array.isArray(value.guidance) || value.guidance.length > 100) fail("unsafe_source");
   for (const fact of Object.values(value.template.compatibility)) {
     if (fact !== "confirmed" && fact !== "rejected" && fact !== "unknown") fail("unsafe_source");
@@ -260,7 +282,7 @@ function validateContext(value: ExistingPostPromotionPreflightContext): void {
 }
 
 function validateRequest(value: ExistingPostPromotionPreflightRequest): ExistingPostPromotionPreflightRequest {
-  exact(value, ["accountRef", "actorRef", "postRef", "promotionTemplateRef", "audiencePresetRef", "budgetPlanRef", "timeframeRef", "objectiveRef", "internalCategoryRef"]);
+  exact(value, ["accountRef", "adSetRef", "actorRef", "postRef", "promotionTemplateRef", "audiencePresetRef", "budgetPlanRef", "timeframeRef", "objectiveRef", "internalCategoryRef"]);
   for (const selected of Object.values(value)) reference(selected);
   return deepFreeze({ ...value });
 }
@@ -284,7 +306,7 @@ export class ExistingPostPromotionPublicPreflightService {
     validateContext(context);
     if (context.workspaceId !== principal.workspaceId || context.workspaceRef !== principal.workspaceRef) fail("unsafe_source");
     const pairs: readonly [string, string][] = [
-      [context.account.ref, selection.accountRef], [context.actor.ref, selection.actorRef], [context.post.ref, selection.postRef],
+      [context.account.ref, selection.accountRef], [context.adSet.ref, selection.adSetRef], [context.actor.ref, selection.actorRef], [context.post.ref, selection.postRef],
       [context.template.ref, selection.promotionTemplateRef], [context.audiencePreset.ref, selection.audiencePresetRef],
       [context.budgetPlan.ref, selection.budgetPlanRef], [context.timeframe.ref, selection.timeframeRef],
       [context.objective.ref, selection.objectiveRef], [context.internalCategory.ref, selection.internalCategoryRef],
@@ -292,6 +314,7 @@ export class ExistingPostPromotionPublicPreflightService {
     if (pairs.some(([actual, expected]) => actual !== expected || !REF.test(actual))) fail("unsafe_source");
 
     const reasons: PromotionPreflightReason[] = [];
+    if (context.adSet.accountRef !== context.account.ref) reasons.push(reason("binding.ad_set_account_mismatch", "binding", "blocked"));
     if (context.post.actorRef !== context.actor.ref) reasons.push(reason("binding.post_actor_mismatch", "binding", "blocked"));
     const eligibility = evaluateExistingPostPromotionEligibility({
       workspaceId: context.workspaceId,
@@ -309,6 +332,7 @@ export class ExistingPostPromotionPublicPreflightService {
       for (const code of eligibility.reasons) reasons.push(reason(`meta.${code}`, "meta_eligibility", eligibility.status === "unknown" ? "unknown" : "blocked"));
     }
 
+    stateReason(context.adSet.state, "ad_set", "ad_set", reasons);
     stateReason(context.template.state, "template", "template", reasons);
     stateReason(context.audiencePreset.state, "audience_preset", "audience_preset", reasons);
     stateReason(context.budgetPlan.state, "budget_plan", "budget_plan", reasons);
@@ -327,13 +351,20 @@ export class ExistingPostPromotionPublicPreflightService {
     if (!context.audiencePreset.internalCategoryRefs.includes(context.internalCategory.ref)) reasons.push(reason("audience_preset.category_incompatible", "audience_preset", "blocked"));
     if (!context.template.budgetKinds.includes(context.budgetPlan.kind)) reasons.push(reason("template.budget_kind_incompatible", "budget_plan", "blocked"));
     if (!context.template.currencies.includes(context.budgetPlan.currency)) reasons.push(reason("template.currency_incompatible", "budget_plan", "blocked"));
-    if (!Number.isSafeInteger(context.budgetPlan.amountMinor) || context.budgetPlan.amountMinor < context.template.minimumBudgetMinor
-      || context.budgetPlan.amountMinor > context.template.maximumBudgetMinor) reasons.push(reason("template.budget_out_of_bounds", "budget_plan", "blocked"));
-    const startAt = iso(context.timeframe.startAt);
-    const endAt = iso(context.timeframe.endAt);
-    const durationDays = days(startAt, endAt);
-    if (!/^[A-Z][A-Za-z_+-]+\/[A-Z][A-Za-z_+-]+$/.test(context.timeframe.timezone)) fail("unsafe_source");
-    if (durationDays < context.template.minimumDurationDays || durationDays > context.template.maximumDurationDays) {
+    if (!Number.isSafeInteger(context.budgetPlan.amountMinor)
+      || context.template.minimumBudgetMinor !== null && context.budgetPlan.amountMinor < context.template.minimumBudgetMinor
+      || context.template.maximumBudgetMinor !== null && context.budgetPlan.amountMinor > context.template.maximumBudgetMinor) reasons.push(reason("template.budget_out_of_bounds", "budget_plan", "blocked"));
+    const startAt = context.timeframe.startAt === null ? null : iso(context.timeframe.startAt);
+    const endAt = context.timeframe.endAt === null ? null : iso(context.timeframe.endAt);
+    const measuredDays = startAt === null || endAt === null ? null : days(startAt, endAt);
+    const durationDays = context.timeframe.durationDays;
+    if (!/^[A-Z][A-Za-z_+-]+\/[A-Z][A-Za-z_+-]+$/.test(context.timeframe.timezone)
+      || context.timeframe.state === "active" && !startAt
+      || context.timeframe.scheduleMode === "continuous" && (endAt !== null || durationDays !== null)
+      || context.timeframe.scheduleMode === "fixed_duration" && (!endAt || durationDays === null || measuredDays !== durationDays)) {
+      fail("unsafe_source");
+    }
+    if (durationDays !== null && (durationDays < context.template.minimumDurationDays || durationDays > context.template.maximumDurationDays)) {
       reasons.push(reason("template.timeframe_out_of_bounds", "timeframe", "blocked"));
     }
     for (const [name, fact] of Object.entries(context.template.compatibility)) {
@@ -351,15 +382,17 @@ export class ExistingPostPromotionPublicPreflightService {
     const status = unique.some((item) => item.disposition === "blocked") ? "blocked" as const
       : unique.length > 0 ? "unknown" as const : "ready_for_approval_proposal" as const;
     const freeze = eligibility.contentFreeze;
-    const proposalPreview = status === "ready_for_approval_proposal" && freeze ? Object.freeze({
-      previewRef: `promotion_preview_${digest({ selection, fingerprint: freeze.fingerprint }).slice(0, 20)}`,
+    const proposalPreview = status === "ready_for_approval_proposal" && freeze && startAt ? Object.freeze({
+      previewRef: `promotion_preview_${digest({ selection, fingerprint: freeze.fingerprint, budget: context.budgetPlan,
+        timeframe: context.timeframe, compatibility: context.template.compatibility }).slice(0, 20)}`,
       actionType: "existing_post_promotion" as const,
       risk: "K4" as const,
       disposition: "approval_required" as const,
       actorType: context.actor.type as "page" | "instagram",
       postFingerprintRef: `post_fingerprint_${freeze.fingerprint.slice(0, 16)}`,
       budget: Object.freeze({ kind: context.budgetPlan.kind, currency: context.budgetPlan.currency, amountMinor: context.budgetPlan.amountMinor }),
-      timeframe: Object.freeze({ startAt, endAt, timezone: context.timeframe.timezone, durationDays }),
+      timeframe: Object.freeze({ scheduleMode: context.timeframe.scheduleMode, startAt, endAt,
+        timezone: context.timeframe.timezone, durationDays }),
     }) : null;
     return deepFreeze({
       contractVersion: EXISTING_POST_PROMOTION_PUBLIC_PREFLIGHT_VERSION,

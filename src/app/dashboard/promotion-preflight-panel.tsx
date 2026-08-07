@@ -37,6 +37,7 @@ const FIELDS: readonly Readonly<{
   placeholder: string;
 }>[] = [
   { key: "accountRef", label: "Reklam hesabı", placeholder: "Hesap seçin" },
+  { key: "adSetRef", label: "Mevcut reklam seti", placeholder: "Reklam seti seçin" },
   { key: "actorRef", label: "Yayın kimliği", placeholder: "Page / Instagram seçin" },
   { key: "postRef", label: "Mevcut gönderi", placeholder: "Yayınlanmış gönderi seçin" },
   { key: "internalCategoryRef", label: "İç kampanya kategorisi", placeholder: "Kategori seçin" },
@@ -53,6 +54,7 @@ function optionsFor(
   key: SelectionKey,
 ): readonly PromotionPreflightOption[] {
   if (key === "accountRef") return catalog.accounts;
+  if (key === "adSetRef") return catalog.adSets.filter((item) => item.accountRef === selection.accountRef);
   if (key === "actorRef") return catalog.actors.filter((item) => item.accountRef === selection.accountRef);
   if (key === "postRef") return catalog.posts.filter((item) => item.actorRef === selection.actorRef);
   if (key === "internalCategoryRef") return catalog.internalCategories;
@@ -136,7 +138,7 @@ export async function requestExistingPostPromotionCatalog(fetcher: typeof fetch)
 function catalogHasSelections(catalog: PromotionPreflightCatalog) {
   return catalog.accounts.length > 0 && catalog.actors.length > 0 && catalog.posts.length > 0 && catalog.templates.length > 0
     && catalog.audiencePresets.length > 0 && catalog.internalCategories.length > 0 && catalog.objectives.length > 0
-    && catalog.budgetPlans.length > 0 && catalog.timeframes.length > 0;
+    && catalog.adSets.length > 0 && catalog.budgetPlans.length > 0 && catalog.timeframes.length > 0;
 }
 
 export function PromotionPreflightSurface(props: Readonly<{
@@ -171,7 +173,7 @@ export function PromotionPreflightSurface(props: Readonly<{
           <header><div><span className={styles.kicker}>COMPATIBILITY & GUIDANCE</span><h2>{ready.result.status === "ready_for_approval_proposal" ? "Onay önerisine hazırlanabilir" : ready.result.status === "blocked" ? "Kurallar nedeniyle engellendi" : "İnsan incelemesi gerekiyor"}</h2></div><span data-status={ready.result.status}>{ready.result.status}</span></header>
           {ready.result.reasons.length ? <div className={styles.promotionPreflightReasons}>{ready.result.reasons.map((item) => <p key={`${item.source}:${item.code}`}><span>{item.source}</span><strong>{item.code}</strong><i data-disposition={item.disposition}>{item.disposition}</i></p>)}</div> : <p className={styles.promotionPreflightClear}>Şablon, preset, Meta uygunluğu ve aktif guidance kontrollerinde engel bulunmadı.</p>}
           {preview ? <div className={styles.promotionBeforeAfter}><div><span>Önce</span><strong>Mevcut gönderi · değişmez</strong><small>{ready.selection.postRef}</small></div><b>→</b><div><span>Sonra</span><strong>K4 reklam önerisi · approval_required</strong><small>{preview.actorType} · {money(preview.budget.amountMinor, preview.budget.currency)} / {preview.budget.kind === "daily" ? "gün" : "dönem"}</small></div></div> : null}
-          {preview ? <dl className={styles.promotionPreflightFacts}><div><dt>Şablon</dt><dd>{ready.selection.promotionTemplateRef}</dd></div><div><dt>Immutable preset</dt><dd>{ready.selection.audiencePresetRef}</dd></div><div><dt>Timeframe</dt><dd>{timestamp(preview.timeframe.startAt, preview.timeframe.timezone)} → {timestamp(preview.timeframe.endAt, preview.timeframe.timezone)} · {preview.timeframe.durationDays} gün</dd></div><div><dt>Risk / durum</dt><dd>{preview.risk} · {preview.disposition}</dd></div></dl> : null}
+          {preview ? <dl className={styles.promotionPreflightFacts}><div><dt>Şablon</dt><dd>{ready.selection.promotionTemplateRef}</dd></div><div><dt>Immutable preset</dt><dd>{ready.selection.audiencePresetRef}</dd></div><div><dt>Timeframe</dt><dd>{timestamp(preview.timeframe.startAt, preview.timeframe.timezone)}{preview.timeframe.endAt ? ` → ${timestamp(preview.timeframe.endAt, preview.timeframe.timezone)} · ${preview.timeframe.durationDays} gün` : " → sürekli"}</dd></div><div><dt>Risk / durum</dt><dd>{preview.risk} · {preview.disposition}</dd></div></dl> : null}
           <footer><span>Persist: kapalı</span><span>Approval: kapalı</span><span>Execute: kapalı</span><span>Meta write: kapalı</span><span>Creative generation: kapalı</span></footer>
         </>}
       </section>
@@ -203,7 +205,7 @@ export function PromotionPreflightPanel() {
     setState((current) => {
       if (current.status !== "ready") return current;
       const next: MutableSelection = { ...current.selection, [key]: value || undefined };
-      if (key === "accountRef") { delete next.actorRef; delete next.postRef; delete next.promotionTemplateRef; delete next.audiencePresetRef; }
+      if (key === "accountRef") { delete next.adSetRef; delete next.actorRef; delete next.postRef; delete next.promotionTemplateRef; delete next.audiencePresetRef; }
       if (key === "actorRef") { delete next.postRef; delete next.promotionTemplateRef; delete next.audiencePresetRef; }
       if (key === "internalCategoryRef" || key === "objectiveRef") { delete next.promotionTemplateRef; delete next.audiencePresetRef; }
       if (key === "promotionTemplateRef") {

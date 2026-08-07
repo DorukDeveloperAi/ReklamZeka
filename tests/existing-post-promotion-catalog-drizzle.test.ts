@@ -16,6 +16,8 @@ const accountId = "22222222-2222-4222-a222-222222222222";
 const actorId = "33333333-3333-4333-a333-333333333333";
 const categoryId = "44444444-4444-4444-a444-444444444444";
 const postId = "55555555-5555-4555-a555-555555555555";
+const adSetId = "77777777-7777-4777-a777-777777777777";
+const campaignId = "88888888-8888-4888-a888-888888888888";
 const accountRef = promotionRegistryPublicRef("account", workspaceId, accountId);
 const actorRef = promotionRegistryPublicRef("actor", workspaceId, actorId);
 const categoryRef = promotionRegistryPublicRef("category", workspaceId, categoryId);
@@ -73,8 +75,10 @@ function registryRow(input: Readonly<{
 function database(registry: readonly unknown[] = [registryRow()], posts: readonly unknown[] = [{
   post_id: postId, actor_id: actorId, asset_type: "instagram_account",
   media_type: "IMAGE", published_at: new Date("2026-08-06T09:00:00.000Z"),
-}]) {
-  const execute = vi.fn().mockResolvedValueOnce({ rows: registry }).mockResolvedValueOnce({ rows: posts });
+}], adSets: readonly unknown[] = [{ ad_set_id: adSetId, ad_set_name: "TR Lead Mesaj",
+  account_id: accountId, campaign_id: campaignId }]) {
+  const execute = vi.fn().mockResolvedValueOnce({ rows: registry }).mockResolvedValueOnce({ rows: posts })
+    .mockResolvedValueOnce({ rows: adSets });
   return { execute };
 }
 
@@ -86,6 +90,8 @@ describe("Drizzle existing-post promotion catalog", () => {
       accounts: [{ ref: accountRef, label: "Doruk Hastaneleri •••" }],
       actors: [{ ref: actorRef, accountRef, type: "instagram", label: "@dorukhastaneleri" }],
       posts: [{ ref: promotionRegistryPublicRef("post", workspaceId, postId), actorRef }],
+      adSets: [{ ref: promotionRegistryPublicRef("adset", workspaceId, adSetId), accountRef,
+        campaignRef: promotionRegistryPublicRef("campaign", workspaceId, campaignId), label: "TR Lead Mesaj" }],
       templates: [{ ref: "template_existing_post", accountRefs: [accountRef], actorRefs: [actorRef],
         internalCategoryRefs: [categoryRef], objectiveRefs: ["objective_messages"], requiredAudiencePresetRef: "audience_preset_hair" }],
       audiencePresets: [{ ref: "audience_preset_hair", label: "İstanbul Saç Ekimi · r4" }],
@@ -98,7 +104,7 @@ describe("Drizzle existing-post promotion catalog", () => {
     expect(serialized).not.toContain(postId);
     expect(serialized).not.toContain("source_message");
     expect(serialized).not.toMatch(/[a-f0-9]{64}/);
-    expect(db.execute).toHaveBeenCalledTimes(2);
+    expect(db.execute).toHaveBeenCalledTimes(3);
   });
 
   it("omits actors bound ambiguously to multiple accounts instead of inventing a relation", async () => {
@@ -107,7 +113,7 @@ describe("Drizzle existing-post promotion catalog", () => {
       overrides: { account_name: "Diğer hesap" } });
     const result = await new DrizzleExistingPostPromotionCatalogRepository(database([registryRow(), ambiguous]) as never)
       .list({ workspaceId });
-    expect(result).toEqual({ accounts: [], actors: [], posts: [], templates: [], audiencePresets: [],
+    expect(result).toEqual({ accounts: [], actors: [], posts: [], adSets: [], templates: [], audiencePresets: [],
       internalCategories: [], objectives: [], budgetPlans: [], timeframes: [] });
   });
 
@@ -140,6 +146,9 @@ describe("Drizzle existing-post promotion catalog", () => {
     const post = { post_id: postId, actor_id: actorId, asset_type: "instagram_account",
       media_type: "IMAGE", published_at: new Date("2026-08-06T09:00:00.000Z") };
     await expect(new DrizzleExistingPostPromotionCatalogRepository(database([], Array(1001).fill(post)) as never).list({ workspaceId }))
+      .rejects.toMatchObject({ code: "source_unavailable" });
+    const adSet = { ad_set_id: adSetId, ad_set_name: "TR Lead", account_id: accountId, campaign_id: campaignId };
+    await expect(new DrizzleExistingPostPromotionCatalogRepository(database([], [], Array(1001).fill(adSet)) as never).list({ workspaceId }))
       .rejects.toMatchObject({ code: "source_unavailable" });
   });
 });
