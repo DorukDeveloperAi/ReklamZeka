@@ -469,8 +469,17 @@ export class DrizzleDecisionRoomScheduleRegistry {
     }));
   }
 
-  async recordTick(input: Readonly<{ scheduleRef: string; scheduledFor: string; nextRunAt: string | null }>): Promise<boolean> {
-    if (!input || Object.keys(input).some((key) => !["scheduleRef", "scheduledFor", "nextRunAt"].includes(key))) {
+  async recordTick(input: Readonly<{
+    scheduleRef: string;
+    revision: number;
+    definitionHash: string;
+    scheduledFor: string;
+    nextRunAt: string | null;
+  }>): Promise<boolean> {
+    if (!input || Object.keys(input).some((key) => ![
+      "scheduleRef", "revision", "definitionHash", "scheduledFor", "nextRunAt",
+    ].includes(key)) || !Number.isSafeInteger(input.revision) || input.revision < 1
+      || !/^[a-f0-9]{64}$/.test(input.definitionHash)) {
       throw new DecisionRoomPersistenceError("invalid_input");
     }
     const scheduleRef = opaqueRef(input.scheduleRef);
@@ -487,6 +496,7 @@ export class DrizzleDecisionRoomScheduleRegistry {
       where id = (
         select id from decision_room_schedules
         where workspace_id = ${this.workspaceId}::uuid and schedule_ref = ${scheduleRef}
+          and revision = ${input.revision} and definition_hash = ${input.definitionHash}
           and superseded_at is null
         limit 1
       )

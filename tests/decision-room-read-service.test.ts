@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   DecisionRoomReadError,
   DecisionRoomReadService,
@@ -103,7 +103,11 @@ describe("Decision Room public read service", () => {
 
   it("projects deterministic run trigger/account/campaign/time refs and inbox read state", async () => {
     const repository = new ReadRepositoryFixture();
-    const service = new DecisionRoomReadService(repository);
+    const clockValues = [
+      new Date("2026-08-07T13:00:00.000Z"),
+      new Date("2026-08-07T14:00:00.000Z"),
+    ];
+    const service = new DecisionRoomReadService(repository, () => clockValues.shift()!);
     const runs = await service.read({ workspaceRef, view: "runs" });
     expect(runs.items.map((item) => (item as { runRef: string }).runRef)).toEqual([
       "run_aaaaaaaaaaaaaaaaaaaa", "run_bbbbbbbbbbbbbbbbbbbb", "run_cccccccccccccccccccc",
@@ -117,11 +121,9 @@ describe("Decision Room public read service", () => {
     expect(unread.items[0]).toMatchObject({ readState: { status: "unread", readAt: null } });
     const marked = await service.markInboxRead({
       workspaceRef, readerRef: "reader_owner", notificationRef: "inbox_aaaaaaaaaaaaaaaaaaaa",
-      readAt: "2026-08-07T13:00:00Z",
     });
     const replay = await service.markInboxRead({
       workspaceRef, readerRef: "reader_owner", notificationRef: "inbox_aaaaaaaaaaaaaaaaaaaa",
-      readAt: "2026-08-07T14:00:00Z",
     });
     expect(marked).toMatchObject({ changed: true, readState: { status: "read", readAt: "2026-08-07T13:00:00.000Z" } });
     expect(replay).toMatchObject({ changed: false, readState: { readAt: "2026-08-07T13:00:00.000Z" } });
@@ -147,6 +149,19 @@ describe("Decision Room public read service", () => {
     const schedules = await service.read({ workspaceRef, view: "schedules", limit: 1 });
     await expect(service.read({ workspaceRef, view: "runs", cursor: schedules.nextCursor }))
       .rejects.toEqual(expect.objectContaining<Partial<DecisionRoomReadError>>({ code: "invalid_input" }));
+
+    await expect(service.markInboxRead({
+      workspaceRef, readerRef: "reader_owner", notificationRef: "inbox_aaaaaaaaaaaaaaaaaaaa",
+      readAt: "2099-01-01T00:00:00.000Z",
+    } as never)).rejects.toEqual(expect.objectContaining<Partial<DecisionRoomReadError>>({ code: "invalid_input" }));
+
+    const invalidClockRepository = new ReadRepositoryFixture();
+    const markRead = vi.spyOn(invalidClockRepository, "markInboxRead");
+    const invalidClock = new DecisionRoomReadService(invalidClockRepository, () => new Date(Number.NaN));
+    await expect(invalidClock.markInboxRead({
+      workspaceRef, readerRef: "reader_owner", notificationRef: "inbox_aaaaaaaaaaaaaaaaaaaa",
+    })).rejects.toEqual(expect.objectContaining<Partial<DecisionRoomReadError>>({ code: "invalid_input" }));
+    expect(markRead).not.toHaveBeenCalled();
   });
 
   it("fails closed on tenant mismatch, internal row IDs, or non-opaque Meta references", async () => {

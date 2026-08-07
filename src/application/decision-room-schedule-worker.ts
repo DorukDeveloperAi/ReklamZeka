@@ -12,6 +12,8 @@ export type DecisionRoomScheduleWorkerRegistry = Readonly<{
   listDue(now: string, limit: number): Promise<readonly DecisionRoomDueSchedule[]>;
   recordTick(input: Readonly<{
     scheduleRef: string;
+    revision: number;
+    definitionHash: string;
     scheduledFor: string;
     nextRunAt: string | null;
   }>): Promise<boolean>;
@@ -131,6 +133,8 @@ export async function runDecisionRoomScheduleWorker(
         // the cursor; it prevents a stale skip-policy row from remaining due.
         const advanced = await registry.recordTick({
           scheduleRef: candidate.schedule.scheduleRef,
+          revision: candidate.revision,
+          definitionHash: candidate.definitionHash,
           scheduledFor: candidate.nextRunAt,
           nextRunAt: plan.nextRunAt,
         });
@@ -150,6 +154,8 @@ export async function runDecisionRoomScheduleWorker(
       }
       const advanced = await registry.recordTick({
         scheduleRef: candidate.schedule.scheduleRef,
+        revision: candidate.revision,
+        definitionHash: candidate.definitionHash,
         scheduledFor,
         nextRunAt: plan.nextRunAt,
       });

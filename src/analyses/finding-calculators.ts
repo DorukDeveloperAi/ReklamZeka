@@ -39,6 +39,7 @@ export type FindingObservation = Readonly<{
   startDate: string;
   endDate: string;
   timezone: string;
+  /** Distinct canonical daily-insight row identity count; not an event/conversion sample. A future contract may add an explicit sample basis. */
   sampleSize: number;
   settled: boolean;
   qualityStatus: "ready" | "degraded";

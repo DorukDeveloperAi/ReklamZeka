@@ -70,6 +70,8 @@ describe("bounded Decision Room schedule worker", () => {
     }));
     expect(recordTick).toHaveBeenCalledWith({
       scheduleRef: "schedule_daily",
+      revision: 1,
+      definitionHash: due().definitionHash,
       scheduledFor: "2026-08-07T06:00:00.000Z",
       nextRunAt: "2026-08-08T06:00:00.000Z",
     });
@@ -135,6 +137,45 @@ describe("bounded Decision Room schedule worker", () => {
     expect(analysis.execute).toHaveBeenCalledOnce();
     expect(inbox.list()).toHaveLength(1);
     expect(concurrent.reduce((sum, value) => sum + value.tickAdvancedCount, 0)).toBe(1);
+  });
+
+  it("does not move a new revision when the schedule changes after executor completion", async () => {
+    const candidate = due();
+    const current = {
+      revision: candidate.revision,
+      definitionHash: candidate.definitionHash,
+      nextRunAt: candidate.nextRunAt,
+    };
+    const registry = {
+      listDue: async () => [candidate],
+      recordTick: vi.fn(async (input: { revision: number; definitionHash: string; nextRunAt: string | null }) => {
+        if (input.revision !== current.revision || input.definitionHash !== current.definitionHash) return false;
+        current.nextRunAt = input.nextRunAt!;
+        return true;
+      }),
+    };
+    const executor = {
+      execute: vi.fn(async () => {
+        current.revision = 2;
+        current.definitionHash = "f".repeat(64);
+        current.nextRunAt = "2026-08-09T06:00:00.000Z";
+        return {
+          status: "completed" as const, runRef: "run_aaaaaaaaaaaaaaaaaaaa",
+          version: "decision-room-executor/1.0.0" as const,
+          idempotencyKey: `idempotency_${"b".repeat(32)}`, attempt: 1, retryable: false,
+          actionAuthority: "none" as const, notificationChannel: "in_app_inbox" as const,
+        };
+      }),
+    };
+    const result = await runDecisionRoomScheduleWorker(
+      { now: "2026-08-07T12:00:00Z" }, registry, executor,
+    );
+    expect(result.items[0]).toMatchObject({ outcome: "tick_conflict", tickAdvanced: false });
+    expect(current).toEqual({
+      revision: 2,
+      definitionHash: "f".repeat(64),
+      nextRunAt: "2026-08-09T06:00:00.000Z",
+    });
   });
 
   it("enforces a bounded batch and rejects an oversized registry response", async () => {

@@ -12,6 +12,7 @@ import {
 import { inspectMetaPersistenceWrite } from "@/domain/meta/data-lifecycle";
 import {
   aggregateMetaMetrics,
+  META_METRIC_FORMULA_CATALOG,
   MetaMetricAggregationError,
 } from "@/domain/meta/insights/metric-engine";
 import {
@@ -97,6 +98,23 @@ const DAY_MS = 86_400_000;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const REF_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function exactKeys(
+  value: unknown,
+  allowed: readonly string[],
+  required: readonly string[],
+  label: string,
+  code: FindingObservationBuilderErrorCode = "invalid_contract",
+): void {
+  if (!isRecord(value)) fail(code, `${label} object olmalıdır`);
+  const unexpected = Object.keys(value).filter((key) => !allowed.includes(key));
+  const missing = required.filter((key) => !(key in value));
+  if (unexpected.length > 0 || missing.length > 0) fail(code, `${label} exact-key sözleşmesiyle uyuşmuyor`);
+}
+
 function fail(code: FindingObservationBuilderErrorCode, message: string): never {
   throw new FindingObservationBuilderError(code, message);
 }
@@ -139,11 +157,11 @@ function inclusiveDays(startDate: string, endDate: string): number {
 }
 
 function requireText(value: string, label: string): void {
-  if (!value?.trim() || value.length > 200) fail("invalid_contract", `${label} geçersiz`);
+  if (typeof value !== "string" || !value.trim() || value.length > 200) fail("invalid_contract", `${label} geçersiz`);
 }
 
-function assertRef(value: string, label: string): void {
-  if (!REF_PATTERN.test(value)) fail("read_contract_violation", `${label} geçersiz ref`);
+function assertRef(value: unknown, label: string): void {
+  if (typeof value !== "string" || !REF_PATTERN.test(value)) fail("read_contract_violation", `${label} geçersiz ref`);
 }
 
 function queryRef(input: FindingObservationMaterializationInput, role: FindingWindowRole, startDate: string, endDate: string): string {
@@ -195,7 +213,13 @@ function windows(input: FindingObservationMaterializationInput): readonly Readon
 }
 
 function validateInput(input: FindingObservationMaterializationInput): void {
-  if (!input || typeof input !== "object" || Array.isArray(input)) fail("invalid_contract", "Materialization input object olmalıdır");
+  exactKeys(input, [
+    "workspaceId", "metaConnectionId", "adAccountId", "entityLevel", "externalEntityId",
+    "attributionLabel", "expectedCurrency", "timeframe", "spec", "maxRowsPerQuery",
+  ], [
+    "workspaceId", "metaConnectionId", "adAccountId", "entityLevel", "externalEntityId",
+    "attributionLabel", "expectedCurrency", "timeframe", "spec", "maxRowsPerQuery",
+  ], "materialization input");
   if (!inspectMetaPersistenceWrite(input).compliant) fail("forbidden_material", "Materialization input raw payload veya secret taşıyamaz");
   for (const [value, label] of [
     [input.workspaceId, "workspaceId"], [input.metaConnectionId, "metaConnectionId"],
@@ -206,7 +230,18 @@ function validateInput(input: FindingObservationMaterializationInput): void {
   if (input.expectedCurrency !== null && (typeof input.expectedCurrency !== "string" || !/^[A-Z]{3}$/.test(input.expectedCurrency))) fail("invalid_contract", "expectedCurrency ISO kodu olmalıdır");
   if (!input.timeframe || typeof input.timeframe !== "object" || Array.isArray(input.timeframe)) fail("invalid_contract", "timeframe object olmalıdır");
   try { validateResolvedAnalysisTimeframe(input.timeframe); } catch { fail("invalid_contract", "Resolved timeframe geçersiz"); }
-  if (!input.spec || typeof input.spec !== "object" || Array.isArray(input.spec) || typeof input.spec.metric !== "string") fail("invalid_contract", "Calculator spec geçersiz");
+  if (!input.spec || typeof input.spec !== "object" || Array.isArray(input.spec)
+    || !["trend", "anomaly", "pacing", "threshold", "period_comparison", "pre_post"].includes(input.spec.kind)
+    || typeof input.spec.metric !== "string" || !(input.spec.metric in META_METRIC_FORMULA_CATALOG)) fail("invalid_contract", "Calculator spec geçersiz");
+  const specKeys: Readonly<Record<FindingCalculatorSpec["kind"], readonly string[]>> = {
+    trend: ["kind", "metric", "direction", "minimumRelativeChange", "minimumPoints", "minimumSample"],
+    anomaly: ["kind", "metric", "minimumAbsoluteZScore", "minimumBaselinePoints", "minimumSample"],
+    pacing: ["kind", "metric", "plannedTotalDecimal", "elapsedFraction", "toleranceFraction", "direction", "minimumSample"],
+    threshold: ["kind", "metric", "operator", "thresholdDecimal", "minimumSample"],
+    period_comparison: ["kind", "metric", "direction", "minimumRelativeChange", "minimumSample"],
+    pre_post: ["kind", "metric", "direction", "minimumRelativeChange", "minimumSample", "actionDate", "minimumSettledPostDays"],
+  };
+  exactKeys(input.spec, specKeys[input.spec.kind], specKeys[input.spec.kind], "calculator spec");
   if (!Number.isSafeInteger(input.maxRowsPerQuery) || input.maxRowsPerQuery < 1 || input.maxRowsPerQuery > FINDING_OBSERVATION_LIMITS.maxRowsPerQuery) fail("bounds_exceeded", "maxRowsPerQuery sınır dışında");
   if (input.timeframe.inclusiveDayCount > FINDING_OBSERVATION_LIMITS.maxWindowDays) fail("bounds_exceeded", "Timeframe gün sınırını aşıyor");
 }
@@ -240,6 +275,15 @@ export function buildFindingObservationPlan(input: FindingObservationMaterializa
 
 function authenticateRow(row: CanonicalMetaDailyInsight): boolean {
   if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+  const rowKeys = [
+    "schemaVersion", "workspaceId", "metaConnectionId", "adAccountId", "entityLevel", "externalEntityId",
+    "dateStart", "dateStop", "attributionLabel", "attributionWindow", "currency", "timezone",
+    "fieldAvailability", "sourceRevision", "sourcePayloadHash", "sourceUpdatedAt", "metricProvenance",
+    "metrics", "identity", "contentHash",
+  ];
+  if (Object.keys(row).some((key) => !rowKeys.includes(key)) || !Array.isArray(row.metrics)) return false;
+  const metricKeys = ["metricKey", "actionType", "aggregation", "valueDecimal", "valueMinor", "valueJson", "currency", "provenance", "availability"];
+  if (row.metrics.some((metric) => !isRecord(metric) || Object.keys(metric).some((key) => !metricKeys.includes(key)))) return false;
   const { identity, contentHash, ...source } = row;
   try {
     const normalized = normalizeMetaDailyInsight(source);
@@ -250,14 +294,16 @@ function authenticateRow(row: CanonicalMetaDailyInsight): boolean {
 }
 
 function validateRead(query: FindingObservationReadQuery, read: FindingObservationReadResult): void {
-  if (!read || typeof read !== "object" || Array.isArray(read) || read.queryRef !== query.queryRef) fail("read_contract_violation", "Read sonucu queryRef ile uyuşmuyor");
+  exactKeys(read, ["queryRef", "rows", "snapshotRefs", "settledThroughDate", "complete", "qualityStatus", "qualityReasonCodes"], ["queryRef", "rows", "snapshotRefs", "settledThroughDate", "complete", "qualityStatus", "qualityReasonCodes"], "read result", "read_contract_violation");
+  if (read.queryRef !== query.queryRef) fail("read_contract_violation", "Read sonucu queryRef ile uyuşmuyor");
   if (!Array.isArray(read.rows) || !Array.isArray(read.snapshotRefs) || !Array.isArray(read.qualityReasonCodes)) fail("read_contract_violation", "Read koleksiyonları geçersiz");
   if (read.rows.length > query.maxRows) fail("read_contract_violation", "Read satır sınırını aştı");
   if (typeof read.complete !== "boolean" || !["ready", "degraded"].includes(read.qualityStatus)) fail("read_contract_violation", "Read quality alanları geçersiz");
-  dateTime(read.settledThroughDate);
+  if (typeof read.settledThroughDate !== "string") fail("read_contract_violation", "settledThroughDate string olmalıdır");
+  try { dateTime(read.settledThroughDate); } catch { fail("read_contract_violation", "settledThroughDate geçersiz"); }
   if (read.snapshotRefs.length === 0) fail("read_contract_violation", "Her read sonucu snapshotRef taşımalıdır");
-  read.snapshotRefs.forEach((ref) => assertRef(ref, "snapshotRef"));
-  read.qualityReasonCodes.forEach((ref) => assertRef(ref, "qualityReasonCode"));
+  read.snapshotRefs.forEach((ref: unknown) => assertRef(ref, "snapshotRef"));
+  read.qualityReasonCodes.forEach((ref: unknown) => assertRef(ref, "qualityReasonCode"));
   for (const row of read.rows as readonly CanonicalMetaDailyInsight[]) {
     if (!authenticateRow(row)) fail("read_contract_violation", "Canonical row hash doğrulanamadı");
     if (row.workspaceId !== query.workspaceId || row.metaConnectionId !== query.metaConnectionId
@@ -273,9 +319,51 @@ export function buildFindingObservations(input: Readonly<{
   plan: FindingObservationPlan;
   reads: readonly FindingObservationReadResult[];
 }>): readonly FindingObservation[] {
-  if (!input || typeof input !== "object" || !input.plan || !Array.isArray(input.reads)) fail("invalid_contract", "Observation build input geçersiz");
+  exactKeys(input, ["plan", "reads"], ["plan", "reads"], "observation build input");
+  if (!input.plan || !Array.isArray(input.reads)) fail("invalid_contract", "Observation build input geçersiz");
+  if (!inspectMetaPersistenceWrite(input).compliant) fail("forbidden_material", "Observation read material raw payload veya secret taşıyamaz");
+  exactKeys(input.plan, ["builderVersion", "metric", "queries", "planHash"], ["builderVersion", "metric", "queries", "planHash"], "observation plan");
   const expectedHash = digest({ builderVersion: input.plan.builderVersion, metric: input.plan.metric, queries: input.plan.queries });
   if (input.plan.builderVersion !== FINDING_OBSERVATION_BUILDER_VERSION || input.plan.planHash !== expectedHash || !Array.isArray(input.plan.queries)) fail("invalid_contract", "Observation plan doğrulanamadı");
+  if (typeof input.plan.metric !== "string" || !(input.plan.metric in META_METRIC_FORMULA_CATALOG) || input.plan.queries.length < 1
+    || input.plan.queries.length > FINDING_OBSERVATION_LIMITS.maxQueries) fail("bounds_exceeded", "Observation plan metric/query sınırı geçersiz");
+  const planQueryRefs = new Set<string>();
+  let requestedRows = 0;
+  let commonScope: string | null = null;
+  for (const query of input.plan.queries) {
+    exactKeys(query, [
+      "builderVersion", "queryRef", "workspaceId", "metaConnectionId", "adAccountId", "entityLevel",
+      "externalEntityId", "attributionLabel", "expectedCurrency", "role", "startDate", "endDate",
+      "timezone", "maxRows",
+    ], [
+      "builderVersion", "queryRef", "workspaceId", "metaConnectionId", "adAccountId", "entityLevel",
+      "externalEntityId", "attributionLabel", "expectedCurrency", "role", "startDate", "endDate",
+      "timezone", "maxRows",
+    ], "observation query");
+    if (query.builderVersion !== FINDING_OBSERVATION_BUILDER_VERSION
+      || typeof query.queryRef !== "string" || !REF_PATTERN.test(query.queryRef)
+      || !["primary", "comparison", "series", "pre", "post"].includes(query.role)
+      || !["campaign", "ad_set", "ad"].includes(query.entityLevel)
+      || typeof query.timezone !== "string" || !query.timezone || query.timezone.length > 100
+      || typeof query.workspaceId !== "string" || !query.workspaceId.trim() || query.workspaceId.length > 200
+      || typeof query.metaConnectionId !== "string" || !query.metaConnectionId.trim() || query.metaConnectionId.length > 200
+      || typeof query.adAccountId !== "string" || !query.adAccountId.trim() || query.adAccountId.length > 200
+      || typeof query.externalEntityId !== "string" || !query.externalEntityId.trim() || query.externalEntityId.length > 200
+      || typeof query.attributionLabel !== "string" || !query.attributionLabel.trim() || query.attributionLabel.length > 200
+      || (query.expectedCurrency !== null && (typeof query.expectedCurrency !== "string" || !/^[A-Z]{3}$/.test(query.expectedCurrency)))
+      || typeof query.startDate !== "string" || typeof query.endDate !== "string"
+      || !Number.isSafeInteger(query.maxRows) || query.maxRows < 1 || query.maxRows > FINDING_OBSERVATION_LIMITS.maxRowsPerQuery
+      || inclusiveDays(query.startDate, query.endDate) < 1 || inclusiveDays(query.startDate, query.endDate) > FINDING_OBSERVATION_LIMITS.maxWindowDays) {
+      fail("bounds_exceeded", "Observation query runtime şekli veya sınırı geçersiz");
+    }
+    const scope = JSON.stringify([query.workspaceId, query.metaConnectionId, query.adAccountId, query.entityLevel, query.externalEntityId, query.attributionLabel, query.expectedCurrency, query.timezone]);
+    if (commonScope !== null && scope !== commonScope) fail("invalid_contract", "Plan query scope alanları tutarlı olmalıdır");
+    commonScope = scope;
+    if (planQueryRefs.has(query.queryRef)) fail("invalid_contract", "Plan queryRef tekrar edemez");
+    planQueryRefs.add(query.queryRef);
+    requestedRows += query.maxRows;
+  }
+  if (requestedRows > FINDING_OBSERVATION_LIMITS.maxRequestedRows) fail("bounds_exceeded", "Plan toplam satır sınırını aşıyor");
   if (input.reads.length !== input.plan.queries.length) fail("read_contract_violation", "Her query için tam bir read sonucu zorunludur");
   const byRef = new Map(input.reads.map((read) => [read?.queryRef, read]));
   if (byRef.size !== input.reads.length) fail("read_contract_violation", "Read queryRef tekrar edemez");

@@ -245,7 +245,10 @@ const CAPABILITIES = Object.freeze({
 });
 
 export class DecisionRoomReadService {
-  constructor(private readonly repository: DecisionRoomReadRepository) {}
+  constructor(
+    private readonly repository: DecisionRoomReadRepository,
+    private readonly clock: () => Date = () => new Date(),
+  ) {}
 
   async read(input: Readonly<{
     workspaceRef: string;
@@ -311,14 +314,17 @@ export class DecisionRoomReadService {
     workspaceRef: string;
     readerRef: string;
     notificationRef: string;
-    readAt: string;
   }>): Promise<DecisionRoomReadStateResult> {
-    exactKeys(input, ["workspaceRef", "readerRef", "notificationRef", "readAt"], "invalid_input");
+    exactKeys(input, ["workspaceRef", "readerRef", "notificationRef"], "invalid_input");
     assertSafe(input);
     const workspaceRef = ref(input.workspaceRef);
     const readerRef = ref(input.readerRef);
     const notificationRef = ref(input.notificationRef);
-    const readAt = instant(input.readAt, false, "invalid_input")!;
+    const current = this.clock();
+    if (!(current instanceof Date) || !Number.isFinite(current.getTime())) {
+      throw new DecisionRoomReadError("invalid_input");
+    }
+    const readAt = current.toISOString();
     const stored = await this.repository.markInboxRead({ workspaceRef, readerRef, notificationRef, readAt });
     if (stored === null) throw new DecisionRoomReadError("not_found");
     exactKeys(stored, ["workspaceRef", "readerRef", "notificationRef", "readAt", "changed"], "corrupt_source");

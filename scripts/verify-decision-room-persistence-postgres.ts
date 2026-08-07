@@ -58,6 +58,7 @@ let disabledSupersededExcluded = false;
 let workerPartialIsolation = false;
 let workerCatchUp = false;
 let concurrentWorkerSingleRun = false;
+let revisionRaceTickBlocked = false;
 let temporaryRowsCommitted = true;
 
 const schedule: DecisionRoomSchedule = {
@@ -126,6 +127,8 @@ try {
       && restored.nextRunAt === "2026-08-08T06:00:00.000Z"
       && await registry.recordTick({
         scheduleRef: schedule.scheduleRef,
+        revision: restored.revision,
+        definitionHash: restored.definitionHash,
         scheduledFor: "2026-08-08T06:00:00Z",
         nextRunAt: "2026-08-09T06:00:00Z",
       });
@@ -384,6 +387,29 @@ try {
       && workerDuplicate.items[0]?.tickAdvanced === false
       && Number(concurrentRows[0]?.count) === 1;
 
+    const raceSchedule = { ...schedule, scheduleRef: "schedule_worker_revision_race" };
+    await registry.save(raceSchedule, "2026-08-07T06:00:00Z");
+    const raceCandidate = (await registry.listDue("2026-08-07T12:00:00Z", 10))
+      .find((entry) => entry.schedule.scheduleRef === raceSchedule.scheduleRef);
+    if (!raceCandidate) throw new Error("Revision race fixture due değil");
+    const editingExecutor = {
+      execute: async (request: Parameters<typeof workerExecutor.execute>[0]) => {
+        const result = await workerExecutor.execute(request);
+        await registry.save({ ...raceSchedule, localTime: "10:00" }, "2026-08-09T07:00:00Z");
+        return result;
+      },
+    };
+    const raceResult = await runDecisionRoomScheduleWorker(
+      { now: "2026-08-07T12:00:00Z" },
+      { listDue: async () => [raceCandidate], recordTick: (input) => registry.recordTick(input) },
+      editingExecutor,
+    );
+    const raceCurrent = await registry.get(raceSchedule.scheduleRef);
+    revisionRaceTickBlocked = raceResult.items[0]?.outcome === "tick_conflict"
+      && raceResult.items[0]?.tickAdvanced === false
+      && raceCurrent?.revision === 2
+      && raceCurrent.nextRunAt === "2026-08-09T07:00:00.000Z";
+
     const authorityColumns = resultRows(await transaction.execute(sql`
       select column_name from information_schema.columns
       where table_schema = 'public'
@@ -402,6 +428,7 @@ try {
       crossTenantReadBlocked, invalidReaderRefBlocked, externalChannelBlocked, authorityColumnAbsent,
       dueListingBounded, disabledSupersededExcluded, workerPartialIsolation, workerCatchUp,
       concurrentWorkerSingleRun,
+      revisionRaceTickBlocked,
     };
     const failed = Object.entries(acceptance).filter(([, passed]) => !passed).map(([name]) => name);
     if (failed.length > 0) throw new Error(
@@ -447,6 +474,7 @@ console.log(JSON.stringify({
   workerPartialIsolation,
   workerCatchUp,
   concurrentWorkerSingleRun,
+  revisionRaceTickBlocked,
   metaNetworkCalls: 0,
   externalNotifications: 0,
   temporaryRowsCommitted,
