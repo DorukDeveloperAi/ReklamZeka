@@ -548,3 +548,24 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   API rollerinde sıfır tablo/schema-create/routine-execute yetkisidir.
 - Kanıt: 98 test dosyası/607 test, production build, Drizzle schema check ve secret artifact kapısı
   temiz. Production Meta writer hâlâ yoktur; S4 rollout kapısı ayrıca ve açık kullanıcı kararıyla açılır.
+
+## 2026-08-07 — S4.2 salt-okunur approval inbox
+
+- Kalıcı action proposal tablolarını tenant-bound ve descending keyset pagination ile okuyan Drizzle
+  adapter eklendi. Internal UUID/Meta bağları workspace'e özel public ref'lere çevrilir; status/budget
+  before-after, bağımlılık ve otonomi izi yalnız doğrulanmış tiplerden projekte edilir. Bozuk veya
+  değiştirilmiş persisted satır kısmen gösterilmez; tüm okuma fail-closed'dur.
+- `/api/approval-queue` yalnız GET list/detail sunar. Ayrı `approval_queue:read` local-session scope'u,
+  her istekte membership doğrulaması, bounded/tekil query parametreleri, no-store güvenlik başlıkları
+  ve public-safe hata eşlemesi vardır. POST/PATCH/PUT/DELETE, approval mutation, grant, execute ve
+  Meta writer handler'ı yoktur.
+- Dashboard onay kuyruğu gerçek API'yi kullanır; loading/unavailable/error/empty, satır ve detay,
+  risk/action/status, before-after, otonomi izi, expiry ve dependency gösterir. Eski demo
+  approve/reject/request-changes/execute kontrolleri ve sahte bekleyen rozeti kaldırıldı.
+- Canlı Supabase read kabulü bağlı workspace'te gerçek boş kuyruk döndürdü: `readOnly=true`,
+  `canApprove=false`, `canExecute=false`, `canWriteMeta=false`. Browser QA'da local-session cookie
+  bulunmadığında görünüm güvenli 503/unavailable durumuna geçti; fixture fallback veya istemci konsol
+  hatası oluşmadı.
+- Kanıt: 102 test dosyası/626 test, production build, security boundary, Drizzle ve npm audit temiz.
+  Sıradaki increment insan-varlığı kanıtlı append-only approve/reject/request-changes mutation'ıdır;
+  approval yine execute olmayacak ve production Meta writer kapalı kalacaktır.

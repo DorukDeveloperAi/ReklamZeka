@@ -290,6 +290,60 @@
 .approvalList footer { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; margin-top: auto; }
 .approvalList footer button { min-height: 34px; padding: 0 10px; border: 1px solid var(--rz-line); border-radius: 8px; background: transparent; color: var(--rz-muted); font-size: .58rem; cursor: pointer; }
 
+.approvalSafetyStrip { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 11px 13px; border: 1px solid rgba(255,194,104,.22); border-radius: 10px; background: rgba(255,194,104,.045); }
+.approvalSafetyStrip span { padding: 5px 8px; border: 1px solid rgba(255,194,104,.19); border-radius: 99px; color: #c9b58f; font-size: .55rem; }
+.approvalSafetyStrip strong { margin-left: auto; color: var(--rz-amber); font-size: .58rem; letter-spacing: .08em; }
+.approvalQueueState { display: grid; place-items: start; gap: 8px; min-height: 230px; padding: 28px; }
+.approvalQueueState h2 { margin: 4px 0 0; font-size: 1.1rem; }
+.approvalQueueState p { max-width: 650px; margin: 0; color: var(--rz-muted); font-size: .65rem; line-height: 1.55; }
+.approvalQueueState > strong { color: var(--rz-amber); font-size: .59rem; text-transform: uppercase; }
+.approvalQueueState button { min-height: 34px; margin-top: 8px; padding: 0 12px; border: 1px solid var(--rz-line); border-radius: 8px; background: transparent; color: var(--rz-text); cursor: pointer; }
+.approvalQueueWorkspace { display: grid; grid-template-columns: minmax(290px, .72fr) minmax(0, 1.28fr); align-items: start; gap: 10px; }
+.approvalQueueIndex { overflow: hidden; }
+.approvalQueueIndex > div { display: grid; }
+.approvalQueueIndex > div > button { display: grid; gap: 8px; padding: 14px 16px; border: 0; border-top: 1px solid var(--rz-line); background: transparent; color: var(--rz-text); text-align: left; cursor: pointer; }
+.approvalQueueIndex > div > button[data-active="true"] { background: linear-gradient(90deg, rgba(184,242,84,.075), transparent); box-shadow: inset 2px 0 var(--rz-green); }
+.approvalQueueIndex button header { display: flex; align-items: center; justify-content: space-between; }
+.approvalQueueIndex button header span { color: var(--rz-muted); font-size: .53rem; text-transform: uppercase; }
+.approvalQueueIndex button header span[data-tone="warning"] { color: var(--rz-amber); }
+.approvalQueueIndex button header span[data-tone="good"] { color: var(--rz-green); }
+.approvalQueueIndex button header span[data-tone="danger"] { color: #ff8f8f; }
+.approvalQueueIndex button header i { color: var(--rz-muted); font-size: .58rem; font-style: normal; font-weight: 800; }
+.approvalQueueIndex button > strong { font-size: .68rem; }
+.approvalQueueIndex button > small { color: var(--rz-muted); font-size: .54rem; }
+.approvalQueueIndex button > p { margin: 0; color: #bdc6c0; font-size: .61rem; }
+.approvalQueueDetail { padding: 20px; }
+.approvalQueueDetail > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--rz-line); }
+.approvalQueueDetail h2 { margin: 8px 0 5px; font-size: 1.2rem; }
+.approvalQueueDetail header p { margin: 0; color: var(--rz-muted); font-size: .59rem; }
+.approvalQueueFacts { display: grid; grid-template-columns: repeat(3, 1fr); margin: 14px 0; border: 1px solid var(--rz-line); border-radius: 9px; overflow: hidden; }
+.approvalQueueFacts > div { display: grid; gap: 6px; min-width: 0; padding: 13px; border-right: 1px solid var(--rz-line); }
+.approvalQueueFacts > div:last-child { border-right: 0; }
+.approvalQueueFacts span, .approvalQueueFacts small { overflow: hidden; color: var(--rz-muted); font-size: .54rem; text-overflow: ellipsis; }
+.approvalQueueFacts strong { font-size: .63rem; text-transform: uppercase; }
+.approvalQueueFacts strong[data-tone="warning"] { color: var(--rz-amber); }
+.approvalQueueFacts strong[data-tone="good"] { color: var(--rz-green); }
+.approvalQueueFacts strong[data-tone="danger"] { color: #ff8f8f; }
+.approvalQueueChange { padding: 14px; border: 1px solid var(--rz-line); border-radius: 10px; background: rgba(0,0,0,.13); }
+.approvalQueueChange > span { color: var(--rz-muted); font-size: .54rem; text-transform: uppercase; }
+.approvalQueueChange > div { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px; margin-top: 11px; }
+.approvalQueueChange p { display: grid; gap: 5px; margin: 0; }
+.approvalQueueChange p:last-child { text-align: right; }
+.approvalQueueChange small { color: var(--rz-muted); font-size: .54rem; }
+.approvalQueueChange strong { font-size: .83rem; }
+.approvalQueueChange i { color: var(--rz-green); font-style: normal; }
+.approvalQueueTrace, .approvalQueueDependencies { margin-top: 18px; }
+.approvalQueueTrace h3, .approvalQueueDependencies h3 { margin: 0 0 9px; font-size: .68rem; }
+.approvalQueueTrace article { display: grid; grid-template-columns: 24px 1fr; align-items: center; gap: 9px; min-height: 48px; padding: 7px 0; border: 0; border-bottom: 1px solid var(--rz-line); border-radius: 0; background: transparent; }
+.approvalQueueTrace article > span { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid rgba(184,242,84,.22); border-radius: 99px; color: var(--rz-green); font-size: .52rem; }
+.approvalQueueTrace article p { display: grid; gap: 3px; margin: 0; }
+.approvalQueueTrace article strong { font-size: .61rem; text-transform: capitalize; }
+.approvalQueueTrace article small { color: var(--rz-muted); font-size: .54rem; }
+.approvalQueueDependencies > p { display: flex; justify-content: space-between; gap: 15px; margin: 0; padding: 10px 0; border-bottom: 1px solid var(--rz-line); color: var(--rz-muted); font-size: .57rem; }
+.approvalQueueDependencies > p strong { color: var(--rz-text); font-size: .56rem; }
+.approvalQueueDetail > footer { display: flex; justify-content: flex-end; gap: 7px; margin-top: 18px; }
+.approvalQueueDetail > footer span { padding: 6px 8px; border: 1px solid var(--rz-line); border-radius: 99px; color: var(--rz-muted); font-size: .53rem; }
+
 .timeline { padding: 8px 18px 18px; }
 .timeline article { position: relative; display: grid; grid-template-columns: 50px 18px 1fr auto; gap: 12px; min-height: 105px; padding: 17px 0; border: 0; border-bottom: 1px solid var(--rz-line); border-radius: 0; background: transparent; }
 .timeline article:last-child { border-bottom: 0; }
@@ -510,6 +564,7 @@
   .decisionRoomList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .practiceLabWorkspace { grid-template-columns: 1fr; }
   .budgetLabWorkspace { grid-template-columns: 1fr; }
+  .approvalQueueWorkspace { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 780px) {
@@ -552,6 +607,11 @@
   .ruleEditor footer > span { width: 100%; margin-left: 0; order: -1; }
   .agentChat { min-height: 610px; }
   .chatMessages > div { max-width: 96%; }
+  .approvalSafetyStrip { flex-wrap: wrap; }
+  .approvalSafetyStrip strong { width: 100%; margin-left: 0; }
+  .approvalQueueFacts { grid-template-columns: 1fr; }
+  .approvalQueueFacts > div { border-right: 0; border-bottom: 1px solid var(--rz-line); }
+  .approvalQueueFacts > div:last-child { border-bottom: 0; }
   .metaMetricGrid { grid-template-columns: 1fr 1fr; }
   .securityBanner { grid-template-columns: auto 1fr; }
   .securityBanner > .statusPill { grid-column: 2; justify-self: start; }

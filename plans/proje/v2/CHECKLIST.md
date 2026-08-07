@@ -234,7 +234,8 @@
     public-safe çıktı ve approval/execute/Meta-write yetkisi `false`.
 - [ ] Approval inbox, automation run, verify/rollback ve tek timeline.
   - [x] Restart-durable awaiting-approval veri modeli ve public-safe read contract.
-  - [ ] Drizzle read adapter, GET API ve dashboard inbox bağlantısı.
+  - [x] Tenant-bound Drizzle read adapter, ayrı `approval_queue:read` kapsamlı GET API ve
+    fixture'sız dashboard list/detail inbox bağlantısı.
   - [ ] İnsan-varlığı kanıtlı approve/reject/request-changes mutation katmanı.
 - [ ] Mevcut creative library + context/performance karşılaştırması.
 - [ ] Yayındaki reklam metni/dynamic variant/CTA/destination/post kaynağı explorer'ı.

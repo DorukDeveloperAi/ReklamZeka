@@ -5,6 +5,7 @@ import type { MetaInventoryApiError, MetaInventorySnapshot } from "@/connectors/
 import { DecisionRoomPanel } from "./decision-room-panel";
 import { BudgetLabPanel } from "./budget-lab-panel";
 import { PracticeLabPanel } from "./practice-lab-panel";
+import { ApprovalQueuePanel } from "./approval-queue-panel";
 import styles from "./operating-dashboard.module.css";
 
 export type OperatingDashboardModel = Readonly<{
@@ -21,7 +22,6 @@ export type OperatingDashboardModel = Readonly<{
 }>;
 
 type ViewId = "today" | "campaigns" | "analysis" | "decision-room" | "practice-lab" | "budgets" | "rules" | "agent" | "approvals" | "timeline" | "meta";
-type ApprovalState = "pending" | "approved" | "rejected";
 type RuleCard = Readonly<{
   id: string;
   kind: string;
@@ -46,7 +46,7 @@ const navGroups: ReadonlyArray<Readonly<{ label: string; items: ReadonlyArray<Re
     { id: "practice-lab", label: "Practice Lab", icon: "◈" },
     { id: "meta", label: "Meta bağlantısı", icon: "◎" },
     { id: "agent", label: "Orchestrator Agent", icon: "✦", badge: "●" },
-    { id: "approvals", label: "Onay kuyruğu", icon: "✓", badge: "3" },
+    { id: "approvals", label: "Onay kuyruğu", icon: "✓" },
     { id: "timeline", label: "Timeline", icon: "↺" },
   ] },
 ];
@@ -122,7 +122,6 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
   const selectedRule = rules.find((rule) => rule.id === selectedRuleId) ?? rules[0]!;
   const [ruleDraft, setRuleDraft] = useState<string>(selectedRule.text);
   const [ruleSaved, setRuleSaved] = useState(true);
-  const [approvalState, setApprovalState] = useState<Record<string, ApprovalState>>({});
   const [autonomy, setAutonomy] = useState<Record<string, string>>({ analysis: "Otomatik", recommendation: "Otomatik", decrease: "Onaya sun", increase: "Onaya sun", pause: "Onaya sun", create: "Her zaman manuel" });
   const [agentMessages, setAgentMessages] = useState<Array<{ from: "agent" | "user"; text: string }>>([
     { from: "agent", text: "Portföy bağlamı hazır. Bugün üç karar adayı var; İstanbul bütçe koruması nedeniyle bir değişikliği özellikle bastırdım." },
@@ -133,7 +132,6 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
   const [metaLoading, setMetaLoading] = useState(true);
   const [metaError, setMetaError] = useState<string | null>(null);
 
-  const pendingApprovals = approvalItems.filter((item) => !approvalState[item.id]).length;
   const currentCampaign = campaigns.find((campaign) => campaign.id === selectedCampaign) ?? campaigns[0];
   const activeTitle = useMemo(() => navGroups.flatMap((group) => group.items).find((item) => item.id === activeView)?.label ?? "Bugün", [activeView]);
 
@@ -181,11 +179,6 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
     setToast("Talimat yeni taslak sürüm olarak kaydedildi. Yayınlanmadan eylemleri değiştirmez.");
   }
 
-  function setApproval(id: string, state: ApprovalState) {
-    setApprovalState((current) => ({ ...current, [id]: state }));
-    setToast(state === "approved" ? "ActionUnit onaylandı; approval execute değildir. Demo modunda Meta write kapalı." : "ActionUnit reddedildi ve bağımlı adımlar durduruldu.");
-  }
-
   function sendAgentMessage() {
     const text = agentInput.trim();
     if (!text) return;
@@ -221,7 +214,7 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
             {approvalItems.map((item, index) => <article key={item.id} className={styles.decisionRow}>
               <div className={styles.decisionIndex}>0{index + 1}</div>
               <div className={styles.decisionBody}><div><StatusPill tone={item.risk === "K1" ? "info" : "warning"}>{item.risk}</StatusPill><span>{item.entity}</span></div><h3>{item.title}</h3><p>{item.evidence}</p><small>{item.policy}</small></div>
-              <div className={styles.decisionAction}>{approvalState[item.id] ? <StatusPill tone={approvalState[item.id] === "approved" ? "good" : "danger"}>{approvalState[item.id] === "approved" ? "Onaylandı" : "Reddedildi"}</StatusPill> : <><button onClick={() => setApproval(item.id, "approved")}>Onayla</button><button className={styles.iconButton} onClick={() => navigate("approvals")} aria-label={`${item.title} ayrıntısı`}>→</button></>}</div>
+              <div className={styles.decisionAction}><StatusPill tone="neutral">Salt okunur</StatusPill><button className={styles.iconButton} onClick={() => navigate("approvals")} aria-label={`${item.title} için gerçek onay kuyruğunu aç`}>→</button></div>
             </article>)}
           </div>
         </section>
@@ -290,13 +283,6 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
     </>;
   }
 
-  function renderApprovals() {
-    return <>
-      <section className={styles.pageHero}><div><span className={styles.kicker}>APPROVAL INBOX</span><h1>Her hareketi tek tek görün, tek tek karar verin.</h1><p>Onay, execute değildir. Önce/sonra, kanıt, policy ve dependency her ActionUnit üzerinde dondurulur.</p></div><StatusPill tone="warning">{pendingApprovals} bekliyor</StatusPill></section>
-      <section className={styles.approvalList}>{approvalItems.map((item) => <article key={item.id} data-state={approvalState[item.id] ?? "pending"}><header><div><StatusPill tone={item.risk === "K1" ? "info" : "warning"}>{item.risk}</StatusPill><span>{item.entity}</span></div><StatusPill tone="neutral">approval_only</StatusPill></header><h2>{item.title}</h2><div className={styles.beforeAfter}><div><span>Önce</span><strong>{item.before}</strong></div><span>→</span><div><span>Sonra</span><strong>{item.after}</strong></div></div><dl><div><dt>Kanıt</dt><dd>{item.evidence}</dd></div><div><dt>Policy</dt><dd>{item.policy}</dd></div><div><dt>Bağımlılık</dt><dd>{item.dependency}</dd></div></dl><footer>{approvalState[item.id] ? <><StatusPill tone={approvalState[item.id] === "approved" ? "good" : "danger"}>{approvalState[item.id] === "approved" ? "Onaylandı · execute bekliyor" : "Reddedildi"}</StatusPill>{approvalState[item.id] === "approved" ? <button onClick={() => setToast("Demo modunda Meta execute kapalı. Production write S4 valfi sonrasında açılacak.")}>Execute incele</button> : null}</> : <><button onClick={() => setApproval(item.id, "rejected")}>Reddet</button><button>Değişiklik iste</button><button className={styles.primaryButton} onClick={() => setApproval(item.id, "approved")}>Onayla</button></>}</footer></article>)}</section>
-    </>;
-  }
-
   function renderMetaConnection() {
     if (!metaInventory) {
       return <>
@@ -358,19 +344,19 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
     return <><section className={styles.pageHero}><div><span className={styles.kicker}>APPEND-ONLY TIMELINE</span><h1>Veri, karar ve hareket aynı kronolojide.</h1><p>Sync'ten outcome'a kadar bizim ve Meta üzerindeki harici değişikliklerin tamamı tek izde.</p></div><button className={styles.secondaryButton}>Filtrele</button></section><section className={styles.panel}><div className={styles.timeline}>{timeline.map((event) => <article key={`${event.time}-${event.title}`}><time>{event.time}</time><span className={styles.timelineDot} data-type={event.type} /><div><StatusPill tone="neutral">{event.type}</StatusPill><h2>{event.title}</h2><p>{event.detail}</p><small>{event.actor}</small></div><button aria-label={`${event.title} detayını aç`}>→</button></article>)}</div></section></>;
   }
 
-  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel /> : activeView === "rules" ? renderRules() : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? renderApprovals() : renderTimeline();
+  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel /> : activeView === "rules" ? renderRules() : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? <ApprovalQueuePanel /> : renderTimeline();
 
   return <main className={styles.appShell}>
     <aside className={styles.sidebar}>
       <div className={styles.brand}><span>RZ</span><div><strong>ReklamZeka</strong><small>Operating System</small></div><i>DEMO</i></div>
-      <nav aria-label="Ana navigasyon">{navGroups.map((group) => <div key={group.label}><span>{group.label}</span>{group.items.map((item) => <button key={item.id} data-active={activeView === item.id} onClick={() => navigate(item.id)}><Icon name={item.icon} /><strong>{item.label}</strong>{item.badge ? <i data-live={item.badge === "●"}>{item.badge === "3" && item.id === "approvals" ? pendingApprovals : item.badge}</i> : null}</button>)}</div>)}</nav>
+      <nav aria-label="Ana navigasyon">{navGroups.map((group) => <div key={group.label}><span>{group.label}</span>{group.items.map((item) => <button key={item.id} data-active={activeView === item.id} onClick={() => navigate(item.id)}><Icon name={item.icon} /><strong>{item.label}</strong>{item.badge ? <i data-live={item.badge === "●"}>{item.badge}</i> : null}</button>)}</div>)}</nav>
       <div className={styles.sidebarFooter}><span className={styles.liveDot} /><div><strong>Meta Mirror</strong><small>{metaInventory ? `${metaInventory.summary.adAccounts} hesap · read-only` : `${model.freshnessLabel} · kontrol ediliyor`}</small></div><button aria-label="Bağlantı ayarları" onClick={() => navigate("meta")}>•••</button></div>
     </aside>
     <section className={styles.workspace}>
-      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button className={styles.workspacePicker} onClick={() => navigate("meta")}><span className={styles.avatar}>DM</span><span><strong>Demo Marka</strong><small>{metaInventory ? `${metaInventory.summary.adAccounts} Meta hesabı` : "Meta kontrol ediliyor"}</small></span><i>⌄</i></button><div className={styles.topActions}><button aria-label="Ara">⌕</button><button aria-label="Bildirimler">♢<i>{pendingApprovals}</i></button><button className={styles.autonomyButton} onClick={() => navigate("agent")}><span className={styles.liveDot} /> approval_only <i>⌄</i></button><button className={styles.profileButton}>AY</button></div></header>
+      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button className={styles.workspacePicker} onClick={() => navigate("meta")}><span className={styles.avatar}>DM</span><span><strong>Demo Marka</strong><small>{metaInventory ? `${metaInventory.summary.adAccounts} Meta hesabı` : "Meta kontrol ediliyor"}</small></span><i>⌄</i></button><div className={styles.topActions}><button aria-label="Ara">⌕</button><button aria-label="Bildirimler">♢</button><button className={styles.autonomyButton} onClick={() => navigate("agent")}><span className={styles.liveDot} /> approval_only <i>⌄</i></button><button className={styles.profileButton}>AY</button></div></header>
       <div className={styles.mobileNav}>{navGroups.flatMap((group) => group.items).map((item) => <button key={item.id} data-active={activeView === item.id} onClick={() => navigate(item.id)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</div>
       <div className={styles.content} aria-label={activeTitle}>{content}</div>
-      <footer className={styles.sourceFooter}><span>{activeView === "meta" && metaInventory ? `Canlı Meta Graph · ${formatMetaTime(metaInventory.refreshedAt)} · ${metaInventory.connection.accessMode}` : activeView === "decision-room" ? "Decision Room read model · canlı kaynak bağlanmadan fixture kullanılmaz" : activeView === "practice-lab" ? "Practice Lab read model · append-only lifecycle doğrulaması" : activeView === "budgets" ? "Budget Lab read model · doğrulanmış proposal ledger" : `Demo snapshot · ${model.currency} · ${model.timezone} · ${model.attribution}`}</span><span>{activeView === "meta" ? "Kimlikler maskeli · token server-only · write connector yok" : activeView === "decision-room" ? "Server-bound workspace · bounded cursor · action authority yok" : activeView === "practice-lab" ? "Public-safe projection · draft ephemeral · promotion/automation/action yok" : activeView === "budgets" ? "Public-safe projection · draft/approval/execute/Meta yok" : "Deterministik veriler mevcut fixture/API'dan; operasyon bağlamı ürün vizyonu demosudur."}</span></footer>
+      <footer className={styles.sourceFooter}><span>{activeView === "meta" && metaInventory ? `Canlı Meta Graph · ${formatMetaTime(metaInventory.refreshedAt)} · ${metaInventory.connection.accessMode}` : activeView === "decision-room" ? "Decision Room read model · canlı kaynak bağlanmadan fixture kullanılmaz" : activeView === "practice-lab" ? "Practice Lab read model · append-only lifecycle doğrulaması" : activeView === "budgets" ? "Budget Lab read model · doğrulanmış proposal ledger" : activeView === "approvals" ? "Approval Queue read model · tenant-bound ActionUnit projection" : `Demo snapshot · ${model.currency} · ${model.timezone} · ${model.attribution}`}</span><span>{activeView === "meta" ? "Kimlikler maskeli · token server-only · write connector yok" : activeView === "decision-room" ? "Server-bound workspace · bounded cursor · action authority yok" : activeView === "practice-lab" ? "Public-safe projection · draft ephemeral · promotion/automation/action yok" : activeView === "budgets" ? "Public-safe projection · draft/approval/execute/Meta yok" : activeView === "approvals" ? "Public-safe projection · approve/reject/grant/execute/Meta kapalı" : "Deterministik veriler mevcut fixture/API'dan; operasyon bağlamı ürün vizyonu demosudur."}</span></footer>
     </section>
     {toast ? <div className={styles.toast} role="status"><span>✓</span><p>{toast}</p><button onClick={() => setToast(null)} aria-label="Bildirimi kapat">×</button></div> : null}
   </main>;
