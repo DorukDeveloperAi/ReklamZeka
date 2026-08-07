@@ -12,6 +12,10 @@ describe("canonical Meta affected-geo persistence migration", () => {
     expect(migration.match(/FOREIGN KEY \("workspace_id","snapshot_id"\)/g)).toHaveLength(2);
     expect(migration).toContain('(\"workspace_id\",\"snapshot_id\",\"polarity\",\"geo_type\",\"geo_ref\")');
     expect(migration).toContain('(\"workspace_id\",\"ad_account_id\",\"campaign_id\",\"ad_set_id\",\"captured_at\")');
+    expect(migration.indexOf('CREATE UNIQUE INDEX "meta_affected_geo_snapshots_workspace_id_unique"'))
+      .toBeLessThan(migration.indexOf('ADD CONSTRAINT "meta_affected_geo_snapshot_items_workspace_snapshot_fk"'));
+    expect(migration.indexOf('CREATE UNIQUE INDEX "meta_ad_sets_workspace_hierarchy_unique"'))
+      .toBeLessThan(migration.indexOf('ADD CONSTRAINT "meta_affected_geo_snapshots_workspace_hierarchy_fk"'));
   });
 
   it("forces RLS, revokes API roles, and blocks UPDATE on all immutable tables", () => {

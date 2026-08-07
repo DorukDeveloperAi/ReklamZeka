@@ -71,6 +71,8 @@ CREATE TABLE "meta_affected_geo_snapshots" (
   )
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX "meta_affected_geo_snapshots_workspace_id_unique" ON "meta_affected_geo_snapshots" USING btree ("workspace_id","id");--> statement-breakpoint
+CREATE UNIQUE INDEX "meta_ad_sets_workspace_hierarchy_unique" ON "meta_ad_sets" USING btree ("workspace_id","id","campaign_id","ad_account_id");--> statement-breakpoint
 ALTER TABLE "meta_affected_geo_snapshot_items" ADD CONSTRAINT "meta_affected_geo_snapshot_items_workspace_snapshot_fk" FOREIGN KEY ("workspace_id","snapshot_id") REFERENCES "public"."meta_affected_geo_snapshots"("workspace_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "meta_affected_geo_snapshot_location_types" ADD CONSTRAINT "meta_affected_geo_snapshot_location_types_workspace_snapshot_fk" FOREIGN KEY ("workspace_id","snapshot_id") REFERENCES "public"."meta_affected_geo_snapshots"("workspace_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "meta_affected_geo_snapshots" ADD CONSTRAINT "meta_affected_geo_snapshots_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -79,12 +81,9 @@ CREATE UNIQUE INDEX "meta_affected_geo_snapshot_items_identity_unique" ON "meta_
 CREATE INDEX "meta_affected_geo_snapshot_items_workspace_snapshot_idx" ON "meta_affected_geo_snapshot_items" USING btree ("workspace_id","snapshot_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "meta_affected_geo_snapshot_location_types_identity_unique" ON "meta_affected_geo_snapshot_location_types" USING btree ("workspace_id","snapshot_id","location_type");--> statement-breakpoint
 CREATE INDEX "meta_affected_geo_snapshot_location_types_workspace_snapshot_idx" ON "meta_affected_geo_snapshot_location_types" USING btree ("workspace_id","snapshot_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "meta_affected_geo_snapshots_workspace_id_unique" ON "meta_affected_geo_snapshots" USING btree ("workspace_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "meta_affected_geo_snapshots_workspace_hash_unique" ON "meta_affected_geo_snapshots" USING btree ("workspace_id","snapshot_hash");--> statement-breakpoint
 CREATE UNIQUE INDEX "meta_affected_geo_snapshots_exact_source_unique" ON "meta_affected_geo_snapshots" USING btree ("workspace_id","ad_set_id","captured_at","raw_payload_hash","source_geo_subtree_hash","source_graph_version","field_catalog_version");--> statement-breakpoint
 CREATE INDEX "meta_affected_geo_snapshots_scope_time_idx" ON "meta_affected_geo_snapshots" USING btree ("workspace_id","ad_account_id","campaign_id","ad_set_id","captured_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "meta_ad_sets_workspace_hierarchy_unique" ON "meta_ad_sets" USING btree ("workspace_id","id","campaign_id","ad_account_id");--> statement-breakpoint
-
 ALTER TABLE meta_affected_geo_snapshots ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE meta_affected_geo_snapshots FORCE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE meta_affected_geo_snapshot_items ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
