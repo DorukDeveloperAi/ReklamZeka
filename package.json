@@ -29,6 +29,7 @@
     "db:migrate": "drizzle-kit migrate",
     "verify:meta-sync-db": "tsx scripts/verify-meta-sync-postgres.ts",
     "verify:meta-asset-content-db": "tsx scripts/verify-meta-asset-content-postgres.ts",
+    "verify:meta-post-media-db": "tsx scripts/verify-meta-post-media-postgres.ts",
     "verify:meta-s14-read": "tsx scripts/verify-meta-s14-read.ts",
     "verify:supabase-security": "tsx scripts/verify-supabase-security.ts",
     "check:security": "npm audit --omit=dev"
