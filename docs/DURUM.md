@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: d776521613eb -->
+<!-- durum-damga: f3deab029608 -->
 
 ## Künye
 
@@ -14,36 +14,35 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 55 |
+| iş commit'i (tüm geçmiş) | 66 |
 | ilk / son iş | 2026-08-06 / 2026-08-07 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-07 | `feat` | orchestrate bounded scheduled read sync | `08ea8c27b` |
+| 2026-08-07 | `docs` | record trusted policy migration proof | `50e14029a` |
+| 2026-08-07 | `feat` | bind proposal snapshots to reviewed policies | `d77d7341b` |
+| 2026-08-07 | `docs` | record approval policy migration proof | `d630b21a4` |
+| 2026-08-07 | `feat` | register reviewed policy definitions | `ba86b06e6` |
+| 2026-08-07 | `feat` | materialize canonical proposal evidence | `22bffc2fe` |
+| 2026-08-07 | `feat` | compose canonical read sync runtime | `1ccd967b3` |
+| 2026-08-07 | `docs` | record compatibility migration proof | `d0c4d894e` |
+| 2026-08-07 | `feat` | register reviewed compatibility evidence | `1bb46c352` |
+| 2026-08-07 | `feat` | type existing post source bindings | `d5ac88406` |
+| 2026-08-07 | `docs` | record inventory and autonomy studio slices | `00469c406` |
 | 2026-08-07 | `feat` | persist reviewed rule revisions | `2223c8181` |
 | 2026-08-07 | `fix` | keep guidance advisory-only | `5bb9ac8e3` |
 | 2026-08-07 | `feat` | guard explicit proposal drafts | `07ecdf47f` |
 | 2026-08-07 | `feat` | resolve guided preflight server-side | `4b46821f2` |
-| 2026-08-07 | `feat` | connect trusted catalog and proposals | `ad7bd6baa` |
-| 2026-08-07 | `feat` | persist immutable registry | `69c30d6da` |
-| 2026-08-07 | `feat` | add immutable existing-post preflight | `68163e504` |
-| 2026-08-07 | `feat` | record human approval decisions | `c97235925` |
-| 2026-08-07 | `feat` | expose read-only approval inbox | `6210bcffc` |
-| 2026-08-07 | `feat` | persist approval proposal queue | `b579ba31f` |
-| 2026-08-07 | `feat` | add approval-only safety cores | `9071004b1` |
-| 2026-08-07 | `feat` | add explicit audited draft flow | `64eecbe36` |
-| 2026-08-07 | `test` | prove local read boundary | `ca6e2febc` |
-| 2026-08-07 | `feat` | persist advisory proposal revisions | `a56c7834e` |
-| 2026-08-07 | `feat` | compose scenarios and guard proxy mapping | `f960369f5` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 40
+- `feat        ` ████████████████████████ 43
+- `docs        ` ████ 7
 - `test        ` ███ 5
-- `docs        ` ██ 3
 - `fix         ` ██ 3
-- `?           ` █ 2
 - `security    ` █ 2
 
 ## Planlar
