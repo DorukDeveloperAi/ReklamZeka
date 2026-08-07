@@ -113,6 +113,13 @@
       "when": 1786105612710,
       "tag": "20260807122652_workspace_tombstone_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786106863353,
+      "tag": "20260807124743_aberrant_supreme_intelligence",
+      "breakpoints": true
     }
   ]
 }

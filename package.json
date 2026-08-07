@@ -33,6 +33,7 @@
     "verify:meta-s14-live-db": "tsx scripts/verify-meta-s14-live-postgres.ts",
     "verify:meta-s14-read": "tsx scripts/verify-meta-s14-read.ts",
     "verify:meta-connection-db": "tsx scripts/verify-meta-connection-postgres.ts",
+    "verify:workspace-tombstone-db": "tsx scripts/verify-workspace-tombstone-postgres.ts",
     "verify:supabase-security": "tsx scripts/verify-supabase-security.ts",
     "check:security": "npm audit --omit=dev"
   },

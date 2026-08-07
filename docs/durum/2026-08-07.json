@@ -4,6 +4,78 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "6e1f9d52f",
+      "tarih": "2026-08-07",
+      "konu": "feat(meta): build change snapshots from mirror",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4260f37f4",
+      "tarih": "2026-08-07",
+      "konu": "feat(security): add workspace tombstone boundary",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4759f711a",
+      "tarih": "2026-08-07",
+      "konu": "feat(meta): persist secure connection lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "71978fe8e",
+      "tarih": "2026-08-07",
+      "konu": "feat(meta): define safe data lifecycle boundary",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4542aa6b5",
+      "tarih": "2026-08-07",
+      "konu": "feat(meta): classify external snapshot changes",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "1fd18b530",
+      "tarih": "2026-08-07",
+      "konu": "docs(meta): close S1.4 evidence gate",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "019cd6d7f",
+      "tarih": "2026-08-07",
+      "konu": "test(meta): prove live S1.4 persistence",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "5ae792ac5",
+      "tarih": "2026-08-07",
+      "konu": "feat(meta): persist linked post inventory",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "91fa14241",
       "tarih": "2026-08-07",
       "konu": "feat(meta): persist S1.4 mirror in Postgres",
@@ -65,88 +137,16 @@
       "kapsam": [
         "test"
       ]
-    },
-    {
-      "hash": "9b5c35728",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): add asset and content read mirror",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "d07dfa9da",
-      "tarih": "2026-08-07",
-      "konu": "security(db): revoke inherited function execution",
-      "tur": "is",
-      "kapsam": [
-        "security"
-      ]
-    },
-    {
-      "hash": "243b438c1",
-      "tarih": "2026-08-07",
-      "konu": "test(db): verify Supabase security posture",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "22e625ca8",
-      "tarih": "2026-08-07",
-      "konu": "security(db): close Supabase Data API by default",
-      "tur": "is",
-      "kapsam": [
-        "security"
-      ]
-    },
-    {
-      "hash": "8bf9d962e",
-      "tarih": "2026-08-07",
-      "konu": "feat: connect Supabase persistence",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "b69f5ee8a",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): integrate durable partial sync",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "a3dca0912",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): add resumable insights persistence contract",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "a2962124d",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): add resumable partial read sync runtime",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 11
+      "adet": 17
     },
     {
       "kapsam": "test",
-      "adet": 3
+      "adet": 4
     },
     {
       "kapsam": "?",
@@ -157,11 +157,15 @@
       "adet": 2
     },
     {
+      "kapsam": "docs",
+      "adet": 1
+    },
+    {
       "kapsam": "fix",
       "adet": 1
     }
   ],
-  "isSayisi": 19,
+  "isSayisi": 27,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -174,5 +178,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "2fc59658741a"
+  "damga": "a75943e13650"
 }

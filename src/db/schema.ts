@@ -5,6 +5,7 @@ import {
   check,
   date,
   doublePrecision,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -405,6 +406,129 @@ export const metaPosts = pgTable("meta_posts", {
   uniqueIndex("meta_posts_connection_external_unique").on(table.metaConnectionId, table.externalPostId),
   index("meta_posts_workspace_actor_idx").on(table.workspaceId, table.actorAssetId),
   index("meta_posts_actor_asset_idx").on(table.actorAssetId),
+]);
+
+/**
+ * Hash-only evidence for a canonical Meta hierarchy observation. The canonical
+ * entity payload remains server-private and is rebuilt from the read mirror;
+ * this table intentionally stores no Meta external IDs or ad content.
+ */
+export const metaChangeSnapshots = pgTable("meta_change_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  metaConnectionId: uuid("meta_connection_id").notNull().references(() => metaConnections.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull().references(() => adAccounts.id, { onDelete: "cascade" }),
+  publicRef: text("public_ref").notNull(),
+  snapshotHash: text("snapshot_hash").notNull(),
+  schemaVersion: integer("schema_version").notNull(),
+  fieldCatalogVersion: text("field_catalog_version").notNull(),
+  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+  /** Server-private tracked facts and Meta IDs; never tokens, ad copy, raw payloads, UI/agent/log output. */
+  canonicalPayload: jsonb("canonical_payload").$type<unknown>().notNull(),
+  safeAggregate: jsonb("safe_aggregate").$type<{
+    entityCounts: { campaign: number; adSet: number; ad: number };
+    knownFieldCount: number;
+    unknownFieldCount: number;
+  }>().notNull(),
+  persistedAt: timestamp("persisted_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("meta_change_snapshots_scope_hash_unique").on(
+    table.workspaceId,
+    table.metaConnectionId,
+    table.adAccountId,
+    table.snapshotHash,
+  ),
+  uniqueIndex("meta_change_snapshots_scope_public_ref_unique").on(
+    table.workspaceId,
+    table.metaConnectionId,
+    table.adAccountId,
+    table.publicRef,
+  ),
+  uniqueIndex("meta_change_snapshots_id_scope_unique").on(
+    table.id,
+    table.workspaceId,
+    table.metaConnectionId,
+    table.adAccountId,
+  ),
+  index("meta_change_snapshots_scope_captured_idx").on(
+    table.workspaceId,
+    table.metaConnectionId,
+    table.adAccountId,
+    table.capturedAt,
+  ),
+  index("meta_change_snapshots_connection_idx").on(table.metaConnectionId),
+  index("meta_change_snapshots_account_idx").on(table.adAccountId),
+  check("meta_change_snapshots_hash_format", sql`${table.snapshotHash} ~ '^[a-f0-9]{64}$'`),
+  check("meta_change_snapshots_public_ref_format", sql`${table.publicRef} ~ '^snapshot_[a-f0-9]{20}$'`),
+  check("meta_change_snapshots_schema_version_positive", sql`${table.schemaVersion} >= 1`),
+]);
+
+/** Privacy-safe, idempotent timeline events derived from two authentic snapshots. */
+export const metaChangeEvents = pgTable("meta_change_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  metaConnectionId: uuid("meta_connection_id").notNull().references(() => metaConnections.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull().references(() => adAccounts.id, { onDelete: "cascade" }),
+  previousSnapshotId: uuid("previous_snapshot_id").notNull(),
+  currentSnapshotId: uuid("current_snapshot_id").notNull(),
+  changeRef: text("change_ref").notNull(),
+  entityRef: text("entity_ref").notNull(),
+  entityType: text("entity_type").notNull(),
+  field: text("field").notNull(),
+  beforeValue: jsonb("before_value").$type<unknown>().notNull(),
+  afterValue: jsonb("after_value").$type<unknown>().notNull(),
+  classification: text("classification").notNull(),
+  correlatedActionRef: text("correlated_action_ref"),
+  timelineHash: text("timeline_hash").notNull(),
+  fieldCatalogVersion: text("field_catalog_version").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  detectedAt: timestamp("detected_at", { withTimezone: true }).notNull(),
+  persistedAt: timestamp("persisted_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("meta_change_events_scope_change_ref_unique").on(
+    table.workspaceId,
+    table.metaConnectionId,
+    table.adAccountId,
+    table.changeRef,
+  ),
+  index("meta_change_events_scope_occurred_idx").on(
+    table.workspaceId,
+    table.metaConnectionId,
+    table.adAccountId,
+    table.occurredAt,
+  ),
+  index("meta_change_events_previous_snapshot_idx").on(table.previousSnapshotId),
+  index("meta_change_events_current_snapshot_idx").on(table.currentSnapshotId),
+  index("meta_change_events_connection_idx").on(table.metaConnectionId),
+  index("meta_change_events_account_idx").on(table.adAccountId),
+  foreignKey({
+    columns: [table.previousSnapshotId, table.workspaceId, table.metaConnectionId, table.adAccountId],
+    foreignColumns: [
+      metaChangeSnapshots.id,
+      metaChangeSnapshots.workspaceId,
+      metaChangeSnapshots.metaConnectionId,
+      metaChangeSnapshots.adAccountId,
+    ],
+    name: "meta_change_events_previous_snapshot_scope_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.currentSnapshotId, table.workspaceId, table.metaConnectionId, table.adAccountId],
+    foreignColumns: [
+      metaChangeSnapshots.id,
+      metaChangeSnapshots.workspaceId,
+      metaChangeSnapshots.metaConnectionId,
+      metaChangeSnapshots.adAccountId,
+    ],
+    name: "meta_change_events_current_snapshot_scope_fk",
+  }).onDelete("restrict"),
+  check("meta_change_events_distinct_snapshots", sql`${table.previousSnapshotId} <> ${table.currentSnapshotId}`),
+  check("meta_change_events_change_ref_format", sql`${table.changeRef} ~ '^ref_[a-f0-9]{20}$'`),
+  check("meta_change_events_entity_ref_format", sql`${table.entityRef} ~ '^ref_[a-f0-9]{20}$'`),
+  check("meta_change_events_action_ref_format", sql`${table.correlatedActionRef} is null or ${table.correlatedActionRef} ~ '^ref_[a-f0-9]{20}$'`),
+  check("meta_change_events_timeline_hash_format", sql`${table.timelineHash} ~ '^[a-f0-9]{64}$'`),
+  check("meta_change_events_classification_valid", sql`${table.classification} in ('internal_expected', 'external_change')`),
+  check("meta_change_events_entity_type_valid", sql`${table.entityType} in ('campaign', 'ad_set', 'ad')`),
+  check("meta_change_events_period_valid", sql`${table.detectedAt} >= ${table.occurredAt}`),
 ]);
 
 export const metaCreatives = pgTable("meta_creatives", {

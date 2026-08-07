@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 2fc59658741a -->
+<!-- durum-damga: a75943e13650 -->
 
 ## Künye
 
@@ -14,13 +14,21 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 19 |
+| iş commit'i (tüm geçmiş) | 27 |
 | ilk / son iş | 2026-08-06 / 2026-08-07 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-07 | `feat` | build change snapshots from mirror | `6e1f9d52f` |
+| 2026-08-07 | `feat` | add workspace tombstone boundary | `4260f37f4` |
+| 2026-08-07 | `feat` | persist secure connection lifecycle | `4759f711a` |
+| 2026-08-07 | `feat` | define safe data lifecycle boundary | `71978fe8e` |
+| 2026-08-07 | `feat` | classify external snapshot changes | `4542aa6b5` |
+| 2026-08-07 | `docs` | close S1.4 evidence gate | `1fd18b530` |
+| 2026-08-07 | `test` | prove live S1.4 persistence | `019cd6d7f` |
+| 2026-08-07 | `feat` | persist linked post inventory | `5ae792ac5` |
 | 2026-08-07 | `feat` | persist S1.4 mirror in Postgres | `91fa14241` |
 | 2026-08-07 | `test` | cover live linked post inventory | `d6346a57a` |
 | 2026-08-07 | `feat` | mirror linked Page and Instagram posts | `6c586b990` |
@@ -28,22 +36,15 @@
 | 2026-08-07 | `feat` | add bounded content persistence and post eligibility | `704f1ce6c` |
 | 2026-08-07 | `feat` | persist Meta asset and post evidence | `74f30ef6c` |
 | 2026-08-07 | `test` | add live S1.4 read acceptance | `09c8add40` |
-| 2026-08-07 | `feat` | add asset and content read mirror | `9b5c35728` |
-| 2026-08-07 | `security` | revoke inherited function execution | `d07dfa9da` |
-| 2026-08-07 | `test` | verify Supabase security posture | `243b438c1` |
-| 2026-08-07 | `security` | close Supabase Data API by default | `22e625ca8` |
-| 2026-08-07 | `feat` | connect Supabase persistence | `8bf9d962e` |
-| 2026-08-07 | `feat` | integrate durable partial sync | `b69f5ee8a` |
-| 2026-08-07 | `feat` | add resumable insights persistence contract | `a3dca0912` |
-| 2026-08-07 | `feat` | add resumable partial read sync runtime | `a2962124d` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 11
-- `test        ` ███████ 3
-- `?           ` ████ 2
-- `security    ` ████ 2
-- `fix         ` ██ 1
+- `feat        ` ████████████████████████ 17
+- `test        ` ██████ 4
+- `?           ` ███ 2
+- `security    ` ███ 2
+- `docs        ` █ 1
+- `fix         ` █ 1
 
 ## Planlar
 
