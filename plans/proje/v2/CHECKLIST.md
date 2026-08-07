@@ -30,11 +30,11 @@
 - [x] Account/campaign/adset/ad/creative/post çekirdek entity şeması, raw hash/provenance,
   first/last seen ve soft disappearance.
 - [ ] Multi-business connection, account group ve account-level permission/capability modeli.
-- [ ] Facebook Page, Instagram, pixel/dataset, app/WhatsApp destination asset graph.
+- [x] Facebook Page, Instagram, pixel/dataset, app/WhatsApp destination asset graph.
   - [x] Asset ve edge canonical şeması, capability/provenance/orphan alanları.
-  - [ ] Parçalı canlı sync, ownership/capability çözümlemesi ve iki hesap kanıtı.
-- [ ] Yayındaki ad copy/spec extraction: primary text/headline/description/caption/CTA/destination/dynamic variants.
-- [ ] Bağlı Instagram/Page post-media inventory, ownership/promotion capability ve güvenli preview.
+  - [x] Parçalı canlı sync, ownership/capability çözümlemesi ve iki hesap kanıtı.
+- [x] Yayındaki ad copy/spec extraction: primary text/headline/description/caption/CTA/destination/dynamic variants.
+- [x] Bağlı Instagram/Page post-media inventory, ownership/promotion capability ve güvenli preview.
 - [ ] L0 raw retention/encryption/purge ile connection revoke/disconnect/export/delete lifecycle.
 - [x] Meta config/targeting özeti, CBO/ABO budget-owner resolver ve versioned legacy
   objective mapping çekirdeği.
@@ -55,7 +55,9 @@
 - [ ] Capability/data-quality raporu ve Meta read-only E2E.
   - [x] Canlı inventory/capability smoke: 5 hesap, 22 Page, 8 Instagram, 422 campaign,
     1.108 ad set, 4.620 ad, 0 hata ve 0 write.
-  - [ ] Kalıcı sync coverage/freshness/data-quality raporu ve iki hesap isolation E2E.
+  - [x] Trust/readiness domain motoru ve PostgreSQL evidence adapter'ı; iki hesap canlı SQL
+    raporu maskeli, eksik insights'i `not_ready` bırakan fail-closed kanıt.
+  - [ ] S1.5 lifecycle/diff sonrası nihai kalıcı coverage/freshness ve iki hesap isolation E2E.
 
 ## A09 — İç kategori ve talimat
 

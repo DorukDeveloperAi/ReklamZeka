@@ -30,8 +30,13 @@ Bu dosya yalnız güncel teslim dilimini yönetir. A08 domain şartnamesinin min
 - **S1.3 kapalı:** Supabase PostgreSQL 17'ye sekiz migration/29 public tablo uygulandı;
   transaction/session pooler SSL bağlantıları ve yeni connection/runtime ile durable
   `partial`→cursor restore→`completed` kabulü geçti. Geçici E2E workspace'i cascade silindi.
-- **Aktif S1.4:** canlı asset/content mirror. S1.5 henüz kapanmadı; schema/contract varlığı
-  canlı asset-content sync veya lifecycle kapanışı sayılmaz.
+- **S1.4 kapalı:** asset/content/post mirror ortak canlı servis ve PostgreSQL repository'ye
+  bağlandı. İki gerçek hesaplı geçici kabulde 79 asset/79 edge, 1.179 bağlı post/media,
+  6 reklam metni/post bağı, 4 creative ve 6 binding; 3 durable checkpoint, izole partial
+  hata, tam cleanup ve `0` Meta write doğrulandı.
+- **Aktif S1.5:** trust/readiness'in saf motoru ve Drizzle evidence adapter'ı hazır; canlı
+  iki hesap SQL raporu eksik insights'i `not_ready` bıraktı. Lifecycle, retention,
+  snapshot diff/external-change ve nihai iki-hesap izolasyon kapısı sırada.
 
 ## Değişmez sınırlar
 
@@ -112,6 +117,13 @@ Yapılacaklar:
 **Çıkış kapısı:** En az bir active ad'in görünen metin/CTA/post kimliği source spec'e
 izlenir; dynamic varyant provenance korunur; promotable/non-promotable post sebeplidir;
 promotion veya creative write çağrısı `0`dır.
+
+**Kanıt (2026-08-07):** `verify:meta-s14-read`, `verify:meta-asset-content-db`,
+`verify:meta-post-media-db` ve `verify:meta-s14-live-db` geçti. Canlı kabul 2 hesapta
+GET-only çalıştı; bir hesap transient hata ve bounded page-limit ile partial kalırken diğer
+kalıcı sonuçlar korundu. Actor bilgisi eksik post kayıtları tahmin edilmeden `wrong_actor`
+olarak reddedilip yalnız kanıtlı kayıtlar aynalandı. Promotion eligibility ve kısa ömürlü,
+workspace-bound preview ref sözleşmeleri olumlu/olumsuz/unknown fixture matrisiyle doğrulandı.
 
 ### S1.5 — Trust, lifecycle ve iki hesap kanıtı
 

@@ -14,7 +14,7 @@
 | 05 | performans deneyimi | KAPALI | 03,04 | `check:experience` + browser QA |
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
-| 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.3 kapalı; Supabase persistence ve canlı GET kanıtlı, S1.4 asset/content sırada |
+| 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.4 kapalı; canlı GET→PostgreSQL iki hesap kanıtlı, S1.5 trust/lifecycle sırada |
 | 09 | kategori ve talimat | AÇIK | 08 | requirement/precedence tasarımı tamam; uygulama sırada |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
 | 11 | bütçe planlama | AÇIK | 09,10 | planlandı |
@@ -200,7 +200,20 @@
 
 ## Sıradaki uygulama
 
-**Slice 1 / Meta Read Mirror — S1.4 asset/content mirror:** Page/Instagram/pixel/dataset/app/
-WhatsApp asset graph'ını, effective ad copy/dynamic variant/post identity ve promotion
-eligibility'yi canlı parçalı sync'e bağla. Ardından S1.5 lifecycle/iki hesap isolation kapanışı
-gelir. A13'e kadar production write scope veya writer ReklamZeka'ya taşınmaz.
+**Slice 1 / Meta Read Mirror — S1.5 trust, lifecycle ve iki hesap kapanışı:** Kalıcı
+connection/secret lifecycle, hash-only raw-retention varsayılanı, audit tombstone, snapshot
+diff/`external_change`, operational alert ve nihai iki-hesap coverage/isolation kanıtını
+tamamla. A13'e kadar production write scope veya writer ReklamZeka'ya taşınmaz.
+
+## 2026-08-07 — S1.4 asset/content mirror kapanışı
+
+- Asset graph, creative/post extraction, linked Page/Instagram inventory, promotion
+  eligibility ve güvenli preview ref sözleşmeleri ortak read-only servise bağlandı.
+- Canlı geçici PostgreSQL kabulü iki gerçek hesapla 79 asset/79 edge, 1.179 post/media,
+  6 reklam metni/post bağı, 4 creative, 6 binding ve 3 durable checkpoint üretti.
+- İkinci hesap transient hatası ve bounded page-limit partial sonucu diğer hesabın kalıcı
+  verisini geri almadı; Meta write çağrısı `0`, cleanup sonrası geçici workspace `0` kaldı.
+- Actor kanıtı olmayan post kayıtları tahmin edilmedi; `wrong_actor` ile fail-closed edildi.
+- Trust/readiness saf motoru ve Drizzle adapter'ı iki hesap üzerinde gerçek SQL okudu; public
+  çıktı teknik ID/metin/token taşımadı ve eksik insights nedeniyle doğru biçimde `not_ready`
+  kaldı. Tam trust/lifecycle çıkış kapısı S1.5'tedir.

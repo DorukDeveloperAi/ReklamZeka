@@ -23,3 +23,14 @@ log veya bildirim payload'ına eklenmez.
   eskisini iptal etmek ve mümkün olan en düşük kapsamlı yeni tokenı yerel secret alanına almaktır.
 - Auth hatasında token değerini hata kaydına eklemeden bağlantıyı yenile. Rate-limit durumunda
   connector retry/backoff uygular; tekrarlayan 429 için otomatik yenilemeyi geçici olarak seyrekleştir.
+- Lokal PostgreSQL kabul sırası: `npm run verify:meta-asset-content-db`,
+  `npm run verify:meta-post-media-db`, ardından gerçek ve salt-okunur iki hesap kanıtı için
+  `npm run verify:meta-s14-live-db`. Son komut geçici workspace kurar ve `finally` içinde
+  hedefli olarak temizler; yalnız aggregate/maskeli kanıt basar.
+- Canlı kabulte `wrong_actor`, eksik actor alanının tahmin edilmeyeceği anlamına gelir;
+  ilgili kayıt park edilir. `permission_missing/unsupported/partial` sıfıra veya başarıya
+  çevrilmez ve trust/readiness raporunda sebepli eksik olarak kalır.
+- Yerel Next/Turbopack build gerçek `.env.local` ile çalıştırılırsa deploy edilmeyen
+  `.next/cache` environment snapshot'ı secret baytlarını tutabilir. Secret taraması tracked
+  kaynakları ve cache dışındaki deploy edilebilir `.next` çıktısını kapsar; gerçek-tokenlı
+  kabul/build sonrasında `.next/cache` güvenli biçimde temizlenir. Cache deploy edilmez.
