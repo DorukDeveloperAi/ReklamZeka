@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: f3deab029608 -->
+<!-- durum-damga: a2bb551676cb -->
 
 ## Künye
 
@@ -14,36 +14,35 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 66 |
-| ilk / son iş | 2026-08-06 / 2026-08-07 |
+| iş commit'i (tüm geçmiş) | 78 |
+| ilk / son iş | 2026-08-06 / 2026-08-08 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-08 | `test` | verify live geo inventory wiring | `0d7eabaa7` |
+| 2026-08-08 | `feat` | wire geo evidence and scheduled sync | `49eefd3a0` |
+| 2026-08-08 | `docs` | record affected geo live proof | `3e11209d4` |
+| 2026-08-08 | `fix` | order affected geo composite keys | `0561270bd` |
+| 2026-08-08 | `feat` | persist affected geo evidence | `1d09a729e` |
+| 2026-08-08 | `feat` | normalize verified affected geo | `3b04b6e53` |
+| 2026-08-08 | `feat` | materialize authentic category evidence | `1fbbffa15` |
+| 2026-08-08 | `test` | verify redacted targeting shape | `ffe0a4af3` |
+| 2026-08-08 | `test` | verify live guardrail persistence | `8eb5aa279` |
+| 2026-08-08 | `docs` | record guardrail migration proof | `cca08c94f` |
+| 2026-08-08 | `feat` | persist reviewed protection guardrails | `2aa61423d` |
+| 2026-08-07 | `feat` | resolve reviewed budget guardrails | `57e8d1455` |
 | 2026-08-07 | `feat` | orchestrate bounded scheduled read sync | `08ea8c27b` |
 | 2026-08-07 | `docs` | record trusted policy migration proof | `50e14029a` |
 | 2026-08-07 | `feat` | bind proposal snapshots to reviewed policies | `d77d7341b` |
-| 2026-08-07 | `docs` | record approval policy migration proof | `d630b21a4` |
-| 2026-08-07 | `feat` | register reviewed policy definitions | `ba86b06e6` |
-| 2026-08-07 | `feat` | materialize canonical proposal evidence | `22bffc2fe` |
-| 2026-08-07 | `feat` | compose canonical read sync runtime | `1ccd967b3` |
-| 2026-08-07 | `docs` | record compatibility migration proof | `d0c4d894e` |
-| 2026-08-07 | `feat` | register reviewed compatibility evidence | `1bb46c352` |
-| 2026-08-07 | `feat` | type existing post source bindings | `d5ac88406` |
-| 2026-08-07 | `docs` | record inventory and autonomy studio slices | `00469c406` |
-| 2026-08-07 | `feat` | persist reviewed rule revisions | `2223c8181` |
-| 2026-08-07 | `fix` | keep guidance advisory-only | `5bb9ac8e3` |
-| 2026-08-07 | `feat` | guard explicit proposal drafts | `07ecdf47f` |
-| 2026-08-07 | `feat` | resolve guided preflight server-side | `4b46821f2` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
 - `feat        ` ████████████████████████ 43
-- `docs        ` ████ 7
+- `docs        ` █████ 9
 - `test        ` ███ 5
 - `fix         ` ██ 3
-- `security    ` █ 2
 
 ## Planlar
 

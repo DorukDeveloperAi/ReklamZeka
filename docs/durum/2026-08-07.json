@@ -4,6 +4,114 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "0d7eabaa7",
+      "tarih": "2026-08-08",
+      "konu": "test(meta): verify live geo inventory wiring",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "49eefd3a0",
+      "tarih": "2026-08-08",
+      "konu": "feat(meta): wire geo evidence and scheduled sync",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "3e11209d4",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record affected geo live proof",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "0561270bd",
+      "tarih": "2026-08-08",
+      "konu": "fix(db): order affected geo composite keys",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "1d09a729e",
+      "tarih": "2026-08-08",
+      "konu": "feat(meta): persist affected geo evidence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "3b04b6e53",
+      "tarih": "2026-08-08",
+      "konu": "feat(meta): normalize verified affected geo",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "1fbbffa15",
+      "tarih": "2026-08-08",
+      "konu": "feat(actions): materialize authentic category evidence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ffe0a4af3",
+      "tarih": "2026-08-08",
+      "konu": "test(meta): verify redacted targeting shape",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "8eb5aa279",
+      "tarih": "2026-08-08",
+      "konu": "test(actions): verify live guardrail persistence",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "cca08c94f",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record guardrail migration proof",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "2aa61423d",
+      "tarih": "2026-08-08",
+      "konu": "feat(actions): persist reviewed protection guardrails",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "57e8d1455",
+      "tarih": "2026-08-07",
+      "konu": "feat(actions): resolve reviewed budget guardrails",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "08ea8c27b",
       "tarih": "2026-08-07",
       "konu": "feat(meta): orchestrate bounded scheduled read sync",
@@ -29,114 +137,6 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "d630b21a4",
-      "tarih": "2026-08-07",
-      "konu": "docs(roadmap): record approval policy migration proof",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "ba86b06e6",
-      "tarih": "2026-08-07",
-      "konu": "feat(approvals): register reviewed policy definitions",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "22bffc2fe",
-      "tarih": "2026-08-07",
-      "konu": "feat(promotions): materialize canonical proposal evidence",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "1ccd967b3",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): compose canonical read sync runtime",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "d0c4d894e",
-      "tarih": "2026-08-07",
-      "konu": "docs(roadmap): record compatibility migration proof",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "1bb46c352",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): register reviewed compatibility evidence",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "d5ac88406",
-      "tarih": "2026-08-07",
-      "konu": "feat(promotions): type existing post source bindings",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "00469c406",
-      "tarih": "2026-08-07",
-      "konu": "docs(roadmap): record inventory and autonomy studio slices",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "2223c8181",
-      "tarih": "2026-08-07",
-      "konu": "feat(autonomy): persist reviewed rule revisions",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "5bb9ac8e3",
-      "tarih": "2026-08-07",
-      "konu": "fix(promotions): keep guidance advisory-only",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "07ecdf47f",
-      "tarih": "2026-08-07",
-      "konu": "feat(promotions): guard explicit proposal drafts",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "4b46821f2",
-      "tarih": "2026-08-07",
-      "konu": "feat(promotions): resolve guided preflight server-side",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -146,7 +146,7 @@
     },
     {
       "kapsam": "docs",
-      "adet": 7
+      "adet": 9
     },
     {
       "kapsam": "test",
@@ -155,15 +155,11 @@
     {
       "kapsam": "fix",
       "adet": 3
-    },
-    {
-      "kapsam": "security",
-      "adet": 2
     }
   ],
-  "isSayisi": 66,
+  "isSayisi": 78,
   "ilkIsTarihi": "2026-08-06",
-  "sonIsTarihi": "2026-08-07",
+  "sonIsTarihi": "2026-08-08",
   "planlar": [
     {
       "slug": "proje",
@@ -174,5 +170,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "f3deab029608"
+  "damga": "a2bb551676cb"
 }
