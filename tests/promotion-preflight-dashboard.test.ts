@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   PromotionPreflightSurface,
+  requestExistingPostPromotionCatalog,
   requestExistingPostPromotionPreflight,
   type PromotionPreflightCatalog,
 } from "@/app/dashboard/promotion-preflight-panel";
@@ -76,6 +77,15 @@ describe("Existing-post promotion preflight dashboard", () => {
     expect(html).not.toContain("type=\"text\"");
   });
 
+  it("shows a distinct trusted empty state without rendering selectors", () => {
+    const empty = Object.fromEntries(Object.keys(catalog).map((key) => [key, []])) as unknown as PromotionPreflightCatalog;
+    const html = renderToStaticMarkup(createElement(PromotionPreflightSurface, {
+      ...callbacks, state: { status: "ready", catalog: empty, selection: {}, result: null, evaluating: false, message: null },
+    }));
+    expect(html).toContain("Kaynak bağlı · katalog boş");
+    expect(html).not.toContain("<select");
+  });
+
   it("uses only server-provided options and exposes no raw targeting or creative editor", () => {
     const html = renderToStaticMarkup(createElement(PromotionPreflightSurface, {
       ...callbacks,
@@ -111,7 +121,9 @@ describe("Existing-post promotion preflight dashboard", () => {
   });
 
   it("posts one exact ref-only selection and rejects an unsafe authority response", async () => {
-    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(result), { status: 200 }));
+    const envelope = { contractVersion: "existing-post-promotion-agent/1.0.0", result,
+      authority: { readOnlyPreflight: true, canPersist: false, canApprove: false, canExecute: false, canWriteMeta: false, canGenerateCreative: false } };
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(envelope), { status: 200 }));
     await expect(requestExistingPostPromotionPreflight(fetcher as typeof fetch, selection)).resolves.toEqual(result);
     expect(fetcher).toHaveBeenCalledWith("/api/existing-post-promotion-preflight", expect.objectContaining({
       method: "POST", credentials: "same-origin",
@@ -119,8 +131,12 @@ describe("Existing-post promotion preflight dashboard", () => {
       body: JSON.stringify({ selection }),
     }));
 
-    const unsafe = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...result, authority: { ...result.authority, canWriteMeta: true } }), { status: 200 }));
+    const unsafe = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...envelope, authority: { ...envelope.authority, canWriteMeta: true } }), { status: 200 }));
     await expect(requestExistingPostPromotionPreflight(unsafe as typeof fetch, selection)).rejects.toThrow("Güvenli preflight sözleşmesi doğrulanamadı");
+    const mismatched = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...envelope,
+      result: { ...result, selection: { ...selection, budgetPlanRef: "budget_plan_other" } } }), { status: 200 }));
+    await expect(requestExistingPostPromotionPreflight(mismatched as typeof fetch, selection))
+      .rejects.toThrow("Güvenli preflight sözleşmesi doğrulanamadı");
   });
 
   it("keeps the runtime route fail-closed until a trusted catalog repository is configured", async () => {
@@ -131,5 +147,17 @@ describe("Existing-post promotion preflight dashboard", () => {
       error: { code: "source_not_configured" },
       authority: { canPersist: false, canApprove: false, canExecute: false, canWriteMeta: false, canGenerateCreative: false },
     });
+  });
+
+  it("loads only a strictly validated catalog envelope with same-origin cookies", async () => {
+    const payload = { contractVersion: "existing-post-promotion-catalog/1.0.0", catalog,
+      authority: { readOnly: true, canPersist: false, canApprove: false, canExecute: false, canWriteMeta: false, canGenerateCreative: false } };
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }));
+    await expect(requestExistingPostPromotionCatalog(fetcher as typeof fetch)).resolves.toEqual(catalog);
+    expect(fetcher).toHaveBeenCalledWith("/api/existing-post-promotion-preflight", expect.objectContaining({
+      method: "GET", credentials: "same-origin", headers: { "X-ReklamZeka-Intent": "existing-post-promotion-catalog-read" },
+    }));
+    const unsafe = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...payload, catalog: { ...catalog, targeting: {} } }), { status: 200 }));
+    await expect(requestExistingPostPromotionCatalog(unsafe as typeof fetch)).rejects.toThrow();
   });
 });

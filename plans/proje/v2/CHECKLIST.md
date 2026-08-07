@@ -245,6 +245,8 @@
 - [ ] Instagram/Page post seçici, PromotionTemplate/AudiencePreset ve existing-post guided flow.
   - [x] Ref-only, sahte katalog kullanmayan fail-closed preflight paneli; exact before→after,
     compatibility/guidance nedenleri ve bütün kapalı action capability'leri görünür.
+  - [x] Immutable preset→template→binding→category registry atomik/idempotent repository'si;
+    public-safe katalog sözleşmesi, strict validator ve cookie-only GET sınırı.
   - [ ] Gerçek registry/post/budget/timeframe kataloğu, proposal persistence ve satır-bazlı approval bağlantısı.
 - [ ] Owner/admin/analyst/operator/viewer rol E2E.
 - [ ] 1280/820/390, keyboard/screen-reader ve hata/partial/conflict E2E.

@@ -1,31 +1,19 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
   ExistingPostPromotionPreflightRequest,
   ExistingPostPromotionPreflightResult,
 } from "@/application/existing-post-promotion-preflight-service";
+import {
+  parseExistingPostPromotionCatalogResult,
+  type ExistingPostPromotionCatalog as PromotionPreflightCatalog,
+  type PromotionCatalogOption as PromotionPreflightOption,
+} from "@/application/existing-post-promotion-catalog";
 import styles from "./operating-dashboard.module.css";
 
-export type PromotionPreflightOption = Readonly<{ ref: string; label: string }>;
-export type PromotionPreflightCatalog = Readonly<{
-  accounts: readonly PromotionPreflightOption[];
-  actors: readonly Readonly<PromotionPreflightOption & { accountRef: string; type: "page" | "instagram" }>[];
-  posts: readonly Readonly<PromotionPreflightOption & { actorRef: string }>[];
-  templates: readonly Readonly<PromotionPreflightOption & {
-    accountRefs: readonly string[];
-    actorRefs: readonly string[];
-    internalCategoryRefs: readonly string[];
-    objectiveRefs: readonly string[];
-    requiredAudiencePresetRef: string;
-  }>[];
-  audiencePresets: readonly PromotionPreflightOption[];
-  internalCategories: readonly PromotionPreflightOption[];
-  objectives: readonly PromotionPreflightOption[];
-  budgetPlans: readonly PromotionPreflightOption[];
-  timeframes: readonly PromotionPreflightOption[];
-}>;
+export type { PromotionPreflightCatalog, PromotionPreflightOption };
 
 export type PromotionPreflightSurfaceState =
   | Readonly<{ status: "loading" }>
@@ -108,15 +96,47 @@ export async function requestExistingPostPromotionPreflight(
     },
     body: JSON.stringify({ selection }),
   });
-  const payload = await response.json() as ExistingPostPromotionPreflightResult | ErrorEnvelope;
-  if (!response.ok || !("contractVersion" in payload)) {
+  const payload = await response.json() as Readonly<{
+    contractVersion?: unknown;
+    result?: ExistingPostPromotionPreflightResult;
+    authority?: Readonly<{ canPersist?: unknown; canApprove?: unknown; canExecute?: unknown; canWriteMeta?: unknown; canGenerateCreative?: unknown }>;
+  }> | ErrorEnvelope;
+  if (!response.ok || !("result" in payload) || !payload.result || !("authority" in payload) || !payload.authority) {
     const message = "error" in payload ? payload.error?.message : undefined;
     throw new Error(message ?? "Öne çıkarma ön kontrolü tamamlanamadı.");
   }
-  if (payload.selection.postRef !== selection.postRef || payload.authority.canWriteMeta || payload.authority.canExecute) {
+  const selectionMatches = Object.entries(selection).every(([key, value]) =>
+    payload.result?.selection[key as keyof ExistingPostPromotionPreflightRequest] === value);
+  if (payload.contractVersion !== "existing-post-promotion-agent/1.0.0" || !selectionMatches
+    || payload.result.authority.ephemeral !== true || payload.result.authority.canPersistProposal !== false
+    || payload.result.authority.canApprove !== false || payload.result.authority.canExecute !== false
+    || payload.result.authority.canWriteMeta !== false || payload.result.authority.canGenerateCreative !== false
+    || payload.authority.canPersist !== false
+    || payload.authority.canApprove !== false || payload.authority.canWriteMeta !== false
+    || payload.authority.canExecute !== false || payload.authority.canGenerateCreative !== false) {
     throw new Error("Güvenli preflight sözleşmesi doğrulanamadı.");
   }
-  return payload;
+  return payload.result;
+}
+
+export async function requestExistingPostPromotionCatalog(fetcher: typeof fetch): Promise<PromotionPreflightCatalog> {
+  const response = await fetcher("/api/existing-post-promotion-preflight", {
+    method: "GET", credentials: "same-origin", cache: "no-store",
+    headers: { "X-ReklamZeka-Intent": "existing-post-promotion-catalog-read" },
+  });
+  const payload = await response.json() as unknown;
+  if (!response.ok) {
+    const message = payload && typeof payload === "object" && "error" in payload
+      ? (payload as ErrorEnvelope).error?.message : undefined;
+    throw Object.assign(new Error(message ?? "Öne çıkarma seçim kataloğu alınamadı."), { unavailable: response.status === 503 });
+  }
+  return parseExistingPostPromotionCatalogResult(payload).catalog;
+}
+
+function catalogHasSelections(catalog: PromotionPreflightCatalog) {
+  return catalog.accounts.length > 0 && catalog.actors.length > 0 && catalog.posts.length > 0 && catalog.templates.length > 0
+    && catalog.audiencePresets.length > 0 && catalog.internalCategories.length > 0 && catalog.objectives.length > 0
+    && catalog.budgetPlans.length > 0 && catalog.timeframes.length > 0;
 }
 
 export function PromotionPreflightSurface(props: Readonly<{
@@ -135,7 +155,8 @@ export function PromotionPreflightSurface(props: Readonly<{
     {props.state.status === "loading" ? <section className={`${styles.panel} ${styles.promotionPreflightState}`} role="status"><strong>Kaynak doğrulanıyor</strong><h2>Yayınlanmış şablonlar ve mevcut gönderiler bekleniyor.</h2><p>Serbest ID, ham targeting veya kreatif alanı açılmaz.</p></section> : null}
     {props.state.status === "unavailable" ? <section className={`${styles.panel} ${styles.promotionPreflightState}`} role="alert"><strong>Kaynak henüz bağlı değil</strong><h2>{props.state.message}</h2><p>Güvenilir seçenek kataloğu olmadan gönderi, hesap, şablon veya hedef kitle uydurulmaz. Meta write ve proposal persistence kapalı kalır.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></section> : null}
     {props.state.status === "error" ? <section className={`${styles.panel} ${styles.promotionPreflightState}`} role="alert"><strong>Preflight okunamadı</strong><h2>{props.state.message}</h2><p>Kısmi veya sözleşme dışı yanıtlar formu açmaz.</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
-    {ready ? <div className={styles.promotionPreflightWorkspace}>
+    {ready && !catalogHasSelections(ready.catalog) ? <section className={`${styles.panel} ${styles.promotionPreflightState}`}><strong>Kaynak bağlı · katalog boş</strong><h2>Bu çalışma alanında henüz uygun öne çıkarma seçimi bulunmuyor.</h2><p>Yayınlanmış şablon, immutable preset ve mevcut gönderi tamamlanmadan form açılmaz.</p></section> : null}
+    {ready && catalogHasSelections(ready.catalog) ? <div className={styles.promotionPreflightWorkspace}>
       <section className={`${styles.panel} ${styles.promotionPreflightForm}`} aria-label="Mevcut gönderi öne çıkarma seçimi">
         <header className={styles.panelHeader}><div><span className={styles.kicker}>GUIDED SELECTION</span><h2>Sunucu tarafından doğrulanan seçimler</h2></div><span>Ref-only</span></header>
         <div className={styles.promotionPreflightFields}>{FIELDS.map((field) => {
@@ -159,15 +180,24 @@ export function PromotionPreflightSurface(props: Readonly<{
 }
 
 export function PromotionPreflightPanel() {
-  const [state, setState] = useState<PromotionPreflightSurfaceState>({
-    status: "unavailable",
-    message: "Mevcut gönderi ve yayınlanmış şablon seçenek kataloğu henüz runtime’a bağlanmadı.",
-  });
+  const [state, setState] = useState<PromotionPreflightSurfaceState>({ status: "loading" });
   const selection = state.status === "ready" ? state.selection : {};
   const requiredPreset = useMemo(() => {
     if (state.status !== "ready") return null;
     return state.catalog.templates.find((item) => item.ref === state.selection.promotionTemplateRef)?.requiredAudiencePresetRef ?? null;
   }, [state]);
+
+  const load = useCallback(async () => {
+    setState({ status: "loading" });
+    try {
+      const catalog = await requestExistingPostPromotionCatalog(fetch);
+      setState({ status: "ready", catalog, selection: {}, result: null, evaluating: false, message: null });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Öne çıkarma seçim kataloğu alınamadı.";
+      setState({ status: error && typeof error === "object" && "unavailable" in error ? "unavailable" : "error", message });
+    }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const change = useCallback((key: SelectionKey, value: string) => {
     setState((current) => {
@@ -195,5 +225,5 @@ export function PromotionPreflightPanel() {
     }
   }, [requiredPreset, selection, state.status]);
 
-  return <PromotionPreflightSurface state={state} onRetry={() => window.location.reload()} onChange={change} onEvaluate={() => void evaluate()} />;
+  return <PromotionPreflightSurface state={state} onRetry={() => void load()} onChange={change} onEvaluate={() => void evaluate()} />;
 }

@@ -621,3 +621,21 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Çekirdek kanıtı 112 test dosyası/677 test, typecheck, Drizzle, secret ve diff kapılarında temizdi;
   dashboard odaklı 5 test ayrıca geçti. Sıradaki increment gerçek registry repository/katalog runtime'ı,
   ardından proposal persistence ve atomik approval bağlantısıdır. Production Meta writer hâlâ kapalıdır.
+
+## 2026-08-07 — S5.2 registry repository ve guided catalog sınırı
+
+- Server-private registry servisi ve Drizzle repository preset→template→binding→normalized category
+  edge zincirini tek tenant transaction'ında yayınlar. Domain constructor'ları canonical hash'leri yeniden
+  kurar; active workspace lock, authentic account/actor/campaign/category opak-ref çözümü, exact replay,
+  conflict ve corrupt-store kontrolleri uygulanır. Dışarı yalnız public ref projeksiyonu çıkar.
+- Doğrudan repository testleri dört tablonun atomik insert'ini, idempotent replay'i, geç edge hatasında
+  tam rollback'i, inactive tenant/eksik foreign ref halinde sıfır write'ı, canonical revision conflict'ini
+  ve bozuk persisted payload'ın public read'de fail-closed kalmasını doğrular.
+- Public-safe guided catalog sözleşmesi hesap→Page/Instagram→mevcut post ve template→zorunlu preset→
+  internal kategori/objective ilişkilerini strict, bounded ve ID/hash/credential sızdırmayan biçimde
+  doğrular. GET sınırı same-origin cookie ister; bearer, proxy ve caller workspace override'ı reddeder.
+- Dashboard mount/retry ile kataloğu yükler; loading, trusted-empty, unavailable ve error ayrıdır. Form
+  yalnız doğrulanmış, tam katalogla açılır. Gerçek DB katalog adapter'ı henüz bağlanmadığı için route
+  güvenli `source_not_configured` durumundadır; hiçbir demo fallback kullanılmaz.
+- Bu increment migration veya Meta çağrısı yapmaz; action/approval/execute/write/creative capability'leri
+  false kalır. Sıradaki iş gerçek catalog read adapter/runtime ve K4 proposal persistence bağlantısıdır.
