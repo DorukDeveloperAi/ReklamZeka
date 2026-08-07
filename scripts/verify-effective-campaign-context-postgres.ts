@@ -38,6 +38,7 @@ const campaignBId = randomUUID();
 const foreignCampaignId = randomUUID();
 const snapshotId = randomUUID();
 const snapshotRef = "snapshot_aaaaaaaaaaaaaaaaaaaa";
+const futureSnapshotRef = "snapshot_bbbbbbbbbbbbbbbbbbbb";
 
 function guidance(entityRef: string) {
   const source: GuidanceSource = {
@@ -135,16 +136,35 @@ let foreignWorkspaceBlocked = false;
 let foreignAccountBlocked = false;
 let brokenHierarchyBlocked = false;
 let nonexistentSnapshotBlocked = false;
+let futureSnapshotBlocked = false;
 let exactEntityInvalidated = false;
 let unrelatedEntityPreserved = false;
 let historicalReplayImmutable = false;
 let invalidationReplayIdempotent = false;
 let forbiddenPayloadBlocked = false;
+let nullableAuthorityBypassBlocked = false;
+let nestedAuthorityEscalationBlocked = false;
+let crossTenantForeignKeyBlocked = false;
 let noWriteAuthority = false;
 let temporaryRowsCommitted = true;
 
 try {
   await database.transaction(async (transaction) => {
+    await transaction.execute(sql`create temporary table workspaces
+      (like public.workspaces including defaults including constraints including indexes) on commit drop`);
+    await transaction.execute(sql`create temporary table meta_connections
+      (like public.meta_connections including defaults including constraints including indexes) on commit drop`);
+    await transaction.execute(sql`create temporary table data_sources
+      (like public.data_sources including defaults including constraints including indexes) on commit drop`);
+    await transaction.execute(sql`create temporary table ad_accounts
+      (like public.ad_accounts including defaults including constraints including indexes) on commit drop`);
+    await transaction.execute(sql`create temporary table ad_campaigns
+      (like public.ad_campaigns including defaults including constraints including indexes) on commit drop`);
+    await transaction.execute(sql`create temporary table meta_change_snapshots
+      (like public.meta_change_snapshots including defaults including constraints including indexes) on commit drop`);
+    await transaction.execute(sql`alter table meta_connections add unique (workspace_id, id)`);
+    await transaction.execute(sql`alter table ad_accounts add unique (workspace_id, id)`);
+    await transaction.execute(sql`alter table ad_campaigns add unique (workspace_id, id)`);
     await transaction.execute(sql`
       create temporary table effective_campaign_contexts (
         id uuid primary key default gen_random_uuid(), workspace_id uuid not null,
@@ -153,11 +173,18 @@ try {
         connection_ref text not null, account_ref text not null, campaign_ref text not null,
         entity_type text not null, entity_ref text not null, captured_at timestamptz not null,
         snapshot_refs jsonb not null, context_payload jsonb not null, created_at timestamptz not null default now(),
-        unique (workspace_id, identity_hash), unique (workspace_id, context_hash),
+        unique (workspace_id, id), unique (workspace_id, identity_hash), unique (workspace_id, context_hash),
+        foreign key (workspace_id, meta_connection_id) references meta_connections(workspace_id, id) on delete restrict,
+        foreign key (workspace_id, ad_account_id) references ad_accounts(workspace_id, id) on delete restrict,
+        foreign key (workspace_id, campaign_id) references ad_campaigns(workspace_id, id) on delete restrict,
         check (jsonb_typeof(snapshot_refs) = 'array' and jsonb_array_length(snapshot_refs) >= 1),
-        check (context_payload::text !~* '"(access[_-]?token|authorization|client[_-]?secret|refresh[_-]?token|raw[_-]?(payload|request|response|json)|agent[_-]?narration|narration)"[[:space:]]*:'),
-        check (context_payload #>> '{capabilities,canAuthorizeAction}' = 'false'
-          and context_payload #>> '{capabilities,canExecuteWrite}' = 'false')
+        check (context_payload::text !~* '"[^"[:space:]]*(token|secret)"[[:space:]]*:'),
+        check ((jsonb_typeof(context_payload #> '{capabilities}') = 'object'
+          and (context_payload #> '{capabilities}') ?& array['containsRawL0','canAuthorizeAction','canExecuteWrite']
+          and context_payload #> '{capabilities,containsRawL0}' = 'false'::jsonb
+          and context_payload #> '{capabilities,canAuthorizeAction}' = 'false'::jsonb
+          and context_payload #> '{capabilities,canExecuteWrite}' = 'false'::jsonb
+          and context_payload::text !~* '"(canAuthorizeAction|canExecuteWrite|canEnforcePolicy|canAlterApproval)"[[:space:]]*:[[:space:]]*true') is true)
       ) on commit drop
     `);
     await transaction.execute(sql`
@@ -226,6 +253,12 @@ try {
       fieldCatalogVersion: "fields-v1", capturedAt: new Date("2026-08-07T11:00:00.000Z"),
       canonicalPayload: {}, safeAggregate: { entityCounts: { campaign: 2, adSet: 0, ad: 0 }, knownFieldCount: 1, unknownFieldCount: 0 },
     });
+    await transaction.insert(schema.metaChangeSnapshots).values({
+      id: randomUUID(), workspaceId, metaConnectionId: connectionId, adAccountId: accountId,
+      publicRef: futureSnapshotRef, snapshotHash: "b".repeat(64), schemaVersion: 1,
+      fieldCatalogVersion: "fields-v1", capturedAt: new Date("2026-08-08T11:00:00.000Z"),
+      canonicalPayload: {}, safeAggregate: { entityCounts: { campaign: 2, adSet: 0, ad: 0 }, knownFieldCount: 1, unknownFieldCount: 0 },
+    });
 
     const repository = new DrizzleEffectiveCampaignContextRepository(transaction as never);
     const contextA = context({ campaignRef: "campaign-a" });
@@ -254,7 +287,13 @@ try {
       (error: unknown) => error instanceof EffectiveCampaignContextRepositoryError && error.code === "workspace_scope_mismatch",
     );
     nonexistentSnapshotBlocked = await repository.save(context({
-      campaignRef: "campaign-a", snapshotRefs: ["snapshot_bbbbbbbbbbbbbbbbbbbb"],
+      campaignRef: "campaign-a", snapshotRefs: ["snapshot_cccccccccccccccccccc"],
+    })).then(
+      () => false,
+      (error: unknown) => error instanceof EffectiveCampaignContextRepositoryError && error.code === "workspace_scope_mismatch",
+    );
+    futureSnapshotBlocked = await repository.save(context({
+      campaignRef: "campaign-a", snapshotRefs: [futureSnapshotRef],
     })).then(
       () => false,
       (error: unknown) => error instanceof EffectiveCampaignContextRepositoryError && error.code === "workspace_scope_mismatch",
@@ -285,7 +324,49 @@ try {
           captured_at, snapshot_refs, context_payload
         ) select workspace_id, ${"b".repeat(64)}, ${"c".repeat(64)}, schema_version, meta_connection_id,
           ad_account_id, campaign_id, connection_ref, account_ref, campaign_ref, entity_type, entity_ref,
-          captured_at + interval '1 second', snapshot_refs, context_payload || '{"accessToken":"unsafe"}'::jsonb
+          captured_at + interval '1 second', snapshot_refs, context_payload || '{"metaAccessToken":"unsafe"}'::jsonb
+        from effective_campaign_contexts limit 1
+      `);
+      return false;
+    }).catch(() => true);
+    nullableAuthorityBypassBlocked = await transaction.transaction(async (savepoint) => {
+      await savepoint.execute(sql`
+        insert into effective_campaign_contexts (
+          workspace_id, identity_hash, context_hash, schema_version, meta_connection_id, ad_account_id,
+          campaign_id, connection_ref, account_ref, campaign_ref, entity_type, entity_ref,
+          captured_at, snapshot_refs, context_payload
+        ) select workspace_id, ${"d".repeat(64)}, ${"e".repeat(64)}, schema_version, meta_connection_id,
+          ad_account_id, campaign_id, connection_ref, account_ref, campaign_ref, entity_type, entity_ref,
+          captured_at + interval '2 seconds', snapshot_refs, context_payload - 'capabilities'
+        from effective_campaign_contexts limit 1
+      `);
+      return false;
+    }).catch(() => true);
+    nestedAuthorityEscalationBlocked = await transaction.transaction(async (savepoint) => {
+      await savepoint.execute(sql`
+        insert into effective_campaign_contexts (
+          workspace_id, identity_hash, context_hash, schema_version, meta_connection_id, ad_account_id,
+          campaign_id, connection_ref, account_ref, campaign_ref, entity_type, entity_ref,
+          captured_at, snapshot_refs, context_payload
+        ) select workspace_id, ${"f".repeat(64)}, ${"1".repeat(64)}, schema_version, meta_connection_id,
+          ad_account_id, campaign_id, connection_ref, account_ref, campaign_ref, entity_type, entity_ref,
+          captured_at + interval '3 seconds', snapshot_refs,
+          context_payload || '{"nested":{"canEnforcePolicy":true}}'::jsonb
+        from effective_campaign_contexts limit 1
+      `);
+      return false;
+    }).catch(() => true);
+    crossTenantForeignKeyBlocked = await transaction.transaction(async (savepoint) => {
+      await savepoint.execute(sql`
+        insert into effective_campaign_contexts (
+          workspace_id, identity_hash, context_hash, schema_version, meta_connection_id, ad_account_id,
+          campaign_id, connection_ref, account_ref, campaign_ref, entity_type, entity_ref,
+          captured_at, snapshot_refs, context_payload
+        ) select ${foreignWorkspaceId}::uuid, ${"2".repeat(64)}, ${"3".repeat(64)}, schema_version,
+          meta_connection_id, ad_account_id, campaign_id, connection_ref, account_ref, campaign_ref,
+          entity_type, entity_ref, captured_at + interval '4 seconds', snapshot_refs,
+          jsonb_set(jsonb_set(context_payload, '{workspaceId}', to_jsonb(${foreignWorkspaceId}::text)),
+            '{contextHash}', to_jsonb(${'3'.repeat(64)}::text))
         from effective_campaign_contexts limit 1
       `);
       return false;
@@ -295,9 +376,10 @@ try {
       && JSON.stringify(historical).match(/access[_-]?token|rawPayload|agentNarration/i) === null;
 
     if (!inserted || !idempotentReplay || !identityConflictBlocked || !foreignWorkspaceBlocked
-      || !foreignAccountBlocked || !brokenHierarchyBlocked || !nonexistentSnapshotBlocked
+      || !foreignAccountBlocked || !brokenHierarchyBlocked || !nonexistentSnapshotBlocked || !futureSnapshotBlocked
       || !exactEntityInvalidated || !unrelatedEntityPreserved || !historicalReplayImmutable
-      || !invalidationReplayIdempotent || !forbiddenPayloadBlocked || !noWriteAuthority) {
+      || !invalidationReplayIdempotent || !forbiddenPayloadBlocked || !nullableAuthorityBypassBlocked
+      || !nestedAuthorityEscalationBlocked || !crossTenantForeignKeyBlocked || !noWriteAuthority) {
       throw new Error("Effective campaign context PostgreSQL acceptance failed");
     }
     throw rollback;
@@ -312,7 +394,9 @@ try {
 console.log(JSON.stringify({
   inserted, idempotentReplay, identityConflictBlocked, foreignWorkspaceBlocked,
   foreignAccountBlocked, brokenHierarchyBlocked, nonexistentSnapshotBlocked,
+  futureSnapshotBlocked,
   exactEntityInvalidated, unrelatedEntityPreserved, historicalReplayImmutable,
-  invalidationReplayIdempotent, forbiddenPayloadBlocked, noWriteAuthority,
+  invalidationReplayIdempotent, forbiddenPayloadBlocked, nullableAuthorityBypassBlocked,
+  nestedAuthorityEscalationBlocked, crossTenantForeignKeyBlocked, noWriteAuthority,
   writeNetworkCalls: 0, temporaryRowsCommitted,
 }));
