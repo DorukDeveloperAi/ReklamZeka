@@ -819,6 +819,167 @@ export const categoryAssignments = pgTable("category_assignments", {
   `),
 ]);
 
+/** Append-only guidance source revisions. Official Meta rows carry stricter publication evidence. */
+export const guidanceSources = pgTable("guidance_sources", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  sourceKey: text("source_key").notNull(),
+  version: integer("version").notNull(),
+  sourceType: text("source_type").notNull(),
+  title: text("title").notNull(),
+  sourceRef: text("source_ref").notNull(),
+  sourceUrl: text("source_url"),
+  content: text("content").notNull(),
+  author: text("author"),
+  capturedAt: timestamp("captured_at", { withTimezone: true }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  reviewBy: timestamp("review_by", { withTimezone: true }),
+  status: text("status").notNull(),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  recordHash: text("record_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("guidance_sources_workspace_key_version_unique").on(table.workspaceId, table.sourceKey, table.version),
+  index("guidance_sources_workspace_status_idx").on(table.workspaceId, table.status, table.sourceKey),
+  check("guidance_sources_version_positive", sql`${table.version} >= 1`),
+  check("guidance_sources_required_text", sql`
+    btrim(${table.sourceKey}) <> '' and btrim(${table.title}) <> ''
+    and btrim(${table.sourceRef}) <> '' and btrim(${table.content}) <> ''
+  `),
+  check("guidance_sources_type_allowlist", sql`${table.sourceType} in (
+    'owner_statement', 'official_meta_guidance', 'business_strategy',
+    'observed_result', 'experiment_outcome', 'operating_note'
+  )`),
+  check("guidance_sources_status_allowlist", sql`${table.status} in ('draft', 'published', 'archived')`),
+  check("guidance_sources_record_hash_format", sql`${table.recordHash} ~ '^[a-f0-9]{64}$'`),
+  check("guidance_sources_lifecycle_consistent", sql`
+    (${table.status} = 'draft' and ${table.publishedAt} is null and ${table.archivedAt} is null)
+    or (${table.status} = 'published' and ${table.publishedAt} is not null and ${table.archivedAt} is null)
+    or (${table.status} = 'archived' and ${table.archivedAt} is not null)
+  `),
+  check("guidance_sources_official_publish_evidence", sql`
+    ${table.sourceType} <> 'official_meta_guidance' or ${table.status} <> 'published' or (
+      ${table.sourceUrl} is not null and ${table.sourceUrl} ~ '^https://' and ${table.capturedAt} is not null
+      and ${table.reviewedAt} is not null and ${table.reviewBy} is not null
+      and ${table.reviewedAt} >= ${table.capturedAt} and ${table.reviewBy} > ${table.reviewedAt}
+    )
+  `),
+]);
+
+/** Append-only soft-guidance card revisions. The authority check cannot mint policy or action rights. */
+export const guidanceCards = pgTable("guidance_cards", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  cardKey: text("card_key").notNull(),
+  version: integer("version").notNull(),
+  sourceType: text("source_type").notNull(),
+  sourceIds: jsonb("source_ids").$type<readonly string[]>().notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  rationale: text("rationale"),
+  strength: text("strength").notNull(),
+  topic: text("topic").notNull(),
+  decisionKey: text("decision_key"),
+  positionKey: text("position_key"),
+  authority: text("authority").notNull().default("guidance_only"),
+  status: text("status").notNull(),
+  effectiveFrom: timestamp("effective_from", { withTimezone: true }),
+  effectiveTo: timestamp("effective_to", { withTimezone: true }),
+  ownerRef: text("owner_ref").notNull(),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  recordHash: text("record_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("guidance_cards_workspace_key_version_unique").on(table.workspaceId, table.cardKey, table.version),
+  index("guidance_cards_workspace_status_topic_idx").on(table.workspaceId, table.status, table.topic),
+  check("guidance_cards_version_positive", sql`${table.version} >= 1`),
+  check("guidance_cards_required_text", sql`
+    btrim(${table.cardKey}) <> '' and btrim(${table.title}) <> '' and btrim(${table.body}) <> ''
+    and btrim(${table.topic}) <> '' and btrim(${table.ownerRef}) <> ''
+  `),
+  check("guidance_cards_source_type_allowlist", sql`${table.sourceType} in (
+    'owner_statement', 'official_meta_guidance', 'business_strategy',
+    'observed_result', 'experiment_outcome', 'operating_note'
+  )`),
+  check("guidance_cards_strength_allowlist", sql`${table.strength} in ('must', 'should', 'consider', 'avoid', 'question')`),
+  check("guidance_cards_status_allowlist", sql`${table.status} in ('draft', 'published', 'archived')`),
+  check("guidance_cards_guidance_only_authority", sql`${table.authority} = 'guidance_only'`),
+  check("guidance_cards_sources_nonempty", sql`
+    jsonb_typeof(${table.sourceIds}) = 'array' and jsonb_array_length(${table.sourceIds}) >= 1
+  `),
+  check("guidance_cards_decision_pair", sql`(${table.decisionKey} is null) = (${table.positionKey} is null)`),
+  check("guidance_cards_effective_interval", sql`
+    ${table.effectiveFrom} is null or ${table.effectiveTo} is null or ${table.effectiveFrom} < ${table.effectiveTo}
+  `),
+  check("guidance_cards_record_hash_format", sql`${table.recordHash} ~ '^[a-f0-9]{64}$'`),
+  check("guidance_cards_lifecycle_consistent", sql`
+    (${table.status} = 'draft' and ${table.publishedAt} is null and ${table.archivedAt} is null)
+    or (${table.status} = 'published' and ${table.publishedAt} is not null and ${table.archivedAt} is null)
+    or (${table.status} = 'archived' and ${table.archivedAt} is not null)
+  `),
+]);
+
+/** Append-only scope binding revisions; values remain advisory-only. */
+export const guidanceBindings = pgTable("guidance_bindings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  bindingKey: text("binding_key").notNull(),
+  version: integer("version").notNull(),
+  cardKey: text("card_key").notNull(),
+  facet: text("facet").notNull(),
+  value: text("value"),
+  entityType: text("entity_type"),
+  mode: text("mode").notNull(),
+  priority: integer("priority").notNull(),
+  recordHash: text("record_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("guidance_bindings_workspace_key_version_unique").on(table.workspaceId, table.bindingKey, table.version),
+  index("guidance_bindings_workspace_card_idx").on(table.workspaceId, table.cardKey),
+  check("guidance_bindings_version_positive", sql`${table.version} >= 1`),
+  check("guidance_bindings_priority_range", sql`${table.priority} between 0 and 100`),
+  check("guidance_bindings_required_text", sql`btrim(${table.bindingKey}) <> '' and btrim(${table.cardKey}) <> ''`),
+  check("guidance_bindings_facet_allowlist", sql`${table.facet} in ('global', 'account', 'objective', 'internal_category', 'entity', 'topic')`),
+  check("guidance_bindings_entity_type_allowlist", sql`${table.entityType} is null or ${table.entityType} in ('campaign', 'ad_set', 'ad', 'creative', 'post')`),
+  check("guidance_bindings_mode_allowlist", sql`${table.mode} in ('default', 'exception')`),
+  check("guidance_bindings_scope_consistent", sql`
+    (${table.facet} = 'global' and ${table.value} is null and ${table.entityType} is null)
+    or (${table.facet} = 'entity' and ${table.value} is not null and btrim(${table.value}) <> '' and ${table.entityType} is not null)
+    or (${table.facet} not in ('global', 'entity') and ${table.value} is not null and btrim(${table.value}) <> '' and ${table.entityType} is null)
+  `),
+  check("guidance_bindings_record_hash_format", sql`${table.recordHash} ~ '^[a-f0-9]{64}$'`),
+]);
+
+/** Append-only reviewed guidance set revisions with deterministic card ordering. */
+export const guidanceSets = pgTable("guidance_sets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  setKey: text("set_key").notNull(),
+  version: integer("version").notNull(),
+  name: text("name").notNull(),
+  orderedCardIds: jsonb("ordered_card_ids").$type<readonly string[]>().notNull(),
+  reviewStatus: text("review_status").notNull(),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  recordHash: text("record_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("guidance_sets_workspace_key_version_unique").on(table.workspaceId, table.setKey, table.version),
+  index("guidance_sets_workspace_status_idx").on(table.workspaceId, table.reviewStatus, table.setKey),
+  check("guidance_sets_version_positive", sql`${table.version} >= 1`),
+  check("guidance_sets_required_text", sql`btrim(${table.setKey}) <> '' and btrim(${table.name}) <> ''`),
+  check("guidance_sets_status_allowlist", sql`${table.reviewStatus} in ('draft', 'reviewed', 'archived')`),
+  check("guidance_sets_cards_array", sql`jsonb_typeof(${table.orderedCardIds}) = 'array'`),
+  check("guidance_sets_lifecycle_consistent", sql`
+    (${table.reviewStatus} = 'draft' and ${table.reviewedAt} is null and ${table.archivedAt} is null)
+    or (${table.reviewStatus} = 'reviewed' and ${table.reviewedAt} is not null and ${table.archivedAt} is null)
+    or (${table.reviewStatus} = 'archived' and ${table.archivedAt} is not null)
+  `),
+  check("guidance_sets_record_hash_format", sql`${table.recordHash} ~ '^[a-f0-9]{64}$'`),
+]);
+
 export const metaAssetEdges = pgTable("meta_asset_edges", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),

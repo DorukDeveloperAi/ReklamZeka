@@ -76,6 +76,7 @@ function binding(
     entityType: null,
     mode: "default",
     priority: 10,
+    version: 1,
     ...overrides,
   };
 }
@@ -96,6 +97,17 @@ function context(overrides: Partial<GuidanceContext> = {}): GuidanceContext {
 }
 
 describe("Guidance registry provenance and publication boundary", () => {
+  it("canonicalizes equivalent timestamps for restart-stable registry hashes", () => {
+    const compact = source("owner-time", "owner_statement", {
+      capturedAt: "2026-08-01T09:00:00Z",
+      reviewedAt: "2026-08-02T09:00:00Z",
+    });
+    const precise = { ...compact, capturedAt: "2026-08-01T09:00:00.000Z", reviewedAt: "2026-08-02T09:00:00.000Z" };
+    const first = createGuidanceRegistry({ workspaceId, sources: [compact], cards: [], bindings: [], sets: [] });
+    const second = createGuidanceRegistry({ workspaceId, sources: [precise], cards: [], bindings: [], sets: [] });
+    expect(second).toEqual(first);
+  });
+
   it("rejects official Meta publication without URL/ref/captured/reviewed/review-by evidence", () => {
     const incomplete = source("meta-1", "official_meta_guidance", {
       sourceRef: "",
@@ -162,6 +174,7 @@ describe("Effective guidance pack", () => {
     });
     const pack = buildEffectiveGuidancePack(registry, context());
 
+    expect(pack.workspaceId).toBe(workspaceId);
     expect(pack.applied.map((entry) => entry.cardId)).toEqual([exception.id]);
     expect(pack.applied[0]).toMatchObject({
       mode: "exception",

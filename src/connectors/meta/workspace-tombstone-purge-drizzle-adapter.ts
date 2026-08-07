@@ -32,6 +32,10 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "category_dimensions",
   "category_definitions",
   "category_assignments",
+  "guidance_sources",
+  "guidance_cards",
+  "guidance_bindings",
+  "guidance_sets",
   "meta_assets",
   "meta_posts",
   "meta_change_snapshots",
@@ -116,6 +120,18 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'category_assignments', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from category_assignments where workspace_id = ${workspaceId}::uuid
+      union all select 'guidance_sources', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from guidance_sources where workspace_id = ${workspaceId}::uuid
+      union all select 'guidance_cards', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from guidance_cards where workspace_id = ${workspaceId}::uuid
+      union all select 'guidance_bindings', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from guidance_bindings where workspace_id = ${workspaceId}::uuid
+      union all select 'guidance_sets', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from guidance_sets where workspace_id = ${workspaceId}::uuid
       union all select 'meta_assets', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from meta_assets where workspace_id = ${workspaceId}::uuid
@@ -245,6 +261,10 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from connection_secrets where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from daily_ad_metrics where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from sync_runs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guidance_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guidance_sets where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guidance_cards where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guidance_sources where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_assignments where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_definitions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_dimensions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

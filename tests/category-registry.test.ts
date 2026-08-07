@@ -150,6 +150,11 @@ describe("category registry effective inheritance", () => {
       "doctor_promotion",
       "international_patient",
     ]);
+    expect(result.frozenContext.definitionVersions.map((value) => value.key)).toEqual([
+      "brand_protection",
+      "doctor_promotion",
+      "international_patient",
+    ]);
 
     const restored = resolveEffectiveCategory({
       dimension: multi,

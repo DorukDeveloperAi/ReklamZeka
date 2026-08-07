@@ -60,6 +60,7 @@ export type GuidanceBinding = Readonly<{
   entityType: GuidanceEntityType | null;
   mode: "default" | "exception";
   priority: number;
+  version: number;
 }>;
 
 export type GuidanceSet = Readonly<{
@@ -129,6 +130,8 @@ export type AppliedGuidanceCard = Readonly<{
 
 export type EffectiveGuidancePack = Readonly<{
   schemaVersion: typeof EFFECTIVE_GUIDANCE_PACK_VERSION;
+  /** Internal tenant scope; public projections must redact it. */
+  workspaceId: string;
   registryHash: string;
   evaluatedAt: string;
   applied: readonly AppliedGuidanceCard[];
@@ -232,6 +235,10 @@ function validIso(value: unknown): value is string {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
 
+function canonicalIso(value: string | null): string | null {
+  return value === null ? null : new Date(value).toISOString();
+}
+
 function assertUnique(values: readonly string[], label: string): void {
   if (new Set(values).size !== values.length) {
     throw new GuidanceRegistryValidationError("duplicate_identity", `${label} kimliği tekrarlı olamaz`);
@@ -265,6 +272,9 @@ function assertBinding(binding: GuidanceBinding): void {
   }
   if (!Number.isSafeInteger(binding.priority) || binding.priority < 0 || binding.priority > 100) {
     throw new GuidanceRegistryValidationError("invalid_binding", "Guidance binding priority 0–100 olmalıdır");
+  }
+  if (!Number.isSafeInteger(binding.version) || binding.version < 1) {
+    throw new GuidanceRegistryValidationError("invalid_binding", "Guidance binding version pozitif olmalıdır");
   }
   if (binding.facet === "global") {
     if (binding.value !== null || binding.entityType !== null) {
@@ -384,8 +394,17 @@ export function createGuidanceRegistry(input: Readonly<{
   const canonical = stableValue({
     schemaVersion: GUIDANCE_REGISTRY_VERSION,
     workspaceId: input.workspaceId,
-    sources: [...input.sources].sort((a, b) => compareText(a.id, b.id)),
-    cards: [...input.cards].sort((a, b) => compareText(a.id, b.id)),
+    sources: [...input.sources].map((source) => ({
+      ...source,
+      capturedAt: canonicalIso(source.capturedAt),
+      reviewedAt: canonicalIso(source.reviewedAt),
+      reviewBy: canonicalIso(source.reviewBy),
+    })).sort((a, b) => compareText(a.id, b.id)),
+    cards: [...input.cards].map((card) => ({
+      ...card,
+      effectiveFrom: canonicalIso(card.effectiveFrom),
+      effectiveTo: canonicalIso(card.effectiveTo),
+    })).sort((a, b) => compareText(a.id, b.id)),
     bindings: [...input.bindings].sort((a, b) => compareText(a.id, b.id)),
     sets: [...input.sets].sort((a, b) => compareText(a.id, b.id)),
   }) as Omit<GuidanceRegistry, "registryHash">;
@@ -653,6 +672,7 @@ export function buildEffectiveGuidancePack(
   });
   const core = stableValue({
     schemaVersion: EFFECTIVE_GUIDANCE_PACK_VERSION,
+    workspaceId: context.workspaceId,
     registryHash: registry.registryHash,
     evaluatedAt,
     applied,

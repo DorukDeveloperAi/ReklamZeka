@@ -250,3 +250,23 @@ ReklamZeka'ya taşınmaz.
   girmeden reddedilir; insufficient data sebepsiz finding olmaz.
 - Kanıt: 44 test dosyası/246 test, production build ve audit 0. Supabase 35/35 RLS,
   API role table grant'i 0; tombstone allowlist 31 workspace-owned tabloyu FK-safe kapsar.
+
+## 2026-08-07 — S2 kategori/guidance/metrik/context kalıcılık kapısı
+
+- Category registry workspace-scoped repository/application core ile gerçek PostgreSQL
+  CRUD, restart, optimistic concurrency, manual-lock denial, frozen archive replay,
+  cross-workspace/cross-account rejection ve tam rollback kabulünden geçti.
+- Guidance registry dört append-only tabloda kalıcıdır. Owner ve official kaynaklar ayrı
+  kalır; restart hash'i, freshness suppression, optimistic conflict ve tenant izolasyonu
+  kanıtlandı. `guidance_only` authority, official URL/review evidence ve scope value
+  gereksinimleri DB seviyesinde fail-closed; NULL ile CHECK bypass edilemiyor.
+- Sürümlü Meta metrik motoru AnalysisMetric sözlüğünü tamamen kapsar; additive değerleri
+  exact decimal ile toplar, ratio-of-sums üretir, reach/frequency'yi toplamaz. Attribution,
+  currency ve aynı insight identity'deki çelişkili revision fail-closed olur.
+- Frozen EffectiveCampaignContext Meta config ref'leri, category, guidance, policy, cadence,
+  data/history ve katalog sürümlerini authentic hash'te birleştirir; L0 raw, token, agent
+  narration ve action/write authority taşımaz.
+- Guidance migration'ı Supabase'e uygulandı. Category, guidance ve 35-tablolu workspace
+  tombstone PostgreSQL kabulleri geçici satır bırakmadan geçti. Supabase 39/39 RLS ve API
+  table grant `0`; 47 test dosyası/263 test, production build ve audit 0. Tracked/build/cache
+  token eşleşmesi `0`; Meta write çağrısı `0`.

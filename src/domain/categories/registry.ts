@@ -62,6 +62,7 @@ export type FrozenCategoryContext = Readonly<{
   workspaceId: string;
   path: readonly Readonly<{ level: CategoryEntityLevel; id: string }>[];
   dimension: Readonly<{ id: string; key: string; version: number; cardinality: CategoryCardinality }>;
+  definitionVersions: readonly Readonly<{ id: string; key: string; version: number }>[];
   effectiveDefinitions: readonly Readonly<{ id: string; key: string; version: number }>[];
   evaluatedAssignments: readonly Readonly<{
     id: string;
@@ -365,6 +366,10 @@ export function resolveEffectiveCategory(input: Readonly<{
       version: dimension.version,
       cardinality: dimension.cardinality,
     },
+    definitionVersions: [...new Set(assignments.map((assignment) => assignment.definitionId))]
+      .map((id) => definitions.get(id)!)
+      .sort((left, right) => compareCodepoints(left.key, right.key) || compareCodepoints(left.id, right.id))
+      .map((definition) => ({ id: definition.id, key: definition.key, version: definition.version })),
     effectiveDefinitions: values.map((definition) => ({
       id: definition.id,
       key: definition.key,

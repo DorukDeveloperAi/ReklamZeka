@@ -67,14 +67,16 @@
 
 - [ ] Category definition, çoklu assignment, evidence/confidence/manual lock.
   - [x] Versioned Postgres şeması, RLS, manual-lock/source guard ve pure resolver çekirdeği.
-  - [ ] Workspace-scoped repository/application API, rol/audit ve gerçek CRUD/restart kabulü.
-- [ ] Kullanıcı tanımlı dimension, single/multi cardinality ve entity-level kataloğu.
+  - [x] Workspace-scoped repository/application core ve gerçek CRUD/restart/rollback kabulü.
+  - [ ] Rol/audit mutation API'si.
+- [x] Kullanıcı tanımlı dimension, single/multi cardinality ve entity-level kataloğu.
 - [ ] Meta/internal selector ve mapping preview motoru.
 - [ ] Category profile: analysis/rule/budget/transfer/schedule/action/creative policy bundle bağları.
 - [ ] Campaign→adset→ad→creative inheritance, child override ve effective-context snapshot.
   - [x] Kesintisiz hierarchy path, child add/override/deny, manual-lock precedence,
     `parked_conflict` ve frozen category context/hash çekirdeği.
-  - [ ] Tüm category/guidance/policy/data refs'lerini birleştiren EffectiveCampaignContext.
+  - [x] Tüm category/guidance/policy/data refs'lerini birleştiren saf EffectiveCampaignContext.
+  - [ ] Context persistence, selective invalidation ve public redaction projection'ı.
 - [ ] Strict instruction/policy DSL ve negatif parser matrisi.
 - [ ] Raw natural-language → normalized draft + assumption/question/impact preview.
 - [ ] Precedence/inheritance/suppression/PARKED_CONFLICT resolver.
@@ -85,7 +87,8 @@
 - [ ] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi.
   - [x] Guidance-only pure registry/pack; provenance ayrımı, deterministic scope/conflict,
     freshness ve bounded context budget.
-  - [ ] PostgreSQL registry/version binding, account-group/lifecycle/template scope ve API.
+  - [x] Append-only PostgreSQL registry, version/hash guard, tenant isolation ve RLS.
+  - [ ] Account-group/lifecycle/template scope, analysis-run binding ve rol/audit API'si.
 - [ ] Owner statement + official Meta source + experiment/observation provenance ve freshness.
 - [ ] G0→G4 progressive formalization, semantic diff, historical replay ve impact preview.
 - [ ] AdvisedPractice candidate→trial→outcome→standardization lifecycle ve decomposition review.
@@ -95,19 +98,22 @@
 - [x] Kampanya objective/funnel/event/classification temel sözleşmesi.
 - [x] Altı objective için primary/diagnostic/guardrail/min-sample karar playbook temeli.
 - [ ] Meta config + çoklu internal category + policy composition.
-- [ ] Tam metrik kataloğu; additive/non-additive/ratio formülleri.
+- [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [ ] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.
   - [x] Deterministik analysis run/record, frozen window/context/snapshot refs ve
     insufficient-data reason sözleşmesi.
-  - [ ] Versioned metrik/formül kataloğu ve gerçek finding fonksiyonları.
+  - [x] Versioned metrik/formül kataloğu, provenance ve fail-closed aggregation motoru.
+  - [ ] Gerçek finding fonksiyonları.
 - [ ] Hierarchical driver ve creative fatigue/config diagnostics.
 - [ ] Analysis run ledger, dry-run API ve deterministic replay.
 - [ ] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
-- [ ] EffectiveGuidancePack scope filter/ranking/context-budget ve source/conflict trace.
+- [x] EffectiveGuidancePack scope filter/ranking/context-budget ve source/conflict trace.
 - [ ] DecisionCadenceProfile, no-change/repeat suppression ve ExperimentRecord lifecycle.
 - [ ] L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.
 - [ ] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
+  - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
+  - [ ] Persistence/invalidation ve bounded driver tools.
 - [ ] Optional manual/CSV BusinessOutcomeSignal ve Meta-proxy mapping guard.
 
 ## A11 — Bütçe planlama

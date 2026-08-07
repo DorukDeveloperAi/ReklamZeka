@@ -17,17 +17,23 @@ bütçe simülasyonu ve Meta write sırasıyla S3 ve S4'e aittir.
 
 - **S2.1 persistence/domain core hazır:** üç tablo migration'ı Supabase'e uygulandı;
   dimension/definition/assignment, manual lock, child add/override/deny, kesintisiz path,
-  frozen replay ve `parked_conflict` resolver'ı testli. Repository/application API ve
-  gerçek iki-workspace CRUD/restart kabulü çıkış kapısı için açık.
-- **S2.2 saf guidance core hazır:** provenance türleri ayrık, official source governance,
+  frozen replay ve `parked_conflict` resolver'ı testli. Workspace-scoped repository ve
+  gerçek iki-workspace CRUD/restart/rollback kabulü geçti; rol/audit mutation API'si açık.
+- **S2.2 persistence/domain core hazır:** provenance türleri ayrık, official source governance,
   deterministic scope/precedence/conflict/context budget ve guidance-only authority testli.
-  PostgreSQL registry ve analysis-run pack snapshot binding'i açık.
+  Dört append-only guidance tablosu Supabase'e uygulandı; restart/hash, optimistic conflict,
+  tenant izolasyonu ve nullable CHECK bypass kabulleri geçti. Analysis-run pack binding'i açık.
 - **S2.3 resolver/contract core hazır:** rolling/fixed/calendar/lifetime/learning/action-
   relative, DST/weekday/previous-year ve forged-window doğrulaması; deterministik analysis
   run/record ID, snapshot/context ref ve sebepli insufficient-data sözleşmesi testli.
-  Metrik formül/aggregation kataloğu ve L2 materialization açık.
-- **Birleşik kanıt:** 44 test dosyası/246 test, production build, audit 0; PostgreSQL
-  tombstone kabulü temiz ve Supabase 35/35 RLS, API table grant'i `0`. Meta write kapalı.
+  Sürümlü metrik/formül motoru additive/non-additive/ratio-of-sums, attribution, currency,
+  replay ve çelişkili revision guard'larıyla hazır; L2 materialization açık.
+- **S2.4 frozen context core hazır:** Meta config refs, effective category, guidance pack,
+  policy/cadence/data/history ve katalog sürümleri tek authentic hash'te birleşiyor; raw L0,
+  token, agent narration ve action/write authority reddediliyor. Persistence/invalidation açık.
+- **Birleşik kanıt:** 47 test dosyası/263 test, production build, audit 0; category/guidance
+  ve tombstone PostgreSQL rollback kabulleri temiz. Supabase 39/39 RLS, API table grant'i
+  `0`; tracked/build/cache token eşleşmesi `0`. Meta write kapalı.
 
 ## Değişmez sınırlar
 
