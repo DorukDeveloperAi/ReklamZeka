@@ -1,0 +1,62 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "bfe9b9fce",
+      "tarih": "2026-08-07",
+      "konu": "merge: uzak ile birleştir — kayıpsız (türev yeniden üretilir, içerik birleşimle korunur)",
+      "tur": "is",
+      "kapsam": [
+        "merge"
+      ]
+    },
+    {
+      "hash": "03d03c538",
+      "tarih": "2026-08-06",
+      "konu": "vscode ayarları eklendi",
+      "tur": "is",
+      "kapsam": []
+    },
+    {
+      "hash": "0d2239dda",
+      "tarih": "2026-08-06",
+      "konu": "aide iskelesi + filing katmanı kuruldu (yeni proje)",
+      "tur": "is",
+      "kapsam": []
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "?",
+      "adet": 2
+    },
+    {
+      "kapsam": "merge",
+      "adet": 1
+    }
+  ],
+  "isSayisi": 3,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-07",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": "08-Meta dijital ikizi"
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "f5bf14502d13"
+}
