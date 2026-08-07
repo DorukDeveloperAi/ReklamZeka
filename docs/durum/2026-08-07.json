@@ -4,6 +4,33 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "5b3930eb3",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record session handoff core",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "fad7505fa",
+      "tarih": "2026-08-08",
+      "konu": "feat(agent): add session handoff lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "3090e2920",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
       "hash": "bbbf3adb1",
       "tarih": "2026-08-08",
       "konu": "docs(roadmap): record local agent client gate",
@@ -110,54 +137,27 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "f725a7f47",
-      "tarih": "2026-08-08",
-      "konu": "feat(actions): add K4 policy bundle drafts",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "c8f18d412",
-      "tarih": "2026-08-08",
-      "konu": "docs(roadmap): record proposal route gate",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "d3d65adbc",
-      "tarih": "2026-08-08",
-      "konu": "feat(actions): wire promotion proposal composition",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 36
+      "adet": 35
     },
     {
       "kapsam": "docs",
-      "adet": 17
+      "adet": 19
     },
     {
       "kapsam": "test",
-      "adet": 5
+      "adet": 4
     },
     {
       "kapsam": "fix",
       "adet": 2
     }
   ],
-  "isSayisi": 101,
+  "isSayisi": 104,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -170,5 +170,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "59ab8b2f6af7"
+  "damga": "dd738d7edd2b"
 }
