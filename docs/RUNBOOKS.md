@@ -52,3 +52,6 @@ log veya bildirim payload'ına eklenmez.
   schema-create/public-function-execute yüzeyi yeniden doğrulanır.
 - Canonical affected-geo snapshot kanıtı yoksa kategori veya audience preset bilgisiyle geo tahmini yapılmaz;
   protection sonucu `unknown/unresolved` kalır ve proposal kuyruğuna ilerlemez.
+- Meta targeting yapısı yalnız `npm run verify:meta-targeting-shape` ile küçük, GET-only ve redakte canary
+  üzerinden gözlemlenir. Çıktı sadece sabit alan adları, tür/adet sayımları ve stable-key varlığı içerir;
+  ülke kodu, region/city/custom ID, isim, koordinat, adres veya raw targeting değeri basılmaz.

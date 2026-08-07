@@ -36,6 +36,7 @@
     "verify:meta-post-media-db": "tsx scripts/verify-meta-post-media-postgres.ts",
     "verify:meta-s14-live-db": "tsx scripts/verify-meta-s14-live-postgres.ts",
     "verify:meta-s14-read": "tsx scripts/verify-meta-s14-read.ts",
+    "verify:meta-targeting-shape": "tsx scripts/verify-meta-targeting-shape.ts",
     "verify:meta-change-timeline-db": "tsx scripts/verify-meta-change-timeline-postgres.ts",
     "verify:meta-connection-db": "tsx scripts/verify-meta-connection-postgres.ts",
     "verify:workspace-tombstone-db": "tsx scripts/verify-workspace-tombstone-postgres.ts",

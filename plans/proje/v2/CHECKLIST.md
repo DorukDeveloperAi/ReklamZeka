@@ -288,6 +288,10 @@
     forced RLS/API revoke, canonical payload CHECK'leri ve workspace tombstone purge kapsamı.
   - [x] Exact scope/freshness/source-revision hash'li kategori+affected-geo evidence materializer sözleşmesi;
     authoritative kategori kaynağı mevcut, canonical affected-geo mirror fact'i gelene kadar geo `unknown`.
+  - [x] GET-only/redacted targeting shape canary; 3 bounded AdSet örneğinde explicit included country
+    koleksiyonu doğrulandı, targeting değerleri/logları ve Meta write yok.
+  - [ ] Versioned canonical affected-geo normalizer + immutable snapshot/item persistence; country dışındaki
+    region/city/custom/exclusion şekilleri canlı kanıt görülene kadar `unknown`.
   - [ ] Trusted protection policy resolver + proposal expiry kaynağıyla canonical submitter'ı route'a bağlama.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.
 - [ ] Owner/admin/analyst/operator/viewer rol E2E.

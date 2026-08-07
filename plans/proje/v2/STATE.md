@@ -834,6 +834,10 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   serbest metin tek başına “fiilen etkilenen bölge” kanıtı değildir. Canonical affected-geo snapshot fact'i
   revision/source hash'iyle persist edilene kadar production geo adapter yazılmayacak ve sonuç `unknown`
   kalacaktır. Hiçbir gerçek guardrail/policy değeri seed edilmedi.
+- Bounded GET-only targeting shape canary mevcut token ve Graph `v23.0` ile çalıştı: iki logical/fiziksel GET,
+  en fazla üç AdSet ve sıfır write çağrısı. Üç örnekte de `targeting.geo_locations.countries` string-array
+  şekli görüldü; değerlerin hiçbiri loglanmadı veya saklanmadı. Region/city/custom-location ve excluded-geo
+  bu örnekte bulunmadığı için bu şekiller doğrulanmış sayılmaz ve fail-closed `unknown` kalır.
 - S1.4 canlı kabul paketi yeniden geçti: 5 hesap, 79 asset/79 edge, 1.179 linked post/media ve örneklenen
   30 reklamın 30'unda copy+post identity; iki hesaplı persistence kabulünde 6 copy/post binding, 4 creative,
   6 binding ve 3 durable checkpoint doğrulandı. Meta write network çağrısı her iki kabulde de `0`dır.
