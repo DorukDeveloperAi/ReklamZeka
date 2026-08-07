@@ -61,3 +61,9 @@ log veya bildirim payload'ına eklenmez.
   Meta hiyerarşisi içinde canonical snapshot append/replay/restart-resolve ile UPDATE trigger'ını sınar, sonra
   bütün satırları rollback eder. Çıktıda raw targeting veya ülke değeri bulunmaz; Meta network/write sayısı sıfırdır.
 - Ardından `npm run verify:supabase-security` ile yeni tablolar dahil RLS ve Data API grant yüzeyi doğrulanır.
+- Graph→canonical inventory→immutable geo atomisitesi `npm run verify:meta-affected-geo-live-db` ile bounded canlı
+  kabulden geçirilir. Script bir hesabın en fazla üç AdSet'ini yalnız GET ile okur, geçici workspace'e yazar,
+  canonical/geo adetleri ile raw-targeting kolonunun sıfır olduğunu doğrular ve workspace'i siler.
+- Meta read-sync schedule migration sonrası `npm run verify:meta-read-sync-schedule-db` çalıştırılır. Geçici active
+  read-only connection/schedule üzerinde due derivation, lease, yanlış token reddi, atomic cursor advance ve
+  duplicate-completed sınanır; transaction sonunda tüm satırlar rollback edilir. Bu işlem cron başlatmaz.

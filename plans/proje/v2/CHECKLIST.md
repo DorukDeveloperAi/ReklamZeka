@@ -205,7 +205,9 @@
     worker çekirdeği.
   - [x] Server-derived sabit scope'lu production service factory ve redakte typed retry classifier; caller
     workspace/account/token enjeksiyonu, public route/cron ve Meta write yok.
-  - [ ] Meta read-sync DB schedule registry + atomik lease adapterı ve scheduler aktivasyonu.
+  - [x] Meta read-sync DB schedule registry + atomik lease/run adapterı; active/read-only binding, exact revision,
+    duplicate/expired retry/attempt cap ve rollback'li canlı cursor kabulü.
+  - [ ] Güvenilir local scheduler principal/runner aktivasyonu; cron/route hâlen kapalı.
   - [ ] Hourly/monthly/after-sync schedule türleri.
 - [ ] Sync→analyze→plan→approval agentic routine; otomatik execute yok.
 - [ ] External intervention reconcile ve sandbox/shadow rollout.
@@ -299,8 +301,9 @@
     region/city/custom/exclusion/travel biçimlerinde tüm snapshot fail-closed `unknown`, hiçbir authority yok.
   - [x] Canonical affected-geo immutable snapshot/item persistence, hash-only ülke item'ları, ayrı `home/recent`
     vocabulary, private inventory extraction adapterı, forced RLS/API revoke ve rollback'li canlı DB kabulü.
-  - [ ] Graph inventory field catalog + transactional runtime persistence wiring ve AuthenticAffectedGeoEvidence
-    production adapterı; doğrulanmamış country dışı şekiller canlı kanıt görülene kadar `unknown`.
+  - [x] Graph AdSet inventory field catalog + transactional runtime persistence wiring ve gerçek Drizzle
+    AuthenticAffectedGeoEvidence adapterı; iki GET/sıfır write canlı kabulünde 3 canonical AdSet/geo snapshot.
+    Doğrulanmamış country dışı şekiller `unknown`.
   - [ ] Trusted protection policy resolver + proposal expiry kaynağıyla canonical submitter'ı route'a bağlama.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.
 - [ ] Owner/admin/analyst/operator/viewer rol E2E.

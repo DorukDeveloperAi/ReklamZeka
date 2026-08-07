@@ -881,3 +881,28 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Tam kapı: 149 test dosyasında 941 test, production build, security/secret ve Drizzle kontrolleri geçti. Production
   Graph field catalog/runtime persistence ve AuthenticAffectedGeoEvidence wiring yapılmadığı için gerçek proposal
   akışında geo kanıtı halen fail-closed `unknown`; hiçbir kural/policy/approval veya Meta writer etkinleşmedi.
+
+## 2026-08-08 — S5.4c3-I Graph→geo evidence ve durable scheduled-sync wiring
+
+- Inventory field catalog `2.0.0` oldu ve `targeting` yalnız AdSet Graph GET alanlarına eklendi. Ham targeting
+  canonical AdSet tipine, generic ledger'a, `targetingSummary`/provenance'a, loga veya public çıktıya taşınmaz;
+  yalnız raw payload hash'e bağlı private extraction çağrısında yaşar. Known ve stale olmayan snapshotlar canonical
+  page transaction'ı içinde immutable geo repository'ye yazılır; hierarchy/hash/repository hatası sayfa+checkpoint'i
+  rollback eder, unsupported geo ise sync'i bozmadan evidence üretmez.
+- Gerçek Drizzle affected-geo scope resolver active workspace ve exact workspace/account/campaign/adset ref'leri,
+  freshness penceresi, Graph/catalog ve source/snapshot hash'leriyle en yeni en fazla iki identity okur. Tek authentic
+  snapshot hash-only geo evidence üretir; missing/stale/corrupt/cross-tenant veya iki aday ambiguity olarak fail-closed
+  kalır. Internal UUID, raw Meta ID, targeting ve ülke değeri public evidence'e çıkmaz; authority tamamen false'dur.
+- Daily Meta read-sync schedule ve run/lease tabloları active workspace + active `read_only` connection lifecycle
+  generation'ına bağlandı. Registry due timeframe'i DB'den türetir; lease adapter deterministic fire/scope hash,
+  row lock, token-bound complete/fail, duplicate suppression, expired retry ve beş-attempt cap uygular. Terminal
+  sonuç cursor'ı aynı transaction'da bir gün ilerletir. Forced RLS/API revoke vardır; schedule seed'i, cron, route,
+  network veya Meta writer aktivasyonu yoktur.
+- Canlı migration sonrası güvenlik yüzeyi 75/75 RLS, API rollerinde sıfır tablo grant'i, sıfır schema-create ve sıfır
+  public routine-execute grant'i olarak geçti. Rollback'li schedule kabulünde due/claim, yanlış token reddi, complete,
+  cursor advance ve duplicate-completed doğrulandı; geçici satır kalmadı. İki hesaplı S1.4 kabulü 70 GET/sıfır write
+  ile yeniden geçti. Ayrı bounded Graph→DB kabulünde iki GET/sıfır write ile üç gerçek AdSet, üç immutable geo
+  snapshot ve üç hash-only item yazıldı; raw-targeting kolonu sıfır kaldı ve geçici workspace silindi.
+- Tam kapı: 153 test dosyasında 974 test, production build, security/secret ve Drizzle kontrolleri geçti. Sonraki
+  kapı reviewed ApprovalPolicy + AutonomyRule + ActionGuardrail/protection composition ve ayrı proposal-expiry
+  kaynağıdır. Kullanıcı değeri uydurulmadı; gerçek policy/expiry seed'i ve Meta writer hâlen yoktur.
