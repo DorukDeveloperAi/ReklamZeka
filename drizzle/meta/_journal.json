@@ -267,6 +267,13 @@
       "when": 1786141001884,
       "tag": "20260807221641_perpetual_black_widow",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1786146283271,
+      "tag": "20260807234443_local_agent_session_handoff",
+      "breakpoints": true
     }
   ]
 }

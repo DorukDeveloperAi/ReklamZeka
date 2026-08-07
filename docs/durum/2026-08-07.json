@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "2ce337256",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
       "hash": "5b3930eb3",
       "tarih": "2026-08-08",
       "konu": "docs(roadmap): record session handoff core",
@@ -128,25 +137,16 @@
       "kapsam": [
         "docs"
       ]
-    },
-    {
-      "hash": "9e54284ac",
-      "tarih": "2026-08-08",
-      "konu": "feat(dashboard): add K4 policy bundle studio",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 35
+      "adet": 34
     },
     {
       "kapsam": "docs",
-      "adet": 19
+      "adet": 20
     },
     {
       "kapsam": "test",
@@ -157,7 +157,7 @@
       "adet": 2
     }
   ],
-  "isSayisi": 104,
+  "isSayisi": 105,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -170,5 +170,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "dd738d7edd2b"
+  "damga": "89d4d202ab20"
 }

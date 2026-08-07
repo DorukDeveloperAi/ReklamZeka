@@ -320,6 +320,114 @@ export const memberships = pgTable("memberships", {
   index("memberships_user_idx").on(table.userId),
 ]);
 
+/** Restart-durable, server-private local agent session binding. It stores no bearer, nonce, prompt, or model state. */
+export const localAgentSessions = pgTable("local_agent_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  sessionRef: text("session_ref").notNull(),
+  workspaceRef: text("workspace_ref").notNull(),
+  userId: uuid("user_id").notNull(),
+  clientRef: text("client_ref").notNull(),
+  transport: text("transport").notNull(),
+  toolCatalogVersion: text("tool_catalog_version").notNull(),
+  allowedTools: jsonb("allowed_tools").$type<readonly string[]>().notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("local_agent_sessions_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("local_agent_sessions_workspace_session_unique").on(table.workspaceId, table.sessionRef),
+  index("local_agent_sessions_workspace_expiry_idx").on(table.workspaceId, table.expiresAt),
+  foreignKey({
+    columns: [table.workspaceId, table.userId],
+    foreignColumns: [memberships.workspaceId, memberships.userId],
+    name: "local_agent_sessions_workspace_membership_fk",
+  }).onDelete("cascade"),
+  check("local_agent_sessions_identity", sql`
+    ${table.sessionRef} ~ '^session_[a-f0-9]{32}$'
+    and ${table.workspaceRef} ~ '^workspace_[a-z0-9][a-z0-9_.:-]{0,86}$'
+    and ${table.clientRef} ~ '^client_[a-z0-9][a-z0-9_-]{0,86}$'
+    and ${table.transport} in ('deterministic_fixture', 'project_stdio', 'loopback_http')
+    and ${table.toolCatalogVersion} = 'local-agent-tools/1.0.0'
+  `),
+  check("local_agent_sessions_tools", sql`
+    jsonb_typeof(${table.allowedTools}) = 'array'
+    and jsonb_array_length(${table.allowedTools}) between 1 and 10
+    and ${table.allowedTools} <@ '[
+      "decision_room_list", "decision_room_mark_inbox_read", "policy_bundle_read",
+      "budget_lab_list", "budget_lab_get", "budget_lab_dry_run", "budget_lab_save_draft",
+      "practice_lab_list", "practice_lab_get", "practice_lab_prepare_draft"
+    ]'::jsonb
+  `),
+  check("local_agent_sessions_time", sql`
+    ${table.lastSeenAt} >= ${table.startedAt}
+    and ${table.expiresAt} > ${table.startedAt}
+    and ${table.expiresAt} <= ${table.startedAt} + interval '8 hours'
+  `),
+]);
+
+/** Short-lived ref-only Dashboard→CLI handoff. Consumption is a single conditional UPDATE. */
+export const localAgentHandoffs = pgTable("local_agent_handoffs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  handoffRef: text("handoff_ref").notNull(),
+  workspaceRef: text("workspace_ref").notNull(),
+  creatorSessionRef: text("creator_session_ref").notNull(),
+  targetSessionRef: text("target_session_ref").notNull(),
+  intent: text("intent").notNull(),
+  entityRef: text("entity_ref").notNull(),
+  timeframeRef: text("timeframe_ref").notNull(),
+  contextRef: text("context_ref").notNull(),
+  contextVersion: integer("context_version").notNull(),
+  templateRef: text("template_ref"),
+  correlationRef: text("correlation_ref").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("local_agent_handoffs_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("local_agent_handoffs_workspace_ref_unique").on(table.workspaceId, table.handoffRef),
+  index("local_agent_handoffs_creator_idx").on(table.workspaceId, table.creatorSessionRef),
+  index("local_agent_handoffs_target_idx").on(table.workspaceId, table.targetSessionRef, table.expiresAt),
+  index("local_agent_handoffs_expiry_idx").on(table.workspaceId, table.expiresAt),
+  foreignKey({
+    columns: [table.workspaceId, table.creatorSessionRef],
+    foreignColumns: [localAgentSessions.workspaceId, localAgentSessions.sessionRef],
+    name: "local_agent_handoffs_workspace_creator_session_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.targetSessionRef],
+    foreignColumns: [localAgentSessions.workspaceId, localAgentSessions.sessionRef],
+    name: "local_agent_handoffs_workspace_target_session_fk",
+  }).onDelete("cascade"),
+  check("local_agent_handoffs_identity", sql`
+    ${table.handoffRef} ~ '^handoff_[a-f0-9]{32}$'
+    and ${table.workspaceRef} ~ '^workspace_[a-z0-9][a-z0-9_.:-]{0,86}$'
+    and ${table.creatorSessionRef} ~ '^session_[a-f0-9]{32}$'
+    and ${table.targetSessionRef} ~ '^session_[a-f0-9]{32}$'
+    and ${table.correlationRef} ~ '^correlation_[a-f0-9]{32}$'
+  `),
+  check("local_agent_handoffs_context", sql`
+    ${table.intent} in ('analysis', 'existing_post_promotion')
+    and ${table.contextVersion} between 1 and 1000000
+    and ${table.entityRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,94}$'
+    and ${table.timeframeRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,94}$'
+    and ${table.contextRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,94}$'
+    and (${table.templateRef} is null or ${table.templateRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,94}$')
+    and (${table.entityRef} || ' ' || ${table.timeframeRef} || ' ' || ${table.contextRef} || ' ' || coalesce(${table.templateRef}, ''))
+      !~* '(token|secret|prompt|raw|hash|sql|uuid|grant|approve|execute|human)'
+    and ((${table.intent} = 'analysis' and ${table.templateRef} is null)
+      or (${table.intent} = 'existing_post_promotion' and ${table.templateRef} is not null))
+  `),
+  check("local_agent_handoffs_time", sql`
+    ${table.expiresAt} >= ${table.createdAt} + interval '15 seconds'
+    and ${table.expiresAt} <= ${table.createdAt} + interval '120 seconds'
+    and (${table.consumedAt} is null or (${table.consumedAt} >= ${table.createdAt} and ${table.consumedAt} < ${table.expiresAt}))
+  `),
+]);
+
 export const dataSources = pgTable("data_sources", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
