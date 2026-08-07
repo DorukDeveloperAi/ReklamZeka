@@ -42,3 +42,13 @@ log veya bildirim payload'ına eklenmez.
   `.next/cache` environment snapshot'ı secret baytlarını tutabilir. Secret taraması tracked
   kaynakları ve cache dışındaki deploy edilebilir `.next` çıktısını kapsar; gerçek-tokenlı
   kabul/build sonrasında `.next/cache` güvenli biçimde temizlenir. Cache deploy edilmez.
+
+## Action guardrail registry
+
+- Migration sonrası `npm run verify:action-guardrail-db` çalıştırılır. Kabul; geçici workspace içinde
+  draft→published append, yeniden kurulan repository ile resolve ve UPDATE append-only trigger'ını sınar;
+  transaction sonunda bütün geçici satırlar rollback edilir.
+- Ardından `npm run verify:supabase-security` ile bütün public tabloların RLS durumu ve Data API grant/
+  schema-create/public-function-execute yüzeyi yeniden doğrulanır.
+- Canonical affected-geo snapshot kanıtı yoksa kategori veya audience preset bilgisiyle geo tahmini yapılmaz;
+  protection sonucu `unknown/unresolved` kalır ve proposal kuyruğuna ilerlemez.

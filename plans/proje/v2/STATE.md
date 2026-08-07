@@ -839,4 +839,6 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   6 binding ve 3 durable checkpoint doğrulandı. Meta write network çağrısı her iki kabulde de `0`dır.
 - Tam kapı: 142 test dosyasında 861 test, production build, security/secret ve Drizzle kontrolleri geçti.
   Migration bağlı Supabase'e uygulandı; canlı kontrolde 70/70 tablo RLS ve API rollerinde sıfır tablo
-  grant'i, sıfır schema-create ve sıfır public routine-execute grant'i doğrulandı.
+  grant'i, sıfır schema-create ve sıfır public routine-execute grant'i doğrulandı. Rollback'li canlı
+  PostgreSQL kabulünde draft→published append, restart-durable resolve ve UPDATE append-only trigger'ı
+  geçti; geçici workspace/policy satırlarının tamamı temizlendi.
