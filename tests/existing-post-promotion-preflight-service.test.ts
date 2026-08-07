@@ -131,6 +131,20 @@ describe("existing-post promotion preflight service", () => {
       "audience_preset.account_incompatible", "audience_preset.category_incompatible",
       "template.budget_out_of_bounds", "template.timeframe_out_of_bounds", "guidance.geo_fixed",
     ]));
+    expect(result.reasons).toContainEqual({ code: "guidance.geo_fixed", source: "guidance", disposition: "unknown" });
+  });
+
+  it("never promotes advisory block language into an enforceable hard block", async () => {
+    const value = context();
+    const advisory: ExistingPostPromotionPreflightContext = {
+      ...value,
+      guidance: [{ guidanceRef: "guidance_block", state: "active", disposition: "block", reasonCode: "guidance.geo_fixed",
+        objectiveRefs: [selection.objectiveRef], internalCategoryRefs: [selection.internalCategoryRef] }],
+    };
+    const result = await service(advisory).service.evaluate(principal, selection);
+    expect(result.status).toBe("unknown");
+    expect(result.proposalPreview).toBeNull();
+    expect(result.reasons).toEqual([{ code: "guidance.geo_fixed", source: "guidance", disposition: "unknown" }]);
   });
 
   it("keeps unknown capability or review-required guidance fail-closed without a proposal", async () => {

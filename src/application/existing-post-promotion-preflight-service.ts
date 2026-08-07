@@ -374,8 +374,11 @@ export class ExistingPostPromotionPublicPreflightService {
     for (const rule of context.guidance) {
       if (rule.state !== "active" || !rule.objectiveRefs.includes(context.objective.ref)
         || !rule.internalCategoryRefs.includes(context.internalCategory.ref)) continue;
-      if (rule.disposition === "block") reasons.push(reason(rule.reasonCode, "guidance", "blocked"));
-      if (rule.disposition === "review_required") reasons.push(reason(rule.reasonCode, "guidance", "unknown"));
+      // Guidance is advisory-only. A blocking phrase must trigger human review,
+      // never silently promote itself into an enforceable action policy.
+      if (rule.disposition === "block" || rule.disposition === "review_required") {
+        reasons.push(reason(rule.reasonCode, "guidance", "unknown"));
+      }
     }
 
     const unique = [...new Map(reasons.map((item) => [`${item.source}:${item.code}:${item.disposition}`, item])).values()];

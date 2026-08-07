@@ -700,3 +700,6 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Sahte creative binding, targeting, preset, policy veya plan üretilmedi. Mevcut saf proposal service ve
   append-only queue repository hazır ve testlidir; sıradaki dilim private materializer/evidence kaynağını
   kurup bu porta bağlayacak. O zamana kadar endpoint 409/503 ile fail-closed ve sıfır business/Meta write'dır.
+- Guidance advisory-only kalır: `block` veya `review_required` dili preflight'ta yalnız insan incelemesi
+  gerektiren `unknown` sonuç üretir. Hard block/confirmed uyumluluk ancak açıkça yayınlanmış typed policy,
+  reviewed compatibility catalog ve deterministik evidence tarafından üretilebilir.
