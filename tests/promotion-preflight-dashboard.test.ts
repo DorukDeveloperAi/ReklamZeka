@@ -127,7 +127,7 @@ describe("Existing-post promotion preflight dashboard", () => {
   });
 
   it("creates only an explicit single-unit K4 draft and rejects unsafe authority", async () => {
-    const draft = { contractVersion: "existing-post-promotion-proposal/1.0.0", outcome: "inserted",
+    const draft = { contractVersion: "existing-post-promotion-proposal/2.0.0", outcome: "inserted",
       proposalRef: "bundle_promotion_primary", actionUnitRefs: ["unit_promotion_primary"],
       preflightRef: "promotion_preflight_aaaaaaaaaaaaaaaaaaaaaaaa", disposition: "approval_required", risk: "K4",
       authority: { canApprove: false, canExecute: false, canWriteMeta: false, canGenerateCreative: false, canChangeTargeting: false } } as const;

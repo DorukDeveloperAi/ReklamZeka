@@ -6,7 +6,13 @@ import {
   type StagedActionProposal,
 } from "@/application/action-proposal-staging-service";
 import { type ApprovalPolicy, type ActionActor, type FrozenPlanIdentity } from "@/domain/actions/approval-lifecycle";
-import { buildActionPlan, type ActionValveContext, type TypedActionIntent } from "@/domain/actions/autonomy-valve";
+import {
+  buildActionPlan,
+  EXISTING_POST_SOURCE_BINDING_VERSION,
+  type ActionValveContext,
+  type ExistingPostSourceBinding,
+  type TypedActionIntent,
+} from "@/domain/actions/autonomy-valve";
 import {
   evaluateExistingPostPromotionEligibility,
   type ExistingPostPromotionEligibilityInput,
@@ -20,15 +26,23 @@ import {
   type PromotionTemplateRevision,
 } from "@/domain/meta/promotion/promotion-template";
 
-export const EXISTING_POST_PROMOTION_PREFLIGHT_VERSION = "existing-post-promotion-preflight/1.0.0" as const;
+export const EXISTING_POST_PROMOTION_PREFLIGHT_VERSION = "existing-post-promotion-preflight/2.0.0" as const;
 
-export type VerifiedExistingPostBinding = Readonly<{
+type VerifiedExistingPostBindingCore = Readonly<{
   verification: "verified";
   sourceType: "existing_post";
   postRef: string;
   actorRef: string;
   actorType: "page" | "instagram";
   postType: "image" | "video" | "carousel" | "reel";
+}>;
+
+export type VerifiedExistingPostBinding = VerifiedExistingPostBindingCore & Readonly<{
+  sourceBinding: ExistingPostSourceBinding;
+}>;
+
+/** V1 compatibility input. It is normalized to an existing_ad_binding and is never emitted. */
+export type LegacyVerifiedExistingPostBinding = VerifiedExistingPostBindingCore & Readonly<{
   creativeBindingRef: string;
   creativeBindingHash: string;
 }>;
@@ -38,7 +52,7 @@ export type ExistingPostPromotionPreflightInput = Readonly<{
   preset: AudiencePresetRevision;
   binding: PromotionTemplateBinding;
   eligibility: ExistingPostPromotionEligibilityInput;
-  postBinding: VerifiedExistingPostBinding;
+  postBinding: VerifiedExistingPostBinding | LegacyVerifiedExistingPostBinding;
   adSetRef: string;
   destinationRef: string;
   budgetPlanVersionRef: string;
@@ -60,7 +74,7 @@ export type ExistingPostPromotionPreflight = Readonly<{
   }>;
   source: Readonly<{
     postFingerprint: string;
-    creativeBindingHash: string;
+    sourceBinding: ExistingPostSourceBinding;
   }>;
   proposal: StagedActionProposal;
   preflightHash: string;
@@ -111,6 +125,39 @@ function exact(value: unknown, keys: readonly string[]): void {
 function ref(value: unknown): string { if (typeof value !== "string" || !REF.test(value)) fail("invalid_input"); return value; }
 function hash(value: unknown): string { if (typeof value !== "string" || !HASH.test(value)) fail("invalid_input"); return value; }
 
+function normalizeSourceBinding(
+  postBinding: VerifiedExistingPostBinding | LegacyVerifiedExistingPostBinding,
+): ExistingPostSourceBinding {
+  if (!postBinding || typeof postBinding !== "object" || Array.isArray(postBinding)) fail("invalid_input");
+  if (Object.hasOwn(postBinding, "sourceBinding")) {
+    exact(postBinding, ["verification", "sourceType", "postRef", "actorRef", "actorType", "postType", "sourceBinding"]);
+    const binding = (postBinding as VerifiedExistingPostBinding).sourceBinding;
+    if (binding.kind === "existing_ad_binding") {
+      exact(binding, ["version", "kind", "bindingRef", "bindingHash"]);
+      if (binding.version !== EXISTING_POST_SOURCE_BINDING_VERSION) fail("invalid_input");
+      return freeze({ version: EXISTING_POST_SOURCE_BINDING_VERSION, kind: "existing_ad_binding" as const,
+        bindingRef: binding.bindingRef === null ? null : ref(binding.bindingRef), bindingHash: hash(binding.bindingHash) });
+    }
+    if (binding.kind === "organic_post_binding") {
+      exact(binding, ["version", "kind", "sourceRef", "sourceHash", "postIdentityHash", "objectStorySpecHash"]);
+      if (binding.version !== EXISTING_POST_SOURCE_BINDING_VERSION) fail("invalid_input");
+      return freeze({ version: EXISTING_POST_SOURCE_BINDING_VERSION, kind: "organic_post_binding" as const,
+        sourceRef: ref(binding.sourceRef), sourceHash: hash(binding.sourceHash),
+        postIdentityHash: hash(binding.postIdentityHash), objectStorySpecHash: hash(binding.objectStorySpecHash) });
+    }
+    return fail("invalid_input");
+  }
+  exact(postBinding, ["verification", "sourceType", "postRef", "actorRef", "actorType", "postType",
+    "creativeBindingRef", "creativeBindingHash"]);
+  const legacy = postBinding as LegacyVerifiedExistingPostBinding;
+  return freeze({
+    version: EXISTING_POST_SOURCE_BINDING_VERSION,
+    kind: "existing_ad_binding" as const,
+    bindingRef: ref(legacy.creativeBindingRef),
+    bindingHash: hash(legacy.creativeBindingHash),
+  });
+}
+
 /** Pure preflight: it resolves no audience, creates no creative and performs no network or persistence call. */
 export class ExistingPostPromotionPreflightService {
   private readonly staging: ActionProposalStagingService;
@@ -119,16 +166,14 @@ export class ExistingPostPromotionPreflightService {
   preflight(input: ExistingPostPromotionPreflightInput): ExistingPostPromotionPreflight {
     exact(input, ["template", "preset", "binding", "eligibility", "postBinding", "adSetRef", "destinationRef",
       "budgetPlanVersionRef", "internalCategoryRefs", "plan", "requester", "proposedAt", "expiresAt", "actionContext", "summary"]);
-    exact(input.postBinding, ["verification", "sourceType", "postRef", "actorRef", "actorType", "postType",
-      "creativeBindingRef", "creativeBindingHash"]);
+    const sourceBinding = normalizeSourceBinding(input.postBinding);
     try { assertPromotionRegistryLink(input.preset, input.template, input.binding, input.actionContext.evaluatedAt); }
     catch { return fail("registry_mismatch"); }
     const eligibility = evaluateExistingPostPromotionEligibility(input.eligibility);
     if (eligibility.status !== "promotable" || !eligibility.contentFreeze) fail("post_not_verified");
     if (!input.postBinding || input.postBinding.verification !== "verified"
       || input.postBinding.sourceType !== "existing_post") fail("post_not_verified");
-    ref(input.postBinding.postRef); ref(input.postBinding.actorRef); ref(input.postBinding.creativeBindingRef);
-    hash(input.postBinding.creativeBindingHash);
+    ref(input.postBinding.postRef); ref(input.postBinding.actorRef);
     if (input.postBinding.actorType !== input.binding.actor.type || input.postBinding.actorRef !== input.binding.actor.actorRef
       || input.eligibility.requestedActor.type !== input.postBinding.actorType
       || !input.template.postTypes.includes(input.postBinding.postType)) fail("template_mismatch");
@@ -149,7 +194,7 @@ export class ExistingPostPromotionPreflightService {
       placeholderOnly: true as const,
       postRef: input.postBinding.postRef,
       postContentHash: eligibility.contentFreeze.contentHash,
-      creativeBindingHash: input.postBinding.creativeBindingHash,
+      sourceBinding,
       actorRef: input.postBinding.actorRef,
       promotionTemplateVersionRef: promotionTemplateVersionRef(input.template),
       audiencePresetVersionRef: audiencePresetVersionRef(input.preset),
@@ -178,7 +223,7 @@ export class ExistingPostPromotionPreflightService {
       registry: freeze({ templateHash: input.template.templateHash, presetHash: input.preset.presetHash,
         bindingHash: input.binding.bindingHash }),
       source: freeze({ postFingerprint: eligibility.contentFreeze.fingerprint,
-        creativeBindingHash: input.postBinding.creativeBindingHash }),
+        sourceBinding }),
       proposal,
       creativeGeneration: "disabled" as const,
       capabilities: freeze({ canExecute: false as const, canWriteMeta: false as const,

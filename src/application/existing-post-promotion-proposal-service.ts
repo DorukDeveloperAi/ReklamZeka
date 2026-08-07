@@ -1,7 +1,7 @@
 import type { ExistingPostPromotionPreflightInput } from "@/application/existing-post-promotion-preflight";
 import type { StagedActionProposal } from "@/application/action-proposal-staging-service";
 
-export const EXISTING_POST_PROMOTION_PROPOSAL_VERSION = "existing-post-promotion-proposal/1.0.0" as const;
+export const EXISTING_POST_PROMOTION_PROPOSAL_VERSION = "existing-post-promotion-proposal/2.0.0" as const;
 
 type PreflightPort = Readonly<{
   preflight(input: ExistingPostPromotionPreflightInput): Readonly<{

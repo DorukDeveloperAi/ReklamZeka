@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AutonomyValveError,
   buildActionPlan,
+  EXISTING_POST_SOURCE_BINDING_VERSION,
   type ActionValveContext,
   type AutonomyRule,
   type TypedActionIntent,
@@ -87,7 +88,10 @@ describe("typed action risk classification", () => {
   it("existing-post promotion'ı frozen typed placeholder olarak K4 ve daima approval yapar", () => {
     const action: TypedActionIntent = {
       kind: "existing_post_promotion", entity: { level: "adset", ref: "adset_promotion" }, placeholderOnly: true,
-      postRef: "post_existing", postContentHash: "a".repeat(64), creativeBindingHash: "b".repeat(64), actorRef: "actor_page",
+      postRef: "post_existing", postContentHash: "a".repeat(64), actorRef: "actor_page",
+      sourceBinding: { version: EXISTING_POST_SOURCE_BINDING_VERSION, kind: "organic_post_binding",
+        sourceRef: "source_page_post", sourceHash: "b".repeat(64), postIdentityHash: "c".repeat(64),
+        objectStorySpecHash: "d".repeat(64) },
       promotionTemplateVersionRef: "template_version_one", audiencePresetVersionRef: "audience_version_one",
       destinationRef: "destination_site", budgetPlanVersionRef: "budget_plan_one", timeframeRef: "timeframe_week",
       scheduleMode: "fixed_duration", durationDays: 7,
@@ -97,7 +101,25 @@ describe("typed action risk classification", () => {
       rules: [rule({ mode: "policy_limited", maximumActionsPerRun: 1 })],
     }));
     expect(plan).toMatchObject({ risk: "K4", disposition: "approval_required" });
+    expect(plan.action).not.toHaveProperty("creativeBindingHash");
     expect(plan.reasonCodes).toContain("human_approval_mandatory_for_risk");
+
+    const { sourceBinding: _sourceBinding, ...legacyAction } = action;
+    const legacyIntent = { ...legacyAction, creativeBindingHash: "e".repeat(64) };
+    const legacyContext = context({
+      entity: { level: "adset", ref: "adset_promotion" },
+    });
+    const legacyPlan = buildActionPlan(legacyIntent as never, legacyContext);
+    expect(legacyPlan.action).toMatchObject({ sourceBinding: {
+      version: EXISTING_POST_SOURCE_BINDING_VERSION, kind: "existing_ad_binding", bindingRef: null,
+      bindingHash: "e".repeat(64),
+    } });
+    expect(legacyPlan.action).not.toHaveProperty("creativeBindingHash");
+    expect(buildActionPlan(legacyIntent as never, legacyContext).planHash).toBe(legacyPlan.planHash);
+    expect(buildActionPlan({ ...legacyIntent, creativeBindingHash: "f".repeat(64) } as never, legacyContext).planHash)
+      .not.toBe(legacyPlan.planHash);
+    expect(() => buildActionPlan({ ...action, sourceBinding: { ...action.sourceBinding, inventedRef: "binding_fake" } } as never,
+      legacyContext)).toThrowError(expect.objectContaining({ code: "invalid_contract" }));
   });
 
   it("ad-level budget ve raw Graph action biçimini şema sınırında reddeder", () => {

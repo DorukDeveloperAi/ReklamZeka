@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ExistingPostPromotionProposalService } from "@/application/existing-post-promotion-proposal-service";
-import { ExistingPostPromotionPreflightService, type ExistingPostPromotionPreflightInput } from "@/application/existing-post-promotion-preflight";
+import { ExistingPostPromotionPreflightService, type ExistingPostPromotionPreflightInput,
+  type VerifiedExistingPostBinding } from "@/application/existing-post-promotion-preflight";
 import { ACTION_APPROVAL_POLICY_VERSION, type ApprovalPolicy } from "@/domain/actions/approval-lifecycle";
+import { EXISTING_POST_SOURCE_BINDING_VERSION } from "@/domain/actions/autonomy-valve";
 import {
   AUDIENCE_PRESET_VERSION, PROMOTION_TEMPLATE_BINDING_VERSION, PROMOTION_TEMPLATE_VERSION,
   createAudiencePresetRevision, createPromotionTemplateBinding, createPromotionTemplateRevision,
@@ -52,7 +54,8 @@ function fixture(): ExistingPostPromotionPreflightInput {
       capabilities: { actorAdvertising: "supported", postPromotion: "supported" } },
     postBinding: { verification: "verified", sourceType: "existing_post", postRef: "post_existing",
       actorRef: "actor_doruk_ig", actorType: "instagram", postType: "image",
-      creativeBindingRef: "creative_binding_existing", creativeBindingHash: h("b") },
+      sourceBinding: { version: EXISTING_POST_SOURCE_BINDING_VERSION, kind: "organic_post_binding",
+        sourceRef: "source_instagram_post", sourceHash: h("b"), postIdentityHash: h("6"), objectStorySpecHash: h("7") } },
     adSetRef: "adset_leads", destinationRef: "destination_lead_form", budgetPlanVersionRef: "budget_plan_v1",
     internalCategoryRefs: ["category_hair"], plan: { planRef: "plan_promotion", revision: 1, planHash: h("c") },
     requester: { actorRef: "user_operator", role: "operator" }, proposedAt: "2026-08-07T11:00:00.000Z",
@@ -78,8 +81,10 @@ describe("ExistingPostPromotionProposalService", () => {
       authority: { canApprove: false, canExecute: false, canWriteMeta: false, canGenerateCreative: false,
         canChangeTargeting: false } });
     const staged = appendInitial.mock.calls[0]![0];
-    expect(staged.summaries[0]!.actionPlan.action).toMatchObject({ creativeBindingHash: h("b"),
+    expect(staged.summaries[0]!.actionPlan.action).toMatchObject({
+      sourceBinding: { kind: "organic_post_binding", sourceHash: h("b"), postIdentityHash: h("6"), objectStorySpecHash: h("7") },
       timeframeRef: "timeframe_week", scheduleMode: "fixed_duration", durationDays: 7 });
+    expect(staged.summaries[0]!.actionPlan.action).not.toHaveProperty("creativeBindingHash");
   });
 
   it("replays idempotently and source changes cannot reuse the old proposal", async () => {
@@ -94,8 +99,11 @@ describe("ExistingPostPromotionProposalService", () => {
     const first = await service.submit(fixture());
     expect((await service.submit(fixture())).outcome).toBe("unchanged");
     const changed = fixture();
+    const sourceBinding = (changed.postBinding as VerifiedExistingPostBinding).sourceBinding;
+    if (sourceBinding.kind !== "organic_post_binding") throw new Error("organic fixture expected");
     const next = await service.submit({ ...changed,
-      postBinding: { ...changed.postBinding, creativeBindingHash: h("d") } });
+      postBinding: { ...changed.postBinding, sourceBinding: {
+        ...sourceBinding, objectStorySpecHash: h("d") } } });
     expect(next.proposalRef).not.toBe(first.proposalRef);
     expect(next.preflightRef).not.toBe(first.preflightRef);
   });

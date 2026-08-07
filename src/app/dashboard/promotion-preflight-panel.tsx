@@ -156,7 +156,7 @@ export async function requestExistingPostPromotionProposalDraft(
     || !exactKeys(result, ["contractVersion", "outcome", "proposalRef", "actionUnitRefs", "preflightRef", "disposition", "risk", "authority"])
     || !exactKeys(authority, ["canApprove", "canExecute", "canWriteMeta", "canGenerateCreative", "canChangeTargeting"])
     || !exactKeys(resultAuthority, ["canApprove", "canExecute", "canWriteMeta", "canGenerateCreative", "canChangeTargeting"])
-    || result.contractVersion !== "existing-post-promotion-proposal/1.0.0"
+    || result.contractVersion !== "existing-post-promotion-proposal/2.0.0"
     || !["inserted", "unchanged"].includes(result.outcome) || !ref.test(result.proposalRef)
     || !Array.isArray(result.actionUnitRefs) || result.actionUnitRefs.length !== 1 || !ref.test(result.actionUnitRefs[0]!)
     || !ref.test(result.preflightRef) || result.disposition !== "approval_required" || result.risk !== "K4"

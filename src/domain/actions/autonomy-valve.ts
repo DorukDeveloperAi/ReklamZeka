@@ -1,6 +1,24 @@
 import { createHash } from "node:crypto";
 
 export const ACTION_PLAN_VERSION = "action-plan/1.0.0" as const;
+export const EXISTING_POST_SOURCE_BINDING_VERSION = "existing-post-source-binding/2.0.0" as const;
+
+export type ExistingPostSourceBinding =
+  | Readonly<{
+    version: typeof EXISTING_POST_SOURCE_BINDING_VERSION;
+    kind: "existing_ad_binding";
+    /** Null only for v1 action payloads that never carried a binding ref. */
+    bindingRef: string | null;
+    bindingHash: string;
+  }>
+  | Readonly<{
+    version: typeof EXISTING_POST_SOURCE_BINDING_VERSION;
+    kind: "organic_post_binding";
+    sourceRef: string;
+    sourceHash: string;
+    postIdentityHash: string;
+    objectStorySpecHash: string;
+  }>;
 
 export type ActionRisk = "K0" | "K1" | "K2" | "K3" | "K4";
 export type AutonomyMode = "denied" | "approval_only" | "policy_limited";
@@ -42,7 +60,7 @@ export type TypedActionIntent =
     placeholderOnly: true;
     postRef: string;
     postContentHash: string;
-    creativeBindingHash: string;
+    sourceBinding: ExistingPostSourceBinding;
     actorRef: string;
     promotionTemplateVersionRef: string;
     audiencePresetVersionRef: string;
@@ -248,6 +266,36 @@ function validateEntity(value: unknown): ActionEntity {
   return Object.freeze({ level: candidate.level as ActionEntity["level"], ref: reference(candidate.ref) });
 }
 
+function validateExistingPostSourceBinding(value: unknown): ExistingPostSourceBinding {
+  if (!value || typeof value !== "object" || Array.isArray(value)) fail("invalid_action");
+  const candidate = value as Record<string, unknown>;
+  if (candidate.version !== EXISTING_POST_SOURCE_BINDING_VERSION) fail("invalid_action");
+  if (candidate.kind === "existing_ad_binding") {
+    exactKeys(value, ["version", "kind", "bindingRef", "bindingHash"]);
+    return Object.freeze({
+      version: EXISTING_POST_SOURCE_BINDING_VERSION,
+      kind: "existing_ad_binding" as const,
+      bindingRef: candidate.bindingRef === null ? null : reference(candidate.bindingRef),
+      bindingHash: typeof candidate.bindingHash === "string" && HASH.test(candidate.bindingHash)
+        ? candidate.bindingHash : fail("invalid_action"),
+    });
+  }
+  if (candidate.kind === "organic_post_binding") {
+    exactKeys(value, ["version", "kind", "sourceRef", "sourceHash", "postIdentityHash", "objectStorySpecHash"]);
+    const checkedHash = (input: unknown): string => typeof input === "string" && HASH.test(input)
+      ? input : fail("invalid_action");
+    return Object.freeze({
+      version: EXISTING_POST_SOURCE_BINDING_VERSION,
+      kind: "organic_post_binding" as const,
+      sourceRef: reference(candidate.sourceRef),
+      sourceHash: checkedHash(candidate.sourceHash),
+      postIdentityHash: checkedHash(candidate.postIdentityHash),
+      objectStorySpecHash: checkedHash(candidate.objectStorySpecHash),
+    });
+  }
+  fail("invalid_action");
+}
+
 function normalizeRefs(value: unknown): readonly string[] {
   if (!Array.isArray(value)) fail("invalid_contract");
   const refs = value.map(reference);
@@ -315,9 +363,14 @@ function classifyAction(value: unknown): ClassifiedAction {
     };
   }
   if (candidate.kind === "existing_post_promotion") {
-    exactKeys(value, [
+    const legacy = Object.hasOwn(candidate, "creativeBindingHash") && !Object.hasOwn(candidate, "sourceBinding");
+    exactKeys(value, legacy ? [
       "kind", "entity", "placeholderOnly", "postRef", "postContentHash", "actorRef",
       "creativeBindingHash", "promotionTemplateVersionRef", "audiencePresetVersionRef", "destinationRef",
+      "budgetPlanVersionRef", "timeframeRef", "scheduleMode", "durationDays",
+    ] : [
+      "kind", "entity", "placeholderOnly", "postRef", "postContentHash", "actorRef",
+      "sourceBinding", "promotionTemplateVersionRef", "audiencePresetVersionRef", "destinationRef",
       "budgetPlanVersionRef", "timeframeRef", "scheduleMode", "durationDays",
     ]);
     const entity = validateEntity(candidate.entity);
@@ -329,14 +382,21 @@ function classifyAction(value: unknown): ClassifiedAction {
     const durationDays: number | null = candidate.durationDays === null ? null
       : Number.isSafeInteger(candidate.durationDays) && (candidate.durationDays as number) >= 1
         && (candidate.durationDays as number) <= 365 ? candidate.durationDays as number : fail("invalid_action");
+    const sourceBinding = legacy
+      ? validateExistingPostSourceBinding({
+        version: EXISTING_POST_SOURCE_BINDING_VERSION,
+        kind: "existing_ad_binding",
+        bindingRef: null,
+        bindingHash: candidate.creativeBindingHash,
+      })
+      : validateExistingPostSourceBinding(candidate.sourceBinding);
     const action = Object.freeze({
       kind: "existing_post_promotion" as const,
       entity: Object.freeze({ level: "adset" as const, ref: entity.ref }),
       placeholderOnly: true as const,
       postRef: reference(candidate.postRef),
       postContentHash: candidate.postContentHash,
-      creativeBindingHash: typeof candidate.creativeBindingHash === "string" && HASH.test(candidate.creativeBindingHash)
-        ? candidate.creativeBindingHash : fail("invalid_action"),
+      sourceBinding,
       actorRef: reference(candidate.actorRef),
       promotionTemplateVersionRef: reference(candidate.promotionTemplateVersionRef),
       audiencePresetVersionRef: reference(candidate.audiencePresetVersionRef),

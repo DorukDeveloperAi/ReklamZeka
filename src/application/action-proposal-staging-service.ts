@@ -12,6 +12,7 @@ import {
 } from "@/domain/actions/approval-lifecycle";
 import {
   ACTION_PLAN_VERSION,
+  EXISTING_POST_SOURCE_BINDING_VERSION,
   type ActionPlan,
   type ActionRisk,
   type ActionType,
@@ -225,11 +226,18 @@ function validateActionShape(action: TypedActionIntent, actionType: ActionType):
     budget_change: ["kind", "entity", "budgetKind", "currency", "beforeDecimal", "afterDecimal", "budgetOwnerRef"],
     existing_post_promotion: [
       "kind", "entity", "placeholderOnly", "postRef", "postContentHash", "actorRef",
-      "creativeBindingHash", "promotionTemplateVersionRef", "audiencePresetVersionRef", "destinationRef",
+      "sourceBinding", "promotionTemplateVersionRef", "audiencePresetVersionRef", "destinationRef",
       "budgetPlanVersionRef", "timeframeRef", "scheduleMode", "durationDays",
     ],
   };
-  exactPlan(action, keysByKind[action.kind]);
+  const actionRecord = action as unknown as Record<string, unknown>;
+  const legacyExistingPost = action.kind === "existing_post_promotion"
+    && Object.hasOwn(actionRecord, "creativeBindingHash") && !Object.hasOwn(actionRecord, "sourceBinding");
+  exactPlan(action, legacyExistingPost ? [
+    "kind", "entity", "placeholderOnly", "postRef", "postContentHash", "actorRef",
+    "creativeBindingHash", "promotionTemplateVersionRef", "audiencePresetVersionRef", "destinationRef",
+    "budgetPlanVersionRef", "timeframeRef", "scheduleMode", "durationDays",
+  ] : keysByKind[action.kind]);
   exactPlan(action.entity, ["level", "ref"]);
   ref(action.entity.ref);
   if (!(["campaign", "adset", "ad"] as const).includes(action.entity.level)) fail("invalid_plan");
@@ -247,7 +255,22 @@ function validateActionShape(action: TypedActionIntent, actionType: ActionType):
   }
   if (actionType === "existing_post_promotion") {
     if (action.kind !== "existing_post_promotion" || action.placeholderOnly !== true || action.entity.level !== "adset") fail("invalid_plan");
-    ref(action.postRef); hash(action.postContentHash); hash(action.creativeBindingHash);
+    ref(action.postRef); hash(action.postContentHash);
+    if (legacyExistingPost) {
+      hash(actionRecord.creativeBindingHash);
+    } else {
+      const binding = action.sourceBinding;
+      if (binding.kind === "existing_ad_binding") {
+        exactPlan(binding, ["version", "kind", "bindingRef", "bindingHash"]);
+        if (binding.version !== EXISTING_POST_SOURCE_BINDING_VERSION) fail("invalid_plan");
+        if (binding.bindingRef !== null) ref(binding.bindingRef);
+        hash(binding.bindingHash);
+      } else if (binding.kind === "organic_post_binding") {
+        exactPlan(binding, ["version", "kind", "sourceRef", "sourceHash", "postIdentityHash", "objectStorySpecHash"]);
+        if (binding.version !== EXISTING_POST_SOURCE_BINDING_VERSION) fail("invalid_plan");
+        ref(binding.sourceRef); hash(binding.sourceHash); hash(binding.postIdentityHash); hash(binding.objectStorySpecHash);
+      } else fail("invalid_plan");
+    }
     ref(action.actorRef); ref(action.promotionTemplateVersionRef);
     ref(action.audiencePresetVersionRef); ref(action.destinationRef); ref(action.budgetPlanVersionRef);
     ref(action.timeframeRef);

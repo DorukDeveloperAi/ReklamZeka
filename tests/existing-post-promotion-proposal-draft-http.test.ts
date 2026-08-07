@@ -9,7 +9,7 @@ const selection = { accountRef: "account_primary", adSetRef: "adset_primary", ac
   timeframeRef: "timeframe_primary", objectiveRef: "objective_primary", internalCategoryRef: "category_primary" } as const;
 const ready = { status: "ready_for_approval_proposal", proposalPreview: { previewRef: "preview_primary" },
   authority: { canPersistProposal: false, canApprove: false, canExecute: false, canWriteMeta: false, canGenerateCreative: false } } as const;
-const persisted = { contractVersion: "existing-post-promotion-proposal/1.0.0", outcome: "inserted", proposalRef: "bundle_primary",
+const persisted = { contractVersion: "existing-post-promotion-proposal/2.0.0", outcome: "inserted", proposalRef: "bundle_primary",
   actionUnitRefs: ["unit_primary"], preflightRef: "promotion_preflight_aaaaaaaaaaaaaaaaaaaaaaaa", disposition: "approval_required", risk: "K4",
   authority: { canApprove: false, canExecute: false, canWriteMeta: false, canGenerateCreative: false, canChangeTargeting: false } } as const;
 

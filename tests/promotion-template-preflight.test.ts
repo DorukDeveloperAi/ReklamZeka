@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ExistingPostPromotionPreflightService } from "@/application/existing-post-promotion-preflight";
 import { ACTION_APPROVAL_POLICY_VERSION } from "@/domain/actions/approval-lifecycle";
-import type { ActionValveContext, AutonomyRule } from "@/domain/actions/autonomy-valve";
+import { EXISTING_POST_SOURCE_BINDING_VERSION, type ActionValveContext, type AutonomyRule } from "@/domain/actions/autonomy-valve";
 import {
   AUDIENCE_PRESET_VERSION,
   PROMOTION_TEMPLATE_BINDING_VERSION,
@@ -73,7 +73,8 @@ function input() {
     },
     postBinding: { verification: "verified" as const, sourceType: "existing_post" as const,
       postRef: "post_doruk_ig", actorRef: "actor_doruk_ig", actorType: "instagram" as const, postType: "image" as const,
-      creativeBindingRef: "creative_binding_doruk", creativeBindingHash: h("b") },
+      sourceBinding: { version: EXISTING_POST_SOURCE_BINDING_VERSION, kind: "organic_post_binding" as const,
+        sourceRef: "source_instagram_post", sourceHash: h("b"), postIdentityHash: h("6"), objectStorySpecHash: h("7") } },
     adSetRef: "adset_health_tr", destinationRef: "destination_lead_form", budgetPlanVersionRef: "budget_plan_v3",
     internalCategoryRefs: ["category_health_lead"],
     plan: { planRef: "plan_promotion", revision: 1, planHash: h("c") },
@@ -124,7 +125,8 @@ describe("existing-post promotion preflight", () => {
     expect(actionPlan).toMatchObject({ actionType: "existing_post_promotion", risk: "K4",
       disposition: "approval_required", capabilities: { canExecute: false, canWriteMeta: false,
         canGrantApproval: false, canAccessRawGraph: false } });
-    expect(actionPlan.action).toMatchObject({ placeholderOnly: true, postContentHash: h("a"), creativeBindingHash: h("b"),
+    expect(actionPlan.action).toMatchObject({ placeholderOnly: true, postContentHash: h("a"),
+      sourceBinding: { kind: "organic_post_binding", sourceHash: h("b"), postIdentityHash: h("6"), objectStorySpecHash: h("7") },
       promotionTemplateVersionRef: `promotion_template_version_${input().template.templateHash.slice(0, 24)}`,
       audiencePresetVersionRef: `audience_preset_version_${input().preset.presetHash.slice(0, 24)}`,
       timeframeRef: "timeframe_rolling_7d", scheduleMode: "continuous", durationDays: null });
@@ -133,7 +135,24 @@ describe("existing-post promotion preflight", () => {
     expect(result.preflightHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
-  it("is stable and changes when the frozen post/creative/template evidence changes", () => {
+  it("normalizes the v1 creative binding input only as an existing-ad compatibility binding", () => {
+    const legacy = input();
+    const result = new ExistingPostPromotionPreflightService(policy).preflight({
+      ...legacy,
+      postBinding: {
+        verification: "verified", sourceType: "existing_post", postRef: legacy.postBinding.postRef,
+        actorRef: legacy.postBinding.actorRef, actorType: legacy.postBinding.actorType, postType: legacy.postBinding.postType,
+        creativeBindingRef: "creative_binding_legacy", creativeBindingHash: h("9"),
+      },
+    });
+    expect(result.proposal.summaries[0]!.actionPlan.action).toMatchObject({
+      sourceBinding: { version: EXISTING_POST_SOURCE_BINDING_VERSION, kind: "existing_ad_binding",
+        bindingRef: "creative_binding_legacy", bindingHash: h("9") },
+    });
+    expect(result.proposal.summaries[0]!.actionPlan.action).not.toHaveProperty("creativeBindingHash");
+  });
+
+  it("is stable and changes when the frozen post/source/template evidence changes", () => {
     const service = new ExistingPostPromotionPreflightService(policy);
     const first = service.preflight(input());
     expect(service.preflight(input()).preflightHash).toBe(first.preflightHash);
@@ -142,10 +161,10 @@ describe("existing-post promotion preflight", () => {
       post: { ...contentChanged.eligibility.post, contentHash: h("e") } } }).preflightHash)
       .not.toBe(first.preflightHash);
     const changed = input();
-    const creativeChanged = service.preflight({ ...changed,
-      postBinding: { ...changed.postBinding, creativeBindingHash: h("d") } });
-    expect(creativeChanged.preflightHash).not.toBe(first.preflightHash);
-    expect(creativeChanged.proposal.summaries[0]!.actionHash)
+    const sourceChanged = service.preflight({ ...changed,
+      postBinding: { ...changed.postBinding, sourceBinding: { ...changed.postBinding.sourceBinding, objectStorySpecHash: h("d") } } });
+    expect(sourceChanged.preflightHash).not.toBe(first.preflightHash);
+    expect(sourceChanged.proposal.summaries[0]!.actionHash)
       .not.toBe(first.proposal.summaries[0]!.actionHash);
     const revisionChanged = input();
     const { templateHash: _templateHash, ...templateInput } = revisionChanged.template;
