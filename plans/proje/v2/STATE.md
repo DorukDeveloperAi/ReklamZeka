@@ -596,3 +596,28 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: 108 test dosyası/658 test, production build, security boundary, Drizzle, npm audit ve secret
   artifact kapıları temiz. Approval hâlâ execute değildir; grant consumption ve production Meta writer
   ayrıca, açık kullanıcı rollout kararı olmadan açılmayacaktır.
+
+## 2026-08-07 — S5.1 immutable promotion registry ve güvenli existing-post preflight
+
+- `AudiencePresetRevision`, `PromotionTemplateRevision` ve account/Page-or-Instagram/internal-category
+  binding'leri canonical hash'e bağlı ve yayınlandıktan sonra değişmezdir. Bütçe sınırları kayan nokta
+  sayıya çevrilmeden scale-normalized `BigInt` ile karşılaştırılır; template zorunlu preset, objective,
+  optimization, destination, placement, tracking, budget owner ve timeframe politikasını taşır.
+- Saf preflight yalnız ownership/permission/capability'si doğrulanmış mevcut Page/Instagram gönderisi,
+  frozen content hash ve mevcut creative binding kabul eder. Post içeriği, creative binding, template veya
+  preset revision değişikliği preflight/action kimliğini değiştirir. Çıktı K4 `approval_required`
+  placeholder'dır; targeting değiştirme, creative üretme, approve, execute ve Meta write kapalıdır.
+- Public-safe model-agnostic sözleşme yalnız exact ref seçimi kabul eder; account/actor/post/category/
+  objective/budget/timeframe ile destination/optimization/placement/special-category/tracking ve aktif
+  guidance uyumunu fail-closed değerlendirir. Ham targeting, raw ID, creative, wildcard, bulk veya
+  workspace override reddedilir.
+- Dört PostgreSQL registry tablosunda tenant-scoped composite FK, RLS, API grant revoke ve append-only
+  UPDATE trigger'ı vardır; kontrollü silme yalnız kilitli workspace tombstone purge yolundadır. Migration
+  gerçek Supabase'e uygulandı; güvenlik sonucu 66/66 RLS, API rollerinde sıfır tablo/schema-create/
+  routine-execute yetkisidir.
+- Dashboard'a ref-only existing-post preflight görünümü eklendi. Güvenilir katalog runtime'ı henüz bağlı
+  olmadığından selector sahte veri göstermeden `source_not_configured` ile güvenli kapalı kalır; hazır
+  sonuçta exact before→after, compatibility/guidance nedenleri ve bütün kapalı capability'ler görünür.
+- Çekirdek kanıtı 112 test dosyası/677 test, typecheck, Drizzle, secret ve diff kapılarında temizdi;
+  dashboard odaklı 5 test ayrıca geçti. Sıradaki increment gerçek registry repository/katalog runtime'ı,
+  ardından proposal persistence ve atomik approval bağlantısıdır. Production Meta writer hâlâ kapalıdır.

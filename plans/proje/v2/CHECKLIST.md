@@ -214,9 +214,11 @@
   ilk lifecycle event'i tek transaction'da, tenant/RLS/immutability/tombstone güvenceleriyle saklanır.
 - [x] Approval queue salt-okunur list/detail ve model-agnostic agent contract; viewer dahil yetkili
   roller yalnız public-safe veri görür, approve/grant/execute/Meta-write capability'leri `false` kalır.
-- [ ] Mevcut Instagram/Page gönderisinden template+audience preset'li promotion preflight ve K4 bundle.
-- [ ] Yeni metin/görsel/video/creative üretmeme boundary ve negatif testleri.
-- [ ] Creative/post spec hash değişiminde stale approval ve yeniden onay.
+- [x] Mevcut Instagram/Page gönderisinden yayınlanmış template + immutable audience preset'li,
+  yalnız doğrulanmış mevcut post kabul eden K4 approval-required preflight/bundle çekirdeği.
+- [x] Yeni metin/görsel/video/creative üretmeme; raw targeting/ID/creative injection negatifleri.
+- [x] Post content, creative binding ve template/preset revision hash değişiminde yeni preflight/action
+  kimliği üreterek eski approval'ın yeni spesifikasyona taşınmaması.
 - [ ] Meta request/write verify ile platform review/delivery effective state ayrımı.
 - [x] Action type/risk + account/category/campaign/entity scoped effective-autonomy resolver ve trace saf çekirdeği.
 
@@ -241,6 +243,9 @@
 - [ ] Mevcut creative library + context/performance karşılaştırması.
 - [ ] Yayındaki reklam metni/dynamic variant/CTA/destination/post kaynağı explorer'ı.
 - [ ] Instagram/Page post seçici, PromotionTemplate/AudiencePreset ve existing-post guided flow.
+  - [x] Ref-only, sahte katalog kullanmayan fail-closed preflight paneli; exact before→after,
+    compatibility/guidance nedenleri ve bütün kapalı action capability'leri görünür.
+  - [ ] Gerçek registry/post/budget/timeframe kataloğu, proposal persistence ve satır-bazlı approval bağlantısı.
 - [ ] Owner/admin/analyst/operator/viewer rol E2E.
 - [ ] 1280/820/390, keyboard/screen-reader ve hata/partial/conflict E2E.
 - [ ] Kota/alert/deadman/kill-switch/runbook ve staged rollout KPI raporu.

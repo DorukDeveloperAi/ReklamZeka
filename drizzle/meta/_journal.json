@@ -197,6 +197,13 @@
       "when": 1786125873464,
       "tag": "20260807180433_fixed_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1786127478062,
+      "tag": "20260807183118_wandering_patch",
+      "breakpoints": true
     }
   ]
 }

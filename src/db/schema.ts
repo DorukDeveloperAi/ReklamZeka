@@ -385,6 +385,7 @@ export const metaAssets = pgTable("meta_assets", {
   disappearedAt: timestamp("disappeared_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  uniqueIndex("meta_assets_id_workspace_unique").on(table.id, table.workspaceId),
   uniqueIndex("meta_assets_connection_type_external_unique").on(
     table.metaConnectionId,
     table.assetType,
@@ -686,6 +687,7 @@ export const categoryDefinitions = pgTable("category_definitions", {
     table.dimensionId,
     table.workspaceId,
   ),
+  uniqueIndex("category_definitions_workspace_id_unique").on(table.workspaceId, table.id),
   index("category_definitions_dimension_archive_idx").on(table.dimensionId, table.archivedAt),
   check("category_definitions_key_format", sql`${table.key} ~ '^[a-z][a-z0-9_]{0,63}$'`),
   check("category_definitions_version_positive", sql`${table.version} >= 1`),
@@ -2368,6 +2370,190 @@ export const operationalEvents = pgTable("operational_events", {
 ]);
 
 /** Immutable, server-private snapshot of the exact policy used to initialize an action queue entry. */
+/** Immutable published audience selection; agents may reference but never synthesize or mutate its targeting. */
+export const audiencePresetRevisions = pgTable("audience_preset_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  presetRef: text("preset_ref").notNull(),
+  revision: integer("revision").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  state: text("state").notNull(),
+  audienceKind: text("audience_kind").notNull(),
+  sourceRef: text("source_ref").notNull(),
+  targetingHash: text("targeting_hash").notNull(),
+  provenanceHash: text("provenance_hash").notNull(),
+  presetHash: text("preset_hash").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("audience_preset_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("audience_preset_revisions_identity_unique").on(table.workspaceId, table.presetRef, table.revision),
+  uniqueIndex("audience_preset_revisions_hash_unique").on(table.workspaceId, table.presetHash),
+  index("audience_preset_revisions_workspace_published_idx").on(table.workspaceId, table.publishedAt),
+  check("audience_preset_revisions_shape", sql`
+    ${table.revision} >= 1 and ${table.schemaVersion} = 'audience-preset/1.0.0' and ${table.state} = 'published'
+    and ${table.audienceKind} in ('meta_saved_audience', 'meta_custom_audience', 'frozen_targeting_spec')
+    and ${table.presetRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.sourceRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.targetingHash} ~ '^[a-f0-9]{64}$' and ${table.provenanceHash} ~ '^[a-f0-9]{64}$'
+    and ${table.presetHash} ~ '^[a-f0-9]{64}$'
+    and jsonb_typeof(${table.payload}) = 'object'
+    and ${table.payload} #>> '{version}' = ${table.schemaVersion}
+    and ${table.payload} #>> '{presetRef}' = ${table.presetRef}
+    and (${table.payload} #>> '{revision}')::integer = ${table.revision}
+    and ${table.payload} #>> '{state}' = 'published'
+    and ${table.payload} #>> '{source,kind}' = ${table.audienceKind}
+    and ${table.payload} #>> '{source,sourceRef}' = ${table.sourceRef}
+    and ${table.payload} #>> '{source,targetingHash}' = ${table.targetingHash}
+    and ${table.payload} #>> '{source,provenanceHash}' = ${table.provenanceHash}
+    and ${table.payload} #>> '{presetHash}' = ${table.presetHash}
+  `),
+  check("audience_preset_revisions_no_authority", sql`
+    not jsonb_path_exists(${table.payload}, '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(actionauthority|executionauthority|writeauthority|writeenabled|canexecute|canwrite|approvalgranted|authorization|grant|creative|copy|headline)$" flag "i")')
+    and ${table.payload}::text !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
+  `),
+]);
+
+/** Immutable template revision bound to one immutable audience preset revision. */
+export const promotionTemplateRevisions = pgTable("promotion_template_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  audiencePresetRevisionId: uuid("audience_preset_revision_id").notNull(),
+  templateRef: text("template_ref").notNull(),
+  revision: integer("revision").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  state: text("state").notNull(),
+  templateHash: text("template_hash").notNull(),
+  audiencePresetHash: text("audience_preset_hash").notNull(),
+  actorTypeScope: jsonb("actor_type_scope").$type<readonly string[]>().notNull(),
+  objectiveRef: text("objective_ref").notNull(),
+  optimizationGoalRef: text("optimization_goal_ref").notNull(),
+  destinationRef: text("destination_ref").notNull(),
+  adSetPolicy: text("ad_set_policy").notNull(),
+  budgetOwnerLevel: text("budget_owner_level").notNull(),
+  budgetKind: text("budget_kind").notNull(),
+  currency: text("currency").notNull(),
+  budgetDefault: numeric("budget_default", { precision: 30, scale: 12 }).notNull(),
+  budgetMinimum: numeric("budget_minimum", { precision: 30, scale: 12 }),
+  budgetMaximum: numeric("budget_maximum", { precision: 30, scale: 12 }),
+  budgetPlanVersionRef: text("budget_plan_version_ref").notNull(),
+  timeframeRef: text("timeframe_ref").notNull(),
+  scheduleMode: text("schedule_mode").notNull(),
+  durationDays: integer("duration_days"),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("promotion_template_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("promotion_template_revisions_identity_unique").on(table.workspaceId, table.templateRef, table.revision),
+  uniqueIndex("promotion_template_revisions_hash_unique").on(table.workspaceId, table.templateHash),
+  index("promotion_template_revisions_audience_idx").on(table.audiencePresetRevisionId),
+  foreignKey({ columns: [table.workspaceId, table.audiencePresetRevisionId],
+    foreignColumns: [audiencePresetRevisions.workspaceId, audiencePresetRevisions.id],
+    name: "promotion_template_revisions_audience_scope_fk" }).onDelete("restrict"),
+  check("promotion_template_revisions_shape", sql`
+    ${table.revision} >= 1 and ${table.schemaVersion} = 'promotion-template/1.0.0' and ${table.state} = 'published'
+    and ${table.templateRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.templateHash} ~ '^[a-f0-9]{64}$' and ${table.audiencePresetHash} ~ '^[a-f0-9]{64}$'
+    and jsonb_typeof(${table.actorTypeScope}) = 'array' and jsonb_array_length(${table.actorTypeScope}) >= 1
+    and not jsonb_path_exists(${table.actorTypeScope}, '$[*] ? (@ != "page" && @ != "instagram")')
+    and ${table.adSetPolicy} in ('existing_only', 'existing_or_new_draft')
+    and ${table.budgetOwnerLevel} in ('campaign', 'adset') and ${table.budgetKind} in ('daily', 'lifetime')
+    and ${table.currency} ~ '^[A-Z]{3}$' and ${table.budgetDefault} >= 0
+    and (${table.budgetMinimum} is null or ${table.budgetMinimum} <= ${table.budgetDefault})
+    and (${table.budgetMaximum} is null or ${table.budgetMaximum} >= ${table.budgetDefault})
+    and ((${table.scheduleMode} = 'continuous' and ${table.durationDays} is null)
+      or (${table.scheduleMode} = 'fixed_duration' and ${table.durationDays} between 1 and 365))
+    and jsonb_typeof(${table.payload}) = 'object'
+    and ${table.payload} #>> '{version}' = ${table.schemaVersion}
+    and ${table.payload} #>> '{templateRef}' = ${table.templateRef}
+    and (${table.payload} #>> '{revision}')::integer = ${table.revision}
+    and ${table.payload} #>> '{templateHash}' = ${table.templateHash}
+    and ${table.payload} #>> '{audiencePreset,presetHash}' = ${table.audiencePresetHash}
+    and ${table.payload} #>> '{budget,ownerLevel}' = ${table.budgetOwnerLevel}
+    and ${table.payload} #>> '{budget,currency}' = ${table.currency}
+    and ${table.payload} #>> '{budget,kind}' = ${table.budgetKind}
+    and ${table.payload} #>> '{timeframe,timeframeRef}' = ${table.timeframeRef}
+  `),
+  check("promotion_template_revisions_no_authority", sql`
+    not jsonb_path_exists(${table.payload}, '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(actionauthority|executionauthority|writeauthority|writeenabled|canexecute|canwrite|approvalgranted|authorization|grant|creative|copy|headline)$" flag "i")')
+    and ${table.payload}::text !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
+  `),
+]);
+
+/** Authentic account/Page-or-Instagram/category/campaign applicability for one immutable template revision. */
+export const promotionTemplateBindings = pgTable("promotion_template_bindings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  templateRevisionId: uuid("template_revision_id").notNull(),
+  adAccountId: uuid("ad_account_id").notNull(),
+  actorAssetId: uuid("actor_asset_id").notNull(),
+  campaignId: uuid("campaign_id"),
+  bindingRef: text("binding_ref").notNull(),
+  bindingHash: text("binding_hash").notNull(),
+  actorType: text("actor_type").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("promotion_template_bindings_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("promotion_template_bindings_identity_unique").on(table.workspaceId, table.bindingRef),
+  uniqueIndex("promotion_template_bindings_hash_unique").on(table.workspaceId, table.bindingHash),
+  index("promotion_template_bindings_template_idx").on(table.templateRevisionId),
+  index("promotion_template_bindings_account_idx").on(table.adAccountId),
+  index("promotion_template_bindings_actor_idx").on(table.actorAssetId),
+  index("promotion_template_bindings_campaign_idx").on(table.campaignId),
+  foreignKey({ columns: [table.workspaceId, table.templateRevisionId],
+    foreignColumns: [promotionTemplateRevisions.workspaceId, promotionTemplateRevisions.id],
+    name: "promotion_template_bindings_template_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.adAccountId], foreignColumns: [adAccounts.workspaceId, adAccounts.id],
+    name: "promotion_template_bindings_account_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.campaignId], foreignColumns: [adCampaigns.workspaceId, adCampaigns.id],
+    name: "promotion_template_bindings_campaign_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.actorAssetId, table.workspaceId], foreignColumns: [metaAssets.id, metaAssets.workspaceId],
+    name: "promotion_template_bindings_actor_scope_fk" }).onDelete("restrict"),
+  check("promotion_template_bindings_shape", sql`
+    ${table.bindingRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.bindingHash} ~ '^[a-f0-9]{64}$' and ${table.actorType} in ('page', 'instagram')
+    and (${table.expiresAt} is null or ${table.expiresAt} > ${table.effectiveFrom})
+    and jsonb_typeof(${table.payload}) = 'object'
+    and ${table.payload} #>> '{version}' = 'promotion-template-binding/1.0.0'
+    and ${table.payload} #>> '{bindingRef}' = ${table.bindingRef}
+    and ${table.payload} #>> '{bindingHash}' = ${table.bindingHash}
+    and ${table.payload} #>> '{actor,type}' = ${table.actorType}
+  `),
+  check("promotion_template_bindings_no_authority", sql`
+    not jsonb_path_exists(${table.payload}, '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(actionauthority|executionauthority|writeauthority|writeenabled|canexecute|canwrite|approvalgranted|authorization|grant|creative|copy|headline)$" flag "i")')
+    and ${table.payload}::text !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
+  `),
+]);
+
+/** Immutable category edges keep multi-category applicability normalized and tenant-bound. */
+export const promotionTemplateBindingCategories = pgTable("promotion_template_binding_categories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  bindingId: uuid("binding_id").notNull(),
+  categoryDefinitionId: uuid("category_definition_id").notNull(),
+  categoryRef: text("category_ref").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("promotion_template_binding_categories_edge_unique")
+    .on(table.workspaceId, table.bindingId, table.categoryDefinitionId),
+  index("promotion_template_binding_categories_binding_idx").on(table.bindingId),
+  index("promotion_template_binding_categories_category_idx").on(table.categoryDefinitionId),
+  foreignKey({ columns: [table.workspaceId, table.bindingId],
+    foreignColumns: [promotionTemplateBindings.workspaceId, promotionTemplateBindings.id],
+    name: "promotion_template_binding_categories_binding_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.categoryDefinitionId],
+    foreignColumns: [categoryDefinitions.workspaceId, categoryDefinitions.id],
+    name: "promotion_template_binding_categories_category_scope_fk" }).onDelete("restrict"),
+  check("promotion_template_binding_categories_identity", sql`
+    ${table.categoryRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+  `),
+]);
+
 export const actionApprovalPolicySnapshots = pgTable("action_approval_policy_snapshots", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),

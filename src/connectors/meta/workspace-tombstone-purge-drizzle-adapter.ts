@@ -50,6 +50,10 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "action_proposal_initial_events",
   "action_approval_decision_events",
   "action_approval_evidence_grants",
+  "audience_preset_revisions",
+  "promotion_template_revisions",
+  "promotion_template_bindings",
+  "promotion_template_binding_categories",
   "analysis_timeframe_definitions",
   "analysis_template_definitions",
   "decision_ledger_records",
@@ -197,6 +201,18 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'action_approval_evidence_grants', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from action_approval_evidence_grants where workspace_id = ${workspaceId}::uuid
+      union all select 'audience_preset_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from audience_preset_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'promotion_template_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from promotion_template_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'promotion_template_bindings', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from promotion_template_bindings where workspace_id = ${workspaceId}::uuid
+      union all select 'promotion_template_binding_categories', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from promotion_template_binding_categories where workspace_id = ${workspaceId}::uuid
       union all select 'analysis_timeframe_definitions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from analysis_timeframe_definitions where workspace_id = ${workspaceId}::uuid
@@ -338,6 +354,10 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from action_proposal_units where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_proposal_bundles where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_approval_policy_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from promotion_template_binding_categories where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from promotion_template_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from promotion_template_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from audience_preset_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (
       delete from meta_daily_insight_metrics where daily_insight_id in (
         select id from meta_daily_insights where workspace_id = ${input.workspaceId}::uuid
