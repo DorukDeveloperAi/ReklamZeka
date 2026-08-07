@@ -230,6 +230,8 @@
 - [ ] Bugün/portfolio hiyerarşi ve internal/Meta filtreler.
 - [ ] Account-group switcher, multi-account connection health ve Page/Instagram asset graph.
 - [ ] Kategori/talimat stüdyosu ve raw/normalized/version/conflict görünümü.
+  - [x] Autonomy revision feed + owner/admin/analyst normalized-draft yüzeyi; viewer read-only,
+    workspace/principal/revision server-derived ve publish/disable/approve/execute/Meta-write kapalı.
 - [ ] Analiz stüdyosu: template/dry-run/publish/schedule/history.
 - [ ] Bütçe stüdyosu: envelope/lock/target/forecast/simulation.
   - [x] Gerçek proposal ledger salt-okunur list/detail, before-after, mapping/suppression ve

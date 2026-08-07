@@ -739,3 +739,14 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   cursor ilerlemez. Entegrasyon opsiyonel port olarak hazırdır; repoda production sync factory olmadığı için
   canlı runtime wiring/sync yapılmadı. Bu dilim compatibility'yi doğrulamaz, Meta network write içermez ve
   proposal materializer'ı açmaz.
+
+## 2026-08-07 — S5.4c1-A Autonomy Studio read + normalized draft
+
+- Dashboard ve cookie-only API artık draft/published/disabled autonomy revision feed'ini public-safe
+  gösterir. Viewer okuyabilir; owner/admin/analyst yalnız normalize draft oluşturabilir. Workspace,
+  principal, rol ve sıradaki revision sunucuda belirlenir; ham talimat metni Guidance Registry'de kalır.
+- Kapsam, mode, effective/expiry, kill-switch, run cap ve guidance provenance ref'leri draft artifact'e
+  bağlanır. İstemciden workspace/revision/role/raw-text veya authority enjeksiyonu reddedilir; canonical
+  hash, actor/decision/reason ve credential HTTP cevabına çıkmaz.
+- Bu yüzeyde publish, disable, approve, execute, approval grant veya Meta write kontrolü yoktur. Yayınlama
+  için ayrı owner/admin insan-varlığı ve açık karar akışı hâlâ gereklidir.
