@@ -805,3 +805,16 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Çekirdek action authority vermez ve Meta write çağrısı yapmaz. DB schedule/lease adapterı, per-connection
   secret binding, account bootstrap, `after_sync` outbox ve scheduler aktivasyonu bilinçli olarak açık
   bırakıldı. 138 test dosyasında 825 test, production build, security/secret ve Drizzle kontrolleri geçti.
+
+## 2026-08-07 — S5.4c3-F action guardrail + ProtectionResolver domain çekirdeği
+
+- Account, campaign, entity, internal kategori ve bölge kapsamlarını action type ile birleştiren typed selector;
+  `deny_action`, para birimli mutlak/oransal `budget_delta_limit` ve kategori/bölge için `fixed|no_outflow`
+  bütçe koruma clause'ları eklendi. Lifecycle hash-linked draft→publish, revise→publish ve disable zinciridir;
+  yalnız owner/admin publish/disable edebilir, guidance ref'leri provenance dışında authority taşımaz.
+- Saf ProtectionResolver bütün revision zincirini, effective/expiry durumunu, exact kapsam örtüşmesini, clause
+  çakışmasını, kategori/bölge kanıtını ve bütçe limitini fail-closed çözer. Yalnız aktif published coverage
+  `allowed` üretebilir; eksik limit/evidence `unresolved`, deny/limit/protected-budget ihlali `denied` olur.
+  Policy-set, evidence hash'leri ve normalize edilmiş action/evidence bağlamı canonical resolution hash'ine
+  bağlıdır. Registry persistence, authentic category/affected-geo evidence materializer ve submitter wiring
+  bir sonraki ayrı dilimdir; gerçek kural veya izin seed edilmemiştir.

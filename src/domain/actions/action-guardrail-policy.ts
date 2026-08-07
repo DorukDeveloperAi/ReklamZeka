@@ -124,6 +124,8 @@ export type ProtectionResolution = Readonly<{
   protectedGeoRefs: readonly string[];
   categoryEvidenceHash: string | null;
   affectedGeoEvidenceHash: string | null;
+  /** Binds normalized action facts and evidence refs to this evaluation, even if a caller reuses actionHash. */
+  evaluationContextHash: string;
   policySetHash: string;
   policyEvidence: readonly Readonly<{
     policyRef: string;
@@ -457,10 +459,11 @@ export function resolveProtection(input: ProtectionResolutionInput): ProtectionR
   latestLifecycle.sort((left, right) => left.policyRef.localeCompare(right.policyRef));
   const policySetHash = digest(latestLifecycle.map((item) => ({ policyRef: item.policyRef, revision: item.revision,
     state: item.state, canonicalHash: item.canonicalHash })));
+  const evaluationContextHash = digest({ action: input.action, categoryEvidence, affectedGeoEvidence: geoEvidence });
   const base = { workspaceRef, evaluatedAt, actionHash: input.action.actionHash, actionType: input.action.actionType,
     protectedInternalCategoryRefs: [] as string[], affectedGeoRefs: geoEvidence.status === "known" ? [...geoEvidence.refs] : [],
     protectedGeoRefs: [] as string[], categoryEvidenceHash: categoryEvidence.status === "known" ? categoryEvidence.evidenceHash : null,
-    affectedGeoEvidenceHash: geoEvidence.status === "known" ? geoEvidence.evidenceHash : null, policySetHash,
+    affectedGeoEvidenceHash: geoEvidence.status === "known" ? geoEvidence.evidenceHash : null, evaluationContextHash, policySetHash,
     policyEvidence: [] as ProtectionResolution["policyEvidence"] };
   if (categoryEvidence.status === "unknown" || geoEvidence.status === "unknown") {
     return resolution({ ...base, disposition: "unresolved", reasonCodes: Object.freeze([

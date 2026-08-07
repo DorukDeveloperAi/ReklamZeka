@@ -99,6 +99,11 @@ describe("ProtectionResolver", () => {
     expect(resolveProtection(input([first, active])).resolutionHash).toBe(result.resolutionHash);
     expect(resolveProtection({ ...input([first, active]), action: { ...input([first, active]).action, actionHash: h("d") } }).resolutionHash)
       .not.toBe(result.resolutionHash);
+    const changedEntity = resolveProtection({ ...input([first, active]), action: {
+      ...input([first, active]).action, entity: { level: "adset", ref: "adset_other" },
+    } });
+    expect(changedEntity.evaluationContextHash).not.toBe(result.evaluationContextHash);
+    expect(changedEntity.resolutionHash).not.toBe(result.resolutionHash);
   });
 
   it("denies matched action and protected fixed/no-outflow budget changes", () => {
