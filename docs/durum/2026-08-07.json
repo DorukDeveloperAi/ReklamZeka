@@ -4,6 +4,42 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "920083baf",
+      "tarih": "2026-08-07",
+      "konu": "feat(decision): persist versioned schedules and inbox",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "af656e3c5",
+      "tarih": "2026-08-07",
+      "konu": "feat(analysis): add deterministic findings and ledger binding",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4d0a37fd7",
+      "tarih": "2026-08-07",
+      "konu": "feat(decision): persist and orchestrate decision room",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c2f6cb0bd",
+      "tarih": "2026-08-07",
+      "konu": "docs(decision): record frozen context and analysis gates",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
       "hash": "243884110",
       "tarih": "2026-08-07",
       "konu": "feat(decision): persist category guidance and context cores",
@@ -101,59 +137,23 @@
       "kapsam": [
         "test"
       ]
-    },
-    {
-      "hash": "5ae792ac5",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): persist linked post inventory",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "91fa14241",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): persist S1.4 mirror in Postgres",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "d6346a57a",
-      "tarih": "2026-08-07",
-      "konu": "test(meta): cover live linked post inventory",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "6c586b990",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): mirror linked Page and Instagram posts",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 20
+      "adet": 23
     },
     {
       "kapsam": "test",
       "adet": 4
     },
     {
-      "kapsam": "?",
-      "adet": 2
+      "kapsam": "docs",
+      "adet": 3
     },
     {
-      "kapsam": "docs",
+      "kapsam": "?",
       "adet": 2
     },
     {
@@ -165,7 +165,7 @@
       "adet": 1
     }
   ],
-  "isSayisi": 31,
+  "isSayisi": 35,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "ed568d607b27"
+  "damga": "8a37fe34eb51"
 }

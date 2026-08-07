@@ -195,15 +195,6 @@ export class DrizzleDecisionRoomRunStore implements DecisionRoomRunStore {
         limit 1
       `))[0];
       if (!asset) throw new DecisionRoomPersistenceError("asset_scope_mismatch");
-      const schedule = scheduleRef === null ? null : rows<{ id: string }>(await transaction.execute(sql`
-        select id from decision_room_schedules
-        where workspace_id = ${this.workspaceId}::uuid and schedule_ref = ${scheduleRef}
-          and definition_hash = ${scheduleDefinitionHash}
-          and ad_account_id = ${asset.account_id}::uuid and campaign_id = ${asset.campaign_id}::uuid
-        limit 1
-      `))[0];
-      if (scheduleRef !== null && !schedule) throw new DecisionRoomPersistenceError("schedule_conflict");
-
       const existing = rows<RunRow>(await transaction.execute(sql`
         select id, run_ref, state, lease_until, attempt, analysis_ref, summary_code,
           ad_account_id, campaign_id, trigger_kind, schedule_id, schedule_definition_hash
@@ -211,6 +202,18 @@ export class DrizzleDecisionRoomRunStore implements DecisionRoomRunStore {
         where workspace_id = ${this.workspaceId}::uuid and idempotency_key = ${input.idempotencyKey}
         for update
       `))[0];
+      const schedule = scheduleRef === null ? null : rows<{ id: string }>(await transaction.execute(sql`
+        select id from decision_room_schedules
+        where workspace_id = ${this.workspaceId}::uuid and schedule_ref = ${scheduleRef}
+          and definition_hash = ${scheduleDefinitionHash}
+          and ad_account_id = ${asset.account_id}::uuid and campaign_id = ${asset.campaign_id}::uuid
+          and (${existing?.schedule_id ?? null}::uuid is not null
+            and id = ${existing?.schedule_id ?? null}::uuid
+            or ${existing?.schedule_id ?? null}::uuid is null
+              and superseded_at is null and enabled is true)
+        limit 1
+      `))[0];
+      if (scheduleRef !== null && !schedule) throw new DecisionRoomPersistenceError("schedule_conflict");
       if (existing && (existing.ad_account_id !== asset.account_id || existing.campaign_id !== asset.campaign_id
         || existing.trigger_kind !== input.triggerKind
         || (existing.schedule_id ?? null) !== (schedule?.id ?? null)
@@ -337,6 +340,14 @@ function restoreSchedule(row: ScheduleRow): DecisionRoomSchedule {
     : { ...base, frequency: "weekly", dayOfWeek: row.day_of_week ?? -1 });
 }
 
+export type DecisionRoomDueSchedule = Readonly<{
+  schedule: DecisionRoomSchedule;
+  revision: number;
+  definitionHash: string;
+  lastScheduledFor: string | null;
+  nextRunAt: string;
+}>;
+
 /** Registry binds schedule refs to the canonical account/campaign mirror. */
 export class DrizzleDecisionRoomScheduleRegistry {
   private readonly workspaceId: string;
@@ -424,6 +435,38 @@ export class DrizzleDecisionRoomScheduleRegistry {
       schedule: restoreSchedule(row), revision: row.revision, definitionHash: row.definition_hash,
       lastScheduledFor: iso(row.last_scheduled_for), nextRunAt: iso(row.next_run_at),
     }) : null;
+  }
+
+  async listDue(now: string, limit = 25): Promise<readonly DecisionRoomDueSchedule[]> {
+    const dueAt = instant(now);
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      throw new DecisionRoomPersistenceError("invalid_input");
+    }
+    await assertActiveWorkspace(this.database, this.workspaceId);
+    const due = rows<ScheduleRow>(await this.database.execute(sql`
+      select schedule_ref, revision, definition_hash, workspace_ref, account_ref, campaign_ref,
+        timeframe_ref, template_ref, timezone, local_time, frequency, day_of_week, enabled,
+        catch_up_policy, tick_grace_minutes, last_scheduled_for, next_run_at
+      from decision_room_schedules
+      where workspace_id = ${this.workspaceId}::uuid
+        and superseded_at is null and enabled is true
+        and next_run_at is not null and next_run_at <= ${dueAt}::timestamptz
+      order by next_run_at, schedule_ref, revision
+      limit ${limit}
+    `));
+    return Object.freeze(due.map((row) => {
+      const nextRunAt = iso(row.next_run_at);
+      if (nextRunAt === null || decisionRoomScheduleDefinitionHash(restoreSchedule(row)) !== row.definition_hash) {
+        throw new DecisionRoomPersistenceError("corrupt_store");
+      }
+      return Object.freeze({
+        schedule: restoreSchedule(row),
+        revision: row.revision,
+        definitionHash: row.definition_hash,
+        lastScheduledFor: iso(row.last_scheduled_for),
+        nextRunAt,
+      });
+    }));
   }
 
   async recordTick(input: Readonly<{ scheduleRef: string; scheduledFor: string; nextRunAt: string | null }>): Promise<boolean> {

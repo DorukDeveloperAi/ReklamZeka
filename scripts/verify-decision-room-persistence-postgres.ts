@@ -3,12 +3,14 @@ import { existsSync } from "node:fs";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { runDecisionRoomScheduleWorker } from "@/application/decision-room-schedule-worker";
 import {
   DrizzleDecisionRoomInbox,
   DrizzleDecisionRoomRunStore,
   DrizzleDecisionRoomScheduleRegistry,
 } from "@/connectors/decisions/decision-room-drizzle-adapters";
 import * as schema from "@/db/schema";
+import { DecisionRoomExecutor } from "@/domain/decisions/executor";
 import { DECISION_ROOM_SCHEDULE_VERSION, type DecisionRoomSchedule } from "@/domain/decisions/schedule";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
@@ -51,6 +53,11 @@ let invalidReaderRefBlocked = false;
 let crossTenantReadBlocked = false;
 let externalChannelBlocked = false;
 let authorityColumnAbsent = false;
+let dueListingBounded = false;
+let disabledSupersededExcluded = false;
+let workerPartialIsolation = false;
+let workerCatchUp = false;
+let concurrentWorkerSingleRun = false;
 let temporaryRowsCommitted = true;
 
 const schedule: DecisionRoomSchedule = {
@@ -304,6 +311,79 @@ try {
     } catch {
       externalChannelBlocked = true;
     }
+
+    const workerOk = { ...schedule, scheduleRef: "schedule_worker_ok" };
+    const workerFail = {
+      ...schedule, scheduleRef: "schedule_worker_fail", campaignRef: "campaign_other",
+    };
+    const workerSkip = {
+      ...schedule, scheduleRef: "schedule_worker_skip", catchUpPolicy: "skip" as const,
+    };
+    const workerDisabled = {
+      ...schedule, scheduleRef: "schedule_worker_disabled", enabled: false,
+    };
+    const workerSuperseded = { ...schedule, scheduleRef: "schedule_worker_superseded" };
+    await registry.save(workerOk, "2026-08-07T06:00:00Z");
+    await registry.save(workerFail, "2026-08-07T06:00:00Z");
+    await registry.save(workerSkip, "2026-08-05T06:00:00Z");
+    await registry.save(workerDisabled, "2026-08-07T06:00:00Z");
+    await registry.save(workerSuperseded, "2026-08-07T06:00:00Z");
+    await registry.save({ ...workerSuperseded, localTime: "10:00" }, "2026-08-08T07:00:00Z");
+
+    const boundedDue = await registry.listDue("2026-08-07T12:00:00Z", 2);
+    const allDue = await registry.listDue("2026-08-07T12:00:00Z", 10);
+    dueListingBounded = boundedDue.length === 2 && allDue.length === 3;
+    const dueRefs = new Set(allDue.map((entry) => entry.schedule.scheduleRef));
+    disabledSupersededExcluded = !dueRefs.has("schedule_worker_disabled")
+      && !dueRefs.has("schedule_worker_superseded");
+
+    const workerAnalysis = {
+      execute: async (input: Readonly<{ campaignRef: string }>) => {
+        if (input.campaignRef === "campaign_other") throw new Error("redacted deterministic failure");
+        return { analysisRef: "analysis_worker", evidenceRefs: [], summaryCode: "worker_ready" };
+      },
+    };
+    const workerExecutor = new DecisionRoomExecutor(
+      new DrizzleDecisionRoomRunStore(transaction as never, workspaceId),
+      workerAnalysis as never,
+      new DrizzleDecisionRoomInbox(transaction as never, workspaceId),
+      () => new Date("2026-08-07T12:00:00Z"),
+    );
+    const workerResult = await runDecisionRoomScheduleWorker(
+      { now: "2026-08-07T12:00:00Z", batchSize: 10 }, registry, workerExecutor,
+    );
+    const workerOutcomes = new Map(workerResult.items.map((entry) => [entry.scheduleRef, entry.outcome]));
+    workerPartialIsolation = workerOutcomes.get("schedule_worker_ok") === "completed"
+      && workerOutcomes.get("schedule_worker_fail") === "failed";
+    workerCatchUp = workerOutcomes.get("schedule_worker_skip") === "stale_skipped"
+      && workerResult.tickAdvancedCount === 2;
+
+    const concurrentSchedule = { ...schedule, scheduleRef: "schedule_worker_concurrent" };
+    await registry.save(concurrentSchedule, "2026-08-07T06:00:00Z");
+    const concurrentCandidate = (await registry.listDue("2026-08-07T12:00:00Z", 10))
+      .find((entry) => entry.schedule.scheduleRef === concurrentSchedule.scheduleRef);
+    if (!concurrentCandidate) throw new Error("Concurrent worker fixture due değil");
+    const cachedRegistry = {
+      listDue: async () => [concurrentCandidate],
+      recordTick: (input: Parameters<typeof registry.recordTick>[0]) => registry.recordTick(input),
+    };
+    const workerFirst = await runDecisionRoomScheduleWorker(
+      { now: "2026-08-07T12:00:00Z" }, cachedRegistry, workerExecutor,
+    );
+    const workerDuplicate = await runDecisionRoomScheduleWorker(
+      { now: "2026-08-07T12:00:00Z" }, cachedRegistry, workerExecutor,
+    );
+    const concurrentRows = resultRows(await transaction.execute(sql`
+      select count(*)::int as count from decision_room_runs run
+      join decision_room_schedules schedule
+        on schedule.workspace_id = run.workspace_id and schedule.id = run.schedule_id
+      where run.workspace_id = ${workspaceId}::uuid and schedule.schedule_ref = ${concurrentSchedule.scheduleRef}
+    `));
+    concurrentWorkerSingleRun = workerFirst.items[0]?.outcome === "completed"
+      && workerDuplicate.items[0]?.outcome === "tick_conflict"
+      && workerDuplicate.items[0]?.tickAdvanced === false
+      && Number(concurrentRows[0]?.count) === 1;
+
     const authorityColumns = resultRows(await transaction.execute(sql`
       select column_name from information_schema.columns
       where table_schema = 'public'
@@ -320,6 +400,8 @@ try {
       duplicateInProgress, overlapSuppressed,
       leaseTokenEnforced, retryStable, duplicateCompleted, inboxDeduplicated, readStateIdempotent,
       crossTenantReadBlocked, invalidReaderRefBlocked, externalChannelBlocked, authorityColumnAbsent,
+      dueListingBounded, disabledSupersededExcluded, workerPartialIsolation, workerCatchUp,
+      concurrentWorkerSingleRun,
     };
     const failed = Object.entries(acceptance).filter(([, passed]) => !passed).map(([name]) => name);
     if (failed.length > 0) throw new Error(
@@ -360,6 +442,11 @@ console.log(JSON.stringify({
   crossTenantReadBlocked,
   externalChannelBlocked,
   authorityColumnAbsent,
+  dueListingBounded,
+  disabledSupersededExcluded,
+  workerPartialIsolation,
+  workerCatchUp,
+  concurrentWorkerSingleRun,
   metaNetworkCalls: 0,
   externalNotifications: 0,
   temporaryRowsCommitted,

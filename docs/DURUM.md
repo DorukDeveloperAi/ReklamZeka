@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: ed568d607b27 -->
+<!-- durum-damga: 8a37fe34eb51 -->
 
 ## Künye
 
@@ -14,13 +14,17 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 31 |
+| iş commit'i (tüm geçmiş) | 35 |
 | ilk / son iş | 2026-08-06 / 2026-08-07 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-07 | `feat` | persist versioned schedules and inbox | `920083baf` |
+| 2026-08-07 | `feat` | add deterministic findings and ledger binding | `af656e3c5` |
+| 2026-08-07 | `feat` | persist and orchestrate decision room | `4d0a37fd7` |
+| 2026-08-07 | `docs` | record frozen context and analysis gates | `c2f6cb0bd` |
 | 2026-08-07 | `feat` | persist category guidance and context cores | `243884110` |
 | 2026-08-07 | `feat` | add category guidance timeframe cores | `fe851692f` |
 | 2026-08-07 | `docs` | start S2 Decision Room | `542fb451c` |
@@ -32,17 +36,13 @@
 | 2026-08-07 | `feat` | classify external snapshot changes | `4542aa6b5` |
 | 2026-08-07 | `docs` | close S1.4 evidence gate | `1fd18b530` |
 | 2026-08-07 | `test` | prove live S1.4 persistence | `019cd6d7f` |
-| 2026-08-07 | `feat` | persist linked post inventory | `5ae792ac5` |
-| 2026-08-07 | `feat` | persist S1.4 mirror in Postgres | `91fa14241` |
-| 2026-08-07 | `test` | cover live linked post inventory | `d6346a57a` |
-| 2026-08-07 | `feat` | mirror linked Page and Instagram posts | `6c586b990` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 20
-- `test        ` █████ 4
+- `feat        ` ████████████████████████ 23
+- `test        ` ████ 4
+- `docs        ` ███ 3
 - `?           ` ██ 2
-- `docs        ` ██ 2
 - `security    ` ██ 2
 - `fix         ` █ 1
 
