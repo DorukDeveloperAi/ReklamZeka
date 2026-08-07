@@ -24,9 +24,10 @@ const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$/;
 const SESSION = /^session_[a-f0-9]{32}$/;
 const NONCE = /^[a-f0-9]{64}$/;
 const TOKEN = /^rzs1\.([A-Za-z0-9_-]{64,2048})\.([A-Za-z0-9_-]{43})$/;
-const SCOPES = new Set<LocalSessionScope>([
+export const LOCAL_SESSION_SCOPES: readonly LocalSessionScope[] = Object.freeze([
   "approval_queue:decide", "approval_queue:read", "autonomy_rules:read", "autonomy_rules:draft", "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish", "budget_lab:draft", "budget_lab:read", "decision_room:read", "decision_room:mark_read", "practice_lab:read", "promotion_catalog:read", "promotion_preflight:read", "promotion_proposal:draft", "local_session:bootstrap",
 ]);
+const SCOPES = new Set<LocalSessionScope>(LOCAL_SESSION_SCOPES);
 
 export class LocalSessionCapabilityError extends Error {
   constructor() {
