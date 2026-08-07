@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 24e30bf0edc0 -->
+<!-- durum-damga: 566403eddbce -->
 
 ## Künye
 
@@ -14,13 +14,16 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 95 |
+| iş commit'i (tüm geçmiş) | 98 |
 | ilk / son iş | 2026-08-06 / 2026-08-08 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-08 | `docs` | record no-model API gate | `23025196d` |
+| 2026-08-08 | `test` | enforce no-model API boundary | `ba4347d8d` |
+| 2026-08-08 | `docs` | refresh deterministic project state | `7d1efb006` |
 | 2026-08-08 | `docs` | record K4 and insight gates | `0dea31c39` |
 | 2026-08-08 | `feat` | add v23 insight capability catalog | `fd392bc5d` |
 | 2026-08-08 | `feat` | complete K4 publication gate | `e8dc56aac` |
@@ -33,16 +36,13 @@
 | 2026-08-08 | `feat` | bind reviewed evidence freshness | `1ff863f10` |
 | 2026-08-08 | `feat` | compose category evidence adapter | `1181f5eda` |
 | 2026-08-08 | `docs` | record policy composition gate | `2454cd2dd` |
-| 2026-08-08 | `feat` | compose promotion policy evidence | `af2d3e95e` |
-| 2026-08-08 | `docs` | record proposal lifetime proof | `05b4c35c8` |
-| 2026-08-08 | `feat` | compose private scheduled sync tick | `1635dd6cd` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 40
-- `docs        ` ████████ 13
-- `test        ` ██ 4
-- `fix         ` ██ 3
+- `feat        ` ████████████████████████ 38
+- `docs        ` █████████ 15
+- `test        ` ███ 5
+- `fix         ` █ 2
 
 ## Planlar
 

@@ -4,6 +4,33 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "23025196d",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record no-model API gate",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "ba4347d8d",
+      "tarih": "2026-08-08",
+      "konu": "test(agent): enforce no-model API boundary",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "7d1efb006",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
       "hash": "0dea31c39",
       "tarih": "2026-08-08",
       "konu": "docs(roadmap): record K4 and insight gates",
@@ -110,54 +137,27 @@
       "kapsam": [
         "docs"
       ]
-    },
-    {
-      "hash": "af2d3e95e",
-      "tarih": "2026-08-08",
-      "konu": "feat(actions): compose promotion policy evidence",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "05b4c35c8",
-      "tarih": "2026-08-08",
-      "konu": "docs(roadmap): record proposal lifetime proof",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "1635dd6cd",
-      "tarih": "2026-08-08",
-      "konu": "feat(meta): compose private scheduled sync tick",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 40
+      "adet": 38
     },
     {
       "kapsam": "docs",
-      "adet": 13
+      "adet": 15
     },
     {
       "kapsam": "test",
-      "adet": 4
+      "adet": 5
     },
     {
       "kapsam": "fix",
-      "adet": 3
+      "adet": 2
     }
   ],
-  "isSayisi": 95,
+  "isSayisi": 98,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -170,5 +170,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "24e30bf0edc0"
+  "damga": "566403eddbce"
 }
