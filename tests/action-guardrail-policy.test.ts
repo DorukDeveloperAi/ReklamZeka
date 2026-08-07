@@ -149,4 +149,20 @@ describe("ProtectionResolver", () => {
     expect(resolveProtection(input([draft(), active, otherDraft, other]))).toMatchObject({ disposition: "unresolved", reasonCodes: ["ambiguous_policy_scope"] });
     expect(() => resolveProtection(input([active]))).toThrowError(expect.objectContaining({ code: "corrupt_registry" }));
   });
+
+  it("fails closed on conflicting clauses and rejects extended evidence contracts", () => {
+    const firstDraft = draft({ selector: selector({ actionTypes: ["budget_increase"], accountRefs: ["account_doruk"] }),
+      clauses: [{ clauseRef: "clause_shared", kind: "deny_action" }] });
+    const secondDraft = draft({ policyRef: "guardrail_campaign", selector: selector({ actionTypes: ["budget_increase"],
+      campaignRefs: ["campaign_leads"] }), clauses: [{ clauseRef: "clause_shared", kind: "budget_delta_limit",
+      currency: "TRY", maximumAbsoluteDeltaDecimal: "50", maximumRelativeDeltaBasisPoints: null }] });
+    const budgetAction = { actionHash: h("d"), actionType: "budget_increase" as const, accountRef: "account_doruk",
+      campaignRef: "campaign_leads", entity: { level: "campaign" as const, ref: "campaign_leads" },
+      budgetChange: { currency: "TRY", absoluteDeltaDecimal: "10", relativeDeltaBasisPoints: 100 } };
+    expect(resolveProtection(input([firstDraft, publish(firstDraft), secondDraft, publish(secondDraft)], { action: budgetAction })))
+      .toMatchObject({ disposition: "unresolved", reasonCodes: ["policy_clause_conflict"] });
+    expect(() => resolveProtection({ ...input([firstDraft, publish(firstDraft)], { action: budgetAction }),
+      categoryEvidence: { status: "known", refs: ["category_health"], evidenceHash: h("b"), raw: "forbidden" } as never }))
+      .toThrowError(expect.objectContaining({ code: "invalid_input" }));
+  });
 });
