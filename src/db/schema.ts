@@ -1245,6 +1245,207 @@ export const decisionLedgerRecords = pgTable("decision_ledger_records", {
   `),
 ]);
 
+/** Persisted, server-private Decision Room cadence configuration. */
+export const decisionRoomSchedules = pgTable("decision_room_schedules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull(),
+  campaignId: uuid("campaign_id").notNull(),
+  scheduleRef: text("schedule_ref").notNull(),
+  revision: integer("revision").notNull(),
+  definitionVersion: text("definition_version").notNull(),
+  definitionHash: text("definition_hash").notNull(),
+  workspaceRef: text("workspace_ref").notNull(),
+  accountRef: text("account_ref").notNull(),
+  campaignRef: text("campaign_ref").notNull(),
+  timeframeRef: text("timeframe_ref").notNull(),
+  templateRef: text("template_ref").notNull(),
+  timezone: text("timezone").notNull(),
+  localTime: text("local_time").notNull(),
+  frequency: text("frequency").notNull(),
+  dayOfWeek: integer("day_of_week"),
+  enabled: boolean("enabled").notNull(),
+  catchUpPolicy: text("catch_up_policy").notNull(),
+  tickGraceMinutes: integer("tick_grace_minutes").notNull(),
+  lastScheduledFor: timestamp("last_scheduled_for", { withTimezone: true }),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+  supersededAt: timestamp("superseded_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.adAccountId],
+    foreignColumns: [adAccounts.workspaceId, adAccounts.id],
+    name: "decision_room_schedules_account_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.campaignId],
+    foreignColumns: [adCampaigns.workspaceId, adCampaigns.id],
+    name: "decision_room_schedules_campaign_scope_fk",
+  }).onDelete("cascade"),
+  uniqueIndex("decision_room_schedules_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("decision_room_schedules_run_binding_unique")
+    .on(table.workspaceId, table.id, table.adAccountId, table.campaignId, table.definitionHash),
+  uniqueIndex("decision_room_schedules_workspace_ref_revision_unique").on(table.workspaceId, table.scheduleRef, table.revision),
+  uniqueIndex("decision_room_schedules_workspace_ref_hash_unique").on(table.workspaceId, table.scheduleRef, table.definitionHash),
+  uniqueIndex("decision_room_schedules_workspace_current_unique")
+    .on(table.workspaceId, table.scheduleRef).where(sql`${table.supersededAt} is null`),
+  index("decision_room_schedules_due_idx").on(table.workspaceId, table.nextRunAt)
+    .where(sql`${table.supersededAt} is null and ${table.enabled} is true`),
+  index("decision_room_schedules_account_idx").on(table.adAccountId),
+  index("decision_room_schedules_campaign_idx").on(table.campaignId),
+  check("decision_room_schedules_required", sql`
+    btrim(${table.scheduleRef}) <> '' and btrim(${table.workspaceRef}) <> ''
+    and btrim(${table.accountRef}) <> '' and btrim(${table.campaignRef}) <> ''
+    and btrim(${table.timeframeRef}) <> '' and btrim(${table.templateRef}) <> ''
+    and btrim(${table.timezone}) <> ''
+  `),
+  check("decision_room_schedules_revision", sql`
+    ${table.revision} >= 1 and ${table.definitionVersion} = 'decision-room-schedule/1.0.0'
+    and ${table.definitionHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("decision_room_schedules_frequency", sql`
+    (${table.frequency} = 'daily' and ${table.dayOfWeek} is null)
+    or (${table.frequency} = 'weekly' and ${table.dayOfWeek} between 0 and 6)
+  `),
+  check("decision_room_schedules_policy", sql`
+    ${table.localTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+    and ${table.catchUpPolicy} in ('skip', 'run_once')
+    and ${table.tickGraceMinutes} between 0 and 60
+  `),
+]);
+
+/** Idempotent run and lease state. Action authority is intentionally absent. */
+export const decisionRoomRuns = pgTable("decision_room_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  scheduleId: uuid("schedule_id"),
+  adAccountId: uuid("ad_account_id").notNull(),
+  campaignId: uuid("campaign_id").notNull(),
+  triggerKind: text("trigger_kind").notNull(),
+  scheduleDefinitionHash: text("schedule_definition_hash"),
+  idempotencyKey: text("idempotency_key").notNull(),
+  scopeKey: text("scope_key").notNull(),
+  runRef: text("run_ref").notNull(),
+  state: text("state").notNull(),
+  leaseToken: uuid("lease_token"),
+  leaseUntil: timestamp("lease_until", { withTimezone: true }),
+  attempt: integer("attempt").notNull().default(0),
+  analysisRef: text("analysis_ref"),
+  summaryCode: text("summary_code"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  failedAt: timestamp("failed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.scheduleId, table.adAccountId, table.campaignId, table.scheduleDefinitionHash],
+    foreignColumns: [
+      decisionRoomSchedules.workspaceId,
+      decisionRoomSchedules.id,
+      decisionRoomSchedules.adAccountId,
+      decisionRoomSchedules.campaignId,
+      decisionRoomSchedules.definitionHash,
+    ],
+    name: "decision_room_runs_schedule_binding_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.workspaceId, table.adAccountId],
+    foreignColumns: [adAccounts.workspaceId, adAccounts.id],
+    name: "decision_room_runs_account_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.campaignId],
+    foreignColumns: [adCampaigns.workspaceId, adCampaigns.id],
+    name: "decision_room_runs_campaign_scope_fk",
+  }).onDelete("cascade"),
+  uniqueIndex("decision_room_runs_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("decision_room_runs_workspace_idempotency_unique").on(table.workspaceId, table.idempotencyKey),
+  uniqueIndex("decision_room_runs_workspace_ref_unique").on(table.workspaceId, table.runRef),
+  index("decision_room_runs_active_scope_idx").on(table.workspaceId, table.scopeKey, table.leaseUntil),
+  index("decision_room_runs_schedule_idx").on(table.scheduleId),
+  index("decision_room_runs_account_idx").on(table.adAccountId),
+  index("decision_room_runs_campaign_idx").on(table.campaignId),
+  check("decision_room_runs_identity", sql`
+    ${table.idempotencyKey} ~ '^idempotency_[a-f0-9]{32}$'
+    and ${table.scopeKey} ~ '^[a-f0-9]{64}$'
+    and ${table.runRef} ~ '^run_[a-f0-9]{20}$'
+  `),
+  check("decision_room_runs_state", sql`${table.state} in ('running', 'completed', 'failed')`),
+  check("decision_room_runs_trigger", sql`
+    (${table.triggerKind} = 'manual' and ${table.scheduleId} is null and ${table.scheduleDefinitionHash} is null)
+    or (${table.triggerKind} = 'scheduled' and ${table.scheduleId} is not null
+      and ${table.scheduleDefinitionHash} ~ '^[a-f0-9]{64}$')
+  `),
+  check("decision_room_runs_attempt_positive", sql`${table.attempt} >= 1`),
+  check("decision_room_runs_state_shape", sql`(
+    (${table.state} = 'running' and ${table.leaseToken} is not null and ${table.leaseUntil} is not null
+      and ${table.analysisRef} is null and ${table.summaryCode} is null and ${table.completedAt} is null)
+    or (${table.state} = 'completed' and ${table.leaseToken} is null and ${table.leaseUntil} is null
+      and ${table.analysisRef} is not null and ${table.summaryCode} is not null and ${table.completedAt} is not null)
+    or (${table.state} = 'failed' and ${table.leaseToken} is null and ${table.leaseUntil} is null
+      and ${table.analysisRef} is null and ${table.summaryCode} is null and ${table.failedAt} is not null)
+  ) is true`),
+  check("decision_room_runs_completion_format", sql`
+    (${table.analysisRef} is null or ${table.analysisRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$')
+    and (${table.summaryCode} is null or ${table.summaryCode} ~ '^[a-z0-9][a-z0-9_:-]{0,127}$')
+  `),
+]);
+
+/** Deduplicated in-app-only completion notifications. */
+export const decisionRoomInboxItems = pgTable("decision_room_inbox_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  runId: uuid("run_id").notNull(),
+  notificationRef: text("notification_ref").notNull(),
+  channel: text("channel").notNull().default("in_app_inbox"),
+  analysisRef: text("analysis_ref").notNull(),
+  summaryCode: text("summary_code").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.runId],
+    foreignColumns: [decisionRoomRuns.workspaceId, decisionRoomRuns.id],
+    name: "decision_room_inbox_items_run_scope_fk",
+  }).onDelete("cascade"),
+  uniqueIndex("decision_room_inbox_items_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("decision_room_inbox_items_workspace_notification_unique").on(table.workspaceId, table.notificationRef),
+  uniqueIndex("decision_room_inbox_items_workspace_run_analysis_unique").on(table.workspaceId, table.runId, table.analysisRef),
+  index("decision_room_inbox_items_run_idx").on(table.runId),
+  index("decision_room_inbox_items_created_idx").on(table.workspaceId, table.createdAt),
+  check("decision_room_inbox_items_channel", sql`${table.channel} = 'in_app_inbox'`),
+  check("decision_room_inbox_items_format", sql`
+    ${table.notificationRef} ~ '^inbox_[a-f0-9]{20}$'
+    and ${table.analysisRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$'
+    and ${table.summaryCode} ~ '^[a-z0-9][a-z0-9_:-]{0,127}$'
+  `),
+]);
+
+/** Per-reader state is separate so dashboard and CLI views remain idempotent. */
+export const decisionRoomInboxReads = pgTable("decision_room_inbox_reads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  inboxItemId: uuid("inbox_item_id").notNull(),
+  readerRef: text("reader_ref").notNull(),
+  readAt: timestamp("read_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.inboxItemId],
+    foreignColumns: [decisionRoomInboxItems.workspaceId, decisionRoomInboxItems.id],
+    name: "decision_room_inbox_reads_item_scope_fk",
+  }).onDelete("cascade"),
+  uniqueIndex("decision_room_inbox_reads_workspace_item_reader_unique")
+    .on(table.workspaceId, table.inboxItemId, table.readerRef),
+  index("decision_room_inbox_reads_item_idx").on(table.inboxItemId),
+  index("decision_room_inbox_reads_reader_idx").on(table.workspaceId, table.readerRef, table.readAt),
+  check("decision_room_inbox_reads_reader_required", sql`
+    ${table.readerRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$'
+    and ${table.readerRef} !~* '(token|secret|prompt|raw[_-]?(payload|request|response|json))'
+  `),
+]);
+
 export const metaAssetEdges = pgTable("meta_asset_edges", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),

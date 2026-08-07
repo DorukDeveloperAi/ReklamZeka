@@ -6,7 +6,7 @@ export type DecisionRoomRequest = Readonly<{
   version: typeof DECISION_ROOM_EXECUTOR_VERSION;
   trigger:
     | Readonly<{ kind: "manual"; requestRef: string; requestedByRef: string }>
-    | Readonly<{ kind: "scheduled"; scheduleRef: string; scheduledFor: string }>;
+    | Readonly<{ kind: "scheduled"; scheduleRef: string; scheduleDefinitionHash: string; scheduledFor: string }>;
   requestedAt: string;
   workspaceRef: string;
   accountRef: string;
@@ -75,6 +75,11 @@ export type DecisionRoomRunStore = Readonly<{
   claim(input: Readonly<{
     idempotencyKey: string;
     scopeKey: string;
+    triggerKind: "manual" | "scheduled";
+    scheduleRef: string | null;
+    scheduleDefinitionHash: string | null;
+    accountRef: string;
+    campaignRef: string;
     now: string;
     leaseUntil: string;
   }>): Promise<ClaimResult>;
@@ -145,7 +150,7 @@ export function validateDecisionRoomRequest(request: DecisionRoomRequest): Decis
     request.trigger,
     request.trigger?.kind === "manual"
       ? ["kind", "requestRef", "requestedByRef"]
-      : ["kind", "scheduleRef", "scheduledFor"],
+      : ["kind", "scheduleRef", "scheduleDefinitionHash", "scheduledFor"],
     "invalid_request",
   );
   if (!(["manual", "scheduled"] as const).includes(request.trigger.kind)) {
@@ -153,7 +158,14 @@ export function validateDecisionRoomRequest(request: DecisionRoomRequest): Decis
   }
   const trigger = request.trigger.kind === "manual"
     ? Object.freeze({ kind: "manual" as const, requestRef: required(request.trigger.requestRef), requestedByRef: required(request.trigger.requestedByRef) })
-    : Object.freeze({ kind: "scheduled" as const, scheduleRef: required(request.trigger.scheduleRef), scheduledFor: time(request.trigger.scheduledFor) });
+    : Object.freeze({
+      kind: "scheduled" as const,
+      scheduleRef: required(request.trigger.scheduleRef),
+      scheduleDefinitionHash: /^[a-f0-9]{64}$/.test(request.trigger.scheduleDefinitionHash)
+        ? request.trigger.scheduleDefinitionHash
+        : (() => { throw new DecisionRoomExecutorError("invalid_request"); })(),
+      scheduledFor: time(request.trigger.scheduledFor),
+    });
   return Object.freeze({
     version: DECISION_ROOM_EXECUTOR_VERSION,
     trigger,
@@ -171,7 +183,7 @@ export function decisionRoomIdempotencyKey(request: DecisionRoomRequest): string
   const valid = validateDecisionRoomRequest(request);
   const triggerIdentity = valid.trigger.kind === "manual"
     ? `manual:${valid.trigger.requestRef}`
-    : `scheduled:${valid.trigger.scheduleRef}:${valid.trigger.scheduledFor}`;
+    : `scheduled:${valid.trigger.scheduleRef}:${valid.trigger.scheduleDefinitionHash}:${valid.trigger.scheduledFor}`;
   return `idempotency_${sha256(JSON.stringify({
     version: valid.version,
     triggerIdentity,
@@ -246,6 +258,11 @@ export class DecisionRoomExecutor {
     const claim = await this.store.claim({
       idempotencyKey,
       scopeKey: scopeKey(request),
+      triggerKind: request.trigger.kind,
+      scheduleRef: request.trigger.kind === "scheduled" ? request.trigger.scheduleRef : null,
+      scheduleDefinitionHash: request.trigger.kind === "scheduled" ? request.trigger.scheduleDefinitionHash : null,
+      accountRef: request.accountRef,
+      campaignRef: request.campaignRef,
       now: current.toISOString(),
       leaseUntil: new Date(current.getTime() + this.leaseMs).toISOString(),
     });
@@ -303,7 +320,17 @@ type MutableRun = {
 export class InMemoryDecisionRoomRunStore implements DecisionRoomRunStore {
   private readonly runs = new Map<string, MutableRun>();
 
-  async claim(input: Readonly<{ idempotencyKey: string; scopeKey: string; now: string; leaseUntil: string }>): Promise<ClaimResult> {
+  async claim(input: Readonly<{
+    idempotencyKey: string;
+    scopeKey: string;
+    triggerKind: "manual" | "scheduled";
+    scheduleRef: string | null;
+    scheduleDefinitionHash: string | null;
+    accountRef: string;
+    campaignRef: string;
+    now: string;
+    leaseUntil: string;
+  }>): Promise<ClaimResult> {
     const existing = this.runs.get(input.idempotencyKey);
     if (existing?.state === "completed") return Object.freeze({
       status: "duplicate_completed", runRef: existing.runRef, attempt: existing.attempt, completion: existing.completion!,

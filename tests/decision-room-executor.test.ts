@@ -40,7 +40,10 @@ function runner(overrides: Partial<DecisionRoomAnalysisPort> = {}): DecisionRoom
 describe("shared manual and scheduled Decision Room executor", () => {
   it("uses one executor contract and deterministic trigger-bound idempotency keys", async () => {
     const manual = request();
-    const scheduled = request({ kind: "scheduled", scheduleRef: "schedule_daily", scheduledFor: "2026-08-07T09:00:00Z" });
+    const scheduled = request({
+      kind: "scheduled", scheduleRef: "schedule_daily", scheduleDefinitionHash: "a".repeat(64),
+      scheduledFor: "2026-08-07T09:00:00Z",
+    });
     expect(decisionRoomIdempotencyKey({ ...manual, requestedAt: "2026-08-07T12:01:00Z" }))
       .toBe(decisionRoomIdempotencyKey(manual));
     expect(decisionRoomIdempotencyKey({ ...scheduled, requestedAt: "2026-08-07T12:01:00Z" }))
@@ -65,7 +68,10 @@ describe("shared manual and scheduled Decision Room executor", () => {
       new InMemoryDecisionRoomRunStore(), analysis, inbox,
       () => new Date("2026-08-07T12:00:00Z"),
     );
-    const scheduled = request({ kind: "scheduled", scheduleRef: "schedule_daily", scheduledFor: "2026-08-07T09:00:00Z" });
+    const scheduled = request({
+      kind: "scheduled", scheduleRef: "schedule_daily", scheduleDefinitionHash: "a".repeat(64),
+      scheduledFor: "2026-08-07T09:00:00Z",
+    });
     const first = await executor.execute(scheduled);
     const duplicate = await executor.execute({ ...scheduled, requestedAt: "2026-08-07T12:02:00Z" });
 
@@ -94,10 +100,14 @@ describe("shared manual and scheduled Decision Room executor", () => {
 
     const firstLease = await store.claim({
       idempotencyKey: "idempotency_expired", scopeKey: "scope_expired",
+      triggerKind: "manual", scheduleRef: null, scheduleDefinitionHash: null,
+      accountRef: "account_masked", campaignRef: "campaign_masked",
       now: "2026-08-07T12:00:00Z", leaseUntil: "2026-08-07T12:01:00Z",
     });
     const secondLease = await store.claim({
       idempotencyKey: "idempotency_expired", scopeKey: "scope_expired",
+      triggerKind: "manual", scheduleRef: null, scheduleDefinitionHash: null,
+      accountRef: "account_masked", campaignRef: "campaign_masked",
       now: "2026-08-07T12:02:00Z", leaseUntil: "2026-08-07T12:03:00Z",
     });
     expect(firstLease).toMatchObject({ status: "claimed", attempt: 1 });

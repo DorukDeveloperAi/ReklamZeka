@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   DECISION_ROOM_EXECUTOR_VERSION,
   validateDecisionRoomRequest,
@@ -171,6 +172,10 @@ export function validateDecisionRoomSchedule(schedule: DecisionRoomSchedule): De
     : Object.freeze({ ...base, frequency: "weekly", dayOfWeek: schedule.dayOfWeek });
 }
 
+export function decisionRoomScheduleDefinitionHash(schedule: DecisionRoomSchedule): string {
+  return createHash("sha256").update(JSON.stringify(validateDecisionRoomSchedule(schedule))).digest("hex");
+}
+
 function applies(schedule: DecisionRoomSchedule, date: string): boolean {
   return schedule.frequency === "daily" || dayOfWeek(date) === schedule.dayOfWeek;
 }
@@ -243,7 +248,12 @@ export function scheduledDecisionRoomRequest(input: Readonly<{
   }
   const request: DecisionRoomRequest = {
     version: DECISION_ROOM_EXECUTOR_VERSION,
-    trigger: { kind: "scheduled", scheduleRef: schedule.scheduleRef, scheduledFor: scheduledFor.toISOString() },
+    trigger: {
+      kind: "scheduled",
+      scheduleRef: schedule.scheduleRef,
+      scheduleDefinitionHash: decisionRoomScheduleDefinitionHash(schedule),
+      scheduledFor: scheduledFor.toISOString(),
+    },
     requestedAt: requestedAt.toISOString(),
     workspaceRef: schedule.workspaceRef,
     accountRef: schedule.accountRef,

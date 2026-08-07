@@ -318,3 +318,29 @@ ReklamZeka'ya taşınmaz.
 - Kanıt: 57 test dosyası/314 test, typecheck, `db:check`, production build, audit `0`.
   Supabase 43/43 RLS, API table grant `0`, API schema create `0`, public routine execute `0`;
   tracked/build/cache token eşleşmesi `0`; Meta write/network çağrısı `0`.
+
+## 2026-08-07 — S2 gerçek finding ve kalıcı scheduled inbox kapısı
+
+- İlk gerçek deterministic finding ailesi trend, anomaly, pacing, threshold, period comparison
+  ve pre/post hesaplarını kapsar. Yalnız authentic metric-engine sonuçlarını ve resolved timeframe'i
+  kabul eder; ratio/non-additive değerleri yeniden toplamaz. Minimum sample/point, settling,
+  data-quality, missing metric, zero baseline ve precision overflow açık reason üretir.
+- Decision Room ledger staging artık gerçek Drizzle repository'ye bağlıdır. Workspace row lock,
+  optimistic head ve immutable prefix kontrolüyle bir koşumun en fazla analysis→optional decision
+  suffix'ini tek transactionda yazar; stale head, prefix rewrite, cross-workspace ve partial failure
+  tam rollback olur. Public sonuç ledger, workspace ref veya internal UUID taşımaz.
+- Schedule tanımları canonical hash ve monoton revision ile immutable'dır. Yeni revision eskisini
+  supersede eder ve due kuyruğundan çıkarır; eski run exact revisionı görmeye devam eder. Scheduled
+  request definition hash'i idempotency anahtarına taşır, dolayısıyla edit/claim yarışı yanlış
+  revisiona bağlanamaz.
+- Manual ve scheduled run'lar gerçek account/campaign zincirine; scheduled run ayrıca exact
+  schedule revision/hash kombinasyonuna composite FK ile bağlıdır. PostgreSQL advisory lock,
+  lease token, retry ve scope overlap yarışlarını korur. Inbox yalnız `in_app_inbox` kabul eder;
+  notification ve per-reader read-state idempotent ve workspace-scoped'dur.
+- Migration Supabase'e uygulandı. Uygulanmış production tablolarında outer-rollback E2E 22/22
+  kabul bayrağında geçti; historical revision, immutable definition, hash/cross-asset/cross-combination,
+  lease/retry/duplicate, inbox/read-state, forbidden reader/channel ve kalıcı-fixture kontrolleri temiz.
+- Kanıt: 60 test dosyası/336 test, typecheck, `db:check`, production build, audit `0`.
+  Supabase 47/47 RLS, API table grant `0`, API schema create `0`, public routine execute `0`;
+  43-tablolu tombstone rollback temiz; tracked/build/cache token eşleşmesi `0`; Meta network ve
+  dış bildirim çağrısı `0`.

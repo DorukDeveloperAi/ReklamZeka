@@ -104,12 +104,14 @@
   - [x] Deterministik analysis run/record, frozen window/context/snapshot refs ve
     insufficient-data reason sözleşmesi.
   - [x] Versioned metrik/formül kataloğu, provenance ve fail-closed aggregation motoru.
-  - [ ] Gerçek finding fonksiyonları.
+  - [x] Trend/anomaly/pacing/threshold/period/pre-post authentic calculator ailesi.
+  - [ ] Cohort calculator ve L2 materialization/application binding'i.
 - [ ] Hierarchical driver ve creative fatigue/config diagnostics.
 - [ ] Analysis run ledger, dry-run API ve deterministic replay.
   - [x] Append-only authentic hash-chain decision ledger saf çekirdeği ve malformed/tamper matrisi.
   - [x] Workspace-scoped PostgreSQL ledger persistence, tenant/temporal guard ve rollback E2E.
   - [x] Model-agnostic read/draft Decision Room application servisi ve stable replay refs.
+  - [x] Optimistic head/immutable prefix korumalı atomik Drizzle suffix staging adapterı.
   - [ ] HTTP/CLI adapter, rol/audit API'si ve gerçek dry-run endpoint'i.
 - [ ] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
   - [x] Deterministik on-pass agenda, category/topic subset ve context/timeframe-bound finding çekirdeği.
@@ -171,7 +173,8 @@
 - [ ] Idempotent execute, Meta error taxonomy, read-after-write ve rollback.
 - [ ] Hourly/daily/weekly/monthly/after-sync scheduler; DST/misfire/idempotency.
   - [x] Decision Room daily/weekly timezone+DST, skip/run_once catch-up ve duplicate-slot çekirdeği.
-  - [ ] Hourly/monthly/after-sync, kalıcı run store ve worker binding'i.
+  - [x] Immutable schedule revision, exact hierarchy binding ve kalıcı lease/run store.
+  - [ ] Hourly/monthly/after-sync ve worker tick binding'i.
 - [ ] Sync→analyze→plan→approval agentic routine; otomatik execute yok.
 - [ ] External intervention reconcile ve sandbox/shadow rollout.
 - [ ] Manual/assisted/automated-read/scheduled-plan + approval-only/policy-limited inheritance ve kill switch.
@@ -205,7 +208,8 @@
 - [ ] Practice Lab candidate/trial/outcome/decomposition/standardized artifact UI.
 - [ ] Scheduled analysis in-app inbox ve duplicate-delivery/read-state E2E.
   - [x] Saf executor üzerinde idempotent in-app teslim/recovery ve duplicate-run testi.
-  - [ ] PostgreSQL inbox/read-state, dashboard ve worker E2E.
+  - [x] Workspace-scoped PostgreSQL inbox/read-state ve duplicate-delivery rollback E2E.
+  - [ ] Dashboard ve worker E2E.
 - [x] Operating Dashboard + Orchestrator çift-yüzey bilgi mimarisi ve etkileşimli demo kabuğu.
 - [ ] Operating Dashboard gerçek backend state'iyle responsive/browser E2E.
 - [ ] Orchestrator skill/context/autonomy/handoff çalışma alanı ve dashboard↔CLI E2E.

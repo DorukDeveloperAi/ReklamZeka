@@ -33,20 +33,24 @@ bütçe simülasyonu ve Meta write sırasıyla S3 ve S4'e aittir.
   PostgreSQL persistence, tenant/hierarchy bağları, source-version selective invalidation,
   historical replay ve güvenli public projection testli; raw L0, token, agent narration ve
   action/write authority reddediliyor.
-- **S2.5 pure agenda/finding core hazır:** on deterministik top-down pass, category/topic subset,
+- **S2.5 agenda/finding core hazır:** on deterministik top-down pass, category/topic subset,
   bounded finding-driver drill-down, objective metric allowlist'i, timeframe/context bağları ve
-  protected-guidance suppression testli. Persistence ve Decision Room application binding'i açık.
+  protected-guidance suppression testli. Trend/anomaly/pacing/threshold/period/pre-post calculator
+  ailesi authentic metric result, precision zarfı ve explicit insufficient/settling reason'larıyla
+  hazır. L2 materialization ve calculator→agenda application binding'i açık.
 - **S2.6 cadence/experiment/ledger persistence hazır:** settle/observation/learning/cooldown,
   evidence ve repeat suppression; tek değişkenli experiment lifecycle ve append-only authentic
   hash-chain ledger testli. Ledger Supabase'e uygulandı; context/analysis tenant bağları,
   temporal guard, restart/idempotency/tamper ve nested-authority reddi rollback E2E'den geçti.
-- **S2.7 application/executor core hazır:** dashboard ve CLI için tek model-agnostic read/draft
-  servis; stable replay refs, güvenli public projection ve optimistic staging portu testli.
-  Manual/scheduled ortak executor duplicate/overlap/retry/lease/inbox idempotency'sini; daily/
-  weekly schedule timezone, DST ve catch-up kurallarını uygular. HTTP/CLI adapter ve UI açık.
-- **Birleşik kanıt:** 57 test dosyası/314 test, production build, audit 0; category/guidance,
-  frozen-context, decision-ledger ve tombstone PostgreSQL rollback kabulleri temiz. Supabase
-  43/43 RLS, API table grant'i `0`; otomatik tracked/build/cache token eşleşmesi `0`.
+- **S2.7 persistence/application/executor core hazır:** dashboard ve CLI için tek model-agnostic
+  read/draft servis, optimistic/atomic ledger suffix adapterı ve güvenli public projection testli.
+  Immutable hash/revision schedule, exact account/campaign/schedule run binding, PostgreSQL lease/
+  retry/overlap, idempotent in-app inbox/read-state ve timezone/DST/catch-up Supabase'e uygulandı.
+  HTTP/CLI adapter, worker tick ve UI açık.
+- **Birleşik kanıt:** 60 test dosyası/336 test, production build, audit 0; category/guidance,
+  frozen-context, decision-ledger, Decision Room persistence ve 43-tablolu tombstone PostgreSQL
+  rollback kabulleri temiz. Supabase 47/47 RLS, API table grant'i `0`; otomatik
+  tracked/build/cache token eşleşmesi `0`.
   Meta write/network çağrısı `0`.
 
 ## Değişmez sınırlar
