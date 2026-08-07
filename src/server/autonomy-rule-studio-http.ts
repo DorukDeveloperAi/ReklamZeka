@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { TrustedDecisionRoomPrincipal } from "@/application/decision-room-agent-contract";
 import { type AutonomyRuleDraftRequest, type AutonomyRuleStudioService } from "@/application/autonomy-rule-studio-service";
+import { AutonomyRuleRegistryError } from "@/domain/actions/autonomy-rule-registry";
 import { AuthorizationError } from "@/security/authorization";
 
 const HEADERS = Object.freeze({ "Cache-Control": "private, no-store, max-age=0", "X-Content-Type-Options": "nosniff",
@@ -14,7 +15,8 @@ function exact(value: unknown, keys: readonly string[]): asserts value is Record
 }
 function failure(reason: unknown) {
   if (reason instanceof AuthorizationError) return error("forbidden", reason.publicMessage, 403);
-  if (reason instanceof Error && reason.message === "invalid_input") return error("invalid_input", "Otonomi kuralı isteği geçersiz.", 400);
+  if (reason instanceof SyntaxError || reason instanceof AutonomyRuleRegistryError && reason.code === "invalid_input"
+    || reason instanceof Error && reason.message === "invalid_input") return error("invalid_input", "Otonomi kuralı isteği geçersiz.", 400);
   return error("unavailable", "Autonomy Studio şu anda kullanılamıyor.", 503);
 }
 export function autonomyRuleStudioNotConfiguredResponse() { return error("source_not_configured", "Autonomy Studio yerel çalışma alanına henüz bağlanmadı.", 503); }

@@ -6,6 +6,7 @@ rol: ajan
 tier: kod
 model: claude-opus-5
 effort: high
+
 ---
 
 # Konfigüratör — agents/skills/hooks yönetim & optimizasyon ajanı
