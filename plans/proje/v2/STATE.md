@@ -837,5 +837,6 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - S1.4 canlı kabul paketi yeniden geçti: 5 hesap, 79 asset/79 edge, 1.179 linked post/media ve örneklenen
   30 reklamın 30'unda copy+post identity; iki hesaplı persistence kabulünde 6 copy/post binding, 4 creative,
   6 binding ve 3 durable checkpoint doğrulandı. Meta write network çağrısı her iki kabulde de `0`dır.
-- Migration öncesi tam kapı: 142 test dosyasında 861 test, production build, security/secret ve Drizzle
-  kontrolleri geçti. Canlı Supabase migration ve security proof bir sonraki adımdır.
+- Tam kapı: 142 test dosyasında 861 test, production build, security/secret ve Drizzle kontrolleri geçti.
+  Migration bağlı Supabase'e uygulandı; canlı kontrolde 70/70 tablo RLS ve API rollerinde sıfır tablo
+  grant'i, sıfır schema-create ve sıfır public routine-execute grant'i doğrulandı.
