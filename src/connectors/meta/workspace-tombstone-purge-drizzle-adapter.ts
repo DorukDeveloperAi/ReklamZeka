@@ -37,6 +37,7 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "guidance_bindings",
   "guidance_sets",
   "autonomy_rule_revisions",
+  "meta_compatibility_artifact_revisions",
   "advised_practice_definitions",
   "advised_practice_events",
   "effective_campaign_contexts",
@@ -163,6 +164,9 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'autonomy_rule_revisions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from autonomy_rule_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'meta_compatibility_artifact_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from meta_compatibility_artifact_revisions where workspace_id = ${workspaceId}::uuid
       union all select 'advised_practice_definitions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from advised_practice_definitions where workspace_id = ${workspaceId}::uuid
@@ -352,6 +356,7 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
 
     // Children first. This ordering is stable to minimize lock-order deadlocks.
     await remove(sql`with removed as (delete from autonomy_rule_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from meta_compatibility_artifact_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_approval_evidence_grants where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_approval_decision_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_proposal_dependencies where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

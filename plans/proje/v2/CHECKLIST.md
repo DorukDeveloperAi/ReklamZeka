@@ -265,6 +265,10 @@
   - [x] Campaign/ad set/ad Graph sayfalarını tenant-bound PostgreSQL aynaya raw payload saklamadan yazan,
     source-priority/revision replay korumalı ve cursor öncesi fail-closed çalışan kanonik inventory
     materializer portu. Production sync factory/live wiring henüz yoktur; compatibility kanıtı sayılmaz.
+  - [x] Beş compatibility boyutu için seed'siz, reviewed/published/expiry kontrollü generic typed artifact
+    registry; empty/partial/stale/conflict protection `unknown`, action/policy/Meta authority yok.
+  - [x] Organic post ile existing-ad kaynağını ayıran versioned `sourceBinding`; organik gönderide creative
+    kimliği/üretimi yok, source/post/object-story kanıtı action hash'ine bağlı ve legacy ref sentezlenmiyor.
   - [ ] Canonical private materializer: template/preset/binding + post/object-story binding + approval
     policy/plan/action context'i kanıtlı kaynaktan kurup mevcut proposal service/queue repository'ye bağlama.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.

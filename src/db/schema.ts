@@ -3216,3 +3216,110 @@ export const autonomyRuleRevisions = pgTable("autonomy_rule_revisions", {
       !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json)|free[_-]?text)"[[:space:]]*:'
   `),
 ]);
+
+/**
+ * One generic append-only registry for reviewed Meta compatibility mappings and
+ * exact selection evidence. Mapping artifacts describe identity only; they do
+ * not grant policy, approval, execution, or Meta write authority.
+ */
+export const metaCompatibilityArtifactRevisions = pgTable("meta_compatibility_artifact_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  artifactRef: text("artifact_ref").notNull(),
+  revision: integer("revision").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  workspaceRef: text("workspace_ref").notNull(),
+  artifactKind: text("artifact_kind").notNull(),
+  dimension: text("dimension").notNull(),
+  state: text("state").notNull(),
+  selectionHash: text("selection_hash"),
+  outcome: text("outcome"),
+  previousHash: text("previous_hash"),
+  reviewedByActorRef: text("reviewed_by_actor_ref"),
+  reviewedByRole: text("reviewed_by_role"),
+  reviewDecisionRef: text("review_decision_ref"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  reviewBy: timestamp("review_by", { withTimezone: true }),
+  publishedByActorRef: text("published_by_actor_ref"),
+  publishedByRole: text("published_by_role"),
+  publicationDecisionRef: text("publication_decision_ref"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  tombstonedByActorRef: text("tombstoned_by_actor_ref"),
+  tombstoneDecisionRef: text("tombstone_decision_ref"),
+  tombstonedAt: timestamp("tombstoned_at", { withTimezone: true }),
+  canonicalHash: text("canonical_hash").notNull(),
+  artifactPayload: jsonb("artifact_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("meta_compatibility_artifact_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("meta_compatibility_artifact_revisions_identity_unique")
+    .on(table.workspaceId, table.artifactRef, table.revision),
+  uniqueIndex("meta_compatibility_artifact_revisions_hash_unique").on(table.workspaceId, table.canonicalHash),
+  index("meta_compatibility_artifact_revisions_registry_idx")
+    .on(table.workspaceId, table.state, table.artifactKind, table.dimension, table.artifactRef, table.revision),
+  index("meta_compatibility_artifact_revisions_selection_idx")
+    .on(table.workspaceId, table.selectionHash, table.dimension, table.state, table.revision),
+  check("meta_compatibility_artifact_revisions_identity", sql`
+    ${table.revision} between 1 and 1000000
+    and ${table.schemaVersion} = 'meta-compatibility-artifact/1.0.0'
+    and ${table.artifactRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.workspaceRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.artifactKind} in ('mapping', 'evidence')
+    and ${table.dimension} in ('destination', 'optimization', 'placement', 'special_category', 'tracking')
+    and ${table.state} in ('draft', 'reviewed', 'published', 'tombstoned')
+    and ${table.canonicalHash} ~ '^[a-f0-9]{64}$'
+    and (${table.previousHash} is null or ${table.previousHash} ~ '^[a-f0-9]{64}$')
+  `),
+  check("meta_compatibility_artifact_revisions_kind_shape", sql`
+    (${table.artifactKind} = 'mapping' and ${table.selectionHash} is null and ${table.outcome} is null)
+    or (${table.artifactKind} = 'evidence' and ${table.selectionHash} ~ '^[a-f0-9]{64}$'
+      and ${table.outcome} in ('confirmed', 'rejected', 'unknown'))
+  `),
+  check("meta_compatibility_artifact_revisions_lifecycle", sql`
+    (${table.state} = 'draft' and ${table.revision} = 1 and ${table.previousHash} is null
+      and ${table.reviewedByActorRef} is null and ${table.reviewedByRole} is null and ${table.reviewDecisionRef} is null
+      and ${table.reviewedAt} is null and ${table.reviewBy} is null
+      and ${table.publishedByActorRef} is null and ${table.publishedByRole} is null and ${table.publicationDecisionRef} is null and ${table.publishedAt} is null
+      and ${table.tombstonedByActorRef} is null and ${table.tombstoneDecisionRef} is null and ${table.tombstonedAt} is null)
+    or (${table.state} = 'reviewed' and ${table.revision} >= 2 and ${table.previousHash} is not null
+      and ${table.reviewedByActorRef} is not null and ${table.reviewedByRole} in ('owner', 'admin')
+      and ${table.reviewDecisionRef} is not null and ${table.reviewedAt} is not null and ${table.reviewBy} > ${table.reviewedAt}
+      and ${table.publishedByActorRef} is null and ${table.publishedByRole} is null and ${table.publicationDecisionRef} is null and ${table.publishedAt} is null
+      and ${table.tombstonedByActorRef} is null and ${table.tombstoneDecisionRef} is null and ${table.tombstonedAt} is null)
+    or (${table.state} = 'published' and ${table.revision} >= 3 and ${table.previousHash} is not null
+      and ${table.reviewedByActorRef} is not null and ${table.reviewedByRole} in ('owner', 'admin')
+      and ${table.reviewDecisionRef} is not null and ${table.reviewedAt} is not null
+      and ${table.publishedByActorRef} is not null and ${table.publishedByRole} in ('owner', 'admin')
+      and ${table.publicationDecisionRef} is not null and ${table.publishedAt} >= ${table.reviewedAt} and ${table.reviewBy} > ${table.publishedAt}
+      and ${table.tombstonedByActorRef} is null and ${table.tombstoneDecisionRef} is null and ${table.tombstonedAt} is null)
+    or (${table.state} = 'tombstoned' and ${table.revision} >= 4 and ${table.previousHash} is not null
+      and ${table.reviewedByActorRef} is not null and ${table.reviewedByRole} in ('owner', 'admin')
+      and ${table.reviewDecisionRef} is not null and ${table.reviewedAt} is not null
+      and ${table.publishedByActorRef} is not null and ${table.publishedByRole} in ('owner', 'admin')
+      and ${table.publicationDecisionRef} is not null and ${table.publishedAt} >= ${table.reviewedAt} and ${table.reviewBy} > ${table.publishedAt}
+      and ${table.tombstonedByActorRef} is not null and ${table.tombstoneDecisionRef} is not null and ${table.tombstonedAt} >= ${table.publishedAt})
+  `),
+  check("meta_compatibility_artifact_revisions_payload_exact", sql`
+    jsonb_typeof(${table.artifactPayload}) = 'object'
+    and ${table.artifactPayload} #>> '{version}' = ${table.schemaVersion}
+    and ${table.artifactPayload} #>> '{artifactRef}' = ${table.artifactRef}
+    and (${table.artifactPayload} #>> '{revision}')::integer = ${table.revision}
+    and ${table.artifactPayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+    and ${table.artifactPayload} #>> '{dimension}' = ${table.dimension}
+    and ${table.artifactPayload} #>> '{state}' = ${table.state}
+    and ${table.artifactPayload} #>> '{content,kind}' = ${table.artifactKind}
+    and (${table.artifactPayload} #>> '{content,selectionHash}') is not distinct from ${table.selectionHash}
+    and (${table.artifactPayload} #>> '{content,outcome}') is not distinct from ${table.outcome}
+    and (${table.artifactPayload} #>> '{previousHash}') is not distinct from ${table.previousHash}
+    and ${table.artifactPayload} #>> '{canonicalHash}' = ${table.canonicalHash}
+    and ${table.artifactPayload} #>> '{authority,canExecute}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canWriteMeta}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canGrantApproval}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canCreatePolicy}' = 'false'
+    and ${table.artifactPayload} #>> '{authority,canPromoteGuidance}' = 'false'
+  `),
+  check("meta_compatibility_artifact_revisions_no_forbidden_material", sql`
+    ${table.artifactPayload}::text
+      !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json)|free[_-]?text)"[[:space:]]*:'
+  `),
+]);

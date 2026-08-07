@@ -750,3 +750,17 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   hash, actor/decision/reason ve credential HTTP cevabına çıkmaz.
 - Bu yüzeyde publish, disable, approve, execute, approval grant veya Meta write kontrolü yoktur. Yayınlama
   için ayrı owner/admin insan-varlığı ve açık karar akışı hâlâ gereklidir.
+
+## 2026-08-07 — S5.4c3-A/B reviewed compatibility ve typed post source
+
+- Existing-post action artık `organic_post_binding` ile `existing_ad_binding` kaynaklarını ayırır. Organik
+  gönderi; source, post identity ve object-story kanıt hash'leriyle dondurulur, creative kimliği veya
+  creative üretimi gerektirmez. Eski creative-binding girdisi gerçek ref'i varsa kontrollü adapte edilir;
+  eski action payload'ında olmayan ref asla sentezlenmez. Preflight/proposal public sözleşmesi v2'dir.
+- Destination, optimization, placement, special-category ve tracking için tek generic fakat typed,
+  append-only compatibility artifact registry eklendi. Draft→reviewed→published→tombstoned zinciri owner/
+  admin review ve publish kanıtına bağlıdır; mapping ve selection evidence revision/hash ile birbirine
+  bağlanır. Boş, eksik, stale, conflict, tombstoned veya review süresi dolmuş kanıt `unknown` kalır.
+- Registry hiçbir gerçek mapping/policy/allowed seed içermez ve action, approval, policy ya da Meta-write
+  yetkisi vermez. PostgreSQL katmanı forced RLS, API revoke, lifecycle/payload CHECK'leri ve tombstone purge
+  kapsamındadır. Sıradaki dilim selection evidence'ı kanonik private proposal materializer'a bağlamaktır.
