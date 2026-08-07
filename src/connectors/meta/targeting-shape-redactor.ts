@@ -1,4 +1,4 @@
-export const META_TARGETING_SHAPE_CANARY_VERSION = "meta-targeting-shape-canary/1.0.0" as const;
+export const META_TARGETING_SHAPE_CANARY_VERSION = "meta-targeting-shape-canary/1.1.0" as const;
 
 type JsonObject = Readonly<Record<string, unknown>>;
 
@@ -26,9 +26,18 @@ type IdentityShape = Readonly<{
   objectsWithStableKey: number;
 }>
 
+type LocationTypeCompatibility = Readonly<{
+  home: number;
+  recent: number;
+  travelIn: number;
+  unrecognized: number;
+  invalid: number;
+}>;
+
 export type MetaTargetingGeoSideShape = Readonly<{
   collection: ValueTypeCounts;
   locationTypes: FieldShape;
+  locationTypeCompatibility: LocationTypeCompatibility;
   countries: FieldShape;
   regions: FieldShape;
   regionIdentity: IdentityShape;
@@ -110,6 +119,22 @@ function identityShape(objects: readonly JsonObject[], stableFields: readonly st
   return { key, id, customLocationId, objectsWithStableKey };
 }
 
+function locationTypeCompatibility(parents: readonly JsonObject[]): LocationTypeCompatibility {
+  const result = { home: 0, recent: 0, travelIn: 0, unrecognized: 0, invalid: 0 };
+  for (const parent of parents) {
+    const value = parent.location_types;
+    if (!Array.isArray(value)) continue;
+    for (const item of value) {
+      if (item === "home") result.home += 1;
+      else if (item === "recent") result.recent += 1;
+      else if (item === "travel_in") result.travelIn += 1;
+      else if (typeof item === "string") result.unrecognized += 1;
+      else result.invalid += 1;
+    }
+  }
+  return result;
+}
+
 function geoSideShape(targetingObjects: readonly JsonObject[], field: string): MetaTargetingGeoSideShape {
   const collection = blankTypes();
   const geoObjects: JsonObject[] = [];
@@ -125,6 +150,7 @@ function geoSideShape(targetingObjects: readonly JsonObject[], field: string): M
   return {
     collection,
     locationTypes: fieldShape(geoObjects, "location_types"),
+    locationTypeCompatibility: locationTypeCompatibility(geoObjects),
     countries: fieldShape(geoObjects, "countries"),
     regions: fieldShape(geoObjects, "regions"),
     regionIdentity: identityShape(regions, ["key"]),

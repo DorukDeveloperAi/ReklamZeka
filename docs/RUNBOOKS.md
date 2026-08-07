@@ -54,4 +54,6 @@ log veya bildirim payload'ına eklenmez.
   protection sonucu `unknown/unresolved` kalır ve proposal kuyruğuna ilerlemez.
 - Meta targeting yapısı yalnız `npm run verify:meta-targeting-shape` ile küçük, GET-only ve redakte canary
   üzerinden gözlemlenir. Çıktı sadece sabit alan adları, tür/adet sayımları ve stable-key varlığı içerir;
-  ülke kodu, region/city/custom ID, isim, koordinat, adres veya raw targeting değeri basılmaz.
+  ülke kodu, region/city/custom ID, isim, koordinat, adres veya raw targeting değeri basılmaz. Canonical country
+  normalizer yalnız bu canary ile doğrulanmış exact included-country + `home/recent` biçimini kabul eder; diğer
+  coğrafya biçimleri canlı kanıt ve ayrı reviewed adapter gelene kadar `unknown` kalır.

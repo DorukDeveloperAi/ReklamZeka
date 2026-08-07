@@ -291,9 +291,11 @@
   - [x] Active-workspace effective context + frozen/current category replay'ini kullanan production-safe
     AuthenticCategoryEvidence adapterı; category ref'i label/free-text değil semantic key digest'idir.
   - [x] GET-only/redacted targeting shape canary; 3 bounded AdSet örneğinde explicit included country
-    koleksiyonu doğrulandı, targeting değerleri/logları ve Meta write yok.
-  - [ ] Versioned canonical affected-geo normalizer + immutable snapshot/item persistence; country dışındaki
-    region/city/custom/exclusion şekilleri canlı kanıt görülene kadar `unknown`.
+    koleksiyonu ile `home/recent` location-type biçimi doğrulandı, targeting değerleri/logları ve Meta write yok.
+  - [x] Versioned ve saf canonical affected-geo country normalizer; exact country + `home/recent` dışında,
+    region/city/custom/exclusion/travel biçimlerinde tüm snapshot fail-closed `unknown`, hiçbir authority yok.
+  - [ ] Canonical affected-geo immutable snapshot/item persistence ve production inventory adapterı; doğrulanmamış
+    country dışı şekiller canlı kanıt görülene kadar `unknown`.
   - [ ] Trusted protection policy resolver + proposal expiry kaynağıyla canonical submitter'ı route'a bağlama.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.
 - [ ] Owner/admin/analyst/operator/viewer rol E2E.

@@ -15,7 +15,7 @@ describe("Meta targeting shape redactor", () => {
             regions: [{ key: sensitiveValues[1], name: sensitiveValues[4] }],
             cities: [{ key: sensitiveValues[2], name: sensitiveValues[4] }],
             custom_locations: [{ custom_location_id: sensitiveValues[3], latitude: sensitiveValues[5] }],
-            location_types: ["SENSITIVE_LOCATION_TYPE"],
+            location_types: ["home", "recent", "travel_in", "SENSITIVE_LOCATION_TYPE", 7],
           },
           excluded_geo_locations: { countries: ["SENSITIVE_EXCLUDED_COUNTRY"] },
           flexible_spec: [{ interests: [{ id: "SENSITIVE_INTEREST" }] }],
@@ -28,6 +28,7 @@ describe("Meta targeting shape redactor", () => {
       targeting: { object: 1 },
       includedGeo: {
         collection: { object: 1 },
+        locationTypeCompatibility: { home: 1, recent: 1, travelIn: 1, unrecognized: 1, invalid: 1 },
         countries: { itemCount: 1, itemTypes: { string: 1 } },
         regions: { itemCount: 1, itemTypes: { object: 1 } },
         regionIdentity: { objectsWithStableKey: 1, key: { string: 1 } },

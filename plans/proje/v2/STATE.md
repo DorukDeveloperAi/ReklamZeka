@@ -843,6 +843,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   en fazla üç AdSet ve sıfır write çağrısı. Üç örnekte de `targeting.geo_locations.countries` string-array
   şekli görüldü; değerlerin hiçbiri loglanmadı veya saklanmadı. Region/city/custom-location ve excluded-geo
   bu örnekte bulunmadığı için bu şekiller doğrulanmış sayılmaz ve fail-closed `unknown` kalır.
+- Redakte canary'nin ikinci kabulünde üç örneğin tamamında `home` ve `recent`, sıfır `travel_in`, sıfır
+  tanınmayan ve sıfır geçersiz location-type görüldü; yine sıfır Meta write çağrısı yapıldı. Buna dayanarak saf
+  canonical normalizer yalnız exact included-country + benzersiz `home/recent` biçimini kabul eder. Ülke değerleri
+  type-namespaced digest ref'lerine dönüşür; exact scope, Graph/catalog sürümü, gözlem/slice/page ve raw/subtree
+  hash provenance'ı snapshot kimliğine bağlanır. Region/city/custom/exclusion/travel, source extension, hash
+  uyuşmazlığı veya kısmi veri bütün snapshot'ı `unknown` yapar; sonuç approve/execute/write/grant authority taşımaz.
+- Bu normalizer henüz production inventory field catalog'una veya immutable PostgreSQL snapshot/item registry'sine
+  bağlı değildir. Dolayısıyla production affected-geo evidence halen `unknown` kalır; bu saf sınır gerçek bir
+  kampanya kuralı, hedefleme seçimi ya da Meta yazma yetkisi oluşturmaz.
 - S1.4 canlı kabul paketi yeniden geçti: 5 hesap, 79 asset/79 edge, 1.179 linked post/media ve örneklenen
   30 reklamın 30'unda copy+post identity; iki hesaplı persistence kabulünde 6 copy/post binding, 4 creative,
   6 binding ve 3 durable checkpoint doğrulandı. Meta write network çağrısı her iki kabulde de `0`dır.
