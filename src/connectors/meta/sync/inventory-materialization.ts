@@ -1,7 +1,7 @@
 import { stableHash, type MetaEntityLevel } from "./types";
 
 export const META_INVENTORY_MATERIALIZATION_VERSION = "meta-inventory-materialization/1.0.0" as const;
-export const META_INVENTORY_FIELD_CATALOG_VERSION = "meta-inventory-field-catalog/1.0.0" as const;
+export const META_INVENTORY_FIELD_CATALOG_VERSION = "meta-inventory-field-catalog/2.0.0" as const;
 
 export type MetaInventoryMaterializedLevel = Exclude<MetaEntityLevel, "account">;
 export type MetaInventoryUnknownReason =
@@ -112,7 +112,7 @@ const FIELD = /^[a-z][a-z0-9_]{0,63}$/;
 const VERSION = /^[A-Za-z0-9][A-Za-z0-9./_-]{0,127}$/;
 const KNOWN_FIELDS: Readonly<Record<MetaInventoryMaterializedLevel, readonly string[]>> = Object.freeze({
   campaign: Object.freeze(["id", "name", "status", "effective_status", "objective", "buying_type", "special_ad_categories", "daily_budget", "lifetime_budget", "updated_time"]),
-  ad_set: Object.freeze(["id", "name", "status", "effective_status", "campaign_id", "optimization_goal", "billing_event", "bid_strategy", "bid_amount", "daily_budget", "lifetime_budget", "attribution_spec", "promoted_object", "updated_time"]),
+  ad_set: Object.freeze(["id", "name", "status", "effective_status", "campaign_id", "optimization_goal", "billing_event", "bid_strategy", "bid_amount", "daily_budget", "lifetime_budget", "attribution_spec", "promoted_object", "targeting", "updated_time"]),
   ad: Object.freeze(["id", "name", "status", "effective_status", "campaign_id", "adset_id", "creative", "updated_time"]),
 });
 
@@ -377,7 +377,8 @@ export type MetaInventoryWriteSummary = Readonly<{
 }>;
 
 export interface MetaInventoryPagePersistencePort {
-  writePage(page: CanonicalMetaInventoryPage): Promise<MetaInventoryWriteSummary>;
+  /** The optional second argument is server-private source material and must never be retained or projected. */
+  writePage(page: CanonicalMetaInventoryPage, privateSource?: unknown): Promise<MetaInventoryWriteSummary>;
 }
 
 export type MetaInventoryCanonicalVersion = Readonly<{

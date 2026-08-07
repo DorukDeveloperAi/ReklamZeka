@@ -155,6 +155,7 @@ export const metaConnections = pgTable("meta_connections", {
   externalBusinessId: text("external_business_id"),
   graphApiVersion: text("graph_api_version").notNull(),
   fieldCatalogVersion: text("field_catalog_version").notNull(),
+  accessMode: text("access_mode").notNull().default("read_only"),
   status: metaConnectionStatus("status").notNull().default("active"),
   grantedScopes: jsonb("granted_scopes").$type<readonly string[]>().notNull().default([]),
   enabledCapabilities: jsonb("enabled_capabilities").$type<readonly string[]>().notNull().default([]),
@@ -180,6 +181,7 @@ export const metaConnections = pgTable("meta_connections", {
   ),
   uniqueIndex("meta_connections_workspace_id_unique").on(table.workspaceId, table.id),
   index("meta_connections_workspace_status_idx").on(table.workspaceId, table.status),
+  check("meta_connections_access_mode_read_only", sql`${table.accessMode} = 'read_only'`),
   check("meta_connections_lifecycle_generation_positive", sql`${table.lifecycleGeneration} >= 1`),
   check("meta_connections_secret_metadata_complete", sql`
     (
@@ -209,6 +211,101 @@ export const metaConnections = pgTable("meta_connections", {
         and ${table.revokedAt} is null
       )
     )
+  `),
+]);
+
+/** Private daily read-sync cursor. Rows are provisioned separately; this slice creates no schedule seed. */
+export const metaReadSyncSchedules = pgTable("meta_read_sync_schedules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  connectionId: uuid("connection_id").notNull(),
+  triggerKind: text("trigger_kind").notNull().default("daily"),
+  revision: integer("revision").notNull().default(1),
+  workspaceLifecycleGeneration: integer("workspace_lifecycle_generation").notNull(),
+  connectionLifecycleGeneration: integer("connection_lifecycle_generation").notNull(),
+  timeframeDays: integer("timeframe_days").notNull().default(1),
+  nextDueAt: timestamp("next_due_at", { withTimezone: true }).notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("meta_read_sync_schedules_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("meta_read_sync_schedules_workspace_connection_unique").on(table.workspaceId, table.connectionId),
+  uniqueIndex("meta_read_sync_schedules_workspace_binding_unique")
+    .on(table.workspaceId, table.id, table.connectionId),
+  index("meta_read_sync_schedules_due_idx").on(table.enabled, table.nextDueAt, table.workspaceId),
+  foreignKey({
+    columns: [table.workspaceId, table.connectionId],
+    foreignColumns: [metaConnections.workspaceId, metaConnections.id],
+    name: "meta_read_sync_schedules_workspace_connection_fk",
+  }).onDelete("cascade"),
+  check("meta_read_sync_schedules_contract", sql`
+    ${table.triggerKind} = 'daily'
+    and ${table.revision} between 1 and 1000000
+    and ${table.workspaceLifecycleGeneration} >= 1
+    and ${table.connectionLifecycleGeneration} >= 1
+    and ${table.timeframeDays} between 1 and 90
+  `),
+]);
+
+/** Atomic lease and terminal run state for one deterministic logical daily fire. */
+export const metaReadSyncScheduleRuns = pgTable("meta_read_sync_schedule_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  scheduleId: uuid("schedule_id").notNull(),
+  connectionId: uuid("connection_id").notNull(),
+  scheduleRevision: integer("schedule_revision").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  scopeKey: text("scope_key").notNull(),
+  triggerKind: text("trigger_kind").notNull(),
+  scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+  dateStart: date("date_start").notNull(),
+  dateStop: date("date_stop").notNull(),
+  state: text("state").notNull(),
+  leaseToken: text("lease_token"),
+  leaseUntil: timestamp("lease_until", { withTimezone: true }),
+  attempt: integer("attempt").notNull(),
+  failureReason: text("failure_reason"),
+  retryable: boolean("retryable"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  failedAt: timestamp("failed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("meta_read_sync_schedule_runs_idempotency_unique").on(table.idempotencyKey),
+  uniqueIndex("meta_read_sync_schedule_runs_workspace_id_unique").on(table.workspaceId, table.id),
+  index("meta_read_sync_schedule_runs_workspace_schedule_idx")
+    .on(table.workspaceId, table.scheduleId, table.scheduleRevision, table.scheduledFor),
+  index("meta_read_sync_schedule_runs_workspace_scope_state_idx")
+    .on(table.workspaceId, table.scopeKey, table.state, table.leaseUntil),
+  foreignKey({
+    columns: [table.workspaceId, table.scheduleId, table.connectionId],
+    foreignColumns: [metaReadSyncSchedules.workspaceId, metaReadSyncSchedules.id, metaReadSyncSchedules.connectionId],
+    name: "meta_read_sync_schedule_runs_workspace_schedule_fk",
+  }).onDelete("cascade"),
+  check("meta_read_sync_schedule_runs_identity", sql`
+    ${table.scheduleRevision} between 1 and 1000000
+    and ${table.idempotencyKey} ~ '^syncfire_[a-f0-9]{64}$'
+    and ${table.scopeKey} ~ '^[a-f0-9]{64}$'
+    and ${table.triggerKind} = 'daily'
+    and ${table.dateStart} <= ${table.dateStop}
+    and ${table.attempt} between 1 and 5
+  `),
+  check("meta_read_sync_schedule_runs_lifecycle", sql`
+    (${table.state} = 'running' and ${table.leaseToken} ~ '^lease_[a-f0-9]{32}$'
+      and ${table.leaseUntil} is not null and ${table.leaseUntil} > ${table.startedAt}
+      and ${table.completedAt} is null and ${table.failedAt} is null
+      and ${table.failureReason} is null and ${table.retryable} is null)
+    or (${table.state} = 'completed' and ${table.leaseToken} is null and ${table.leaseUntil} is null
+      and ${table.completedAt} is not null and ${table.failedAt} is null
+      and ${table.completedAt} >= ${table.startedAt}
+      and ${table.failureReason} is null and ${table.retryable} is null)
+    or (${table.state} = 'failed' and ${table.leaseToken} is null and ${table.leaseUntil} is null
+      and ${table.completedAt} is null and ${table.failedAt} is not null
+      and ${table.failedAt} >= ${table.startedAt}
+      and ${table.failureReason} in ('scope_unavailable', 'connection_unavailable', 'account_scope_unavailable',
+        'rate_limited', 'transient', 'partial_result', 'sync_failed') and ${table.retryable} is not null)
   `),
 ]);
 

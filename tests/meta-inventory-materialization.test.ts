@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   classifyMetaInventoryCanonicalDelta,
+  META_INVENTORY_FIELD_CATALOG_VERSION,
   MetaInventoryMaterializationError,
   parseMetaInventoryPage,
   type CanonicalMetaInventoryPage,
@@ -17,7 +18,7 @@ function parse(level: "campaign" | "ad_set" | "ad", records: readonly Readonly<R
     workspaceId: "workspace_test", connectionId: "connection_test", externalAccountId: "act_100",
     parentRunId: "run_test", sliceId: `inventory:act_100:${level}:all:all`, cursorId,
     entityLevel: level, observedAt, sourceGraphVersion: "v23.0",
-    fieldCatalogVersion: "meta-inventory-field-catalog/1.0.0", terminal, records,
+    fieldCatalogVersion: META_INVENTORY_FIELD_CATALOG_VERSION, terminal, records,
   });
 }
 
@@ -71,6 +72,19 @@ describe("Meta canonical inventory parser", () => {
     expect(Object.isFrozen(row.unsupportedFields)).toBe(true);
   });
 
+  it("binds requested targeting into the raw hash without retaining it in the canonical AdSet projection", () => {
+    const page = parse("ad_set", [{ id: "adset_1", name: "Ad Set", campaign_id: "campaign_1",
+      status: "ACTIVE", effective_status: "ACTIVE", optimization_goal: "LINK_CLICKS",
+      billing_event: "IMPRESSIONS", bid_strategy: "LOWEST_COST_WITHOUT_CAP", bid_amount: null,
+      daily_budget: "1000", lifetime_budget: null, attribution_spec: [], promoted_object: {},
+      targeting: { geo_locations: { countries: ["AA"], location_types: ["home"] } },
+      updated_time: "2026-08-07T11:30:00Z" }]);
+    const serialized = JSON.stringify(page);
+    expect(serialized).not.toMatch(/targeting|geo_locations|countries|"AA"/);
+    expect(page.records[0]?.trace.rawPayloadHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(page.records[0]?.unsupportedFields).not.toContainEqual({ field: "targeting", reason: "unrequested_field" });
+  });
+
   it("preserves ad hierarchy and creative identity while explicitly leaving tracking unknown", () => {
     const page = parse("ad", [{
       id: "ad_1", name: "Ad", status: "PAUSED", effective_status: "PAUSED",
@@ -114,8 +128,10 @@ describe("Meta canonical inventory parser", () => {
 
 class PageWriter implements MetaInventoryPagePersistencePort {
   readonly pages: CanonicalMetaInventoryPage[] = [];
-  async writePage(page: CanonicalMetaInventoryPage) {
+  readonly privateSources: unknown[] = [];
+  async writePage(page: CanonicalMetaInventoryPage, privateSource?: unknown) {
     this.pages.push(structuredClone(page));
+    this.privateSources.push(privateSource);
     return { inserted: page.records.length, updated: 0, unchanged: 0, stale: 0, disappeared: 0, pageHash: page.pageHash };
   }
 }
@@ -136,7 +152,7 @@ describe("Meta inventory runtime materialization hook", () => {
           records: [campaign({ id: request.cursor ? "campaign_2" : "campaign_1" })],
           nextCursor: request.cursor ? null : "opaque-next",
           usageHeadroom: 0.5, sourceGraphVersion: "v23.0",
-          fieldCatalogVersion: "meta-inventory-field-catalog/1.0.0",
+          fieldCatalogVersion: META_INVENTORY_FIELD_CATALOG_VERSION,
         };
       },
     };
@@ -148,6 +164,10 @@ describe("Meta inventory runtime materialization hook", () => {
     expect(requests.map((entry) => entry.cursor)).toEqual([null, "opaque-next"]);
     expect(writer.pages.map((entry) => entry.terminal)).toEqual([false, true]);
     expect(writer.pages.map((entry) => entry.records[0]?.externalId)).toEqual(["campaign_1", "campaign_2"]);
+    expect(writer.privateSources).toEqual([
+      { records: [campaign({ id: "campaign_1" })] },
+      { records: [campaign({ id: "campaign_2" })] },
+    ]);
     expect(runtime.store.snapshot().records.map((entry) => entry.payload)).toEqual([{}, {}]);
   });
 
@@ -165,7 +185,7 @@ describe("Meta inventory runtime materialization hook", () => {
   it("isolates a persistence failure as a redacted non-retryable slice result", async () => {
     const transport: MetaReadTransport = { get: vi.fn(async () => ({
       records: [campaign()], nextCursor: null, usageHeadroom: 0.5,
-      sourceGraphVersion: "v23.0", fieldCatalogVersion: "meta-inventory-field-catalog/1.0.0",
+      sourceGraphVersion: "v23.0", fieldCatalogVersion: META_INVENTORY_FIELD_CATALOG_VERSION,
     })) };
     const runtime = new MetaPartialReadSyncRuntime({
       transport, now: () => new Date(observedAt),

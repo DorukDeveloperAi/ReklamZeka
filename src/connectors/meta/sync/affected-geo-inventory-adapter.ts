@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { stableHash } from "./types";
+import { META_INVENTORY_FIELD_CATALOG_VERSION } from "./inventory-materialization";
 import {
   hashMetaAffectedGeoSourceSubtree,
   META_AFFECTED_GEO_VERIFIED_GRAPH_VERSION,
@@ -8,7 +9,7 @@ import {
 } from "@/domain/meta/affected-geo-country-snapshot";
 
 export const META_AFFECTED_GEO_INVENTORY_ADAPTER_VERSION = "meta-affected-geo-inventory-adapter/1.0.0" as const;
-export const META_AFFECTED_GEO_SOURCE_FIELD_CATALOG_VERSION = "meta-adset-targeting-country-field-catalog/1.0.0" as const;
+export const META_AFFECTED_GEO_SOURCE_FIELD_CATALOG_VERSION = META_INVENTORY_FIELD_CATALOG_VERSION;
 
 type NoAuthority = Readonly<{
   canApprove: false;

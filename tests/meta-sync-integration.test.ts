@@ -108,6 +108,26 @@ describe("Meta S1.3 runtime persistence integration", () => {
     expect(requestedFields).not.toContain("caption");
   });
 
+  it("adds targeting only to the GET-only AdSet inventory catalog", async () => {
+    const calls: Array<{ method: string | undefined; path: string; fields: string }> = [];
+    const fetchImpl = async (input: string | URL, init?: RequestInit) => {
+      const url = new URL(input); calls.push({ method: init?.method, path: url.pathname,
+        fields: url.searchParams.get("fields") ?? "" });
+      return new Response(JSON.stringify({ data: [] }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    const transport = new MetaGraphSyncTransport(new MetaGraphClient("fixture-token", fetchImpl));
+    const request = (entityLevel: "campaign" | "ad_set") => transport.get({ method: "GET", stream: "inventory",
+      accountId: "act_fixture", entityLevel, dateStart: null, dateStop: null, cursor: null, limit: 3,
+      correlation: { parentRunId: "run", streamRunId: "stream", accountId: "act_fixture",
+        sliceId: "slice", cursorId: "cursor" } });
+    await request("campaign"); await request("ad_set");
+    expect(calls).toHaveLength(2); expect(calls.every((call) => call.method === "GET")).toBe(true);
+    expect(calls[0]).toMatchObject({ path: "/v23.0/act_fixture/campaigns" });
+    expect(calls[0]?.fields.split(",")).not.toContain("targeting");
+    expect(calls[1]).toMatchObject({ path: "/v23.0/act_fixture/adsets" });
+    expect(calls[1]?.fields.split(",").filter((field) => field === "targeting")).toEqual(["targeting"]);
+  });
+
   it("restores a durable cursor in a fresh runtime and resumes without replaying page one", async () => {
     const transactions = new TransactionFixture();
     const persistence = new TransactionBackedMetaSyncPersistenceAdapter(transactions);

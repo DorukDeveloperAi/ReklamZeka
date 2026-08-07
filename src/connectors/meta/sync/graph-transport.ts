@@ -11,7 +11,7 @@ type GraphPage = Readonly<{
 const INVENTORY_FIELDS = {
   account: "id,name,currency,timezone_name,account_status,business",
   campaign: "id,name,status,effective_status,objective,buying_type,special_ad_categories,daily_budget,lifetime_budget,updated_time",
-  ad_set: "id,name,status,effective_status,campaign_id,optimization_goal,billing_event,bid_strategy,bid_amount,daily_budget,lifetime_budget,attribution_spec,promoted_object,updated_time",
+  ad_set: "id,name,status,effective_status,campaign_id,optimization_goal,billing_event,bid_strategy,bid_amount,daily_budget,lifetime_budget,attribution_spec,promoted_object,targeting,updated_time",
   ad: "id,name,status,effective_status,campaign_id,adset_id,creative{id},updated_time",
 } as const;
 

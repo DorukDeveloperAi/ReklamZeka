@@ -165,13 +165,14 @@ export class MetaPartialReadSyncRuntime {
           if (!page.sourceGraphVersion || !page.fieldCatalogVersion) {
             throw new MetaInventoryMaterializationError("invalid_page", "Inventory provenance metadata eksik");
           }
-          await this.options.inventoryPagePersistence.writePage(parseMetaInventoryPage({
+          const canonicalPage = parseMetaInventoryPage({
             workspaceId: parent.workspaceId, connectionId: parent.connectionId,
             externalAccountId: slice.accountId, parentRunId: parent.id,
             sliceId: slice.id, cursorId, entityLevel: slice.entityLevel, observedAt,
             sourceGraphVersion: page.sourceGraphVersion, fieldCatalogVersion: page.fieldCatalogVersion,
             terminal: page.nextCursor === null, records: page.records,
-          }));
+          });
+          await this.options.inventoryPagePersistence.writePage(canonicalPage, { records: page.records });
         } catch (error) {
           return { completed: false, inserted, updated, unchanged, error: {
             reason: error instanceof MetaInventoryMaterializationError ? "malformed_response" : "unknown",

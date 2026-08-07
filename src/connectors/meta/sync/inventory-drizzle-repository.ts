@@ -2,6 +2,8 @@ import { and, eq, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import type { SQLWrapper } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "@/db/schema";
+import { DrizzleMetaAffectedGeoSnapshotRepository } from "@/connectors/meta/meta-affected-geo-snapshot-drizzle-repository";
+import { appendKnownAffectedGeoForCanonicalAdSetPage, type MetaAffectedGeoAppendPort } from "./affected-geo-page-persistence";
 import { classifyMetaInventoryCanonicalDelta } from "./inventory-materialization";
 import type {
   CanonicalMetaInventoryAd,
@@ -17,6 +19,7 @@ import type {
 type ReklamZekaDatabase = NodePgDatabase<typeof schema>;
 type WriteOutcome = MetaInventoryCanonicalWriteOutcome;
 type Existing = Readonly<{ externalId: string; sourceRevision: string; sourcePriority: number; payloadHash: string }>;
+type AffectedGeoRepositoryFactory = (database: ReklamZekaDatabase, workspaceId: string) => MetaAffectedGeoAppendPort;
 
 const incomingRevision = sql<string>`excluded.provenance ->> 'sourceRevision'`;
 const incomingPriority = sql<number>`case
@@ -75,16 +78,18 @@ function appendIssue(issues: readonly MetaInventoryFieldIssue[], field: string, 
  * calls and never persists or logs the source page itself.
  */
 export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePersistencePort {
-  constructor(private readonly database: ReklamZekaDatabase) {}
+  constructor(private readonly database: ReklamZekaDatabase,
+    private readonly affectedGeoRepository: AffectedGeoRepositoryFactory = (database, workspaceId) =>
+      new DrizzleMetaAffectedGeoSnapshotRepository(database, workspaceId)) {}
 
-  async writePage(page: CanonicalMetaInventoryPage): Promise<MetaInventoryWriteSummary> {
+  async writePage(page: CanonicalMetaInventoryPage, privateSource?: unknown): Promise<MetaInventoryWriteSummary> {
     return this.database.transaction(async (transaction) => {
       const database = transaction as ReklamZekaDatabase;
       const accountId = await this.resolveAccount(database, page);
       const outcomes = page.entityLevel === "campaign"
         ? await this.writeCampaigns(database, accountId, page, page.records as readonly CanonicalMetaInventoryCampaign[])
         : page.entityLevel === "ad_set"
-          ? await this.writeAdSets(database, accountId, page, page.records as readonly CanonicalMetaInventoryAdSet[])
+          ? await this.writeAdSets(database, accountId, page, page.records as readonly CanonicalMetaInventoryAdSet[], privateSource)
           : await this.writeAds(database, accountId, page, page.records as readonly CanonicalMetaInventoryAd[]);
       const disappeared = page.terminal ? await this.markDisappeared(database, accountId, page) : 0;
       return summary(outcomes, disappeared, page.pageHash);
@@ -168,6 +173,7 @@ export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePer
     accountId: string,
     page: CanonicalMetaInventoryPage,
     records: readonly CanonicalMetaInventoryAdSet[],
+    privateSource: unknown,
   ): Promise<readonly WriteOutcome[]> {
     if (records.length === 0) return [];
     const campaignExternalIds = [...new Set(records.map((entry) => entry.externalCampaignId))];
@@ -214,6 +220,19 @@ export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePer
       },
       setWhere: revisionCanReplace(schema.metaAdSets.provenance),
     });
+    const resolvedRows = await database.select({ id: schema.metaAdSets.id, campaignId: schema.metaAdSets.campaignId,
+      externalAdSetId: schema.metaAdSets.externalAdSetId }).from(schema.metaAdSets).where(and(
+      eq(schema.metaAdSets.workspaceId, page.workspaceId), eq(schema.metaAdSets.adAccountId, accountId),
+      inArray(schema.metaAdSets.externalAdSetId, ids), isNull(schema.metaAdSets.disappearedAt),
+    ));
+    if (resolvedRows.length !== records.length || records.some((entry) => {
+      const resolved = resolvedRows.find((row) => row.externalAdSetId === entry.externalId);
+      return !resolved || resolved.campaignId !== campaigns.get(entry.externalCampaignId);
+    })) throw new Error("Meta inventory affected-geo hierarchy kapsamı çözülemedi");
+    await appendKnownAffectedGeoForCanonicalAdSetPage({ page, privateSource, adAccountId: accountId,
+      hierarchy: resolvedRows.map((row) => ({ externalAdSetId: row.externalAdSetId,
+        campaignId: row.campaignId, adSetId: row.id })), outcomes,
+      repository: this.affectedGeoRepository(database, page.workspaceId) });
     await this.markObserved(database, schema.metaAdSets, schema.metaAdSets.externalAdSetId, schema.metaAdSets.adAccountId,
       schema.metaAdSets.workspaceId, schema.metaAdSets.fetchedAt, schema.metaAdSets.provenance, ids, accountId, page);
     return outcomes;
