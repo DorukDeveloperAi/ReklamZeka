@@ -244,6 +244,9 @@ export function normalizeMetaDigitalTwinSnapshot(
 
   const campaignIds = new Set(input.campaigns.map((entity) => entity.externalCampaignId));
   const adSetIds = new Set(input.adSets.map((entity) => entity.externalAdSetId));
+  const adSetCampaignIds = new Map(
+    input.adSets.map((entity) => [entity.externalAdSetId, entity.externalCampaignId] as const),
+  );
   const adIds = new Set(input.ads.map((entity) => entity.externalAdId));
   const creativeIds = new Set(input.creatives.map((entity) => entity.externalCreativeId));
   const postIds = new Set(input.posts.map((entity) => entity.externalPostId));
@@ -269,6 +272,13 @@ export function normalizeMetaDigitalTwinSnapshot(
     assertAccount(input.account.externalAccountId, ad.externalAccountId, ad.externalAdId);
     assertParent(campaignIds, ad.externalCampaignId, ad.externalAdId, "Campaign→ad");
     assertParent(adSetIds, ad.externalAdSetId, ad.externalAdId, "Ad set→ad");
+    if (adSetCampaignIds.get(ad.externalAdSetId) !== ad.externalCampaignId) {
+      throw new MetaDigitalTwinValidationError(
+        "orphan_parent",
+        ad.externalAdId,
+        `Ad set ${ad.externalAdSetId}, campaign ${ad.externalCampaignId} altında değildir`,
+      );
+    }
     if (ad.externalCreativeId !== null) {
       assertParent(creativeIds, ad.externalCreativeId, ad.externalAdId, "Creative→ad");
     }

@@ -25,6 +25,7 @@ export type BudgetOwner = Readonly<{
 
 export type BudgetOwnerUnknownReason =
   | "ambiguous_budget_period"
+  | "budget_mode_conflict"
   | "campaign_budget_missing"
   | "conflicting_budget_levels"
   | "ad_set_budget_missing"
@@ -151,6 +152,14 @@ export function resolveBudgetOwners(input: Readonly<{
         input.campaign.externalCampaignId,
         ...adSetsWithBudget.map(({ adSet }) => adSet.externalAdSetId),
       ],
+    };
+  }
+
+  if (campaignBudget && input.campaign.campaignBudgetOptimization === false) {
+    return {
+      status: "unknown",
+      reason: "budget_mode_conflict",
+      affectedExternalIds: [input.campaign.externalCampaignId],
     };
   }
 
