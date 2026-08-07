@@ -4,6 +4,33 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "03716c2fc",
+      "tarih": "2026-08-07",
+      "konu": "merge: uzak ile birleştir (2. tur)",
+      "tur": "is",
+      "kapsam": [
+        "merge"
+      ]
+    },
+    {
+      "hash": "1927e26a3",
+      "tarih": "2026-08-07",
+      "konu": "chore(turev): merge sonrası türevleri üreticiden yeniden üret (agac.mjs INDEX/TODO + DURUM)",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
+      "hash": "bfe9b9fce",
+      "tarih": "2026-08-07",
+      "konu": "merge: uzak ile birleştir — kayıpsız (türev yeniden üretilir, içerik birleşimle korunur)",
+      "tur": "is",
+      "kapsam": [
+        "merge"
+      ]
+    },
+    {
       "hash": "fa74d5a3a",
       "tarih": "2026-08-07",
       "konu": "feat: add read-only Meta access inventory",
@@ -33,11 +60,19 @@
       "adet": 2
     },
     {
+      "kapsam": "merge",
+      "adet": 2
+    },
+    {
+      "kapsam": "chore",
+      "adet": 1
+    },
+    {
       "kapsam": "feat",
       "adet": 1
     }
   ],
-  "isSayisi": 3,
+  "isSayisi": 6,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -48,7 +83,15 @@
       "asamaKapali": 6,
       "asamaToplam": 14,
       "siradaki": "08-Meta dijital ikizi"
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "ffdb0b1de75f"
+  "damga": "3f4ee5736a62"
 }
