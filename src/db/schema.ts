@@ -1306,6 +1306,129 @@ export const effectiveCampaignContextInvalidations = pgTable("effective_campaign
   `),
 ]);
 
+/** Append-only, advisory-only budget proposal revisions over one exact frozen campaign context. */
+export const budgetProposalVersions = pgTable("budget_proposal_versions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull(),
+  campaignId: uuid("campaign_id").notNull(),
+  contextId: uuid("context_id").notNull(),
+  contextHash: text("context_hash").notNull(),
+  seriesRef: text("series_ref").notNull(),
+  revision: integer("revision").notNull(),
+  previousProposalHash: text("previous_proposal_hash").notNull(),
+  proposalRef: text("proposal_ref").notNull(),
+  proposalHash: text("proposal_hash").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  proposedAt: timestamp("proposed_at", { withTimezone: true }).notNull(),
+  proposalPayload: jsonb("proposal_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.adAccountId],
+    foreignColumns: [adAccounts.workspaceId, adAccounts.id],
+    name: "budget_proposal_versions_account_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.campaignId],
+    foreignColumns: [adCampaigns.workspaceId, adCampaigns.id],
+    name: "budget_proposal_versions_campaign_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.contextId],
+    foreignColumns: [effectiveCampaignContexts.workspaceId, effectiveCampaignContexts.id],
+    name: "budget_proposal_versions_context_scope_fk",
+  }).onDelete("restrict"),
+  uniqueIndex("budget_proposal_versions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("budget_proposal_versions_workspace_series_revision_unique")
+    .on(table.workspaceId, table.seriesRef, table.revision),
+  uniqueIndex("budget_proposal_versions_workspace_hash_unique").on(table.workspaceId, table.proposalHash),
+  uniqueIndex("budget_proposal_versions_workspace_idempotency_unique")
+    .on(table.workspaceId, table.idempotencyKey),
+  uniqueIndex("budget_proposal_versions_alternative_binding_unique")
+    .on(table.workspaceId, table.id, table.proposalHash),
+  index("budget_proposal_versions_scope_created_idx")
+    .on(table.workspaceId, table.adAccountId, table.campaignId, table.proposedAt, table.id),
+  index("budget_proposal_versions_context_idx").on(table.contextId),
+  check("budget_proposal_versions_identity", sql`
+    ${table.seriesRef} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+    and ${table.idempotencyKey} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+    and ${table.proposalRef} ~ '^budget_proposal_[a-f0-9]{20}$'
+    and ${table.proposalHash} ~ '^[a-f0-9]{64}$'
+    and ${table.contextHash} ~ '^[a-f0-9]{64}$'
+    and ${table.revision} >= 1
+    and ((${table.revision} = 1 and ${table.previousProposalHash} = 'GENESIS')
+      or (${table.revision} > 1 and ${table.previousProposalHash} ~ '^[a-f0-9]{64}$'))
+  `),
+  check("budget_proposal_versions_payload_exact", sql`(
+    jsonb_typeof(${table.proposalPayload}) = 'object'
+    and ${table.proposalPayload} #>> '{schemaVersion}' = ${table.schemaVersion}
+    and ${table.schemaVersion} = 'budget-proposal/1.0.0'
+    and ${table.proposalPayload} #>> '{seriesRef}' = ${table.seriesRef}
+    and (${table.proposalPayload} #>> '{revision}')::integer = ${table.revision}
+    and ${table.proposalPayload} #>> '{previousProposalHash}' = ${table.previousProposalHash}
+    and ${table.proposalPayload} #>> '{proposalRef}' = ${table.proposalRef}
+    and ${table.proposalPayload} #>> '{proposalHash}' = ${table.proposalHash}
+    and ${table.proposalPayload} #>> '{idempotencyKey}' = ${table.idempotencyKey}
+    and (${table.proposalPayload} #>> '{createdAt}')::timestamptz = ${table.proposedAt}
+    and ${table.proposalPayload} #>> '{scope,workspaceId}' = ${table.workspaceId}::text
+    and ${table.proposalPayload} #>> '{scope,adAccountId}' = ${table.adAccountId}::text
+    and ${table.proposalPayload} #>> '{scope,campaignId}' = ${table.campaignId}::text
+    and ${table.proposalPayload} #>> '{scope,contextHash}' = ${table.contextHash}
+    and ${table.proposalPayload} #>> '{frozenContext,contextHash}' = ${table.contextHash}
+    and ${table.proposalPayload} #>> '{actionAuthority}' = 'none'
+    and ${table.proposalPayload} #> '{capabilities}' = '{
+      "canApprove": false, "canExecute": false, "canWriteMeta": false
+    }'::jsonb
+  ) is true`),
+  check("budget_proposal_versions_no_forbidden_material", sql`
+    ${table.proposalPayload}::text !~* '"[^"[:space:]]*(token|secret|prompt)"[[:space:]]*:'
+    and ${table.proposalPayload}::text !~* '"authorization"[[:space:]]*:'
+    and ${table.proposalPayload}::text !~* '"[^"[:space:]]*raw[_-]?(payload|request|response|json)"[[:space:]]*:'
+  `),
+]);
+
+/** Ordered immutable alternatives. They cannot contain approval or execution authority. */
+export const budgetProposalAlternatives = pgTable("budget_proposal_alternatives", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  proposalId: uuid("proposal_id").notNull(),
+  proposalHash: text("proposal_hash").notNull(),
+  ordinal: integer("ordinal").notNull(),
+  scenarioRef: text("scenario_ref").notNull(),
+  scenarioKind: text("scenario_kind").notNull(),
+  scenarioStatus: text("scenario_status").notNull(),
+  alternativePayload: jsonb("alternative_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.proposalId, table.proposalHash],
+    foreignColumns: [budgetProposalVersions.workspaceId, budgetProposalVersions.id, budgetProposalVersions.proposalHash],
+    name: "budget_proposal_alternatives_proposal_binding_fk",
+  }).onDelete("cascade"),
+  uniqueIndex("budget_proposal_alternatives_proposal_ordinal_unique").on(table.proposalId, table.ordinal),
+  uniqueIndex("budget_proposal_alternatives_proposal_scenario_unique").on(table.proposalId, table.scenarioRef),
+  index("budget_proposal_alternatives_workspace_proposal_idx").on(table.workspaceId, table.proposalId),
+  check("budget_proposal_alternatives_shape", sql`
+    ${table.ordinal} >= 1 and ${table.ordinal} <= 3
+    and ${table.scenarioRef} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+    and ${table.scenarioKind} in ('keep', 'conservative', 'target_seeking')
+    and ${table.scenarioStatus} in ('composed', 'suppressed')
+    and ${table.proposalHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("budget_proposal_alternatives_payload_exact", sql`(
+    jsonb_typeof(${table.alternativePayload}) = 'object'
+    and ${table.alternativePayload} #>> '{scenarioRef}' = ${table.scenarioRef}
+    and ${table.alternativePayload} #>> '{kind}' = ${table.scenarioKind}
+    and ${table.alternativePayload} #>> '{status}' = ${table.scenarioStatus}
+    and ${table.alternativePayload} #>> '{actionAuthority}' = 'none'
+  ) is true`),
+  check("budget_proposal_alternatives_no_authority", sql`
+    ${table.alternativePayload}::text !~* '"(canApprove|canExecute|canWriteMeta|approvalGranted|writeEnabled)"[[:space:]]*:[[:space:]]*true'
+  `),
+]);
+
 /** Append-only, versioned timeframe definitions used by deterministic analysis. */
 export const analysisTimeframeDefinitions = pgTable("analysis_timeframe_definitions", {
   id: uuid("id").primaryKey().defaultRandom(),

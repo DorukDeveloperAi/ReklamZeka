@@ -459,3 +459,19 @@ write scope veya writer S4'e kadar ReklamZeka'ya taşınmaz.
   değerlendirilir; mapping yoksa, eski/yetersizse veya birden fazla uygunsa seçim yapılmaz.
 - Bu çekirdekler de saf ve advisory-only'dir. Sıradaki increment mapping→scenario application
   binding, append-only proposal persistence ve Budget Lab read API/dashboard kesitidir.
+
+## 2026-08-07 — S3 Budget Lab proposal persistence kapısı
+
+- BudgetProposalService exact frozen EffectiveCampaignContext üzerinde mapping gate ve scenario
+  composer'ı birleştirir. `target_seeking` yalnız ready mapping, exact proxy signal ve açık proxy
+  izniyle compose edilir; aksi explicit suppressed. `keep/conservative` mapping'e bağlı değildir.
+- İki append-only tablo proposal revision/hash/idempotency zincirini ve en fazla üç alternative'i
+  workspace/account/campaign/context composite scope'uyla saklar. Action authority `none`;
+  capabilities approve/execute/Meta-write için false'dur. Public projection full UUID, Meta ref,
+  allocation ref ve authentic context hash'i opaque alias'a çevirir.
+- Drizzle migration'da composite alternative FK'sinin unique index'i önce yaratılacak şekilde
+  statement sırası düzeltildi; 26 statement outer-rollback doğrulandı ve migration Supabase'e
+  uygulandı. Proposal, 51-tablolu tombstone ve security rollback kabulleri temizdir.
+- Canlı kanıt: exact context/mapping suppression/idempotency/revision/cross-tenant/immutability/
+  public-redaction bütün bayraklar true, geçici satır `0`, Meta/execution çağrısı `0`;
+  Supabase 55/55 RLS ve API table grant `0`. Sırada Budget Lab read API/dashboard vardır.

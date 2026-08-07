@@ -151,10 +151,13 @@
 - [x] Fixed/proportional/priority/ladder deterministic allocation ve exact integer-weight rounding.
 - [x] Saf keep/conservative/target-seeking (en fazla üç explicit alternatif), frozen input,
   before/after, pacing+constraint trace ve suppression/no-change/unsatisfied preservation.
-- [ ] Versioned proposal ledger/API; artış approval zorunluluğu.
+- [x] Versioned append-only proposal ledger/repository; frozen workspace/account/campaign/context,
+  revision/hash/idempotency, alternatives ve public-safe projection.
+- [ ] Budget Lab agent/HTTP/dashboard read API; artış approval S4'te zorunlu olacaktır.
 - [x] Saf business outcome target/Meta proxy ayrımı; provenance/scope/timeframe/evidence/review
   kapıları ve eksik/ambiguous/stale mapping suppression.
-- [ ] Target mapping→scenario application binding ve persisted proposal trace.
+- [x] Target mapping→scenario application binding ve persisted proposal trace; mapping-ready
+  olmayan target-seeking bastırılır, keep/conservative bağımsız kalır.
 
 ## A12 — Prompt ve advisor
 
