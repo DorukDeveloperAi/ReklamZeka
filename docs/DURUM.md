@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 5a803d77f5d6 -->
+<!-- durum-damga: 42641d2ff7a9 -->
 
 ## Künye
 
@@ -14,13 +14,14 @@
 |---|---|
 | dal | `codex/meta-connection-security` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 3 |
+| iş commit'i (tüm geçmiş) | 4 |
 | ilk / son iş | 2026-08-06 / 2026-08-07 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-07 | `fix` | align Meta connection lifecycle contract | `62d4eb672` |
 | 2026-08-07 | `feat` | add read-only Meta access inventory | `fa74d5a3a` |
 | 2026-08-06 | `—` | vscode ayarları eklendi | `03d03c538` |
 | 2026-08-06 | `—` | aide iskelesi + filing katmanı kuruldu (yeni proje) | `0d2239dda` |
@@ -29,6 +30,7 @@
 
 - `?           ` ████████████████████████ 2
 - `feat        ` ████████████ 1
+- `fix         ` ████████████ 1
 
 ## Planlar
 

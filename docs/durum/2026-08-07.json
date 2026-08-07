@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "62d4eb672",
+      "tarih": "2026-08-07",
+      "konu": "fix: align Meta connection lifecycle contract",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
       "hash": "fa74d5a3a",
       "tarih": "2026-08-07",
       "konu": "feat: add read-only Meta access inventory",
@@ -35,9 +44,13 @@
     {
       "kapsam": "feat",
       "adet": 1
+    },
+    {
+      "kapsam": "fix",
+      "adet": 1
     }
   ],
-  "isSayisi": 3,
+  "isSayisi": 4,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -50,5 +63,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "5a803d77f5d6"
+  "damga": "42641d2ff7a9"
 }
