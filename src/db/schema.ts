@@ -983,6 +983,170 @@ export const guidanceSets = pgTable("guidance_sets", {
   check("guidance_sets_record_hash_format", sql`${table.recordHash} ~ '^[a-f0-9]{64}$'`),
 ]);
 
+/** Append-only, advisory-only practice definition revisions. Conversation output cannot mint policy or automation. */
+export const advisedPracticeDefinitions = pgTable("advised_practice_definitions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceRef: text("workspace_ref").notNull(),
+  practiceRef: text("practice_ref").notNull(),
+  version: integer("version").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  previousDefinitionHash: text("previous_definition_hash").notNull(),
+  definitionHash: text("definition_hash").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("advised_practice_definitions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("advised_practice_definitions_workspace_ref_version_unique")
+    .on(table.workspaceId, table.practiceRef, table.version),
+  uniqueIndex("advised_practice_definitions_workspace_ref_hash_unique")
+    .on(table.workspaceId, table.practiceRef, table.definitionHash),
+  uniqueIndex("advised_practice_definitions_event_binding_unique")
+    .on(table.workspaceId, table.id, table.practiceRef, table.version, table.definitionHash),
+  index("advised_practice_definitions_workspace_created_idx")
+    .on(table.workspaceId, table.createdAt, table.practiceRef),
+  check("advised_practice_definitions_version", sql`
+    ${table.version} >= 1 and ${table.schemaVersion} = 'advised-practice/1.0.0'
+    and ((${table.version} = 1 and ${table.previousDefinitionHash} = 'GENESIS')
+      or (${table.version} > 1 and ${table.previousDefinitionHash} ~ '^[a-f0-9]{64}$'))
+  `),
+  check("advised_practice_definitions_identity", sql`
+    ${table.workspaceRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$'
+    and ${table.practiceRef} ~ '^practice_[a-z0-9][a-z0-9_-]{0,86}$'
+    and ${table.definitionHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("advised_practice_definitions_payload_exact", sql`(
+    jsonb_typeof(${table.payload}) = 'object'
+    and ${table.payload} #>> '{schemaVersion}' = ${table.schemaVersion}
+    and ${table.payload} #>> '{workspaceRef}' = ${table.workspaceRef}
+    and ${table.payload} #>> '{practiceRef}' = ${table.practiceRef}
+    and (${table.payload} #>> '{version}')::integer = ${table.version}
+    and ${table.payload} #>> '{previousDefinitionHash}' = ${table.previousDefinitionHash}
+    and ${table.payload} #>> '{definitionHash}' = ${table.definitionHash}
+    and ${table.payload} #>> '{capabilities,canCreateGuidance}' = 'false'
+    and ${table.payload} #>> '{capabilities,canPromotePolicy}' = 'false'
+    and ${table.payload} #>> '{capabilities,canEnableAutomation}' = 'false'
+    and ${table.payload} #>> '{capabilities,canAuthorizeAction}' = 'false'
+    and ${table.payload} #> '{capabilities}' = '{
+      "canCreateGuidance": false,
+      "canPromotePolicy": false,
+      "canEnableAutomation": false,
+      "canAuthorizeAction": false
+    }'::jsonb
+  ) is true`),
+  check("advised_practice_definitions_required_provenance", sql`(
+    jsonb_typeof(${table.payload} #> '{provenance,ownerSource}') = 'object'
+    and jsonb_typeof(${table.payload} #> '{provenance,metaSources}') = 'array'
+    and jsonb_array_length(${table.payload} #> '{provenance,metaSources}') >= 1
+    and jsonb_typeof(${table.payload} #> '{provenance,evidenceRefs}') = 'array'
+    and jsonb_array_length(${table.payload} #> '{provenance,evidenceRefs}') >= 1
+    and jsonb_typeof(${table.payload} #> '{provenance,deliberation}') = 'object'
+  ) is true`),
+  check("advised_practice_definitions_no_forbidden_material", sql`
+    ${table.payload}::text !~* '"[^"[:space:]]*(token|secret|prompt)"[[:space:]]*:'
+    and ${table.payload}::text !~* '"authorization"[[:space:]]*:'
+    and ${table.payload}::text !~* '"[^"[:space:]]*raw[_-]?(payload|request|response|json)"[[:space:]]*:'
+  `),
+  check("advised_practice_definitions_no_authority_escalation", sql`
+    not jsonb_path_exists(
+      ${table.payload} - 'capabilities',
+      '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(canwrite|writeenabled|actionauthority|writeauthority|executionauthority|approvalgranted|canauthorizeaction|canexecutewrite|canenforcepolicy|canalterapproval|cancreateguidance|canpromotepolicy|canenableautomation)$" flag "i")'
+    )
+  `),
+]);
+
+/** Append-only lifecycle event chain. Standardization is a review only; artifact promotion remains disabled. */
+export const advisedPracticeEvents = pgTable("advised_practice_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  definitionId: uuid("definition_id").notNull(),
+  workspaceRef: text("workspace_ref").notNull(),
+  practiceRef: text("practice_ref").notNull(),
+  definitionVersion: integer("definition_version").notNull(),
+  definitionHash: text("definition_hash").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  sequence: integer("sequence").notNull(),
+  previousEventHash: text("previous_event_hash").notNull(),
+  eventId: text("event_id").notNull(),
+  eventHash: text("event_hash").notNull(),
+  eventType: text("event_type").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.definitionId, table.practiceRef, table.definitionVersion, table.definitionHash],
+    foreignColumns: [
+      advisedPracticeDefinitions.workspaceId, advisedPracticeDefinitions.id, advisedPracticeDefinitions.practiceRef,
+      advisedPracticeDefinitions.version, advisedPracticeDefinitions.definitionHash,
+    ],
+    name: "advised_practice_events_definition_binding_fk",
+  }).onDelete("cascade"),
+  uniqueIndex("advised_practice_events_workspace_event_unique").on(table.workspaceId, table.eventId),
+  uniqueIndex("advised_practice_events_workspace_hash_unique").on(table.workspaceId, table.eventHash),
+  uniqueIndex("advised_practice_events_definition_sequence_unique").on(table.workspaceId, table.definitionId, table.sequence),
+  index("advised_practice_events_definition_idx").on(table.definitionId),
+  index("advised_practice_events_workspace_practice_occurred_idx")
+    .on(table.workspaceId, table.practiceRef, table.occurredAt),
+  check("advised_practice_events_version", sql`
+    ${table.schemaVersion} = 'advised-practice-event/1.0.0' and ${table.definitionVersion} >= 1 and ${table.sequence} >= 1
+  `),
+  check("advised_practice_events_identity", sql`
+    ${table.workspaceRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$'
+    and ${table.practiceRef} ~ '^practice_[a-z0-9][a-z0-9_-]{0,86}$'
+    and ${table.definitionHash} ~ '^[a-f0-9]{64}$'
+    and (${table.previousEventHash} = 'GENESIS' or ${table.previousEventHash} ~ '^[a-f0-9]{64}$')
+  `),
+  check("advised_practice_events_event_identity", sql`
+    ${table.eventId} ~ '^practice_event_[a-f0-9]{20}$' and ${table.eventHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("advised_practice_events_type", sql`${table.eventType} in (
+    'candidate_created', 'reviewed', 'trial_started', 'outcome_recorded', 'standardization_reviewed', 'retired'
+  )`),
+  check("advised_practice_events_payload_exact", sql`(
+    jsonb_typeof(${table.payload}) = 'object'
+    and ${table.payload} #>> '{schemaVersion}' = ${table.schemaVersion}
+    and ${table.payload} #>> '{workspaceRef}' = ${table.workspaceRef}
+    and ${table.payload} #>> '{practiceRef}' = ${table.practiceRef}
+    and (${table.payload} #>> '{definitionVersion}')::integer = ${table.definitionVersion}
+    and ${table.payload} #>> '{definitionHash}' = ${table.definitionHash}
+    and (${table.payload} #>> '{sequence}')::integer = ${table.sequence}
+    and ${table.payload} #>> '{previousEventHash}' = ${table.previousEventHash}
+    and ${table.payload} #>> '{eventId}' = ${table.eventId}
+    and ${table.payload} #>> '{eventHash}' = ${table.eventHash}
+    and ${table.payload} #>> '{eventType}' = ${table.eventType}
+    and (${table.payload} #>> '{occurredAt}')::timestamptz = ${table.occurredAt}
+    and ${table.payload} #>> '{authority}' = 'advisory_only'
+  ) is true`),
+  check("advised_practice_events_outcome", sql`
+    ${table.eventType} <> 'outcome_recorded' or (
+      ${table.payload} #>> '{result}' in ('validated', 'conditional', 'rejected')
+      and jsonb_typeof(${table.payload} #> '{evidenceRefs}') = 'array'
+      and jsonb_array_length(${table.payload} #> '{evidenceRefs}') >= 1
+    )
+  `),
+  check("advised_practice_events_review_disabled", sql`
+    ${table.eventType} <> 'standardization_reviewed' or (
+      ${table.payload} #>> '{policyPromotionCapability}' = 'disabled'
+      and ${table.payload} #>> '{automationCapability}' = 'disabled'
+      and jsonb_typeof(${table.payload} #> '{decomposition}') = 'array'
+      and jsonb_array_length(${table.payload} #> '{decomposition}') >= 1
+      and not jsonb_path_exists(${table.payload}, '$.decomposition[*] ? (@.artifactRef != null || @.promotionCapability != "disabled")')
+    )
+  `),
+  check("advised_practice_events_no_forbidden_material", sql`
+    ${table.payload}::text !~* '"[^"[:space:]]*(token|secret|prompt)"[[:space:]]*:'
+    and ${table.payload}::text !~* '"authorization"[[:space:]]*:'
+    and ${table.payload}::text !~* '"[^"[:space:]]*raw[_-]?(payload|request|response|json)"[[:space:]]*:'
+  `),
+  check("advised_practice_events_no_authority_escalation", sql`
+    not jsonb_path_exists(
+      ${table.payload} - 'authority' - 'policyPromotionCapability' - 'automationCapability',
+      '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(canwrite|writeenabled|actionauthority|writeauthority|executionauthority|approvalgranted|canauthorizeaction|canexecutewrite|canenforcepolicy|canalterapproval|canpromotepolicy|canenableautomation)$" flag "i")'
+    )
+  `),
+]);
+
 /** Immutable, server-private L5 analysis context snapshots. */
 export const effectiveCampaignContexts = pgTable("effective_campaign_contexts", {
   id: uuid("id").primaryKey().defaultRandom(),

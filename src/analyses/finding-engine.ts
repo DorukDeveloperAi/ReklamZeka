@@ -262,7 +262,13 @@ export function buildDeterministicFindings(input: Readonly<{
   if (digest(input.agenda.resolvedTimeframe) !== digest(input.analysis.resolvedTimeframe)) {
     throw new DeterministicFindingEngineError("scope_mismatch");
   }
-  const allowedSnapshots = new Set(input.context.data.snapshotRefs);
+  // L0/L1 source snapshots and frozen L2 feature snapshots are both valid
+  // evidence roots. Runtime analysis must never introduce a ref that was not
+  // frozen into the authentic campaign context.
+  const allowedSnapshots = new Set([
+    ...input.context.data.snapshotRefs,
+    ...input.context.data.featureRefs,
+  ]);
   if (input.analysis.snapshotRefs.some((ref) => !allowedSnapshots.has(ref))) {
     throw new DeterministicFindingEngineError("scope_mismatch");
   }

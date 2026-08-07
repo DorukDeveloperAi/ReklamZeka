@@ -35,6 +35,7 @@ export function DecisionRoomReadSurface(props: Readonly<{
   onView: (view: View) => void;
   onRetry: () => void;
   onMarkRead: (notificationRef: string) => void;
+  onConnect?: (capability: string) => void;
 }>) {
   const { state, view } = props;
   return <>
@@ -48,9 +49,24 @@ export function DecisionRoomReadSurface(props: Readonly<{
     </section>
 
     {state.status === "loading" ? <section className={`${styles.panel} ${styles.decisionRoomState}`} role="status"><span className={styles.liveDot} /><h2>Decision Room kaynağı okunuyor</h2><p>Çalışma alanı ve okuyucu kimliği yalnız sunucu oturumundan bağlanır.</p></section> : null}
-    {state.status === "unavailable" || state.status === "error" ? <section className={`${styles.panel} ${styles.decisionRoomState}`} role="alert"><strong>{state.status === "unavailable" ? "Kaynak henüz bağlı değil" : "Decision Room okunamadı"}</strong><h2>{state.message}</h2><p>Demo verisi canlı sonuç gibi gösterilmez. Üretim read repository ve güvenilir kimlik bağlama etkinleştiğinde bu görünüm otomatik açılacak.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></section> : null}
+    {state.status === "unavailable" || state.status === "error" ? <section className={`${styles.panel} ${styles.decisionRoomState}`} role="alert"><strong>{state.status === "unavailable" ? "Kaynak henüz bağlı değil" : "Decision Room okunamadı"}</strong><h2>{state.message}</h2><p>Demo verisi canlı sonuç gibi gösterilmez. Üretim read repository ve güvenilir kimlik bağlama etkinleştiğinde bu görünüm otomatik açılacak.</p><button onClick={props.onRetry}>Tekrar kontrol et</button>{state.status === "unavailable" && props.onConnect ? <LocalSessionForm onConnect={props.onConnect} /> : null}</section> : null}
     {state.status === "ready" ? <DecisionRoomItems view={view} result={state.result} onMarkRead={props.onMarkRead} /> : null}
   </>;
+}
+
+function LocalSessionForm(props: Readonly<{ onConnect: (capability: string) => void }>) {
+  const [capability, setCapability] = useState("");
+  return <form onSubmit={(event) => {
+    event.preventDefault();
+    const submitted = capability.trim();
+    setCapability("");
+    if (submitted) props.onConnect(submitted);
+  }}>
+    <label htmlFor="local-session-capability">Tek kullanımlık yerel oturum capability</label>
+    <input id="local-session-capability" type="password" autoComplete="off" spellCheck={false}
+      value={capability} onChange={(event) => setCapability(event.target.value)} />
+    <button type="submit" disabled={!capability.trim()}>Yerel oturumu bağla</button>
+  </form>;
 }
 
 function DecisionRoomItems(props: Readonly<{
@@ -93,7 +109,10 @@ export function DecisionRoomPanel() {
   const markRead = useCallback(async (notificationRef: string) => {
     try {
       const response = await fetch("/api/decision-room", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
+        method: "PATCH", headers: {
+          "Content-Type": "application/json",
+          "X-ReklamZeka-Intent": "mark-inbox-read",
+        },
         body: JSON.stringify({ notificationRef }),
       });
       if (!response.ok) throw new Error("mark_failed");
@@ -103,5 +122,32 @@ export function DecisionRoomPanel() {
     }
   }, [load]);
 
-  return <DecisionRoomReadSurface view={view} state={state} onView={setView} onRetry={() => void load()} onMarkRead={(ref) => void markRead(ref)} />;
+  const connect = useCallback(async (capability: string) => {
+    try {
+      const response = await fetch("/api/local-session", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${capability}`,
+          "X-ReklamZeka-Intent": "bootstrap-local-session",
+        },
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error("session_rejected");
+      const verified = await fetch("/api/decision-room?view=inbox&limit=1", {
+        cache: "no-store", credentials: "same-origin",
+      });
+      if (!verified.ok) {
+        setState({ status: "error", message: "Güvenli yerel oturum cookie'si saklanamadı veya veritabanı üyeliği doğrulanmadı. Origin olarak http://localhost kullanın." });
+        return;
+      }
+      const payload = await verified.json() as AgentEnvelope;
+      if (payload.result.view !== "inbox") throw new Error("invalid_contract");
+      setView("inbox");
+      setState({ status: "ready", result: payload.result });
+    } catch {
+      setState({ status: "error", message: "Yerel oturum capability doğrulanamadı veya süresi doldu." });
+    }
+  }, [load]);
+
+  return <DecisionRoomReadSurface view={view} state={state} onView={setView} onRetry={() => void load()} onMarkRead={(ref) => void markRead(ref)} onConnect={(value) => void connect(value)} />;
 }

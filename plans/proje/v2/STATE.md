@@ -200,10 +200,9 @@
 
 ## Sıradaki uygulama
 
-**Slice 2 / Decision Room:** İç kategori/talimat registry'sini ve effective-context
-resolver'ı, timeframe-aware deterministic analysis ile birleştir; agent yalnız L4/L5
-kanıt paketinden finding/proposal üretsin. A13'e kadar production write scope veya writer
-ReklamZeka'ya taşınmaz.
+**Slice 2 kapanış bağı:** persisted analysis template/timeframe registry ve production asset
+loader ile deterministic runtime'ı worker'a bağla; ardından Practice Lab read yüzeyi ve S3
+Budget Lab'e geç. A13'e kadar production write scope veya writer ReklamZeka'ya taşınmaz.
 
 ## 2026-08-07 — S1.4 asset/content mirror kapanışı
 
@@ -390,3 +389,25 @@ ReklamZeka'ya taşınmaz.
 - Kanıt: 68 test dosyası/381 test, typecheck, `db:check`, production build, audit `0`;
   Supabase 47/47 RLS, API table grant `0`, schema create `0`, public routine execute `0`;
   tracked/build/cache token eşleşmesi `0`.
+
+## 2026-08-07 — S2 local session, analysis runtime ve AdvisedPractice kapısı
+
+- Manual ve scheduled executor için tek deterministic analysis runtime L2 observation
+  materialization, calculator, agenda/finding ve Decision Room ledger akışını exact frozen
+  snapshot ref'lerine bağladı. Model, Meta write veya notification çağrısı yoktur. Persisted
+  template/timeframe registry ile production asset loader kapanış işi olarak açık kaldı.
+- Dashboard ve CLI aynı read/mark-read application contract'ına bağlandı. HMAC capability
+  exact workspace/user/reader/tool scope, OS UID ve süre taşır; dashboard tek kullanımlık
+  bootstrap'tan Secure/HttpOnly cookie, CLI süreli bearer alır. Loopback Host/Origin ve her
+  istekte aktif DB üyeliği fail-closed doğrulanır.
+- Veritabanında ilk local owner/workspace bağı serializable transaction + advisory lock ile
+  oluşturuldu ve audit edildi. Kimlik binding'i ile 32-byte signing key git-dışı, `0600`
+  `.env.local` içine değerleri yazdırmadan yerleştirildi; başka tenant seçilmedi/değiştirilmedi.
+- AdvisedPractice candidate/review/trial/outcome/standardization-review yaşam döngüsü iki
+  append-only tabloya bağlandı. Owner anlatımı, resmi Meta source, evidence ve deliberation
+  zorunlu; conditional/rejected korunur. Policy artifact/promotion, automation ve action
+  authority DB/domain sınırında kapalıdır; tombstone purge 45 workspace tablosunu kapsar.
+- Additive migration Supabase'e uygulandı. Gerçek rollback kabulleri practice lifecycle,
+  cross-tenant/tombstone, workspace bootstrap idempotency/audit/foreign isolation ve sıfır
+  kalıntı için geçti. Kanıt: 74 test dosyası/426 test, typecheck, `db:check`, production build;
+  Supabase 49/49 RLS, API grant `0`, tracked/build/cache secret eşleşmesi `0`, Meta write `0`.

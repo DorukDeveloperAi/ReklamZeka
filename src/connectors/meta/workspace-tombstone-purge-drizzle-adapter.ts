@@ -36,6 +36,8 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "guidance_cards",
   "guidance_bindings",
   "guidance_sets",
+  "advised_practice_definitions",
+  "advised_practice_events",
   "effective_campaign_contexts",
   "effective_campaign_context_components",
   "effective_campaign_context_invalidations",
@@ -140,6 +142,12 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'guidance_sets', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from guidance_sets where workspace_id = ${workspaceId}::uuid
+      union all select 'advised_practice_definitions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from advised_practice_definitions where workspace_id = ${workspaceId}::uuid
+      union all select 'advised_practice_events', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from advised_practice_events where workspace_id = ${workspaceId}::uuid
       union all select 'effective_campaign_contexts', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from effective_campaign_contexts where workspace_id = ${workspaceId}::uuid
@@ -297,6 +305,8 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from guidance_sets where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guidance_cards where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guidance_sources where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from advised_practice_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from advised_practice_definitions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from decision_room_inbox_reads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from decision_room_inbox_items where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from decision_room_runs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

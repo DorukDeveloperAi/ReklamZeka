@@ -49,6 +49,21 @@ describe("Decision Room HTTP boundary", () => {
     expect(patchResponse.status).toBe(400);
   });
 
+  it("rejects oversized or malformed PATCH bodies before principal resolution", async () => {
+    const api = handlers();
+    const oversized = await api.PATCH(new Request("http://localhost/api/decision-room", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: "x".repeat(1025),
+    }));
+    expect(oversized.status).toBe(400);
+    expect(api.resolve).not.toHaveBeenCalled();
+
+    const malformed = await api.PATCH(new Request("http://localhost/api/decision-room", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{",
+    }));
+    expect(malformed.status).toBe(400);
+    expect(api.resolve).not.toHaveBeenCalled();
+  });
+
   it("marks read with host identity and host time, not request time", async () => {
     const api = handlers();
     const response = await api.PATCH(new Request("http://localhost/api/decision-room", {

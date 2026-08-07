@@ -15,6 +15,10 @@ type HttpDependencies = Readonly<{
 
 const NO_STORE = Object.freeze({
   "Cache-Control": "private, no-store, max-age=0",
+  "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+  "Referrer-Policy": "no-referrer",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
   "X-ReklamZeka-Access-Mode": "read-only",
   "X-ReklamZeka-Action-Authority": "none",
 });
@@ -73,7 +77,18 @@ export function createDecisionRoomHttpHandlers(dependencies: HttpDependencies) {
         if (url.search || request.headers.get("content-type")?.split(";", 1)[0] !== "application/json") {
           throw new DecisionRoomReadError("invalid_input");
         }
-        const body: unknown = await request.json();
+        const contentLength = request.headers.get("content-length");
+        if (contentLength !== null && (!/^\d+$/.test(contentLength) || Number(contentLength) > 1024)) {
+          throw new DecisionRoomReadError("invalid_input");
+        }
+        const text = await request.text();
+        if (text.length > 1024) throw new DecisionRoomReadError("invalid_input");
+        let body: unknown;
+        try {
+          body = JSON.parse(text);
+        } catch {
+          throw new DecisionRoomReadError("invalid_input");
+        }
         if (!body || typeof body !== "object" || Array.isArray(body)
           || Object.keys(body).length !== 1 || !("notificationRef" in body)) {
           throw new DecisionRoomReadError("invalid_input");

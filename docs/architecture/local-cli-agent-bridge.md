@@ -74,6 +74,45 @@ proposal preview'da kaynak olarak görünür; birden fazla adayda kullanıcı se
 - L0 raw payload/dump yok; context bütçesi ve typed drill-down sınırı tüm client'larda aynı;
 - dashboard/CLI aynı approval-only ve action valve sonucunu alır.
 
+### İlk yerel dashboard session bağlaması
+
+İlk üretim read-model bağlaması tek kullanıcı makinesinde açıkça etkinleştirilen, sabit
+bir yerel principal ve süreli capability kullanır. `workspaceId`, public `workspaceRef`,
+`actor userId` ve `readerRef` yalnız server environment'tan gelir; query, body, cookie
+claim'i veya agent argümanı bu kimlikleri seçemez. HMAC-imzalı capability aynı değerleri,
+salt-okunur tool scope'unu, `issuedAt`/`expiresAt`, session/nonce ve server process OS UID
+bağını taşır; doğrulanan claim'ler server binding ile exact eşleşmelidir. Üyelik rolü
+environment'ta tutulmaz: her istekte aktif workspace ve güncel `memberships` kaydı
+PostgreSQL'den yeniden doğrulanır. Üyelik silinirse veya workspace tombstone sürecine
+girerse erişim process restart beklemeden kapanır.
+
+HTTP yüzeyi yalnız yapılandırılan exact loopback origin/Host çiftini kabul eder. Güvenli
+dashboard cookie'si için düz HTTP yalnız `http://localhost` ile desteklenir; `127.0.0.1`
+ve `[::1]` loopback adresleri HTTPS ister. `Forwarded`,
+`X-Forwarded-*` ve benzeri başlıklar locality
+kanıtı sayılmaz; proxy hop'u görüldüğünde istek fail-closed reddedilir. Bu nedenle ilk
+sürüm reverse proxy, LAN bind veya public deployment arkasında çalıştırılmaz. GET için
+cross-site Fetch Metadata reddedilir. Tek mutation olan idempotent inbox `mark_read`, exact
+same-origin `Origin`, `Sec-Fetch-Site: same-origin`, JSON ve `X-ReklamZeka-Intent` ister.
+Dashboard session cookie'si yalnız 90 saniyelik, OS-user bağlı ve dosya sisteminde
+tek-kullanımlık nonce kaydı bulunan bootstrap capability tüketilince server tarafından
+yeniden mint edilir; gelen session ID cookie'ye taşınmaz (fixation yoktur). Cookie
+`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/` ve sekiz saat ömürlüdür. CLI aynı
+doğrulayıcıya doğrudan süreli Bearer capability sunabilir. Bearer tekrar oynatma riski
+expiry/tool scope ile sınırlandırılır; mevcut tek state mutation idempotent `mark_read`
+olduğu için replay yeni yetki veya timestamp üretmez. DB URL, signing key ve diğer sırlar
+yalnız server process'indedir; response ve uygulama log'una yazılmaz.
+Bir session; üyeliği kaldırarak anında veri erişiminden düşürülebilir, tüm mevcut
+capability'leri kriptografik olarak iptal etmek için signing key rotate edilip local process
+yeniden başlatılır.
+
+Dashboard capability üretimi proje kökünde `npm run local-session:mint` ile yapılır; bu
+komut `.env.local` dosyasını açıkça yükler. Script doğrudan `tsx
+scripts/mint-local-session.ts` şeklinde çağrılırsa environment otomatik yüklenmez ve aynı
+değişkenlerin çağıran shell tarafından verilmesi gerekir. CLI capability için
+`npm run local-session:mint -- --cli` kullanılır. Capability terminal/history açısından
+geçici kimlik bilgisi sayılır; paylaşılmaz ve log'a yönlendirilmez.
+
 Session bir konuşmadan GuidanceCard veya AdvisedPractice taslağı çıkarabilir. Bunlar
 dashboard Practice Lab'de versioned review/outcome görmeden standardize, publish veya
 enforceable policy olamaz; conversation memory kalıcı öğrenme kaynağı değildir.

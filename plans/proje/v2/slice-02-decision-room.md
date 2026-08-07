@@ -51,12 +51,18 @@ bütçe simülasyonu ve Meta write sırasıyla S3 ve S4'e aittir.
   exact-key/scope/hash doğrulamalı, bounded ve replay-stable deterministic query/read sözleşmesini
   kurdu. Public read service read-state zamanını yalnız server clock'tan alıyor. Gerçek Drizzle
   read repository ve gerçek insight read adapteri Supabase rollback kabulünden geçti. Dashboard
-  Decision Room görünümü ile Codex/Claude araç/HTTP kontratı hazır; güvenilir workspace principal
-  bağlanana kadar production route bilinçli olarak `503 source_not_configured` verir ve fixture
-  kullanmaz.
-- **Birleşik kanıt:** 68 test dosyası/381 test, production build, audit 0; category/guidance,
-  frozen-context, decision-ledger, Decision Room persistence ve 43-tablolu tombstone PostgreSQL
-  rollback kabulleri temiz. Supabase 47/47 RLS, API table grant'i `0`; otomatik
+  Decision Room görünümü ile Codex/Claude araç/HTTP kontratı hazır. HMAC capability'li, OS
+  kullanıcısına ve exact workspace üyeliğine bağlı loopback-only local session; dashboard cookie,
+  CLI bearer ve read/mark-read route assembly'sini aynı servise bağlar. Yerel owner/workspace
+  bootstrap'ı dry-run + explicit apply ile oluşturuldu ve private env binding etkinleştirildi.
+- **S2.8 persistence/domain core hazır:** AdvisedPractice candidate→review→trial→outcome→
+  standardization-review zinciri owner + resmi Meta kaynağı + evidence + deliberation ister.
+  Conditional/rejected sonuçlar korunur; standardization review policy artifact, promotion,
+  automation veya action authority üretemez. İki append-only tablo tenant-bound repository,
+  RLS ve tombstone purge ile Supabase'e uygulandı. Practice Lab UI açık iştir.
+- **Birleşik kanıt:** 74 test dosyası/426 test, production build, audit 0; category/guidance,
+  frozen-context, decision-ledger, Decision Room persistence ve 45-tablolu tombstone PostgreSQL
+  rollback kabulleri temiz. Supabase 49/49 RLS, API table grant'i `0`; otomatik
   tracked/build/cache token eşleşmesi `0`.
   Meta write/network çağrısı `0`.
 

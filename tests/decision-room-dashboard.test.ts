@@ -21,6 +21,19 @@ describe("Decision Room dashboard surface", () => {
     expect(html).not.toContain("Onayla");
   });
 
+  it("offers an explicit password-style capability bootstrap without embedding a token", () => {
+    const html = renderToStaticMarkup(createElement(DecisionRoomReadSurface, {
+      ...callbacks,
+      onConnect: vi.fn(),
+      view: "inbox",
+      state: { status: "unavailable", message: "Yerel oturum gerekli." },
+    }));
+    expect(html).toContain("Tek kullanımlık yerel oturum capability");
+    expect(html).toContain('type="password"');
+    expect(html).toContain('autoComplete="off"');
+    expect(html).not.toContain("rzs1.");
+  });
+
   it("renders an explicitly empty live read response as empty, not unavailable", () => {
     const html = renderToStaticMarkup(createElement(DecisionRoomReadSurface, {
       ...callbacks,

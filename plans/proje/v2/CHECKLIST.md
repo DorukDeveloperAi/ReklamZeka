@@ -108,7 +108,9 @@
   - [x] Bounded, exact-scope/hash doğrulamalı ve replay-stable L2 observation plan/builder sözleşmesi.
   - [x] Gerçek PostgreSQL insight read adapteri; canonical hash replay, row cap, explicit
     attribution-settlement policy ve rollback kabulü.
-  - [ ] Cohort calculator ve full Decision Room analysis application binding'i.
+  - [x] Manual/scheduled ortak deterministic analysis runtime; L2 materialization→calculator→
+    finding→ledger bağlamı, exact frozen snapshot ve server-private entity identity sınırı.
+  - [ ] Cohort calculator, persisted template/timeframe registry ve production asset loader.
 - [ ] Hierarchical driver ve creative fatigue/config diagnostics.
 - [ ] Analysis run ledger, dry-run API ve deterministic replay.
   - [x] Append-only authentic hash-chain decision ledger saf çekirdeği ve malformed/tamper matrisi.
@@ -119,7 +121,9 @@
     dışında fail-closed, Meta/action authority taşımıyor.
   - [x] Gerçek Drizzle schedule/run/inbox read repository, public asset alias, keyset pagination
     ve yarış-güvenli server-clock read-state.
-  - [ ] Güvenilir local-session principal/route assembly, rol/audit API'si ve gerçek dry-run endpoint'i.
+  - [x] HMAC capability'li loopback-only local-session principal/route assembly; dashboard cookie,
+    CLI bearer, her istekte aktif workspace üyeliği ve read/mark-read scope'u.
+  - [ ] Rol yönetimi/audit mutation API'si ve gerçek analysis dry-run endpoint'i.
 - [ ] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
   - [x] Deterministik on-pass agenda, category/topic subset ve context/timeframe-bound finding çekirdeği.
   - [ ] Persistence, gerçek finding ailesi ve Decision Room application binding'i.
@@ -214,6 +218,8 @@
 - [ ] Kritik sohbet + live guidance cards + scope/topic binding + promote-to-policy studio.
 - [ ] AnalysisAgenda, applied guidance, cadence/experiment ve no-change UI yolculuğu.
 - [ ] Practice Lab candidate/trial/outcome/decomposition/standardized artifact UI.
+  - [x] AdvisedPractice candidate→review→trial→outcome→standardization-review append-only domain,
+    PostgreSQL persistence, tenant/RLS/tombstone ve policy/automation-promotion engeli.
 - [ ] Scheduled analysis in-app inbox ve duplicate-delivery/read-state E2E.
   - [x] Saf executor üzerinde idempotent in-app teslim/recovery ve duplicate-run testi.
   - [x] Workspace-scoped PostgreSQL inbox/read-state ve duplicate-delivery rollback E2E.

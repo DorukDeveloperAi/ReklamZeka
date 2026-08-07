@@ -6,5 +6,6 @@ coverage/
 *.log
 *.tsbuildinfo
 .pilot/
+.reklamzeka/
 pilot-field-input*.json
 .DS_Store
