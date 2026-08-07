@@ -277,7 +277,9 @@ export class DecisionRoomReadService {
         : (rows as readonly DecisionRoomInboxReadRow[]).map((row) => inbox(row, workspaceRef))
           .sort((left, right) => compareText(right.createdAt, left.createdAt) || compareText(right.notificationRef, left.notificationRef));
     const itemRefs = projected.map((item) => (
-      "scheduleRef" in item ? item.scheduleRef : "notificationRef" in item ? item.notificationRef : item.runRef
+      input.view === "schedules" ? (item as DecisionRoomScheduleSummary).scheduleRef
+        : input.view === "runs" ? (item as DecisionRoomRunStatus).runRef
+          : (item as DecisionRoomInboxItem).notificationRef
     ));
     if (new Set(itemRefs).size !== itemRefs.length) throw new DecisionRoomReadError("corrupt_source");
     if (after && projected.some((item) => {
