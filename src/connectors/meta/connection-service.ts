@@ -8,11 +8,12 @@ import {
 import { META_GRAPH_API_VERSION, type MetaFetch } from "./graph-client";
 import {
   publicMetaConnection,
+  type MetaCapabilitySnapshot,
   type MetaConnection,
   type MetaSecretReference,
   type PublicMetaConnection,
 } from "./connection-types";
-import type { MetaConnectionRepository } from "./connection-repository";
+import { MetaConnectionNotFoundError, type MetaConnectionRepository } from "./connection-repository";
 import { inspectMetaConnection } from "./doctor";
 import type { MetaSecretRepository } from "./secret-repository";
 
@@ -51,6 +52,12 @@ export class MetaConnectionService {
     secretReference: MetaSecretReference;
   }>): Promise<PublicMetaConnection> {
     const membership = authorizeWorkspace(input.actor, input.workspaceId, "connection:manage", this.options.memberships);
+    try {
+      await this.options.connections.find(input.workspaceId, input.connectionId);
+      throw new MetaConnectionLifecycleError("Connection identifier already exists", "Meta bağlantı kimliği zaten kullanılıyor");
+    } catch (error) {
+      if (!(error instanceof MetaConnectionNotFoundError)) throw error;
+    }
     await this.options.secrets.assertUsable(input.secretReference, {
       workspaceId: input.workspaceId,
       connectionId: input.connectionId,
@@ -88,7 +95,7 @@ export class MetaConnectionService {
     const connection = await this.options.connections.find(workspaceId, connectionId);
     this.assertConnected(connection);
     const token = await this.options.secrets.resolve(connection.secretReference, { workspaceId, connectionId });
-    let snapshot;
+    let snapshot: MetaCapabilitySnapshot;
     try {
       snapshot = await inspectMetaConnection({
         token,

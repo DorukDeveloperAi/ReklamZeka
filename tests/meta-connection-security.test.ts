@@ -97,7 +97,7 @@ describe("Meta token doctor", () => {
 });
 
 describe("Meta connection lifecycle boundary", () => {
-  function setup() {
+  function setup(fetchImpl: MetaFetch = doctorFetch()) {
     const secrets = new InMemoryMetaSecretRepository();
     const connections = new InMemoryMetaConnectionRepository();
     const audit = new AppendOnlyAuditLog();
@@ -106,7 +106,7 @@ describe("Meta connection lifecycle boundary", () => {
       connections,
       secrets,
       audit,
-      fetchImpl: doctorFetch(),
+      fetchImpl,
       now: () => new Date("2026-08-07T09:00:00.000Z"),
     });
     return { secrets, connections, audit, service };
@@ -156,6 +156,17 @@ describe("Meta connection lifecycle boundary", () => {
     })).rejects.toBeInstanceOf(MetaSecretAccessError);
   });
 
+  it("does not allow registration to overwrite an existing connection", async () => {
+    const { secrets, service } = setup();
+    const connectionId = "connection-duplicate";
+    const first = secrets.store({ workspaceId: "workspace-a", connectionId }, fixtureToken);
+    await service.register({ actor: { userId: "admin-a" }, workspaceId: "workspace-a", connectionId, displayName: "Original", secretReference: first });
+    const second = secrets.store({ workspaceId: "workspace-a", connectionId }, "replacement-token");
+    await expect(service.register({ actor: { userId: "admin-a" }, workspaceId: "workspace-a", connectionId, displayName: "Replacement", secretReference: second }))
+      .rejects.toBeInstanceOf(MetaConnectionLifecycleError);
+    expect((await service.list({ userId: "viewer-a" }, "workspace-a"))[0]?.displayName).toBe("Original");
+  });
+
   it("disables local secret use on disconnect and performs no upstream revocation", async () => {
     const { secrets, service, audit } = setup();
     const connectionId = "connection-disconnect";
@@ -188,6 +199,20 @@ describe("Meta connection lifecycle boundary", () => {
     const result = await service.revoke({ userId: "admin-a" }, "workspace-a", connectionId);
     expect(result.connection.status).toBe("revoked");
     await expect(secrets.resolve(reference, { workspaceId: "workspace-a", connectionId })).rejects.toBeInstanceOf(MetaSecretAccessError);
+  });
+
+  it("parks an authentication failure as invalid and blocks repeated doctor calls", async () => {
+    const fetchImpl: MetaFetch = vi.fn(async () => json({ data: { is_valid: false } }));
+    const { secrets, connections, service, audit } = setup(fetchImpl);
+    const connectionId = "connection-invalid";
+    const reference = secrets.store({ workspaceId: "workspace-a", connectionId }, fixtureToken);
+    await service.register({ actor: { userId: "admin-a" }, workspaceId: "workspace-a", connectionId, displayName: "A", secretReference: reference });
+
+    await expect(service.doctor({ userId: "admin-a" }, "workspace-a", connectionId)).rejects.toMatchObject({ code: "authentication" });
+    expect((await connections.find("workspace-a", connectionId)).status).toBe("invalid");
+    expect(audit.list("workspace-a").at(-1)?.metadata).toMatchObject({ tokenStatus: "invalid", writeOperations: 0 });
+    await expect(service.doctor({ userId: "admin-a" }, "workspace-a", connectionId)).rejects.toBeInstanceOf(MetaConnectionLifecycleError);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
 
