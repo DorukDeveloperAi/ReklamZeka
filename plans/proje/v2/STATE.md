@@ -927,3 +927,23 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Sonraki güvenli kapı; gerçek reviewed ApprovalPolicy, AutonomyRule, ActionGuardrail/protection ve authentic
   category/affected-geo kanıtlarını tek production `ExistingPostPromotionPolicyPort` içinde fail-closed çözmektir.
   Hiçbir gerçek policy değeri yayınlanmadı ve production Meta writer kapalıdır.
+
+## 2026-08-08 — S5.4c3-K existing-post policy composition çekirdeği
+
+- Existing-post preflight ve protection evaluation artık tek exported canonical action builder/hash fonksiyonunu
+  kullanır. Post/source binding, template/preset version, destination, budget plan ve timeframe alanlarından biri
+  değişirse guardrail'in değerlendirdiği hash ile queue action hash'i birlikte değişir; paralel builder sapması yoktur.
+- Server-private `ExistingPostPromotionPolicyAdapter`; active membership→requester rolünü, exact-one reviewed
+  ApprovalPolicy'yi, exact scope'lu published AutonomyRule'ları, authentic category/affected-geo evidence'i ve
+  guardrail ProtectionResolution'ı birleştirir. Viewer, cross-tenant material, eksik freshness, active workspace
+  approval-only kuralının yokluğu, kill switch, denied/unresolved veya kanıtsız guardrail sonucu `null` döner.
+- Proposal expiry; reviewed maximum proposal lifetime ve yedi günlük teknik cap yanında approval definition,
+  uygulanan active autonomy rules, eşleşen guardrail policy revisions ve template binding bitişlerinin en erkenine
+  kırpılır. Approval source ve guardrail policy evidence artık server-private expiry metadata'sı taşır; protection
+  context'i immutable resolution hash ref'iyle plan hash'ine bağlanır.
+- Freshness değeri için varsayılan üretilmedi: adapter authoritative `resolveNotBefore` portu ister. Drizzle factory,
+  route ve dashboard persistence bağlantısı bu kaynağın reviewed configuration/registry modeli kurulana kadar
+  kapalıdır. Gerçek policy/rule/guardrail seed'i, approval yetkisi, execution veya Meta writer eklenmedi.
+- Tam kapı 156 test dosyasında 994 test, production build, architecture/security/secret ve Drizzle kontrolleriyle
+  geçti. Sonraki dilim authoritative evidence-freshness configuration, request-bound Drizzle composition ve ancak
+  sonra dashboard proposal POST→queue E2E'dir.

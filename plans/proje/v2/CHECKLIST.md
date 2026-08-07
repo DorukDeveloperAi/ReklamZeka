@@ -308,8 +308,12 @@
   - [x] Graph AdSet inventory field catalog + transactional runtime persistence wiring ve gerçek Drizzle
     AuthenticAffectedGeoEvidence adapterı; iki GET/sıfır write canlı kabulünde 3 canonical AdSet/geo snapshot.
     Doğrulanmamış country dışı şekiller `unknown`.
+  - [x] Preflight/protection ortak canonical existing-post action builder/hash; reviewed approval/autonomy/guardrail
+    ve authentic category/geo evidence'i birleştiren fail-closed private policy adapterı. Requester membership,
+    kill-switch, protection disposition ve bütün bilinen expiry kaynakları bağlı; freshness default'u yok.
   - [ ] Trusted protection policy resolver + reviewed proposal lifetime ile canonical submitter'ı production
-    policy composition üzerinden route'a bağlama; süre alanı hazır, gerçek policy seed/publish yok.
+    Drizzle composition üzerinden route'a bağlama; çekirdek adapter hazır, authoritative freshness registry/factory,
+    gerçek policy publish ve route wiring yok.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.
 - [ ] Owner/admin/analyst/operator/viewer rol E2E.
 - [ ] 1280/820/390, keyboard/screen-reader ve hata/partial/conflict E2E.

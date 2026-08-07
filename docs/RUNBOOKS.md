@@ -76,3 +76,8 @@ log veya bildirim payload'ına eklenmez.
   principal değildir. Bir runner açılmadan önce principal kimliği, tek-instance/lease davranışı, process shutdown,
   deadman/alert ve timezone/misfire kabulü ayrı olarak tamamlanmalıdır. Caller'dan workspace, connection, account,
   token veya adapter alınmamalıdır.
+- Existing-post proposal policy composition'ında evidence freshness için sessiz varsayılan kullanılmaz.
+  `resolveNotBefore` yalnız reviewed server configuration/registry'den gelmelidir; request body, model çıktısı,
+  template etiketi veya audience preset freshness kanıtı değildir. Kaynak yoksa adapter `null` döner ve queue yazımı
+  yapılmaz. Proposal expiry; approval definition, uygulanan autonomy rule, eşleşen guardrail revision, binding ve
+  maximum proposal lifetime bitişlerinin en erkenini aşmamalıdır.
