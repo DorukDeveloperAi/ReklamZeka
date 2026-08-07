@@ -5,7 +5,7 @@ tools: Read, Glob, Grep, Bash, WebSearch, WebFetch
 rol: ajan
 tier: plan
 model: claude-fable-5
-effort: xhigh
+effort: high
 ---
 
 # Analist — anlar ve kanıtlar, düzeltmez
