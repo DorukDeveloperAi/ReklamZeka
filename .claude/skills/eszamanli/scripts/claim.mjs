@@ -981,6 +981,81 @@ function cmdH2Kapi() {
   process.exit(r.gecti ? 0 : 1);
 }
 
+
+/* ── MÜKERRER EMEK RAPORU (2026-08-07) ──────────────────────────────────────────
+ *
+ * SORU: "iki oturum farkında olmadan aynı işi mi yapıyor?"
+ *
+ * Kilit sistemi DOSYAYI korur, NİYETİ korumaz. Ölçülen kayıp (2026-08-07): iki oturum
+ * `claims-lib.mjs`e aynı zombi kuralını bağımsız yazdı, merge çakıştı, bir implementasyon
+ * çöpe gitti — ve bu hiçbir yerde GÖRÜNMEDİ, çünkü ikisi de claim almamıştı.
+ *
+ * ÖLÇÜ: `claim-guard` her oturumun her dosyaya **claim'siz İLK yazımını** deftere düşürür
+ * (`tip: "claimsiz"`). Aynı yola ≥2 FARKLI oturum dokunduysa mükerrer emek RİSKİ vardır.
+ *
+ * HÜKÜM DEĞİL SİNYAL: iki oturum aynı dosyayı meşru sebeplerle de düzenlemiş olabilir
+ * (farklı fonksiyonlar, ardışık turlar). Rapor bunu iddia ETMEZ — "bakmaya değer" der.
+ * Deterministik · 0 token · salt-okur. */
+function cmdMukerrer() {
+  const root = ROOT;
+  const json = has("json");
+  const saatler = Number(flag("saat", 24));
+  const esik = Date.now() - saatler * 3600_000;
+
+  const yol = L.olayPath(root);
+  let satirlar = [];
+  try {
+    satirlar = readFileSync(yol, "utf8").trim().split("\n").filter(Boolean).map((l) => {
+      try { return JSON.parse(l); } catch { return null; }
+    }).filter(Boolean);
+  } catch {
+    /* defter yok → ölçüm yok, hüküm yok */
+  }
+
+  const pencere = satirlar.filter((o) => o.tip === "claimsiz" && Date.parse(o.ts) >= esik);
+  const yolaGore = new Map();
+  for (const o of pencere) {
+    if (!o.key) continue;
+    if (!yolaGore.has(o.key)) yolaGore.set(o.key, new Map());
+    // İlk temas anı korunur — "kim önce girdi" sorusu devir kararında işe yarar.
+    const m = yolaGore.get(o.key);
+    if (!m.has(o.engellenen)) m.set(o.engellenen, o.ts);
+  }
+  const riskli = [...yolaGore.entries()]
+    .filter(([, m]) => m.size >= 2)
+    .sort((a, b) => b[1].size - a[1].size);
+
+  if (json) {
+    console.log(JSON.stringify({
+      repo: root, pencere_saat: saatler,
+      olcum: { claimsiz_yazim: pencere.length, dokunulan_yol: yolaGore.size, riskli_yol: riskli.length },
+      riskli: riskli.map(([k, m]) => ({ yol: k, oturumlar: [...m.entries()].map(([sid, ts]) => ({ oturum: sid, ilk: ts })) })),
+    }, null, 2));
+    return;
+  }
+
+  console.log(`mükerrer emek taraması — ${root} · son ${saatler} saat`);
+  console.log(`  claim'siz ilk yazım: ${pencere.length} · dokunulan yol: ${yolaGore.size} · RİSKLİ: ${riskli.length}`);
+  if (!satirlar.length) {
+    console.log("  ölçüm YOK — olay defteri boş (kapı henüz hiç claim'siz yazım görmedi)");
+    return;
+  }
+  if (!riskli.length) {
+    console.log("  aynı yola claim'siz dokunan ikinci bir oturum yok.");
+    return;
+  }
+  console.log("");
+  for (const [k, m] of riskli.slice(0, 20)) {
+    console.log(`  ⚠ ${k}  ← ${m.size} oturum`);
+    for (const [sid, ts] of m) console.log(`      ${sid}  ilk temas ${ts}`);
+  }
+  if (riskli.length > 20) console.log(`  … +${riskli.length - 20} yol daha (--json ile tamamı)`);
+  console.log(
+    `\nSİNYAL, HÜKÜM DEĞİL: meşru olabilir (farklı fonksiyonlar · ardışık turlar).` +
+    `\nÖnce bakılacak yer: aynı yolu tutan oturumların niyetleri → node claim.mjs status`,
+  );
+}
+
 const table = {
   claim: cmdClaim,
   release: cmdRelease,
@@ -993,6 +1068,7 @@ const table = {
   "h2-kapi": cmdH2Kapi,
   gc: cmdGc,
   resources: cmdResources,
+  mukerrer: cmdMukerrer,
 };
 const fn = table[cmd];
 if (!fn) {
