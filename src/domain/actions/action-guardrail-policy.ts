@@ -131,6 +131,7 @@ export type ProtectionResolution = Readonly<{
     policyRef: string;
     revision: number;
     canonicalHash: string;
+    expiresAt: string | null;
     clauseRefs: readonly string[];
   }>[];
   capabilities: Readonly<{ canApprove: false; canExecute: false; canWriteMeta: false; canGrantApproval: false }>;
@@ -493,6 +494,7 @@ export function resolveProtection(input: ProtectionResolutionInput): ProtectionR
   }
   const policyEvidence = Object.freeze(matched.sort((left, right) => left.policyRef.localeCompare(right.policyRef)).map((policy) => Object.freeze({
     policyRef: policy.policyRef, revision: policy.revision, canonicalHash: policy.canonicalHash,
+    expiresAt: policy.expiresAt,
     clauseRefs: Object.freeze(policy.clauses.map((clause) => clause.clauseRef).sort()),
   })));
   const clauses = matched.flatMap((policy) => policy.clauses);

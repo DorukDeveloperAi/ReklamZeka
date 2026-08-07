@@ -28,7 +28,11 @@ export class ApprovalPolicyRegistryRepositoryError extends Error {
 }
 
 export type PersistedApprovalPolicyResolution = Readonly<ResolvedApprovalPolicyDefinition & {
-  source: ResolvedApprovalPolicyDefinition["source"] & Readonly<{ definitionId: string }>;
+  source: ResolvedApprovalPolicyDefinition["source"] & Readonly<{
+    definitionId: string;
+    effectiveFrom: string;
+    expiresAt: string | null;
+  }>;
 }>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -185,7 +189,11 @@ export class DrizzleApprovalPolicyRegistryRepository {
       const sourceRow = result.find((row) => row.canonical_hash === resolved.source.canonicalHash
         && row.revision === resolved.source.revision);
       if (!sourceRow || !UUID.test(sourceRow.id)) fail("corrupt_store");
-      return Object.freeze({ ...resolved, source: Object.freeze({ ...resolved.source, definitionId: sourceRow.id }) });
+      const sourceDefinition = definitions.find((definition) => definition.canonicalHash === resolved.source.canonicalHash
+        && definition.revision === resolved.source.revision);
+      if (!sourceDefinition) fail("corrupt_store");
+      return Object.freeze({ ...resolved, source: Object.freeze({ ...resolved.source, definitionId: sourceRow.id,
+        effectiveFrom: sourceDefinition.effectiveFrom, expiresAt: sourceDefinition.expiresAt }) });
     });
   }
 }

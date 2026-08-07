@@ -158,6 +158,44 @@ function normalizeSourceBinding(
   });
 }
 
+export type ExistingPostPromotionActionInput = Readonly<{
+  template: PromotionTemplateRevision;
+  preset: AudiencePresetRevision;
+  postBinding: VerifiedExistingPostBinding | LegacyVerifiedExistingPostBinding;
+  postContentHash: string;
+  adSetRef: string;
+  destinationRef: string;
+  budgetPlanVersionRef: string;
+}>;
+
+/** Shared canonical action builder used by protection evaluation and final preflight. */
+export function buildExistingPostPromotionAction(input: ExistingPostPromotionActionInput): TypedActionIntent {
+  exact(input, ["template", "preset", "postBinding", "postContentHash", "adSetRef", "destinationRef",
+    "budgetPlanVersionRef"]);
+  const sourceBinding = normalizeSourceBinding(input.postBinding);
+  return freeze({
+    kind: "existing_post_promotion" as const,
+    entity: freeze({ level: "adset" as const, ref: ref(input.adSetRef) }),
+    placeholderOnly: true as const,
+    postRef: ref(input.postBinding.postRef),
+    postContentHash: hash(input.postContentHash),
+    sourceBinding,
+    actorRef: ref(input.postBinding.actorRef),
+    promotionTemplateVersionRef: promotionTemplateVersionRef(input.template),
+    audiencePresetVersionRef: audiencePresetVersionRef(input.preset),
+    destinationRef: ref(input.destinationRef),
+    budgetPlanVersionRef: ref(input.budgetPlanVersionRef),
+    timeframeRef: ref(input.template.timeframe.timeframeRef),
+    scheduleMode: input.template.timeframe.scheduleMode,
+    durationDays: input.template.timeframe.durationDays,
+  });
+}
+
+export function existingPostPromotionActionHash(action: TypedActionIntent): string {
+  if (action.kind !== "existing_post_promotion") fail("invalid_input");
+  return digest(action);
+}
+
 /** Pure preflight: it resolves no audience, creates no creative and performs no network or persistence call. */
 export class ExistingPostPromotionPreflightService {
   private readonly staging: ActionProposalStagingService;
@@ -188,22 +226,10 @@ export class ExistingPostPromotionPreflightService {
     if (input.destinationRef !== input.template.destinationRef
       || input.budgetPlanVersionRef !== input.template.budget.budgetPlanVersionRef) fail("template_mismatch");
 
-    const action: TypedActionIntent = freeze({
-      kind: "existing_post_promotion" as const,
-      entity: freeze({ level: "adset" as const, ref: ref(input.adSetRef) }),
-      placeholderOnly: true as const,
-      postRef: input.postBinding.postRef,
-      postContentHash: eligibility.contentFreeze.contentHash,
-      sourceBinding,
-      actorRef: input.postBinding.actorRef,
-      promotionTemplateVersionRef: promotionTemplateVersionRef(input.template),
-      audiencePresetVersionRef: audiencePresetVersionRef(input.preset),
-      destinationRef: ref(input.destinationRef),
-      budgetPlanVersionRef: ref(input.budgetPlanVersionRef),
-      timeframeRef: input.template.timeframe.timeframeRef,
-      scheduleMode: input.template.timeframe.scheduleMode,
-      durationDays: input.template.timeframe.durationDays,
-    });
+    const action = buildExistingPostPromotionAction({ template: input.template, preset: input.preset,
+      postBinding: input.postBinding, postContentHash: eligibility.contentFreeze.contentHash,
+      adSetRef: input.adSetRef, destinationRef: input.destinationRef,
+      budgetPlanVersionRef: input.budgetPlanVersionRef });
     const actionPlan = buildActionPlan(action, input.actionContext);
     if (actionPlan.risk !== "K4" || actionPlan.disposition !== "approval_required"
       || actionPlan.capabilities.canExecute || actionPlan.capabilities.canWriteMeta
@@ -215,7 +241,7 @@ export class ExistingPostPromotionPreflightService {
         unitKey: "existing_post_promotion", plan: input.plan, actionPlan,
         workspaceRef: input.actionContext.workspaceRef, accountRef: input.actionContext.accountRef,
         entityRef: input.adSetRef, actionType: "existing_post_promotion", risk: "K4",
-        actionHash: digest(action), dependencies: [], summary: input.summary,
+        actionHash: existingPostPromotionActionHash(action), dependencies: [], summary: input.summary,
       }],
     });
     const core = {
