@@ -992,3 +992,35 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   Meta/execution çağrısını doğruladı. Tam kapı 160 test dosyasında 1014 test, production build,
   architecture/security/secret ve Drizzle kontrolleriyle geçti. In-app browser localhost URL politikası görsel
   tıklama kabulünü engelledi; responsive/browser E2E açık iş olarak korunuyor.
+
+## 2026-08-08 — S5.4c3-N insan-onaylı policy yayını ve selection-bound preflight
+
+- ApprovalPolicy ve ActionGuardrail immutable draft'ları owner/admin için ayrı macOS insan-varlığı töreniyle
+  yayınlanabilir hale geldi. Kanıt 10–120 saniye ömürlü, process-local ve tek kullanımlıdır; workspace, actor,
+  policy türü/ref'i, draft revision'ı ve canonical içerikten türetilen opaque unit'e bağlıdır. Bearer/proxy,
+  caller workspace/revision/authority/hash enjeksiyonu ve stale draft fail-closed reddedilir.
+- Dashboard yalnız töreni başlatma yetkisini gösterir; `canPublish`, action approve, grant, execute ve Meta-write
+  her cevapta kapalı kalır. Server son immutable draft'ı yeniden okur ve yalnız bir sonraki append-only published
+  revision'ı yazar. Hiçbir gerçek business policy değeri seed edilmedi veya yayınlanmadı.
+- Model-agnostic agent için aynı Policy Bundle Studio kaynağını kullanan tek `policy_bundle_read` aracı eklendi.
+  Dashboard üyelik görünümü agent çıktısına authority olarak taşınmaz; agent-specific read-only authority bütün
+  mutation ve Meta yetkilerini false tutar.
+- Public preflight ve proposal draft recheck, exact request selection + immutable template/preset/binding/post/ad-set/
+  campaign materyal hash'inden üretilen evidence selection hash'iyle reviewed compatibility registry'ye bağlandı.
+  Beş boyutun tamamı exact eşleşmiyorsa, veri bozuksa veya workspace farklıysa tüm compatibility `unknown` kalır.
+  Scope-free Policy Studio artık compatibility'yi seçim anında değerlendirilen bir kapı olarak gösterir ve tek
+  başına `proposalReady` ilan etmez.
+
+## 2026-08-08 — A08 Graph v23 insight capability kataloğu
+
+- Analiz metrik formüllerini Graph v23 source field'ları, exact action/action-value type'ları, campaign/ad-set/ad
+  level spelling'i, attribution modu ve breakdown permutation matrisiyle bağlayan sürümlü/hash'li saf katalog
+  eklendi. Unsupported source alias, izin eksikliği, bilinmeyen Graph sürümü, geçersiz attribution/time increment,
+  çakışan breakdown ve action-uyumsuz breakdown kombinasyonları Graph çağrısından önce fail-closed kalır.
+- Sync transport artık insight sorgusunu bu planner'dan üretir ve catalog provenance'ını sayfa sonucuna bağlar.
+  Exact action extractor container eksikliği, bozuk/duplicate action type, para birimi veya minor-unit scale
+  belirsizliğini sıfır saymaz; sebepli unavailable sonuç üretir.
+- Bounded canlı verifier en fazla beş hesabı yalnız ID göstermeden seçti; iki hesap incelendi ve campaign/ad-set/ad
+  seviyelerinde sekiz probe gerçek satır döndürdü. Son kanıt 11 GET, 0 write, 66 istenen field slotunun 63'ü,
+  üç satırda `actions` ve sıfır satırda `action_values` gösterdi. Sonuç dürüstçe `partial_coverage`; eksik üç alan
+  ve gözlenmeyen `action_values` açık gap'tir. DB/schema, Meta write veya ham ID/payload/log eklenmedi.

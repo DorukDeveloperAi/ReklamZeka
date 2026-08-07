@@ -44,7 +44,10 @@
 - [ ] Geniş metrik/action/action-value/breakdown kataloğu.
   - [x] Extensible metric contract; additive/non-additive/derived, action/action-value,
     attribution ve availability provenance çekirdeği.
-  - [ ] Canlı field catalog, breakdown uyumluluk matrisi ve gerçek payload coverage.
+  - [x] Sürümlü Graph v23 field/action/breakdown kataloğu, fail-closed compatibility planner,
+    exact action-type extractor ve campaign/ad-set/ad + sekiz probe gerçek payload coverage.
+  - [ ] Gerçek örnekte `action_values` container gözlemi; bounded kabul bunu sıfır gördü ve
+    `partial_coverage` olarak açık bıraktı, sıfır değer veya doğrulanmış destek uydurulmadı.
 - [x] Inventory/creative/insights parçalı sync, adaptive page/date slice ve resume.
   - [x] Deterministik planner, bağımsız stream/slice state, bounded retry, adaptive page,
     idempotency, partial success ve durable cursor restore.
@@ -317,6 +320,13 @@
     active/effective/ambiguity-aware readiness, viewer read-only ve owner/admin/analyst immutable draft akışı.
     Guardrail account→campaign→ad-set kapsamı ile internal kategori yalnız server kataloğundan; business değer
     varsayımı, publish/disable/approve/grant/execute/Meta-write ve geo serbest metni yok.
+  - [x] K4 policy bundle için owner/admin-only macOS insan-varlığı yayın töreni; immutable draft revision/content
+    bağlı, kısa ömürlü tek-kullanımlık kanıt ve cookie-only exact intent. Dashboard töreni başlatabilir ancak
+    publish/action-approve/grant/execute/Meta-write authority istemciye veya agenta verilmez.
+  - [x] Dashboard ve model-agnostic agentın aynı Policy Bundle read/readiness servisini kullanması; agent contract'ı
+    salt okunur ve draft/publish/approve/grant/execute/Meta-write capability'lerinin tamamı kapalı.
+  - [x] Dashboard preflight ve proposal recheck için exact immutable material/selection hash'ine bağlı reviewed
+    compatibility köprüsü; eksik, bozuk, foreign-workspace veya beş boyutu tam olmayan kanıt bütünüyle `unknown`.
   - [ ] Kullanıcı-reviewed gerçek ApprovalPolicy/AutonomyRule/Guardrail/compatibility bundle'ını yayınlama ve
     dashboard üzerinden proposal→satır-bazlı approval canlı E2E; hiçbir business policy seed edilmedi.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.

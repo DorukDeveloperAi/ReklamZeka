@@ -23,6 +23,10 @@ log veya bildirim payload'ına eklenmez.
   eskisini iptal etmek ve mümkün olan en düşük kapsamlı yeni tokenı yerel secret alanına almaktır.
 - Auth hatasında token değerini hata kaydına eklemeden bağlantıyı yenile. Rate-limit durumunda
   connector retry/backoff uygular; tekrarlayan 429 için otomatik yenilemeyi geçici olarak seyrekleştir.
+- Graph v23 insight field/action/breakdown kapsamını `npm run verify:meta-insight-capabilities` ile doğrula.
+  Verifier bounded ve GET-only'dir; çıktı yalnız aggregate/redakte coverage taşır. `partial_coverage` operasyonel
+  bir başarısızlık değildir fakat gözlenmeyen field/container'ı doğrulanmış veya sıfır kabul etmeme talimatıdır.
+  `writeNetworkCalls` sıfır değilse veya probe `failed_closed` ise kapı başarısızdır.
 - Lokal PostgreSQL kabul sırası: `npm run verify:meta-asset-content-db`,
   `npm run verify:meta-post-media-db`, ardından gerçek ve salt-okunur iki hesap kanıtı için
   `npm run verify:meta-s14-live-db`. Son komut geçici workspace kurar ve `finally` içinde
@@ -45,16 +49,22 @@ log veya bildirim payload'ına eklenmez.
 
 ## Action guardrail registry
 
-- Dashboard `Autonomy & Policy Studio → K4 Policy Bundle` yüzeyi yalnız public-safe revision feed, readiness ve
-  immutable draft oluşturma sağlar. Draft kaydı policy'yi etkinleştirmez; aynı `policyRef` için açık draft varken
-  yeni draft yazılmaz. Düzenlenecek değerler kaydetmeden önce kontrol edilmelidir.
+- Dashboard `Autonomy & Policy Studio → K4 Policy Bundle` yüzeyi public-safe revision feed, readiness,
+  immutable draft ve owner/admin için insan-varlığı yayın töreni sağlar. Draft kaydı policy'yi etkinleştirmez;
+  aynı `policyRef` için açık draft varken yeni draft yazılmaz. Değerler kaydetmeden ve yayınlamadan önce kullanıcı
+  tarafından kontrol edilmelidir. Agent tarafındaki `policy_bundle_read` aynı kaynağı yalnız salt okunur görür;
+  draft veya yayın yetkisi alamaz.
 - ApprovalPolicy rol/süre/separation-of-duties alanlarında seed veya UI varsayılanı yoktur. Guardrail scope yalnız
   güncel server catalog account/ad-set zincirinden seçilir; campaign server tarafından ad-set kaydından türetilir.
   Geo kapsamı reviewed public selector kataloğu gelene kadar bu yüzeyde kapalıdır.
-- `READY`; tekil, etkin published ApprovalPolicy + Guardrail ve etkin workspace `approval_only` AutonomyRule birlikte
-  yoksa gösterilmez. Taslak, expired/future veya ambiguous set production proposal akışını açmaz. Publish için ayrı
-  owner/admin yetkisi ve insan-varlığı töreni henüz uygulanmadığından gerçek policy bundle yayınlamayın veya DB'ye
-  elle seed etmeyin.
+- Politika kapısı; tekil, etkin published ApprovalPolicy + Guardrail ve etkin workspace `approval_only` AutonomyRule
+  birlikte yoksa hazır gösterilmez. Taslak, expired/future veya ambiguous set production proposal akışını açmaz;
+  scope-free studio hiçbir zaman tek başına `proposalReady` ilan etmez. Tam proposal uygunluğu seçilen post/template/
+  preset ve beş boyutlu reviewed compatibility kanıtıyla preflight sırasında yeniden hesaplanır.
+- Yayın yalnız owner/admin cookie oturumundan, exact same-origin intent ile ve macOS sistem diyaloğunun ürettiği
+  10–120 saniyelik tek-kullanımlık kanıt üzerinden yapılır. Kanıt exact workspace, actor, policy tür/ref/revision ve
+  immutable canonical içeriğe bağlıdır. Yayın sonucu action onayı, grant, execute veya Meta write yetkisi değildir.
+  İnsan tarafından incelenmiş gerçek business değerleri olmadan yayın yapmayın ve DB'ye elle seed etmeyin.
 
 - Migration sonrası `npm run verify:action-guardrail-db` çalıştırılır. Kabul; geçici workspace içinde
   draft→published append, yeniden kurulan repository ile resolve ve UPDATE append-only trigger'ını sınar;
