@@ -4,6 +4,42 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "b579ba31f",
+      "tarih": "2026-08-07",
+      "konu": "feat(actions): persist approval proposal queue",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "9071004b1",
+      "tarih": "2026-08-07",
+      "konu": "feat(actions): add approval-only safety cores",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "64eecbe36",
+      "tarih": "2026-08-07",
+      "konu": "feat(budget): add explicit audited draft flow",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ca6e2febc",
+      "tarih": "2026-08-07",
+      "konu": "test(budget): prove local read boundary",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
       "hash": "a56c7834e",
       "tarih": "2026-08-07",
       "konu": "feat(budget): persist advisory proposal revisions",
@@ -101,52 +137,16 @@
       "kapsam": [
         "docs"
       ]
-    },
-    {
-      "hash": "243884110",
-      "tarih": "2026-08-07",
-      "konu": "feat(decision): persist category guidance and context cores",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "fe851692f",
-      "tarih": "2026-08-07",
-      "konu": "feat(decision): add category guidance timeframe cores",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "542fb451c",
-      "tarih": "2026-08-07",
-      "konu": "docs(plan): start S2 Decision Room",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "4014834a0",
-      "tarih": "2026-08-07",
-      "konu": "feat(meta): close S1 read mirror trust gate",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 29
+      "adet": 32
     },
     {
       "kapsam": "test",
-      "adet": 4
+      "adet": 5
     },
     {
       "kapsam": "docs",
@@ -165,7 +165,7 @@
       "adet": 2
     }
   ],
-  "isSayisi": 42,
+  "isSayisi": 46,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "94aa783c259a"
+  "damga": "9d34b5d8f996"
 }

@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 94aa783c259a -->
+<!-- durum-damga: 9d34b5d8f996 -->
 
 ## Künye
 
@@ -14,13 +14,17 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 42 |
+| iş commit'i (tüm geçmiş) | 46 |
 | ilk / son iş | 2026-08-06 / 2026-08-07 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-07 | `feat` | persist approval proposal queue | `b579ba31f` |
+| 2026-08-07 | `feat` | add approval-only safety cores | `9071004b1` |
+| 2026-08-07 | `feat` | add explicit audited draft flow | `64eecbe36` |
+| 2026-08-07 | `test` | prove local read boundary | `ca6e2febc` |
 | 2026-08-07 | `feat` | persist advisory proposal revisions | `a56c7834e` |
 | 2026-08-07 | `feat` | compose scenarios and guard proxy mapping | `f960369f5` |
 | 2026-08-07 | `feat` | add deterministic planning cores | `047001fc8` |
@@ -32,15 +36,11 @@
 | 2026-08-07 | `feat` | add deterministic findings and ledger binding | `af656e3c5` |
 | 2026-08-07 | `feat` | persist and orchestrate decision room | `4d0a37fd7` |
 | 2026-08-07 | `docs` | record frozen context and analysis gates | `c2f6cb0bd` |
-| 2026-08-07 | `feat` | persist category guidance and context cores | `243884110` |
-| 2026-08-07 | `feat` | add category guidance timeframe cores | `fe851692f` |
-| 2026-08-07 | `docs` | start S2 Decision Room | `542fb451c` |
-| 2026-08-07 | `feat` | close S1 read mirror trust gate | `4014834a0` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 29
-- `test        ` ███ 4
+- `feat        ` ████████████████████████ 32
+- `test        ` ████ 5
 - `docs        ` ██ 3
 - `?           ` ██ 2
 - `fix         ` ██ 2
