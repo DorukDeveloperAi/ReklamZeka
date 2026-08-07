@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 export type AuditAction =
   | "connection.created"
   | "connection.rotated"
+  | "connection.inventory_refreshed"
   | "sync.started"
   | "sync.completed"
   | "report.shared"
