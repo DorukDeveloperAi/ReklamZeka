@@ -29,13 +29,13 @@
   "sonIsTarihi": "2026-08-06",
   "planlar": [
     {
-      "slug": "reklamzeka-sistemi",
+      "slug": "proje",
       "v": 2,
-      "durum": "AÇIK",
-      "asamaKapali": 0,
-      "asamaToplam": 10,
-      "siradaki": "01-temel-kapanis"
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "cf13d795538f"
+  "damga": "5a88b997bd1d"
 }

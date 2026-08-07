@@ -5,3 +5,13 @@ warehouse.db
 config/settings.yaml
 *.env
 .env*
+node_modules/
+.next/
+coverage/
+.env
+.env.local
+*.log
+*.tsbuildinfo
+.pilot/
+pilot-field-input*.json
+.DS_Store

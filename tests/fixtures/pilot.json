@@ -1,0 +1,33 @@
+[
+  {
+    "id": "workspace-alpha",
+    "accounts": [
+      { "id": "a-1", "connectedAt": "2026-08-06T10:00:00Z", "firstDashboardAt": "2026-08-06T10:08:00Z", "lastSyncedAt": "2026-08-06T11:35:00Z" },
+      { "id": "a-2", "connectedAt": "2026-08-06T10:05:00Z", "firstDashboardAt": "2026-08-06T10:15:00Z", "lastSyncedAt": "2026-08-06T11:40:00Z" },
+      { "id": "a-3", "connectedAt": "2026-08-06T10:10:00Z", "firstDashboardAt": "2026-08-06T10:24:00Z", "lastSyncedAt": "2026-08-06T11:42:00Z" },
+      { "id": "a-4", "connectedAt": "2026-08-06T10:20:00Z", "firstDashboardAt": "2026-08-06T10:32:00Z", "lastSyncedAt": "2026-08-06T11:45:00Z" }
+    ],
+    "feedback": { "helpful": 3, "unhelpful": 1, "acted": 1 },
+    "openCriticalSecurityIncidents": 0
+  },
+  {
+    "id": "workspace-beta",
+    "accounts": [
+      { "id": "b-1", "connectedAt": "2026-08-06T09:00:00Z", "firstDashboardAt": "2026-08-06T09:06:00Z", "lastSyncedAt": "2026-08-06T11:30:00Z" },
+      { "id": "b-2", "connectedAt": "2026-08-06T09:10:00Z", "firstDashboardAt": "2026-08-06T09:19:00Z", "lastSyncedAt": "2026-08-06T11:36:00Z" },
+      { "id": "b-3", "connectedAt": "2026-08-06T09:20:00Z", "firstDashboardAt": "2026-08-06T09:31:00Z", "lastSyncedAt": "2026-08-06T11:50:00Z" }
+    ],
+    "feedback": { "helpful": 2, "unhelpful": 1, "acted": 1 },
+    "openCriticalSecurityIncidents": 0
+  },
+  {
+    "id": "workspace-gamma",
+    "accounts": [
+      { "id": "c-1", "connectedAt": "2026-08-06T08:00:00Z", "firstDashboardAt": "2026-08-06T08:07:00Z", "lastSyncedAt": "2026-08-06T11:31:00Z" },
+      { "id": "c-2", "connectedAt": "2026-08-06T08:10:00Z", "firstDashboardAt": "2026-08-06T08:23:00Z", "lastSyncedAt": "2026-08-06T11:38:00Z" },
+      { "id": "c-3", "connectedAt": "2026-08-06T08:20:00Z", "firstDashboardAt": "2026-08-06T08:35:00Z", "lastSyncedAt": "2026-08-06T11:44:00Z" }
+    ],
+    "feedback": { "helpful": 1, "unhelpful": 1, "acted": 1 },
+    "openCriticalSecurityIncidents": 0
+  }
+]

@@ -28,3 +28,7 @@ CRM'imdeki lead→satış kapanışlarını sisteme bağla: kendi tarafımızda 
 Conversions API dataset'ine lead_id'li geri besleme; Satış rubriği gerçek CPA/ROAS ile
 beslensin. Kişisel veri sınırı (hash'li alan, amaç sınırlaması) tasarımda baştan
 kurulsun. Varış hali: "ölçülemedi" satırları kapanır.
+<!-- uy:alt-proje/reklamzeka-mvp -->
+## ReklamZeka salt-okunur MVP
+boy: epik
+Meta Ads ve Google Ads verisini ortak modele alan, çalışma alanı ve müşteri ayrımını koruyan, performans dashboard'u ile açıklanabilir anomali/öneri üreten ve paylaşılabilir rapor sunan ilk pilot sürümü uçtan uca teslim et.

@@ -1,0 +1,19 @@
+{
+  "mode": "fixture_readiness",
+  "asOf": "2026-08-06T12:00:00Z",
+  "workspaceCount": 3,
+  "accountCount": 10,
+  "freshWithin60MinutesRate": 1,
+  "medianActivationMinutes": 10.5,
+  "usefulOrActedRate": 0.75,
+  "openCriticalSecurityIncidents": 0,
+  "thresholds": {
+    "workspaces": true,
+    "accounts": true,
+    "freshness": true,
+    "activation": true,
+    "feedback": true,
+    "security": true
+  },
+  "verdict": "pass"
+}

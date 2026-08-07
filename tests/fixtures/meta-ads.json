@@ -1,0 +1,46 @@
+[
+  [
+    {
+      "id": "meta-row-2026-08-01",
+      "updatedAt": "2026-08-02T03:00:00.000Z",
+      "payload": {
+        "account_id": "meta-account-1",
+        "account_name": "Ana Hesap",
+        "campaign_id": "meta-campaign-1",
+        "campaign_name": "Yaz Kampanyası",
+        "date_start": "2026-08-01",
+        "currency": "TRY",
+        "timezone": "Europe/Istanbul",
+        "spend": "123.45",
+        "impressions": "10000",
+        "clicks": "250",
+        "purchases": "12.5",
+        "purchase_value": "456.78",
+        "attribution_click_days": "7",
+        "attribution_view_days": "1"
+      }
+    }
+  ],
+  [
+    {
+      "id": "meta-row-2026-08-02",
+      "updatedAt": "2026-08-03T03:00:00.000Z",
+      "payload": {
+        "account_id": "meta-account-1",
+        "account_name": "Ana Hesap",
+        "campaign_id": "meta-campaign-1",
+        "campaign_name": "Yaz Kampanyası",
+        "date_start": "2026-08-02",
+        "currency": "TRY",
+        "timezone": "Europe/Istanbul",
+        "spend": "100.00",
+        "impressions": "8000",
+        "clicks": "200",
+        "purchases": "10",
+        "purchase_value": "400.00",
+        "attribution_click_days": "7",
+        "attribution_view_days": "1"
+      }
+    }
+  ]
+]

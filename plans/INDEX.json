@@ -1,43 +1,40 @@
 {
   "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
-  "damga": "b627eb133bbd",
+  "damga": "19791d05d659",
   "plans": [
     {
-      "slug": "reklamzeka-sistemi",
+      "slug": "proje",
       "v": 2,
-      "title": "REKLAMZEKA SİSTEMİ",
+      "title": "ReklamZeka Meta Reklam İşletim Sistemi",
       "kategori": "proje",
       "ust": null,
-      "durum": "AÇIK",
+      "durum": "SÜRÜYOR",
       "kunye": {
-        "hedef": "Brief-temelli, kontrol-öncelikli Meta reklam yardımcı ajanı uçtan uca canlı — veri ambarı, brief yargısı, onaylı yazma, bütçe danışmanı, metin kuralları ve CRM kapısı 10 koşulabilir aşamada kanıtlanmış durumda.",
+        "hedef": "ReklamZeka; Meta portföyünü doğru bağlamda anlayan, kullanıcı",
         "kritiklik": "yüksek",
-        "aciliyet": "yakın",
+        "aciliyet": "normal",
         "hacim": "epik",
         "oncelik": 2,
-        "puan": 10,
+        "puan": 9,
         "eksik": [],
-        "oturum": "ot:2026-08-06/reklamzeka-hiyerarsi-uretimi"
+        "oturum": "ot:2026-08-06/reklamzeka-baslangic"
       },
-      "asamaToplam": 10,
-      "asamaKapali": 0,
-      "checklistAcik": 65,
-      "checklistKapali": 0,
-      "sonTur": {
-        "baslik": "2026-08-06 16:05 — hiyerarşi üretimi (session 35fbdca7)",
-        "yapilan": "v2 roadmap tam plan-kur formatında üretildi (Titiz: 1 çerçeve + 10 paralel planlama"
-      },
+      "asamaToplam": 14,
+      "asamaKapali": 6,
+      "checklistAcik": 111,
+      "checklistKapali": 16,
+      "sonTur": null,
       "siradaki": {
-        "no": "01",
-        "ad": "temel-kapanis"
+        "no": "08",
+        "ad": "Meta dijital ikizi"
       },
-      "goal": "/goal plans/reklamzeka-sistemi/v2/asama-01-temel-kapanis.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
+      "goal": "/goal plans/proje/v2/asama-08-meta-dijital-ikizi.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
       "depli": true,
       "hazir": [
         {
-          "no": "01",
-          "ad": "temel-kapanis",
-          "goal": "/goal plans/reklamzeka-sistemi/v2/asama-01-temel-kapanis.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
+          "no": "08",
+          "ad": "Meta dijital ikizi",
+          "goal": "/goal plans/proje/v2/asama-08-meta-dijital-ikizi.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
           "kosum": {
             "tur": "tek-ajan"
           }
@@ -45,204 +42,48 @@
       ],
       "bekleyen": [
         {
-          "no": "02",
-          "ad": "meta-baglanti-dogrulama",
-          "bekledigi": [
-            "01"
-          ]
-        },
-        {
-          "no": "03",
-          "ad": "sheets-kanon",
-          "bekledigi": [
-            "01"
-          ]
-        },
-        {
-          "no": "04",
-          "ad": "ingest-ambar",
-          "bekledigi": [
-            "02"
-          ]
-        },
-        {
-          "no": "05",
-          "ad": "taksonomi-esleme",
-          "bekledigi": [
-            "03",
-            "04"
-          ]
-        },
-        {
-          "no": "06",
-          "ad": "degerlendirme-digest",
-          "bekledigi": [
-            "05"
-          ]
-        },
-        {
-          "no": "07",
-          "ad": "panel-onayli-yazma",
-          "bekledigi": [
-            "06"
-          ]
-        },
-        {
-          "no": "08",
-          "ad": "butce-danismani",
-          "bekledigi": [
-            "07"
-          ]
-        },
-        {
           "no": "09",
-          "ad": "creative-tani-metin-kurallari",
+          "ad": "kategori ve talimat",
           "bekledigi": [
-            "07"
+            "08"
           ]
         },
         {
-          "no": "10",
-          "ad": "crm-v2-kapisi",
+          "no": "11",
+          "ad": "bütçe planlama",
           "bekledigi": [
-            "08",
-            "09"
+            "09",
+            "10"
+          ]
+        },
+        {
+          "no": "13",
+          "ad": "eylem valfi ve rutin",
+          "bekledigi": [
+            "10–12"
+          ]
+        },
+        {
+          "no": "14",
+          "ad": "kontrol merkezi",
+          "bekledigi": [
+            "07",
+            "09–13"
           ]
         }
       ],
       "baslangiclar": [
         "01"
       ],
-      "getirir": [
-        {
-          "no": "01",
-          "ad": "temel-kapanis",
-          "durum": "AÇIK",
-          "dugum": [
-            "arac:.claude/kanit.json",
-            "arac:scripts/githooks/pre-commit",
-            "arac:.github/workflows/ci.yml"
-          ],
-          "dokunur": [
-            "modul:pyproject.toml"
-          ]
-        },
-        {
-          "no": "02",
-          "ad": "meta-baglanti-dogrulama",
-          "durum": "AÇIK",
-          "dokunur": [
-            "modul:src/reklamzeka/meta_gateway.py",
-            "dok:docs/mcp-envanter.md",
-            "dok:docs/api-gercekleri.md"
-          ]
-        },
-        {
-          "no": "03",
-          "ad": "sheets-kanon",
-          "durum": "AÇIK",
-          "dugum": [
-            "modul:src/reklamzeka/settings.py",
-            "modul:src/reklamzeka/sheets_sync.py"
-          ]
-        },
-        {
-          "no": "04",
-          "ad": "ingest-ambar",
-          "durum": "AÇIK",
-          "dugum": [
-            "modul:src/reklamzeka/ingest.py",
-            "modul:src/reklamzeka/buc.py",
-            "modul:src/reklamzeka/metric_map.py",
-            "modul:src/reklamzeka/rederive.py",
-            "arac:scripts/run_daily.sh"
-          ],
-          "dokunur": [
-            "modul:src/reklamzeka/schema.py"
-          ]
-        },
-        {
-          "no": "05",
-          "ad": "taksonomi-esleme",
-          "durum": "AÇIK",
-          "dugum": [
-            "modul:src/reklamzeka/taxonomy_loader.py",
-            "modul:src/reklamzeka/mapping.py",
-            "modul:src/reklamzeka/skeleton.py",
-            "arac:scripts/run_weekly.sh"
-          ]
-        },
-        {
-          "no": "06",
-          "ad": "degerlendirme-digest",
-          "durum": "AÇIK",
-          "dugum": [
-            "modul:src/reklamzeka/delta.py",
-            "modul:src/reklamzeka/rubric.py",
-            "modul:src/reklamzeka/evaluate.py",
-            "modul:src/reklamzeka/digest.py",
-            "modul:src/reklamzeka/sinks.py",
-            "modul:src/reklamzeka/notify.py"
-          ]
-        },
-        {
-          "no": "07",
-          "ad": "panel-onayli-yazma",
-          "durum": "AÇIK",
-          "dugum": [
-            "modul:src/reklamzeka/propose.py",
-            "modul:src/reklamzeka/apply.py",
-            "modul:src/reklamzeka/karar_gunlugu.py",
-            "modul:src/reklamzeka/panel.py"
-          ],
-          "dokunur": [
-            "modul:src/reklamzeka/guardrails.py"
-          ]
-        },
-        {
-          "no": "08",
-          "ad": "butce-danismani",
-          "durum": "AÇIK",
-          "dugum": [
-            "modul:src/reklamzeka/budget_advisor.py"
-          ],
-          "dokunur": [
-            "modul:src/reklamzeka/guardrails.py"
-          ]
-        },
-        {
-          "no": "09",
-          "ad": "creative-tani-metin-kurallari",
-          "durum": "AÇIK",
-          "dugum": [
-            "modul:src/reklamzeka/creative_diag.py",
-            "modul:src/reklamzeka/copy_rules.py",
-            "modul:src/reklamzeka/copy_scan.py",
-            "arac:scripts/seed_copy_rules.py"
-          ]
-        },
-        {
-          "no": "10",
-          "ad": "crm-v2-kapisi",
-          "durum": "AÇIK",
-          "dugum": [
-            "modul:src/reklamzeka/crm_ledger.py",
-            "modul:src/reklamzeka/capi_feed.py"
-          ],
-          "dokunur": [
-            "dok:utopya/vizyon/4-uyum-guveni.md"
-          ]
-        }
-      ],
-      "master": "plans/reklamzeka-sistemi/v2/MASTER.md"
+      "master": "plans/proje/v2/MASTER.md"
     }
   ],
   "legacy": [],
   "todo": {
-    "acik": 70,
+    "acik": 111,
     "kaynak": {
-      "chk": 65,
-      "elle": 5,
+      "chk": 111,
+      "elle": 0,
       "hukum": 0,
       "kunye": 0,
       "oturum": 0
@@ -256,710 +97,1110 @@
     ],
     "maddeler": [
       {
-        "ref": "td:elle/meta-mcp-oauth",
-        "tur": "elle",
-        "metin": "Meta Ads MCP OAuth'unu tamamla ve canlı sözleşme testini koştur (envanter + 8 teyitsiz API maddesi)",
-        "plan": null,
+        "ref": "td:chk/proje/a07",
+        "tur": "chk",
+        "metin": "**A07 — rapor ve saha pilotu**",
+        "plan": "proje",
         "asama": null,
-        "kapatan": [
-          "reklamzeka-sistemi"
-        ],
+        "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:elle/sheets-kimlik",
-        "tur": "elle",
-        "metin": "Google Sheets service-account kimliği kur ve kanon Sheet'i sıfırdan oluştur",
-        "plan": null,
+        "ref": "td:chk/proje/h20b84a",
+        "tur": "chk",
+        "metin": "Gerçek 3 workspace/10 hesap `field_pilot` kanıtı.",
+        "plan": "proje",
         "asama": null,
-        "kapatan": [
-          "reklamzeka-sistemi"
-        ],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:elle/python-uv",
-        "tur": "elle",
-        "metin": "uv + Python 3.12 kurulumu ve projenin 3.12'ye geçişi (kullanıcı onayı verildi 2026-08-06)",
-        "plan": null,
-        "asama": null,
-        "kapatan": [
-          "reklamzeka-sistemi"
-        ],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:elle/kanit-json",
-        "tur": "elle",
-        "metin": "`.claude/kanit.json` doğrulama sınıflarını kur (hizli/tam/surus) — REQUIREMENTS `kanit:` girişlerinin önkoşulu",
-        "plan": null,
-        "asama": null,
-        "kapatan": [
-          "reklamzeka-sistemi"
-        ],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:elle/master-acik-sorular",
-        "tur": "elle",
-        "metin": "v1 MASTER §10'un kalan açık sorularını yanıtla (isimlendirme düzeni · İKK envanteri · harcama tavanları · CRM arayüzü)",
-        "plan": null,
-        "asama": null,
-        "kapatan": [
-          "reklamzeka-sistemi"
-        ],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/a01",
-        "tur": "chk",
-        "metin": "**A01** SONUÇ: uv/3.12 + kanit.json + commit kapısı kurulu → detay: [asama-01-temel-kapanis.md](asama-01-temel-kapanis.md)",
-        "plan": "reklamzeka-sistemi",
-        "asama": "01",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t01.1",
+        "ref": "td:chk/proje/h16c55a",
         "tur": "chk",
-        "metin": "T01.1 — uv geçişi · kanıt: `uv run pytest -q` → `14 passed, 2 skipped` (Python 3.12)",
-        "plan": "reklamzeka-sistemi",
-        "asama": "01",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t01.2",
-        "tur": "chk",
-        "metin": "T01.2 — kanıt defteri · kanıt: `python3 -m json.tool .claude/kanit.json` geçerli + hizli cmd exit 0",
-        "plan": "reklamzeka-sistemi",
-        "asama": "01",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t01.3",
-        "tur": "chk",
-        "metin": "T01.3 — pre-commit kapısı · kanıt: probe commit DÜŞTÜ (`TERMINOLOJI IHLALI`), temizlik sonrası yeşil",
-        "plan": "reklamzeka-sistemi",
-        "asama": "01",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t01.4",
-        "tur": "chk",
-        "metin": "T01.4 — CI tanımı · kanıt: `yaml-ok` + `grep -c lint_terminology .github/workflows/ci.yml` → 1",
-        "plan": "reklamzeka-sistemi",
-        "asama": "01",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t01.5",
-        "tur": "chk",
-        "metin": "T01.5 — repo kaydı · kanıt: `git status --short | grep -v utopya` → boş",
-        "plan": "reklamzeka-sistemi",
-        "asama": "01",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/a02",
-        "tur": "chk",
-        "metin": "**A02** SONUÇ: envanter dolu + 7/8 teyitsiz madde kapalı → detay: [asama-02-meta-baglanti-dogrulama.md](asama-02-meta-baglanti-dogrulama.md)",
-        "plan": "reklamzeka-sistemi",
-        "asama": "02",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t02.1",
-        "tur": "chk",
-        "metin": "T02.1 — OAuth + headless token · kanıt: list_tools duman testi → `N araç` (N ≥ 1)",
-        "plan": "reklamzeka-sistemi",
-        "asama": "02",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t02.2",
-        "tur": "chk",
-        "metin": "T02.2 — envanter dökümü · kanıt: `rg 'doldurulacak' docs/mcp-envanter.md` → 0 + #1/#6 ✅",
-        "plan": "reklamzeka-sistemi",
-        "asama": "02",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t02.3",
-        "tur": "chk",
-        "metin": "T02.3 — canlı insights ölçümleri · kanıt: #2/#3/#7/#8 ✅ (4 satır)",
-        "plan": "reklamzeka-sistemi",
-        "asama": "02",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t02.4",
-        "tur": "chk",
-        "metin": "T02.4 — boost yapısı dökümü · kanıt: `boost-yapisi.json` dolu + #5 ✅",
-        "plan": "reklamzeka-sistemi",
-        "asama": "02",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t02.5",
-        "tur": "chk",
-        "metin": "T02.5 — kapanış süpürmesi · kanıt: `rg '⬜' docs/api-gercekleri.md` → 0 · MCP testleri 2 passed/0 skipped",
-        "plan": "reklamzeka-sistemi",
-        "asama": "02",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/a03",
-        "tur": "chk",
-        "metin": "**A03** SONUÇ: Sheet 11 sekmeyle canlı + sync/append disiplini testli → detay: [asama-03-sheets-kanon.md](asama-03-sheets-kanon.md)",
-        "plan": "reklamzeka-sistemi",
-        "asama": "03",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t03.1",
-        "tur": "chk",
-        "metin": "T03.1 — SA + anahtar + paylaşım (✋) · kanıt: `open_by_key` → `ReklamZeka Kanon`",
-        "plan": "reklamzeka-sistemi",
-        "asama": "03",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t03.2",
-        "tur": "chk",
-        "metin": "T03.2 — bootstrap + check · kanıt: pytest `-k \"bootstrap or check\"` yeşil",
-        "plan": "reklamzeka-sistemi",
-        "asama": "03",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t03.3",
-        "tur": "chk",
-        "metin": "T03.3 — pull (Sheets→SQLite) · kanıt: pytest `-k pull` yeşil",
-        "plan": "reklamzeka-sistemi",
-        "asama": "03",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t03.4",
-        "tur": "chk",
-        "metin": "T03.4 — append-only disiplin · kanıt: pytest `-k append` yeşil",
-        "plan": "reklamzeka-sistemi",
-        "asama": "03",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t03.5",
-        "tur": "chk",
-        "metin": "T03.5 — canlı uçtan uca · kanıt: `--check` → `11/11 sekme OK`",
-        "plan": "reklamzeka-sistemi",
-        "asama": "03",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/a04",
-        "tur": "chk",
-        "metin": "**A04** SONUÇ: günlük 4-seviye çekim + backoff + eksik-gün alarmı + ≥3 gün sürüş → detay: [asama-04-ingest-ambar.md](asama-04-ingest-ambar.md)",
-        "plan": "reklamzeka-sistemi",
-        "asama": "04",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t04.1",
-        "tur": "chk",
-        "metin": "T04.1 — şema: 4 seviye + ingest_run + migration · kanıt: `pytest tests/test_schema_migration.py` PASSED",
-        "plan": "reklamzeka-sistemi",
-        "asama": "04",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t04.2",
-        "tur": "chk",
-        "metin": "T04.2 — BUC %80 backoff · kanıt: `pytest tests/test_buc.py` PASSED (5 senaryo)",
-        "plan": "reklamzeka-sistemi",
-        "asama": "04",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t04.3",
-        "tur": "chk",
-        "metin": "T04.3 — ingest.py + async job · kanıt: `pytest tests/test_ingest.py` PASSED + smoke PASSED",
-        "plan": "reklamzeka-sistemi",
-        "asama": "04",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t04.4",
-        "tur": "chk",
-        "metin": "T04.4 — metric_map + rederive provası · kanıt: alan-adı-göçü senaryosu PASSED",
-        "plan": "reklamzeka-sistemi",
-        "asama": "04",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t04.5",
-        "tur": "chk",
-        "metin": "T04.5 — eksik-gün alarmı + cron sürüşü · kanıt: ≥3 günlük jsonl + `--gaps` → `eksik gün yok`",
-        "plan": "reklamzeka-sistemi",
-        "asama": "04",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/a05",
-        "tur": "chk",
-        "metin": "**A05** SONUÇ: iki zıt İKA aktif + İK'lar brief'li/eşli + yetim raporu → detay: [asama-05-taksonomi-esleme.md](asama-05-taksonomi-esleme.md)",
-        "plan": "reklamzeka-sistemi",
-        "asama": "05",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t05.1",
-        "tur": "chk",
-        "metin": "T05.1 — ✋ İKA/İKK/İK + brief girişi · kanıt: aktif aile ≥2, brief'siz aktif İK = 0",
-        "plan": "reklamzeka-sistemi",
-        "asama": "05",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t05.2",
-        "tur": "chk",
-        "metin": "T05.2 — taksonomi loader · kanıt: `pytest tests/test_taxonomy_loader.py` passed + CLI üç katmanlı JSON",
-        "plan": "reklamzeka-sistemi",
-        "asama": "05",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t05.3",
-        "tur": "chk",
-        "metin": "T05.3 — mapping üç yol · kanıt: `pytest tests/test_mapping.py` passed + `scan --dry-run` raporu",
-        "plan": "reklamzeka-sistemi",
-        "asama": "05",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t05.4",
-        "tur": "chk",
-        "metin": "T05.4 — boost sınıflandırıcısı · kanıt: `pytest tests/test_boost_classifier.py` passed (gerçek döküm fikstürü)",
-        "plan": "reklamzeka-sistemi",
-        "asama": "05",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t05.5",
-        "tur": "chk",
-        "metin": "T05.5 — yetim rapor + haftalık · kanıt: `orphans` → rapor + `yetim=<N>`; crontab satırı",
-        "plan": "reklamzeka-sistemi",
-        "asama": "05",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t05.6",
-        "tur": "chk",
-        "metin": "T05.6 — AI iskeleti v1 · kanıt: draft İKK ≥1 + `MOTOR-DEGISMEDI`",
-        "plan": "reklamzeka-sistemi",
-        "asama": "05",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/a06",
-        "tur": "chk",
-        "metin": "**A06** SONUÇ: brief-gerekçeli skorlar + digest artefaktı + sink'ler + ≥7 gün sürüş → detay: [asama-06-degerlendirme-digest.md](asama-06-degerlendirme-digest.md)",
-        "plan": "reklamzeka-sistemi",
-        "asama": "06",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t06.1",
-        "tur": "chk",
-        "metin": "T06.1 — delta deterministik SQL · kanıt: `pytest tests/test_delta.py` yeşil + `cmp` → BAYT-ES",
-        "plan": "reklamzeka-sistemi",
-        "asama": "06",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t06.2",
-        "tur": "chk",
-        "metin": "T06.2 — rubrik bağlayıcı + benchmark · kanıt: `pytest tests/test_rubric.py` yeşil",
-        "plan": "reklamzeka-sistemi",
-        "asama": "06",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t06.3",
-        "tur": "chk",
-        "metin": "T06.3 — evaluate instance+agrega · kanıt: `pytest tests/test_evaluate.py` yeşil + dörtlü gerekçe sorguları",
-        "plan": "reklamzeka-sistemi",
-        "asama": "06",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t06.4",
-        "tur": "chk",
-        "metin": "T06.4 — digest üretici · kanıt: `pytest tests/test_digest.py` yeşil + sessiz-boşluk alanları",
-        "plan": "reklamzeka-sistemi",
-        "asama": "06",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t06.5",
-        "tur": "chk",
-        "metin": "T06.5 — sink kayıt defteri (✋ Telegram) · kanıt: `pytest tests/test_sinks.py` yeşil + `notify --test`",
-        "plan": "reklamzeka-sistemi",
-        "asama": "06",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t06.6",
-        "tur": "chk",
-        "metin": "T06.6 — cadence + ≥7 gün sürüş · kanıt: `digest_artifact` 7 ardışık gün + kesintisiz log",
-        "plan": "reklamzeka-sistemi",
-        "asama": "06",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/a07",
-        "tur": "chk",
-        "metin": "**A07** SONUÇ: onaylı yazma zinciri canlıda kanıtlı + dry-run varsayılan + madde 4 kapalı → detay: [asama-07-panel-onayli-yazma.md](asama-07-panel-onayli-yazma.md)",
-        "plan": "reklamzeka-sistemi",
-        "asama": "07",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t07.1",
-        "tur": "chk",
-        "metin": "T07.1 — propose + expire · kanıt: `pytest tests/test_propose.py` passed; brief'siz öneri = 0",
-        "plan": "reklamzeka-sistemi",
-        "asama": "07",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t07.2",
-        "tur": "chk",
-        "metin": "T07.2 — guardrails + apply · kanıt: `pytest tests/test_guardrails.py tests/test_apply.py` passed",
-        "plan": "reklamzeka-sistemi",
-        "asama": "07",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t07.3",
-        "tur": "chk",
-        "metin": "T07.3 — karar günlüğü + rollback · kanıt: `pytest tests/test_karar_gunlugu.py` passed",
-        "plan": "reklamzeka-sistemi",
-        "asama": "07",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t07.4",
-        "tur": "chk",
-        "metin": "T07.4 — FastAPI panel · kanıt: `curl /api/kuyruk` → diff'li pending JSON",
-        "plan": "reklamzeka-sistemi",
-        "asama": "07",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/t07.5",
-        "tur": "chk",
-        "metin": "T07.5 — canlı prova (✋) + madde 4 · kanıt: `canli_prova.py --dokum` tam zincir",
-        "plan": "reklamzeka-sistemi",
-        "asama": "07",
-        "kapatan": [],
-        "kapatAdayi": false,
-        "onar": null
-      },
-      {
-        "ref": "td:chk/reklamzeka-sistemi/a08",
-        "tur": "chk",
-        "metin": "**A08** SONUÇ: onaylı bütçe kaydırma döngüsü + digest etki raporu → detay: [asama-08-butce-danismani.md](asama-08-butce-danismani.md)",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Secret reference/migration ve read/write scope ayrımı.",
+        "plan": "proje",
         "asama": "08",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t08.1",
+        "ref": "td:chk/proje/h871fea",
         "tur": "chk",
-        "metin": "T08.1 — portföy skoru + marjinal verim · kanıt: `pytest -k \"portfoy or verim\"` PASS",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Account/campaign/adset/ad/creative tam entity şeması ve raw provenance.",
+        "plan": "proje",
         "asama": "08",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t08.2",
+        "ref": "td:chk/proje/h142d75",
         "tur": "chk",
-        "metin": "T08.2 — Advantage+ uyum katmanı · kanıt: `pytest -k advantage` PASS (3 senaryo)",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Multi-business connection, account group ve account-level permission/capability modeli.",
+        "plan": "proje",
         "asama": "08",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t08.3",
+        "ref": "td:chk/proje/hf4f8bc",
         "tur": "chk",
-        "metin": "T08.3 — kaydırma diff'i + guardrail'ler · kanıt: `pytest -k budget` + `-k rationale` PASS",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Facebook Page, Instagram, pixel/dataset, app/WhatsApp destination asset graph.",
+        "plan": "proje",
         "asama": "08",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t08.4",
+        "ref": "td:chk/proje/hcad3c6",
         "tur": "chk",
-        "metin": "T08.4 — onay hattı + digest etkisi · kanıt: dry-run yazmıyor; gerçek koşu → pending ≥1",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Yayındaki ad copy/spec extraction: primary text/headline/description/caption/CTA/destination/dynamic variants.",
+        "plan": "proje",
         "asama": "08",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t08.5",
+        "ref": "td:chk/proje/h53917f",
         "tur": "chk",
-        "metin": "T08.5 — canlı döngü (✋) · kanıt: applied budget_shift ≥1 + digest bölümü dolu",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Bağlı Instagram/Page post-media inventory, ownership/promotion capability ve güvenli preview.",
+        "plan": "proje",
         "asama": "08",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/a09",
+        "ref": "td:chk/proje/l0",
         "tur": "chk",
-        "metin": "**A09** SONUÇ: yorgunluk tanısı digest'te + block/warn uçtan uca testli → detay: [asama-09-creative-tani-metin-kurallari.md](asama-09-creative-tani-metin-kurallari.md)",
-        "plan": "reklamzeka-sistemi",
+        "metin": "L0 raw retention/encryption/purge ile connection revoke/disconnect/export/delete lifecycle.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h1dd69c",
+        "tur": "chk",
+        "metin": "Meta config, targeting özeti, budget owner ve legacy objective mapping.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h0abde7",
+        "tur": "chk",
+        "metin": "Geniş metrik/action/action-value/breakdown kataloğu.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hb95318",
+        "tur": "chk",
+        "metin": "Inventory/creative/insights parçalı sync, adaptive page/date slice ve resume.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd9b688",
+        "tur": "chk",
+        "metin": "Snapshot diff ve external/manual intervention timeline olayı.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h1b5b8d",
+        "tur": "chk",
+        "metin": "Capability/data-quality raporu ve Meta read-only E2E.",
+        "plan": "proje",
+        "asama": "08",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h6f6a7e",
+        "tur": "chk",
+        "metin": "Category definition, çoklu assignment, evidence/confidence/manual lock.",
+        "plan": "proje",
         "asama": "09",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t09.1",
+        "ref": "td:chk/proje/h4b2cdd",
         "tur": "chk",
-        "metin": "T09.1 — yorgunluk tanısı · kanıt: `pytest tests/test_creative_diag.py` geçer",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Kullanıcı tanımlı dimension, single/multi cardinality ve entity-level kataloğu.",
+        "plan": "proje",
         "asama": "09",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t09.2",
+        "ref": "td:chk/proje/hf87f05",
         "tur": "chk",
-        "metin": "T09.2 — copy_rules motoru + gate · kanıt: `pytest tests/test_copy_rules.py` geçer",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Meta/internal selector ve mapping preview motoru.",
+        "plan": "proje",
         "asama": "09",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t09.3",
+        "ref": "td:chk/proje/hc6456c",
         "tur": "chk",
-        "metin": "T09.3 — başlangıç paketi pasif seed (✋ aktivasyon) · kanıt: seed sonrası `aktif=1` = 0; idempotens",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Category profile: analysis/rule/budget/transfer/schedule/action/creative policy bundle bağları.",
+        "plan": "proje",
         "asama": "09",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t09.4",
+        "ref": "td:chk/proje/haf478f",
         "tur": "chk",
-        "metin": "T09.4 — digest bölümleri + 0-aktif uyarısı · kanıt: `pytest tests/test_digest_creative.py` geçer",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Campaign→adset→ad→creative inheritance, child override ve effective-context snapshot.",
+        "plan": "proje",
         "asama": "09",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t09.5",
+        "ref": "td:chk/proje/h2ff773",
         "tur": "chk",
-        "metin": "T09.5 — e2e block/warn + canlı prova · kanıt: e2e geçer + `copy_rule_log` canlı satır",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Strict instruction/policy DSL ve negatif parser matrisi.",
+        "plan": "proje",
         "asama": "09",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/a10",
+        "ref": "td:chk/proje/h668d7c",
         "tur": "chk",
-        "metin": "**A10** SONUÇ: CRM defteri + CAPI + rubrik kapanışı + genişleme provası → detay: [asama-10-crm-v2-kapisi.md](asama-10-crm-v2-kapisi.md)",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Raw natural-language → normalized draft + assumption/question/impact preview.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h9fb5fd",
+        "tur": "chk",
+        "metin": "Precedence/inheritance/suppression/PARKED_CONFLICT resolver.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h346e65",
+        "tur": "chk",
+        "metin": "Versioned draft/publish/pause/archive ve rol/audit API'leri.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h763206",
+        "tur": "chk",
+        "metin": "Başlangıç objective/internal kategori playbook seti.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h8ca7a8",
+        "tur": "chk",
+        "metin": "Kategori coverage/unmatched/conflict/impact dashboard ve güvenli archive akışı.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h36429c",
+        "tur": "chk",
+        "metin": "PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h7b6132",
+        "tur": "chk",
+        "metin": "GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h095098",
+        "tur": "chk",
+        "metin": "Owner statement + official Meta source + experiment/observation provenance ve freshness.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/g0",
+        "tur": "chk",
+        "metin": "G0→G4 progressive formalization, semantic diff, historical replay ve impact preview.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd13a94",
+        "tur": "chk",
+        "metin": "AdvisedPractice candidate→trial→outcome→standardization lifecycle ve decomposition review.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h837c80",
+        "tur": "chk",
+        "metin": "Meta config + çoklu internal category + policy composition.",
+        "plan": "proje",
         "asama": "10",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t10.1",
+        "ref": "td:chk/proje/h43db1a",
         "tur": "chk",
-        "metin": "T10.1 — G4.3 revizyonu + ✋ kapı onayı · kanıt: `rg` tasarım satırları + STATE onay kaydı",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Tam metrik kataloğu; additive/non-additive/ratio formülleri.",
+        "plan": "proje",
         "asama": "10",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t10.2",
+        "ref": "td:chk/proje/hcc55fe",
         "tur": "chk",
-        "metin": "T10.2 — eşleme defteri · kanıt: `pytest tests/test_crm_ledger.py tests/test_schema_kvkk.py` geçer",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.",
+        "plan": "proje",
         "asama": "10",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t10.3",
+        "ref": "td:chk/proje/h6d598c",
         "tur": "chk",
-        "metin": "T10.3 — CAPI gönderimi · kanıt: `pytest tests/test_capi_feed.py` geçer + `events_received ≥ 1`",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.",
+        "plan": "proje",
         "asama": "10",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t10.4",
+        "ref": "td:chk/proje/ha5e060",
         "tur": "chk",
-        "metin": "T10.4 — rubrik + digest kapanışı · kanıt: `pytest tests/test_digest_satis_v2.py` geçer",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Hierarchical driver ve creative fatigue/config diagnostics.",
+        "plan": "proje",
         "asama": "10",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/t10.5",
+        "ref": "td:chk/proje/hf0c5b9",
         "tur": "chk",
-        "metin": "T10.5 — genişleme provası · kanıt: `git diff --stat prova-onu-10 -- src/ tests/` → boş",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Analysis run ledger, dry-run API ve deterministic replay.",
+        "plan": "proje",
         "asama": "10",
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/h1aedb4",
+        "ref": "td:chk/proje/h458649",
         "tur": "chk",
-        "metin": "Tüm aşama maddeleri işaretli ve kanıt yolları STATE.md'de",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h01f46d",
+        "tur": "chk",
+        "metin": "EffectiveGuidancePack scope filter/ranking/context-budget ve source/conflict trace.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h8b2551",
+        "tur": "chk",
+        "metin": "DecisionCadenceProfile, no-change/repeat suppression ve ExperimentRecord lifecycle.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/l0-l5",
+        "tur": "chk",
+        "metin": "L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h2c48df",
+        "tur": "chk",
+        "metin": "Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd3b659",
+        "tur": "chk",
+        "metin": "Optional manual/CSV BusinessOutcomeSignal ve Meta-proxy mapping guard.",
+        "plan": "proje",
+        "asama": "10",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h39f892",
+        "tur": "chk",
+        "metin": "Envelope, allocation, target ve planned/committed/actual/forecast şemaları.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h0cb8c1",
+        "tur": "chk",
+        "metin": "CBO/ABO budget owner ve parent-child reconciliation.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h14ff56",
+        "tur": "chk",
+        "metin": "Protected floor/fixed allocation ve transfer allow/deny/within-group.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h2de05b",
+        "tur": "chk",
+        "metin": "Pacing/forecast, min sample, learning, cap ve cooldown guard'ları.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h6b0943",
+        "tur": "chk",
+        "metin": "Fixed/proportional/priority/ladder deterministic allocation.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hc63432",
+        "tur": "chk",
+        "metin": "Keep/conservative/target-seeking simülasyon ve constraint trace.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd8dcc6",
+        "tur": "chk",
+        "metin": "Versioned proposal ledger/API; artış approval zorunluluğu.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h580e41",
+        "tur": "chk",
+        "metin": "Business outcome target/proxy ayrımı ve yetersiz mapping suppression.",
+        "plan": "proje",
+        "asama": "11",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/he961f5",
+        "tur": "chk",
+        "metin": "PolicyId/simulationId bağlı genişletilmiş envelope ve claim validator.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h22cbf5",
+        "tur": "chk",
+        "metin": "Natural-language instruction translator ve ambiguity eval seti.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h149c30",
+        "tur": "chk",
+        "metin": "Salt-okur local-session/advisor ledger, import/DB saldırı testi ve redaksiyon.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h76c76a",
+        "tur": "chk",
+        "metin": "Karar defteri/context budget ve deterministic fallback.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/haa9d1e",
+        "tur": "chk",
+        "metin": "Injection/cross-tenant/secret/action-bypass tam negatif matrisi.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hff54c2",
+        "tur": "chk",
+        "metin": "LocalAgentClient/session contract ve modelsiz deterministic fixture client.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h76738f",
+        "tur": "chk",
+        "metin": "No-model-API boundary: ReklamZeka'da OpenAI/Anthropic key, SDK veya model network call yok.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd44902",
+        "tur": "chk",
+        "metin": "Localhost Streamable HTTP + project STDIO MCP; auth ve read/proposal tool ayrımı.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h5d9115",
+        "tur": "chk",
+        "metin": "Codex CLI/VS Code + Claude Code MCP conformance; raw writer/human grant expose edilmez.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h0200e6",
+        "tur": "chk",
+        "metin": "Session register/heartbeat, dashboard context handoff ve proposal correlation.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h937c5b",
+        "tur": "chk",
+        "metin": "Local `reklamzeka` companion ile TTY/passkey HumanPresenceGrant ve ayrı approve/execute.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/ha7e250",
+        "tur": "chk",
+        "metin": "MCP-capable CLI config ve güvenli allowlist LocalCliAdapter extension point.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/ha40175",
+        "tur": "chk",
+        "metin": "Kritik guidance interview, owner+Meta best-practice+evidence karşılaştırması ve eval seti.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h74010b",
+        "tur": "chk",
+        "metin": "Guidance retrieval/context tools ve source/freshness/best-practice claim guard.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hf8fe34",
+        "tur": "chk",
+        "metin": "Act/test/observe/no-change + cadence ihlali proposal suppression eval'i.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/l4",
+        "tur": "chk",
+        "metin": "L4/L5 compact context, bounded drill-down ve raw L0 access negatifleri.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hae87bb",
+        "tur": "chk",
+        "metin": "draft_advised_practice authority boundary ve standardization bypass negatifleri.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h5f4daf",
+        "tur": "chk",
+        "metin": "ReklamZeka OrchestratorProfile ve altı vendor-agnostic skill manifesti/conformance eval'i.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h93deb4",
+        "tur": "chk",
+        "metin": "RuleCoach owner+Meta source+evidence+conflict deliberation ve publish-bypass negatifleri.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h9be15e",
+        "tur": "chk",
+        "metin": "Typed Meta writer allowlist; raw Graph write yok.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd515f4",
+        "tur": "chk",
+        "metin": "Campaign/adset/ad pause/activate eligibility ve parent/effective-status matrisi.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd8c3cb",
+        "tur": "chk",
+        "metin": "Campaign/adset budget owner write; ad-level budget negatif testi.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/k0-k4",
+        "tur": "chk",
+        "metin": "K0–K4 valve, account allowlist, caps, kill switch ve çift anahtar.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h925a45",
+        "tur": "chk",
+        "metin": "Approval state machine, expiry, stale-plan ve separation of duties.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h9b0b2d",
+        "tur": "chk",
+        "metin": "Idempotent execute, Meta error taxonomy, read-after-write ve rollback.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h000c67",
+        "tur": "chk",
+        "metin": "Hourly/daily/weekly/monthly/after-sync scheduler; DST/misfire/idempotency.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h17c1bc",
+        "tur": "chk",
+        "metin": "Sync→analyze→plan→approval agentic routine; otomatik execute yok.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h67739b",
+        "tur": "chk",
+        "metin": "External intervention reconcile ve sandbox/shadow rollout.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h7cd99e",
+        "tur": "chk",
+        "metin": "Manual/assisted/automated-read/scheduled-plan + approval-only/policy-limited inheritance ve kill switch.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h908106",
+        "tur": "chk",
+        "metin": "Multi-account batch plan; account-bazlı approval/execute/partial recovery.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd8a307",
+        "tur": "chk",
+        "metin": "Varsayılan workspace `approval_only` autonomy lock; expiry/child scope fail-closed.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hdd1197",
+        "tur": "chk",
+        "metin": "ActionBundle→atomik ActionUnit dependency DAG, tek tek approve/reject/request-changes.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/ha9ca7f",
+        "tur": "chk",
+        "metin": "Mevcut Instagram/Page gönderisinden template+audience preset'li promotion preflight ve K4 bundle.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hf0b1da",
+        "tur": "chk",
+        "metin": "Yeni metin/görsel/video/creative üretmeme boundary ve negatif testleri.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hba96e9",
+        "tur": "chk",
+        "metin": "Creative/post spec hash değişiminde stale approval ve yeniden onay.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/ha8b583",
+        "tur": "chk",
+        "metin": "Meta request/write verify ile platform review/delivery effective state ayrımı.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h0d94d6",
+        "tur": "chk",
+        "metin": "Action type/risk + account/category/campaign/entity scoped effective-autonomy resolver ve trace.",
+        "plan": "proje",
+        "asama": "13",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hb8d4e8",
+        "tur": "chk",
+        "metin": "Bugün/portfolio hiyerarşi ve internal/Meta filtreler.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd7b228",
+        "tur": "chk",
+        "metin": "Account-group switcher, multi-account connection health ve Page/Instagram asset graph.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/he405ed",
+        "tur": "chk",
+        "metin": "Kategori/talimat stüdyosu ve raw/normalized/version/conflict görünümü.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/he6f118",
+        "tur": "chk",
+        "metin": "Analiz stüdyosu: template/dry-run/publish/schedule/history.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hb498ac",
+        "tur": "chk",
+        "metin": "Bütçe stüdyosu: envelope/lock/target/forecast/simulation.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h86fc64",
+        "tur": "chk",
+        "metin": "Approval inbox, automation run, verify/rollback ve tek timeline.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h7a9216",
+        "tur": "chk",
+        "metin": "Mevcut creative library + context/performance karşılaştırması.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/he5cdef",
+        "tur": "chk",
+        "metin": "Yayındaki reklam metni/dynamic variant/CTA/destination/post kaynağı explorer'ı.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h748424",
+        "tur": "chk",
+        "metin": "Instagram/Page post seçici, PromotionTemplate/AudiencePreset ve existing-post guided flow.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h3aff1a",
+        "tur": "chk",
+        "metin": "Owner/admin/analyst/operator/viewer rol E2E.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h13fad8",
+        "tur": "chk",
+        "metin": "1280/820/390, keyboard/screen-reader ve hata/partial/conflict E2E.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h3d7380",
+        "tur": "chk",
+        "metin": "Kota/alert/deadman/kill-switch/runbook ve staged rollout KPI raporu.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h4b0ecb",
+        "tur": "chk",
+        "metin": "Codex CLI/VS Code/Claude Code local session hub, config/health/handoff ve action queue UI.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hd6d304",
+        "tur": "chk",
+        "metin": "Satır-bazlı partial approval inbox ve planlama modu/otonomi kilidi kontrol paneli.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h9781dc",
+        "tur": "chk",
+        "metin": "Kritik sohbet + live guidance cards + scope/topic binding + promote-to-policy studio.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h15ef9e",
+        "tur": "chk",
+        "metin": "AnalysisAgenda, applied guidance, cadence/experiment ve no-change UI yolculuğu.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h0c8a74",
+        "tur": "chk",
+        "metin": "Practice Lab candidate/trial/outcome/decomposition/standardized artifact UI.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h2c9b81",
+        "tur": "chk",
+        "metin": "Scheduled analysis in-app inbox ve duplicate-delivery/read-state E2E.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h52d78e",
+        "tur": "chk",
+        "metin": "Operating Dashboard gerçek backend state'iyle responsive/browser E2E.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h30d52a",
+        "tur": "chk",
+        "metin": "Orchestrator skill/context/autonomy/handoff çalışma alanı ve dashboard↔CLI E2E.",
+        "plan": "proje",
+        "asama": "14",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/a07-2",
+        "tur": "chk",
+        "metin": "A07 gerçek saha pilotu tamamlandı.",
+        "plan": "proje",
         "asama": null,
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/hfb81dd",
+        "ref": "td:chk/proje/a08-a14",
         "tur": "chk",
-        "metin": "MASTER.md'deki BAŞARI tanımı sağlanmış (doğrulama komutu: REQUIREMENTS.md Global tablosunun tüm doğrulama komutları sırayla → hepsi PASS)",
-        "plan": "reklamzeka-sistemi",
+        "metin": "A08–A14 kabul/kanıtları temiz.",
+        "plan": "proje",
         "asama": null,
         "kapatan": [],
         "kapatAdayi": false,
         "onar": null
       },
       {
-        "ref": "td:chk/reklamzeka-sistemi/ha5f918",
+        "ref": "td:chk/proje/hd72c59",
         "tur": "chk",
-        "metin": "İlanlı muafiyetler hâlâ geçerli (değişen varsa revizyon: `/plan-kur revize reklamzeka-sistemi`)",
-        "plan": "reklamzeka-sistemi",
+        "metin": "Production security/build/DB/browser ve Meta sandbox kapıları temiz.",
+        "plan": "proje",
+        "asama": null,
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/hcbb68b",
+        "tur": "chk",
+        "metin": "Production write ayrı kullanıcı onayı ve sınırlı cohort ile açıldı.",
+        "plan": "proje",
         "asama": null,
         "kapatan": [],
         "kapatAdayi": false,

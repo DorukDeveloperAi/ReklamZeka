@@ -1,0 +1,77 @@
+{
+  "$sema": "ReklamZeka proje kanıt sözleşmesi. İnsan yazar; Rotacı yalnız okur. Komutlar argv dizisidir ve kabuk içermez.",
+  "girisler": [
+    {
+      "ad": "urun-temeli",
+      "sinif": "hizli",
+      "cmd": ["node", "scripts/check-project-foundation.mjs"],
+      "timeoutSn": 30
+    },
+    {
+      "ad": "teknik-hizli",
+      "sinif": "hizli",
+      "cmd": ["npm", "run", "check:quick"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "production-build",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "build"],
+      "timeoutSn": 300
+    },
+    {
+      "ad": "veri-platformu",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:data"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "kiraci-guvenligi",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:security-boundaries"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "performans-deneyimi",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:experience"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "icgoru-motoru",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:insights"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "analiz-platformu",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:analysis-platform"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "pilot-web-yolculugu",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:pilot-web"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "pilot-hazirlik",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:pilot-readiness"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "production-audit",
+      "sinif": "tam",
+      "cmd": ["npm", "run", "check:security"],
+      "timeoutSn": 120
+    },
+    {
+      "ad": "eszamanli-regresyon",
+      "sinif": "tam",
+      "cmd": ["node", ".claude/skills/eszamanli/proof/proof.mjs"],
+      "timeoutSn": 240
+    }
+  ]
+}

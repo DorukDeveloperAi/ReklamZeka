@@ -1,7 +1,7 @@
 # DEVRALIŞ — ReklamZeka
 
 > **TÜREVDİR, elle düzenlenmez.** Her `aide filing` koşumunda yeniden üretilir.
-> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-07 07:33
+> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-06 19:44
 
 Bu belge bir sonraki Claude hesabının **ilk okuyacağı** dosyadır: neyin yarıda kaldığını
 ve hangi komutla devam edileceğini söyler.
@@ -14,13 +14,13 @@ _Bu projede canlı oturum yok._
 
 | plan | durum | sıradaki aşama |
 |---|---|---|
-| `reklamzeka-sistemi` 2 | AÇIK | 01-temel-kapanis |
+| `proje` 2 | SÜRÜYOR | 08-Meta dijital ikizi |
 
 Sıradaki işi başlatmak için:
 
 ```bash
 cd /Users/ybg/dev/ReklamZeka
-/goal plans/reklamzeka-sistemi/v2/asama-01-temel-kapanis.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz
+/goal plans/proje/v2/asama-08-meta-dijital-ikizi.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz
 ```
 
 ## Devralma sırası

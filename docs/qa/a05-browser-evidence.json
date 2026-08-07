@@ -1,0 +1,50 @@
+{
+  "capturedAt": "2026-08-06T19:03:49+03:00",
+  "surface": "Codex in-app browser",
+  "baseUrl": "http://localhost:3000/dashboard",
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "state": "ready",
+      "bodyFits": true,
+      "metricColumns": 4,
+      "visualInspection": "pass"
+    },
+    {
+      "name": "tablet",
+      "width": 820,
+      "state": "error",
+      "bodyFits": true,
+      "metricColumns": 2,
+      "alertName": "Google Ads bağlantısı yenilenmeli",
+      "visualInspection": "pass"
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "state": "partial",
+      "bodyFits": true,
+      "metricColumns": 1,
+      "tableScrollable": true,
+      "alertName": "Google Ads verisi henüz tamamlanmadı",
+      "visualInspection": "pass"
+    }
+  ],
+  "states": ["ready", "connecting", "syncing", "empty", "partial", "delayed", "error"],
+  "accessibility": {
+    "singleH1PerState": true,
+    "namedStatusForNonErrorStates": true,
+    "namedAlertForPartialDelayedError": true,
+    "periodNavigationLabelled": true,
+    "campaignTableHeaders": true,
+    "focusVisibleStyles": true
+  },
+  "interaction": {
+    "from": "/dashboard?period=30&state=error",
+    "action": "Bağlantıyı yeniden doğrula",
+    "to": "/dashboard?state=syncing",
+    "result": "pass"
+  },
+  "consoleErrors": 0
+}

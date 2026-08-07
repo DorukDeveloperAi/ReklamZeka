@@ -1,0 +1,74 @@
+{
+  "capturedAt": "2026-08-06T20:07:54+03:00",
+  "mode": "fixture_guided_journey",
+  "surface": "Codex in-app browser",
+  "baseUrl": "http://localhost:3000/pilot",
+  "journey": [
+    { "step": "session", "result": "pass", "heading": "Güvenli karar destek yolculuğu" },
+    { "step": "workspace", "result": "pass", "heading": "Demo Marka çalışma alanı" },
+    { "step": "source", "result": "pass", "heading": "Salt-okunur kaynağı seçin" },
+    { "step": "sync", "result": "pass", "heading": "Kaynak izi korunarak tamamlandı" },
+    { "step": "dashboard", "result": "pass", "heading": "İki kanal, aynı kanonik görünüm" },
+    { "step": "insights", "result": "pass", "heading": "Karar için veri yeterince taze değil" },
+    { "step": "share", "result": "pass", "heading": "Salt-okunur rapor hazır" }
+  ],
+  "feedback": {
+    "action": "helpful",
+    "status": "Geri bildirim kaydedildi: helpful",
+    "result": "pass"
+  },
+  "report": {
+    "path": "/reports/shared/[signed-token]",
+    "heading": "Demo Marka · 7 gün",
+    "access": "read_only",
+    "metricCards": 3,
+    "robots": "noindex, nofollow",
+    "result": "pass"
+  },
+  "signedShare": {
+    "configuration": "REPORT_SIGNING_KEY test-only environment value",
+    "create": { "method": "POST", "status": 200, "result": "pass" },
+    "render": { "status": 200, "snapshot": "demo:delayed:7", "result": "pass" },
+    "csv": { "validStatus": 200, "revokedStatus": 410, "securityHeaders": true, "result": "pass" },
+    "revoke": { "method": "DELETE", "status": 200, "result": "pass" },
+    "revokedPage": { "status": 404, "readOnlyDataRendered": false, "result": "pass" },
+    "tamperedPage": { "status": 404, "result": "pass" },
+    "htmlSecurityHeaders": {
+      "cacheControl": "private, no-store",
+      "referrerPolicy": "no-referrer",
+      "xContentTypeOptions": "nosniff",
+      "xFrameOptions": "DENY",
+      "xRobotsTag": "noindex, nofollow",
+      "result": "pass"
+    },
+    "auditActions": ["report.shared", "report.revoked"],
+    "tokenPersistedInClientStorage": false
+  },
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "height": 900,
+      "journeyStepsVisible": 7,
+      "reportMetricColumns": 3,
+      "bodyFits": true
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "journeyStepsChecked": 7,
+      "reportMetricColumns": 1,
+      "bodyFitsAllStages": true,
+      "signedShareControlWidth": 362,
+      "signedShareActions": 3
+    }
+  ],
+  "consoleErrors": 0,
+  "regression": {
+    "found": "instanceof check crossed a development server bundle boundary and initially returned 500 after revoke",
+    "fix": "code-based ShareLinkError guard",
+    "verifiedFinalStatus": 404
+  },
+  "fieldPilotEvidence": false
+}

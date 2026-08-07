@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  quick:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:quick
+      - run: npm run check:security-boundaries
+      - run: npm run check:experience
+      - run: npm run check:insights
+      - run: npm run check:analysis-platform
+      - run: npm run check:pilot-web
+      - run: npm run check:pilot-readiness
+      - run: npm run db:check
+      - run: npm run check:security
+      - run: npm run build
