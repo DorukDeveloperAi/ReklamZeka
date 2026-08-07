@@ -41,29 +41,22 @@ durabilir, o yüzden taşıyıcı bu tabloya sütun olarak eklenmez.
 `BOOT ⟺ (a) sistemin ayakta olması ona bağlı ∧ (b) deterministik ∧ (c) tmux gerektirmez`.
 Üçünden biri düşerse iş MAESTRO'dur. Ölçen komut: `aide boot sinif`.
 
-**K1'in kapsamı DARdır (ilanlı):** yukarıdaki yüklem yalnız **boot ↔ maestro** ayrımını ölçer;
-session-yerleşik kovayı ölçmez ve ölçemez (o kova tmux'a da `aide` şalterine de bağlı değildir).
-Session-yerleşik taşıyıcının ölçeni ayrıdır: **`aide kurulum doctor`** — dosya VARLIĞI ile
-Claude Code KAYDINI ayrı ölçer, çünkü kaydı olmayan hook ölü metindir.
+**K1'in kapsamı DARdır (ilanlı):** bu yüklem yalnız **boot ↔ maestro** ayrımını ölçer;
+session-yerleşik kovanın ölçeni ayrıdır — **`aide kurulum doctor`** (dosya VARLIĞI ile Claude
+Code KAYDINI ayrı ölçer, çünkü **kaydı olmayan hook ölü metindir**).
 
 | terim | anlamı |
 |---|---|
 | **taşıyıcı** (carrier) | bir otomasyonun NEREDE YAŞADIĞI: `session-yerleşik` · `boot-taşınan` · `maestro-taşınan`. Şalterini, hayatta kalma koşulunu ve kimin durdurabileceğini belirler. Sınıfı (motor/ajan) belirlemez. |
-| **seviye 0** | otonomi merdiveninin EN ALT basamağı: session-yerleşik taşıyıcıya gömülü, human-driven development sırasında bile kendiliğinden çalışan baseline otomasyon tabanı. Doktrin: **üst katman (aide) bu tabanı DENETLER, eksiğini ONARIR, İKAME ETMEZ.** Sınıf: çoğunlukla motor/kapı (0 token); talimat bacağı token'ı ana loop'un context'inden öder — o yüzden `CLAUDE.md` bütçesine tabidir. |
+| **seviye 0** | otonomi merdiveninin EN ALT basamağı: session-yerleşik taşıyıcıya gömülü, human-driven development sırasında bile koşan baseline. Doktrin: **üst katman (aide) bu tabanı DENETLER, ONARIR, İKAME ETMEZ.** Talimat bacağı ana loop context'inden ödenir → `CLAUDE.md` bütçesine tabidir. |
 
-**Taşıyıcı ekseni ORTOGONALDİR ve KADRAN DEĞİLDİR.** Taşıyıcı *"nerede yaşar"*, sınıf
-(Sınıf 0) *"ne doğurur"*, şalter-sınıf ekseni *"ne zaman susar"* sorusunu yanıtlar; üç soru
-bağımsızdır ve biri ötekinden türetilemez. Taşıyıcı bir **yetki kademesi AÇMAZ** — bundan
-**üçüncü kadran ailesi** doğmaz (utopya `G4.6` md.3). Dayanak: `otonomi-kontrol v2`'nin "yesil→kosum
-**bit-eşit** göç" bulgusu — yeni bir eksen tanımlamak hiçbir profile yetki KAZANDIRMAMIŞTI;
-eksen adlandırır, yetkilendirmez (00 kanıtı:
-`docs/kesifler/2026-07-27-dogmamis-dort-tasarim/01-otonomi-kontrol-v2.md` § R4 / "Ölçülmüş
-fiilî tablo"). Yetki tek yerden gelir: **kadran** (`gozlem|yesil|tam`) ve 🔴 valf.
+**Taşıyıcı ekseni ORTOGONALDİR ve KADRAN DEĞİLDİR** — *"nerede yaşar"* sorusu, sınıfın
+*"ne doğurur"*undan ve şalterin *"ne zaman susar"*ından bağımsızdır. Taşıyıcı **yetki AÇMAZ**;
+yetki tek yerden gelir: **kadran** (`gozlem|yesil|tam`) ve 🔴 valf. Kanıt:
+`docs/kesifler/2026-07-27-dogmamis-dort-tasarim/01-otonomi-kontrol-v2.md` § R4.
 
-**Muafiyet (ilanlı):** aide-DIŞI taşıyıcılar — `crontab` · launchd `KeepAlive` · dışarıdan
-sürülen CI — bu üç kovaya girmez ve bu sözlükte sınıflandırılmaz. Üç kova aide'ın kendi
-otomasyonlarının haritasıdır; dışarıdan gelen bir tetikleyiciyi buraya oturtmak, şalteri
-aide'da sanma yanılgısı üretirdi.
+**Muafiyet (ilanlı):** aide-DIŞI taşıyıcılar (`crontab` · launchd `KeepAlive` · dış CI) bu üç
+kovaya girmez ve burada sınıflandırılmaz — şalteri aide'da sanma yanılgısı üretirdi.
 
 ## Sınıf 2 — bilginin sınıfları (ne taşınır)
 
@@ -87,21 +80,9 @@ Sözleşme: `.claude/aide/docs/claude-md-sozlesmesi.md` · ölçen kapı: `aide 
 
 ## Sınıf 3 — İKİ YER, İKİ YÖN  ⭐ *en çok karıştırılan yer*
 
-Yalnız **iki yer** vardır. Her şey bu ikisi arasında gider gelir:
-
-```
-   Claude deposu                              KLASÖR  (filing)
-   ~/.claude                                  <proje>/.claude/filing/
-   ── hesaba bağlı, hesap değişince GİDER     ── git'te, hesap değişse de KALIR
-   ── "çalışan kopya"                         ── "kanon" = tek doğru kaynak
-
-        │                                              ▲
-        │   aide filing yaz    (KLASÖRE YAZ)           │
-        └──────────────────────────────────────────────┘
-        ▲                                              │
-        │   aide filing donan  (KLASÖRDEN DONAN)       │
-        └──────────────────────────────────────────────┘
-```
+Yalnız **iki yer** vardır: **çalışan kopya** `~/.claude` (hesaba bağlı, hesap değişince GİDER)
+ve **kanon** `<proje>/.claude/filing/` (git'te, KALIR). İki yön: `aide filing yaz` çalışandan
+klasöre, `aide filing donan` klasörden çalışana. Detay: `docs/filing-katmani.md`.
 
 | terim | anlamı |
 |---|---|
@@ -112,11 +93,11 @@ Yalnız **iki yer** vardır. Her şey bu ikisi arasında gider gelir:
 | **`filing donan`** | **KLASÖR ──▶** çalışan kopya. Yeni hesap buradan donanır. **Asla ezmez, asla silmez.** |
 | **yüzey** (surface) | taşınan bir kalem (`memory`, `pm-persona`, `plan-mode` … 16 tane). (Sınıf 0'daki render-katı "yüzey"den AYRIDIR.) |
 | **vendor** | aide'ın kanonunu TÜKETEN ajan ürünü (`claude` · `codex`). Kapalı küme. `claude` şaltersizdir — taşıyıcının kendisidir; ek her vendor `config.json → vendors.<v>.enabled` ile açılır ve **varsayılanı KAPALI**dır. |
-| **projeksiyon** | kanonun bir vendor'ın ÇERÇEVESİNE deterministik çevirisi (0 token). Üç ayrı katman: **yol** (`vendorRel`) · **içerik** (projektör) · **kayıt** (hook emitter). Gövde passthrough'dur; değişen yalnız çerçevedir (frontmatter · dosya düzeni · kayıt biçimi). Detay: `docs/vendor-katmani.md` |
-| **ayrık kanon** | her kanon dosyasının TEK sahip yüzeyi olması kuralı. `filing yaz` tam ayna olduğu için, iki vendor aynı kanon dizinine aynalasaydı biri ötekinin dosyalarını sessizce silerdi; ayrıklık bu öncülü YAPISAL olarak ortadan kaldırır (vendor yüzeyleri `filing/vendor/<v>/` altına rezervedir). |
+| **projeksiyon** | kanonun bir vendor ÇERÇEVESİNE deterministik çevirisi (0 token). Üç katman: **yol** (`vendorRel`) · **içerik** (projektör) · **kayıt** (hook emitter). Gövde passthrough, değişen yalnız çerçeve. Detay: `docs/vendor-katmani.md` |
+| **ayrık kanon** | her kanon dosyasının TEK sahip yüzeyi olması kuralı — `filing yaz` tam ayna olduğu için iki vendor aynı dizine aynalasa biri ötekini silerdi (vendor yüzeyleri `filing/vendor/<v>/` altına rezerve). |
 | **ayna** (mirror) | hedefi kaynağın birebir kopyası yapmak — **yokluk da kopyalanır** (silme yansır). |
 | **çakışma** | iki yanda da (son mutabakattan beri) değişmiş dosya. Otomatik çözülmez; raporlanır, insan karar verir. Ölçütü **taban defteri** verir. |
-| **taban defteri** | son başarılı `yaz`/`donan` anında iki ucun eşit olduğu dosyaların hash kaydı (`~/.claude/filing-taban/` — DURUM, taşınmaz). Üçlü karşılaştırmayı mümkün kılar: çalışan ilerlemiş (`yaz` taşır) · kanon ilerlemiş (`donan` fast-forward alır) · gerçek çakışma. Taban yoksa motor temkinliye düşer (fark = çakışma). |
+| **taban defteri** | son başarılı `yaz`/`donan` anında iki ucun eşit olduğu dosyaların hash kaydı (`~/.claude/filing-taban/` — DURUM). Üçlü karşılaştırmayı mümkün kılar; **taban yoksa motor temkinliye düşer** (fark = çakışma). |
 | **devir** | pencere kapanırken yapılan `filing yaz`. |
 | **transition blok** | devir bitmeden yeni pencerenin **hiçbir şey yazamaması**. |
 
@@ -124,10 +105,9 @@ Yalnız **iki yer** vardır. Her şey bu ikisi arasında gider gelir:
 Fiiller kasten farklı: `yaz` yıkıcıdır (ayna), `donan` asla yıkmaz.
 
 **`aide` sistemin adıdır, `filing` bu katmanın adı.** Karıştırma: `aide sync`/`aide boot`
-sistemin işleri; `aide filing …` projenin kendi bilgisiyle ilgilenir.
-
-~~`bilgi topla`~~ · ~~`kanon yaz`~~ → **`filing yaz`** · ~~`bilgi kur`~~ · ~~`kanon al`~~ → **`filing donan`**
-(2026-07-22; eski adlar çalışır ama yeni adı söyler). |
+sistemin işleri; `aide filing …` projenin kendi bilgisiyle ilgilenir. (Eski adlar —
+`bilgi topla`/`kanon yaz` → `filing yaz` · `bilgi kur`/`kanon al` → `filing donan` — çalışır
+ama yeni adı söyler.)
 
 ## Sınıf 4 — denetim ve hüküm
 
@@ -158,27 +138,23 @@ sistemin işleri; `aide filing …` projenin kendi bilgisiyle ilgilenir.
 | **limit devri** | askıdaki sahibin KENDİ kilitlerini bırakması (üçüncü taraf biçemez). |
 | **park** | bir işin arıza sebebiyle durdurulması. Bekçi **kendi bulgusuyla park olmaz**. |
 | **deadman** | ateş tavanı aşılınca devreye giren global durdurucu. |
-| **kırık** (zombi) | **açık ama işlevsiz** koşum; ölümün aksine GÖRÜNMEZ (pencere duruyor, kayıt "koşuyor" diyor, iş ilerlemiyor). Ölü DEĞİL (kapatıcı evreni), biten DEĞİL (sonucu yok). Sınıfları: `kimlik` · `limit` · `yanitsiz` · `kanitsiz`. Envanter `aide kirik` (motor · 0 token); devam kararı frenlere tabidir. Detay: `docs/kirik-kosum.md`. |
-| **soft-resume** (yumuşak devam) | kapalı/başka-hesap session'ın transcript'inden damıtılan brifle TAZE oturumda devam. Hard resume'un (`--resume`) taşınabilir ucuz karşılığı. Toplama motor (0 token), damıtma ajan — ve damıtan hep DEVRALANdır: kapatan taraf agentic iş yapmaz. |
-| **stop dalı** | `goal-tracker.mjs stop` — açık iş bırakıp erken duran oturumu `{"decision":"block"}` ile BİR KEZ geri çeviren motor (0 token · session-yerleşik). Açık işin TEK kaynağı hedef defteri (todo'lar + `/goal`). Döngü kilidi üç katmanlı (`stop_hook_active` ∧ `prompt_id` ∧ **açık-küme imzası**) → oturum×küme başına en fazla 1 blok; **şüphe SERBEST BIRAKMA yönünedir.** Kademe: `kaptan/stop-dali.json → kapsam` (`acik`\|`goal`\|`kapali`). Muaf: kullanıcı kesmesi Stop'u tetiklemez (yapısal) · `SubagentStop` · oturum defteri. |
+| **kırık** (zombi) | **açık ama işlevsiz** koşum; ölümün aksine GÖRÜNMEZ (pencere duruyor, kayıt "koşuyor" diyor, iş ilerlemiyor). Ölü DEĞİL, biten DEĞİL. Sınıfları `kimlik`·`limit`·`yanitsiz`·`kanitsiz`; envanter `aide kirik` (motor · 0 token). Detay: `docs/kirik-kosum.md`. |
+| **soft-resume** (yumuşak devam) | kapalı/başka-hesap session'ının transcript'inden damıtılan brifle TAZE oturumda devam (hard `--resume`'un taşınabilir karşılığı). Toplama motor, damıtma ajan — **damıtan hep DEVRALANdır**: kapatan taraf agentic iş yapmaz. |
+| **stop dalı** | `goal-tracker.mjs stop` — açık iş bırakıp erken duran oturumu BİR KEZ geri çeviren motor (0 token · session-yerleşik). Açık işin TEK kaynağı hedef defteri (todo + `/goal`); **şüphe SERBEST BIRAKMA yönünedir.** Kademe `kaptan/stop-dali.json → kapsam`; kullanıcı kesmesi MUAF (yapısal). Detay: `docs/seviye-0.md`. |
 
 ## Sınıf 6 — plan katmanı  → kanon zincir DIŞINDA
 
 Plan katmanının TAM sözlüğü **`docs/plan-katmani.md` § 4e**'dedir (taşıma anında 21 terimdi;
 bugün daha fazla — sayı ve liste **§ 4e'de yaşar, burada TEKRARLANMAZ**).
 
-**Neden burada liste YOK (ölçülmüş gerekçe):** 2026-07-30'da buraya 21 terimlik bir özet liste
-kondu; 08-03'te §4e **27** terime çıkmıştı ve buradaki liste hâlâ 21 diyordu — yani ikinci bir
-kopya, senkronu elle tutulduğu için yalanlaştı. **Sayı bir SÖZLEŞME DEĞİL, ÖZETTİR** ve tek
-ölçüsü §4e'nin kendisidir:
+**Burada liste YOK, çünkü ikinci kopya yalanlaşır** (ölçüldü: 21 terimlik özet, §4e 27'ye
+çıkınca bayatladı). **Sayı SÖZLEŞME değil ÖZETtir**; tek ölçüsü §4e'nin kendisidir:
 `awk '/^## 4e\./{f=1} f&&/^## /&&!/^## 4e\./{f=0} f' docs/plan-katmani.md | grep -cE '^\| \*\*'`
 
 Terim kanonu kuralı KIRILMADI, YERİ değişti: yeni bir plan-katmanı terimi ORAYA eklenir
-(yazım sözleşmesi md.6 oraya da uygulanır). Taşındı 2026-07-30 — seviye-0-otonomi v1
-aşama-10, **kullanıcı kararı K10-1**. Gerekçe ÖLÇÜLDÜ: bu dosya CLAUDE.md @-zincirindedir
-ve o projedeki HER isteğe girer; tam sözlüğün bedeli (**4.959 B ≈ ~1.550 token/istek**) her
-oturumda yeniden ödeniyordu. **Zincirde çekirdek kalır, ayrıntı işaretçiye iner** (K3 doktrini;
-emsal: aşama-03'ün 4 yetim kalemi kanon belgelere taşıması — önce taşı, sonra sil).
+(yazım sözleşmesi md.6 oraya da uygulanır). **Zincirde çekirdek kalır, ayrıntı işaretçiye iner**
+(K3 doktrini; taşıma 2026-07-30, seviye-0-otonomi v1 aşama-10, kullanıcı kararı K10-1 —
+ölçülen bedel 4.959 B ≈ ~1.550 token/istek).
 
 ## Yazım sözleşmesi
 
