@@ -181,6 +181,9 @@
 - [ ] Localhost Streamable HTTP + project STDIO MCP; auth ve read/proposal tool ayrımı.
 - [ ] Codex CLI/VS Code + Claude Code MCP conformance; raw writer/human grant expose edilmez.
 - [ ] Session register/heartbeat, dashboard context handoff ve proposal correlation.
+  - [x] Verified local capability + exact descriptor bağlı application lifecycle çekirdeği; server-clock heartbeat,
+    same-user/workspace + intent-tool bağlı 15–120 sn ref-only handoff ve atomik single-use consume.
+  - [ ] Durable repository, authenticated route/transport ve gerçek dashboard↔CLI handoff E2E.
 - [ ] Local `reklamzeka` companion ile TTY/passkey HumanPresenceGrant ve ayrı approve/execute.
 - [ ] MCP-capable CLI config ve güvenli allowlist LocalCliAdapter extension point.
 - [ ] Kritik guidance interview, owner+Meta best-practice+evidence karşılaştırması ve eval seti.

@@ -35,6 +35,13 @@ kullanır. Session çıktısı dashboarda kopyalanmaz; zaten aynı backend'e ID 
 Handoff veri snapshot'ı değil, scoped referans ve version setidir. Session her aracı
 çağırdığında tenant/role/stale kontrolü yeniden yapılır.
 
+İlk application çekirdeği register, server-clock heartbeat ve 15–120 saniyelik atomik
+tek-kullanımlık handoff lifecycle'ını tanımlar. Capability claim seti ile agent descriptor;
+session, workspace, kullanıcı, client, transport, tool catalog ve expiry boyunca exact bağlıdır.
+Target aynı kullanıcı/workspace'te olmalı ve intent için gereken safe tool'a sahip olmalıdır.
+Bu çekirdek henüz kalıcı repository, dashboard butonu, `get_handoff_context` transport tool'u
+veya MCP/STDIO route'u değildir; yukarıdaki beş adımlı yolculuk bu katmanlar geldikten sonra E2E kapanır.
+
 ## Session → onay ve execute
 
 Model/MCP tool'u onay veremez. Kullanıcı session içinde öneri özetini gördükten sonra

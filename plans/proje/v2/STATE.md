@@ -1047,3 +1047,20 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   correlation replay ve başka session'ın correlation ref'i fail-closed kalır.
 - Bu parça route, MCP transport, DB/session ledger veya dashboard handoff değildir; `project_stdio` ve
   `loopback_http` yalnız contract transport adlarıdır. Network, DB, secret, model API veya Meta çağrısı eklenmedi.
+
+## 2026-08-08 — A12 AgentSession + DashboardHandoff application lifecycle
+
+- Doğrulanmış runtime local-session claim seti ile LocalAgentSessionDescriptor'ı exact session/workspace/user/client/
+  transport/catalog/tool/expiry bağına alan repository-port'lu application lifecycle eklendi. Register ve heartbeat
+  yalnız server clock kullanır; heartbeat capability expiry'yi uzatamaz, clock regression ve descriptor drift'i
+  fail-closed reddeder.
+- Dashboard handoff veri snapshot'ı veya prompt değildir. Yalnız `analysis|existing_post_promotion` intent'i,
+  public entity/timeframe/context/template ref'leri, version ve correlation ref taşır. Handoff 15–120 saniye ile
+  creator/target capability expiry'nin en erken anına cap'lenir; target aynı workspace ve kullanıcıya ait olmalı,
+  intent'in gereken safe tool'una sahip olmalıdır. Consume repository portunda atomik ve tek kullanımlıdır.
+- Caller workspace/time/authority/provider/model/prompt/tool/raw/hash/sql/human/grant/approve/execute enjeksiyonu,
+  unregistered veya drift etmiş session, cross-user/workspace/session, expiry, replay ve concurrent çift tüketim
+  negatifleri kapsandı. Public sonuç internal UUID/user/nonce/tool listesi taşımaz ve business/model/human/approval/
+  grant/execution/raw/Meta authority'leri false'dur; yalnız session coordination capability'si true'dur.
+- Bu dilim in-memory test repository'siyle application contract kanıtıdır. Kalıcı repository, route, dashboard,
+  MCP/STDIO transport, network, DB migration, secret veya Meta/model çağrısı eklenmedi.
