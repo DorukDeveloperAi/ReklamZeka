@@ -8,7 +8,8 @@
 
 - **ReklamZeka Faz 0 kurulum** · session `35fbdca7` · KAPALI · başlangıç 2026-08-06T08:27:53.752Z · bitiş 2026-08-06T12:39:41Z
 - Hedef: Onaylı planın Faz 0'ı ayakta: repo iskeleti, terminoloji lint'i, şemalar, taksonomi çözücü, rubrik varsayılanları, MCP sözleşme testi taslağı; testler yeşil
-- Hedefler: 10/10 kapalı
+- Hedefler: 17/17 kapalı
+- devir: `plans/oturumlar/devir/2026-08-06-reklamzeka-faz-0-kurulum.json` · sıradaki: —
 - Planlar: — (bu oturum plan üretmedi ya da planlar `> Oturum:` beyanı taşımıyor)
 
 ## ▶ ot:2026-08-06/reklamzeka-hiyerarsi-uretimi — SÜRÜYOR

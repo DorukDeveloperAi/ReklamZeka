@@ -111,6 +111,9 @@ Yalnız **iki yer** vardır. Her şey bu ikisi arasında gider gelir:
 | **`filing yaz`** | çalışan kopya **──▶ KLASÖR**. Tam ayna: silme de yansır, sır elenir. YIKICI. |
 | **`filing donan`** | **KLASÖR ──▶** çalışan kopya. Yeni hesap buradan donanır. **Asla ezmez, asla silmez.** |
 | **yüzey** (surface) | taşınan bir kalem (`memory`, `pm-persona`, `plan-mode` … 16 tane). (Sınıf 0'daki render-katı "yüzey"den AYRIDIR.) |
+| **vendor** | aide'ın kanonunu TÜKETEN ajan ürünü (`claude` · `codex`). Kapalı küme. `claude` şaltersizdir — taşıyıcının kendisidir; ek her vendor `config.json → vendors.<v>.enabled` ile açılır ve **varsayılanı KAPALI**dır. |
+| **projeksiyon** | kanonun bir vendor'ın ÇERÇEVESİNE deterministik çevirisi (0 token). Üç ayrı katman: **yol** (`vendorRel`) · **içerik** (projektör) · **kayıt** (hook emitter). Gövde passthrough'dur; değişen yalnız çerçevedir (frontmatter · dosya düzeni · kayıt biçimi). Detay: `docs/vendor-katmani.md` |
+| **ayrık kanon** | her kanon dosyasının TEK sahip yüzeyi olması kuralı. `filing yaz` tam ayna olduğu için, iki vendor aynı kanon dizinine aynalasaydı biri ötekinin dosyalarını sessizce silerdi; ayrıklık bu öncülü YAPISAL olarak ortadan kaldırır (vendor yüzeyleri `filing/vendor/<v>/` altına rezervedir). |
 | **ayna** (mirror) | hedefi kaynağın birebir kopyası yapmak — **yokluk da kopyalanır** (silme yansır). |
 | **çakışma** | iki yanda da (son mutabakattan beri) değişmiş dosya. Otomatik çözülmez; raporlanır, insan karar verir. Ölçütü **taban defteri** verir. |
 | **taban defteri** | son başarılı `yaz`/`donan` anında iki ucun eşit olduğu dosyaların hash kaydı (`~/.claude/filing-taban/` — DURUM, taşınmaz). Üçlü karşılaştırmayı mümkün kılar: çalışan ilerlemiş (`yaz` taşır) · kanon ilerlemiş (`donan` fast-forward alır) · gerçek çakışma. Taban yoksa motor temkinliye düşer (fark = çakışma). |

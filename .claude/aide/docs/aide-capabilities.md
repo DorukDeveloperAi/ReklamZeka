@@ -130,7 +130,17 @@ elle düzenleme sapmadır). Diffin tekrarı YASAK · kapsam zorunlu · **12 sat�
 Detay (zincir DIŞI — gerekince oku): `.claude/aide/docs/commit-sozlesmesi.md` ·
 `/Users/ybg/dev/agent-ide/docs/durum-logu.md`
 
-### 15. Seviye 0 — aide KAPALIYKEN de duran taban (envanter + kapı)
+### 15. Vendor katmanı — tek kanon, ürüne özel çerçeve
+Kanon (`packages/kit/` + `hooks-registry.json` + `.claude/filing/`) ikinci bir ajan ürününe
+(**Codex**) **deterministik, 0-token** projekte edilir; o ürünün ürettiği artefakt da aynı
+filing'e geri akar. **Şalter varsayılan KAPALI** — kapalıyken tek bayt yazılmaz.
+Üç ayrı katman: **yol** (`vendorRel`, `kit.json` DEĞİŞMEZ) · **içerik** (projektör: gövde
+passthrough, çerçeve üretilir) · **kayıt** (`settings.json` ⊕ `hooks.json`).
+Bir hook ikinci ürüne ancak **açık beyanla** iner (bloke edici hook sezgiselle kurulmaz);
+**kayıtsız hook ölü metindir, DOSYASIZ kayıt ondan da kötüdür** → kapı ikisini birlikte ölçer.
+`aide vendor durum|ac|kapat|doctor`. Detay: `/Users/ybg/dev/agent-ide/docs/vendor-katmani.md`
+
+### 16. Seviye 0 — aide KAPALIYKEN de duran taban (envanter + kapı)
 Bu tabanı **aide taşımaz, DENETLER · ONARIR · İKAME ETMEZ**. Ne olduğu Seviye 0 maddesinde
 (yukarıda); burada **ölçeni** var: `aide seviye0` envanteri her yüzeyin **sınıfını ·
 taşıyıcısını · şalterini** ve `[kayıt][dosya]` rozetini basar — **kayıtsız hook ölü metindir

@@ -19,7 +19,13 @@
 - [x] meta_gateway iskeleti + MCP sözleşme testi taslağı (creds yoksa skip)
 - [x] docs/api-gercekleri.md + mcp-envanter.md (teyitsiz maddeler listesi)
 - [x] Doğrulama: pytest + lint koşusu yeşil
-
+- [x] Claim'ler + oturum geçişi
+- [x] TODO-ELLE maddeleri + ref dökümü
+- [x] Çerçeve + 10 aşama ajanı fan-out
+- [x] utopya/ tamam + doğrulandı (yapı temiz, 32 çıpa)
+- [x] v2 dosyaları: MASTER/STATE/CHECKLIST/REQUIREMENTS/10 aşama/REVIZYON
+- [x] Türetme + gate PASS (DAG aktif) + getirir blokları
+- [x] Doğrulama + oturum defteri + claim bırakıldı + rapor
 ## Notlar
 
 - 2026-08-06: Kod ayağı tamam — 14 test yeşil, 2 MCP sözleşme testi token bekliyor
