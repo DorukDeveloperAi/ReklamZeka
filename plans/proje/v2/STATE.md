@@ -781,5 +781,7 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   published/disabled→new draft→publish ve published→disabled revision'ları; exact K4 existing-post rol/SoD/
   grant-consumer/lifetime payload'ı ve ayrı publish/disable kanıtı taşır. Resolver tüm zinciri doğrular,
   draft'ı authority saymaz ve yalnız exact-one active published policy döndürür; hiçbir policy seed edilmedi.
+  Migration Supabase'e uygulandı; canlı kontrolde 69/69 tablo RLS ve API rollerinde sıfır tablo grant'i,
+  sıfır schema-create ve sıfır public routine-execute grant'i doğrulandı.
 - Bir sonraki zorunlu kapı: queue policy snapshot'ını reviewed registry source revision FK/hash'ine bağlamak,
   protection policy kaynağını çözmek ve ancak ardından private submitter'ı route'a takmaktır.
