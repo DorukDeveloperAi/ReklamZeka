@@ -288,6 +288,8 @@
     forced RLS/API revoke, canonical payload CHECK'leri ve workspace tombstone purge kapsamı.
   - [x] Exact scope/freshness/source-revision hash'li kategori+affected-geo evidence materializer sözleşmesi;
     authoritative kategori kaynağı mevcut, canonical affected-geo mirror fact'i gelene kadar geo `unknown`.
+  - [x] Active-workspace effective context + frozen/current category replay'ini kullanan production-safe
+    AuthenticCategoryEvidence adapterı; category ref'i label/free-text değil semantic key digest'idir.
   - [x] GET-only/redacted targeting shape canary; 3 bounded AdSet örneğinde explicit included country
     koleksiyonu doğrulandı, targeting değerleri/logları ve Meta write yok.
   - [ ] Versioned canonical affected-geo normalizer + immutable snapshot/item persistence; country dışındaki

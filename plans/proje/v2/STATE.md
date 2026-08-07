@@ -834,6 +834,11 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   serbest metin tek başına “fiilen etkilenen bölge” kanıtı değildir. Canonical affected-geo snapshot fact'i
   revision/source hash'iyle persist edilene kadar production geo adapter yazılmayacak ve sonuç `unknown`
   kalacaktır. Hiçbir gerçek guardrail/policy değeri seed edilmedi.
+- Production AuthenticCategoryEvidence adapterı mevcut active-workspace effective-context loader ile frozen/current
+  category replay resolver'larını yeniden kullanır. Exact account/campaign/entity/time window, ready/no-blocker,
+  invalidation, path ve resolution hash eşitliği olmadan aday üretmez. Public category ref'i label, isim veya serbest
+  key metni değildir; dimension+definition semantic key çiftinin deterministic digest'idir. Source context,
+  resolution ve component revision/hash zincirleri evidence materializer'a taşınır.
 - Bounded GET-only targeting shape canary mevcut token ve Graph `v23.0` ile çalıştı: iki logical/fiziksel GET,
   en fazla üç AdSet ve sıfır write çağrısı. Üç örnekte de `targeting.geo_locations.countries` string-array
   şekli görüldü; değerlerin hiçbiri loglanmadı veya saklanmadı. Region/city/custom-location ve excluded-geo
