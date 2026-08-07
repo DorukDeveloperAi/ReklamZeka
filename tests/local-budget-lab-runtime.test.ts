@@ -76,7 +76,7 @@ describe("local Budget Lab route", () => {
       expiresAt: Math.floor(Date.now() / 1000) + 300 }, signingKey).claims;
     expect(claims.scopes).toEqual([
       "approval_queue:decide", "approval_queue:read", "budget_lab:draft", "budget_lab:read",
-      "decision_room:mark_read", "decision_room:read", "practice_lab:read",
+      "decision_room:mark_read", "decision_room:read", "practice_lab:read", "promotion_catalog:read",
     ]);
     const database = { execute: vi.fn(async () => ({ rows: [{ workspace_id: workspaceId, user_id: userId, role: "viewer", lifecycle_state: "active" }] })), select: vi.fn(), transaction: vi.fn() };
     const POST = createLocalBudgetLabPostHandler({ database: database as never, config: localDecisionRoomConfig(environment())! });

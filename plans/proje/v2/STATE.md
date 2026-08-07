@@ -639,3 +639,25 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   güvenli `source_not_configured` durumundadır; hiçbir demo fallback kullanılmaz.
 - Bu increment migration veya Meta çağrısı yapmaz; action/approval/execute/write/creative capability'leri
   false kalır. Sıradaki iş gerçek catalog read adapter/runtime ve K4 proposal persistence bağlantısıdır.
+
+## 2026-08-07 — S5.3 gerçek katalog runtime'ı ve K4 proposal persistence köprüsü
+
+- Drizzle/PostgreSQL catalog adapter aktif connection/account/Page-or-Instagram bağları, yayınlanmış
+  immutable registry revision'ları, internal category edge'leri ve yalnız promotion eligibility'si
+  `eligible` olan mevcut gönderileri workspace içinde birleştirir. Bütçe ve schedule/timeframe seçenekleri
+  yayınlanmış template'ten türetilir; bağımsız veya uydurulmuş plan oluşturulmaz.
+- Preset/template/binding payload'ları katalog projeksiyonundan önce domain constructor'larıyla yeniden
+  kurulur; persisted hash/identity/link uyuşmazlığı fail-closed'dur. Belirsiz actor→account bağı çıkarılır;
+  10.001 registry, 1.001 post veya 100 public seçenek sınırında kısmi katalog gösterilmez.
+- Public katalog Meta ID, tam hash, targeting, reklam metni veya credential taşımaz. Ayrı
+  `promotion_catalog:read` local-session scope'u, cookie-only/same-origin GET runtime'ı ve dashboard
+  loading/empty/unavailable/error akışı gerçek kaynağa bağlandı. POST preflight runtime'ı henüz kapalıdır.
+- Existing-post typed action artık frozen post content yanında `creativeBindingHash`, `timeframeRef`,
+  `scheduleMode` ve `durationDays` taşır. Böylece creative veya zaman planı değişikliği action hash,
+  ActionUnit ve proposal ref'ini değiştirir; eski approval yeni spesifikasyona taşınamaz.
+- Proposal service saf K4 preflight'ı mevcut append-only action queue repository'sine verir. Exact replay
+  `unchanged`, kaynak değişimi ayrı proposal; persistence hatası public-safe ve authority'siz fail-closed
+  sonuçtur. Bu sınır approve, grant, execute, targeting, creative veya Meta transport içermez.
+- Canlı Supabase katalog okuması gerçek boş durum döndürdü; `metaWrites=0`, `businessMutations=0`.
+  Sıradaki increment server-resolved POST context repository'si, dashboard'dan proposal oluşturma ve
+  mevcut tek-ActionUnit approval inbox'a uçtan uca bağlantıdır.

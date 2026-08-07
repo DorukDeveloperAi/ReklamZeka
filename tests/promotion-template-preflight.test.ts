@@ -124,9 +124,10 @@ describe("existing-post promotion preflight", () => {
     expect(actionPlan).toMatchObject({ actionType: "existing_post_promotion", risk: "K4",
       disposition: "approval_required", capabilities: { canExecute: false, canWriteMeta: false,
         canGrantApproval: false, canAccessRawGraph: false } });
-    expect(actionPlan.action).toMatchObject({ placeholderOnly: true, postContentHash: h("a"),
+    expect(actionPlan.action).toMatchObject({ placeholderOnly: true, postContentHash: h("a"), creativeBindingHash: h("b"),
       promotionTemplateVersionRef: `promotion_template_version_${input().template.templateHash.slice(0, 24)}`,
-      audiencePresetVersionRef: `audience_preset_version_${input().preset.presetHash.slice(0, 24)}` });
+      audiencePresetVersionRef: `audience_preset_version_${input().preset.presetHash.slice(0, 24)}`,
+      timeframeRef: "timeframe_rolling_7d", scheduleMode: "continuous", durationDays: null });
     expect(result).toMatchObject({ creativeGeneration: "disabled", capabilities: { canExecute: false,
       canWriteMeta: false, canGenerateCreative: false, canChangeTargeting: false, canGrantApproval: false } });
     expect(result.preflightHash).toMatch(/^[a-f0-9]{64}$/);
@@ -141,8 +142,11 @@ describe("existing-post promotion preflight", () => {
       post: { ...contentChanged.eligibility.post, contentHash: h("e") } } }).preflightHash)
       .not.toBe(first.preflightHash);
     const changed = input();
-    expect(service.preflight({ ...changed, postBinding: { ...changed.postBinding, creativeBindingHash: h("d") } }).preflightHash)
-      .not.toBe(first.preflightHash);
+    const creativeChanged = service.preflight({ ...changed,
+      postBinding: { ...changed.postBinding, creativeBindingHash: h("d") } });
+    expect(creativeChanged.preflightHash).not.toBe(first.preflightHash);
+    expect(creativeChanged.proposal.summaries[0]!.actionHash)
+      .not.toBe(first.proposal.summaries[0]!.actionHash);
     const revisionChanged = input();
     const { templateHash: _templateHash, ...templateInput } = revisionChanged.template;
     const nextTemplate = createPromotionTemplateRevision({ ...templateInput, revision: 4 });

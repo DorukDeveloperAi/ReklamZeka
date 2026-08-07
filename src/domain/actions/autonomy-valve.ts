@@ -42,11 +42,15 @@ export type TypedActionIntent =
     placeholderOnly: true;
     postRef: string;
     postContentHash: string;
+    creativeBindingHash: string;
     actorRef: string;
     promotionTemplateVersionRef: string;
     audiencePresetVersionRef: string;
     destinationRef: string;
     budgetPlanVersionRef: string;
+    timeframeRef: string;
+    scheduleMode: "continuous" | "fixed_duration";
+    durationDays: number | null;
   }>;
 
 export type AutonomyScope =
@@ -313,24 +317,37 @@ function classifyAction(value: unknown): ClassifiedAction {
   if (candidate.kind === "existing_post_promotion") {
     exactKeys(value, [
       "kind", "entity", "placeholderOnly", "postRef", "postContentHash", "actorRef",
-      "promotionTemplateVersionRef", "audiencePresetVersionRef", "destinationRef", "budgetPlanVersionRef",
+      "creativeBindingHash", "promotionTemplateVersionRef", "audiencePresetVersionRef", "destinationRef",
+      "budgetPlanVersionRef", "timeframeRef", "scheduleMode", "durationDays",
     ]);
     const entity = validateEntity(candidate.entity);
     if (entity.level !== "adset" || candidate.placeholderOnly !== true || typeof candidate.postContentHash !== "string" || !HASH.test(candidate.postContentHash)) {
       fail("invalid_action");
     }
+    const scheduleMode: "continuous" | "fixed_duration" = candidate.scheduleMode === "continuous"
+      || candidate.scheduleMode === "fixed_duration" ? candidate.scheduleMode : fail("invalid_action");
+    const durationDays: number | null = candidate.durationDays === null ? null
+      : Number.isSafeInteger(candidate.durationDays) && (candidate.durationDays as number) >= 1
+        && (candidate.durationDays as number) <= 365 ? candidate.durationDays as number : fail("invalid_action");
     const action = Object.freeze({
       kind: "existing_post_promotion" as const,
       entity: Object.freeze({ level: "adset" as const, ref: entity.ref }),
       placeholderOnly: true as const,
       postRef: reference(candidate.postRef),
       postContentHash: candidate.postContentHash,
+      creativeBindingHash: typeof candidate.creativeBindingHash === "string" && HASH.test(candidate.creativeBindingHash)
+        ? candidate.creativeBindingHash : fail("invalid_action"),
       actorRef: reference(candidate.actorRef),
       promotionTemplateVersionRef: reference(candidate.promotionTemplateVersionRef),
       audiencePresetVersionRef: reference(candidate.audiencePresetVersionRef),
       destinationRef: reference(candidate.destinationRef),
       budgetPlanVersionRef: reference(candidate.budgetPlanVersionRef),
+      timeframeRef: reference(candidate.timeframeRef),
+      scheduleMode,
+      durationDays,
     });
+    if ((action.scheduleMode === "continuous" && action.durationDays !== null)
+      || (action.scheduleMode === "fixed_duration" && action.durationDays === null)) fail("invalid_action");
     return { action, actionType: "existing_post_promotion", risk: "K4", budgetDelta: null, budgetBefore: null, budgetAfter: null };
   }
   fail("invalid_action");

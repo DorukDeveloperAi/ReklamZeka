@@ -87,9 +87,10 @@ describe("typed action risk classification", () => {
   it("existing-post promotion'ı frozen typed placeholder olarak K4 ve daima approval yapar", () => {
     const action: TypedActionIntent = {
       kind: "existing_post_promotion", entity: { level: "adset", ref: "adset_promotion" }, placeholderOnly: true,
-      postRef: "post_existing", postContentHash: "a".repeat(64), actorRef: "actor_page",
+      postRef: "post_existing", postContentHash: "a".repeat(64), creativeBindingHash: "b".repeat(64), actorRef: "actor_page",
       promotionTemplateVersionRef: "template_version_one", audiencePresetVersionRef: "audience_version_one",
-      destinationRef: "destination_site", budgetPlanVersionRef: "budget_plan_one",
+      destinationRef: "destination_site", budgetPlanVersionRef: "budget_plan_one", timeframeRef: "timeframe_week",
+      scheduleMode: "fixed_duration", durationDays: 7,
     };
     const plan = buildActionPlan(action, context({
       entity: { level: "adset", ref: "adset_promotion" },

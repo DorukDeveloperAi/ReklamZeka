@@ -50,7 +50,7 @@ function same(left: unknown, right: unknown): boolean {
 
 /** Stable opaque reference shared by server-side catalogs and this resolver. */
 export function promotionRegistryPublicRef(
-  kind: "account" | "actor" | "campaign" | "category",
+  kind: "account" | "actor" | "campaign" | "category" | "post",
   workspaceId: string,
   internalId: string,
 ): string {

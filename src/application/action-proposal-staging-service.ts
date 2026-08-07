@@ -225,7 +225,8 @@ function validateActionShape(action: TypedActionIntent, actionType: ActionType):
     budget_change: ["kind", "entity", "budgetKind", "currency", "beforeDecimal", "afterDecimal", "budgetOwnerRef"],
     existing_post_promotion: [
       "kind", "entity", "placeholderOnly", "postRef", "postContentHash", "actorRef",
-      "promotionTemplateVersionRef", "audiencePresetVersionRef", "destinationRef", "budgetPlanVersionRef",
+      "creativeBindingHash", "promotionTemplateVersionRef", "audiencePresetVersionRef", "destinationRef",
+      "budgetPlanVersionRef", "timeframeRef", "scheduleMode", "durationDays",
     ],
   };
   exactPlan(action, keysByKind[action.kind]);
@@ -246,8 +247,15 @@ function validateActionShape(action: TypedActionIntent, actionType: ActionType):
   }
   if (actionType === "existing_post_promotion") {
     if (action.kind !== "existing_post_promotion" || action.placeholderOnly !== true || action.entity.level !== "adset") fail("invalid_plan");
-    ref(action.postRef); hash(action.postContentHash); ref(action.actorRef); ref(action.promotionTemplateVersionRef);
+    ref(action.postRef); hash(action.postContentHash); hash(action.creativeBindingHash);
+    ref(action.actorRef); ref(action.promotionTemplateVersionRef);
     ref(action.audiencePresetVersionRef); ref(action.destinationRef); ref(action.budgetPlanVersionRef);
+    ref(action.timeframeRef);
+    if (!(["continuous", "fixed_duration"] as const).includes(action.scheduleMode)
+      || action.durationDays !== null && (!Number.isSafeInteger(action.durationDays)
+        || action.durationDays < 1 || action.durationDays > 365)
+      || action.scheduleMode === "continuous" && action.durationDays !== null
+      || action.scheduleMode === "fixed_duration" && action.durationDays === null) fail("invalid_plan");
   }
 }
 

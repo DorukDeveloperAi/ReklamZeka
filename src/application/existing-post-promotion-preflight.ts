@@ -149,11 +149,15 @@ export class ExistingPostPromotionPreflightService {
       placeholderOnly: true as const,
       postRef: input.postBinding.postRef,
       postContentHash: eligibility.contentFreeze.contentHash,
+      creativeBindingHash: input.postBinding.creativeBindingHash,
       actorRef: input.postBinding.actorRef,
       promotionTemplateVersionRef: promotionTemplateVersionRef(input.template),
       audiencePresetVersionRef: audiencePresetVersionRef(input.preset),
       destinationRef: ref(input.destinationRef),
       budgetPlanVersionRef: ref(input.budgetPlanVersionRef),
+      timeframeRef: input.template.timeframe.timeframeRef,
+      scheduleMode: input.template.timeframe.scheduleMode,
+      durationDays: input.template.timeframe.durationDays,
     });
     const actionPlan = buildActionPlan(action, input.actionContext);
     if (actionPlan.risk !== "K4" || actionPlan.disposition !== "approval_required"

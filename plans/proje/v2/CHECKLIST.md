@@ -247,7 +247,11 @@
     compatibility/guidance nedenleri ve bütün kapalı action capability'leri görünür.
   - [x] Immutable preset→template→binding→category registry atomik/idempotent repository'si;
     public-safe katalog sözleşmesi, strict validator ve cookie-only GET sınırı.
-  - [ ] Gerçek registry/post/budget/timeframe kataloğu, proposal persistence ve satır-bazlı approval bağlantısı.
+  - [x] Gerçek PostgreSQL registry + yalnız `eligible` existing-post kataloğu; template kaynaklı budget/timeframe,
+    ayrı cookie-only `promotion_catalog:read` runtime'ı ve truncation/corruption fail-closed kontrolleri.
+  - [x] Pure K4 preflight sonucunu mevcut append-only approval queue'ya atomik/idempotent kaydeden,
+    creative binding + schedule/timeframe'i action hash'ine bağlayan proposal persistence köprüsü.
+  - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.
 - [ ] Owner/admin/analyst/operator/viewer rol E2E.
 - [ ] 1280/820/390, keyboard/screen-reader ve hata/partial/conflict E2E.
 - [ ] Kota/alert/deadman/kill-switch/runbook ve staged rollout KPI raporu.
