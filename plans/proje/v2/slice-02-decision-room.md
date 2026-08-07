@@ -46,8 +46,15 @@ bütçe simülasyonu ve Meta write sırasıyla S3 ve S4'e aittir.
   read/draft servis, optimistic/atomic ledger suffix adapterı ve güvenli public projection testli.
   Immutable hash/revision schedule, exact account/campaign/schedule run binding, PostgreSQL lease/
   retry/overlap, idempotent in-app inbox/read-state ve timezone/DST/catch-up Supabase'e uygulandı.
-  HTTP/CLI adapter, worker tick ve UI açık.
-- **Birleşik kanıt:** 60 test dosyası/336 test, production build, audit 0; category/guidance,
+  Bounded worker tick; partial-failure isolation, concurrent duplicate suppression ve schedule
+  revision yarışı guard'ıyla gerçek tablolarda rollback kabulünden geçti. L2 observation builder
+  exact-key/scope/hash doğrulamalı, bounded ve replay-stable deterministic query/read sözleşmesini
+  kurdu. Public read service read-state zamanını yalnız server clock'tan alıyor. Gerçek Drizzle
+  read repository ve gerçek insight read adapteri Supabase rollback kabulünden geçti. Dashboard
+  Decision Room görünümü ile Codex/Claude araç/HTTP kontratı hazır; güvenilir workspace principal
+  bağlanana kadar production route bilinçli olarak `503 source_not_configured` verir ve fixture
+  kullanmaz.
+- **Birleşik kanıt:** 68 test dosyası/381 test, production build, audit 0; category/guidance,
   frozen-context, decision-ledger, Decision Room persistence ve 43-tablolu tombstone PostgreSQL
   rollback kabulleri temiz. Supabase 47/47 RLS, API table grant'i `0`; otomatik
   tracked/build/cache token eşleşmesi `0`.

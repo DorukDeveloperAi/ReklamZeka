@@ -38,6 +38,22 @@ function runner(overrides: Partial<DecisionRoomAnalysisPort> = {}): DecisionRoom
 }
 
 describe("shared manual and scheduled Decision Room executor", () => {
+  it("passes immutable trigger, asset, timeframe, and template trace into the run claim", async () => {
+    const claim = vi.fn(async () => ({
+      status: "duplicate_in_progress" as const, runRef: `run_${"a".repeat(20)}`, attempt: 1,
+    }));
+    const executor = new DecisionRoomExecutor(
+      { claim, complete: vi.fn(), fail: vi.fn() }, runner(), new InMemoryDecisionRoomInbox(),
+      () => new Date("2026-08-07T12:00:00Z"),
+    );
+    await executor.execute(request());
+    expect(claim).toHaveBeenCalledWith(expect.objectContaining({
+      triggerKind: "manual", triggerRef: "manual_request_1",
+      accountRef: "account_masked", campaignRef: "campaign_masked",
+      timeframeRef: "timeframe_7d", templateRef: "template_daily",
+    }));
+  });
+
   it("uses one executor contract and deterministic trigger-bound idempotency keys", async () => {
     const manual = request();
     const scheduled = request({
@@ -101,12 +117,14 @@ describe("shared manual and scheduled Decision Room executor", () => {
     const firstLease = await store.claim({
       idempotencyKey: "idempotency_expired", scopeKey: "scope_expired",
       triggerKind: "manual", scheduleRef: null, scheduleDefinitionHash: null,
+      triggerRef: "manual_request_1", timeframeRef: "timeframe_7d", templateRef: "template_daily",
       accountRef: "account_masked", campaignRef: "campaign_masked",
       now: "2026-08-07T12:00:00Z", leaseUntil: "2026-08-07T12:01:00Z",
     });
     const secondLease = await store.claim({
       idempotencyKey: "idempotency_expired", scopeKey: "scope_expired",
       triggerKind: "manual", scheduleRef: null, scheduleDefinitionHash: null,
+      triggerRef: "manual_request_1", timeframeRef: "timeframe_7d", templateRef: "template_daily",
       accountRef: "account_masked", campaignRef: "campaign_masked",
       now: "2026-08-07T12:02:00Z", leaseUntil: "2026-08-07T12:03:00Z",
     });

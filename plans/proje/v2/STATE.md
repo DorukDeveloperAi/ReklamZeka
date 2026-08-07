@@ -344,3 +344,49 @@ ReklamZeka'ya taşınmaz.
   Supabase 47/47 RLS, API table grant `0`, API schema create `0`, public routine execute `0`;
   43-tablolu tombstone rollback temiz; tracked/build/cache token eşleşmesi `0`; Meta network ve
   dış bildirim çağrısı `0`.
+
+## 2026-08-07 — S2 worker ve deterministik observation sınırı
+
+- Daily/weekly due schedule worker'ı bounded batch, partial-failure isolation ve deterministic
+  catch-up ile schedule registry/executor zincirine bağlandı. Yalnız completed veya daha önce
+  completed duplicate run schedule cursor'ını ilerletir; diğer sonuçlar güvenli biçimde yeniden
+  denenebilir kalır.
+- Cursor güncellemesi exact current `revision + definitionHash` koşuluna bağlandı. Execution
+  sırasında yeni revision yayınlanırsa eski worker tick'i `tick_conflict` olur ve yeni revision'ın
+  `nextRunAt` değeri değişmez. Eşzamanlı worker aynı slot için tek kalıcı run üretir.
+- Deterministik L2 observation builder primary/comparison/series/pre/post query planlarını
+  sürümlü hash ile üretir. Query/read/row/metric şekilleri exact-key ve bounded'dır; canonical
+  content hash, tenant/entity/attribution/currency/timezone scope'u ve snapshot kanıtı yeniden
+  doğrulanır. Raw payload, token, prompt ve authority taşıyan girişler reddedilir.
+- Public Decision Room read service schedule/run/inbox projection ve keyset cursor sözleşmesini
+  kurdu. Inbox read zamanı istemciden alınmaz; server clock ile üretilir ve tekrar çağrıda ilk
+  timestamp korunur. Bu aşama henüz public HTTP endpoint veya güvenilir workspace principal açmaz.
+- Uygulanmış production tablolarındaki outer-rollback kabulü worker partial isolation, catch-up,
+  concurrency ve revision-race bayraklarıyla geçti; kalıcı fixture, Meta network çağrısı ve dış
+  bildirim `0`. Kanıt: 63 test dosyası/355 test, typecheck, `db:check`, production build, audit `0`;
+  tracked/build/cache token eşleşmesi `0`.
+
+## 2026-08-07 — S2 gerçek read-side ve dashboard/agent kontratı
+
+- Decision Room run satırları trigger/account/campaign/timeframe/template trace'lerini claim
+  anında saklıyor; aynı idempotency key farklı metadata ile retry edilirse fail-closed oluyor.
+  Nullable kolonlar legacy satırları migration sırasında bozmuyor, fakat trace'siz legacy run
+  public read modeline giremiyor.
+- Gerçek Drizzle read repository current schedule, run ve inbox için workspace-bound keyset
+  pagination sağlıyor. Public account/campaign referansları yalnız workspace + internal random
+  UUID'den türetilmiş sabit alias; full Meta referansı ve internal UUID dışarı çıkmıyor. Read-state
+  transaction/advisory lock ile yarış güvenli ve ilk server timestamp'ini koruyor.
+- Canonical Meta daily-insight tablolarını okuyan gerçek L2 adapter exact tenant/account/connection,
+  entity, attribution, timezone, currency ve tarih scope'u uygular; SQL row cap'ten sonra metricleri
+  canonical hash ile yeniden kurar. Sync completion attribution finality sayılmaz: zorunlu,
+  deterministik settlement policy cutoff'u calendar/sync coverage ile birleştirilir.
+- Dashboard'a ayrı Decision Room read-only görünümü ve model-agnostic Codex/Claude tool/HTTP
+  kontratı eklendi. Tool argümanı workspace/reader/authority seçemez. Güvenilir authenticated
+  principal ve production assembly henüz bağlanmadığı için route `503 source_not_configured`
+  verir; demo fixture canlı sonuç gibi gösterilmez.
+- Additive migration Supabase'e uygulandı. Decision Room ve insight adapteri applied-table
+  outer-rollback kabullerinde bütün projection/pagination/tenant/legacy/trace/settlement/hash/
+  row-cap bayraklarını geçti; Meta network/write, dış bildirim ve kalıcı fixture `0`.
+- Kanıt: 68 test dosyası/381 test, typecheck, `db:check`, production build, audit `0`;
+  Supabase 47/47 RLS, API table grant `0`, schema create `0`, public routine execute `0`;
+  tracked/build/cache token eşleşmesi `0`.

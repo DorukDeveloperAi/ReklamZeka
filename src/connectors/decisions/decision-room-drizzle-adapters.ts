@@ -6,6 +6,12 @@ import type {
   DecisionRoomInboxPort,
   DecisionRoomRunStore,
 } from "@/domain/decisions/executor";
+import type {
+  DecisionRoomInboxReadRow,
+  DecisionRoomReadRepository,
+  DecisionRoomRunReadRow,
+  DecisionRoomScheduleReadRow,
+} from "@/application/decision-room-read-service";
 import {
   DECISION_ROOM_SCHEDULE_VERSION,
   decisionRoomScheduleDefinitionHash,
@@ -26,9 +32,14 @@ type RunRow = Readonly<{
   summary_code: string | null;
   ad_account_id: string;
   campaign_id: string;
+  account_ref: string;
+  campaign_ref: string;
   trigger_kind: "manual" | "scheduled";
   schedule_id: string | null;
   schedule_definition_hash: string | null;
+  trigger_ref: string;
+  timeframe_ref: string;
+  template_ref: string;
 }>;
 
 type ScheduleRow = Readonly<{
@@ -104,6 +115,14 @@ function opaqueRef(value: unknown): string {
   return ref;
 }
 
+function privateAssetRef(value: unknown): string {
+  const ref = required(value, 256);
+  if (/(token|secret|prompt|raw[_-]?(payload|request|response|json))/i.test(ref)) {
+    throw new DecisionRoomPersistenceError("invalid_input");
+  }
+  return ref;
+}
+
 function workspace(value: string): string {
   if (!UUID_PATTERN.test(value)) throw new DecisionRoomPersistenceError("invalid_input");
   return value;
@@ -150,25 +169,32 @@ export class DrizzleDecisionRoomRunStore implements DecisionRoomRunStore {
     triggerKind: "manual" | "scheduled";
     scheduleRef: string | null;
     scheduleDefinitionHash: string | null;
+    triggerRef: string;
     accountRef: string;
     campaignRef: string;
+    timeframeRef: string;
+    templateRef: string;
     now: string;
     leaseUntil: string;
   }>) {
     if (!input || Object.keys(input).some((key) => ![
       "idempotencyKey", "scopeKey", "triggerKind", "scheduleRef", "scheduleDefinitionHash",
-      "accountRef", "campaignRef", "now", "leaseUntil",
+      "triggerRef", "accountRef", "campaignRef", "timeframeRef", "templateRef", "now", "leaseUntil",
     ].includes(key)) || !IDEMPOTENCY_PATTERN.test(input.idempotencyKey) || !SCOPE_PATTERN.test(input.scopeKey)
       || !(["manual", "scheduled"] as const).includes(input.triggerKind)
       || (input.triggerKind === "manual"
         ? input.scheduleRef !== null || input.scheduleDefinitionHash !== null
-        : input.scheduleRef === null || !/^[a-f0-9]{64}$/.test(input.scheduleDefinitionHash ?? ""))) {
+        : input.scheduleRef === null || input.triggerRef !== input.scheduleRef
+          || !/^[a-f0-9]{64}$/.test(input.scheduleDefinitionHash ?? ""))) {
       throw new DecisionRoomPersistenceError("invalid_input");
     }
     const scheduleRef = input.scheduleRef === null ? null : opaqueRef(input.scheduleRef);
     const scheduleDefinitionHash = input.scheduleDefinitionHash;
-    const accountRef = required(input.accountRef);
-    const campaignRef = required(input.campaignRef);
+    const triggerRef = opaqueRef(input.triggerRef);
+    const accountRef = privateAssetRef(input.accountRef);
+    const campaignRef = privateAssetRef(input.campaignRef);
+    const timeframeRef = opaqueRef(input.timeframeRef);
+    const templateRef = opaqueRef(input.templateRef);
     const now = instant(input.now);
     const leaseUntil = instant(input.leaseUntil);
     if (Date.parse(leaseUntil) <= Date.parse(now)) throw new DecisionRoomPersistenceError("invalid_input");
@@ -198,6 +224,7 @@ export class DrizzleDecisionRoomRunStore implements DecisionRoomRunStore {
       const existing = rows<RunRow>(await transaction.execute(sql`
         select id, run_ref, state, lease_until, attempt, analysis_ref, summary_code,
           ad_account_id, campaign_id, trigger_kind, schedule_id, schedule_definition_hash
+          , trigger_ref, account_ref, campaign_ref, timeframe_ref, template_ref
         from decision_room_runs
         where workspace_id = ${this.workspaceId}::uuid and idempotency_key = ${input.idempotencyKey}
         for update
@@ -207,6 +234,8 @@ export class DrizzleDecisionRoomRunStore implements DecisionRoomRunStore {
         where workspace_id = ${this.workspaceId}::uuid and schedule_ref = ${scheduleRef}
           and definition_hash = ${scheduleDefinitionHash}
           and ad_account_id = ${asset.account_id}::uuid and campaign_id = ${asset.campaign_id}::uuid
+          and account_ref = ${accountRef} and campaign_ref = ${campaignRef}
+          and timeframe_ref = ${timeframeRef} and template_ref = ${templateRef}
           and (${existing?.schedule_id ?? null}::uuid is not null
             and id = ${existing?.schedule_id ?? null}::uuid
             or ${existing?.schedule_id ?? null}::uuid is null
@@ -217,7 +246,10 @@ export class DrizzleDecisionRoomRunStore implements DecisionRoomRunStore {
       if (existing && (existing.ad_account_id !== asset.account_id || existing.campaign_id !== asset.campaign_id
         || existing.trigger_kind !== input.triggerKind
         || (existing.schedule_id ?? null) !== (schedule?.id ?? null)
-        || (existing.schedule_definition_hash ?? null) !== scheduleDefinitionHash)) {
+        || (existing.schedule_definition_hash ?? null) !== scheduleDefinitionHash
+        || existing.account_ref !== accountRef || existing.campaign_ref !== campaignRef
+        || existing.trigger_ref !== triggerRef || existing.timeframe_ref !== timeframeRef
+        || existing.template_ref !== templateRef)) {
         throw new DecisionRoomPersistenceError("corrupt_store");
       }
       if (existing?.state === "completed") {
@@ -235,6 +267,7 @@ export class DrizzleDecisionRoomRunStore implements DecisionRoomRunStore {
       const overlap = rows<RunRow>(await transaction.execute(sql`
         select id, run_ref, state, lease_until, attempt, analysis_ref, summary_code,
           ad_account_id, campaign_id, trigger_kind, schedule_id, schedule_definition_hash
+          , trigger_ref, account_ref, campaign_ref, timeframe_ref, template_ref
         from decision_room_runs
         where workspace_id = ${this.workspaceId}::uuid
           and scope_key = ${input.scopeKey}
@@ -263,11 +296,13 @@ export class DrizzleDecisionRoomRunStore implements DecisionRoomRunStore {
         await transaction.execute(sql`
           insert into decision_room_runs (
             workspace_id, schedule_id, ad_account_id, campaign_id, trigger_kind, schedule_definition_hash,
+            trigger_ref, account_ref, campaign_ref, timeframe_ref, template_ref,
             idempotency_key, scope_key, run_ref, state, lease_token,
             lease_until, attempt, started_at
           ) values (
             ${this.workspaceId}::uuid, ${schedule?.id ?? null}::uuid, ${asset.account_id}::uuid,
             ${asset.campaign_id}::uuid, ${input.triggerKind}, ${scheduleDefinitionHash},
+            ${triggerRef}, ${accountRef}, ${campaignRef}, ${timeframeRef}, ${templateRef},
             ${input.idempotencyKey}, ${input.scopeKey}, ${runRef}, 'running',
             ${leaseToken}::uuid, ${leaseUntil}::timestamptz, ${attempt}, ${now}::timestamptz
           )
@@ -604,5 +639,264 @@ export class DrizzleDecisionRoomInbox implements DecisionRoomInboxPort {
       returning id
     `);
     return rows(result).length === 1;
+  }
+}
+
+type ReadAfter = Readonly<{ ref: string; sortAt: string | null }>;
+
+type ScheduleReadSource = Readonly<{
+  schedule_ref: string;
+  revision: number;
+  definition_version: string;
+  definition_hash: string;
+  ad_account_id: string;
+  campaign_id: string;
+  account_ref: string;
+  campaign_ref: string;
+  timeframe_ref: string;
+  template_ref: string;
+  frequency: "daily" | "weekly";
+  day_of_week: number | null;
+  timezone: string;
+  local_time: string;
+  enabled: boolean;
+  last_scheduled_for: Date | string | null;
+  next_run_at: Date | string | null;
+}>;
+
+type RunReadSource = Readonly<{
+  run_ref: string;
+  state: "running" | "completed" | "failed";
+  trigger_kind: "manual" | "scheduled";
+  trigger_ref: string;
+  schedule_ref: string | null;
+  schedule_definition_hash: string | null;
+  ad_account_id: string;
+  campaign_id: string;
+  account_ref: string | null;
+  campaign_ref: string | null;
+  timeframe_ref: string;
+  template_ref: string;
+  attempt: number;
+  started_at: Date | string;
+  completed_at: Date | string | null;
+  failed_at: Date | string | null;
+}>;
+
+type InboxReadSource = Readonly<{
+  notification_ref: string;
+  run_ref: string;
+  analysis_ref: string;
+  summary_code: string;
+  created_at: Date | string;
+  read_at: Date | string | null;
+}>;
+
+function exactReadInput(value: unknown, allowed: readonly string[]): asserts value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || Object.keys(value).some((key) => !allowed.includes(key))) {
+    throw new DecisionRoomPersistenceError("invalid_input");
+  }
+}
+
+function readLimit(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 1 || (value as number) > 101) {
+    throw new DecisionRoomPersistenceError("invalid_input");
+  }
+  return value as number;
+}
+
+function readAfter(value: unknown, temporal: boolean): ReadAfter | null {
+  if (value === null) return null;
+  exactReadInput(value, ["ref", "sortAt"]);
+  const ref = opaqueRef(value.ref);
+  const sortAt = temporal ? instant(value.sortAt) : value.sortAt === null
+    ? null
+    : (() => { throw new DecisionRoomPersistenceError("invalid_input"); })();
+  return Object.freeze({ ref, sortAt });
+}
+
+function storedOpaqueRef(value: unknown): string {
+  try {
+    return opaqueRef(value);
+  } catch {
+    throw new DecisionRoomPersistenceError("corrupt_store");
+  }
+}
+
+function publicAssetRef(kind: "account" | "campaign", workspaceId: string, internalId: unknown): string {
+  if (typeof internalId !== "string" || !UUID_PATTERN.test(internalId)) {
+    throw new DecisionRoomPersistenceError("corrupt_store");
+  }
+  return `${kind}_${sha256(`${workspaceId}:${kind}:${internalId}`).slice(0, 20)}`;
+}
+
+/**
+ * Server-private read repository. The constructor binds one internal workspace
+ * UUID to one opaque public workspace ref; neither database IDs nor Meta IDs
+ * cross the repository boundary.
+ */
+export class DrizzleDecisionRoomReadRepository implements DecisionRoomReadRepository {
+  private readonly workspaceId: string;
+  private readonly workspaceRef: string;
+
+  constructor(private readonly database: PersistenceDatabase, workspaceId: string, workspaceRef: string) {
+    this.workspaceId = workspace(workspaceId);
+    this.workspaceRef = opaqueRef(workspaceRef);
+  }
+
+  private bound(input: unknown, reader = false, temporal = false): Readonly<{
+    after: ReadAfter | null;
+    limit: number;
+    readerRef: string | null;
+  }> {
+    exactReadInput(input, reader ? ["workspaceRef", "readerRef", "after", "limit"] : ["workspaceRef", "after", "limit"]);
+    if (input.workspaceRef !== this.workspaceRef) throw new DecisionRoomPersistenceError("workspace_scope_mismatch");
+    return Object.freeze({
+      after: readAfter(input.after, temporal),
+      limit: readLimit(input.limit),
+      readerRef: reader ? opaqueRef(input.readerRef) : null,
+    });
+  }
+
+  async listSchedules(input: Parameters<DecisionRoomReadRepository["listSchedules"]>[0]): Promise<readonly DecisionRoomScheduleReadRow[]> {
+    const valid = this.bound(input);
+    await assertActiveWorkspace(this.database, this.workspaceId);
+    const result = rows<ScheduleReadSource>(await this.database.execute(sql`
+      select schedule_ref, revision, definition_version, definition_hash, ad_account_id, campaign_id,
+        account_ref, campaign_ref,
+        timeframe_ref, template_ref, frequency, day_of_week, timezone, local_time, enabled,
+        last_scheduled_for, next_run_at
+      from decision_room_schedules
+      where workspace_id = ${this.workspaceId}::uuid and workspace_ref = ${this.workspaceRef}
+        and superseded_at is null
+        and (${valid.after?.ref ?? null}::text is null or schedule_ref > ${valid.after?.ref ?? null})
+      order by schedule_ref asc
+      limit ${valid.limit}
+    `));
+    return Object.freeze(result.map((row) => Object.freeze({
+      workspaceRef: this.workspaceRef,
+      version: row.definition_version as typeof DECISION_ROOM_SCHEDULE_VERSION,
+      scheduleRef: storedOpaqueRef(row.schedule_ref),
+      revision: row.revision,
+      definitionHash: row.definition_hash,
+      accountRef: publicAssetRef("account", this.workspaceId, row.ad_account_id),
+      campaignRef: publicAssetRef("campaign", this.workspaceId, row.campaign_id),
+      timeframeRef: storedOpaqueRef(row.timeframe_ref),
+      templateRef: storedOpaqueRef(row.template_ref),
+      frequency: row.frequency,
+      dayOfWeek: row.day_of_week,
+      timezone: row.timezone,
+      localTime: row.local_time,
+      enabled: row.enabled,
+      lastScheduledFor: iso(row.last_scheduled_for),
+      nextRunAt: iso(row.next_run_at),
+    })));
+  }
+
+  async listRuns(input: Parameters<DecisionRoomReadRepository["listRuns"]>[0]): Promise<readonly DecisionRoomRunReadRow[]> {
+    const valid = this.bound(input, false, true);
+    await assertActiveWorkspace(this.database, this.workspaceId);
+    const result = rows<RunReadSource>(await this.database.execute(sql`
+      select run.run_ref, run.state, run.trigger_kind, run.trigger_ref,
+        schedule.schedule_ref, run.schedule_definition_hash, run.ad_account_id, run.campaign_id,
+        run.account_ref, run.campaign_ref, run.timeframe_ref, run.template_ref,
+        run.attempt, run.started_at, run.completed_at, run.failed_at
+      from decision_room_runs run
+      left join decision_room_schedules schedule
+        on schedule.workspace_id = run.workspace_id and schedule.id = run.schedule_id
+      where run.workspace_id = ${this.workspaceId}::uuid
+        and (${valid.after?.sortAt ?? null}::timestamptz is null
+          or (run.started_at, run.run_ref) < (${valid.after?.sortAt ?? null}::timestamptz, ${valid.after?.ref ?? null}::text))
+      order by run.started_at desc, run.run_ref desc
+      limit ${valid.limit}
+    `));
+    return Object.freeze(result.map((row) => Object.freeze({
+      workspaceRef: this.workspaceRef,
+      runRef: storedOpaqueRef(row.run_ref),
+      status: row.state,
+      triggerKind: row.trigger_kind,
+      triggerRef: storedOpaqueRef(row.trigger_ref),
+      scheduleRef: row.schedule_ref === null ? null : storedOpaqueRef(row.schedule_ref),
+      scheduleDefinitionHash: row.schedule_definition_hash,
+      accountRef: publicAssetRef("account", this.workspaceId, row.ad_account_id),
+      campaignRef: publicAssetRef("campaign", this.workspaceId, row.campaign_id),
+      timeframeRef: storedOpaqueRef(row.timeframe_ref),
+      templateRef: storedOpaqueRef(row.template_ref),
+      attempt: row.attempt,
+      startedAt: iso(row.started_at)!,
+      completedAt: iso(row.completed_at),
+      failedAt: iso(row.failed_at),
+    })));
+  }
+
+  async listInbox(input: Parameters<DecisionRoomReadRepository["listInbox"]>[0]): Promise<readonly DecisionRoomInboxReadRow[]> {
+    const valid = this.bound(input, true, true);
+    await assertActiveWorkspace(this.database, this.workspaceId);
+    const result = rows<InboxReadSource>(await this.database.execute(sql`
+      select item.notification_ref, run.run_ref, item.analysis_ref, item.summary_code,
+        item.created_at, read_state.read_at
+      from decision_room_inbox_items item
+      join decision_room_runs run on run.workspace_id = item.workspace_id and run.id = item.run_id
+      left join decision_room_inbox_reads read_state
+        on read_state.workspace_id = item.workspace_id and read_state.inbox_item_id = item.id
+        and read_state.reader_ref = ${valid.readerRef}
+      where item.workspace_id = ${this.workspaceId}::uuid
+        and (${valid.after?.sortAt ?? null}::timestamptz is null
+          or (item.created_at, item.notification_ref) < (${valid.after?.sortAt ?? null}::timestamptz, ${valid.after?.ref ?? null}::text))
+      order by item.created_at desc, item.notification_ref desc
+      limit ${valid.limit}
+    `));
+    return Object.freeze(result.map((row) => Object.freeze({
+      workspaceRef: this.workspaceRef,
+      notificationRef: storedOpaqueRef(row.notification_ref),
+      runRef: storedOpaqueRef(row.run_ref),
+      analysisRef: storedOpaqueRef(row.analysis_ref),
+      summaryCode: row.summary_code,
+      createdAt: iso(row.created_at)!,
+      readAt: iso(row.read_at),
+    })));
+  }
+
+  async markInboxRead(input: Parameters<DecisionRoomReadRepository["markInboxRead"]>[0]) {
+    exactReadInput(input, ["workspaceRef", "readerRef", "notificationRef", "readAt"]);
+    if (input.workspaceRef !== this.workspaceRef) throw new DecisionRoomPersistenceError("workspace_scope_mismatch");
+    const readerRef = opaqueRef(input.readerRef);
+    const notificationRef = opaqueRef(input.notificationRef);
+    if (!INBOX_REF_PATTERN.test(notificationRef)) throw new DecisionRoomPersistenceError("invalid_input");
+    const readAt = instant(input.readAt);
+    return this.database.transaction(async (transaction) => {
+      await assertActiveWorkspace(transaction, this.workspaceId);
+      await transaction.execute(sql`
+        select pg_advisory_xact_lock(hashtextextended(
+          ${`${this.workspaceId}:inbox-read:${notificationRef}:${readerRef}`}, 0
+        ))
+      `);
+      const inserted = rows<{ notification_ref: string; read_at: Date | string }>(await transaction.execute(sql`
+        insert into decision_room_inbox_reads (workspace_id, inbox_item_id, reader_ref, read_at)
+        select ${this.workspaceId}::uuid, item.id, ${readerRef}, ${readAt}::timestamptz
+        from decision_room_inbox_items item
+        where item.workspace_id = ${this.workspaceId}::uuid and item.notification_ref = ${notificationRef}
+        on conflict (workspace_id, inbox_item_id, reader_ref) do nothing
+        returning ${notificationRef}::text as notification_ref, read_at
+      `))[0];
+      const stored = inserted ?? rows<{ notification_ref: string; read_at: Date | string }>(await transaction.execute(sql`
+        select item.notification_ref, read_state.read_at
+        from decision_room_inbox_items item
+        join decision_room_inbox_reads read_state
+          on read_state.workspace_id = item.workspace_id and read_state.inbox_item_id = item.id
+          and read_state.reader_ref = ${readerRef}
+        where item.workspace_id = ${this.workspaceId}::uuid and item.notification_ref = ${notificationRef}
+        limit 1
+      `))[0];
+      if (!stored) return null;
+      return Object.freeze({
+        workspaceRef: this.workspaceRef,
+        readerRef,
+        notificationRef: storedOpaqueRef(stored.notification_ref),
+        readAt: iso(stored.read_at)!,
+        changed: Boolean(inserted),
+      });
+    });
   }
 }

@@ -4,8 +4,10 @@ import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { runDecisionRoomScheduleWorker } from "@/application/decision-room-schedule-worker";
+import { DecisionRoomReadService } from "@/application/decision-room-read-service";
 import {
   DrizzleDecisionRoomInbox,
+  DrizzleDecisionRoomReadRepository,
   DrizzleDecisionRoomRunStore,
   DrizzleDecisionRoomScheduleRegistry,
 } from "@/connectors/decisions/decision-room-drizzle-adapters";
@@ -59,6 +61,13 @@ let workerPartialIsolation = false;
 let workerCatchUp = false;
 let concurrentWorkerSingleRun = false;
 let revisionRaceTickBlocked = false;
+let persistedRunTraceVerified = false;
+let retryTraceMismatchBlocked = false;
+let readRepositoryProjectionVerified = false;
+let readRepositoryPaginationVerified = false;
+let readRepositoryIdempotentMarkVerified = false;
+let readRepositoryCrossTenantBlocked = false;
+let legacyTraceFailsClosed = false;
 let temporaryRowsCommitted = true;
 
 const schedule: DecisionRoomSchedule = {
@@ -138,6 +147,7 @@ try {
       idempotencyKey: `idempotency_${"e".repeat(32)}`, scopeKey: "f".repeat(64),
       triggerKind: "scheduled", scheduleRef: schedule.scheduleRef,
       scheduleDefinitionHash: restored!.definitionHash,
+      triggerRef: schedule.scheduleRef, timeframeRef: schedule.timeframeRef, templateRef: schedule.templateRef,
       accountRef: "account_safe", campaignRef: "campaign_safe",
       now: "2026-08-07T10:00:00Z", leaseUntil: "2026-08-07T10:05:00Z",
     });
@@ -150,11 +160,13 @@ try {
       idempotencyKey: `idempotency_${"e".repeat(32)}`, scopeKey: "f".repeat(64),
       triggerKind: "scheduled", scheduleRef: schedule.scheduleRef,
       scheduleDefinitionHash: restored!.definitionHash,
+      triggerRef: schedule.scheduleRef, timeframeRef: schedule.timeframeRef, templateRef: schedule.templateRef,
       accountRef: "account_safe", campaignRef: "campaign_safe",
       now: "2026-08-07T10:01:00Z", leaseUntil: "2026-08-07T10:06:00Z",
     });
     const revisionEvidence = resultRows(await transaction.execute(sql`
-      select run.trigger_kind, run.ad_account_id, run.campaign_id, schedule.revision,
+      select run.trigger_kind, run.trigger_ref, run.account_ref, run.campaign_ref,
+        run.timeframe_ref, run.template_ref, run.ad_account_id, run.campaign_id, schedule.revision,
         schedule.superseded_at, schedule.next_run_at,
         (select max(revision) from decision_room_schedules latest
           where latest.workspace_id = run.workspace_id and latest.schedule_ref = schedule.schedule_ref) as latest_revision
@@ -169,10 +181,16 @@ try {
       && revisionEvidence?.superseded_at !== null && revisionEvidence?.next_run_at === null;
     scheduledAssetBinding = revisionEvidence?.trigger_kind === "scheduled"
       && revisionEvidence?.ad_account_id === accountId && revisionEvidence?.campaign_id === campaignId;
+    persistedRunTraceVerified = revisionEvidence?.trigger_ref === schedule.scheduleRef
+      && revisionEvidence?.account_ref === schedule.accountRef
+      && revisionEvidence?.campaign_ref === schedule.campaignRef
+      && revisionEvidence?.timeframe_ref === schedule.timeframeRef
+      && revisionEvidence?.template_ref === schedule.templateRef;
     try {
       await scheduledStore.claim({
         idempotencyKey: `idempotency_${"4".repeat(32)}`, scopeKey: "5".repeat(64),
         triggerKind: "scheduled", scheduleRef: schedule.scheduleRef, scheduleDefinitionHash: "6".repeat(64),
+        triggerRef: schedule.scheduleRef, timeframeRef: schedule.timeframeRef, templateRef: schedule.templateRef,
         accountRef: "account_safe", campaignRef: "campaign_safe",
         now: "2026-08-07T10:02:00Z", leaseUntil: "2026-08-07T10:07:00Z",
       });
@@ -184,6 +202,7 @@ try {
         idempotencyKey: `idempotency_${"7".repeat(32)}`, scopeKey: "8".repeat(64),
         triggerKind: "scheduled", scheduleRef: schedule.scheduleRef,
         scheduleDefinitionHash: restored!.definitionHash,
+        triggerRef: schedule.scheduleRef, timeframeRef: schedule.timeframeRef, templateRef: schedule.templateRef,
         accountRef: "account_safe", campaignRef: "campaign_other",
         now: "2026-08-07T10:02:00Z", leaseUntil: "2026-08-07T10:07:00Z",
       });
@@ -230,23 +249,31 @@ try {
     const first = await store.claim({
       idempotencyKey, scopeKey, now: "2026-08-07T12:00:00Z", leaseUntil: "2026-08-07T12:05:00Z",
       triggerKind: "manual", scheduleRef: null, scheduleDefinitionHash: null,
+      triggerRef: "manual_request_e2e", timeframeRef: schedule.timeframeRef, templateRef: schedule.templateRef,
       accountRef: "account_safe", campaignRef: "campaign_safe",
     });
     if (first.status !== "claimed") throw new Error("İlk run claim alınamadı");
     const manualBinding = resultRows(await transaction.execute(sql`
-      select trigger_kind, schedule_id, ad_account_id, campaign_id from decision_room_runs
+      select trigger_kind, schedule_id, ad_account_id, campaign_id,
+        trigger_ref, account_ref, campaign_ref, timeframe_ref, template_ref
+      from decision_room_runs
       where workspace_id = ${workspaceId}::uuid and run_ref = ${first.runRef}
     `))[0];
     manualAssetBinding = manualBinding?.trigger_kind === "manual" && manualBinding.schedule_id === null
-      && manualBinding.ad_account_id === accountId && manualBinding.campaign_id === campaignId;
+      && manualBinding.ad_account_id === accountId && manualBinding.campaign_id === campaignId
+      && manualBinding.trigger_ref === "manual_request_e2e"
+      && manualBinding.account_ref === "account_safe" && manualBinding.campaign_ref === "campaign_safe"
+      && manualBinding.timeframe_ref === schedule.timeframeRef && manualBinding.template_ref === schedule.templateRef;
     duplicateInProgress = (await store.claim({
       idempotencyKey, scopeKey, now: "2026-08-07T12:01:00Z", leaseUntil: "2026-08-07T12:06:00Z",
       triggerKind: "manual", scheduleRef: null, scheduleDefinitionHash: null,
+      triggerRef: "manual_request_e2e", timeframeRef: schedule.timeframeRef, templateRef: schedule.templateRef,
       accountRef: "account_safe", campaignRef: "campaign_safe",
     })).status === "duplicate_in_progress";
     overlapSuppressed = (await store.claim({
       idempotencyKey: retryKey, scopeKey, now: "2026-08-07T12:01:00Z", leaseUntil: "2026-08-07T12:06:00Z",
       triggerKind: "manual", scheduleRef: null, scheduleDefinitionHash: null,
+      triggerRef: "manual_request_other", timeframeRef: schedule.timeframeRef, templateRef: schedule.templateRef,
       accountRef: "account_safe", campaignRef: "campaign_safe",
     })).status === "overlap_suppressed";
     leaseTokenEnforced = !await store.complete({
@@ -256,6 +283,7 @@ try {
     const retry = await store.claim({
       idempotencyKey, scopeKey, now: "2026-08-07T12:02:00Z", leaseUntil: "2026-08-07T12:07:00Z",
       triggerKind: "manual", scheduleRef: null, scheduleDefinitionHash: null,
+      triggerRef: "manual_request_e2e", timeframeRef: schedule.timeframeRef, templateRef: schedule.templateRef,
       accountRef: "account_safe", campaignRef: "campaign_safe",
     });
     retryStable = retry.status === "claimed" && retry.runRef === first.runRef && retry.attempt === 2;
@@ -266,8 +294,19 @@ try {
     duplicateCompleted = (await store.claim({
       idempotencyKey, scopeKey, now: "2026-08-07T12:03:00Z", leaseUntil: "2026-08-07T12:08:00Z",
       triggerKind: "manual", scheduleRef: null, scheduleDefinitionHash: null,
+      triggerRef: "manual_request_e2e", timeframeRef: schedule.timeframeRef, templateRef: schedule.templateRef,
       accountRef: "account_safe", campaignRef: "campaign_safe",
     })).status === "duplicate_completed";
+    try {
+      await store.claim({
+        idempotencyKey, scopeKey, now: "2026-08-07T12:03:00Z", leaseUntil: "2026-08-07T12:08:00Z",
+        triggerKind: "manual", scheduleRef: null, scheduleDefinitionHash: null,
+        triggerRef: "manual_request_e2e", timeframeRef: schedule.timeframeRef, templateRef: "template_other",
+        accountRef: "account_safe", campaignRef: "campaign_safe",
+      });
+    } catch {
+      retryTraceMismatchBlocked = true;
+    }
 
     const inbox = new DrizzleDecisionRoomInbox(transaction as never, workspaceId);
     const notification = {
@@ -289,6 +328,66 @@ try {
     });
     readStateIdempotent = firstRead && !duplicateRead
       && (await inbox.list("reader_owner"))[0]?.readAt === "2026-08-07T12:04:00.000Z";
+
+    const readRepository = new DrizzleDecisionRoomReadRepository(
+      transaction as never, workspaceId, schedule.workspaceRef,
+    );
+    const readService = new DecisionRoomReadService(
+      readRepository,
+      () => new Date("2026-08-07T13:00:00Z"),
+    );
+    const schedulePage = await readService.read({ workspaceRef: schedule.workspaceRef, view: "schedules", limit: 1 });
+    const runPage = await readService.read({ workspaceRef: schedule.workspaceRef, view: "runs", limit: 1 });
+    const inboxPage = await readService.read({
+      workspaceRef: schedule.workspaceRef, view: "inbox", readerRef: "reader_owner", limit: 1,
+    });
+    const publicProjection = JSON.stringify({ schedulePage, runPage, inboxPage });
+    const projectedSchedule = schedulePage.items[0] as { accountRef?: string; campaignRef?: string } | undefined;
+    const projectedRun = runPage.items[0] as { accountRef?: string; campaignRef?: string } | undefined;
+    readRepositoryProjectionVerified = schedulePage.items.length === 1 && runPage.items.length === 1
+      && inboxPage.items.length === 1 && !publicProjection.includes(workspaceId)
+      && !publicProjection.includes(accountId) && !publicProjection.includes(campaignId)
+      && !publicProjection.includes("account_safe") && !publicProjection.includes("campaign_safe")
+      && projectedSchedule?.accountRef === projectedRun?.accountRef
+      && projectedSchedule?.campaignRef === projectedRun?.campaignRef;
+    const firstRunPage = await readService.read({ workspaceRef: schedule.workspaceRef, view: "runs", limit: 1 });
+    const secondRunPage = firstRunPage.nextCursor
+      ? await readService.read({
+        workspaceRef: schedule.workspaceRef, view: "runs", limit: 1, cursor: firstRunPage.nextCursor,
+      })
+      : null;
+    readRepositoryPaginationVerified = secondRunPage?.items.length === 1
+      && JSON.stringify(firstRunPage.items) !== JSON.stringify(secondRunPage.items);
+    const replayRead = await readService.markInboxRead({
+      workspaceRef: schedule.workspaceRef, readerRef: "reader_owner", notificationRef: notification.notificationRef,
+    });
+    readRepositoryIdempotentMarkVerified = replayRead.changed === false
+      && replayRead.readState.readAt === "2026-08-07T12:04:00.000Z";
+    const foreignRead = new DecisionRoomReadService(new DrizzleDecisionRoomReadRepository(
+      transaction as never, foreignWorkspaceId, "workspace_foreign",
+    ));
+    readRepositoryCrossTenantBlocked = (await foreignRead.read({
+      workspaceRef: "workspace_foreign", view: "runs", limit: 10,
+    })).items.length === 0;
+    await transaction.execute(sql`
+      insert into decision_room_runs (
+        workspace_id, ad_account_id, campaign_id, trigger_kind, idempotency_key, scope_key,
+        run_ref, state, attempt, started_at, failed_at
+      ) values (
+        ${workspaceId}::uuid, ${accountId}::uuid, ${campaignId}::uuid, 'manual',
+        ${`idempotency_${"9".repeat(32)}`}, ${"0".repeat(64)}, ${`run_${"9".repeat(20)}`},
+        'failed', 1, '2099-01-01T00:00:00Z'::timestamptz, '2099-01-01T00:00:01Z'::timestamptz
+      )
+    `);
+    try {
+      await readService.read({ workspaceRef: schedule.workspaceRef, view: "runs", limit: 1 });
+    } catch {
+      legacyTraceFailsClosed = true;
+    }
+    await transaction.execute(sql`
+      delete from decision_room_runs
+      where workspace_id = ${workspaceId}::uuid and idempotency_key = ${`idempotency_${"9".repeat(32)}`}
+    `);
     try {
       await transaction.transaction(async (savepoint) => {
         await savepoint.execute(sql`
@@ -429,6 +528,9 @@ try {
       dueListingBounded, disabledSupersededExcluded, workerPartialIsolation, workerCatchUp,
       concurrentWorkerSingleRun,
       revisionRaceTickBlocked,
+      persistedRunTraceVerified, retryTraceMismatchBlocked,
+      readRepositoryProjectionVerified, readRepositoryPaginationVerified,
+      readRepositoryIdempotentMarkVerified, readRepositoryCrossTenantBlocked, legacyTraceFailsClosed,
     };
     const failed = Object.entries(acceptance).filter(([, passed]) => !passed).map(([name]) => name);
     if (failed.length > 0) throw new Error(
@@ -475,6 +577,13 @@ console.log(JSON.stringify({
   workerCatchUp,
   concurrentWorkerSingleRun,
   revisionRaceTickBlocked,
+  persistedRunTraceVerified,
+  retryTraceMismatchBlocked,
+  readRepositoryProjectionVerified,
+  readRepositoryPaginationVerified,
+  readRepositoryIdempotentMarkVerified,
+  readRepositoryCrossTenantBlocked,
+  legacyTraceFailsClosed,
   metaNetworkCalls: 0,
   externalNotifications: 0,
   temporaryRowsCommitted,

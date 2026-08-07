@@ -1323,7 +1323,12 @@ export const decisionRoomRuns = pgTable("decision_room_runs", {
   adAccountId: uuid("ad_account_id").notNull(),
   campaignId: uuid("campaign_id").notNull(),
   triggerKind: text("trigger_kind").notNull(),
+  triggerRef: text("trigger_ref"),
   scheduleDefinitionHash: text("schedule_definition_hash"),
+  accountRef: text("account_ref"),
+  campaignRef: text("campaign_ref"),
+  timeframeRef: text("timeframe_ref"),
+  templateRef: text("template_ref"),
   idempotencyKey: text("idempotency_key").notNull(),
   scopeKey: text("scope_key").notNull(),
   runRef: text("run_ref").notNull(),
@@ -1367,6 +1372,7 @@ export const decisionRoomRuns = pgTable("decision_room_runs", {
   index("decision_room_runs_schedule_idx").on(table.scheduleId),
   index("decision_room_runs_account_idx").on(table.adAccountId),
   index("decision_room_runs_campaign_idx").on(table.campaignId),
+  index("decision_room_runs_read_page_idx").on(table.workspaceId, table.startedAt, table.runRef),
   check("decision_room_runs_identity", sql`
     ${table.idempotencyKey} ~ '^idempotency_[a-f0-9]{32}$'
     and ${table.scopeKey} ~ '^[a-f0-9]{64}$'
@@ -1377,6 +1383,17 @@ export const decisionRoomRuns = pgTable("decision_room_runs", {
     (${table.triggerKind} = 'manual' and ${table.scheduleId} is null and ${table.scheduleDefinitionHash} is null)
     or (${table.triggerKind} = 'scheduled' and ${table.scheduleId} is not null
       and ${table.scheduleDefinitionHash} ~ '^[a-f0-9]{64}$')
+  `),
+  check("decision_room_runs_trace_refs", sql`
+    (${table.triggerRef} is null and ${table.accountRef} is null and ${table.campaignRef} is null
+      and ${table.timeframeRef} is null and ${table.templateRef} is null)
+    or (${table.triggerRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$'
+      and btrim(${table.accountRef}) <> '' and length(${table.accountRef}) <= 256
+      and btrim(${table.campaignRef}) <> '' and length(${table.campaignRef}) <= 256
+      and ${table.timeframeRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$'
+      and ${table.templateRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$'
+      and concat_ws('|', ${table.triggerRef}, ${table.accountRef}, ${table.campaignRef}, ${table.timeframeRef}, ${table.templateRef})
+        !~* '(token|secret|prompt|raw[_-]?(payload|request|response|json))')
   `),
   check("decision_room_runs_attempt_positive", sql`${table.attempt} >= 1`),
   check("decision_room_runs_state_shape", sql`(
@@ -1414,6 +1431,7 @@ export const decisionRoomInboxItems = pgTable("decision_room_inbox_items", {
   uniqueIndex("decision_room_inbox_items_workspace_run_analysis_unique").on(table.workspaceId, table.runId, table.analysisRef),
   index("decision_room_inbox_items_run_idx").on(table.runId),
   index("decision_room_inbox_items_created_idx").on(table.workspaceId, table.createdAt),
+  index("decision_room_inbox_items_read_page_idx").on(table.workspaceId, table.createdAt, table.notificationRef),
   check("decision_room_inbox_items_channel", sql`${table.channel} = 'in_app_inbox'`),
   check("decision_room_inbox_items_format", sql`
     ${table.notificationRef} ~ '^inbox_[a-f0-9]{20}$'

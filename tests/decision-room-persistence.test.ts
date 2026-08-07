@@ -8,6 +8,7 @@ import {
 import { WORKSPACE_TOMBSTONE_PURGE_TABLES } from "@/connectors/meta/workspace-tombstone-purge-drizzle-adapter";
 
 const migrationPath = "drizzle/20260807143420_true_storm.sql";
+const readMigrationPath = "drizzle/20260807150835_fancy_may_parker.sql";
 
 describe("Decision Room PostgreSQL persistence contract", () => {
   it("is additive, tenant-linked, private, and orders composite targets before foreign keys", () => {
@@ -35,6 +36,17 @@ describe("Decision Room PostgreSQL persistence contract", () => {
     expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|DROP CONSTRAINT|TRUNCATE|DELETE FROM/);
   });
 
+  it("adds nullable legacy-safe run trace metadata and read keyset indexes without exposing tables", () => {
+    const migration = readFileSync(readMigrationPath, "utf8");
+    for (const column of ["trigger_ref", "account_ref", "campaign_ref", "timeframe_ref", "template_ref"]) {
+      expect(migration).toContain(`ADD COLUMN "${column}" text`);
+    }
+    expect(migration).toContain("decision_room_runs_trace_refs");
+    expect(migration).toContain("decision_room_runs_read_page_idx");
+    expect(migration).toContain("decision_room_inbox_items_read_page_idx");
+    expect(migration).not.toMatch(/GRANT|DROP|TRUNCATE|DELETE FROM|ENABLE WRITE/i);
+  });
+
   it("fails closed before I/O on token/raw/prompt-shaped extra fields and external channels", async () => {
     const unreachable = {
       execute: async () => { throw new Error("database should not be reached"); },
@@ -46,6 +58,7 @@ describe("Decision Room PostgreSQL persistence contract", () => {
       idempotencyKey: `idempotency_${"a".repeat(32)}`,
       scopeKey: "b".repeat(64), now: "2026-08-07T12:00:00Z", leaseUntil: "2026-08-07T12:01:00Z",
       triggerKind: "manual", scheduleRef: null, scheduleDefinitionHash: null,
+      triggerRef: "manual_request_safe", timeframeRef: "timeframe_7d", templateRef: "template_daily",
       accountRef: "account_safe", campaignRef: "campaign_safe",
       accessToken: "secret",
     } as never)).rejects.toEqual(expect.objectContaining<Partial<DecisionRoomPersistenceError>>({ code: "invalid_input" }));

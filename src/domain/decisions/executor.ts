@@ -78,8 +78,11 @@ export type DecisionRoomRunStore = Readonly<{
     triggerKind: "manual" | "scheduled";
     scheduleRef: string | null;
     scheduleDefinitionHash: string | null;
+    triggerRef: string;
     accountRef: string;
     campaignRef: string;
+    timeframeRef: string;
+    templateRef: string;
     now: string;
     leaseUntil: string;
   }>): Promise<ClaimResult>;
@@ -261,8 +264,11 @@ export class DecisionRoomExecutor {
       triggerKind: request.trigger.kind,
       scheduleRef: request.trigger.kind === "scheduled" ? request.trigger.scheduleRef : null,
       scheduleDefinitionHash: request.trigger.kind === "scheduled" ? request.trigger.scheduleDefinitionHash : null,
+      triggerRef: request.trigger.kind === "scheduled" ? request.trigger.scheduleRef : request.trigger.requestRef,
       accountRef: request.accountRef,
       campaignRef: request.campaignRef,
+      timeframeRef: request.timeframeRef,
+      templateRef: request.templateRef,
       now: current.toISOString(),
       leaseUntil: new Date(current.getTime() + this.leaseMs).toISOString(),
     });
@@ -326,8 +332,11 @@ export class InMemoryDecisionRoomRunStore implements DecisionRoomRunStore {
     triggerKind: "manual" | "scheduled";
     scheduleRef: string | null;
     scheduleDefinitionHash: string | null;
+    triggerRef: string;
     accountRef: string;
     campaignRef: string;
+    timeframeRef: string;
+    templateRef: string;
     now: string;
     leaseUntil: string;
   }>): Promise<ClaimResult> {

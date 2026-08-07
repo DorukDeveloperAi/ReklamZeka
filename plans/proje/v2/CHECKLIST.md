@@ -105,14 +105,21 @@
     insufficient-data reason sözleşmesi.
   - [x] Versioned metrik/formül kataloğu, provenance ve fail-closed aggregation motoru.
   - [x] Trend/anomaly/pacing/threshold/period/pre-post authentic calculator ailesi.
-  - [ ] Cohort calculator ve L2 materialization/application binding'i.
+  - [x] Bounded, exact-scope/hash doğrulamalı ve replay-stable L2 observation plan/builder sözleşmesi.
+  - [x] Gerçek PostgreSQL insight read adapteri; canonical hash replay, row cap, explicit
+    attribution-settlement policy ve rollback kabulü.
+  - [ ] Cohort calculator ve full Decision Room analysis application binding'i.
 - [ ] Hierarchical driver ve creative fatigue/config diagnostics.
 - [ ] Analysis run ledger, dry-run API ve deterministic replay.
   - [x] Append-only authentic hash-chain decision ledger saf çekirdeği ve malformed/tamper matrisi.
   - [x] Workspace-scoped PostgreSQL ledger persistence, tenant/temporal guard ve rollback E2E.
   - [x] Model-agnostic read/draft Decision Room application servisi ve stable replay refs.
   - [x] Optimistic head/immutable prefix korumalı atomik Drizzle suffix staging adapterı.
-  - [ ] HTTP/CLI adapter, rol/audit API'si ve gerçek dry-run endpoint'i.
+  - [x] Model-agnostic dashboard/Codex/Claude read-tool ve HTTP kontratı; server-bound workspace
+    dışında fail-closed, Meta/action authority taşımıyor.
+  - [x] Gerçek Drizzle schedule/run/inbox read repository, public asset alias, keyset pagination
+    ve yarış-güvenli server-clock read-state.
+  - [ ] Güvenilir local-session principal/route assembly, rol/audit API'si ve gerçek dry-run endpoint'i.
 - [ ] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
   - [x] Deterministik on-pass agenda, category/topic subset ve context/timeframe-bound finding çekirdeği.
   - [ ] Persistence, gerçek finding ailesi ve Decision Room application binding'i.
@@ -174,7 +181,8 @@
 - [ ] Hourly/daily/weekly/monthly/after-sync scheduler; DST/misfire/idempotency.
   - [x] Decision Room daily/weekly timezone+DST, skip/run_once catch-up ve duplicate-slot çekirdeği.
   - [x] Immutable schedule revision, exact hierarchy binding ve kalıcı lease/run store.
-  - [ ] Hourly/monthly/after-sync ve worker tick binding'i.
+  - [x] Bounded daily/weekly worker tick, partial isolation, concurrent suppression ve exact revision cursor guard'ı.
+  - [ ] Hourly/monthly/after-sync schedule türleri.
 - [ ] Sync→analyze→plan→approval agentic routine; otomatik execute yok.
 - [ ] External intervention reconcile ve sandbox/shadow rollout.
 - [ ] Manual/assisted/automated-read/scheduled-plan + approval-only/policy-limited inheritance ve kill switch.
@@ -209,7 +217,10 @@
 - [ ] Scheduled analysis in-app inbox ve duplicate-delivery/read-state E2E.
   - [x] Saf executor üzerinde idempotent in-app teslim/recovery ve duplicate-run testi.
   - [x] Workspace-scoped PostgreSQL inbox/read-state ve duplicate-delivery rollback E2E.
-  - [ ] Dashboard ve worker E2E.
+  - [x] Applied-table worker partial/catch-up/concurrency/revision-race rollback E2E.
+  - [x] Dashboard Decision Room read-only/unavailable/empty source ayrımı; fixture canlı sonuç
+    yerine kullanılmıyor.
+  - [ ] Güvenilir principal ile canlı dashboard E2E.
 - [x] Operating Dashboard + Orchestrator çift-yüzey bilgi mimarisi ve etkileşimli demo kabuğu.
 - [ ] Operating Dashboard gerçek backend state'iyle responsive/browser E2E.
 - [ ] Orchestrator skill/context/autonomy/handoff çalışma alanı ve dashboard↔CLI E2E.
