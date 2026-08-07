@@ -789,6 +789,7 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   expired veya kaynaksız policy zero-write fail-closed kalır. Canlı migration öncesinde ilgili iki tabloda da
   kayıt olmadığı salt-okunur sayımla doğrulandı; tarihsel exact replay yalnız hiçbir yeni kayıt üretmeyen
   `unchanged` yolunda korunur. 137 test dosyasında 819 test, production build, security/secret ve Drizzle
-  kontrolleri geçti.
+  kontrolleri geçti. Migration bağlı Supabase'e uygulandı; canlı kontrolde 69/69 tablo RLS ve API
+  rollerinde sıfır tablo grant'i, sıfır schema-create ve sıfır public routine-execute grant'i doğrulandı.
 - Bir sonraki zorunlu kapı: trusted action guardrail/protection policy kaynağını ve saf resolver'ını kurmak,
   proposal expiry kaynağını çözmek ve ancak ardından private submitter'ı route'a takmaktır.
