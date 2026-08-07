@@ -45,6 +45,7 @@
     "verify:decision-ledger-db": "tsx scripts/verify-decision-ledger-postgres.ts",
     "verify:advised-practice-db": "tsx scripts/verify-advised-practice-postgres.ts",
     "verify:budget-proposal-db": "tsx scripts/verify-budget-proposal-postgres.ts",
+    "verify:action-proposal-queue-db": "tsx scripts/verify-action-proposal-queue-postgres.ts",
     "verify:decision-room-persistence-db": "tsx scripts/verify-decision-room-persistence-postgres.ts",
     "verify:finding-observation-read-db": "tsx scripts/verify-finding-observation-read-postgres.ts",
     "verify:decision-room-analysis-assets-db": "tsx scripts/verify-decision-room-analysis-assets-postgres.ts",

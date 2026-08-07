@@ -525,3 +525,26 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: 94 test dosyası/578 test, production build ve secret kapısı temiz. Bu dilim saf ve
   persistence'sızdır; Meta network/write `0`. Sıradaki increment append-only action/autonomy
   persistence ve public-safe approval queue read modelidir; approval mutation ve writer hâlâ kapalıdır.
+
+## 2026-08-07 — S4.1 restart-durable action proposal queue
+
+- Yalnız `approval_required` typed action plan'ları kabul eden staging servisi eklendi. Exact
+  plan/action/context/policy hash'leri, deterministic bundle/unit kimlikleri ve public-safe özet
+  üretilir; K0/policy-limited adaylar, ad-level budget, raw Graph/secret/prompt benzeri alanlar ve
+  saldırgan tarafından yeniden hash'lenmiş biçimler fail-closed reddedilir. Budget action'ları artık
+  `daily` veya `lifetime` sahibini açıkça taşır; çıkarım yapılmaz.
+- Policy snapshot, proposal bundle, action unit, dependency ve ilk lifecycle event'i beş append-only
+  PostgreSQL tablosunda tek transaction ile saklanır. Exact replay yeni satır üretmez; aynı anahtarla
+  farklı içerik conflict olur. Tenant/entity bağları, RLS, PUBLIC/anon/authenticated revoke,
+  update engeli ve kontrollü workspace tombstone sırası migration düzeyinde uygulanır.
+- Public-safe approval queue list/detail read modeli ve model-agnostic agent contract eklendi.
+  Capability matrisi açıkça salt-okunurdur: approve, reject, request-changes, grant, execute,
+  Meta-write ve raw Graph kapalıdır. Drizzle read adapter, GET API ve dashboard inbox sonraki küçük
+  increment'tir; bu aşama kullanıcı kararını veya Meta varlığını değiştirmez.
+- Migration gerçek Supabase'e uygulandı. Canlı kabul: `tablesApplied`, insert, exact replay,
+  immutability, RLS/grants, exact row count ve rollback temiz; `metaCalls=0`, `executionCalls=0`.
+  Workspace tombstone kabulü hedef satırların child-first temizlendiğini, yabancı workspace'in
+  değişmediğini ve geçici satır kalmadığını doğruladı. Supabase güvenlik sonucu 60/60 tabloda RLS,
+  API rollerinde sıfır tablo/schema-create/routine-execute yetkisidir.
+- Kanıt: 98 test dosyası/607 test, production build, Drizzle schema check ve secret artifact kapısı
+  temiz. Production Meta writer hâlâ yoktur; S4 rollout kapısı ayrıca ve açık kullanıcı kararıyla açılır.

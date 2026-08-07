@@ -53,7 +53,7 @@ function status(toStatus: "ACTIVE" | "PAUSED" = "PAUSED"): TypedActionIntent {
 function budget(afterDecimal = "90"): TypedActionIntent {
   return {
     kind: "budget_change", entity: { level: "campaign", ref: "campaign_leads_tr" },
-    currency: "TRY", beforeDecimal: "100", afterDecimal, budgetOwnerRef: "campaign_leads_tr",
+    budgetKind: "daily", currency: "TRY", beforeDecimal: "100", afterDecimal, budgetOwnerRef: "campaign_leads_tr",
   };
 }
 
@@ -105,6 +105,11 @@ describe("typed action risk classification", () => {
     expect(() => buildActionPlan({ kind: "raw_graph", path: "/act_x/campaigns", field: "daily_budget" } as never, context()))
       .toThrowError(expect.objectContaining({ code: "invalid_action" }));
     expect(() => buildActionPlan({ ...budget(), budgetOwnerRef: "campaign_other" } as never, context({ budgetLimits })))
+      .toThrowError(expect.objectContaining({ code: "invalid_action" }));
+    const { budgetKind: _budgetKind, ...missingBudgetKind } = budget() as Extract<TypedActionIntent, { kind: "budget_change" }>;
+    expect(() => buildActionPlan(missingBudgetKind as never, context({ budgetLimits })))
+      .toThrowError(expect.objectContaining({ code: "invalid_contract" }));
+    expect(() => buildActionPlan({ ...budget(), budgetKind: "weekly" } as never, context({ budgetLimits })))
       .toThrowError(expect.objectContaining({ code: "invalid_action" }));
   });
 });

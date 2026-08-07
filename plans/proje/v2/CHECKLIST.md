@@ -208,6 +208,12 @@
 - [x] Varsayılan workspace `approval_only` autonomy lock; expiry/child scope fail-closed saf çekirdek.
 - [x] ActionBundle→atomik ActionUnit dependency DAG, tek tek approve/reject/request-changes saf
   yaşam döngüsü; approval execute değildir ve grant exact/single-use'dur.
+- [x] Typed action plan→approval-required staging; exact plan/action/context/policy hash'i,
+  deterministic bundle/unit kimliği, public-safe özet ve idempotency doğrulaması.
+- [x] Append-only action proposal queue persistence; policy snapshot, bundle, unit, dependency ve
+  ilk lifecycle event'i tek transaction'da, tenant/RLS/immutability/tombstone güvenceleriyle saklanır.
+- [x] Approval queue salt-okunur list/detail ve model-agnostic agent contract; viewer dahil yetkili
+  roller yalnız public-safe veri görür, approve/grant/execute/Meta-write capability'leri `false` kalır.
 - [ ] Mevcut Instagram/Page gönderisinden template+audience preset'li promotion preflight ve K4 bundle.
 - [ ] Yeni metin/görsel/video/creative üretmeme boundary ve negatif testleri.
 - [ ] Creative/post spec hash değişiminde stale approval ve yeniden onay.
@@ -227,6 +233,9 @@
   - [x] Explicit dry-run compose ve append-only draft persistence; aynı transaction'da audit,
     public-safe çıktı ve approval/execute/Meta-write yetkisi `false`.
 - [ ] Approval inbox, automation run, verify/rollback ve tek timeline.
+  - [x] Restart-durable awaiting-approval veri modeli ve public-safe read contract.
+  - [ ] Drizzle read adapter, GET API ve dashboard inbox bağlantısı.
+  - [ ] İnsan-varlığı kanıtlı approve/reject/request-changes mutation katmanı.
 - [ ] Mevcut creative library + context/performance karşılaştırması.
 - [ ] Yayındaki reklam metni/dynamic variant/CTA/destination/post kaynağı explorer'ı.
 - [ ] Instagram/Page post seçici, PromotionTemplate/AudiencePreset ve existing-post guided flow.

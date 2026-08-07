@@ -575,6 +575,11 @@ function validateLifecycle(candidate: ApprovalLifecycle): ApprovalLifecycle {
   return candidate;
 }
 
+/** Pure persistence-boundary verifier; it never mutates, approves, grants, or executes. */
+export function assertValidApprovalLifecycle(candidate: unknown): asserts candidate is ApprovalLifecycle {
+  validateLifecycle(candidate as ApprovalLifecycle);
+}
+
 function freshnessMap(lifecycle: ApprovalLifecycle, candidates: readonly UnitFreshness[]): Map<string, UnitFreshness> {
   if (!Array.isArray(candidates) || candidates.length !== lifecycle.bundle.units.length) fail("stale_unit");
   const map = new Map<string, UnitFreshness>();

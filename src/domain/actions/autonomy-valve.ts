@@ -30,6 +30,7 @@ export type TypedActionIntent =
   | Readonly<{
     kind: "budget_change";
     entity: Readonly<{ level: "campaign" | "adset"; ref: string }>;
+    budgetKind: "daily" | "lifetime";
     currency: string;
     beforeDecimal: string;
     afterDecimal: string;
@@ -279,9 +280,10 @@ function classifyAction(value: unknown): ClassifiedAction {
     return { action, actionType: isPause ? "status_pause" : "status_activate", risk: isPause ? "K2" : "K3", budgetDelta: null, budgetBefore: null, budgetAfter: null };
   }
   if (candidate.kind === "budget_change") {
-    exactKeys(value, ["kind", "entity", "currency", "beforeDecimal", "afterDecimal", "budgetOwnerRef"]);
+    exactKeys(value, ["kind", "entity", "budgetKind", "currency", "beforeDecimal", "afterDecimal", "budgetOwnerRef"]);
     const entity = validateEntity(candidate.entity);
     if (entity.level === "ad") fail("invalid_action");
+    if (!(["daily", "lifetime"] as const).includes(candidate.budgetKind as "daily" | "lifetime")) fail("invalid_action");
     if (typeof candidate.currency !== "string" || !CURRENCY.test(candidate.currency)) fail("invalid_action");
     const before = parseDecimal(candidate.beforeDecimal);
     const after = parseDecimal(candidate.afterDecimal);
@@ -292,6 +294,7 @@ function classifyAction(value: unknown): ClassifiedAction {
     const action = Object.freeze({
       kind: "budget_change" as const,
       entity: Object.freeze({ level: entity.level as "campaign" | "adset", ref: entity.ref }),
+      budgetKind: candidate.budgetKind as "daily" | "lifetime",
       currency: candidate.currency,
       beforeDecimal: formatDecimal(before),
       afterDecimal: formatDecimal(after),

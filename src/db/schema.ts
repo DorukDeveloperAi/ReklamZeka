@@ -2366,3 +2366,355 @@ export const operationalEvents = pgTable("operational_events", {
   index("operational_events_metric_observed_idx").on(table.metric, table.observedAt),
   index("operational_events_workspace_observed_idx").on(table.workspaceId, table.observedAt),
 ]);
+
+/** Immutable, server-private snapshot of the exact policy used to initialize an action queue entry. */
+export const actionApprovalPolicySnapshots = pgTable("action_approval_policy_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  policyRef: text("policy_ref").notNull(),
+  revision: integer("revision").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  policyHash: text("policy_hash").notNull(),
+  policyPayload: jsonb("policy_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("action_approval_policy_snapshots_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("action_approval_policy_snapshots_workspace_revision_unique")
+    .on(table.workspaceId, table.policyRef, table.revision),
+  uniqueIndex("action_approval_policy_snapshots_workspace_hash_unique")
+    .on(table.workspaceId, table.policyRef, table.policyHash),
+  index("action_approval_policy_snapshots_workspace_created_idx").on(table.workspaceId, table.createdAt),
+  check("action_approval_policy_snapshots_revision_positive", sql`${table.revision} >= 1`),
+  check("action_approval_policy_snapshots_hash_format", sql`${table.policyHash} ~ '^[a-f0-9]{64}$'`),
+  check("action_approval_policy_snapshots_identity", sql`
+    ${table.schemaVersion} = 'action-approval-policy/1.0.0'
+    and ${table.policyRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+  `),
+  check("action_approval_policy_snapshots_payload_exact", sql`
+    jsonb_typeof(${table.policyPayload}) = 'object'
+    and ${table.policyPayload} #>> '{version}' = ${table.schemaVersion}
+    and ${table.policyPayload} #>> '{policyRef}' = ${table.policyRef}
+    and (${table.policyPayload} #>> '{revision}')::integer = ${table.revision}
+    and ${table.policyPayload} #>> '{policyHash}' = ${table.policyHash}
+    and ${table.policyPayload} #>> '{autonomyMode}' = 'approval_only'
+  `),
+  check("action_approval_policy_snapshots_no_authority", sql`
+    not jsonb_path_exists(${table.policyPayload}, '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(actionauthority|executionauthority|writeauthority|writeenabled|canexecute|canwrite|approvalgranted|grant|authorization)$" flag "i")')
+  `),
+  check("action_approval_policy_snapshots_no_forbidden_material", sql`
+    ${table.policyPayload}::text !~* '"[^"[:space:]]*(token|secret|prompt)"[[:space:]]*:'
+    and ${table.policyPayload}::text !~* '"authorization"[[:space:]]*:'
+    and ${table.policyPayload}::text !~* '"[^"[:space:]]*raw[_-]?(payload|request|response|json)"[[:space:]]*:'
+  `),
+]);
+
+/** One immutable proposal envelope. This table is queue state, never execution authority. */
+export const actionProposalBundles = pgTable("action_proposal_bundles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  policySnapshotId: uuid("policy_snapshot_id").notNull(),
+  workspaceRef: text("workspace_ref").notNull(),
+  bundleRef: text("bundle_ref").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  stagingVersion: text("staging_version").notNull(),
+  stagingHash: text("staging_hash").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  bundleHash: text("bundle_hash").notNull(),
+  planRef: text("plan_ref").notNull(),
+  planRevision: integer("plan_revision").notNull(),
+  planHash: text("plan_hash").notNull(),
+  traceHash: text("trace_hash").notNull(),
+  lifecycleHash: text("lifecycle_hash").notNull(),
+  bundlePayload: jsonb("bundle_payload").$type<Record<string, unknown>>().notNull(),
+  initializedAt: timestamp("initialized_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("action_proposal_bundles_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("action_proposal_bundles_workspace_identity_unique")
+    .on(table.workspaceId, table.bundleRef, table.planRef, table.planRevision),
+  uniqueIndex("action_proposal_bundles_workspace_hash_unique").on(table.workspaceId, table.bundleHash),
+  uniqueIndex("action_proposal_bundles_workspace_idempotency_unique")
+    .on(table.workspaceId, table.idempotencyKey),
+  uniqueIndex("action_proposal_bundles_workspace_staging_hash_unique")
+    .on(table.workspaceId, table.stagingHash),
+  index("action_proposal_bundles_workspace_initialized_idx").on(table.workspaceId, table.initializedAt, table.id),
+  index("action_proposal_bundles_policy_idx").on(table.policySnapshotId),
+  foreignKey({
+    columns: [table.workspaceId, table.policySnapshotId],
+    foreignColumns: [actionApprovalPolicySnapshots.workspaceId, actionApprovalPolicySnapshots.id],
+    name: "action_proposal_bundles_policy_scope_fk",
+  }).onDelete("cascade"),
+  check("action_proposal_bundles_plan_revision_positive", sql`${table.planRevision} >= 1`),
+  check("action_proposal_bundles_identity", sql`
+    ${table.stagingVersion} = 'action-proposal-staging/1.0.0'
+    and ${table.schemaVersion} = 'action-bundle/1.0.0'
+    and ${table.workspaceRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.bundleRef} ~ '^action_bundle_[a-f0-9]{20}$'
+    and ${table.planRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+  `),
+  check("action_proposal_bundles_hash_formats", sql`
+    ${table.bundleHash} ~ '^[a-f0-9]{64}$'
+    and ${table.planHash} ~ '^[a-f0-9]{64}$'
+    and ${table.traceHash} ~ '^[a-f0-9]{64}$'
+    and ${table.lifecycleHash} ~ '^[a-f0-9]{64}$'
+    and ${table.idempotencyKey} ~ '^[a-f0-9]{64}$'
+    and ${table.stagingHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("action_proposal_bundles_payload_exact", sql`
+    jsonb_typeof(${table.bundlePayload}) = 'object'
+    and ${table.bundlePayload} #>> '{version}' = ${table.schemaVersion}
+    and ${table.bundlePayload} #>> '{bundleRef}' = ${table.bundleRef}
+    and ${table.bundlePayload} #>> '{bundleHash}' = ${table.bundleHash}
+    and ${table.bundlePayload} #>> '{plan,planRef}' = ${table.planRef}
+    and (${table.bundlePayload} #>> '{plan,revision}')::integer = ${table.planRevision}
+    and ${table.bundlePayload} #>> '{plan,planHash}' = ${table.planHash}
+    and jsonb_typeof(${table.bundlePayload} #> '{units}') = 'array'
+    and jsonb_array_length(${table.bundlePayload} #> '{units}') >= 1
+  `),
+  check("action_proposal_bundles_no_authority", sql`
+    not jsonb_path_exists(${table.bundlePayload}, '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(actionauthority|executionauthority|writeauthority|writeenabled|canexecute|canwrite|approvalgranted|grant|authorization)$" flag "i")')
+  `),
+  check("action_proposal_bundles_no_forbidden_material", sql`
+    ${table.bundlePayload}::text !~* '"[^"[:space:]]*(token|secret|prompt)"[[:space:]]*:'
+    and ${table.bundlePayload}::text !~* '"authorization"[[:space:]]*:'
+    and ${table.bundlePayload}::text !~* '"[^"[:space:]]*raw[_-]?(payload|request|response|json)"[[:space:]]*:'
+  `),
+]);
+
+/**
+ * Opaque refs are retained only as private, hash-bound source identity. Every
+ * queued Meta mutation must also bind to exactly one tenant-local account and
+ * one target at the action plan's declared campaign/adset/ad level.
+ */
+export const actionProposalUnits = pgTable("action_proposal_units", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  bundleId: uuid("bundle_id").notNull(),
+  ordinal: integer("ordinal").notNull(),
+  unitRef: text("unit_ref").notNull(),
+  unitHash: text("unit_hash").notNull(),
+  scopeHash: text("scope_hash").notNull(),
+  accountRef: text("account_ref").notNull(),
+  entityRef: text("entity_ref").notNull(),
+  actionType: text("action_type").notNull(),
+  risk: text("risk").notNull(),
+  sourceHash: text("source_hash").notNull(),
+  contextHash: text("context_hash").notNull(),
+  specHash: text("spec_hash").notNull(),
+  actionPlanHash: text("action_plan_hash").notNull(),
+  actionHash: text("action_hash").notNull(),
+  summaryHash: text("summary_hash").notNull(),
+  requesterRef: text("requester_ref").notNull(),
+  requesterRole: text("requester_role").notNull(),
+  proposedAt: timestamp("proposed_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  initialState: text("initial_state").notNull(),
+  adAccountId: uuid("ad_account_id").notNull(),
+  campaignId: uuid("campaign_id"),
+  adSetId: uuid("ad_set_id"),
+  adId: uuid("ad_id"),
+  unitPayload: jsonb("unit_payload").$type<Record<string, unknown>>().notNull(),
+  actionPlanPayload: jsonb("action_plan_payload").$type<Record<string, unknown>>().notNull(),
+  summaryPayload: jsonb("summary_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("action_proposal_units_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("action_proposal_units_dependency_binding_unique")
+    .on(table.workspaceId, table.bundleId, table.id, table.unitRef),
+  uniqueIndex("action_proposal_units_bundle_ordinal_unique").on(table.bundleId, table.ordinal),
+  uniqueIndex("action_proposal_units_bundle_ref_unique").on(table.bundleId, table.unitRef),
+  uniqueIndex("action_proposal_units_bundle_hash_unique").on(table.bundleId, table.unitHash),
+  index("action_proposal_units_workspace_account_idx").on(table.workspaceId, table.adAccountId),
+  index("action_proposal_units_bundle_idx").on(table.bundleId),
+  foreignKey({
+    columns: [table.workspaceId, table.bundleId],
+    foreignColumns: [actionProposalBundles.workspaceId, actionProposalBundles.id],
+    name: "action_proposal_units_bundle_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.adAccountId],
+    foreignColumns: [adAccounts.workspaceId, adAccounts.id],
+    name: "action_proposal_units_account_scope_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.workspaceId, table.campaignId],
+    foreignColumns: [adCampaigns.workspaceId, adCampaigns.id],
+    name: "action_proposal_units_campaign_scope_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.adSetId, table.workspaceId],
+    foreignColumns: [metaAdSets.id, metaAdSets.workspaceId],
+    name: "action_proposal_units_ad_set_scope_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.adId, table.workspaceId],
+    foreignColumns: [metaAds.id, metaAds.workspaceId],
+    name: "action_proposal_units_ad_scope_fk",
+  }).onDelete("restrict"),
+  check("action_proposal_units_ordinal_positive", sql`${table.ordinal} >= 1`),
+  check("action_proposal_units_initial_state", sql`${table.initialState} = 'awaiting_approval'`),
+  check("action_proposal_units_risk", sql`${table.risk} in ('K0', 'K1', 'K2', 'K3', 'K4')`),
+  check("action_proposal_units_identity", sql`
+    ${table.unitRef} ~ '^action_unit_[a-f0-9]{20}$'
+    and ${table.accountRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.entityRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.requesterRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.requesterRole} in ('owner', 'admin', 'operator', 'analyst')
+    and ${table.actionType} in ('internal_annotation', 'status_pause', 'status_activate', 'budget_decrease', 'budget_increase', 'existing_post_promotion')
+  `),
+  check("action_proposal_units_hash_formats", sql`
+    ${table.unitHash} ~ '^[a-f0-9]{64}$'
+    and ${table.scopeHash} ~ '^[a-f0-9]{64}$'
+    and ${table.sourceHash} ~ '^[a-f0-9]{64}$'
+    and ${table.contextHash} ~ '^[a-f0-9]{64}$'
+    and ${table.specHash} ~ '^[a-f0-9]{64}$'
+    and ${table.actionPlanHash} ~ '^[a-f0-9]{64}$'
+    and ${table.actionHash} ~ '^[a-f0-9]{64}$'
+    and ${table.summaryHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("action_proposal_units_authentic_entity_single", sql`
+    num_nonnulls(${table.campaignId}, ${table.adSetId}, ${table.adId}) = 1
+    and not (${table.actionType} in ('budget_decrease', 'budget_increase') and ${table.adId} is not null)
+  `),
+  check("action_proposal_units_time_order", sql`${table.expiresAt} > ${table.proposedAt}`),
+  check("action_proposal_units_payload_exact", sql`
+    jsonb_typeof(${table.unitPayload}) = 'object'
+    and ${table.unitPayload} #>> '{unitRef}' = ${table.unitRef}
+    and ${table.unitPayload} #>> '{unitHash}' = ${table.unitHash}
+    and ${table.unitPayload} #>> '{scopeHash}' = ${table.scopeHash}
+    and ${table.unitPayload} #>> '{scope,accountRef}' = ${table.accountRef}
+    and ${table.unitPayload} #>> '{scope,entityRef}' = ${table.entityRef}
+    and ${table.unitPayload} #>> '{scope,actionType}' = ${table.actionType}
+    and ${table.unitPayload} #>> '{risk}' = ${table.risk}
+    and ${table.unitPayload} #>> '{sourceHash}' = ${table.sourceHash}
+    and ${table.unitPayload} #>> '{contextHash}' = ${table.contextHash}
+    and ${table.unitPayload} #>> '{specHash}' = ${table.specHash}
+    and ${table.unitPayload} #>> '{requester,actorRef}' = ${table.requesterRef}
+    and ${table.unitPayload} #>> '{requester,role}' = ${table.requesterRole}
+    and (${table.unitPayload} #>> '{proposedAt}')::timestamptz = ${table.proposedAt}
+    and (${table.unitPayload} #>> '{expiresAt}')::timestamptz = ${table.expiresAt}
+  `),
+  check("action_proposal_units_action_plan_exact", sql`
+    jsonb_typeof(${table.actionPlanPayload}) = 'object'
+    and ${table.actionPlanPayload} #>> '{schemaVersion}' = 'action-plan/1.0.0'
+    and ${table.actionPlanPayload} #>> '{planHash}' = ${table.actionPlanHash}
+    and ${table.actionPlanPayload} #>> '{actionType}' = ${table.actionType}
+    and ${table.actionPlanPayload} #>> '{risk}' = ${table.risk}
+    and ${table.actionPlanPayload} #>> '{action,entity,ref}' = ${table.entityRef}
+    and ${table.actionPlanPayload} #>> '{disposition}' = 'approval_required'
+    and ${table.actionPlanPayload} #>> '{contextHash}' = ${table.contextHash}
+    and ${table.actionPlanPayload} #>> '{capabilities,canExecute}' = 'false'
+    and ${table.actionPlanPayload} #>> '{capabilities,canWriteMeta}' = 'false'
+    and ${table.actionPlanPayload} #>> '{capabilities,canGrantApproval}' = 'false'
+    and ${table.actionPlanPayload} #>> '{capabilities,canAccessRawGraph}' = 'false'
+  `),
+  check("action_proposal_units_summary_exact", sql`
+    jsonb_typeof(${table.summaryPayload}) = 'object'
+    and ${table.summaryPayload} #>> '{safety}' = 'public_safe'
+    and jsonb_typeof(${table.summaryPayload} #> '{before}') = 'object'
+    and jsonb_typeof(${table.summaryPayload} #> '{after}') = 'object'
+    and jsonb_typeof(${table.summaryPayload} #> '{evidence}') = 'array'
+  `),
+  check("action_proposal_units_authentic_level_exact", sql`
+    (${table.actionPlanPayload} #>> '{action,entity,level}' = 'campaign'
+      and ${table.campaignId} is not null and ${table.adSetId} is null and ${table.adId} is null)
+    or (${table.actionPlanPayload} #>> '{action,entity,level}' = 'adset'
+      and ${table.campaignId} is null and ${table.adSetId} is not null and ${table.adId} is null)
+    or (${table.actionPlanPayload} #>> '{action,entity,level}' = 'ad'
+      and ${table.campaignId} is null and ${table.adSetId} is null and ${table.adId} is not null)
+  `),
+  check("action_proposal_units_no_authority", sql`
+    not jsonb_path_exists(${table.unitPayload}, '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(actionauthority|executionauthority|writeauthority|writeenabled|canexecute|canwrite|approvalgranted|grant|authorization)$" flag "i")')
+    and not jsonb_path_exists(${table.actionPlanPayload} - 'capabilities', '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(actionauthority|executionauthority|writeauthority|writeenabled|canexecute|canwrite|approvalgranted|grant|authorization)$" flag "i")')
+    and not jsonb_path_exists(${table.summaryPayload}, '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(actionauthority|executionauthority|writeauthority|writeenabled|canexecute|canwrite|approvalgranted|grant|authorization)$" flag "i")')
+  `),
+  check("action_proposal_units_no_forbidden_material", sql`
+    (${table.unitPayload}::text || ${table.actionPlanPayload}::text || ${table.summaryPayload}::text)
+      !~* '"[^"[:space:]]*(token|secret|prompt)"[[:space:]]*:'
+    and (${table.unitPayload}::text || ${table.actionPlanPayload}::text || ${table.summaryPayload}::text)
+      !~* '"authorization"[[:space:]]*:'
+    and (${table.unitPayload}::text || ${table.actionPlanPayload}::text || ${table.summaryPayload}::text)
+      !~* '"[^"[:space:]]*raw[_-]?(payload|request|response|json)"[[:space:]]*:'
+  `),
+]);
+
+/** Immutable edges preserve the proposal DAG without carrying approval state. */
+export const actionProposalDependencies = pgTable("action_proposal_dependencies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  bundleId: uuid("bundle_id").notNull(),
+  unitId: uuid("unit_id").notNull(),
+  dependencyUnitId: uuid("dependency_unit_id").notNull(),
+  unitRef: text("unit_ref").notNull(),
+  dependencyUnitRef: text("dependency_unit_ref").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("action_proposal_dependencies_edge_unique").on(table.bundleId, table.unitId, table.dependencyUnitId),
+  index("action_proposal_dependencies_unit_idx").on(table.unitId),
+  index("action_proposal_dependencies_dependency_idx").on(table.dependencyUnitId),
+  foreignKey({
+    columns: [table.workspaceId, table.bundleId],
+    foreignColumns: [actionProposalBundles.workspaceId, actionProposalBundles.id],
+    name: "action_proposal_dependencies_bundle_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.bundleId, table.unitId, table.unitRef],
+    foreignColumns: [
+      actionProposalUnits.workspaceId,
+      actionProposalUnits.bundleId,
+      actionProposalUnits.id,
+      actionProposalUnits.unitRef,
+    ],
+    name: "action_proposal_dependencies_unit_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.bundleId, table.dependencyUnitId, table.dependencyUnitRef],
+    foreignColumns: [
+      actionProposalUnits.workspaceId,
+      actionProposalUnits.bundleId,
+      actionProposalUnits.id,
+      actionProposalUnits.unitRef,
+    ],
+    name: "action_proposal_dependencies_dependency_scope_fk",
+  }).onDelete("cascade"),
+  check("action_proposal_dependencies_identity", sql`
+    ${table.unitRef} ~ '^action_unit_[a-f0-9]{20}$'
+    and ${table.dependencyUnitRef} ~ '^action_unit_[a-f0-9]{20}$'
+    and ${table.unitRef} <> ${table.dependencyUnitRef}
+  `),
+]);
+
+/** Exactly the initialization audit intent; later approval events belong to a future append API. */
+export const actionProposalInitialEvents = pgTable("action_proposal_initial_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  bundleId: uuid("bundle_id").notNull(),
+  eventRef: text("event_ref").notNull(),
+  sequence: integer("sequence").notNull(),
+  previousHash: text("previous_hash").notNull(),
+  eventHash: text("event_hash").notNull(),
+  eventType: text("event_type").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  reasonCode: text("reason_code").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("action_proposal_initial_events_bundle_unique").on(table.bundleId),
+  uniqueIndex("action_proposal_initial_events_workspace_event_unique").on(table.workspaceId, table.eventRef),
+  uniqueIndex("action_proposal_initial_events_workspace_hash_unique").on(table.workspaceId, table.eventHash),
+  index("action_proposal_initial_events_bundle_idx").on(table.bundleId),
+  foreignKey({
+    columns: [table.workspaceId, table.bundleId],
+    foreignColumns: [actionProposalBundles.workspaceId, actionProposalBundles.id],
+    name: "action_proposal_initial_events_bundle_scope_fk",
+  }).onDelete("cascade"),
+  check("action_proposal_initial_events_shape", sql`
+    ${table.sequence} = 1
+    and ${table.previousHash} = '0000000000000000000000000000000000000000000000000000000000000000'
+    and ${table.eventType} = 'lifecycle_initialized'
+    and ${table.eventHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("action_proposal_initial_events_identity", sql`
+    ${table.eventRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.reasonCode} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+  `),
+]);

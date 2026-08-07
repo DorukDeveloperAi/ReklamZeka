@@ -43,6 +43,11 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "effective_campaign_context_invalidations",
   "budget_proposal_versions",
   "budget_proposal_alternatives",
+  "action_approval_policy_snapshots",
+  "action_proposal_bundles",
+  "action_proposal_units",
+  "action_proposal_dependencies",
+  "action_proposal_initial_events",
   "analysis_timeframe_definitions",
   "analysis_template_definitions",
   "decision_ledger_records",
@@ -169,6 +174,21 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'budget_proposal_alternatives', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from budget_proposal_alternatives where workspace_id = ${workspaceId}::uuid
+      union all select 'action_approval_policy_snapshots', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from action_approval_policy_snapshots where workspace_id = ${workspaceId}::uuid
+      union all select 'action_proposal_bundles', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from action_proposal_bundles where workspace_id = ${workspaceId}::uuid
+      union all select 'action_proposal_units', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from action_proposal_units where workspace_id = ${workspaceId}::uuid
+      union all select 'action_proposal_dependencies', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from action_proposal_dependencies where workspace_id = ${workspaceId}::uuid
+      union all select 'action_proposal_initial_events', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from action_proposal_initial_events where workspace_id = ${workspaceId}::uuid
       union all select 'analysis_timeframe_definitions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from analysis_timeframe_definitions where workspace_id = ${workspaceId}::uuid
@@ -303,6 +323,11 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     };
 
     // Children first. This ordering is stable to minimize lock-order deadlocks.
+    await remove(sql`with removed as (delete from action_proposal_dependencies where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from action_proposal_initial_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from action_proposal_units where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from action_proposal_bundles where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from action_approval_policy_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (
       delete from meta_daily_insight_metrics where daily_insight_id in (
         select id from meta_daily_insights where workspace_id = ${input.workspaceId}::uuid
