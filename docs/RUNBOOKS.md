@@ -67,3 +67,12 @@ log veya bildirim payload'ına eklenmez.
 - Meta read-sync schedule migration sonrası `npm run verify:meta-read-sync-schedule-db` çalıştırılır. Geçici active
   read-only connection/schedule üzerinde due derivation, lease, yanlış token reddi, atomic cursor advance ve
   duplicate-completed sınanır; transaction sonunda tüm satırlar rollback edilir. Bu işlem cron başlatmaz.
+- ApprovalPolicy proposal-lifetime migration'ı seed veya backfill yapmaz. Migration öncesinde
+  `approval_policy_definition_revisions` ve `action_approval_policy_snapshots` satırları varsa migration bilinçli
+  olarak durur; her policy için explicit reviewed yeni revision hazırlanmalıdır. Boş/uygun ortamda migration sonrası
+  `npm run verify:action-proposal-queue-db` exact policy snapshot, proposal/decision replay, immutability ve rollback
+  temizliğini sınar; Meta veya execution çağrısı yapmaz.
+- `runDrizzleMetaReadSyncScheduleTick` yalnız server-private composition'dır; cron, public route veya scheduler
+  principal değildir. Bir runner açılmadan önce principal kimliği, tek-instance/lease davranışı, process shutdown,
+  deadman/alert ve timezone/misfire kabulü ayrı olarak tamamlanmalıdır. Caller'dan workspace, connection, account,
+  token veya adapter alınmamalıdır.

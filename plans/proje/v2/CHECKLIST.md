@@ -207,6 +207,8 @@
     workspace/account/token enjeksiyonu, public route/cron ve Meta write yok.
   - [x] Meta read-sync DB schedule registry + atomik lease/run adapterı; active/read-only binding, exact revision,
     duplicate/expired retry/attempt cap ve rollback'li canlı cursor kabulü.
+  - [x] Registry/lease/service/retry portlarını server içinde kuran private Drizzle tick composition'ı; caller
+    scope/account/token/port enjeksiyonu yok, sonuç authority/write-network invariant'ı fail-closed.
   - [ ] Güvenilir local scheduler principal/runner aktivasyonu; cron/route hâlen kapalı.
   - [ ] Hourly/monthly/after-sync schedule türleri.
 - [ ] Sync→analyze→plan→approval agentic routine; otomatik execute yok.
@@ -223,6 +225,8 @@
   deterministic bundle/unit kimliği, public-safe özet ve idempotency doğrulaması.
 - [x] Append-only action proposal queue persistence; policy snapshot, bundle, unit, dependency ve
   ilk lifecycle event'i tek transaction'da, tenant/RLS/immutability/tombstone güvenceleriyle saklanır.
+- [x] Reviewed ApprovalPolicy'de grant ömründen ayrı zorunlu proposal lifetime; canonical hash/snapshot/queue
+  doğrulaması, migration'da seed/backfill yasağı ve policy üst sınırını aşan proposal'a zero-write.
 - [x] Approval queue salt-okunur list/detail ve model-agnostic agent contract; viewer dahil yetkili
   roller yalnız public-safe veri görür, approve/grant/execute/Meta-write capability'leri `false` kalır.
 - [x] Mevcut Instagram/Page gönderisinden yayınlanmış template + immutable audience preset'li,
@@ -304,7 +308,8 @@
   - [x] Graph AdSet inventory field catalog + transactional runtime persistence wiring ve gerçek Drizzle
     AuthenticAffectedGeoEvidence adapterı; iki GET/sıfır write canlı kabulünde 3 canonical AdSet/geo snapshot.
     Doğrulanmamış country dışı şekiller `unknown`.
-  - [ ] Trusted protection policy resolver + proposal expiry kaynağıyla canonical submitter'ı route'a bağlama.
+  - [ ] Trusted protection policy resolver + reviewed proposal lifetime ile canonical submitter'ı production
+    policy composition üzerinden route'a bağlama; süre alanı hazır, gerçek policy seed/publish yok.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.
 - [ ] Owner/admin/analyst/operator/viewer rol E2E.
 - [ ] 1280/820/390, keyboard/screen-reader ve hata/partial/conflict E2E.

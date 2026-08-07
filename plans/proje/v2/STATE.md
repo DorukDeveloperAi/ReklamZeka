@@ -906,3 +906,24 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Tam kapı: 153 test dosyasında 974 test, production build, security/secret ve Drizzle kontrolleri geçti. Sonraki
   kapı reviewed ApprovalPolicy + AutonomyRule + ActionGuardrail/protection composition ve ayrı proposal-expiry
   kaynağıdır. Kullanıcı değeri uydurulmadı; gerçek policy/expiry seed'i ve Meta writer hâlen yoktur.
+
+## 2026-08-08 — S5.4c3-J proposal lifetime policy ve private scheduler tick
+
+- Reviewed `ApprovalPolicy`, grant ömründen bağımsız ve zorunlu `maximumProposalLifetimeSeconds` alanı kazandı.
+  Değer 1–604.800 saniye aralığında exact/canonical policy payload'ına, policy hash'ine, queue snapshot'ına ve
+  proposal staging kontrolüne bağlıdır. Existing-post submitter ayrıca mevcut yedi günlük üst sınırı korur;
+  proposal zaman penceresi reviewed policy değerini aşarsa queue write oluşmaz.
+- Migration hiçbir varsayılan süre, seed veya otomatik backfill üretmez. Policy revision veya queue policy snapshot
+  tablosunda önceden satır varsa açıkça durur ve yeni reviewed revision ister. Canlı uygulama öncesi her iki tablo
+  boş doğrulandı; migration sonrasında rollback'li proposal/decision kabulü insert, exact replay, immutability,
+  policy snapshot doğrulaması ve temizliği Meta/execution çağrısı olmadan geçti.
+- Scheduled Meta read-sync için caller'ın workspace, connection, account, token veya port enjekte edemediği private
+  Drizzle tick composition'ı eklendi. Registry, lease, server-derived service factory ve retry classifier yalnız
+  server boundary içinde kurulur; sonuç `actionAuthority=none` ve `writeNetworkCalls=0` değilse reddedilir. Public
+  route, cron ve scheduler principal hâlen yoktur; bu bileşen kendi başına zamanlanmış işi başlatmaz.
+- Canlı güvenlik yüzeyi migration sonrasında 75/75 RLS, API rollerinde sıfır tablo grant'i, sıfır schema-create ve
+  sıfır public routine-execute grant'i olarak kaldı. Tam kapı 155 test dosyasında 986 test, production build,
+  architecture/security/secret ve Drizzle kontrolleriyle geçti.
+- Sonraki güvenli kapı; gerçek reviewed ApprovalPolicy, AutonomyRule, ActionGuardrail/protection ve authentic
+  category/affected-geo kanıtlarını tek production `ExistingPostPromotionPolicyPort` içinde fail-closed çözmektir.
+  Hiçbir gerçek policy değeri yayınlanmadı ve production Meta writer kapalıdır.
