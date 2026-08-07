@@ -116,15 +116,15 @@
       "pkg": "skill:planla-kos"
     },
     ".claude/agents/analist.md": {
-      "hash": "7144a858f4f5fc12",
+      "hash": "77ab997a0205c81f",
       "pkg": "agent:analist"
     },
     ".claude/agents/planlayici.md": {
-      "hash": "694f1eefcc9dd1a8",
+      "hash": "e148504f4cce3af0",
       "pkg": "agent:planlayici"
     },
     ".claude/agents/pm.md": {
-      "hash": "37eb2b0e1dfe00ac",
+      "hash": "008f114d4cd7fdca",
       "pkg": "agent:pm"
     },
     ".claude/agents/konfigurator.md": {
@@ -136,7 +136,7 @@
       "pkg": "agent:denetci"
     },
     ".claude/agents/gunlukcu.md": {
-      "hash": "47c5303174a569ff",
+      "hash": "80c91107929783a3",
       "pkg": "agent:gunlukcu"
     },
     ".claude/skills/kaptan/SKILL.md": {
@@ -172,7 +172,7 @@
       "pkg": "skill:kaptan"
     },
     ".claude/skills/kaptan/scripts/_olay.mjs": {
-      "hash": "f65fc67d5f498c22",
+      "hash": "1de1019af2b7d790",
       "pkg": "skill:kaptan"
     },
     ".claude/skills/kaptan/proof/proof.mjs": {
@@ -212,7 +212,7 @@
       "pkg": "skill:pm"
     },
     ".claude/skills/pm/scripts/_olay.mjs": {
-      "hash": "f65fc67d5f498c22",
+      "hash": "1de1019af2b7d790",
       "pkg": "skill:pm"
     },
     ".claude/skills/pm/scripts/kurallar.mjs": {
@@ -240,7 +240,7 @@
       "pkg": "doc:model-policy"
     },
     ".claude/agents/kaptan.md": {
-      "hash": "d5ed7eae59037b6b",
+      "hash": "587db8f90e2a14e8",
       "pkg": "agent:kaptan"
     },
     ".claude/aide/automation/kaptan-brifing.job.json": {
@@ -376,11 +376,11 @@
       "pkg": "doc:commit-sozlesmesi"
     },
     ".claude/agents/filing-teshis.md": {
-      "hash": "ba7ac6d39d71783c",
+      "hash": "dffcc91725a38331",
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-07T09:24:06.549Z",
+  "updatedAt": "2026-08-07T09:47:33.092Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",
