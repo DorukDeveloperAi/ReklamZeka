@@ -21,6 +21,8 @@ import {
   type MetaCanonicalVersion,
   type MetaCanonicalWriteOutcome,
   type MetaContentRow,
+  type MetaPostMediaDiscoveryRow,
+  type MetaPostMediaItemRow,
   type ResolvedMetaAssetContentScope,
 } from "./asset-content-persistence";
 
@@ -34,6 +36,7 @@ type ExistingVersion = Readonly<{
 type ActorReference = Readonly<{
   id: string;
   externalAssetId: string;
+  assetType: "facebook_page" | "instagram_account" | "pixel" | "dataset" | "app" | "whatsapp_account" | "destination";
 }>;
 
 const incomingRevision = sql<string>`excluded.provenance ->> 'sourceRevision'`;
@@ -42,6 +45,30 @@ const incomingRevision = sql<string>`excluded.provenance ->> 'sourceRevision'`;
 function revisionCanReplace(currentProvenance: SQLWrapper) {
   const current = sql<string>`${currentProvenance} ->> 'sourceRevision'`;
   return sql<boolean>`case
+    when ${current} ~ '^-?[0-9]+([.][0-9]+)?$'
+      and ${incomingRevision} ~ '^-?[0-9]+([.][0-9]+)?$'
+      then (${incomingRevision})::numeric >= (${current})::numeric
+    else ${incomingRevision} >= ${current}
+  end`;
+}
+
+const incomingPostPriority = sql<number>`case
+  when excluded.provenance ->> 'sourcePriority' ~ '^[0-9]+$'
+    then (excluded.provenance ->> 'sourcePriority')::integer
+  else 10
+end`;
+
+/** Inventory is authoritative for organic post/media fields; ad extraction remains authoritative for creative copy. */
+function postRevisionCanReplace(currentProvenance: SQLWrapper) {
+  const currentPriority = sql<number>`case
+    when ${currentProvenance} ->> 'sourcePriority' ~ '^[0-9]+$'
+      then (${currentProvenance} ->> 'sourcePriority')::integer
+    else 10
+  end`;
+  const current = sql<string>`${currentProvenance} ->> 'sourceRevision'`;
+  return sql<boolean>`case
+    when ${incomingPostPriority} > ${currentPriority} then true
+    when ${incomingPostPriority} < ${currentPriority} then false
     when ${current} ~ '^-?[0-9]+([.][0-9]+)?$'
       and ${incomingRevision} ~ '^-?[0-9]+([.][0-9]+)?$'
       then (${incomingRevision})::numeric >= (${current})::numeric
@@ -121,6 +148,8 @@ function canonicalPostRevision(row: MetaContentRow): Record<string, unknown> {
   const post = row.record.extraction.post;
   return {
     sourceRevision: row.record.sourceRevision,
+    sourceKind: "active_ad_extraction",
+    sourcePriority: 10,
     identitySource: post?.identitySource ?? null,
     identities: post?.identities ?? [],
     fieldSources: post?.provenance ?? {},
@@ -180,9 +209,246 @@ export class DrizzleMetaAssetContentRepository implements MetaAssetContentReposi
         upsertEdges: (rows) => this.upsertEdges(database, rows),
         validateReferences: (rows) => this.validateReferences(database, rows),
         upsertContent: (rows) => this.upsertContent(database, rows),
+        upsertPostMediaItems: (rows) => this.upsertPostMediaItems(database, rows),
+        upsertPostMediaDiscoveries: (rows) => this.upsertPostMediaDiscoveries(database, rows),
+        validatePostMediaReferences: (rows, discoveries) =>
+          this.validatePostMediaReferences(database, rows, discoveries),
         saveCheckpoint: (input) => this.saveCheckpoint(database, input),
       });
     });
+  }
+
+  private async inventoryActorMap(
+    database: ReklamZekaDatabase,
+    rows: readonly MetaPostMediaItemRow[],
+  ): Promise<ReadonlyMap<string, ActorReference>> {
+    if (rows.length === 0) return new Map();
+    const externalIds = [...new Set(rows.map((row) => row.item.actor.externalId))];
+    const actors = await database.select({
+      id: schema.metaAssets.id,
+      externalAssetId: schema.metaAssets.externalAssetId,
+      assetType: schema.metaAssets.assetType,
+    }).from(schema.metaAssets).where(and(
+      eq(schema.metaAssets.workspaceId, rows[0]!.workspaceId),
+      eq(schema.metaAssets.metaConnectionId, rows[0]!.connectionId),
+      inArray(schema.metaAssets.externalAssetId, externalIds),
+    ));
+    return new Map(actors.map((actor) => [`${actor.assetType}:${actor.externalAssetId}`, actor]));
+  }
+
+  private async validatePostMediaReferences(
+    database: ReklamZekaDatabase,
+    rows: readonly MetaPostMediaItemRow[],
+    discoveries: readonly MetaPostMediaDiscoveryRow[],
+  ): Promise<void> {
+    if (rows.length === 0 && discoveries.length === 0) return;
+    const first = rows[0] ?? discoveries[0]!;
+    if (
+      rows.some((row) => row.workspaceId !== first.workspaceId || row.connectionId !== first.connectionId)
+      || discoveries.some((row) => row.workspaceId !== first.workspaceId || row.connectionId !== first.connectionId)
+    ) {
+      throw persistenceError("invalid_scope", "Post/media batch kapsamı uyuşmuyor");
+    }
+    const references = [
+      ...rows.map((row) => ({ type: row.item.actor.type, externalId: row.item.actor.externalId })),
+      ...discoveries.map((row) => ({ type: row.discovery.actorType, externalId: row.discovery.actorExternalId })),
+    ];
+    const externalIds = [...new Set(references.map((reference) => reference.externalId))];
+    const actorRows = await database.select({
+      externalAssetId: schema.metaAssets.externalAssetId,
+      assetType: schema.metaAssets.assetType,
+    }).from(schema.metaAssets).where(and(
+      eq(schema.metaAssets.workspaceId, first.workspaceId),
+      eq(schema.metaAssets.metaConnectionId, first.connectionId),
+      inArray(schema.metaAssets.externalAssetId, externalIds),
+    ));
+    const known = new Set(actorRows.map((actor) => `${actor.assetType}:${actor.externalAssetId}`));
+    if (references.some((reference) => !known.has(`${reference.type}:${reference.externalId}`))) {
+      throw persistenceError("wrong_actor", "Post/media actor referansı bağlantı kapsamında bulunamadı");
+    }
+  }
+
+  private async upsertPostMediaItems(
+    database: ReklamZekaDatabase,
+    rows: readonly MetaPostMediaItemRow[],
+  ): Promise<readonly MetaCanonicalWriteOutcome[]> {
+    if (rows.length === 0) return [];
+    const actors = await this.inventoryActorMap(database, rows);
+    const externalIds = [...new Set(rows.map((row) => row.item.externalContentId))];
+    const currentRows = await database.select({
+      externalPostId: schema.metaPosts.externalPostId,
+      provenance: schema.metaPosts.provenance,
+      rawPayloadHash: schema.metaPosts.rawPayloadHash,
+    }).from(schema.metaPosts).where(and(
+      eq(schema.metaPosts.workspaceId, rows[0]!.workspaceId),
+      eq(schema.metaPosts.metaConnectionId, rows[0]!.connectionId),
+      inArray(schema.metaPosts.externalPostId, externalIds),
+    ));
+    const current = new Map(currentRows.map((row) => [row.externalPostId, {
+      ...asVersion(row.provenance, row.rawPayloadHash),
+      sourcePriority: typeof row.provenance.sourcePriority === "number" ? row.provenance.sourcePriority : 10,
+    }]));
+    const outcomes = rows.map((row) => {
+      const existing = current.get(row.item.externalContentId);
+      if (!existing) return "inserted" as const;
+      if (existing.sourcePriority > 20) return "stale" as const;
+      if (existing.sourcePriority < 20) return "updated" as const;
+      return outcome(existing, { sourceRevision: row.sourceRevision, sourcePayloadHash: row.sourcePayloadHash });
+    });
+    const canonicalRows = latestRowsBy(rows, (row) => row.item.externalContentId, (row) => row.sourceRevision);
+    const now = new Date();
+    await database.insert(schema.metaPosts).values(canonicalRows.map((row) => {
+      const item = row.item;
+      const actor = actors.get(`${item.actor.type}:${item.actor.externalId}`);
+      if (!actor) throw persistenceError("wrong_actor", "Post/media actor referansı çözülemedi");
+      const lifecycleStatus = item.lifecycle === "unknown" ? null : item.lifecycle.toUpperCase();
+      return {
+        workspaceId: row.workspaceId,
+        metaConnectionId: row.connectionId,
+        actorAssetId: actor.id,
+        externalPostId: item.externalContentId,
+        externalMediaId: item.contentKind === "instagram_media" ? item.externalContentId : null,
+        mediaType: item.mediaType,
+        permalink: item.previewSource.permalink,
+        sourceMessage: item.contentKind === "page_post" ? item.messageOrCaption : null,
+        sourceCaption: item.contentKind === "instagram_media" ? item.messageOrCaption : null,
+        publishedAt: item.publishedAt ? new Date(item.publishedAt) : null,
+        promotionEligibilityStatus: item.promotionEligibility.status,
+        promotionEligibilityReason: item.promotionEligibility.reason,
+        contentHash: item.contentHash,
+        configuredStatus: lifecycleStatus,
+        effectiveStatus: lifecycleStatus,
+        fetchedAt: new Date(item.provenance.fetchedAt),
+        rawPayloadHash: row.sourcePayloadHash,
+        sourceGraphVersion: item.provenance.sourceGraphVersion,
+        fieldCatalogVersion: item.provenance.fieldCatalogVersion,
+        provenance: {
+          ...item.provenance,
+          sourceRevision: row.sourceRevision,
+          sourceKind: "post_media_inventory",
+          sourcePriority: 20,
+          contentKind: item.contentKind,
+          actorType: item.actor.type,
+        },
+        lastSeenAt: now,
+      };
+    })).onConflictDoUpdate({
+      target: [schema.metaPosts.metaConnectionId, schema.metaPosts.externalPostId],
+      set: {
+        actorAssetId: sql`excluded.actor_asset_id`,
+        externalMediaId: sql`excluded.external_media_id`,
+        mediaType: sql`excluded.media_type`,
+        permalink: sql`excluded.permalink`,
+        sourceMessage: sql`excluded.source_message`,
+        sourceCaption: sql`excluded.source_caption`,
+        publishedAt: sql`excluded.published_at`,
+        promotionEligibilityStatus: sql`case
+          when ${schema.metaPosts.promotionEligibilityStatus} in ('eligible', 'ineligible')
+            then ${schema.metaPosts.promotionEligibilityStatus}
+          else excluded.promotion_eligibility_status
+        end`,
+        promotionEligibilityReason: sql`case
+          when ${schema.metaPosts.promotionEligibilityStatus} in ('eligible', 'ineligible')
+            then ${schema.metaPosts.promotionEligibilityReason}
+          else excluded.promotion_eligibility_reason
+        end`,
+        promotionEligibilityEvaluatedAt: sql`case
+          when ${schema.metaPosts.promotionEligibilityStatus} in ('eligible', 'ineligible')
+            then ${schema.metaPosts.promotionEligibilityEvaluatedAt}
+          else excluded.promotion_eligibility_evaluated_at
+        end`,
+        contentHash: sql`excluded.content_hash`,
+        configuredStatus: sql`excluded.configured_status`,
+        effectiveStatus: sql`excluded.effective_status`,
+        fetchedAt: sql`excluded.fetched_at`,
+        rawPayloadHash: sql`excluded.raw_payload_hash`,
+        sourceGraphVersion: sql`excluded.source_graph_version`,
+        fieldCatalogVersion: sql`excluded.field_catalog_version`,
+        provenance: sql`excluded.provenance`,
+        lastSeenAt: now,
+        disappearedAt: null,
+      },
+      setWhere: postRevisionCanReplace(schema.metaPosts.provenance),
+    });
+    return outcomes;
+  }
+
+  private async upsertPostMediaDiscoveries(
+    database: ReklamZekaDatabase,
+    rows: readonly MetaPostMediaDiscoveryRow[],
+  ): Promise<readonly MetaCanonicalWriteOutcome[]> {
+    if (rows.length === 0) return [];
+    const discoveryKey = (row: MetaPostMediaDiscoveryRow) =>
+      `asset:${row.discovery.actorExternalId}:${row.discovery.actorType === "facebook_page" ? "page_posts" : "instagram_media"}`;
+    const keys = [...new Set(rows.map(discoveryKey))];
+    const currentRows = await database.select({
+      discoveryKey: schema.metaAssetDiscoveries.discoveryKey,
+      provenance: schema.metaAssetDiscoveries.provenance,
+      rawPayloadHash: schema.metaAssetDiscoveries.rawPayloadHash,
+    }).from(schema.metaAssetDiscoveries).where(and(
+      eq(schema.metaAssetDiscoveries.workspaceId, rows[0]!.workspaceId),
+      eq(schema.metaAssetDiscoveries.metaConnectionId, rows[0]!.connectionId),
+      inArray(schema.metaAssetDiscoveries.discoveryKey, keys),
+    ));
+    const current = new Map(currentRows.map((row) => [
+      row.discoveryKey,
+      asVersion(row.provenance, row.rawPayloadHash),
+    ]));
+    const outcomes = rows.map((row) => outcome(current.get(discoveryKey(row)), {
+      sourceRevision: row.sourceRevision,
+      sourcePayloadHash: row.sourcePayloadHash,
+    }));
+    const canonicalRows = latestRowsBy(rows, discoveryKey, (row) => row.sourceRevision);
+    const now = new Date();
+    await database.insert(schema.metaAssetDiscoveries).values(canonicalRows.map((row) => ({
+      workspaceId: row.workspaceId,
+      metaConnectionId: row.connectionId,
+      adAccountId: null,
+      discoveryKey: discoveryKey(row),
+      resource: row.discovery.actorType === "facebook_page" ? "page_posts" as const : "instagram_media" as const,
+      sourceType: "asset" as const,
+      sourceExternalId: row.discovery.actorExternalId,
+      status: row.discovery.status,
+      reason: row.discovery.reason,
+      itemCount: row.discovery.itemCount,
+      sourceEdge: row.discovery.sourceEdge,
+      rawPayloadHash: row.sourcePayloadHash,
+      sourceGraphVersion: row.sourceGraphVersion,
+      fieldCatalogVersion: row.fieldCatalogVersion,
+      provenance: {
+        sourceRevision: row.sourceRevision,
+        sourceKind: "post_media_inventory_discovery",
+        sourcePriority: 20,
+        inventorySnapshotHash: row.inventorySnapshotHash,
+        promotionEligibility: row.discovery.promotionEligibility,
+        actorType: row.discovery.actorType,
+      },
+      fetchedAt: new Date(row.fetchedAt),
+      lastSeenAt: now,
+    }))).onConflictDoUpdate({
+      target: [
+        schema.metaAssetDiscoveries.workspaceId,
+        schema.metaAssetDiscoveries.metaConnectionId,
+        schema.metaAssetDiscoveries.discoveryKey,
+      ],
+      set: {
+        resource: sql`excluded.resource`,
+        sourceType: sql`excluded.source_type`,
+        sourceExternalId: sql`excluded.source_external_id`,
+        status: sql`excluded.status`,
+        reason: sql`excluded.reason`,
+        itemCount: sql`excluded.item_count`,
+        sourceEdge: sql`excluded.source_edge`,
+        rawPayloadHash: sql`excluded.raw_payload_hash`,
+        sourceGraphVersion: sql`excluded.source_graph_version`,
+        fieldCatalogVersion: sql`excluded.field_catalog_version`,
+        provenance: sql`excluded.provenance`,
+        fetchedAt: sql`excluded.fetched_at`,
+        lastSeenAt: now,
+      },
+      setWhere: revisionCanReplace(schema.metaAssetDiscoveries.provenance),
+    });
+    return outcomes;
   }
 
   private async upsertDiscoveries(
@@ -433,6 +699,7 @@ export class DrizzleMetaAssetContentRepository implements MetaAssetContentReposi
     const actors = await database.select({
       id: schema.metaAssets.id,
       externalAssetId: schema.metaAssets.externalAssetId,
+      assetType: schema.metaAssets.assetType,
     }).from(schema.metaAssets).where(and(
       eq(schema.metaAssets.workspaceId, rows[0]!.workspaceId),
       eq(schema.metaAssets.metaConnectionId, rows[0]!.connectionId),
@@ -580,7 +847,7 @@ export class DrizzleMetaAssetContentRepository implements MetaAssetContentReposi
           lastSeenAt: now,
           disappearedAt: null,
         },
-        setWhere: revisionCanReplace(schema.metaPosts.provenance),
+        setWhere: postRevisionCanReplace(schema.metaPosts.provenance),
       });
     }
 

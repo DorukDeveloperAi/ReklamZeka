@@ -5,6 +5,11 @@ import type {
   MetaMirroredAsset,
 } from "@/domain/meta/asset-mirror";
 import type { MetaAdContentExtraction } from "@/domain/meta/content/extract";
+import type {
+  CanonicalMetaPostMediaInventory,
+  MetaPostMediaDiscovery,
+  MetaPostMediaItem,
+} from "@/domain/meta/content/post-media-inventory";
 import { stableHash } from "./types";
 
 export const META_ASSET_CONTENT_MIN_BATCH_SIZE = 250;
@@ -36,6 +41,7 @@ export type MetaAssetContentPage = Readonly<{
   cursor: string | null;
   checkpoint: Readonly<Record<string, unknown>>;
   assetSnapshot?: CanonicalMetaAssetMirrorSnapshot;
+  postMediaInventory?: CanonicalMetaPostMediaInventory;
   content: readonly MetaAdContentRecord[];
 }>;
 
@@ -111,6 +117,26 @@ export type MetaContentRow = Readonly<{
   record: MetaAdContentRecord;
 }>;
 
+export type MetaPostMediaItemRow = Readonly<{
+  workspaceId: string;
+  connectionId: string;
+  item: MetaPostMediaItem;
+  sourceRevision: string;
+  sourcePayloadHash: string;
+}>;
+
+export type MetaPostMediaDiscoveryRow = Readonly<{
+  workspaceId: string;
+  connectionId: string;
+  discovery: MetaPostMediaDiscovery;
+  sourceRevision: string;
+  sourcePayloadHash: string;
+  sourceGraphVersion: string;
+  fieldCatalogVersion: string;
+  fetchedAt: string;
+  inventorySnapshotHash: string;
+}>;
+
 export interface MetaAssetContentTransaction {
   /**
    * Implementations use INSERT ... ON CONFLICT and compare revision + hash:
@@ -121,6 +147,13 @@ export interface MetaAssetContentTransaction {
   upsertDiscoveries(rows: readonly MetaAssetDiscoveryRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
   upsertEdges(rows: readonly MetaAssetEdgeRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
   upsertContent(rows: readonly MetaContentRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
+  /** Optional for backward-compatible repositories; required when a page carries linked post/media inventory. */
+  upsertPostMediaItems?(rows: readonly MetaPostMediaItemRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
+  upsertPostMediaDiscoveries?(rows: readonly MetaPostMediaDiscoveryRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
+  validatePostMediaReferences?(
+    rows: readonly MetaPostMediaItemRow[],
+    discoveries: readonly MetaPostMediaDiscoveryRow[],
+  ): Promise<void>;
   /** Resolves actor/post references within this workspace + connection only. */
   validateReferences(rows: readonly MetaContentRow[]): Promise<void>;
   saveCheckpoint(input: Readonly<{
@@ -144,6 +177,12 @@ export interface MetaAssetContentMapper {
   discovery(scope: ResolvedMetaAssetContentScope, discovery: MetaAssetDiscovery): MetaAssetDiscoveryRow;
   edge(scope: ResolvedMetaAssetContentScope, edge: MetaAssetEdge): MetaAssetEdgeRow;
   content(scope: ResolvedMetaAssetContentScope, record: MetaAdContentRecord): MetaContentRow;
+  postMediaItem(scope: ResolvedMetaAssetContentScope, item: MetaPostMediaItem): MetaPostMediaItemRow;
+  postMediaDiscovery(
+    scope: ResolvedMetaAssetContentScope,
+    inventory: CanonicalMetaPostMediaInventory,
+    discovery: MetaPostMediaDiscovery,
+  ): MetaPostMediaDiscoveryRow;
 }
 
 /**
@@ -180,6 +219,30 @@ export const defaultMetaAssetContentMapper: MetaAssetContentMapper = {
     const adAccountId = scope.accountIdByExternalId.get(record.adAccountExternalId);
     if (!adAccountId) throw persistenceError("cross_account", "İçerik run kapsamı dışındaki reklam hesabına ait");
     return { workspaceId: scope.workspaceId, connectionId: scope.connectionId, adAccountId, record };
+  },
+  postMediaItem: (scope, item) => ({
+    workspaceId: scope.workspaceId,
+    connectionId: scope.connectionId,
+    item,
+    sourceRevision: item.provenance.fetchedAt,
+    sourcePayloadHash: item.provenance.rawPayloadHash,
+  }),
+  postMediaDiscovery: (scope, inventory, discovery) => {
+    const actorItems = inventory.items.filter((item) =>
+      item.actor.type === discovery.actorType && item.actor.externalId === discovery.actorExternalId);
+    const graphVersions = [...new Set(actorItems.map((item) => item.provenance.sourceGraphVersion))].sort();
+    const catalogVersions = [...new Set(actorItems.map((item) => item.provenance.fieldCatalogVersion))].sort();
+    return {
+      workspaceId: scope.workspaceId,
+      connectionId: scope.connectionId,
+      discovery,
+      sourceRevision: inventory.fetchedAt,
+      sourcePayloadHash: stableHash(discovery),
+      sourceGraphVersion: graphVersions.join(",") || "unknown",
+      fieldCatalogVersion: catalogVersions.join(",") || "post-media-inventory-v1",
+      fetchedAt: inventory.fetchedAt,
+      inventorySnapshotHash: inventory.snapshotHash,
+    };
   },
 };
 
@@ -290,6 +353,10 @@ export class MetaAssetContentPersistenceRun {
         }
       }
     }
+    if (page.postMediaInventory && (
+      page.postMediaInventory.workspaceId !== this.scope.workspaceId
+      || page.postMediaInventory.connectionExternalKey !== this.scope.connectionExternalKey
+    )) throw persistenceError("invalid_scope", "Post/media inventory workspace/connection kapsamı uyuşmuyor");
     page.content.forEach(validateRecord);
 
     const assets = page.assetSnapshot?.assets.map((asset) => this.mapper.asset(this.scope, asset)) ?? [];
@@ -308,7 +375,12 @@ export class MetaAssetContentPersistenceRun {
       return row;
     }) ?? [];
     const content = page.content.map((record) => this.mapper.content(this.scope, record));
-    const recordCount = assets.length + discoveries.length + edges.length + content.length;
+    const postMediaItems = page.postMediaInventory?.items.map((item) =>
+      this.mapper.postMediaItem(this.scope, item)) ?? [];
+    const postMediaDiscoveries = page.postMediaInventory?.discoveries.map((discovery) =>
+      this.mapper.postMediaDiscovery(this.scope, page.postMediaInventory!, discovery)) ?? [];
+    const recordCount = assets.length + discoveries.length + edges.length + content.length
+      + postMediaItems.length + postMediaDiscoveries.length;
 
     return this.repository.transaction(async (transaction) => {
       const summary: Record<MetaCanonicalWriteOutcome, number> = {
@@ -319,6 +391,18 @@ export class MetaAssetContentPersistenceRun {
         addOutcomes(summary, await transaction.upsertDiscoveries(batch));
       }
       for (const batch of chunks(edges, this.batchSize)) addOutcomes(summary, await transaction.upsertEdges(batch));
+      if (postMediaItems.length > 0 || postMediaDiscoveries.length > 0) {
+        if (!transaction.upsertPostMediaItems || !transaction.upsertPostMediaDiscoveries || !transaction.validatePostMediaReferences) {
+          throw persistenceError("invalid_scope", "Repository post/media inventory persistence portunu desteklemiyor");
+        }
+        await transaction.validatePostMediaReferences(postMediaItems, postMediaDiscoveries);
+        for (const batch of chunks(postMediaItems, this.batchSize)) {
+          addOutcomes(summary, await transaction.upsertPostMediaItems(batch));
+        }
+        for (const batch of chunks(postMediaDiscoveries, this.batchSize)) {
+          addOutcomes(summary, await transaction.upsertPostMediaDiscoveries(batch));
+        }
+      }
       await transaction.validateReferences(content);
       for (const batch of chunks(content, this.batchSize)) addOutcomes(summary, await transaction.upsertContent(batch));
       await transaction.saveCheckpoint({

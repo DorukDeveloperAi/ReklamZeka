@@ -51,6 +51,8 @@ export const metaPromotionEligibilityStatus = pgEnum("meta_promotion_eligibility
 export const metaAssetDiscoveryResource = pgEnum("meta_asset_discovery_resource", [
   "ad_accounts",
   "pages",
+  "page_posts",
+  "instagram_media",
   "pixels",
   "datasets",
   "apps",
@@ -60,10 +62,12 @@ export const metaAssetDiscoverySourceType = pgEnum("meta_asset_discovery_source_
   "connection",
   "ad_account",
   "business",
+  "asset",
 ]);
 export const metaAssetDiscoveryStatus = pgEnum("meta_asset_discovery_status", [
   "verified",
   "empty",
+  "partial",
   "permission_missing",
   "unsupported",
   "unavailable",

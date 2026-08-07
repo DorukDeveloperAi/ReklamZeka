@@ -4,6 +4,114 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "91fa14241",
+      "tarih": "2026-08-07",
+      "konu": "feat(meta): persist S1.4 mirror in Postgres",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "d6346a57a",
+      "tarih": "2026-08-07",
+      "konu": "test(meta): cover live linked post inventory",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "6c586b990",
+      "tarih": "2026-08-07",
+      "konu": "feat(meta): mirror linked Page and Instagram posts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ddf971314",
+      "tarih": "2026-08-07",
+      "konu": "fix(meta): persist asset discovery evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "704f1ce6c",
+      "tarih": "2026-08-07",
+      "konu": "feat(meta): add bounded content persistence and post eligibility",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "74f30ef6c",
+      "tarih": "2026-08-07",
+      "konu": "feat(db): persist Meta asset and post evidence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "09c8add40",
+      "tarih": "2026-08-07",
+      "konu": "test(meta): add live S1.4 read acceptance",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "9b5c35728",
+      "tarih": "2026-08-07",
+      "konu": "feat(meta): add asset and content read mirror",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "d07dfa9da",
+      "tarih": "2026-08-07",
+      "konu": "security(db): revoke inherited function execution",
+      "tur": "is",
+      "kapsam": [
+        "security"
+      ]
+    },
+    {
+      "hash": "243b438c1",
+      "tarih": "2026-08-07",
+      "konu": "test(db): verify Supabase security posture",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "22e625ca8",
+      "tarih": "2026-08-07",
+      "konu": "security(db): close Supabase Data API by default",
+      "tur": "is",
+      "kapsam": [
+        "security"
+      ]
+    },
+    {
+      "hash": "8bf9d962e",
+      "tarih": "2026-08-07",
+      "konu": "feat: connect Supabase persistence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "b69f5ee8a",
       "tarih": "2026-08-07",
       "konu": "feat(meta): integrate durable partial sync",
@@ -29,51 +137,31 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "23124e1ee",
-      "tarih": "2026-08-07",
-      "konu": "feat: establish Meta read mirror core",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "fa74d5a3a",
-      "tarih": "2026-08-07",
-      "konu": "feat: add read-only Meta access inventory",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "03d03c538",
-      "tarih": "2026-08-06",
-      "konu": "vscode ayarları eklendi",
-      "tur": "is",
-      "kapsam": []
-    },
-    {
-      "hash": "0d2239dda",
-      "tarih": "2026-08-06",
-      "konu": "aide iskelesi + filing katmanı kuruldu (yeni proje)",
-      "tur": "is",
-      "kapsam": []
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 5
+      "adet": 11
+    },
+    {
+      "kapsam": "test",
+      "adet": 3
     },
     {
       "kapsam": "?",
       "adet": 2
+    },
+    {
+      "kapsam": "security",
+      "adet": 2
+    },
+    {
+      "kapsam": "fix",
+      "adet": 1
     }
   ],
-  "isSayisi": 7,
+  "isSayisi": 19,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-07",
   "planlar": [
@@ -86,5 +174,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "f7ec8bfe4f44"
+  "damga": "2fc59658741a"
 }
