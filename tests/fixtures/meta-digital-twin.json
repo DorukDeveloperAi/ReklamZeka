@@ -1,0 +1,18 @@
+{
+  "campaign": {
+    "externalId": "cmp-golden-1",
+    "budgetOptimizationEnabled": true,
+    "dailyBudgetMinor": 15000,
+    "lifetimeBudgetMinor": null
+  },
+  "adSet": {
+    "externalId": "set-golden-1",
+    "dailyBudgetMinor": null,
+    "lifetimeBudgetMinor": null
+  },
+  "hierarchy": {
+    "campaigns": [{ "externalId": "cmp-golden-1", "parentExternalId": null }],
+    "adSets": [{ "externalId": "set-golden-1", "parentExternalId": "cmp-golden-1" }],
+    "ads": [{ "externalId": "ad-golden-1", "parentExternalId": "set-golden-1" }]
+  }
+}
