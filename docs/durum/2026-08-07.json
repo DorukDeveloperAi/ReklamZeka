@@ -4,6 +4,33 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "bbbf3adb1",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record local agent client gate",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "8f33dbc22",
+      "tarih": "2026-08-08",
+      "konu": "feat(agent): add vendor-neutral fixture client",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "9b317f2d8",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
       "hash": "23025196d",
       "tarih": "2026-08-08",
       "konu": "docs(roadmap): record no-model API gate",
@@ -110,43 +137,16 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "1ff863f10",
-      "tarih": "2026-08-08",
-      "konu": "feat(actions): bind reviewed evidence freshness",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "1181f5eda",
-      "tarih": "2026-08-08",
-      "konu": "feat(actions): compose category evidence adapter",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "2454cd2dd",
-      "tarih": "2026-08-08",
-      "konu": "docs(roadmap): record policy composition gate",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 38
+      "adet": 36
     },
     {
       "kapsam": "docs",
-      "adet": 15
+      "adet": 17
     },
     {
       "kapsam": "test",
@@ -157,7 +157,7 @@
       "adet": 2
     }
   ],
-  "isSayisi": 98,
+  "isSayisi": 101,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -170,5 +170,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "566403eddbce"
+  "damga": "59ab8b2f6af7"
 }
