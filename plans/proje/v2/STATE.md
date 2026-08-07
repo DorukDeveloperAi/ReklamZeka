@@ -431,3 +431,19 @@ write scope veya writer S4'e kadar ReklamZeka'ya taşınmaz.
   security/secret kapıları; Supabase 53/53 RLS, API grant `0`, Meta write/network `0`.
 - Browser QA: Practice Lab unavailable state fixture göstermeden açıkça ayrılıyor; 1280px'te
   yatay overflow yok ve read-only/no-persist sınırı görünür. S2 kapanmıştır; sıradaki dilim S3'tür.
+
+## 2026-08-07 — S3 Budget Lab saf karar çekirdekleri başlangıcı
+
+- BudgetEnvelope period/currency, açık scale/rounding, total/min/max/fixed/reserve/allocatable
+  ve planned/committed/actual/forecast ayrımını `bigint` exact decimal ile kurdu. CBO campaign
+  ve ABO ad-set owner parent-child toplamları fail-closed uzlaştırılır; ad-level budget yoktur.
+- Constraint motoru floor/cap/fixed/reserve, transfer allow/deny/only-within-group ve category/
+  geo protected davranışını fixed/proportional/priority/ladder allocation ile çözer. “Pahalı
+  bölgeden taşıma” yalnız açık koruma kuralı varsa engellenir; sistem bunu default varsaymaz.
+  Proportional dağıtım exact integer-weight/BigInt kalan sırasıyla deterministiktir.
+- Pacing motoru timezone/DST dönem ilerlemesi, expected-to-date/variance, bounded linear ve
+  configurable conservative forecast üretir. Freshness, coverage, sample, attribution lag,
+  learning, cooldown, proxy-vs-outcome ve max-change guard'ları bütün başarısızlıkları sıralı
+  trace ile bastırır; retrieval observation'dan önce olamaz.
+- Üç çekirdek de saf/advisory'dir; action authority `none`, persistence ve Meta network/write
+  yoktur. Sıradaki increment simulation/proposal composition ve append-only persistence'tır.

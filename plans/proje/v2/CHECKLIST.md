@@ -143,11 +143,12 @@
 
 ## A11 — Bütçe planlama
 
-- [ ] Envelope, allocation, target ve planned/committed/actual/forecast şemaları.
-- [ ] CBO/ABO budget owner ve parent-child reconciliation.
-- [ ] Protected floor/fixed allocation ve transfer allow/deny/within-group.
-- [ ] Pacing/forecast, min sample, learning, cap ve cooldown guard'ları.
-- [ ] Fixed/proportional/priority/ladder deterministic allocation.
+- [x] Saf period/currency envelope ve planned/committed/actual/forecast şemaları; target
+  persistence/application binding'i ileri incrementtir.
+- [x] CBO/ABO budget owner ve exact parent-child reconciliation saf çekirdeği.
+- [x] Protected floor/fixed allocation ve transfer allow/deny/within-group saf motoru.
+- [x] Pacing/forecast, freshness/coverage/min sample/attribution/learning/cap/cooldown saf guard'ları.
+- [x] Fixed/proportional/priority/ladder deterministic allocation ve exact integer-weight rounding.
 - [ ] Keep/conservative/target-seeking simülasyon ve constraint trace.
 - [ ] Versioned proposal ledger/API; artış approval zorunluluğu.
 - [ ] Business outcome target/proxy ayrımı ve yetersiz mapping suppression.
