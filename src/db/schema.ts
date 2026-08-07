@@ -1142,6 +1142,109 @@ export const effectiveCampaignContextInvalidations = pgTable("effective_campaign
   `),
 ]);
 
+/** Immutable analysis/decision hash-chain rows. This table cannot grant action authority. */
+export const decisionLedgerRecords = pgTable("decision_ledger_records", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceRef: text("workspace_ref").notNull(),
+  version: text("version").notNull(),
+  recordType: text("record_type").notNull(),
+  sequence: integer("sequence").notNull(),
+  previousHash: text("previous_hash").notNull(),
+  recordId: text("record_id").notNull(),
+  recordHash: text("record_hash").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  effectiveContextId: uuid("effective_context_id"),
+  effectiveContextRef: text("effective_context_ref"),
+  analysisRecordRowId: uuid("analysis_record_row_id"),
+  analysisRecordRef: text("analysis_record_ref"),
+  analysisDefinitionRef: text("analysis_definition_ref"),
+  cadenceResultRef: text("cadence_result_ref"),
+  disposition: text("disposition"),
+  payload: text("payload").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.effectiveContextId],
+    foreignColumns: [effectiveCampaignContexts.workspaceId, effectiveCampaignContexts.id],
+    name: "decision_ledger_records_context_scope_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.workspaceId, table.analysisRecordRowId],
+    foreignColumns: [table.workspaceId, table.id],
+    name: "decision_ledger_records_analysis_scope_fk",
+  }).onDelete("restrict"),
+  uniqueIndex("decision_ledger_records_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("decision_ledger_records_workspace_sequence_unique").on(table.workspaceId, table.sequence),
+  uniqueIndex("decision_ledger_records_workspace_record_unique").on(table.workspaceId, table.recordId),
+  uniqueIndex("decision_ledger_records_workspace_hash_unique").on(table.workspaceId, table.recordHash),
+  index("decision_ledger_records_workspace_ref_sequence_idx")
+    .on(table.workspaceId, table.workspaceRef, table.sequence),
+  index("decision_ledger_records_context_idx").on(table.effectiveContextId),
+  index("decision_ledger_records_analysis_idx").on(table.analysisRecordRowId),
+  check("decision_ledger_records_version", sql`${table.version} = 'decision-ledger/1.0.0'`),
+  check("decision_ledger_records_sequence_positive", sql`${table.sequence} >= 1`),
+  check("decision_ledger_records_type", sql`${table.recordType} in ('analysis', 'decision')`),
+  check("decision_ledger_records_hash_format", sql`
+    ${table.previousHash} = 'GENESIS' or ${table.previousHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("decision_ledger_records_identity_format", sql`
+    ${table.recordId} ~ '^(analysis|decision)_[a-f0-9]{20}$'
+    and ${table.recordHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("decision_ledger_records_required", sql`
+    btrim(${table.workspaceRef}) <> '' and btrim(${table.recordId}) <> ''
+  `),
+  check("decision_ledger_records_shape", sql`(
+    (${table.recordType} = 'analysis'
+      and ${table.effectiveContextId} is not null
+      and ${table.effectiveContextRef} is not null and btrim(${table.effectiveContextRef}) <> ''
+      and ${table.analysisDefinitionRef} is not null and btrim(${table.analysisDefinitionRef}) <> ''
+      and ${table.analysisRecordRowId} is null and ${table.analysisRecordRef} is null
+      and ${table.cadenceResultRef} is null and ${table.disposition} is null)
+    or (${table.recordType} = 'decision'
+      and ${table.effectiveContextId} is null and ${table.effectiveContextRef} is null
+      and ${table.analysisDefinitionRef} is null
+      and ${table.analysisRecordRowId} is not null
+      and ${table.analysisRecordRef} is not null and btrim(${table.analysisRecordRef}) <> ''
+      and ${table.cadenceResultRef} is not null and btrim(${table.cadenceResultRef}) <> ''
+      and ${table.disposition} in ('act', 'test', 'observe', 'no_change', 'blocked'))
+  ) is true`),
+  check("decision_ledger_records_payload_object", sql`jsonb_typeof(${table.payload}::jsonb) = 'object'`),
+  check("decision_ledger_records_payload_exact", sql`(
+    ${table.payload}::jsonb #>> '{version}' = ${table.version}
+    and ${table.payload}::jsonb #>> '{recordType}' = ${table.recordType}
+    and (${table.payload}::jsonb #>> '{sequence}')::integer = ${table.sequence}
+    and ${table.payload}::jsonb #>> '{previousHash}' = ${table.previousHash}
+    and ${table.payload}::jsonb #>> '{workspaceRef}' = ${table.workspaceRef}
+    and (${table.payload}::jsonb #>> '{occurredAt}')::timestamptz = ${table.occurredAt}
+    and ${table.payload}::jsonb #>> '{recordId}' = ${table.recordId}
+    and ${table.payload}::jsonb #>> '{recordHash}' = ${table.recordHash}
+    and (${table.recordType} <> 'analysis' or (
+      ${table.payload}::jsonb #>> '{effectiveContextRef}' = ${table.effectiveContextRef}
+      and ${table.payload}::jsonb #>> '{analysisDefinitionRef}' = ${table.analysisDefinitionRef}
+      and ${table.payload}::jsonb #>> '{actionAuthority}' = 'none'
+      and not (${table.payload}::jsonb ? 'executionAuthority')))
+    and (${table.recordType} <> 'decision' or (
+      ${table.payload}::jsonb #>> '{analysisRecordRef}' = ${table.analysisRecordRef}
+      and ${table.payload}::jsonb #>> '{cadenceResultRef}' = ${table.cadenceResultRef}
+      and ${table.payload}::jsonb #>> '{disposition}' = ${table.disposition}
+      and ${table.payload}::jsonb #>> '{executionAuthority}' = 'none'
+      and not (${table.payload}::jsonb ? 'actionAuthority')))
+  ) is true`),
+  check("decision_ledger_records_no_forbidden_material", sql`
+    ${table.payload} !~* '"[^"[:space:]]*(token|secret|prompt)"[[:space:]]*:'
+    and ${table.payload} !~* '"authorization"[[:space:]]*:'
+    and ${table.payload} !~* '"[^"[:space:]]*raw[_-]?(payload|request|response|json)"[[:space:]]*:'
+  `),
+  check("decision_ledger_records_no_authority_escalation", sql`
+    not jsonb_path_exists(
+      ${table.payload}::jsonb - 'actionAuthority' - 'executionAuthority',
+      '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(canwrite|writeenabled|actionauthority|writeauthority|executionauthority|approvalgranted|canauthorizeaction|canexecutewrite|canenforcepolicy|canalterapproval)$" flag "i")'
+    )
+  `),
+]);
+
 export const metaAssetEdges = pgTable("meta_asset_edges", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),

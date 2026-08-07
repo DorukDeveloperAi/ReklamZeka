@@ -36,12 +36,18 @@ bütçe simülasyonu ve Meta write sırasıyla S3 ve S4'e aittir.
 - **S2.5 pure agenda/finding core hazır:** on deterministik top-down pass, category/topic subset,
   bounded finding-driver drill-down, objective metric allowlist'i, timeframe/context bağları ve
   protected-guidance suppression testli. Persistence ve Decision Room application binding'i açık.
-- **S2.6 pure cadence/experiment/ledger core hazır:** settle/observation/learning/cooldown,
+- **S2.6 cadence/experiment/ledger persistence hazır:** settle/observation/learning/cooldown,
   evidence ve repeat suppression; tek değişkenli experiment lifecycle ve append-only authentic
-  hash-chain ledger testli. PostgreSQL ledger persistence ve application API'si açık.
-- **Birleşik kanıt:** 53 test dosyası/296 test, production build, audit 0; category/guidance,
-  frozen-context ve tombstone PostgreSQL rollback kabulleri temiz. Supabase 42/42 RLS, API
-  table grant'i `0`; tracked/build/cache token eşleşmesi `0`. Meta write çağrısı `0`.
+  hash-chain ledger testli. Ledger Supabase'e uygulandı; context/analysis tenant bağları,
+  temporal guard, restart/idempotency/tamper ve nested-authority reddi rollback E2E'den geçti.
+- **S2.7 application/executor core hazır:** dashboard ve CLI için tek model-agnostic read/draft
+  servis; stable replay refs, güvenli public projection ve optimistic staging portu testli.
+  Manual/scheduled ortak executor duplicate/overlap/retry/lease/inbox idempotency'sini; daily/
+  weekly schedule timezone, DST ve catch-up kurallarını uygular. HTTP/CLI adapter ve UI açık.
+- **Birleşik kanıt:** 57 test dosyası/314 test, production build, audit 0; category/guidance,
+  frozen-context, decision-ledger ve tombstone PostgreSQL rollback kabulleri temiz. Supabase
+  43/43 RLS, API table grant'i `0`; otomatik tracked/build/cache token eşleşmesi `0`.
+  Meta write/network çağrısı `0`.
 
 ## Değişmez sınırlar
 

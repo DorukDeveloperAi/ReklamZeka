@@ -294,3 +294,27 @@ ReklamZeka'ya taşınmaz.
 - Kanıt: 53 test dosyası/296 test, `db:check`, production build ve audit `0`. Supabase 42/42
   RLS, API table grant `0`, API schema create `0`, public routine execute `0`; tracked/build/cache
   token eşleşmesi `0`; Meta write/network çağrısı `0`.
+
+## 2026-08-07 — S2 Decision Room persistence ve scheduler kapısı
+
+- Analysis/decision ledger Supabase'e uygulandı. Append-only workspace chain context ve analysis
+  satırlarına composite tenant FK ile bağlıdır; workspace kilidi sequence yarışını önler. Analysis
+  context capture'dan, decision bağlı analysis'ten önce tarihlenemez. Restart ve idempotent replay
+  aynı authentic zinciri geri verir.
+- SQL ve repository katmanları payload-column eşleşmesi, token/prompt/raw, NULL authority bypass,
+  nested `actionAuthority` ve tamper girişlerini fail-closed reddeder. Applied production tablo
+  rollback E2E bütün conflict/isolation/temporal/security bayraklarında geçti ve kalıcı fixture bırakmadı.
+- Tek `runDecisionRoom` servisi EffectiveCampaignContext→agenda→finding→cadence→optional experiment→
+  ledger staging akışını modelsiz orkestre eder. Public sonuç yalnız `draft/advisory/observe/no_change`
+  ve opaque ref'ler taşır; tam ledger yalnız injected persistence portunda kalır. `occurredAt` ile
+  cadence instant'ı bağlıdır ve replay yeniden stage etmez.
+- Manual ve scheduled analiz aynı executor sözleşmesini kullanır. Deterministik idempotency,
+  duplicate/in-flight/campaign-overlap suppression, retry/expired lease ve idempotent inbox recovery
+  testlidir. Daily/weekly timezone, DST gap/overlap, `skip/run_once` catch-up ve gerçek slot validation
+  vardır; tek çıktı kanalı `in_app_inbox`, action authority daima `none`dır.
+- Build sırasında Meta tokenı bilinçli olarak boş environment ile tutuluyor; tracked dosyalar,
+  production bundle ve Turbopack cache exact-secret taraması otomatik build kapısıdır. Önceki üç
+  yerel cache kopyası geri alınabilir biçimde Çöp Sepeti'ne taşındı; runtime `.env.local` değişmedi.
+- Kanıt: 57 test dosyası/314 test, typecheck, `db:check`, production build, audit `0`.
+  Supabase 43/43 RLS, API table grant `0`, API schema create `0`, public routine execute `0`;
+  tracked/build/cache token eşleşmesi `0`; Meta write/network çağrısı `0`.

@@ -108,14 +108,17 @@
 - [ ] Hierarchical driver ve creative fatigue/config diagnostics.
 - [ ] Analysis run ledger, dry-run API ve deterministic replay.
   - [x] Append-only authentic hash-chain decision ledger saf çekirdeği ve malformed/tamper matrisi.
-  - [ ] PostgreSQL ledger persistence ve read/draft application API'si.
+  - [x] Workspace-scoped PostgreSQL ledger persistence, tenant/temporal guard ve rollback E2E.
+  - [x] Model-agnostic read/draft Decision Room application servisi ve stable replay refs.
+  - [ ] HTTP/CLI adapter, rol/audit API'si ve gerçek dry-run endpoint'i.
 - [ ] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
   - [x] Deterministik on-pass agenda, category/topic subset ve context/timeframe-bound finding çekirdeği.
   - [ ] Persistence, gerçek finding ailesi ve Decision Room application binding'i.
 - [x] EffectiveGuidancePack scope filter/ranking/context-budget ve source/conflict trace.
 - [ ] DecisionCadenceProfile, no-change/repeat suppression ve ExperimentRecord lifecycle.
   - [x] Settle/observation/learning/cooldown/evidence/repeat saf karar kapısı ve tek değişkenli experiment çekirdeği.
-  - [ ] PostgreSQL persistence, rol/audit API'si ve scheduled executor binding'i.
+  - [x] Manual/scheduled ortak executor, idempotency/overlap/retry/lease ve in-app inbox çekirdeği.
+  - [ ] Cadence/experiment PostgreSQL persistence, rol/audit API'si ve Decision Room adapter binding'i.
 - [ ] L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
@@ -167,6 +170,8 @@
 - [ ] Approval state machine, expiry, stale-plan ve separation of duties.
 - [ ] Idempotent execute, Meta error taxonomy, read-after-write ve rollback.
 - [ ] Hourly/daily/weekly/monthly/after-sync scheduler; DST/misfire/idempotency.
+  - [x] Decision Room daily/weekly timezone+DST, skip/run_once catch-up ve duplicate-slot çekirdeği.
+  - [ ] Hourly/monthly/after-sync, kalıcı run store ve worker binding'i.
 - [ ] Sync→analyze→plan→approval agentic routine; otomatik execute yok.
 - [ ] External intervention reconcile ve sandbox/shadow rollout.
 - [ ] Manual/assisted/automated-read/scheduled-plan + approval-only/policy-limited inheritance ve kill switch.
@@ -199,6 +204,8 @@
 - [ ] AnalysisAgenda, applied guidance, cadence/experiment ve no-change UI yolculuğu.
 - [ ] Practice Lab candidate/trial/outcome/decomposition/standardized artifact UI.
 - [ ] Scheduled analysis in-app inbox ve duplicate-delivery/read-state E2E.
+  - [x] Saf executor üzerinde idempotent in-app teslim/recovery ve duplicate-run testi.
+  - [ ] PostgreSQL inbox/read-state, dashboard ve worker E2E.
 - [x] Operating Dashboard + Orchestrator çift-yüzey bilgi mimarisi ve etkileşimli demo kabuğu.
 - [ ] Operating Dashboard gerçek backend state'iyle responsive/browser E2E.
 - [ ] Orchestrator skill/context/autonomy/handoff çalışma alanı ve dashboard↔CLI E2E.
