@@ -1,7 +1,7 @@
-# DEVRALIŞ — ReklamZeka
+# DEVRALIŞ — ReklamZeka-wt-connection
 
 > **TÜREVDİR, elle düzenlenmez.** Her `aide filing` koşumunda yeniden üretilir.
-> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-06 19:44
+> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-07 08:46
 
 Bu belge bir sonraki Claude hesabının **ilk okuyacağı** dosyadır: neyin yarıda kaldığını
 ve hangi komutla devam edileceğini söyler.
@@ -19,7 +19,7 @@ _Bu projede canlı oturum yok._
 Sıradaki işi başlatmak için:
 
 ```bash
-cd /Users/ybg/dev/ReklamZeka
+cd /Users/ybg/dev/ReklamZeka-wt-connection
 /goal plans/proje/v2/asama-08-meta-dijital-ikizi.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz
 ```
 

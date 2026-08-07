@@ -1,4 +1,5 @@
 import { AppendOnlyAuditLog } from "@/security/audit";
+import { ConnectorError } from "@/connectors/contract";
 import {
   authorizeWorkspace,
   type Actor,
@@ -61,7 +62,7 @@ export class MetaConnectionService {
       displayName: input.displayName.trim() || "Meta Ads",
       graphApiVersion: input.graphApiVersion ?? META_GRAPH_API_VERSION,
       accessMode: "read_only",
-      status: "connected",
+      status: "active",
       secretReference: input.secretReference,
       capabilitySnapshot: null,
       createdAt: timestamp,
@@ -87,12 +88,20 @@ export class MetaConnectionService {
     const connection = await this.options.connections.find(workspaceId, connectionId);
     this.assertConnected(connection);
     const token = await this.options.secrets.resolve(connection.secretReference, { workspaceId, connectionId });
-    const snapshot = await inspectMetaConnection({
-      token,
-      graphApiVersion: connection.graphApiVersion,
-      fetchImpl: this.options.fetchImpl,
-      now: this.now,
-    });
+    let snapshot;
+    try {
+      snapshot = await inspectMetaConnection({
+        token,
+        graphApiVersion: connection.graphApiVersion,
+        fetchImpl: this.options.fetchImpl,
+        now: this.now,
+      });
+    } catch (error) {
+      if (error instanceof ConnectorError && error.code === "authentication") {
+        await this.markInvalid(connection, membership.userId);
+      }
+      throw error;
+    }
     const updated: MetaConnection = Object.freeze({
       ...connection,
       capabilitySnapshot: snapshot,
@@ -143,8 +152,8 @@ export class MetaConnectionService {
   ): Promise<PublicMetaConnection> {
     const membership = authorizeWorkspace(actor, workspaceId, "connection:manage", this.options.memberships);
     const connection = await this.options.connections.find(workspaceId, connectionId);
-    const canRevokeDisconnected = target === "revoked" && connection.status === "disconnected";
-    if (connection.status !== "connected" && !canRevokeDisconnected) {
+    const closable = connection.status === "active" || connection.status === "invalid" || (target === "revoked" && connection.status === "disconnected");
+    if (!closable) {
       if (connection.status === target) return publicMetaConnection(connection);
       throw new MetaConnectionLifecycleError(`Cannot move ${connection.status} connection to ${target}`);
     }
@@ -180,7 +189,25 @@ export class MetaConnectionService {
   }
 
   private assertConnected(connection: MetaConnection): void {
-    if (connection.status !== "connected") throw new MetaConnectionLifecycleError(`Connection is ${connection.status}`);
+    if (connection.status !== "active") throw new MetaConnectionLifecycleError(`Connection is ${connection.status}`);
     if (connection.accessMode !== "read_only") throw new MetaConnectionLifecycleError("Writer access mode is not supported");
+  }
+
+  private async markInvalid(connection: MetaConnection, actorId: string): Promise<void> {
+    const timestamp = this.now().toISOString();
+    await this.options.connections.save(Object.freeze({
+      ...connection,
+      status: "invalid",
+      updatedAt: timestamp,
+    }));
+    this.options.audit.append({
+      workspaceId: connection.workspaceId,
+      actorId,
+      action: "connection.doctor_checked",
+      resourceType: "meta_connection",
+      resourceId: connection.id,
+      occurredAt: timestamp,
+      metadata: { tokenStatus: "invalid", writeOperations: 0 },
+    });
   }
 }

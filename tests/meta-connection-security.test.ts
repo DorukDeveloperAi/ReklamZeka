@@ -124,7 +124,7 @@ describe("Meta connection lifecycle boundary", () => {
       secretReference,
     });
     expect(JSON.stringify(registered)).not.toContain(secretReference.id);
-    expect(registered).toMatchObject({ accessMode: "read_only", status: "connected", secretConfigured: true });
+    expect(registered).toMatchObject({ accessMode: "read_only", status: "active", secretConfigured: true });
 
     const checked = await service.doctor({ userId: "admin-a" }, "workspace-a", connectionId);
     const serialized = JSON.stringify(checked);

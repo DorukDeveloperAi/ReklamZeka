@@ -45,7 +45,7 @@ export type MetaCapabilitySnapshot = Readonly<{
   principal: Readonly<{ id: string; name: string | null }>;
 }>;
 
-export type MetaConnectionStatus = "connected" | "disconnected" | "revoked";
+export type MetaConnectionStatus = "active" | "disconnected" | "revoked" | "invalid";
 
 export type MetaConnection = Readonly<{
   id: string;
@@ -76,7 +76,7 @@ export function publicMetaConnection(connection: MetaConnection): PublicMetaConn
       id: maskExternalId(capabilitySnapshot.principal.id),
     },
   } : null;
-  return { ...safe, capabilitySnapshot: publicSnapshot, secretConfigured: connection.status === "connected" };
+  return { ...safe, capabilitySnapshot: publicSnapshot, secretConfigured: connection.status === "active" };
 }
 
 function maskExternalId(value: string): string {
