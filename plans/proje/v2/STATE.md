@@ -1034,3 +1034,16 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   üretmez. Checker kendi kaynak içeriğini veya secret değeri hata çıktısına basmaz; yalnız dosya/ihlal sınıfını verir.
   On iki test temiz repo ile import, scoped SDK, env, endpoint, package script, manifest, lock-only transitive ve
   eksik-root negatiflerini doğrular. Ana `npm test`/CI zincirine bağlandı; network, DB veya secret erişimi yapmaz.
+
+## 2026-08-08 — A12 vendor-agnostic LocalAgentClient fixture contract
+
+- Decision Room, Approval Queue read, Policy Bundle read, Budget Lab read/draft, Practice Lab read/ephemeral draft
+  ve existing-post preflight araçları tek sürümlü 13-tool safe catalog altında toplandı. Her tool exact mevcut
+  `LocalSessionScope` ister; bilinmeyen scope/tool, eksik veya fazla executor ve descriptor capability enjeksiyonu
+  dispatch öncesinde reddedilir.
+- Session descriptor vendor/model/prompt taşımaz; model execution, human presence, approval, grant, execution,
+  raw Meta/SQL ve Meta write authority alanları yapısal olarak false'dur. Modelsiz fixture yalnız önceden enjekte
+  edilmiş deterministic executorları sıralı çağırır. Unsafe sonuç anahtarı/açık authority/class instance,
+  correlation replay ve başka session'ın correlation ref'i fail-closed kalır.
+- Bu parça route, MCP transport, DB/session ledger veya dashboard handoff değildir; `project_stdio` ve
+  `loopback_http` yalnız contract transport adlarıdır. Network, DB, secret, model API veya Meta çağrısı eklenmedi.

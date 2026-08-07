@@ -31,8 +31,14 @@ Dashboard / Local companion CLI       Codex CLI / VS Code      Claude Code      
 Sync, category/effective context, policy, timeframe/metric/finding, budget, promotion
 template resolution, action eligibility/risk/approval, scheduler ve timeline paketleri
 model SDK'sı import etmez. ReklamZeka runtime'ında `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
-ve provider Responses/Messages çağrısı yoktur. Modelsiz fixture client tüm deterministic
-akışı CI'da çalıştırmak için sıradaki ayrı uygulama dilimidir; bu checker onun yerine geçmez.
+ve provider Responses/Messages çağrısı yoktur. Modelsiz fixture client tool/session contract
+conformance akışını CI'da çalıştırır; gerçek STDIO/HTTP transport ve session ledger ayrı dilimlerdir.
+
+`LocalAgentClient` için modelsiz referans fixture artık mevcut safe agent contract'larını tek versioned catalogda
+toplar. Session descriptor exact local capability scope + allowlisted tool + correlation ref'e bağlıdır; fixture
+yalnız enjekte edilmiş deterministic executorları çağırır. Provider/model/prompt adapterı, human-presence,
+approval/grant/execute veya raw Meta/SQL yüzeyi yoktur. Bu in-memory conformance çekirdeği gerçek STDIO/HTTP
+transportu ya da kalıcı session ledger'ı tamamlanmış saymaz.
 
 Bu değişmez `npm run check:model-api-boundary` ile repository seviyesinde uygulanır. Checker runtime
 kaynaklarını, package script'lerini ve direct/transitive dependency yüzeyini tarar; provider SDK/import,

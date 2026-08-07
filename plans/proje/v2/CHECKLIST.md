@@ -174,7 +174,8 @@
 - [ ] Salt-okur local-session/advisor ledger, import/DB saldırı testi ve redaksiyon.
 - [ ] Karar defteri/context budget ve deterministic fallback.
 - [ ] Injection/cross-tenant/secret/action-bypass tam negatif matrisi.
-- [ ] LocalAgentClient/session contract ve modelsiz deterministic fixture client.
+- [x] LocalAgentClient/session contract ve modelsiz deterministic fixture client; 13 safe read/draft/preflight
+  tool'u exact local-session scope'a bağlı, correlation replay/cross-session ve authority/raw/tool injection fail-closed.
 - [x] No-model-API boundary: runtime source, package scripts ve direct/transitive dependency yüzeyinde
   OpenAI/Anthropic key, SDK veya doğrudan model endpoint'i fail-closed CI checker + negatif fixture matrisiyle yasak.
 - [ ] Localhost Streamable HTTP + project STDIO MCP; auth ve read/proposal tool ayrımı.
