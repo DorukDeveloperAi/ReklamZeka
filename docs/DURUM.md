@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: ace67330e0b8 -->
+<!-- durum-damga: 24e30bf0edc0 -->
 
 ## Künye
 
@@ -14,13 +14,16 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 92 |
+| iş commit'i (tüm geçmiş) | 95 |
 | ilk / son iş | 2026-08-06 / 2026-08-08 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-08 | `docs` | record K4 and insight gates | `0dea31c39` |
+| 2026-08-08 | `feat` | add v23 insight capability catalog | `fd392bc5d` |
+| 2026-08-08 | `feat` | complete K4 publication gate | `e8dc56aac` |
 | 2026-08-08 | `docs` | refresh deterministic project state | `04be8a651` |
 | 2026-08-08 | `docs` | record K4 policy studio gate | `8c9e8295b` |
 | 2026-08-08 | `feat` | add K4 policy bundle studio | `9e54284ac` |
@@ -33,14 +36,11 @@
 | 2026-08-08 | `feat` | compose promotion policy evidence | `af2d3e95e` |
 | 2026-08-08 | `docs` | record proposal lifetime proof | `05b4c35c8` |
 | 2026-08-08 | `feat` | compose private scheduled sync tick | `1635dd6cd` |
-| 2026-08-08 | `feat` | bind proposal lifetime policy | `522bc0e4c` |
-| 2026-08-08 | `docs` | record geo and scheduler proof | `ede2072c7` |
-| 2026-08-08 | `test` | verify live geo inventory wiring | `0d7eabaa7` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 41
-- `docs        ` ███████ 12
+- `feat        ` ████████████████████████ 40
+- `docs        ` ████████ 13
 - `test        ` ██ 4
 - `fix         ` ██ 3
 

@@ -4,6 +4,33 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "0dea31c39",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record K4 and insight gates",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "fd392bc5d",
+      "tarih": "2026-08-08",
+      "konu": "feat(meta): add v23 insight capability catalog",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e8dc56aac",
+      "tarih": "2026-08-08",
+      "konu": "feat(actions): complete K4 publication gate",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "04be8a651",
       "tarih": "2026-08-08",
       "konu": "docs(status): refresh deterministic project state",
@@ -110,43 +137,16 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "522bc0e4c",
-      "tarih": "2026-08-08",
-      "konu": "feat(actions): bind proposal lifetime policy",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "ede2072c7",
-      "tarih": "2026-08-08",
-      "konu": "docs(roadmap): record geo and scheduler proof",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "0d7eabaa7",
-      "tarih": "2026-08-08",
-      "konu": "test(meta): verify live geo inventory wiring",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 41
+      "adet": 40
     },
     {
       "kapsam": "docs",
-      "adet": 12
+      "adet": 13
     },
     {
       "kapsam": "test",
@@ -157,7 +157,7 @@
       "adet": 3
     }
   ],
-  "isSayisi": 92,
+  "isSayisi": 95,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -170,5 +170,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "ace67330e0b8"
+  "damga": "24e30bf0edc0"
 }
