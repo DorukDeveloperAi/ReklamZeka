@@ -51,6 +51,14 @@ describe("workspace authorization boundary", () => {
       .toThrow(AuthorizationError);
   });
 
+  it("reserves policy publication for owner/admin while keeping draft collaboration separate", () => {
+    expect(can("owner", "policy_bundle:publish")).toBe(true);
+    expect(can("admin", "policy_bundle:publish")).toBe(true);
+    expect(can("analyst", "policy_bundle:draft")).toBe(true);
+    expect(can("analyst", "policy_bundle:publish")).toBe(false);
+    expect(can("viewer", "policy_bundle:publish")).toBe(false);
+  });
+
   it("filters resources by the authorized workspace at the server boundary", () => {
     const audit = new AppendOnlyAuditLog();
     const service = new WorkspaceDataService(memberships, [

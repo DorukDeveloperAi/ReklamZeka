@@ -100,6 +100,12 @@ describe("local Decision Room principal boundary", () => {
     expect(() => assertTrustedLocalDecisionRoomRequest(request("/api/decision-room", {
       Origin: "http://localhost:3000", "X-ReklamZeka-Intent": "mark-inbox-read",
     }), config, "mark_read")).not.toThrow();
+    expect(() => assertTrustedLocalDecisionRoomRequest(request("/api/policy-bundles", {
+      Origin: "http://localhost:3000", "X-ReklamZeka-Intent": "policy-bundle-confirm-human-presence",
+    }), config, "publish")).not.toThrow();
+    expect(() => assertTrustedLocalDecisionRoomRequest(request("/api/policy-bundles", {
+      Origin: "http://localhost:3000", "X-ReklamZeka-Intent": "policy-bundle-create-draft",
+    }), config, "publish")).toThrow(LocalDecisionRoomBoundaryError);
   });
 
   it("binds the fixed principal to a current DB membership and exposes no private IDs", async () => {

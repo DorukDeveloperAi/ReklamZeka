@@ -114,4 +114,17 @@ describe("K4 Policy Bundle owner/admin publication ceremony service", () => {
       revision: prepared.revision, reasonRef: "reason_reviewed", humanPresenceProof: challenge.proof }))
       .rejects.toMatchObject({ code: "store_rejected" });
   });
+
+  it("classifies malformed injected presence evidence as rejected instead of trusting adapter timestamps", async () => {
+    const api = harness();
+    const service = new PolicyBundlePublicationService(api.approvalRepo, api.guardrailRepo, {
+      consume: vi.fn(async () => ({ authorizationRef: "presence_auth_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        issuedAt: "not-an-instant", expiresAt: "2026-08-08T18:01:00.000Z",
+        humanPresence: true as const, canExecute: false as const })),
+    }, [{ userId, workspaceId, role: "owner" }], () => now);
+    await expect(service.publish(principal, { kind: "approval_policy",
+      policyRef: "approval_policy_existing_post", revision: 1, reasonRef: "reason_reviewed",
+      humanPresenceProof: `presence_${"b".repeat(43)}` })).rejects.toMatchObject({ code: "human_presence_rejected" });
+    expect(api.approvalRepo.append).not.toHaveBeenCalled();
+  });
 });

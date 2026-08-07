@@ -657,11 +657,16 @@
 .policyNotice { margin: 0; padding: 12px 15px; border: 1px solid rgba(123,198,255,.25); border-radius: 9px; color: var(--rz-blue); background: rgba(123,198,255,.05); font-size: .58rem; }
 .policyRevisionFeed { overflow: hidden; }
 .policyRevisionFeed > p { margin: 0; padding: 18px; color: var(--rz-muted); font-size: .6rem; }
+.policyPublicationReason { display: grid; grid-template-columns: minmax(180px, .45fr) minmax(240px, 1fr); align-items: center; gap: 6px 14px; padding: 14px 18px; border-bottom: 1px solid var(--rz-line); color: var(--rz-dim); font-size: .51rem; text-transform: uppercase; }
+.policyPublicationReason input { min-height: 35px; padding: 0 9px; border: 1px solid var(--rz-line); border-radius: 7px; color: var(--rz-text); background: var(--rz-surface-3); }
+.policyPublicationReason small { grid-column: 2; color: var(--rz-muted); font-size: .5rem; line-height: 1.45; text-transform: none; }
 .policyRevisionFeed > div { display: grid; }
-.policyRevisionFeed article { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 12px 18px; border-bottom: 1px solid var(--rz-line); }
+.policyRevisionFeed article { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 14px; padding: 12px 18px; border-bottom: 1px solid var(--rz-line); }
 .policyRevisionFeed article strong { overflow-wrap: anywhere; font-size: .63rem; }
 .policyRevisionFeed article span { color: var(--rz-muted); font-size: .53rem; }
 .policyRevisionFeed article em { color: var(--rz-amber); font: 700 .5rem ui-monospace, monospace; font-style: normal; text-transform: uppercase; }
+.policyRevisionFeed article button { padding: 7px 9px; border: 1px solid var(--rz-line); border-radius: 7px; color: var(--rz-text); background: var(--rz-surface-3); font-size: .52rem; cursor: pointer; }
+.policyRevisionFeed article button:disabled { opacity: .42; cursor: default; }
 
 .sourceFooter { display: flex; justify-content: space-between; gap: 20px; padding: 13px 36px 22px; color: var(--rz-dim); font-size: .54rem; }
 .toast { position: fixed; right: 24px; bottom: 24px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: min(440px, calc(100% - 32px)); padding: 12px 14px; border: 1px solid rgba(184,242,84,.28); border-radius: 11px; background: #182018; box-shadow: 0 18px 60px rgba(0,0,0,.4); z-index: 50; }
@@ -765,6 +770,10 @@
   .promotionPreflightFields { grid-template-columns: 1fr; }
   .autonomyStudioForm > div { grid-template-columns: 1fr; }
   .policyFields { grid-template-columns: 1fr; }
+  .policyPublicationReason { grid-template-columns: 1fr; }
+  .policyPublicationReason small { grid-column: auto; }
+  .policyRevisionFeed article { grid-template-columns: minmax(0, 1fr) auto; }
+  .policyRevisionFeed article button { grid-column: 1 / -1; }
   .promotionPreflightForm footer { grid-template-columns: 1fr; }
 }
 

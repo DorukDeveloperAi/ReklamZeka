@@ -48,7 +48,8 @@ describe("K4 Policy Bundle Studio read + draft", () => {
       approvalPolicy: "missing", guardrail: "missing", workspaceAutonomy: "published_approval_only",
       authenticEvidence: "evaluated_per_proposal", compatibility: "evaluated_per_selection",
       policyBundleReady: false, proposalReady: false },
-    authority: { canDraft: true, canPublish: false, canApproveAction: false, canExecute: false, canWriteMeta: false } });
+    authority: { canDraft: true, canStartPublicationCeremony: true, canPublish: false,
+      canApproveAction: false, canExecute: false, canWriteMeta: false } });
     expect(result.scopeCatalog).toEqual({ accounts: catalog.accounts, adSets: catalog.adSets,
       internalCategories: catalog.internalCategories });
   });
@@ -77,7 +78,8 @@ describe("K4 Policy Bundle Studio read + draft", () => {
 
   it("allows viewer reads and denies both draft kinds", async () => {
     const service = harness("viewer").service;
-    await expect(service.list(principal)).resolves.toMatchObject({ approvalPolicies: [], authority: { canDraft: false } });
+    await expect(service.list(principal)).resolves.toMatchObject({ approvalPolicies: [],
+      authority: { canDraft: false, canStartPublicationCeremony: false } });
     await expect(service.createDraft(principal, approvalRequest)).rejects.toMatchObject({ status: 403 });
     await expect(service.createDraft(principal, guardrailRequest)).rejects.toMatchObject({ status: 403 });
   });

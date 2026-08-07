@@ -30,12 +30,19 @@ function resultIsSafe(value: unknown): value is PolicyBundleStudioResult {
   const result = value as Partial<PolicyBundleStudioResult>;
   return result.contractVersion === "policy-bundle-studio/1.1.0" && Array.isArray(result.approvalPolicies)
     && Array.isArray(result.guardrails) && Boolean(result.scopeCatalog) && Boolean(result.readiness)
-    && Boolean(result.authority) && result.authority?.canPublish === false && result.authority.canDisable === false
+    && Boolean(result.authority) && typeof result.authority?.canStartPublicationCeremony === "boolean"
+    && result.authority.canPublish === false && result.authority.canDisable === false
     && result.authority.canApproveAction === false && result.authority.canGrant === false
     && result.authority.canExecute === false && result.authority.canWriteMeta === false;
 }
 function toggle(values: string[], value: string): string[] {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+}
+function publicationAuthorityClosed(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const authority = value as Record<string, unknown>;
+  return authority.canPublish === false && authority.canDisable === false && authority.canApproveAction === false
+    && authority.canGrant === false && authority.canExecute === false && authority.canWriteMeta === false;
 }
 
 export function createApprovalPolicyDraftBody(form: ApprovalForm): ApprovalPolicyDraftRequest {
@@ -65,6 +72,46 @@ async function saveDraft(body: ApprovalPolicyDraftRequest | GuardrailPolicyDraft
   const payload = await response.json() as { error?: { message?: string } };
   if (!response.ok) throw new Error(payload.error?.message ?? "Taslak kaydedilemedi.");
 }
+export async function runPolicyPublicationCeremony(item: Readonly<{ kind: "approval_policy" | "guardrail_policy";
+  policyRef: string; revision: number }>, reasonRef: string, request: typeof fetch = fetch): Promise<void> {
+  if (!/^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/.test(reasonRef)) {
+    throw new Error("Yayın için yapılandırılmış bir reason ref gerekli.");
+  }
+  const confirm = await request("/api/policy-bundles", { method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "policy-bundle-confirm-human-presence" },
+    body: JSON.stringify(item) });
+  const confirmation: unknown = await confirm.json();
+  const challenge = confirmation && typeof confirmation === "object" && "challenge" in confirmation
+    ? (confirmation as { challenge?: Record<string, unknown> }).challenge : null;
+  const confirmationAuthority = confirmation && typeof confirmation === "object" && "authority" in confirmation
+    ? (confirmation as { authority?: unknown }).authority : null;
+  if (!confirm.ok || !challenge || challenge.kind !== item.kind || challenge.policyRef !== item.policyRef
+    || challenge.revision !== item.revision || typeof challenge.unitRef !== "string"
+    || !/^policy_unit_[a-f0-9]{20}$/.test(challenge.unitRef) || typeof challenge.proof !== "string"
+    || !/^presence_[A-Za-z0-9_-]{32,160}$/.test(challenge.proof) || typeof challenge.expiresAt !== "string"
+    || !Number.isFinite(Date.parse(challenge.expiresAt)) || !publicationAuthorityClosed(confirmationAuthority)) {
+    const error = confirmation as { error?: { message?: string } };
+    throw new Error(error.error?.message ?? "İnsan-varlığı töreni doğrulanamadı.");
+  }
+  const intent = item.kind === "approval_policy" ? "policy-bundle-publish-approval-policy"
+    : "policy-bundle-publish-guardrail-policy";
+  const publish = await request("/api/policy-bundles", { method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": intent },
+    body: JSON.stringify({ policyRef: item.policyRef, revision: item.revision, reasonRef,
+      humanPresenceProof: challenge.proof }) });
+  const result: unknown = await publish.json();
+  const published = result && typeof result === "object" && "item" in result
+    ? (result as { item?: Record<string, unknown> }).item : null;
+  const resultAuthority = result && typeof result === "object" && "authority" in result
+    ? (result as { authority?: unknown }).authority : null;
+  if (!publish.ok || !published || (result as { contractVersion?: unknown }).contractVersion !== "policy-bundle-publication/1.0.0"
+    || published.kind !== item.kind || published.policyRef !== item.policyRef
+    || published.draftRevision !== item.revision || published.state !== "published"
+    || !publicationAuthorityClosed(resultAuthority)) {
+    const error = result as { error?: { message?: string } };
+    throw new Error(error.error?.message ?? "Policy yayını doğrulanamadı.");
+  }
+}
 
 function RoleChoices({ legend, roles, selected, onToggle }: Readonly<{ legend: string; roles: readonly string[];
   selected: readonly string[]; onToggle(role: string): void }>) {
@@ -77,6 +124,7 @@ export function PolicyBundleStudioSurface({ result, onReload }: Readonly<{
 }>) {
   const [approval, setApproval] = useState(emptyApproval); const [guardrail, setGuardrail] = useState(emptyGuardrail);
   const [saving, setSaving] = useState<"approval" | "guardrail" | null>(null); const [notice, setNotice] = useState<string | null>(null);
+  const [publicationReason, setPublicationReason] = useState(""); const [publishing, setPublishing] = useState<string | null>(null);
   const adSets = useMemo(() => result.scopeCatalog.adSets.filter((item) => item.accountRef === guardrail.accountRef),
     [result.scopeCatalog.adSets, guardrail.accountRef]);
   const selectedAdSet = adSets.find((item) => item.ref === guardrail.adSetRef);
@@ -93,6 +141,13 @@ export function PolicyBundleStudioSurface({ result, onReload }: Readonly<{
     await onReload();
   } catch (reason) { setNotice(reason instanceof Error ? reason.message : "Taslak kaydedilemedi."); }
   finally { setSaving(null); } };
+  const publishDraft = async (item: Readonly<{ kind: "approval_policy" | "guardrail_policy";
+    policyRef: string; revision: number }>) => { const key = `${item.kind}:${item.policyRef}:${item.revision}`;
+    setPublishing(key); setNotice(null); try { await runPolicyPublicationCeremony(item, publicationReason);
+      setNotice("Policy yayınlandı. Bu kayıt tek başına action onayı, execute veya Meta write yetkisi vermez.");
+      setPublicationReason(""); await onReload();
+    } catch (reason) { setNotice(reason instanceof Error ? reason.message : "Policy yayınlanamadı."); }
+    finally { setPublishing(null); } };
   const readiness = result.readiness;
   return <div className={styles.policyBundleStack}>
     <section className={`${styles.panel} ${styles.policyReadiness}`}>
@@ -129,7 +184,8 @@ export function PolicyBundleStudioSurface({ result, onReload }: Readonly<{
     </div>
     {notice ? <p className={styles.policyNotice} role="status">{notice}</p> : null}
     <section className={`${styles.panel} ${styles.policyRevisionFeed}`}><header className={styles.panelHeader}><div><span className={styles.kicker}>PUBLIC-SAFE REVISION FEED</span><h2>{result.approvalPolicies.length + result.guardrails.length} sürüm</h2></div><span>Actor ve hash yok</span></header>
-      {result.approvalPolicies.length + result.guardrails.length === 0 ? <p>Henüz K4 politika taslağı yok.</p> : <div>{[...result.approvalPolicies, ...result.guardrails].map((item) => <article key={`${item.kind}:${item.policyRef}:${item.revision}`}><strong>{item.policyRef} · r{item.revision}</strong><span>{item.kind === "approval_policy" ? "ApprovalPolicy" : "Guardrail"}</span><em data-state={item.state}>{item.state}</em></article>)}</div>}
+      {result.authority.canStartPublicationCeremony && [...result.approvalPolicies, ...result.guardrails].some((item) => item.state === "draft") ? <label className={styles.policyPublicationReason}>Yayın reason ref<input value={publicationReason} placeholder="reason_owner_reviewed_…" onChange={(event) => setPublicationReason(event.target.value)} /><small>Yayın, macOS insan-varlığı diyaloğu ve tek kullanımlık kanıt ister.</small></label> : null}
+      {result.approvalPolicies.length + result.guardrails.length === 0 ? <p>Henüz K4 politika taslağı yok.</p> : <div>{[...result.approvalPolicies, ...result.guardrails].map((item) => { const key = `${item.kind}:${item.policyRef}:${item.revision}`; return <article key={key}><strong>{item.policyRef} · r{item.revision}</strong><span>{item.kind === "approval_policy" ? "ApprovalPolicy" : "Guardrail"}</span><em data-state={item.state}>{item.state}</em>{item.state === "draft" && result.authority.canStartPublicationCeremony ? <button disabled={!publicationReason || publishing !== null} onClick={() => void publishDraft(item)}>{publishing === key ? "Tören sürüyor…" : "İnsan onayıyla yayınla"}</button> : null}</article>; })}</div>}
     </section>
   </div>;
 }

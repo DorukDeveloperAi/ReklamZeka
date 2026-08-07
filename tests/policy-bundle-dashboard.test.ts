@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { createApprovalPolicyDraftBody, createGuardrailPolicyDraftBody,
-  PolicyBundleStudioSurface } from "@/app/dashboard/policy-bundle-studio-panel";
+  PolicyBundleStudioSurface, runPolicyPublicationCeremony } from "@/app/dashboard/policy-bundle-studio-panel";
 import type { PolicyBundleStudioResult } from "@/application/policy-bundle-studio-service";
 
 const result: PolicyBundleStudioResult = {
@@ -14,7 +14,7 @@ const result: PolicyBundleStudioResult = {
   readiness: { approvalPolicy: "missing", guardrail: "missing", workspaceAutonomy: "missing",
     authenticEvidence: "evaluated_per_proposal", compatibility: "evaluated_per_selection",
     policyBundleReady: false, proposalReady: false },
-  authority: { canDraft: true, canPublish: false, canDisable: false, canApproveAction: false,
+  authority: { canDraft: true, canStartPublicationCeremony: true, canPublish: false, canDisable: false, canApproveAction: false,
     canGrant: false, canExecute: false, canWriteMeta: false },
 };
 
@@ -44,5 +44,57 @@ describe("K4 Policy Bundle dashboard", () => {
     expect(() => createGuardrailPolicyDraftBody({ policyRef: "guardrail_k4", accountRef: "account_foreign",
       adSetRef: "adset_doruk", internalCategoryRefs: [], denyAction: false, denyClauseRef: "",
       effectiveFrom: "2026-08-08T12:00", expiresAt: "", sourceGuidanceRefs: "" }, result)).toThrow();
+  });
+
+  it("runs the human-presence challenge before publication and preserves closed action authority", async () => {
+    const proof = `presence_${"A".repeat(32)}`;
+    const request = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ challenge: { kind: "approval_policy",
+        policyRef: "approval_policy_k4", revision: 1, unitRef: `policy_unit_${"a".repeat(20)}`,
+        proof, expiresAt: "2026-08-08T12:01:00.000Z" }, authority: { canPublish: false,
+        canDisable: false, canApproveAction: false, canGrant: false, canExecute: false, canWriteMeta: false } }),
+      { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ contractVersion: "policy-bundle-publication/1.0.0",
+        item: { kind: "approval_policy", policyRef: "approval_policy_k4", draftRevision: 1, state: "published" },
+        authority: { canPublish: false, canDisable: false, canApproveAction: false, canGrant: false,
+          canExecute: false, canWriteMeta: false } }), { status: 200 }));
+
+    await runPolicyPublicationCeremony({ kind: "approval_policy", policyRef: "approval_policy_k4", revision: 1 },
+      "reason_owner_reviewed_k4", request as unknown as typeof fetch);
+
+    expect(request).toHaveBeenNthCalledWith(1, "/api/policy-bundles", expect.objectContaining({
+      method: "POST", credentials: "same-origin", headers: expect.objectContaining({
+        "X-ReklamZeka-Intent": "policy-bundle-confirm-human-presence" }) }));
+    expect(request).toHaveBeenNthCalledWith(2, "/api/policy-bundles", expect.objectContaining({
+      body: JSON.stringify({ policyRef: "approval_policy_k4", revision: 1,
+        reasonRef: "reason_owner_reviewed_k4", humanPresenceProof: proof }),
+      headers: expect.objectContaining({ "X-ReklamZeka-Intent": "policy-bundle-publish-approval-policy" }) }));
+  });
+
+  it("fails closed when the ceremony response opens authority or does not match the selected draft", async () => {
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ challenge: { kind: "guardrail_policy",
+      policyRef: "guardrail_foreign", revision: 1, unitRef: `policy_unit_${"a".repeat(20)}`,
+      proof: `presence_${"A".repeat(32)}`, expiresAt: "2026-08-08T12:01:00.000Z" },
+    authority: { canPublish: true } }), { status: 200 }));
+    await expect(runPolicyPublicationCeremony({ kind: "approval_policy", policyRef: "approval_policy_k4", revision: 1 },
+      "reason_owner_reviewed_k4", request as unknown as typeof fetch)).rejects.toThrow("doğrulanamadı");
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the ceremony control only for an authorized human and a real draft", () => {
+    const approvalDraft = { kind: "approval_policy" as const, policyRef: "approval_policy_k4", revision: 1,
+      state: "draft" as const, effectiveFrom: "2026-08-08T12:00:00.000Z", expiresAt: null,
+      requesterRoles: ["owner" as const], approverRoles: ["owner" as const], grantConsumerRoles: ["owner" as const],
+      separationOfDuties: false, maximumProtectionEvidenceAgeSeconds: 3600,
+      maximumProposalLifetimeSeconds: 3600, maximumGrantLifetimeSeconds: 600,
+      normalizedByRole: "owner", publishedByRole: null };
+    const ownerHtml = renderToStaticMarkup(createElement(PolicyBundleStudioSurface,
+      { result: { ...result, approvalPolicies: [approvalDraft] }, onReload: vi.fn() }));
+    expect(ownerHtml).toContain("İnsan onayıyla yayınla");
+    expect(ownerHtml).toContain("Yayın reason ref");
+    const viewerHtml = renderToStaticMarkup(createElement(PolicyBundleStudioSurface,
+      { result: { ...result, approvalPolicies: [approvalDraft], authority: {
+        ...result.authority, canDraft: false, canStartPublicationCeremony: false } }, onReload: vi.fn() }));
+    expect(viewerHtml).not.toContain("İnsan onayıyla yayınla");
   });
 });

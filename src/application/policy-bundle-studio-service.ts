@@ -80,10 +80,11 @@ export type PolicyBundleScopeCatalog = Readonly<{
   adSets: readonly Readonly<PromotionCatalogOption & { accountRef: string; campaignRef: string }>[];
   internalCategories: readonly PromotionCatalogOption[];
 }>;
-export type PolicyBundleStudioAuthority = Readonly<{ canDraft: boolean; canPublish: false; canDisable: false;
+export type PolicyBundleStudioAuthority = Readonly<{ canDraft: boolean; canStartPublicationCeremony: boolean;
+  canPublish: false; canDisable: false;
   canApproveAction: false; canGrant: false; canExecute: false; canWriteMeta: false }>;
-function authority(canDraft: boolean): PolicyBundleStudioAuthority {
-  return Object.freeze({ canDraft, canPublish: false, canDisable: false,
+function authority(canDraft: boolean, canStartPublicationCeremony = false): PolicyBundleStudioAuthority {
+  return Object.freeze({ canDraft, canStartPublicationCeremony, canPublish: false, canDisable: false,
     canApproveAction: false, canGrant: false, canExecute: false, canWriteMeta: false });
 }
 export type PolicyBundleStudioResult = Readonly<{
@@ -234,7 +235,7 @@ export class PolicyBundleStudioService {
         compatibility: "evaluated_per_selection" as const,
         policyBundleReady: approvalPolicy === "published" && guardrail === "published"
           && workspaceAutonomy === "published_approval_only", proposalReady: false as const }),
-      authority: authority(membership.role !== "viewer") });
+      authority: authority(membership.role !== "viewer", membership.role === "owner" || membership.role === "admin") });
   }
 
   async createDraft(principal: TrustedDecisionRoomPrincipal, request: PolicyBundleDraftRequest) {
@@ -275,7 +276,8 @@ export class PolicyBundleStudioService {
       effectiveFrom: instant(request.effectiveFrom), expiresAt: request.expiresAt === null ? null : instant(request.expiresAt),
       normalizedBy });
     await this.approvals.append(artifact);
-    return Object.freeze({ contractVersion: POLICY_BUNDLE_STUDIO_VERSION, item: approvalProjection(artifact), authority: authority(true) });
+    return Object.freeze({ contractVersion: POLICY_BUNDLE_STUDIO_VERSION, item: approvalProjection(artifact),
+      authority: authority(true, membership.role === "owner" || membership.role === "admin") });
   }
 
   private async createGuardrailDraft(principal: TrustedDecisionRoomPrincipal, membership: WorkspaceMembership,
@@ -310,6 +312,7 @@ export class PolicyBundleStudioService {
       workspaceRef: principal.workspaceRef, policyRef, revision: 1, previousHash: null, effectiveFrom, expiresAt,
       selector, clauses, normalizedBy, sourceGuidanceRefs });
     await this.guardrails.append(artifact);
-    return Object.freeze({ contractVersion: POLICY_BUNDLE_STUDIO_VERSION, item: guardrailProjection(artifact), authority: authority(true) });
+    return Object.freeze({ contractVersion: POLICY_BUNDLE_STUDIO_VERSION, item: guardrailProjection(artifact),
+      authority: authority(true, membership.role === "owner" || membership.role === "admin") });
   }
 }

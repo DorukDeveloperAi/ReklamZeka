@@ -9,7 +9,8 @@ import { AuthorizationError } from "@/security/authorization";
 
 const HEADERS = Object.freeze({ "Cache-Control": "private, no-store, max-age=0", "X-Content-Type-Options": "nosniff",
   "X-ReklamZeka-Access-Mode": "policy-bundle-read-draft", "X-ReklamZeka-Action-Authority": "none" });
-const AUTHORITY = Object.freeze({ canDraft: false, canPublish: false, canDisable: false, canApproveAction: false,
+const AUTHORITY = Object.freeze({ canDraft: false, canStartPublicationCeremony: false,
+  canPublish: false, canDisable: false, canApproveAction: false,
   canGrant: false, canExecute: false, canWriteMeta: false });
 const FORWARDED = ["forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip", "cf-connecting-ip"] as const;
 function response(code: string, message: string, status: number) {

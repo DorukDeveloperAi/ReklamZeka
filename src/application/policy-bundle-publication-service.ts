@@ -72,6 +72,10 @@ function instant(value: unknown): string {
   if (typeof value !== "string" || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) fail("store_rejected");
   return value;
 }
+function evidenceInstant(value: unknown): string | null {
+  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) return null;
+  return new Date(value).toISOString() === value ? value : null;
+}
 function unitRef(input: Readonly<{ workspaceId: string; kind: PolicyPublicationKind; policyRef: string;
   revision: number; canonicalHash: string }>): string {
   return `policy_unit_${createHash("sha256").update(JSON.stringify(input)).digest("hex").slice(0, 20)}`;
@@ -132,12 +136,13 @@ export class PolicyBundlePublicationService {
       evidence = await this.humanPresence.consume({ proof: unsafe.humanPresenceProof,
         workspaceId: principal.workspaceId, actorRef: principal.readerRef, unitRef: prepared.unitRef,
         action: action(kind), now: prepared.now });
+      exact(evidence, ["authorizationRef", "issuedAt", "expiresAt", "humanPresence", "canExecute"]);
+      const issuedAt = evidenceInstant(evidence.issuedAt); const expiresAt = evidenceInstant(evidence.expiresAt);
+      if (!REF.test(evidence.authorizationRef) || evidence.humanPresence !== true || evidence.canExecute !== false
+        || issuedAt === null || expiresAt === null || issuedAt > prepared.now || expiresAt <= prepared.now) {
+        throw new Error("rejected evidence");
+      }
     } catch { return fail("human_presence_rejected"); }
-    exact(evidence, ["authorizationRef", "issuedAt", "expiresAt", "humanPresence", "canExecute"]);
-    if (!REF.test(evidence.authorizationRef) || evidence.humanPresence !== true || evidence.canExecute !== false
-      || instant(evidence.issuedAt) > prepared.now || instant(evidence.expiresAt) <= prepared.now) {
-      fail("human_presence_rejected");
-    }
     const actor = { actorRef: principal.readerRef, role: membership.role as "owner" | "admin" } as const;
     if (kind === "approval_policy") {
       const published = publishApprovalPolicy({ draft: prepared.found as ApprovalPolicyDefinitionRevision,

@@ -6,8 +6,8 @@ import type { ExistingPostPromotionPreflightContext, ExistingPostPromotionPrefli
   "@/application/existing-post-promotion-preflight-service";
 import { META_COMPATIBILITY_DIMENSIONS } from "@/domain/meta/promotion/compatibility-artifact";
 
-const HASH = /^[a-f0-9]{64}$/;
 type Compatibility = ExistingPostPromotionPreflightContext["template"]["compatibility"];
+const COMPATIBILITY_STATUSES = new Set(["confirmed", "rejected", "unknown"] as const);
 
 function unresolved(context: ExistingPostPromotionPreflightContext): ExistingPostPromotionPreflightContext {
   return Object.freeze({ ...context, template: Object.freeze({ ...context.template,
@@ -54,6 +54,7 @@ export class ExistingPostPromotionCompatibilityPreflightRepository implements Ex
     if (resolution.selectionHash !== evidenceSelectionHash
       || resolution.dimensions.length !== META_COMPATIBILITY_DIMENSIONS.length
       || new Set(resolution.dimensions.map((item) => item.dimension)).size !== META_COMPATIBILITY_DIMENSIONS.length
+      || resolution.dimensions.some((item) => !COMPATIBILITY_STATUSES.has(item.status))
       || META_COMPATIBILITY_DIMENSIONS.some((dimension) => !resolution.dimensions.some((item) => item.dimension === dimension))) {
       return unresolved(context);
     }

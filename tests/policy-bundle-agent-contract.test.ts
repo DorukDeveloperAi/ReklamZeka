@@ -27,7 +27,8 @@ function studioResult(): PolicyBundleStudioResult {
     readiness: Object.freeze({ approvalPolicy: "missing" as const, guardrail: "missing" as const,
       workspaceAutonomy: "missing" as const, authenticEvidence: "evaluated_per_proposal" as const,
       compatibility: "evaluated_per_selection" as const, policyBundleReady: false, proposalReady: false as const }),
-    authority: Object.freeze({ canDraft: true, canPublish: false as const, canDisable: false as const,
+    authority: Object.freeze({ canDraft: true, canStartPublicationCeremony: true,
+      canPublish: false as const, canDisable: false as const,
       canApproveAction: false as const, canGrant: false as const, canExecute: false as const, canWriteMeta: false as const }),
   });
 }
