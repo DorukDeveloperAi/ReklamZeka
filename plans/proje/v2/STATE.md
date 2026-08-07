@@ -968,3 +968,27 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Tam kapı 158 test dosyasında 1003 test, production build, architecture/security/secret ve Drizzle kontrolleriyle
   geçti. Sonraki ürün dilimi policy/rule/guardrail oluşturma-yayınlama stüdyosu ve örnek bir kullanıcı-reviewed
   K4 policy bundle ile dashboard proposal→satır-bazlı approval E2E kabulüdür.
+
+## 2026-08-08 — S5.4c3-M draft-only K4 Policy Bundle Studio
+
+- Autonomy Studio içine ayrı K4 Policy Bundle sekmesi eklendi. ApprovalPolicy ve ActionGuardrail revision
+  registry'leri aynı server-private okuma servisine bağlandı; public projeksiyonda canonical/policy hash, actor,
+  karar kimliği, internal UUID, Meta ID ve raw targeting bulunmaz. Viewer yalnız okuyabilir; owner/admin/analyst
+  immutable draft oluşturabilir. Publish, disable, action approve, grant, execute ve Meta-write authority'lerinin
+  tamamı kapalıdır.
+- ApprovalPolicy formu K4 + `approval_only` applicability'sini sabitler; rol, separation-of-duties, evidence,
+  proposal ve grant sürelerini kullanıcıdan açıkça ister. Hiçbir business değer, süre veya rol otomatik doldurulmaz.
+  Guardrail formunda account ve ad set yalnız server kataloğundan seçilir; campaign ad set kaydından türetilir,
+  internal kategori yine katalogdan seçilir. Geo serbest metni ve caller workspace/revision/authority alanları
+  reddedilir. Aynı policyRef için açık draft varsa overwrite yerine fail-closed conflict oluşur.
+- Readiness görünümü active/effective exact-one ApprovalPolicy ve Guardrail, zaman penceresi içinde published
+  workspace `approval_only` autonomy kuralı ve proposal-anında authentic evidence koşullarını ayrı gösterir.
+  Expired/future, birden çok aktif policy veya viewer draft yetkisi yanlışlıkla `READY` üretmez. Henüz gerçek
+  kullanıcı-reviewed policy, autonomy, guardrail veya compatibility bundle yayınlanmadığı için production proposal
+  zinciri `NOT READY` ve Meta writer kapalı kalır.
+- Repository revision feed ve latest sorguları DB tenant filtresine ek olarak artifact workspace/policy bağını
+  yeniden doğrular. Canlı Supabase kabulü 75/75 RLS, sıfır API table grant/schema-create/public routine-execute ile
+  geçti. Guardrail rollback kabulü draft→published append, restart durability, append-only UPDATE reddi ve sıfır
+  Meta/execution çağrısını doğruladı. Tam kapı 160 test dosyasında 1014 test, production build,
+  architecture/security/secret ve Drizzle kontrolleriyle geçti. In-app browser localhost URL politikası görsel
+  tıklama kabulünü engelledi; responsive/browser E2E açık iş olarak korunuyor.

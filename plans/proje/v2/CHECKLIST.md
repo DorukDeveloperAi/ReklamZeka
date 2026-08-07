@@ -313,6 +313,10 @@
     kill-switch, protection disposition ve bütün bilinen expiry kaynakları bağlı; freshness default'u yok.
   - [x] Evidence freshness'i reviewed ApprovalPolicy alanından türeten request-bound Drizzle submitter ve cookie-only
     proposal-draft route composition'ı; principal/membership exact binding, yalnız append-only queue, Meta writer yok.
+  - [x] Autonomy Studio içinde draft-only K4 Policy Bundle sekmesi; ApprovalPolicy/Guardrail public-safe feed,
+    active/effective/ambiguity-aware readiness, viewer read-only ve owner/admin/analyst immutable draft akışı.
+    Guardrail account→campaign→ad-set kapsamı ile internal kategori yalnız server kataloğundan; business değer
+    varsayımı, publish/disable/approve/grant/execute/Meta-write ve geo serbest metni yok.
   - [ ] Kullanıcı-reviewed gerçek ApprovalPolicy/AutonomyRule/Guardrail/compatibility bundle'ını yayınlama ve
     dashboard üzerinden proposal→satır-bazlı approval canlı E2E; hiçbir business policy seed edilmedi.
   - [ ] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı.

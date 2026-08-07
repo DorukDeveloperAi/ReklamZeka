@@ -45,6 +45,17 @@ log veya bildirim payload'ına eklenmez.
 
 ## Action guardrail registry
 
+- Dashboard `Autonomy & Policy Studio → K4 Policy Bundle` yüzeyi yalnız public-safe revision feed, readiness ve
+  immutable draft oluşturma sağlar. Draft kaydı policy'yi etkinleştirmez; aynı `policyRef` için açık draft varken
+  yeni draft yazılmaz. Düzenlenecek değerler kaydetmeden önce kontrol edilmelidir.
+- ApprovalPolicy rol/süre/separation-of-duties alanlarında seed veya UI varsayılanı yoktur. Guardrail scope yalnız
+  güncel server catalog account/ad-set zincirinden seçilir; campaign server tarafından ad-set kaydından türetilir.
+  Geo kapsamı reviewed public selector kataloğu gelene kadar bu yüzeyde kapalıdır.
+- `READY`; tekil, etkin published ApprovalPolicy + Guardrail ve etkin workspace `approval_only` AutonomyRule birlikte
+  yoksa gösterilmez. Taslak, expired/future veya ambiguous set production proposal akışını açmaz. Publish için ayrı
+  owner/admin yetkisi ve insan-varlığı töreni henüz uygulanmadığından gerçek policy bundle yayınlamayın veya DB'ye
+  elle seed etmeyin.
+
 - Migration sonrası `npm run verify:action-guardrail-db` çalıştırılır. Kabul; geçici workspace içinde
   draft→published append, yeniden kurulan repository ile resolve ve UPDATE append-only trigger'ını sınar;
   transaction sonunda bütün geçici satırlar rollback edilir.
