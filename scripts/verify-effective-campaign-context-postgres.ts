@@ -150,62 +150,7 @@ let temporaryRowsCommitted = true;
 
 try {
   await database.transaction(async (transaction) => {
-    await transaction.execute(sql`create temporary table workspaces
-      (like public.workspaces including defaults including constraints including indexes) on commit drop`);
-    await transaction.execute(sql`create temporary table meta_connections
-      (like public.meta_connections including defaults including constraints including indexes) on commit drop`);
-    await transaction.execute(sql`create temporary table data_sources
-      (like public.data_sources including defaults including constraints including indexes) on commit drop`);
-    await transaction.execute(sql`create temporary table ad_accounts
-      (like public.ad_accounts including defaults including constraints including indexes) on commit drop`);
-    await transaction.execute(sql`create temporary table ad_campaigns
-      (like public.ad_campaigns including defaults including constraints including indexes) on commit drop`);
-    await transaction.execute(sql`create temporary table meta_change_snapshots
-      (like public.meta_change_snapshots including defaults including constraints including indexes) on commit drop`);
-    await transaction.execute(sql`alter table meta_connections add unique (workspace_id, id)`);
-    await transaction.execute(sql`alter table ad_accounts add unique (workspace_id, id)`);
-    await transaction.execute(sql`alter table ad_campaigns add unique (workspace_id, id)`);
-    await transaction.execute(sql`
-      create temporary table effective_campaign_contexts (
-        id uuid primary key default gen_random_uuid(), workspace_id uuid not null,
-        identity_hash text not null, context_hash text not null, schema_version text not null,
-        meta_connection_id uuid not null, ad_account_id uuid not null, campaign_id uuid not null,
-        connection_ref text not null, account_ref text not null, campaign_ref text not null,
-        entity_type text not null, entity_ref text not null, captured_at timestamptz not null,
-        snapshot_refs jsonb not null, context_payload jsonb not null, created_at timestamptz not null default now(),
-        unique (workspace_id, id), unique (workspace_id, identity_hash), unique (workspace_id, context_hash),
-        foreign key (workspace_id, meta_connection_id) references meta_connections(workspace_id, id) on delete restrict,
-        foreign key (workspace_id, ad_account_id) references ad_accounts(workspace_id, id) on delete restrict,
-        foreign key (workspace_id, campaign_id) references ad_campaigns(workspace_id, id) on delete restrict,
-        check (jsonb_typeof(snapshot_refs) = 'array' and jsonb_array_length(snapshot_refs) >= 1),
-        check (context_payload::text !~* '"[^"[:space:]]*(token|secret)"[[:space:]]*:'),
-        check ((jsonb_typeof(context_payload #> '{capabilities}') = 'object'
-          and (context_payload #> '{capabilities}') ?& array['containsRawL0','canAuthorizeAction','canExecuteWrite']
-          and context_payload #> '{capabilities,containsRawL0}' = 'false'::jsonb
-          and context_payload #> '{capabilities,canAuthorizeAction}' = 'false'::jsonb
-          and context_payload #> '{capabilities,canExecuteWrite}' = 'false'::jsonb
-          and context_payload::text !~* '"(canAuthorizeAction|canExecuteWrite|canEnforcePolicy|canAlterApproval)"[[:space:]]*:[[:space:]]*true') is true)
-      ) on commit drop
-    `);
-    await transaction.execute(sql`
-      create temporary table effective_campaign_context_components (
-        id uuid primary key default gen_random_uuid(), workspace_id uuid not null,
-        context_id uuid not null references effective_campaign_contexts(id) on delete cascade,
-        component_type text not null, component_ref text not null, component_version text not null,
-        created_at timestamptz not null default now(),
-        unique (context_id, component_type, component_ref, component_version)
-      ) on commit drop
-    `);
-    await transaction.execute(sql`
-      create temporary table effective_campaign_context_invalidations (
-        id uuid primary key default gen_random_uuid(), workspace_id uuid not null,
-        event_hash text not null, component_type text not null, component_ref text not null,
-        component_version text not null, scope_kind text not null, entity_type text, entity_ref text,
-        reason_code text not null, observed_at timestamptz not null, created_at timestamptz not null default now(),
-        unique (workspace_id, event_hash)
-      ) on commit drop
-    `);
-
+    // Exercise the applied production schema; the outer transaction rolls all fixtures back.
     await transaction.insert(schema.workspaces).values([
       { id: workspaceId, name: "Context E2E" }, { id: foreignWorkspaceId, name: "Foreign Context E2E" },
     ]);

@@ -28,12 +28,20 @@ bütçe simülasyonu ve Meta write sırasıyla S3 ve S4'e aittir.
   run/record ID, snapshot/context ref ve sebepli insufficient-data sözleşmesi testli.
   Sürümlü metrik/formül motoru additive/non-additive/ratio-of-sums, attribution, currency,
   replay ve çelişkili revision guard'larıyla hazır; L2 materialization açık.
-- **S2.4 frozen context core hazır:** Meta config refs, effective category, guidance pack,
-  policy/cadence/data/history ve katalog sürümleri tek authentic hash'te birleşiyor; raw L0,
-  token, agent narration ve action/write authority reddediliyor. Persistence/invalidation açık.
-- **Birleşik kanıt:** 47 test dosyası/263 test, production build, audit 0; category/guidance
-  ve tombstone PostgreSQL rollback kabulleri temiz. Supabase 39/39 RLS, API table grant'i
-  `0`; tracked/build/cache token eşleşmesi `0`. Meta write kapalı.
+- **S2.4 frozen context kapısı hazır:** Meta config refs, effective category, guidance pack,
+  policy/cadence/data/history ve katalog sürümleri tek authentic hash'te birleşiyor. Append-only
+  PostgreSQL persistence, tenant/hierarchy bağları, source-version selective invalidation,
+  historical replay ve güvenli public projection testli; raw L0, token, agent narration ve
+  action/write authority reddediliyor.
+- **S2.5 pure agenda/finding core hazır:** on deterministik top-down pass, category/topic subset,
+  bounded finding-driver drill-down, objective metric allowlist'i, timeframe/context bağları ve
+  protected-guidance suppression testli. Persistence ve Decision Room application binding'i açık.
+- **S2.6 pure cadence/experiment/ledger core hazır:** settle/observation/learning/cooldown,
+  evidence ve repeat suppression; tek değişkenli experiment lifecycle ve append-only authentic
+  hash-chain ledger testli. PostgreSQL ledger persistence ve application API'si açık.
+- **Birleşik kanıt:** 53 test dosyası/296 test, production build, audit 0; category/guidance,
+  frozen-context ve tombstone PostgreSQL rollback kabulleri temiz. Supabase 42/42 RLS, API
+  table grant'i `0`; tracked/build/cache token eşleşmesi `0`. Meta write çağrısı `0`.
 
 ## Değişmez sınırlar
 

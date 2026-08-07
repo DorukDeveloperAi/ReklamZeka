@@ -76,7 +76,7 @@
   - [x] Kesintisiz hierarchy path, child add/override/deny, manual-lock precedence,
     `parked_conflict` ve frozen category context/hash çekirdeği.
   - [x] Tüm category/guidance/policy/data refs'lerini birleştiren saf EffectiveCampaignContext.
-  - [ ] Context persistence, selective invalidation ve public redaction projection'ı.
+  - [x] Context persistence, selective invalidation ve public redaction projection'ı.
 - [ ] Strict instruction/policy DSL ve negatif parser matrisi.
 - [ ] Raw natural-language → normalized draft + assumption/question/impact preview.
 - [ ] Precedence/inheritance/suppression/PARKED_CONFLICT resolver.
@@ -107,13 +107,20 @@
   - [ ] Gerçek finding fonksiyonları.
 - [ ] Hierarchical driver ve creative fatigue/config diagnostics.
 - [ ] Analysis run ledger, dry-run API ve deterministic replay.
+  - [x] Append-only authentic hash-chain decision ledger saf çekirdeği ve malformed/tamper matrisi.
+  - [ ] PostgreSQL ledger persistence ve read/draft application API'si.
 - [ ] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
+  - [x] Deterministik on-pass agenda, category/topic subset ve context/timeframe-bound finding çekirdeği.
+  - [ ] Persistence, gerçek finding ailesi ve Decision Room application binding'i.
 - [x] EffectiveGuidancePack scope filter/ranking/context-budget ve source/conflict trace.
 - [ ] DecisionCadenceProfile, no-change/repeat suppression ve ExperimentRecord lifecycle.
+  - [x] Settle/observation/learning/cooldown/evidence/repeat saf karar kapısı ve tek değişkenli experiment çekirdeği.
+  - [ ] PostgreSQL persistence, rol/audit API'si ve scheduled executor binding'i.
 - [ ] L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.
-- [ ] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
+- [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
-  - [ ] Persistence/invalidation ve bounded driver tools.
+  - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.
+  - [x] Finding'e bağlı max-depth/max-driver sınırlı bottom-up driver çekirdeği.
 - [ ] Optional manual/CSV BusinessOutcomeSignal ve Meta-proxy mapping guard.
 
 ## A11 — Bütçe planlama

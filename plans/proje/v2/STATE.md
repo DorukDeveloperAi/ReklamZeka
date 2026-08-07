@@ -270,3 +270,27 @@ ReklamZeka'ya taşınmaz.
   tombstone PostgreSQL kabulleri geçici satır bırakmadan geçti. Supabase 39/39 RLS ve API
   table grant `0`; 47 test dosyası/263 test, production build ve audit 0. Tracked/build/cache
   token eşleşmesi `0`; Meta write çağrısı `0`.
+
+## 2026-08-07 — S2 frozen context ve analitik karar çekirdekleri
+
+- EffectiveCampaignContext append-only PostgreSQL repository'sine bağlandı. Composite tenant
+  foreign key'leri connection→account→campaign→entity zincirini doğruluyor; snapshot zamanı ve
+  source component sürümleri context capture'ıyla bağlı. Aynı identity/farklı hash çatışması,
+  cross-tenant ve bozuk hierarchy fail-closed.
+- `workspace_component` ve `exact_entity_component` invalidation modları açık semantik taşıyor;
+  latest-valid seçim invalidated context'i atlıyor, historical replay immutable kalıyor. Güvenli
+  public projection workspace ve dahili ref'leri maskeliyor, authentic hash doğrulanmadan çıktı vermiyor.
+- AnalysisAgenda on deterministik top-down pass üretir; seçili category dimension/definition ve
+  applied-guidance topic'leri agenda hash'ine girer. Finding motoru context/timeframe/metric allowlist
+  sınırlarını korur ve yalnız finding'e bağlı max 2 derinlik/max 3 driver bottom-up inceleme açar.
+- DecisionCadenceProfile yeni kanıt, settle/observation/learning/cooldown ve tekrar bastırma kapılarını
+  uygular. ExperimentRecord tek ana değişken, baseline, guardrail, örneklem/pencere ve contamination
+  taşır. Append-only decision ledger canonical hash-chain ile tamper ve yetki enjeksiyonunu reddeder;
+  henüz PostgreSQL'e bağlanmış değildir ve hiçbir action authority üretmez.
+- Context migration'ı Supabase'e uygulandı. Gerçek production tablolarında outer-rollback E2E;
+  idempotent replay, identity conflict, cross-tenant/hierarchy/snapshot guard, invalidation/replay,
+  payload/NULL/nested-authority reddi ve rollback-clean kontrollerinden geçti. Workspace tombstone
+  kabulü de 38 workspace tablosunda temiz geçti.
+- Kanıt: 53 test dosyası/296 test, `db:check`, production build ve audit `0`. Supabase 42/42
+  RLS, API table grant `0`, API schema create `0`, public routine execute `0`; tracked/build/cache
+  token eşleşmesi `0`; Meta write/network çağrısı `0`.
