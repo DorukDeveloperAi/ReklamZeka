@@ -62,7 +62,8 @@ const actionPlan = buildActionPlan(action, {
 const proposal = new ActionProposalStagingService({
   version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_verifier", revision: 1, autonomyMode: "approval_only",
   requesterRoles: ["operator"], approverRoles: [{ risk: "K2", roles: ["owner"] }],
-  grantConsumerRoles: ["owner"], separationOfDutiesRisks: [], maximumProposalLifetimeSeconds: 86_400,
+  grantConsumerRoles: ["owner"], separationOfDutiesRisks: [], maximumProtectionEvidenceAgeSeconds: 3_600,
+  maximumProposalLifetimeSeconds: 86_400,
   maximumGrantLifetimeSeconds: 300,
 }).stage({
   plan: { planRef: "plan_verifier", revision: 1, planHash: "a".repeat(64) },

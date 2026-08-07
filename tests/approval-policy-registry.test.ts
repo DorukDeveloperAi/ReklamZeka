@@ -22,6 +22,7 @@ function policy(policyRef = "policy_existing_post", revision = 1): ApprovalPolic
     requesterRoles: ["owner", "admin", "analyst"],
     approverRoles: [{ risk: "K4", roles: ["owner", "admin"] }],
     grantConsumerRoles: ["owner", "admin"], separationOfDutiesRisks: ["K4"],
+    maximumProtectionEvidenceAgeSeconds: 3_600,
     maximumProposalLifetimeSeconds: 86_400,
     maximumGrantLifetimeSeconds: 900,
   };
@@ -51,7 +52,8 @@ describe("reviewed ApprovalPolicy definition registry", () => {
       policy: {
         requesterRoles: ["admin", "analyst", "owner"],
         approverRoles: [{ risk: "K4", roles: ["admin", "owner"] }],
-        grantConsumerRoles: ["admin", "owner"], maximumProposalLifetimeSeconds: 86_400,
+        grantConsumerRoles: ["admin", "owner"], maximumProtectionEvidenceAgeSeconds: 3_600,
+        maximumProposalLifetimeSeconds: 86_400,
         maximumGrantLifetimeSeconds: 900,
       },
       authority: { canApprove: false, canGrant: false, canExecute: false, canWriteMeta: false, canPromoteGuidance: false },
@@ -65,6 +67,12 @@ describe("reviewed ApprovalPolicy definition registry", () => {
       normalizedBy: { actorRef: "actor_admin", role: "admin" } });
     expect(shorter.policyHash).not.toBe(definition.policyHash);
     expect(shorter.canonicalHash).not.toBe(definition.canonicalHash);
+    const fresherEvidence = createApprovalPolicyDraft({ workspaceRef: "workspace_alpha",
+      policy: { ...policy(), maximumProtectionEvidenceAgeSeconds: 1_800 },
+      effectiveFrom: "2026-08-07T00:00:00.000Z", expiresAt: null,
+      normalizedBy: { actorRef: "actor_admin", role: "admin" } });
+    expect(fresherEvidence.policyHash).not.toBe(definition.policyHash);
+    expect(fresherEvidence.canonicalHash).not.toBe(definition.canonicalHash);
   });
 
   it("requires explicit owner/admin publication and makes exact command replay deterministic", () => {
@@ -136,14 +144,15 @@ describe("reviewed ApprovalPolicy definition registry", () => {
     const oldPublished = published();
     const revisedDraft = reviseApprovalPolicyDraft({
       current: oldPublished,
-      policy: { ...policy(oldPublished.policyRef, 3), maximumProposalLifetimeSeconds: 43_200,
+      policy: { ...policy(oldPublished.policyRef, 3), maximumProtectionEvidenceAgeSeconds: 1_800,
+        maximumProposalLifetimeSeconds: 43_200,
         maximumGrantLifetimeSeconds: 1_800,
         requesterRoles: ["owner", "admin"] },
       effectiveFrom: "2026-08-07T00:00:00.000Z", expiresAt: null,
       normalizedBy: { actorRef: "actor_analyst", role: "analyst" },
     });
     expect(revisedDraft).toMatchObject({ policyRef: oldPublished.policyRef, revision: 3, state: "draft",
-      policy: { revision: 3, maximumProposalLifetimeSeconds: 43_200,
+      policy: { revision: 3, maximumProtectionEvidenceAgeSeconds: 1_800, maximumProposalLifetimeSeconds: 43_200,
         maximumGrantLifetimeSeconds: 1_800, requesterRoles: ["admin", "owner"] },
       provenance: { publishedByActorRef: null, disabledByActorRef: null } });
     expect(resolvePublishedExistingPostPolicy({ workspaceRef: "workspace_alpha",
@@ -155,7 +164,8 @@ describe("reviewed ApprovalPolicy definition registry", () => {
     });
     const resolved = resolvePublishedExistingPostPolicy({ workspaceRef: "workspace_alpha",
       evaluatedAt: "2026-08-07T12:00:00.000Z", definitions: [draft(), oldPublished, revisedDraft, replacement] });
-    expect(resolved).toMatchObject({ policy: { revision: 4, maximumProposalLifetimeSeconds: 43_200,
+    expect(resolved).toMatchObject({ policy: { revision: 4, maximumProtectionEvidenceAgeSeconds: 1_800,
+      maximumProposalLifetimeSeconds: 43_200,
       maximumGrantLifetimeSeconds: 1_800 },
       source: { policyRef: oldPublished.policyRef, revision: 4 } });
     expect(() => reviseApprovalPolicyDraft({ ...({ current: revisedDraft, policy: policy(oldPublished.policyRef, 4),
@@ -205,6 +215,16 @@ describe("reviewed ApprovalPolicy definition registry", () => {
         effectiveFrom: "2026-08-07T00:00:00.000Z", expiresAt: null,
         normalizedBy: { actorRef: "actor_admin", role: "admin" } })).toThrow(ApprovalPolicyRegistryError);
     }
+    for (const maximumProtectionEvidenceAgeSeconds of [0, 604_801, 1.5]) {
+      expect(() => createApprovalPolicyDraft({ workspaceRef: "workspace_alpha",
+        policy: { ...policy(), maximumProtectionEvidenceAgeSeconds },
+        effectiveFrom: "2026-08-07T00:00:00.000Z", expiresAt: null,
+        normalizedBy: { actorRef: "actor_admin", role: "admin" } })).toThrow(ApprovalPolicyRegistryError);
+    }
+    const { maximumProtectionEvidenceAgeSeconds: _missingEvidenceAge, ...legacyEvidencePolicy } = policy();
+    expect(() => createApprovalPolicyDraft({ workspaceRef: "workspace_alpha", policy: legacyEvidencePolicy as never,
+      effectiveFrom: "2026-08-07T00:00:00.000Z", expiresAt: null,
+      normalizedBy: { actorRef: "actor_admin", role: "admin" } })).toThrow(ApprovalPolicyRegistryError);
     const { maximumProposalLifetimeSeconds: _missing, ...legacyPolicy } = policy();
     expect(() => createApprovalPolicyDraft({ workspaceRef: "workspace_alpha", policy: legacyPolicy as never,
       effectiveFrom: "2026-08-07T00:00:00.000Z", expiresAt: null,

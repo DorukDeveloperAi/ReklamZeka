@@ -24,13 +24,6 @@ type ProtectionPort = Readonly<{ resolve(input: PersistedProtectionResolutionInp
 export type ExistingPostPromotionMembershipPort = Readonly<{
   resolve(principal: TrustedDecisionRoomPrincipal): Promise<WorkspaceMembership | null>;
 }>;
-export type ExistingPostPromotionEvidenceFreshnessPort = Readonly<{
-  resolveNotBefore(input: Readonly<{
-    principal: TrustedDecisionRoomPrincipal;
-    material: ExistingPostPromotionCanonicalMaterial;
-    evaluatedAt: string;
-  }>): Promise<string | null>;
-}>;
 
 export class ExistingPostPromotionPolicyAdapterError extends Error {
   constructor(readonly code: "invalid_construction") {
@@ -91,9 +84,8 @@ function protectionContext(resolution: ProtectionResolution): ProtectionContext 
 export class ExistingPostPromotionPolicyAdapter implements ExistingPostPromotionPolicyPort {
   constructor(private readonly approval: ApprovalPolicyPort, private readonly autonomy: AutonomyRulesPort,
     private readonly evidence: ExistingPostPromotionProtectionEvidenceMaterializer,
-    private readonly protection: ProtectionPort, private readonly memberships: ExistingPostPromotionMembershipPort,
-    private readonly freshness: ExistingPostPromotionEvidenceFreshnessPort) {
-    if (!approval || !autonomy || !evidence || !protection || !memberships || !freshness) {
+    private readonly protection: ProtectionPort, private readonly memberships: ExistingPostPromotionMembershipPort) {
+    if (!approval || !autonomy || !evidence || !protection || !memberships) {
       throw new ExistingPostPromotionPolicyAdapterError("invalid_construction");
     }
   }
@@ -119,6 +111,9 @@ export class ExistingPostPromotionPolicyAdapter implements ExistingPostPromotion
       const approval = await this.approval.resolveExistingPostPolicy(evaluatedAt);
       if (approval.source.workspaceRef !== principal.workspaceRef || approval.policy.autonomyMode !== "approval_only"
         || !approval.policy.requesterRoles.includes(requesterRole)) return null;
+      const maximumEvidenceAgeSeconds = approval.policy.maximumProtectionEvidenceAgeSeconds;
+      if (!Number.isSafeInteger(maximumEvidenceAgeSeconds)
+        || maximumEvidenceAgeSeconds < 1 || maximumEvidenceAgeSeconds > 604_800) return null;
 
       const allRules = await this.autonomy.resolve();
       const rules = Object.freeze(allRules.filter((rule) => rule.workspaceRef === principal.workspaceRef
@@ -128,8 +123,7 @@ export class ExistingPostPromotionPolicyAdapter implements ExistingPostPromotion
       if (!activeRules.some((rule) => rule.scope.level === "workspace" && rule.scope.ref === principal.workspaceRef
         && rule.mode === "approval_only" && !rule.killSwitch)
         || activeRules.some((rule) => rule.killSwitch)) return null;
-      const notBefore = await this.freshness.resolveNotBefore({ principal, material, evaluatedAt });
-      if (!instant(notBefore) || notBefore > evaluatedAt) return null;
+      const notBefore = new Date(Date.parse(evaluatedAt) - maximumEvidenceAgeSeconds * 1_000).toISOString();
       const evidenceScope: ProtectionEvidenceScope = Object.freeze({ workspaceId: principal.workspaceId,
         workspaceRef: principal.workspaceRef, accountRef: material.accountRef, campaignRef: material.campaignRef,
         entity: Object.freeze({ level: "adset" as const, ref: material.adSetRef }), evaluatedAt, notBefore });

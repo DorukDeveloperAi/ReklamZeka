@@ -27,6 +27,7 @@ const policy: ApprovalPolicy = {
   ],
   grantConsumerRoles: ["owner"],
   separationOfDutiesRisks: ["K3", "K4"],
+  maximumProtectionEvidenceAgeSeconds: 3_600,
   maximumProposalLifetimeSeconds: 86_400,
   maximumGrantLifetimeSeconds: 300,
 };

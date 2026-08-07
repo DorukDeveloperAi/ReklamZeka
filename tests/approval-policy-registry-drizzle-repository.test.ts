@@ -20,7 +20,8 @@ const workspaceRef = "workspace_alpha";
 function policy(policyRef = "policy_existing_post", revision = 1): ApprovalPolicy {
   return { version: ACTION_APPROVAL_POLICY_VERSION, policyRef, revision, autonomyMode: "approval_only",
     requesterRoles: ["owner", "analyst"], approverRoles: [{ risk: "K4", roles: ["owner"] }],
-    grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K4"], maximumProposalLifetimeSeconds: 86_400,
+    grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K4"], maximumProtectionEvidenceAgeSeconds: 3_600,
+    maximumProposalLifetimeSeconds: 86_400,
     maximumGrantLifetimeSeconds: 600 };
 }
 function draft(patch: { workspaceRef?: string; policyRef?: string } = {}) {
@@ -92,7 +93,8 @@ describe("Drizzle reviewed ApprovalPolicy registry", () => {
   it("accepts published-to-new-draft-to-published revisions under the same policyRef", async () => {
     const original = published();
     const nextDraft = reviseApprovalPolicyDraft({ current: original,
-      policy: { ...policy(original.policyRef, 3), maximumProposalLifetimeSeconds: 43_200,
+      policy: { ...policy(original.policyRef, 3), maximumProtectionEvidenceAgeSeconds: 1_800,
+        maximumProposalLifetimeSeconds: 43_200,
         maximumGrantLifetimeSeconds: 1_200 },
       effectiveFrom: "2026-08-07T00:00:00.000Z", expiresAt: null,
       normalizedBy: { actorRef: "actor_analyst", role: "analyst" } });
@@ -114,7 +116,8 @@ describe("Drizzle reviewed ApprovalPolicy registry", () => {
     ] }]);
     await expect(new DrizzleApprovalPolicyRegistryRepository(resolve as never, workspaceId, workspaceRef)
       .resolveExistingPostPolicy("2026-08-07T12:00:00.000Z"))
-      .resolves.toMatchObject({ policy: { revision: 4, maximumProposalLifetimeSeconds: 43_200,
+      .resolves.toMatchObject({ policy: { revision: 4, maximumProtectionEvidenceAgeSeconds: 1_800,
+        maximumProposalLifetimeSeconds: 43_200,
         maximumGrantLifetimeSeconds: 1_200 },
         source: { revision: 4, definitionId: "55555555-5555-4555-a555-555555555555" } });
   });

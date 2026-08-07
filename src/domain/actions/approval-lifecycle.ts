@@ -64,6 +64,7 @@ export type ApprovalPolicy = Readonly<{
   approverRoles: readonly Readonly<{ risk: ActionRisk; roles: readonly ActionApprovalRole[] }>[];
   grantConsumerRoles: readonly ActionApprovalRole[];
   separationOfDutiesRisks: readonly ActionRisk[];
+  maximumProtectionEvidenceAgeSeconds: number;
   maximumProposalLifetimeSeconds: number;
   maximumGrantLifetimeSeconds: number;
 }>;
@@ -302,10 +303,12 @@ function normalizePolicy(candidate: ApprovalPolicy): ResolvedApprovalPolicy {
   exact(candidate, [
     "version", "policyRef", "revision", ...(Object.hasOwn(candidate, "autonomyMode") ? ["autonomyMode"] : []),
     "requesterRoles", "approverRoles", "grantConsumerRoles", "separationOfDutiesRisks",
-    "maximumProposalLifetimeSeconds", "maximumGrantLifetimeSeconds",
+    "maximumProtectionEvidenceAgeSeconds", "maximumProposalLifetimeSeconds", "maximumGrantLifetimeSeconds",
   ]);
   if (candidate.version !== ACTION_APPROVAL_POLICY_VERSION || (candidate.autonomyMode ?? "approval_only") !== "approval_only"
     || !Number.isSafeInteger(candidate.revision) || candidate.revision < 1
+    || !Number.isSafeInteger(candidate.maximumProtectionEvidenceAgeSeconds)
+    || candidate.maximumProtectionEvidenceAgeSeconds < 1 || candidate.maximumProtectionEvidenceAgeSeconds > 604_800
     || !Number.isSafeInteger(candidate.maximumProposalLifetimeSeconds)
     || candidate.maximumProposalLifetimeSeconds < 1 || candidate.maximumProposalLifetimeSeconds > 604_800
     || !Number.isSafeInteger(candidate.maximumGrantLifetimeSeconds)
@@ -330,6 +333,7 @@ function normalizePolicy(candidate: ApprovalPolicy): ResolvedApprovalPolicy {
     approverRoles: freeze(approverRoles),
     grantConsumerRoles: normalizeRoles(candidate.grantConsumerRoles, APPROVER_ROLES),
     separationOfDutiesRisks: freeze([...candidate.separationOfDutiesRisks].sort()),
+    maximumProtectionEvidenceAgeSeconds: candidate.maximumProtectionEvidenceAgeSeconds,
     maximumProposalLifetimeSeconds: candidate.maximumProposalLifetimeSeconds,
     maximumGrantLifetimeSeconds: candidate.maximumGrantLifetimeSeconds,
   };

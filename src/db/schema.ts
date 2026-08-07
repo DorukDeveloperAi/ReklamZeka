@@ -2805,6 +2805,9 @@ export const actionApprovalPolicySnapshots = pgTable("action_approval_policy_sna
     and (${table.policyPayload} #>> '{revision}')::integer = ${table.revision}
     and ${table.policyPayload} #>> '{policyHash}' = ${table.policyHash}
     and ${table.policyPayload} #>> '{autonomyMode}' = 'approval_only'
+    and ${table.policyPayload} ? 'maximumProtectionEvidenceAgeSeconds'
+    and jsonb_typeof(${table.policyPayload} #> '{maximumProtectionEvidenceAgeSeconds}') = 'number'
+    and (${table.policyPayload} #>> '{maximumProtectionEvidenceAgeSeconds}')::integer between 1 and 604800
     and ${table.policyPayload} ? 'maximumProposalLifetimeSeconds'
     and jsonb_typeof(${table.policyPayload} #> '{maximumProposalLifetimeSeconds}') = 'number'
     and (${table.policyPayload} #>> '{maximumProposalLifetimeSeconds}')::integer between 1 and 604800
@@ -3658,6 +3661,9 @@ export const approvalPolicyDefinitionRevisions = pgTable("approval_policy_defini
     and jsonb_typeof(${table.policyPayload} #> '{approverRoles}') = 'array'
     and jsonb_typeof(${table.policyPayload} #> '{grantConsumerRoles}') = 'array'
     and jsonb_typeof(${table.policyPayload} #> '{separationOfDutiesRisks}') = 'array'
+    and ${table.policyPayload} ? 'maximumProtectionEvidenceAgeSeconds'
+    and jsonb_typeof(${table.policyPayload} #> '{maximumProtectionEvidenceAgeSeconds}') = 'number'
+    and (${table.policyPayload} #>> '{maximumProtectionEvidenceAgeSeconds}')::integer between 1 and 604800
     and ${table.policyPayload} ? 'maximumProposalLifetimeSeconds'
     and jsonb_typeof(${table.policyPayload} #> '{maximumProposalLifetimeSeconds}') = 'number'
     and (${table.policyPayload} #>> '{maximumProposalLifetimeSeconds}')::integer between 1 and 604800

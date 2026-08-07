@@ -80,6 +80,7 @@ function start(source = bundle()): ApprovalLifecycle {
       ],
       grantConsumerRoles: ["owner", "admin"],
       separationOfDutiesRisks: ["K3", "K4"],
+      maximumProtectionEvidenceAgeSeconds: 3_600,
       maximumProposalLifetimeSeconds: 86_400,
       maximumGrantLifetimeSeconds: 300,
     },
@@ -154,7 +155,8 @@ describe("ActionUnit approval lifecycle", () => {
       policy: {
         version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_analyst_request", revision: 1,
         requesterRoles: ["analyst"], approverRoles: [{ risk: "K3", roles: ["owner"] }],
-        grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K3"], maximumProposalLifetimeSeconds: 86_400,
+        grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K3"], maximumProtectionEvidenceAgeSeconds: 3_600,
+        maximumProposalLifetimeSeconds: 86_400,
         maximumGrantLifetimeSeconds: 300,
       },
       initializedAt: "2026-08-07T10:01:00Z", eventRef: "event_analyst_request",
@@ -167,11 +169,26 @@ describe("ActionUnit approval lifecycle", () => {
       policy: {
         version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_bad_approver", revision: 1,
         requesterRoles: ["analyst"], approverRoles: [{ risk: "K3", roles: ["analyst"] as never }],
-        grantConsumerRoles: ["owner"], separationOfDutiesRisks: [], maximumProposalLifetimeSeconds: 86_400,
+        grantConsumerRoles: ["owner"], separationOfDutiesRisks: [], maximumProtectionEvidenceAgeSeconds: 3_600,
+        maximumProposalLifetimeSeconds: 86_400,
         maximumGrantLifetimeSeconds: 300,
       },
       initializedAt: "2026-08-07T10:01:00Z", eventRef: "event_bad_approver",
     })).toThrowError(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  it("requires an explicit bounded protection evidence age in the exact lifecycle policy", () => {
+    const { policyHash: _policyHash, ...validPolicy } = start().policy;
+    for (const maximumProtectionEvidenceAgeSeconds of [0, 604_801, 1.5]) {
+      expect(() => initializeApprovalLifecycle({ bundle: bundle(),
+        policy: { ...validPolicy, maximumProtectionEvidenceAgeSeconds },
+        initializedAt: "2026-08-07T10:01:00.000Z", eventRef: "event_invalid_evidence_age" }))
+        .toThrowError(expect.objectContaining({ code: "invalid_input" }));
+    }
+    const { maximumProtectionEvidenceAgeSeconds: _missing, ...legacyPolicy } = validPolicy;
+    expect(() => initializeApprovalLifecycle({ bundle: bundle(), policy: legacyPolicy as never,
+      initializedAt: "2026-08-07T10:01:00.000Z", eventRef: "event_missing_evidence_age" }))
+      .toThrowError(expect.objectContaining({ code: "invalid_input" }));
   });
 
   it("cascades rejected and changes-requested dependencies without affecting independent units", () => {
@@ -246,7 +263,8 @@ describe("ActionUnit approval lifecycle", () => {
       policy: {
         version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_strict", revision: 1,
         requesterRoles: ["owner"], approverRoles: [{ risk: "K3", roles: ["owner"] }],
-        grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K3"], maximumProposalLifetimeSeconds: 86_400,
+        grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K3"], maximumProtectionEvidenceAgeSeconds: 3_600,
+        maximumProposalLifetimeSeconds: 86_400,
         maximumGrantLifetimeSeconds: 300,
       },
       initializedAt: "2026-08-07T10:01:00Z", eventRef: "event_same_actor",

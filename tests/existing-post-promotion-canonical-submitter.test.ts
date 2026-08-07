@@ -56,7 +56,8 @@ function compatibility(hash: string, status: "confirmed" | "unknown" | "rejected
 function policy(): ExistingPostPromotionPolicyResolution { return {
   approvalPolicy: { version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "approval_policy_published", revision: 4,
     autonomyMode: "approval_only", requesterRoles: ["owner"], approverRoles: [{ risk: "K4", roles: ["owner", "admin"] }],
-    grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K4"], maximumProposalLifetimeSeconds: 3_600,
+    grantConsumerRoles: ["owner"], separationOfDutiesRisks: ["K4"], maximumProtectionEvidenceAgeSeconds: 3_600,
+    maximumProposalLifetimeSeconds: 3_600,
     maximumGrantLifetimeSeconds: 300 },
   rules: [{ ruleRef: "autonomy_workspace_reviewed", workspaceRef: principal.workspaceRef,
     scope: { level: "workspace", ref: principal.workspaceRef }, mode: "approval_only", state: "published",

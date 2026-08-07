@@ -55,7 +55,8 @@ function material(): ExistingPostPromotionCanonicalMaterial {
 }
 
 function harness(overrides: Readonly<{ membershipRole?: "owner" | "admin" | "analyst" | "viewer";
-  notBefore?: string | null; workspaceRule?: boolean; killSwitch?: boolean; disposition?: "allowed" | "denied" | "unresolved" }> = {}) {
+  evidenceAgeSeconds?: number; workspaceRule?: boolean; killSwitch?: boolean;
+  disposition?: "allowed" | "denied" | "unresolved" }> = {}) {
   const category = { resolveCandidates: vi.fn(async (scope) => [Object.freeze({ sourceKind: "effective_category_context",
     workspaceId: principal.workspaceId, workspaceRef: principal.workspaceRef, accountRef: "account_doruk",
     campaignRef: "campaign_leads", entity: scope.entity, capturedAt: "2026-08-07T11:30:00.000Z",
@@ -68,7 +69,8 @@ function harness(overrides: Readonly<{ membershipRole?: "owner" | "admin" | "ana
   const approval = { resolveExistingPostPolicy: vi.fn(async () => ({ policy: { version: ACTION_APPROVAL_POLICY_VERSION,
     policyRef: "approval_policy_main", revision: 2, autonomyMode: "approval_only", requesterRoles: ["owner", "admin", "analyst"],
     approverRoles: [{ risk: "K4", roles: ["owner", "admin"] }], grantConsumerRoles: ["owner"],
-    separationOfDutiesRisks: ["K4"], maximumProposalLifetimeSeconds: 3_600, maximumGrantLifetimeSeconds: 300 },
+    separationOfDutiesRisks: ["K4"], maximumProtectionEvidenceAgeSeconds: overrides.evidenceAgeSeconds ?? 3_600,
+    maximumProposalLifetimeSeconds: 3_600, maximumGrantLifetimeSeconds: 300 },
     policyHash: h("1"), source: { workspaceRef: principal.workspaceRef, policyRef: "approval_policy_main", revision: 2,
       canonicalHash: h("2"), applicability: { actionType: "existing_post_promotion", risk: "K4" },
       definitionId: "33333333-3333-4333-a333-333333333333", effectiveFrom: "2026-08-07T10:00:00.000Z",
@@ -87,11 +89,9 @@ function harness(overrides: Readonly<{ membershipRole?: "owner" | "admin" | "ana
       canExecute: false as const, canWriteMeta: false as const, canGrantApproval: false as const }, resolutionHash: h("8") })) };
   const memberships = { resolve: vi.fn(async () => ({ userId: principal.actor.userId, workspaceId: principal.workspaceId,
     role: overrides.membershipRole ?? "owner" })) };
-  const freshness = { resolveNotBefore: vi.fn(async () => overrides.notBefore === undefined
-    ? "2026-08-07T11:00:00.000Z" : overrides.notBefore) };
-  return { approval, autonomy, protection, memberships, freshness, category, geo,
+  return { approval, autonomy, protection, memberships, category, geo,
     adapter: new ExistingPostPromotionPolicyAdapter(approval as never, autonomy,
-      new ExistingPostPromotionProtectionEvidenceMaterializer(category, geo), protection as never, memberships, freshness) };
+      new ExistingPostPromotionProtectionEvidenceMaterializer(category, geo), protection as never, memberships) };
 }
 
 describe("existing-post production policy composition", () => {
@@ -105,7 +105,18 @@ describe("existing-post production policy composition", () => {
     expect(api.protection.resolve).toHaveBeenCalledWith(expect.objectContaining({ action: expect.objectContaining({
       actionType: "existing_post_promotion", accountRef: "account_doruk", campaignRef: "campaign_leads",
       entity: { level: "adset", ref: "adset_leads" }, actionHash: expect.stringMatching(/^[a-f0-9]{64}$/) }) }));
+    expect(api.category.resolveCandidates).toHaveBeenCalledWith(expect.objectContaining({
+      evaluatedAt: now, notBefore: "2026-08-07T11:00:00.000Z" }));
+    expect(api.geo.resolveCandidates).toHaveBeenCalledWith(expect.objectContaining({
+      evaluatedAt: now, notBefore: "2026-08-07T11:00:00.000Z" }));
     expect(JSON.stringify(resolved)).not.toContain(principal.workspaceId);
+  });
+
+  it("derives the evidence window only from the reviewed approval policy", async () => {
+    const api = harness({ evidenceAgeSeconds: 7_200 });
+    await expect(api.adapter.resolve({ principal, material: material(), evaluatedAt: now })).resolves.not.toBeNull();
+    expect(api.category.resolveCandidates).toHaveBeenCalledWith(expect.objectContaining({
+      evaluatedAt: now, notBefore: "2026-08-07T10:00:00.000Z" }));
   });
 
   it.each(["owner", "admin", "analyst"] as const)("maps an active %s membership to the requester", async (membershipRole) => {
@@ -113,9 +124,9 @@ describe("existing-post production policy composition", () => {
       .resolves.toMatchObject({ requester: { role: membershipRole } });
   });
 
-  it("fails closed before protection for viewer, absent workspace rule, kill switch or missing freshness", async () => {
+  it("fails closed before protection for viewer, absent workspace rule, kill switch or invalid reviewed evidence age", async () => {
     for (const overrides of [{ membershipRole: "viewer" as const }, { workspaceRule: false }, { killSwitch: true },
-      { notBefore: null }]) {
+      { evidenceAgeSeconds: 0 }, { evidenceAgeSeconds: 604_801 }, { evidenceAgeSeconds: 1.5 }]) {
       const api = harness(overrides);
       await expect(api.adapter.resolve({ principal, material: material(), evaluatedAt: now })).resolves.toBeNull();
       expect(api.protection.resolve).not.toHaveBeenCalled();
