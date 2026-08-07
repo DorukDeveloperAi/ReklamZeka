@@ -40,6 +40,6 @@ const capability = mintLocalSessionCapability({
 if (!cli) await registerLocalSessionBootstrap(capability.claims, capability.token);
 
 console.log(cli
-  ? "Aşağıdaki süreli Bearer capability yalnız bu OS kullanıcısında Decision Room read araçları içindir:"
+  ? "Aşağıdaki süreli Bearer capability yalnız bu OS kullanıcısında ReklamZeka yerel read araçları içindir:"
   : "Aşağıdaki tek kullanımlık capability'yi 90 saniye içinde dashboard yerel oturum alanına yapıştırın:");
 console.log(capability.token);

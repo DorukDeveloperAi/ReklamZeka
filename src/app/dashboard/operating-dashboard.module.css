@@ -398,6 +398,48 @@
 .decisionRoomList footer { margin-top: auto; padding-top: 24px; }
 .decisionRoomList footer small { color: var(--rz-muted); font-size: .54rem; }
 
+.practiceLabState { display: grid; place-items: start; gap: 9px; min-height: 230px; padding: 26px; }
+.practiceLabState > strong { color: var(--rz-amber); font: 750 .59rem ui-monospace, monospace; text-transform: uppercase; }
+.practiceLabState h2 { max-width: 760px; margin: 2px 0; font-size: 1.08rem; }
+.practiceLabState p { max-width: 720px; margin: 0; color: var(--rz-muted); font-size: .65rem; line-height: 1.55; }
+.practiceLabState button, .practiceLabDetail header button { padding: 8px 11px; border: 1px solid var(--rz-line-strong); border-radius: 8px; background: var(--rz-surface-3); color: var(--rz-text); cursor: pointer; font-size: .61rem; }
+.practiceLabWorkspace { display: grid; grid-template-columns: minmax(260px, .72fr) minmax(0, 1.6fr); gap: 10px; align-items: start; }
+.practiceLabIndex { overflow: hidden; }
+.practiceLabIndex > div:last-child { display: grid; }
+.practiceLabIndex > div > button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; width: 100%; padding: 15px 17px; border: 0; border-bottom: 1px solid var(--rz-line); background: transparent; color: var(--rz-text); text-align: left; cursor: pointer; }
+.practiceLabIndex > div > button[data-active="true"] { background: rgba(184,242,84,.055); box-shadow: inset 2px 0 var(--rz-green); }
+.practiceLabIndex button span { display: grid; gap: 6px; min-width: 0; }
+.practiceLabIndex button strong { overflow-wrap: anywhere; font-size: .66rem; line-height: 1.35; }
+.practiceLabIndex button small { overflow-wrap: anywhere; color: var(--rz-muted); font-size: .52rem; }
+.practiceLabIndex button i { color: var(--rz-green); font: 700 .48rem ui-monospace, monospace; text-transform: uppercase; }
+.practiceLabDetail { overflow: hidden; }
+.practiceLabDetail > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px; border-bottom: 1px solid var(--rz-line); }
+.practiceLabDetail > header h2 { max-width: 760px; margin: 7px 0; font-size: 1.18rem; }
+.practiceLabDetail > header p { margin: 0; color: var(--rz-muted); font-size: .58rem; }
+.practiceLabFacts { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--rz-line); }
+.practiceLabFacts > div { display: grid; gap: 6px; padding: 16px 20px; border-right: 1px solid var(--rz-line); }
+.practiceLabFacts > div:last-child { border-right: 0; }
+.practiceLabFacts span, .practiceLabNarrative span { color: var(--rz-dim); font-size: .49rem; text-transform: uppercase; }
+.practiceLabFacts strong { font-size: .64rem; }
+.practiceLabFacts small { overflow-wrap: anywhere; color: var(--rz-muted); font-size: .52rem; }
+.practiceLabNarrative { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--rz-line); }
+.practiceLabNarrative article { padding: 18px 20px; border-right: 1px solid var(--rz-line); }
+.practiceLabNarrative article:last-child { border-right: 0; }
+.practiceLabNarrative p { margin: 8px 0 0; color: var(--rz-muted); font-size: .61rem; line-height: 1.55; }
+.practiceLabDetail > section { padding: 20px; border-bottom: 1px solid var(--rz-line); }
+.practiceLabDetail ol { display: grid; gap: 8px; margin: 14px 0 0; padding-left: 19px; }
+.practiceLabDetail li { color: var(--rz-muted); font-size: .61rem; line-height: 1.5; }
+.practiceTimeline { display: grid; gap: 9px; margin-top: 14px; }
+.practiceTimeline > article { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; }
+.practiceTimeline > article > span { display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--rz-line-strong); border-radius: 99px; color: var(--rz-green); font: 700 .52rem ui-monospace, monospace; }
+.practiceTimeline strong { font-size: .57rem; text-transform: uppercase; }
+.practiceTimeline p { margin: 4px 0; color: var(--rz-muted); font-size: .59rem; line-height: 1.45; }
+.practiceTimeline small { color: var(--rz-dim); font-size: .49rem; }
+.practiceDraft { background: rgba(123,198,255,.035); }
+.practiceDraft h3 { margin: 8px 0 12px; font-size: .88rem; }
+.practiceDraft p { margin: 6px 0; color: var(--rz-muted); font-size: .59rem; }
+.practiceDraft small { display: block; margin-top: 13px; color: var(--rz-blue); font-size: .52rem; }
+
 .sourceFooter { display: flex; justify-content: space-between; gap: 20px; padding: 13px 36px 22px; color: var(--rz-dim); font-size: .54rem; }
 .toast { position: fixed; right: 24px; bottom: 24px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: min(440px, calc(100% - 32px)); padding: 12px 14px; border: 1px solid rgba(184,242,84,.28); border-radius: 11px; background: #182018; box-shadow: 0 18px 60px rgba(0,0,0,.4); z-index: 50; }
 .toast > span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 99px; color: #111; background: var(--rz-green); font-weight: 900; }
@@ -421,6 +463,7 @@
   .metaConnectionBar > div:nth-child(-n+2) { border-bottom: 1px solid var(--rz-line); }
   .metaInventoryColumns { grid-template-columns: 1fr; }
   .decisionRoomList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .practiceLabWorkspace { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 780px) {
@@ -475,6 +518,11 @@
   .scopeDisclosure { align-items: flex-start; flex-direction: column; }
   .sourceFooter { flex-direction: column; padding: 12px 14px 20px; }
   .decisionRoomList { grid-template-columns: 1fr; }
+  .practiceLabDetail > header { flex-direction: column; }
+  .practiceLabFacts { grid-template-columns: 1fr; }
+  .practiceLabFacts > div { border-right: 0; border-bottom: 1px solid var(--rz-line); }
+  .practiceLabNarrative { grid-template-columns: 1fr; }
+  .practiceLabNarrative article { border-right: 0; border-bottom: 1px solid var(--rz-line); }
 }
 
 @media (max-width: 480px) {

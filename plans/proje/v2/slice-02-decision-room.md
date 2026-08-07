@@ -59,10 +59,18 @@ bütçe simülasyonu ve Meta write sırasıyla S3 ve S4'e aittir.
   standardization-review zinciri owner + resmi Meta kaynağı + evidence + deliberation ister.
   Conditional/rejected sonuçlar korunur; standardization review policy artifact, promotion,
   automation veya action authority üretemez. İki append-only tablo tenant-bound repository,
-  RLS ve tombstone purge ile Supabase'e uygulandı. Practice Lab UI açık iştir.
-- **Birleşik kanıt:** 74 test dosyası/426 test, production build, audit 0; category/guidance,
-  frozen-context, decision-ledger, Decision Room persistence ve 45-tablolu tombstone PostgreSQL
-  rollback kabulleri temiz. Supabase 49/49 RLS, API table grant'i `0`; otomatik
+  RLS ve tombstone purge ile Supabase'e uygulandı. Lifecycle mutation/edit stüdyosu açık iştir.
+- **S2.7 production asset binding hazır:** append-only timeframe/template revision registry,
+  immutable schedule-revision hash binding ve tek frozen run asset manual/scheduled executor'ı
+  aynı production loader'a bağlar. Retry latest'i yeniden seçmez; exact frozen revision/hash'i
+  doğrular. Dört tablo Supabase'e uygulandı; canlı rollback kabulü temizdir.
+- **S2.8 read yüzeyi hazır:** Practice Lab public-safe list/detail/lifecycle/source özetini,
+  ephemeral collaboration draft'ını ve model-agnostic read araçlarını dashboard + local session'a
+  bağlar. Capability-cookie ve CLI bearer conformance'ı aynı safe ref'leri kanıtlar. Lifecycle
+  mutation/edit stüdyosu ileri iştir.
+- **Birleşik kanıt:** 80 test dosyası/441 test, production build, audit 0; category/guidance,
+  frozen-context, decision-ledger, Decision Room persistence ve 49-tablolu tombstone PostgreSQL
+  rollback kabulleri temiz. Supabase 53/53 RLS, API table grant'i `0`; otomatik
   tracked/build/cache token eşleşmesi `0`.
   Meta write/network çağrısı `0`.
 

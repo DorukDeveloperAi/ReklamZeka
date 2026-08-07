@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 export const LOCAL_SESSION_COOKIE = "__Host-rzka_local_session" as const;
-export type LocalSessionScope = "decision_room:read" | "decision_room:mark_read" | "local_session:bootstrap";
+export type LocalSessionScope = "decision_room:read" | "decision_room:mark_read" | "practice_lab:read" | "local_session:bootstrap";
 export type LocalSessionKind = "bootstrap" | "session";
 
 export type LocalSessionClaims = Readonly<{
@@ -25,7 +25,7 @@ const SESSION = /^session_[a-f0-9]{32}$/;
 const NONCE = /^[a-f0-9]{64}$/;
 const TOKEN = /^rzs1\.([A-Za-z0-9_-]{64,2048})\.([A-Za-z0-9_-]{43})$/;
 const SCOPES = new Set<LocalSessionScope>([
-  "decision_room:read", "decision_room:mark_read", "local_session:bootstrap",
+  "decision_room:read", "decision_room:mark_read", "practice_lab:read", "local_session:bootstrap",
 ]);
 
 export class LocalSessionCapabilityError extends Error {
@@ -64,7 +64,7 @@ function validClaims(value: unknown): LocalSessionClaims {
     || typeof value.workspaceRef !== "string" || !REF.test(value.workspaceRef)
     || typeof value.userId !== "string" || !UUID.test(value.userId)
     || typeof value.readerRef !== "string" || !REF.test(value.readerRef)
-    || !Array.isArray(value.scopes) || value.scopes.length < 1 || value.scopes.length > 2
+    || !Array.isArray(value.scopes) || value.scopes.length < 1 || value.scopes.length > 3
     || new Set(value.scopes).size !== value.scopes.length
     || value.scopes.some((scope) => typeof scope !== "string" || !SCOPES.has(scope as LocalSessionScope))
     || !Number.isSafeInteger(value.issuedAt) || !Number.isSafeInteger(value.expiresAt)
@@ -72,7 +72,7 @@ function validClaims(value: unknown): LocalSessionClaims {
     || (value.expiresAt as number) <= (value.issuedAt as number)) fail();
   const scopes = [...value.scopes] as LocalSessionScope[];
   const expected = value.kind === "bootstrap" ? ["local_session:bootstrap"]
-    : ["decision_room:mark_read", "decision_room:read"];
+    : ["decision_room:mark_read", "decision_room:read", "practice_lab:read"];
   if (JSON.stringify(scopes) !== JSON.stringify(expected)) fail();
   return Object.freeze({ ...(value as unknown as LocalSessionClaims), scopes: Object.freeze(scopes) });
 }
@@ -105,7 +105,7 @@ export function mintLocalSessionCapability(input: Readonly<{
     readerRef: input.readerRef,
     scopes: input.kind === "bootstrap"
       ? ["local_session:bootstrap"] as const
-      : ["decision_room:mark_read", "decision_room:read"] as const,
+      : ["decision_room:mark_read", "decision_room:read", "practice_lab:read"] as const,
     issuedAt: input.issuedAt,
     expiresAt: input.expiresAt,
     osUid: input.osUid,

@@ -200,9 +200,9 @@
 
 ## Sıradaki uygulama
 
-**Slice 2 kapanış bağı:** persisted analysis template/timeframe registry ve production asset
-loader ile deterministic runtime'ı worker'a bağla; ardından Practice Lab read yüzeyi ve S3
-Budget Lab'e geç. A13'e kadar production write scope veya writer ReklamZeka'ya taşınmaz.
+**Slice 3 / Budget Lab:** envelope, planned/committed/actual/forecast ayrımı, protected
+allocation/transfer matrisi ve deterministic pacing/simulation çekirdeğini aç. Production
+write scope veya writer S4'e kadar ReklamZeka'ya taşınmaz.
 
 ## 2026-08-07 — S1.4 asset/content mirror kapanışı
 
@@ -411,3 +411,23 @@ Budget Lab'e geç. A13'e kadar production write scope veya writer ReklamZeka'ya 
   cross-tenant/tombstone, workspace bootstrap idempotency/audit/foreign isolation ve sıfır
   kalıntı için geçti. Kanıt: 74 test dosyası/426 test, typecheck, `db:check`, production build;
   Supabase 49/49 RLS, API grant `0`, tracked/build/cache secret eşleşmesi `0`, Meta write `0`.
+
+## 2026-08-07 — S2 production analysis asset binding ve Practice Lab read kapanışı
+
+- Versioned timeframe/template registry, immutable schedule-revision binding ve tek frozen
+  run asset dört append-only PostgreSQL tablosuna bağlandı. Manual ve scheduled analiz aynı
+  production loader/executor'ı kullanır; retry `latest` seçmez, ilk run'daki exact revision,
+  definition hash, context, account/campaign ve entity scope'unu yeniden doğrular.
+- İlk migration denemesinde Drizzle'ın composite FK'lerden önce referenced unique index
+  üretmemesi canlı kapıda yakalandı. İki workspace-row unique index FK'lerden önceye alındı;
+  57 statement outer-rollback validation'ı ve ardından gerçek migration temiz geçti.
+- Practice Lab public-safe list/detail/lifecycle/source görünümü, yalnız konuşma içi ephemeral
+  draft ve model-agnostic read araçlarıyla dashboard'a bağlandı. Ayrı `practice_lab:read`
+  scope'u vardır; guidance/policy promotion, persistence, automation, Meta/action authority yoktur.
+- Dashboard bootstrap-cookie ve CLI bearer aynı güvenli public Decision Room ref'lerini üretir;
+  replay, expiry, Host spoof, cross-site ve proxy negatifleri conformance testinde fail-closed.
+- Canlı rollback kabulleri frozen registry/retry, cross-tenant, immutability, 49-tablolu
+  tombstone purge ve sıfır kalıntı için geçti. Kanıt: 80 test dosyası/441 test, production build,
+  security/secret kapıları; Supabase 53/53 RLS, API grant `0`, Meta write/network `0`.
+- Browser QA: Practice Lab unavailable state fixture göstermeden açıkça ayrılıyor; 1280px'te
+  yatay overflow yok ve read-only/no-persist sınırı görünür. S2 kapanmıştır; sıradaki dilim S3'tür.

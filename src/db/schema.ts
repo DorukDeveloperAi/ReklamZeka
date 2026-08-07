@@ -1306,6 +1306,125 @@ export const effectiveCampaignContextInvalidations = pgTable("effective_campaign
   `),
 ]);
 
+/** Append-only, versioned timeframe definitions used by deterministic analysis. */
+export const analysisTimeframeDefinitions = pgTable("analysis_timeframe_definitions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  timeframeRef: text("timeframe_ref").notNull(),
+  revision: integer("revision").notNull(),
+  definitionVersion: text("definition_version").notNull(),
+  definitionHash: text("definition_hash").notNull(),
+  definitionPayload: jsonb("definition_payload").$type<Record<string, unknown>>().notNull(),
+  supersededAt: timestamp("superseded_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("analysis_timeframe_definitions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("analysis_timeframe_definitions_workspace_ref_revision_unique")
+    .on(table.workspaceId, table.timeframeRef, table.revision),
+  uniqueIndex("analysis_timeframe_definitions_workspace_ref_hash_unique")
+    .on(table.workspaceId, table.timeframeRef, table.definitionHash),
+  uniqueIndex("analysis_timeframe_definitions_workspace_current_unique")
+    .on(table.workspaceId, table.timeframeRef).where(sql`${table.supersededAt} is null`),
+  index("analysis_timeframe_definitions_workspace_lookup_idx")
+    .on(table.workspaceId, table.timeframeRef, table.supersededAt),
+  check("analysis_timeframe_definitions_shape", sql`(
+    ${table.timeframeRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$'
+    and ${table.revision} >= 1
+    and ${table.definitionVersion} = 'analysis-timeframe-definition/1.0.0'
+    and ${table.definitionHash} ~ '^[a-f0-9]{64}$'
+    and jsonb_typeof(${table.definitionPayload}) = 'object'
+    and ${table.definitionPayload} #>> '{version}' = ${table.definitionVersion}
+    and ${table.definitionPayload} #>> '{timeframeRef}' = ${table.timeframeRef}
+    and (${table.definitionPayload} #>> '{revision}')::integer = ${table.revision}
+  ) is true`),
+  check("analysis_timeframe_definitions_no_forbidden_material", sql`
+    ${table.definitionPayload}::text !~* '"[^"[:space:]]*(token|secret|prompt)"[[:space:]]*:'
+    and ${table.definitionPayload}::text !~* '"authorization"[[:space:]]*:'
+    and ${table.definitionPayload}::text !~* '"[^"[:space:]]*raw[_-]?(payload|request|response|json)"[[:space:]]*:'
+  `),
+]);
+
+/** Append-only template revisions, each bound to one exact context and timeframe revision. */
+export const analysisTemplateDefinitions = pgTable("analysis_template_definitions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull(),
+  campaignId: uuid("campaign_id").notNull(),
+  contextId: uuid("context_id").notNull(),
+  timeframeDefinitionId: uuid("timeframe_definition_id").notNull(),
+  accountRef: text("account_ref").notNull(),
+  campaignRef: text("campaign_ref").notNull(),
+  templateRef: text("template_ref").notNull(),
+  revision: integer("revision").notNull(),
+  definitionVersion: text("definition_version").notNull(),
+  definitionHash: text("definition_hash").notNull(),
+  timeframeRef: text("timeframe_ref").notNull(),
+  timeframeDefinitionHash: text("timeframe_definition_hash").notNull(),
+  contextHash: text("context_hash").notNull(),
+  definitionPayload: jsonb("definition_payload").$type<Record<string, unknown>>().notNull(),
+  supersededAt: timestamp("superseded_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.adAccountId],
+    foreignColumns: [adAccounts.workspaceId, adAccounts.id],
+    name: "analysis_template_definitions_account_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.campaignId],
+    foreignColumns: [adCampaigns.workspaceId, adCampaigns.id],
+    name: "analysis_template_definitions_campaign_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.contextId],
+    foreignColumns: [effectiveCampaignContexts.workspaceId, effectiveCampaignContexts.id],
+    name: "analysis_template_definitions_context_scope_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.workspaceId, table.timeframeDefinitionId],
+    foreignColumns: [analysisTimeframeDefinitions.workspaceId, analysisTimeframeDefinitions.id],
+    name: "analysis_template_definitions_timeframe_scope_fk",
+  }).onDelete("restrict"),
+  uniqueIndex("analysis_template_definitions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("analysis_template_definitions_workspace_ref_revision_unique")
+    .on(table.workspaceId, table.templateRef, table.revision),
+  uniqueIndex("analysis_template_definitions_workspace_ref_hash_unique")
+    .on(table.workspaceId, table.templateRef, table.definitionHash),
+  uniqueIndex("analysis_template_definitions_workspace_current_unique")
+    .on(table.workspaceId, table.templateRef).where(sql`${table.supersededAt} is null`),
+  index("analysis_template_definitions_workspace_asset_idx")
+    .on(table.workspaceId, table.adAccountId, table.campaignId, table.templateRef),
+  index("analysis_template_definitions_context_idx").on(table.contextId),
+  index("analysis_template_definitions_timeframe_idx").on(table.timeframeDefinitionId),
+  check("analysis_template_definitions_shape", sql`(
+    ${table.templateRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$'
+    and ${table.timeframeRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$'
+    and ${table.revision} >= 1
+    and ${table.definitionVersion} = 'analysis-template-definition/1.0.0'
+    and ${table.definitionHash} ~ '^[a-f0-9]{64}$'
+    and ${table.timeframeDefinitionHash} ~ '^[a-f0-9]{64}$'
+    and ${table.contextHash} ~ '^[a-f0-9]{64}$'
+    and jsonb_typeof(${table.definitionPayload}) = 'object'
+    and ${table.definitionPayload} #>> '{version}' = ${table.definitionVersion}
+    and ${table.definitionPayload} #>> '{templateRef}' = ${table.templateRef}
+    and (${table.definitionPayload} #>> '{revision}')::integer = ${table.revision}
+    and ${table.definitionPayload} #>> '{timeframeRef}' = ${table.timeframeRef}
+    and ${table.definitionPayload} #>> '{timeframeDefinitionHash}' = ${table.timeframeDefinitionHash}
+    and ${table.definitionPayload} #>> '{contextHash}' = ${table.contextHash}
+  ) is true`),
+  check("analysis_template_definitions_no_forbidden_material", sql`
+    ${table.definitionPayload}::text !~* '"[^"[:space:]]*(token|secret|prompt)"[[:space:]]*:'
+    and ${table.definitionPayload}::text !~* '"authorization"[[:space:]]*:'
+    and ${table.definitionPayload}::text !~* '"[^"[:space:]]*raw[_-]?(payload|request|response|json)"[[:space:]]*:'
+  `),
+  check("analysis_template_definitions_no_authority_escalation", sql`
+    not jsonb_path_exists(
+      ${table.definitionPayload},
+      '$.** ? (@.type() == "object").keyvalue() ? (@.key like_regex "^(canwrite|writeenabled|actionauthority|writeauthority|executionauthority|approvalgranted|canauthorizeaction|canexecutewrite|canenforcepolicy|canalterapproval)$" flag "i")'
+    )
+  `),
+]);
+
 /** Immutable analysis/decision hash-chain rows. This table cannot grant action authority. */
 export const decisionLedgerRecords = pgTable("decision_ledger_records", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -1572,6 +1691,83 @@ export const decisionRoomRuns = pgTable("decision_room_runs", {
     (${table.analysisRef} is null or ${table.analysisRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$')
     and (${table.summaryCode} is null or ${table.summaryCode} ~ '^[a-z0-9][a-z0-9_:-]{0,127}$')
   `),
+]);
+
+/** Immutable schedule-revision binding to exact analysis definition revisions. */
+export const decisionRoomScheduleAnalysisBindings = pgTable("decision_room_schedule_analysis_bindings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  scheduleId: uuid("schedule_id").notNull(),
+  templateDefinitionId: uuid("template_definition_id").notNull(),
+  timeframeDefinitionId: uuid("timeframe_definition_id").notNull(),
+  bindingHash: text("binding_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.scheduleId],
+    foreignColumns: [decisionRoomSchedules.workspaceId, decisionRoomSchedules.id],
+    name: "decision_room_schedule_analysis_bindings_schedule_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.templateDefinitionId],
+    foreignColumns: [analysisTemplateDefinitions.workspaceId, analysisTemplateDefinitions.id],
+    name: "decision_room_schedule_analysis_bindings_template_scope_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.workspaceId, table.timeframeDefinitionId],
+    foreignColumns: [analysisTimeframeDefinitions.workspaceId, analysisTimeframeDefinitions.id],
+    name: "decision_room_schedule_analysis_bindings_timeframe_scope_fk",
+  }).onDelete("restrict"),
+  uniqueIndex("decision_room_schedule_analysis_bindings_schedule_unique").on(table.workspaceId, table.scheduleId),
+  uniqueIndex("decision_room_schedule_analysis_bindings_hash_unique").on(table.workspaceId, table.bindingHash),
+  index("decision_room_schedule_analysis_bindings_template_idx").on(table.templateDefinitionId),
+  index("decision_room_schedule_analysis_bindings_timeframe_idx").on(table.timeframeDefinitionId),
+  check("decision_room_schedule_analysis_bindings_hash_format", sql`${table.bindingHash} ~ '^[a-f0-9]{64}$'`),
+]);
+
+/** One immutable frozen analysis-asset selection per claimed Decision Room run. */
+export const decisionRoomRunAnalysisAssets = pgTable("decision_room_run_analysis_assets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  runId: uuid("run_id").notNull(),
+  templateDefinitionId: uuid("template_definition_id").notNull(),
+  timeframeDefinitionId: uuid("timeframe_definition_id").notNull(),
+  contextId: uuid("context_id").notNull(),
+  assetHash: text("asset_hash").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  resolvedTimeframe: jsonb("resolved_timeframe").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.runId],
+    foreignColumns: [decisionRoomRuns.workspaceId, decisionRoomRuns.id],
+    name: "decision_room_run_analysis_assets_run_scope_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.templateDefinitionId],
+    foreignColumns: [analysisTemplateDefinitions.workspaceId, analysisTemplateDefinitions.id],
+    name: "decision_room_run_analysis_assets_template_scope_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.workspaceId, table.timeframeDefinitionId],
+    foreignColumns: [analysisTimeframeDefinitions.workspaceId, analysisTimeframeDefinitions.id],
+    name: "decision_room_run_analysis_assets_timeframe_scope_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.workspaceId, table.contextId],
+    foreignColumns: [effectiveCampaignContexts.workspaceId, effectiveCampaignContexts.id],
+    name: "decision_room_run_analysis_assets_context_scope_fk",
+  }).onDelete("restrict"),
+  uniqueIndex("decision_room_run_analysis_assets_run_unique").on(table.workspaceId, table.runId),
+  uniqueIndex("decision_room_run_analysis_assets_hash_unique").on(table.workspaceId, table.assetHash),
+  index("decision_room_run_analysis_assets_template_idx").on(table.templateDefinitionId),
+  index("decision_room_run_analysis_assets_timeframe_idx").on(table.timeframeDefinitionId),
+  index("decision_room_run_analysis_assets_context_idx").on(table.contextId),
+  check("decision_room_run_analysis_assets_shape", sql`(
+    ${table.assetHash} ~ '^[a-f0-9]{64}$'
+    and jsonb_typeof(${table.resolvedTimeframe}) = 'object'
+    and ${table.resolvedTimeframe} #>> '{resolverVersion}' = 'analysis-timeframe-resolver/1.0.0'
+  ) is true`),
 ]);
 
 /** Deduplicated in-app-only completion notifications. */

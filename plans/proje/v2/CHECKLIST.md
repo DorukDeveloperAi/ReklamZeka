@@ -110,7 +110,9 @@
     attribution-settlement policy ve rollback kabulü.
   - [x] Manual/scheduled ortak deterministic analysis runtime; L2 materialization→calculator→
     finding→ledger bağlamı, exact frozen snapshot ve server-private entity identity sınırı.
-  - [ ] Cohort calculator, persisted template/timeframe registry ve production asset loader.
+  - [x] Persisted, versioned template/timeframe registry; schedule-revision hash binding,
+    frozen run asset ve manual/scheduled ortak production loader/executor.
+  - [ ] Cohort calculator.
 - [ ] Hierarchical driver ve creative fatigue/config diagnostics.
 - [ ] Analysis run ledger, dry-run API ve deterministic replay.
   - [x] Append-only authentic hash-chain decision ledger saf çekirdeği ve malformed/tamper matrisi.
@@ -220,12 +222,16 @@
 - [ ] Practice Lab candidate/trial/outcome/decomposition/standardized artifact UI.
   - [x] AdvisedPractice candidate→review→trial→outcome→standardization-review append-only domain,
     PostgreSQL persistence, tenant/RLS/tombstone ve policy/automation-promotion engeli.
+  - [x] Public-safe list/detail/lifecycle/source özeti, ephemeral collaboration draft ve
+    model-agnostic read tools; persistence/promotion/action authority yok.
 - [ ] Scheduled analysis in-app inbox ve duplicate-delivery/read-state E2E.
   - [x] Saf executor üzerinde idempotent in-app teslim/recovery ve duplicate-run testi.
   - [x] Workspace-scoped PostgreSQL inbox/read-state ve duplicate-delivery rollback E2E.
   - [x] Applied-table worker partial/catch-up/concurrency/revision-race rollback E2E.
   - [x] Dashboard Decision Room read-only/unavailable/empty source ayrımı; fixture canlı sonuç
     yerine kullanılmıyor.
+  - [x] Dashboard capability-cookie ve CLI bearer aynı public ref'leri üretir; replay/expiry/
+    host-spoof/cross-site/proxy conformance negatifleri.
   - [ ] Güvenilir principal ile canlı dashboard E2E.
 - [x] Operating Dashboard + Orchestrator çift-yüzey bilgi mimarisi ve etkileşimli demo kabuğu.
 - [ ] Operating Dashboard gerçek backend state'iyle responsive/browser E2E.

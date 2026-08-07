@@ -186,4 +186,34 @@ export class DrizzleAdvisedPracticeRepository {
       return Object.freeze({ definition, history: Object.freeze(history) });
     });
   }
+
+  /**
+   * Returns only public opaque practice references. Definition payloads and
+   * database identifiers remain behind load(), where their integrity chain is
+   * verified before use.
+   */
+  async listRefs(input: Readonly<{ after: string | null; limit: number }>): Promise<readonly string[]> {
+    const { after, limit } = input;
+    if ((after !== null && !PRACTICE_REF.test(after))
+      || !Number.isInteger(limit) || limit < 1 || limit > 101) {
+      throw new AdvisedPracticeRepositoryError("definition_missing");
+    }
+    const workspaceId = this.workspaceId;
+    return this.database.transaction(async (transaction) => {
+      await assertWorkspace(transaction as PracticeDatabase, workspaceId, false);
+      const result = await transaction.execute(sql`
+        select distinct practice_ref
+        from advised_practice_definitions
+        where workspace_id = ${workspaceId}::uuid
+          and (${after}::text is null or practice_ref > ${after}::text)
+        order by practice_ref asc
+        limit ${limit}
+      `);
+      const refs = rowsOf(result).map((row) => row.practice_ref);
+      if (refs.some((value) => typeof value !== "string" || !PRACTICE_REF.test(value))) {
+        throw new AdvisedPracticeRepositoryError("corrupt_store");
+      }
+      return Object.freeze(refs as string[]);
+    });
+  }
 }

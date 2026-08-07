@@ -17,6 +17,7 @@ import {
   cookieToken,
   localSessionSigningKey,
   verifyLocalSessionCapability,
+  type LocalSessionScope,
   type LocalSessionClaims,
 } from "@/security/local-session-capability";
 
@@ -220,6 +221,27 @@ async function bindPrincipal(database: Pick<Database, "execute">, config: LocalD
     }),
     membership: Object.freeze({ userId: config.userId, workspaceId: config.workspaceId, role: row.role }),
   });
+}
+
+/** Shared, fail-closed local reader binding used by server-side read tools. */
+export async function resolveTrustedLocalReadPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+  requiredScope: Extract<LocalSessionScope, "decision_room:read" | "practice_lab:read">;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config", "requiredScope"]);
+  const authenticated = authenticate(input.request, input.config, "read");
+  verifyLocalSessionCapability({
+    token: authenticated.credential === "bearer" ? bearerToken(input.request)! : cookieToken(input.request)!,
+    key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000),
+    osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: input.requiredScope,
+    expected: input.config,
+  });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "read", authenticated.credential);
+  return bindPrincipal(input.database, input.config);
 }
 
 function unavailable() {
