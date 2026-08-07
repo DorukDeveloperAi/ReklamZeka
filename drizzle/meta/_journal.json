@@ -64,6 +64,13 @@
       "when": 1786101090652,
       "tag": "20260807111130_secure_supabase_data_api",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786101312193,
+      "tag": "20260807111512_revoke_public_function_execute",
+      "breakpoints": true
     }
   ]
 }

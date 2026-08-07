@@ -41,19 +41,31 @@ try {
     select role_name, has_schema_privilege(role_name, 'public', 'CREATE') as can_create
     from unnest(array['anon', 'authenticated']) as roles(role_name)
   `);
+  const routineGrants = await pool.query<{ grant_count: number }>(`
+    select count(*)::int as grant_count
+    from information_schema.routine_privileges
+    where routine_schema = 'public'
+      and grantee in ('PUBLIC', 'anon', 'authenticated')
+      and privilege_type = 'EXECUTE'
+  `);
 
   const posture = {
     tables: tables.rows[0]?.total ?? 0,
     rlsEnabled: tables.rows[0]?.rls_enabled ?? 0,
     apiRoleTableGrants: grants.rows[0]?.grant_count ?? 0,
     apiRolesWithSchemaCreate: schemaCreate.rows.filter((row) => row.can_create).length,
+    publicApiRoutineExecuteGrants: routineGrants.rows[0]?.grant_count ?? 0,
   };
 
   if (posture.tables === 0) throw new Error("Public uygulama tablosu bulunamadı");
   if (posture.rlsEnabled !== posture.tables) {
     throw new Error(`RLS güvenli değil: ${posture.rlsEnabled}/${posture.tables}`);
   }
-  if (posture.apiRoleTableGrants !== 0 || posture.apiRolesWithSchemaCreate !== 0) {
+  if (
+    posture.apiRoleTableGrants !== 0
+    || posture.apiRolesWithSchemaCreate !== 0
+    || posture.publicApiRoutineExecuteGrants !== 0
+  ) {
     throw new Error("Supabase Data API rolleri beklenmeyen doğrudan yetkiye sahip");
   }
 
