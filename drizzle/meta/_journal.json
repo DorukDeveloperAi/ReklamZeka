@@ -57,6 +57,13 @@
       "when": 1786095296774,
       "tag": "20260807093456_gorgeous_killraven",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786101090652,
+      "tag": "20260807111130_secure_supabase_data_api",
+      "breakpoints": true
     }
   ]
 }
