@@ -36,7 +36,7 @@
   },
   "files": {
     ".claude/aide/docs/aide-capabilities.md": {
-      "hash": "fa393f6dbd6c0506",
+      "hash": "3483b194070db01a",
       "pkg": "doc:aide-capabilities"
     },
     ".claude/skills/zamanla/SKILL.md": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-07T10:55:18.114Z",
+  "updatedAt": "2026-08-07T11:04:05.850Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",
