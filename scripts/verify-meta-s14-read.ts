@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { discoverMetaAssetMirror } from "@/connectors/meta/asset-mirror";
 import { MetaGraphClient } from "@/connectors/meta/graph-client";
+import { discoverMetaPostMediaInventory } from "@/connectors/meta/post-media-inventory";
 import { MetaGraphSyncTransport } from "@/connectors/meta/sync/graph-transport";
 import { extractMetaAdContent } from "@/domain/meta/content/extract";
 
@@ -23,6 +24,12 @@ const assetSnapshot = await discoverMetaAssetMirror({
   token,
   workspaceId: "live-acceptance",
   connectionExternalKey: "meta-read-mirror",
+});
+const postMediaSnapshot = await discoverMetaPostMediaInventory({
+  token,
+  workspaceId: "live-acceptance",
+  connectionExternalKey: "meta-read-mirror",
+  maxPagesPerActor: 1,
 });
 
 let sampledAds = 0;
@@ -80,6 +87,13 @@ const discoveryGaps = assetSnapshot.discoveries.reduce<Record<string, number>>((
   result[discovery.status] = (result[discovery.status] ?? 0) + 1;
   return result;
 }, {});
+const postDiscoveryStatuses = postMediaSnapshot.discoveries.reduce<Record<string, number>>(
+  (result, discovery) => {
+    result[discovery.status] = (result[discovery.status] ?? 0) + 1;
+    return result;
+  },
+  {},
+);
 
 console.log(JSON.stringify({
   status: "ok",
@@ -93,5 +107,7 @@ console.log(JSON.stringify({
   adsWithPostIdentity,
   adsWithDynamicVariants,
   boundedIssues,
+  linkedPostMediaItems: postMediaSnapshot.items.length,
+  postDiscoveryStatuses,
   writeOperations: 0,
 }));
