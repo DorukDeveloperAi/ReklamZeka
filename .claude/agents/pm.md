@@ -5,7 +5,7 @@ tools: Bash, Read, Glob, Grep, Agent
 rol: kosucu
 tier: plan
 model: claude-fable-5
-effort: xhigh
+effort: high
 maxTurns: 30
 ---
 
