@@ -185,7 +185,9 @@
     same-user/workspace + intent-tool bağlı 15–120 sn ref-only handoff ve atomik single-use consume.
   - [x] PostgreSQL durable repository + migration; active-workspace register kilidi, restart-durable session/handoff,
     atomik single-use consume, workspace tombstone purge ve rollback kabulü.
-  - [ ] Authenticated route/transport ve gerçek dashboard↔CLI handoff E2E.
+  - [x] Authenticated local HTTP coordination: cookie-only dashboard list/create, bearer-only CLI
+    register/heartbeat/consume, canlı session seçimi ve dashboard handoff UI; PostgreSQL HTTP kabulü.
+  - [ ] Gerçek Codex/Claude MCP/STDIO adapter konfigürasyonu ve CLI içinden handoff consume E2E.
 - [ ] Local `reklamzeka` companion ile TTY/passkey HumanPresenceGrant ve ayrı approve/execute.
 - [ ] MCP-capable CLI config ve güvenli allowlist LocalCliAdapter extension point.
 - [ ] Kritik guidance interview, owner+Meta best-practice+evidence karşılaştırması ve eval seti.

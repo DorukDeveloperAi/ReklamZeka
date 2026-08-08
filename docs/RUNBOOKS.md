@@ -43,6 +43,10 @@ log veya bildirim payload'ına eklenmez.
   `npm run verify:workspace-tombstone-db` ve `npm run verify:supabase-security` sırasıyla çalıştırılır.
   İlk kabul iki session, tek-kullanımlık handoff, restart-durable read ve tombstoning register reddini
   transaction rollback içinde sınar; `temporaryRowsCommitted`, model ve Meta write sayıları sıfır kalmalıdır.
+- Authenticated coordination route veya dashboard handoff UI değiştiğinde
+  `npm run verify:local-agent-handoff-http-db` çalıştırılır. Kabul ephemeral dashboard/CLI session'larını,
+  active-list görünürlüğünü, handoff create/consume ve replay reddini gerçek PostgreSQL üzerinde sınar;
+  `cleanupVerified=true`, `temporaryRowsRetained=false`, model ve Meta write sayıları sıfır olmalıdır.
 - Canlı kabulte `wrong_actor`, eksik actor alanının tahmin edilmeyeceği anlamına gelir;
   ilgili kayıt park edilir. `permission_missing/unsupported/partial` sıfıra veya başarıya
   çevrilmez ve trust/readiness raporunda sebepli eksik olarak kalır.

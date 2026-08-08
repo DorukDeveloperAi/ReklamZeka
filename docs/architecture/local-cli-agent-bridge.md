@@ -41,8 +41,11 @@ session, workspace, kullanıcı, client, transport, tool catalog ve expiry boyun
 Target aynı kullanıcı/workspace'te olmalı ve intent için gereken safe tool'a sahip olmalıdır.
 PostgreSQL repository session ve ref-only handoff'u restart-durable saklar; active workspace kilidi,
 composite session FK'leri, atomik consume, RLS/grant kapısı ve tombstone purge ile sınırlar.
-Bu çekirdek henüz dashboard butonu, `get_handoff_context` transport tool'u veya MCP/STDIO
-route'u değildir; yukarıdaki beş adımlı yolculuk bu katmanlar geldikten sonra E2E kapanır.
+Authenticated local HTTP koordinasyonu dashboard cookie'siyle session list/register ve handoff create;
+CLI bearer capability'siyle register/heartbeat/consume sunar. Dashboard yalnız API'dan aktif session
+doğrulanınca bağlı durum gösterir; tek hedefi otomatik, birden fazlasını açık seçimle ele alır.
+Bu çekirdek henüz `get_handoff_context` MCP/STDIO tool'u veya gerçek Codex/Claude client config'i
+değildir; yukarıdaki beş adımlı yolculuk bu adapterlar geldikten sonra E2E kapanır.
 
 ## Session → onay ve execute
 

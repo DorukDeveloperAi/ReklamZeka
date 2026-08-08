@@ -1081,3 +1081,20 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   Meta write, model ve dış network çağrısı yapılmadı.
 - Bu dilim authenticated HTTP/MCP/STDIO transport, dashboard butonu veya gerçek dashboard↔CLI E2E açmaz. Bunlar
   ayrı kapılar olarak kapalıdır; repository hiçbir approval, execution, human-presence veya Meta-write authority üretmez.
+
+## 2026-08-08 — A12 authenticated local coordination HTTP + dashboard handoff
+
+- `/api/local-agent-sessions` cookie-only dashboard session list/create ile bearer-only CLI register/heartbeat;
+  `/api/local-agent-handoffs` cookie-only same-origin create ile bearer-only consume sunar. Her istek mevcut loopback
+  Host/origin/proxy, OS UID, signed capability ve active workspace/membership kontrolünü yeniden kullanır.
+- Request gövdesi 2 KB ve exact-shape ile sınırlıdır. Workspace/user/session authority caller'dan alınmaz; dashboard
+  descriptor'ı server-side `client_dashboard`, `loopback_http` ve yalnız `decision_room_list` olarak kurulur. CLI yalnız
+  safe tool kataloğundan seçim yapabilir. Cookie+bearer karışımı, tenant header, proxy, query, unknown key/tool reddedilir.
+- Dashboard artık API kanıtı olmadan “Codex bağlı” göstermez. Sıfır session açıkça disconnected, tek session otomatik,
+  çoklu session explicit dropdown'dır. Seçili portföy/kampanya ve 7 günlük timeframe için 60 saniyelik ref-only handoff
+  üretir; expiry ve tek-kullanımlık ref görünürdür. Dashboard içindeki sahte model sohbeti devre dışıdır.
+- Canlı Supabase HTTP kabulü dashboard register, CLI register, same-user active list, handoff create, consume ve replay
+  reddini doğruladı; hedefli cleanup sonunda geçici satır kalmadı. 77/77 RLS ve sıfır Data API grant duruşu korundu;
+  model ve Meta write çağrısı sıfırdır.
+- MCP/STDIO adapter ve gerçek Codex/Claude config henüz bağlı değildir. Handoff ref route seviyesinde tüketilebilir,
+  fakat CLI içinden doğal tool çağrısı ayrı kapı olarak açıktır; dashboard bu eksikliği bağlı sohbet gibi göstermez.
