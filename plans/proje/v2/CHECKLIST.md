@@ -105,8 +105,9 @@
   - [x] Resolver algoritmasını kopyalamayan structured `applied/unmatched/parked_conflict`
     inspector ve stable conflict reason kodları; dependency güven sınıflı, archive authority
     her zaman kapalı salt-okur dimension/definition archive-impact önizlemesi.
-  - [ ] Canlı hierarchy path'leri üzerinden bounded portföy çapında effective single-dimension
-    conflict taraması ve preview dependency coverage'ini tamamlama.
+  - [x] Canlı hierarchy path'leri üzerinden bounded portföy çapında effective single-dimension
+    conflict taraması; creative reuse path-bazlı, 20.000 yol/100 boyut hard cap ve fail-closed sonuç.
+  - [ ] Archive preview dependency coverage'ini tamamlayıp güvenli mutation guard'ına bağlama.
   - [ ] Rol/audit/optimistic concurrency/context invalidation bağlı category authoring/archive akışı.
 - [ ] PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run.
 - [ ] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi.

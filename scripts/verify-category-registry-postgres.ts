@@ -5,6 +5,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { DrizzleCategoryRegistryRepository } from "@/connectors/categories/category-registry-drizzle-repository";
 import { DrizzleCategoryArchiveImpactRepository } from "@/connectors/categories/category-archive-impact-drizzle-repository";
+import { DrizzleCategoryEffectiveHealthRepository } from "@/connectors/categories/category-effective-health-drizzle-repository";
+import { scanPortfolioEffectiveCategoryHealth } from "@/application/category-effective-health-scanner";
 import * as schema from "@/db/schema";
 import { categoryDimensionPublicRef } from "@/domain/categories/public-reference";
 import {
@@ -40,6 +42,7 @@ let foreignScopeRejected = false;
 let optimisticConcurrency = false;
 let rollbackClean = false;
 let archiveImpactReadSafe = false;
+let effectiveHealthReadSafe = false;
 
 try {
   await database.transaction(async (tx) => {
@@ -155,6 +158,14 @@ try {
     archiveImpactReadSafe = impact?.archiveAllowed === false && impact.coverage.complete === false
       && impact.exactBlockers.activeDefinitions === 2 && impact.exactBlockers.activeAssignments === 1
       && impact.exactBlockers.manualLocks === 1;
+    const effectiveHealth = scanPortfolioEffectiveCategoryHealth(
+      await new DrizzleCategoryEffectiveHealthRepository(tx as never).load(ids.workspace!),
+    );
+    effectiveHealthReadSafe = effectiveHealth.status === "complete"
+      && effectiveHealth.evaluationBasis === "hierarchy_path"
+      && effectiveHealth.counts.dimensions === 1 && effectiveHealth.counts.hierarchyPaths === 2
+      && effectiveHealth.counts.evaluations === 2 && effectiveHealth.counts.applied === 2
+      && !JSON.stringify(effectiveHealth).includes(ids.campaign!);
 
     const restarted = new CategoryRegistryService(new DrizzleCategoryRegistryRepository(tx as never));
     const persistedDimension = await restarted.findDimension(ids.workspace!, ids.dimension!);
@@ -205,7 +216,7 @@ try {
     foreignScopeRejected = wrongWorkspaceRead && wrongWorkspaceWrite && wrongHierarchy && crossAccountHierarchy;
 
     if (!restartDurable || !manualLockConflict || !lockedMutationDenied || !frozenReplayAfterArchive
-      || !foreignScopeRejected || !optimisticConcurrency || !archiveImpactReadSafe) {
+      || !foreignScopeRejected || !optimisticConcurrency || !archiveImpactReadSafe || !effectiveHealthReadSafe) {
       throw new Error("Category registry PostgreSQL acceptance failed");
     }
     throw rollback;
@@ -237,6 +248,7 @@ console.log(JSON.stringify({
   foreignScopeRejected,
   optimisticConcurrency,
   archiveImpactReadSafe,
+  effectiveHealthReadSafe,
   metaNetworkCalls: 0,
   metaWriteCalls: 0,
   rollbackClean,

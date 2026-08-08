@@ -1,6 +1,6 @@
 {
   "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
-  "damga": "5d0ec39376a5",
+  "damga": "24d198751768",
   "plans": [
     {
       "slug": "proje",
@@ -22,7 +22,7 @@
       "asamaToplam": 14,
       "asamaKapali": 6,
       "checklistAcik": 101,
-      "checklistKapali": 162,
+      "checklistKapali": 163,
       "sonTur": null,
       "siradaki": {
         "no": "11",
@@ -291,9 +291,9 @@
         "onar": null
       },
       {
-        "ref": "td:chk/proje/h0c011a",
+        "ref": "td:chk/proje/hcc33ff",
         "tur": "chk",
-        "metin": "Canlı hierarchy path'leri üzerinden bounded portföy çapında effective single-dimension",
+        "metin": "Archive preview dependency coverage'ini tamamlayıp güvenli mutation guard'ına bağlama.",
         "plan": "proje",
         "asama": "09",
         "kapatan": [],

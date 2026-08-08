@@ -167,6 +167,26 @@
   network/write sıfır kaldı. Açık A09.6c: canlı hierarchy batch material ile bounded portföy
   effective-conflict scan; ardından dependency coverage'i tamamlayıp A09.7 mutation guard'ına bağlama.
 
+## 2026-08-08 — A09.6c portföy effective kategori sağlık taraması
+
+- Mevcut effective resolver'ı kopyalamadan kullanan saf, indeksli scanner; aktif dimension/definition/assignment
+  materialini canlı campaign→ad set→ad→creative hierarchy path'leri üzerinde değerlendirir. Yeniden kullanılan
+  kreatif her tam parent yolu için ayrı değerlendirilir; çıktı yalnız public dimension key/ref, aggregate
+  `applied/unmatched/parked_conflict` ve stable reason dağılımı taşır.
+- Tarama 20.000 hierarchy path ve 100 dimension hard cap'ine sahiptir. Sınır aşımı typed `capacity_exceeded`
+  ile fail-closed olur; dashboard eksik sonucu tamamlanmış gibi göstermez. Raw UUID, Meta entity ID veya evidence
+  ref API/UI yanıtına girmez.
+- Cookie-only, same-origin, exact-intent `/api/category-effective-health` boundary'si mevcut
+  `category_registry:read` principal'ını kullanır ve bütün write/approval/policy authority alanlarını false tutar.
+  Dashboard salt-okur aggregate sağlık, değerlendirme temeli ve kapasite davranışını açıkça gösterir.
+- Unit/HTTP/repository testlerine ek olarak canlı PostgreSQL rollback kabulü non-empty hierarchy üzerinde iki
+  path/two applied evaluation doğruladı; geçici satır commit edilmedi, Meta network/write ve database write sonucu
+  sıfır kaldı. Gerçek bağlı workspace registry'si şu anda boş olduğundan bağımsız canlı read verifier 0/0 temiz
+  sonucu verir.
+- Açık A09.6d/A09.7 kapısı: archive preview'in partial/unknown dependency ailelerini tamamlamak; ardından rol/audit,
+  optimistic concurrency ve category-resolution invalidation ile mutation authoring'i açmak. Archive authority
+  bu coverage tamamlanana kadar kapalıdır.
+
 ## 2026-08-06 — bütün görüşmelerin kanonik ürün distilasyonu
 
 - Konuşmalardaki ürün niyeti, sınırlar, iç kategori/talimat modeli, analiz ve prompt

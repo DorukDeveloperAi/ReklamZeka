@@ -30,6 +30,14 @@ type ArchiveImpact = Readonly<{ contractVersion: string; target: Readonly<{ kind
   contextsNeedingInvalidation: number }>; coverage: Readonly<{ complete: false; partialOrUnknown: readonly string[] }>;
   disposition: "blocked" | "review_required"; archiveAllowed: false;
   authority: Readonly<{ canArchive: false; canAssign: false; canAuthorizeAction: false; canWriteMeta: false }> }>;
+type EffectiveHealth = Readonly<{ contractVersion: "category-effective-health/1.0.0"; status: "complete";
+  evaluationBasis: "hierarchy_path"; limits: Readonly<{ maxHierarchyPaths: number; maxDimensions: number }>;
+  counts: Readonly<{ dimensions: number; hierarchyPaths: number; evaluations: number; applied: number;
+    unmatched: number; parkedConflict: number }>; reasonBreakdown: readonly Readonly<{ reason: string; count: number }>[];
+  dimensions: readonly Readonly<{ dimension: Readonly<{ key: string; ref: string }>;
+    evaluationBasis: "hierarchy_path"; counts: Readonly<{ total: number; applied: number; unmatched: number;
+      parkedConflict: number }>; reasonBreakdown: readonly Readonly<{ reason: string; count: number }>[] }> [];
+  authority: Readonly<{ canAssign: false; canWriteMeta: false; canAuthorizeAction: false }> }>;
 
 class InventoryError extends Error { constructor(readonly code: string, message: string) { super(message); } }
 function object(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
@@ -94,6 +102,30 @@ function parseImpact(value: unknown): ArchiveImpact {
   }
   return value as unknown as ArchiveImpact;
 }
+function parseEffectiveHealth(value: unknown): EffectiveHealth {
+  if (!object(value)) throw new InventoryError("unsafe_response", "Effective kategori kaynağı güvenli sözleşmeyi döndürmedi.");
+  const limits = value.limits; const counts = value.counts; const dimensions = value.dimensions; const authority = value.authority;
+  if (value.contractVersion !== "category-effective-health/1.0.0" || value.status !== "complete"
+    || value.evaluationBasis !== "hierarchy_path" || !object(limits) || !object(counts)
+    || !["maxHierarchyPaths", "maxDimensions"].every((key) => nonNegative(limits[key]))
+    || !["dimensions", "hierarchyPaths", "evaluations", "applied", "unmatched", "parkedConflict"]
+      .every((key) => nonNegative(counts[key]))
+    || counts.evaluations !== Number(counts.applied) + Number(counts.unmatched) + Number(counts.parkedConflict)
+    || !Array.isArray(value.reasonBreakdown) || !value.reasonBreakdown.every((item) => object(item)
+      && typeof item.reason === "string" && nonNegative(item.count))
+    || !Array.isArray(dimensions) || dimensions.length !== counts.dimensions || !dimensions.every((item) => object(item)
+      && object(item.dimension) && typeof item.dimension.key === "string" && typeof item.dimension.ref === "string"
+      && item.evaluationBasis === "hierarchy_path" && object(item.counts)
+      && ["total", "applied", "unmatched", "parkedConflict"].every((key) => nonNegative((item.counts as Record<string, unknown>)[key]))
+      && item.counts.total === Number(item.counts.applied) + Number(item.counts.unmatched) + Number(item.counts.parkedConflict)
+      && Array.isArray(item.reasonBreakdown) && item.reasonBreakdown.every((reason) => object(reason)
+        && typeof reason.reason === "string" && nonNegative(reason.count)))
+    || !object(authority) || authority.canAssign !== false || authority.canWriteMeta !== false
+    || authority.canAuthorizeAction !== false) {
+    throw new InventoryError("unsafe_response", "Effective kategori kaynağı güvenli sözleşmeyi döndürmedi.");
+  }
+  return value as unknown as EffectiveHealth;
+}
 function levelLabel(level: Level) { return level === "campaign" ? "Kampanya" : level === "ad_set" ? "Reklam seti" : level === "ad" ? "Reklam" : "Kreatif"; }
 function number(value: number) { return new Intl.NumberFormat("tr-TR").format(value); }
 function ratio(value: number | null) { return value === null ? "Veri yok" : `%${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(value / 100)}`; }
@@ -107,6 +139,8 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
   const [impact, setImpact] = useState<ArchiveImpact | null>(null);
   const [impactLoading, setImpactLoading] = useState(false);
   const [impactError, setImpactError] = useState<string | null>(null);
+  const [effectiveHealth, setEffectiveHealth] = useState<EffectiveHealth | null>(null);
+  const [effectiveHealthError, setEffectiveHealthError] = useState<string | null>(null);
   const refresh = useCallback(async () => {
     setLoading(true); setError(null); setSessionRequired(false);
     try {
@@ -120,6 +154,21 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
         throw new InventoryError(code, message);
       }
       setSnapshot(parse(payload));
+      setEffectiveHealthError(null);
+      try {
+        const healthResponse = await fetch("/api/category-effective-health", { cache: "no-store", credentials: "same-origin",
+          headers: { "X-ReklamZeka-Intent": "category-effective-health-read" } });
+        let healthPayload: unknown = null; try { healthPayload = await healthResponse.json(); } catch { /* redacted below */ }
+        if (!healthResponse.ok) {
+          const found = object(healthPayload) && object(healthPayload.error) ? healthPayload.error : null;
+          throw new InventoryError(found && typeof found.code === "string" ? found.code : "request_failed",
+            found && typeof found.message === "string" ? found.message : "Effective kategori sağlığı alınamadı.");
+        }
+        setEffectiveHealth(parseEffectiveHealth(healthPayload));
+      } catch (reason) {
+        setEffectiveHealth(null);
+        setEffectiveHealthError(reason instanceof Error ? reason.message : "Effective kategori sağlığı alınamadı.");
+      }
     } catch (reason) {
       setSessionRequired(reason instanceof InventoryError && reason.code === "local_session_required");
       setError(reason instanceof Error ? reason.message : "Kategori envanteri alınamadı.");
@@ -159,6 +208,12 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
     </div>
     {healthTotal ? <section className={styles.categoryHealth} role="status"><strong>Kayıt sağlığı · {number(healthTotal)} inceleme noktası</strong><div><span>Tanımsız boyut {number(snapshot.health.dimensionsWithoutDefinitions)}</span><span>Atamasız tanım {number(snapshot.health.definitionsWithoutDirectAssignments)}</span><span>Kaybolmuş hedef {number(snapshot.health.staleTargetAssignments)}</span><span>Arşivli kayda bağlı {number(snapshot.health.assignmentsUnderArchivedRegistry)}</span></div></section> : <section className={styles.categoryHealth} data-clean="true"><strong>Kayıt sağlığı temiz</strong><span>Aktif registry için yapısal uyarı bulunmadı.</span></section>}
     <section className={styles.categoryReviewSignal}><div><strong>Kanıt ve güven inceleme sinyali</strong><p>Eşik {ratio(snapshot.classificationPolicy.minimumTrustedConfidenceBasisPoints)} · {snapshot.classificationPolicy.version}. Bu eşik otomatik karar veya kategori değişikliği üretmez.</p></div><span>{number(snapshot.summary.lowConfidenceAssignments)} düşük güven</span><span>{number(snapshot.summary.invalidEvidenceAssignments)} geçersiz kanıt</span></section>
+    {effectiveHealth ? <section className={styles.categoryHealth} data-clean={effectiveHealth.counts.parkedConflict === 0 ? "true" : undefined}>
+      <strong>Effective kategori sağlığı · hierarchy path bazlı</strong>
+      <div><span>{number(effectiveHealth.counts.hierarchyPaths)} canlı yol</span><span>{number(effectiveHealth.counts.evaluations)} değerlendirme</span><span>{number(effectiveHealth.counts.applied)} uygulanmış</span><span>{number(effectiveHealth.counts.unmatched)} eşleşmemiş</span><span>{number(effectiveHealth.counts.parkedConflict)} park edilmiş çakışma</span></div>
+      {effectiveHealth.reasonBreakdown.some((item) => item.count > 0) ? <p>Reason dağılımı: {effectiveHealth.reasonBreakdown.filter((item) => item.count > 0).map((item) => `${item.reason} · ${number(item.count)}`).join("  •  ")}</p> : null}
+      <p>Yeniden kullanılan kreatifler her kampanya → reklam seti → reklam bağlamında ayrı değerlendirilir. Sınır: {number(effectiveHealth.limits.maxHierarchyPaths)} yol / {number(effectiveHealth.limits.maxDimensions)} boyut; aşımda kısmi sonuç gösterilmez.</p>
+    </section> : effectiveHealthError ? <section className={styles.categoryHealth} role="status"><strong>Effective tarama tamamlanamadı</strong><span>{effectiveHealthError}</span></section> : null}
     {impactError ? <section className={styles.guidanceInlineError} role="alert"><span>{impactError}</span><button type="button" onClick={() => setImpactError(null)}>Kapat</button></section> : null}
     {impact ? <section className={styles.categoryImpact} aria-label={`${impact.target.label} arşiv etki önizlemesi`}>
       <header><div><span>ARŞİV ETKİ ÖNİZLEMESİ · İŞLEM YAPILMADI</span><h2>{impact.target.label}</h2><p>{impact.target.kind === "dimension" ? "Boyut" : "Tanım"} · v{impact.target.version}</p></div><button type="button" onClick={() => setImpact(null)}>Kapat</button></header>
