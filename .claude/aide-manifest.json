@@ -116,15 +116,15 @@
       "pkg": "skill:planla-kos"
     },
     ".claude/agents/analist.md": {
-      "hash": "77ab997a0205c81f",
+      "hash": "7144a858f4f5fc12",
       "pkg": "agent:analist"
     },
     ".claude/agents/planlayici.md": {
-      "hash": "e148504f4cce3af0",
+      "hash": "694f1eefcc9dd1a8",
       "pkg": "agent:planlayici"
     },
     ".claude/agents/pm.md": {
-      "hash": "008f114d4cd7fdca",
+      "hash": "37eb2b0e1dfe00ac",
       "pkg": "agent:pm"
     },
     ".claude/agents/konfigurator.md": {
@@ -136,7 +136,7 @@
       "pkg": "agent:denetci"
     },
     ".claude/agents/gunlukcu.md": {
-      "hash": "80c91107929783a3",
+      "hash": "47c5303174a569ff",
       "pkg": "agent:gunlukcu"
     },
     ".claude/skills/kaptan/SKILL.md": {
@@ -236,11 +236,11 @@
       "pkg": "hook:oturum-kapanis"
     },
     ".claude/docs/model-policy.md": {
-      "hash": "842e21d718f303e5",
+      "hash": "8f7f20f3aa07c2b1",
       "pkg": "doc:model-policy"
     },
     ".claude/agents/kaptan.md": {
-      "hash": "587db8f90e2a14e8",
+      "hash": "d5ed7eae59037b6b",
       "pkg": "agent:kaptan"
     },
     ".claude/aide/automation/kaptan-brifing.job.json": {
@@ -376,11 +376,11 @@
       "pkg": "doc:commit-sozlesmesi"
     },
     ".claude/agents/filing-teshis.md": {
-      "hash": "dffcc91725a38331",
+      "hash": "ba7ac6d39d71783c",
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-07T19:52:10.988Z",
+  "updatedAt": "2026-08-08T07:55:43.547Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",

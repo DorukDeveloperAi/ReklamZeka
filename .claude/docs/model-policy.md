@@ -5,8 +5,9 @@ oradan **`~/.claude/model-policy.json`**'a türetilir (agent'lar ve maestro bunu
 **`~/.claude/settings.json` → `model`** alanına pinlenir (Claude Code'un okuduğu tek yer).
 Ayarı kullanıcı `aide` TUI'nın *Yapılandır → Modeller* sekmesinden yapar. Sen yalnız **okur**, uygularsın.
 
-**Türev dosyaları ELLE DÜZENLEME** (`model-policy.json`, `settings.json → model`): `writeModelPolicy`
-üzerine yazar, değişikliğin sessizce kaybolur. Değişiklik yalnız kaynaktan (`config.json → models`) yapılır.
+**Türev dosyaları ELLE DÜZENLEME** (`model-policy.json`, `settings.json → model`, vendor açıkken
+`~/.codex/config.toml → model`): `writeModelPolicy` üzerine yazar, değişikliğin sessizce kaybolur.
+Değişiklik yalnız kaynaktan (`config.json → models`) yapılır; `tiers.<t>` altında `vendors` REZERVEDİR.
 
 ## Kanon — üç cümle
 
@@ -76,6 +77,12 @@ Alt-görev açmayan (leaf) bir agent'ın policy'yi okumasına gerek yoktur; kend
 onu başlatan launcher tarafından çözülür. Bu yüzden `tools:` listesinde `Bash`
 olmayan leaf agent'lar sorunsuzdur. Orchestrator bir agent yazıyorsan `Bash`'e
 ihtiyacın var.
+
+## Vendor ekseni — Codex (şalter açıkken)
+
+Tier→model çözümü vendor-farkındadır: Codex pinini **pin motoru** yazar (`~/.codex/config.toml` kök
+`model`/`model_reasoning_effort` — TÜREVDİR, elle düzenlenmez). `model-policy-guard`'ın Codex portu
+**YOK** (ilanlı kör nokta); enforcement = pin + `aide model doctor`. Ayrıntı: `docs/vendor-katmani.md`.
 
 ## Denetim
 
