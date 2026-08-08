@@ -258,6 +258,23 @@
 .chatComposer button { align-self: end; min-height: 34px; padding: 0 12px; border: 0; border-radius: 8px; color: #111; background: var(--rz-green); font-size: .61rem; font-weight: 850; cursor: pointer; }
 .agentChat > footer { padding: 0 20px 15px; color: var(--rz-dim); font-size: .55rem; text-align: center; }
 .agentConfiguration { display: grid; align-content: start; gap: 10px; }
+.agentSessionHub { display: grid; gap: 13px; padding-bottom: 16px; }
+.agentSessionHub > p { margin: 0 16px; padding: 9px 11px; border: 1px solid rgba(255,184,77,.24); border-radius: 8px; color: #ffd29a; background: rgba(255,184,77,.06); font-size: .61rem; line-height: 1.5; }
+.agentSessionHub > div:not(.handoffReceipt) { display: grid; gap: 5px; margin: 0 16px; }
+.agentSessionHub > div:not(.handoffReceipt) strong { font-size: .68rem; }
+.agentSessionHub > div:not(.handoffReceipt) small { color: var(--rz-muted); font-size: .57rem; line-height: 1.5; }
+.agentSessionHub > label { display: grid; gap: 7px; margin: 0 16px; color: var(--rz-muted); font-size: .58rem; }
+.agentSessionHub select { min-height: 38px; padding: 0 10px; border: 1px solid var(--rz-line); border-radius: 8px; background: var(--rz-surface-3); color: var(--rz-text); font-size: .61rem; }
+.agentSessionHub dl { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0 16px; border: 1px solid var(--rz-line); border-radius: 8px; overflow: hidden; }
+.agentSessionHub dl div { display: grid; gap: 5px; padding: 10px; border-right: 1px solid var(--rz-line); }
+.agentSessionHub dl div:last-child { border-right: 0; }
+.agentSessionHub dt { color: var(--rz-dim); font-size: .52rem; }
+.agentSessionHub dd { margin: 0; font-size: .58rem; overflow-wrap: anywhere; }
+.agentSessionHub > button { margin: 0 16px; }
+.handoffReceipt { display: grid; gap: 6px; margin: 0 16px; padding: 11px; border: 1px solid rgba(184,242,84,.2); border-radius: 8px; background: rgba(184,242,84,.05); }
+.handoffReceipt span { color: var(--rz-green); font-size: .56rem; font-weight: 800; }
+.handoffReceipt code { color: var(--rz-text); font-size: .58rem; overflow-wrap: anywhere; }
+.handoffReceipt small { color: var(--rz-muted); font-size: .54rem; }
 .skillList { display: grid; padding: 6px 13px 11px; }
 .skillList article { display: grid; grid-template-columns: auto 1fr; gap: 9px; min-height: 0; padding: 11px 0; border: 0; border-bottom: 1px solid var(--rz-line); border-radius: 0; background: transparent; }
 .skillList article:last-child { border-bottom: 0; }
