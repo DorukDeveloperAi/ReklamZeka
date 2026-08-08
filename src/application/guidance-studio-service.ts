@@ -10,7 +10,7 @@ import {
 } from "@/domain/guidance/registry";
 import { authorizeWorkspace, type WorkspaceMembership } from "@/security/authorization";
 
-export const GUIDANCE_STUDIO_VERSION = "guidance-studio/1.0.0" as const;
+export const GUIDANCE_STUDIO_VERSION = "guidance-studio/1.1.0" as const;
 
 export type GuidanceStudioScope = Readonly<{
   facet: GuidanceScopeFacet;
@@ -29,7 +29,7 @@ export type GuidanceStudioItem = Readonly<{
   strength: GuidanceStrength;
   topic: string;
   status: GuidanceCard["status"];
-  scope: GuidanceStudioScope;
+  scopes: readonly GuidanceStudioScope[];
   updatedAt: null;
 }>;
 
@@ -108,6 +108,17 @@ function scope(value: GuidanceStudioScope, categories: readonly GuidanceStudioCa
   return Object.freeze({ ...value });
 }
 
+function scopes(values: readonly GuidanceStudioScope[], categories: readonly GuidanceStudioCategory[]): readonly GuidanceStudioScope[] {
+  if (!Array.isArray(values) || values.length < 1 || values.length > 12) throw new GuidanceStudioError("invalid_input");
+  const validated = values.map((value) => scope(value, categories));
+  const identities = validated.map((value) => `${value.facet}\u0000${value.value ?? ""}\u0000${value.entityType ?? ""}`);
+  if (new Set(identities).size !== identities.length
+    || validated.length > 1 && validated.some((value) => value.facet === "global")) {
+    throw new GuidanceStudioError("invalid_input");
+  }
+  return Object.freeze(validated);
+}
+
 function identity(prefix: "guidance" | "source" | "binding"): string {
   return `${prefix}_${randomBytes(12).toString("hex")}`;
 }
@@ -122,20 +133,22 @@ function authority(role: WorkspaceMembership["role"]) {
 }
 
 function project(registry: GuidanceRegistry): readonly GuidanceStudioItem[] {
-  const bindings = new Map(registry.bindings.map((item) => [item.cardId, item] as const));
+  const bindings = new Map<string, GuidanceBinding[]>();
+  for (const binding of registry.bindings) bindings.set(binding.cardId, [...(bindings.get(binding.cardId) ?? []), binding]);
   return Object.freeze(registry.cards.map((card) => {
-    const binding = bindings.get(card.id);
-    if (!binding) throw new GuidanceStudioError("not_found");
+    const cardBindings = [...(bindings.get(card.id) ?? [])].sort((left, right) => left.id.localeCompare(right.id, "en"));
+    if (!cardBindings.length) throw new GuidanceStudioError("not_found");
     return Object.freeze({
       cardRef: card.id, version: card.version, title: card.title, body: card.body,
       strength: card.strength, topic: card.topic, status: card.status,
-      scope: Object.freeze({ facet: binding.facet, value: binding.value, entityType: binding.entityType,
-        mode: binding.mode, priority: binding.priority }), updatedAt: null,
+      scopes: Object.freeze(cardBindings.map((binding) => Object.freeze({ facet: binding.facet, value: binding.value,
+        entityType: binding.entityType, mode: binding.mode, priority: binding.priority }))), updatedAt: null,
     });
   }).sort((left, right) => left.status.localeCompare(right.status) || left.title.localeCompare(right.title, "tr")));
 }
 
-type DraftBody = Readonly<{ title: string; body: string; strength: GuidanceStrength; topic: string; scope: GuidanceStudioScope }>;
+type DraftBody = Readonly<{ title: string; body: string; strength: GuidanceStrength; topic: string;
+  scopes: readonly GuidanceStudioScope[] }>;
 
 export class GuidanceStudioService {
   constructor(private readonly repository: GuidanceStudioRepository, private readonly memberships: readonly WorkspaceMembership[]) {}
@@ -156,8 +169,8 @@ export class GuidanceStudioService {
     ]);
     const title = text(request.title, 160); const body = text(request.body, 12_000); const topic = text(request.topic, 80);
     if (!STRENGTHS.has(request.strength)) throw new GuidanceStudioError("invalid_input");
-    const bindingScope = scope(request.scope, categories);
-    const cardRef = identity("guidance"); const sourceRef = identity("source"); const bindingRef = identity("binding");
+    const bindingScopes = scopes(request.scopes, categories);
+    const cardRef = identity("guidance"); const sourceRef = identity("source");
     const next = createGuidanceRegistry({ workspaceId: principal.workspaceId,
       sources: [...current.sources, { id: sourceRef, workspaceId: principal.workspaceId, sourceType: "owner_statement",
         title, sourceRef: cardRef, sourceUrl: null, content: body, author: principal.readerRef, capturedAt: new Date().toISOString(),
@@ -166,11 +179,12 @@ export class GuidanceStudioService {
         sourceIds: [sourceRef], title, body, rationale: null, strength: request.strength, topic,
         decisionKey: null, positionKey: null, authority: "guidance_only", status: "draft",
         effectiveFrom: null, effectiveTo: null, ownerRef: principal.readerRef, version: 1 }],
-      bindings: [...current.bindings, { id: bindingRef, workspaceId: principal.workspaceId, cardId: cardRef,
-        ...bindingScope, version: 1 }], sets: current.sets });
+      bindings: [...current.bindings, ...bindingScopes.map((bindingScope) => ({ id: identity("binding"),
+        workspaceId: principal.workspaceId, cardId: cardRef, ...bindingScope, version: 1 }))], sets: current.sets });
     const saved = await this.repository.saveAudited(next, { expectedRegistryHash: request.expectedRegistryHash,
       actorId: principal.actor.userId, action: "guidance.draft_created", resourceId: cardRef,
-      occurredAt: new Date().toISOString(), metadata: { version: 1, role: membership.role, facet: bindingScope.facet } });
+      occurredAt: new Date().toISOString(), metadata: { version: 1, role: membership.role,
+        bindingCount: bindingScopes.length } });
     return Object.freeze({ contractVersion: GUIDANCE_STUDIO_VERSION, item: project(next).find((item) => item.cardRef === cardRef)!,
       registryHash: saved.registryHash, contextInvalidated: saved.contextInvalidationAppended,
       authority: authority(membership.role) });
@@ -179,7 +193,7 @@ export class GuidanceStudioService {
   async mutate(principal: TrustedDecisionRoomPrincipal, request: Readonly<{
     cardRef: string; expectedVersion: number; expectedRegistryHash: string;
     operation: "revise" | "publish" | "archive";
-    title?: string; body?: string; strength?: GuidanceStrength; topic?: string; scope?: GuidanceStudioScope;
+    title?: string; body?: string; strength?: GuidanceStrength; topic?: string; scopes?: readonly GuidanceStudioScope[];
   }>) {
     const action = request.operation === "revise" ? "guidance:draft" : "guidance:publish";
     const membership = authorizeWorkspace(principal.actor, principal.workspaceId, action, this.memberships);
@@ -189,9 +203,10 @@ export class GuidanceStudioService {
       this.repository.load(principal.workspaceId), this.repository.listActiveCategories(principal.workspaceId),
     ]);
     const card = current.cards.find((item) => item.id === request.cardRef);
-    const binding = current.bindings.find((item) => item.cardId === request.cardRef);
+    const bindings = current.bindings.filter((item) => item.cardId === request.cardRef)
+      .sort((left, right) => left.id.localeCompare(right.id, "en"));
     const source = card && current.sources.find((item) => card.sourceIds.includes(item.id));
-    if (!card || !binding || !source) throw new GuidanceStudioError("not_found");
+    if (!card || !bindings.length || !source) throw new GuidanceStudioError("not_found");
     if (card.version !== request.expectedVersion) throw new GuidanceStudioError("conflict");
     if (request.operation === "revise" && card.status !== "draft"
       || request.operation === "publish" && card.status !== "draft"
@@ -202,7 +217,12 @@ export class GuidanceStudioService {
     const nextTopic = request.operation === "revise" ? text(request.topic, 80) : card.topic;
     const nextStrength = request.operation === "revise" ? request.strength : card.strength;
     if (!nextStrength || !STRENGTHS.has(nextStrength)) throw new GuidanceStudioError("invalid_input");
-    const nextScope = request.operation === "revise" ? scope(request.scope!, categories) : binding;
+    const nextScopes = request.operation === "revise" ? scopes(request.scopes!, categories)
+      : bindings.map((binding) => ({ facet: binding.facet, value: binding.value, entityType: binding.entityType,
+        mode: binding.mode, priority: binding.priority }));
+    if (request.operation === "revise" && nextScopes.length !== bindings.length) {
+      throw new GuidanceStudioError("invalid_transition");
+    }
     const version = card.version + 1;
     const replace = <T extends { id: string }>(rows: readonly T[], id: string, value: T) => rows.map((row) => row.id === id ? value : row);
     const next = createGuidanceRegistry({ workspaceId: current.workspaceId,
@@ -210,14 +230,15 @@ export class GuidanceStudioService {
       cards: replace(current.cards, card.id, { ...card, title: nextTitle, body: nextBody, topic: nextTopic,
         strength: nextStrength, status: nextStatus, effectiveFrom: nextStatus === "published" ? new Date().toISOString() : card.effectiveFrom,
         version }),
-      bindings: request.operation === "revise" ? replace(current.bindings, binding.id,
-        { id: binding.id, workspaceId: binding.workspaceId, cardId: binding.cardId, ...nextScope, version: binding.version + 1 }) : current.bindings,
+      bindings: request.operation === "revise" ? bindings.reduce((rows, binding, index) => replace(rows, binding.id,
+        { id: binding.id, workspaceId: binding.workspaceId, cardId: binding.cardId,
+          ...nextScopes[index]!, version: binding.version + 1 }), current.bindings) : current.bindings,
       sets: current.sets });
     const auditAction = request.operation === "revise" ? "guidance.draft_revised"
       : request.operation === "publish" ? "guidance.published" : "guidance.archived";
     const saved = await this.repository.saveAudited(next, { expectedRegistryHash: request.expectedRegistryHash,
       actorId: principal.actor.userId, action: auditAction, resourceId: card.id, occurredAt: new Date().toISOString(),
-      metadata: { version, role: membership.role, facet: nextScope.facet } });
+      metadata: { version, role: membership.role, bindingCount: nextScopes.length } });
     return Object.freeze({ contractVersion: GUIDANCE_STUDIO_VERSION, item: project(next).find((item) => item.cardRef === card.id)!,
       registryHash: saved.registryHash, contextInvalidated: saved.contextInvalidationAppended,
       authority: authority(membership.role) });

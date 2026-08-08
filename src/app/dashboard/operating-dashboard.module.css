@@ -245,6 +245,10 @@
 .guidanceFields input:disabled, .guidanceFields select:disabled, .guidanceFields textarea:disabled { cursor: not-allowed; opacity: .56; }
 .guidanceFields input[type="range"] { padding: 0; accent-color: var(--rz-green); }
 .guidanceBodyField { grid-column: 1 / -1; }
+.guidanceScopeGroup { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 13px; border: 1px solid var(--rz-line); border-radius: 9px; background: rgba(255,255,255,.012); }
+.guidanceScopeGroup > div { display: flex; grid-column: 1 / -1; align-items: center; justify-content: space-between; gap: 10px; }
+.guidanceScopeGroup > div strong { font-size: .62rem; }
+.guidanceScopeGroup > div button { border: 0; background: transparent; color: #ff9d95; font-size: .55rem; cursor: pointer; }
 .guidanceFacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 20px; overflow: hidden; border: 1px solid var(--rz-line); border-radius: 9px; }
 .guidanceFacts > div { display: grid; gap: 6px; min-width: 0; padding: 12px; border-right: 1px solid var(--rz-line); }
 .guidanceFacts > div:last-child { border-right: 0; }
@@ -789,6 +793,7 @@
   .budgetRows article > div:first-child, .budgetRows article > button { grid-column: 1 / -1; }
   .guidanceHeroActions { align-items: flex-start; flex-direction: column; }
   .guidanceFields, .guidanceFacts { grid-template-columns: 1fr; }
+  .guidanceScopeGroup { grid-template-columns: 1fr; }
   .guidanceFacts > div { border-right: 0; border-bottom: 1px solid var(--rz-line); }
   .guidanceFacts > div:last-child { border-bottom: 0; }
   .guidanceEditor > footer, .guidanceEditor > footer > div { align-items: stretch; flex-direction: column; }

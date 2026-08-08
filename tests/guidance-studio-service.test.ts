@@ -25,15 +25,15 @@ function memory(role: "owner" | "admin" | "analyst" | "viewer" = "owner") {
 }
 
 const draft = { title: "Learning döneminde sakin kal", body: "Acil risk yoksa 72 saat gözlemle.",
-  strength: "should" as const, topic: "cadence", scope: { facet: "internal_category" as const,
-    value: category.ref, entityType: null, mode: "default" as const, priority: 60 } };
+  strength: "should" as const, topic: "cadence", scopes: [{ facet: "internal_category" as const,
+    value: category.ref, entityType: null, mode: "default" as const, priority: 60 }] };
 
 describe("GuidanceStudioService", () => {
   it("preserves the owner statement separately and creates guidance-only scoped draft", async () => {
     const state = memory(); const before = await state.service.list(principal);
     const created = await state.service.createDraft(principal, { ...draft, expectedRegistryHash: before.registryHash });
     expect(created.item).toMatchObject({ status: "draft", title: draft.title, body: draft.body,
-      scope: { facet: "internal_category", value: category.ref }, version: 1 });
+      scopes: [{ facet: "internal_category", value: category.ref }], version: 1 });
     expect(created.contextInvalidated).toBe(false);
     expect(state.registry().sources[0]).toMatchObject({ sourceType: "owner_statement", content: draft.body, status: "draft" });
     expect(state.registry().cards[0]).toMatchObject({ authority: "guidance_only", status: "draft" });
@@ -68,6 +68,19 @@ describe("GuidanceStudioService", () => {
   it("rejects an internal category ref that is not in the active canonical catalog", async () => {
     const state = memory(); const initial = await state.service.list(principal);
     await expect(state.service.createDraft(principal, { ...draft, expectedRegistryHash: initial.registryHash,
-      scope: { ...draft.scope, value: "category_ffffffffffffffffffffffff" } })).rejects.toMatchObject({ code: "not_found" });
+      scopes: [{ ...draft.scopes[0]!, value: "category_ffffffffffffffffffffffff" }] })).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("authors conjunctive multi-facet scopes and keeps binding cardinality stable across revisions", async () => {
+    const state = memory(); const initial = await state.service.list(principal);
+    const scopes = [draft.scopes[0]!, { facet: "account" as const, value: "account_aaaaaaaaaaaaaaaaaaaaaaaa",
+      entityType: null, mode: "default" as const, priority: 70 }, { facet: "topic" as const, value: "budget",
+      entityType: null, mode: "exception" as const, priority: 80 }];
+    const created = await state.service.createDraft(principal, { ...draft, scopes, expectedRegistryHash: initial.registryHash });
+    expect(created.item.scopes).toHaveLength(3);
+    expect(state.registry().bindings.filter((binding) => binding.cardId === created.item.cardRef)).toHaveLength(3);
+    await expect(state.service.mutate(principal, { cardRef: created.item.cardRef, expectedVersion: 1,
+      expectedRegistryHash: created.registryHash, operation: "revise", ...draft }))
+      .rejects.toMatchObject({ code: "invalid_transition" });
   });
 });

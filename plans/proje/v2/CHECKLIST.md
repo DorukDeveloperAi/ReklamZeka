@@ -106,7 +106,9 @@
     public-safe kararlı category ref ve rol/audit API'si.
   - [x] Codex/Claude salt-okur guidance registry ve explicit account/category/entity/topic/
     timeframe bağlamlı deterministic effective-pack preview araçları.
-  - [ ] Çoklu binding/set authoring; account-group/lifecycle/template scope ve analysis-run binding.
+  - [x] Tek guidance card için en fazla 12 çoklu facet binding authoring; farklı facet'ler
+    AND, aynı facet alternatifleri OR çözülür ve Studio'da birlikte görünür.
+  - [ ] Guidance set authoring; account-group/lifecycle/template scope ve analysis-run binding.
 - [ ] Owner statement + official Meta source + experiment/observation provenance ve freshness.
 - [ ] G0→G4 progressive formalization, semantic diff, historical replay ve impact preview.
 - [ ] AdvisedPractice candidate→trial→outcome→standardization lifecycle ve decomposition review.

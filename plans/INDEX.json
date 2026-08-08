@@ -1,6 +1,6 @@
 {
   "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
-  "damga": "059d2ecceb9d",
+  "damga": "5ff8a06449c9",
   "plans": [
     {
       "slug": "proje",
@@ -22,7 +22,7 @@
       "asamaToplam": 14,
       "asamaKapali": 6,
       "checklistAcik": 100,
-      "checklistKapali": 157,
+      "checklistKapali": 158,
       "sonTur": null,
       "siradaki": {
         "no": "11",
@@ -321,9 +321,9 @@
         "onar": null
       },
       {
-        "ref": "td:chk/proje/hd68f79",
+        "ref": "td:chk/proje/hdf14d4",
         "tur": "chk",
-        "metin": "Çoklu binding/set authoring; account-group/lifecycle/template scope ve analysis-run binding.",
+        "metin": "Guidance set authoring; account-group/lifecycle/template scope ve analysis-run binding.",
         "plan": "proje",
         "asama": "09",
         "kapatan": [],

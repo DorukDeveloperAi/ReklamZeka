@@ -24,7 +24,7 @@ type GuidanceItem = Readonly<{
   strength: GuidanceStrength;
   topic: string;
   status: GuidanceStatus;
-  scope: GuidanceScope;
+  scopes: readonly GuidanceScope[];
   updatedAt: string | null;
 }>;
 
@@ -48,7 +48,7 @@ type Draft = Readonly<{
   body: string;
   strength: GuidanceStrength;
   topic: string;
-  scope: GuidanceScope;
+  scopes: readonly GuidanceScope[];
 }>;
 
 const EMPTY_DRAFT: Draft = Object.freeze({
@@ -56,7 +56,7 @@ const EMPTY_DRAFT: Draft = Object.freeze({
   body: "",
   strength: "should",
   topic: "",
-  scope: Object.freeze({ facet: "global", value: null, entityType: null, mode: "default", priority: 50 }),
+  scopes: Object.freeze([Object.freeze({ facet: "global", value: null, entityType: null, mode: "default", priority: 50 })]),
 });
 const FACETS: readonly Readonly<{ value: GuidanceFacet; label: string }>[] = Object.freeze([
   { value: "global", label: "Tüm çalışma alanı" },
@@ -102,7 +102,8 @@ function isItem(value: unknown): value is GuidanceItem {
     && typeof value.title === "string" && typeof value.body === "string" && typeof value.topic === "string"
     && ["must", "should", "consider", "avoid", "question"].includes(String(value.strength))
     && ["draft", "published", "archived"].includes(String(value.status))
-    && (value.updatedAt === null || typeof value.updatedAt === "string") && isScope(value.scope);
+    && (value.updatedAt === null || typeof value.updatedAt === "string") && Array.isArray(value.scopes)
+    && value.scopes.length >= 1 && value.scopes.length <= 12 && value.scopes.every(isScope);
 }
 
 function parseSnapshot(value: unknown): GuidanceStudioSnapshot {
@@ -130,7 +131,8 @@ function errorFromResponse(response: Response, payload: unknown): GuidanceStudio
 }
 
 function draftFromItem(item: GuidanceItem): Draft {
-  return { title: item.title, body: item.body, strength: item.strength, topic: item.topic, scope: { ...item.scope } };
+  return { title: item.title, body: item.body, strength: item.strength, topic: item.topic,
+    scopes: item.scopes.map((scope) => ({ ...scope })) };
 }
 
 function labelForScope(scope: GuidanceScope, categories: readonly GuidanceCategory[]): string {
@@ -141,6 +143,10 @@ function labelForScope(scope: GuidanceScope, categories: readonly GuidanceCatego
   }
   const facet = FACETS.find((candidate) => candidate.value === scope.facet)?.label ?? scope.facet;
   return `${facet} · ${scope.entityType ? `${scope.entityType} · ` : ""}${scope.value ?? "—"}`;
+}
+
+function labelForScopes(scopes: readonly GuidanceScope[], categories: readonly GuidanceCategory[]): string {
+  return scopes.map((scope) => labelForScope(scope, categories)).join(" + ");
 }
 
 function formatUpdatedAt(value: string | null): string {
@@ -177,9 +183,10 @@ export function GuidanceStudioPanel() {
 
   const selected = snapshot?.items.find((item) => item.cardRef === selectedRef) ?? null;
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(baseline), [baseline, draft]);
-  const valid = Boolean(draft.title.trim() && draft.body.trim() && draft.topic.trim()
-    && (draft.scope.facet === "global" || draft.scope.value?.trim())
-    && (draft.scope.facet !== "entity" || draft.scope.entityType));
+  const valid = Boolean(draft.title.trim() && draft.body.trim() && draft.topic.trim() && draft.scopes.length
+    && draft.scopes.every((scope) => (scope.facet === "global" || scope.value?.trim())
+      && (scope.facet !== "entity" || scope.entityType))
+    && (draft.scopes.length === 1 || draft.scopes.every((scope) => scope.facet !== "global")));
 
   const selectItem = useCallback((item: GuidanceItem) => {
     const next = draftFromItem(item);
@@ -234,17 +241,29 @@ export function GuidanceStudioPanel() {
     setNotice(null);
   }
 
-  function updateScope(patch: Partial<GuidanceScope>) {
-    setDraft((current) => ({ ...current, scope: { ...current.scope, ...patch } }));
+  function updateScope(index: number, patch: Partial<GuidanceScope>) {
+    setDraft((current) => ({ ...current,
+      scopes: current.scopes.map((scope, candidate) => candidate === index ? { ...scope, ...patch } : scope) }));
   }
 
-  function changeFacet(facet: GuidanceFacet) {
+  function changeFacet(index: number, facet: GuidanceFacet) {
     const categoryRef = snapshot?.categories[0]?.ref ?? null;
-    updateScope({
+    updateScope(index, {
       facet,
       value: facet === "global" ? null : facet === "internal_category" ? categoryRef : "",
       entityType: facet === "entity" ? "campaign" : null,
     });
+  }
+
+  function addScope() {
+    if (draft.scopes.length >= 12 || !creating) return;
+    const base: GuidanceScope = { facet: "account", value: "", entityType: null, mode: "default", priority: 50 };
+    setDraft((current) => ({ ...current, scopes: current.scopes[0]?.facet === "global" ? [base] : [...current.scopes, base] }));
+  }
+
+  function removeScope(index: number) {
+    if (!creating || draft.scopes.length <= 1) return;
+    setDraft((current) => ({ ...current, scopes: current.scopes.filter((_, candidate) => candidate !== index) }));
   }
 
   async function mutate(operation: "create" | "revise" | "publish" | "archive") {
@@ -257,10 +276,10 @@ export function GuidanceStudioPanel() {
     const isCreate = operation === "create";
     const body = isCreate
       ? { title: draft.title.trim(), body: draft.body.trim(), strength: draft.strength, topic: draft.topic.trim(),
-          scope: draft.scope, expectedRegistryHash: snapshot.registryHash }
+          scopes: draft.scopes, expectedRegistryHash: snapshot.registryHash }
       : { cardRef: selected!.cardRef, expectedVersion: selected!.version, expectedRegistryHash: snapshot.registryHash,
           operation, ...(operation === "revise" ? { title: draft.title.trim(), body: draft.body.trim(),
-            strength: draft.strength, topic: draft.topic.trim(), scope: draft.scope } : {}) };
+            strength: draft.strength, topic: draft.topic.trim(), scopes: draft.scopes } : {}) };
     try {
       const response = await fetch("/api/guidance-studio", {
         method: isCreate ? "POST" : "PATCH",
@@ -314,7 +333,7 @@ export function GuidanceStudioPanel() {
         <div>
           {creating ? <button type="button" data-active="true" onClick={beginCreate}><span><strong>Yeni talimat</strong><small>Henüz kaydedilmedi</small></span><Status tone="guidance">Taslak</Status></button> : null}
           {snapshot?.items.map((item) => <button type="button" key={item.cardRef} data-active={!creating && selectedRef === item.cardRef} onClick={() => selectItem(item)}>
-            <span><strong>{item.title}</strong><small>{labelForScope(item.scope, snapshot.categories)} · v{item.version}</small></span><Status tone={statusTone(item.status)}>{statusLabel(item.status)}</Status>
+            <span><strong>{item.title}</strong><small>{labelForScopes(item.scopes, snapshot.categories)} · v{item.version}</small></span><Status tone={statusTone(item.status)}>{statusLabel(item.status)}</Status>
           </button>)}
         </div>
       </section>
@@ -326,14 +345,18 @@ export function GuidanceStudioPanel() {
           <label>Konu<input value={draft.topic} onChange={(event) => setDraft((current) => ({ ...current, topic: event.target.value }))} disabled={editorLocked} placeholder="budget_allocation" maxLength={80} /></label>
           <label className={styles.guidanceBodyField}>Talimat metni<textarea value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))} disabled={editorLocked} maxLength={6000} placeholder="Bu kapsamda karar verirken..." /></label>
           <label>Karar ağırlığı<select value={draft.strength} onChange={(event) => setDraft((current) => ({ ...current, strength: event.target.value as GuidanceStrength }))} disabled={editorLocked}>{STRENGTHS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-          <label>Kapsam türü<select value={draft.scope.facet} onChange={(event) => changeFacet(event.target.value as GuidanceFacet)} disabled={editorLocked}>{FACETS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-          {draft.scope.facet === "internal_category" ? <label>İç kategori<select value={draft.scope.value ?? ""} onChange={(event) => updateScope({ value: event.target.value })} disabled={editorLocked || !snapshot.categories.length}><option value="" disabled>Kategori seçin</option>{snapshot.categories.map((category) => <option key={category.ref} value={category.ref}>{category.dimension} · {category.label}</option>)}</select></label>
-            : draft.scope.facet !== "global" ? <label>Kapsam değeri<input value={draft.scope.value ?? ""} onChange={(event) => updateScope({ value: event.target.value })} disabled={editorLocked} placeholder={draft.scope.facet === "entity" ? "Kampanya veya varlık referansı" : "Eşleşecek değer"} /></label> : null}
-          {draft.scope.facet === "entity" ? <label>Varlık seviyesi<select value={draft.scope.entityType ?? "campaign"} onChange={(event) => updateScope({ entityType: event.target.value as Exclude<GuidanceEntityType, null> })} disabled={editorLocked}>{ENTITY_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></label> : null}
-          <label>Eşleşme modu<select value={draft.scope.mode} onChange={(event) => updateScope({ mode: event.target.value as GuidanceScope["mode"] })} disabled={editorLocked}><option value="default">Varsayılan</option><option value="exception">İstisna</option></select></label>
-          <label>Öncelik · {draft.scope.priority}<input type="range" min="0" max="100" value={draft.scope.priority} onChange={(event) => updateScope({ priority: Number(event.target.value) })} disabled={editorLocked} /></label>
+          {draft.scopes.map((scope, index) => <div className={styles.guidanceScopeGroup} key={`${index}-${scope.facet}`}>
+            <div><strong>Kapsam {index + 1}</strong>{creating && draft.scopes.length > 1 ? <button type="button" onClick={() => removeScope(index)}>Kaldır</button> : null}</div>
+            <label>Kapsam türü<select value={scope.facet} onChange={(event) => changeFacet(index, event.target.value as GuidanceFacet)} disabled={editorLocked}>{FACETS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+            {scope.facet === "internal_category" ? <label>İç kategori<select value={scope.value ?? ""} onChange={(event) => updateScope(index, { value: event.target.value })} disabled={editorLocked || !snapshot.categories.length}><option value="" disabled>Kategori seçin</option>{snapshot.categories.map((category) => <option key={category.ref} value={category.ref}>{category.dimension} · {category.label}</option>)}</select></label>
+              : scope.facet !== "global" ? <label>Kapsam değeri<input value={scope.value ?? ""} onChange={(event) => updateScope(index, { value: event.target.value })} disabled={editorLocked} placeholder={scope.facet === "entity" ? "Kampanya veya varlık referansı" : "Eşleşecek değer"} /></label> : null}
+            {scope.facet === "entity" ? <label>Varlık seviyesi<select value={scope.entityType ?? "campaign"} onChange={(event) => updateScope(index, { entityType: event.target.value as Exclude<GuidanceEntityType, null> })} disabled={editorLocked}>{ENTITY_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></label> : null}
+            <label>Eşleşme modu<select value={scope.mode} onChange={(event) => updateScope(index, { mode: event.target.value as GuidanceScope["mode"] })} disabled={editorLocked}><option value="default">Varsayılan</option><option value="exception">İstisna</option></select></label>
+            <label>Öncelik · {scope.priority}<input type="range" min="0" max="100" value={scope.priority} onChange={(event) => updateScope(index, { priority: Number(event.target.value) })} disabled={editorLocked} /></label>
+          </div>)}
+          {creating && draft.scopes.length < 12 ? <button className={styles.secondaryButton} type="button" onClick={addScope}>+ Kapsam ekle</button> : null}
         </div>
-        <div className={styles.guidanceFacts}><div><span>Otorite</span><strong>Yalnız analitik guidance</strong></div><div><span>Kapsam</span><strong>{labelForScope(draft.scope, snapshot.categories)}</strong></div><div><span>Kayıt</span><strong>{dirty ? "Kaydedilmemiş değişiklik" : "Sunucuyla eşleşiyor"}</strong></div></div>
+        <div className={styles.guidanceFacts}><div><span>Otorite</span><strong>Yalnız analitik guidance</strong></div><div><span>Kapsam</span><strong>{labelForScopes(draft.scopes, snapshot.categories)}</strong></div><div><span>Kayıt</span><strong>{dirty ? "Kaydedilmemiş değişiklik" : "Sunucuyla eşleşiyor"}</strong></div></div>
         <footer>
           {!creating && selected?.status !== "archived" ? <button className={styles.guidanceDangerButton} type="button" onClick={() => void mutate("archive")} disabled={saving || !authority.canArchive}>Arşivle</button> : <span />}
           <div><span>{saving ? "İşlem sürüyor…" : selected?.status === "published" ? "Yayındaki talimat salt okunurdur; değiştirmek için arşivleyip yeni talimat oluşturun." : selected?.status === "archived" ? "Arşivli talimat yeni analiz bağlamlarında uygulanmaz." : "Taslak yayınlanana kadar uygulanmaz."}</span>

@@ -61,7 +61,7 @@ export function createGuidanceStudioHttpHandlers(input: Readonly<{
     } catch (reason) { return failure(reason); } },
     POST: async (request: Request) => { try {
       requestShape(request, "POST", "guidance-studio-create", true);
-      const value = await body(request); exact(value, ["title", "body", "strength", "topic", "scope", "expectedRegistryHash"]);
+      const value = await body(request); exact(value, ["title", "body", "strength", "topic", "scopes", "expectedRegistryHash"]);
       const principal = await input.resolvePrincipal(request, "draft");
       if (!principal) throw new AuthorizationError();
       return NextResponse.json(await input.service.createDraft(principal, value as never), { status: 201, headers: HEADERS });
@@ -74,7 +74,7 @@ export function createGuidanceStudioHttpHandlers(input: Readonly<{
       requestShape(request, "PATCH", intent!, true);
       const value = await body(request);
       exact(value, operation === "revise"
-        ? ["cardRef", "expectedVersion", "expectedRegistryHash", "operation", "title", "body", "strength", "topic", "scope"]
+        ? ["cardRef", "expectedVersion", "expectedRegistryHash", "operation", "title", "body", "strength", "topic", "scopes"]
         : ["cardRef", "expectedVersion", "expectedRegistryHash", "operation"]);
       if (value.operation !== operation) throw new GuidanceStudioError("invalid_input");
       const principal = await input.resolvePrincipal(request, operation === "revise" ? "draft" : "publish");

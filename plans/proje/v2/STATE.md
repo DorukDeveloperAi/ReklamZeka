@@ -15,7 +15,7 @@
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
 | 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.5 ve Slice 01 kapalı; geniş field/breakdown kataloğu, multi-business grouping ve export/rotation ileri işi açık |
-| 09 | kategori ve talimat | DEVAM | 08 | Guidance Studio, agent effective preview ve publish/archive context invalidation hazır; çoklu binding ve category yönetimi sırada |
+| 09 | kategori ve talimat | DEVAM | 08 | Guidance Studio, agent preview, invalidation ve çoklu facet binding hazır; guidance set ve category yönetimi sırada |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
 | 11 | bütçe planlama | AÇIK | 09,10 | planlandı |
 | 12 | prompt/advisor | DEVAM | 09–11 | narrative envelope/claim guard temeli var; translator/ledger sırada |
@@ -77,6 +77,24 @@
   dört audit fact ve iki context invalidation fact doğruladı; final authority yine Meta-write false.
   Açık sonraki dilim: guidance'ın gerçek analysis-run assembly'sine frozen binding'i ve çoklu
   binding/set authoring.
+
+## 2026-08-08 — A09.4 çoklu facet guidance authoring
+
+- Guidance Studio tek kartı en fazla 12 scope binding ile oluşturabiliyor. Account, objective,
+  iç kategori, entity ve topic facet'leri birlikte seçildiğinde resolver hepsini AND; aynı
+  facet içindeki alternatif değerleri OR olarak deterministic değerlendiriyor.
+- Global scope başka scope'larla karıştırılmaz; boş/tekrarlı binding, bilinmeyen kategori ve
+  sınır aşımı fail-closed reddedilir. İlk taslakta binding sayısı belirlenir; mevcut append-only
+  model nedeniyle taslak revizyonunda cardinality sabit tutulur, değer/mode/priority değişebilir.
+  Cardinality değişikliği yeni kart olarak author edilir; sessiz binding silme yapılmaz.
+- Dashboard her scope'u ayrı düzenleme grubu ve birleşik kapsam özetiyle gösterir. Çoklu binding
+  registry, agent list ve effective preview tarafından aynı kaynaktan okunur; ilave policy,
+  approval veya Meta-write authority doğurmaz.
+- Canlı Supabase kabulünde internal-category + topic iki binding'i create→revise→publish→restart→
+  archive boyunca korundu; iki invalidation ve dört audit fact de geçmeye devam etti.
+- Browser güvenlik kabulünde capability cookie bulunmayan yeni sekme Guidance Studio'yu fail-closed
+  kapalı gösterdi; secret/capability tarayıcıya enjekte edilmedi. Merkezi dashboard session bootstrap
+  usability'si ayrı açık iş olarak korunur.
 
 ## 2026-08-06 — bütün görüşmelerin kanonik ürün distilasyonu
 

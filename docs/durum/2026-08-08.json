@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "ee0e41193",
+      "tarih": "2026-08-08",
+      "konu": "feat(guidance): invalidate stale campaign contexts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "65cbab3a8",
       "tarih": "2026-08-08",
       "konu": "feat(agent): add guidance context tools",
@@ -128,15 +137,6 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "3090e2920",
-      "tarih": "2026-08-08",
-      "konu": "docs(status): refresh deterministic project state",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -157,7 +157,7 @@
       "adet": 1
     }
   ],
-  "isSayisi": 116,
+  "isSayisi": 117,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -170,5 +170,5 @@
       "siradaki": "11-bütçe planlama"
     }
   ],
-  "damga": "8b39d013007f"
+  "damga": "044956b2bf5a"
 }

@@ -32,12 +32,13 @@ try {
   if (!category?.ref.startsWith("category_")) throw new Error("category catalog missing");
   let result = await service.createDraft(principal, { title: "Korunan bölge bütçesi",
     body: "Bölge pahalılaşsa bile bütçeyi başka bölgeye taşıma.", strength: "must", topic: "budget_allocation",
-    scope: { facet: "internal_category", value: category.ref, entityType: null, mode: "exception", priority: 90 },
+    scopes: [{ facet: "internal_category", value: category.ref, entityType: null, mode: "exception", priority: 90 },
+      { facet: "topic", value: "budget_allocation", entityType: null, mode: "default", priority: 70 }],
     expectedRegistryHash: initial.registryHash });
   result = await service.mutate(principal, { cardRef: result.item.cardRef, expectedVersion: 1,
     expectedRegistryHash: result.registryHash, operation: "revise", title: result.item.title,
     body: "Bölge pahalılaşsa bile bütçeyi başka bölgeye taşıma; tabanı koru.", strength: "must",
-    topic: "budget_allocation", scope: result.item.scope });
+    topic: "budget_allocation", scopes: result.item.scopes });
   result = await service.mutate(principal, { cardRef: result.item.cardRef, expectedVersion: 2,
     expectedRegistryHash: result.registryHash, operation: "publish" });
   const restarted = new GuidanceStudioService(new DrizzleGuidanceRegistryRepository(database),
@@ -52,11 +53,12 @@ try {
   const versions = await pool.query("select version, status from guidance_cards where workspace_id = $1 order by version", [workspaceId]);
   const invalidations = await pool.query(`select component_type, component_ref, component_version, reason_code
     from effective_campaign_context_invalidations where workspace_id = $1 order by observed_at, created_at, id`, [workspaceId]);
-  if (audit.rowCount !== 4 || versions.rowCount !== 4 || invalidations.rowCount !== 2
+  const bindings = await pool.query("select distinct binding_key from guidance_bindings where workspace_id = $1", [workspaceId]);
+  if (audit.rowCount !== 4 || versions.rowCount !== 4 || bindings.rowCount !== 2 || invalidations.rowCount !== 2
     || invalidations.rows[0]?.reason_code !== "source_changed" || invalidations.rows[1]?.reason_code !== "source_removed"
     || result.item.status !== "archived" || result.contextInvalidated !== true) throw new Error("audit/version/invalidation acceptance failed");
   process.stdout.write(JSON.stringify({ ok: true, categoryCatalog: initial.categories.length, revisions: versions.rowCount,
-    auditEvents: audit.rowCount, contextInvalidations: invalidations.rowCount,
+    auditEvents: audit.rowCount, bindingCount: bindings.rowCount, contextInvalidations: invalidations.rowCount,
     finalStatus: result.item.status, canWriteMeta: result.authority.canWriteMeta }) + "\n");
 } finally {
   await pool.query("delete from audit_events where workspace_id = $1", [workspaceId]).catch(() => undefined);

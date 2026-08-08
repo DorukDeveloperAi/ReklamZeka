@@ -3,7 +3,7 @@ import { createGuidanceStudioHttpHandlers } from "@/server/guidance-studio-http"
 
 const principal = { actor: { userId: "22222222-2222-4222-8222-222222222222" },
   workspaceId: "11111111-1111-4111-8111-111111111111", workspaceRef: "workspace_test", readerRef: "reader_test" } as const;
-const snapshot = { contractVersion: "guidance-studio/1.0.0", items: [], categories: [], registryHash: "a".repeat(64),
+const snapshot = { contractVersion: "guidance-studio/1.1.0", items: [], categories: [], registryHash: "a".repeat(64),
   authority: { canDraft: true, canPublish: true, canArchive: true, canWriteMeta: false, canAuthorizeAction: false, canEnforcePolicy: false } } as const;
 function request(method: string, intent: string, body?: unknown, extras: Record<string, string> = {}) {
   return new Request("http://localhost:3000/api/guidance-studio", { method, headers: {

@@ -2,7 +2,7 @@
 
 > **TÜREV — elle düzenlenmez.** Tek yazar `agac.mjs` (motor · deterministik · 0 token).
 > Elle madde buraya değil **`TODO-ELLE.md`**'ye yazılır.
-> Damga: `059d2ecceb9d` · Kaynak: CHECKLIST(açık) · TODO-ELLE.md · HUKUM.md(EKSİK/STUCK) · künye-eksikleri · sarkık-oturum
+> Damga: `5ff8a06449c9` · Kaynak: CHECKLIST(açık) · TODO-ELLE.md · HUKUM.md(EKSİK/STUCK) · künye-eksikleri · sarkık-oturum
 > İLANLI MUAF (bu listeye GİRMEZ, her birinin kendi kanalı var): alerts.jsonl · parked işler · doctor fix: · teslim onar: · kaptan task'ları
 
 **100 açık madde** · plansız: 0 · chk: 100 · elle: 0 · hüküm: 0 · künye: 0 · oturum: 0
@@ -47,7 +47,7 @@ _yok_
 - [ ] [09] Category assignment coverage/unmatched/conflict/archive-impact yüzeyi. `td:chk/proje/he1fb34`
 - [ ] [09] PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run. `td:chk/proje/h36429c`
 - [ ] [09] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi. `td:chk/proje/h7b6132`
-- [ ] [09] Çoklu binding/set authoring; account-group/lifecycle/template scope ve analysis-run binding. `td:chk/proje/hd68f79`
+- [ ] [09] Guidance set authoring; account-group/lifecycle/template scope ve analysis-run binding. `td:chk/proje/hdf14d4`
 - [ ] [09] Owner statement + official Meta source + experiment/observation provenance ve freshness. `td:chk/proje/h095098`
 - [ ] [09] G0→G4 progressive formalization, semantic diff, historical replay ve impact preview. `td:chk/proje/g0`
 - [ ] [09] AdvisedPractice candidate→trial→outcome→standardization lifecycle ve decomposition review. `td:chk/proje/hd13a94`
