@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CategoryResolutionError,
+  inspectEffectiveCategory,
   resolveEffectiveCategory,
   type CategoryAssignment,
   type CategoryDefinition,
@@ -225,6 +226,63 @@ describe("category registry effective inheritance", () => {
       path,
       assignments: [{ ...locked, source: "agent" }],
     })).toThrowError(expect.objectContaining<Partial<CategoryResolutionError>>({ code: "invalid_registry" }));
+  });
+});
+
+describe("category registry structured inspection", () => {
+  it("classifies single parent add plus child add and accepts an explicit child override", () => {
+    const parent = assignment("parent", "definition-brand", "campaign", "campaign-1", "add");
+    const childAdd = assignment("child-add", "definition-patient", "ad_set", "ad-set-1", "add");
+    expect(inspectEffectiveCategory({ dimension: dimension(), definitions, path,
+      assignments: [parent, childAdd] })).toEqual({
+      state: "parked_conflict", reason: "single_child_add_requires_override", resolution: null,
+    });
+
+    const childOverride = { ...childAdd, operation: "override" as const };
+    const inspected = inspectEffectiveCategory({ dimension: dimension(), definitions, path,
+      assignments: [parent, childOverride] });
+    expect(inspected.state).toBe("applied");
+    if (inspected.state === "applied") {
+      expect(inspected.reason).toBe("effective_definition");
+      expect(inspected.resolution.values.map((value) => value.key)).toEqual(["international_patient"]);
+    }
+  });
+
+  it("allows multi-value inheritance and reports an empty effective set as unmatched", () => {
+    const multi = inspectEffectiveCategory({ dimension: dimension({ cardinality: "multi" }), definitions, path,
+      assignments: [
+        assignment("parent", "definition-brand", "campaign", "campaign-1", "add"),
+        assignment("child", "definition-patient", "ad_set", "ad-set-1", "add"),
+      ] });
+    expect(multi.state).toBe("applied");
+    if (multi.state === "applied") {
+      expect(multi.resolution.values.map((value) => value.key)).toEqual(["brand_protection", "international_patient"]);
+    }
+    expect(inspectEffectiveCategory({ dimension: dimension(), definitions, path, assignments: [] })).toMatchObject({
+      state: "unmatched", reason: "no_effective_definition", resolution: { values: [] },
+    });
+  });
+
+  it("returns stable manual-lock reasons for automatic override, add and deny", () => {
+    const positiveLock = assignment("positive-lock", "definition-brand", "campaign", "campaign-1", "add", {
+      manualLock: true,
+    });
+    const denyLock = assignment("deny-lock", "definition-brand", "campaign", "campaign-1", "deny", {
+      manualLock: true,
+    });
+    const automatic = { source: "agent" as const, confidence: 0.8 };
+    expect(inspectEffectiveCategory({ dimension: dimension(), definitions, path, assignments: [
+      positiveLock,
+      assignment("override", "definition-patient", "ad_set", "ad-set-1", "override", automatic),
+    ] })).toMatchObject({ state: "parked_conflict", reason: "manual_lock_automatic_override" });
+    expect(inspectEffectiveCategory({ dimension: dimension({ cardinality: "multi" }), definitions, path, assignments: [
+      denyLock,
+      assignment("add", "definition-brand", "ad_set", "ad-set-1", "add", automatic),
+    ] })).toMatchObject({ state: "parked_conflict", reason: "manual_lock_automatic_add" });
+    expect(inspectEffectiveCategory({ dimension: dimension({ cardinality: "multi" }), definitions, path, assignments: [
+      positiveLock,
+      assignment("deny", "definition-brand", "ad_set", "ad-set-1", "deny", automatic),
+    ] })).toMatchObject({ state: "parked_conflict", reason: "manual_lock_automatic_deny" });
   });
 });
 

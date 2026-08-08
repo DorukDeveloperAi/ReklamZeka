@@ -79,6 +79,32 @@ export type EffectiveCategoryResolution = Readonly<{
   frozenContext: FrozenCategoryContext;
 }>;
 
+export const CATEGORY_INSPECTION_REASONS = Object.freeze([
+  "effective_definition",
+  "no_effective_definition",
+  "duplicate_node_definition",
+  "manual_lock_automatic_override",
+  "manual_lock_automatic_add",
+  "manual_lock_automatic_deny",
+  "single_multiple_override",
+  "single_child_add_requires_override",
+  "single_multiple_effective",
+] as const);
+export type CategoryInspectionReason = typeof CATEGORY_INSPECTION_REASONS[number];
+export type EffectiveCategoryInspection =
+  | Readonly<{ state: "applied"; reason: "effective_definition"; resolution: EffectiveCategoryResolution }>
+  | Readonly<{ state: "unmatched"; reason: "no_effective_definition"; resolution: EffectiveCategoryResolution }>
+  | Readonly<{ state: "parked_conflict"; reason: Exclude<CategoryInspectionReason,
+    "effective_definition" | "no_effective_definition">; resolution: null }>;
+
+export type EffectiveCategoryResolutionInput = Readonly<{
+  dimension: CategoryDimension;
+  definitions: readonly CategoryDefinition[];
+  assignments: readonly CategoryAssignment[];
+  path: CategoryEntityPath;
+  mode?: "current" | "frozen_replay";
+}>;
+
 export class CategoryResolutionError extends Error {
   constructor(
     readonly code:
@@ -93,6 +119,30 @@ export class CategoryResolutionError extends Error {
     super(message);
     this.name = "CategoryResolutionError";
   }
+}
+
+type CategoryConflictReason = Exclude<CategoryInspectionReason,
+  "effective_definition" | "no_effective_definition">;
+
+const CONFLICT_MESSAGES: Readonly<Record<CategoryConflictReason, string>> = Object.freeze({
+  duplicate_node_definition: "Aynı düğüm ve definition için birden çok aktif işlem bulunamaz",
+  manual_lock_automatic_override: "Automatic override manuel kilitli kategori kararını değiştiremez",
+  manual_lock_automatic_add: "Automatic add manuel kilitli deny kararını değiştiremez",
+  manual_lock_automatic_deny: "Automatic deny manuel kilitli kategori kararını değiştiremez",
+  single_multiple_override: "Single dimension birden çok override alamaz",
+  single_child_add_requires_override: "Single dimension değerini değiştirmek için child override kullanılmalıdır",
+  single_multiple_effective: "Single dimension en fazla bir effective değer üretebilir",
+});
+
+class CategoryInspectionConflict extends Error {
+  constructor(readonly reason: CategoryConflictReason) {
+    super(CONFLICT_MESSAGES[reason]);
+    this.name = "CategoryInspectionConflict";
+  }
+}
+
+function park(reason: CategoryConflictReason): never {
+  throw new CategoryInspectionConflict(reason);
 }
 
 function assertText(value: string, label: string): void {
@@ -172,13 +222,7 @@ function assignmentOrder(left: CategoryAssignment, right: CategoryAssignment): n
  * versions. `frozen_replay` evaluates exactly the supplied historical revisions,
  * allowing a previously frozen context to be reconstructed after archival.
  */
-export function resolveEffectiveCategory(input: Readonly<{
-  dimension: CategoryDimension;
-  definitions: readonly CategoryDefinition[];
-  assignments: readonly CategoryAssignment[];
-  path: CategoryEntityPath;
-  mode?: "current" | "frozen_replay";
-}>): EffectiveCategoryResolution {
+function resolveEffectiveCategoryCore(input: EffectiveCategoryResolutionInput): EffectiveCategoryResolution {
   const mode = input.mode ?? "current";
   const { dimension, path } = input;
   validatePath(path);
@@ -266,10 +310,7 @@ export function resolveEffectiveCategory(input: Readonly<{
     }
     const nodeDefinition = `${entityKey(assignment.entity.level, assignment.entity.id)}:${assignment.definitionId}`;
     if (seenAtNode.has(nodeDefinition)) {
-      throw new CategoryResolutionError(
-        "parked_conflict",
-        "Aynı düğüm ve definition için birden çok aktif işlem bulunamaz",
-      );
+      park("duplicate_node_definition");
     }
     seenAtNode.add(nodeDefinition);
   }
@@ -294,28 +335,19 @@ export function resolveEffectiveCategory(input: Readonly<{
         [...positiveLocks].some((definitionId) => !replacement.has(definitionId))
         || [...denyLocks].some((definitionId) => replacement.has(definitionId))
       ) {
-        throw new CategoryResolutionError(
-          "parked_conflict",
-          "Automatic override manuel kilitli kategori kararını değiştiremez",
-        );
+        park("manual_lock_automatic_override");
       }
     }
     if (automaticAdditions.some((assignment) => denyLocks.has(assignment.definitionId))) {
-      throw new CategoryResolutionError(
-        "parked_conflict",
-        "Automatic add manuel kilitli deny kararını değiştiremez",
-      );
+      park("manual_lock_automatic_add");
     }
     if (automaticDenials.some((assignment) => positiveLocks.has(assignment.definitionId))) {
-      throw new CategoryResolutionError(
-        "parked_conflict",
-        "Automatic deny manuel kilitli kategori kararını değiştiremez",
-      );
+      park("manual_lock_automatic_deny");
     }
 
     if (overrides.length > 0) {
       if (dimension.cardinality === "single" && overrides.length > 1) {
-        throw new CategoryResolutionError("parked_conflict", "Single dimension birden çok override alamaz");
+        park("single_multiple_override");
       }
       effective.clear();
       for (const assignment of overrides) effective.add(assignment.definitionId);
@@ -326,10 +358,7 @@ export function resolveEffectiveCategory(input: Readonly<{
         && effective.size > 0
         && !effective.has(assignment.definitionId)
       ) {
-        throw new CategoryResolutionError(
-          "parked_conflict",
-          "Single dimension değerini değiştirmek için child override kullanılmalıdır",
-        );
+        park("single_child_add_requires_override");
       }
       effective.add(assignment.definitionId);
     }
@@ -351,7 +380,7 @@ export function resolveEffectiveCategory(input: Readonly<{
   }
 
   if (dimension.cardinality === "single" && effective.size > 1) {
-    throw new CategoryResolutionError("parked_conflict", "Single dimension en fazla bir effective değer üretebilir");
+    park("single_multiple_effective");
   }
   const values = [...effective]
     .map((id) => definitions.get(id)!)
@@ -391,4 +420,32 @@ export function resolveEffectiveCategory(input: Readonly<{
       resolutionHash: digest(contextWithoutHash),
     },
   };
+}
+
+/**
+ * Read-only inspection over the exact resolver core. Registry/path validation
+ * still fails closed, while expected operational conflicts are returned as
+ * stable machine-readable reasons for inventory and impact previews.
+ */
+export function inspectEffectiveCategory(input: EffectiveCategoryResolutionInput): EffectiveCategoryInspection {
+  try {
+    const resolution = resolveEffectiveCategoryCore(input);
+    return resolution.values.length === 0
+      ? Object.freeze({ state: "unmatched" as const, reason: "no_effective_definition" as const, resolution })
+      : Object.freeze({ state: "applied" as const, reason: "effective_definition" as const, resolution });
+  } catch (error) {
+    if (error instanceof CategoryInspectionConflict) {
+      return Object.freeze({ state: "parked_conflict" as const, reason: error.reason, resolution: null });
+    }
+    throw error;
+  }
+}
+
+/** Backward-compatible throwing resolver built on the structured inspection core. */
+export function resolveEffectiveCategory(input: EffectiveCategoryResolutionInput): EffectiveCategoryResolution {
+  const inspection = inspectEffectiveCategory(input);
+  if (inspection.state === "parked_conflict") {
+    throw new CategoryResolutionError("parked_conflict", CONFLICT_MESSAGES[inspection.reason]);
+  }
+  return inspection.resolution;
 }

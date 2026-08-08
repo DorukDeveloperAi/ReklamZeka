@@ -304,6 +304,10 @@
 .categoryRegistry summary small, .categoryRegistry summary > span { color: var(--rz-muted); font-size: .55rem; }
 .categoryDetail { display: grid; gap: 13px; padding: 0 17px 18px; }
 .categoryDetail > p { margin: 0; color: var(--rz-muted); font-size: .61rem; line-height: 1.5; }
+.categoryDimensionActions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.categoryDimensionActions p { margin: 0; color: var(--rz-muted); font-size: .61rem; }
+.categoryDimensionActions button, .categoryDefinitions footer button { min-height: 29px; padding: 0 8px; border: 1px solid var(--rz-line); border-radius: 7px; background: transparent; color: var(--rz-muted); font-size: .52rem; cursor: pointer; }
+.categoryDimensionActions button:disabled, .categoryDefinitions footer button:disabled { opacity: .45; cursor: wait; }
 .categoryCoverage { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--rz-line); border-radius: 9px; overflow: hidden; }
 .categoryCoverage article { display: grid; gap: 5px; min-height: 86px; padding: 12px; border: 0; border-right: 1px solid var(--rz-line); border-radius: 0; background: rgba(0,0,0,.12); }
 .categoryCoverage article:last-child { border-right: 0; }
@@ -323,6 +327,22 @@
 .categoryDefinitions .categoryEvidenceKinds { color: #acd8f7; font: .51rem ui-monospace, monospace; overflow-wrap: anywhere; }
 .categoryDefinitions footer { display: flex; flex-wrap: wrap; gap: 5px; }
 .categoryDefinitions footer span { padding: 4px 6px; border: 1px solid var(--rz-line); border-radius: 99px; }
+.categoryDefinitions footer button { margin-left: auto; }
+.categoryImpact { margin-bottom: 10px; border: 1px solid rgba(255,194,104,.25); border-radius: 11px; background: rgba(255,194,104,.035); overflow: hidden; }
+.categoryImpact > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 15px; border-bottom: 1px solid var(--rz-line); }
+.categoryImpact header span { color: var(--rz-amber); font-size: .52rem; font-weight: 850; }
+.categoryImpact h2 { margin: 6px 0 3px; font-size: 1rem; }
+.categoryImpact header p { margin: 0; color: var(--rz-muted); font-size: .55rem; }
+.categoryImpact header button { border: 0; background: transparent; color: var(--rz-muted); cursor: pointer; }
+.categoryImpactGrid { display: grid; grid-template-columns: repeat(3, 1fr); }
+.categoryImpactGrid article { padding: 13px 15px; border: 0; border-right: 1px solid var(--rz-line); border-radius: 0; background: transparent; }
+.categoryImpactGrid article:last-child { border-right: 0; }
+.categoryImpactGrid strong { display: block; margin-bottom: 8px; font-size: .61rem; }
+.categoryImpactGrid p { display: flex; justify-content: space-between; gap: 10px; margin: 0; padding: 5px 0; color: var(--rz-muted); font-size: .53rem; }
+.categoryImpactGrid b { color: var(--rz-text); }
+.categoryImpact > footer { display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-top: 1px solid var(--rz-line); }
+.categoryImpact > footer p { margin: 0 auto 0 0; color: var(--rz-muted); font-size: .54rem; line-height: 1.45; }
+.categoryImpact > footer span { padding: 5px 8px; border: 1px solid rgba(255,194,104,.25); border-radius: 99px; color: var(--rz-amber); font-size: .52rem; }
 .categoryEmpty { padding: 24px 17px; }
 .categoryEmpty p { color: var(--rz-muted); font-size: .6rem; }
 
@@ -857,6 +877,9 @@
   .categoryReviewSignal > div { width: 100%; }
   .categoryHealth > div { justify-content: flex-start; }
   .categoryDefinitions { grid-template-columns: 1fr; }
+  .categoryImpactGrid { grid-template-columns: 1fr; }
+  .categoryImpactGrid article { border-right: 0; border-bottom: 1px solid var(--rz-line); }
+  .categoryImpactGrid article:last-child { border-bottom: 0; }
   .agentChat { min-height: 610px; }
   .chatMessages > div { max-width: 96%; }
   .approvalSafetyStrip { flex-wrap: wrap; }

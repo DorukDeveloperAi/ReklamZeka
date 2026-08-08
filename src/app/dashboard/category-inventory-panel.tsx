@@ -24,6 +24,12 @@ type Snapshot = Readonly<{ contractVersion: string; summary: Readonly<{ dimensio
   definitionsWithoutDirectAssignments: number; staleTargetAssignments: number;
   assignmentsUnderArchivedRegistry: number }>; dimensions: readonly Dimension[];
   authority: Readonly<{ canAssign: false; canWriteMeta: false; canAuthorizeAction: false }> }>;
+type ArchiveImpact = Readonly<{ contractVersion: string; target: Readonly<{ kind: "dimension" | "definition";
+  ref: string; label: string; version: number }>; exactBlockers: Readonly<Record<string, number>>;
+  historicalImpact: Readonly<Record<string, number>>; invalidationPlan: Readonly<{ categoryResolutionComponents: number;
+  contextsNeedingInvalidation: number }>; coverage: Readonly<{ complete: false; partialOrUnknown: readonly string[] }>;
+  disposition: "blocked" | "review_required"; archiveAllowed: false;
+  authority: Readonly<{ canArchive: false; canAssign: false; canAuthorizeAction: false; canWriteMeta: false }> }>;
 
 class InventoryError extends Error { constructor(readonly code: string, message: string) { super(message); } }
 function object(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
@@ -71,6 +77,23 @@ function parse(value: unknown): Snapshot {
     || value.authority.canAuthorizeAction !== false) throw new InventoryError("unsafe_response", "Kategori kaynağı güvenli sözleşmeyi döndürmedi.");
   return value as unknown as Snapshot;
 }
+function parseImpact(value: unknown): ArchiveImpact {
+  if (!object(value) || value.contractVersion !== "category-archive-impact/1.0.0" || !object(value.target)
+    || !["dimension", "definition"].includes(String(value.target.kind)) || typeof value.target.ref !== "string"
+    || typeof value.target.label !== "string" || !nonNegative(value.target.version) || !object(value.exactBlockers)
+    || !Object.values(value.exactBlockers).every(nonNegative) || !object(value.historicalImpact)
+    || !Object.values(value.historicalImpact).every(nonNegative) || !object(value.invalidationPlan)
+    || !nonNegative(value.invalidationPlan.categoryResolutionComponents)
+    || !nonNegative(value.invalidationPlan.contextsNeedingInvalidation) || !object(value.coverage)
+    || value.coverage.complete !== false || !Array.isArray(value.coverage.partialOrUnknown)
+    || !value.coverage.partialOrUnknown.every((item) => typeof item === "string")
+    || !["blocked", "review_required"].includes(String(value.disposition)) || value.archiveAllowed !== false
+    || !object(value.authority) || value.authority.canArchive !== false || value.authority.canAssign !== false
+    || value.authority.canAuthorizeAction !== false || value.authority.canWriteMeta !== false) {
+    throw new InventoryError("unsafe_response", "Arşiv etki kaynağı güvenli sözleşmeyi döndürmedi.");
+  }
+  return value as unknown as ArchiveImpact;
+}
 function levelLabel(level: Level) { return level === "campaign" ? "Kampanya" : level === "ad_set" ? "Reklam seti" : level === "ad" ? "Reklam" : "Kreatif"; }
 function number(value: number) { return new Intl.NumberFormat("tr-TR").format(value); }
 function ratio(value: number | null) { return value === null ? "Veri yok" : `%${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(value / 100)}`; }
@@ -81,6 +104,9 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sessionRequired, setSessionRequired] = useState(false);
+  const [impact, setImpact] = useState<ArchiveImpact | null>(null);
+  const [impactLoading, setImpactLoading] = useState(false);
+  const [impactError, setImpactError] = useState<string | null>(null);
   const refresh = useCallback(async () => {
     setLoading(true); setError(null); setSessionRequired(false);
     try {
@@ -100,6 +126,22 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
     } finally { setLoading(false); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
+  const previewImpact = useCallback(async (targetRef: string) => {
+    setImpactLoading(true); setImpactError(null);
+    try {
+      const response = await fetch(`/api/category-archive-impact?view=archive-impact&targetRef=${encodeURIComponent(targetRef)}`,
+        { cache: "no-store", credentials: "same-origin", headers: {
+          "X-ReklamZeka-Intent": "category-archive-impact-preview" } });
+      let payload: unknown = null; try { payload = await response.json(); } catch { /* redacted below */ }
+      if (!response.ok) {
+        const found = object(payload) && object(payload.error) ? payload.error : null;
+        throw new InventoryError(found && typeof found.code === "string" ? found.code : "request_failed",
+          found && typeof found.message === "string" ? found.message : "Arşiv etkisi alınamadı.");
+      }
+      setImpact(parseImpact(payload));
+    } catch (reason) { setImpactError(reason instanceof Error ? reason.message : "Arşiv etkisi alınamadı."); }
+    finally { setImpactLoading(false); }
+  }, []);
 
   if (loading && !snapshot) return <section className={`${styles.panel} ${styles.categoryState}`} aria-busy="true"><strong>İÇ KATEGORİLER</strong><h2>Kategori envanteri yükleniyor</h2><p>Aktif tanımlar ve doğrudan atama kapsamı okunuyor.</p></section>;
   if (error && !snapshot) return <section className={`${styles.panel} ${styles.categoryState}`} role="alert"><strong>{sessionRequired ? "YEREL OTURUM GEREKLİ" : "BAĞLANTI KURULAMADI"}</strong><h2>{sessionRequired ? "Dashboard oturumunu bağlayın" : "Kategori kaynağı kullanılamıyor"}</h2><p>{error}</p>{sessionRequired && props.onOpenSession ? <button type="button" onClick={props.onOpenSession}>Decision Room’da oturumu bağla</button> : <button type="button" onClick={() => void refresh()}>Yeniden dene</button>}</section>;
@@ -117,14 +159,20 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
     </div>
     {healthTotal ? <section className={styles.categoryHealth} role="status"><strong>Kayıt sağlığı · {number(healthTotal)} inceleme noktası</strong><div><span>Tanımsız boyut {number(snapshot.health.dimensionsWithoutDefinitions)}</span><span>Atamasız tanım {number(snapshot.health.definitionsWithoutDirectAssignments)}</span><span>Kaybolmuş hedef {number(snapshot.health.staleTargetAssignments)}</span><span>Arşivli kayda bağlı {number(snapshot.health.assignmentsUnderArchivedRegistry)}</span></div></section> : <section className={styles.categoryHealth} data-clean="true"><strong>Kayıt sağlığı temiz</strong><span>Aktif registry için yapısal uyarı bulunmadı.</span></section>}
     <section className={styles.categoryReviewSignal}><div><strong>Kanıt ve güven inceleme sinyali</strong><p>Eşik {ratio(snapshot.classificationPolicy.minimumTrustedConfidenceBasisPoints)} · {snapshot.classificationPolicy.version}. Bu eşik otomatik karar veya kategori değişikliği üretmez.</p></div><span>{number(snapshot.summary.lowConfidenceAssignments)} düşük güven</span><span>{number(snapshot.summary.invalidEvidenceAssignments)} geçersiz kanıt</span></section>
+    {impactError ? <section className={styles.guidanceInlineError} role="alert"><span>{impactError}</span><button type="button" onClick={() => setImpactError(null)}>Kapat</button></section> : null}
+    {impact ? <section className={styles.categoryImpact} aria-label={`${impact.target.label} arşiv etki önizlemesi`}>
+      <header><div><span>ARŞİV ETKİ ÖNİZLEMESİ · İŞLEM YAPILMADI</span><h2>{impact.target.label}</h2><p>{impact.target.kind === "dimension" ? "Boyut" : "Tanım"} · v{impact.target.version}</p></div><button type="button" onClick={() => setImpact(null)}>Kapat</button></header>
+      <div className={styles.categoryImpactGrid}><article><strong>Kesin engeller</strong>{Object.entries(impact.exactBlockers).filter(([, value]) => value > 0).map(([key, value]) => <p key={key}><span>{key}</span><b>{number(value)}</b></p>)}{Object.values(impact.exactBlockers).every((value) => value === 0) ? <p><span>Kesin engel</span><b>0</b></p> : null}</article><article><strong>Tarihsel etki</strong>{Object.entries(impact.historicalImpact).map(([key, value]) => <p key={key}><span>{key}</span><b>{number(value)}</b></p>)}</article><article><strong>Gerekli invalidation</strong><p><span>Context</span><b>{number(impact.invalidationPlan.contextsNeedingInvalidation)}</b></p><p><span>Component</span><b>{number(impact.invalidationPlan.categoryResolutionComponents)}</b></p></article></div>
+      <footer><p>Kapsama henüz tam değil: {impact.coverage.partialOrUnknown.join(" · ")}. Bu nedenle arşiv yetkisi kapalıdır.</p><span>{impact.disposition === "blocked" ? "ENGELLİ" : "İNCELEME GEREKLİ"}</span></footer>
+    </section> : null}
     <section className={`${styles.panel} ${styles.categoryRegistry}`}>
       <header className={styles.panelHeader}><div><span className={styles.kicker}>DOĞRUDAN KAPSAMA</span><h2>Boyutlar ve tanımlar</h2></div><span>{snapshot.contractVersion}</span></header>
       {!snapshot.dimensions.length ? <div className={styles.categoryEmpty}><strong>Henüz aktif iç kategori yok</strong><p>İlk registry tanımları ayrı, denetimli authoring diliminde eklenecek.</p></div> : snapshot.dimensions.map((dimension) => <details key={dimension.ref} open>
         <summary><div><strong>{dimension.name}</strong><small>{dimension.key} · v{dimension.version} · {dimension.cardinality === "single" ? "tek seçim" : "çoklu seçim"}</small></div><span>{dimension.definitions.length} tanım</span></summary>
         <div className={styles.categoryDetail}>
-          {dimension.description ? <p>{dimension.description}</p> : null}
+          <div className={styles.categoryDimensionActions}>{dimension.description ? <p>{dimension.description}</p> : <span /> }<button type="button" disabled={impactLoading} onClick={() => void previewImpact(dimension.ref)}>{impactLoading ? "Hesaplanıyor" : "Boyut arşiv etkisi"}</button></div>
           <div className={styles.categoryCoverage}>{dimension.coverage.map((coverage) => <article key={coverage.level}><span>{levelLabel(coverage.level)}</span><strong>{ratio(coverage.coverageBasisPoints)}</strong><small>{number(coverage.directlyAssignedEntities)} / {number(coverage.totalEntities)} doğrudan · {number(coverage.unmatchedEntities)} eşleşmemiş{coverage.deniedAssignments ? ` · ${number(coverage.deniedAssignments)} deny` : ""}</small></article>)}</div>
-          <div className={styles.categoryDefinitions}>{dimension.definitions.map((definition) => <article key={definition.ref}><div><strong>{definition.label}</strong><small>{definition.key} · v{definition.version}</small></div><p>{definition.description ?? "Açıklama eklenmemiş."}</p><dl><div><dt>Ortalama güven</dt><dd>{confidence(definition.confidence.averageBasisPoints)}</dd></div><div><dt>En düşük</dt><dd>{confidence(definition.confidence.minimumBasisPoints)}</dd></div><div><dt>Eşik altı</dt><dd>{number(definition.confidence.belowReviewThreshold)}</dd></div><div><dt>Kanıt kaydı</dt><dd>{number(definition.evidenceHealth.evidenceRecords)}</dd></div></dl>{definition.evidenceHealth.kinds.length ? <p className={styles.categoryEvidenceKinds}>{definition.evidenceHealth.kinds.map((item) => `${item.kind} · ${number(item.count)}`).join("  •  ")}</p> : null}<footer><span>{number(definition.assignments.total)} atama</span><span>{number(definition.assignments.manualLocked)} kilit</span><span>{number(definition.assignments.manual)} manuel · {number(definition.assignments.agent)} agent · {number(definition.assignments.deterministic)} deterministik</span>{definition.evidenceHealth.invalidEvidenceAssignments ? <span>{number(definition.evidenceHealth.invalidEvidenceAssignments)} geçersiz kanıt</span> : null}</footer></article>)}</div>
+          <div className={styles.categoryDefinitions}>{dimension.definitions.map((definition) => <article key={definition.ref}><div><strong>{definition.label}</strong><small>{definition.key} · v{definition.version}</small></div><p>{definition.description ?? "Açıklama eklenmemiş."}</p><dl><div><dt>Ortalama güven</dt><dd>{confidence(definition.confidence.averageBasisPoints)}</dd></div><div><dt>En düşük</dt><dd>{confidence(definition.confidence.minimumBasisPoints)}</dd></div><div><dt>Eşik altı</dt><dd>{number(definition.confidence.belowReviewThreshold)}</dd></div><div><dt>Kanıt kaydı</dt><dd>{number(definition.evidenceHealth.evidenceRecords)}</dd></div></dl>{definition.evidenceHealth.kinds.length ? <p className={styles.categoryEvidenceKinds}>{definition.evidenceHealth.kinds.map((item) => `${item.kind} · ${number(item.count)}`).join("  •  ")}</p> : null}<footer><span>{number(definition.assignments.total)} atama</span><span>{number(definition.assignments.manualLocked)} kilit</span><span>{number(definition.assignments.manual)} manuel · {number(definition.assignments.agent)} agent · {number(definition.assignments.deterministic)} deterministik</span>{definition.evidenceHealth.invalidEvidenceAssignments ? <span>{number(definition.evidenceHealth.invalidEvidenceAssignments)} geçersiz kanıt</span> : null}<button type="button" disabled={impactLoading} onClick={() => void previewImpact(definition.ref)}>Arşiv etkisi</button></footer></article>)}</div>
         </div>
       </details>)}
     </section>

@@ -4,7 +4,9 @@ import { and, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { DrizzleCategoryRegistryRepository } from "@/connectors/categories/category-registry-drizzle-repository";
+import { DrizzleCategoryArchiveImpactRepository } from "@/connectors/categories/category-archive-impact-drizzle-repository";
 import * as schema from "@/db/schema";
+import { categoryDimensionPublicRef } from "@/domain/categories/public-reference";
 import {
   CategoryRegistryPersistenceError,
   CategoryRegistryService,
@@ -37,6 +39,7 @@ let frozenReplayAfterArchive = false;
 let foreignScopeRejected = false;
 let optimisticConcurrency = false;
 let rollbackClean = false;
+let archiveImpactReadSafe = false;
 
 try {
   await database.transaction(async (tx) => {
@@ -147,6 +150,11 @@ try {
       operation: "add", source: "manual", manualLock: true,
       evidence: [{ kind: "owner_instruction", ref: "category-e2e:locked-v2" }], confidence: 1,
     });
+    const impact = await new DrizzleCategoryArchiveImpactRepository(tx as never)
+      .preview(ids.workspace!, categoryDimensionPublicRef("internal_campaign_type"));
+    archiveImpactReadSafe = impact?.archiveAllowed === false && impact.coverage.complete === false
+      && impact.exactBlockers.activeDefinitions === 2 && impact.exactBlockers.activeAssignments === 1
+      && impact.exactBlockers.manualLocks === 1;
 
     const restarted = new CategoryRegistryService(new DrizzleCategoryRegistryRepository(tx as never));
     const persistedDimension = await restarted.findDimension(ids.workspace!, ids.dimension!);
@@ -197,7 +205,7 @@ try {
     foreignScopeRejected = wrongWorkspaceRead && wrongWorkspaceWrite && wrongHierarchy && crossAccountHierarchy;
 
     if (!restartDurable || !manualLockConflict || !lockedMutationDenied || !frozenReplayAfterArchive
-      || !foreignScopeRejected || !optimisticConcurrency) {
+      || !foreignScopeRejected || !optimisticConcurrency || !archiveImpactReadSafe) {
       throw new Error("Category registry PostgreSQL acceptance failed");
     }
     throw rollback;
@@ -228,6 +236,7 @@ console.log(JSON.stringify({
   frozenReplayAfterArchive,
   foreignScopeRejected,
   optimisticConcurrency,
+  archiveImpactReadSafe,
   metaNetworkCalls: 0,
   metaWriteCalls: 0,
   rollbackClean,

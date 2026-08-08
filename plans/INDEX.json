@@ -1,6 +1,6 @@
 {
   "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
-  "damga": "06d08f9fb388",
+  "damga": "5d0ec39376a5",
   "plans": [
     {
       "slug": "proje",
@@ -22,7 +22,7 @@
       "asamaToplam": 14,
       "asamaKapali": 6,
       "checklistAcik": 101,
-      "checklistKapali": 161,
+      "checklistKapali": 162,
       "sonTur": null,
       "siradaki": {
         "no": "11",
@@ -291,9 +291,9 @@
         "onar": null
       },
       {
-        "ref": "td:chk/proje/hdcff0e",
+        "ref": "td:chk/proje/h0c011a",
         "tur": "chk",
-        "metin": "Portföy çapında effective single-dimension conflict taraması ve dependency sınıflı",
+        "metin": "Canlı hierarchy path'leri üzerinden bounded portföy çapında effective single-dimension",
         "plan": "proje",
         "asama": "09",
         "kapatan": [],

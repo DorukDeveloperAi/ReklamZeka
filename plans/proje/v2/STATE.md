@@ -15,7 +15,7 @@
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
 | 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.5 ve Slice 01 kapalı; geniş field/breakdown kataloğu, multi-business grouping ve export/rotation ileri işi açık |
-| 09 | kategori ve talimat | DEVAM | 08 | Guidance Studio, agent preview, invalidation, çoklu facet binding ve salt-okur category inventory hazır; evidence/conflict/impact ve category yönetimi sırada |
+| 09 | kategori ve talimat | DEVAM | 08 | Guidance Studio, agent preview, invalidation, çoklu facet binding, category health ve archive-impact preview hazır; portföy conflict scan ve category yönetimi sırada |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
 | 11 | bütçe planlama | AÇIK | 09,10 | planlandı |
 | 12 | prompt/advisor | DEVAM | 09–11 | narrative envelope/claim guard temeli var; translator/ledger sırada |
@@ -144,6 +144,28 @@
   conflict taraması ve dependency güven sınıflı archive-impact preview A09.6b; archive
   mutation/rol/audit/invalidation ise A09.7. `archiveDimension` child kayıt varken bugün
   güvensiz olduğundan authoring yüzeyi bu preview ve blocker guard gelmeden açılmayacak.
+
+## 2026-08-08 — A09.6b structured conflict ve archive-impact preview
+
+- Category resolver tek `resolveEffectiveCategoryCore` çekirdeğinde kaldı; yeni salt-okur
+  `inspectEffectiveCategory` aynı algoritmadan `applied`, `unmatched` veya `parked_conflict`
+  ve stable reason code döndürüyor. Eski throwing resolver davranışı geriye uyumlu korundu.
+- Parent add + child add single conflict, child override, multi inheritance, unmatched ve
+  manual-lock automatic override/add/deny senaryoları reason-bazlı testlerle mühürlendi.
+- `/api/category-archive-impact` yalnız canonical `dimension_*`/`category_*` public ref,
+  cookie-bound aynı-origin `category_registry:read` capability ve exact preview intent kabul
+  ediyor; raw UUID/workspace header/query ve bearer reddediliyor.
+- Preview active child definition/assignment/manual lock; current guidance; exact promotion
+  binding; autonomy/guardrail ref; effective context/invalidation ve bağlı tarihsel budget
+  proposal sayılarını workspace-scoped okuyor. Bağımlılıklar `exact_relational`,
+  `exact_contract_ref`, `partial_or_unknown` olarak ayrılıyor.
+- İlk sözleşmede `coverage.complete=false` ve `archiveAllowed=false` yapısal sabit. Dashboard
+  yalnız “Arşiv etkisi—işlem yapılmadı” paneli gösteriyor; archive düğmesi, audit, invalidation
+  yazımı, category mutation veya Meta çağrısı yok.
+- Canlı Supabase rollback acceptance iki definition, bir manual-locked assignment üzerinde
+  exact blocker sayılarını doğruladı; geçici satırlar commit edilmedi, cleanup temiz ve Meta
+  network/write sıfır kaldı. Açık A09.6c: canlı hierarchy batch material ile bounded portföy
+  effective-conflict scan; ardından dependency coverage'i tamamlayıp A09.7 mutation guard'ına bağlama.
 
 ## 2026-08-06 — bütün görüşmelerin kanonik ürün distilasyonu
 
