@@ -223,6 +223,23 @@ export class DrizzleLocalAgentSessionRepository implements LocalAgentSessionRepo
     return stored[0] ? sessionRecord(stored[0]) : null;
   }
 
+  async listActiveSessions(input: Readonly<{
+    workspaceId: string; userId: string; at: number; limit: number;
+  }>): Promise<readonly LocalAgentSessionRecord[]> {
+    if (!UUID.test(input.workspaceId) || !UUID.test(input.userId) || !Number.isSafeInteger(input.at)
+      || !Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 20) fail("invalid_input");
+    const stored = rows<SessionRow>(await this.database.execute(sql`
+      select ${SESSION_COLUMNS} from local_agent_sessions session
+      join workspaces workspace on workspace.id = session.workspace_id and workspace.lifecycle_state = 'active'
+      where session.workspace_id = ${input.workspaceId}::uuid and session.user_id = ${input.userId}::uuid
+        and session.expires_at > ${new Date(input.at * 1000)}::timestamptz
+      order by session.last_seen_at desc, session.session_ref asc
+      limit ${input.limit}
+    `));
+    if (stored.length > input.limit) fail("corrupt_store");
+    return Object.freeze(stored.map(sessionRecord));
+  }
+
   async createHandoff(record: LocalAgentHandoffRecord): Promise<"inserted" | "conflict"> {
     if (!UUID.test(record.workspaceId) || !HANDOFF.test(record.handoffRef)) fail("invalid_input");
     const inserted = rows<HandoffRow>(await this.database.execute(sql`

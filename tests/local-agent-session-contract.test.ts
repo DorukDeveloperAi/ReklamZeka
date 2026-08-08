@@ -60,6 +60,11 @@ function repository(): LocalAgentSessionRepository & Readonly<{
       return next;
     },
     findSession: async (input) => sessions.get(key(input.workspaceId, input.sessionRef)) ?? null,
+    listActiveSessions: async (input) => [...sessions.values()]
+      .filter((record) => record.workspaceId === input.workspaceId && record.userId === input.userId
+        && record.expiresAt > input.at)
+      .sort((left, right) => right.lastSeenAt - left.lastSeenAt || left.sessionRef.localeCompare(right.sessionRef))
+      .slice(0, input.limit),
     createHandoff: async (record) => {
       if (handoffs.has(record.handoffRef)) return "conflict";
       handoffs.set(record.handoffRef, record);
@@ -160,6 +165,34 @@ describe("local AgentSession and DashboardHandoff lifecycle", () => {
       .rejects.toMatchObject({ code: "session_expired" });
   });
 
+  it("lists only active sessions for the same capability user and workspace", async () => {
+    const h = harness();
+    const owner = claims();
+    const second = claims({ sessionRef: sessionB });
+    const otherUser = claims({ sessionRef: sessionC, userId: userB });
+    const otherWorkspace = claims({ workspaceId: workspaceB, workspaceRef: "workspace_beta",
+      sessionRef: "session_11111111111111111111111111111111" });
+    const dashboard = claims({ sessionRef: "session_22222222222222222222222222222222" });
+    await register(h, owner); await register(h, second); await register(h, otherUser); await register(h, otherWorkspace);
+    await h.service.register({ claims: dashboard, descriptor: createLocalAgentSessionDescriptor({
+      clientRef: "client_dashboard", sessionRef: dashboard.sessionRef, transport: "loopback_http",
+      workspaceRef: dashboard.workspaceRef, sessionScopes: dashboard.scopes, allowedTools: ["decision_room_list"],
+    }) });
+    h.setNow(h.now() + 1);
+    await h.service.heartbeat({ claims: second, descriptor: descriptor(second) });
+    const result = await h.service.listActiveSessions({ claims: owner, descriptor: descriptor(owner) });
+    expect(result.sessions.map((session) => session.sessionRef)).toEqual([sessionB, sessionA]);
+    expect(JSON.stringify(result)).not.toContain(userA);
+    expect(result.authority).toMatchObject({ sessionCoordination: true, businessMutation: false,
+      modelExecution: false, approval: false, execution: false, metaWrite: false });
+    const base = repository();
+    const leaking: LocalAgentSessionRepository = { ...base,
+      listActiveSessions: async () => [Object.freeze({ ...h.store.sessions.values().next().value!, userId: userB })] };
+    await expect(new LocalAgentSessionLifecycleService(leaking, () => new Date(h.now() * 1000))
+      .listActiveSessions({ claims: owner, descriptor: descriptor(owner) }))
+      .rejects.toMatchObject({ code: "session_conflict" });
+  });
+
   it("creates a bounded ref-only handoff for an active session and caps it at session expiry", async () => {
     const h = harness();
     const creator = claims();
@@ -177,6 +210,11 @@ describe("local AgentSession and DashboardHandoff lifecycle", () => {
       context: context(), ttlSeconds: 121 })).rejects.toMatchObject({ code: "invalid_input" });
     await expect(h.service.createHandoff({ claims: creator, descriptor: descriptor(creator), targetSessionRef: sessionB,
       context: context(), ttlSeconds: 30, createdAt: h.now() } as never)).rejects.toMatchObject({ code: "invalid_input" });
+    const expiringTarget = claims({ sessionRef: "session_33333333333333333333333333333333", expiresAt: h.now() + 10 });
+    await register(h, expiringTarget);
+    await expect(h.service.createHandoff({ claims: creator, descriptor: descriptor(creator),
+      targetSessionRef: expiringTarget.sessionRef, context: context(), ttlSeconds: 30 }))
+      .rejects.toMatchObject({ code: "session_expired" });
     const readOnlyTarget = claims({ sessionRef: sessionC });
     await h.service.register({ claims: readOnlyTarget, descriptor: createLocalAgentSessionDescriptor({
       clientRef: "client_local", sessionRef: sessionC, transport: "deterministic_fixture",

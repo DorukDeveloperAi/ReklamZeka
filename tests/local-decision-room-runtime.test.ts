@@ -4,6 +4,7 @@ import {
   assertTrustedLocalDecisionRoomRequest,
   createLocalDecisionRoomRouteHandlers,
   localDecisionRoomConfig,
+  resolveTrustedLocalSessionIdentity,
   type LocalDecisionRoomEnvironment,
 } from "@/server/local-decision-room-runtime";
 import {
@@ -71,6 +72,23 @@ function readDatabase(membership = true) {
 }
 
 describe("local Decision Room principal boundary", () => {
+  it("reuses the exact cookie/bearer capability and active-membership binding for agent coordination", async () => {
+    const config = localDecisionRoomConfig(environment())!;
+    const token = sessionToken();
+    const cookie = request("/api/local-agent-sessions", {
+      Cookie: `${LOCAL_SESSION_COOKIE}=${encodeURIComponent(token)}`,
+    });
+    await expect(resolveTrustedLocalSessionIdentity({ request: cookie, database: readDatabase() as never,
+      config, credential: "cookie" })).resolves.toMatchObject({
+      claims: { workspaceId, userId, kind: "session" }, membership: { workspaceId, userId, role: "viewer" },
+    });
+    await expect(resolveTrustedLocalSessionIdentity({ request: cookie, database: readDatabase() as never,
+      config, credential: "bearer" })).rejects.toBeInstanceOf(LocalDecisionRoomBoundaryError);
+    const bearer = request("/api/local-agent-sessions", { Authorization: `Bearer ${token}` });
+    await expect(resolveTrustedLocalSessionIdentity({ request: bearer, database: readDatabase(false) as never,
+      config, credential: "bearer" })).rejects.toBeInstanceOf(LocalDecisionRoomBoundaryError);
+  });
+
   it("is disabled unless all server-only bindings are explicitly enabled", () => {
     expect(localDecisionRoomConfig(environment({ REKLAMZEKA_LOCAL_SESSION_ENABLED: "false" }))).toBeNull();
     expect(localDecisionRoomConfig(environment({ DATABASE_URL: "" }))).toBeNull();

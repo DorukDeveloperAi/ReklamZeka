@@ -258,6 +258,27 @@ export async function resolveTrustedLocalReadPrincipal(input: Readonly<{
   return bindPrincipal(input.database, input.config);
 }
 
+/** Exact local identity binding for session coordination routes. */
+export async function resolveTrustedLocalSessionIdentity(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+  credential: "cookie" | "bearer";
+}>): Promise<Readonly<{
+  claims: LocalSessionClaims;
+  principal: TrustedDecisionRoomPrincipal;
+  membership: WorkspaceMembership;
+}>> {
+  exactKeys(input, ["request", "database", "config", "credential"]);
+  const authenticated = authenticate(input.request, input.config, "read");
+  if (authenticated.credential !== input.credential) {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "read", authenticated.credential);
+  const bound = await bindPrincipal(input.database, input.config);
+  return Object.freeze({ claims: authenticated.claims, ...bound });
+}
+
 export async function resolveTrustedLocalDraftPrincipal(input: Readonly<{
   request: Request;
   database: Pick<Database, "execute">;

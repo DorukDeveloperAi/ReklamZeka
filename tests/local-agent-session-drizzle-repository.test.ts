@@ -77,6 +77,16 @@ describe("durable local agent session/handoff repository", () => {
     expect(source.rendered[0]).toMatch(/update local_agent_handoffs set consumed_at.*target_session_ref.*consumed_at is null.*expires_at >/s);
   });
 
+  it("lists a bounded same-user, same-workspace active set with tenant-leftmost filtering", async () => {
+    const source = database([{ rows: [sessionRow] }]);
+    await expect(new DrizzleLocalAgentSessionRepository(source.database as never).listActiveSessions({
+      workspaceId, userId, at: startedAt, limit: 20,
+    })).resolves.toEqual([session]);
+    expect(source.rendered[0]).toMatch(/where session\.workspace_id = .* and session\.user_id = .*and session\.expires_at >/s);
+    expect(source.rendered[0]).toContain("order by session.last_seen_at desc, session.session_ref asc");
+    expect(source.rendered[0]).toContain("limit $4");
+  });
+
   it("fails closed on a corrupt stored tool or context instead of projecting it", async () => {
     const badSession = database([{ rows: [{ ...sessionRow, allowed_tools: ["execute_action"] }] }]);
     await expect(new DrizzleLocalAgentSessionRepository(badSession.database as never).findSession({

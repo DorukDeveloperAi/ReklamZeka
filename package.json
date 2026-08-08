@@ -27,6 +27,7 @@
     "local-workspace:bootstrap": "tsx scripts/bootstrap-local-workspace.ts",
     "verify:local-workspace-bootstrap-db": "tsx scripts/verify-local-workspace-bootstrap-postgres.ts",
     "verify:local-agent-session-db": "tsx scripts/verify-local-agent-session-postgres.ts",
+    "verify:local-agent-handoff-http-db": "tsx scripts/verify-local-agent-handoff-http-postgres.ts",
     "check:field-pilot": "node scripts/check-field-pilot.mjs",
     "test": "npm run check:foundation && npm run check:architecture && npm run check:model-api-boundary && npm run check:analysis-platform && npm run typecheck && npm run test:unit",
     "check:quick": "npm test && npm run db:check",

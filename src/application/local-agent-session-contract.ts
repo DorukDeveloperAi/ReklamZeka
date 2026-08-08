@@ -52,6 +52,12 @@ export type LocalAgentSessionRepository = Readonly<{
   register: (record: LocalAgentSessionRecord) => Promise<"inserted" | "unchanged" | "conflict">;
   heartbeat: (input: Readonly<{ workspaceId: string; sessionRef: string; at: number }>) => Promise<LocalAgentSessionRecord | "missing" | "clock_regression">;
   findSession: (input: Readonly<{ workspaceId: string; sessionRef: string }>) => Promise<LocalAgentSessionRecord | null>;
+  listActiveSessions: (input: Readonly<{
+    workspaceId: string;
+    userId: string;
+    at: number;
+    limit: number;
+  }>) => Promise<readonly LocalAgentSessionRecord[]>;
   createHandoff: (record: LocalAgentHandoffRecord) => Promise<"inserted" | "conflict">;
   consumeHandoff: (input: Readonly<{ workspaceId: string; sessionRef: string; handoffRef: string; at: number }>) => Promise<
     | Readonly<{ status: "consumed"; record: LocalAgentHandoffRecord }>
@@ -221,6 +227,31 @@ export class LocalAgentSessionLifecycleService {
       session: publicSession(result), authority: AUTHORITY });
   }
 
+  async listActiveSessions(input: Readonly<{
+    claims: LocalSessionClaims;
+    descriptor: LocalAgentSessionDescriptor;
+  }>) {
+    exact(input, ["claims", "descriptor"]);
+    const now = epoch(this.clock);
+    validateBinding(input.claims, input.descriptor, now);
+    const sessions = await this.repository.listActiveSessions({
+      workspaceId: input.claims.workspaceId.toLowerCase(),
+      userId: input.claims.userId.toLowerCase(),
+      at: now,
+      limit: 20,
+    });
+    if (sessions.length > 20 || sessions.some((record) =>
+      record.workspaceId !== input.claims.workspaceId.toLowerCase()
+      || record.workspaceRef !== input.claims.workspaceRef
+      || record.userId !== input.claims.userId.toLowerCase()
+      || record.expiresAt <= now)) fail("session_conflict");
+    return Object.freeze({
+      contractVersion: LOCAL_AGENT_SESSION_LIFECYCLE_VERSION,
+      sessions: Object.freeze(sessions.filter((record) => record.clientRef !== "client_dashboard").map(publicSession)),
+      authority: AUTHORITY,
+    });
+  }
+
   async createHandoff(input: Readonly<{ claims: LocalSessionClaims; descriptor: LocalAgentSessionDescriptor;
     targetSessionRef: string; context: LocalAgentHandoffContext; ttlSeconds: number }>) {
     exact(input, ["claims", "descriptor", "targetSessionRef", "context", "ttlSeconds"]);
@@ -239,7 +270,7 @@ export class LocalAgentSessionLifecycleService {
     const normalizedContext = context(input.context);
     if (!target.allowedTools.includes(requiredHandoffTool(normalizedContext.intent))) fail("handoff_scope_rejected");
     const expiresAt = Math.min(now + input.ttlSeconds, target.expiresAt, input.claims.expiresAt);
-    if (expiresAt <= now) fail("session_expired");
+    if (expiresAt < now + 15) fail("session_expired");
     const handoffRef = this.handoffRef();
     if (!HANDOFF_REF.test(handoffRef)) fail("invalid_input");
     const record: LocalAgentHandoffRecord = Object.freeze({
