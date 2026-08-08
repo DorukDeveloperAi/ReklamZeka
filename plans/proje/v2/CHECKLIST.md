@@ -102,6 +102,8 @@
   - [x] Append-only PostgreSQL registry, version/hash guard, tenant isolation ve RLS.
   - [x] Global/account/objective/internal-category/entity/topic tek-binding authoring,
     public-safe kararlı category ref ve rol/audit API'si.
+  - [x] Codex/Claude salt-okur guidance registry ve explicit account/category/entity/topic/
+    timeframe bağlamlı deterministic effective-pack preview araçları.
   - [ ] Çoklu binding/set authoring; account-group/lifecycle/template scope ve analysis-run binding.
 - [ ] Owner statement + official Meta source + experiment/observation provenance ve freshness.
 - [ ] G0→G4 progressive formalization, semantic diff, historical replay ve impact preview.
@@ -185,12 +187,12 @@
 - [ ] Salt-okur local-session/advisor ledger, import/DB saldırı testi ve redaksiyon.
 - [ ] Karar defteri/context budget ve deterministic fallback.
 - [ ] Injection/cross-tenant/secret/action-bypass tam negatif matrisi.
-- [x] LocalAgentClient/session contract ve modelsiz deterministic fixture client; 13 safe read/draft/preflight
+- [x] LocalAgentClient/session contract ve modelsiz deterministic fixture client; 15 safe read/draft/preflight
   tool'u exact local-session scope'a bağlı, correlation replay/cross-session ve authority/raw/tool injection fail-closed.
 - [x] No-model-API boundary: runtime source, package scripts ve direct/transitive dependency yüzeyinde
   OpenAI/Anthropic key, SDK veya doğrudan model endpoint'i fail-closed CI checker + negatif fixture matrisiyle yasak.
 - [ ] Localhost Streamable HTTP + project STDIO MCP; auth ve read/proposal tool ayrımı.
-  - [x] Project STDIO MCP v2 server; 3 coordination + exact 13 safe read/draft/preflight tool,
+  - [x] Project STDIO MCP v2 server; 3 coordination + exact 15 safe read/draft/preflight tool,
     OS-UID capability, whitelist env loader, strict Zod schema ve stdout-protocol sınırı.
   - [ ] Localhost Streamable HTTP MCP transport; mevcut localhost REST application API bunun yerine geçmez.
 - [x] Codex CLI/VS Code + Claude Code MCP conformance; project config/server discovery,
@@ -211,6 +213,9 @@
   - [ ] MCP'siz istemciler için allowlist binary/arg/cwd lifecycle adapter'ı.
 - [ ] Kritik guidance interview, owner+Meta best-practice+evidence karşılaştırması ve eval seti.
 - [ ] Guidance retrieval/context tools ve source/freshness/best-practice claim guard.
+  - [x] Preserved owner statement/source/scope/freshness içeren registry read ve deterministic
+    effective-pack preview; agent authority bütünüyle kapalı.
+  - [ ] Official Meta source claim guard, semantic retrieval/ranking ve analysis-run binding.
 - [ ] Act/test/observe/no-change + cadence ihlali proposal suppression eval'i.
 - [ ] L4/L5 compact context, bounded drill-down ve raw L0 access negatifleri.
 - [ ] draft_advised_practice authority boundary ve standardization bypass negatifleri.

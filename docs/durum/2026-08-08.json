@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "9ddd42599",
+      "tarih": "2026-08-08",
+      "konu": "feat(guidance): add category-bound studio",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "ccba7d95e",
       "tarih": "2026-08-08",
       "konu": "docs(status): refresh deterministic project state",
@@ -128,15 +137,6 @@
       "kapsam": [
         "docs"
       ]
-    },
-    {
-      "hash": "8f33dbc22",
-      "tarih": "2026-08-08",
-      "konu": "feat(agent): add vendor-neutral fixture client",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -157,7 +157,7 @@
       "adet": 1
     }
   ],
-  "isSayisi": 114,
+  "isSayisi": 115,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -170,5 +170,5 @@
       "siradaki": "11-bütçe planlama"
     }
   ],
-  "damga": "7b046e38110f"
+  "damga": "de7c6204dc2c"
 }

@@ -2,10 +2,10 @@
 
 > **TÜREV — elle düzenlenmez.** Tek yazar `agac.mjs` (motor · deterministik · 0 token).
 > Elle madde buraya değil **`TODO-ELLE.md`**'ye yazılır.
-> Damga: `2a276e7bad5a` · Kaynak: CHECKLIST(açık) · TODO-ELLE.md · HUKUM.md(EKSİK/STUCK) · künye-eksikleri · sarkık-oturum
+> Damga: `7c2027f17918` · Kaynak: CHECKLIST(açık) · TODO-ELLE.md · HUKUM.md(EKSİK/STUCK) · künye-eksikleri · sarkık-oturum
 > İLANLI MUAF (bu listeye GİRMEZ, her birinin kendi kanalı var): alerts.jsonl · parked işler · doctor fix: · teslim onar: · kaptan task'ları
 
-**99 açık madde** · plansız: 0 · chk: 99 · elle: 0 · hüküm: 0 · künye: 0 · oturum: 0
+**100 açık madde** · plansız: 0 · chk: 100 · elle: 0 · hüküm: 0 · künye: 0 · oturum: 0
 
 ## Plansız maddeler — plan-üretim adayları (0)
 
@@ -19,7 +19,7 @@ _yok_
 
 _yok_
 
-## Plan checklist maddeleri (99) — künye önceliği sırasında
+## Plan checklist maddeleri (100) — künye önceliği sırasında
 
 
 ### proje v2 · P2
@@ -76,6 +76,7 @@ _yok_
 - [ ] [12] MCP'siz istemciler için allowlist binary/arg/cwd lifecycle adapter'ı. `td:chk/proje/hb499ff`
 - [ ] [12] Kritik guidance interview, owner+Meta best-practice+evidence karşılaştırması ve eval seti. `td:chk/proje/ha40175`
 - [ ] [12] Guidance retrieval/context tools ve source/freshness/best-practice claim guard. `td:chk/proje/h74010b`
+- [ ] [12] Official Meta source claim guard, semantic retrieval/ranking ve analysis-run binding. `td:chk/proje/h73e879`
 - [ ] [12] Act/test/observe/no-change + cadence ihlali proposal suppression eval'i. `td:chk/proje/hf8fe34`
 - [ ] [12] L4/L5 compact context, bounded drill-down ve raw L0 access negatifleri. `td:chk/proje/l4`
 - [ ] [12] draft_advised_practice authority boundary ve standardization bypass negatifleri. `td:chk/proje/hae87bb`

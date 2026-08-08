@@ -44,7 +44,10 @@ composite session FK'leri, atomik consume, RLS/grant kapısı ve tombstone purge
 Authenticated local HTTP koordinasyonu dashboard cookie'siyle session list/register ve handoff create;
 CLI bearer capability'siyle register/heartbeat/consume sunar. Dashboard yalnız API'dan aktif session
 doğrulanınca bağlı durum gösterir; tek hedefi otomatik, birden fazlasını açık seçimle ele alır.
-Project STDIO MCP bu çekirdeği artık 3 coordination ve 13 güvenli application tool'u ile sunar.
+Project STDIO MCP bu çekirdeği 3 coordination ve 15 güvenli application tool'u ile sunar.
+İki guidance aracı korunmuş owner statement/source/scope kayıtlarını ve explicit
+account/category/entity/topic/timeframe bağlamı için deterministic effective pack'i okur;
+hiçbir publish, policy, approval, action veya Meta-write authority üretmez.
 Codex project config'i exact tool allowlist ve `writes` approval modunu; Claude project/local config'i
 aynı server komutunu kullanır. Dashboard discovery → handoff create → CLI consume → replay reject zinciri
 canlı PostgreSQL/HTTP kabulünde kapanmıştır. Localhost Streamable HTTP MCP ve MCP'siz CLI adapter'ı ileri iştir.

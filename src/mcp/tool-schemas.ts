@@ -85,6 +85,21 @@ const promotionSelection = z.object({
   timeframeRef: publicRef, objectiveRef: publicRef, internalCategoryRef: publicRef,
 }).strict();
 
+const guidanceEntity = z.object({
+  type: z.enum(["campaign", "ad_set", "ad", "creative", "post"]),
+  ref: publicRef,
+}).strict();
+const guidanceTimeframe = z.object({
+  ref: publicRef,
+  kind: z.enum(["rolling", "fixed", "calendar", "lifetime", "learning", "action_relative"]),
+}).strict();
+const guidanceBudget = z.object({
+  maxCards: z.number().int().min(1).max(100),
+  maxSources: z.number().int().min(1).max(100),
+  maxCharacters: z.number().int().min(1).max(100_000),
+}).strict();
+const guidanceTopic = z.string().regex(/^[a-z][a-z0-9_.:-]{0,79}$/);
+
 export const MCP_TOOL_SCHEMAS = Object.freeze({
   register_agent_session: z.object({}).strict(),
   heartbeat_agent_session: z.object({}).strict(),
@@ -101,6 +116,18 @@ export const MCP_TOOL_SCHEMAS = Object.freeze({
   practice_lab_list: z.object(optionalPage).strict(),
   practice_lab_get: z.object({ practiceRef: z.string().regex(/^practice_[a-z0-9][a-z0-9_-]{0,86}$/) }).strict(),
   practice_lab_prepare_draft: z.object({ practiceRef: z.string().regex(/^practice_[a-z0-9][a-z0-9_-]{0,86}$/) }).strict(),
+  guidance_registry_list: z.object({ status: z.enum(["draft", "published", "archived"]).optional() }).strict(),
+  guidance_effective_preview: z.object({
+    accountRef: publicRef,
+    objective: z.string().regex(/^[A-Z][A-Z0-9_]{1,79}$/).nullable(),
+    internalCategoryRefs: z.array(z.string().regex(/^category_[a-f0-9]{24}$/)).max(100),
+    entity: guidanceEntity.nullable(),
+    topics: z.array(guidanceTopic).max(100),
+    requiredTopics: z.array(guidanceTopic).max(100),
+    evaluatedAt: instant,
+    timeframe: guidanceTimeframe,
+    budget: guidanceBudget.optional(),
+  }).strict(),
   existing_post_promotion_preflight: promotionSelection,
 });
 

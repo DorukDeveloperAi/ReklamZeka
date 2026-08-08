@@ -22,6 +22,8 @@ enabled_tools = [
   "practice_lab_list",
   "practice_lab_get",
   "practice_lab_prepare_draft",
+  "guidance_registry_list",
+  "guidance_effective_preview",
   "existing_post_promotion_preflight",
 ]
 

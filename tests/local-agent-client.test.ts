@@ -45,6 +45,7 @@ describe("vendor-agnostic local agent client/session contract", () => {
       "policy_bundle_read",
       "budget_lab_list", "budget_lab_get", "budget_lab_dry_run", "budget_lab_save_draft",
       "practice_lab_list", "practice_lab_get", "practice_lab_prepare_draft",
+      "guidance_registry_list", "guidance_effective_preview",
       "existing_post_promotion_preflight",
     ]);
     expect(new Set(names).size).toBe(names.length);

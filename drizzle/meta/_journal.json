@@ -274,6 +274,13 @@
       "when": 1786146825544,
       "tag": "20260807235345_local_agent_session_handoff",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1786152656930,
+      "tag": "20260808013056_extend_local_agent_guidance_tools",
+      "breakpoints": true
     }
   ]
 }

@@ -66,6 +66,10 @@ function requestFor(name: ReklamZekaMcpToolName, args: Readonly<Record<string, u
       method: "GET", intent: "practice-lab-get" };
     case "practice_lab_prepare_draft": return { path: query("/api/practice-lab", { view: "draft", ...args }),
       method: "GET", intent: "practice-lab-prepare-draft" };
+    case "guidance_registry_list": return { path: query("/api/guidance-context", { view: "list", ...args }),
+      method: "GET", intent: "guidance-registry-list" };
+    case "guidance_effective_preview": return { path: "/api/guidance-context", method: "POST",
+      intent: "guidance-effective-preview", body: { context: args } };
     case "existing_post_promotion_preflight": return { path: "/api/existing-post-promotion-preflight", method: "POST",
       intent: "existing-post-promotion-preflight", body: { selection: args } };
   }

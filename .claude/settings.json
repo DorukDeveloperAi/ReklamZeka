@@ -14,6 +14,8 @@
       "mcp__reklamzeka__practice_lab_list",
       "mcp__reklamzeka__practice_lab_get",
       "mcp__reklamzeka__practice_lab_prepare_draft",
+      "mcp__reklamzeka__guidance_registry_list",
+      "mcp__reklamzeka__guidance_effective_preview",
       "mcp__reklamzeka__existing_post_promotion_preflight"
     ]
   }

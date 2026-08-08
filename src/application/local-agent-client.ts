@@ -3,6 +3,7 @@ import { BUDGET_LAB_AGENT_TOOLS } from "@/application/budget-lab-agent-contract"
 import { DECISION_ROOM_AGENT_TOOLS } from "@/application/decision-room-agent-contract";
 import { EXISTING_POST_PROMOTION_AGENT_TOOLS } from
   "@/application/existing-post-promotion-preflight-agent-contract";
+import { GUIDANCE_AGENT_TOOLS } from "@/application/guidance-agent-contract";
 import { POLICY_BUNDLE_AGENT_TOOLS } from "@/application/policy-bundle-agent-contract";
 import { PRACTICE_LAB_AGENT_TOOLS } from "@/application/practice-lab-agent-contract";
 import { LOCAL_SESSION_SCOPES, type LocalSessionScope } from "@/security/local-session-capability";
@@ -16,6 +17,7 @@ export const LOCAL_AGENT_SAFE_TOOLS = Object.freeze([
   ...POLICY_BUNDLE_AGENT_TOOLS,
   ...BUDGET_LAB_AGENT_TOOLS,
   ...PRACTICE_LAB_AGENT_TOOLS,
+  ...GUIDANCE_AGENT_TOOLS,
   ...EXISTING_POST_PROMOTION_AGENT_TOOLS,
 ]);
 
@@ -94,6 +96,8 @@ const TOOL_SCOPES: Readonly<Record<LocalAgentToolName, readonly LocalSessionScop
   practice_lab_list: scopes("practice_lab:read"),
   practice_lab_get: scopes("practice_lab:read"),
   practice_lab_prepare_draft: scopes("practice_lab:read"),
+  guidance_registry_list: scopes("guidance:read"),
+  guidance_effective_preview: scopes("guidance:read"),
   existing_post_promotion_preflight: scopes("promotion_preflight:read"),
 });
 const FORBIDDEN_TOOL_NAME = /(^|_)(approve|grant|execute|human_presence|raw_meta|raw_sql|write_meta)(_|$)/i;
@@ -104,6 +108,7 @@ const CLOSED_AUTHORITY_KEYS = new Set([
   "canapprove", "canreject", "canrequestchanges", "cangrant", "canexecute", "canwritemeta", "canpersist",
   "cangeneratecreative", "cancreatepolicy", "canpromoteguidance", "metawrite", "actionexecution",
   "humanpresence", "modelexecution", "approval", "grant", "execution", "rawmeta", "rawsql",
+  "candraft", "canpublish", "canarchive", "canauthorizeaction", "canenforcepolicy", "canalterapproval",
 ]);
 const AUTHORITY = Object.freeze({
   modelExecution: false as const,

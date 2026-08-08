@@ -1,6 +1,6 @@
 {
   "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
-  "damga": "2a276e7bad5a",
+  "damga": "7c2027f17918",
   "plans": [
     {
       "slug": "proje",
@@ -21,8 +21,8 @@
       },
       "asamaToplam": 14,
       "asamaKapali": 6,
-      "checklistAcik": 99,
-      "checklistKapali": 154,
+      "checklistAcik": 100,
+      "checklistKapali": 156,
       "sonTur": null,
       "siradaki": {
         "no": "11",
@@ -64,9 +64,9 @@
   ],
   "legacy": [],
   "todo": {
-    "acik": 99,
+    "acik": 100,
     "kaynak": {
-      "chk": 99,
+      "chk": 100,
       "elle": 0,
       "hukum": 0,
       "kunye": 0,
@@ -604,6 +604,16 @@
         "ref": "td:chk/proje/h74010b",
         "tur": "chk",
         "metin": "Guidance retrieval/context tools ve source/freshness/best-practice claim guard.",
+        "plan": "proje",
+        "asama": "12",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h73e879",
+        "tur": "chk",
+        "metin": "Official Meta source claim guard, semantic retrieval/ranking ve analysis-run binding.",
         "plan": "proje",
         "asama": "12",
         "kapatan": [],

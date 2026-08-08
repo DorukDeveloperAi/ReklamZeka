@@ -354,13 +354,13 @@ export const localAgentSessions = pgTable("local_agent_sessions", {
   `),
   check("local_agent_sessions_tools", sql`
     jsonb_typeof(${table.allowedTools}) = 'array'
-    and jsonb_array_length(${table.allowedTools}) between 1 and 13
+    and jsonb_array_length(${table.allowedTools}) between 1 and 15
     and ${table.allowedTools} <@ '[
       "decision_room_list", "decision_room_mark_inbox_read", "approval_queue_list", "approval_queue_get",
       "policy_bundle_read",
       "budget_lab_list", "budget_lab_get", "budget_lab_dry_run", "budget_lab_save_draft",
       "practice_lab_list", "practice_lab_get", "practice_lab_prepare_draft",
-      "existing_post_promotion_preflight"
+      "existing_post_promotion_preflight", "guidance_registry_list", "guidance_effective_preview"
     ]'::jsonb
   `),
   check("local_agent_sessions_time", sql`

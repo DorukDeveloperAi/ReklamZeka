@@ -12,7 +12,7 @@ export const REKLAMZEKA_MCP_TOOL_NAMES = Object.freeze(Object.keys(MCP_TOOL_SCHE
 
 const SAFE_NAMES = LOCAL_AGENT_SAFE_TOOLS.map((tool) => tool.name);
 const EXPECTED = [...COORDINATION_TOOL_NAMES, ...SAFE_NAMES];
-if (REKLAMZEKA_MCP_TOOL_NAMES.length !== 16
+if (REKLAMZEKA_MCP_TOOL_NAMES.length !== 18
   || JSON.stringify(REKLAMZEKA_MCP_TOOL_NAMES) !== JSON.stringify(EXPECTED)
   || new Set(REKLAMZEKA_MCP_TOOL_NAMES).size !== REKLAMZEKA_MCP_TOOL_NAMES.length) {
   throw new Error("ReklamZeka MCP catalog rejected");
@@ -27,7 +27,8 @@ const DESCRIPTIONS = new Map<string, string>([
 const READ_ONLY = new Set<ReklamZekaMcpToolName>([
   "decision_room_list", "approval_queue_list", "approval_queue_get", "policy_bundle_read",
   "budget_lab_list", "budget_lab_get", "budget_lab_dry_run", "practice_lab_list",
-  "practice_lab_get", "practice_lab_prepare_draft", "existing_post_promotion_preflight",
+  "practice_lab_get", "practice_lab_prepare_draft", "guidance_registry_list", "guidance_effective_preview",
+  "existing_post_promotion_preflight",
 ]);
 const IDEMPOTENT = new Set<ReklamZekaMcpToolName>([
   "register_agent_session", "heartbeat_agent_session", "decision_room_mark_inbox_read", "budget_lab_save_draft",

@@ -56,7 +56,7 @@ describe("private local MCP environment", () => {
 });
 
 describe("local MCP HTTP bridge", () => {
-  it("maps all 16 exact tools to the existing bearer endpoints and never returns coordination identity", async () => {
+  it("maps all 18 exact tools to the existing bearer endpoints and never returns coordination identity", async () => {
     const calls: { url: string; init: RequestInit }[] = [];
     const fetcher = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
       calls.push({ url: String(input), init });
@@ -78,16 +78,31 @@ describe("local MCP HTTP bridge", () => {
       approval_queue_get: { unitRef: "action_unit_aaaaaaaaaaaaaaaaaaaa" }, budget_lab_get: { seriesRef: "series_public" },
       budget_lab_dry_run: { command: {} }, budget_lab_save_draft: { command: {} },
       practice_lab_get: { practiceRef: "practice_public" }, practice_lab_prepare_draft: { practiceRef: "practice_public" },
+      guidance_registry_list: { status: "published" },
+      guidance_effective_preview: { accountRef: "account_public", objective: null, internalCategoryRefs: ["category_public"],
+        entity: { type: "campaign", ref: "campaign_public" }, topics: ["budget"], requiredTopics: [],
+        evaluatedAt: "2027-01-15T08:00:00.000Z", timeframe: { ref: "timeframe_public", kind: "rolling" },
+        budget: { maxCards: 10, maxSources: 10, maxCharacters: 20_000 } },
       existing_post_promotion_preflight: { accountRef: "account_public" },
     };
     const outputs = [];
     for (const name of REKLAMZEKA_MCP_TOOL_NAMES) outputs.push(await bridge.execute(name, minimal[name] ?? {}));
-    expect(calls).toHaveLength(16);
+    expect(calls).toHaveLength(18);
     expect(calls.every((call) => new Headers(call.init.headers).get("authorization") === `Bearer ${token}`)).toBe(true);
     expect(calls.map((call) => new URL(call.url).pathname)).toEqual(expect.arrayContaining([
       "/api/local-agent-sessions", "/api/local-agent-handoffs", "/api/decision-room", "/api/approval-queue",
       "/api/policy-bundles", "/api/budget-lab", "/api/practice-lab", "/api/existing-post-promotion-preflight",
+      "/api/guidance-context",
     ]));
+    const guidanceList = calls.find((call) => new URL(call.url).searchParams.get("view") === "list"
+      && new URL(call.url).pathname === "/api/guidance-context");
+    expect(guidanceList).toBeDefined();
+    expect(new URL(guidanceList!.url).searchParams.get("status")).toBe("published");
+    expect(new Headers(guidanceList!.init.headers).get("x-reklamzeka-intent")).toBe("guidance-registry-list");
+    const guidancePreview = calls.find((call) => new URL(call.url).pathname === "/api/guidance-context"
+      && call.init.method === "POST");
+    expect(new Headers(guidancePreview!.init.headers).get("x-reklamzeka-intent")).toBe("guidance-effective-preview");
+    expect(JSON.parse(String(guidancePreview!.init.body))).toEqual({ context: minimal.guidance_effective_preview });
     expect(outputs[0]).toEqual({ status: "registered", outcome: "inserted", expiresAt: "2027-01-15T08:05:00.000Z" });
     expect(JSON.stringify(outputs.slice(0, 3))).not.toMatch(/workspace_alpha|session_[a-f0-9]+|rzs1\./);
   });
@@ -109,7 +124,7 @@ async function receive(transport: InMemoryTransport, predicate: (message: JSONRP
 }
 
 describe("MCP v2 protocol conformance", () => {
-  it("negotiates, exposes exactly 16 strict tools, preserves annotations, and dispatches a call", async () => {
+  it("negotiates, exposes exactly 18 strict tools, preserves annotations, and dispatches a call", async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ outcome: "inserted",
       session: { expiresAt: "2027-01-15T08:05:00.000Z" } }), { status: 200 }));
     const server = createReklamZekaMcpServer({ runtime, bridge: new LocalMcpHttpBridge(runtime, fetcher) });
@@ -126,11 +141,13 @@ describe("MCP v2 protocol conformance", () => {
     const listMessage = await listed as unknown as { result: { tools: { name: string; inputSchema: Record<string, unknown>;
       annotations: Record<string, unknown>; _meta?: Record<string, unknown> }[] } };
     expect(listMessage.result.tools.map((tool) => tool.name)).toEqual(REKLAMZEKA_MCP_TOOL_NAMES);
-    expect(listMessage.result.tools).toHaveLength(16);
+    expect(listMessage.result.tools).toHaveLength(18);
     expect(listMessage.result.tools.every((tool) => tool.inputSchema.additionalProperties === false)).toBe(true);
     expect(listMessage.result.tools.find((tool) => tool.name === "get_handoff_context")?.annotations)
       .toMatchObject({ readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false });
     expect(annotations("budget_lab_save_draft")).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
+    expect(annotations("guidance_registry_list")).toMatchObject({ readOnlyHint: true, destructiveHint: false, idempotentHint: true });
+    expect(annotations("guidance_effective_preview")).toMatchObject({ readOnlyHint: true, destructiveHint: false, idempotentHint: true });
     expect(listMessage.result.tools.filter((tool) => tool._meta?.["anthropic/requiresUserInteraction"] === true)
       .map((tool) => tool.name)).toEqual(["decision_room_mark_inbox_read", "budget_lab_save_draft"]);
     const called = receive(clientTransport, (message) => "id" in message && message.id === 3);

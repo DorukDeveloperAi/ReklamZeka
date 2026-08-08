@@ -15,7 +15,7 @@
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
 | 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.5 ve Slice 01 kapalı; geniş field/breakdown kataloğu, multi-business grouping ve export/rotation ileri işi açık |
-| 09 | kategori ve talimat | DEVAM | 08 | category/guidance çekirdeği ve gerçek Guidance Studio hazır; composition/preview, çoklu binding ve category yönetimi sırada |
+| 09 | kategori ve talimat | DEVAM | 08 | category/guidance çekirdeği, gerçek Guidance Studio ve agent effective preview hazır; invalidation, çoklu binding ve category yönetimi sırada |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
 | 11 | bütçe planlama | AÇIK | 09,10 | planlandı |
 | 12 | prompt/advisor | DEVAM | 09–11 | narrative envelope/claim guard temeli var; translator/ledger sırada |
@@ -41,6 +41,26 @@
   typecheck, DB check ve `scripts/verify-guidance-studio-postgres.ts`.
 - Açık sonraki dilim: agent/Codex/Claude read tools + effective guidance preview/composer,
   publish/archive context invalidation, çoklu binding/set ve category CRUD/coverage yüzeyi.
+
+## 2026-08-08 — A09.2 model-agnostic guidance context araçları
+
+- Codex ve Claude aynı application contract üzerinden iki strict, salt-okur araç kazandı:
+  `guidance_registry_list` preserved owner statement/source/card/scope kayıtlarını listeler;
+  `guidance_effective_preview` explicit account, objective, internal category, entity, topic,
+  timeframe ve opsiyonel budget bağlamından deterministic effective guidance pack üretir.
+- Timeframe türü semantic `timeframe:<kind>` topic'i olarak resolution'a katılır. Pack scope,
+  source, freshness, conflict ve context-budget izini korur; agent prompt enjeksiyonu, model
+  çağrısı veya serbest workspace/header authority kullanmaz.
+- Her iki aracın draft/publish/archive, policy, approval, action, persistence, execution ve
+  Meta authority alanları yapısal olarak false'dur. Dashboard mutation yolu ile CLI read yolu
+  ayrıdır; bearer-only local-session her çağrıda aktif membership ve exact `guidance:read`
+  scope'uyla yeniden doğrulanır.
+- MCP kataloğu 3 coordination + 15 safe application aracı olmak üzere exact 18 araca çıktı.
+  PostgreSQL session allowlist constraint'i additive migration ile 15 araca genişletildi;
+  77/77 public tabloda RLS ve API rollerinde sıfır table grant duruşu korundu.
+- Canlı kabul hem registry read hem effective preview için gerçek localhost→PostgreSQL→STDIO
+  zincirinde geçti; Codex discovery ve Claude connection doğrulandı. Açık sonraki dilim:
+  publish/archive context invalidation ve analysis-run binding.
 
 ## 2026-08-06 — bütün görüşmelerin kanonik ürün distilasyonu
 
@@ -1088,7 +1108,7 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 ## 2026-08-08 — A12 durable AgentSession + DashboardHandoff repository
 
 - `local_agent_sessions` ve `local_agent_handoffs` PostgreSQL tabloları additive migration ile eklendi. Session
-  kayıtları exact workspace membership, transport, tool-catalog, süre ve 13 safe-tool allowlist constraint'lerine;
+  kayıtları exact workspace membership, transport, tool-catalog, süre ve başlangıçtaki 13 safe-tool allowlist constraint'lerine;
   handoff kayıtları exact creator/target session composite FK'leri, public-ref bağlamı ve 15–120 saniye TTL'e bağlıdır.
 - Server-private Drizzle repository yeni session kaydından önce active workspace satırını kilitler. Heartbeat süreyi
   uzatamaz; handoff consume exact workspace/target/expiry ve `consumed_at is null` koşullarıyla tek atomik UPDATE'tir.
@@ -1117,12 +1137,12 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   reddini doğruladı; hedefli cleanup sonunda geçici satır kalmadı. 77/77 RLS ve sıfır Data API grant duruşu korundu;
   model ve Meta write çağrısı sıfırdır.
 - Project STDIO MCP adapter, Codex/Claude config ve CLI içinden doğal `get_handoff_context` çağrısı bağlıdır.
-  Exact 16-tool katalog dışında araç yayımlanmaz; dashboard handoff'u tek kullanımlı tüketilir ve replay reddedilir.
+  Bu dilimde exact 16-tool katalog dışında araç yayımlanmaz; dashboard handoff'u tek kullanımlı tüketilir ve replay reddedilir.
   Localhost Streamable HTTP MCP ile MCP'siz CLI adapter'ı ayrı ileri kapılar olarak kapalıdır.
 
 ## 2026-08-08 — A12 project STDIO MCP + Codex/Claude conformance
 
-- `@modelcontextprotocol/server` v2 tabanlı project STDIO server 3 coordination aracı ile mevcut 13 safe
+- `@modelcontextprotocol/server` v2 tabanlı project STDIO server başlangıçta 3 coordination aracı ile 13 safe
   read/draft/preflight application aracını exact katalog ve strict Zod input şemasıyla yayımlar. Provider/model,
   raw Meta/SQL, approval, human-presence grant veya action execution aracı yoktur.
 - MCP prosesi `.env.local` dosyasını symlink/owner/mode/size kontrollerinden geçirir; yalnız yedi
@@ -1132,7 +1152,7 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   kabul edilir; locality kanıtı değildir. Partial/external/mismatched forwarding, tenant header ve dual credential
   reddi korunur. Policy read ve promotion preflight yalnız ilgili bearer read scope'larına açılmış; draft/publish
   ve diğer dashboard mutation sınırları cookie/human yolunda kalmıştır.
-- Codex `.codex/config.toml` exact 16 araçla etkin; coordination otomatik, diğer mutation'lar `writes` prompt'tur.
+- Codex `.codex/config.toml` bu dilimde exact 16 araçla etkin; coordination otomatik, diğer mutation'lar `writes` prompt'tur.
   Claude `.mcp.json` ve project permission seti yalnız coordination/read araçlarını auto-allow eder;
   mark-read ile persisted budget draft server metadata ile explicit interaction ister. Makine-local Claude entry
   health check'te connected durumundadır.
