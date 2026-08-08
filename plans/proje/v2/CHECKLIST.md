@@ -96,7 +96,12 @@
 - [ ] Kategori coverage/unmatched/conflict/impact dashboard ve güvenli archive akışı.
   - [x] Rules fixture kaldırıldı; gerçek Guidance Studio loading/empty/conflict/error,
     create/revise/publish/archive ve aktif iç kategori selector yüzeyi.
-  - [ ] Category assignment coverage/unmatched/conflict/archive-impact yüzeyi.
+  - [x] Ayrı `category_registry:read` yetkili, public-safe aktif dimension/definition kataloğu;
+    campaign/ad set/ad/creative doğrudan assignment coverage, unmatched, manual-lock ve
+    registry-health görünümü. Sıfır payda “veri yok”, kaybolmuş Meta hedefleri kapsam dışı;
+    dashboard ve canlı PostgreSQL verifier aynı read model'i kullanır.
+  - [ ] Assignment evidence/low-confidence/single-dimension conflict ve archive-impact
+    önizlemesi; rol/audit/invalidation bağlı category authoring/archive akışı.
 - [ ] PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run.
 - [ ] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi.
   - [x] Guidance-only pure registry/pack; provenance ayrımı, deterministic scope/conflict,

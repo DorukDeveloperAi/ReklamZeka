@@ -15,7 +15,7 @@
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
 | 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.5 ve Slice 01 kapalı; geniş field/breakdown kataloğu, multi-business grouping ve export/rotation ileri işi açık |
-| 09 | kategori ve talimat | DEVAM | 08 | Guidance Studio, agent preview, invalidation ve çoklu facet binding hazır; guidance set ve category yönetimi sırada |
+| 09 | kategori ve talimat | DEVAM | 08 | Guidance Studio, agent preview, invalidation, çoklu facet binding ve salt-okur category inventory hazır; evidence/conflict/impact ve category yönetimi sırada |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
 | 11 | bütçe planlama | AÇIK | 09,10 | planlandı |
 | 12 | prompt/advisor | DEVAM | 09–11 | narrative envelope/claim guard temeli var; translator/ledger sırada |
@@ -106,6 +106,25 @@
   agent context'i veya browser otomasyonuna aktarılmaz.
 - Browser kabulü yeni capability'siz sekmede Guidance Studio → session-required → Decision Room
   bootstrap yönlendirmesini doğruladı. Bu dilim session yetkisi üretmez ve auth sınırını gevşetmez.
+
+## 2026-08-08 — A09.5 iç kategori envanteri ve doğrudan coverage
+
+- Dashboard'a ayrı “İç kategoriler” görünümü eklendi. Aktif dimension/definition kataloğu,
+  campaign→ad set→ad→creative seviyelerindeki doğrudan atama kapsamı, unmatched sayısı,
+  source/operation dağılımı ve manuel kilitler aynı PostgreSQL read model'inden gösteriliyor.
+- Bu projection `EffectiveCampaignContext` veya kalıtılmış kategori sonucu gibi sunulmuyor;
+  yalnız doğrudan assignment ölçüyor. `disappeared_at` dolu Meta hedefleri pay/paydaya girmez,
+  payda sıfırsa oran `null/veri yok` kalır.
+- Kayıt sağlığı tanımsız aktif dimension, güncel hedefe ataması olmayan definition, kaybolmuş
+  hedef assignment'ı ve arşivli registry kaydına bağlı aktif assignment'ı ayrı sayar.
+- Erişim ayrı `category_registry:read` workspace/session scope'uyla cookie-only ve same-origin;
+  yanıtta UUID/Meta external ID yoktur. Assign, archive, policy, approval, action ve Meta-write
+  authority alanları yapısal olarak false'dur.
+- Canlı Supabase verifier bağlı workspace'te dürüst empty-state döndürdü ve 0 DB/Meta write
+  kaydetti. 180 test dosyası/1.122 test, production build, 77/77 RLS, sıfır API table grant,
+  secret taraması ve capability'siz browser recovery akışı geçti.
+- Açık sonraki dilim: assignment evidence/low-confidence/conflict ve archive-impact preview;
+  ardından rol+audit+optimistic concurrency+context invalidation bağlı category authoring.
 
 ## 2026-08-06 — bütün görüşmelerin kanonik ürün distilasyonu
 

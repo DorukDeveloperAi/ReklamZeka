@@ -49,6 +49,7 @@
     "verify:meta-connection-db": "tsx scripts/verify-meta-connection-postgres.ts",
     "verify:workspace-tombstone-db": "tsx scripts/verify-workspace-tombstone-postgres.ts",
     "verify:category-registry-db": "tsx scripts/verify-category-registry-postgres.ts",
+    "verify:category-inventory-live": "node --env-file=.env.local --import tsx scripts/verify-category-inventory-postgres.ts",
     "verify:guidance-registry-db": "tsx scripts/verify-guidance-registry-postgres.ts",
     "verify:effective-campaign-context-db": "tsx scripts/verify-effective-campaign-context-postgres.ts",
     "verify:decision-ledger-db": "tsx scripts/verify-decision-ledger-postgres.ts",

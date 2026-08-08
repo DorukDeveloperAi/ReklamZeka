@@ -5,6 +5,12 @@ function validKey(value: string): boolean {
 }
 
 /** Stable across immutable UUID revisions; exact revision evidence stays in frozen context. */
+export function categoryDimensionPublicRef(dimensionKey: string): string {
+  if (!validKey(dimensionKey)) throw new TypeError("invalid_category_key");
+  return `dimension_${createHash("sha256").update(JSON.stringify({ dimensionKey })).digest("hex").slice(0, 24)}`;
+}
+
+/** Stable across immutable UUID revisions; exact revision evidence stays in frozen context. */
 export function categoryDefinitionPublicRef(dimensionKey: string, definitionKey: string): string {
   if (!validKey(dimensionKey) || !validKey(definitionKey)) throw new TypeError("invalid_category_key");
   const canonical = JSON.stringify({ definitionKey, dimensionKey });

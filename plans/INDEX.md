@@ -1,7 +1,7 @@
 # PLAN AĞACI — ReklamZeka
 
 > **ELLE DÜZENLEME YAPMA** — bu dosyayı `plan-organizatoru/scripts/agac.mjs` türetir (tek yazar).
-> Damga: `e1c4adaa7983` · Kaynak: `plans/*/v*/{MASTER,STATE,CHECKLIST}.md` + `plans/legacy.json`
+> Damga: `64b920e90ac2` · Kaynak: `plans/*/v*/{MASTER,STATE,CHECKLIST}.md` + `plans/legacy.json`
 > Tazelik: `node ~/.claude/skills/plan-organizatoru/scripts/agac.mjs --gate` (damga uyuşmazlığı = bayat INDEX → yeniden türet)
 
 ## Ağaç
@@ -12,7 +12,7 @@
 
 | plan | kategori | künye (kritiklik/aciliyet · hacim) | üst | sürüm | durum | aşamalar | checklist (açık/kapalı) | son tur |
 |---|---|---|---|---|---|---|---|---|
-| [proje](proje/v2/MASTER.md) | proje | yüksek/normal · epik (P2) | — | v2 | SÜRÜYOR | 6/14 | 100/159 | — |
+| [proje](proje/v2/MASTER.md) | proje | yüksek/normal · epik (P2) | — | v2 | SÜRÜYOR | 6/14 | 100/160 | — |
 
 ## Öncelik sırası (türev — künye: kritiklik × aciliyet)
 

@@ -2,7 +2,7 @@
 
 > **TÜREV — elle düzenlenmez.** Tek yazar `agac.mjs` (motor · deterministik · 0 token).
 > Elle madde buraya değil **`TODO-ELLE.md`**'ye yazılır.
-> Damga: `e1c4adaa7983` · Kaynak: CHECKLIST(açık) · TODO-ELLE.md · HUKUM.md(EKSİK/STUCK) · künye-eksikleri · sarkık-oturum
+> Damga: `64b920e90ac2` · Kaynak: CHECKLIST(açık) · TODO-ELLE.md · HUKUM.md(EKSİK/STUCK) · künye-eksikleri · sarkık-oturum
 > İLANLI MUAF (bu listeye GİRMEZ, her birinin kendi kanalı var): alerts.jsonl · parked işler · doctor fix: · teslim onar: · kaptan task'ları
 
 **100 açık madde** · plansız: 0 · chk: 100 · elle: 0 · hüküm: 0 · künye: 0 · oturum: 0
@@ -44,7 +44,7 @@ _yok_
 - [ ] [09] Strict policy pause/publish lifecycle, history/diff projection ve context invalidation binding'i. `td:chk/proje/h840d8d`
 - [ ] [09] Başlangıç objective/internal kategori playbook seti. `td:chk/proje/h763206`
 - [ ] [09] Kategori coverage/unmatched/conflict/impact dashboard ve güvenli archive akışı. `td:chk/proje/h8ca7a8`
-- [ ] [09] Category assignment coverage/unmatched/conflict/archive-impact yüzeyi. `td:chk/proje/he1fb34`
+- [ ] [09] Assignment evidence/low-confidence/single-dimension conflict ve archive-impact `td:chk/proje/h104041`
 - [ ] [09] PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run. `td:chk/proje/h36429c`
 - [ ] [09] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi. `td:chk/proje/h7b6132`
 - [ ] [09] Guidance set authoring; account-group/lifecycle/template scope ve analysis-run binding. `td:chk/proje/hdf14d4`

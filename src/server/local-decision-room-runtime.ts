@@ -347,6 +347,23 @@ export async function resolveTrustedLocalGuidancePrincipal(input: Readonly<{
   return bindPrincipal(input.database, input.config);
 }
 
+/** Cookie-only internal category registry visibility; it grants no mutation authority. */
+export async function resolveTrustedLocalCategoryRegistryPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null) {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: "category_registry:read", expected: input.config });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "read", "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
 /**
  * Separately scoped K4 Policy Bundle Studio binding. Read access may use the
  * same OS-UID-bound bearer capability as the project MCP server. Draft and
