@@ -96,6 +96,17 @@
   kapalı gösterdi; secret/capability tarayıcıya enjekte edilmedi. Merkezi dashboard session bootstrap
   usability'si ayrı açık iş olarak korunur.
 
+## 2026-08-08 — A14 Guidance Studio session recovery UX
+
+- Guidance Studio runtime eksik, malformed veya süresi dolmuş cookie capability durumunu artık
+  veri kaynağı/DB yapılandırma hatası gibi 503 göstermez. Redakte, authority-none bir
+  `local_session_required` 401 sözleşmesi döndürür; gerçek repository/DB arızası 503 kalır.
+- Dashboard bu durumu “Yerel oturum gerekli” olarak açıklar ve kullanıcıyı Decision Room'daki
+  tek-kullanımlık capability bootstrap formuna taşır. Capability değeri URL, log, kaynak kodu,
+  agent context'i veya browser otomasyonuna aktarılmaz.
+- Browser kabulü yeni capability'siz sekmede Guidance Studio → session-required → Decision Room
+  bootstrap yönlendirmesini doğruladı. Bu dilim session yetkisi üretmez ve auth sınırını gevşetmez.
+
 ## 2026-08-06 — bütün görüşmelerin kanonik ürün distilasyonu
 
 - Konuşmalardaki ürün niyeti, sınırlar, iç kategori/talimat modeli, analiz ve prompt

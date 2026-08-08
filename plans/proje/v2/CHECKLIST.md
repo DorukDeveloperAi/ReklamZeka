@@ -282,6 +282,8 @@
 - [ ] Bugün/portfolio hiyerarşi ve internal/Meta filtreler.
 - [ ] Account-group switcher, multi-account connection health ve Page/Instagram asset graph.
 - [ ] Kategori/talimat stüdyosu ve raw/normalized/version/conflict görünümü.
+  - [x] Guidance Studio eksik/expired dashboard capability'yi DB arızasından ayırır; 401
+    `local_session_required` ile Decision Room tek-kullanımlık bootstrap yüzeyine yönlendirir.
   - [x] Autonomy revision feed + owner/admin/analyst normalized-draft yüzeyi; viewer read-only,
     workspace/principal/revision server-derived ve publish/disable/approve/execute/Meta-write kapalı.
 - [ ] Analiz stüdyosu: template/dry-run/publish/schedule/history.

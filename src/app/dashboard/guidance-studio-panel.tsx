@@ -168,7 +168,7 @@ function Status({ children, tone = "neutral" }: { children: React.ReactNode; ton
   return <span className={styles.statusPill} data-tone={tone}>{children}</span>;
 }
 
-export function GuidanceStudioPanel() {
+export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void }> = {}) {
   const [snapshot, setSnapshot] = useState<GuidanceStudioSnapshot | null>(null);
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
   const selectedRefRef = useRef<string | null>(null);
@@ -178,6 +178,7 @@ export function GuidanceStudioPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionRequired, setSessionRequired] = useState(false);
   const [conflict, setConflict] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -202,6 +203,7 @@ export function GuidanceStudioPanel() {
   const refresh = useCallback(async (options: Readonly<{ preserveDraft?: boolean; preferredRef?: string | null }> = {}) => {
     setLoading(true);
     setError(null);
+    setSessionRequired(false);
     try {
       const response = await fetch("/api/guidance-studio", {
         cache: "no-store", credentials: "same-origin", headers: { "X-ReklamZeka-Intent": "guidance-studio-read" },
@@ -223,6 +225,7 @@ export function GuidanceStudioPanel() {
         setSelectedRef(nextSelected.cardRef);
       }
     } catch (reason) {
+      setSessionRequired(reason instanceof GuidanceStudioRequestError && reason.code === "local_session_required");
       setError(reason instanceof Error ? reason.message : "Talimat kaynağı kullanılamıyor.");
     } finally {
       setLoading(false);
@@ -309,7 +312,7 @@ export function GuidanceStudioPanel() {
   }
 
   if (loading && !snapshot) return <section className={`${styles.panel} ${styles.guidanceState}`} aria-busy="true"><strong>TALİMAT STUDIO</strong><h2>Talimatlar yükleniyor</h2><p>Kalıcı guidance registry ve iç kategori kataloğu okunuyor.</p></section>;
-  if (error && !snapshot) return <section className={`${styles.panel} ${styles.guidanceState}`} role="alert"><strong>BAĞLANTI KURULAMADI</strong><h2>Talimat kaynağı kullanılamıyor</h2><p>{error}</p><button type="button" onClick={() => void refresh()}>Yeniden dene</button></section>;
+  if (error && !snapshot) return <section className={`${styles.panel} ${styles.guidanceState}`} role="alert"><strong>{sessionRequired ? "YEREL OTURUM GEREKLİ" : "BAĞLANTI KURULAMADI"}</strong><h2>{sessionRequired ? "Dashboard oturumunu bağlayın" : "Talimat kaynağı kullanılamıyor"}</h2><p>{error}</p>{sessionRequired && props.onOpenSession ? <button type="button" onClick={props.onOpenSession}>Decision Room’da oturumu bağla</button> : <button type="button" onClick={() => void refresh()}>Yeniden dene</button>}</section>;
   if (!snapshot) return <section className={`${styles.panel} ${styles.guidanceState}`} role="alert"><strong>KAYNAK HAZIR DEĞİL</strong><h2>Talimat kaynağı doğrulanamadı</h2><p>Kalıcı registry yanıtı alınamadı.</p><button type="button" onClick={() => void refresh()}>Yeniden dene</button></section>;
 
   const authority = snapshot.authority;

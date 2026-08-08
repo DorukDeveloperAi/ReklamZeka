@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createGuidanceStudioHttpHandlers } from "@/server/guidance-studio-http";
+import { createGuidanceStudioHttpHandlers, guidanceStudioSessionRequiredResponse } from "@/server/guidance-studio-http";
 
 const principal = { actor: { userId: "22222222-2222-4222-8222-222222222222" },
   workspaceId: "11111111-1111-4111-8111-111111111111", workspaceRef: "workspace_test", readerRef: "reader_test" } as const;
@@ -13,6 +13,12 @@ function request(method: string, intent: string, body?: unknown, extras: Record<
 }
 
 describe("Guidance Studio HTTP boundary", () => {
+  it("returns a redacted no-authority session bootstrap requirement", async () => {
+    const response = guidanceStudioSessionRequiredResponse();
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error: { code: "local_session_required" },
+      authority: { canWriteMeta: false, canAuthorizeAction: false, canEnforcePolicy: false } });
+  });
   it("reads only with the exact cookie intent", async () => {
     const service = { list: vi.fn(async () => snapshot), createDraft: vi.fn(), mutate: vi.fn() };
     const handlers = createGuidanceStudioHttpHandlers({ service: service as never, resolvePrincipal: async () => principal });

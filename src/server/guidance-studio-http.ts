@@ -47,6 +47,9 @@ async function body(request: Request): Promise<Record<string, unknown>> {
 export function guidanceStudioNotConfiguredResponse() {
   return error("source_not_configured", "Guidance Studio yerel çalışma alanına henüz bağlanmadı.", 503);
 }
+export function guidanceStudioSessionRequiredResponse() {
+  return error("local_session_required", "Guidance Studio için yerel dashboard oturumunu bağlayın.", 401);
+}
 
 export function createGuidanceStudioHttpHandlers(input: Readonly<{
   service: Pick<GuidanceStudioService, "list" | "createDraft" | "mutate">;
