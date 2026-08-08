@@ -71,6 +71,13 @@ describe("GuidanceStudioService", () => {
       scopes: [{ ...draft.scopes[0]!, value: "category_ffffffffffffffffffffffff" }] })).rejects.toMatchObject({ code: "not_found" });
   });
 
+  it("rejects nested scope authority injection before persistence", async () => {
+    const state = memory(); const initial = await state.service.list(principal);
+    await expect(state.service.createDraft(principal, { ...draft, expectedRegistryHash: initial.registryHash,
+      scopes: [{ ...draft.scopes[0]!, canWriteMeta: true }] as never })).rejects.toMatchObject({ code: "invalid_input" });
+    expect(state.registry().cards).toEqual([]);
+  });
+
   it("authors conjunctive multi-facet scopes and keeps binding cardinality stable across revisions", async () => {
     const state = memory(); const initial = await state.service.list(principal);
     const scopes = [draft.scopes[0]!, { facet: "account" as const, value: "account_aaaaaaaaaaaaaaaaaaaaaaaa",

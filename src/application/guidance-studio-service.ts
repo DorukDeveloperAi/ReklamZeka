@@ -86,7 +86,10 @@ function text(value: unknown, max: number): string {
 }
 
 function scope(value: GuidanceStudioScope, categories: readonly GuidanceStudioCategory[]): GuidanceStudioScope {
-  if (!value || !FACETS.has(value.facet) || !["default", "exception"].includes(value.mode)
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || Object.keys(value).length !== 5
+    || Object.keys(value).some((key) => !["facet", "value", "entityType", "mode", "priority"].includes(key))
+    || !FACETS.has(value.facet) || !["default", "exception"].includes(value.mode)
     || !Number.isSafeInteger(value.priority) || value.priority < 0 || value.priority > 100) {
     throw new GuidanceStudioError("invalid_input");
   }
@@ -105,7 +108,8 @@ function scope(value: GuidanceStudioScope, categories: readonly GuidanceStudioCa
   if (value.facet === "internal_category" && !categories.some((item) => item.ref === value.value)) {
     throw new GuidanceStudioError("not_found");
   }
-  return Object.freeze({ ...value });
+  return Object.freeze({ facet: value.facet, value: value.value, entityType: value.entityType,
+    mode: value.mode, priority: value.priority });
 }
 
 function scopes(values: readonly GuidanceStudioScope[], categories: readonly GuidanceStudioCategory[]): readonly GuidanceStudioScope[] {
