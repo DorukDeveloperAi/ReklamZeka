@@ -5,7 +5,8 @@ import type {
   LocalAgentSessionRecord,
   LocalAgentSessionRepository,
 } from "@/application/local-agent-session-contract";
-import type { LocalAgentToolName, LocalAgentTransport } from "@/application/local-agent-client";
+import { LOCAL_AGENT_SAFE_TOOLS, type LocalAgentToolName, type LocalAgentTransport } from
+  "@/application/local-agent-client";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -46,12 +47,13 @@ type HandoffRow = Readonly<{
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SESSION = /^session_[a-f0-9]{32}$/;
 const HANDOFF = /^handoff_[a-f0-9]{32}$/;
+const WORKSPACE_REF = /^workspace_[a-z0-9][a-z0-9_.:-]{0,86}$/;
+const CLIENT_REF = /^client_[a-z0-9][a-z0-9_-]{0,86}$/;
+const PUBLIC_REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,94}$/;
+const CORRELATION = /^correlation_[a-f0-9]{32}$/;
+const FORBIDDEN_REF = /(token|secret|prompt|raw|hash|sql|uuid|grant|approve|execute|human)/i;
 const TRANSPORTS = new Set<LocalAgentTransport>(["deterministic_fixture", "project_stdio", "loopback_http"]);
-const TOOLS = new Set<LocalAgentToolName>([
-  "decision_room_list", "decision_room_mark_inbox_read", "policy_bundle_read",
-  "budget_lab_list", "budget_lab_get", "budget_lab_dry_run", "budget_lab_save_draft",
-  "practice_lab_list", "practice_lab_get", "practice_lab_prepare_draft",
-]);
+const TOOLS = new Set<LocalAgentToolName>(LOCAL_AGENT_SAFE_TOOLS.map((tool) => tool.name));
 
 export class LocalAgentSessionRepositoryError extends Error {
   constructor(readonly code: "invalid_input" | "corrupt_store") {
@@ -75,43 +77,69 @@ function epoch(value: Date | string): number {
   return milliseconds / 1000;
 }
 
+function publicRef(value: unknown): value is string {
+  return typeof value === "string" && PUBLIC_REF.test(value) && !FORBIDDEN_REF.test(value);
+}
+
 function sessionRecord(row: SessionRow): LocalAgentSessionRecord {
   if (!UUID.test(row.workspace_id) || !UUID.test(row.user_id) || !SESSION.test(row.session_ref)
+    || !WORKSPACE_REF.test(row.workspace_ref) || !CLIENT_REF.test(row.client_ref)
     || !TRANSPORTS.has(row.transport as LocalAgentTransport)
     || row.tool_catalog_version !== "local-agent-tools/1.0.0"
-    || !Array.isArray(row.allowed_tools) || row.allowed_tools.length < 1 || row.allowed_tools.length > 10
+    || !Array.isArray(row.allowed_tools) || row.allowed_tools.length < 1 || row.allowed_tools.length > TOOLS.size
     || new Set(row.allowed_tools).size !== row.allowed_tools.length
     || row.allowed_tools.some((tool) => typeof tool !== "string" || !TOOLS.has(tool as LocalAgentToolName))) fail("corrupt_store");
+  const startedAt = epoch(row.started_at); const lastSeenAt = epoch(row.last_seen_at); const expiresAt = epoch(row.expires_at);
+  if (lastSeenAt < startedAt || lastSeenAt >= expiresAt || expiresAt > startedAt + 28_800) fail("corrupt_store");
   return Object.freeze({
     sessionRef: row.session_ref, workspaceId: row.workspace_id.toLowerCase(), workspaceRef: row.workspace_ref,
     userId: row.user_id.toLowerCase(), clientRef: row.client_ref, transport: row.transport as LocalAgentTransport,
     toolCatalogVersion: "local-agent-tools/1.0.0", allowedTools: Object.freeze([...row.allowed_tools] as LocalAgentToolName[]),
-    startedAt: epoch(row.started_at), lastSeenAt: epoch(row.last_seen_at), expiresAt: epoch(row.expires_at),
+    startedAt, lastSeenAt, expiresAt,
   });
 }
 
 function handoffRecord(row: HandoffRow): LocalAgentHandoffRecord {
-  if (!HANDOFF.test(row.handoff_ref) || !UUID.test(row.workspace_id)
+  if (!HANDOFF.test(row.handoff_ref) || !UUID.test(row.workspace_id) || !WORKSPACE_REF.test(row.workspace_ref)
     || !SESSION.test(row.creator_session_ref) || !SESSION.test(row.target_session_ref)
     || (row.intent !== "analysis" && row.intent !== "existing_post_promotion")
-    || !Number.isSafeInteger(row.context_version)) fail("corrupt_store");
+    || !publicRef(row.entity_ref) || !publicRef(row.timeframe_ref) || !publicRef(row.context_ref)
+    || (row.template_ref !== null && !publicRef(row.template_ref)) || !CORRELATION.test(row.correlation_ref)
+    || !Number.isSafeInteger(row.context_version) || row.context_version < 1 || row.context_version > 1_000_000
+    || row.intent === "analysis" && row.template_ref !== null
+    || row.intent === "existing_post_promotion" && row.template_ref === null) fail("corrupt_store");
+  const createdAt = epoch(row.created_at); const expiresAt = epoch(row.expires_at);
+  const consumedAt = row.consumed_at === null ? null : epoch(row.consumed_at);
+  if (expiresAt < createdAt + 15 || expiresAt > createdAt + 120
+    || consumedAt !== null && (consumedAt < createdAt || consumedAt >= expiresAt)) fail("corrupt_store");
   return Object.freeze({
     handoffRef: row.handoff_ref, workspaceId: row.workspace_id.toLowerCase(), workspaceRef: row.workspace_ref,
     creatorSessionRef: row.creator_session_ref, targetSessionRef: row.target_session_ref,
     context: Object.freeze({ intent: row.intent, entityRef: row.entity_ref, timeframeRef: row.timeframe_ref,
       contextRef: row.context_ref, contextVersion: row.context_version, templateRef: row.template_ref,
       correlationRef: row.correlation_ref }),
-    createdAt: epoch(row.created_at), expiresAt: epoch(row.expires_at),
-    consumedAt: row.consumed_at === null ? null : epoch(row.consumed_at),
+    createdAt, expiresAt, consumedAt,
   });
 }
 
 function sameSession(left: LocalAgentSessionRecord, right: LocalAgentSessionRecord): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return left.sessionRef === right.sessionRef && left.workspaceId === right.workspaceId
+    && left.workspaceRef === right.workspaceRef && left.userId === right.userId
+    && left.clientRef === right.clientRef && left.transport === right.transport
+    && left.toolCatalogVersion === right.toolCatalogVersion
+    && JSON.stringify(left.allowedTools) === JSON.stringify(right.allowedTools)
+    && left.startedAt === right.startedAt && left.lastSeenAt === right.lastSeenAt
+    && left.expiresAt === right.expiresAt;
 }
 
 function sameHandoff(left: LocalAgentHandoffRecord, right: LocalAgentHandoffRecord): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return left.handoffRef === right.handoffRef && left.workspaceId === right.workspaceId
+    && left.workspaceRef === right.workspaceRef && left.creatorSessionRef === right.creatorSessionRef
+    && left.targetSessionRef === right.targetSessionRef && left.context.intent === right.context.intent
+    && left.context.entityRef === right.context.entityRef && left.context.timeframeRef === right.context.timeframeRef
+    && left.context.contextRef === right.context.contextRef && left.context.contextVersion === right.context.contextVersion
+    && left.context.templateRef === right.context.templateRef && left.context.correlationRef === right.context.correlationRef
+    && left.createdAt === right.createdAt && left.expiresAt === right.expiresAt && left.consumedAt === right.consumedAt;
 }
 
 const SESSION_COLUMNS = sql`workspace_id, session_ref, workspace_ref, user_id, client_ref, transport,
@@ -127,6 +155,11 @@ export class DrizzleLocalAgentSessionRepository implements LocalAgentSessionRepo
   async register(record: LocalAgentSessionRecord): Promise<"inserted" | "unchanged" | "conflict"> {
     if (!UUID.test(record.workspaceId) || !SESSION.test(record.sessionRef)) fail("invalid_input");
     return this.database.transaction(async (transaction) => {
+      const active = rows<{ id: string }>(await transaction.execute(sql`
+        select id from workspaces where id = ${record.workspaceId}::uuid and lifecycle_state = 'active'
+        limit 2 for update
+      `));
+      if (active.length !== 1 || !UUID.test(active[0]!.id)) return "conflict" as const;
       const inserted = rows<SessionRow>(await transaction.execute(sql`
         insert into local_agent_sessions (
           workspace_id, session_ref, workspace_ref, user_id, client_ref, transport,

@@ -1,5 +1,5 @@
 {
-  "id": "0275d0b4-00fb-412b-8750-8d2cf65efcf8",
+  "id": "a48d9c36-239b-4cb3-b3c0-b3bd781c771e",
   "prevId": "78f552e0-2b70-4817-b797-fe03cf895976",
   "version": "7",
   "dialect": "postgresql",
@@ -11780,11 +11780,11 @@
         },
         "local_agent_sessions_tools": {
           "name": "local_agent_sessions_tools",
-          "value": "\n    jsonb_typeof(\"local_agent_sessions\".\"allowed_tools\") = 'array'\n    and jsonb_array_length(\"local_agent_sessions\".\"allowed_tools\") between 1 and 10\n    and \"local_agent_sessions\".\"allowed_tools\" <@ '[\n      \"decision_room_list\", \"decision_room_mark_inbox_read\", \"policy_bundle_read\",\n      \"budget_lab_list\", \"budget_lab_get\", \"budget_lab_dry_run\", \"budget_lab_save_draft\",\n      \"practice_lab_list\", \"practice_lab_get\", \"practice_lab_prepare_draft\"\n    ]'::jsonb\n  "
+          "value": "\n    jsonb_typeof(\"local_agent_sessions\".\"allowed_tools\") = 'array'\n    and jsonb_array_length(\"local_agent_sessions\".\"allowed_tools\") between 1 and 13\n    and \"local_agent_sessions\".\"allowed_tools\" <@ '[\n      \"decision_room_list\", \"decision_room_mark_inbox_read\", \"approval_queue_list\", \"approval_queue_get\",\n      \"policy_bundle_read\",\n      \"budget_lab_list\", \"budget_lab_get\", \"budget_lab_dry_run\", \"budget_lab_save_draft\",\n      \"practice_lab_list\", \"practice_lab_get\", \"practice_lab_prepare_draft\",\n      \"existing_post_promotion_preflight\"\n    ]'::jsonb\n  "
         },
         "local_agent_sessions_time": {
           "name": "local_agent_sessions_time",
-          "value": "\n    \"local_agent_sessions\".\"last_seen_at\" >= \"local_agent_sessions\".\"started_at\"\n    and \"local_agent_sessions\".\"expires_at\" > \"local_agent_sessions\".\"started_at\"\n    and \"local_agent_sessions\".\"expires_at\" <= \"local_agent_sessions\".\"started_at\" + interval '8 hours'\n  "
+          "value": "\n    \"local_agent_sessions\".\"last_seen_at\" >= \"local_agent_sessions\".\"started_at\"\n    and \"local_agent_sessions\".\"last_seen_at\" < \"local_agent_sessions\".\"expires_at\"\n    and \"local_agent_sessions\".\"expires_at\" > \"local_agent_sessions\".\"started_at\"\n    and \"local_agent_sessions\".\"expires_at\" <= \"local_agent_sessions\".\"started_at\" + interval '8 hours'\n  "
         }
       },
       "isRLSEnabled": false

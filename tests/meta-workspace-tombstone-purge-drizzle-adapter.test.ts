@@ -34,7 +34,7 @@ describe("explicit workspace tombstone purge adapter", () => {
 
     expect(evidence.candidateCount).toBe(1);
     expect(evidence.revision).toMatch(/^[a-f0-9]{64}$/);
-    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(71);
+    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(73);
     const allSchemaTables = Object.values(schema)
       .flatMap((value) => isTable(value) ? [getTableName(value)] : [])
       .sort();
@@ -80,7 +80,11 @@ describe("explicit workspace tombstone purge adapter", () => {
     expect(result).toEqual({ purgedRowCount: 0, membershipCount: 0 });
     expect(inspectCalls).toBe(3);
     const deletes = statements.filter((statement) => statement.includes("delete from"));
-    expect(deletes).toHaveLength(71);
+    expect(deletes).toHaveLength(73);
+    expect(deletes.findIndex((statement) => statement.includes("delete from local_agent_handoffs")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from local_agent_sessions")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from local_agent_sessions")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from memberships")));
     expect(deletes.findIndex((statement) => statement.includes("delete from action_proposal_dependencies")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from action_proposal_units")));
     expect(deletes.findIndex((statement) => statement.includes("delete from action_proposal_units")))

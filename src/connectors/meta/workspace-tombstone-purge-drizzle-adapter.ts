@@ -24,6 +24,8 @@ type DeleteCountRow = Readonly<{ count: number | string }>;
  * It intentionally excludes workspaces, audit_events, users and meta_connections.
  */
 export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
+  "local_agent_handoffs",
+  "local_agent_sessions",
   "memberships",
   "data_sources",
   "ad_accounts",
@@ -344,6 +346,12 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'report_shares', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from report_shares where workspace_id = ${workspaceId}::uuid
+      union all select 'local_agent_handoffs', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from local_agent_handoffs where workspace_id = ${workspaceId}::uuid
+      union all select 'local_agent_sessions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from local_agent_sessions where workspace_id = ${workspaceId}::uuid
       union all select 'operational_events', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from operational_events where workspace_id = ${workspaceId}::uuid
@@ -457,6 +465,8 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from insights where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from report_shares where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from operational_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from local_agent_handoffs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from local_agent_sessions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     const membershipCount = await remove(sql`with removed as (delete from memberships where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
 
     if (purgedRowCount !== before.candidateCount) {
