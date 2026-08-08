@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: a4874e554b3f -->
+<!-- durum-damga: 58d7f3b1fcce -->
 
 ## Künye
 
@@ -14,13 +14,14 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 112 |
+| iş commit'i (tüm geçmiş) | 113 |
 | ilk / son iş | 2026-08-06 / 2026-08-08 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-08 | `feat` | add secure project MCP bridge | `8023e340e` |
 | 2026-08-08 | `docs` | refresh deterministic project state | `d0468245c` |
 | 2026-08-08 | `docs` | record authenticated handoff slice | `be4484bb6` |
 | 2026-08-08 | `feat` | add live agent session hub | `981e744d6` |
@@ -35,7 +36,6 @@
 | 2026-08-08 | `docs` | record local agent client gate | `bbbf3adb1` |
 | 2026-08-08 | `feat` | add vendor-neutral fixture client | `8f33dbc22` |
 | 2026-08-08 | `docs` | refresh deterministic project state | `9b317f2d8` |
-| 2026-08-08 | `docs` | record no-model API gate | `23025196d` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
@@ -48,7 +48,7 @@
 
 | plan | v | durum | aşama | sıradaki |
 |---|---|---|---|---|
-| `proje` | 2 | SÜRÜYOR | 6/14 | 08-Meta dijital ikizi |
+| `proje` | 2 | SÜRÜYOR | 6/14 | 09-kategori ve talimat |
 
 ---
 

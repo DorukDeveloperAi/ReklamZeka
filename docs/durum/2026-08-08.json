@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "8023e340e",
+      "tarih": "2026-08-08",
+      "konu": "feat(agent): add secure project MCP bridge",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "d0468245c",
       "tarih": "2026-08-08",
       "konu": "docs(status): refresh deterministic project state",
@@ -128,15 +137,6 @@
       "kapsam": [
         "docs"
       ]
-    },
-    {
-      "hash": "23025196d",
-      "tarih": "2026-08-08",
-      "konu": "docs(roadmap): record no-model API gate",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -157,7 +157,7 @@
       "adet": 2
     }
   ],
-  "isSayisi": 112,
+  "isSayisi": 113,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -167,8 +167,8 @@
       "durum": "SÜRÜYOR",
       "asamaKapali": 6,
       "asamaToplam": 14,
-      "siradaki": "08-Meta dijital ikizi"
+      "siradaki": "09-kategori ve talimat"
     }
   ],
-  "damga": "a4874e554b3f"
+  "damga": "58d7f3b1fcce"
 }
