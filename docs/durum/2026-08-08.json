@@ -1,0 +1,174 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "456bd5842",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record durable agent sessions",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "bbcea6595",
+      "tarih": "2026-08-08",
+      "konu": "feat(agent): persist local session handoffs",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "2ce337256",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "5b3930eb3",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record session handoff core",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "fad7505fa",
+      "tarih": "2026-08-08",
+      "konu": "feat(agent): add session handoff lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "3090e2920",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "bbbf3adb1",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record local agent client gate",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "8f33dbc22",
+      "tarih": "2026-08-08",
+      "konu": "feat(agent): add vendor-neutral fixture client",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "9b317f2d8",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "23025196d",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record no-model API gate",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "ba4347d8d",
+      "tarih": "2026-08-08",
+      "konu": "test(agent): enforce no-model API boundary",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "7d1efb006",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "0dea31c39",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record K4 and insight gates",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "fd392bc5d",
+      "tarih": "2026-08-08",
+      "konu": "feat(meta): add v23 insight capability catalog",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e8dc56aac",
+      "tarih": "2026-08-08",
+      "konu": "feat(actions): complete K4 publication gate",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "feat",
+      "adet": 33
+    },
+    {
+      "kapsam": "docs",
+      "adet": 21
+    },
+    {
+      "kapsam": "test",
+      "adet": 4
+    },
+    {
+      "kapsam": "fix",
+      "adet": 2
+    }
+  ],
+  "isSayisi": 107,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-08",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": "08-Meta dijital ikizi"
+    }
+  ],
+  "damga": "031d116e2ef9"
+}

@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 89d4d202ab20 -->
+<!-- durum-damga: 031d116e2ef9 -->
 
 ## Künye
 
@@ -14,13 +14,15 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 105 |
+| iş commit'i (tüm geçmiş) | 107 |
 | ilk / son iş | 2026-08-06 / 2026-08-08 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-08 | `docs` | record durable agent sessions | `456bd5842` |
+| 2026-08-08 | `feat` | persist local session handoffs | `bbcea6595` |
 | 2026-08-08 | `docs` | refresh deterministic project state | `2ce337256` |
 | 2026-08-08 | `docs` | record session handoff core | `5b3930eb3` |
 | 2026-08-08 | `feat` | add session handoff lifecycle | `fad7505fa` |
@@ -34,13 +36,11 @@
 | 2026-08-08 | `docs` | record K4 and insight gates | `0dea31c39` |
 | 2026-08-08 | `feat` | add v23 insight capability catalog | `fd392bc5d` |
 | 2026-08-08 | `feat` | complete K4 publication gate | `e8dc56aac` |
-| 2026-08-08 | `docs` | refresh deterministic project state | `04be8a651` |
-| 2026-08-08 | `docs` | record K4 policy studio gate | `8c9e8295b` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 34
-- `docs        ` ██████████████ 20
+- `feat        ` ████████████████████████ 33
+- `docs        ` ███████████████ 21
 - `test        ` ███ 4
 - `fix         ` █ 2
 
