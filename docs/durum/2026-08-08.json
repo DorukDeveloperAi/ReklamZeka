@@ -4,6 +4,60 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "c90883c4c",
+      "tarih": "2026-08-08",
+      "konu": "feat(categories): scan effective portfolio health",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "86284c17a",
+      "tarih": "2026-08-08",
+      "konu": "feat(categories): preview archive impact safely",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e65579e21",
+      "tarih": "2026-08-08",
+      "konu": "feat(categories): surface evidence confidence health",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c0c3f2f70",
+      "tarih": "2026-08-08",
+      "konu": "feat(categories): add read-only inventory dashboard",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "49d98f771",
+      "tarih": "2026-08-08",
+      "konu": "fix(dashboard): guide local session recovery",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "19eac50de",
+      "tarih": "2026-08-08",
+      "konu": "feat(guidance): add multi-scope authoring",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "ee0e41193",
       "tarih": "2026-08-08",
       "konu": "feat(guidance): invalidate stale campaign contexts",
@@ -83,70 +137,16 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "6cfbe4585",
-      "tarih": "2026-08-08",
-      "konu": "docs(status): refresh deterministic project state",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "456bd5842",
-      "tarih": "2026-08-08",
-      "konu": "docs(roadmap): record durable agent sessions",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "bbcea6595",
-      "tarih": "2026-08-08",
-      "konu": "feat(agent): persist local session handoffs",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "2ce337256",
-      "tarih": "2026-08-08",
-      "konu": "docs(status): refresh deterministic project state",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "5b3930eb3",
-      "tarih": "2026-08-08",
-      "konu": "docs(roadmap): record session handoff core",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "fad7505fa",
-      "tarih": "2026-08-08",
-      "konu": "feat(agent): add session handoff lifecycle",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 31
+      "adet": 32
     },
     {
       "kapsam": "docs",
-      "adet": 24
+      "adet": 22
     },
     {
       "kapsam": "test",
@@ -154,10 +154,10 @@
     },
     {
       "kapsam": "fix",
-      "adet": 1
+      "adet": 2
     }
   ],
-  "isSayisi": 117,
+  "isSayisi": 123,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -170,5 +170,5 @@
       "siradaki": "11-bütçe planlama"
     }
   ],
-  "damga": "044956b2bf5a"
+  "damga": "04553dc0acbc"
 }
