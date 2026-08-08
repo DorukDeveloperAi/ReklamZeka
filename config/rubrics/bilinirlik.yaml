@@ -1,0 +1,25 @@
+# Rubrik varsayılanı — amaç kapsamı: bilinirlik (MASTER §5)
+# Sheets RUBRIK_OVERRIDE sekmesi bu varsayılanın üstüne biner.
+goal_scope: bilinirlik
+metrics:
+  - metric_key: reach
+    source: ads_insights
+    direction: maximize
+    weight: 0.35
+    benchmark: null           # boşsa ilk 4 haftada kendi tarihinden önerilir
+  - metric_key: cpm
+    source: ads_insights
+    direction: minimize
+    weight: 0.25
+    benchmark: null
+  - metric_key: frequency
+    source: ads_insights
+    direction: band            # üst eşik aşımı creative yorgunluğu sinyali
+    weight: 0.20
+    benchmark: {warn_above: 3.5}
+  - metric_key: thruplay
+    source: ads_insights
+    direction: maximize
+    weight: 0.20
+    benchmark: null
+    notes: "Alan adı v26'da teyitsiz (docs/api-gercekleri.md #3) — Faz 0'da doğrula"

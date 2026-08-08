@@ -1,0 +1,315 @@
+{
+ "sessionId": "35fbdca7-b993-4abb-a8d2-ae41d850f9de",
+ "cwd": "/Users/ybg/dev/ReklamZeka",
+ "dirName": "ReklamZeka",
+ "title": "devam",
+ "agent": null,
+ "transcriptPath": "/Users/ybg/.claude/projects/-Users-ybg-dev-ReklamZeka/35fbdca7-b993-4abb-a8d2-ae41d850f9de.jsonl",
+ "startedAt": "2026-08-06T08:27:53.752Z",
+ "endedAt": "2026-08-07T07:33:11.659Z",
+ "todos": [
+  {
+   "content": "Kaynağı claim'le + oturum defterini tohumla",
+   "status": "completed",
+   "firstSeen": "2026-08-06T08:27:53.752Z",
+   "lastChange": "2026-08-06T12:39:31.121Z",
+   "removed": true
+  },
+  {
+   "content": "Planı plans/ ağacına yerleştir (MASTER.md künye + agac.mjs)",
+   "status": "completed",
+   "firstSeen": "2026-08-06T08:27:53.752Z",
+   "lastChange": "2026-08-06T12:39:31.121Z",
+   "removed": true
+  },
+  {
+   "content": "Repo iskeleti: pyproject, src paketi, config, docs",
+   "status": "completed",
+   "firstSeen": "2026-08-06T08:27:53.752Z",
+   "lastChange": "2026-08-06T12:39:31.121Z",
+   "removed": true
+  },
+  {
+   "content": "Terminoloji lint scripti (çıplak 'campaign' yasağı)",
+   "status": "completed",
+   "firstSeen": "2026-08-06T08:27:53.752Z",
+   "lastChange": "2026-08-06T08:36:38.299Z",
+   "removed": true
+  },
+  {
+   "content": "SQLite şeması + Sheets şema tanımı (kod + doc)",
+   "status": "completed",
+   "firstSeen": "2026-08-06T08:27:53.752Z",
+   "lastChange": "2026-08-06T12:39:31.121Z",
+   "removed": true
+  },
+  {
+   "content": "Taksonomi miras çözücü (resolve_effective_config) + testler",
+   "status": "pending",
+   "firstSeen": "2026-08-06T08:27:53.752Z",
+   "lastChange": "2026-08-06T08:32:50.970Z",
+   "removed": true
+  },
+  {
+   "content": "Rubrik varsayılan YAML'ları (5 amaç kapsamı)",
+   "status": "completed",
+   "firstSeen": "2026-08-06T08:27:53.752Z",
+   "lastChange": "2026-08-06T12:39:31.121Z",
+   "removed": true
+  },
+  {
+   "content": "meta_gateway iskeleti + MCP sözleşme testi taslağı (creds yoksa skip)",
+   "status": "pending",
+   "firstSeen": "2026-08-06T08:27:53.752Z",
+   "lastChange": "2026-08-06T08:32:50.970Z",
+   "removed": true
+  },
+  {
+   "content": "docs/api-gercekleri.md + mcp-envanter.md (teyitsiz maddeler listesi)",
+   "status": "pending",
+   "firstSeen": "2026-08-06T08:27:53.752Z",
+   "lastChange": "2026-08-06T08:32:50.970Z",
+   "removed": true
+  },
+  {
+   "content": "Doğrulama: pytest + lint koşusu yeşil",
+   "status": "pending",
+   "firstSeen": "2026-08-06T08:27:53.752Z",
+   "lastChange": "2026-08-06T08:32:50.970Z",
+   "removed": true
+  },
+  {
+   "content": "Taksonomi miras çözücü (resolve_effective_config)",
+   "status": "completed",
+   "firstSeen": "2026-08-06T08:32:50.970Z",
+   "lastChange": "2026-08-06T12:39:31.121Z",
+   "removed": true
+  },
+  {
+   "content": "meta_gateway iskeleti + guardrails (ACTIVE engeli)",
+   "status": "completed",
+   "firstSeen": "2026-08-06T08:32:50.970Z",
+   "lastChange": "2026-08-06T12:39:31.121Z",
+   "removed": true
+  },
+  {
+   "content": "docs: terminoloji.md + api-gercekleri.md + mcp-envanter.md + README",
+   "status": "in_progress",
+   "firstSeen": "2026-08-06T08:32:50.970Z",
+   "lastChange": "2026-08-06T08:36:38.299Z",
+   "removed": true
+  },
+  {
+   "content": "Testler: taxonomy + guardrails + lint + MCP sözleşme (skip'li)",
+   "status": "completed",
+   "firstSeen": "2026-08-06T08:32:50.970Z",
+   "lastChange": "2026-08-06T12:39:31.121Z",
+   "removed": true
+  },
+  {
+   "content": "Doğrulama: pytest + lint koşusu yeşil; claim bırak",
+   "status": "pending",
+   "firstSeen": "2026-08-06T08:32:50.970Z",
+   "lastChange": "2026-08-06T08:36:38.299Z",
+   "removed": true
+  },
+  {
+   "content": "Terminoloji lint scripti (çıplak terim yasağı)",
+   "status": "completed",
+   "firstSeen": "2026-08-06T08:36:38.299Z",
+   "lastChange": "2026-08-06T12:39:31.121Z",
+   "removed": true
+  },
+  {
+   "content": "docs: terminoloji + api-gercekleri + mcp-envanter + README",
+   "status": "completed",
+   "firstSeen": "2026-08-06T08:36:38.299Z",
+   "lastChange": "2026-08-06T12:39:31.121Z",
+   "removed": true
+  },
+  {
+   "content": "Doğrulama: pytest + lint yeşil; STATE güncel; claim bırakıldı",
+   "status": "completed",
+   "firstSeen": "2026-08-06T08:36:38.299Z",
+   "lastChange": "2026-08-06T12:39:31.121Z",
+   "removed": true
+  },
+  {
+   "content": "Claim'ler + eski oturumu kapat + yeni oturum tohumla",
+   "status": "in_progress",
+   "firstSeen": "2026-08-06T12:39:31.121Z",
+   "lastChange": "2026-08-06T12:44:35.339Z",
+   "removed": true
+  },
+  {
+   "content": "plan-kur şablonlarını oku (birebir format)",
+   "status": "pending",
+   "firstSeen": "2026-08-06T12:39:31.121Z",
+   "lastChange": "2026-08-06T12:44:35.339Z",
+   "removed": true
+  },
+  {
+   "content": "utopya/: KUZEY + 5 vizyon bölümü + istek envanteri",
+   "status": "completed",
+   "firstSeen": "2026-08-06T12:39:31.121Z",
+   "lastChange": "2026-08-06T12:50:09.857Z",
+   "removed": true
+  },
+  {
+   "content": "utopya doğrulama: analiz.mjs --yapi + --json",
+   "status": "pending",
+   "firstSeen": "2026-08-06T12:39:31.121Z",
+   "lastChange": "2026-08-06T12:44:35.339Z",
+   "removed": true
+  },
+  {
+   "content": "TODO-ELLE maddeleri (5 çıpalı)",
+   "status": "pending",
+   "firstSeen": "2026-08-06T12:39:31.121Z",
+   "lastChange": "2026-08-06T12:44:35.339Z",
+   "removed": true
+  },
+  {
+   "content": "Çerçeve planlayıcı ajanı (aşama listesi + global req + riskler)",
+   "status": "in_progress",
+   "firstSeen": "2026-08-06T12:39:31.121Z",
+   "lastChange": "2026-08-06T12:50:09.857Z",
+   "removed": true
+  },
+  {
+   "content": "Aşama başına paralel planlayıcı fan-out (~10 ajan)",
+   "status": "pending",
+   "firstSeen": "2026-08-06T12:39:31.121Z",
+   "lastChange": "2026-08-06T12:50:09.857Z",
+   "removed": true
+  },
+  {
+   "content": "v2 dosyalarını yaz: MASTER/STATE/CHECKLIST/REQUIREMENTS/asama-NN/REVIZYON",
+   "status": "pending",
+   "firstSeen": "2026-08-06T12:39:31.121Z",
+   "lastChange": "2026-08-06T14:02:14.176Z",
+   "removed": true
+  },
+  {
+   "content": "Türetme + gate: agac.mjs · --gate · --denetle · oturum durum · .dag-aktif",
+   "status": "in_progress",
+   "firstSeen": "2026-08-06T12:39:31.121Z",
+   "lastChange": "2026-08-06T14:04:46.224Z",
+   "removed": true
+  },
+  {
+   "content": "Doğrulama + claim bırak + rapor",
+   "status": "pending",
+   "firstSeen": "2026-08-06T12:39:31.121Z",
+   "lastChange": "2026-08-06T14:04:46.224Z",
+   "removed": true
+  },
+  {
+   "content": "Claim'ler + oturum geçişi",
+   "status": "completed",
+   "firstSeen": "2026-08-06T12:44:35.339Z",
+   "lastChange": "2026-08-06T12:44:35.339Z",
+   "removed": false
+  },
+  {
+   "content": "plan-kur şablonları okundu",
+   "status": "completed",
+   "firstSeen": "2026-08-06T12:44:35.339Z",
+   "lastChange": "2026-08-06T14:02:14.176Z",
+   "removed": true
+  },
+  {
+   "content": "utopya doğrulama: yapı temiz + çıpalar parse",
+   "status": "completed",
+   "firstSeen": "2026-08-06T12:44:35.339Z",
+   "lastChange": "2026-08-06T12:50:09.857Z",
+   "removed": true
+  },
+  {
+   "content": "TODO-ELLE maddeleri (5 çıpalı) + ref dökümü",
+   "status": "completed",
+   "firstSeen": "2026-08-06T12:44:35.339Z",
+   "lastChange": "2026-08-06T12:50:09.857Z",
+   "removed": true
+  },
+  {
+   "content": "utopya/ tamam + doğrulandı (yapı temiz)",
+   "status": "completed",
+   "firstSeen": "2026-08-06T12:50:09.857Z",
+   "lastChange": "2026-08-06T14:04:46.224Z",
+   "removed": true
+  },
+  {
+   "content": "TODO-ELLE maddeleri + ref dökümü",
+   "status": "completed",
+   "firstSeen": "2026-08-06T12:50:09.857Z",
+   "lastChange": "2026-08-06T12:50:09.857Z",
+   "removed": false
+  },
+  {
+   "content": "Çerçeve planlayıcı ajanı (10 aşama + GR + riskler)",
+   "status": "completed",
+   "firstSeen": "2026-08-06T12:50:09.857Z",
+   "lastChange": "2026-08-06T14:02:14.176Z",
+   "removed": true
+  },
+  {
+   "content": "Aşama başına paralel planlayıcı fan-out (10 ajan)",
+   "status": "in_progress",
+   "firstSeen": "2026-08-06T12:50:09.857Z",
+   "lastChange": "2026-08-06T14:02:14.176Z",
+   "removed": true
+  },
+  {
+   "content": "Çerçeve + 10 aşama ajanı fan-out",
+   "status": "completed",
+   "firstSeen": "2026-08-06T14:02:14.176Z",
+   "lastChange": "2026-08-06T14:02:14.176Z",
+   "removed": false
+  },
+  {
+   "content": "v2 dosyaları yazıldı: MASTER/STATE/CHECKLIST/REQUIREMENTS/10 aşama/REVIZYON",
+   "status": "completed",
+   "firstSeen": "2026-08-06T14:02:14.176Z",
+   "lastChange": "2026-08-06T14:04:46.224Z",
+   "removed": true
+  },
+  {
+   "content": "utopya/ tamam + doğrulandı (yapı temiz, 32 çıpa)",
+   "status": "completed",
+   "firstSeen": "2026-08-06T14:04:46.224Z",
+   "lastChange": "2026-08-06T14:04:46.224Z",
+   "removed": false
+  },
+  {
+   "content": "v2 dosyaları: MASTER/STATE/CHECKLIST/REQUIREMENTS/10 aşama/REVIZYON",
+   "status": "completed",
+   "firstSeen": "2026-08-06T14:04:46.224Z",
+   "lastChange": "2026-08-06T14:04:46.224Z",
+   "removed": false
+  },
+  {
+   "content": "Türetme + gate PASS (DAG aktif) + getirir blokları",
+   "status": "completed",
+   "firstSeen": "2026-08-06T14:04:46.224Z",
+   "lastChange": "2026-08-06T14:04:46.224Z",
+   "removed": false
+  },
+  {
+   "content": "Doğrulama + oturum defteri + claim bırakıldı + rapor",
+   "status": "completed",
+   "firstSeen": "2026-08-06T14:04:46.224Z",
+   "lastChange": "2026-08-06T14:04:46.224Z",
+   "removed": false
+  }
+ ],
+ "updatedAt": "2026-08-06T14:04:46.224Z",
+ "counts": {
+  "total": 7,
+  "completed": 7,
+  "in_progress": 0,
+  "pending": 0
+ },
+ "lastPromptAt": "2026-08-06T13:48:55.607Z",
+ "lastPromptId": "65ecbb71-ae38-4fd6-bfe3-3390a5572769"
+}

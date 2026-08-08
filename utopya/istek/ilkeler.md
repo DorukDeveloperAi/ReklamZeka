@@ -10,6 +10,27 @@
 > İlkenin kendisi + niçin var olduğu — tek paragraf, kesin dille.
 > ```
 
+<!-- uy:ilke/otonom-yayin-yok -->
+## Otonom yayın yoktur
+Sağlık sektörü + Kasım 2025 mevzuatı + KVKK gerçeğinde otomatik yayınlanan reklam
+metni/nesnesi hukuki risktir; sistemin hiçbir bileşeni kullanıcı onayı olmadan Meta'da
+yazma yapamaz, metin yayınlayamaz, nesne aktive edemez — bu pazarlık dışıdır.
+
+<!-- uy:ilke/terminoloji-disiplini -->
+## Terminoloji disiplini kod seviyesine iner
+"Kampanya" kelimesi tek başına kullanılmaz: İç Kampanya Ailesi/Kategorisi/İç Kampanya
+ile Meta Campaign/Ad Set/Ad her zaman tam nitelenir; bu ayrım değişken adlarından
+Sheets sekmelerine ve LLM prompt'larına kadar korunur (lint zorunlu).
+
+<!-- uy:ilke/olculemeyen-tahmin-edilmez -->
+## Ölçülemeyen tahmin edilmez
+Verisi olmayan metrik raporda uydurulmaz; "ölçülemedi" + nedeni yazılır. Düşük güvenli
+türev metrik güven etiketi taşır. Dürüst boşluk, yanlış sayıdan iyidir.
+
+<!-- uy:ilke/onay-islem-bazli -->
+## Onay işlem-bazlıdır, toplu onay yoktur
+Her yazma önerisi tek tek görülür ve tek tek onaylanır; "hepsini onayla" düğmesi
+tasarım gereği yoktur, süresi geçen öneri kendiliğinden düşer ve yeniden değerlendirilir.
 <!-- uy:ilke/insan-onayi -->
 ## Reklam hesabı değişikliklerinde insan onayı
 Ürün ilk sürümde reklam platformlarında bütçe, teklif, durum veya kreatif değişikliği yapmaz; ileride eklenecek her yazma yeteneği açık yetki, değişiklik önizlemesi, insan onayı, idempotency anahtarı ve geri alma planı taşır. İlk production profili approval-only'dır; schedule, agent, expiry veya alt scope bu kilidi kendiliğinden genişletemez.

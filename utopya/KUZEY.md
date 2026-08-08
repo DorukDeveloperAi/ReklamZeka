@@ -19,6 +19,17 @@
 
 ## Amaç ve kapsam
 
+ReklamZeka, Doruk Sağlık Grubu'nun Meta reklam operasyonu için **brief-temelli,
+kontrol-öncelikli, sürekli çalışan bir reklam yardımcı ajanıdır**. Nihai durumda
+kullanıcıya sunulan: Meta reklam verisi kayıpsız kendi ambarında durur; her İç Kampanya
+kullanıcının brief'ine ve amaç kapsamından türeyen rubriğe göre iki düzeyde (birim +
+portföy) değerlendirilir; bütçe/portföy önerileri gerekçeli diff'ler olarak onay
+kuyruğuna düşer; Meta'ya dokunan her yazma insan onayından geçer ve append-only karar
+günlüğüyle izlenir; digest bir ürün olarak üretilip kanallara (Telegram, panel, …)
+dağıtılır; metin yazarlığı kısıtlarını kullanıcı koyar, sistem mekanik uygular. AI
+vardır ama otonom değildir; brief'e bağlanamayan öneri üretilmez. Bu şartname beş
+davranış alanını tanımlar: veri edinimi, brief yargısı, insan hakimiyeti, uyum güveni,
+açık uçlu büyüme.
 Bu şartnamenin bütün görüşmelerden damıtılmış çalışma özeti
 [kanonik ürün distilasyonu](../docs/product/reklamzeka-product-distillation.md)dır. KUZEY
 nihai isteği, distilasyon sistem davranışını, v2 MASTER ise teslim sırasını tanımlar.
@@ -88,6 +99,11 @@ approval-only operations→existing-post promotion→selective standardization d
 
 | # | bölüm | kapsadığı davranış alanı | durum |
 |---|---|---|---|
+| 1 | [veri-gercegi](vizyon/1-veri-gercegi.md) | Meta verisinin kayıpsız, dayanıklı, eşleme-bütün edinimi | taslak (2026-08-06) |
+| 2 | [brief-yargisi](vizyon/2-brief-yargisi.md) | brief'e/rubriğe bağlı iki-düzey değerlendirme; ölçülemeyen dürüstlüğü | taslak (2026-08-06) |
+| 3 | [insan-hakimiyeti](vizyon/3-insan-hakimiyeti.md) | diff→onay hattı, PAUSED garantisi, karar günlüğü, digest=ürün | taslak (2026-08-06) |
+| 4 | [uyum-guveni](vizyon/4-uyum-guveni.md) | kullanıcı-tanımlı metin kural motoru, pasif başlangıç paketi, KVKK sınırı | taslak (2026-08-06) |
+| 5 | [acik-uclu-buyume](vizyon/5-acik-uclu-buyume.md) | dikey-agnostik motor, konfigle genişleme, CRM v2 kapısı | taslak (2026-08-06) |
 | 1 | [ürün ve MVP kapsamı](vizyon/1-urun-ve-mvp.md) | kullanıcı, değer, veri, içgörü, güvenlik ve başarı | başlangıç şartnamesi |
 | 2 | [Meta reklam işletim sistemi](vizyon/2-analiz-platformu.md) | dijital ikiz, kategori/talimat, analiz, bütçe, şablonlu post promotion, yerel AI CLI/MCP, atomik approval-only eylem ve kontrol merkezi | genişletilmiş şartname |
 

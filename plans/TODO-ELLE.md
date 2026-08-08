@@ -15,3 +15,8 @@
 
 ## Maddeler
 
+- [ ] Meta Ads MCP OAuth'unu tamamla ve canlı sözleşme testini koştur (envanter + 8 teyitsiz API maddesi) <!-- td:elle/meta-mcp-oauth -->
+- [ ] Google Sheets service-account kimliği kur ve kanon Sheet'i sıfırdan oluştur <!-- td:elle/sheets-kimlik -->
+- [ ] uv + Python 3.12 kurulumu ve projenin 3.12'ye geçişi (kullanıcı onayı verildi 2026-08-06) <!-- td:elle/python-uv -->
+- [ ] `.claude/kanit.json` doğrulama sınıflarını kur (hizli/tam/surus) — REQUIREMENTS `kanit:` girişlerinin önkoşulu <!-- td:elle/kanit-json -->
+- [ ] v1 MASTER §10'un kalan açık sorularını yanıtla (isimlendirme düzeni · İKK envanteri · harcama tavanları · CRM arayüzü) <!-- td:elle/master-acik-sorular -->

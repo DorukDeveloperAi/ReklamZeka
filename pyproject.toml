@@ -1,0 +1,24 @@
+[project]
+name = "reklamzeka"
+version = "0.1.0"
+description = "Brief-temelli, kontrol-öncelikli Meta reklam yardımcı ajanı (Doruk Sağlık Grubu)"
+requires-python = ">=3.12"
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.0"]
+sheets = ["gspread>=6.0", "google-auth>=2.0"]
+panel = ["fastapi>=0.115", "uvicorn>=0.30"]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

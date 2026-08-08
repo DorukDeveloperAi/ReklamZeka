@@ -1,0 +1,138 @@
+{
+ "surum": 1,
+ "ref": "ot:2026-08-06/reklamzeka-faz-0-kurulum",
+ "session": {
+  "id": "35fbdca7-b993-4abb-a8d2-ae41d850f9de",
+  "kisa": "35fbdca7"
+ },
+ "proje": "ReklamZeka",
+ "kok": "/Users/ybg/dev/ReklamZeka",
+ "baslangic": "2026-08-06T08:27:53.752Z",
+ "kapanis": "2026-08-06T12:39:41Z",
+ "kapanisSebebi": "other",
+ "niyet": "Onaylı planın Faz 0'ı ayakta: repo iskeleti, terminoloji lint'i, şemalar, taksonomi çözücü, rubrik varsayılanları, MCP sözleşme testi taslağı; testler yeşil",
+ "acilisIstek": "# Claude Code'a Verilecek PLANLAMA Promptu > Bu dosyanın içeriğini Claude Code'a **plan modunda** yapıştır. Amaç: sistemi kurmak değil, önce sistemin **detaylı planını** ürettirmek. Prompt, Claude Co…",
+ "sonIstek": "yani planı komple hazırla, devasa şekilde, biliyorsun aide sisteminin içerisinde belli başlı aşamalar ve görevler var, yani vizyon, kutup yıldızı, roadmap, planlar, session vegenel todolar",
+ "hedefler": [
+  {
+   "metin": "Kaynağı claim'le + oturum defterini tohumla",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "Planı plans/ ağacına yerleştir (MASTER.md künye + agac.mjs)",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "Repo iskeleti: pyproject, src paketi, config, docs",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "Terminoloji lint scripti (çıplak 'campaign' yasağı)",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "SQLite şeması + Sheets şema tanımı (kod + doc)",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "Taksonomi miras çözücü (resolve_effective_config) + testler",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "Rubrik varsayılan YAML'ları (5 amaç kapsamı)",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "meta_gateway iskeleti + MCP sözleşme testi taslağı (creds yoksa skip)",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "docs/api-gercekleri.md + mcp-envanter.md (teyitsiz maddeler listesi)",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "Doğrulama: pytest + lint koşusu yeşil",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "Claim'ler + oturum geçişi",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "TODO-ELLE maddeleri + ref dökümü",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "Çerçeve + 10 aşama ajanı fan-out",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "utopya/ tamam + doğrulandı (yapı temiz, 32 çıpa)",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "v2 dosyaları: MASTER/STATE/CHECKLIST/REQUIREMENTS/10 aşama/REVIZYON",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "Türetme + gate PASS (DAG aktif) + getirir blokları",
+   "kapali": true,
+   "terfi": []
+  },
+  {
+   "metin": "Doğrulama + oturum defteri + claim bırakıldı + rapor",
+   "kapali": true,
+   "terfi": []
+  }
+ ],
+ "todos": {
+  "acik": [],
+  "inProgress": [],
+  "toplam": 7
+ },
+ "planlar": [],
+ "oturumDefteri": {
+  "dosya": "plans/oturumlar/2026-08-06-reklamzeka-faz-0-kurulum.md",
+  "durum": "KAPALI",
+  "hukum": "TAM"
+ },
+ "kilitler": [
+  {
+   "key": "glob:plans/** utopya/**",
+   "intent": "v2 roadmap + utopya üretimi (onaylı plan)",
+   "breadth": "focused",
+   "durum": "birakildi"
+  },
+  {
+   "key": "glob:src/** config/** docs/** plans/** tests/** pyproject.toml README.md scripts/**",
+   "intent": "ReklamZeka Faz 0 iskeleti: kod+şema+plan dosyalama (planlama oturumu 35fbdca7)",
+   "breadth": "focused",
+   "durum": "birakildi"
+  },
+  {
+   "key": "utopya-itemize",
+   "intent": "kutup yıldızı taslağı (onaylı plan, session 35fbdca7)",
+   "breadth": "focused",
+   "durum": "birakildi"
+  }
+ ],
+ "siradakiAdim": null,
+ "devamModeli": null,
+ "olculemedi": [],
+ "ozet": "ReklamZeka Faz 0 kurulum · hüküm TAM · açık hedef 0/17 · açık plan 0/0 · açık todo 0/7 · kilit 3 · sıradaki adım YOK"
+}

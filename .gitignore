@@ -1,3 +1,10 @@
+__pycache__/
+*.egg-info/
+.venv/
+warehouse.db
+config/settings.yaml
+*.env
+.env*
 node_modules/
 .next/
 coverage/
