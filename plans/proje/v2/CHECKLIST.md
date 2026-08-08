@@ -183,7 +183,9 @@
 - [ ] Session register/heartbeat, dashboard context handoff ve proposal correlation.
   - [x] Verified local capability + exact descriptor bağlı application lifecycle çekirdeği; server-clock heartbeat,
     same-user/workspace + intent-tool bağlı 15–120 sn ref-only handoff ve atomik single-use consume.
-  - [ ] Durable repository, authenticated route/transport ve gerçek dashboard↔CLI handoff E2E.
+  - [x] PostgreSQL durable repository + migration; active-workspace register kilidi, restart-durable session/handoff,
+    atomik single-use consume, workspace tombstone purge ve rollback kabulü.
+  - [ ] Authenticated route/transport ve gerçek dashboard↔CLI handoff E2E.
 - [ ] Local `reklamzeka` companion ile TTY/passkey HumanPresenceGrant ve ayrı approve/execute.
 - [ ] MCP-capable CLI config ve güvenli allowlist LocalCliAdapter extension point.
 - [ ] Kritik guidance interview, owner+Meta best-practice+evidence karşılaştırması ve eval seti.

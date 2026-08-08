@@ -1064,3 +1064,20 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   grant/execution/raw/Meta authority'leri false'dur; yalnız session coordination capability'si true'dur.
 - Bu dilim in-memory test repository'siyle application contract kanıtıdır. Kalıcı repository, route, dashboard,
   MCP/STDIO transport, network, DB migration, secret veya Meta/model çağrısı eklenmedi.
+
+## 2026-08-08 — A12 durable AgentSession + DashboardHandoff repository
+
+- `local_agent_sessions` ve `local_agent_handoffs` PostgreSQL tabloları additive migration ile eklendi. Session
+  kayıtları exact workspace membership, transport, tool-catalog, süre ve 13 safe-tool allowlist constraint'lerine;
+  handoff kayıtları exact creator/target session composite FK'leri, public-ref bağlamı ve 15–120 saniye TTL'e bağlıdır.
+- Server-private Drizzle repository yeni session kaydından önce active workspace satırını kilitler. Heartbeat süreyi
+  uzatamaz; handoff consume exact workspace/target/expiry ve `consumed_at is null` koşullarıyla tek atomik UPDATE'tir.
+  Stored tool/context drift'i public projection üretmeden fail-closed reddedilir.
+- Her iki tablo `ENABLE` + `FORCE RLS` kullanır; `PUBLIC`, `anon`, `authenticated` ve `service_role` tablo grant'leri
+  kaldırılmıştır. Workspace tombstone explicit purge allowlist'i handoff → session → membership FK sırasına genişletildi.
+- Canlı Supabase kabulü iki session register, handoff create, tek kullanım, process/repository yeniden kurulumundan
+  okuma, tombstoning sırasında yeni register reddi ve tam transaction rollback temizliğini doğruladı. Son güvenlik
+  kanıtı 77/77 public tabloda RLS, API rollerinde sıfır table grant/schema-create/public-routine execute gösterdi;
+  Meta write, model ve dış network çağrısı yapılmadı.
+- Bu dilim authenticated HTTP/MCP/STDIO transport, dashboard butonu veya gerçek dashboard↔CLI E2E açmaz. Bunlar
+  ayrı kapılar olarak kapalıdır; repository hiçbir approval, execution, human-presence veya Meta-write authority üretmez.

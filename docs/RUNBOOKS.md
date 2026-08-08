@@ -39,6 +39,10 @@ log veya bildirim payload'ına eklenmez.
 - Yeni workspace-owned tablo eklendiğinde tombstone allowlist testi kasıtlı olarak kırılır.
   Tablo ancak FK-safe inspect/delete sırasına açıkça eklenip PostgreSQL rollback kabulü
   yeniden geçtikten sonra lifecycle kapsamına alınmış sayılır.
+- Local agent session/handoff migration'ından sonra `npm run verify:local-agent-session-db`,
+  `npm run verify:workspace-tombstone-db` ve `npm run verify:supabase-security` sırasıyla çalıştırılır.
+  İlk kabul iki session, tek-kullanımlık handoff, restart-durable read ve tombstoning register reddini
+  transaction rollback içinde sınar; `temporaryRowsCommitted`, model ve Meta write sayıları sıfır kalmalıdır.
 - Canlı kabulte `wrong_actor`, eksik actor alanının tahmin edilmeyeceği anlamına gelir;
   ilgili kayıt park edilir. `permission_missing/unsupported/partial` sıfıra veya başarıya
   çevrilmez ve trust/readiness raporunda sebepli eksik olarak kalır.
