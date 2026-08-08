@@ -100,8 +100,11 @@
     campaign/ad set/ad/creative doğrudan assignment coverage, unmatched, manual-lock ve
     registry-health görünümü. Sıfır payda “veri yok”, kaybolmuş Meta hedefleri kapsam dışı;
     dashboard ve canlı PostgreSQL verifier aynı read model'i kullanır.
-  - [ ] Assignment evidence/low-confidence/single-dimension conflict ve archive-impact
-    önizlemesi; rol/audit/invalidation bağlı category authoring/archive akışı.
+  - [x] Raw evidence ref göstermeyen evidence-kind/count/observed-at sağlık özeti; minimum/
+    ortalama confidence ve sürümlü `%70` `review_signal_only` düşük güven görünümü.
+  - [ ] Portföy çapında effective single-dimension conflict taraması ve dependency sınıflı
+    salt-okur archive-impact önizlemesi.
+  - [ ] Rol/audit/optimistic concurrency/context invalidation bağlı category authoring/archive akışı.
 - [ ] PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run.
 - [ ] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi.
   - [x] Guidance-only pure registry/pack; provenance ayrımı, deterministic scope/conflict,

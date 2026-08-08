@@ -1,6 +1,6 @@
 {
   "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
-  "damga": "64b920e90ac2",
+  "damga": "06d08f9fb388",
   "plans": [
     {
       "slug": "proje",
@@ -21,8 +21,8 @@
       },
       "asamaToplam": 14,
       "asamaKapali": 6,
-      "checklistAcik": 100,
-      "checklistKapali": 160,
+      "checklistAcik": 101,
+      "checklistKapali": 161,
       "sonTur": null,
       "siradaki": {
         "no": "11",
@@ -64,9 +64,9 @@
   ],
   "legacy": [],
   "todo": {
-    "acik": 100,
+    "acik": 101,
     "kaynak": {
-      "chk": 100,
+      "chk": 101,
       "elle": 0,
       "hukum": 0,
       "kunye": 0,
@@ -291,9 +291,19 @@
         "onar": null
       },
       {
-        "ref": "td:chk/proje/h104041",
+        "ref": "td:chk/proje/hdcff0e",
         "tur": "chk",
-        "metin": "Assignment evidence/low-confidence/single-dimension conflict ve archive-impact",
+        "metin": "Portföy çapında effective single-dimension conflict taraması ve dependency sınıflı",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h37aef4",
+        "tur": "chk",
+        "metin": "Rol/audit/optimistic concurrency/context invalidation bağlı category authoring/archive akışı.",
         "plan": "proje",
         "asama": "09",
         "kapatan": [],

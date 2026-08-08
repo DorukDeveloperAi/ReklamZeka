@@ -1,7 +1,9 @@
 import type { TrustedDecisionRoomPrincipal } from "@/application/decision-room-agent-contract";
 import { authorizeWorkspace, type WorkspaceMembership } from "@/security/authorization";
 
-export const CATEGORY_INVENTORY_VERSION = "category-inventory/1.0.0" as const;
+export const CATEGORY_INVENTORY_VERSION = "category-inventory/1.1.0" as const;
+export const CATEGORY_CLASSIFICATION_POLICY = Object.freeze({ version: "category-classification-review/1.0.0" as const,
+  minimumTrustedConfidenceBasisPoints: 7_000 as const, purpose: "review_signal_only" as const });
 export type CategoryCoverageLevel = "campaign" | "ad_set" | "ad" | "creative";
 
 export type CategoryInventoryDefinition = Readonly<{
@@ -12,6 +14,10 @@ export type CategoryInventoryDefinition = Readonly<{
   version: number;
   assignments: Readonly<{ total: number; manualLocked: number; manual: number; agent: number;
     deterministic: number; add: number; override: number; deny: number }>;
+  confidence: Readonly<{ minimumBasisPoints: number | null; averageBasisPoints: number | null;
+    belowReviewThreshold: number }>;
+  evidenceHealth: Readonly<{ evidenceRecords: number; assignmentsWithObservedAt: number;
+    invalidEvidenceAssignments: number; kinds: readonly Readonly<{ kind: string; count: number }>[] }>;
 }>;
 export type CategoryInventoryDimension = Readonly<{
   ref: string;
@@ -61,7 +67,12 @@ export class CategoryInventoryService {
         directlyAssignedEntities: dimensions.reduce((total, item) => total
           + item.coverage.reduce((sum, coverage) => sum + coverage.directlyAssignedEntities, 0), 0),
         manualLocks: dimensions.reduce((total, item) => total + item.definitions.reduce((sum, definition) =>
-          sum + definition.assignments.manualLocked, 0), 0) }),
-      health: snapshot.health, dimensions: Object.freeze([...dimensions]), authority: AUTHORITY });
+          sum + definition.assignments.manualLocked, 0), 0),
+        lowConfidenceAssignments: dimensions.reduce((total, item) => total + item.definitions.reduce((sum, definition) =>
+          sum + definition.confidence.belowReviewThreshold, 0), 0),
+        invalidEvidenceAssignments: dimensions.reduce((total, item) => total + item.definitions.reduce((sum, definition) =>
+          sum + definition.evidenceHealth.invalidEvidenceAssignments, 0), 0) }),
+      classificationPolicy: CATEGORY_CLASSIFICATION_POLICY, health: snapshot.health,
+      dimensions: Object.freeze([...dimensions]), authority: AUTHORITY });
   }
 }

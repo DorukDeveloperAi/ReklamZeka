@@ -10,6 +10,9 @@ const snapshot = { dimensions: [{ ref: "dimension_1234567890abcdef12345678", key
     ref: "category_1234567890abcdef12345678", key: "evergreen", label: "Evergreen",
     description: null, version: 1, assignments: { total: 2, manualLocked: 1, manual: 1,
       agent: 1, deterministic: 0, add: 2, override: 0, deny: 0 },
+    confidence: { minimumBasisPoints: 6_500, averageBasisPoints: 8_250, belowReviewThreshold: 1 },
+    evidenceHealth: { evidenceRecords: 3, assignmentsWithObservedAt: 1,
+      invalidEvidenceAssignments: 0, kinds: [{ kind: "owner_instruction", count: 2 }] },
   }], coverage: [{ level: "campaign" as const, totalEntities: 5, directlyAssignedEntities: 2,
     unmatchedEntities: 3, coverageBasisPoints: 4_000, deniedAssignments: 0 }] }],
   health: { dimensionsWithoutDefinitions: 0, definitionsWithoutDirectAssignments: 0,
@@ -20,7 +23,10 @@ describe("CategoryInventoryService", () => {
     const repository: CategoryInventoryRepository = { list: vi.fn(async () => snapshot) };
     const result = await new CategoryInventoryService(repository, [{ userId, workspaceId, role: "viewer" }]).list(principal);
     expect(result).toMatchObject({ summary: { dimensions: 1, definitions: 1,
-      directlyAssignedEntities: 2, manualLocks: 1 }, health: { staleTargetAssignments: 1 },
+      directlyAssignedEntities: 2, manualLocks: 1, lowConfidenceAssignments: 1,
+      invalidEvidenceAssignments: 0 }, classificationPolicy: {
+      minimumTrustedConfidenceBasisPoints: 7_000, purpose: "review_signal_only" },
+    health: { staleTargetAssignments: 1 },
     authority: { canAssign: false, canWriteMeta: false, canAuthorizeAction: false } });
     expect(repository.list).toHaveBeenCalledWith(workspaceId);
   });

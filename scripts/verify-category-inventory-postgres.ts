@@ -14,7 +14,12 @@ try {
   const directCoverageRows = snapshot.dimensions.reduce((total, dimension) => total + dimension.coverage.length, 0);
   const manualLocks = snapshot.dimensions.reduce((total, dimension) => total + dimension.definitions.reduce(
     (sum, definition) => sum + definition.assignments.manualLocked, 0), 0);
+  const lowConfidenceAssignments = snapshot.dimensions.reduce((total, dimension) => total + dimension.definitions.reduce(
+    (sum, definition) => sum + definition.confidence.belowReviewThreshold, 0), 0);
+  const invalidEvidenceAssignments = snapshot.dimensions.reduce((total, dimension) => total + dimension.definitions.reduce(
+    (sum, definition) => sum + definition.evidenceHealth.invalidEvidenceAssignments, 0), 0);
   process.stdout.write(`${JSON.stringify({ ok: true, access: "read_only", dimensions: snapshot.dimensions.length,
-    definitions, directCoverageRows, manualLocks, health: snapshot.health, metaNetworkCalls: 0,
+    definitions, directCoverageRows, manualLocks, lowConfidenceAssignments, invalidEvidenceAssignments,
+    health: snapshot.health, metaNetworkCalls: 0,
     databaseWrites: 0, metaWriteCalls: 0 })}\n`);
 } finally { await pool.end(); }

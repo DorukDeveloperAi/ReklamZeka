@@ -126,6 +126,25 @@
 - Açık sonraki dilim: assignment evidence/low-confidence/conflict ve archive-impact preview;
   ardından rol+audit+optimistic concurrency+context invalidation bağlı category authoring.
 
+## 2026-08-08 — A09.6a kategori kanıt ve güven sağlığı
+
+- Category Inventory sözleşmesi v1.1'e çıktı. Definition bazında ham evidence ref'lerini
+  dışarı vermeden kanıt kayıt sayısı, güvenli kind dağılımı, observed-at bulunan assignment
+  sayısı ve malformed evidence sayısı gösteriliyor.
+- Confidence, minimum ve ortalama basis-point ile deterministic toplanıyor. Sürümlü
+  `category-classification-review/1.0.0` `%70` eşiği yalnız `review_signal_only`; otomatik
+  kategori ataması, policy, action veya Meta-write kararı üretmiyor. Owner-configurable eşik
+  daha sonraki category profile/authoring diliminde gelecek.
+- SQL yalnız aktif dimension/definition/assignment ve explicit workspace predicate kullanıyor;
+  raw evidence ref, internal UUID ve external Meta ID response/DOM'a çıkmıyor. Evidence kind
+  yalnız dar semantic slug biçimindeyse projekte ediliyor; diğerleri sağlık uyarısı sayılıyor.
+- Repository projection testleri 6999/7000 eşik semantiğini, public redaction ve sıfır payda
+  `null` davranışını kapsıyor. Canlı bağlı workspace verifier 0 DB/Meta write ile geçti.
+- İki salt-okur audit sonucunda sonraki iş ikiye ayrıldı: resolver tabanlı portföy effective
+  conflict taraması ve dependency güven sınıflı archive-impact preview A09.6b; archive
+  mutation/rol/audit/invalidation ise A09.7. `archiveDimension` child kayıt varken bugün
+  güvensiz olduğundan authoring yüzeyi bu preview ve blocker guard gelmeden açılmayacak.
+
 ## 2026-08-06 — bütün görüşmelerin kanonik ürün distilasyonu
 
 - Konuşmalardaki ürün niyeti, sınırlar, iç kategori/talimat modeli, analiz ve prompt

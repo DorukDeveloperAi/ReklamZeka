@@ -289,6 +289,11 @@
 .categoryHealth strong { font-size: .61rem; }
 .categoryHealth > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .categoryHealth span { padding: 4px 7px; border: 1px solid currentColor; border-radius: 99px; color: inherit; font-size: .52rem; opacity: .78; }
+.categoryReviewSignal { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 12px 14px; border: 1px solid rgba(123,198,255,.2); border-radius: 10px; background: rgba(123,198,255,.04); }
+.categoryReviewSignal > div { margin-right: auto; }
+.categoryReviewSignal strong { font-size: .62rem; }
+.categoryReviewSignal p { margin: 4px 0 0; color: var(--rz-muted); font-size: .54rem; }
+.categoryReviewSignal > span { padding: 5px 8px; border: 1px solid rgba(123,198,255,.2); border-radius: 99px; color: #acd8f7; font-size: .53rem; }
 .categoryRegistry { overflow: hidden; }
 .categoryRegistry .panelHeader > span { color: var(--rz-dim); font: .53rem ui-monospace, monospace; }
 .categoryRegistry details { border-top: 1px solid var(--rz-line); }
@@ -310,6 +315,12 @@
 .categoryDefinitions strong { font-size: .65rem; }
 .categoryDefinitions small, .categoryDefinitions p, .categoryDefinitions footer { color: var(--rz-muted); font-size: .54rem; }
 .categoryDefinitions p { margin: 0; line-height: 1.45; }
+.categoryDefinitions dl { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; border: 1px solid var(--rz-line); border-radius: 7px; overflow: hidden; }
+.categoryDefinitions dl > div { display: grid; gap: 4px; padding: 7px; border-right: 1px solid var(--rz-line); }
+.categoryDefinitions dl > div:last-child { border-right: 0; }
+.categoryDefinitions dt { color: var(--rz-dim); font-size: .49rem; }
+.categoryDefinitions dd { margin: 0; font-size: .57rem; }
+.categoryDefinitions .categoryEvidenceKinds { color: #acd8f7; font: .51rem ui-monospace, monospace; overflow-wrap: anywhere; }
 .categoryDefinitions footer { display: flex; flex-wrap: wrap; gap: 5px; }
 .categoryDefinitions footer span { padding: 4px 6px; border: 1px solid var(--rz-line); border-radius: 99px; }
 .categoryEmpty { padding: 24px 17px; }
@@ -842,6 +853,8 @@
   .guidanceEditor > footer, .guidanceEditor > footer > div { align-items: stretch; flex-direction: column; }
   .guidanceEditor > footer button { width: 100%; }
   .categorySafety, .categoryHealth { align-items: flex-start; flex-direction: column; }
+  .categoryReviewSignal { align-items: flex-start; flex-wrap: wrap; }
+  .categoryReviewSignal > div { width: 100%; }
   .categoryHealth > div { justify-content: flex-start; }
   .categoryDefinitions { grid-template-columns: 1fr; }
   .agentChat { min-height: 610px; }

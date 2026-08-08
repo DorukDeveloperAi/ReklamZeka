@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CategoryCoverageLevel, CategoryInventoryDefinition, CategoryInventoryDimension,
   CategoryInventoryRepository, CategoryInventorySnapshot } from "@/application/category-inventory-service";
+import { CATEGORY_CLASSIFICATION_POLICY } from "@/application/category-inventory-service";
 import * as schema from "@/db/schema";
 import { categoryDefinitionPublicRef, categoryDimensionPublicRef } from "@/domain/categories/public-reference";
 
@@ -38,6 +39,10 @@ type DimensionRow = Readonly<{ id: string; key: string; name: string; descriptio
 type DefinitionRow = Readonly<{ dimension_id: string; key: string; label: string; description: string | null; version: number }>;
 type DefinitionStatsRow = Readonly<{ dimension_id: string; definition_id: string; total: unknown; manual_locked: unknown;
   manual: unknown; agent: unknown; deterministic: unknown; add_count: unknown; override_count: unknown; deny_count: unknown }>;
+type DefinitionQualityRow = Readonly<{ definition_id: string; minimum_bps: unknown; average_bps: unknown;
+  below_review_threshold: unknown; evidence_records: unknown; assignments_with_observed_at: unknown;
+  invalid_evidence_assignments: unknown }>;
+type EvidenceKindRow = Readonly<{ definition_id: string; kind: unknown; total: unknown }>;
 type CoverageRow = Readonly<{ dimension_id: string; entity_level: string; assigned: unknown; denied: unknown }>;
 type HealthRow = Readonly<{ dimensions_without_definitions: unknown; definitions_without_assignments: unknown;
   stale_target_assignments: unknown; assignments_under_archived_registry: unknown }>;
@@ -83,6 +88,51 @@ export class DrizzleCategoryInventoryRepository implements CategoryInventoryRepo
         and definition.archived_at is null
       where assignment.workspace_id = ${workspaceId}::uuid and assignment.archived_at is null
       group by assignment.dimension_id, assignment.definition_id
+    `));
+    const definitionQuality = rows<DefinitionQualityRow>(await this.database.execute(sql`
+      select assignment.definition_id::text,
+        min(round(assignment.confidence * 10000))::int as minimum_bps,
+        round(avg(assignment.confidence) * 10000)::int as average_bps,
+        count(*) filter (where assignment.confidence < ${CATEGORY_CLASSIFICATION_POLICY.minimumTrustedConfidenceBasisPoints / 10_000})::int as below_review_threshold,
+        sum(jsonb_array_length(assignment.evidence))::int as evidence_records,
+        count(*) filter (where exists (select 1 from jsonb_array_elements(assignment.evidence) evidence
+          where jsonb_typeof(evidence) = 'object' and evidence ? 'observedAt'
+            and jsonb_typeof(evidence->'observedAt') = 'string'
+            and btrim(evidence->>'observedAt') <> ''))::int as assignments_with_observed_at,
+        count(*) filter (where jsonb_typeof(assignment.evidence) <> 'array'
+          or jsonb_array_length(assignment.evidence) = 0 or exists (
+            select 1 from jsonb_array_elements(assignment.evidence) evidence
+            where jsonb_typeof(evidence) <> 'object' or jsonb_typeof(evidence->'kind') <> 'string'
+              or jsonb_typeof(evidence->'ref') <> 'string' or btrim(evidence->>'kind') = ''
+              or btrim(evidence->>'ref') = '' or length(evidence->>'kind') > 64
+              or (evidence->>'kind') !~ '^[a-z][a-z0-9_.:-]{0,63}$'
+              or (evidence ? 'observedAt' and (jsonb_typeof(evidence->'observedAt') <> 'string'
+                or btrim(evidence->>'observedAt') = ''))
+          ))::int as invalid_evidence_assignments
+      from category_assignments assignment
+      join category_dimensions dimension on dimension.workspace_id = assignment.workspace_id
+        and dimension.id = assignment.dimension_id and dimension.archived_at is null
+      join category_definitions definition on definition.workspace_id = assignment.workspace_id
+        and definition.id = assignment.definition_id and definition.dimension_id = assignment.dimension_id
+        and definition.archived_at is null
+      where assignment.workspace_id = ${workspaceId}::uuid and assignment.archived_at is null
+      group by assignment.definition_id
+    `));
+    const evidenceKinds = rows<EvidenceKindRow>(await this.database.execute(sql`
+      select assignment.definition_id::text, evidence->>'kind' as kind, count(*)::int as total
+      from category_assignments assignment
+      join category_dimensions dimension on dimension.workspace_id = assignment.workspace_id
+        and dimension.id = assignment.dimension_id and dimension.archived_at is null
+      join category_definitions definition on definition.workspace_id = assignment.workspace_id
+        and definition.id = assignment.definition_id and definition.dimension_id = assignment.dimension_id
+        and definition.archived_at is null
+      cross join lateral jsonb_array_elements(assignment.evidence) evidence
+      where assignment.workspace_id = ${workspaceId}::uuid and assignment.archived_at is null
+        and jsonb_typeof(evidence) = 'object' and jsonb_typeof(evidence->'kind') = 'string'
+        and btrim(evidence->>'kind') <> '' and length(evidence->>'kind') <= 64
+        and (evidence->>'kind') ~ '^[a-z][a-z0-9_.:-]{0,63}$'
+      group by assignment.definition_id, evidence->>'kind'
+      order by assignment.definition_id, evidence->>'kind'
     `));
     const coverage = rows<CoverageRow>(await this.database.execute(sql`
       select assignment.dimension_id::text, assignment.entity_level::text,
@@ -176,6 +226,10 @@ export class DrizzleCategoryInventoryRepository implements CategoryInventoryRepo
     `));
     if (healthRows.length !== 1) throw new CategoryInventoryRepositoryError("corrupt_store");
     const statsByDefinition = new Map(definitionStats.map((row) => [row.definition_id, row] as const));
+    const qualityByDefinition = new Map(definitionQuality.map((row) => [row.definition_id, row] as const));
+    const kindsByDefinition = new Map<string, EvidenceKindRow[]>();
+    for (const row of evidenceKinds) kindsByDefinition.set(row.definition_id,
+      [...(kindsByDefinition.get(row.definition_id) ?? []), row]);
     const coverageByDimension = new Map<string, Map<string, CoverageRow>>();
     for (const row of coverage) coverageByDimension.set(row.dimension_id,
       new Map([...(coverageByDimension.get(row.dimension_id) ?? new Map()).entries(), [row.entity_level, row]]));
@@ -189,6 +243,7 @@ export class DrizzleCategoryInventoryRepository implements CategoryInventoryRepo
       const projectedDefinitions: CategoryInventoryDefinition[] = definitions
         .filter((definition) => definition.dimension_id === dimension.id).map((definition) => {
           const stats = statsByDefinition.get(definition.definition_id);
+          const quality = qualityByDefinition.get(definition.definition_id);
           if (!Number.isSafeInteger(definition.version) || definition.version < 1) throw new CategoryInventoryRepositoryError("corrupt_store");
           return Object.freeze({ ref: categoryDefinitionPublicRef(key, text(definition.key, 128)), key: text(definition.key, 128),
             label: text(definition.label), description: definition.description === null ? null : text(definition.description),
@@ -196,7 +251,15 @@ export class DrizzleCategoryInventoryRepository implements CategoryInventoryRepo
               manualLocked: count(stats?.manual_locked ?? 0), manual: count(stats?.manual ?? 0),
               agent: count(stats?.agent ?? 0), deterministic: count(stats?.deterministic ?? 0),
               add: count(stats?.add_count ?? 0), override: count(stats?.override_count ?? 0),
-              deny: count(stats?.deny_count ?? 0) }) });
+              deny: count(stats?.deny_count ?? 0) }), confidence: Object.freeze({
+                minimumBasisPoints: quality ? count(quality.minimum_bps) : null,
+                averageBasisPoints: quality ? count(quality.average_bps) : null,
+                belowReviewThreshold: count(quality?.below_review_threshold ?? 0),
+              }), evidenceHealth: Object.freeze({ evidenceRecords: count(quality?.evidence_records ?? 0),
+                assignmentsWithObservedAt: count(quality?.assignments_with_observed_at ?? 0),
+                invalidEvidenceAssignments: count(quality?.invalid_evidence_assignments ?? 0),
+                kinds: Object.freeze((kindsByDefinition.get(definition.definition_id) ?? []).map((row) =>
+                  Object.freeze({ kind: text(row.kind, 64), count: count(row.total) }))) }) });
         });
       return Object.freeze({ ref: categoryDimensionPublicRef(key), key, name: text(dimension.name),
         description: dimension.description === null ? null : text(dimension.description),
