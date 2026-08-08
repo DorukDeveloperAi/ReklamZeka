@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 031d116e2ef9 -->
+<!-- durum-damga: b377cc67f183 -->
 
 ## Künye
 
@@ -14,13 +14,17 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 107 |
+| iş commit'i (tüm geçmiş) | 111 |
 | ilk / son iş | 2026-08-06 / 2026-08-08 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-08 | `docs` | record authenticated handoff slice | `be4484bb6` |
+| 2026-08-08 | `feat` | add live agent session hub | `981e744d6` |
+| 2026-08-08 | `feat` | expose secure local handoffs | `ac1428135` |
+| 2026-08-08 | `docs` | refresh deterministic project state | `6cfbe4585` |
 | 2026-08-08 | `docs` | record durable agent sessions | `456bd5842` |
 | 2026-08-08 | `feat` | persist local session handoffs | `bbcea6595` |
 | 2026-08-08 | `docs` | refresh deterministic project state | `2ce337256` |
@@ -32,17 +36,13 @@
 | 2026-08-08 | `docs` | refresh deterministic project state | `9b317f2d8` |
 | 2026-08-08 | `docs` | record no-model API gate | `23025196d` |
 | 2026-08-08 | `test` | enforce no-model API boundary | `ba4347d8d` |
-| 2026-08-08 | `docs` | refresh deterministic project state | `7d1efb006` |
-| 2026-08-08 | `docs` | record K4 and insight gates | `0dea31c39` |
-| 2026-08-08 | `feat` | add v23 insight capability catalog | `fd392bc5d` |
-| 2026-08-08 | `feat` | complete K4 publication gate | `e8dc56aac` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 33
-- `docs        ` ███████████████ 21
+- `feat        ` ████████████████████████ 31
+- `docs        ` ██████████████████ 23
 - `test        ` ███ 4
-- `fix         ` █ 2
+- `fix         ` ██ 2
 
 ## Planlar
 
