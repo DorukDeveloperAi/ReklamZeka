@@ -82,16 +82,27 @@
   - [x] Context persistence, selective invalidation ve public redaction projection'ı.
 - [ ] Strict instruction/policy DSL ve negatif parser matrisi.
 - [ ] Raw natural-language → normalized draft + assumption/question/impact preview.
+  - [x] `owner_statement` ham metni ayrı provenance kaydı olarak koruyan, guidance-only
+    card + tek scope binding üreten gerçek taslak authoring akışı.
+  - [ ] Agent normalization, varsayım/soru, semantic diff ve affected-entity/impact preview.
 - [ ] Precedence/inheritance/suppression/PARKED_CONFLICT resolver.
 - [ ] Versioned draft/publish/pause/archive ve rol/audit API'leri.
+  - [x] Guidance için immutable draft/revise/publish/archive, optimistic registry hash,
+    analyst draft + owner/admin publish/archive ve mutation+audit tek transaction.
+  - [ ] Strict policy pause/publish lifecycle, history/diff projection ve context invalidation binding'i.
 - [ ] Başlangıç objective/internal kategori playbook seti.
 - [ ] Kategori coverage/unmatched/conflict/impact dashboard ve güvenli archive akışı.
+  - [x] Rules fixture kaldırıldı; gerçek Guidance Studio loading/empty/conflict/error,
+    create/revise/publish/archive ve aktif iç kategori selector yüzeyi.
+  - [ ] Category assignment coverage/unmatched/conflict/archive-impact yüzeyi.
 - [ ] PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run.
 - [ ] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi.
   - [x] Guidance-only pure registry/pack; provenance ayrımı, deterministic scope/conflict,
     freshness ve bounded context budget.
   - [x] Append-only PostgreSQL registry, version/hash guard, tenant isolation ve RLS.
-  - [ ] Account-group/lifecycle/template scope, analysis-run binding ve rol/audit API'si.
+  - [x] Global/account/objective/internal-category/entity/topic tek-binding authoring,
+    public-safe kararlı category ref ve rol/audit API'si.
+  - [ ] Çoklu binding/set authoring; account-group/lifecycle/template scope ve analysis-run binding.
 - [ ] Owner statement + official Meta source + experiment/observation provenance ve freshness.
 - [ ] G0→G4 progressive formalization, semantic diff, historical replay ve impact preview.
 - [ ] AdvisedPractice candidate→trial→outcome→standardization lifecycle ve decomposition review.

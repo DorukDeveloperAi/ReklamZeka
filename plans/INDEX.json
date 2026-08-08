@@ -1,6 +1,6 @@
 {
   "_uyari": "ELLE DÜZENLEME — agac.mjs türetir; makine tüketicisi (kaptan readPlans) için projeksiyon",
-  "damga": "c07e963cf364",
+  "damga": "2a276e7bad5a",
   "plans": [
     {
       "slug": "proje",
@@ -21,24 +21,17 @@
       },
       "asamaToplam": 14,
       "asamaKapali": 6,
-      "checklistAcik": 96,
-      "checklistKapali": 150,
+      "checklistAcik": 99,
+      "checklistKapali": 154,
       "sonTur": null,
       "siradaki": {
-        "no": "09",
-        "ad": "kategori ve talimat"
+        "no": "11",
+        "ad": "bütçe planlama"
       },
-      "goal": "/goal plans/proje/v2/asama-09-kategori-talimat.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
+      "goal": "/goal plans/proje/v2/asama-11-butce-planlama.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz",
       "depli": true,
       "hazir": [],
       "bekleyen": [
-        {
-          "no": "09",
-          "ad": "kategori ve talimat",
-          "bekledigi": [
-            "08"
-          ]
-        },
         {
           "no": "11",
           "ad": "bütçe planlama",
@@ -71,9 +64,9 @@
   ],
   "legacy": [],
   "todo": {
-    "acik": 96,
+    "acik": 99,
     "kaynak": {
-      "chk": 96,
+      "chk": 99,
       "elle": 0,
       "hukum": 0,
       "kunye": 0,
@@ -238,6 +231,16 @@
         "onar": null
       },
       {
+        "ref": "td:chk/proje/h557a12",
+        "tur": "chk",
+        "metin": "Agent normalization, varsayım/soru, semantic diff ve affected-entity/impact preview.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
         "ref": "td:chk/proje/h9fb5fd",
         "tur": "chk",
         "metin": "Precedence/inheritance/suppression/PARKED_CONFLICT resolver.",
@@ -251,6 +254,16 @@
         "ref": "td:chk/proje/h346e65",
         "tur": "chk",
         "metin": "Versioned draft/publish/pause/archive ve rol/audit API'leri.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
+        "ref": "td:chk/proje/h840d8d",
+        "tur": "chk",
+        "metin": "Strict policy pause/publish lifecycle, history/diff projection ve context invalidation binding'i.",
         "plan": "proje",
         "asama": "09",
         "kapatan": [],
@@ -278,6 +291,16 @@
         "onar": null
       },
       {
+        "ref": "td:chk/proje/he1fb34",
+        "tur": "chk",
+        "metin": "Category assignment coverage/unmatched/conflict/archive-impact yüzeyi.",
+        "plan": "proje",
+        "asama": "09",
+        "kapatan": [],
+        "kapatAdayi": false,
+        "onar": null
+      },
+      {
         "ref": "td:chk/proje/h36429c",
         "tur": "chk",
         "metin": "PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run.",
@@ -298,9 +321,9 @@
         "onar": null
       },
       {
-        "ref": "td:chk/proje/ha9f858",
+        "ref": "td:chk/proje/hd68f79",
         "tur": "chk",
-        "metin": "Account-group/lifecycle/template scope, analysis-run binding ve rol/audit API'si.",
+        "metin": "Çoklu binding/set authoring; account-group/lifecycle/template scope ve analysis-run binding.",
         "plan": "proje",
         "asama": "09",
         "kapatan": [],

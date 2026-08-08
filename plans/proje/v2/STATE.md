@@ -15,12 +15,32 @@
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
 | 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.5 ve Slice 01 kapalı; geniş field/breakdown kataloğu, multi-business grouping ve export/rotation ileri işi açık |
-| 09 | kategori ve talimat | AÇIK | 08 | requirement/precedence tasarımı tamam; uygulama sırada |
+| 09 | kategori ve talimat | DEVAM | 08 | category/guidance çekirdeği ve gerçek Guidance Studio hazır; composition/preview, çoklu binding ve category yönetimi sırada |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
 | 11 | bütçe planlama | AÇIK | 09,10 | planlandı |
 | 12 | prompt/advisor | DEVAM | 09–11 | narrative envelope/claim guard temeli var; translator/ledger sırada |
 | 13 | eylem valfi ve rutin | AÇIK | 04,10–12 | planlandı; write kapalı |
 | 14 | kontrol merkezi | AÇIK | 07,09–13 | planlandı |
+
+## 2026-08-08 — A09.1 gerçek Guidance Studio
+
+- Dashboard'daki fixture talimat listesi ve yalnız React state'ine yazan sahte kayıt akışı
+  kaldırıldı. `/api/guidance-studio` artık kalıcı registry, aktif iç kategori kataloğu ve
+  gerçek loading/empty/conflict/unavailable durumlarını besliyor.
+- Ham kullanıcı anlatımı `owner_statement` kaynağında korunuyor; ayrı guidance-only card ve
+  global/account/objective/internal-category/entity/topic binding'iyle taslaklanıyor.
+- Taslak revizyonu, publish ve archive fiziksel update/delete yerine kesintisiz immutable
+  version üretiyor. Registry hash optimistic concurrency sağlıyor.
+- Viewer read-only, analyst draft, owner/admin publish/archive rol sınırı var. Guidance hiçbir
+  action/policy/approval/Meta-write yetkisi üretmiyor.
+- Guidance revision ve hash-chain audit fact'i aynı PostgreSQL transaction'ında commit/rollback
+  oluyor. Kararlı iç kategori public ref'i UUID revision'dan ayrıldı; exact revision frozen
+  category context içinde kalıyor.
+- Supabase acceptance: geçici izole workspace'te create→revise→publish→restart→archive,
+  dört revision/dört audit olayı ve cleanup doğrulandı. Kanıt: 174 test dosyası/1.106 test,
+  typecheck, DB check ve `scripts/verify-guidance-studio-postgres.ts`.
+- Açık sonraki dilim: agent/Codex/Claude read tools + effective guidance preview/composer,
+  publish/archive context invalidation, çoklu binding/set ve category CRUD/coverage yüzeyi.
 
 ## 2026-08-06 — bütün görüşmelerin kanonik ürün distilasyonu
 

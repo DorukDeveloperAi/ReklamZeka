@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "ccba7d95e",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
       "hash": "8023e340e",
       "tarih": "2026-08-08",
       "konu": "feat(agent): add secure project MCP bridge",
@@ -128,15 +137,6 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "9b317f2d8",
-      "tarih": "2026-08-08",
-      "konu": "docs(status): refresh deterministic project state",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -146,7 +146,7 @@
     },
     {
       "kapsam": "docs",
-      "adet": 24
+      "adet": 25
     },
     {
       "kapsam": "test",
@@ -154,10 +154,10 @@
     },
     {
       "kapsam": "fix",
-      "adet": 2
+      "adet": 1
     }
   ],
-  "isSayisi": 113,
+  "isSayisi": 114,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -167,8 +167,8 @@
       "durum": "SÜRÜYOR",
       "asamaKapali": 6,
       "asamaToplam": 14,
-      "siradaki": "09-kategori ve talimat"
+      "siradaki": "11-bütçe planlama"
     }
   ],
-  "damga": "58d7f3b1fcce"
+  "damga": "7b046e38110f"
 }

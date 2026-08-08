@@ -11,6 +11,9 @@ export type WorkspaceAction =
   | "promotion:draft"
   | "autonomy_rules:read"
   | "autonomy_rules:draft"
+  | "guidance:read"
+  | "guidance:draft"
+  | "guidance:publish"
   | "policy_bundle:read"
   | "policy_bundle:draft"
   | "policy_bundle:publish";
@@ -26,15 +29,17 @@ const ROLE_ACTIONS: Readonly<Record<WorkspaceRole, ReadonlySet<WorkspaceAction>>
   owner: new Set([
     "workspace:manage", "member:manage", "connection:manage", "data:read",
     "sync:run", "insight:feedback", "report:share",
-    "budget:draft", "promotion:draft", "autonomy_rules:read", "autonomy_rules:draft", "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish",
+    "budget:draft", "promotion:draft", "autonomy_rules:read", "autonomy_rules:draft",
+    "guidance:read", "guidance:draft", "guidance:publish", "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish",
   ]),
   admin: new Set([
     "member:manage", "connection:manage", "data:read", "sync:run",
     "insight:feedback", "report:share",
-    "budget:draft", "promotion:draft", "autonomy_rules:read", "autonomy_rules:draft", "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish",
+    "budget:draft", "promotion:draft", "autonomy_rules:read", "autonomy_rules:draft",
+    "guidance:read", "guidance:draft", "guidance:publish", "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish",
   ]),
-  analyst: new Set(["data:read", "sync:run", "insight:feedback", "report:share", "budget:draft", "promotion:draft", "autonomy_rules:read", "autonomy_rules:draft", "policy_bundle:read", "policy_bundle:draft"]),
-  viewer: new Set(["data:read", "autonomy_rules:read", "policy_bundle:read"]),
+  analyst: new Set(["data:read", "sync:run", "insight:feedback", "report:share", "budget:draft", "promotion:draft", "autonomy_rules:read", "autonomy_rules:draft", "guidance:read", "guidance:draft", "policy_bundle:read", "policy_bundle:draft"]),
+  viewer: new Set(["data:read", "autonomy_rules:read", "guidance:read", "policy_bundle:read"]),
 };
 
 export class AuthorizationError extends Error {

@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 export const LOCAL_SESSION_COOKIE = "__Host-rzka_local_session" as const;
-export type LocalSessionScope = "approval_queue:decide" | "approval_queue:read" | "autonomy_rules:read" | "autonomy_rules:draft" | "policy_bundle:read" | "policy_bundle:draft" | "policy_bundle:publish" | "budget_lab:draft" | "budget_lab:read" | "decision_room:read" | "decision_room:mark_read" | "practice_lab:read" | "promotion_catalog:read" | "promotion_preflight:read" | "promotion_proposal:draft" | "local_session:bootstrap";
+export type LocalSessionScope = "approval_queue:decide" | "approval_queue:read" | "autonomy_rules:read" | "autonomy_rules:draft" | "guidance:read" | "guidance:draft" | "guidance:publish" | "policy_bundle:read" | "policy_bundle:draft" | "policy_bundle:publish" | "budget_lab:draft" | "budget_lab:read" | "decision_room:read" | "decision_room:mark_read" | "practice_lab:read" | "promotion_catalog:read" | "promotion_preflight:read" | "promotion_proposal:draft" | "local_session:bootstrap";
 export type LocalSessionKind = "bootstrap" | "session";
 
 export type LocalSessionClaims = Readonly<{
@@ -26,6 +26,7 @@ const NONCE = /^[a-f0-9]{64}$/;
 const TOKEN = /^rzs1\.([A-Za-z0-9_-]{64,2048})\.([A-Za-z0-9_-]{43})$/;
 export const LOCAL_SESSION_RUNTIME_SCOPES: readonly LocalSessionScope[] = Object.freeze([
   "approval_queue:decide", "approval_queue:read", "autonomy_rules:draft", "autonomy_rules:read",
+  "guidance:draft", "guidance:publish", "guidance:read",
   "policy_bundle:draft", "policy_bundle:publish", "policy_bundle:read", "budget_lab:draft", "budget_lab:read",
   "decision_room:mark_read", "decision_room:read", "practice_lab:read", "promotion_catalog:read",
   "promotion_preflight:read", "promotion_proposal:draft",
@@ -71,7 +72,7 @@ function validClaims(value: unknown): LocalSessionClaims {
     || typeof value.workspaceRef !== "string" || !REF.test(value.workspaceRef)
     || typeof value.userId !== "string" || !UUID.test(value.userId)
     || typeof value.readerRef !== "string" || !REF.test(value.readerRef)
-    || !Array.isArray(value.scopes) || value.scopes.length < 1 || value.scopes.length > 15
+    || !Array.isArray(value.scopes) || value.scopes.length < 1 || value.scopes.length > 18
     || new Set(value.scopes).size !== value.scopes.length
     || value.scopes.some((scope) => typeof scope !== "string" || !SCOPES.has(scope as LocalSessionScope))
     || !Number.isSafeInteger(value.issuedAt) || !Number.isSafeInteger(value.expiresAt)

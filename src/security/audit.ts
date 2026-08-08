@@ -12,7 +12,11 @@ export type AuditAction =
   | "report.shared"
   | "report.revoked"
   | "insight.feedback"
-  | "budget.draft_saved";
+  | "budget.draft_saved"
+  | "guidance.draft_created"
+  | "guidance.draft_revised"
+  | "guidance.published"
+  | "guidance.archived";
 
 export type AuditEventInput = Readonly<{
   workspaceId: string;

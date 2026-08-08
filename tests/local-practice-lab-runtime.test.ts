@@ -46,7 +46,7 @@ describe("local Practice Lab route", () => {
       kind: "session", workspaceId, workspaceRef: "workspace_local", userId,
       readerRef: "reader_local_owner", osUid: process.getuid!(), issuedAt: now, expiresAt: now + 300,
     }, signingKey).claims;
-    expect(claims.scopes).toEqual(["approval_queue:decide", "approval_queue:read", "autonomy_rules:draft", "autonomy_rules:read", "policy_bundle:draft", "policy_bundle:publish", "policy_bundle:read", "budget_lab:draft", "budget_lab:read", "decision_room:mark_read", "decision_room:read", "practice_lab:read", "promotion_catalog:read", "promotion_preflight:read", "promotion_proposal:draft"]);
+    expect(claims.scopes).toEqual(["approval_queue:decide", "approval_queue:read", "autonomy_rules:draft", "autonomy_rules:read", "guidance:draft", "guidance:publish", "guidance:read", "policy_bundle:draft", "policy_bundle:publish", "policy_bundle:read", "budget_lab:draft", "budget_lab:read", "decision_room:mark_read", "decision_room:read", "practice_lab:read", "promotion_catalog:read", "promotion_preflight:read", "promotion_proposal:draft"]);
     const transaction = vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
       execute: vi.fn()
         .mockResolvedValueOnce({ rows: [{ id: workspaceId }] })

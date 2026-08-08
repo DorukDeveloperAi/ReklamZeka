@@ -12,6 +12,7 @@ import * as schema from "@/db/schema";
 import type { StoredEffectiveCampaignContext } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
 import type { EffectiveCategoryResolution } from "@/domain/categories/registry";
 import type { CategoryHierarchyTarget } from "@/domain/categories/service";
+import { categoryDefinitionPublicRef } from "@/domain/categories/public-reference";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
@@ -123,7 +124,7 @@ export class AuthenticCategoryEvidenceAdapter implements AuthenticCategoryEviden
         for (const definition of replayed.values) {
           if (definition.workspaceId !== this.workspaceId || definition.dimensionId !== frozen.dimension.id
             || !definition.key.trim() || !frozen.dimension.key.trim()) return [];
-          categoryRefs.push(`category_${digest({ dimensionKey: frozen.dimension.key, definitionKey: definition.key }).slice(0, 24)}`);
+          categoryRefs.push(categoryDefinitionPublicRef(frozen.dimension.key, definition.key));
         }
         resolutionRevisions.push(Object.freeze({
           sourceRef: `category_resolution_${digest(frozen.dimension.id).slice(0, 20)}`,
