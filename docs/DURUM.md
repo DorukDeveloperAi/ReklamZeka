@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 6914cbe5002f -->
+<!-- durum-damga: 7121b8177f71 -->
 
 ## Künye
 
@@ -14,13 +14,14 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 129 |
+| iş commit'i (tüm geçmiş) | 130 |
 | ilk / son iş | 2026-08-06 / 2026-08-08 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-08 | `chore` | merge sonrası türevleri üreticiden yeniden üret | `07fc6819b` |
 | 2026-08-08 | `chore` | tema ayarları ve oturum kasası kaydı | `8916ab22f` |
 | 2026-08-08 | `feat` | scan effective portfolio health | `c90883c4c` |
 | 2026-08-08 | `feat` | preview archive impact safely | `86284c17a` |
@@ -35,15 +36,14 @@
 | 2026-08-08 | `feat` | add secure project MCP bridge | `8023e340e` |
 | 2026-08-08 | `docs` | refresh deterministic project state | `d0468245c` |
 | 2026-08-08 | `docs` | record authenticated handoff slice | `be4484bb6` |
-| 2026-08-08 | `feat` | add live agent session hub | `981e744d6` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
 - `feat        ` ████████████████████████ 31
-- `docs        ` █████████████████ 22
+- `docs        ` ████████████████ 21
 - `test        ` ███ 4
+- `chore       ` ██ 2
 - `fix         ` ██ 2
-- `chore       ` █ 1
 
 ## Planlar
 

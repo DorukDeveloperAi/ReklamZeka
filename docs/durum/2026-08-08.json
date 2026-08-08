@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "07fc6819b",
+      "tarih": "2026-08-08",
+      "konu": "chore(turev): merge sonrası türevleri üreticiden yeniden üret",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
       "hash": "8916ab22f",
       "tarih": "2026-08-08",
       "konu": "chore(vscode,oturum): tema ayarları ve oturum kasası kaydı",
@@ -128,15 +137,6 @@
       "kapsam": [
         "docs"
       ]
-    },
-    {
-      "hash": "981e744d6",
-      "tarih": "2026-08-08",
-      "konu": "feat(dashboard): add live agent session hub",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -146,22 +146,22 @@
     },
     {
       "kapsam": "docs",
-      "adet": 22
+      "adet": 21
     },
     {
       "kapsam": "test",
       "adet": 4
     },
     {
-      "kapsam": "fix",
+      "kapsam": "chore",
       "adet": 2
     },
     {
-      "kapsam": "chore",
-      "adet": 1
+      "kapsam": "fix",
+      "adet": 2
     }
   ],
-  "isSayisi": 129,
+  "isSayisi": 130,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "6914cbe5002f"
+  "damga": "7121b8177f71"
 }
