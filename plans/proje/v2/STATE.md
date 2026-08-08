@@ -1096,5 +1096,26 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Canlı Supabase HTTP kabulü dashboard register, CLI register, same-user active list, handoff create, consume ve replay
   reddini doğruladı; hedefli cleanup sonunda geçici satır kalmadı. 77/77 RLS ve sıfır Data API grant duruşu korundu;
   model ve Meta write çağrısı sıfırdır.
-- MCP/STDIO adapter ve gerçek Codex/Claude config henüz bağlı değildir. Handoff ref route seviyesinde tüketilebilir,
-  fakat CLI içinden doğal tool çağrısı ayrı kapı olarak açıktır; dashboard bu eksikliği bağlı sohbet gibi göstermez.
+- Project STDIO MCP adapter, Codex/Claude config ve CLI içinden doğal `get_handoff_context` çağrısı bağlıdır.
+  Exact 16-tool katalog dışında araç yayımlanmaz; dashboard handoff'u tek kullanımlı tüketilir ve replay reddedilir.
+  Localhost Streamable HTTP MCP ile MCP'siz CLI adapter'ı ayrı ileri kapılar olarak kapalıdır.
+
+## 2026-08-08 — A12 project STDIO MCP + Codex/Claude conformance
+
+- `@modelcontextprotocol/server` v2 tabanlı project STDIO server 3 coordination aracı ile mevcut 13 safe
+  read/draft/preflight application aracını exact katalog ve strict Zod input şemasıyla yayımlar. Provider/model,
+  raw Meta/SQL, approval, human-presence grant veya action execution aracı yoktur.
+- MCP prosesi `.env.local` dosyasını symlink/owner/mode/size kontrollerinden geçirir; yalnız yedi
+  `REKLAMZEKA_LOCAL_*` binding'ini tutar. Meta tokenı, `DATABASE_URL` ve provider secret'ları process env,
+  argüman, stdout, tool sonucu veya config'e taşınmaz. Capability process memory'de OS UID'ye bağlı mint edilir.
+- Next.js'in doğrudan loopback isteklerde eklediği exact canonical forwarding tuple framework uyumluluğu için
+  kabul edilir; locality kanıtı değildir. Partial/external/mismatched forwarding, tenant header ve dual credential
+  reddi korunur. Policy read ve promotion preflight yalnız ilgili bearer read scope'larına açılmış; draft/publish
+  ve diğer dashboard mutation sınırları cookie/human yolunda kalmıştır.
+- Codex `.codex/config.toml` exact 16 araçla etkin; coordination otomatik, diğer mutation'lar `writes` prompt'tur.
+  Claude `.mcp.json` ve project permission seti yalnız coordination/read araçlarını auto-allow eder;
+  mark-read ile persisted budget draft server metadata ile explicit interaction ister. Makine-local Claude entry
+  health check'te connected durumundadır.
+- Canlı kabul: STDIO initialize/list/call, session register, dashboard active-session discovery, 60 saniyelik
+  handoff create, CLI consume ve replay reject geçti; Decision Room, policy bundle ve promotion preflight gerçek
+  localhost→PostgreSQL hattına ulaştı. Geçici MCP kabul session'ları hedefli biçimde temizlendi.

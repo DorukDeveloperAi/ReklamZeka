@@ -44,8 +44,10 @@ composite session FK'leri, atomik consume, RLS/grant kapısı ve tombstone purge
 Authenticated local HTTP koordinasyonu dashboard cookie'siyle session list/register ve handoff create;
 CLI bearer capability'siyle register/heartbeat/consume sunar. Dashboard yalnız API'dan aktif session
 doğrulanınca bağlı durum gösterir; tek hedefi otomatik, birden fazlasını açık seçimle ele alır.
-Bu çekirdek henüz `get_handoff_context` MCP/STDIO tool'u veya gerçek Codex/Claude client config'i
-değildir; yukarıdaki beş adımlı yolculuk bu adapterlar geldikten sonra E2E kapanır.
+Project STDIO MCP bu çekirdeği artık 3 coordination ve 13 güvenli application tool'u ile sunar.
+Codex project config'i exact tool allowlist ve `writes` approval modunu; Claude project/local config'i
+aynı server komutunu kullanır. Dashboard discovery → handoff create → CLI consume → replay reject zinciri
+canlı PostgreSQL/HTTP kabulünde kapanmıştır. Localhost Streamable HTTP MCP ve MCP'siz CLI adapter'ı ileri iştir.
 
 ## Session → onay ve execute
 
@@ -107,8 +109,9 @@ girerse erişim process restart beklemeden kapanır.
 HTTP yüzeyi yalnız yapılandırılan exact loopback origin/Host çiftini kabul eder. Güvenli
 dashboard cookie'si için düz HTTP yalnız `http://localhost` ile desteklenir; `127.0.0.1`
 ve `[::1]` loopback adresleri HTTPS ister. `Forwarded`,
-`X-Forwarded-*` ve benzeri başlıklar locality
-kanıtı sayılmaz; proxy hop'u görüldüğünde istek fail-closed reddedilir. Bu nedenle ilk
+`X-Forwarded-*` ve benzeri başlıklar locality kanıtı sayılmaz. Next.js'in doğrudan loopback
+isteğe eklediği tam ve origin ile birebir eşleşen canonical dört başlık yalnız framework uyumluluğu
+için kabul edilir; kısmi, çoklu, harici IP veya host/protokol/port uyuşmazlığı fail-closed reddedilir. Bu nedenle ilk
 sürüm reverse proxy, LAN bind veya public deployment arkasında çalıştırılmaz. GET için
 cross-site Fetch Metadata reddedilir. Tek mutation olan idempotent inbox `mark_read`, exact
 same-origin `Origin`, `Sec-Fetch-Site: same-origin`, JSON ve `X-ReklamZeka-Intent` ister.

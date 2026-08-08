@@ -6,13 +6,13 @@ import { PolicyBundleStudioError, type PolicyBundleDraftRequest,
 import { ActionGuardrailPolicyError } from "@/domain/actions/action-guardrail-policy";
 import { ApprovalPolicyRegistryError } from "@/domain/actions/approval-policy-registry";
 import { AuthorizationError } from "@/security/authorization";
+import { hasTrustedFrameworkForwarding } from "@/server/local-decision-room-runtime";
 
 const HEADERS = Object.freeze({ "Cache-Control": "private, no-store, max-age=0", "X-Content-Type-Options": "nosniff",
   "X-ReklamZeka-Access-Mode": "policy-bundle-read-draft", "X-ReklamZeka-Action-Authority": "none" });
 const AUTHORITY = Object.freeze({ canDraft: false, canStartPublicationCeremony: false,
   canPublish: false, canDisable: false, canApproveAction: false,
   canGrant: false, canExecute: false, canWriteMeta: false });
-const FORWARDED = ["forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip", "cf-connecting-ip"] as const;
 function response(code: string, message: string, status: number) {
   return NextResponse.json({ error: { code, message }, authority: AUTHORITY }, { status, headers: HEADERS });
 }
@@ -36,9 +36,12 @@ export function policyBundleStudioNotConfiguredResponse() {
 }
 function trusted(request: Request, method: "GET" | "POST", intent: string): boolean {
   const url = new URL(request.url);
-  return request.method === method && !url.search && !request.headers.has("authorization")
-    && Boolean(request.headers.get("cookie")) && request.headers.get("sec-fetch-site") === "same-origin"
-    && !FORWARDED.some((header) => request.headers.has(header)) && !request.headers.has("x-workspace-id")
+  const bearer = Boolean(request.headers.get("authorization"));
+  const cookie = Boolean(request.headers.get("cookie"));
+  return request.method === method && !url.search && bearer !== cookie && (method === "GET" || !bearer)
+    && request.headers.get("sec-fetch-site") === "same-origin"
+    && hasTrustedFrameworkForwarding(request, url.origin)
+    && !request.headers.has("x-workspace-id")
     && !request.headers.has("x-workspace-ref") && request.headers.get("x-reklamzeka-intent") === intent;
 }
 

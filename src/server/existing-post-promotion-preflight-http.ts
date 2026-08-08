@@ -7,9 +7,9 @@ import {
 import { ExistingPostPromotionPublicPreflightError } from "@/application/existing-post-promotion-preflight-service";
 import type { TrustedDecisionRoomPrincipal } from "@/application/decision-room-agent-contract";
 import { AuthorizationError } from "@/security/authorization";
+import { hasTrustedFrameworkForwarding } from "@/server/local-decision-room-runtime";
 
 const MAX_BODY = 4_096;
-const FORWARDED = ["forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip", "cf-connecting-ip"] as const;
 const HEADERS = Object.freeze({
   "Cache-Control": "private, no-store, max-age=0",
   "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
@@ -49,7 +49,8 @@ export function createExistingPostPromotionPreflightHttpHandler(input: Readonly<
       try { url = new URL(request.url); configured = new URL(input.origin); } catch { return invalid(); }
       if (request.method !== "POST" || url.origin !== configured.origin || url.search || url.hash
         || request.headers.get("host") !== configured.host || request.headers.get("origin") !== configured.origin
-        || request.headers.get("sec-fetch-site") !== "same-origin" || FORWARDED.some((header) => request.headers.has(header))
+        || request.headers.get("sec-fetch-site") !== "same-origin"
+        || !hasTrustedFrameworkForwarding(request, configured.origin)
         || request.headers.get("x-reklamzeka-intent") !== "existing-post-promotion-preflight"
         || request.headers.get("content-type")?.toLowerCase() !== "application/json"
         || request.headers.has("transfer-encoding")) invalid();

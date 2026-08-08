@@ -11,16 +11,14 @@ import {
   type LocalAgentTransport,
 } from "@/application/local-agent-client";
 import type { LocalSessionClaims } from "@/security/local-session-capability";
-import { LocalDecisionRoomBoundaryError } from "@/server/local-decision-room-runtime";
+import { hasTrustedFrameworkForwarding, LocalDecisionRoomBoundaryError } from
+  "@/server/local-decision-room-runtime";
 import {
   createDashboardLocalAgentSessionDescriptor,
   type LocalAgentSessionIdentityResolver,
 } from "@/server/local-agent-session-http";
 
 const MAX_BODY_BYTES = 2_048;
-const FORWARDED = [
-  "forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip", "cf-connecting-ip",
-] as const;
 const FORBIDDEN_HEADERS = ["x-workspace-id", "x-workspace-ref", "x-user-id", "x-session-ref"] as const;
 const HEADERS = Object.freeze({
   "Cache-Control": "private, no-store, max-age=0",
@@ -57,9 +55,9 @@ async function json(request: Request, keys: readonly string[]): Promise<Record<s
   return value;
 }
 
-function boundary(request: Request): "cookie" | "bearer" {
+function boundary(request: Request, origin: string): "cookie" | "bearer" {
   const url = new URL(request.url);
-  if (url.search || FORWARDED.some((header) => request.headers.has(header))
+  if (url.search || !hasTrustedFrameworkForwarding(request, origin)
     || FORBIDDEN_HEADERS.some((header) => request.headers.has(header))) throw new Error("invalid_input");
   const cookie = request.headers.has("cookie");
   const bearer = request.headers.has("authorization");
@@ -107,7 +105,7 @@ export function createLocalAgentHandoffHttpHandlers(input: Readonly<{
   return Object.freeze({
     POST: async (request: Request) => {
       try {
-        if (request.method !== "POST" || boundary(request) !== "cookie"
+        if (request.method !== "POST" || boundary(request, input.origin) !== "cookie"
           || request.headers.get("origin") !== input.origin
           || request.headers.get("sec-fetch-site") !== "same-origin"
           || request.headers.get("x-reklamzeka-intent") !== "local-agent-handoff-create") {
@@ -128,7 +126,7 @@ export function createLocalAgentHandoffHttpHandlers(input: Readonly<{
     },
     PATCH: async (request: Request) => {
       try {
-        if (request.method !== "PATCH" || boundary(request) !== "bearer"
+        if (request.method !== "PATCH" || boundary(request, input.origin) !== "bearer"
           || request.headers.get("x-reklamzeka-intent") !== "local-agent-handoff-consume") {
           throw new Error("invalid_input");
         }

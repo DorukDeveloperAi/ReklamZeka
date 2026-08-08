@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "d0468245c",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
       "hash": "be4484bb6",
       "tarih": "2026-08-08",
       "konu": "docs(roadmap): record authenticated handoff slice",
@@ -128,25 +137,16 @@
       "kapsam": [
         "docs"
       ]
-    },
-    {
-      "hash": "ba4347d8d",
-      "tarih": "2026-08-08",
-      "konu": "test(agent): enforce no-model API boundary",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 31
+      "adet": 30
     },
     {
       "kapsam": "docs",
-      "adet": 23
+      "adet": 24
     },
     {
       "kapsam": "test",
@@ -157,7 +157,7 @@
       "adet": 2
     }
   ],
-  "isSayisi": 111,
+  "isSayisi": 112,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -170,5 +170,5 @@
       "siradaki": "08-Meta dijital ikizi"
     }
   ],
-  "damga": "b377cc67f183"
+  "damga": "a4874e554b3f"
 }

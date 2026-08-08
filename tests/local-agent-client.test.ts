@@ -3,6 +3,7 @@ import {
   DeterministicLocalAgentFixtureClient,
   InMemoryLocalAgentCorrelationRegistry,
   LOCAL_AGENT_SAFE_TOOLS,
+  assertLocalAgentSafeToolResult,
   createLocalAgentSessionDescriptor,
 } from "@/application/local-agent-client";
 
@@ -65,6 +66,12 @@ describe("vendor-agnostic local agent client/session contract", () => {
         execution: false, rawMeta: false, rawSql: false, metaWrite: false,
       },
     });
+  });
+
+  it("accepts explicit false raw-data authority while rejecting raw material", () => {
+    expect(() => assertLocalAgentSafeToolResult({ authority: { rawMeta: false, rawSql: false } })).not.toThrow();
+    expect(() => assertLocalAgentSafeToolResult({ authority: { rawMeta: { id: "private" } } }))
+      .toThrowError(expect.objectContaining({ code: "unsafe_tool_result" }));
   });
 
   it("orchestrates deterministic tool calls in order and preserves one session correlation", async () => {

@@ -54,10 +54,24 @@ type MembershipRow = Readonly<{
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const OPAQUE_REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_-]{0,94}$/;
 const ROLES = new Set<WorkspaceRole>(["owner", "admin", "analyst", "viewer"]);
-const FORWARDED_HEADERS = [
-  "forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto",
-  "x-real-ip", "cf-connecting-ip",
-] as const;
+/**
+ * Next.js adds a canonical x-forwarded tuple even for a direct loopback
+ * request. It is never used as locality evidence; this only distinguishes the
+ * framework tuple from caller-injected or partial forwarding claims.
+ */
+export function hasTrustedFrameworkForwarding(request: Request, origin: string): boolean {
+  if (["forwarded", "x-real-ip", "cf-connecting-ip"].some((header) => request.headers.has(header))) return false;
+  const names = ["x-forwarded-for", "x-forwarded-host", "x-forwarded-port", "x-forwarded-proto"] as const;
+  const present = names.filter((header) => request.headers.has(header));
+  if (present.length === 0) return true;
+  if (present.length !== names.length) return false;
+  const configured = new URL(origin);
+  const port = configured.port || (configured.protocol === "https:" ? "443" : "80");
+  return ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(request.headers.get("x-forwarded-for") ?? "")
+    && request.headers.get("x-forwarded-host") === configured.host
+    && request.headers.get("x-forwarded-port") === port
+    && request.headers.get("x-forwarded-proto") === configured.protocol.slice(0, -1);
+}
 
 export class LocalDecisionRoomBoundaryError extends Error {
   constructor(readonly code: "invalid_config" | "untrusted_request" | "principal_unavailable") {
@@ -144,7 +158,7 @@ export function assertTrustedLocalDecisionRoomRequest(
   const configured = new URL(config.origin);
   if (url.origin !== configured.origin || !isLoopbackHostname(url.hostname)
     || request.headers.get("host") !== configured.host
-    || FORWARDED_HEADERS.some((header) => request.headers.has(header))) {
+    || !hasTrustedFrameworkForwarding(request, config.origin)) {
     throw new LocalDecisionRoomBoundaryError("untrusted_request");
   }
   const origin = request.headers.get("origin");
@@ -311,7 +325,11 @@ export async function resolveTrustedLocalAutonomyRulePrincipal(input: Readonly<{
   return bindPrincipal(input.database, input.config);
 }
 
-/** Cookie-only, separately scoped K4 Policy Bundle Studio binding. */
+/**
+ * Separately scoped K4 Policy Bundle Studio binding. Read access may use the
+ * same OS-UID-bound bearer capability as the project MCP server. Draft and
+ * publication stay dashboard-cookie only.
+ */
 export async function resolveTrustedLocalPolicyBundlePrincipal(input: Readonly<{
   request: Request;
   database: Pick<Database, "execute">;
@@ -319,17 +337,20 @@ export async function resolveTrustedLocalPolicyBundlePrincipal(input: Readonly<{
   requiredScope: Extract<LocalSessionScope, "policy_bundle:read" | "policy_bundle:draft" | "policy_bundle:publish">;
 }>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
   exactKeys(input, ["request", "database", "config", "requiredScope"]);
-  if (bearerToken(input.request) !== null || cookieToken(input.request) === null) {
+  const bearer = bearerToken(input.request);
+  const cookie = cookieToken(input.request);
+  if ((bearer === null) === (cookie === null)
+    || input.requiredScope !== "policy_bundle:read" && bearer !== null) {
     throw new LocalDecisionRoomBoundaryError("untrusted_request");
   }
   verifyLocalSessionCapability({
-    token: cookieToken(input.request)!, key: input.config.signingKey, now: Math.floor(Date.now() / 1000),
+    token: bearer ?? cookie!, key: input.config.signingKey, now: Math.floor(Date.now() / 1000),
     osUid: typeof process.getuid === "function" ? process.getuid() : -1, requiredScope: input.requiredScope,
     expected: input.config,
   });
   assertTrustedLocalDecisionRoomRequest(input.request, input.config,
     input.requiredScope === "policy_bundle:read" ? "read"
-      : input.requiredScope === "policy_bundle:draft" ? "draft" : "publish", "cookie");
+      : input.requiredScope === "policy_bundle:draft" ? "draft" : "publish", bearer === null ? "cookie" : "bearer");
   return bindPrincipal(input.database, input.config);
 }
 

@@ -136,13 +136,13 @@ function normalizedKey(key: string): string {
   return key.replace(/[^a-z]/gi, "").toLowerCase();
 }
 
-function assertSafeToolResult(value: unknown, seen = new Set<object>()): void {
+export function assertLocalAgentSafeToolResult(value: unknown, seen = new Set<object>()): void {
   if (value === null || ["string", "number", "boolean"].includes(typeof value)) return;
   if (typeof value !== "object") fail("unsafe_tool_result");
   if (seen.has(value)) fail("unsafe_tool_result");
   seen.add(value);
   if (Array.isArray(value)) {
-    value.forEach((item) => assertSafeToolResult(item, seen));
+    value.forEach((item) => assertLocalAgentSafeToolResult(item, seen));
     seen.delete(value);
     return;
   }
@@ -151,9 +151,10 @@ function assertSafeToolResult(value: unknown, seen = new Set<object>()): void {
   }
   for (const [key, child] of Object.entries(value)) {
     const normalized = normalizedKey(key);
-    if (FORBIDDEN_RESULT_KEYS.has(normalized)) fail("unsafe_tool_result");
+    if (FORBIDDEN_RESULT_KEYS.has(normalized)
+      && !(CLOSED_AUTHORITY_KEYS.has(normalized) && child === false)) fail("unsafe_tool_result");
     if (CLOSED_AUTHORITY_KEYS.has(normalized) && child !== false) fail("unsafe_tool_result");
-    assertSafeToolResult(child, seen);
+    assertLocalAgentSafeToolResult(child, seen);
   }
   seen.delete(value);
 }
@@ -261,7 +262,7 @@ export class DeterministicLocalAgentFixtureClient {
     for (const call of input.calls) {
       const toolName = call.name as LocalAgentToolName;
       const result = await this.executors[toolName]!.execute(Object.freeze({ name: toolName, arguments: call.arguments }));
-      assertSafeToolResult(result);
+      assertLocalAgentSafeToolResult(result);
       results.push(Object.freeze({ callRef: call.callRef as string, name: toolName, result }));
     }
     return Object.freeze({

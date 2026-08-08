@@ -179,7 +179,11 @@
 - [x] No-model-API boundary: runtime source, package scripts ve direct/transitive dependency yüzeyinde
   OpenAI/Anthropic key, SDK veya doğrudan model endpoint'i fail-closed CI checker + negatif fixture matrisiyle yasak.
 - [ ] Localhost Streamable HTTP + project STDIO MCP; auth ve read/proposal tool ayrımı.
-- [ ] Codex CLI/VS Code + Claude Code MCP conformance; raw writer/human grant expose edilmez.
+  - [x] Project STDIO MCP v2 server; 3 coordination + exact 13 safe read/draft/preflight tool,
+    OS-UID capability, whitelist env loader, strict Zod schema ve stdout-protocol sınırı.
+  - [ ] Localhost Streamable HTTP MCP transport; mevcut localhost REST application API bunun yerine geçmez.
+- [x] Codex CLI/VS Code + Claude Code MCP conformance; project config/server discovery,
+  exact tool kataloğu ve canlı STDIO protokol kabulü; raw writer/human grant expose edilmez.
 - [ ] Session register/heartbeat, dashboard context handoff ve proposal correlation.
   - [x] Verified local capability + exact descriptor bağlı application lifecycle çekirdeği; server-clock heartbeat,
     same-user/workspace + intent-tool bağlı 15–120 sn ref-only handoff ve atomik single-use consume.
@@ -187,9 +191,13 @@
     atomik single-use consume, workspace tombstone purge ve rollback kabulü.
   - [x] Authenticated local HTTP coordination: cookie-only dashboard list/create, bearer-only CLI
     register/heartbeat/consume, canlı session seçimi ve dashboard handoff UI; PostgreSQL HTTP kabulü.
-  - [ ] Gerçek Codex/Claude MCP/STDIO adapter konfigürasyonu ve CLI içinden handoff consume E2E.
+  - [x] Gerçek Codex/Claude MCP/STDIO adapter konfigürasyonu ve CLI içinden handoff consume E2E;
+    dashboard discovery, single-use consume ve replay reddi canlı PostgreSQL/HTTP zincirinde doğrulandı.
 - [ ] Local `reklamzeka` companion ile TTY/passkey HumanPresenceGrant ve ayrı approve/execute.
 - [ ] MCP-capable CLI config ve güvenli allowlist LocalCliAdapter extension point.
+  - [x] Codex `.codex/config.toml` ve Claude `.mcp.json`/project permission config; secret-free exact allowlist,
+    yalnız koordinasyon/read otomatik, mark-read ve persisted draft kullanıcı etkileşimli.
+  - [ ] MCP'siz istemciler için allowlist binary/arg/cwd lifecycle adapter'ı.
 - [ ] Kritik guidance interview, owner+Meta best-practice+evidence karşılaştırması ve eval seti.
 - [ ] Guidance retrieval/context tools ve source/freshness/best-practice claim guard.
 - [ ] Act/test/observe/no-change + cadence ihlali proposal suppression eval'i.

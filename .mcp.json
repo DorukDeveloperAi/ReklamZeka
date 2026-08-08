@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "reklamzeka": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "--import",
+        "tsx",
+        "${CLAUDE_PROJECT_DIR:-.}/scripts/reklamzeka-mcp.ts"
+      ],
+      "timeout": 60000
+    }
+  }
+}

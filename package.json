@@ -24,6 +24,8 @@
     "pilot:field-report": "tsx scripts/generate-field-pilot-report.ts",
     "local-session:mint": "tsx --env-file=.env.local scripts/mint-local-session.ts",
     "local-session:configure": "tsx scripts/configure-local-session.ts",
+    "mcp:stdio": "node --import tsx scripts/reklamzeka-mcp.ts",
+    "verify:mcp-live": "tsx scripts/verify-reklamzeka-mcp-live.ts",
     "local-workspace:bootstrap": "tsx scripts/bootstrap-local-workspace.ts",
     "verify:local-workspace-bootstrap-db": "tsx scripts/verify-local-workspace-bootstrap-postgres.ts",
     "verify:local-agent-session-db": "tsx scripts/verify-local-agent-session-postgres.ts",
@@ -66,11 +68,13 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
     "drizzle-orm": "^0.45.2",
     "next": "^16.3.0",
     "pg": "^8.22.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

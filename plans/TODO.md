@@ -2,10 +2,10 @@
 
 > **TÜREV — elle düzenlenmez.** Tek yazar `agac.mjs` (motor · deterministik · 0 token).
 > Elle madde buraya değil **`TODO-ELLE.md`**'ye yazılır.
-> Damga: `19791d05d659` · Kaynak: CHECKLIST(açık) · TODO-ELLE.md · HUKUM.md(EKSİK/STUCK) · künye-eksikleri · sarkık-oturum
+> Damga: `c07e963cf364` · Kaynak: CHECKLIST(açık) · TODO-ELLE.md · HUKUM.md(EKSİK/STUCK) · künye-eksikleri · sarkık-oturum
 > İLANLI MUAF (bu listeye GİRMEZ, her birinin kendi kanalı var): alerts.jsonl · parked işler · doctor fix: · teslim onar: · kaptan task'ları
 
-**111 açık madde** · plansız: 0 · chk: 111 · elle: 0 · hüküm: 0 · künye: 0 · oturum: 0
+**96 açık madde** · plansız: 0 · chk: 96 · elle: 0 · hüküm: 0 · künye: 0 · oturum: 0
 
 ## Plansız maddeler — plan-üretim adayları (0)
 
@@ -19,26 +19,20 @@ _yok_
 
 _yok_
 
-## Plan checklist maddeleri (111) — künye önceliği sırasında
+## Plan checklist maddeleri (96) — künye önceliği sırasında
 
 
 ### proje v2 · P2
 - [ ] **A07 — rapor ve saha pilotu** `td:chk/proje/a07`
 - [ ] Gerçek 3 workspace/10 hesap `field_pilot` kanıtı. `td:chk/proje/h20b84a`
-- [ ] [08] Secret reference/migration ve read/write scope ayrımı. `td:chk/proje/h16c55a`
-- [ ] [08] Account/campaign/adset/ad/creative tam entity şeması ve raw provenance. `td:chk/proje/h871fea`
 - [ ] [08] Multi-business connection, account group ve account-level permission/capability modeli. `td:chk/proje/h142d75`
-- [ ] [08] Facebook Page, Instagram, pixel/dataset, app/WhatsApp destination asset graph. `td:chk/proje/hf4f8bc`
-- [ ] [08] Yayındaki ad copy/spec extraction: primary text/headline/description/caption/CTA/destination/dynamic variants. `td:chk/proje/hcad3c6`
-- [ ] [08] Bağlı Instagram/Page post-media inventory, ownership/promotion capability ve güvenli preview. `td:chk/proje/h53917f`
 - [ ] [08] L0 raw retention/encryption/purge ile connection revoke/disconnect/export/delete lifecycle. `td:chk/proje/l0`
-- [ ] [08] Meta config, targeting özeti, budget owner ve legacy objective mapping. `td:chk/proje/h1dd69c`
+- [ ] [08] Kullanıcıya sunulan veri export akışı ve production secret rotation işletimi. `td:chk/proje/hb672a3`
 - [ ] [08] Geniş metrik/action/action-value/breakdown kataloğu. `td:chk/proje/h0abde7`
-- [ ] [08] Inventory/creative/insights parçalı sync, adaptive page/date slice ve resume. `td:chk/proje/hb95318`
-- [ ] [08] Snapshot diff ve external/manual intervention timeline olayı. `td:chk/proje/hd9b688`
+- [ ] [08] Gerçek örnekte `action_values` container gözlemi; bounded kabul bunu sıfır gördü ve `td:chk/proje/hb37fe3`
 - [ ] [08] Capability/data-quality raporu ve Meta read-only E2E. `td:chk/proje/h1b5b8d`
 - [ ] [09] Category definition, çoklu assignment, evidence/confidence/manual lock. `td:chk/proje/h6f6a7e`
-- [ ] [09] Kullanıcı tanımlı dimension, single/multi cardinality ve entity-level kataloğu. `td:chk/proje/h4b2cdd`
+- [ ] [09] Rol/audit mutation API'si. `td:chk/proje/h900b4e`
 - [ ] [09] Meta/internal selector ve mapping preview motoru. `td:chk/proje/hf87f05`
 - [ ] [09] Category profile: analysis/rule/budget/transfer/schedule/action/creative policy bundle bağları. `td:chk/proje/hc6456c`
 - [ ] [09] Campaign→adset→ad→creative inheritance, child override ve effective-context snapshot. `td:chk/proje/haf478f`
@@ -50,41 +44,33 @@ _yok_
 - [ ] [09] Kategori coverage/unmatched/conflict/impact dashboard ve güvenli archive akışı. `td:chk/proje/h8ca7a8`
 - [ ] [09] PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run. `td:chk/proje/h36429c`
 - [ ] [09] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi. `td:chk/proje/h7b6132`
+- [ ] [09] Account-group/lifecycle/template scope, analysis-run binding ve rol/audit API'si. `td:chk/proje/ha9f858`
 - [ ] [09] Owner statement + official Meta source + experiment/observation provenance ve freshness. `td:chk/proje/h095098`
 - [ ] [09] G0→G4 progressive formalization, semantic diff, historical replay ve impact preview. `td:chk/proje/g0`
 - [ ] [09] AdvisedPractice candidate→trial→outcome→standardization lifecycle ve decomposition review. `td:chk/proje/hd13a94`
 - [ ] [10] Meta config + çoklu internal category + policy composition. `td:chk/proje/h837c80`
-- [ ] [10] Tam metrik kataloğu; additive/non-additive/ratio formülleri. `td:chk/proje/h43db1a`
-- [ ] [10] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver. `td:chk/proje/hcc55fe`
 - [ ] [10] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi. `td:chk/proje/h6d598c`
+- [ ] [10] Cohort calculator. `td:chk/proje/hd5fc1c`
 - [ ] [10] Hierarchical driver ve creative fatigue/config diagnostics. `td:chk/proje/ha5e060`
 - [ ] [10] Analysis run ledger, dry-run API ve deterministic replay. `td:chk/proje/hf0c5b9`
+- [ ] [10] Rol yönetimi/audit mutation API'si ve gerçek analysis dry-run endpoint'i. `td:chk/proje/h3bc88a`
 - [ ] [10] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu. `td:chk/proje/h458649`
-- [ ] [10] EffectiveGuidancePack scope filter/ranking/context-budget ve source/conflict trace. `td:chk/proje/h01f46d`
+- [ ] [10] Persistence, gerçek finding ailesi ve Decision Room application binding'i. `td:chk/proje/h6eba8b`
 - [ ] [10] DecisionCadenceProfile, no-change/repeat suppression ve ExperimentRecord lifecycle. `td:chk/proje/h8b2551`
+- [ ] [10] Cadence/experiment PostgreSQL persistence, rol/audit API'si ve Decision Room adapter binding'i. `td:chk/proje/hae8419`
 - [ ] [10] L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget. `td:chk/proje/l0-l5`
-- [ ] [10] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools. `td:chk/proje/h2c48df`
 - [ ] [10] Optional manual/CSV BusinessOutcomeSignal ve Meta-proxy mapping guard. `td:chk/proje/hd3b659`
-- [ ] [11] Envelope, allocation, target ve planned/committed/actual/forecast şemaları. `td:chk/proje/h39f892`
-- [ ] [11] CBO/ABO budget owner ve parent-child reconciliation. `td:chk/proje/h0cb8c1`
-- [ ] [11] Protected floor/fixed allocation ve transfer allow/deny/within-group. `td:chk/proje/h14ff56`
-- [ ] [11] Pacing/forecast, min sample, learning, cap ve cooldown guard'ları. `td:chk/proje/h2de05b`
-- [ ] [11] Fixed/proportional/priority/ladder deterministic allocation. `td:chk/proje/h6b0943`
-- [ ] [11] Keep/conservative/target-seeking simülasyon ve constraint trace. `td:chk/proje/hc63432`
-- [ ] [11] Versioned proposal ledger/API; artış approval zorunluluğu. `td:chk/proje/hd8dcc6`
-- [ ] [11] Business outcome target/proxy ayrımı ve yetersiz mapping suppression. `td:chk/proje/h580e41`
 - [ ] [12] PolicyId/simulationId bağlı genişletilmiş envelope ve claim validator. `td:chk/proje/he961f5`
 - [ ] [12] Natural-language instruction translator ve ambiguity eval seti. `td:chk/proje/h22cbf5`
 - [ ] [12] Salt-okur local-session/advisor ledger, import/DB saldırı testi ve redaksiyon. `td:chk/proje/h149c30`
 - [ ] [12] Karar defteri/context budget ve deterministic fallback. `td:chk/proje/h76c76a`
 - [ ] [12] Injection/cross-tenant/secret/action-bypass tam negatif matrisi. `td:chk/proje/haa9d1e`
-- [ ] [12] LocalAgentClient/session contract ve modelsiz deterministic fixture client. `td:chk/proje/hff54c2`
-- [ ] [12] No-model-API boundary: ReklamZeka'da OpenAI/Anthropic key, SDK veya model network call yok. `td:chk/proje/h76738f`
 - [ ] [12] Localhost Streamable HTTP + project STDIO MCP; auth ve read/proposal tool ayrımı. `td:chk/proje/hd44902`
-- [ ] [12] Codex CLI/VS Code + Claude Code MCP conformance; raw writer/human grant expose edilmez. `td:chk/proje/h5d9115`
+- [ ] [12] Localhost Streamable HTTP MCP transport; mevcut localhost REST application API bunun yerine geçmez. `td:chk/proje/h37d3e2`
 - [ ] [12] Session register/heartbeat, dashboard context handoff ve proposal correlation. `td:chk/proje/h0200e6`
 - [ ] [12] Local `reklamzeka` companion ile TTY/passkey HumanPresenceGrant ve ayrı approve/execute. `td:chk/proje/h937c5b`
 - [ ] [12] MCP-capable CLI config ve güvenli allowlist LocalCliAdapter extension point. `td:chk/proje/ha7e250`
+- [ ] [12] MCP'siz istemciler için allowlist binary/arg/cwd lifecycle adapter'ı. `td:chk/proje/hb499ff`
 - [ ] [12] Kritik guidance interview, owner+Meta best-practice+evidence karşılaştırması ve eval seti. `td:chk/proje/ha40175`
 - [ ] [12] Guidance retrieval/context tools ve source/freshness/best-practice claim guard. `td:chk/proje/h74010b`
 - [ ] [12] Act/test/observe/no-change + cadence ihlali proposal suppression eval'i. `td:chk/proje/hf8fe34`
@@ -96,29 +82,27 @@ _yok_
 - [ ] [13] Campaign/adset/ad pause/activate eligibility ve parent/effective-status matrisi. `td:chk/proje/hd515f4`
 - [ ] [13] Campaign/adset budget owner write; ad-level budget negatif testi. `td:chk/proje/hd8c3cb`
 - [ ] [13] K0–K4 valve, account allowlist, caps, kill switch ve çift anahtar. `td:chk/proje/k0-k4`
-- [ ] [13] Approval state machine, expiry, stale-plan ve separation of duties. `td:chk/proje/h925a45`
 - [ ] [13] Idempotent execute, Meta error taxonomy, read-after-write ve rollback. `td:chk/proje/h9b0b2d`
 - [ ] [13] Hourly/daily/weekly/monthly/after-sync scheduler; DST/misfire/idempotency. `td:chk/proje/h000c67`
+- [ ] [13] Güvenilir local scheduler principal/runner aktivasyonu; cron/route hâlen kapalı. `td:chk/proje/h225c69`
+- [ ] [13] Hourly/monthly/after-sync schedule türleri. `td:chk/proje/h14203a`
 - [ ] [13] Sync→analyze→plan→approval agentic routine; otomatik execute yok. `td:chk/proje/h17c1bc`
 - [ ] [13] External intervention reconcile ve sandbox/shadow rollout. `td:chk/proje/h67739b`
 - [ ] [13] Manual/assisted/automated-read/scheduled-plan + approval-only/policy-limited inheritance ve kill switch. `td:chk/proje/h7cd99e`
 - [ ] [13] Multi-account batch plan; account-bazlı approval/execute/partial recovery. `td:chk/proje/h908106`
-- [ ] [13] Varsayılan workspace `approval_only` autonomy lock; expiry/child scope fail-closed. `td:chk/proje/hd8a307`
-- [ ] [13] ActionBundle→atomik ActionUnit dependency DAG, tek tek approve/reject/request-changes. `td:chk/proje/hdd1197`
-- [ ] [13] Mevcut Instagram/Page gönderisinden template+audience preset'li promotion preflight ve K4 bundle. `td:chk/proje/ha9ca7f`
-- [ ] [13] Yeni metin/görsel/video/creative üretmeme boundary ve negatif testleri. `td:chk/proje/hf0b1da`
-- [ ] [13] Creative/post spec hash değişiminde stale approval ve yeniden onay. `td:chk/proje/hba96e9`
 - [ ] [13] Meta request/write verify ile platform review/delivery effective state ayrımı. `td:chk/proje/ha8b583`
-- [ ] [13] Action type/risk + account/category/campaign/entity scoped effective-autonomy resolver ve trace. `td:chk/proje/h0d94d6`
 - [ ] [14] Bugün/portfolio hiyerarşi ve internal/Meta filtreler. `td:chk/proje/hb8d4e8`
 - [ ] [14] Account-group switcher, multi-account connection health ve Page/Instagram asset graph. `td:chk/proje/hd7b228`
 - [ ] [14] Kategori/talimat stüdyosu ve raw/normalized/version/conflict görünümü. `td:chk/proje/he405ed`
 - [ ] [14] Analiz stüdyosu: template/dry-run/publish/schedule/history. `td:chk/proje/he6f118`
 - [ ] [14] Bütçe stüdyosu: envelope/lock/target/forecast/simulation. `td:chk/proje/hb498ac`
+- [ ] [14] Kural/target edit akışı. `td:chk/proje/he66169`
 - [ ] [14] Approval inbox, automation run, verify/rollback ve tek timeline. `td:chk/proje/h86fc64`
 - [ ] [14] Mevcut creative library + context/performance karşılaştırması. `td:chk/proje/h7a9216`
 - [ ] [14] Yayındaki reklam metni/dynamic variant/CTA/destination/post kaynağı explorer'ı. `td:chk/proje/he5cdef`
 - [ ] [14] Instagram/Page post seçici, PromotionTemplate/AudiencePreset ve existing-post guided flow. `td:chk/proje/h748424`
+- [ ] [14] Kullanıcı-reviewed gerçek ApprovalPolicy/AutonomyRule/Guardrail/compatibility bundle'ını yayınlama ve `td:chk/proje/hd6f86b`
+- [ ] [14] Dashboard seçimi→server-resolved POST context→proposal kaydı ve satır-bazlı approval uçtan uca bağlantısı. `td:chk/proje/hcec5ac`
 - [ ] [14] Owner/admin/analyst/operator/viewer rol E2E. `td:chk/proje/h3aff1a`
 - [ ] [14] 1280/820/390, keyboard/screen-reader ve hata/partial/conflict E2E. `td:chk/proje/h13fad8`
 - [ ] [14] Kota/alert/deadman/kill-switch/runbook ve staged rollout KPI raporu. `td:chk/proje/h3d7380`
@@ -128,6 +112,7 @@ _yok_
 - [ ] [14] AnalysisAgenda, applied guidance, cadence/experiment ve no-change UI yolculuğu. `td:chk/proje/h15ef9e`
 - [ ] [14] Practice Lab candidate/trial/outcome/decomposition/standardized artifact UI. `td:chk/proje/h0c8a74`
 - [ ] [14] Scheduled analysis in-app inbox ve duplicate-delivery/read-state E2E. `td:chk/proje/h2c9b81`
+- [ ] [14] Güvenilir principal ile canlı dashboard E2E. `td:chk/proje/hb0f0b3`
 - [ ] [14] Operating Dashboard gerçek backend state'iyle responsive/browser E2E. `td:chk/proje/h52d78e`
 - [ ] [14] Orchestrator skill/context/autonomy/handoff çalışma alanı ve dashboard↔CLI E2E. `td:chk/proje/h30d52a`
 - [ ] A07 gerçek saha pilotu tamamlandı. `td:chk/proje/a07-2`

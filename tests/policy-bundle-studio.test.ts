@@ -121,5 +121,12 @@ describe("K4 Policy Bundle Studio read + draft", () => {
       Host: "localhost:3000", Cookie: "__Host-rzka_local_session=opaque", "Sec-Fetch-Site": "same-origin",
       "X-ReklamZeka-Intent": "policy-bundle-read" } }));
     expect(get.status).toBe(200); expect(get.headers.get("x-reklamzeka-action-authority")).toBe("none");
+    const bearerGet = await handlers.GET(new Request("http://localhost:3000/api/policy-bundles", { headers: {
+      Host: "localhost:3000", Authorization: "Bearer opaque", "Sec-Fetch-Site": "same-origin",
+      "X-ReklamZeka-Intent": "policy-bundle-read" } }));
+    expect(bearerGet.status).toBe(200);
+    const bearerPost = await handlers.POST(new Request("http://localhost:3000/api/policy-bundles", { method: "POST",
+      headers: { ...headers, Cookie: "", Authorization: "Bearer opaque" }, body: JSON.stringify(approvalRequest) }));
+    expect(bearerPost.status).toBe(400);
   });
 });

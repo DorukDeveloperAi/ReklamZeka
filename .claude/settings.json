@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__reklamzeka__register_agent_session",
+      "mcp__reklamzeka__heartbeat_agent_session",
+      "mcp__reklamzeka__get_handoff_context",
+      "mcp__reklamzeka__decision_room_list",
+      "mcp__reklamzeka__approval_queue_list",
+      "mcp__reklamzeka__approval_queue_get",
+      "mcp__reklamzeka__policy_bundle_read",
+      "mcp__reklamzeka__budget_lab_list",
+      "mcp__reklamzeka__budget_lab_get",
+      "mcp__reklamzeka__budget_lab_dry_run",
+      "mcp__reklamzeka__practice_lab_list",
+      "mcp__reklamzeka__practice_lab_get",
+      "mcp__reklamzeka__practice_lab_prepare_draft",
+      "mcp__reklamzeka__existing_post_promotion_preflight"
+    ]
+  }
+}

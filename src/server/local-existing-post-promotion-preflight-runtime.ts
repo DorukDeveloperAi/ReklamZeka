@@ -16,7 +16,9 @@ export function createLocalExistingPostPromotionPreflightRouteHandler(input: Rea
 }>) {
   return async function POST(request: Request) {
     try {
-      if (request.headers.has("authorization") || !request.headers.get("cookie")) return existingPostPromotionPreflightNotConfiguredResponse();
+      if (request.headers.has("authorization") === request.headers.has("cookie")) {
+        return existingPostPromotionPreflightNotConfiguredResponse();
+      }
       const bound = await resolveTrustedLocalReadPrincipal({ request, database: input.database, config: input.config,
         requiredScope: "promotion_preflight:read" });
       const contract = new ExistingPostPromotionPreflightAgentContract(

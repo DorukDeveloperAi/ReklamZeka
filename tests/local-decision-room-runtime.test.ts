@@ -4,6 +4,7 @@ import {
   assertTrustedLocalDecisionRoomRequest,
   createLocalDecisionRoomRouteHandlers,
   localDecisionRoomConfig,
+  resolveTrustedLocalPolicyBundlePrincipal,
   resolveTrustedLocalSessionIdentity,
   type LocalDecisionRoomEnvironment,
 } from "@/server/local-decision-room-runtime";
@@ -89,6 +90,20 @@ describe("local Decision Room principal boundary", () => {
       config, credential: "bearer" })).rejects.toBeInstanceOf(LocalDecisionRoomBoundaryError);
   });
 
+  it("allows bearer only for policy-bundle reads and keeps policy mutations cookie-only", async () => {
+    const config = localDecisionRoomConfig(environment())!;
+    const token = sessionToken();
+    const bearer = request("/api/policy-bundles", {
+      Authorization: `Bearer ${token}`, "X-ReklamZeka-Intent": "policy-bundle-read",
+    });
+    await expect(resolveTrustedLocalPolicyBundlePrincipal({ request: bearer, database: readDatabase() as never,
+      config, requiredScope: "policy_bundle:read" })).resolves.toMatchObject({
+      membership: { workspaceId, userId, role: "viewer" },
+    });
+    await expect(resolveTrustedLocalPolicyBundlePrincipal({ request: bearer, database: readDatabase() as never,
+      config, requiredScope: "policy_bundle:draft" })).rejects.toBeInstanceOf(LocalDecisionRoomBoundaryError);
+  });
+
   it("is disabled unless all server-only bindings are explicitly enabled", () => {
     expect(localDecisionRoomConfig(environment({ REKLAMZEKA_LOCAL_SESSION_ENABLED: "false" }))).toBeNull();
     expect(localDecisionRoomConfig(environment({ DATABASE_URL: "" }))).toBeNull();
@@ -105,6 +120,10 @@ describe("local Decision Room principal boundary", () => {
   it("rejects host spoofing, proxy claims, cross-site reads, and replayable PATCH requests", () => {
     const config = localDecisionRoomConfig(environment())!;
     expect(() => assertTrustedLocalDecisionRoomRequest(request(), config, "read")).not.toThrow();
+    expect(() => assertTrustedLocalDecisionRoomRequest(request(undefined, {
+      "X-Forwarded-For": "::1", "X-Forwarded-Host": "localhost:3000",
+      "X-Forwarded-Port": "3000", "X-Forwarded-Proto": "http",
+    }), config, "read")).not.toThrow();
     expect(() => assertTrustedLocalDecisionRoomRequest(request(undefined, { Host: "evil.example" }), config, "read"))
       .toThrow(LocalDecisionRoomBoundaryError);
     expect(() => assertTrustedLocalDecisionRoomRequest(request(undefined, { "X-Forwarded-For": "127.0.0.1" }), config, "read"))

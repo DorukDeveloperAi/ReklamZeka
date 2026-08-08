@@ -30,8 +30,13 @@ describe("local existing-post preflight runtime", () => {
     expect(response.status).toBe(404); expect(execute).toHaveBeenCalledTimes(2);
     await expect(response.json()).resolves.toMatchObject({ error: { code: "not_found" }, authority: { canExecute: false, canWriteMeta: false } });
   });
-  it("rejects bearer before database access", async () => {
-    const execute = vi.fn(); const response = await createLocalExistingPostPromotionPreflightRouteHandler({ database: { execute } as never, config })(request("bearer"));
-    expect(response.status).toBe(503); expect(execute).not.toHaveBeenCalled();
+  it("accepts the OS-bound bearer read scope for the local MCP preflight", async () => {
+    const execute = vi.fn().mockResolvedValueOnce({ rows: [{ workspace_id: workspaceId, user_id: userId,
+      role: "viewer", lifecycle_state: "active" }] }).mockResolvedValueOnce({ rows: [] });
+    const response = await createLocalExistingPostPromotionPreflightRouteHandler({ database: { execute } as never,
+      config })(request("bearer"));
+    expect(response.status).toBe(404); expect(execute).toHaveBeenCalledTimes(2);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "not_found" },
+      authority: { canExecute: false, canWriteMeta: false } });
   });
 });

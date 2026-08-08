@@ -11,12 +11,10 @@ import {
   type LocalAgentTransport,
 } from "@/application/local-agent-client";
 import type { LocalSessionClaims } from "@/security/local-session-capability";
-import { LocalDecisionRoomBoundaryError } from "@/server/local-decision-room-runtime";
+import { hasTrustedFrameworkForwarding, LocalDecisionRoomBoundaryError } from
+  "@/server/local-decision-room-runtime";
 
 const MAX_BODY_BYTES = 2_048;
-const FORWARDED = [
-  "forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip", "cf-connecting-ip",
-] as const;
 const FORBIDDEN_HEADERS = ["x-workspace-id", "x-workspace-ref", "x-user-id", "x-session-ref"] as const;
 const HEADERS = Object.freeze({
   "Cache-Control": "private, no-store, max-age=0",
@@ -47,9 +45,9 @@ function exact(value: unknown, keys: readonly string[]): asserts value is Record
   }
 }
 
-function boundary(request: Request): void {
+function boundary(request: Request, origin: string): void {
   const url = new URL(request.url);
-  if (url.search || FORWARDED.some((header) => request.headers.has(header))
+  if (url.search || !hasTrustedFrameworkForwarding(request, origin)
     || FORBIDDEN_HEADERS.some((header) => request.headers.has(header))) throw new Error("invalid_input");
 }
 
@@ -129,7 +127,7 @@ export function createLocalAgentSessionHttpHandlers(input: Readonly<{
   return Object.freeze({
     GET: async (request: Request) => {
       try {
-        boundary(request);
+        boundary(request, input.origin);
         if (request.method !== "GET" || credential(request) !== "cookie"
           || request.headers.get("sec-fetch-site") !== "same-origin"
           || request.headers.get("x-reklamzeka-intent") !== "local-agent-sessions-read"
@@ -142,7 +140,7 @@ export function createLocalAgentSessionHttpHandlers(input: Readonly<{
     },
     POST: async (request: Request) => {
       try {
-        boundary(request);
+        boundary(request, input.origin);
         if (request.method !== "POST") throw new Error("invalid_input");
         const mode = credential(request);
         const intent = request.headers.get("x-reklamzeka-intent");
@@ -177,7 +175,7 @@ export function createLocalAgentSessionHttpHandlers(input: Readonly<{
     },
     PATCH: async (request: Request) => {
       try {
-        boundary(request);
+        boundary(request, input.origin);
         if (request.method !== "PATCH" || credential(request) !== "bearer"
           || request.headers.get("x-reklamzeka-intent") !== "local-agent-session-heartbeat") {
           throw new Error("invalid_input");
