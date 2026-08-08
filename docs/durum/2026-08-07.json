@@ -4,95 +4,162 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "8bbeef3c0",
-      "tarih": "2026-08-07",
-      "konu": "chore(kit): utopya iskeletleri kalıcı YEREL ilan edildi",
+      "hash": "2ce337256",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
       "tur": "is",
       "kapsam": [
-        "chore"
+        "docs"
       ]
     },
     {
-      "hash": "211d67333",
-      "tarih": "2026-08-07",
-      "konu": "chore(turev): 2. merge sonrası türevleri yeniden üret",
+      "hash": "5b3930eb3",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record session handoff core",
       "tur": "is",
       "kapsam": [
-        "chore"
+        "docs"
       ]
     },
     {
-      "hash": "03716c2fc",
-      "tarih": "2026-08-07",
-      "konu": "merge: uzak ile birleştir (2. tur)",
-      "tur": "is",
-      "kapsam": [
-        "merge"
-      ]
-    },
-    {
-      "hash": "1927e26a3",
-      "tarih": "2026-08-07",
-      "konu": "chore(turev): merge sonrası türevleri üreticiden yeniden üret (agac.mjs INDEX/TODO + DURUM)",
-      "tur": "is",
-      "kapsam": [
-        "chore"
-      ]
-    },
-    {
-      "hash": "bfe9b9fce",
-      "tarih": "2026-08-07",
-      "konu": "merge: uzak ile birleştir — kayıpsız (türev yeniden üretilir, içerik birleşimle korunur)",
-      "tur": "is",
-      "kapsam": [
-        "merge"
-      ]
-    },
-    {
-      "hash": "fa74d5a3a",
-      "tarih": "2026-08-07",
-      "konu": "feat: add read-only Meta access inventory",
+      "hash": "fad7505fa",
+      "tarih": "2026-08-08",
+      "konu": "feat(agent): add session handoff lifecycle",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "03d03c538",
-      "tarih": "2026-08-06",
-      "konu": "vscode ayarları eklendi",
+      "hash": "3090e2920",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
       "tur": "is",
-      "kapsam": []
+      "kapsam": [
+        "docs"
+      ]
     },
     {
-      "hash": "0d2239dda",
-      "tarih": "2026-08-06",
-      "konu": "aide iskelesi + filing katmanı kuruldu (yeni proje)",
+      "hash": "bbbf3adb1",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record local agent client gate",
       "tur": "is",
-      "kapsam": []
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "8f33dbc22",
+      "tarih": "2026-08-08",
+      "konu": "feat(agent): add vendor-neutral fixture client",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "9b317f2d8",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "23025196d",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record no-model API gate",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "ba4347d8d",
+      "tarih": "2026-08-08",
+      "konu": "test(agent): enforce no-model API boundary",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "7d1efb006",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "0dea31c39",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record K4 and insight gates",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "fd392bc5d",
+      "tarih": "2026-08-08",
+      "konu": "feat(meta): add v23 insight capability catalog",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e8dc56aac",
+      "tarih": "2026-08-08",
+      "konu": "feat(actions): complete K4 publication gate",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "04be8a651",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "8c9e8295b",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record K4 policy studio gate",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
     }
   ],
   "kapsamDagilimi": [
     {
-      "kapsam": "chore",
-      "adet": 3
-    },
-    {
-      "kapsam": "?",
-      "adet": 2
-    },
-    {
-      "kapsam": "merge",
-      "adet": 2
-    },
-    {
       "kapsam": "feat",
-      "adet": 1
+      "adet": 34
+    },
+    {
+      "kapsam": "docs",
+      "adet": 20
+    },
+    {
+      "kapsam": "test",
+      "adet": 4
+    },
+    {
+      "kapsam": "fix",
+      "adet": 2
     }
   ],
-  "isSayisi": 8,
+  "isSayisi": 105,
   "ilkIsTarihi": "2026-08-06",
-  "sonIsTarihi": "2026-08-07",
+  "sonIsTarihi": "2026-08-08",
   "planlar": [
     {
       "slug": "proje",
@@ -101,15 +168,7 @@
       "asamaKapali": 6,
       "asamaToplam": 14,
       "siradaki": "08-Meta dijital ikizi"
-    },
-    {
-      "slug": "reklamzeka-sistemi",
-      "v": 2,
-      "durum": "AÇIK",
-      "asamaKapali": 0,
-      "asamaToplam": 10,
-      "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "754a4fd24415"
+  "damga": "89d4d202ab20"
 }

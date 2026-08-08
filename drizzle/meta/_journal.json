@@ -40,8 +40,246 @@
     {
       "idx": 5,
       "version": "7",
-      "when": 1786091983389,
-      "tag": "20260807083943_meta_digital_twin_core",
+      "when": 1786092685281,
+      "tag": "20260807085125_mature_penance",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786094176373,
+      "tag": "20260807091616_chunky_sauron",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786095296774,
+      "tag": "20260807093456_gorgeous_killraven",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786101090652,
+      "tag": "20260807111130_secure_supabase_data_api",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786101312193,
+      "tag": "20260807111512_revoke_public_function_execute",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786101597557,
+      "tag": "20260807111957_marvelous_daimon_hellstrom",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786102983983,
+      "tag": "20260807114303_cool_union_jack",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786104951993,
+      "tag": "20260807121551_persist_meta_connection_secrets",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786105264367,
+      "tag": "20260807122104_clever_switch",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786105332985,
+      "tag": "20260807122212_nebulous_valkyrie",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1786105612710,
+      "tag": "20260807122652_workspace_tombstone_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786106863353,
+      "tag": "20260807124743_aberrant_supreme_intelligence",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786108241990,
+      "tag": "20260807131041_fine_wolverine",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786109040258,
+      "tag": "20260807132400_robust_red_hulk",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786110471824,
+      "tag": "20260807134751_handy_nekra",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786111681832,
+      "tag": "20260807140801_sleepy_marrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786113260203,
+      "tag": "20260807143420_true_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1786115315509,
+      "tag": "20260807150835_fancy_may_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1786117046115,
+      "tag": "20260807153726_little_devos",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1786118076497,
+      "tag": "20260807155436_cheerful_beyonder",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786120550007,
+      "tag": "20260807163550_watery_roland_deschain",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1786124137889,
+      "tag": "20260807173537_action_proposal_queue",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1786125873464,
+      "tag": "20260807180433_fixed_tarantula",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1786127478062,
+      "tag": "20260807183118_wandering_patch",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1786131645270,
+      "tag": "20260807194045_tiresome_sugar_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1786132876908,
+      "tag": "20260807200116_petite_madame_hydra",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1786134071898,
+      "tag": "20260807202111_clean_bishop",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1786135203140,
+      "tag": "20260807204003_unusual_taskmaster",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1786136345722,
+      "tag": "20260807205905_action_guardrail_policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1786137874437,
+      "tag": "20260807212434_meta_affected_geo_persistence",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1786139026927,
+      "tag": "20260807214346_meta_read_sync_schedule_persistence",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1786139859366,
+      "tag": "20260807215739_medical_thena",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1786141001884,
+      "tag": "20260807221641_perpetual_black_widow",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1786146825544,
+      "tag": "20260807235345_local_agent_session_handoff",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1786152656930,
+      "tag": "20260808013056_extend_local_agent_guidance_tools",
       "breakpoints": true
     }
   ]

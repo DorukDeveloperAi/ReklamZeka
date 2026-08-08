@@ -42,6 +42,9 @@ export const ANALYSIS_METRICS = [
   "leads",
   "qualifiedLeads",
   "qualifiedLeadRate",
+  "cplMinor",
+  "messages",
+  "costPerMessageMinor",
   "appInstalls",
   "cpiMinor",
   "retentionD7",
@@ -92,7 +95,12 @@ export type AnalysisRule = Readonly<{
 export type AnalysisTimeframe =
   | Readonly<{ kind: "rolling"; days: number; timezone: string }>
   | Readonly<{ kind: "fixed"; startDate: string; endDate: string; timezone: string }>
-  | Readonly<{ kind: "calendar"; unit: "week" | "month" | "quarter"; offset: number; timezone: string }>;
+  | Readonly<{ kind: "calendar"; unit: "week" | "month" | "quarter"; offset: number; timezone: string }>
+  | Readonly<{ kind: "lifetime"; timezone: string }>
+  | Readonly<{ kind: "learning"; timezone: string }>
+  | Readonly<{ kind: "action_relative"; beforeDays: number; afterDays: number; timezone: string }>;
+
+export type AnalysisComparison = "previous_period" | "previous_year" | "weekday_matched" | "none";
 
 export type AnalysisSchedule =
   | Readonly<{ frequency: "manual" }>
@@ -143,7 +151,7 @@ export type AnalysisDefinition = Readonly<{
   name: string;
   campaignContext: CampaignContext;
   timeframe: AnalysisTimeframe;
-  comparison: "previous_period" | "previous_year" | "none";
+  comparison: AnalysisComparison;
   rules: readonly AnalysisRule[];
   schedule: AnalysisSchedule;
   narrative: NarrativeConfiguration;
@@ -168,6 +176,13 @@ function isOneOf<T extends readonly string[]>(value: unknown, allowed: T): value
   return typeof value === "string" && allowed.includes(value as T[number]);
 }
 
+function isCalendarDate(value: string): boolean {
+  if (!DATE_PATTERN.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number) as [number, number, number];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
 export function isValidIanaTimezone(timezone: string): boolean {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
@@ -186,13 +201,22 @@ function validateTimeframe(timeframe: AnalysisTimeframe): void {
     }
   } else if (timeframe.kind === "fixed") {
     requireExactKeys(timeframe, ["kind", "startDate", "endDate", "timezone"], "Fixed timeframe");
-    if (!DATE_PATTERN.test(timeframe.startDate) || !DATE_PATTERN.test(timeframe.endDate) || timeframe.startDate > timeframe.endDate) {
+    if (!isCalendarDate(timeframe.startDate) || !isCalendarDate(timeframe.endDate) || timeframe.startDate > timeframe.endDate) {
       throw new AnalysisDefinitionValidationError("Fixed timeframe geçerli ve sıralı tarihler taşımalıdır");
     }
-  } else {
+  } else if (timeframe.kind === "calendar") {
     requireExactKeys(timeframe, ["kind", "unit", "offset", "timezone"], "Calendar timeframe");
     if (!["week", "month", "quarter"].includes(timeframe.unit) || !Number.isInteger(timeframe.offset) || timeframe.offset > 0 || timeframe.offset < -24) {
       throw new AnalysisDefinitionValidationError("Calendar timeframe unit ve offset değeri geçersizdir");
+    }
+  } else if (timeframe.kind === "lifetime" || timeframe.kind === "learning") {
+    requireExactKeys(timeframe, ["kind", "timezone"], `${timeframe.kind} timeframe`);
+  } else {
+    requireExactKeys(timeframe, ["kind", "beforeDays", "afterDays", "timezone"], "Action-relative timeframe");
+    if (!Number.isInteger(timeframe.beforeDays) || timeframe.beforeDays < 0 || timeframe.beforeDays > 365 ||
+        !Number.isInteger(timeframe.afterDays) || timeframe.afterDays < 0 || timeframe.afterDays > 365 ||
+        timeframe.beforeDays + timeframe.afterDays < 1) {
+      throw new AnalysisDefinitionValidationError("Action-relative timeframe günleri 0–365 aralığında ve toplamda pozitif olmalıdır");
     }
   }
 }
@@ -238,7 +262,7 @@ export function validateAnalysisDefinition(definition: AnalysisDefinition): Anal
   if (definition.status === "published" && definition.campaignContext.classificationSource === "uncertain") {
     throw new AnalysisDefinitionValidationError("Belirsiz kampanya sınıflandırması yayınlanamaz");
   }
-  if (!["previous_period", "previous_year", "none"].includes(definition.comparison)) throw new AnalysisDefinitionValidationError("Karşılaştırma politikası geçersizdir");
+  if (!["previous_period", "previous_year", "weekday_matched", "none"].includes(definition.comparison)) throw new AnalysisDefinitionValidationError("Karşılaştırma politikası geçersizdir");
   validateTimeframe(definition.timeframe);
   validateSchedule(definition.schedule);
   const ruleIds = new Set<string>();

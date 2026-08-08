@@ -1,19 +1,19 @@
 # PLAN AĞACI — ReklamZeka
 
 > **ELLE DÜZENLEME YAPMA** — bu dosyayı `plan-organizatoru/scripts/agac.mjs` türetir (tek yazar).
-> Damga: `e090c0916e20` · Kaynak: `plans/*/v*/{MASTER,STATE,CHECKLIST}.md` + `plans/legacy.json`
+> Damga: `5fec82bef03d` · Kaynak: `plans/*/v*/{MASTER,STATE,CHECKLIST}.md` + `plans/legacy.json`
 > Tazelik: `node ~/.claude/skills/plan-organizatoru/scripts/agac.mjs --gate` (damga uyuşmazlığı = bayat INDEX → yeniden türet)
 
 ## Ağaç
 
-- **proje** (v2 · SÜRÜYOR · aşama 6/14 · sıradaki: 08-Meta dijital ikizi) — ReklamZeka Meta Reklam İşletim Sistemi `[proje]` `P2`
+- **proje** (v2 · SÜRÜYOR · aşama 6/14) — ReklamZeka Meta Reklam İşletim Sistemi `[proje]` `P2`
 - **reklamzeka-sistemi** (v2 · AÇIK · aşama 0/10 · sıradaki: 01-temel-kapanis) — REKLAMZEKA SİSTEMİ `[proje]` `P2`
 
 ## Planlar
 
 | plan | kategori | künye (kritiklik/aciliyet · hacim) | üst | sürüm | durum | aşamalar | checklist (açık/kapalı) | son tur |
 |---|---|---|---|---|---|---|---|---|
-| [proje](proje/v2/MASTER.md) | proje | yüksek/normal · epik (P2) | — | v2 | SÜRÜYOR | 6/14 | 111/16 | — |
+| [proje](proje/v2/MASTER.md) | proje | yüksek/normal · epik (P2) | — | v2 | SÜRÜYOR | 6/14 | 101/163 | — |
 | [reklamzeka-sistemi](reklamzeka-sistemi/v2/MASTER.md) | proje | yüksek/yakın · epik (P2) | — | v2 | AÇIK | 0/10 | 65/0 | 2026-08-06 16:05 — hiyerarşi üretimi (session 35fbdca7) |
 
 ## Öncelik sırası (türev — künye: kritiklik × aciliyet)
@@ -26,9 +26,7 @@
 ### proje — ReklamZeka Meta Reklam İşletim Sistemi
 - Künye: proje · yüksek/normal · epik (P2) · **hedef:** ReklamZeka; Meta portföyünü doğru bağlamda anlayan, kullanıcı
 - Kaynak oturum: `ot:2026-08-06/reklamzeka-baslangic`
-- Sıradaki aşama: **08 — Meta dijital ikizi** (AÇIK)
-- Bekleyen: 09-kategori ve talimat ⟵ 08 · 11-bütçe planlama ⟵ 09, 10 · 13-eylem valfi ve rutin ⟵ 10–12 · 14-kontrol merkezi ⟵ 07, 09–13
-- Hazır komut: `/goal plans/proje/v2/asama-08-meta-dijital-ikizi.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz`
+- Bekleyen: 11-bütçe planlama ⟵ 09, 10 · 13-eylem valfi ve rutin ⟵ 10–12 · 14-kontrol merkezi ⟵ 07, 09–13
 
 ### reklamzeka-sistemi — REKLAMZEKA SİSTEMİ
 - Künye: proje · yüksek/yakın · epik (P2) · **hedef:** Brief-temelli, kontrol-öncelikli Meta reklam yardımcı ajanı uçtan uca canlı — veri ambarı, brief yargısı, onaylı yazma, bütçe danışmanı, metin kuralları ve CRM kapısı 10 koşulabilir aşamada kanıtlanmış durumda.

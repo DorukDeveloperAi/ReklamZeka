@@ -13,6 +13,33 @@ hesap kanıtından sonra ikinci hesapta tenant/account izolasyonu doğrulanır.
 Bu dosya yalnız güncel teslim dilimini yönetir. A08 domain şartnamesinin minimum değer
 üreten sırasıdır; S2 category/analysis veya A13 write kapsamını öne çekmez.
 
+## Güncel ilerleme — 2026-08-07
+
+- **S1.1 çekirdek sözleşme tamam:** read-only connection service, capability doctor,
+  workspace authorization, redacted public model, environment/in-memory secret reference,
+  lifecycle ve append-only audit testli. Kalıcı DB adapter ve secret rotation S1.5'e açık.
+- **S1.2 tamam:** non-destructive digital-twin migration, full hierarchy/content/asset
+  canonical modeli ve deterministik CBO/ABO budget-owner resolver testli.
+- **Canlı read kanıtı:** 5 ad account, 22 Page, 8 Instagram, 422 campaign, 1.108 ad set,
+  4.620 ad; tüm hesaplarda son-7-gün insight erişimi, 0 hata ve 0 write.
+- **S1.3 core tamam:** parçalı/resumable runtime, persistence schema, metric contract,
+  transaction adapter, somut Drizzle repository ve hash-only replay ledger fixture/golden
+  testli. Her sayfa/slice durable olur ve yeni runtime cursor'dan hydrate edilir.
+- **GET-only Graph binding tamam:** inventory hierarchy, creative/post ve insight edge'leri,
+  cursor pagination ve usage headroom gerçek Meta'da sınırlı smoke ile 0 write doğrulandı.
+- **S1.3 kapalı:** Supabase PostgreSQL 17'ye sekiz migration/29 public tablo uygulandı;
+  transaction/session pooler SSL bağlantıları ve yeni connection/runtime ile durable
+  `partial`→cursor restore→`completed` kabulü geçti. Geçici E2E workspace'i cascade silindi.
+- **S1.4 kapalı:** asset/content/post mirror ortak canlı servis ve PostgreSQL repository'ye
+  bağlandı. İki gerçek hesaplı geçici kabulde 79 asset/79 edge, 1.179 bağlı post/media,
+  6 reklam metni/post bağı, 4 creative ve 6 binding; 3 durable checkpoint, izole partial
+  hata, tam cleanup ve `0` Meta write doğrulandı.
+- **S1.5 ve Slice 01 kapalı:** trust/readiness eksikleri sebepli ve fail-closed gösteriyor;
+  kalıcı connection/secret lifecycle, hash-only raw retention, workspace tombstone,
+  restart-durable snapshot diff ve doğrulanmış action-ledger dışı `external_change`
+  timeline tamamlandı. İki hesap scope izolasyonu, replay/restart, 32/32 RLS ve `0` Meta
+  write kanıtlandı. Sıradaki dilim S2 Decision Room'dur.
+
 ## Değişmez sınırlar
 
 - Meta write import'u, management operation ve action proposal yok.
@@ -93,6 +120,13 @@ Yapılacaklar:
 izlenir; dynamic varyant provenance korunur; promotable/non-promotable post sebeplidir;
 promotion veya creative write çağrısı `0`dır.
 
+**Kanıt (2026-08-07):** `verify:meta-s14-read`, `verify:meta-asset-content-db`,
+`verify:meta-post-media-db` ve `verify:meta-s14-live-db` geçti. Canlı kabul 2 hesapta
+GET-only çalıştı; bir hesap transient hata ve bounded page-limit ile partial kalırken diğer
+kalıcı sonuçlar korundu. Actor bilgisi eksik post kayıtları tahmin edilmeden `wrong_actor`
+olarak reddedilip yalnız kanıtlı kayıtlar aynalandı. Promotion eligibility ve kısa ömürlü,
+workspace-bound preview ref sözleşmeleri olumlu/olumsuz/unknown fixture matrisiyle doğrulandı.
+
 ### S1.5 — Trust, lifecycle ve iki hesap kanıtı
 
 **Amaç:** Read mirror'ın analiz için güvenilir olup olmadığını açıkça göstermek.
@@ -111,6 +145,17 @@ Yapılacaklar:
 **Çıkış kapısı:** İki hesap birbirinin permission/currency/timezone/result state'ini ezmez;
 disconnect sonrası secret kullanılamaz; retention yalnız hedef workspace verisini işler;
 coverage eksikleri sebeplidir; Meta write network call sayısı `0`dır.
+
+**Kanıt (2026-08-07):** `verify:meta-change-timeline-db`,
+`verify:workspace-tombstone-db` ve `verify:supabase-security` geçti. Canonical tracked
+snapshot server-private olarak kalıcıdır ve restart sonrası en yeni authentic snapshot
+geri yüklenir; event satırları dış Meta kimliği, reklam metni, token veya raw payload
+taşımaz. Replay satır çoğaltmaz, unknown gözlem değişiklik uydurmaz, hesaplar arası scope
+reddedilir ve composite FK çapraz-scope snapshot bağını DB seviyesinde engeller. Yalnız
+exact ve `verified` action-ledger eşleşmesi `internal_expected` olabilir. Workspace
+tombstone 28 veri tablosunu explicit allowlist ile temizler, audit zincirini ve tombstone
+kaydını korur; yabancı workspace değişmez. Tüm DB kabulleri rollback ile geçici veri
+bırakmadan tamamlandı. Supabase sonucu 32 tablo/32 RLS, API tablo grant'i `0`dır.
 
 ## Uygulama ve kanıt disiplini
 

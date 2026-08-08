@@ -422,11 +422,12 @@ Gerçek write scope A13'ten önce ReklamZeka'ya taşınmaz.
 Stage dosyaları domain sahipliğini, aşağıdaki slice'lar gerçek teslim sırasını tanımlar:
 
 1. **S0 güvenli temel — tamam:** v1 read-only/tenant/audit/dashboard/insight/report.
-2. **S1 Meta Read Mirror:** [güncel yürütme planı](slice-01-meta-read-mirror.md); minimum
+2. **S1 Meta Read Mirror — tamam:** [kapanış planı](slice-01-meta-read-mirror.md); minimum
    A08 + L0/L1; hiyerarşi, config, budget owner,
    insights, live ad text/post, quality. Tek hesap→ikinci hesap isolation; write 0.
-3. **S2 Decision Room:** L2–L5, EffectiveCampaignContext, categories, Guidance/AdvisedPractice,
-   AnalysisAgenda/cadence/experiment/outcome, local CLI read/draft, in-app inbox; write 0.
+3. **S2 Decision Room — aktif:** [güncel yürütme planı](slice-02-decision-room.md); L2–L5,
+   EffectiveCampaignContext, categories, Guidance/AdvisedPractice, AnalysisAgenda/cadence/
+   experiment/outcome, local CLI read/draft, in-app inbox; write 0.
 4. **S3 Budget Lab:** envelope/target/protected allocation/pacing/forecast/simulation;
    proposal/approval queue var, Meta write 0.
 5. **S4 Approval-only Operations:** tek hesap+tek action type; atomik human approval,
@@ -441,6 +442,7 @@ canlı CRM connector, external notification kanalları, K3/K4 otomasyonu ve kara
 ## /goal komutları
 
 ```text
+/goal plans/proje/v2/slice-02-decision-room.md planında yalnız S2.1'i uygula; çıkış kapısını kanıtla, STATE ve CHECKLIST'i güncelle
 /goal plans/proje/v2/slice-01-meta-read-mirror.md planında yalnız S1.1'i uygula; çıkış kapısını kanıtla, STATE ve CHECKLIST'i güncelle
 /goal plans/proje/v2/asama-08-meta-dijital-ikizi.md planını uygula; bitince STATE.md ve CHECKLIST.md'yi kanıtla güncelle
 /goal plans/proje/v2/asama-09-kategori-talimat.md planını uygula; bitince STATE.md ve CHECKLIST.md'yi kanıtla güncelle
@@ -451,8 +453,8 @@ canlı CRM connector, external notification kanalları, K3/K4 otomasyonu ve kara
 /goal plans/proje/v2/asama-14-kontrol-merkezi.md planını uygula; bitince STATE.md ve CHECKLIST.md'yi kanıtla güncelle
 ```
 
-Aktif geliştirmede ilk komut tercih edilir. Tüm A08'i tek koşumda uygulama komutu tarihsel/
-domain kapsam referansıdır; S1.1→S1.5 çıkış kapıları atlanmaz.
+Aktif geliştirmede `slice-02-decision-room.md` tercih edilir. Stage komutları domain kapsam
+referansıdır; S2.1→S2.8 çıkış kapıları atlanmaz.
 
 ## Global güvenlik ve sadelik kuralları
 

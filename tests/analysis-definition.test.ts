@@ -25,6 +25,7 @@ describe("analysis definition contract", () => {
 
   it.each([
     ["invalid timezone", { timeframe: { kind: "rolling", days: 7, timezone: "Mars/Olympus" } }],
+    ["impossible fixed date", { timeframe: { kind: "fixed", startDate: "2026-02-30", endDate: "2026-03-01", timezone: "UTC" } }],
     ["invalid schedule clock", { schedule: { frequency: "daily", at: "25:00", timezone: "Europe/Istanbul", enabled: true, misfirePolicy: "skip" } }],
     ["raw cron field", { schedule: { frequency: "daily", at: "09:00", timezone: "Europe/Istanbul", enabled: true, misfirePolicy: "skip", cron: "* * * * *" } }],
     ["executable code field", { rules: [{ id: "unsafe", name: "unsafe", metric: "roas", operator: "lt", threshold: 1, minimumSample: { metric: "spendMinor", value: 1 }, severity: "critical", enabled: true, sql: "select *" }] }],

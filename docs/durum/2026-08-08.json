@@ -1,0 +1,186 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "8916ab22f",
+      "tarih": "2026-08-08",
+      "konu": "chore(vscode,oturum): tema ayarları ve oturum kasası kaydı",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
+      "hash": "c90883c4c",
+      "tarih": "2026-08-08",
+      "konu": "feat(categories): scan effective portfolio health",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "86284c17a",
+      "tarih": "2026-08-08",
+      "konu": "feat(categories): preview archive impact safely",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e65579e21",
+      "tarih": "2026-08-08",
+      "konu": "feat(categories): surface evidence confidence health",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c0c3f2f70",
+      "tarih": "2026-08-08",
+      "konu": "feat(categories): add read-only inventory dashboard",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "49d98f771",
+      "tarih": "2026-08-08",
+      "konu": "fix(dashboard): guide local session recovery",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "19eac50de",
+      "tarih": "2026-08-08",
+      "konu": "feat(guidance): add multi-scope authoring",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ee0e41193",
+      "tarih": "2026-08-08",
+      "konu": "feat(guidance): invalidate stale campaign contexts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "65cbab3a8",
+      "tarih": "2026-08-08",
+      "konu": "feat(agent): add guidance context tools",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "9ddd42599",
+      "tarih": "2026-08-08",
+      "konu": "feat(guidance): add category-bound studio",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ccba7d95e",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "8023e340e",
+      "tarih": "2026-08-08",
+      "konu": "feat(agent): add secure project MCP bridge",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "d0468245c",
+      "tarih": "2026-08-08",
+      "konu": "docs(status): refresh deterministic project state",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "be4484bb6",
+      "tarih": "2026-08-08",
+      "konu": "docs(roadmap): record authenticated handoff slice",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "981e744d6",
+      "tarih": "2026-08-08",
+      "konu": "feat(dashboard): add live agent session hub",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "feat",
+      "adet": 31
+    },
+    {
+      "kapsam": "docs",
+      "adet": 22
+    },
+    {
+      "kapsam": "test",
+      "adet": 4
+    },
+    {
+      "kapsam": "fix",
+      "adet": 2
+    },
+    {
+      "kapsam": "chore",
+      "adet": 1
+    }
+  ],
+  "isSayisi": 129,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-08",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "6914cbe5002f"
+}

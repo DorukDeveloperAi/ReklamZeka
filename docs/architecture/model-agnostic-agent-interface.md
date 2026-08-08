@@ -31,8 +31,19 @@ Dashboard / Local companion CLI       Codex CLI / VS Code      Claude Code      
 Sync, category/effective context, policy, timeframe/metric/finding, budget, promotion
 template resolution, action eligibility/risk/approval, scheduler ve timeline paketleri
 model SDK'sı import etmez. ReklamZeka runtime'ında `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
-ve provider Responses/Messages çağrısı yoktur. Modelsiz fixture client tüm deterministic
-akışı CI'da çalıştırır.
+ve provider Responses/Messages çağrısı yoktur. Modelsiz fixture client tool/session contract
+conformance akışını CI'da çalıştırır; gerçek STDIO/HTTP transport ve session ledger ayrı dilimlerdir.
+
+`LocalAgentClient` için modelsiz referans fixture artık mevcut safe agent contract'larını tek versioned catalogda
+toplar. Session descriptor exact local capability scope + allowlisted tool + correlation ref'e bağlıdır; fixture
+yalnız enjekte edilmiş deterministic executorları çağırır. Provider/model/prompt adapterı, human-presence,
+approval/grant/execute veya raw Meta/SQL yüzeyi yoktur. Bu in-memory conformance çekirdeği gerçek STDIO/HTTP
+transportu ya da kalıcı session ledger'ı tamamlanmış saymaz.
+
+Bu değişmez `npm run check:model-api-boundary` ile repository seviyesinde uygulanır. Checker runtime
+kaynaklarını, package script'lerini ve direct/transitive dependency yüzeyini tarar; provider SDK/import,
+API-key env adı veya doğrudan model endpoint'i CI'ı durdurur. Dokümantasyon ve kendi login/session'ıyla
+çalışan yerel CLI istemcileri bu runtime sınırının dışındadır.
 
 Yerel Codex/Claude Code ürünleri kendi servisleriyle haberleşebilir; bu trafik ve kimlik
 bilgisi ilgili CLI'nın sorumluluğudur, ReklamZeka'nın model entegrasyonu değildir.
@@ -153,6 +164,8 @@ Araçlar:
 - `get_effective_campaign_context`, `get_metric_drivers`, `compare_timeframes`;
 - `compare_category_cohort`, `get_pre_post_action`, `get_business_outcome_signals`;
 - `search_guidance`, `get_effective_guidance_pack`, `get_analysis_agenda`;
+- `policy_bundle_read` (K4 ApprovalPolicy/Guardrail revision feed, scope catalog ve
+  selection-bound readiness; draft/publish/approve/grant/execute yetkisi yoktur);
 - `get_decision_cadence`, `get_experiment_history`, `draft_guidance_set`;
 - `list_advised_practices`, `draft_advised_practice`, `draft_standardization_review`;
 - `promote_guidance_to_policy` (yalnız gated taslak/impact preview);
@@ -168,6 +181,14 @@ nedeni ve context version/hash görünürdür.
 Yeni creative/metin üretme, asset upload, raw Graph, token read veya writer tool'u yoktur.
 Promotion proposal yalnız yayınlanmış `PromotionTemplate + AudiencePresetVersion` seçer;
 agent targeting spec oluşturamaz/değiştiremez.
+
+`policy_bundle_read`, dashboard K4 Policy Bundle Studio ile aynı application read servisini
+kullanır. Dashboarddaki kullanıcı rolü taslak oluşturmaya izin verse bile agent zarfında
+`canDraft`, `canPublish`, `canDisable`, `canApproveAction`, `canGrant`, `canExecute` ve
+`canWriteMeta` daima `false` döner. Çıktıda yalnız public ref/projeksiyonlar bulunur;
+workspace/database/Meta ID, hash, actor ref ve raw targeting bulunmaz. Scope-free görünüm
+yalnız bundle hazırlığını bildirir; gerçek proposal uygunluğu compatibility ve authentic
+evidence ile somut seçim başına yeniden değerlendirilir.
 
 Guidance retrieval önce deterministic tenant/scope/topic filtresi, ardından bounded
 relevance ranking kullanır. Natural-language guidance analiz ve proposal framing'ine

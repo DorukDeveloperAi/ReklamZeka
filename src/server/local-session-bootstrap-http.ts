@@ -1,0 +1,90 @@
+import { NextResponse } from "next/server";
+import {
+  LOCAL_SESSION_COOKIE,
+  bearerToken,
+  mintLocalSessionCapability,
+  verifyLocalSessionCapability,
+  type LocalSessionClaims,
+} from "@/security/local-session-capability";
+import { consumeLocalSessionBootstrap } from "@/security/local-session-bootstrap-store";
+import {
+  LocalDecisionRoomBoundaryError,
+  assertTrustedLocalDecisionRoomRequest,
+  type LocalDecisionRoomConfig,
+} from "@/server/local-decision-room-runtime";
+
+const HEADERS = Object.freeze({
+  "Cache-Control": "private, no-store, max-age=0",
+  "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+  "Referrer-Policy": "no-referrer",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+});
+
+function rejected() {
+  return NextResponse.json({ error: { code: "local_session_rejected", message: "Yerel oturum kanıtı reddedildi." } }, {
+    status: 403, headers: HEADERS,
+  });
+}
+
+export function createLocalSessionBootstrapHandler(input: Readonly<{
+  config: LocalDecisionRoomConfig;
+  clock?: () => number;
+  consume?: (claims: LocalSessionClaims, token: string, now: number) => Promise<void>;
+}>) {
+  return async function POST(request: Request) {
+    try {
+      assertTrustedLocalDecisionRoomRequest(request, input.config, "read", "bearer");
+      const contentLength = request.headers.get("content-length");
+      if (request.method !== "POST" || request.headers.get("origin") !== input.config.origin
+        || request.headers.get("sec-fetch-site") !== "same-origin"
+        || request.headers.get("x-reklamzeka-intent") !== "bootstrap-local-session"
+        || (contentLength !== null && contentLength !== "0")) {
+        throw new LocalDecisionRoomBoundaryError("untrusted_request");
+      }
+      // Exact empty body. Rejecting a present stream avoids buffering an
+      // unbounded chunked body when Content-Length is absent.
+      if (request.body !== null) throw new LocalDecisionRoomBoundaryError("untrusted_request");
+      const token = bearerToken(request);
+      if (!token) throw new LocalDecisionRoomBoundaryError("untrusted_request");
+      const osUid = typeof process.getuid === "function" ? process.getuid() : -1;
+      if (osUid < 0) throw new LocalDecisionRoomBoundaryError("untrusted_request");
+      const now = input.clock?.() ?? Math.floor(Date.now() / 1000);
+      const bootstrap = verifyLocalSessionCapability({
+        token, key: input.config.signingKey, now, osUid,
+        requiredScope: "local_session:bootstrap", expected: input.config,
+      });
+      await (input.consume ?? consumeLocalSessionBootstrap)(bootstrap, token, now);
+      const session = mintLocalSessionCapability({
+        kind: "session",
+        workspaceId: input.config.workspaceId,
+        workspaceRef: input.config.workspaceRef,
+        userId: input.config.userId,
+        readerRef: input.config.readerRef,
+        osUid,
+        issuedAt: now,
+        expiresAt: now + 28_800,
+      }, input.config.signingKey);
+      const response = new NextResponse(null, { status: 204, headers: HEADERS });
+      response.headers.set("X-ReklamZeka-Session-Bootstrapped", "cookie");
+      response.cookies.set({
+        name: LOCAL_SESSION_COOKIE,
+        value: session.token,
+        httpOnly: true,
+        sameSite: "strict",
+        secure: true,
+        path: "/",
+        maxAge: 28_800,
+      });
+      return response;
+    } catch {
+      return rejected();
+    }
+  };
+}
+
+export function localSessionBootstrapNotConfiguredResponse() {
+  return NextResponse.json({ error: { code: "local_session_not_configured", message: "Yerel oturum henüz etkin değil." } }, {
+    status: 503, headers: HEADERS,
+  });
+}

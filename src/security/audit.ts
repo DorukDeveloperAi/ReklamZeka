@@ -3,12 +3,20 @@ import { createHash, randomUUID } from "node:crypto";
 export type AuditAction =
   | "connection.created"
   | "connection.rotated"
+  | "connection.doctor_checked"
+  | "connection.disconnected"
+  | "connection.revoked"
   | "connection.inventory_refreshed"
   | "sync.started"
   | "sync.completed"
   | "report.shared"
   | "report.revoked"
-  | "insight.feedback";
+  | "insight.feedback"
+  | "budget.draft_saved"
+  | "guidance.draft_created"
+  | "guidance.draft_revised"
+  | "guidance.published"
+  | "guidance.archived";
 
 export type AuditEventInput = Readonly<{
   workspaceId: string;

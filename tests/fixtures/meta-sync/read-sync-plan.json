@@ -1,0 +1,7 @@
+{
+  "accounts": ["act_a", "act_b"],
+  "dateStart": "2026-08-01",
+  "dateStop": "2026-08-03",
+  "dateSliceDays": 2,
+  "initialPageSize": 100
+}

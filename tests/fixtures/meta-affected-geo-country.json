@@ -1,0 +1,25 @@
+{
+  "sourceKind": "meta_graph_adset_targeting",
+  "scope": {
+    "workspaceRef": "workspace_fixture",
+    "accountRef": "account_fixture",
+    "campaignRef": "campaign_fixture",
+    "adSetRef": "adset_fixture"
+  },
+  "sourceGraphVersion": "v23.0",
+  "fieldCatalogVersion": "fixture-country-catalog/1.0.0",
+  "fetchedAt": "2026-08-08T12:00:00.000Z",
+  "provenance": {
+    "observationRunRef": "observation_fixture",
+    "sliceRef": "slice_fixture",
+    "pageRef": "page_fixture",
+    "rawPayloadHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceGeoSubtreeHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "targeting": {
+    "geo_locations": {
+      "countries": ["AA", "ZZ"],
+      "location_types": ["home", "recent"]
+    }
+  }
+}

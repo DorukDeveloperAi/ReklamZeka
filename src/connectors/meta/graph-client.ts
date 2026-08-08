@@ -2,7 +2,7 @@ import { ConnectorError } from "@/connectors/contract";
 import { withConnectorRetry } from "@/connectors/retry";
 
 export const META_GRAPH_API_VERSION = "v23.0";
-const META_GRAPH_BASE_URL = `https://graph.facebook.com/${META_GRAPH_API_VERSION}`;
+const META_GRAPH_ORIGIN = "https://graph.facebook.com";
 
 export type MetaFetch = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
@@ -11,6 +11,23 @@ type GraphPage<T> = Readonly<{
   paging?: Readonly<{ cursors?: Readonly<{ after?: string }> }>;
   summary?: Readonly<{ total_count?: number }>;
 }>;
+
+export type MetaGraphResponse<T> = Readonly<{ data: T; usageHeadroom: number }>;
+
+function usageHeadroom(headers: Headers): number {
+  const percentages: number[] = [];
+  for (const header of ["x-app-usage", "x-ad-account-usage"]) {
+    const value = headers.get(header);
+    if (!value) continue;
+    try {
+      const parsed = JSON.parse(value) as Record<string, unknown>;
+      for (const entry of Object.values(parsed)) if (typeof entry === "number" && Number.isFinite(entry)) percentages.push(entry);
+    } catch {
+      // A malformed optional usage header must not make valid entity data disappear.
+    }
+  }
+  return percentages.length ? Math.max(0, Math.min(1, 1 - Math.max(...percentages) / 100)) : 0.5;
+}
 
 function retryAfterMilliseconds(response: Response): number | undefined {
   const value = response.headers.get("retry-after");
@@ -33,25 +50,43 @@ function connectorErrorFor(response: Response): ConnectorError {
 }
 
 export class MetaGraphClient {
+  readonly graphApiVersion: string;
+
   constructor(
     private readonly token: string,
     private readonly fetchImpl: MetaFetch = fetch,
+    options: Readonly<{ graphApiVersion?: string }> = {},
   ) {
     if (!token.trim()) throw new ConnectorError("authentication", "Meta access token yapılandırılmadı", false);
+    this.graphApiVersion = options.graphApiVersion ?? META_GRAPH_API_VERSION;
+    if (!/^v\d+\.\d+$/.test(this.graphApiVersion)) {
+      throw new ConnectorError("invalid_data", "Meta Graph API sürümü geçersiz", false);
+    }
   }
 
   async get<T>(path: string, params: Readonly<Record<string, string>> = {}): Promise<T> {
+    return (await this.getWithUsage<T>(path, params)).data;
+  }
+
+  async getWithUsage<T>(path: string, params: Readonly<Record<string, string>> = {}): Promise<MetaGraphResponse<T>> {
     return withConnectorRetry(async () => {
-      const url = new URL(`${META_GRAPH_BASE_URL}/${path.replace(/^\//, "")}`);
+      const url = new URL(`${META_GRAPH_ORIGIN}/${this.graphApiVersion}/${path.replace(/^\//, "")}`);
       for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-      const response = await this.fetchImpl(url, {
-        method: "GET",
-        cache: "no-store",
-        headers: { Authorization: `Bearer ${this.token}`, Accept: "application/json" },
-      });
+      let response: Response;
+      try {
+        response = await this.fetchImpl(url, {
+          method: "GET",
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${this.token}`, Accept: "application/json" },
+        });
+      } catch {
+        // Fetch implementations may include the complete request URL or Authorization
+        // header in their native errors. Never let that material cross this boundary.
+        throw new ConnectorError("transient", "Meta ağına güvenli bağlantı kurulamadı", true);
+      }
       if (!response.ok) throw connectorErrorFor(response);
       try {
-        return await response.json() as T;
+        return { data: await response.json() as T, usageHeadroom: usageHeadroom(response.headers) };
       } catch {
         throw new ConnectorError("invalid_data", "Meta geçersiz JSON döndürdü", false);
       }

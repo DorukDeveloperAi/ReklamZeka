@@ -31,11 +31,12 @@ describe("workspace authorization boundary", () => {
     const actions: readonly WorkspaceAction[] = [
       "workspace:manage", "member:manage", "connection:manage", "data:read",
       "sync:run", "insight:feedback", "report:share",
+      "budget:draft",
     ];
     const expected: Record<WorkspaceRole, readonly WorkspaceAction[]> = {
       owner: actions,
       admin: actions.filter((action) => action !== "workspace:manage"),
-      analyst: ["data:read", "sync:run", "insight:feedback", "report:share"],
+      analyst: ["data:read", "sync:run", "insight:feedback", "report:share", "budget:draft"],
       viewer: ["data:read"],
     };
     for (const role of Object.keys(expected) as WorkspaceRole[]) {
@@ -48,6 +49,14 @@ describe("workspace authorization boundary", () => {
       .toThrow(AuthorizationError);
     expect(() => authorizeWorkspace({ userId: "unknown" }, "workspace-a", "data:read", memberships))
       .toThrow(AuthorizationError);
+  });
+
+  it("reserves policy publication for owner/admin while keeping draft collaboration separate", () => {
+    expect(can("owner", "policy_bundle:publish")).toBe(true);
+    expect(can("admin", "policy_bundle:publish")).toBe(true);
+    expect(can("analyst", "policy_bundle:draft")).toBe(true);
+    expect(can("analyst", "policy_bundle:publish")).toBe(false);
+    expect(can("viewer", "policy_bundle:publish")).toBe(false);
   });
 
   it("filters resources by the authorized workspace at the server boundary", () => {
