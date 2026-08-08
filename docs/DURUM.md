@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 04553dc0acbc -->
+<!-- durum-damga: 6914cbe5002f -->
 
 ## Künye
 
@@ -14,13 +14,14 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 123 |
+| iş commit'i (tüm geçmiş) | 129 |
 | ilk / son iş | 2026-08-06 / 2026-08-08 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-08 | `chore` | tema ayarları ve oturum kasası kaydı | `8916ab22f` |
 | 2026-08-08 | `feat` | scan effective portfolio health | `c90883c4c` |
 | 2026-08-08 | `feat` | preview archive impact safely | `86284c17a` |
 | 2026-08-08 | `feat` | surface evidence confidence health | `e65579e21` |
@@ -35,20 +36,21 @@
 | 2026-08-08 | `docs` | refresh deterministic project state | `d0468245c` |
 | 2026-08-08 | `docs` | record authenticated handoff slice | `be4484bb6` |
 | 2026-08-08 | `feat` | add live agent session hub | `981e744d6` |
-| 2026-08-08 | `feat` | expose secure local handoffs | `ac1428135` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 32
+- `feat        ` ████████████████████████ 31
 - `docs        ` █████████████████ 22
 - `test        ` ███ 4
 - `fix         ` ██ 2
+- `chore       ` █ 1
 
 ## Planlar
 
 | plan | v | durum | aşama | sıradaki |
 |---|---|---|---|---|
-| `proje` | 2 | SÜRÜYOR | 6/14 | 11-bütçe planlama |
+| `proje` | 2 | SÜRÜYOR | 6/14 | — |
+| `reklamzeka-sistemi` | 2 | AÇIK | 0/10 | 01-temel-kapanis |
 
 ---
 

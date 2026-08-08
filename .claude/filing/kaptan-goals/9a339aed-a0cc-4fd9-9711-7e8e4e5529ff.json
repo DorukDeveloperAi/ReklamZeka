@@ -1,0 +1,54 @@
+{
+ "sessionId": "9a339aed-a0cc-4fd9-9711-7e8e4e5529ff",
+ "cwd": "/Users/ybg/dev/ReklamZeka",
+ "dirName": "ReklamZeka",
+ "title": "commit and push",
+ "agent": null,
+ "transcriptPath": "/Users/ybg/.claude/projects/-Users-ybg-dev-ReklamZeka/9a339aed-a0cc-4fd9-9711-7e8e4e5529ff.jsonl",
+ "startedAt": "2026-08-08T07:07:35.779Z",
+ "endedAt": null,
+ "todos": [
+  {
+   "content": "Çalışma ağacını commit'le (.vscode/settings.json + plans/oturumlar/kasa)",
+   "status": "completed",
+   "firstSeen": "2026-08-08T07:07:35.779Z",
+   "lastChange": "2026-08-08T07:08:30.150Z",
+   "removed": false
+  },
+  {
+   "content": "origin/main ile merge et, çakışmaları çöz (türevleri üreticiden yeniden üret)",
+   "status": "in_progress",
+   "firstSeen": "2026-08-08T07:07:35.779Z",
+   "lastChange": "2026-08-08T07:08:30.150Z",
+   "removed": false
+  },
+  {
+   "content": "Test/build ile merge sonucunu doğrula",
+   "status": "pending",
+   "firstSeen": "2026-08-08T07:07:35.779Z",
+   "lastChange": "2026-08-08T07:07:35.779Z",
+   "removed": false
+  },
+  {
+   "content": "origin/main'e push et",
+   "status": "pending",
+   "firstSeen": "2026-08-08T07:07:35.779Z",
+   "lastChange": "2026-08-08T07:07:35.779Z",
+   "removed": false
+  },
+  {
+   "content": "Planın tamamını incele: agentic sürecin en son geldiği yer + progress durumu",
+   "status": "pending",
+   "firstSeen": "2026-08-08T07:07:35.779Z",
+   "lastChange": "2026-08-08T07:07:35.779Z",
+   "removed": false
+  }
+ ],
+ "updatedAt": "2026-08-08T07:08:30.150Z",
+ "counts": {
+  "total": 5,
+  "completed": 1,
+  "in_progress": 1,
+  "pending": 3
+ }
+}

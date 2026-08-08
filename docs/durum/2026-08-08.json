@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "8916ab22f",
+      "tarih": "2026-08-08",
+      "konu": "chore(vscode,oturum): tema ayarları ve oturum kasası kaydı",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
       "hash": "c90883c4c",
       "tarih": "2026-08-08",
       "konu": "feat(categories): scan effective portfolio health",
@@ -128,21 +137,12 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "ac1428135",
-      "tarih": "2026-08-08",
-      "konu": "feat(agent): expose secure local handoffs",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 32
+      "adet": 31
     },
     {
       "kapsam": "docs",
@@ -155,9 +155,13 @@
     {
       "kapsam": "fix",
       "adet": 2
+    },
+    {
+      "kapsam": "chore",
+      "adet": 1
     }
   ],
-  "isSayisi": 123,
+  "isSayisi": 129,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -167,8 +171,16 @@
       "durum": "SÜRÜYOR",
       "asamaKapali": 6,
       "asamaToplam": 14,
-      "siradaki": "11-bütçe planlama"
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "04553dc0acbc"
+  "damga": "6914cbe5002f"
 }

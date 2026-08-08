@@ -1,26 +1,37 @@
 # DEVRALIŞ — ReklamZeka
 
 > **TÜREVDİR, elle düzenlenmez.** Her `aide filing` koşumunda yeniden üretilir.
-> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-07 09:47
+> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-08 07:08
 
 Bu belge bir sonraki Claude hesabının **ilk okuyacağı** dosyadır: neyin yarıda kaldığını
 ve hangi komutla devam edileceğini söyler.
 
 ## Açık oturumlar
 
-_Bu projede canlı oturum yok._
+1 canlı oturum. Devam etmek için komutu kopyala-yapıştır:
+
+### commit and push
+
+- **durum:** `generating` · son hareket: 2026-08-08 07:06
+- **ne için açıldı:** codex tarafından ciddi ilerleme kaydedilmişti ama commmit ve push yapıldı mı emin değilim en son durumu
+- **nerede kaldı:** commit and push
+
+```bash
+cd /Users/ybg/dev/ReklamZeka && claude --resume 9a339aed-a0cc-4fd9-9711-7e8e4e5529ff
+```
 
 ## Planlar
 
 | plan | durum | sıradaki aşama |
 |---|---|---|
-| `proje` 2 | SÜRÜYOR | 09-kategori ve talimat |
+| `proje` 2 | SÜRÜYOR | — |
+| `reklamzeka-sistemi` 2 | AÇIK | 01-temel-kapanis |
 
 Sıradaki işi başlatmak için:
 
 ```bash
 cd /Users/ybg/dev/ReklamZeka
-/goal plans/proje/v2/asama-09-kategori-talimat.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz
+/goal plans/reklamzeka-sistemi/v2/asama-01-temel-kapanis.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz
 ```
 
 ## Devralma sırası
