@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "65cbab3a8",
+      "tarih": "2026-08-08",
+      "konu": "feat(agent): add guidance context tools",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "9ddd42599",
       "tarih": "2026-08-08",
       "konu": "feat(guidance): add category-bound studio",
@@ -128,25 +137,16 @@
       "kapsam": [
         "docs"
       ]
-    },
-    {
-      "hash": "bbbf3adb1",
-      "tarih": "2026-08-08",
-      "konu": "docs(roadmap): record local agent client gate",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 30
+      "adet": 31
     },
     {
       "kapsam": "docs",
-      "adet": 25
+      "adet": 24
     },
     {
       "kapsam": "test",
@@ -157,7 +157,7 @@
       "adet": 1
     }
   ],
-  "isSayisi": 115,
+  "isSayisi": 116,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-08",
   "planlar": [
@@ -170,5 +170,5 @@
       "siradaki": "11-bütçe planlama"
     }
   ],
-  "damga": "de7c6204dc2c"
+  "damga": "8b39d013007f"
 }

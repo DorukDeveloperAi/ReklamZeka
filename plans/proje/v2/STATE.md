@@ -15,7 +15,7 @@
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
 | 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.5 ve Slice 01 kapalı; geniş field/breakdown kataloğu, multi-business grouping ve export/rotation ileri işi açık |
-| 09 | kategori ve talimat | DEVAM | 08 | category/guidance çekirdeği, gerçek Guidance Studio ve agent effective preview hazır; invalidation, çoklu binding ve category yönetimi sırada |
+| 09 | kategori ve talimat | DEVAM | 08 | Guidance Studio, agent effective preview ve publish/archive context invalidation hazır; çoklu binding ve category yönetimi sırada |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
 | 11 | bütçe planlama | AÇIK | 09,10 | planlandı |
 | 12 | prompt/advisor | DEVAM | 09–11 | narrative envelope/claim guard temeli var; translator/ledger sırada |
@@ -61,6 +61,22 @@
 - Canlı kabul hem registry read hem effective preview için gerçek localhost→PostgreSQL→STDIO
   zincirinde geçti; Codex discovery ve Claude connection doğrulandı. Açık sonraki dilim:
   publish/archive context invalidation ve analysis-run binding.
+
+## 2026-08-08 — A09.3 guidance publish/archive context invalidation
+
+- Guidance publish ve archive artık registry revision, audit fact ve effective-context
+  invalidation fact'ini tek PostgreSQL transaction'ında yazar. Herhangi biri başarısızsa
+  tamamı rollback olur; historical context payload'ları değiştirilmez veya silinmez.
+- Invalidation yalnız önceki `guidance_registry` component version'ını kullanan context'lerle
+  eşleşir. Publish `source_changed`, archive `source_removed` reason code'u taşır; draft create
+  ve draft revise analize etkisiz oldukları için invalidation üretmez.
+- Decision Room, budget proposal ve latest-valid context sorgularındaki mevcut component join'i
+  yeni fact'i otomatik tüketir. Böylece eski pack yeniden kullanılamaz; historical replay ise
+  payload ve invalidated işaretiyle denetlenebilir kalır.
+- Canlı Supabase kabulü create→revise→publish→restart→archive akışında dört immutable revision,
+  dört audit fact ve iki context invalidation fact doğruladı; final authority yine Meta-write false.
+  Açık sonraki dilim: guidance'ın gerçek analysis-run assembly'sine frozen binding'i ve çoklu
+  binding/set authoring.
 
 ## 2026-08-06 — bütün görüşmelerin kanonik ürün distilasyonu
 

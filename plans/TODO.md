@@ -2,7 +2,7 @@
 
 > **TÜREV — elle düzenlenmez.** Tek yazar `agac.mjs` (motor · deterministik · 0 token).
 > Elle madde buraya değil **`TODO-ELLE.md`**'ye yazılır.
-> Damga: `7c2027f17918` · Kaynak: CHECKLIST(açık) · TODO-ELLE.md · HUKUM.md(EKSİK/STUCK) · künye-eksikleri · sarkık-oturum
+> Damga: `059d2ecceb9d` · Kaynak: CHECKLIST(açık) · TODO-ELLE.md · HUKUM.md(EKSİK/STUCK) · künye-eksikleri · sarkık-oturum
 > İLANLI MUAF (bu listeye GİRMEZ, her birinin kendi kanalı var): alerts.jsonl · parked işler · doctor fix: · teslim onar: · kaptan task'ları
 
 **100 açık madde** · plansız: 0 · chk: 100 · elle: 0 · hüküm: 0 · künye: 0 · oturum: 0

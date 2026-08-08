@@ -275,7 +275,8 @@ async function persistRegistry(database: GuidanceDatabase, validated: GuidanceRe
   await assertWorkspace(database, validated.workspaceId, true);
   const current = await loadRegistry(database, validated.workspaceId);
   if (current.registryHash === validated.registryHash) {
-    return { outcome: "unchanged" as const, registryHash: current.registryHash };
+    return { outcome: "unchanged" as const, registryHash: current.registryHash,
+      previousRegistryHash: current.registryHash };
   }
   const expectedMatches = expectedRegistryHash === null
     ? current.sources.length + current.cards.length + current.bindings.length + current.sets.length === 0
@@ -287,7 +288,8 @@ async function persistRegistry(database: GuidanceDatabase, validated: GuidanceRe
   if (persisted.registryHash !== validated.registryHash) {
     throw new GuidanceRepositoryError("optimistic_conflict", "Guidance registry atomik olarak doğrulanamadı");
   }
-  return { outcome: "inserted" as const, registryHash: persisted.registryHash };
+  return { outcome: "inserted" as const, registryHash: persisted.registryHash,
+    previousRegistryHash: current.registryHash };
 }
 
 function validatedRegistry(registry: GuidanceRegistry): GuidanceRegistry {
@@ -314,9 +316,10 @@ export class DrizzleGuidanceRegistryRepository {
     expectedRegistryHash: string | null;
   }>): Promise<Readonly<{ outcome: "inserted" | "unchanged"; registryHash: string }>> {
     const validated = validatedRegistry(registry);
-    return this.database.transaction((transaction) => persistRegistry(
-      transaction as GuidanceDatabase, validated, guard.expectedRegistryHash,
-    ));
+    return this.database.transaction(async (transaction) => {
+      const persisted = await persistRegistry(transaction as GuidanceDatabase, validated, guard.expectedRegistryHash);
+      return Object.freeze({ outcome: persisted.outcome, registryHash: persisted.registryHash });
+    });
   }
 
   /** Public-safe selector catalog; internal UUIDs never leave this adapter. */
@@ -349,13 +352,35 @@ export class DrizzleGuidanceRegistryRepository {
     resourceId: string;
     occurredAt: string;
     metadata: Readonly<Record<string, string | number | boolean | null>>;
-  }>): Promise<Readonly<{ outcome: "inserted" | "unchanged"; registryHash: string; auditAppended: boolean }>> {
+  }>): Promise<Readonly<{ outcome: "inserted" | "unchanged"; registryHash: string; auditAppended: boolean;
+    contextInvalidationAppended: boolean }>> {
     const validated = validatedRegistry(registry);
     if (!UUID.test(input.actorId) || !/^guidance_[a-f0-9]{24}$/.test(input.resourceId)
       || !Number.isFinite(Date.parse(input.occurredAt))) throw new GuidanceRepositoryError("corrupt_store", "Guidance audit girdisi geçersiz");
     return this.database.transaction(async (transaction) => {
       const persisted = await persistRegistry(transaction as GuidanceDatabase, validated, input.expectedRegistryHash);
-      if (persisted.outcome === "unchanged") return Object.freeze({ ...persisted, auditAppended: false });
+      if (persisted.outcome === "unchanged") return Object.freeze({ outcome: persisted.outcome,
+        registryHash: persisted.registryHash, auditAppended: false, contextInvalidationAppended: false });
+      let contextInvalidationAppended = false;
+      if (input.action === "guidance.published" || input.action === "guidance.archived") {
+        const invalidation = Object.freeze({ workspaceId: validated.workspaceId,
+          componentType: "guidance_registry", componentRef: "guidance-registry",
+          componentVersion: persisted.previousRegistryHash, scopeKind: "workspace_component",
+          reasonCode: input.action === "guidance.archived" ? "source_removed" : "source_changed",
+          observedAt: new Date(input.occurredAt).toISOString() });
+        const eventHash = recordHash(invalidation);
+        const inserted = await transaction.execute(sql`
+          insert into effective_campaign_context_invalidations (
+            workspace_id, event_hash, component_type, component_ref, component_version,
+            scope_kind, entity_type, entity_ref, reason_code, observed_at
+          ) values (
+            ${invalidation.workspaceId}::uuid, ${eventHash}, ${invalidation.componentType},
+            ${invalidation.componentRef}, ${invalidation.componentVersion}, ${invalidation.scopeKind},
+            null, null, ${invalidation.reasonCode}, ${invalidation.observedAt}::timestamptz
+          ) on conflict (workspace_id, event_hash) do nothing returning id
+        `);
+        contextInvalidationAppended = rowsOf(inserted).length === 1;
+      }
       await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`audit:${validated.workspaceId}`}, 0))`);
       const previousHash = String(rowsOf(await transaction.execute(sql`
         select event_hash from audit_events where workspace_id = ${validated.workspaceId}::uuid
@@ -376,7 +401,8 @@ export class DrizzleGuidanceRegistryRepository {
           ${event.previousHash}, ${eventHash}, ${event.occurredAt}::timestamptz
         )
       `);
-      return Object.freeze({ ...persisted, auditAppended: true });
+      return Object.freeze({ outcome: persisted.outcome, registryHash: persisted.registryHash,
+        auditAppended: true, contextInvalidationAppended });
     });
   }
 }

@@ -50,9 +50,14 @@ try {
     expectedRegistryHash: afterRestart.registryHash, operation: "archive" });
   const audit = await pool.query("select action from audit_events where workspace_id = $1 order by occurred_at, created_at, id", [workspaceId]);
   const versions = await pool.query("select version, status from guidance_cards where workspace_id = $1 order by version", [workspaceId]);
-  if (audit.rowCount !== 4 || versions.rowCount !== 4 || result.item.status !== "archived") throw new Error("audit/version acceptance failed");
+  const invalidations = await pool.query(`select component_type, component_ref, component_version, reason_code
+    from effective_campaign_context_invalidations where workspace_id = $1 order by observed_at, created_at, id`, [workspaceId]);
+  if (audit.rowCount !== 4 || versions.rowCount !== 4 || invalidations.rowCount !== 2
+    || invalidations.rows[0]?.reason_code !== "source_changed" || invalidations.rows[1]?.reason_code !== "source_removed"
+    || result.item.status !== "archived" || result.contextInvalidated !== true) throw new Error("audit/version/invalidation acceptance failed");
   process.stdout.write(JSON.stringify({ ok: true, categoryCatalog: initial.categories.length, revisions: versions.rowCount,
-    auditEvents: audit.rowCount, finalStatus: result.item.status, canWriteMeta: result.authority.canWriteMeta }) + "\n");
+    auditEvents: audit.rowCount, contextInvalidations: invalidations.rowCount,
+    finalStatus: result.item.status, canWriteMeta: result.authority.canWriteMeta }) + "\n");
 } finally {
   await pool.query("delete from audit_events where workspace_id = $1", [workspaceId]).catch(() => undefined);
   await pool.query("delete from memberships where workspace_id = $1", [workspaceId]).catch(() => undefined);

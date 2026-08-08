@@ -89,6 +89,8 @@
 - [ ] Versioned draft/publish/pause/archive ve rol/audit API'leri.
   - [x] Guidance için immutable draft/revise/publish/archive, optimistic registry hash,
     analyst draft + owner/admin publish/archive ve mutation+audit tek transaction.
+  - [x] Publish/archive ile eski guidance registry version'lı frozen context'lere atomik,
+    append-only workspace invalidation; draft/revise invalidation üretmez.
   - [ ] Strict policy pause/publish lifecycle, history/diff projection ve context invalidation binding'i.
 - [ ] Başlangıç objective/internal kategori playbook seti.
 - [ ] Kategori coverage/unmatched/conflict/impact dashboard ve güvenli archive akışı.

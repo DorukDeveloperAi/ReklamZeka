@@ -60,7 +60,8 @@ export type GuidanceStudioRepository = Readonly<{
     resourceId: string;
     occurredAt: string;
     metadata: Readonly<Record<string, string | number | boolean | null>>;
-  }>): Promise<Readonly<{ outcome: "inserted" | "unchanged"; registryHash: string; auditAppended: boolean }>>;
+  }>): Promise<Readonly<{ outcome: "inserted" | "unchanged"; registryHash: string; auditAppended: boolean;
+    contextInvalidationAppended: boolean }>>;
 }>;
 
 export class GuidanceStudioError extends Error {
@@ -171,7 +172,8 @@ export class GuidanceStudioService {
       actorId: principal.actor.userId, action: "guidance.draft_created", resourceId: cardRef,
       occurredAt: new Date().toISOString(), metadata: { version: 1, role: membership.role, facet: bindingScope.facet } });
     return Object.freeze({ contractVersion: GUIDANCE_STUDIO_VERSION, item: project(next).find((item) => item.cardRef === cardRef)!,
-      registryHash: saved.registryHash, authority: authority(membership.role) });
+      registryHash: saved.registryHash, contextInvalidated: saved.contextInvalidationAppended,
+      authority: authority(membership.role) });
   }
 
   async mutate(principal: TrustedDecisionRoomPrincipal, request: Readonly<{
@@ -217,6 +219,7 @@ export class GuidanceStudioService {
       actorId: principal.actor.userId, action: auditAction, resourceId: card.id, occurredAt: new Date().toISOString(),
       metadata: { version, role: membership.role, facet: nextScope.facet } });
     return Object.freeze({ contractVersion: GUIDANCE_STUDIO_VERSION, item: project(next).find((item) => item.cardRef === card.id)!,
-      registryHash: saved.registryHash, authority: authority(membership.role) });
+      registryHash: saved.registryHash, contextInvalidated: saved.contextInvalidationAppended,
+      authority: authority(membership.role) });
   }
 }
