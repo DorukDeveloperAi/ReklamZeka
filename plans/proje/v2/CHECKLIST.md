@@ -108,7 +108,18 @@
   - [x] Canlı hierarchy path'leri üzerinden bounded portföy çapında effective single-dimension
     conflict taraması; creative reuse path-bazlı, 20.000 yol/100 boyut hard cap ve fail-closed sonuç.
   - [ ] Archive preview dependency coverage'ini tamamlayıp güvenli mutation guard'ına bağlama.
+    - [x] Sürümlü JSONB dependency manifest'i, `pg_catalog` drift kontrolü, canonical+legacy
+      category ref lineage'ı, promotion/practice/budget geçmişi, conservative non-terminal
+      action blocker'ı ve deterministic impact hash kod+contract testlerinde tamamlandı.
+    - [ ] Bağlı PostgreSQL üzerinde tam coverage/integrity ve gerçek dependency fixture kabulü;
+      yerel `.env.local`/DB bağlantısı bulunmadığı için verifier çalıştırılamıyor.
   - [ ] Rol/audit/optimistic concurrency/context invalidation bağlı category authoring/archive akışı.
+    - [x] Dimension/definition create/revise/archive; owner/admin publish yetkisi, analyst/viewer
+      negatifleri, registry+version+impact hash guard'ı, atomik audit ve append-only
+      `category_resolution` invalidation kod+HTTP+UI testlerinde bağlı. Assignment/mapping
+      mutation authority bu dilimde yapısal olarak kapalı.
+    - [ ] Canlı PostgreSQL rollback/concurrency verifier ve oturumlu browser create→revise→
+      preview→archive kabulü; yerel `.env.local`/DB/session binding'i bulunmadığı için açık.
 - [ ] PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run.
 - [ ] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi.
   - [x] Guidance-only pure registry/pack; provenance ayrımı, deterministic scope/conflict,

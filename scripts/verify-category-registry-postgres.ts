@@ -155,7 +155,8 @@ try {
     });
     const impact = await new DrizzleCategoryArchiveImpactRepository(tx as never)
       .preview(ids.workspace!, categoryDimensionPublicRef("internal_campaign_type"));
-    archiveImpactReadSafe = impact?.archiveAllowed === false && impact.coverage.complete === false
+    archiveImpactReadSafe = impact?.archiveAllowed === false && impact.coverage.complete === true
+      && impact.coverage.partialOrUnknown.length === 0
       && impact.exactBlockers.activeDefinitions === 2 && impact.exactBlockers.activeAssignments === 1
       && impact.exactBlockers.manualLocks === 1;
     const effectiveHealth = scanPortfolioEffectiveCategoryHealth(

@@ -15,12 +15,54 @@
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
 | 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.5 ve Slice 01 kapalı; geniş field/breakdown kataloğu, multi-business grouping ve export/rotation ileri işi açık |
-| 09 | kategori ve talimat | DEVAM | 08 | Guidance Studio, agent preview, invalidation, çoklu facet binding, category health ve archive-impact preview hazır; portföy conflict scan ve category yönetimi sırada |
+| 09 | kategori ve talimat | DEVAM | 08 | A09.6c kapalı; A09.6d dependency coverage ve A09.7 guarded category lifecycle kodu hazır, canlı DB+oturumlu browser kabulü açık |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
-| 11 | bütçe planlama | AÇIK | 09,10 | planlandı |
+| 11 | bütçe planlama | KAPALI | 09,10 | Checklist'teki envelope/constraint/forecast/scenario/ledger/target binding dilimleri kanıtlı; upstream context genişlemeleri A09/A10 altında izleniyor |
 | 12 | prompt/advisor | DEVAM | 09–11 | narrative envelope/claim guard temeli var; translator/ledger sırada |
 | 13 | eylem valfi ve rutin | AÇIK | 04,10–12 | planlandı; write kapalı |
 | 14 | kontrol merkezi | AÇIK | 07,09–13 | planlandı |
+
+## 2026-08-09 — A09.6d/A09.7 guarded category lifecycle teknik checkpoint'i
+
+- Başlangıç yeniden haritalaması `c90883c` son doğrulanmış işlevsel checkpoint'ini doğruladı.
+  Güncel HEAD'deki doğrulanmamış post-checkpoint drift'in `.codex/config.toml` ile kendi MCP
+  sözleşme testini bozduğu görüldü; `required=true` ve write-onay varsayılanı doğrulanmış
+  checkpoint davranışına döndürüldü. `plans/reklamzeka-sistemi/v2` tarihsel ağacına dokunulmadı.
+- Archive impact sözleşmesi `category-archive-impact/2.0.0` oldu. Tüm public JSONB kolonları
+  sürümlü allowlist manifest'i ve runtime `pg_catalog` karşılaştırmasıyla sınıflandırılıyor;
+  yeni/bilinmeyen kolon, malformed contract, unresolved category ref, promotion edge sapması,
+  lifecycle bozukluğu veya ambiguous lineage coverage'i fail-closed kapatıyor.
+- Aktif ve tarihsel dependency hesabı canonical semantic ref ile UUID-revision bağlı legacy
+  promotion ref ailesini birlikte izliyor. Promotion template, AdvisedPractice ve budget
+  contract'ları exact; category bağını geri çıkaramayan non-terminal action unit'leri workspace
+  çapında conservative blocker. Preview deterministic `impactHash` taşır ve kendi başına hiçbir
+  archive/action/Meta-write yetkisi vermez.
+- Yeni cookie-only, same-origin `/api/category-authoring` lifecycle'ı yalnız dimension/definition
+  create/revise/archive açar. Workspace/actor/role request body'den alınmaz; owner/admin publish,
+  analyst/viewer read-only kalır. Assignment/mapping, approval, action ve Meta write authority
+  yapısal olarak kapalıdır.
+- Her mutation aktif workspace satırını `FOR UPDATE` kilitler; registry hash ve hedef version'ı,
+  revise/archive için transaction içinde yeniden hesaplanan impact hash'i doğrular. Mutation,
+  hash-chain audit fact'i ve etkilenen `category_resolution` component/version çiftlerinin
+  append-only invalidation fact'leri aynı transaction'dadır; frozen context payload'ı update edilmez.
+- Dashboard server authority'yi ayrı GET ile okur. Create/revise formları ve archive onayı yalnız
+  tam coverage, sıfır exact/conservative/integrity blocker, eşleşen registry/target version ve
+  güncel preview hash ile açılır; stale/hata preview'i geçersizleştirip state'i yeniden okur.
+- Otomatik kanıt: hedefli 14 dosya/57 test; tam `npm test` 194 dosya/1.168 test; production
+  `npm run build`; `npm run db:check`; `check:security-boundaries`; model/API boundary;
+  secret-artifact kontrolü ve `npm audit --omit=dev` sıfır zafiyet. Secret-artifact kontrolü,
+  taranabilir yerel secret yapılandırılmadığı için dürüst `SKIP` döndürdü.
+- Browser kanıtı: gerçek Chromium localhost `/dashboard` → İç kategoriler akışında bağlantısız
+  durum redakte `Kategori kaynağı kullanılamıyor` olarak fail-closed kaldı; 390/768/1440 px'te
+  body `scrollWidth == clientWidth`. Console'da yalnız beklenen 503 kaynak yanıtları ve favicon
+  404 vardı; client runtime/hydration hatası yoktu.
+- Açık kabul kapısı: çalışma ağacında `.env.local`, `DATABASE_URL` ve `DIRECT_DATABASE_URL`
+  bulunmuyor. Bu yüzden `verify:category-authoring-live`, category registry/inventory/effective
+  health ve Supabase security verifier'ları DB'ye bağlanamadı; oturumlu create→revise→preview→
+  archive browser happy-path'i koşulmadı. Devam komutu: güvenli `.env.local` geri yüklendikten
+  sonra `npm run verify:category-authoring-live`; ardından `npm run verify:category-registry-db`,
+  `npm run verify:category-inventory-live`, `npm run verify:category-effective-health-live` ve
+  `npm run verify:supabase-security`, sonra aynı localhost akışının owner/admin ve rol negatifleri.
 
 ## 2026-08-08 — A09.1 gerçek Guidance Studio
 

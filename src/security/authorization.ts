@@ -10,6 +10,7 @@ export type WorkspaceAction =
   | "budget:draft"
   | "promotion:draft"
   | "category_registry:read"
+  | "category_registry:publish"
   | "autonomy_rules:read"
   | "autonomy_rules:draft"
   | "guidance:read"
@@ -30,13 +31,13 @@ const ROLE_ACTIONS: Readonly<Record<WorkspaceRole, ReadonlySet<WorkspaceAction>>
   owner: new Set([
     "workspace:manage", "member:manage", "connection:manage", "data:read",
     "sync:run", "insight:feedback", "report:share",
-    "budget:draft", "promotion:draft", "category_registry:read", "autonomy_rules:read", "autonomy_rules:draft",
+    "budget:draft", "promotion:draft", "category_registry:read", "category_registry:publish", "autonomy_rules:read", "autonomy_rules:draft",
     "guidance:read", "guidance:draft", "guidance:publish", "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish",
   ]),
   admin: new Set([
     "member:manage", "connection:manage", "data:read", "sync:run",
     "insight:feedback", "report:share",
-    "budget:draft", "promotion:draft", "category_registry:read", "autonomy_rules:read", "autonomy_rules:draft",
+    "budget:draft", "promotion:draft", "category_registry:read", "category_registry:publish", "autonomy_rules:read", "autonomy_rules:draft",
     "guidance:read", "guidance:draft", "guidance:publish", "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish",
   ]),
   analyst: new Set(["data:read", "sync:run", "insight:feedback", "report:share", "budget:draft", "promotion:draft", "category_registry:read", "autonomy_rules:read", "autonomy_rules:draft", "guidance:read", "guidance:draft", "policy_bundle:read", "policy_bundle:draft"]),

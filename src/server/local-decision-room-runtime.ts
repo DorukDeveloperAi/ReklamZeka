@@ -183,6 +183,7 @@ export function assertTrustedLocalDecisionRoomRequest(
   if (operation === "publish" && ![
     "policy-bundle-confirm-human-presence", "policy-bundle-publish-approval-policy",
     "policy-bundle-publish-guardrail-policy", "guidance-studio-publish", "guidance-studio-archive",
+    "category-authoring-mutate",
   ].includes(request.headers.get("x-reklamzeka-intent") ?? "")) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if ((operation === "mark_read" || operation === "draft" || operation === "decide" || operation === "publish") && credential === "cookie"
     && (origin !== config.origin || fetchSite !== "same-origin")) {
@@ -361,6 +362,25 @@ export async function resolveTrustedLocalCategoryRegistryPrincipal(input: Readon
     now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
     requiredScope: "category_registry:read", expected: input.config });
   assertTrustedLocalDecisionRoomRequest(input.request, input.config, "read", "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
+/** Cookie-only category authoring boundary; publish capability never grants action or Meta-write authority. */
+export async function resolveTrustedLocalCategoryAuthoringPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+  requiredScope: Extract<LocalSessionScope, "category_registry:read" | "category_registry:publish">;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config", "requiredScope"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null) {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: input.requiredScope, expected: input.config });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config,
+    input.requiredScope === "category_registry:read" ? "read" : "publish", "cookie");
   return bindPrincipal(input.database, input.config);
 }
 

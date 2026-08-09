@@ -2,10 +2,10 @@
 command = "node"
 args = ["--import", "tsx", "scripts/reklamzeka-mcp.ts"]
 enabled = true
-required = false
+required = true
 startup_timeout_sec = 15
 tool_timeout_sec = 60
-default_tools_approval_mode = "prompt"
+default_tools_approval_mode = "writes"
 enabled_tools = [
   "register_agent_session",
   "heartbeat_agent_session",

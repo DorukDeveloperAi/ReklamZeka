@@ -59,6 +59,15 @@ describe("workspace authorization boundary", () => {
     expect(can("viewer", "policy_bundle:publish")).toBe(false);
   });
 
+  it("reserves active category registry publication for owner and admin", () => {
+    expect(can("owner", "category_registry:publish")).toBe(true);
+    expect(can("admin", "category_registry:publish")).toBe(true);
+    expect(can("analyst", "category_registry:publish")).toBe(false);
+    expect(can("viewer", "category_registry:publish")).toBe(false);
+    expect(can("analyst", "category_registry:read")).toBe(true);
+    expect(can("viewer", "category_registry:read")).toBe(true);
+  });
+
   it("filters resources by the authorized workspace at the server boundary", () => {
     const audit = new AppendOnlyAuditLog();
     const service = new WorkspaceDataService(memberships, [

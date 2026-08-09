@@ -6,19 +6,29 @@ const principal = { actor: { userId }, workspaceId, workspaceRef: "workspace_tes
 
 describe("CategoryArchiveImpactService", () => {
   it("authorizes read separately and preserves zero archive authority", async () => {
-    const impact = { target: { kind: "dimension", ref: "dimension_1234567890abcdef12345678", label: "Tür", version: 1 },
+    const impact = { impactHash: "a".repeat(64),
+      target: { kind: "dimension", ref: "dimension_1234567890abcdef12345678", label: "Tür", version: 1 },
       exactBlockers: { activeDefinitions: 1, activeAssignments: 0, manualLocks: 0, guidanceDrafts: 0,
-        guidancePublished: 0, activePromotionBindings: 0, autonomyDrafts: 0, autonomyPublished: 0,
-        guardrailDrafts: 0, guardrailPublished: 0 }, historicalImpact: { archivedGuidance: 0,
-        expiredPromotionBindings: 0, effectiveContexts: 0, alreadyInvalidatedContexts: 0, budgetProposals: 0 },
+        guidancePublished: 0, activePromotionBindings: 0, activePromotionTemplateScopes: 0,
+        activeAdvisedPractices: 0, autonomyDrafts: 0, autonomyPublished: 0,
+        guardrailDrafts: 0, guardrailPublished: 0 },
+      conservativeBlockers: { nonTerminalActionProposalUnits: 0 }, historicalImpact: { archivedGuidance: 0,
+        expiredPromotionBindings: 0, supersededPromotionTemplateScopes: 0, retiredAdvisedPractices: 0,
+        supersededAdvisedPractices: 0, effectiveContexts: 0, alreadyInvalidatedContexts: 0,
+        budgetProposals: 0, terminalActionProposalUnits: 0 },
       invalidationPlan: { categoryResolutionComponents: 0, contextsNeedingInvalidation: 0 },
-      coverage: { complete: false, exactRelational: [], exactContractRef: [], partialOrUnknown: ["unknown"] },
+      coverage: { complete: true, precision: "exact_with_conservative_action_queue",
+        manifestVersion: "category-dependency-manifest/1.0.0", exactRelational: [], exactContractRef: [],
+        conservative: ["action_proposal_payloads"], partialOrUnknown: [], integrity: {
+          unclassifiedJsonbColumns: 0, missingManifestJsonbColumns: 0, unresolvedCategoryRefs: 0,
+          inconsistentPromotionEdges: 0, malformedCategoryContracts: 0,
+          corruptLifecycleRows: 0, ambiguousLineage: 0 } },
       disposition: "blocked", archiveAllowed: false, authority: { canArchive: false, canAssign: false,
         canAuthorizeAction: false, canWriteMeta: false } } as const;
     const repository: CategoryArchiveImpactRepository = { preview: vi.fn(async () => impact) };
     const result = await new CategoryArchiveImpactService(repository, [{ userId, workspaceId, role: "viewer" }])
       .preview(principal, impact.target.ref);
-    expect(result).toMatchObject({ contractVersion: "category-archive-impact/1.0.0", archiveAllowed: false,
+    expect(result).toMatchObject({ contractVersion: "category-archive-impact/2.0.0", archiveAllowed: false,
       authority: { canArchive: false, canWriteMeta: false } });
   });
 });
