@@ -1,15 +1,19 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+
 import * as schema from "@/db/schema";
+import {
+  createLocalPromotionTemplateAuthoringHandlers,
+  promotionTemplateAuthoringNotConfiguredResponse,
+} from "@/server/local-promotion-template-authoring-runtime";
 import { localDecisionRoomConfig } from "@/server/local-decision-room-runtime";
-import { createLocalPracticeLabRouteHandlers, practiceLabNotConfiguredResponse } from "@/server/local-practice-lab-runtime";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-let runtimeDatabase: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let database: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
-function configuredHandler() {
+function handlers() {
   try {
     const environment = {
       DATABASE_URL: process.env.DATABASE_URL,
@@ -23,32 +27,22 @@ function configuredHandler() {
     };
     const config = localDecisionRoomConfig(environment);
     if (!config) return null;
-    if (!runtimeDatabase) {
-      const pool = new Pool({
-        connectionString: environment.DATABASE_URL,
-        max: 2,
-        connectionTimeoutMillis: 5_000,
-        statement_timeout: 10_000,
-        idleTimeoutMillis: 30_000,
-        allowExitOnIdle: true,
-      });
+    if (!database) {
+      const pool = new Pool({ connectionString: environment.DATABASE_URL, max: 2,
+        connectionTimeoutMillis: 5_000, statement_timeout: 10_000, idleTimeoutMillis: 30_000, allowExitOnIdle: true });
       pool.on("error", () => undefined);
-      runtimeDatabase = drizzle(pool, { schema });
+      database = drizzle(pool, { schema });
     }
-    return createLocalPracticeLabRouteHandlers({ database: runtimeDatabase, config });
-  } catch {
-    return null;
-  }
+    return createLocalPromotionTemplateAuthoringHandlers({ database, config });
+  } catch { return null; }
 }
 
-export function GET(): ReturnType<typeof practiceLabNotConfiguredResponse>;
-export function GET(request: Request): Promise<Response> | Response;
 export function GET(request?: Request) {
-  const handler = configuredHandler();
-  return handler && request ? handler.GET(request) : practiceLabNotConfiguredResponse();
+  const found = handlers();
+  return found && request ? found.GET(request) : promotionTemplateAuthoringNotConfiguredResponse();
 }
 
 export function POST(request?: Request) {
-  const handler = configuredHandler();
-  return handler && request ? handler.POST(request) : practiceLabNotConfiguredResponse();
+  const found = handlers();
+  return found && request ? found.POST(request) : promotionTemplateAuthoringNotConfiguredResponse();
 }

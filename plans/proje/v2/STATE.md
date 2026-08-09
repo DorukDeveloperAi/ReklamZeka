@@ -15,12 +15,51 @@
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
 | 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.5 ve Slice 01 kapalı; geniş field/breakdown kataloğu, multi-business grouping ve export/rotation ileri işi açık |
-| 09 | kategori ve talimat | DEVAM | 08 | Guarded lifecycle, target chooser, strict policy lifecycle/precedence, progressive contract ve Guidance Set hazır; facet/source/promotion/UI entegrasyonları ile canlı DB kabulü açık |
+| 09 | kategori ve talimat | DEVAM | 08 | Guarded category/policy/practice lifecycle, target chooser, precedence, promotion dry-run ve Guidance Set hazır; facet/source/formalization/mutable promotion ile canlı DB kabulü açık |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
 | 11 | bütçe planlama | KAPALI | 09,10 | Checklist'teki envelope/constraint/forecast/scenario/ledger/target binding dilimleri kanıtlı; upstream context genişlemeleri A09/A10 altında izleniyor |
 | 12 | prompt/advisor | DEVAM | 09–11 | narrative envelope/claim guard temeli var; translator/ledger sırada |
 | 13 | eylem valfi ve rutin | AÇIK | 04,10–12 | planlandı; write kapalı |
 | 14 | kontrol merkezi | AÇIK | 07,09–13 | planlandı |
+
+## 2026-08-09 — A09 human-gated Practice, Promotion dry-run ve Strict Policy Studio
+
+- AdvisedPractice lifecycle canonical zinciri `validated|conditional → standardization_reviewed
+  → standardization_candidate → standardized|retired` olarak tamamlandı. Analyst/owner/admin
+  candidate önerebilir; `standardized` yalnız owner/admin rolünün explicit human confirmation'ı,
+  exact definition version + `practice_revision_*` OCC ve aktif workspace membership recheck'iyle
+  yazılır. Event ve hash-chain audit aynı transaction'dadır. Standardization eventleri policy
+  promote, automation enable, action authorization veya Meta write authority üretmez; G3/G4 ya da
+  A13 grant'i oluşturmaz.
+- Ayrı `20260809202132_advised_practice_standardization_lifecycle` migrationı event allowlist ve
+  event-specific JSONB authority guard'larını ekler; existing tables FORCE RLS, PUBLIC/anon/
+  authenticated/service_role revoke ve append-only UPDATE trigger'larıyla sertleştirilir. Journal
+  idx 42 ve matching generated snapshot kanıtlıdır; önceki policy migration testi additive journal
+  sırasını exact idx 41→42 olarak doğrular.
+- Practice Lab POST sınırı cookie-only/same-origin, body principal/workspace/bearer injection
+  reddi ve ayrı `practice_lab:draft|standardize` scopes kullanır. Unknown operation fail-closed;
+  analyst standardize denemesi 403'tür. Timeline ve UI state/revision/human-gated controls gösterir;
+  agent veya UI kendi başına standardize edemez.
+- Strict Policy Studio mevcut lifecycle API'sini raw provenance + normalized DSL, type/status/text
+  filtreleri, append-only history/diff ve role-aware draft/revise/publish/pause/archive kontrolleriyle
+  dashboard'a bağlar. Gerçek dependency impact reader henüz yoktur; UI sayı uydurmak yerine
+  `henüz hesaplanmadı` gösterir. Approve/execute/schedule/tool/network/Meta write kapalıdır.
+- PromotionTemplate authoring read/dry-run vertical'ı aktif published immutable registry'yi tenant-
+  bound Drizzle adapterıyla yükler. Candidate hash/payload/ref/link/effective time, complete category
+  edge ve row-cap bütünlüğü GET dahil doğrulanır. API body yalnız server-issued opaque scope ref,
+  post/media type ve instruction alır; workspace/account/Page/Instagram/category sunucuda çözülür.
+  Owner/admin/analyst dry-run yapabilir, viewer salt okunurdur. Mevcut registry actor/audit/OCC
+  mutable authoring state'i taşımadığından draft persistence ve publish mutation bilinçli kapalıdır;
+  Meta write, targeting/creative invention, action proposal ve approval authority yoktur.
+- Kanıt: birleşik hedefli 12 dosya/60 test; tam `npm test` 221 dosya/1.348 test; production
+  build, `db:check`, architecture, model/security boundaries, secret scan ve `npm audit`
+  (0 vulnerability) yeşil. Ana ajan gerçek Chromium'da Strict Policy 390 px, Practice Lab 768 px
+  ve Promotion 1440 px fail-closed durumlarını `scrollWidth == clientWidth` ile doğruladı. Mutation
+  happy-pathleri mocked browser/HTTP contract testlerinde rol, OCC, unknown-operation ve authority
+  negatifleriyle kanıtlandı; console yalnız beklenen source/session 503'leri ve favicon 404 içerdi.
+- Canlı `verify:advised-practice-db` exact `postgres_connection_not_configured` blocker'ı ve
+  `npm run verify:advised-practice-db` devam komutunu döndürdü; `verify:supabase-security` de DB
+  bağlantısı olmadığı için başlayamadı. Production publish, Meta write, deploy ve git push yoktur.
 
 ## 2026-08-09 — A09 policy lifecycle, target chooser ve Guidance Set checkpoint'i
 

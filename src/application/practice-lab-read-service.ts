@@ -5,7 +5,8 @@ import {
   type AdvisedPracticeEvent,
   type AdvisedPracticeState,
 } from "@/domain/guidance/advised-practice";
-import type { PersistedAdvisedPractice } from "@/connectors/guidance/advised-practice-drizzle-repository";
+import { advisedPracticeRevisionRef,
+  type PersistedAdvisedPractice } from "@/connectors/guidance/advised-practice-drizzle-repository";
 
 export const PRACTICE_LAB_READ_MODEL_VERSION = "practice-lab-read-model/1.0.0" as const;
 
@@ -44,6 +45,8 @@ export type PracticeLabSummary = Readonly<{
   state: AdvisedPracticeState | null;
   outcomeStatus: "validated" | "conditional" | "rejected" | null;
   standardizationReviewStatus: "not_reviewed" | "reviewed";
+  standardizationStatus: "not_candidate" | "candidate" | "standardized";
+  revision: Readonly<{ definitionVersion: number; lastSequence: number; revisionRef: string }>;
   updatedAt: string;
   scope: Readonly<{
     kind: "global" | "bounded";
@@ -149,6 +152,8 @@ function stateAfter(event: AdvisedPracticeEvent): AdvisedPracticeState {
   if (event.eventType === "trial_started") return "trial";
   if (event.eventType === "outcome_recorded") return event.result;
   if (event.eventType === "standardization_reviewed") return "standardization_reviewed";
+  if (event.eventType === "standardization_candidate") return "standardization_candidate";
+  if (event.eventType === "standardized") return "standardized";
   return "retired";
 }
 
@@ -158,6 +163,8 @@ function note(event: AdvisedPracticeEvent): string {
   if (event.eventType === "trial_started") return event.hypothesis;
   if (event.eventType === "outcome_recorded") return event.outcomeNote;
   if (event.eventType === "standardization_reviewed") return event.reviewNote;
+  if (event.eventType === "standardization_candidate") return event.candidateNote;
+  if (event.eventType === "standardized") return event.confirmationNote;
   return event.reason;
 }
 
@@ -183,6 +190,9 @@ function summary(record: PersistedAdvisedPractice, workspaceRef: string): Practi
     state: replay.state,
     outcomeStatus: replay.outcomeStatus,
     standardizationReviewStatus: replay.standardizationReviewStatus,
+    standardizationStatus: replay.standardizationStatus,
+    revision: Object.freeze({ definitionVersion: definition.version, lastSequence: history.length,
+      revisionRef: advisedPracticeRevisionRef(record) }),
     updatedAt: updatedAt(definition, history),
     scope: Object.freeze({
       kind: definition.scope.kind,

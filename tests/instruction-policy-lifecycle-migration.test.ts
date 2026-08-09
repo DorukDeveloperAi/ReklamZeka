@@ -14,8 +14,11 @@ describe("strict instruction policy lifecycle migration", () => {
   });
 
   it("is journaled with the matching generated schema snapshot", () => {
-    const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")) as { entries: { tag: string }[] };
-    expect(journal.entries.at(-1)?.tag).toBe("20260809194948_strict_instruction_policy_lifecycle");
+    const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")) as { entries: { idx: number; tag: string }[] };
+    const policy = journal.entries.find((entry) => entry.tag === "20260809194948_strict_instruction_policy_lifecycle");
+    const advisedPractice = journal.entries.find((entry) => entry.tag === "20260809202132_advised_practice_standardization_lifecycle");
+    expect(policy).toMatchObject({ idx: 41 });
+    expect(advisedPractice?.idx).toBeGreaterThan(policy!.idx);
     expect(existsSync("drizzle/meta/20260809194948_snapshot.json")).toBe(true);
   });
 

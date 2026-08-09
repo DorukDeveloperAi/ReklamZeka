@@ -1,0 +1,273 @@
+.studio {
+  display: grid;
+  gap: 18px;
+}
+
+.hero,
+.surface,
+.empty,
+.error {
+  border: 1px solid var(--border, #dfe4e2);
+  border-radius: 18px;
+  background: var(--surface, #fff);
+  box-shadow: 0 10px 30px rgb(24 43 36 / 6%);
+}
+
+.hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px;
+}
+
+.hero h1,
+.surface h2,
+.surface h3 {
+  margin: 4px 0 6px;
+  color: #17231f;
+}
+
+.hero p,
+.surface p,
+.empty,
+.error {
+  margin: 0;
+  color: #64716c;
+  line-height: 1.55;
+}
+
+.kicker {
+  color: #22845d;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .13em;
+}
+
+.closedAuthority {
+  display: grid;
+  gap: 4px;
+  min-width: 220px;
+  padding: 13px 15px;
+  border: 1px solid #cfe6da;
+  border-radius: 12px;
+  background: #f2faf6;
+  color: #2d6550;
+  font-size: 12px;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(150px, 220px)) auto;
+  gap: 10px;
+  padding: 16px;
+}
+
+.filters input,
+.filters select,
+.editor input,
+.editor textarea {
+  width: 100%;
+  border: 1px solid #d8dfdc;
+  border-radius: 10px;
+  background: #fff;
+  color: #17231f;
+  font: inherit;
+}
+
+.filters input,
+.filters select,
+.editor input {
+  min-height: 42px;
+  padding: 9px 11px;
+}
+
+.filters button,
+.actions button,
+.retry {
+  min-height: 42px;
+  border: 1px solid #cad5d0;
+  border-radius: 10px;
+  padding: 9px 14px;
+  background: #fff;
+  color: #263a32;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.filters button:disabled,
+.actions button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(250px, .75fr) minmax(0, 1.75fr);
+  gap: 16px;
+}
+
+.surface {
+  padding: 18px;
+}
+
+.index {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  max-height: 720px;
+  overflow: auto;
+}
+
+.index > button {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  border: 1px solid #e0e5e3;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  color: #17231f;
+  text-align: left;
+  cursor: pointer;
+}
+
+.index > button[data-active="true"] {
+  border-color: #4aa47e;
+  background: #f3faf7;
+}
+
+.index small,
+.meta,
+.historyItem small {
+  color: #71807a;
+}
+
+.row,
+.badges,
+.actions,
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.row,
+.sectionHeader {
+  justify-content: space-between;
+}
+
+.badge {
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #eef2f0;
+  color: #52615b;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.badge[data-status="published"] { background: #e8f7ef; color: #23704f; }
+.badge[data-status="paused"] { background: #fff4da; color: #8a6412; }
+.badge[data-status="archived"] { background: #f1f1f1; color: #676767; }
+.badge[data-status="draft"] { background: #eaf1ff; color: #325f9b; }
+
+.editor {
+  display: grid;
+  gap: 16px;
+}
+
+.editor label {
+  display: grid;
+  gap: 7px;
+  color: #405049;
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.editor textarea {
+  min-height: 150px;
+  resize: vertical;
+  padding: 12px;
+  line-height: 1.5;
+}
+
+.editor textarea[data-code="true"] {
+  min-height: 330px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 12px;
+}
+
+.impact {
+  border: 1px dashed #d5a543;
+  border-radius: 12px;
+  padding: 13px;
+  background: #fffaf0;
+  color: #76581b;
+}
+
+.actions {
+  justify-content: flex-end;
+  border-top: 1px solid #e6ebe9;
+  padding-top: 15px;
+}
+
+.actions .primary {
+  border-color: #197652;
+  background: #197652;
+  color: #fff;
+}
+
+.actions .danger {
+  border-color: #e2b7b7;
+  color: #9a3535;
+}
+
+.history {
+  display: grid;
+  gap: 10px;
+}
+
+.historyItem {
+  border-left: 3px solid #d8e1dd;
+  padding: 9px 12px;
+}
+
+.historyItem code {
+  color: #3c554b;
+  overflow-wrap: anywhere;
+}
+
+.empty,
+.error {
+  padding: 24px;
+}
+
+.error {
+  border-color: #ead0d0;
+  background: #fff8f8;
+  color: #8a4141;
+}
+
+.error button { margin-top: 12px; }
+
+@media (max-width: 980px) {
+  .workspace,
+  .split { grid-template-columns: 1fr; }
+  .index { max-height: 320px; }
+}
+
+@media (max-width: 720px) {
+  .hero { display: grid; padding: 18px; }
+  .closedAuthority { min-width: 0; }
+  .filters { grid-template-columns: 1fr; }
+  .surface { padding: 14px; }
+  .actions { align-items: stretch; }
+  .actions button { flex: 1 1 140px; }
+}

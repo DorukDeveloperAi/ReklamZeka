@@ -69,7 +69,7 @@ describe("local Practice Lab route", () => {
       result: { view: "list", items: [], authority: { canExecuteWrite: false } },
       authority: { persistence: false, policyPromotion: false, automation: false, metaWrite: false, actionExecution: false },
     });
-    expect(response.headers.get("x-reklamzeka-access-mode")).toBe("read-draft-ephemeral");
+    expect(response.headers.get("x-reklamzeka-access-mode")).toBe("read-guarded-lifecycle");
     expect(response.headers.get("x-reklamzeka-action-authority")).toBe("none");
     expect(database.execute).toHaveBeenCalledTimes(1);
     expect(transaction).toHaveBeenCalledTimes(1);

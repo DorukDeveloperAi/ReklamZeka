@@ -128,6 +128,37 @@ export type PracticeStandardizationReviewEvent = PracticeEventBase & Readonly<{
   automationCapability: "disabled";
 }>;
 
+export type PracticeStandardizationCandidateEvent = PracticeEventBase & Readonly<{
+  eventType: "standardization_candidate";
+  proposedByRef: string;
+  proposedByRole: "owner" | "admin" | "analyst";
+  reviewEventRef: string;
+  candidateNote: string;
+  humanConfirmationRequired: true;
+  capabilities: Readonly<{
+    canPromotePolicy: false;
+    canEnableAutomation: false;
+    canAuthorizeAction: false;
+    canWriteMeta: false;
+  }>;
+}>;
+
+export type PracticeStandardizedEvent = PracticeEventBase & Readonly<{
+  eventType: "standardized";
+  confirmedByRef: string;
+  confirmedByRole: "owner" | "admin";
+  candidateEventRef: string;
+  decisionRef: string;
+  confirmationNote: string;
+  humanConfirmation: "explicit";
+  capabilities: Readonly<{
+    canPromotePolicy: false;
+    canEnableAutomation: false;
+    canAuthorizeAction: false;
+    canWriteMeta: false;
+  }>;
+}>;
+
 export type PracticeRetiredEvent = PracticeEventBase & Readonly<{
   eventType: "retired";
   retiredByRef: string;
@@ -140,6 +171,8 @@ export type AdvisedPracticeEvent =
   | PracticeTrialEvent
   | PracticeOutcomeEvent
   | PracticeStandardizationReviewEvent
+  | PracticeStandardizationCandidateEvent
+  | PracticeStandardizedEvent
   | PracticeRetiredEvent;
 
 export type AdvisedPracticeState =
@@ -150,6 +183,8 @@ export type AdvisedPracticeState =
   | "conditional"
   | "rejected"
   | "standardization_reviewed"
+  | "standardization_candidate"
+  | "standardized"
   | "retired";
 
 export class AdvisedPracticeError extends Error {
@@ -428,6 +463,10 @@ type TrialInput = Omit<PracticeTrialEvent, keyof PracticeEventBase | "eventType"
 type OutcomeInput = Omit<PracticeOutcomeEvent, keyof PracticeEventBase | "eventType">;
 type ReviewInput = Omit<PracticeStandardizationReviewEvent, keyof PracticeEventBase | "eventType"
   | "policyPromotionCapability" | "automationCapability">;
+type StandardizationCandidateInput = Omit<PracticeStandardizationCandidateEvent, keyof PracticeEventBase | "eventType"
+  | "humanConfirmationRequired" | "capabilities">;
+type StandardizedInput = Omit<PracticeStandardizedEvent, keyof PracticeEventBase | "eventType"
+  | "humanConfirmation" | "capabilities">;
 type RetiredInput = Omit<PracticeRetiredEvent, keyof PracticeEventBase | "eventType">;
 
 export type AppendPracticeEventInput =
@@ -436,6 +475,8 @@ export type AppendPracticeEventInput =
   | Readonly<{ eventType: "trial_started"; occurredAt: string; payload: TrialInput }>
   | Readonly<{ eventType: "outcome_recorded"; occurredAt: string; payload: OutcomeInput }>
   | Readonly<{ eventType: "standardization_reviewed"; occurredAt: string; payload: ReviewInput }>
+  | Readonly<{ eventType: "standardization_candidate"; occurredAt: string; payload: StandardizationCandidateInput }>
+  | Readonly<{ eventType: "standardized"; occurredAt: string; payload: StandardizedInput }>
   | Readonly<{ eventType: "retired"; occurredAt: string; payload: RetiredInput }>;
 
 function stateOf(history: readonly AdvisedPracticeEvent[]): AdvisedPracticeState | null {
@@ -446,8 +487,17 @@ function stateOf(history: readonly AdvisedPracticeEvent[]): AdvisedPracticeState
   if (last.eventType === "trial_started") return "trial";
   if (last.eventType === "outcome_recorded") return last.result;
   if (last.eventType === "standardization_reviewed") return "standardization_reviewed";
+  if (last.eventType === "standardization_candidate") return "standardization_candidate";
+  if (last.eventType === "standardized") return "standardized";
   return "retired";
 }
+
+const NO_ESCALATION_CAPABILITIES = Object.freeze({
+  canPromotePolicy: false as const,
+  canEnableAutomation: false as const,
+  canAuthorizeAction: false as const,
+  canWriteMeta: false as const,
+});
 
 function makeEvent(definition: AdvisedPracticeDefinition, history: readonly AdvisedPracticeEvent[],
   eventType: AdvisedPracticeEvent["eventType"], occurredAt: string, payload: Record<string, unknown>): AdvisedPracticeEvent {
@@ -510,7 +560,7 @@ export function appendAdvisedPracticeEvent(
       evidenceRefs: refs(input.payload.evidenceRefs, 1), observedAt, outcomeNote: text(input.payload.outcomeNote),
     };
   } else if (input.eventType === "standardization_reviewed") {
-    if (state !== "validated") throw new AdvisedPracticeError("outcome_required");
+    if (state !== "validated" && state !== "conditional") throw new AdvisedPracticeError("outcome_required");
     exactKeys(input.payload, ["reviewerRef", "outcomeEventRef", "decomposition", "reviewNote"]);
     const outcome = history.at(-1) as PracticeOutcomeEvent;
     if (input.payload.outcomeEventRef !== outcome.eventId || !Array.isArray(input.payload.decomposition)
@@ -529,6 +579,29 @@ export function appendAdvisedPracticeEvent(
       reviewerRef: ref(input.payload.reviewerRef), outcomeEventRef: ref(input.payload.outcomeEventRef),
       decomposition: Object.freeze(decomposition), reviewNote: text(input.payload.reviewNote),
       policyPromotionCapability: "disabled", automationCapability: "disabled",
+    };
+  } else if (input.eventType === "standardization_candidate") {
+    if (state !== "standardization_reviewed") throw new AdvisedPracticeError("invalid_transition");
+    exactKeys(input.payload, ["proposedByRef", "proposedByRole", "reviewEventRef", "candidateNote"]);
+    const review = history.at(-1) as PracticeStandardizationReviewEvent;
+    if (!(["owner", "admin", "analyst"] as const).includes(input.payload.proposedByRole)
+      || input.payload.reviewEventRef !== review.eventId) throw new AdvisedPracticeError("invalid_input");
+    payload = {
+      proposedByRef: ref(input.payload.proposedByRef), proposedByRole: input.payload.proposedByRole,
+      reviewEventRef: ref(input.payload.reviewEventRef), candidateNote: text(input.payload.candidateNote),
+      humanConfirmationRequired: true, capabilities: NO_ESCALATION_CAPABILITIES,
+    };
+  } else if (input.eventType === "standardized") {
+    if (state !== "standardization_candidate") throw new AdvisedPracticeError("invalid_transition");
+    exactKeys(input.payload, ["confirmedByRef", "confirmedByRole", "candidateEventRef", "decisionRef", "confirmationNote"]);
+    const candidateEvent = history.at(-1) as PracticeStandardizationCandidateEvent;
+    if (!(["owner", "admin"] as const).includes(input.payload.confirmedByRole)
+      || input.payload.candidateEventRef !== candidateEvent.eventId) throw new AdvisedPracticeError("authority_escalation");
+    payload = {
+      confirmedByRef: ref(input.payload.confirmedByRef), confirmedByRole: input.payload.confirmedByRole,
+      candidateEventRef: ref(input.payload.candidateEventRef), decisionRef: ref(input.payload.decisionRef),
+      confirmationNote: text(input.payload.confirmationNote), humanConfirmation: "explicit",
+      capabilities: NO_ESCALATION_CAPABILITIES,
     };
   } else {
     if (state === null || state === "retired") throw new AdvisedPracticeError("invalid_transition");
@@ -616,7 +689,8 @@ function assertPersistedEventShape(event: AdvisedPracticeEvent, history: readonl
     exactKeys(event, [...base, "reviewerRef", "outcomeEventRef", "decomposition", "reviewNote",
       "policyPromotionCapability", "automationCapability"]);
     const outcome = history.at(-1);
-    if (!outcome || outcome.eventType !== "outcome_recorded" || outcome.result !== "validated"
+    if (!outcome || outcome.eventType !== "outcome_recorded"
+      || outcome.result !== "validated" && outcome.result !== "conditional"
       || event.outcomeEventRef !== outcome.eventId || ref(event.reviewerRef) !== event.reviewerRef
       || text(event.reviewNote) !== event.reviewNote || event.policyPromotionCapability !== "disabled"
       || event.automationCapability !== "disabled" || !Array.isArray(event.decomposition)
@@ -625,6 +699,29 @@ function assertPersistedEventShape(event: AdvisedPracticeEvent, history: readonl
       exactKeys(part, ["target", "summary", "sourceRefs", "artifactRef", "promotionCapability"]);
       if (!TARGETS.has(part.target) || text(part.summary) !== part.summary || !sameCanonical(part.sourceRefs, 1)
         || part.artifactRef !== null || part.promotionCapability !== "disabled") throw new AdvisedPracticeError("invalid_history");
+    }
+  } else if (event.eventType === "standardization_candidate") {
+    exactKeys(event, [...base, "proposedByRef", "proposedByRole", "reviewEventRef", "candidateNote",
+      "humanConfirmationRequired", "capabilities"]);
+    const review = history.at(-1);
+    if (!review || review.eventType !== "standardization_reviewed" || event.reviewEventRef !== review.eventId
+      || ref(event.proposedByRef) !== event.proposedByRef
+      || !(["owner", "admin", "analyst"] as const).includes(event.proposedByRole)
+      || text(event.candidateNote) !== event.candidateNote || event.humanConfirmationRequired !== true
+      || stableStringify(event.capabilities) !== stableStringify(NO_ESCALATION_CAPABILITIES)) {
+      throw new AdvisedPracticeError("invalid_history");
+    }
+  } else if (event.eventType === "standardized") {
+    exactKeys(event, [...base, "confirmedByRef", "confirmedByRole", "candidateEventRef", "decisionRef",
+      "confirmationNote", "humanConfirmation", "capabilities"]);
+    const candidate = history.at(-1);
+    if (!candidate || candidate.eventType !== "standardization_candidate"
+      || event.candidateEventRef !== candidate.eventId || ref(event.confirmedByRef) !== event.confirmedByRef
+      || !(["owner", "admin"] as const).includes(event.confirmedByRole)
+      || ref(event.decisionRef) !== event.decisionRef || text(event.confirmationNote) !== event.confirmationNote
+      || event.humanConfirmation !== "explicit"
+      || stableStringify(event.capabilities) !== stableStringify(NO_ESCALATION_CAPABILITIES)) {
+      throw new AdvisedPracticeError("invalid_history");
     }
   } else {
     exactKeys(event, [...base, "retiredByRef", "reason"]);
@@ -646,7 +743,9 @@ function appendAdvisedPracticeEventUnchecked(
     || (input.eventType === "reviewed" && state !== "candidate")
     || (input.eventType === "trial_started" && state !== "reviewed" && state !== "conditional")
     || (input.eventType === "outcome_recorded" && state !== "trial")
-    || (input.eventType === "standardization_reviewed" && state !== "validated")
+    || (input.eventType === "standardization_reviewed" && state !== "validated" && state !== "conditional")
+    || (input.eventType === "standardization_candidate" && state !== "standardization_reviewed")
+    || (input.eventType === "standardized" && state !== "standardization_candidate")
     || (input.eventType === "retired" && (state === null || state === "retired"))) {
     throw new AdvisedPracticeError("invalid_transition");
   }
@@ -661,6 +760,7 @@ export function replayAdvisedPractice(
   state: AdvisedPracticeState | null;
   outcomeStatus: "validated" | "conditional" | "rejected" | null;
   standardizationReviewStatus: "not_reviewed" | "reviewed";
+  standardizationStatus: "not_candidate" | "candidate" | "standardized";
   lastEventRef: string | null;
   historyHash: string;
 }> {
@@ -670,6 +770,8 @@ export function replayAdvisedPractice(
     state: stateOf(history), outcomeStatus: outcome?.result ?? null,
     standardizationReviewStatus: history.some((event) => event.eventType === "standardization_reviewed")
       ? "reviewed" : "not_reviewed",
+    standardizationStatus: history.some((event) => event.eventType === "standardized") ? "standardized"
+      : history.some((event) => event.eventType === "standardization_candidate") ? "candidate" : "not_candidate",
     lastEventRef: history.at(-1)?.eventId ?? null,
     historyHash: digest({ definitionHash: definition.definitionHash, eventHashes: history.map((event) => event.eventHash) }),
   });

@@ -1625,7 +1625,8 @@ export const advisedPracticeEvents = pgTable("advised_practice_events", {
     ${table.eventId} ~ '^practice_event_[a-f0-9]{20}$' and ${table.eventHash} ~ '^[a-f0-9]{64}$'
   `),
   check("advised_practice_events_type", sql`${table.eventType} in (
-    'candidate_created', 'reviewed', 'trial_started', 'outcome_recorded', 'standardization_reviewed', 'retired'
+    'candidate_created', 'reviewed', 'trial_started', 'outcome_recorded', 'standardization_reviewed',
+    'standardization_candidate', 'standardized', 'retired'
   )`),
   check("advised_practice_events_payload_exact", sql`(
     jsonb_typeof(${table.payload}) = 'object'
@@ -1656,6 +1657,26 @@ export const advisedPracticeEvents = pgTable("advised_practice_events", {
       and jsonb_typeof(${table.payload} #> '{decomposition}') = 'array'
       and jsonb_array_length(${table.payload} #> '{decomposition}') >= 1
       and not jsonb_path_exists(${table.payload}, '$.decomposition[*] ? (@.artifactRef != null || @.promotionCapability != "disabled")')
+    )
+  `),
+  check("advised_practice_events_candidate_guard", sql`
+    ${table.eventType} <> 'standardization_candidate' or (
+      ${table.payload} #>> '{proposedByRole}' in ('owner', 'admin', 'analyst')
+      and ${table.payload} #>> '{humanConfirmationRequired}' = 'true'
+      and ${table.payload} #>> '{capabilities,canPromotePolicy}' = 'false'
+      and ${table.payload} #>> '{capabilities,canEnableAutomation}' = 'false'
+      and ${table.payload} #>> '{capabilities,canAuthorizeAction}' = 'false'
+      and ${table.payload} #>> '{capabilities,canWriteMeta}' = 'false'
+    )
+  `),
+  check("advised_practice_events_standardized_guard", sql`
+    ${table.eventType} <> 'standardized' or (
+      ${table.payload} #>> '{confirmedByRole}' in ('owner', 'admin')
+      and ${table.payload} #>> '{humanConfirmation}' = 'explicit'
+      and ${table.payload} #>> '{capabilities,canPromotePolicy}' = 'false'
+      and ${table.payload} #>> '{capabilities,canEnableAutomation}' = 'false'
+      and ${table.payload} #>> '{capabilities,canAuthorizeAction}' = 'false'
+      and ${table.payload} #>> '{capabilities,canWriteMeta}' = 'false'
     )
   `),
   check("advised_practice_events_no_forbidden_material", sql`

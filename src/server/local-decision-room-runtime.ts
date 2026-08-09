@@ -173,7 +173,7 @@ export function assertTrustedLocalDecisionRoomRequest(
   if (operation === "draft" && !["budget-lab-dry-run", "budget-lab-save-draft"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   ) && !["autonomy-rule-create-draft", "guidance-studio-create", "guidance-studio-revise",
-    "guidance-set-create", "guidance-set-revise"].includes(
+    "guidance-set-create", "guidance-set-revise", "practice-lab-propose-standardization"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if (operation === "decide" && ![
@@ -185,7 +185,7 @@ export function assertTrustedLocalDecisionRoomRequest(
     "policy-bundle-confirm-human-presence", "policy-bundle-publish-approval-policy",
     "policy-bundle-publish-guardrail-policy", "guidance-studio-publish", "guidance-studio-archive",
     "guidance-set-review", "guidance-set-archive",
-    "category-authoring-mutate",
+    "category-authoring-mutate", "practice-lab-standardize",
   ].includes(request.headers.get("x-reklamzeka-intent") ?? "")) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if ((operation === "mark_read" || operation === "draft" || operation === "decide" || operation === "publish") && credential === "cookie"
     && (origin !== config.origin || fetchSite !== "same-origin")) {
@@ -383,6 +383,26 @@ export async function resolveTrustedLocalCategoryAuthoringPrincipal(input: Reado
     requiredScope: input.requiredScope, expected: input.config });
   assertTrustedLocalDecisionRoomRequest(input.request, input.config,
     input.requiredScope === "category_registry:read" ? "read" : "publish", "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
+/** Cookie-only Practice Lab lifecycle boundary; analyst proposals and owner/admin standardization stay separately scoped. */
+export async function resolveTrustedLocalPracticeLabPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+  requiredScope: Extract<LocalSessionScope, "practice_lab:read" | "practice_lab:draft" | "practice_lab:standardize">;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config", "requiredScope"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null) {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: input.requiredScope, expected: input.config });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config,
+    input.requiredScope === "practice_lab:read" ? "read"
+      : input.requiredScope === "practice_lab:draft" ? "draft" : "publish", "cookie");
   return bindPrincipal(input.database, input.config);
 }
 

@@ -4,9 +4,11 @@ import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import {
+  advisedPracticeRevisionRef,
   DrizzleAdvisedPracticeRepository,
   AdvisedPracticeRepositoryError,
 } from "@/connectors/guidance/advised-practice-drizzle-repository";
+import { AdvisedPracticeLifecycleService } from "@/application/advised-practice-lifecycle-service";
 import { DrizzleWorkspaceTombstonePurgePort } from "@/connectors/meta/workspace-tombstone-purge-drizzle-adapter";
 import * as schema from "@/db/schema";
 import {
@@ -19,15 +21,22 @@ import {
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const databaseUrl = process.env.DATABASE_URL?.trim();
-if (!databaseUrl) throw new Error("DATABASE_URL yapılandırılmadı");
+if (!databaseUrl) {
+  console.error(JSON.stringify({ ok: false, blocker: "postgres_connection_not_configured",
+    requiredOneOf: ["DATABASE_URL"], continuation: "npm run verify:advised-practice-db" }));
+  process.exit(2);
+}
 
-const migrationPath = "drizzle/20260807153726_little_devos.sql";
+const migrationPaths = ["drizzle/20260807153726_little_devos.sql",
+  "drizzle/20260809202132_advised_practice_standardization_lifecycle.sql"] as const;
 const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 30_000 });
 const database = drizzle(pool, { schema });
 const rollback = Symbol("rollback");
 const workspaceId = randomUUID();
 const foreignWorkspaceId = randomUUID();
 const tombstoneWorkspaceId = randomUUID();
+const actorId = randomUUID();
+const analystId = randomUUID();
 let ephemeralSchema = false;
 let migrationVerified = false;
 let definitionRoundTrip = false;
@@ -44,6 +53,12 @@ let tombstonedLoadBlocked = false;
 let tombstonePracticeRowsPurged = false;
 let idempotentReplay = false;
 let corruptRevisionBlocked = false;
+let standardizationCandidatePersisted = false;
+let standardizedByOwner = false;
+let staleStandardizationBlocked = false;
+let analystStandardizationBlocked = false;
+let standardizationAuditCount = 0;
+let standardizedAuthorityBlocked = false;
 let rlsEnabled = false;
 let publicApiGrants = -1;
 let temporaryRowsCommitted = true;
@@ -114,9 +129,11 @@ function historyToOutcome(definitionValue: AdvisedPracticeDefinition, result: "v
 }
 
 async function applyEphemeralMigration(transaction: Parameters<Parameters<typeof database.transaction>[0]>[0]) {
-  const source = readFileSync(migrationPath, "utf8");
-  for (const statement of source.split("--> statement-breakpoint").map((value) => value.trim()).filter(Boolean)) {
-    await transaction.execute(sql.raw(statement));
+  for (const migrationPath of migrationPaths) {
+    const source = readFileSync(migrationPath, "utf8");
+    for (const statement of source.split("--> statement-breakpoint").map((value) => value.trim()).filter(Boolean)) {
+      await transaction.execute(sql.raw(statement));
+    }
   }
 }
 
@@ -139,19 +156,26 @@ try {
       select count(*)::int as count from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'public' and c.relname in ('advised_practice_definitions', 'advised_practice_events')
-        and c.relrowsecurity is true
+        and c.relrowsecurity is true and c.relforcerowsecurity is true
     `);
     rlsEnabled = Number((rls as unknown as { rows?: { count: number }[] }).rows?.[0]?.count ?? 0) === 2;
     const grants = await transaction.execute(sql`
       select count(*)::int as count from information_schema.role_table_grants
       where table_schema = 'public' and table_name in ('advised_practice_definitions', 'advised_practice_events')
-        and grantee in ('anon', 'authenticated', 'PUBLIC')
+        and grantee in ('anon', 'authenticated', 'service_role', 'PUBLIC')
     `);
     publicApiGrants = Number((grants as unknown as { rows?: { count: number }[] }).rows?.[0]?.count ?? -1);
 
     await transaction.insert(schema.workspaces).values([
       { id: workspaceId, name: "Practice E2E" }, { id: foreignWorkspaceId, name: "Foreign Practice E2E" },
       { id: tombstoneWorkspaceId, name: "Tombstone Practice E2E" },
+    ]);
+    await transaction.insert(schema.users).values([
+      { id: actorId, email: `practice-owner-${actorId}@invalid.local` },
+      { id: analystId, email: `practice-analyst-${analystId}@invalid.local` },
+    ]);
+    await transaction.insert(schema.memberships).values([
+      { workspaceId, userId: actorId, role: "owner" }, { workspaceId, userId: analystId, role: "analyst" },
     ]);
     const repository = new DrizzleAdvisedPracticeRepository(transaction as never, workspaceId);
     const foreignRepository = new DrizzleAdvisedPracticeRepository(transaction as never, foreignWorkspaceId);
@@ -185,6 +209,66 @@ try {
     lifecycleRoundTrip = loaded !== null
       && replayAdvisedPractice(loaded.definition, loaded.history).outcomeStatus === "validated"
       && replayAdvisedPractice(loaded.definition, loaded.history).standardizationReviewStatus === "reviewed";
+
+    const standardizationDefinition = definition("practice_standardization_e2e");
+    await repository.saveDefinition(standardizationDefinition);
+    const standardizationOutcome = historyToOutcome(standardizationDefinition, "conditional");
+    for (const event of standardizationOutcome.history) await repository.appendEvent(event);
+    const standardizationReview = appendAdvisedPracticeEvent(standardizationDefinition, standardizationOutcome.history, {
+      eventType: "standardization_reviewed", occurredAt: "2026-08-21T12:00:00.000Z", payload: {
+        reviewerRef: "operator_owner", outcomeEventRef: standardizationOutcome.event.eventId,
+        decomposition: [{ target: "feature", summary: "Veri yeterliliği", sourceRefs: ["evidence_post_window"],
+          artifactRef: null, promotionCapability: "disabled" }], reviewNote: "Koşullu kapsamla complete review",
+      },
+    });
+    await repository.appendEvent(standardizationReview.event);
+    const initialStandardizationRecord = (await repository.load(standardizationDefinition.practiceRef))!;
+    const ownerPrincipal = { actor: { userId: actorId }, workspaceId, workspaceRef: "workspace_practice_e2e",
+      readerRef: "operator_owner" } as const;
+    const ownerService = new AdvisedPracticeLifecycleService(repository, [{ userId: actorId, workspaceId, role: "owner" }]);
+    const proposalCommand = { operation: "propose_standardization" as const,
+      practiceRef: standardizationDefinition.practiceRef, expectedDefinitionVersion: standardizationDefinition.version,
+      expectedRevisionRef: advisedPracticeRevisionRef(initialStandardizationRecord), candidateNote: "İnsan teyidine hazır" };
+    const proposed = await ownerService.mutate(ownerPrincipal, proposalCommand);
+    standardizationCandidatePersisted = proposed.state === "standardization_candidate"
+      && proposed.standardizationStatus === "candidate" && proposed.auditAppended;
+    staleStandardizationBlocked = await ownerService.mutate(ownerPrincipal, proposalCommand).then(
+      () => false, (reason: unknown) => reason instanceof Error && "code" in reason && reason.code === "conflict");
+    const analystService = new AdvisedPracticeLifecycleService(repository,
+      [{ userId: analystId, workspaceId, role: "analyst" }]);
+    analystStandardizationBlocked = await analystService.mutate({ ...ownerPrincipal, actor: { userId: analystId },
+      readerRef: "operator_analyst" }, { operation: "standardize", practiceRef: standardizationDefinition.practiceRef,
+      expectedDefinitionVersion: standardizationDefinition.version, expectedRevisionRef: proposed.revisionRef,
+      decisionRef: "decision_forbidden", confirmationNote: "Yetkisiz", humanConfirmation: "explicit" }).then(
+      () => false, () => true);
+    const standardized = await ownerService.mutate(ownerPrincipal, { operation: "standardize",
+      practiceRef: standardizationDefinition.practiceRef, expectedDefinitionVersion: standardizationDefinition.version,
+      expectedRevisionRef: proposed.revisionRef, decisionRef: "decision_owner_confirmed",
+      confirmationNote: "Owner kanıtı açıkça inceledi", humanConfirmation: "explicit" });
+    standardizedByOwner = standardized.state === "standardized" && standardized.standardizationStatus === "standardized"
+      && !standardized.authority.canPromotePolicy && !standardized.authority.canEnableAutomation
+      && !standardized.authority.canAuthorizeAction && !standardized.authority.canWriteMeta;
+    const standardizationAudits = await transaction.execute(sql`select count(*)::int as count from audit_events
+      where workspace_id = ${workspaceId}::uuid and resource_type = 'advised_practice'
+        and action in ('advised_practice.propose_standardization', 'advised_practice.standardize')`);
+    standardizationAuditCount = Number((standardizationAudits as unknown as { rows?: { count: number }[] }).rows?.[0]?.count ?? 0);
+    const standardizedRecord = (await repository.load(standardizationDefinition.practiceRef))!;
+    const standardizedEvent = standardizedRecord.history.at(-1)!;
+    standardizedAuthorityBlocked = await transaction.transaction(async (savepoint) => {
+      await savepoint.insert(schema.advisedPracticeEvents).values({ workspaceId,
+        definitionId: (await savepoint.select({ id: schema.advisedPracticeDefinitions.id })
+          .from(schema.advisedPracticeDefinitions).where(sql`${schema.advisedPracticeDefinitions.workspaceId} = ${workspaceId}::uuid
+            and ${schema.advisedPracticeDefinitions.practiceRef} = ${standardizationDefinition.practiceRef}`))[0]!.id,
+        workspaceRef: standardizedEvent.workspaceRef, practiceRef: standardizedEvent.practiceRef,
+        definitionVersion: standardizedEvent.definitionVersion, definitionHash: standardizedEvent.definitionHash,
+        schemaVersion: standardizedEvent.schemaVersion, sequence: standardizedEvent.sequence + 1,
+        previousEventHash: standardizedEvent.eventHash, eventId: `practice_event_${"e".repeat(20)}`,
+        eventHash: "e".repeat(64), eventType: "standardized", occurredAt: new Date("2026-08-24T00:00:00.000Z"),
+        payload: { ...standardizedEvent, sequence: standardizedEvent.sequence + 1,
+          previousEventHash: standardizedEvent.eventHash, eventId: `practice_event_${"e".repeat(20)}`,
+          eventHash: "e".repeat(64), occurredAt: "2026-08-24T00:00:00.000Z", confirmedByRole: "analyst" } as never });
+      return false;
+    }).catch(() => true);
 
     for (const result of ["conditional", "rejected"] as const) {
       const itemDefinition = definition(`practice_${result}_e2e`);
@@ -280,6 +364,8 @@ try {
       || !policyArtifactBlocked || !definitionAuthorityBlocked || !crossTenantBlocked
       || !crossTenantLoadIsolated || !tombstonedLoadBlocked
       || !tombstonePracticeRowsPurged || !idempotentReplay || !corruptRevisionBlocked
+      || !standardizationCandidatePersisted || !standardizedByOwner || !staleStandardizationBlocked
+      || !analystStandardizationBlocked || standardizationAuditCount !== 2 || !standardizedAuthorityBlocked
       || !rlsEnabled || publicApiGrants !== 0) throw new Error("Advised practice PostgreSQL kabulü başarısız");
     throw rollback;
   });
@@ -309,5 +395,7 @@ console.log(JSON.stringify({
   definitionAuthorityBlocked,
   crossTenantBlocked, crossTenantLoadIsolated, tombstonedLoadBlocked, tombstonePracticeRowsPurged,
   idempotentReplay, corruptRevisionBlocked, rlsEnabled, publicApiGrants,
+  standardizationCandidatePersisted, standardizedByOwner, staleStandardizationBlocked,
+  analystStandardizationBlocked, standardizationAuditCount, standardizedAuthorityBlocked,
   metaNetworkCalls: 0, metaWriteCalls: 0, temporaryRowsCommitted, ephemeralTablesRemaining,
 }));

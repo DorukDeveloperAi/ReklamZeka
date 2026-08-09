@@ -12,6 +12,12 @@ import {
   type ExistingPostPromotionCatalog as PromotionPreflightCatalog,
   type PromotionCatalogOption as PromotionPreflightOption,
 } from "@/application/existing-post-promotion-catalog";
+import {
+  PROMOTION_TEMPLATE_AUTHORING_VERSION,
+  type PromotionTemplateAuthoringDryRunEnvelope,
+  type PromotionTemplateAuthoringInspection,
+  type PromotionTemplateAuthoringSelection,
+} from "@/application/promotion-template-authoring";
 import styles from "./operating-dashboard.module.css";
 
 export type { PromotionPreflightCatalog, PromotionPreflightOption };
@@ -33,6 +39,137 @@ export type PromotionPreflightSurfaceState =
 type SelectionKey = keyof ExistingPostPromotionPreflightRequest;
 type MutableSelection = { -readonly [K in SelectionKey]?: ExistingPostPromotionPreflightRequest[K] };
 type ErrorEnvelope = Readonly<{ error?: Readonly<{ message?: string }> }>;
+type PromotionTemplateAuthoringState =
+  | Readonly<{ status: "loading" }>
+  | Readonly<{ status: "unavailable" | "error"; message: string }>
+  | Readonly<{
+    status: "ready";
+    inspection: PromotionTemplateAuthoringInspection;
+    selection: PromotionTemplateAuthoringSelection;
+    result: PromotionTemplateAuthoringDryRunEnvelope["result"] | null;
+    evaluating: boolean;
+    message: string | null;
+  }>;
+
+const SAFE_REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
+const PROMOTION_SCOPE_REF = /^promotion_scope_[a-f0-9]{24}$/;
+const HASH = /^[a-f0-9]{64}$/;
+const ROLES = new Set(["owner", "admin", "analyst", "viewer"]);
+
+function exactObject(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).length === keys.length && Object.keys(value).every((key) => keys.includes(key)));
+}
+
+function validAuthoringCapabilities(value: unknown): boolean {
+  const keys = ["canRead", "canDryRun", "canPersistDraft", "canPublish", "canWriteMeta", "canChangeTargeting",
+    "canGenerateCreative", "canProposeAction", "canGrantApproval"] as const;
+  return exactObject(value, keys) && value.canRead === true && typeof value.canDryRun === "boolean"
+    && keys.slice(2).every((key) => value[key] === false);
+}
+
+function validLifecycle(value: unknown): boolean {
+  return exactObject(value, ["draftPersistence", "publishMutation", "blocker"])
+    && value.draftPersistence === "unavailable" && value.publishMutation === "unavailable"
+    && value.blocker === "immutable_registry_has_no_authoring_occ_audit_lifecycle";
+}
+
+function parsePromotionTemplateAuthoringInspection(value: unknown): PromotionTemplateAuthoringInspection {
+  if (!exactObject(value, ["contractVersion", "catalog", "role", "capabilities", "lifecycle"])
+    || value.contractVersion !== PROMOTION_TEMPLATE_AUTHORING_VERSION || typeof value.role !== "string" || !ROLES.has(value.role)
+    || !validAuthoringCapabilities(value.capabilities) || !validLifecycle(value.lifecycle)
+    || !exactObject(value.catalog, ["scopes"]) || !Array.isArray(value.catalog.scopes) || value.catalog.scopes.length > 100) {
+    throw new Error("Güvenli PromotionTemplate authoring kataloğu doğrulanamadı.");
+  }
+  for (const scope of value.catalog.scopes) {
+    if (!exactObject(scope, ["scopeRef", "label", "actorType", "categoryCount", "postTypes", "instructionAliases"])
+      || typeof scope.scopeRef !== "string" || !PROMOTION_SCOPE_REF.test(scope.scopeRef)
+      || typeof scope.label !== "string" || scope.label.length < 1 || scope.label.length > 120
+      || !["page", "instagram"].includes(String(scope.actorType))
+      || !Number.isSafeInteger(scope.categoryCount) || (scope.categoryCount as number) < 1
+      || !Array.isArray(scope.postTypes) || scope.postTypes.length < 1
+      || scope.postTypes.some((item) => !["image", "video", "carousel", "reel"].includes(String(item)))
+      || !Array.isArray(scope.instructionAliases) || scope.instructionAliases.length < 1
+      || scope.instructionAliases.some((item) => typeof item !== "string" || item.length < 1 || item.length > 80)) {
+      throw new Error("Güvenli PromotionTemplate authoring kataloğu doğrulanamadı.");
+    }
+  }
+  if (/"(?:targeting|accountRef|actorRef|internalCategoryRefs)"/.test(JSON.stringify(value.catalog))) {
+    throw new Error("Güvenli PromotionTemplate authoring kataloğu doğrulanamadı.");
+  }
+  return value as unknown as PromotionTemplateAuthoringInspection;
+}
+
+function validSelectorCapabilities(value: unknown): boolean {
+  const keys = ["canPublish", "canPersist", "canWriteMeta", "canChangeTargeting", "canGenerateCreative", "canProposeAction",
+    "canGrantApproval"] as const;
+  return exactObject(value, keys) && keys.every((key) => value[key] === false);
+}
+
+function parsePromotionTemplateAuthoringDryRun(value: unknown): PromotionTemplateAuthoringDryRunEnvelope {
+  if (!exactObject(value, ["contractVersion", "result", "role", "capabilities", "lifecycle"])
+    || value.contractVersion !== PROMOTION_TEMPLATE_AUTHORING_VERSION || typeof value.role !== "string" || !ROLES.has(value.role)
+    || !validAuthoringCapabilities(value.capabilities)
+    || (value.capabilities as Record<string, unknown>).canDryRun !== true || !validLifecycle(value.lifecycle)
+    || !exactObject(value.result, ["version", "status", "dryRunOnly", "publishReady", "recommendation", "reasons", "questions",
+      "capabilities", "selectionHash"])
+    || value.result.version !== "promotion-template-selector/1.0.0"
+    || !["recommended", "ambiguous", "unresolved"].includes(String(value.result.status))
+    || value.result.dryRunOnly !== true || typeof value.result.publishReady !== "boolean"
+    || typeof value.result.selectionHash !== "string" || !HASH.test(value.result.selectionHash)
+    || !validSelectorCapabilities(value.result.capabilities)
+    || !Array.isArray(value.result.reasons) || !Array.isArray(value.result.questions)) {
+    throw new Error("Güvenli PromotionTemplate dry-run sözleşmesi doğrulanamadı.");
+  }
+  if (value.result.recommendation !== null) {
+    const recommendation = value.result.recommendation;
+    if (!exactObject(recommendation, ["promotionTemplate", "audiencePreset"])
+      || !exactObject(recommendation.promotionTemplate, ["templateRef", "revision", "versionRef"])
+      || !exactObject(recommendation.audiencePreset, ["presetRef", "revision", "versionRef"])
+      || !SAFE_REF.test(String(recommendation.promotionTemplate.templateRef))
+      || !SAFE_REF.test(String(recommendation.promotionTemplate.versionRef))
+      || !Number.isSafeInteger(recommendation.promotionTemplate.revision)
+      || !SAFE_REF.test(String(recommendation.audiencePreset.presetRef))
+      || !SAFE_REF.test(String(recommendation.audiencePreset.versionRef))
+      || !Number.isSafeInteger(recommendation.audiencePreset.revision)) {
+      throw new Error("Güvenli PromotionTemplate dry-run sözleşmesi doğrulanamadı.");
+    }
+  }
+  if (value.result.reasons.some((item) => !exactObject(item, ["code", "outcome", "candidateCount"]))
+    || value.result.questions.some((item) => !exactObject(item, ["code", "field", "prompt"]))
+    || /"(?:targeting|creative|accountRef|actorRef|internalCategoryRefs)"/.test(JSON.stringify(value))) {
+    throw new Error("Güvenli PromotionTemplate dry-run sözleşmesi doğrulanamadı.");
+  }
+  return value as unknown as PromotionTemplateAuthoringDryRunEnvelope;
+}
+
+export async function requestPromotionTemplateAuthoringCatalog(fetcher: typeof fetch): Promise<PromotionTemplateAuthoringInspection> {
+  const response = await fetcher("/api/promotion-template-authoring", { method: "GET", credentials: "same-origin", cache: "no-store",
+    headers: { "X-ReklamZeka-Intent": "promotion-template-authoring-read" } });
+  const payload = await response.json() as unknown;
+  if (!response.ok) {
+    const message = payload && typeof payload === "object" && "error" in payload
+      ? (payload as ErrorEnvelope).error?.message : undefined;
+    throw Object.assign(new Error(message ?? "PromotionTemplate authoring kataloğu alınamadı."), { unavailable: response.status === 503 });
+  }
+  return parsePromotionTemplateAuthoringInspection(payload);
+}
+
+export async function requestPromotionTemplateAuthoringDryRun(
+  fetcher: typeof fetch,
+  selection: PromotionTemplateAuthoringSelection,
+): Promise<PromotionTemplateAuthoringDryRunEnvelope> {
+  const response = await fetcher("/api/promotion-template-authoring", { method: "POST", credentials: "same-origin", cache: "no-store",
+    headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "promotion-template-authoring-dry-run" },
+    body: JSON.stringify({ selection }) });
+  const payload = await response.json() as unknown;
+  if (!response.ok) {
+    const message = payload && typeof payload === "object" && "error" in payload
+      ? (payload as ErrorEnvelope).error?.message : undefined;
+    throw new Error(message ?? "PromotionTemplate dry-run tamamlanamadı.");
+  }
+  return parsePromotionTemplateAuthoringDryRun(payload);
+}
 
 const FIELDS: readonly Readonly<{
   key: SelectionKey;
@@ -191,6 +328,92 @@ function catalogHasSelections(catalog: PromotionPreflightCatalog) {
     && catalog.adSets.length > 0 && catalog.budgetPlans.length > 0 && catalog.timeframes.length > 0;
 }
 
+export function PromotionTemplateAuthoringSurface(props: Readonly<{
+  state: PromotionTemplateAuthoringState;
+  onRetry(): void;
+  onChange(selection: PromotionTemplateAuthoringSelection): void;
+  onEvaluate(): void;
+}>) {
+  const ready = props.state.status === "ready" ? props.state : null;
+  const scope = ready?.inspection.catalog.scopes.find((item) => item.scopeRef === ready.selection.scopeRef) ?? null;
+  const complete = Boolean(ready?.selection.scopeRef && ready.selection.postType && ready.selection.instruction);
+  return <section className={`${styles.panel} ${styles.promotionPreflightForm}`} aria-label="PromotionTemplate authoring dry-run">
+    <header className={styles.panelHeader}><div><span className={styles.kicker}>PUBLISHED TEMPLATE AUTHORING · DRY-RUN</span><h2>Alias ve talimattan güvenli şablon önerisi</h2></div><span className={styles.readOnlyBadge}>NO PUBLISH · NO META WRITE</span></header>
+    <p>Hesap, Page/Instagram ve iç kategori sunucunun yayınlanmış kapsamından çözülür. Form workspace, kullanıcı, ham Meta ID, hedefleme veya creative malzemesi kabul etmez.</p>
+    {props.state.status === "loading" ? <p role="status">Yayınlanmış şablon kapsamları doğrulanıyor…</p> : null}
+    {props.state.status === "unavailable" || props.state.status === "error" ? <div role="alert"><strong>{props.state.message}</strong><p>Güvenilir katalog olmadan şablon veya hedef kitle uydurulmaz.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></div> : null}
+    {ready ? <>
+      <div className={styles.promotionPreflightFields}>
+        <label><span>Yayınlanmış kapsam</span><select aria-label="Yayınlanmış template kapsamı" value={ready.selection.scopeRef ?? ""}
+          disabled={ready.evaluating || ready.inspection.catalog.scopes.length === 0 || !ready.inspection.capabilities.canDryRun}
+          onChange={(event) => props.onChange({ scopeRef: event.target.value || null, postType: null, instruction: null })}>
+          <option value="">{ready.inspection.catalog.scopes.length ? "Kapsam seçin" : "Yayınlanmış kapsam yok"}</option>
+          {ready.inspection.catalog.scopes.map((item) => <option key={item.scopeRef} value={item.scopeRef}>{item.label}</option>)}
+        </select></label>
+        <label><span>Gönderi / medya tipi</span><select aria-label="Promotion medya tipi" value={ready.selection.postType ?? ""}
+          disabled={ready.evaluating || !scope || !ready.inspection.capabilities.canDryRun}
+          onChange={(event) => props.onChange({ ...ready.selection,
+            postType: (event.target.value || null) as PromotionTemplateAuthoringSelection["postType"] })}>
+          <option value="">Medya tipi seçin</option>{scope?.postTypes.map((item) => <option key={item} value={item}>{item}</option>)}
+        </select></label>
+        <label><span>Yayınlanmış alias / talimat</span><input aria-label="Promotion template alias veya talimatı"
+          list="promotion-template-authoring-aliases" value={ready.selection.instruction ?? ""} maxLength={500}
+          disabled={ready.evaluating || !scope || !ready.inspection.capabilities.canDryRun}
+          placeholder="Yayınlanmış alias veya açık talimat"
+          onChange={(event) => props.onChange({ ...ready.selection, instruction: event.target.value || null })} />
+          <datalist id="promotion-template-authoring-aliases">{scope?.instructionAliases.map((alias) => <option key={alias} value={alias} />)}</datalist>
+        </label>
+      </div>
+      <footer><p>{ready.inspection.role === "viewer" ? "Viewer rolü salt okunurdur; dry-run başlatamaz."
+        : "Bu sadece deterministik önizlemedir; draft persistence ve publish mutation şema/audit/OCC desteği gelene kadar kapalıdır."}</p>
+        <button disabled={!complete || ready.evaluating || !ready.inspection.capabilities.canDryRun}
+          onClick={props.onEvaluate}>{ready.evaluating ? "Çözülüyor…" : "Template dry-run çalıştır"}</button></footer>
+      {ready.message ? <p className={styles.promotionPreflightMessage} role="alert">{ready.message}</p> : null}
+      {ready.result ? <div className={styles.promotionPreflightPreview} role="status">
+        <header><div><span className={styles.kicker}>DETERMINISTIC RESULT</span><h2>{ready.result.status === "recommended"
+          ? "Tek yayınlanmış eşleşme bulundu" : ready.result.status === "ambiguous" ? "Alias belirsiz" : "Eksik veya desteklenmeyen gerçek var"}</h2></div>
+          <span data-status={ready.result.status}>{ready.result.status}</span></header>
+        {ready.result.recommendation ? <dl className={styles.promotionPreflightFacts}>
+          <div><dt>PromotionTemplate</dt><dd>{ready.result.recommendation.promotionTemplate.versionRef}</dd></div>
+          <div><dt>Immutable AudiencePreset</dt><dd>{ready.result.recommendation.audiencePreset.versionRef}</dd></div>
+        </dl> : <div className={styles.promotionPreflightReasons}>{ready.result.questions.map((item) =>
+          <p key={`${item.code}:${item.field}`}><span>{item.field}</span><strong>{item.prompt}</strong><i data-disposition="blocked">blocked</i></p>)}</div>}
+        <footer><span>Draft persist: kapalı</span><span>Publish: kapalı</span><span>Meta write: kapalı</span><span>Targeting/creative: kapalı</span></footer>
+      </div> : null}
+    </> : null}
+  </section>;
+}
+
+function PromotionTemplateAuthoringPanel() {
+  const [state, setState] = useState<PromotionTemplateAuthoringState>({ status: "loading" });
+  const load = useCallback(async () => {
+    setState({ status: "loading" });
+    try {
+      const inspection = await requestPromotionTemplateAuthoringCatalog(fetch);
+      setState({ status: "ready", inspection, selection: { scopeRef: null, postType: null, instruction: null },
+        result: null, evaluating: false, message: null });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "PromotionTemplate authoring kataloğu alınamadı.";
+      setState({ status: error && typeof error === "object" && "unavailable" in error ? "unavailable" : "error", message });
+    }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  const evaluate = useCallback(async () => {
+    if (state.status !== "ready" || !state.inspection.capabilities.canDryRun) return;
+    setState((current) => current.status === "ready" ? { ...current, evaluating: true, result: null, message: null } : current);
+    try {
+      const envelope = await requestPromotionTemplateAuthoringDryRun(fetch, state.selection);
+      setState((current) => current.status === "ready" ? { ...current, evaluating: false, result: envelope.result, message: null } : current);
+    } catch (error) {
+      setState((current) => current.status === "ready" ? { ...current, evaluating: false, result: null,
+        message: error instanceof Error ? error.message : "PromotionTemplate dry-run tamamlanamadı." } : current);
+    }
+  }, [state]);
+  return <PromotionTemplateAuthoringSurface state={state} onRetry={() => void load()}
+    onChange={(selection) => setState((current) => current.status === "ready"
+      ? { ...current, selection, result: null, message: null } : current)} onEvaluate={() => void evaluate()} />;
+}
+
 export function PromotionPreflightSurface(props: Readonly<{
   state: PromotionPreflightSurfaceState;
   onRetry(): void;
@@ -293,6 +516,6 @@ export function PromotionPreflightPanel() {
     }
   }, [selection, state]);
 
-  return <PromotionPreflightSurface state={state} onRetry={() => void load()} onChange={change}
-    onEvaluate={() => void evaluate()} onDraft={() => void draft()} />;
+  return <><PromotionTemplateAuthoringPanel /><PromotionPreflightSurface state={state} onRetry={() => void load()} onChange={change}
+    onEvaluate={() => void evaluate()} onDraft={() => void draft()} /></>;
 }

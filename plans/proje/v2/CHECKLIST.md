@@ -105,7 +105,9 @@
   - [x] Strict policy raw provenance + normalized append-only revision; analyst draft/revise,
     owner/admin publish/pause/archive, registry+version+hash OCC, history/diff, audit ve exact
     `instruction_policy` frozen-context invalidation binding'i.
-  - [ ] Strict policy Studio filtre/impact UI'si, canlı PostgreSQL verifier ve gerçek oturum kabulü.
+  - [x] Strict policy Studio raw+normalized filtreleri, history/diff ve role-aware
+    draft/revise/publish/pause/archive kontrolleri; impact reader yoksa fail-closed görünüm.
+  - [ ] Authoritative dependency impact binding'i, canlı PostgreSQL verifier ve gerçek oturum kabulü.
 - [ ] Başlangıç objective/internal kategori playbook seti.
   - [x] Altı canonical objective playbook'una version/hash ile bağlı, review-required ve
     authority-free starter category/profile proposal kataloğu.
@@ -142,7 +144,10 @@
     budget/timeframe ve immutable preset ref sözleşmesi ile fail-closed preflight çekirdeği.
   - [x] Account, Page/Instagram, internal category, post/media ve alias/talimat bağlı saf
     deterministic selector; belirsizlikte publish-ready değil, targeting/creative icat etmez.
-  - [ ] Published-catalog Drizzle adapterı, rol/audit/OCC authoring API'si ve kullanıcı dry-run UI'si.
+  - [x] Tenant-bound published-catalog Drizzle adapterı, cookie-only same-origin read/dry-run
+    API'si ve role-aware kullanıcı UI'si; hesap/actor/category yalnız sunucuda çözülür.
+  - [ ] Mutable template/preset draft+publish için ayrı rol/audit/OCC authoring lifecycle'ı;
+    mevcut immutable registry bu authority'yi güvenle taşımadığı için kapalı.
 - [ ] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi.
   - [x] Guidance-only pure registry/pack; provenance ayrımı, deterministic scope/conflict,
     freshness ve bounded context budget.
@@ -166,8 +171,11 @@
   - [ ] Gerçek artifact üretimi, persistence/API/UI, authoritative replay/impact ve browser kabulü.
 - [ ] AdvisedPractice candidate→trial→outcome→standardization lifecycle.
   - [x] Candidate/review/trial/outcome ve ayrı StandardizationReview decomposition çekirdeği.
-  - [ ] Explicit human-confirmed `standardization_candidate` ve `standardized` event/state,
-    additive DB allowlist migrationı, rol/audit API/UI ve canlı verifier.
+  - [x] `validated|conditional → standardization_reviewed → standardization_candidate →
+    standardized|retired`; analyst proposal, yalnız owner/admin explicit human confirmation,
+    additive DB migration, OCC/audit API ve Practice Lab UI.
+  - [ ] Bağlı PostgreSQL outer-rollback/RLS verifier ve gerçek oturumlu browser acceptance;
+    yerel DB/session bulunmadığı için açık.
 - [x] StandardizationReview feature/agenda/playbook/cadence/guidance/policy/human-judgment decomposition.
 
 ## A10 — Zamansal analiz

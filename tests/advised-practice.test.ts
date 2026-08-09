@@ -142,7 +142,7 @@ describe("advised practice lifecycle", () => {
       .toThrowError(expect.objectContaining({ code: "workspace_scope_mismatch" }));
   });
 
-  it("candidate→reviewed→trial→validated→standardization review zincirini authority üretmeden tamamlar", () => {
+  it("candidate→reviewed→trial→validated→review→candidate→standardized zincirini authority üretmeden tamamlar", () => {
     const definition = createAdvisedPracticeDefinition(input());
     const fourth = outcome(definition, "validated");
     const fifth = appendAdvisedPracticeEvent(definition, fourth.history, {
@@ -162,22 +162,57 @@ describe("advised practice lifecycle", () => {
     expect(replayAdvisedPractice(definition, fifth.history)).toMatchObject({
       outcomeStatus: "validated", standardizationReviewStatus: "reviewed",
     });
-    expect(verifyAdvisedPracticeHistory(definition, fifth.history)).toBe(true);
+    const sixth = appendAdvisedPracticeEvent(definition, fifth.history, {
+      eventType: "standardization_candidate", occurredAt: "2026-08-22T12:00:00.000Z",
+      payload: { proposedByRef: "operator_analyst", proposedByRole: "analyst",
+        reviewEventRef: fifth.event.eventId, candidateNote: "Owner teyidine hazır aday" },
+    });
+    const seventh = appendAdvisedPracticeEvent(definition, sixth.history, {
+      eventType: "standardized", occurredAt: "2026-08-23T12:00:00.000Z",
+      payload: { confirmedByRef: "operator_owner", confirmedByRole: "owner",
+        candidateEventRef: sixth.event.eventId, decisionRef: "decision_standardize_geo",
+        confirmationNote: "Kanıt ve decomposition insan tarafından incelendi" },
+    });
+    expect(seventh.state).toBe("standardized");
+    expect(seventh.event).toMatchObject({ humanConfirmation: "explicit",
+      capabilities: { canPromotePolicy: false, canEnableAutomation: false, canAuthorizeAction: false, canWriteMeta: false } });
+    expect(replayAdvisedPractice(definition, seventh.history)).toMatchObject({
+      outcomeStatus: "validated", standardizationReviewStatus: "reviewed", standardizationStatus: "standardized",
+    });
+    expect(verifyAdvisedPracticeHistory(definition, seventh.history)).toBe(true);
+    const retired = appendAdvisedPracticeEvent(definition, seventh.history, { eventType: "retired",
+      occurredAt: "2026-08-24T12:00:00.000Z", payload: { retiredByRef: "operator_owner", reason: "Yeni kanıtla geçersiz" } });
+    expect(retired.state).toBe("retired");
   });
 
-  it.each(["conditional", "rejected"] as const)("%s outcome'u kayıpsız korur ve standardization review'u açmaz", (result) => {
+  it("conditional outcome'u kayıpsız korur ve complete review ardından candidate açar", () => {
     const definition = createAdvisedPracticeDefinition(input());
-    const fourth = outcome(definition, result);
+    const fourth = outcome(definition, "conditional");
     expect(replayAdvisedPractice(definition, fourth.history)).toMatchObject({
-      state: result, outcomeStatus: result, standardizationReviewStatus: "not_reviewed",
+      state: "conditional", outcomeStatus: "conditional", standardizationReviewStatus: "not_reviewed",
     });
-    expect(() => appendAdvisedPracticeEvent(definition, fourth.history, {
+    const reviewed = appendAdvisedPracticeEvent(definition, fourth.history, {
       eventType: "standardization_reviewed", occurredAt: "2026-08-21T12:00:00.000Z",
       payload: {
         reviewerRef: "operator_owner", outcomeEventRef: fourth.event.eventId,
         decomposition: [{ target: "guidance", summary: "x", sourceRefs: ["source_owner_geo"], artifactRef: null, promotionCapability: "disabled" }],
-        reviewNote: "uygun değil",
+        reviewNote: "Koşullu kapsam açıkça korundu",
       },
+    });
+    const candidate = appendAdvisedPracticeEvent(definition, reviewed.history, { eventType: "standardization_candidate",
+      occurredAt: "2026-08-22T12:00:00.000Z", payload: { proposedByRef: "operator_analyst", proposedByRole: "analyst",
+        reviewEventRef: reviewed.event.eventId, candidateNote: "Koşullu standardization adayı" } });
+    expect(candidate.state).toBe("standardization_candidate");
+  });
+
+  it("rejected outcome standardization review/candidate açmaz", () => {
+    const definition = createAdvisedPracticeDefinition(input());
+    const fourth = outcome(definition, "rejected");
+    expect(() => appendAdvisedPracticeEvent(definition, fourth.history, {
+      eventType: "standardization_reviewed", occurredAt: "2026-08-21T12:00:00.000Z",
+      payload: { reviewerRef: "operator_owner", outcomeEventRef: fourth.event.eventId,
+        decomposition: [{ target: "guidance", summary: "x", sourceRefs: ["source_owner_geo"], artifactRef: null, promotionCapability: "disabled" }],
+        reviewNote: "uygun değil" },
     })).toThrowError(expect.objectContaining({ code: "outcome_required" }));
   });
 
@@ -216,6 +251,22 @@ describe("advised practice lifecycle", () => {
     expect(() => appendAdvisedPracticeEvent(definition, first.history, {
       eventType: "standardized" as never, occurredAt: "2026-08-08T12:00:00.000Z", payload: {} as never,
     })).toThrow(AdvisedPracticeError);
+  });
+
+  it("analyst standardize edemez ve explicit human confirmation atlanamaz", () => {
+    const definition = createAdvisedPracticeDefinition(input());
+    const fourth = outcome(definition, "validated");
+    const review = appendAdvisedPracticeEvent(definition, fourth.history, { eventType: "standardization_reviewed",
+      occurredAt: "2026-08-21T12:00:00.000Z", payload: { reviewerRef: "operator_owner",
+        outcomeEventRef: fourth.event.eventId, decomposition: [{ target: "feature", summary: "Veri kontrolü",
+          sourceRefs: ["evidence_post_window"], artifactRef: null, promotionCapability: "disabled" }], reviewNote: "Tam review" } });
+    const candidate = appendAdvisedPracticeEvent(definition, review.history, { eventType: "standardization_candidate",
+      occurredAt: "2026-08-22T12:00:00.000Z", payload: { proposedByRef: "operator_analyst", proposedByRole: "analyst",
+        reviewEventRef: review.event.eventId, candidateNote: "Aday" } });
+    expect(() => appendAdvisedPracticeEvent(definition, candidate.history, { eventType: "standardized",
+      occurredAt: "2026-08-23T12:00:00.000Z", payload: { confirmedByRef: "operator_analyst",
+        confirmedByRole: "analyst" as never, candidateEventRef: candidate.event.eventId,
+        decisionRef: "decision_forbidden", confirmationNote: "Yetkisiz" } })).toThrowError(expect.objectContaining({ code: "authority_escalation" }));
   });
 
   it("history tamper, reordered evidence, extra field ve rollback'i doğrulamada yakalar", () => {
