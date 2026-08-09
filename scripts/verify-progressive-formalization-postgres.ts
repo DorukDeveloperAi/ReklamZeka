@@ -1,0 +1,112 @@
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { Pool } from "pg";
+
+import { advanceProgressiveFormalization, createNormalizedPolicyDraft,
+  NORMALIZED_POLICY_DRAFT_VERSION, PROGRESSIVE_FORMALIZATION_VERSION } from
+  "@/domain/guidance/progressive-formalization";
+import type { ProgressiveFormalizationRevision } from "@/domain/guidance/progressive-formalization";
+import { parseStrictInstructionPolicy } from "@/domain/policies/instruction-policy-dsl";
+
+if (existsSync(".env.local")) process.loadEnvFile(".env.local");
+const connectionString = process.env.DIRECT_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
+if (!connectionString) {
+  console.error(JSON.stringify({ ok: false, blocker: "postgres_connection_not_configured",
+    requiredOneOf: ["DIRECT_DATABASE_URL", "DATABASE_URL"],
+    continuation: "npm run verify:progressive-formalization-live" }));
+  process.exit(2);
+}
+const h = (value: unknown) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex");
+const workspaceId = randomUUID(); const workspaceRef = "workspace_progressive_verify";
+const actorRef = "actor_progressive_verify"; const formalizationRef = "formalization_progressive_verify";
+const at = (hour: number) => `2026-08-10T${String(hour).padStart(2, "0")}:00:00.000Z`;
+const strictPolicy = parseStrictInstructionPolicy({ dslVersion: "strict-instruction-policy/1.0.0", workspaceRef,
+  policyRef: "policy_progressive_verify", policyVersion: 1, previousVersionHash: null, policyType: "prohibition",
+  owner: { actorRef, role: "owner" }, status: "draft", reasonCode: "owner_verified", priority: 800,
+  effectiveDates: { from: at(0), until: null }, scope: { global: true, accountGroupRefs: [], accountRefs: [],
+    objectiveRefs: [], internalCategoryRefs: [], entities: [], topicRefs: [] }, source: {
+    rawProvenanceRef: "provenance_progressive_verify", rawTextHash: h("Do not transfer budget"),
+    promotedFromGuidanceRefs: ["guidance_progressive_verify"] },
+  clause: { kind: "prohibition", operations: ["budget_transfer"] } });
+const draft = createNormalizedPolicyDraft({ schemaVersion: NORMALIZED_POLICY_DRAFT_VERSION, workspaceRef,
+  formalizationRef, guidanceSetRef: "guidance_set_progressive_verify", strictPolicy, assumptions: [], questions: [],
+  semanticDiff: { status: "resolved", items: [{ meaningRef: "meaning_progressive_verify", sourceStatementHash: h("meaning"),
+    normalizedClauseRef: "policy_clause_progressive_verify", disposition: "preserved", reasonCode: "exact_mapping" }],
+    diffHash: h("diff") }, historicalReplay: { status: "no_history", evaluatedRevisionRefs: [], changedOutcomeRefs: [],
+    unknownOutcomeRefs: [], replayHash: h("replay") }, conflictPreview: { status: "clear", conflictRefs: [],
+    previewHash: h("conflict") }, impactPreview: { status: "complete", affectedScopeRefs: ["scope_global"],
+    affectedEntityCount: 0, affectedPolicyCount: 0, affectedBudgetCount: 0, affectedAutomationCount: 0,
+    unresolvedDependencyRefs: [], previewHash: h("impact") } });
+const transition = (previous: Parameters<typeof advanceProgressiveFormalization>[0], input: Parameters<typeof advanceProgressiveFormalization>[1]) =>
+  advanceProgressiveFormalization(previous, input);
+const g0 = transition(null, { schemaVersion: PROGRESSIVE_FORMALIZATION_VERSION, transition: "capture_g0", workspaceRef,
+  formalizationRef, occurredAt: at(1), actor: { actorRef, role: "owner" }, payload: {
+    rawProvenanceRef: "source_progressive_verify", rawTextHash: h("raw") } });
+const g1 = transition(g0, { schemaVersion: PROGRESSIVE_FORMALIZATION_VERSION, transition: "scope_g1", workspaceRef,
+  formalizationRef, occurredAt: at(2), actor: { actorRef, role: "owner" }, payload: {
+    guidanceCardRefs: ["guidance_progressive_verify"], scope: { global: true, accountGroupRefs: [], accountRefs: [],
+      objectiveRefs: [], internalCategoryRefs: [], entityRefs: [], promotionTemplateRefs: [], topicRefs: [] } } });
+const g2 = transition(g1, { schemaVersion: PROGRESSIVE_FORMALIZATION_VERSION, transition: "review_g2", workspaceRef,
+  formalizationRef, occurredAt: at(3), actor: { actorRef, role: "owner" }, payload: {
+    guidanceSetRef: "guidance_set_progressive_verify", reviewedGuidanceHash: h("reviewed"), confirmation: {
+      confirmed: true, confirmationRef: "confirmation_progressive_g2", confirmedAt: at(3) } } });
+const g3 = transition(g2, { schemaVersion: PROGRESSIVE_FORMALIZATION_VERSION, transition: "promote_g3", workspaceRef,
+  formalizationRef, occurredAt: at(4), actor: { actorRef, role: "owner" }, payload: { normalizedDraft: draft,
+    confirmation: { confirmed: true, confirmationRef: "confirmation_progressive_g3", confirmedAt: at(4) } } });
+const g4 = transition(g3, { schemaVersion: PROGRESSIVE_FORMALIZATION_VERSION, transition: "qualify_g4", workspaceRef,
+  formalizationRef, occurredAt: at(5), actor: { actorRef, role: "owner" }, payload: {
+    publishedPolicyRef: "policy_progressive_verify", publishedPolicyHash: h("published"),
+    riskAssessmentRef: "risk_assessment_progressive_verify", capPolicyRef: "cap_policy_progressive_verify",
+    approvalPolicyRef: "approval_policy_progressive_verify", rolloutEvidenceRefs: ["rollout_evidence_progressive_verify"],
+    actionValveRef: "action_valve_progressive_verify", approvalMode: "approval_only", confirmation: {
+      confirmed: true, confirmationRef: "confirmation_progressive_g4", confirmedAt: at(5) } } });
+
+const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 10_000 });
+const client = await pool.connect();
+try {
+  await client.query("begin");
+  await client.query("insert into workspaces (id, name) values ($1, $2)", [workspaceId, "Progressive verifier"]);
+  const insertRevision = async (revision: ProgressiveFormalizationRevision, payload: unknown = revision) => client.query(`insert into progressive_formalization_revisions (
+    workspace_id, workspace_ref, formalization_ref, sequence, previous_revision_hash, from_level, to_level, transition,
+    actor_ref, actor_role, revision_hash, revision_payload, occurred_at) values
+    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::timestamptz)`, [workspaceId, revision.workspaceRef,
+    revision.formalizationRef, revision.sequence, revision.previousRevisionHash, revision.fromLevel, revision.toLevel,
+    revision.transition, revision.actor.actorRef, revision.actor.role, revision.revisionHash, JSON.stringify(payload), revision.occurredAt]);
+  const expectRejected = async (name: string, revision: ProgressiveFormalizationRevision, payload: unknown) => {
+    await client.query(`savepoint ${name}`); let rejected = false;
+    try { await insertRevision(revision, payload); }
+    catch { rejected = true; await client.query(`rollback to savepoint ${name}`); }
+    if (!rejected) { await client.query(`rollback to savepoint ${name}`); throw new Error(`${name}_accepted`); }
+  };
+  await expectRejected("extra_top_level", g0, { ...g0, extra: "malicious" });
+  await expectRejected("extra_nested", g0, { ...g0, payload: { ...g0.payload, extra: "malicious" } });
+  await expectRejected("authority_open", g0, { ...g0, authority: { ...g0.authority, canExecute: true } });
+  await expectRejected("secret_material", g0, { ...g0, payload: { ...g0.payload, secret: "redacted" } });
+  await insertRevision(g0);
+  await expectRejected("broken_chain", { ...g1, previousRevisionHash: h("forged") },
+    { ...g1, previousRevisionHash: h("forged") });
+  for (const revision of [g1, g2, g3, g4]) await insertRevision(revision);
+  const count = Number((await client.query<{ count: string }>("select count(*) from progressive_formalization_revisions where workspace_id = $1", [workspaceId])).rows[0]!.count);
+  if (count !== 5) throw new Error("progressive_revision_count_mismatch");
+  await client.query("savepoint immutable_check");
+  let immutable = false;
+  try { await client.query("update progressive_formalization_revisions set actor_role = actor_role where workspace_id = $1", [workspaceId]); }
+  catch { immutable = true; await client.query("rollback to savepoint immutable_check"); }
+  if (!immutable) throw new Error("progressive_revision_update_not_blocked");
+  await client.query("savepoint active_delete_check"); let activeDeleteBlocked = false;
+  try { await client.query("delete from progressive_formalization_revisions where workspace_id = $1", [workspaceId]); }
+  catch { activeDeleteBlocked = true; await client.query("rollback to savepoint active_delete_check"); }
+  if (!activeDeleteBlocked) throw new Error("progressive_revision_active_delete_not_blocked");
+  await client.query("update workspaces set lifecycle_state = 'tombstoning' where id = $1", [workspaceId]);
+  const deleted = (await client.query("delete from progressive_formalization_revisions where workspace_id = $1", [workspaceId])).rowCount;
+  if (deleted !== 5) throw new Error("progressive_revision_tombstone_delete_failed");
+  await client.query("rollback");
+  console.log(JSON.stringify({ ok: true, chainLength: 5, headHash: g4.revisionHash, immutable,
+    activeDeleteBlocked, tombstoneDeleteCount: deleted,
+    rejectedCorruptRows: ["extra_top_level", "extra_nested", "authority_open", "secret_material", "broken_chain"],
+    authority: { canApprove: false, canExecute: false, canWriteMeta: false, canSchedule: false, canCallTool: false },
+    transaction: "outer_rollback" }));
+} catch (reason) {
+  await client.query("rollback").catch(() => undefined);
+  throw reason;
+} finally { client.release(); await pool.end(); }

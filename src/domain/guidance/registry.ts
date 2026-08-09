@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { CAMPAIGN_OBJECTIVES, type CampaignObjective } from "@/analyses/schema";
+import { normalizeMetaCampaignObjective } from "@/domain/meta/objective-mapping";
 
 export const GUIDANCE_REGISTRY_VERSION = "guidance-registry/1.0.0" as const;
 export const EFFECTIVE_GUIDANCE_PACK_VERSION = "effective-guidance-pack/1.1.0" as const;
@@ -559,12 +561,26 @@ const STRENGTH_RANK: Readonly<Record<GuidanceStrength, number>> = {
   question: 1,
 };
 
+const CANONICAL_OBJECTIVES = new Set<string>(CAMPAIGN_OBJECTIVES);
+
+/** Canonicalizes only reviewed Meta aliases; unknown values never become matchable. */
+export function canonicalGuidanceObjective(value: string | null): CampaignObjective | null {
+  if (value === null) return null;
+  if (CANONICAL_OBJECTIVES.has(value)) return value as CampaignObjective;
+  const mapped = normalizeMetaCampaignObjective(value);
+  return mapped.status === "mapped" ? mapped.canonicalObjective : null;
+}
+
 function bindingMatches(binding: GuidanceBinding, context: GuidanceContext): boolean {
   switch (binding.facet) {
     case "global": return true;
     case "account_group": return (context.accountGroupIds ?? []).includes(binding.value!);
     case "account": return binding.value === context.accountId;
-    case "objective": return binding.value === context.objective;
+    case "objective": {
+      const bindingObjective = canonicalGuidanceObjective(binding.value);
+      const contextObjective = canonicalGuidanceObjective(context.objective);
+      return bindingObjective !== null && contextObjective !== null && bindingObjective === contextObjective;
+    }
     case "funnel": return binding.value === (context.funnel ?? null);
     case "optimization": return binding.value === (context.optimization ?? null);
     case "internal_category": return context.internalCategoryIds.includes(binding.value!);

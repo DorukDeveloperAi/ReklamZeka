@@ -1,15 +1,18 @@
 import type { TrustedDecisionRoomPrincipal } from "@/application/decision-room-agent-contract";
+import type { GuidanceFacetScopeResolver } from "@/application/guidance-facet-scope-resolver";
 import type { GuidanceStudioRepository } from "@/application/guidance-studio-service";
 import { buildEffectiveGuidancePack, GUIDANCE_REGISTRY_LIMITS, type GuidanceEntityType } from "@/domain/guidance/registry";
 import { authorizeWorkspace, type WorkspaceMembership } from "@/security/authorization";
 
-export const GUIDANCE_AGENT_CONTRACT_VERSION = "guidance-agent-tools/1.1.0" as const;
+export const GUIDANCE_AGENT_CONTRACT_VERSION = "guidance-agent-tools/1.2.0" as const;
 
 export type GuidanceAgentCall =
   | Readonly<{ name: "guidance_registry_list"; arguments: Readonly<{ status?: "draft" | "published" | "archived" }> }>
   | Readonly<{ name: "guidance_effective_preview"; arguments: GuidancePreviewRequest }>;
 
 export type GuidancePreviewRequest = Readonly<{
+  contractVersion: typeof GUIDANCE_AGENT_CONTRACT_VERSION;
+  expectedCatalogHash: string;
   accountRef: string;
   accountGroupRefs: readonly string[];
   objective: string | null;
@@ -30,8 +33,7 @@ const AUTHORITY = Object.freeze({ canDraft: false as const, canPublish: false as
   canAuthorizeAction: false as const, canEnforcePolicy: false as const, canAlterApproval: false as const,
   canWriteMeta: false as const, persistence: false as const, actionExecution: false as const });
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
-const TOPIC = /^[a-z][a-z0-9_.:-]{0,79}$/;
-const OBJECTIVE = /^[A-Z][A-Z0-9_]{1,79}$/;
+const HASH = /^[a-f0-9]{64}$/;
 const KINDS = new Set(["rolling", "fixed", "calendar", "lifetime", "learning", "action_relative"]);
 const ENTITY_TYPES = new Set<GuidanceEntityType>(["campaign", "ad_set", "ad", "creative", "post"]);
 
@@ -52,18 +54,19 @@ function list(value: unknown, pattern: RegExp, max: number): readonly string[] {
 }
 
 function preview(value: GuidancePreviewRequest) {
-  exact(value, ["accountRef", "accountGroupRefs", "objective", "funnel", "optimization", "internalCategoryRefs",
+  exact(value, ["contractVersion", "expectedCatalogHash", "accountRef", "accountGroupRefs", "objective", "funnel", "optimization", "internalCategoryRefs",
     "lifecycle", "entity", "promotionTemplateRefs", "topics", "requiredTopics", "evaluatedAt", "timeframe", "budget"]);
-  if (!REF.test(value.accountRef) || value.objective !== null && !OBJECTIVE.test(value.objective)
-    || value.funnel !== null && !TOPIC.test(value.funnel)
-    || value.optimization !== null && !OBJECTIVE.test(value.optimization)
-    || value.lifecycle !== null && !TOPIC.test(value.lifecycle)
+  if (value.contractVersion !== GUIDANCE_AGENT_CONTRACT_VERSION || !HASH.test(value.expectedCatalogHash)
+    || !REF.test(value.accountRef) || value.objective !== null && !REF.test(value.objective)
+    || value.funnel !== null && !REF.test(value.funnel)
+    || value.optimization !== null && !REF.test(value.optimization)
+    || value.lifecycle !== null && !REF.test(value.lifecycle)
     || !Number.isFinite(Date.parse(value.evaluatedAt))) fail();
   const accountGroups = list(value.accountGroupRefs, REF, GUIDANCE_REGISTRY_LIMITS.accountGroups);
   const categories = list(value.internalCategoryRefs, /^category_[a-f0-9]{24}$/, GUIDANCE_REGISTRY_LIMITS.internalCategories);
   const promotionTemplates = list(value.promotionTemplateRefs, REF, GUIDANCE_REGISTRY_LIMITS.promotionTemplates);
-  const topics = list(value.topics, TOPIC, GUIDANCE_REGISTRY_LIMITS.topics);
-  const requiredTopics = list(value.requiredTopics, TOPIC, GUIDANCE_REGISTRY_LIMITS.requiredTopics);
+  const topics = list(value.topics, REF, GUIDANCE_REGISTRY_LIMITS.topics);
+  const requiredTopics = list(value.requiredTopics, REF, GUIDANCE_REGISTRY_LIMITS.requiredTopics);
   if (value.entity !== null) {
     exact(value.entity, ["type", "ref"]);
     if (!ENTITY_TYPES.has(value.entity.type) || !REF.test(value.entity.ref)) fail();
@@ -75,14 +78,18 @@ function preview(value: GuidancePreviewRequest) {
   if (!Number.isSafeInteger(budget.maxCards) || budget.maxCards < 1 || budget.maxCards > 100
     || !Number.isSafeInteger(budget.maxSources) || budget.maxSources < 1 || budget.maxSources > 100
     || !Number.isSafeInteger(budget.maxCharacters) || budget.maxCharacters < 1 || budget.maxCharacters > 100_000) fail();
-  return Object.freeze({ accountGroups, categories, promotionTemplates,
-    topics: Object.freeze([...new Set([...topics, `timeframe:${value.timeframe.kind}`])]), requiredTopics,
-    budget: Object.freeze({ ...budget }) });
+  return Object.freeze({ selection: Object.freeze({ expectedCatalogHash: value.expectedCatalogHash,
+    accountRef: value.accountRef, accountGroupRefs: accountGroups,
+    objective: value.objective, funnel: value.funnel, optimization: value.optimization,
+    internalCategoryRefs: categories, lifecycle: value.lifecycle,
+    entity: value.entity === null ? null : Object.freeze({ ...value.entity }),
+    promotionTemplateRefs: promotionTemplates, topics, requiredTopics }), budget: Object.freeze({ ...budget }) });
 }
 
 export class GuidanceAgentContract {
   constructor(private readonly repository: Pick<GuidanceStudioRepository, "load">,
-    private readonly memberships: readonly WorkspaceMembership[]) {}
+    private readonly memberships: readonly WorkspaceMembership[],
+    private readonly scopeResolver: GuidanceFacetScopeResolver) {}
 
   async execute(principal: TrustedDecisionRoomPrincipal, call: GuidanceAgentCall) {
     exact(principal, ["actor", "workspaceId", "workspaceRef", "readerRef"]); exact(principal.actor, ["userId"]);
@@ -105,23 +112,27 @@ export class GuidanceAgentContract {
             value: binding.value, entityType: binding.entityType, mode: binding.mode, priority: binding.priority,
             version: binding.version }))),
         })).sort((left, right) => left.cardRef.localeCompare(right.cardRef, "en"));
+      const scopeCatalog = await this.scopeResolver.listCatalog(principal.workspaceId);
       return Object.freeze({ contractVersion: GUIDANCE_AGENT_CONTRACT_VERSION, result: Object.freeze({
-        registryVersion: registry.registryHash, items: Object.freeze(items), count: items.length }), authority: AUTHORITY });
+        registryVersion: registry.registryHash, items: Object.freeze(items), count: items.length, scopeCatalog }), authority: AUTHORITY });
     }
     if (call.name !== "guidance_effective_preview") fail();
     const normalized = preview(call.arguments);
+    const resolved = await this.scopeResolver.resolve(principal.workspaceId, normalized.selection);
     const pack = buildEffectiveGuidancePack(registry, { workspaceId: principal.workspaceId,
-      accountId: call.arguments.accountRef, objective: call.arguments.objective,
-      accountGroupIds: normalized.accountGroups, funnel: call.arguments.funnel, optimization: call.arguments.optimization,
-      internalCategoryIds: normalized.categories, lifecycle: call.arguments.lifecycle,
-      promotionTemplateIds: normalized.promotionTemplates, entity: call.arguments.entity === null ? null
-        : { type: call.arguments.entity.type, id: call.arguments.entity.ref }, topics: normalized.topics,
-      requiredTopics: normalized.requiredTopics, evaluatedAt: new Date(call.arguments.evaluatedAt).toISOString(),
+      accountId: resolved.accountRef, objective: resolved.objective,
+      accountGroupIds: resolved.accountGroupRefs, funnel: resolved.funnel, optimization: resolved.optimization,
+      internalCategoryIds: resolved.internalCategoryRefs, lifecycle: resolved.lifecycle,
+      promotionTemplateIds: resolved.promotionTemplateRefs, entity: resolved.entity === null ? null
+        : { type: resolved.entity.type, id: resolved.entity.ref },
+      topics: Object.freeze([...new Set([...resolved.topics, `timeframe:${call.arguments.timeframe.kind}`])]),
+      requiredTopics: resolved.requiredTopics, evaluatedAt: new Date(call.arguments.evaluatedAt).toISOString(),
       budget: normalized.budget });
     return Object.freeze({ contractVersion: GUIDANCE_AGENT_CONTRACT_VERSION, result: Object.freeze({
       registryVersion: pack.registryHash, evaluatedAt: pack.evaluatedAt, timeframe: Object.freeze({ ...call.arguments.timeframe }),
       applied: pack.applied, suppressed: pack.suppressed, conflicting: pack.conflicting, missing: pack.missing,
-      sources: pack.sources, budget: pack.budget, packVersion: pack.packHash }), authority: AUTHORITY });
+      sources: pack.sources, budget: pack.budget, packVersion: pack.packHash,
+      scopeCapture: resolved.capture }), authority: AUTHORITY });
   }
 }
 
@@ -131,23 +142,26 @@ export const GUIDANCE_AGENT_TOOLS = Object.freeze([
       properties: Object.freeze({ status: Object.freeze({ type: "string", enum: Object.freeze(["draft", "published", "archived"]) }) }) }) }),
   Object.freeze({ name: "guidance_effective_preview", description: "Resolve the deterministic effective guidance pack for an explicit account/category/entity/topic/timeframe context without running a model or writing state.",
     inputSchema: Object.freeze({ type: "object", additionalProperties: false,
-      required: Object.freeze(["accountRef", "accountGroupRefs", "objective", "funnel", "optimization",
+      required: Object.freeze(["contractVersion", "expectedCatalogHash", "accountRef", "accountGroupRefs", "objective", "funnel", "optimization",
         "internalCategoryRefs", "lifecycle", "entity", "promotionTemplateRefs", "topics", "requiredTopics", "evaluatedAt", "timeframe"]),
-      properties: Object.freeze({ accountRef: Object.freeze({ type: "string", pattern: REF.source }),
+      properties: Object.freeze({ contractVersion: Object.freeze({ type: "string", enum: Object.freeze([GUIDANCE_AGENT_CONTRACT_VERSION]) }),
+        expectedCatalogHash: Object.freeze({ type: "string", pattern: HASH.source }),
+        accountRef: Object.freeze({ type: "string", pattern: REF.source }),
         accountGroupRefs: Object.freeze({ type: "array", maxItems: GUIDANCE_REGISTRY_LIMITS.accountGroups,
           uniqueItems: true, items: Object.freeze({ type: "string", pattern: REF.source }) }),
-        objective: Object.freeze({ type: ["string", "null"] }), funnel: Object.freeze({ type: ["string", "null"] }),
-        optimization: Object.freeze({ type: ["string", "null"] }),
+        objective: Object.freeze({ type: ["string", "null"], pattern: REF.source }),
+        funnel: Object.freeze({ type: ["string", "null"], pattern: REF.source }),
+        optimization: Object.freeze({ type: ["string", "null"], pattern: REF.source }),
         internalCategoryRefs: Object.freeze({ type: "array", maxItems: GUIDANCE_REGISTRY_LIMITS.internalCategories,
           uniqueItems: true, items: Object.freeze({ type: "string", pattern: "^category_[a-f0-9]{24}$" }) }),
         entity: Object.freeze({ type: ["object", "null"] }),
-        lifecycle: Object.freeze({ type: ["string", "null"] }),
+        lifecycle: Object.freeze({ type: ["string", "null"], pattern: REF.source }),
         promotionTemplateRefs: Object.freeze({ type: "array", maxItems: GUIDANCE_REGISTRY_LIMITS.promotionTemplates,
           uniqueItems: true, items: Object.freeze({ type: "string", pattern: REF.source }) }),
         topics: Object.freeze({ type: "array", maxItems: GUIDANCE_REGISTRY_LIMITS.topics,
-          uniqueItems: true, items: Object.freeze({ type: "string", pattern: TOPIC.source }) }),
+          uniqueItems: true, items: Object.freeze({ type: "string", pattern: REF.source }) }),
         requiredTopics: Object.freeze({ type: "array", maxItems: GUIDANCE_REGISTRY_LIMITS.requiredTopics,
-          uniqueItems: true, items: Object.freeze({ type: "string", pattern: TOPIC.source }) }),
+          uniqueItems: true, items: Object.freeze({ type: "string", pattern: REF.source }) }),
         evaluatedAt: Object.freeze({ type: "string", format: "date-time" }), timeframe: Object.freeze({ type: "object" }),
         budget: Object.freeze({ type: "object" }) }) }) }),
 ]);

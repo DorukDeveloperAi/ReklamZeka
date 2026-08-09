@@ -1,7 +1,8 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { StarterCategoryAdoptionService } from "@/application/starter-category-adoption-service";
-import { DrizzleCategoryAuthoringRepository } from "@/connectors/categories/category-authoring-drizzle-repository";
+import { DrizzleStarterCategoryAdoptionRepository } from
+  "@/connectors/categories/starter-category-adoption-drizzle-repository";
 import * as schema from "@/db/schema";
 import { LocalDecisionRoomBoundaryError, resolveTrustedLocalCategoryAuthoringPrincipal,
   type LocalDecisionRoomConfig } from "@/server/local-decision-room-runtime";
@@ -18,7 +19,7 @@ export function createLocalStarterCategoryAdoptionHandlers(input: Readonly<{
     const bound = await resolveTrustedLocalCategoryAuthoringPrincipal({ request, database: input.database,
       config: input.config, requiredScope: operation === "read" ? "category_registry:read" : "category_registry:publish" });
     const service = new StarterCategoryAdoptionService(
-      new DrizzleCategoryAuthoringRepository(input.database as Database), [bound.membership]);
+      new DrizzleStarterCategoryAdoptionRepository(input.database), [bound.membership]);
     const handlers = createStarterCategoryAdoptionHttpHandlers({ service, resolvePrincipal: async () => bound.principal });
     return operation === "read" ? handlers.GET(request) : handlers.POST(request);
   } catch (reason) {

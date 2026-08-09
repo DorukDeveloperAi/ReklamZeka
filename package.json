@@ -54,6 +54,7 @@
     "verify:category-authoring-live": "node --import tsx scripts/verify-category-authoring-postgres.ts",
     "verify:category-profile-live": "node --import tsx scripts/verify-category-profile-postgres.ts",
     "verify:instruction-policy-live": "node --import tsx scripts/verify-instruction-policy-lifecycle-postgres.ts",
+    "verify:progressive-formalization-live": "node --import tsx scripts/verify-progressive-formalization-postgres.ts",
     "verify:promotion-template-lifecycle-live": "node --import tsx scripts/verify-promotion-template-lifecycle-postgres.ts",
     "verify:guidance-registry-db": "tsx scripts/verify-guidance-registry-postgres.ts",
     "verify:effective-campaign-context-db": "tsx scripts/verify-effective-campaign-context-postgres.ts",

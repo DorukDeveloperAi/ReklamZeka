@@ -42,6 +42,7 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "category_profile_revisions",
   "instruction_policy_raw_provenance",
   "strict_instruction_policy_revisions",
+  "progressive_formalization_revisions",
   "guidance_sources",
   "guidance_cards",
   "guidance_bindings",
@@ -188,6 +189,9 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'strict_instruction_policy_revisions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from strict_instruction_policy_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'progressive_formalization_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from progressive_formalization_revisions where workspace_id = ${workspaceId}::uuid
       union all select 'guidance_sources', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from guidance_sources where workspace_id = ${workspaceId}::uuid
@@ -415,6 +419,7 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     };
 
     // Children first. This ordering is stable to minimize lock-order deadlocks.
+    await remove(sql`with removed as (delete from progressive_formalization_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from strict_instruction_policy_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from instruction_policy_raw_provenance where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from autonomy_rule_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

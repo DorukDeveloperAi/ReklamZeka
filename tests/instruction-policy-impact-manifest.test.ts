@@ -7,6 +7,7 @@ describe("instruction policy dependency manifest", () => {
   it("classifies the strict contract, effective projection and opaque action payloads", () => {
     const byKey = new Map(INSTRUCTION_POLICY_JSONB_MANIFEST.map((entry) => [`${entry.table}.${entry.column}`, entry.policy]));
     expect(byKey.get("strict_instruction_policy_revisions.policy_payload")).toBe("policy_contract");
+    expect(byKey.get("progressive_formalization_revisions.revision_payload")).toBe("policy_contract");
     expect(byKey.get("effective_campaign_contexts.context_payload")).toBe("policy_projection");
     expect(byKey.get("action_proposal_units.unit_payload")).toBe("opaque_policy_context");
     const source = readFileSync("src/db/schema.ts", "utf8"); let table = "";

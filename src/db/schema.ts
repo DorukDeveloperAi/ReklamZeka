@@ -1215,6 +1215,138 @@ export const strictInstructionPolicyRevisions = pgTable("strict_instruction_poli
   `),
 ]);
 
+/** Immutable G0-G4 formalization events; maturity never carries action or Meta-write authority. */
+export const progressiveFormalizationRevisions = pgTable("progressive_formalization_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceRef: text("workspace_ref").notNull(),
+  formalizationRef: text("formalization_ref").notNull(),
+  sequence: integer("sequence").notNull(),
+  previousRevisionHash: text("previous_revision_hash").notNull(),
+  fromLevel: text("from_level"),
+  toLevel: text("to_level").notNull(),
+  transition: text("transition").notNull(),
+  actorRef: text("actor_ref").notNull(),
+  actorRole: text("actor_role").notNull(),
+  revisionHash: text("revision_hash").notNull(),
+  revisionPayload: jsonb("revision_payload").$type<Record<string, unknown>>().notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("progressive_formalization_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("progressive_formalization_workspace_sequence_unique")
+    .on(table.workspaceId, table.formalizationRef, table.sequence),
+  uniqueIndex("progressive_formalization_workspace_hash_unique").on(table.workspaceId, table.revisionHash),
+  index("progressive_formalization_workspace_head_idx")
+    .on(table.workspaceId, table.formalizationRef, table.sequence),
+  check("progressive_formalization_identity", sql`
+    ${table.workspaceRef} ~ '^workspace_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.formalizationRef} ~ '^formalization_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.actorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.sequence} between 1 and 5
+    and (${table.previousRevisionHash} = 'GENESIS' or ${table.previousRevisionHash} ~ '^[a-f0-9]{64}$')
+  `),
+  check("progressive_formalization_transition_exact", sql`
+    (${table.sequence} = 1 and ${table.previousRevisionHash} = 'GENESIS' and ${table.fromLevel} is null
+      and ${table.toLevel} = 'G0' and ${table.transition} = 'capture_g0')
+    or (${table.sequence} = 2 and ${table.fromLevel} = 'G0' and ${table.toLevel} = 'G1'
+      and ${table.transition} = 'scope_g1')
+    or (${table.sequence} = 3 and ${table.fromLevel} = 'G1' and ${table.toLevel} = 'G2'
+      and ${table.transition} = 'review_g2')
+    or (${table.sequence} = 4 and ${table.fromLevel} = 'G2' and ${table.toLevel} = 'G3'
+      and ${table.transition} = 'promote_g3')
+    or (${table.sequence} = 5 and ${table.fromLevel} = 'G3' and ${table.toLevel} = 'G4'
+      and ${table.transition} = 'qualify_g4')
+  `),
+  check("progressive_formalization_payload_exact", sql`(
+    jsonb_typeof(${table.revisionPayload}) = 'object'
+    and ${table.revisionPayload} #>> '{schemaVersion}' = 'progressive-formalization/1.0.0'
+    and ${table.revisionPayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+    and ${table.revisionPayload} #>> '{formalizationRef}' = ${table.formalizationRef}
+    and (${table.revisionPayload} #>> '{sequence}')::integer = ${table.sequence}
+    and ${table.revisionPayload} #>> '{previousRevisionHash}' = ${table.previousRevisionHash}
+    and (${table.revisionPayload} #>> '{fromLevel}') is not distinct from ${table.fromLevel}
+    and ${table.revisionPayload} #>> '{toLevel}' = ${table.toLevel}
+    and ${table.revisionPayload} #>> '{transition}' = ${table.transition}
+    and ${table.revisionPayload} #>> '{actor,actorRef}' = ${table.actorRef}
+    and ${table.revisionPayload} #>> '{actor,role}' = ${table.actorRole}
+    and ${table.revisionPayload} #>> '{revisionHash}' = ${table.revisionHash}
+    and (${table.revisionPayload} #>> '{occurredAt}')::timestamptz = ${table.occurredAt}
+    and ${table.actorRole} in ('owner', 'admin', 'analyst')
+    and (${table.sequence} <= 2 or ${table.actorRole} in ('owner', 'admin'))
+    and ${table.revisionHash} ~ '^[a-f0-9]{64}$'
+    and jsonb_typeof(${table.revisionPayload} #> '{payload}') = 'object'
+    and ${table.revisionPayload} #> '{authority,canPublish}' = 'false'::jsonb
+    and ${table.revisionPayload} #> '{authority,canApprove}' = 'false'::jsonb
+    and ${table.revisionPayload} #> '{authority,canExecute}' = 'false'::jsonb
+    and ${table.revisionPayload} #> '{authority,canWriteMeta}' = 'false'::jsonb
+    and ${table.revisionPayload} #> '{authority,canGrant}' = 'false'::jsonb
+    and ${table.revisionPayload} #> '{authority,canSchedule}' = 'false'::jsonb
+    and ${table.revisionPayload} #> '{authority,canCallTool}' = 'false'::jsonb
+    and ${table.revisionPayload} #> '{authority,canAccessNetwork}' = 'false'::jsonb
+    and ${table.revisionPayload} #> '{authority,canQuerySql}' = 'false'::jsonb
+  ) is true`),
+  check("progressive_formalization_nested_exact", sql`(
+    (${table.revisionPayload}
+      - 'schemaVersion' - 'formalizationRef' - 'workspaceRef' - 'sequence' - 'previousRevisionHash'
+      - 'fromLevel' - 'toLevel' - 'transition' - 'occurredAt' - 'actor' - 'payload' - 'authority' - 'revisionHash') = '{}'::jsonb
+    and (${table.revisionPayload} #> '{actor}' - 'actorRef' - 'role') = '{}'::jsonb
+    and (${table.revisionPayload} #> '{authority}' - 'canPublish' - 'canApprove' - 'canExecute' - 'canWriteMeta'
+      - 'canGrant' - 'canSchedule' - 'canCallTool' - 'canAccessNetwork' - 'canQuerySql') = '{}'::jsonb
+    and case ${table.transition}
+      when 'capture_g0' then
+        (${table.revisionPayload} #> '{payload}' - 'rawProvenanceRef' - 'rawTextHash') = '{}'::jsonb
+        and ${table.revisionPayload} #>> '{payload,rawProvenanceRef}' ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+        and ${table.revisionPayload} #>> '{payload,rawTextHash}' ~ '^[a-f0-9]{64}$'
+      when 'scope_g1' then
+        (${table.revisionPayload} #> '{payload}' - 'guidanceCardRefs' - 'scope') = '{}'::jsonb
+        and jsonb_typeof(${table.revisionPayload} #> '{payload,guidanceCardRefs}') = 'array'
+        and jsonb_array_length(${table.revisionPayload} #> '{payload,guidanceCardRefs}') between 1 and 1000
+        and (${table.revisionPayload} #> '{payload,scope}' - 'global' - 'accountGroupRefs' - 'accountRefs'
+          - 'objectiveRefs' - 'internalCategoryRefs' - 'entityRefs' - 'promotionTemplateRefs' - 'topicRefs') = '{}'::jsonb
+      when 'review_g2' then
+        (${table.revisionPayload} #> '{payload}' - 'guidanceSetRef' - 'reviewedGuidanceHash' - 'confirmation') = '{}'::jsonb
+        and ${table.revisionPayload} #>> '{payload,reviewedGuidanceHash}' ~ '^[a-f0-9]{64}$'
+        and (${table.revisionPayload} #> '{payload,confirmation}' - 'confirmed' - 'confirmationRef' - 'confirmedAt') = '{}'::jsonb
+        and ${table.revisionPayload} #> '{payload,confirmation,confirmed}' = 'true'::jsonb
+      when 'promote_g3' then
+        (${table.revisionPayload} #> '{payload}' - 'normalizedDraft' - 'confirmation') = '{}'::jsonb
+        and (${table.revisionPayload} #> '{payload,confirmation}' - 'confirmed' - 'confirmationRef' - 'confirmedAt') = '{}'::jsonb
+        and ${table.revisionPayload} #> '{payload,confirmation,confirmed}' = 'true'::jsonb
+        and (${table.revisionPayload} #> '{payload,normalizedDraft}' - 'schemaVersion' - 'workspaceRef'
+          - 'formalizationRef' - 'guidanceSetRef' - 'strictPolicy' - 'assumptions' - 'questions' - 'semanticDiff'
+          - 'historicalReplay' - 'conflictPreview' - 'impactPreview' - 'authority' - 'draftHash') = '{}'::jsonb
+        and (${table.revisionPayload} #> '{payload,normalizedDraft,authority}' - 'canPublish' - 'canApprove'
+          - 'canExecute' - 'canWriteMeta' - 'canGrant' - 'canCallTool' - 'canAccessNetwork' - 'canQuerySql') = '{}'::jsonb
+        and (${table.revisionPayload} #> '{payload,normalizedDraft,strictPolicy}' - 'dslVersion' - 'workspaceRef'
+          - 'policyRef' - 'policyVersion' - 'previousVersionHash' - 'policyType' - 'owner' - 'status' - 'reasonCode'
+          - 'priority' - 'effectiveDates' - 'scope' - 'source' - 'clause' - 'authority' - 'canonicalHash') = '{}'::jsonb
+        and (${table.revisionPayload} #> '{payload,normalizedDraft,semanticDiff}' - 'status' - 'items' - 'diffHash') = '{}'::jsonb
+        and (${table.revisionPayload} #> '{payload,normalizedDraft,historicalReplay}' - 'status'
+          - 'evaluatedRevisionRefs' - 'changedOutcomeRefs' - 'unknownOutcomeRefs' - 'replayHash') = '{}'::jsonb
+        and (${table.revisionPayload} #> '{payload,normalizedDraft,conflictPreview}' - 'status' - 'conflictRefs' - 'previewHash') = '{}'::jsonb
+        and (${table.revisionPayload} #> '{payload,normalizedDraft,impactPreview}' - 'status' - 'affectedScopeRefs'
+          - 'affectedEntityCount' - 'affectedPolicyCount' - 'affectedBudgetCount' - 'affectedAutomationCount'
+          - 'unresolvedDependencyRefs' - 'previewHash') = '{}'::jsonb
+      when 'qualify_g4' then
+        (${table.revisionPayload} #> '{payload}' - 'publishedPolicyRef' - 'publishedPolicyHash'
+          - 'riskAssessmentRef' - 'capPolicyRef' - 'approvalPolicyRef' - 'rolloutEvidenceRefs'
+          - 'actionValveRef' - 'approvalMode' - 'confirmation') = '{}'::jsonb
+        and ${table.revisionPayload} #>> '{payload,approvalMode}' = 'approval_only'
+        and ${table.revisionPayload} #>> '{payload,publishedPolicyHash}' ~ '^[a-f0-9]{64}$'
+        and jsonb_typeof(${table.revisionPayload} #> '{payload,rolloutEvidenceRefs}') = 'array'
+        and jsonb_array_length(${table.revisionPayload} #> '{payload,rolloutEvidenceRefs}') between 1 and 1000
+        and (${table.revisionPayload} #> '{payload,confirmation}' - 'confirmed' - 'confirmationRef' - 'confirmedAt') = '{}'::jsonb
+        and ${table.revisionPayload} #> '{payload,confirmation,confirmed}' = 'true'::jsonb
+      else false
+    end
+  ) is true`),
+  check("progressive_formalization_no_forbidden_material", sql`
+    ${table.revisionPayload}::text !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json)|authorization|approvalgranted)"[[:space:]]*:'
+    and ${table.revisionPayload}::text !~* '"(canPublish|canApprove|canExecute|canWriteMeta|canGrant|canSchedule|canCallTool|canAccessNetwork|canQuerySql)"[[:space:]]*:[[:space:]]*true'
+  `),
+]);
+
 function categoryAssignmentRevisionScope(): [AnyPgColumn, AnyPgColumn, AnyPgColumn] {
   return [categoryAssignments.id, categoryAssignments.workspaceId, categoryAssignments.dimensionId];
 }

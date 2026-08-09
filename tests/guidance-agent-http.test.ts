@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createGuidanceAgentHttpHandlers } from "@/server/guidance-agent-http";
+import { GuidanceFacetScopeError } from "@/application/guidance-facet-scope-resolver";
 
 const principal = { actor: { userId: "22222222-2222-4222-8222-222222222222" },
   workspaceId: "11111111-1111-4111-8111-111111111111", workspaceRef: "workspace_test", readerRef: "reader_test" } as const;
@@ -25,5 +26,20 @@ describe("Guidance agent HTTP", () => {
     expect((await handlers.POST(request("/api/guidance-context", "POST", "guidance-effective-preview",
       { context: {}, extra: true }, { "x-workspace-id": principal.workspaceId }))).status).toBe(400);
     expect(execute).not.toHaveBeenCalled();
+  });
+  it("maps stale/cross-tenant refs and missing authoritative catalogs without leaking details", async () => {
+    const handlers = createGuidanceAgentHttpHandlers({ contract: { execute: vi.fn()
+      .mockRejectedValueOnce(new GuidanceFacetScopeError("unknown_scope_ref"))
+      .mockRejectedValueOnce(new GuidanceFacetScopeError("catalog_unavailable")) } as never,
+    resolvePrincipal: async () => principal });
+    const body = { context: {} };
+    const unknown = await handlers.POST(request("/api/guidance-context", "POST", "guidance-effective-preview", body));
+    expect(unknown.status).toBe(400);
+    expect(await unknown.json()).toEqual({ error: { code: "unknown_scope_ref",
+      message: "Guidance kapsam referansı güncel katalogda bulunamadı." } });
+    const unavailable = await handlers.POST(request("/api/guidance-context", "POST", "guidance-effective-preview", body));
+    expect(unavailable.status).toBe(503);
+    expect(await unavailable.json()).toEqual({ error: { code: "catalog_unavailable",
+      message: "Guidance kapsam kataloğu kullanılamıyor." } });
   });
 });

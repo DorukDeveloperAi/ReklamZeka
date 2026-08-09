@@ -174,7 +174,8 @@ export function assertTrustedLocalDecisionRoomRequest(
     request.headers.get("x-reklamzeka-intent") ?? "",
   ) && !["autonomy-rule-create-draft", "guidance-studio-create", "guidance-studio-revise",
     "guidance-set-create", "guidance-set-revise", "instruction-policy-mutate",
-    "practice-lab-propose-standardization", "promotion-template-lifecycle-draft"].includes(
+    "practice-lab-propose-standardization", "promotion-template-lifecycle-draft",
+    "progressive-formalization-mutate"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if (operation === "decide" && ![
@@ -188,6 +189,7 @@ export function assertTrustedLocalDecisionRoomRequest(
     "guidance-set-review", "guidance-set-archive",
     "category-authoring-mutate", "category-profile-mutate", "starter-category-adoption-confirm",
     "instruction-policy-mutate", "practice-lab-standardize", "promotion-template-lifecycle-publish",
+    "progressive-formalization-mutate",
   ].includes(request.headers.get("x-reklamzeka-intent") ?? "")) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if ((operation === "mark_read" || operation === "draft" || operation === "decide" || operation === "publish") && credential === "cookie"
     && (origin !== config.origin || fetchSite !== "same-origin")) {

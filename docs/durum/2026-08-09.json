@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "904a45278",
+      "tarih": "2026-08-10",
+      "konu": "feat(a09): harden policy and promotion authoring",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "a5855809f",
       "tarih": "2026-08-10",
       "konu": "feat(guidance): harden run binding rollout",
@@ -128,15 +137,6 @@
       "kapsam": [
         "fix"
       ]
-    },
-    {
-      "hash": "19eac50de",
-      "tarih": "2026-08-08",
-      "konu": "feat(guidance): add multi-scope authoring",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -161,7 +161,7 @@
       "adet": 2
     }
   ],
-  "isSayisi": 137,
+  "isSayisi": 138,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-10",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "b1980a3731e1"
+  "damga": "c4deaad20fe8"
 }

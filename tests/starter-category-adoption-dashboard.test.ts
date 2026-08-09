@@ -2,66 +2,54 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { parseStarterCategoryAdoptionBlockedResponse, parseStarterCategoryAdoptionPlan, StarterCategoryAdoption } from
+import { parseStarterCategoryAdoptionPlan, parseStarterCategoryAdoptionSuccess, StarterCategoryAdoption } from
   "@/app/dashboard/starter-category-adoption";
 import { buildStarterCategoryAdoptionPlan } from "@/application/starter-category-adoption-service";
 
-const coverage = ["service_line", "brand_clinic", "geo_market", "language", "campaign_role", "funnel_intent",
-  "audience_strategy", "destination", "budget_pool", "operating_mode", "lifecycle", "experiment",
-  "protection_class", "custom"].map((dimensionKey) => ({ dimensionKey, disposition: "satisfied",
-    reasonCode: "already_present" }));
-const payload = { contractVersion: "starter-category-adoption/1.0.0",
-  catalogVersion: "starter-category-playbooks/1.1.0", catalogHash: "a".repeat(64),
-  registryHash: "b".repeat(64), planHash: "c".repeat(64), status: "preview_only",
-  summary: { canonicalDimensions: 14, dimensionsToCreate: 0, definitionsToCreate: 0,
-    profileProposals: 0, satisfied: 14, conflicts: 0, ownerConfigurationRequired: 0 },
-  dimensionCoverage: coverage, categoryCommands: [], profileProposals: [],
-  blockers: [{ code: "atomic_multi_command_category_adoption_unavailable",
-    refs: ["category_authoring_atomic_batch/1.0.0"] }, { code: "category_profile_registry_unavailable",
-    refs: ["category_profile_authoritative_inventory/1.0.0"] }], ownerConfirmationRequired: true,
-  confirmationLiteral: "adopt_starter_category_playbook", authority: { canPersist: false, canConfirm: true,
-    canAuthorizeAction: false, canWriteMeta: false, canPublishPolicy: false } } as const;
+const payload = buildStarterCategoryAdoptionPlan("workspace_starter", {
+  registryHash: "a".repeat(64), dimensions: [], assignments: [], targets: [],
+}, { registryHash: "b".repeat(64), definitions: [] });
 
 describe("StarterCategoryAdoption dashboard", () => {
-  it("parses only bounded 14-dimension preview-only material with all write authority closed", () => {
-    expect(parseStarterCategoryAdoptionPlan(payload)).toMatchObject({ summary: { canonicalDimensions: 14 },
+  it("parses only bounded 14-dimension, 42-proposal and seven-profile draft material", () => {
+    expect(parseStarterCategoryAdoptionPlan(payload)).toMatchObject({
+      contractVersion: "starter-category-adoption/1.1.0",
+      summary: { canonicalDimensions: 14, profileProposals: 42, profileDraftsToCreate: 7 },
       authority: { canPersist: false, canAuthorizeAction: false, canWriteMeta: false, canPublishPolicy: false } });
     expect(() => parseStarterCategoryAdoptionPlan({ ...payload,
       authority: { ...payload.authority, canPersist: true } })).toThrow("unsafe_response");
-    expect(() => parseStarterCategoryAdoptionPlan({ ...payload,
-      dimensionCoverage: [...coverage.slice(0, 13), coverage[0]] })).toThrow("unsafe_response");
-    expect(() => parseStarterCategoryAdoptionPlan({ ...payload,
-      authority: { ...payload.authority, canConfirm: "true" } })).toThrow("unsafe_response");
     expect(() => parseStarterCategoryAdoptionPlan({ ...payload, unexpected: true })).toThrow("unsafe_response");
     expect(() => parseStarterCategoryAdoptionPlan({ ...payload,
-      summary: { ...payload.summary, definitionsToCreate: Number.MAX_SAFE_INTEGER } })).toThrow("unsafe_response");
+      targetRefs: [...payload.targetRefs].reverse() })).toThrow("unsafe_response");
     expect(() => parseStarterCategoryAdoptionPlan({ ...payload,
-      blockers: [...payload.blockers, { code: "unknown", refs: [] }] })).toThrow("unsafe_response");
-    expect(parseStarterCategoryAdoptionPlan(buildStarterCategoryAdoptionPlan("workspace_starter", {
-      registryHash: "d".repeat(64), dimensions: [], assignments: [], targets: [],
-    }))).toMatchObject({ summary: { dimensionsToCreate: 14, definitionsToCreate: 7,
-      profileProposals: 42 } });
+      profileDrafts: [{ ...payload.profileDrafts[0], proposalHashes: ["c".repeat(64)] },
+        ...payload.profileDrafts.slice(1)] })).toThrow("unsafe_response");
+    expect(() => parseStarterCategoryAdoptionPlan({ ...payload,
+      blockers: [{ code: "unknown", blocking: false, refs: ["safe_ref"] }] })).toThrow("unsafe_response");
   });
 
-  it("accepts only the exact replay-bound zero-write confirmation response", () => {
+  it("accepts only an exact replay-bound partial-core adoption result", () => {
     const preview = parseStarterCategoryAdoptionPlan(payload);
-    const blocked = { ...payload, status: "blocked", persistenceAttempted: false,
-      blocker: "atomic_multi_command_category_adoption_unavailable",
-      continuation: { requiredCapability:
-        "category_authoring_atomic_batch/1.0.0 + category_profile_atomic_batch/1.0.0",
-      replay: { planHash: payload.planHash, expectedRegistryHash: payload.registryHash,
-        confirmation: payload.confirmationLiteral } } } as const;
-    expect(parseStarterCategoryAdoptionBlockedResponse(blocked, preview)).toEqual({
-      blocker: "atomic_multi_command_category_adoption_unavailable",
-    });
-    expect(() => parseStarterCategoryAdoptionBlockedResponse({ ...blocked,
-      continuation: { ...blocked.continuation, replay: { ...blocked.continuation.replay,
-        planHash: "d".repeat(64) } } }, preview)).toThrow("unsafe_response");
+    const success = { contractVersion: preview.contractVersion, catalogVersion: preview.catalogVersion,
+      catalogHash: preview.catalogHash, planHash: preview.planHash,
+      status: "core_adopted_with_owner_configuration_pending",
+      pendingOwnerConfiguration: preview.blockers.find((blocker) => blocker.code === "pending_owner_configuration")!.refs,
+      result: { outcome: "inserted", registryHash: "c".repeat(64), profileRegistryHash: "d".repeat(64),
+        dimensionsCreated: 14, definitionsCreated: 7, profileDraftsCreated: 7, auditAppended: true,
+        categoryInvalidationsAppended: 0, profileInvalidationsAppended: 0 },
+      authority: { canPersist: true, canConfirm: true, canAuthorizeAction: false,
+        canWriteMeta: false, canPublishPolicy: false } } as const;
+    expect(parseStarterCategoryAdoptionSuccess(success, preview)).toMatchObject({ outcome: "inserted",
+      profileDraftsCreated: 7 });
+    expect(() => parseStarterCategoryAdoptionSuccess({ ...success, planHash: "e".repeat(64) }, preview))
+      .toThrow("unsafe_response");
+    expect(() => parseStarterCategoryAdoptionSuccess({ ...success,
+      authority: { ...success.authority, canWriteMeta: true } }, preview)).toThrow("unsafe_response");
   });
 
-  it("renders the fail-closed loading shell without a persistence or Meta-write control", () => {
+  it("renders the fail-closed loading shell without Meta or action controls", () => {
     const html = renderToStaticMarkup(createElement(StarterCategoryAdoption));
     expect(html).toContain("14-DIMENSION STARTER PLAN"); expect(html).toContain("Plan yükleniyor");
-    expect(html).not.toContain("Meta write"); expect(html).not.toContain("Kategorileri oluştur");
+    expect(html).not.toContain("Meta write"); expect(html).not.toContain("Action execute");
   });
 });

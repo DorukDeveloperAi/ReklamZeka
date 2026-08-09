@@ -177,6 +177,25 @@ describe("Guidance registry provenance and publication boundary", () => {
 });
 
 describe("Effective guidance pack", () => {
+  it("matches canonical and reviewed current/legacy objective bindings but never unknown aliases", () => {
+    const owner = source("objective-owner");
+    const definitions = [
+      ["canonical", "lead_generation"],
+      ["current", "OUTCOME_LEADS"],
+      ["legacy", "LEAD_GENERATION"],
+      ["unknown", "OUTCOME_FUTURE"],
+    ] as const;
+    const cards = definitions.map(([id]) => card(`objective-${id}`, owner.id));
+    const bindings = definitions.map(([id, value], index) => binding(`objective-binding-${index}`,
+      cards[index]!.id, { facet: "objective", value }));
+    const registry = createGuidanceRegistry({ workspaceId, sources: [owner], cards, bindings, sets: [] });
+    const pack = buildEffectiveGuidancePack(registry, context({ objective: "lead_generation" }));
+    expect(pack.applied.map((item) => item.cardId).sort()).toEqual([
+      "objective-canonical", "objective-current", "objective-legacy",
+    ]);
+    expect(pack.suppressed).toContainEqual({ cardId: "objective-unknown", reason: "scope_not_matched" });
+  });
+
   it("fails closed at registry/context caps and never truncates exact evaluated revision coverage", () => {
     const sharedSource = source("bounded-source");
     const cards = Array.from({ length: GUIDANCE_REGISTRY_LIMITS.evaluatedCards }, (_, index) =>

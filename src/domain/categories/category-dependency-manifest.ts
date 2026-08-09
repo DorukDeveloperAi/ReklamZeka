@@ -30,6 +30,7 @@ const categoryContract = new Set([
   "promotion_template_authoring_revisions.published_binding_payload",
   "category_profile_revisions.profile_payload",
   "strict_instruction_policy_revisions.policy_payload",
+  "progressive_formalization_revisions.revision_payload",
 ]);
 
 const categoryProjection = new Set([
@@ -87,6 +88,7 @@ const columns = [
   "category_assignments.evidence",
   "category_profile_revisions.profile_payload",
   "strict_instruction_policy_revisions.policy_payload",
+  "progressive_formalization_revisions.revision_payload",
   "guidance_cards.source_ids",
   "guidance_sets.ordered_card_ids",
   "advised_practice_definitions.payload",

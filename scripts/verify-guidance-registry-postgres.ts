@@ -7,6 +7,9 @@ import {
   DrizzleGuidanceRegistryRepository,
   GuidanceRepositoryError,
 } from "@/connectors/guidance/guidance-drizzle-repository";
+import { DrizzleGuidanceFacetScopeResolver } from
+  "@/connectors/guidance/guidance-facet-scope-drizzle-resolver";
+import { GuidanceFacetScopeError } from "@/application/guidance-facet-scope-resolver";
 import * as schema from "@/db/schema";
 import {
   buildEffectiveGuidancePack,
@@ -17,8 +20,12 @@ import {
 } from "@/domain/guidance/registry";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
-const databaseUrl = process.env.DATABASE_URL?.trim();
-if (!databaseUrl) throw new Error("DATABASE_URL yapılandırılmadı");
+const databaseUrl = process.env.DIRECT_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
+if (!databaseUrl) {
+  console.error(JSON.stringify({ ok: false, blocker: "postgres_connection_not_configured",
+    requiredOneOf: ["DIRECT_DATABASE_URL", "DATABASE_URL"], continuation: "npm run verify:guidance-registry-db" }));
+  process.exit(2);
+}
 
 const pool = new Pool({
   connectionString: databaseUrl,
@@ -30,6 +37,10 @@ const database = drizzle(pool, { schema });
 const rollback = Symbol("rollback");
 const workspaceId = randomUUID();
 const foreignWorkspaceId = randomUUID();
+const connectionId = randomUUID(); const sourceId = randomUUID(); const accountId = randomUUID();
+const campaignId = randomUUID(); const adSetId = randomUUID();
+const funnelDimensionId = randomUUID(); const funnelDefinitionId = randomUUID();
+const lifecycleDimensionId = randomUUID(); const lifecycleDefinitionId = randomUUID();
 
 function source(
   id: string,
@@ -106,6 +117,11 @@ let officialEvidenceBypassBlocked = false;
 let emptyScopeBindingBlocked = false;
 let noSecretRawOrWriteEvidence = false;
 let temporaryRowsCommitted = true;
+let facetScopeResolved = false;
+let canonicalObjectiveResolved = false;
+let crossTenantRefBlocked = false;
+let accountGroupCatalogExplicit = false;
+let singleCaptureStable = false;
 
 try {
   await database.transaction(async (transaction) => {
@@ -114,6 +130,31 @@ try {
     await transaction.insert(schema.workspaces).values([
       { id: workspaceId, name: "Guidance E2E" },
       { id: foreignWorkspaceId, name: "Foreign Guidance E2E" },
+    ]);
+    await transaction.insert(schema.metaConnections).values({ id: connectionId, workspaceId,
+      externalConnectionKey: "guidance-scope-connection", displayName: "Guidance scope connection",
+      graphApiVersion: "v23.0", fieldCatalogVersion: "guidance-scope/1.0.0" });
+    await transaction.insert(schema.dataSources).values({ id: sourceId, workspaceId, metaConnectionId: connectionId,
+      platform: "meta_ads", externalAccountId: "act_guidance_scope", displayName: "Guidance scope source" });
+    await transaction.insert(schema.adAccounts).values({ id: accountId, workspaceId, dataSourceId: sourceId,
+      externalAccountId: "act_guidance_scope", name: "Guidance scope account", currency: "TRY", timezone: "Europe/Istanbul" });
+    await transaction.insert(schema.adCampaigns).values({ id: campaignId, workspaceId, adAccountId: accountId,
+      externalCampaignId: "campaign_guidance_scope", name: "Guidance scope campaign",
+      objectiveSource: "OUTCOME_LEADS", canonicalObjective: "lead_generation",
+      objectiveMappingVersion: "meta-objective-mapping/1.0.0" });
+    await transaction.insert(schema.metaAdSets).values({ id: adSetId, workspaceId, adAccountId: accountId,
+      campaignId, externalAdSetId: "adset_guidance_scope", name: "Guidance scope ad set", optimizationGoal: "LEAD",
+      rawPayloadHash: "a".repeat(64), sourceGraphVersion: "v23.0", fieldCatalogVersion: "guidance-scope/1.0.0",
+      provenance: { source: "rollback_verifier" } });
+    await transaction.insert(schema.categoryDimensions).values([
+      { id: funnelDimensionId, workspaceId, key: "funnel_intent", name: "Funnel intent",
+        cardinality: "single", allowedEntityLevels: ["campaign"] },
+      { id: lifecycleDimensionId, workspaceId, key: "lifecycle", name: "Lifecycle",
+        cardinality: "single", allowedEntityLevels: ["campaign"] },
+    ]);
+    await transaction.insert(schema.categoryDefinitions).values([
+      { id: funnelDefinitionId, workspaceId, dimensionId: funnelDimensionId, key: "consideration", label: "Consideration" },
+      { id: lifecycleDefinitionId, workspaceId, dimensionId: lifecycleDimensionId, key: "evergreen", label: "Evergreen" },
     ]);
 
     const owner = source("owner-source", "owner_statement");
@@ -140,6 +181,38 @@ try {
 
     const restarted = new DrizzleGuidanceRegistryRepository(transaction as never);
     const recovered = await restarted.load(workspaceId);
+    const scopeResolver = new DrizzleGuidanceFacetScopeResolver(transaction as never);
+    const scopeCatalog = await scopeResolver.listCatalog(workspaceId);
+    const facet = (name: string) => scopeCatalog.facets.find((entry) => entry.facet === name)!;
+    const accountRef = facet("account").options[0]!.ref;
+    const objectiveRef = facet("objective").options[0]!.ref;
+    const funnelRef = facet("funnel").options[0]!.ref;
+    const optimizationRef = facet("optimization").options[0]!.ref;
+    const lifecycleRef = facet("lifecycle").options[0]!.ref;
+    const campaignRef = facet("entity").options.find((option) => option.entityType === "campaign")!.ref;
+    const budgetTopicRef = facet("topic").options.find((option) => option.label === "budget")!.ref;
+    const resolvedScope = await scopeResolver.resolve(workspaceId, { expectedCatalogHash: scopeCatalog.catalogHash,
+      accountRef, accountGroupRefs: [],
+      objective: objectiveRef, funnel: funnelRef, optimization: optimizationRef,
+      internalCategoryRefs: [funnelRef], lifecycle: lifecycleRef,
+      entity: { type: "campaign", ref: campaignRef }, promotionTemplateRefs: [],
+      topics: [budgetTopicRef], requiredTopics: [budgetTopicRef] });
+    facetScopeResolved = resolvedScope.accountRef === accountRef && resolvedScope.funnel === "consideration"
+      && resolvedScope.optimization === "LEAD" && resolvedScope.lifecycle === "evergreen"
+      && resolvedScope.topics[0] === "budget" && resolvedScope.entity?.ref === campaignRef;
+    canonicalObjectiveResolved = resolvedScope.objective === "lead_generation"
+      && scopeCatalog.evidence.objectiveMappingVersion === "meta-objective-mapping/1.0.0";
+    accountGroupCatalogExplicit = facet("account_group").status === "partial"
+      && facet("account_group").reasonCode === "account_group_catalog_unavailable";
+    singleCaptureStable = resolvedScope.capture.catalogHash === scopeCatalog.catalogHash
+      && resolvedScope.capture.capturedAt === scopeCatalog.capturedAt;
+    const foreignScopeCatalog = await scopeResolver.listCatalog(foreignWorkspaceId);
+    crossTenantRefBlocked = await scopeResolver.resolve(foreignWorkspaceId, {
+      expectedCatalogHash: foreignScopeCatalog.catalogHash, accountRef,
+      accountGroupRefs: [], objective: null, funnel: null, optimization: null, internalCategoryRefs: [],
+      lifecycle: null, entity: null, promotionTemplateRefs: [], topics: [], requiredTopics: [] })
+      .then(() => false, (reason: unknown) => reason instanceof GuidanceFacetScopeError
+        && reason.code === "unknown_scope_ref");
     const packContext = {
       workspaceId,
       accountId: "account-e2e",
@@ -227,7 +300,8 @@ try {
     if (!inserted || !idempotentReplay || !restartPackSameHash || !ownerOfficialSeparate
       || !staleOfficialSuppressed || !foreignWorkspaceIsolated || !optimisticConflictBlocked
       || !authorityEscalationBlocked || !officialEvidenceBypassBlocked || !emptyScopeBindingBlocked
-      || !noSecretRawOrWriteEvidence) {
+      || !noSecretRawOrWriteEvidence || !facetScopeResolved || !canonicalObjectiveResolved
+      || !crossTenantRefBlocked || !accountGroupCatalogExplicit || !singleCaptureStable) {
       throw new Error("Guidance PostgreSQL acceptance failed");
     }
     throw rollback;
@@ -251,6 +325,11 @@ console.log(JSON.stringify({
   officialEvidenceBypassBlocked,
   emptyScopeBindingBlocked,
   noSecretRawOrWriteEvidence,
+  facetScopeResolved,
+  canonicalObjectiveResolved,
+  crossTenantRefBlocked,
+  accountGroupCatalogExplicit,
+  singleCaptureStable,
   writeNetworkCalls: 0,
   temporaryRowsCommitted,
 }));

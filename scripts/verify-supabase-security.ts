@@ -102,6 +102,20 @@ try {
     where namespace.nspname = 'public' and relation.relkind = 'r'
       and relation.relname in ('audience_preset_authoring_revisions', 'promotion_template_authoring_revisions')
   `);
+  const progressiveFormalization = await pool.query<{ total: number; force_rls: number; grant_count: number;
+    routine_grant_count: number }>(`
+    select count(*)::int as total,
+      count(*) filter (where relation.relrowsecurity and relation.relforcerowsecurity)::int as force_rls,
+      (select count(*)::int from information_schema.role_table_grants where table_schema = 'public'
+        and table_name = 'progressive_formalization_revisions'
+        and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) as grant_count,
+      (select count(*)::int from information_schema.routine_privileges where routine_schema = 'public'
+        and routine_name = 'progressive_formalization_revision_guard'
+        and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) as routine_grant_count
+    from pg_class relation join pg_namespace namespace on namespace.oid = relation.relnamespace
+    where namespace.nspname = 'public' and relation.relkind = 'r'
+      and relation.relname = 'progressive_formalization_revisions'
+  `);
 
   const posture = {
     tables: tables.rows[0]?.total ?? 0,
@@ -120,6 +134,10 @@ try {
     promotionAuthoringForceRls: promotionAuthoring.rows[0]?.force_rls ?? 0,
     promotionAuthoringDirectGrants: promotionAuthoring.rows[0]?.grant_count ?? 0,
     promotionAuthoringRoutineDirectGrants: promotionAuthoring.rows[0]?.routine_grant_count ?? 0,
+    progressiveFormalizationTables: progressiveFormalization.rows[0]?.total ?? 0,
+    progressiveFormalizationForceRls: progressiveFormalization.rows[0]?.force_rls ?? 0,
+    progressiveFormalizationDirectGrants: progressiveFormalization.rows[0]?.grant_count ?? 0,
+    progressiveFormalizationRoutineDirectGrants: progressiveFormalization.rows[0]?.routine_grant_count ?? 0,
   };
 
   if (posture.tables === 0) throw new Error("Public uygulama tablosu bulunamadı");
@@ -144,6 +162,11 @@ try {
   if (posture.promotionAuthoringTables !== 2 || posture.promotionAuthoringForceRls !== 2
     || posture.promotionAuthoringDirectGrants !== 0 || posture.promotionAuthoringRoutineDirectGrants !== 0) {
     throw new Error("Promotion authoring tabloları FORCE RLS/revoke sınırını karşılamıyor");
+  }
+  if (posture.progressiveFormalizationTables !== 1 || posture.progressiveFormalizationForceRls !== 1
+    || posture.progressiveFormalizationDirectGrants !== 0
+    || posture.progressiveFormalizationRoutineDirectGrants !== 0) {
+    throw new Error("Progressive formalization FORCE RLS/revoke sınırını karşılamıyor");
   }
 
   console.log(JSON.stringify({ status: "secure", ...posture }));

@@ -185,6 +185,12 @@ describe("local Decision Room principal boundary", () => {
     expect(() => assertTrustedLocalDecisionRoomRequest(request("/api/instruction-policies", {
       Origin: "http://localhost:3000", "X-ReklamZeka-Intent": "instruction-policy-mutate",
     }), config, "publish")).not.toThrow();
+    expect(() => assertTrustedLocalDecisionRoomRequest(request("/api/progressive-formalization", {
+      Origin: "http://localhost:3000", "X-ReklamZeka-Intent": "progressive-formalization-mutate",
+    }), config, "draft")).not.toThrow();
+    expect(() => assertTrustedLocalDecisionRoomRequest(request("/api/progressive-formalization", {
+      Origin: "http://localhost:3000", "X-ReklamZeka-Intent": "progressive-formalization-mutate",
+    }), config, "publish")).not.toThrow();
     expect(() => assertTrustedLocalDecisionRoomRequest(request("/api/guidance-studio", {
       Origin: "http://localhost:3000", "X-ReklamZeka-Intent": "guidance-set-create",
     }), config, "draft")).not.toThrow();

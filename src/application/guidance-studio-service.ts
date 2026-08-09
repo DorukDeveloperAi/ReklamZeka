@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { TrustedDecisionRoomPrincipal } from "@/application/decision-room-agent-contract";
 import {
   createGuidanceRegistry,
+  canonicalGuidanceObjective,
   isOfficialGuidanceSourceUrl,
   type GuidanceBinding,
   type GuidanceCard,
@@ -129,9 +130,11 @@ function scope(value: GuidanceStudioScope, categories: readonly GuidanceStudioCa
     if (value.value !== null || value.entityType !== null) throw new GuidanceStudioError("invalid_input");
   } else {
     if (typeof value.value !== "string") throw new GuidanceStudioError("invalid_input");
-    const validValue = ["objective", "optimization"].includes(value.facet) ? /^[A-Z][A-Z0-9_]{1,79}$/.test(value.value)
-      : ["topic", "funnel", "lifecycle"].includes(value.facet) ? /^[a-z][a-z0-9_.:-]{0,79}$/.test(value.value)
-        : REF.test(value.value);
+    const canonicalObjective = value.facet === "objective" ? canonicalGuidanceObjective(value.value) : null;
+    const validValue = value.facet === "objective" ? canonicalObjective !== null
+      : value.facet === "optimization" ? /^[A-Z][A-Z0-9_]{1,79}$/.test(value.value)
+        : ["topic", "funnel", "lifecycle"].includes(value.facet) ? /^[a-z][a-z0-9_.:-]{0,79}$/.test(value.value)
+          : REF.test(value.value);
     if (!validValue) throw new GuidanceStudioError("invalid_input");
     if (value.facet === "entity") {
       if (value.entityType === null || !ENTITIES.has(value.entityType)) throw new GuidanceStudioError("invalid_input");
@@ -140,7 +143,9 @@ function scope(value: GuidanceStudioScope, categories: readonly GuidanceStudioCa
   if (value.facet === "internal_category" && !categories.some((item) => item.ref === value.value)) {
     throw new GuidanceStudioError("not_found");
   }
-  return Object.freeze({ facet: value.facet, value: value.value, entityType: value.entityType,
+  return Object.freeze({ facet: value.facet,
+    value: value.facet === "objective" ? canonicalGuidanceObjective(value.value) : value.value,
+    entityType: value.entityType,
     mode: value.mode, priority: value.priority });
 }
 

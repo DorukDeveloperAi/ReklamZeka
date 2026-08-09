@@ -6,7 +6,7 @@ import { StarterCategoryAdoptionError, type StarterCategoryAdoptionService } fro
 import { AuthorizationError } from "@/security/authorization";
 
 const HEADERS = Object.freeze({ "Cache-Control": "private, no-store, max-age=0",
-  "X-Content-Type-Options": "nosniff", "X-ReklamZeka-Access-Mode": "starter-category-preview-only",
+  "X-Content-Type-Options": "nosniff", "X-ReklamZeka-Access-Mode": "starter-category-owner-confirmed-core-batch",
   "X-ReklamZeka-Action-Authority": "none", "X-ReklamZeka-Meta-Write": "disabled" });
 const AUTHORITY = Object.freeze({ canPersist: false, canAuthorizeAction: false, canWriteMeta: false });
 
@@ -29,18 +29,28 @@ function shape(request: Request, method: "GET" | "POST", intent: string) {
   }
 }
 async function body(request: Request) {
-  const raw = await request.text(); if (Buffer.byteLength(raw) > 2_048) throw new StarterCategoryAdoptionError("invalid_input");
-  const parsed = JSON.parse(raw) as unknown; exact(parsed, ["planHash", "expectedRegistryHash", "confirmation"]);
+  const raw = await request.text(); if (Buffer.byteLength(raw) > 4_096) throw new StarterCategoryAdoptionError("invalid_input");
+  const parsed = JSON.parse(raw) as unknown; exact(parsed, ["planHash", "expectedRegistryHash",
+    "expectedProfileRegistryHash", "targetRefs", "confirmation", "acknowledgedPendingOwnerConfiguration"]);
   if (typeof parsed.planHash !== "string" || !/^[a-f0-9]{64}$/.test(parsed.planHash)
     || typeof parsed.expectedRegistryHash !== "string" || !/^[a-f0-9]{64}$/.test(parsed.expectedRegistryHash)
-    || parsed.confirmation !== "adopt_starter_category_playbook") throw new StarterCategoryAdoptionError("invalid_input");
-  return parsed as { planHash: string; expectedRegistryHash: string;
-    confirmation: "adopt_starter_category_playbook" };
+    || typeof parsed.expectedProfileRegistryHash !== "string" || !/^[a-f0-9]{64}$/.test(parsed.expectedProfileRegistryHash)
+    || !Array.isArray(parsed.targetRefs) || parsed.targetRefs.length < 1 || parsed.targetRefs.length > 32
+    || parsed.targetRefs.some((ref) => typeof ref !== "string" || !/^[a-z][a-z0-9_.:-]{1,158}$/.test(ref))
+    || new Set(parsed.targetRefs).size !== parsed.targetRefs.length
+    || JSON.stringify(parsed.targetRefs) !== JSON.stringify([...parsed.targetRefs].sort())
+    || parsed.confirmation !== "adopt_starter_category_playbook"
+    || parsed.acknowledgedPendingOwnerConfiguration !== true) throw new StarterCategoryAdoptionError("invalid_input");
+  return parsed as { planHash: string; expectedRegistryHash: string; expectedProfileRegistryHash: string;
+    targetRefs: string[]; confirmation: "adopt_starter_category_playbook";
+    acknowledgedPendingOwnerConfiguration: true };
 }
 function failure(reason: unknown) {
   if (reason instanceof AuthorizationError) return responseError("forbidden", reason.publicMessage, 403);
   if (reason instanceof StarterCategoryAdoptionError) return reason.code === "conflict"
     ? responseError("conflict", "Starter adoption planı registry ile birlikte değişti; önizlemeyi yenileyin.", 409)
+    : reason.code === "forbidden" ? responseError("forbidden", "Starter adoption yetkisi artık geçerli değil.", 403)
+      : reason.code === "not_found" ? responseError("not_found", "Aktif çalışma alanı bulunamadı.", 404)
     : responseError("invalid_input", "Starter adoption isteği geçersiz.", 400);
   if (reason instanceof SyntaxError) return responseError("invalid_input", "Starter adoption isteği geçersiz.", 400);
   return responseError("unavailable", "Starter adoption önizlemesi şu anda kullanılamıyor.", 503);

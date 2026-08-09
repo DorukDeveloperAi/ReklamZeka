@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { GuidanceAgentContract, GuidanceAgentError, type GuidanceAgentCall } from "@/application/guidance-agent-contract";
+import { GuidanceFacetScopeError } from "@/application/guidance-facet-scope-resolver";
 import type { TrustedDecisionRoomPrincipal } from "@/application/decision-room-agent-contract";
 import { AuthorizationError } from "@/security/authorization";
 
@@ -9,6 +10,13 @@ function error(code: string, message: string, status: number) { return NextRespo
 function failure(reason: unknown) {
   if (reason instanceof AuthorizationError) return error("forbidden", reason.publicMessage, 403);
   if (reason instanceof GuidanceAgentError) return error(reason.code, "Guidance agent isteği geçersiz.", 400);
+  if (reason instanceof GuidanceFacetScopeError) {
+    if (reason.code === "unknown_scope_ref") return error(reason.code, "Guidance kapsam referansı güncel katalogda bulunamadı.", 400);
+    if (reason.code === "stale_catalog") return error(reason.code, "Guidance kapsam kataloğu değişti; yeniden listeleyin.", 409);
+    if (reason.code === "catalog_unavailable") return error(reason.code, "Guidance kapsam kataloğu kullanılamıyor.", 503);
+    if (reason.code === "invalid_input") return error(reason.code, "Guidance agent isteği geçersiz.", 400);
+    return error("unsafe_source", "Guidance kapsam kataloğu güvenli biçimde çözülemedi.", 503);
+  }
   return error("unavailable", "Guidance agent okuma kaynağı kullanılamıyor.", 503);
 }
 function boundary(request: Request, method: "GET" | "POST", intent: string): void {

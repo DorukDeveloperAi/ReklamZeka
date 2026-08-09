@@ -9,7 +9,10 @@ export type InstructionPolicyJsonbPolicy =
   | "opaque_policy_context"
   | "policy_absent";
 
-const policyContract = new Set(["strict_instruction_policy_revisions.policy_payload"]);
+const policyContract = new Set([
+  "strict_instruction_policy_revisions.policy_payload",
+  "progressive_formalization_revisions.revision_payload",
+]);
 const policyProjection = new Set(["effective_campaign_contexts.context_payload"]);
 const opaquePolicyContext = new Set([
   "action_proposal_bundles.bundle_payload",

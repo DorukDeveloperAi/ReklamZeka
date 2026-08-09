@@ -98,7 +98,6 @@ const guidanceBudget = z.object({
   maxSources: z.number().int().min(1).max(100),
   maxCharacters: z.number().int().min(1).max(100_000),
 }).strict();
-const guidanceTopic = z.string().regex(/^[a-z][a-z0-9_.:-]{0,79}$/);
 const uniqueArray = <T>(schema: z.ZodType<T>, max: number) => z.array(schema).max(max)
   .refine((items) => new Set(items).size === items.length, { message: "refs must be unique" });
 
@@ -120,17 +119,19 @@ export const MCP_TOOL_SCHEMAS = Object.freeze({
   practice_lab_prepare_draft: z.object({ practiceRef: z.string().regex(/^practice_[a-z0-9][a-z0-9_-]{0,86}$/) }).strict(),
   guidance_registry_list: z.object({ status: z.enum(["draft", "published", "archived"]).optional() }).strict(),
   guidance_effective_preview: z.object({
+    contractVersion: z.literal("guidance-agent-tools/1.2.0"),
+    expectedCatalogHash: hash,
     accountRef: publicRef,
     accountGroupRefs: uniqueArray(publicRef, 25),
-    objective: z.string().regex(/^[A-Z][A-Z0-9_]{1,79}$/).nullable(),
-    funnel: guidanceTopic.nullable(),
-    optimization: z.string().regex(/^[A-Z][A-Z0-9_]{1,79}$/).nullable(),
+    objective: publicRef.nullable(),
+    funnel: publicRef.nullable(),
+    optimization: publicRef.nullable(),
     internalCategoryRefs: uniqueArray(z.string().regex(/^category_[a-f0-9]{24}$/), 100),
-    lifecycle: guidanceTopic.nullable(),
+    lifecycle: publicRef.nullable(),
     entity: guidanceEntity.nullable(),
     promotionTemplateRefs: uniqueArray(publicRef, 50),
-    topics: uniqueArray(guidanceTopic, 100),
-    requiredTopics: uniqueArray(guidanceTopic, 100),
+    topics: uniqueArray(publicRef, 100),
+    requiredTopics: uniqueArray(publicRef, 100),
     evaluatedAt: instant,
     timeframe: guidanceTimeframe,
     budget: guidanceBudget.optional(),

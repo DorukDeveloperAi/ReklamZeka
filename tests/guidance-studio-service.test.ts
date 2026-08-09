@@ -30,6 +30,22 @@ const draft = { title: "Learning döneminde sakin kal", body: "Acil risk yoksa 7
     value: category.ref, entityType: null, mode: "default" as const, priority: 60 }] };
 
 describe("GuidanceStudioService", () => {
+  it("persists canonical objective bindings and canonicalizes only reviewed Meta aliases", async () => {
+    for (const [input, expected] of [["lead_generation", "lead_generation"],
+      ["OUTCOME_LEADS", "lead_generation"], ["LEAD_GENERATION", "lead_generation"]] as const) {
+      const state = memory(); const initial = await state.service.list(principal);
+      const created = await state.service.createDraft(principal, { ...draft,
+        scopes: [{ facet: "objective", value: input, entityType: null, mode: "default", priority: 60 }],
+        expectedRegistryHash: initial.registryHash });
+      expect(created.item.scopes[0]?.value).toBe(expected);
+      expect(state.registry().bindings[0]?.value).toBe(expected);
+    }
+    const unknown = memory(); const initial = await unknown.service.list(principal);
+    await expect(unknown.service.createDraft(principal, { ...draft,
+      scopes: [{ facet: "objective", value: "OUTCOME_FUTURE", entityType: null, mode: "default", priority: 60 }],
+      expectedRegistryHash: initial.registryHash })).rejects.toMatchObject({ code: "invalid_input" });
+  });
+
   it("preserves the owner statement separately and creates guidance-only scoped draft", async () => {
     const state = memory(); const before = await state.service.list(principal);
     const created = await state.service.createDraft(principal, { ...draft, expectedRegistryHash: before.registryHash });

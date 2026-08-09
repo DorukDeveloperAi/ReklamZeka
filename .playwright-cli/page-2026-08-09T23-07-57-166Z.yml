@@ -1,0 +1,96 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]: RZ
+        - generic [ref=e6]:
+          - strong [ref=e7]: ReklamZeka
+          - generic [ref=e8]: Operating System
+        - generic [ref=e9]: DEMO
+      - navigation "Ana navigasyon" [ref=e10]:
+        - generic [ref=e11]:
+          - generic [ref=e12]: Çalışma
+          - button "Bugün 3" [ref=e13] [cursor=pointer]:
+            - generic [ref=e14]: ⌂
+            - strong [ref=e15]: Bugün
+            - generic [ref=e16]: "3"
+          - button [ref=e17] [cursor=pointer]:
+            - generic [ref=e18]: ◫
+            - strong [ref=e19]: Kampanyalar
+          - button "Analizler 2" [ref=e20] [cursor=pointer]:
+            - generic [ref=e21]: ⌁
+            - strong [ref=e22]: Analizler
+            - generic [ref=e23]: "2"
+          - button [ref=e24] [cursor=pointer]:
+            - generic [ref=e25]: ◇
+            - strong [ref=e26]: Decision Room
+          - button [ref=e27] [cursor=pointer]:
+            - generic [ref=e28]: ₺
+            - strong [ref=e29]: Bütçeler
+        - generic [ref=e30]:
+          - generic [ref=e31]: Yönetim
+          - button [ref=e32] [cursor=pointer]:
+            - generic [ref=e33]: ≡
+            - strong [ref=e34]: Kurallar & akışlar
+          - button [active] [ref=e35] [cursor=pointer]:
+            - generic [ref=e36]: §
+            - strong [ref=e37]: Strict policies
+          - button [ref=e38] [cursor=pointer]:
+            - generic [ref=e39]: ⊞
+            - strong [ref=e40]: İç kategoriler
+          - button [ref=e41] [cursor=pointer]:
+            - generic [ref=e42]: ◉
+            - strong [ref=e43]: Autonomy Studio
+          - button [ref=e44] [cursor=pointer]:
+            - generic [ref=e45]: ◈
+            - strong [ref=e46]: Practice Lab
+          - button [ref=e47] [cursor=pointer]:
+            - generic [ref=e48]: ◎
+            - strong [ref=e49]: Meta bağlantısı
+          - button "Orchestrator Agent ●" [ref=e50] [cursor=pointer]:
+            - generic [ref=e51]: ✦
+            - strong [ref=e52]: Orchestrator Agent
+            - generic [ref=e53]: ●
+          - button [ref=e54] [cursor=pointer]:
+            - generic [ref=e55]: ✓
+            - strong [ref=e56]: Onay kuyruğu
+          - button [ref=e57] [cursor=pointer]:
+            - generic [ref=e58]: ↗
+            - strong [ref=e59]: Gönderi öne çıkarma
+          - button [ref=e60] [cursor=pointer]:
+            - generic [ref=e61]: ↺
+            - strong [ref=e62]: Timeline
+      - generic [ref=e63]:
+        - generic [ref=e65]:
+          - strong [ref=e66]: Meta Mirror
+          - generic [ref=e67]: güncel · kontrol ediliyor
+        - button "Bağlantı ayarları" [ref=e68] [cursor=pointer]: •••
+    - generic [ref=e69]:
+      - generic [ref=e70]:
+        - button "DM Demo Marka Meta kontrol ediliyor ⌄" [ref=e71] [cursor=pointer]:
+          - generic [ref=e72]: DM
+          - generic [ref=e73]:
+            - strong [ref=e74]: Demo Marka
+            - generic [ref=e75]: Meta kontrol ediliyor
+          - generic [ref=e76]: ⌄
+        - generic [ref=e77]:
+          - button "Ara" [ref=e78] [cursor=pointer]: ⌕
+          - button "Bildirimler" [ref=e79] [cursor=pointer]: ♢
+          - button "approval_only ⌄" [ref=e80] [cursor=pointer]:
+            - text: approval_only
+            - generic [ref=e82]: ⌄
+          - button "AY" [ref=e83] [cursor=pointer]
+      - generic "Strict policies" [ref=e261]:
+        - alert [ref=e262]:
+          - strong [ref=e263]: Strict policy Studio kullanılamıyor.
+          - paragraph [ref=e264]: Talimat politikası yerel çalışma alanına henüz bağlanmadı.
+          - paragraph [ref=e265]: "Dependency impact: henüz hesaplanmadı."
+          - button "Tekrar dene" [ref=e266] [cursor=pointer]
+        - generic [ref=e267]:
+          - strong [ref=e268]: PROGRESSIVE FORMALIZATION
+          - paragraph [ref=e269]: Progressive formalization yerel PostgreSQL kaynağına bağlı değil.
+          - button "Tekrar dene" [ref=e270]
+      - generic [ref=e256]:
+        - generic [ref=e257]: Strict policy registry · raw provenance + normalize DSL + append-only diff
+        - generic [ref=e258]: Cookie-only · OCC guarded · approve/execute/schedule/tool/network/Meta write kapalı
+  - alert [ref=e259]
