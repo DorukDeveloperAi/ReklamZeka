@@ -151,14 +151,21 @@ describe("PromotionTemplate authoring dashboard", () => {
     const command = { operation: "create_preset_draft" as const, expectedRegistryHash: value.registryHash,
       selection, alias: "Yeni alias" };
     const mutation = vi.fn().mockResolvedValue(new Response(JSON.stringify({ contractVersion: value.contractVersion,
-      state: { registryHash: value.registryHash, presetCurrent: [], presetHistory: [], templateCurrent: [], templateHistory: [] },
+      state: { registryHash: "b".repeat(64), presetCurrent: [], presetHistory: [], templateCurrent: [], templateHistory: [] },
       auditAppended: true, contextInvalidationAppended: false, publishedMaterial: false, authority: value.authority }),
     { status: 200 }));
-    await expect(requestPromotionTemplateLifecycleMutation(mutation as typeof fetch, command)).resolves.toEqual(value);
+    await expect(requestPromotionTemplateLifecycleMutation(mutation as typeof fetch, command)).resolves.toEqual({
+      ...value, registryHash: "b".repeat(64),
+    });
     expect(mutation).toHaveBeenCalledWith("/api/promotion-template-authoring", expect.objectContaining({
       body: JSON.stringify({ command }), headers: { "Content-Type": "application/json",
         "X-ReklamZeka-Intent": "promotion-template-lifecycle-draft" } }));
     const unsafe = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...value, targeting: {} }), { status: 200 }));
     await expect(requestPromotionTemplateLifecycle(unsafe as typeof fetch)).rejects.toThrow("Lifecycle");
+    const malformedSummary = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...value,
+      presetCurrent: [{ presetRef: "audience_bad", lifecycleVersion: 0, recordHash: "bad", status: "published",
+        presetRevision: 1, presetMaterialHash: "a".repeat(64), publishedPresetHash: null, actorRole: "viewer",
+        reasonCode: "x", recordedAt: "not-a-date" }] }), { status: 200 }));
+    await expect(requestPromotionTemplateLifecycle(malformedSummary as typeof fetch)).rejects.toThrow("Lifecycle");
   });
 });

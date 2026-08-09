@@ -181,6 +181,35 @@ function parsePromotionTemplateLifecycle(value: unknown): PromotionTemplateLifec
     if (!Array.isArray(items) || items.length > 10_000 || items.some((item) => !exactObject(item, keys))) {
       throw new Error("Lifecycle sözleşmesi doğrulanamadı.");
     }
+    const presetItems = key.startsWith("preset");
+    for (const item of items as Record<string, unknown>[]) {
+      const publishedHashes = presetItems ? [item.publishedPresetHash]
+        : [item.publishedTemplateHash, item.publishedBindingHash];
+      if (typeof item[presetItems ? "presetRef" : "templateRef"] !== "string"
+        || !SAFE_REF.test(item[presetItems ? "presetRef" : "templateRef"] as string)
+        || !Number.isSafeInteger(item.lifecycleVersion) || (item.lifecycleVersion as number) < 1
+        || (item.lifecycleVersion as number) > 1_000_000 || typeof item.recordHash !== "string" || !HASH.test(item.recordHash)
+        || !["draft", "published", "archived"].includes(String(item.status))
+        || !Number.isSafeInteger(item.presetRevision) || (item.presetRevision as number) < 1
+        || (item.presetRevision as number) > 1_000_000
+        || typeof item[presetItems ? "presetMaterialHash" : "presetHash"] !== "string"
+        || !HASH.test(item[presetItems ? "presetMaterialHash" : "presetHash"] as string)
+        || !["owner", "admin", "analyst"].includes(String(item.actorRole))
+        || typeof item.reasonCode !== "string" || !/^[a-z][a-z0-9_]{1,63}$/.test(item.reasonCode)
+        || typeof item.recordedAt !== "string" || !Number.isFinite(Date.parse(item.recordedAt))
+        || new Date(item.recordedAt).toISOString() !== item.recordedAt
+        || publishedHashes.some((hash) => hash !== null && (typeof hash !== "string" || !HASH.test(hash)))) {
+        throw new Error("Lifecycle sözleşmesi doğrulanamadı.");
+      }
+      if (!presetItems && (typeof item.presetRef !== "string" || !SAFE_REF.test(item.presetRef)
+        || !Number.isSafeInteger(item.templateRevision) || (item.templateRevision as number) < 1
+        || (item.templateRevision as number) > 1_000_000 || typeof item.templateMaterialHash !== "string"
+        || !HASH.test(item.templateMaterialHash))) throw new Error("Lifecycle sözleşmesi doğrulanamadı.");
+      if (item.status === "draft" && publishedHashes.some((hash) => hash !== null)
+        || item.status === "published" && publishedHashes.some((hash) => hash === null)) {
+        throw new Error("Lifecycle sözleşmesi doğrulanamadı.");
+      }
+    }
   }
   const serialized = JSON.stringify(value);
   if (/"(?:targeting|source|aliases|accountRefs|actorRef|internalCategoryRefs|budget|timeframe|publishedAt)"/.test(serialized)) {
@@ -200,9 +229,9 @@ export async function requestPromotionTemplateLifecycle(fetcher: typeof fetch): 
 
 export async function requestPromotionTemplateLifecycleMutation(fetcher: typeof fetch,
   command: PromotionTemplateLifecycleCommand): Promise<PromotionTemplateLifecycleEnvelope> {
-  const publication = command.operation.startsWith("publish_") || command.operation.startsWith("archive_");
+  const lifecycleMutation = command.operation.startsWith("publish_") || command.operation.startsWith("archive_");
   const response = await fetcher("/api/promotion-template-authoring", { method: "POST", credentials: "same-origin",
-    cache: "no-store", headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": publication
+    cache: "no-store", headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": lifecycleMutation
       ? "promotion-template-lifecycle-publish" : "promotion-template-lifecycle-draft" },
     body: JSON.stringify({ command }) });
   const payload = await response.json() as unknown;
@@ -210,11 +239,32 @@ export async function requestPromotionTemplateLifecycleMutation(fetcher: typeof 
     ? (payload as ErrorEnvelope).error?.message ?? "Lifecycle değişikliği reddedildi." : "Lifecycle değişikliği reddedildi.");
   if (!exactObject(payload, ["contractVersion", "state", "auditAppended", "contextInvalidationAppended",
     "publishedMaterial", "authority"]) || payload.auditAppended !== true || !exactObject(payload.state,
-      ["registryHash", "presetCurrent", "presetHistory", "templateCurrent", "templateHistory"])) {
+      ["registryHash", "presetCurrent", "presetHistory", "templateCurrent", "templateHistory"])
+    || typeof payload.contextInvalidationAppended !== "boolean" || typeof payload.publishedMaterial !== "boolean") {
     throw new Error("Lifecycle mutation kanıtı doğrulanamadı.");
   }
-  return parsePromotionTemplateLifecycle({ contractVersion: payload.contractVersion, ...payload.state,
+  const parsed = parsePromotionTemplateLifecycle({ contractVersion: payload.contractVersion, ...payload.state,
     authority: payload.authority });
+  const publication = command.operation.startsWith("publish_");
+  const archive = command.operation.startsWith("archive_");
+  if (payload.publishedMaterial !== publication
+    || payload.contextInvalidationAppended !== (publication || archive)
+    || parsed.registryHash === command.expectedRegistryHash) throw new Error("Lifecycle mutation kanıtı doğrulanamadı.");
+  if ("presetRef" in command) {
+    const head = parsed.presetCurrent.find((item) => item.presetRef === command.presetRef);
+    if (!head || publication && head.status !== "published" || archive && head.status !== "archived"
+      || (publication || archive) && (!("reasonCode" in command) || head.reasonCode !== command.reasonCode)) {
+      throw new Error("Lifecycle mutation kanıtı doğrulanamadı.");
+    }
+  }
+  if ("templateRef" in command) {
+    const head = parsed.templateCurrent.find((item) => item.templateRef === command.templateRef);
+    if (!head || publication && head.status !== "published" || archive && head.status !== "archived"
+      || (publication || archive) && (!("reasonCode" in command) || head.reasonCode !== command.reasonCode)) {
+      throw new Error("Lifecycle mutation kanıtı doğrulanamadı.");
+    }
+  }
+  return parsed;
 }
 
 export async function requestPromotionTemplateAuthoringCatalog(fetcher: typeof fetch): Promise<PromotionTemplateAuthoringInspection> {

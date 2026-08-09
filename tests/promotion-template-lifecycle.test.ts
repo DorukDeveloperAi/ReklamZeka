@@ -6,6 +6,7 @@ import { createAudiencePresetRevision, createPromotionTemplateBinding, createPro
   "@/domain/meta/promotion/promotion-template";
 import { publishAudiencePresetDraftMaterial } from "@/domain/meta/promotion/promotion-template-draft";
 import { createPromotionTemplateLifecycleHttpHandlers } from "@/server/promotion-template-authoring-http";
+import { AuthorizationError } from "@/security/authorization";
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
@@ -82,7 +83,7 @@ describe("PromotionTemplate and AudiencePreset authoring lifecycle", () => {
     await expect(service.mutate(principal, { operation: "publish_preset", expectedRegistryHash: state.registryHash,
       presetRef: "audience_hair", expectedLifecycleVersion: 1, expectedRecordHash: "d".repeat(64),
       expectedPresetRevision: 2, expectedPresetHash: "e".repeat(64), reasonCode: "owner_publish" }))
-      .rejects.toMatchObject({ code: "invalid_input" });
+      .rejects.toBeInstanceOf(AuthorizationError);
     expect(repository.mutate).not.toHaveBeenCalled();
   });
 

@@ -96,7 +96,7 @@ try {
         and table_name in ('audience_preset_authoring_revisions', 'promotion_template_authoring_revisions')
         and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) as grant_count,
       (select count(*)::int from information_schema.routine_privileges where routine_schema = 'public'
-        and routine_name = 'promotion_authoring_revision_guard'
+        and routine_name in ('promotion_authoring_revision_guard', 'promotion_authoring_revision_immutable')
         and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) as routine_grant_count
     from pg_class relation join pg_namespace namespace on namespace.oid = relation.relnamespace
     where namespace.nspname = 'public' and relation.relkind = 'r'

@@ -1,7 +1,7 @@
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 
-import { DrizzlePromotionTemplateLifecycleRepository } from
+import { DrizzlePromotionTemplateLifecycleRepository, promotionRegistryInvalidationVersions } from
   "@/connectors/meta/promotion/promotion-template-lifecycle-drizzle-repository";
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
@@ -13,6 +13,12 @@ function command() {
 }
 
 describe("PromotionTemplate lifecycle Drizzle repository", () => {
+  it("invalidates H0 contexts as well as the current H1 authoring hash after a draft then publish", () => {
+    const h0 = "0".repeat(64); const h1 = "1".repeat(64);
+    expect(promotionRegistryInvalidationVersions(h1, [h0, h1, h0])).toEqual([h0, h1]);
+    expect(() => promotionRegistryInvalidationVersions(h1, Array(1001).fill(h0)))
+      .toThrowError(expect.objectContaining({ code: "integrity_rejected" }));
+  });
   it("locks the active workspace and rechecks exact same-transaction membership before reading lifecycle state", async () => {
     const statements: string[] = [];
     const results = [{ rows: [{ id: workspaceId }] }, { rows: [] }];
@@ -23,7 +29,7 @@ describe("PromotionTemplate lifecycle Drizzle repository", () => {
     await expect(new DrizzlePromotionTemplateLifecycleRepository(database as never).mutate({ workspaceId,
       workspaceRef: "workspace_test", actorId, actorRef: "actor_owner", role: "owner",
       occurredAt: "2026-08-10T00:00:00.000Z", command: command(), sourceCandidate: null }))
-      .rejects.toMatchObject({ code: "invalid_transition" });
+      .rejects.toMatchObject({ code: "forbidden" });
     expect(statements).toHaveLength(2);
     expect(statements[0]).toContain("lifecycle_state = 'active'");
     expect(statements[0]).toContain("for update");

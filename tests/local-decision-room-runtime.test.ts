@@ -5,6 +5,7 @@ import {
   createLocalDecisionRoomRouteHandlers,
   localDecisionRoomConfig,
   resolveTrustedLocalPolicyBundlePrincipal,
+  resolveTrustedLocalPromotionLifecyclePrincipal,
   resolveTrustedLocalSessionIdentity,
   type LocalDecisionRoomEnvironment,
 } from "@/server/local-decision-room-runtime";
@@ -102,6 +103,35 @@ describe("local Decision Room principal boundary", () => {
     });
     await expect(resolveTrustedLocalPolicyBundlePrincipal({ request: bearer, database: readDatabase() as never,
       config, requiredScope: "policy_bundle:draft" })).rejects.toBeInstanceOf(LocalDecisionRoomBoundaryError);
+  });
+
+  it("binds lifecycle read, draft and publish to exact dedicated cookie scope and intent", async () => {
+    const config = localDecisionRoomConfig(environment())!;
+    const token = sessionToken();
+    const lifecycle = (intent: string, mode: "cookie" | "bearer" = "cookie") => request(
+      "/api/promotion-template-authoring",
+      { "X-ReklamZeka-Intent": intent, Origin: "http://localhost:3000",
+        ...(mode === "cookie" ? { Cookie: `${LOCAL_SESSION_COOKIE}=${encodeURIComponent(token)}` }
+          : { Authorization: `Bearer ${token}` }) },
+    );
+    for (const [scope, intent] of [
+      ["promotion_lifecycle:read", "promotion-template-lifecycle-read"],
+      ["promotion_lifecycle:draft", "promotion-template-lifecycle-draft"],
+      ["promotion_lifecycle:publish", "promotion-template-lifecycle-publish"],
+    ] as const) {
+      await expect(resolveTrustedLocalPromotionLifecyclePrincipal({ request: lifecycle(intent),
+        database: readDatabase() as never, config, requiredScope: scope })).resolves.toMatchObject({
+        membership: { workspaceId, userId, role: "viewer" },
+      });
+    }
+    await expect(resolveTrustedLocalPromotionLifecyclePrincipal({
+      request: lifecycle("promotion-template-lifecycle-publish"), database: readDatabase() as never,
+      config, requiredScope: "promotion_lifecycle:draft",
+    })).rejects.toBeInstanceOf(LocalDecisionRoomBoundaryError);
+    await expect(resolveTrustedLocalPromotionLifecyclePrincipal({
+      request: lifecycle("promotion-template-lifecycle-publish", "bearer"), database: readDatabase() as never,
+      config, requiredScope: "promotion_lifecycle:publish",
+    })).rejects.toBeInstanceOf(LocalDecisionRoomBoundaryError);
   });
 
   it("is disabled unless all server-only bindings are explicitly enabled", () => {

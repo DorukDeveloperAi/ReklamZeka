@@ -11,6 +11,7 @@ import { inspectMetaPersistenceWrite } from "@/domain/meta/data-lifecycle";
 
 export const EFFECTIVE_CAMPAIGN_CONTEXT_VERSION = "effective-campaign-context/1.0.0" as const;
 export const EFFECTIVE_CONTEXT_INSTRUCTION_POLICY_COMPONENT_REF = "instruction-policy-registry" as const;
+export const EFFECTIVE_CONTEXT_PROMOTION_REGISTRY_COMPONENT_REF = "promotion_registry_workspace" as const;
 
 type Observed<T> =
   | Readonly<{ state: "known"; value: T }>
@@ -73,6 +74,8 @@ export type EffectiveCampaignContextInput = Readonly<{
     timeframeResolver: string;
     /** Optional only for replaying contexts frozen before the A09 policy registry existed. */
     instructionPolicyRegistry?: string;
+    /** Optional only for replaying contexts frozen before PromotionTemplate lifecycle binding existed. */
+    promotionRegistry?: string;
   }>;
 }>;
 
@@ -172,7 +175,7 @@ export function buildEffectiveCampaignContext(input: EffectiveCampaignContextInp
   exactKeys(input.data, ["trustStatus", "snapshotRefs", "featureRefs", "windowRefs", "blockers"]);
   exactKeys(input.history, ["changeRefs", "decisionRefs", "experimentRefs", "practiceRefs", "outcomeRefs"]);
   exactKeys(input.versions, ["metaCatalog", "categoryResolver", "guidanceRegistry", "metricCatalog", "formulaCatalog",
-    "timeframeResolver", "instructionPolicyRegistry"]);
+    "timeframeResolver", "instructionPolicyRegistry", "promotionRegistry"]);
 
   const policyReport = inspectMetaPersistenceWrite(input);
   if (!policyReport.compliant) throw new EffectiveCampaignContextError("forbidden_material");
@@ -227,6 +230,9 @@ export function buildEffectiveCampaignContext(input: EffectiveCampaignContextInp
   if (snapshotRefs.length === 0) throw new EffectiveCampaignContextError("invalid_input");
   if (input.versions.instructionPolicyRegistry !== undefined
     && !/^[a-f0-9]{64}$/.test(input.versions.instructionPolicyRegistry)) {
+    throw new EffectiveCampaignContextError("invalid_input");
+  }
+  if (input.versions.promotionRegistry !== undefined && !/^[a-f0-9]{64}$/.test(input.versions.promotionRegistry)) {
     throw new EffectiveCampaignContextError("invalid_input");
   }
   const core = stableValue({

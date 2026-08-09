@@ -13,6 +13,7 @@ import {
   promotionTemplateAuthoringNotConfiguredResponse,
 } from "@/server/promotion-template-authoring-http";
 import {
+  resolveTrustedLocalPromotionLifecyclePrincipal,
   resolveTrustedLocalReadPrincipal,
   type LocalDecisionRoomConfig,
 } from "@/server/local-decision-room-runtime";
@@ -26,10 +27,15 @@ export function createLocalPromotionTemplateAuthoringHandlers(input: Readonly<{
 }>) {
   async function bind(request: Request) {
     if (request.headers.has("authorization") || !request.headers.get("cookie")) throw new Error("local_session_required");
-    const lifecycleMutation = request.method === "POST"
-      && request.headers.get("x-reklamzeka-intent")?.startsWith("promotion-template-lifecycle-");
-    const bound = await resolveTrustedLocalReadPrincipal({ request, database: input.database, config: input.config,
-      requiredScope: lifecycleMutation ? "promotion_proposal:draft" : "promotion_catalog:read" });
+    const intent = request.headers.get("x-reklamzeka-intent");
+    const lifecycleScope = intent === "promotion-template-lifecycle-read" ? "promotion_lifecycle:read" as const
+      : intent === "promotion-template-lifecycle-draft" ? "promotion_lifecycle:draft" as const
+        : intent === "promotion-template-lifecycle-publish" ? "promotion_lifecycle:publish" as const : null;
+    const bound = lifecycleScope === null
+      ? await resolveTrustedLocalReadPrincipal({ request, database: input.database, config: input.config,
+        requiredScope: "promotion_catalog:read" })
+      : await resolveTrustedLocalPromotionLifecyclePrincipal({ request, database: input.database,
+        config: input.config, requiredScope: lifecycleScope });
     const catalog = new DrizzlePublishedPromotionTemplateCatalog(
       input.database,
       input.config.workspaceId,

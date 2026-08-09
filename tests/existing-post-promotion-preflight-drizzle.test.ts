@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { DrizzleExistingPostPromotionPreflightRepository } from "@/connectors/meta/promotion/existing-post-promotion-preflight-drizzle-repository";
 import { promotionRegistryPublicRef } from "@/connectors/meta/promotion/promotion-registry-drizzle-repository";
 import { AUDIENCE_PRESET_VERSION, PROMOTION_TEMPLATE_BINDING_VERSION, PROMOTION_TEMPLATE_VERSION,
@@ -67,6 +68,11 @@ describe("Drizzle existing-post public preflight resolver", () => {
       template: { compatibility: { destination: "unknown", optimization: "unknown", placement: "unknown",
         specialCategory: "unknown", tracking: "unknown" } }, post: { promotionCapability: "supported" } });
     expect(JSON.stringify(value)).not.toContain("targeting");
+    const rendered = new PgDialect().sqlToQuery((execute.mock.calls as unknown[][])[0]![0] as never).sql;
+    expect(rendered).toMatch(/effective_event\.status = 'published'/);
+    expect(rendered).toMatch(/effective_event\.published_template_hash = template\.template_hash/);
+    expect(rendered).toMatch(/effective_event\.published_binding_hash = binding\.binding_hash/);
+    expect(rendered).toMatch(/newer_event\.status in \('published', 'archived'\)/);
   });
 
   it("returns null for a ref mismatch and fails closed on candidate overflow", async () => {

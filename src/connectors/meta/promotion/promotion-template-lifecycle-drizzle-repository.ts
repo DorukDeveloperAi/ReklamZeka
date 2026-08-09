@@ -6,6 +6,7 @@ import { nextAudiencePresetDraft, nextPromotionTemplateDraft,
   type PromotionTemplateLifecycleCommand, type PromotionTemplateLifecycleRepository,
   type PromotionTemplateLifecycleState } from "@/application/promotion-template-lifecycle-service";
 import { DrizzlePromotionRegistryRepository } from "@/connectors/meta/promotion/promotion-registry-drizzle-repository";
+import { EFFECTIVE_CONTEXT_PROMOTION_REGISTRY_COMPONENT_REF } from "@/analyses/effective-campaign-context";
 import * as schema from "@/db/schema";
 import { createAudiencePresetRevision, type AudiencePresetRevision } from "@/domain/meta/promotion/promotion-template";
 import { publishAudiencePresetDraftMaterial, publishPromotionTemplateBindingDraftMaterial,
@@ -28,10 +29,19 @@ type TemplateRow = Readonly<{ workspace_ref: string; template_ref: string; lifec
   reason_code: string; record_hash: string; recorded_at: string | Date }>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const HASH = /^[a-f0-9]{64}$/;
 function fail(code: PromotionTemplateLifecycleError["code"]): never { throw new PromotionTemplateLifecycleError(code); }
 function rows<T>(value: unknown): readonly T[] {
   if (!value || typeof value !== "object" || !("rows" in value) || !Array.isArray(value.rows)) fail("integrity_rejected");
   return value.rows as readonly T[];
+}
+export function promotionRegistryInvalidationVersions(
+  currentAuthoringRegistryHash: string,
+  persistedContextVersions: readonly string[],
+): readonly string[] {
+  if (!HASH.test(currentAuthoringRegistryHash) || persistedContextVersions.length > 1000
+    || persistedContextVersions.some((value) => !HASH.test(value))) fail("integrity_rejected");
+  return Object.freeze([...new Set([currentAuthoringRegistryHash, ...persistedContextVersions])].sort());
 }
 function at(value: string | Date) { const date = new Date(value); if (!Number.isFinite(date.valueOf())) fail("integrity_rejected");
   return date.toISOString(); }
@@ -165,7 +175,7 @@ export class DrizzlePromotionTemplateLifecycleRepository implements PromotionTem
       const membership = rows<{ role: string }>(await tx.execute(sql`select role from memberships
         where workspace_id = ${input.workspaceId}::uuid and user_id = ${input.actorId}::uuid limit 2 for update`));
       if (membership.length !== 1 || membership[0]!.role !== input.role || input.role === "analyst"
-        && (input.command.operation.startsWith("publish_") || input.command.operation.startsWith("archive_"))) fail("invalid_transition");
+        && (input.command.operation.startsWith("publish_") || input.command.operation.startsWith("archive_"))) fail("forbidden");
       const before = await load(tx, input.workspaceId); if (before.registryHash !== input.command.expectedRegistryHash) fail("conflict");
       const command = input.command; let preset: AudiencePresetLifecycleRevision | null = null;
       let template: PromotionTemplateLifecycleRevision | null = null; let publishedMaterial = false;
@@ -231,17 +241,35 @@ export class DrizzlePromotionTemplateLifecycleRepository implements PromotionTem
       } else fail("invalid_input");
       if (preset) await insertPreset(tx, input.workspaceId, preset); if (template) await insertTemplate(tx, input.workspaceId, template);
       const lifecycle = preset ?? template!; let contextInvalidationAppended = false;
+      let contextInvalidationPlannedCount = 0; let contextInvalidationAppendedCount = 0;
+      let contextInvalidationReason: "source_changed" | "source_removed" | null = null;
       if (command.operation.startsWith("publish_") || command.operation.startsWith("archive_")) {
-        const invalidation = { workspaceId: input.workspaceId, componentType: "promotion_registry",
-          componentRef: "promotion_registry_workspace", componentVersion: before.registryHash, scopeKind: "workspace_component",
-          entityType: null, entityRef: null, reasonCode: command.operation.startsWith("archive_") ? "source_removed" : "source_changed",
-          observedAt: input.occurredAt } as const;
-        contextInvalidationAppended = rows(await tx.execute(sql`insert into effective_campaign_context_invalidations
-          (workspace_id, event_hash, component_type, component_ref, component_version, scope_kind, entity_type, entity_ref,
-            reason_code, observed_at) values (${input.workspaceId}::uuid, ${promotionTemplateLifecycleHash(invalidation)},
-            'promotion_registry', 'promotion_registry_workspace', ${before.registryHash}, 'workspace_component', null, null,
-            ${invalidation.reasonCode}, ${input.occurredAt}::timestamptz)
-          on conflict (workspace_id, event_hash) do nothing returning id`)).length === 1;
+        const persisted = rows<{ component_version: string }>(await tx.execute(sql`
+          select distinct component.component_version
+          from effective_campaign_context_components component
+          where component.workspace_id = ${input.workspaceId}::uuid
+            and component.component_type = 'promotion_registry'
+            and component.component_ref = ${EFFECTIVE_CONTEXT_PROMOTION_REGISTRY_COMPONENT_REF}
+          order by component.component_version
+          limit 1001
+        `));
+        const versions = promotionRegistryInvalidationVersions(before.registryHash,
+          persisted.map((item) => item.component_version));
+        contextInvalidationReason = command.operation.startsWith("archive_") ? "source_removed" : "source_changed";
+        contextInvalidationPlannedCount = versions.length;
+        for (const componentVersion of versions) {
+          const invalidation = { workspaceId: input.workspaceId, componentType: "promotion_registry",
+            componentRef: EFFECTIVE_CONTEXT_PROMOTION_REGISTRY_COMPONENT_REF, componentVersion,
+            scopeKind: "workspace_component", entityType: null, entityRef: null,
+            reasonCode: contextInvalidationReason, observedAt: input.occurredAt } as const;
+          contextInvalidationAppendedCount += rows(await tx.execute(sql`insert into effective_campaign_context_invalidations
+            (workspace_id, event_hash, component_type, component_ref, component_version, scope_kind, entity_type, entity_ref,
+              reason_code, observed_at) values (${input.workspaceId}::uuid, ${promotionTemplateLifecycleHash(invalidation)},
+              'promotion_registry', ${EFFECTIVE_CONTEXT_PROMOTION_REGISTRY_COMPONENT_REF}, ${componentVersion},
+              'workspace_component', null, null, ${invalidation.reasonCode}, ${input.occurredAt}::timestamptz)
+            on conflict (workspace_id, event_hash) do nothing returning id`)).length;
+        }
+        contextInvalidationAppended = contextInvalidationAppendedCount > 0;
       }
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`audit:${input.workspaceId}`}, 0))`);
       const previousHash = String(rows<{ event_hash: string }>(await tx.execute(sql`select event_hash from audit_events
@@ -251,7 +279,10 @@ export class DrizzlePromotionTemplateLifecycleRepository implements PromotionTem
         action: `promotion_template.${command.operation}`, resourceType: preset ? "audience_preset_version" : "promotion_template",
         resourceId: preset?.presetRef ?? template!.templateRef, occurredAt: input.occurredAt, previousHash,
         metadata: { role: input.role, lifecycleVersion: lifecycle.lifecycleVersion,
-          expectedRegistryHash: command.expectedRegistryHash, contextInvalidationAppended, publishedMaterial } } as const;
+          expectedRegistryHash: command.expectedRegistryHash, previousAuthoringRegistryHash: before.registryHash,
+          reasonCode: lifecycle.reasonCode, newRecordHash: lifecycle.recordHash,
+          contextInvalidationReason, contextInvalidationPlannedCount, contextInvalidationAppendedCount,
+          contextInvalidationAppended, publishedMaterial } } as const;
       await tx.execute(sql`insert into audit_events (id, workspace_id, actor_id, action, resource_type, resource_id,
         metadata, previous_hash, event_hash, occurred_at) values (${event.id}::uuid, ${event.workspaceId}::uuid,
         ${event.actorId}::uuid, ${event.action}, ${event.resourceType}, ${event.resourceId}, ${JSON.stringify(event.metadata)}::jsonb,

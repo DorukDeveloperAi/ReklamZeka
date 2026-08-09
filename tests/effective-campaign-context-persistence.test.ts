@@ -102,6 +102,7 @@ function context() {
       metaCatalog: "meta-v1", categoryResolver: "category-v1", guidanceRegistry: "guidance-v1",
       metricCatalog: "metric-v1", formulaCatalog: "formula-v1", timeframeResolver: "timeframe-v1",
       instructionPolicyRegistry: "9".repeat(64),
+      promotionRegistry: "8".repeat(64),
     },
   };
   return buildEffectiveCampaignContext(input);
@@ -126,6 +127,8 @@ describe("effective campaign context persistence contract", () => {
     });
     expect(components).toContainEqual({ componentType: "instruction_policy",
       componentRef: "instruction-policy-registry", componentVersion: "9".repeat(64) });
+    expect(components).toContainEqual({ componentType: "promotion_registry",
+      componentRef: "promotion_registry_workspace", componentVersion: "8".repeat(64) });
     expect(sourceComponentsOf(context())).toEqual(components);
   });
 
@@ -141,10 +144,11 @@ describe("effective campaign context persistence contract", () => {
     const current = context();
     const { schemaVersion: _schema, contextHash: _contextHash, capabilities: _capabilities,
       ...currentInput } = current;
-    const { instructionPolicyRegistry: _policy, ...legacyVersions } = current.versions;
+    const { instructionPolicyRegistry: _policy, promotionRegistry: _promotion, ...legacyVersions } = current.versions;
     const legacy = buildEffectiveCampaignContext({ ...currentInput, versions: legacyVersions });
     expect(legacy.versions).not.toHaveProperty("instructionPolicyRegistry");
     expect(sourceComponentsOf(legacy).some((component) => component.componentType === "instruction_policy")).toBe(false);
+    expect(sourceComponentsOf(legacy).some((component) => component.componentType === "promotion_registry")).toBe(false);
 
     const executeResults = [{ rows: [{ id: workspaceId }] }, { rows: [{
       metaConnectionId: "00000000-0000-0000-0000-000000000201",

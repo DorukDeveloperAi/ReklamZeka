@@ -4,6 +4,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   buildEffectiveCampaignContext,
   EFFECTIVE_CONTEXT_INSTRUCTION_POLICY_COMPONENT_REF,
+  EFFECTIVE_CONTEXT_PROMOTION_REGISTRY_COMPONENT_REF,
   EFFECTIVE_CAMPAIGN_CONTEXT_VERSION,
   type EffectiveCampaignContext,
   type EffectiveCampaignContextInput,
@@ -25,6 +26,7 @@ export const CONTEXT_SOURCE_COMPONENT_TYPES = Object.freeze([
   "formula_catalog",
   "timeframe_resolver",
   "instruction_policy",
+  "promotion_registry",
 ] as const);
 
 export type ContextSourceComponentType = typeof CONTEXT_SOURCE_COMPONENT_TYPES[number];
@@ -165,6 +167,11 @@ export function sourceComponentsOf(context: EffectiveCampaignContext): readonly 
       componentType: "instruction_policy" as const,
       componentRef: EFFECTIVE_CONTEXT_INSTRUCTION_POLICY_COMPONENT_REF,
       componentVersion: context.versions.instructionPolicyRegistry,
+    }]),
+    ...(context.versions.promotionRegistry === undefined ? [] : [{
+      componentType: "promotion_registry" as const,
+      componentRef: EFFECTIVE_CONTEXT_PROMOTION_REGISTRY_COMPONENT_REF,
+      componentVersion: context.versions.promotionRegistry,
     }]),
   ];
   const normalized = components.map((component) => Object.freeze({
@@ -387,6 +394,9 @@ export class DrizzleEffectiveCampaignContextRepository {
       // Missing only on immutable pre-A09 payloads. New persistence must bind the
       // exact policy registry hash so future lifecycle invalidations can match.
       if (context.versions.instructionPolicyRegistry === undefined) {
+        throw new EffectiveCampaignContextRepositoryError("invalid_input");
+      }
+      if (context.versions.promotionRegistry === undefined) {
         throw new EffectiveCampaignContextRepositoryError("invalid_input");
       }
       const sameIdentity = await transaction.select().from(schema.effectiveCampaignContexts).where(and(

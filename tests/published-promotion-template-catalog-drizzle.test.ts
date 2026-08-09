@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
 
 import { DrizzlePublishedPromotionTemplateCatalog } from
   "@/connectors/meta/promotion/published-promotion-template-catalog-drizzle";
@@ -67,6 +68,9 @@ describe("published PromotionTemplate Drizzle catalog", () => {
     expect(result[0]).toMatchObject({ template: { templateRef: "template_hair" }, preset: { presetRef: "audience_hair" },
       binding: { bindingRef: "binding_hair" } });
     expect(execute).toHaveBeenCalledTimes(1);
+    const rendered = new PgDialect().sqlToQuery(execute.mock.calls[0]![0] as never).sql;
+    expect(rendered).toMatch(/effective_event\.status = 'published'/);
+    expect(rendered).toMatch(/newer_event\.status in \('published', 'archived'\)/);
   });
 
   it("fails closed on forged public relations, payload hashes, duplicate edges and truncation", async () => {

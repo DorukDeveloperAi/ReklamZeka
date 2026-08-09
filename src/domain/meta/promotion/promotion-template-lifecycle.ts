@@ -35,7 +35,7 @@ export type PromotionTemplateLifecycleRevision = Readonly<LifecycleBase & {
 }>;
 
 export class PromotionTemplateLifecycleError extends Error {
-  constructor(readonly code: "invalid_input" | "conflict" | "not_found" | "invalid_transition" | "integrity_rejected") {
+  constructor(readonly code: "invalid_input" | "forbidden" | "conflict" | "not_found" | "invalid_transition" | "integrity_rejected") {
     super(`PromotionTemplate lifecycle reddedildi: ${code}`); this.name = "PromotionTemplateLifecycleError";
   }
 }

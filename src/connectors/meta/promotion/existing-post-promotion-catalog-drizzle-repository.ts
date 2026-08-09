@@ -8,6 +8,7 @@ import {
   type PromotionCatalogOption,
 } from "@/application/existing-post-promotion-catalog";
 import { promotionRegistryPublicRef } from "@/connectors/meta/promotion/promotion-registry-drizzle-repository";
+import { currentPromotionTemplateAuthoringHeadSql } from "@/connectors/meta/promotion/promotion-template-authoring-active-sql";
 import * as schema from "@/db/schema";
 import {
   assertPromotionRegistryLink,
@@ -237,6 +238,7 @@ export class DrizzleExistingPostPromotionCatalogRepository implements ExistingPo
           and account.disappeared_at is null and actor.disappeared_at is null and category.archived_at is null
           and binding.effective_from <= current_timestamp
           and (binding.expires_at is null or binding.expires_at > current_timestamp)
+          and ${currentPromotionTemplateAuthoringHeadSql}
         order by template.template_ref, template.revision desc, binding.binding_ref, edge.category_ref
         limit 10001
       `));

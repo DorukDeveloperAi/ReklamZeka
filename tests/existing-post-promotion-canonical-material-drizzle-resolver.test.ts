@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { DrizzleExistingPostPromotionCanonicalMaterialResolver } from "@/connectors/meta/promotion/existing-post-promotion-canonical-material-drizzle-resolver";
 import { promotionRegistryPublicRef } from "@/connectors/meta/promotion/promotion-registry-drizzle-repository";
 import { EXISTING_POST_SOURCE_BINDING_VERSION } from "@/domain/actions/autonomy-valve";
@@ -91,6 +92,11 @@ describe("Drizzle existing-post canonical material resolver", () => {
         sourceHash: hash("e"), postIdentityHash: hash("f"), objectStorySpecHash: hash("0") } } });
     expect(JSON.stringify(value)).not.toContain("must_not_escape");
     expect(api.execute).toHaveBeenCalledTimes(2);
+    const rendered = new PgDialect().sqlToQuery(api.execute.mock.calls[1]![0] as never).sql;
+    expect(rendered).toMatch(/effective_event\.status = 'published'/);
+    expect(rendered).toMatch(/effective_event\.published_template_hash = template\.template_hash/);
+    expect(rendered).toMatch(/effective_event\.published_binding_hash = binding\.binding_hash/);
+    expect(rendered).toMatch(/newer_event\.status in \('published', 'archived'\)/);
   });
 
   it("uses a persisted existing-ad binding hash without synthesizing a binding ref", async () => {

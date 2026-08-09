@@ -11,7 +11,7 @@ import { createAudiencePresetDraftMaterial, createPromotionTemplateBindingDraftM
 import { PromotionTemplateLifecycleError, createAudiencePresetLifecycleRevision,
   createPromotionTemplateLifecycleRevision, type AudiencePresetLifecycleRevision,
   type PromotionTemplateLifecycleRevision } from "@/domain/meta/promotion/promotion-template-lifecycle";
-import { authorizeWorkspace, type WorkspaceMembership } from "@/security/authorization";
+import { AuthorizationError, authorizeWorkspace, type WorkspaceMembership } from "@/security/authorization";
 
 export const PROMOTION_TEMPLATE_LIFECYCLE_SERVICE_VERSION = "promotion-template-lifecycle-service/1.0.0" as const;
 
@@ -203,7 +203,7 @@ export class PromotionTemplateLifecycleService {
     const command = normalize(commandValue);
     const membership = authorizeWorkspace(principal.actor, principal.workspaceId, "promotion:draft", this.memberships);
     const publication = command.operation.startsWith("publish_") || command.operation.startsWith("archive_");
-    if (membership.role === "viewer" || publication && membership.role === "analyst") invalid();
+    if (membership.role === "viewer" || publication && membership.role === "analyst") throw new AuthorizationError();
     const role = membership.role as "owner" | "admin" | "analyst";
     const occurredAt = new Date().toISOString();
     let sourceCandidate: PromotionTemplateSelectorCandidate | null = null;

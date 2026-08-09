@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
 
 import { DrizzleExistingPostPromotionCatalogRepository } from "@/connectors/meta/promotion/existing-post-promotion-catalog-drizzle-repository";
 import { promotionRegistryPublicRef } from "@/connectors/meta/promotion/promotion-registry-drizzle-repository";
@@ -105,6 +106,12 @@ describe("Drizzle existing-post promotion catalog", () => {
     expect(serialized).not.toContain("source_message");
     expect(serialized).not.toMatch(/[a-f0-9]{64}/);
     expect(db.execute).toHaveBeenCalledTimes(3);
+    const registrySql = new PgDialect().sqlToQuery(db.execute.mock.calls[0]![0] as never).sql;
+    expect(registrySql).toMatch(/managed_event\.status in \('published', 'archived'\)/);
+    expect(registrySql).toMatch(/effective_event\.status = 'published'/);
+    expect(registrySql).toMatch(/effective_event\.published_template_hash = template\.template_hash/);
+    expect(registrySql).toMatch(/effective_event\.published_binding_hash = binding\.binding_hash/);
+    expect(registrySql).toMatch(/newer_event\.status in \('published', 'archived'\)/);
   });
 
   it("omits actors bound ambiguously to multiple accounts instead of inventing a relation", async () => {

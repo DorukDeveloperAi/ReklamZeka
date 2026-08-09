@@ -3203,16 +3203,32 @@ export const audiencePresetAuthoringRevisions = pgTable("audience_preset_authori
     and ((${table.status} = 'draft' and ${table.publishedPresetHash} is null and ${table.publishedPresetPayload} is null)
       or (${table.status} = 'published' and ${table.publishedPresetHash} ~ '^[a-f0-9]{64}$'
           and ${table.publishedPresetPayload} #>> '{presetHash}' = ${table.publishedPresetHash}
-          and ${table.publishedPresetPayload} #>> '{state}' = 'published')
+          and ${table.publishedPresetPayload} #>> '{version}' = 'audience-preset/1.0.0'
+          and ${table.publishedPresetPayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+          and ${table.publishedPresetPayload} #>> '{presetRef}' = ${table.presetRef}
+          and (${table.publishedPresetPayload} #>> '{revision}')::integer = ${table.presetRevision}
+          and ${table.publishedPresetPayload} #>> '{state}' = 'published'
+          and ${table.publishedPresetPayload} ? 'publishedAt'
+          and (${table.publishedPresetPayload} - 'version' - 'state' - 'publishedAt' - 'presetHash')
+            = (${table.presetPayload} - 'version' - 'authority' - 'materialHash'))
       or (${table.status} = 'archived' and (
         (${table.publishedPresetHash} is null and ${table.publishedPresetPayload} is null)
         or (${table.publishedPresetHash} ~ '^[a-f0-9]{64}$'
           and ${table.publishedPresetPayload} #>> '{presetHash}' = ${table.publishedPresetHash}
-          and ${table.publishedPresetPayload} #>> '{state}' = 'published'))))
+          and ${table.publishedPresetPayload} #>> '{version}' = 'audience-preset/1.0.0'
+          and ${table.publishedPresetPayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+          and ${table.publishedPresetPayload} #>> '{presetRef}' = ${table.presetRef}
+          and (${table.publishedPresetPayload} #>> '{revision}')::integer = ${table.presetRevision}
+          and ${table.publishedPresetPayload} #>> '{state}' = 'published'
+          and ${table.publishedPresetPayload} ? 'publishedAt'
+          and (${table.publishedPresetPayload} - 'version' - 'state' - 'publishedAt' - 'presetHash')
+            = (${table.presetPayload} - 'version' - 'authority' - 'materialHash')))))
   ) is true`),
   check("audience_preset_authoring_no_authority", sql`
-    ${table.presetPayload}::text !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json)|authorization|approvalgranted)"[[:space:]]*:'
-    and ${table.presetPayload}::text !~* '"(canAuthorizeAction|canExecuteWrite|canWriteMeta|canGrantApproval)"[[:space:]]*:[[:space:]]*true'
+    (${table.presetPayload}::text || coalesce(${table.publishedPresetPayload}::text, ''))
+      !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json)|authorization|approvalgranted)"[[:space:]]*:'
+    and (${table.presetPayload}::text || coalesce(${table.publishedPresetPayload}::text, ''))
+      !~* '"(canAuthorizeAction|canExecuteWrite|canWriteMeta|canGrantApproval)"[[:space:]]*:[[:space:]]*true'
   `),
 ]);
 
@@ -3297,14 +3313,52 @@ export const promotionTemplateAuthoringRevisions = pgTable("promotion_template_a
       or (${table.status} = 'published' and ${table.publishedTemplateHash} ~ '^[a-f0-9]{64}$'
           and ${table.publishedBindingHash} ~ '^[a-f0-9]{64}$'
           and ${table.publishedTemplatePayload} #>> '{templateHash}' = ${table.publishedTemplateHash}
-          and ${table.publishedBindingPayload} #>> '{bindingHash}' = ${table.publishedBindingHash})
+          and ${table.publishedTemplatePayload} #>> '{version}' = 'promotion-template/1.0.0'
+          and ${table.publishedTemplatePayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+          and ${table.publishedTemplatePayload} #>> '{templateRef}' = ${table.templateRef}
+          and (${table.publishedTemplatePayload} #>> '{revision}')::integer = ${table.templateRevision}
+          and ${table.publishedTemplatePayload} #>> '{state}' = 'published'
+          and ${table.publishedTemplatePayload} #>> '{audiencePreset,presetRef}' = ${table.presetRef}
+          and (${table.publishedTemplatePayload} #>> '{audiencePreset,revision}')::integer = ${table.presetRevision}
+          and ${table.publishedTemplatePayload} #>> '{audiencePreset,presetHash}' = ${table.presetHash}
+          and ${table.publishedBindingPayload} #>> '{bindingHash}' = ${table.publishedBindingHash}
+          and ${table.publishedBindingPayload} #>> '{version}' = 'promotion-template-binding/1.0.0'
+          and ${table.publishedBindingPayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+          and ${table.publishedBindingPayload} #>> '{bindingRef}' = ${table.bindingRef}
+          and ${table.publishedBindingPayload} #>> '{template,templateRef}' = ${table.templateRef}
+          and (${table.publishedBindingPayload} #>> '{template,revision}')::integer = ${table.templateRevision}
+          and ${table.publishedBindingPayload} #>> '{template,templateHash}' = ${table.publishedTemplateHash}
+          and ${table.publishedBindingPayload} ? 'effectiveFrom'
+          and (${table.publishedTemplatePayload} - 'version' - 'state' - 'publishedAt' - 'templateHash')
+            = (${table.templatePayload} - 'version' - 'authority' - 'materialHash')
+          and (${table.publishedBindingPayload} - 'version' - 'effectiveFrom' - 'expiresAt' - 'bindingHash' - 'template')
+            = (${table.bindingPayload} - 'version' - 'authority' - 'materialHash' - 'template'))
       or (${table.status} = 'archived' and (
         (${table.publishedTemplateHash} is null and ${table.publishedTemplatePayload} is null
           and ${table.publishedBindingHash} is null and ${table.publishedBindingPayload} is null)
         or (${table.publishedTemplateHash} ~ '^[a-f0-9]{64}$'
           and ${table.publishedBindingHash} ~ '^[a-f0-9]{64}$'
           and ${table.publishedTemplatePayload} #>> '{templateHash}' = ${table.publishedTemplateHash}
-          and ${table.publishedBindingPayload} #>> '{bindingHash}' = ${table.publishedBindingHash}))))
+          and ${table.publishedTemplatePayload} #>> '{version}' = 'promotion-template/1.0.0'
+          and ${table.publishedTemplatePayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+          and ${table.publishedTemplatePayload} #>> '{templateRef}' = ${table.templateRef}
+          and (${table.publishedTemplatePayload} #>> '{revision}')::integer = ${table.templateRevision}
+          and ${table.publishedTemplatePayload} #>> '{state}' = 'published'
+          and ${table.publishedTemplatePayload} #>> '{audiencePreset,presetRef}' = ${table.presetRef}
+          and (${table.publishedTemplatePayload} #>> '{audiencePreset,revision}')::integer = ${table.presetRevision}
+          and ${table.publishedTemplatePayload} #>> '{audiencePreset,presetHash}' = ${table.presetHash}
+          and ${table.publishedBindingPayload} #>> '{bindingHash}' = ${table.publishedBindingHash}
+          and ${table.publishedBindingPayload} #>> '{version}' = 'promotion-template-binding/1.0.0'
+          and ${table.publishedBindingPayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+          and ${table.publishedBindingPayload} #>> '{bindingRef}' = ${table.bindingRef}
+          and ${table.publishedBindingPayload} #>> '{template,templateRef}' = ${table.templateRef}
+          and (${table.publishedBindingPayload} #>> '{template,revision}')::integer = ${table.templateRevision}
+          and ${table.publishedBindingPayload} #>> '{template,templateHash}' = ${table.publishedTemplateHash}
+          and ${table.publishedBindingPayload} ? 'effectiveFrom'
+          and (${table.publishedTemplatePayload} - 'version' - 'state' - 'publishedAt' - 'templateHash')
+            = (${table.templatePayload} - 'version' - 'authority' - 'materialHash')
+          and (${table.publishedBindingPayload} - 'version' - 'effectiveFrom' - 'expiresAt' - 'bindingHash' - 'template')
+            = (${table.bindingPayload} - 'version' - 'authority' - 'materialHash' - 'template')))))
   ) is true`),
   check("promotion_template_authoring_no_authority", sql`
     (${table.presetPayload}::text || ${table.templatePayload}::text || ${table.bindingPayload}::text

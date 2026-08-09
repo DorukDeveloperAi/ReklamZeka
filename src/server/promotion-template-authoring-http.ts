@@ -86,6 +86,7 @@ function failure(reason: unknown) {
         : "Yayınlanmış şablon kataloğunun bütünlüğü doğrulanamadı.", reason.code === "invalid_input" ? 400 : 422);
   }
   if (reason instanceof PromotionTemplateLifecycleError) {
+    if (reason.code === "forbidden") return error("forbidden", "Lifecycle işlemi rol sınırı nedeniyle reddedildi.", 403);
     if (reason.code === "conflict") return error("conflict", "PromotionTemplate kaydı başka bir oturumda değişti.", 409);
     if (reason.code === "not_found") return error("not_found", "PromotionTemplate lifecycle kaydı bulunamadı.", 404);
     if (reason.code === "invalid_transition") return error("invalid_transition", "Lifecycle geçişi rol veya durum nedeniyle reddedildi.", 422);

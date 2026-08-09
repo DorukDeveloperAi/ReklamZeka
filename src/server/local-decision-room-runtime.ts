@@ -174,7 +174,7 @@ export function assertTrustedLocalDecisionRoomRequest(
     request.headers.get("x-reklamzeka-intent") ?? "",
   ) && !["autonomy-rule-create-draft", "guidance-studio-create", "guidance-studio-revise",
     "guidance-set-create", "guidance-set-revise", "instruction-policy-mutate",
-    "practice-lab-propose-standardization"].includes(
+    "practice-lab-propose-standardization", "promotion-template-lifecycle-draft"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if (operation === "decide" && ![
@@ -187,7 +187,7 @@ export function assertTrustedLocalDecisionRoomRequest(
     "policy-bundle-publish-guardrail-policy", "guidance-studio-publish", "guidance-studio-archive",
     "guidance-set-review", "guidance-set-archive",
     "category-authoring-mutate", "category-profile-mutate", "starter-category-adoption-confirm",
-    "instruction-policy-mutate", "practice-lab-standardize",
+    "instruction-policy-mutate", "practice-lab-standardize", "promotion-template-lifecycle-publish",
   ].includes(request.headers.get("x-reklamzeka-intent") ?? "")) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if ((operation === "mark_read" || operation === "draft" || operation === "decide" || operation === "publish") && credential === "cookie"
     && (origin !== config.origin || fetchSite !== "same-origin")) {
@@ -276,6 +276,33 @@ export async function resolveTrustedLocalReadPrincipal(input: Readonly<{
     expected: input.config,
   });
   assertTrustedLocalDecisionRoomRequest(input.request, input.config, "read", authenticated.credential);
+  return bindPrincipal(input.database, input.config);
+}
+
+/** Cookie-only PromotionTemplate lifecycle binding with exact scope/intent partitioning. */
+export async function resolveTrustedLocalPromotionLifecyclePrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+  requiredScope: Extract<LocalSessionScope,
+    "promotion_lifecycle:read" | "promotion_lifecycle:draft" | "promotion_lifecycle:publish">;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config", "requiredScope"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null) {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  const expectedIntent = input.requiredScope === "promotion_lifecycle:read" ? "promotion-template-lifecycle-read"
+    : input.requiredScope === "promotion_lifecycle:draft" ? "promotion-template-lifecycle-draft"
+      : "promotion-template-lifecycle-publish";
+  if (input.request.headers.get("x-reklamzeka-intent") !== expectedIntent) {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: input.requiredScope, expected: input.config });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config,
+    input.requiredScope === "promotion_lifecycle:read" ? "read"
+      : input.requiredScope === "promotion_lifecycle:draft" ? "draft" : "publish", "cookie");
   return bindPrincipal(input.database, input.config);
 }
 

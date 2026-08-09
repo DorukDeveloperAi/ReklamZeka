@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 export const LOCAL_SESSION_COOKIE = "__Host-rzka_local_session" as const;
-export type LocalSessionScope = "approval_queue:decide" | "approval_queue:read" | "autonomy_rules:read" | "autonomy_rules:draft" | "category_registry:read" | "category_registry:publish" | "instruction_policy:read" | "instruction_policy:draft" | "instruction_policy:publish" | "guidance:read" | "guidance:draft" | "guidance:publish" | "policy_bundle:read" | "policy_bundle:draft" | "policy_bundle:publish" | "budget_lab:draft" | "budget_lab:read" | "decision_room:read" | "decision_room:mark_read" | "practice_lab:read" | "practice_lab:draft" | "practice_lab:standardize" | "promotion_catalog:read" | "promotion_preflight:read" | "promotion_proposal:draft" | "local_session:bootstrap";
+export type LocalSessionScope = "approval_queue:decide" | "approval_queue:read" | "autonomy_rules:read" | "autonomy_rules:draft" | "category_registry:read" | "category_registry:publish" | "instruction_policy:read" | "instruction_policy:draft" | "instruction_policy:publish" | "guidance:read" | "guidance:draft" | "guidance:publish" | "policy_bundle:read" | "policy_bundle:draft" | "policy_bundle:publish" | "budget_lab:draft" | "budget_lab:read" | "decision_room:read" | "decision_room:mark_read" | "practice_lab:read" | "practice_lab:draft" | "practice_lab:standardize" | "promotion_catalog:read" | "promotion_preflight:read" | "promotion_proposal:draft" | "promotion_lifecycle:read" | "promotion_lifecycle:draft" | "promotion_lifecycle:publish" | "local_session:bootstrap";
 export type LocalSessionKind = "bootstrap" | "session";
 
 export type LocalSessionClaims = Readonly<{
@@ -32,6 +32,7 @@ export const LOCAL_SESSION_RUNTIME_SCOPES: readonly LocalSessionScope[] = Object
   "policy_bundle:draft", "policy_bundle:publish", "policy_bundle:read", "budget_lab:draft", "budget_lab:read",
   "decision_room:mark_read", "decision_room:read", "practice_lab:read", "practice_lab:draft", "practice_lab:standardize", "promotion_catalog:read",
   "promotion_preflight:read", "promotion_proposal:draft",
+  "promotion_lifecycle:read", "promotion_lifecycle:draft", "promotion_lifecycle:publish",
 ]);
 export const LOCAL_SESSION_SCOPES: readonly LocalSessionScope[] = Object.freeze([
   ...LOCAL_SESSION_RUNTIME_SCOPES, "local_session:bootstrap",

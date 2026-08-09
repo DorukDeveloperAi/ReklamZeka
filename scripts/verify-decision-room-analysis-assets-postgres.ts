@@ -191,6 +191,7 @@ try {
         metaCatalog: "meta_v1", categoryResolver: "category_v1", guidanceRegistry: "guidance_v1",
         metricCatalog: "metric_v1", formulaCatalog: "formula_v1", timeframeResolver: "timeframe_v1",
         instructionPolicyRegistry: "9".repeat(64),
+        promotionRegistry: "8".repeat(64),
       },
     });
     await new DrizzleEffectiveCampaignContextRepository(transaction as never).save(context);

@@ -19,8 +19,13 @@ import {
 } from "@/domain/guidance/registry";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
-const databaseUrl = process.env.DATABASE_URL?.trim();
-if (!databaseUrl) throw new Error("DATABASE_URL yapılandırılmadı");
+const databaseUrl = process.env.DIRECT_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
+if (!databaseUrl) {
+  process.stderr.write(`${JSON.stringify({ ok: false, blocker: "postgres_connection_not_configured",
+    requiredOneOf: ["DIRECT_DATABASE_URL", "DATABASE_URL"],
+    continuation: "npm run verify:effective-campaign-context-db" })}\n`);
+  process.exit(2);
+}
 
 const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 20_000 });
 const database = drizzle(pool, { schema });
@@ -125,6 +130,7 @@ function context(options: Readonly<{
       metaCatalog: "meta-v1", categoryResolver: "category-v1", guidanceRegistry: "guidance-v1",
       metricCatalog: "metric-v1", formulaCatalog: "formula-v1", timeframeResolver: "timeframe-v1",
       instructionPolicyRegistry: "9".repeat(64),
+      promotionRegistry: "8".repeat(64),
     },
   };
   return buildEffectiveCampaignContext(input);
@@ -141,6 +147,7 @@ let futureSnapshotBlocked = false;
 let exactEntityInvalidated = false;
 let unrelatedEntityPreserved = false;
 let instructionPolicyWorkspaceInvalidated = false;
+let promotionRegistryWorkspaceInvalidated = false;
 let historicalReplayImmutable = false;
 let invalidationReplayIdempotent = false;
 let forbiddenPayloadBlocked = false;
@@ -267,6 +274,12 @@ try {
       && policyInvalidation.affectedContextCount === 2
       && await repository.loadLatestValid({ workspaceId, entityType: "campaign", entityRef: "campaign-a" }) === null
       && await repository.loadLatestValid({ workspaceId, entityType: "campaign", entityRef: "campaign-b" }) === null;
+    const promotionComponent = sourceComponentsOf(contextA).find((entry) => entry.componentType === "promotion_registry")!;
+    const promotionInvalidation = await repository.invalidate({ workspaceId, ...promotionComponent,
+      scope: { kind: "workspace_component" }, reasonCode: "source_changed",
+      observedAt: "2026-08-07T13:01:30.000Z" });
+    promotionRegistryWorkspaceInvalidated = promotionInvalidation.outcome === "inserted"
+      && promotionInvalidation.affectedContextCount === 2;
     const historical = await repository.loadHistorical(workspaceId, contextA.contextHash);
     historicalReplayImmutable = historical.context.contextHash === contextA.contextHash && historical.invalidated;
     invalidationReplayIdempotent = (await repository.invalidate(invalidation)).outcome === "unchanged";
@@ -333,6 +346,7 @@ try {
     if (!inserted || !idempotentReplay || !identityConflictBlocked || !foreignWorkspaceBlocked
       || !foreignAccountBlocked || !brokenHierarchyBlocked || !nonexistentSnapshotBlocked || !futureSnapshotBlocked
       || !exactEntityInvalidated || !unrelatedEntityPreserved || !historicalReplayImmutable
+      || !instructionPolicyWorkspaceInvalidated || !promotionRegistryWorkspaceInvalidated
       || !invalidationReplayIdempotent || !forbiddenPayloadBlocked || !nullableAuthorityBypassBlocked
       || !nestedAuthorityEscalationBlocked || !crossTenantForeignKeyBlocked || !noWriteAuthority) {
       throw new Error("Effective campaign context PostgreSQL acceptance failed");
@@ -350,7 +364,8 @@ console.log(JSON.stringify({
   inserted, idempotentReplay, identityConflictBlocked, foreignWorkspaceBlocked,
   foreignAccountBlocked, brokenHierarchyBlocked, nonexistentSnapshotBlocked,
   futureSnapshotBlocked,
-  exactEntityInvalidated, unrelatedEntityPreserved, instructionPolicyWorkspaceInvalidated, historicalReplayImmutable,
+  exactEntityInvalidated, unrelatedEntityPreserved, instructionPolicyWorkspaceInvalidated,
+  promotionRegistryWorkspaceInvalidated, historicalReplayImmutable,
   invalidationReplayIdempotent, forbiddenPayloadBlocked, nullableAuthorityBypassBlocked,
   nestedAuthorityEscalationBlocked, crossTenantForeignKeyBlocked, noWriteAuthority,
   writeNetworkCalls: 0, temporaryRowsCommitted,

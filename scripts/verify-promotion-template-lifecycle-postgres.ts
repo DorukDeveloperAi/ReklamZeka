@@ -49,7 +49,8 @@ if (!connectionString) {
       (select count(*)::int from pg_trigger where not tgisinternal and tgname in
         ('audience_preset_authoring_lineage_trigger','promotion_template_authoring_lineage_trigger',
          'audience_preset_authoring_append_only_trigger','promotion_template_authoring_append_only_trigger')) as trigger_count,
-      has_function_privilege('service_role', 'public.promotion_authoring_revision_guard()', 'execute') as function_privileged`);
+      (has_function_privilege('service_role', 'public.promotion_authoring_revision_guard()', 'execute')
+        or has_function_privilege('service_role', 'public.promotion_authoring_revision_immutable()', 'execute')) as function_privileged`);
     const posture = security.rows[0];
     if (posture?.table_count !== 2 || posture.forced_count !== 2 || posture.privileged_count !== 0
       || posture.trigger_count !== 4 || posture.function_privileged) throw new Error("migration_security_failed");
@@ -107,6 +108,26 @@ if (!connectionString) {
       const presetDraftResult = await lifecycle.mutate(principal, { operation: "create_preset_draft",
         expectedRegistryHash: initial.registryHash, selection, alias: "Verify audience revised" });
       const presetDraft = presetDraftResult.state.presetCurrent[0]!;
+      const unexpectedMalformedAcceptance = new Error("MALFORMED_PUBLISHED_ACCEPTED");
+      let malformedPublishedRejected = false;
+      try {
+        await outer.transaction(async (savepoint) => {
+          await savepoint.execute(sql`insert into audience_preset_authoring_revisions (
+            id, workspace_id, workspace_ref, preset_ref, lifecycle_version, previous_record_hash, status,
+            preset_revision, preset_hash, preset_payload, published_preset_hash, published_preset_payload,
+            actor_ref, actor_role, reason_code, record_hash, recorded_at)
+          select ${randomUUID()}::uuid, workspace_id, workspace_ref, preset_ref, lifecycle_version + 1, record_hash,
+            'published', preset_revision, preset_hash, preset_payload, ${"d".repeat(64)},
+            jsonb_build_object('version', 'audience-preset/1.0.0', 'workspaceRef', 'workspace_forged',
+              'presetRef', preset_ref, 'revision', preset_revision + 1, 'state', 'published',
+              'publishedAt', ${"2026-08-10T00:01:30.000Z"}, 'presetHash', ${"d".repeat(64)},
+              'authority', jsonb_build_object('canWriteMeta', true)),
+            actor_ref, 'owner', 'owner_publish', ${"e".repeat(64)}, ${"2026-08-10T00:01:30.000Z"}::timestamptz
+          from audience_preset_authoring_revisions where workspace_id = ${ids.workspace}::uuid
+            and preset_ref = ${presetDraft.presetRef} order by lifecycle_version desc limit 1`);
+          throw unexpectedMalformedAcceptance;
+        });
+      } catch (reason) { malformedPublishedRejected = reason !== unexpectedMalformedAcceptance; }
       const immutableBeforePublish = await outer.select().from(schema.audiencePresetRevisions)
         .where(eq(schema.audiencePresetRevisions.workspaceId, ids.workspace));
       const presetPublishResult = await lifecycle.mutate(principal, { operation: "publish_preset",
@@ -142,6 +163,25 @@ if (!connectionString) {
         expectedPresetRevision: currentTemplate.presetRevision, expectedPresetHash: currentTemplate.presetHash,
         expectedTemplateRevision: currentTemplate.templateRevision, expectedTemplateHash: currentTemplate.templateMaterialHash,
         reasonCode: "owner_archive" });
+      const unexpectedArchivedAcceptance = new Error("MALFORMED_ARCHIVED_ACCEPTED");
+      let malformedArchivedRejected = false;
+      try {
+        await outer.transaction(async (savepoint) => {
+          await savepoint.execute(sql`insert into promotion_template_authoring_revisions (
+            id, workspace_id, workspace_ref, template_ref, lifecycle_version, previous_record_hash, status,
+            preset_ref, preset_revision, preset_hash, preset_payload, template_revision, template_hash, template_payload,
+            binding_ref, binding_hash, binding_payload, published_template_hash, published_template_payload,
+            published_binding_hash, published_binding_payload, actor_ref, actor_role, reason_code, record_hash, recorded_at)
+          select ${randomUUID()}::uuid, workspace_id, workspace_ref, template_ref, lifecycle_version + 1, record_hash, 'archived',
+            preset_ref, preset_revision, preset_hash, preset_payload, template_revision, template_hash, template_payload,
+            binding_ref, binding_hash, binding_payload, published_template_hash, published_template_payload,
+            published_binding_hash, jsonb_set(published_binding_payload, '{version}', '"forged"'::jsonb),
+            actor_ref, 'owner', 'owner_archive', ${"f".repeat(64)}, ${"2026-08-10T00:04:00.000Z"}::timestamptz
+          from promotion_template_authoring_revisions where workspace_id = ${ids.workspace}::uuid
+            and template_ref = ${currentTemplate.templateRef} order by lifecycle_version desc limit 1`);
+          throw unexpectedArchivedAcceptance;
+        });
+      } catch (reason) { malformedArchivedRejected = reason !== unexpectedArchivedAcceptance; }
       const counts = (await outer.execute(sql`select
         (select count(*)::int from audience_preset_authoring_revisions where workspace_id = ${ids.workspace}::uuid) preset_lifecycle,
         (select count(*)::int from promotion_template_authoring_revisions where workspace_id = ${ids.workspace}::uuid) template_lifecycle,
@@ -152,13 +192,19 @@ if (!connectionString) {
           and component_type = 'promotion_registry') invalidations`)).rows[0] as Record<string, unknown>;
       const appendOnly = await outer.execute(sql`update audience_preset_authoring_revisions set reason_code = 'tamper'
         where workspace_id = ${ids.workspace}::uuid`).then(() => false, () => true);
+      const arbitraryDeleteRejected = await outer.execute(sql`delete from promotion_template_authoring_revisions
+        where workspace_id = ${ids.workspace}::uuid`).then(() => false, () => true);
+      await outer.execute(sql`update workspaces set lifecycle_state = 'tombstoning' where id = ${ids.workspace}::uuid`);
+      const tombstoneDeleteAllowed = await outer.execute(sql`delete from promotion_template_authoring_revisions
+        where workspace_id = ${ids.workspace}::uuid`).then(() => true, () => false);
       evidence = { migrationApplied: true, forcedRls: true, serviceRoleRevoked: true, draftDidNotMaterialize:
         immutableBeforePublish.length === 1, explicitPresetPublish: Number(counts.immutable_presets) === 2,
         explicitTemplatePublish: Number(counts.immutable_templates) === 2, presetLifecycleTwoRows:
         Number(counts.preset_lifecycle) === 2, templateLifecycleThreeRows: Number(counts.template_lifecycle) === 3,
         staleOccRejected: staleRejected, archiveInvalidated: archive.contextInvalidationAppended,
+        malformedPublishedRejected, malformedArchivedRejected,
         auditAtomic: Number(counts.audits) === 5, invalidationsAtomic: Number(counts.invalidations) === 3,
-        appendOnly, noNetworkOrMeta: networkCalls === 0 };
+        appendOnly, arbitraryDeleteRejected, tombstoneDeleteAllowed, noNetworkOrMeta: networkCalls === 0 };
       if (!Object.values(evidence).every(Boolean)) throw new Error("promotion_lifecycle_acceptance_failed");
       throw rollback;
     });

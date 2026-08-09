@@ -5,6 +5,7 @@ import { EXISTING_POST_SOURCE_BINDING_VERSION, type ExistingPostSourceBinding } 
 import { canonicalPromotionRegistryDocuments } from "@/connectors/meta/promotion/existing-post-promotion-catalog-drizzle-repository";
 import { DrizzleExistingPostPromotionPreflightRepository } from "@/connectors/meta/promotion/existing-post-promotion-preflight-drizzle-repository";
 import { promotionRegistryPublicRef } from "@/connectors/meta/promotion/promotion-registry-drizzle-repository";
+import { currentPromotionTemplateAuthoringHeadSql } from "@/connectors/meta/promotion/promotion-template-authoring-active-sql";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>; type ReadDatabase = Pick<Database, "execute">;
@@ -79,6 +80,7 @@ export class DrizzleExistingPostPromotionCanonicalMaterialResolver implements Ex
         and binding.effective_from <= ${input.evaluatedAt}::timestamptz and (binding.expires_at is null or binding.expires_at > ${input.evaluatedAt}::timestamptz)
         and account.disappeared_at is null and actor.disappeared_at is null and post.disappeared_at is null
         and ad_set.disappeared_at is null and campaign.disappeared_at is null
+        and ${currentPromotionTemplateAuthoringHeadSql}
       order by binding.binding_ref, creative_binding.id nulls first limit 101
     `));
     if (result.length > 100) return null;

@@ -103,8 +103,15 @@ describe("effective campaign context", () => {
       ...input().versions, instructionPolicyRegistry: "9".repeat(64) } });
     expect(policyAware.versions.instructionPolicyRegistry).toBe("9".repeat(64));
     expect(policyAware.contextHash).not.toBe(legacy.contextHash);
+    const promotionAware = buildEffectiveCampaignContext({ ...input(), versions: {
+      ...input().versions, promotionRegistry: "8".repeat(64) } });
+    expect(promotionAware.versions.promotionRegistry).toBe("8".repeat(64));
+    expect(promotionAware.contextHash).not.toBe(legacy.contextHash);
     expect(() => buildEffectiveCampaignContext({ ...input(), versions: {
       ...input().versions, instructionPolicyRegistry: "not-a-registry-hash" } }))
+      .toThrowError(expect.objectContaining<Partial<EffectiveCampaignContextError>>({ code: "invalid_input" }));
+    expect(() => buildEffectiveCampaignContext({ ...input(), versions: {
+      ...input().versions, promotionRegistry: "not-a-registry-hash" } }))
       .toThrowError(expect.objectContaining<Partial<EffectiveCampaignContextError>>({ code: "invalid_input" }));
   });
 

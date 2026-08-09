@@ -115,11 +115,19 @@
     `instruction_policy` frozen-context invalidation binding'i.
   - [x] Strict policy Studio raw+normalized filtreleri, history/diff ve role-aware
     draft/revise/publish/pause/archive kontrolleri; impact reader yoksa fail-closed görünüm.
-  - [ ] Authoritative dependency impact binding'i, canlı PostgreSQL verifier ve gerçek oturum kabulü.
+  - [x] Persisted exception/context/budget/analysis/schedule/ledger/action dependency reader;
+    deterministic impact hash, transaction-içi OCC recheck, audit/invalidation atomikliği ve
+    incomplete coverage'da publish/pause/archive fail-closed Studio akışı.
+  - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
+    context ailelerinin authoritative binding'i; canlı PostgreSQL verifier ve gerçek oturum kabulü.
 - [ ] Başlangıç objective/internal kategori playbook seti.
   - [x] Altı canonical objective playbook'una version/hash ile bağlı, review-required ve
     authority-free starter category/profile proposal kataloğu.
-  - [ ] Tenant persistence, owner adoption/confirmation ve eksik başlangıç dimension kapsamı.
+  - [x] MASTER'daki 14 canonical dimension için registry-hash bağlı deterministic tenant preview;
+    owner/admin exact confirmation, strict browser parser ve atomik capability yoksa zero-write
+    replay blocker'ı.
+  - [ ] Atomik category+CategoryProfile batch persistence, authoritative profile inventory ve
+    bağlı PostgreSQL/gerçek session adoption kabulü.
 - [ ] Kategori coverage/unmatched/conflict/impact dashboard ve güvenli archive akışı.
   - [x] Rules fixture kaldırıldı; gerçek Guidance Studio loading/empty/conflict/error,
     create/revise/publish/archive ve aktif iç kategori selector yüzeyi.
@@ -154,8 +162,15 @@
     deterministic selector; belirsizlikte publish-ready değil, targeting/creative icat etmez.
   - [x] Tenant-bound published-catalog Drizzle adapterı, cookie-only same-origin read/dry-run
     API'si ve role-aware kullanıcı UI'si; hesap/actor/category yalnız sunucuda çözülür.
-  - [ ] Mutable template/preset draft+publish için ayrı rol/audit/OCC authoring lifecycle'ı;
-    mevcut immutable registry bu authority'yi güvenle taşımadığı için kapalı.
+  - [x] Ayrı reusable AudiencePreset ve mutable PromotionTemplate draft/revise/publish/archive
+    lifecycle'ı; analyst draft, owner/admin publish, workspace-lock membership recheck,
+    registry/resource OCC, audit, immutable registry materialization ve multi-version context
+    invalidation aynı transaction'da.
+  - [x] Dedicated local lifecycle read/draft/publish capability+intent sınırı; archived template'i
+    selector/existing-post catalog/preflight/canonical resolver'dan düşüren, draft sırasında son
+    yayını koruyan effective-event filtresi ve bounded fail-closed UI.
+  - [ ] Forward migration, lifecycle rollback verifier ve gerçek oturumlu browser happy-path kabulü;
+    yerel PostgreSQL/session bağlantısı bulunmadığı için açık.
 - [ ] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi.
   - [x] Guidance-only pure registry/pack; provenance ayrımı, deterministic scope/conflict,
     freshness ve bounded context budget.

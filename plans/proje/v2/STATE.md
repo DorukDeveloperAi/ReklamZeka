@@ -22,6 +22,66 @@
 | 13 | eylem valfi ve rutin | AÇIK | 04,10–12 | planlandı; write kapalı |
 | 14 | kontrol merkezi | AÇIK | 07,09–13 | planlandı |
 
+## 2026-08-10 — A09 strict impact, starter adoption ve promotion lifecycle checkpoint'i
+
+- Strict instruction policy için persisted dependency reader exception ref'leri, frozen
+  context/component geçmişi, budget proposal, analysis template/schedule/run asset, decision
+  ledger ve action-unit lifecycle ailelerini exact tarar. Deterministic `impactHash`, gerçek
+  JSONB schema drift, chain/integrity ve 20.000 satır cap'i vardır. Publish/pause/archive workspace
+  kilidinden sonra membership, registry/target version-hash ve impact'i aynı transaction'da yeniden
+  doğrular; revision, multi-context invalidation ve hash-chain audit birlikte commit/rollback olur.
+  Audit expected/actual impact hash, gerçek invalidation reason ve planlanan/eklenen event sayısını
+  saklar. `trusted_authority_catalog`, `manual_policy_locks`, `account_group_scope`, `topic_scope`
+  ve opaque action-policy context association authoritative persist edilmediği için coverage
+  bilinçli incomplete ve gerçek publish/pause/archive kapalıdır; draft/revise açıktır.
+- Starter playbook kataloğu MASTER'daki 14 dimension'ı exact kapsar. Tenant registry state'inden
+  deterministic create/satisfied/conflict planı, gerçek `dimension_*` public ref'li komutlar ve
+  yalnız uyumlu dimension'lar için profile proposal üretir. Owner/admin confirmation registry ve
+  plan hash'ini replay eder; atomik category+CategoryProfile batch ile authoritative profile
+  inventory bulunmadığından zero-write `atomic_multi_command_category_adoption_unavailable`,
+  `category_profile_registry_unavailable` veya exact conflict blocker'ı döndürür. Browser parser
+  exact key/type/cap/ref/summary/blocked-response eşleşmesi dışında fail-closed'dur; Meta/action/
+  policy authority vermez.
+- AudiencePreset ve PromotionTemplate için ayrı append-only authoring lifecycle'ları eklendi.
+  Draft material published state/time taşımaz; analyst draft/revise, yalnız owner/admin explicit
+  publish/archive yapar. Preset first-class ve birden çok template tarafından exact immutable
+  ref/revision/hash ile reuse edilir. Workspace lock sonrası DB membership recheck, lifecycle+
+  resource OCC, immutable registry materialization, audit ve invalidation tek transaction'dadır.
+  Local session `promotion_lifecycle:read|draft|publish` scope ve exact intent'lerle ayrılmıştır;
+  bearer/wrong-intent kapalıdır. Public state targeting/payload yerine bounded ref/version/hash
+  özeti döndürür ve hiçbir Meta/network write yolu açılmaz.
+- Authoring archive semantiği dört authoritative promotion consumer'ına ortak effective-event SQL
+  ile bağlandı: lifecycle yoksa legacy immutable yayın aktif, draft son yayını değiştirmez, en son
+  publish/archive olayı exact template+binding hash'iyle yayını seçer veya tamamen düşürür. Publish/
+  archive, frozen context'lerde bulunan tüm bounded eski `promotion_registry_workspace` version'ları
+  ile current authoring registry version'ını deterministic olarak invalidate eder; böylece draft
+  öncesi H0 context'i publish sonrası geçerli kalmaz. Yeni EffectiveCampaignContext persistence hem
+  instruction-policy hem promotion-registry hash'ini ister; pre-A09 same-hash replay korunur.
+- Dış checkpoint mekanizması bu dalga review tamamlanmadan değişiklikleri `e63adab` commit'ine alıp
+  `origin/main`e push etti; ana ajan commit/push çalıştırmadı. Remote'a giren
+  `20260809220203_promotion_template_authoring_lifecycle` migration/snapshot'ı değiştirilmedi.
+  Published draft↔immutable JSON equality, archived parity, published secret/authority reddi ve
+  tombstoning-dışı UPDATE/DELETE koruması ayrı forward-only
+  `20260809222726_promotion_authoring_constraint_hardening` migration'ına taşındı. Constraint'ler
+  drop/re-add ile mevcut satırları da validate eder; tombstone purge yalnız workspace gerçekten
+  `tombstoning` iken DELETE yapabilir. Dış commit'in izleme amaçlı `.playwright-cli` geçici YAML'ları
+  takip eden yerel checkpoint'te silindi ve generated `next-env.d.ts` production biçimine döndürüldü.
+- Entegrasyon kanıtı: strict+starter hedefli 14 dosya/65 test; promotion/context hedefli 15 dosya/
+  68 test; bağımsız strict ve promotion re-audit'leri ACCEPT. Son tam `npm test` 240 dosya/1.429
+  test, production build, `db:check`, architecture, model/security boundaries, secret scan ve
+  production dependency audit yeşildir. Gerçek browser'da 390/768/1440 fail-closed/overflow kabulü,
+  mocked owner partial-impact no-POST ve promotion safe-unconfigured ekranı doğrulandı;
+  `output/playwright/promotion-template-lifecycle-unconfigured.png` kanıtıdır.
+- Canlı kapı çevreseldir: workspace'te `.env.local`, `DATABASE_URL` ve `DIRECT_DATABASE_URL` yok.
+  `verify:promotion-template-lifecycle-live`, `verify:effective-campaign-context-db` ve
+  `verify:supabase-security` redakte `postgres_connection_not_configured` ile exit 2 döndürür.
+  Güvenli bağlantı geri geldiğinde hazır sıra:
+  `node --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs migrate && npm run
+  verify:promotion-template-lifecycle-live && npm run verify:effective-campaign-context-db && npm run
+  verify:supabase-security`. Extant satır forward CHECK'te fail ederse sessiz dönüşüm yapılmadan
+  exact tenant/data remediation blocker'ı olarak park edilmelidir. Gerçek policy publish, Meta write,
+  production action, deploy veya ana ajan tarafından git push yapılmadı.
+
 ## 2026-08-10 — A09 CategoryProfile, 11-facet guidance ve run-binding checkpoint'i
 
 - CategoryProfile için owner/admin create/revise/publish/pause/archive vertical'ı eklendi.

@@ -9,6 +9,7 @@ import {
   canonicalPromotionRegistryDocuments,
 } from "@/connectors/meta/promotion/existing-post-promotion-catalog-drizzle-repository";
 import { promotionRegistryPublicRef } from "@/connectors/meta/promotion/promotion-registry-drizzle-repository";
+import { currentPromotionTemplateAuthoringHeadSql } from "@/connectors/meta/promotion/promotion-template-authoring-active-sql";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -140,6 +141,7 @@ export class DrizzleExistingPostPromotionPreflightRepository implements Existing
         and (binding.expires_at is null or binding.expires_at > ${evaluatedAt}::timestamptz)
         and account.disappeared_at is null and actor.disappeared_at is null and post.disappeared_at is null
         and ad_set.disappeared_at is null and campaign.disappeared_at is null
+        and ${currentPromotionTemplateAuthoringHeadSql}
       order by binding.binding_ref, post.id, ad_set.id
       limit 1001
     `));
