@@ -2728,36 +2728,140 @@ if (isMain) {
       return;
     }
 
+    // ---- CANLI KATMAN (aşama 24 / T24.3) — canvas'ın İKİ TEMPOLU uçları ----
+    //
+    // ENGEL KALKTI 2026-08-05: bu iki uç 24'te BLOKE'ydi çünkü `aide canlilik` / `aide olay`
+    // CLI yüzeyi hiç doğmamıştı (18/19 çekirdeği core'da bırakmıştı, tek tüketici VSCode
+    // sidecar'ıydı). Yüzey doğdu → R2'nin kalkma koşulu kelimesi kelimesine karşılandı.
+    //
+    // İKİ AYRI TTL, İKİ AYRI TEMPO — tek bir "canlı uç" sınıfı YOK:
+    //   canlılık = DURUM fotoğrafı (kim yaşıyor) → 3sn poll, TTL 2500 (poll'un ALTINDA)
+    //   olay     = AKIŞ penceresi (ne oldu)      → TTL 1000 + saniye-bucket anahtarı
+    // Bucket şart: `sinceMs` her istekte milisaniye kayarsa anahtar HER SEFERİNDE değişir ve
+    // memoize hiç tutmaz — saniyeye yuvarlamak eşzamanlı sekmeleri tek spawn'da birleştirir.
+    if (url.pathname === "/api/canlilik") {
+      if (!AIDE_CLI) {
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ yok: true }));
+        return;
+      }
+      const proje = url.searchParams.get("proje");
+      cliJsonCached(
+        "canlilik:" + (proje || ""),
+        ["canlilik", "--json", ...(proje ? ["--proje", proje] : [])],
+        2500,
+      )
+        .then((r) => {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8", "x-kaynak": r.kaynak });
+          res.end(r.govde || JSON.stringify({ yok: true }));
+        })
+        .catch((e) => {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ hata: String(e?.message || e) }));
+        });
+      return;
+    }
+
+    if (url.pathname === "/api/olay") {
+      if (!AIDE_CLI) {
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ yok: true }));
+        return;
+      }
+      const proje = url.searchParams.get("proje");
+      // Sayı DIŞI / negatif girdi 0'a düşer: `Number("abc")` NaN'dır ve NaN argv'ye
+      // yazılırsa CLI'ın süzgeci sessizce tüm defteri döndürürdü.
+      const ham = Number(url.searchParams.get("sinceMs"));
+      const sinceMs = Number.isFinite(ham) && ham > 0 ? Math.floor(ham) : 0;
+      cliJsonCached(
+        "olay:" + Math.floor(sinceMs / 1000) + ":" + (proje || ""),
+        ["olay", "--json", "--since-ms", String(sinceMs), ...(proje ? ["--proje", proje] : [])],
+        1000,
+      )
+        .then((r) => {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8", "x-kaynak": r.kaynak });
+          res.end(r.govde || JSON.stringify({ yok: true }));
+        })
+        .catch((e) => {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ hata: String(e?.message || e) }));
+        });
+      return;
+    }
+
+    // ---- NOT OKUMA UCU (aşama 36 / R5) — `{bagli, ham}` sarmalı ----
+    //
+    // ENGEL KALKTI 2026-08-05: 35 gövdeyi `{bagli,ham}` olarak DONDURMUŞ, 36'nın R6'sı ise
+    // panoya `@aide/core` import'unu YASAKLIYOR — o sarmalı üreten CLI yüzeyi yoktu.
+    // Şimdi var: `graf not liste --bagli --json`. Motorun kapısı (`if(!d||!d.bagli)`) geçer.
+    // İLANLI kısıt (CLI'ın kendi kuralı): `--bagli` süzgeçle BİRLEŞMEZ — sayaç TÜM deftere
+    // göredir, o yüzden buradan `--capa`/`--tip` gibi bir süzgeç GEÇİRİLMEZ.
+    if (url.pathname === "/api/graf-not") {
+      if (!AIDE_CLI) {
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ yok: true }));
+        return;
+      }
+      const proje = url.searchParams.get("proje");
+      cliJsonCached(
+        "not:" + (proje || ""),
+        ["graf", "not", "liste", "--bagli", "--json", ...(proje ? ["--proje", proje] : [])],
+        12e3,
+      )
+        .then((r) => {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8", "x-kaynak": r.kaynak });
+          res.end(r.govde || JSON.stringify({ yok: true }));
+        })
+        .catch((e) => {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ hata: String(e?.message || e) }));
+        });
+      return;
+    }
+
     if (url.pathname === "/sistem-agi") {
       // Graf sayfası — veri GÖMÜLMEZ: HTML /api/sistem-graf'tan çeker + 15sn poll eder
       // (talep-üzerine sidecar değişmezi). Kullanıcı girdisi ayrı argv elemanı (kabuk yok).
       // memoize: TTL 60sn + single-flight — sekme başına spawn YOK (asama 24). Şablon
       // yalnız bayraklarla değişir, veri içinde DEĞİL → uzun TTL güvenli.
-      // BLOKE (asama 24 / R2): --canli-url/--olay-url bayrakları burada VERİLMİYOR — motor
-      // (23) onları taşıyor ama /api/canlilik + /api/olay uçları YOK, çünkü `aide canlilik`
-      // ve `aide olay` CLI yüzeyi hiç doğmadı (18/19 core'da bıraktı). Bayrağı şimdi vermek
-      // canvas'ı 404'e poll ettirirdi. Ayrıntı: plans/sistem-graf/v4/kanit/asama-24/BLOKE-R2.md
-      // BLOKE (asama 36 / R5): --not-url + --not-yaz-url de VERİLMİYOR. Motor not
-      // sarmalını `{bagli, ham}` bekliyor (bagli = grafa bağlanmış sayaçlar); bunu üreten
-      // BİR CLI YÜZEYİ YOK (`graf not liste --json` yalnız ham tarafı verir) ve pano
-      // çekirdeği import EDEMEZ (R6: tek temas CLI spawn'ı). Motor bagli'siz yanıtı HATA
-      // sayar, `--not-yaz-url` de `--not-url` olmadan CLI'da exit 1'dir → yazma formu da
-      // bu bacağa bağlı. Ayrıntı: plans/sistem-graf/v4/kanit/asama-36/BLOKE-R5-not-url.md
+      // CANLI MOD + NOT BACAĞI AÇILDI (aşama 24/T24.4 · aşama 36/R5 — 2026-08-05'te kalkan
+      // engellerin teslimi). Dört bayrak da ancak KENDİ ucu ayaktayken verilir; eksik uçla
+      // bayrak vermek canvas'ı 404'e SONSUZ poll ettirirdi (23 ölçümü: motor fetch hatasında
+      // poll'u durdurmuyor). Dördünün de ucu bu dosyada, hemen yukarıda:
+      //   --canli-url → /api/canlilik   --olay-url → /api/olay
+      //   --not-url   → /api/graf-not   --not-yaz-url → /api/graf-not/ekle
+      // `--not-yaz-url` CLI'da `--not-url` OLMADAN exit 1'dir — ikisi birlikte verilir.
       if (!AIDE_CLI) {
         res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
         res.end("aide CLI yok");
         return;
       }
       const proje = url.searchParams.get("proje");
-      const veriUrl = "/api/sistem-graf" + (proje ? "?proje=" + encodeURIComponent(proje) : "");
-      const farkUrl = "/api/planlanan" + (proje ? "?proje=" + encodeURIComponent(proje) : "");
+      // Proje süzgeci HER uca AYNI biçimde taşınır; kullanıcı girdisi encode edilir ve
+      // argv'ye AYRI eleman olarak girer (kabuk yok — enjeksiyon yüzeyi kapalı).
+      const q = proje ? "?proje=" + encodeURIComponent(proje) : "";
+      const veriUrl = "/api/sistem-graf" + q;
+      const farkUrl = "/api/planlanan" + q;
+      const canliUrl = "/api/canlilik" + q;
+      const olayUrl = "/api/olay" + q;
+      const notUrl = "/api/graf-not" + q;
+      const notYazUrl = "/api/graf-not/ekle";
       cliJsonCached(
         // memoize anahtarı DEĞİŞEN argv'yi içerir: bayrak seti değişince eski HTML dönmez.
-        "html:fark:" + (proje || ""),
+        // Bayrak seti bu turda GENİŞLEDİ → anahtar da değişti (`fark` → `canli`), yoksa
+        // 60sn boyunca bayraksız eski HTML servis edilirdi.
+        "html:canli:" + (proje || ""),
         [
           "sistem-graf", "--html",
           "--veri-url", veriUrl,
           "--fark-url", farkUrl,
+          "--canli-url", canliUrl,
+          "--olay-url", olayUrl,
+          // `--notlar` VERİLMEZ ve bu ölçülmüş bir düzeltmedir: motor `--notlar` (notu HTML'e
+          // GÖMER) ile `--veri-url` (grafı poll'lar) çiftini K35.1 simetri kapısında REDDEDER
+          // — "gömülü not + poll'lu graf = bayat referans". Poll'lu bacak `--not-url`dur.
+          "--not-url", notUrl,
+          "--not-yaz-url", notYazUrl,
           ...(proje ? ["--proje", proje] : []),
         ],
         60e3,
