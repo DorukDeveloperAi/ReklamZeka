@@ -36,7 +36,7 @@
   },
   "files": {
     ".claude/aide/docs/aide-capabilities.md": {
-      "hash": "3483b194070db01a",
+      "hash": "2fb07617c2ba0a37",
       "pkg": "doc:aide-capabilities"
     },
     ".claude/skills/zamanla/SKILL.md": {
@@ -156,7 +156,7 @@
       "pkg": "skill:kaptan"
     },
     ".claude/skills/kaptan/scripts/dashboard.mjs": {
-      "hash": "958fbd4f7585584e",
+      "hash": "554ae687f8a96803",
       "pkg": "skill:kaptan"
     },
     ".claude/skills/kaptan/scripts/distill.mjs": {
@@ -236,7 +236,7 @@
       "pkg": "hook:oturum-kapanis"
     },
     ".claude/docs/model-policy.md": {
-      "hash": "8f7f20f3aa07c2b1",
+      "hash": "4ca800f5bc8fa1a1",
       "pkg": "doc:model-policy"
     },
     ".claude/agents/kaptan.md": {
@@ -248,15 +248,15 @@
       "pkg": "automation:kaptan-brifing"
     },
     ".claude/skills/eszamanli/SKILL.md": {
-      "hash": "9579bc0993c53e27",
+      "hash": "b5e819566189618f",
       "pkg": "skill:eszamanli"
     },
     ".claude/skills/eszamanli/scripts/claim.mjs": {
-      "hash": "edaf510dbec8c6b9",
+      "hash": "e9d5eb0d8de673bf",
       "pkg": "skill:eszamanli"
     },
     ".claude/skills/eszamanli/proof/proof.mjs": {
-      "hash": "f1a209115c347ebe",
+      "hash": "d1f9e42727943651",
       "pkg": "skill:eszamanli"
     },
     ".claude/skills/workflow/SKILL.md": {
@@ -312,11 +312,11 @@
       "pkg": "skill:devam"
     },
     ".claude/hooks/claims-lib.mjs": {
-      "hash": "d7c2f516289bc150",
+      "hash": "cc464913fe6d07fd",
       "pkg": "hook:eszamanli-guard"
     },
     ".claude/hooks/claim-guard.mjs": {
-      "hash": "b8d8bedab246c1b5",
+      "hash": "11d913adc26c49f1",
       "pkg": "hook:eszamanli-guard"
     },
     ".claude/hooks/hook-nabiz.mjs": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-08T07:55:43.529Z",
+  "updatedAt": "2026-08-09T19:59:04.514Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",

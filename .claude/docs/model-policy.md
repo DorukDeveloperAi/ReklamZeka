@@ -41,7 +41,7 @@ cat ~/.claude/model-policy.json 2>/dev/null
 { "schema": 1,
   "tiers":  { "ana":  {"model": "claude-opus-5[1m]", "effort": "high"},
               "plan": {"model": "claude-fable-5", "effort": "high", "fallback": "claude-opus-5[1m]"} },
-  "agents": { "<agent-adı>": { "kod": {"effort": "xhigh"} } } }
+  "agents": { "<agent-adı>": { "kod": {"effort": "max"} } } }
 ```
 
 Bir tier'ın efektif ayarı = `agents.<ben>.<tier>` ile `tiers.<tier>`'ın **alan bazında**
