@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const RUNTIME_ROOTS = ["src", "scripts"];
-const SOURCE_EXTENSIONS = new Set([".cjs", ".js", ".jsx", ".mjs", ".ts", ".tsx"]);
+const SOURCE_EXTENSIONS = new Set([".cjs", ".js", ".jsx", ".mjs", ".py", ".ts", ".tsx"]);
 const SELF_PATH = "scripts/check-model-provider-boundary.mjs";
 
 const FORBIDDEN_PACKAGES = [

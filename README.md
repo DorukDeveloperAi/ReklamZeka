@@ -1,41 +1,30 @@
 # ReklamZeka
 
-Brief-temelli, kontrol-öncelikli Meta reklam yardımcı ajanı (Doruk Sağlık Grubu).
-AI vardır ama otonom değildir: **her yazma işlemi insan onayından geçer**, yeni
-Meta nesneleri açıkça PAUSED üretilir, brief'e bağlanamayan öneri üretilmez.
-
-- **Plan (kanon):** `plans/reklamzeka-sistemi/v1/MASTER.md` — terminoloji, veri
-  modeli, mimari, fazlar. Durum: `plans/reklamzeka-sistemi/v1/STATE.md`.
-- **Terminoloji kilidi:** `docs/terminoloji.md` · lint: `python scripts/lint_terminology.py`
-- **API gerçekleri + Faz 0 doğrulama listesi:** `docs/api-gercekleri.md`
-
-## Yapı
-
-```
-src/reklamzeka/
-  taxonomy.py       # Aile→Kategori→Örnek miras/override çözümü (dikey-agnostik motor)
-  schema.py         # SQLite ambar (warehouse.db) DDL
-  sheets_schema.py  # Google Sheets kanon sekme/kolon tanımları
-  meta_gateway.py   # resmî Meta Ads MCP tek geçiş noktası (değiştirilebilir arka uç)
-  guardrails.py     # ACTIVE-create engeli + (Faz 2) tavanlar/dry-run
-config/rubrics/     # amaç kapsamı başına düzenlenebilir rubrik varsayılanları
-scripts/            # lint + (Faz 1) cadence scriptleri
-docs/               # terminoloji, API gerçekleri, MCP envanteri
-```
-
-## Kurulum
-
-```sh
-pip install -e ".[dev]"          # + [mcp] [sheets] [panel] gerektikçe
-pytest                            # birim testleri
-python scripts/lint_terminology.py
-```
-
-Faz 0 kullanıcı adımları: resmî Meta Ads MCP OAuth bağlantısı (interaktif) ve
-Google Sheets kimlik bilgisi — bkz. `plans/reklamzeka-sistemi/v1/STATE.md`.
 ReklamZeka, Meta Ads ve Google Ads performansını ortak metriklerde birleştirmeyi,
 sapmaları açıklanabilir kanıtla göstermeyi ve sonraki aksiyonları insan onayında tutmayı
 hedefleyen çok kiracılı reklam karar destek ürünüdür.
+
+Tek plan otoritesi `plans/proje/v2` altındaki dört kanonik dosyadır:
+
+- [MASTER](plans/proje/v2/MASTER.md)
+- [STATE](plans/proje/v2/STATE.md)
+- [CHECKLIST](plans/proje/v2/CHECKLIST.md)
+- [REQUIREMENTS](plans/proje/v2/REQUIREMENTS.md)
+
+## Yapı
+
+Aktif uygulama sınırı Next.js/TypeScript modular monolith, Drizzle ve PostgreSQL'dir.
+Meta bağlantısı tenant-bağlı secret reference üzerinden salt-okunur Graph adapter'ına gider.
+Codex CLI/VS Code ve Claude Code entegrasyonu project-scoped local MCP'nin exact safe-tool
+allowlist'ini kullanır; raw Meta writer agent veya dashboard yüzeyine açılmaz.
+
+## Kurulum
+
+```bash
+npm ci
+npm run check:quick
+npm run dev
+```
 
 ## Mevcut durum
 

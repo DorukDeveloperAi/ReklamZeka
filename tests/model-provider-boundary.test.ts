@@ -17,6 +17,7 @@ async function fixture(input: Readonly<{
   packageJson?: Record<string, unknown>;
   packageLock?: Record<string, unknown>;
   runtimeSource?: string;
+  pythonRuntimeSource?: string;
 }>) {
   const root = await mkdtemp(join(tmpdir(), "reklamzeka-model-boundary-"));
   roots.push(root);
@@ -25,6 +26,9 @@ async function fixture(input: Readonly<{
     mkdir(join(root, "scripts"), { recursive: true }),
     mkdir(join(root, "docs"), { recursive: true }),
   ]);
+  if (input.pythonRuntimeSource !== undefined) {
+    await writeFile(join(root, "src/legacy_runtime.py"), input.pythonRuntimeSource);
+  }
   await Promise.all([
     writeFile(join(root, "package.json"), JSON.stringify(input.packageJson ?? {
       name: "safe-fixture", private: true, dependencies: { pg: "1.0.0" },
@@ -85,6 +89,13 @@ describe("no-model-API boundary checker", () => {
     const result = await run(root);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("yasak model-provider paketi (@ai-sdk/openai)");
+  });
+
+  it("also rejects model-provider authority introduced through Python runtime source", async () => {
+    const root = await fixture({ pythonRuntimeSource: "from openai import OpenAI\nkey = OPENAI_API_KEY\n" });
+    const result = await run(root);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("src/legacy_runtime.py: yasak model-provider environment anahtarı (OPENAI_API_KEY)");
   });
 
   it("rejects a direct model-provider endpoint hidden in a package script", async () => {

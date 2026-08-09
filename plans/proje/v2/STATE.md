@@ -22,6 +22,22 @@
 | 13 | eylem valfi ve rutin | AÇIK | 04,10–12 | planlandı; write kapalı |
 | 14 | kontrol merkezi | AÇIK | 07,09–13 | planlandı |
 
+## 2026-08-09 — Post-checkpoint ikinci kontrol düzlemi karantinası
+
+- `c90883c` sonrasındaki doğrulanmamış merge ile aktif ağaca eklenen Python/SQLite/Google
+  Sheets ve doğrudan Meta MCP kontrol düzlemi kanonik Next.js/TypeScript, Drizzle/PostgreSQL,
+  tenant-bound read-only Graph ve typed local MCP sınırlarıyla çelişiyordu. Bu yüzey A09+
+  uygulamasına entegre edilmeden Git geçmişinde recoverable kalacak biçimde aktif ağaçtan çıkarıldı.
+- README tek plan otoritesini `plans/proje/v2/{MASTER,STATE,CHECKLIST,REQUIREMENTS}.md` olarak
+  gösteriyor. `plans/reklamzeka-sistemi/v2` tarihsel planı değişmeden korunuyor.
+- Architecture kapısı ikinci installable Python/runtime ağacını; security kapısı doğrudan Meta MCP
+  endpoint/secret, Python MCP transport, SQLite ve Sheets kanonu marker'larını; model ve secret
+  kapıları da Python provider yüzeyi ile legacy Meta MCP secret artifact'ını fail-closed reddediyor.
+- Kanıt: dört regression dosyasında 25/25 test; `check:architecture`,
+  `check:security-boundaries`, `check:model-api-boundary`, `check:secret-artifacts`, `db:check`,
+  production build ve dependency audit. Yerel secret bulunmadığı için secret-artifact sonucu
+  dürüst `SKIP`; production/deploy/Meta write yapılmadı.
+
 ## 2026-08-09 — A09.6d/A09.7 guarded category lifecycle teknik checkpoint'i
 
 - Başlangıç yeniden haritalaması `c90883c` son doğrulanmış işlevsel checkpoint'ini doğruladı.
