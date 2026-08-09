@@ -120,8 +120,19 @@ const FAKEBIN = join(SB, "fakebin");
 const AIDE_LOG = join(SB, "aide-cagrilari.log");
 mkdirSync(FAKEBIN, { recursive: true });
 writeFileSync(join(FAKEBIN, "aide"), `#!/bin/sh\nprintf '%s\\n' "$*" >> ${AIDE_LOG}\nexit 0\n`, { mode: 0o755 });
-const ENV_MAESTRO_CANLI = { PATH: `${FAKEBIN}:/usr/local/bin:/usr/bin:/bin` };
-const ENV_MAESTRO_OLU = { PATH: "/usr/local/bin:/usr/bin:/bin" }; // node var, aide YOK
+/* NODE'U KAYBETME (düzeltme 2026-08-09): sabit PATH `/usr/local/bin:/usr/bin:/bin` bu
+   makinede (Apple Silicon, node = /opt/homebrew/bin) NODE'U da eliyordu. `spawnSync("node")`
+   hiç koşmuyor, `status` null dönüyor ve ⑱'in dört ölçümü ÜRÜNÜ SÜRMEDEN kırmızı oluyordu
+   (aynı FAIL kurulu kopyada da vardı → yalancı-kırmızı, ürün hatası değil harness hatası).
+   Ölü Maestro'nun ölçütü "aide YOK"tur, "node yok" DEĞİL: node'un dizini korunur. */
+const NODE_DIR = dirname(process.execPath);
+const ENV_MAESTRO_CANLI = { PATH: `${FAKEBIN}:${NODE_DIR}:/usr/local/bin:/usr/bin:/bin` };
+const ENV_MAESTRO_OLU = { PATH: `${NODE_DIR}:/usr/bin:/bin` }; // node var, aide YOK
+/** …ve bunu İDDİA ETME, ÖLÇ: aide node'un dizininde de olabilir (o hâlde ölçüm geçersiz). */
+const AIDE_GERCEKTEN_OLU = !(
+  spawnSync("sh", ["-c", "command -v aide"], { env: { PATH: ENV_MAESTRO_OLU.PATH }, encoding: "utf8" })
+    .stdout || ""
+).trim();
 
 /** session-status kaydını yamala (state · limit alanı — 07'nin 08'e verdiği arayüz). */
 function statusYama(sessionId, yama) {
@@ -221,6 +232,17 @@ function yaslandir(qfile, sessionId, ms) {
     if (w.sessionId === sessionId) w.since = new Date(Date.now() - ms).toISOString();
   }
   writeFileSync(qfile, JSON.stringify(j));
+}
+
+/** Bildiri kutusunun yolunu ÜRÜNDEN sor (slug/dizin mantığı harness'a KOPYALANMAZ). */
+function bildiriFileOf(sessionId) {
+  const r = spawnSync(
+    "node",
+    ["-e", `import(process.argv[1]).then(L=>console.log(L.bildiriPath(L.repoRootOf(process.argv[2]),process.argv[3])))`,
+     join(HERE, "..", "..", "..", "hooks", "claims-lib.mjs"), REPO, sessionId],
+    { encoding: "utf8", env: ENV, cwd: REPO }
+  );
+  return (r.stdout || "").trim();
 }
 
 /** Defter dizinini ÜRÜNÜN çözümleyicisinden sor (sandbox HOME altında). */
@@ -819,15 +841,17 @@ console.log("\n⑱ DEVİR İŞARETİ: Maestro ölüyken de iş kaybolmaz (ÇİFT
      yol exit 5'ti: iş Maestro'yla birlikte ölüyordu, yani devir en çok ihtiyaç duyulan
      anda hiç çalışmıyordu. */
   const d = runCli(C.sessionId, ["devret", "--res", "dc-html", "--gorev", "parça B: onChange düzelt"], ENV_MAESTRO_OLU);
+  if (!AIDE_GERCEKTEN_OLU)
+    olculemedi("Maestro ölü senaryosu", "aide, node'un dizininde bulunuyor → 'ölü Maestro' PATH'i kurulamadı");
   ok("Maestro ölü → devret exit 0 (eski sözleşme 5: iş kaybolurdu)", d.code === 0, d.out);
   ok("çıktı NE OLDUĞUNU söyler (MAESTRO YAZILAMADI + işaret KALDI)",
      /MAESTRO YAZILAMADI/.test(d.out) && /devir işareti KALDI/.test(d.out), d.out);
   ok("çıktı iki ucu da SÖYLER (devir list · devir al --id)", /devir list/.test(d.out) && /devir al --id/.test(d.out), d.out);
   const l1 = devirListe();
   ok("devir işareti diskte — kalıcı · süreçsiz · TTL'siz",
-     l1.length === 1 && l1[0].kaynak === "devret" && l1[0].keys[0] === "dc-html", JSON.stringify(l1));
+     l1.length === 1 && l1[0]?.kaynak === "devret" && l1[0]?.keys?.[0] === "dc-html", JSON.stringify(l1));
   ok("işaret devredeni + görevi + şemayı taşır (v=1)",
-     l1[0].v === 1 && l1[0].devreden?.sessionId === C.sessionId && /onChange/.test(l1[0].gorev || ""), JSON.stringify(l1[0]));
+     l1[0]?.v === 1 && l1[0]?.devreden?.sessionId === C.sessionId && /onChange/.test(l1[0]?.gorev || ""), JSON.stringify(l1[0]));
   ok("GERÇEK aide HİÇ çağrılmadı (canlı Maestro kuyruğuna yazım YOK)", !existsSync(AIDE_LOG));
 
   /* Maestro CANLI (sahte aide): iş kuyruğa YAZILIR **ve** işaret yine kalır — çift yol,
@@ -1447,6 +1471,136 @@ console.log("\n㉖ OLAY DEFTERİ: bekleme ÖLÇÜLEBİLİR (otonomi-merdiveni:05
 
   runCli(B.sessionId, ["release", "--all"]);
   runCli(C.sessionId, ["release", "--all"]);
+}
+
+console.log("\n㉒ BİLDİRİ: bırakan SIRADAKİNE haber verir (seviye 0)");
+{
+  /* Ölçülen olgu: bir kilit bırakıldığında, uyanma yolu OLMAYAN bekleyen haberi ALIR ve
+     haberi kendi turunda OKUR. Eski davranışta bırakma sonucu yalnız BIRAKANIN ekranına
+     basılıyordu — bekleyen hiçbir şey görmüyordu (kullanıcı raporu 2026-08-09).
+     TAZE SESSION'LAR: A/B/C bu noktaya kadar limit/devir senaryolarından geçti; onların
+     üzerine kurulan bir ölçüm ürünü değil harness'ın kalıntısını ölçerdi. */
+  const M = spawnSession("sess-m", "bırakan (bildiri senaryosu)");
+  const N = spawnSession("sess-n", "SESSİZ bekleyen (işaret)");
+  const KEY = "scripts/bildiri-a.txt";
+  writeFileSync(join(REPO, KEY), "//");
+  const nDosya = bildiriFileOf(N.sessionId);
+
+  const cl = runCli(M.sessionId, ["claim", "--res", KEY, "--intent", "bildiri senaryosu"]);
+  ok("ön koşul: M kilidi aldı", cl.code === 0, cl.out);
+  const deny = runGuard("write", { hook_event_name: "PreToolUse", session_id: N.sessionId, cwd: REPO,
+                                   tool_name: "Write", tool_input: { file_path: join(REPO, KEY) } });
+  ok("N kapıda reddedildi (işaret bırakıldı)", deny.dec?.permissionDecision === "deny", JSON.stringify(deny.dec));
+  ok("N'nin kaydı SESSİZ (pid yok = kendi uyanamaz)",
+     queueOf(KEY).some((w) => w.sessionId === N.sessionId && !w.pid), JSON.stringify(queueOf(KEY)));
+
+  // M bırakır → bildiri YAZILMALI ve bunu SÖYLEMELİ (sessiz bırakma yok).
+  const rel = runCli(M.sessionId, ["release", "--res", KEY]);
+  ok("release BİLDİRİ GÖNDERDİĞİNİ söyler", /BİLDİRİ GÖNDERİLDİ/.test(rel.out), rel.out);
+  ok("bildiri kutusu N için diske düştü", existsSync(nDosya), nDosya);
+
+  // N kendi turunda haberi OKUR — ve haber TÜKETİLİR (her turda yeniden basılmaz).
+  const ctx1 = runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: N.sessionId, cwd: REPO });
+  const m1 = ctx1.dec?.additionalContext || "";
+  ok("N haberi ilk turunda görür", /BEKLEDİĞİN KAYNAK BOŞALDI/.test(m1), m1.slice(0, 300));
+  ok("haber KAYNAĞI ve ÇAREYİ taşır", m1.includes(KEY) && /ŞİMDİ AL: node .*claim --res/.test(m1), m1.slice(0, 400));
+  const ctx2 = runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: N.sessionId, cwd: REPO });
+  ok("haber TÜKETİLİR (ikinci turda tekrarlanmaz)",
+     !/BEKLEDİĞİN KAYNAK BOŞALDI/.test(ctx2.dec?.additionalContext || ""));
+
+  /* BAYAT HABER YALAN SÖYLEMEZ: bırakma ile okuma arasında kaynağı başkası kapmış olabilir.
+     Haber o hâlde "şimdi al" DEMEZ, yeniden sıraya girmeyi söyler. */
+  runCli(M.sessionId, ["claim", "--res", KEY, "--intent", "kaynağı yeniden aldım"]);
+  runCli(M.sessionId, ["release", "--res", KEY]); // N hâlâ işaret bırakmış durumda → yeni bildiri
+  runCli(M.sessionId, ["claim", "--res", KEY, "--intent", "araya giren sahip"]);
+  const m3 = runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: N.sessionId, cwd: REPO })
+    .dec?.additionalContext || "";
+  ok("araya sahip girdiyse haber BUNU SÖYLER (bayat haber yalanlamaz)",
+     /kaynak YENİDEN alınmış/.test(m3) && /wait --res/.test(m3), m3.slice(0, 400));
+  runCli(M.sessionId, ["release", "--all"]);
+}
+
+console.log("\n㉒b AKTİF bekleyene bildiri YAZILMAZ (kendi süreci uyandırır)");
+{
+  /* Yanlış pozitifin bedeli: canlı `wait` süreci kilidi ZATEN sahibi adına alır ve çıkışıyla
+     oturumu uyandırır. Ona bir de bildiri yazmak, okunduğunda çoktan bayatlamış bir haber
+     üretirdi ("sıra sende" derken kaynak zaten onun). */
+  const M2 = spawnSession("sess-m2", "bırakan (aktif bekleyen senaryosu)");
+  const P = spawnSession("sess-p", "AKTİF bekleyen (wait süreci)");
+  const KEY = "scripts/bildiri-b.txt";
+  writeFileSync(join(REPO, KEY), "//");
+  const cl = runCli(M2.sessionId, ["claim", "--res", KEY, "--intent", "aktif bekleyen senaryosu"]);
+  ok("ön koşul: M2 kilidi aldı", cl.code === 0, cl.out);
+  const w = spawnWait(P.sessionId, KEY);
+  await sleep(1500); // wait süreci kuyruğa pid'li kayıt yazsın
+  ok("P AKTİF bekleyen (pid'li kayıt)",
+     queueOf(KEY).some((x) => x.sessionId === P.sessionId && !!x.pid), JSON.stringify(queueOf(KEY)));
+  const rel = runCli(M2.sessionId, ["release", "--res", KEY]);
+  ok("release 'bildiri GEREKMEZ' der", /bildiri GEREKMEZ/.test(rel.out), rel.out);
+  ok("aktif bekleyene bildiri YAZILMADI", !existsSync(bildiriFileOf(P.sessionId)));
+  await w.exited;
+  ok("aktif bekleyen kilidi KENDİ aldı (uyanma yolu çalıştı)", /SIRA SENDE/.test(w.out()), w.out());
+  runCli(P.sessionId, ["release", "--all"]);
+}
+
+console.log("\n㉓ ORKESTRATÖR: saha olayları koordinatöre KENDİLİĞİNDEN düşer");
+{
+  /* Orkestratör = planı yürüten, sahadaki koordinatör oturum (PM'in repo-içi, 0-token,
+     hands-on karşılığı). Ölçülen olgu: kimse ona rapor YAZMADAN, olaylar ona ULAŞIR. */
+  const O = spawnSession("sess-o", "ORKESTRATÖR (planı yürüten)");
+  const W = spawnSession("sess-w", "sahada çalışan oturum");
+  const X = spawnSession("sess-x", "bloke olan oturum");
+  const KEY = "scripts/orkestrator-a.txt";
+  writeFileSync(join(REPO, KEY), "//");
+
+  // TEK SLOT: ikinci kayıt sessizce kapamaz.
+  const k1 = runCli(O.sessionId, ["orkestrator", "kayit", "--kapsam", "plan: bildiri v1"]);
+  ok("kayıt olur ve sözleşmeyi SÖYLER", k1.code === 0 && /ORKESTRATÖR SENSİN/.test(k1.out), k1.out);
+  const k2 = runCli(W.sessionId, ["orkestrator", "kayit"]);
+  ok("ikinci kayıt sessizce KAPMAZ (--devral ister)",
+     k2.code === 3 && /ORKESTRATÖR ZATEN VAR/.test(k2.out) && /--devral/.test(k2.out), k2.out);
+  ok("status orkestratörü GÖSTERİR", /orkestratör: sess-o/.test(runCli(W.sessionId, ["status"]).out));
+  /* REGRESYON (2026-08-09): kayıt defterin KÖKÜNDE dururken `activeClaims` onu sahipsiz
+     claim sanıp arşive atıyordu — orkestratörlük ilk taramada sessizce buharlaşıyordu. */
+  runCli(W.sessionId, ["status"]); // defteri TARAT (activeClaims)
+  runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: W.sessionId, cwd: REPO });
+  ok("kayıt defter TARAMASINDAN sağ çıkar (claim sanılıp biçilmez)",
+     /orkestratör: sess-o/.test(runCli(W.sessionId, ["orkestrator", "durum"]).out));
+
+  // Saha olayı 1: W bloke olur (kapıda DENY) → "bloke" haberi.
+  runCli(W.sessionId, ["claim", "--res", KEY, "--intent", "sahadaki iş"]);
+  runGuard("write", { hook_event_name: "PreToolUse", session_id: X.sessionId, cwd: REPO,
+                      tool_name: "Write", tool_input: { file_path: join(REPO, KEY) } });
+  // Aynı tıkanıklığın ikinci DENY'i haber ÜRETMEZ (yankı değil, olay bildirilir).
+  runGuard("write", { hook_event_name: "PreToolUse", session_id: X.sessionId, cwd: REPO,
+                      tool_name: "Write", tool_input: { file_path: join(REPO, KEY) } });
+  // Saha olayı 2: W işini bitirir → "bitti" haberi.
+  const rel = runCli(W.sessionId, ["release", "--res", KEY]);
+  ok("bırakan, orkestratöre bildirdiğini SÖYLER", /orkestratöre bildirildi/.test(rel.out), rel.out);
+
+  // Orkestratör kendi turunda hepsini TEK blokta okur.
+  const m = runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: O.sessionId, cwd: REPO })
+    .dec?.additionalContext || "";
+  ok("saha bloğu basılır", /\[orkestratör\] Sahadan \d+ haber/.test(m), m.slice(0, 300));
+  ok("bloke olayı düştü (kim → hangi kaynak)",
+     new RegExp(`bloke: ${X.sessionId.slice(0, 8)} → ${KEY.replace(/[.*+?^$()|[\]\\]/g, "\\$&")}`).test(m), m.slice(0, 500));
+  ok("bitti olayı düştü (iş + niyet)", /bitti: scripts\/orkestrator-a\.txt/.test(m) && /sahadaki iş/.test(m), m.slice(0, 500));
+  ok("aynı tıkanıklığın yankısı TEKRAR bildirilmedi", (m.match(/⛔ bloke:/g) || []).length === 1, m.slice(0, 500));
+  ok("saha haberi TÜKETİLİR",
+     !/\[orkestratör\] Sahadan/.test(runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: O.sessionId, cwd: REPO }).dec?.additionalContext || ""));
+
+  // Sahadaki oturum, gözlendiğini BİLİR (görünmez gözlemci yok).
+  const mw = runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: W.sessionId, cwd: REPO })
+    .dec?.additionalContext || "";
+  ok("sahadakiler orkestratörün VARLIĞINI görür", /Bu repoda ORKESTRATÖR var/.test(mw), mw.slice(0, 300));
+
+  // Kendi olayı kendine yazılmaz + oturum kapanınca kayıt düşer.
+  runCli(O.sessionId, ["claim", "--res", "scripts/orkestrator-b.txt", "--intent", "orkestratörün kendi işi"]);
+  runCli(O.sessionId, ["release", "--res", "scripts/orkestrator-b.txt"]);
+  ok("orkestratör KENDİ olayını kendine yazmaz", !existsSync(bildiriFileOf(O.sessionId)));
+  runGuard("release_all", { hook_event_name: "SessionEnd", session_id: O.sessionId, cwd: REPO });
+  ok("SessionEnd orkestratörlüğü düşürür", /orkestratör: YOK/.test(runCli(W.sessionId, ["orkestrator", "durum"]).out));
+  runCli(X.sessionId, ["release", "--all"]);
 }
 
 console.log("\n⑫ salt-okunurluk");

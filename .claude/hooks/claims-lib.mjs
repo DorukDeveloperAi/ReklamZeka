@@ -335,7 +335,12 @@ export function activeClaims(repoRoot) {
     } catch {
       continue;
     }
-    const o = c?.owner || {};
+    /* CLAIM OLMAYANI BİÇME (2026-08-09): biçme kararı yalnız claim ŞEKLİNDEKİ kayda
+       uygulanır. Defter köküne düşen yabancı bir `.json` (yanlış konumlanmış kayıt, elle
+       bırakılmış not) eskiden "sahip ölü" hükmüyle arşive taşınıyordu — sessiz veri kaybı.
+       Ölçülemeyene hüküm verilmez: tanımadığımız dosya ATLANIR, taşınmaz. */
+    if (!c?.resource?.key || !c?.owner) continue;
+    const o = c.owner;
     if (!procAlive(o.pid, o.procStart)) {
       reap(dir, f, c, "sahip süreci ölü");
       continue;
@@ -1616,5 +1621,219 @@ export function olayClaimsiz(repoRoot, sessionId, absYol, why = "claim'siz ilk y
     yazOlay(repoRoot, { tip: "claimsiz", key: rel, engellenen: sessionId, why });
   } catch {
     /* yut */
+  }
+}
+
+/* ═══════════════ BİLDİRİ — bırakan, SIRADAKİNE haber verir (seviye 0) ═══════════════
+ *
+ * Kilit sistemi sırayı DOĞRU kuruyordu ama "sıra sana geldi" haberi kimseye ULAŞMIYORDU:
+ * bırakan session sonucu KENDİ stdout'una basıyor, bekleyen ise başka bir pencerede
+ * sessizce oturuyordu. Ölçüldü (2026-08-07/08 defteri): 25 bloke olayına karşılık 15
+ * kapanış — yani ~10 bloke oturum hiçbir uyanma yolu kurmadan kaldı.
+ *
+ * İKİ BEKLEYEN SINIFI, İKİ FARKLI ÇARE (ayrım bu bölümün özü):
+ *   · AKTİF bekleyen (canlı `wait` süreci) → KENDİ uyanır: süreç kilidi onun adına alır,
+ *     çıkışıyla oturumu uyandırır. Ona bildiri YAZILMAZ (gürültü + bayat haber olurdu).
+ *   · SESSİZ bekleyen (pid'siz "istedim" işareti — kapıda DENY yiyip devam etmiş oturum)
+ *     → hiçbir uyanma yolu YOK. Bildiri TAM BU BOŞLUK içindir.
+ *
+ * Taşıyıcı SEVİYE 0'dır: Maestro/tmux/PM YOK. Yazan `release` (ve SessionEnd'de
+ * `release_all`), okuyan `claim-guard ctx` (SessionStart + UserPromptSubmit) — ikisi de
+ * zaten kayıtlı yüzeyler, 0 token. İLANLI SINIR: bu bir POSTA KUTUSUDUR, ZİL DEĞİL —
+ * durmuş bir oturumu UYANDIRAMAZ (uyandırma tek yoldan olur: enjeksiyon = Maestro).
+ * Bekleyen döndüğü ilk anda okur; "geldim ve kaynağın boşaldığını görmedim" hâli biter.
+ */
+export const BILDIRI_SURUM = 1;
+/** Haberin tazelik ömrü: 12 saat. Daha eskisi bilgi değil arkeolojidir (kaynak çoktan
+ *  el değiştirmiş olabilir) — okuma anında elenir, dosya zaten tüketimde silinir. */
+export const BILDIRI_TTL_MS = 12 * 60 * 60 * 1000;
+export const bildiriDirOf = (repoRoot) => join(ledgerDirOf(repoRoot), "bildiri");
+export const bildiriPath = (repoRoot, sessionId) =>
+  join(bildiriDirOf(repoRoot), `${slugOf(sessionId)}.jsonl`);
+
+/** Tek bir bildiri satırı yaz (append; hedef başına dosya). Hatayı YUTMAZ — çağıran sarar. */
+export function bildir(repoRoot, kayit) {
+  const hedef = kayit?.hedef;
+  if (!hedef) return null;
+  const satir = { v: BILDIRI_SURUM, ts: new Date().toISOString(), ...kayit };
+  mkdirSync(bildiriDirOf(repoRoot), { recursive: true, mode: 0o700 });
+  appendFileSync(bildiriPath(repoRoot, hedef), JSON.stringify(satir) + "\n", { mode: 0o600 });
+  return satir;
+}
+
+/**
+ * Bana gelen bildiriler. Varsayılan TÜKETİCİdir (okundu = dosya silinir): aynı haber her
+ * turda yeniden enjekte edilirse bağlam çöpe döner ve haber olmaktan çıkar.
+ * Salt bakmak için `{ tuket: false }` (teşhis yolu — `claim status` bunu kullanır).
+ */
+export function bildiriOku(repoRoot, sessionId, { tuket = true, now = Date.now() } = {}) {
+  if (!sessionId) return [];
+  const f = bildiriPath(repoRoot, sessionId);
+  let ham;
+  try {
+    ham = readFileSync(f, "utf8");
+  } catch {
+    return []; // kutu yok = haber yok (en sık hâl; tek stat maliyeti)
+  }
+  const rows = ham
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => {
+      try {
+        return JSON.parse(l);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean)
+    .filter((r) => {
+      const t = Date.parse(r?.ts || "");
+      return !Number.isFinite(t) || now - t <= BILDIRI_TTL_MS;
+    });
+  if (tuket) {
+    try {
+      unlinkSync(f);
+    } catch {
+      /* yoktu/yarışıldı — haber zaten okundu */
+    }
+  }
+  return rows;
+}
+
+/**
+ * BIRAKMA ANININ SÖZLEŞMESİ: bir kilit bırakılırken sırada SESSİZ bekleyen varsa herkes
+ * haberdar edilir. Aktif bekleyen VARSA hiç kimseye yazılmaz — sıra onundur, o da kendi
+ * süreciyle uyanır; sıra ona geçtikten sonra bırakırken bu fonksiyon yeniden koşar.
+ *
+ * Dönüş: { aktif, sessiz, bildirilen } — çağıran ne olduğunu RAPOR edebilsin diye
+ * (sessiz sonuç, "haber verdim mi?" sorusunu ölçülemez kılar).
+ */
+export function bildirSiradakine(repoRoot, key, kimden = {}) {
+  const bos = { aktif: [], sessiz: [], bildirilen: [] };
+  let q;
+  try {
+    q = queueOf(repoRoot, key);
+  } catch {
+    return bos;
+  }
+  const aktif = q.filter(waiterActive);
+  const sessiz = q.filter((w) => !waiterActive(w));
+  if (aktif.length) return { aktif, sessiz, bildirilen: [] };
+  const kimdenBaslik = kimden?.sessionId ? sessionInfo(kimden.sessionId)?.title || null : null;
+  const bildirilen = [];
+  sessiz.forEach((w, i) => {
+    try {
+      const r = bildir(repoRoot, {
+        hedef: w.sessionId,
+        key,
+        kimden: kimden?.sessionId || null,
+        kimdenBaslik,
+        kimdenNiyet: kimden?.intent || null,
+        bekleyenNiyet: w.intent || null,
+        bekleyisBaslangic: w.since || null,
+        sira: i + 1,
+        toplam: sessiz.length,
+        neden: kimden?.neden || "release",
+      });
+      if (r) bildirilen.push(w);
+    } catch {
+      /* yut — haber yazılamaması BIRAKMAYI asla bozmaz */
+    }
+  });
+  return { aktif, sessiz, bildirilen };
+}
+
+/* ══════════ ORKESTRATÖR — sahadaki tek koordinatör oturum (seviye 0) ══════════
+ *
+ * Bildiri, "sıradaki bekleyen"i çözdü ama bir boşluk daha vardı: planı yürüten,
+ * aşamaları sırayla ateşleyen bir oturum sahada olup biteni HİÇ öğrenmiyordu — hangi iş
+ * bitti, kim nerede bloke oldu, hangi oturum açık kilitle kapandı. PM bu soruyu
+ * projeler-arası ve agentic olarak soruyor; ORKESTRATÖR onun sahadaki, repo İÇİNDEKİ,
+ * 0-token karşılığıdır: kimse ona rapor yazmaz — olaylar KENDİLİĞİNDEN düşer.
+ *
+ * TEK SLOT, ÖLÇÜLEN CANLILIK: repo başına bir kayıt; canlılık claim'lerdeki ölçütün
+ * AYNISIdır (pid ⊕ procStart). Ölmüş orkestratör YOK sayılır — kayıt silinmez, hükmü
+ * ölçüm verir. Bu yüzden "orkestratörüm ama çöktüm" hâli kuyruğu dondurmaz.
+ *
+ * İLANLI SINIR — KAPSAM REPO'DUR: bu katman `~/.claude/claims/<repo>/` defterinde yaşar
+ * ve yalnız o repodaki olayları taşır. Projeler-arası eksen PM'in işidir (`/pm`); burada
+ * ikinci bir küresel router YAPILMAZ. Orkestratör başka repoda da koordine edecekse orada
+ * AYRICA kayıt olur — sessizce genişletilmez.
+ */
+/* KAYIT ALT DİZİNDE DURUR — defter KÖKÜ claim'lerin yeridir (ölçülen hata 2026-08-09:
+   kök dizine konan `orkestrator.json`u `activeClaims` "sahipsiz claim" sanıp ARŞİVE ATTI;
+   kayıt ilk `status`ta sessizce buharlaştı). `.q.json` için yıllar önce yazılmış uyarının
+   aynısı: bu dizinde claim'den başka bir şey YAŞAYAMAZ. Alt dizin adı `.json` ile bitmediği
+   için taramanın dışındadır — `devir/` ve `bildiri/` de bu yüzden alt dizindir. */
+export const orkestratorPath = (repoRoot) =>
+  join(ledgerDirOf(repoRoot), "orkestrator", "kayit.json");
+
+/** Bu repoda CANLI orkestratör (yoksa/ölmüşse null). Kayıt SİLİNMEZ — hüküm ölçümdür. */
+export function orkestratorOku(repoRoot) {
+  let j;
+  try {
+    j = JSON.parse(readFileSync(orkestratorPath(repoRoot), "utf8"));
+  } catch {
+    return null;
+  }
+  if (!j?.sessionId) return null;
+  const s = sessionInfo(j.sessionId);
+  const canli = procAlive(j.pid, j.procStart) || (s && procAlive(s.pid, s.procStart));
+  return canli ? j : null;
+}
+
+/** Kayıt ol. Başkası CANLI kayıtlıysa devralma AÇIK BEYAN ister (sessiz kapma yok). */
+export function orkestratorKayit(repoRoot, kimlik, { kapsam = null, devral = false } = {}) {
+  const mevcut = orkestratorOku(repoRoot);
+  if (mevcut && mevcut.sessionId !== kimlik.sessionId && !devral)
+    return { ok: false, neden: "dolu", mevcut };
+  const kayit = {
+    v: 1,
+    sessionId: kimlik.sessionId,
+    pid: kimlik.pid ?? null,
+    procStart: kimlik.procStart ?? null,
+    since: new Date().toISOString(),
+    kapsam,
+    devralindi: mevcut && mevcut.sessionId !== kimlik.sessionId ? mevcut.sessionId : null,
+  };
+  mkdirSync(join(ledgerDirOf(repoRoot), "orkestrator"), { recursive: true, mode: 0o700 });
+  atomicWrite(orkestratorPath(repoRoot), kayit);
+  return { ok: true, kayit, oncekiSahip: kayit.devralindi };
+}
+
+/** Bırak — yalnız KENDİ kaydını (başkasınınkini üçüncü taraf silemez). */
+export function orkestratorBirak(repoRoot, sessionId) {
+  let j;
+  try {
+    j = JSON.parse(readFileSync(orkestratorPath(repoRoot), "utf8"));
+  } catch {
+    return false;
+  }
+  if (j?.sessionId !== sessionId) return false;
+  try {
+    unlinkSync(orkestratorPath(repoRoot));
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Sahadan orkestratöre olay düşür. KENDİ olayını kendine YAZMAZ (orkestratör de sahada
+ * çalışır; kendi bıraktığı kilidi kendine haber vermek gürültüdür).
+ *
+ * Tipler: `bitti` (kilit bırakıldı = o iş bitti) · `bloke` (bir oturum kapıda durdu) ·
+ * `kapandi` (oturum açık kilitle/işle kapandı) · `devir` (iş devredildi, üstlenen aranıyor).
+ * Hepsi AYNI posta kutusuna düşer; okuma ucu tipe göre ayırır. Hata YUTULUR — haber,
+ * haber verdiren işi (release · DENY · kapanış) ASLA bozmaz.
+ */
+export function bildirOrkestratore(repoRoot, olay = {}) {
+  try {
+    const o = orkestratorOku(repoRoot);
+    if (!o) return null;
+    if (o.sessionId === olay.kimden) return null; // kendi olayın
+    return bildir(repoRoot, { hedef: o.sessionId, ...olay });
+  } catch {
+    return null;
   }
 }

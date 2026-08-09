@@ -50,6 +50,13 @@ yazımı `claim-guard` REDDEDER. `C=~/.claude/skills/eszamanli/scripts/claim.mjs
 - **DENY yiyince BEKLEME, İŞİ PARÇALA:** bloke adımlar B, kalanı A; A'yı şimdi yap, B için
   `node $C wait --res <k>` (`run_in_background`) ya da oturum kapanıyorsa `devret --gorev "<B>"`.
 - **Limit uyarısında kilidini BIRAK/DEVRET** (`node $C limit-devir`) — askıdaki sahip kuyruğu dondurur.
+- **BIRAKAN HABER VERİR (2026-08-09):** `release` (ve SessionEnd), uyanma yolu OLMAYAN sıradaki
+  bekleyenlere **bildiri** bırakır; aktif `wait` süreci olana yazılmaz (o kendi uyanır). Okuma
+  `ctx` hook'unda, **tek sefer**. Posta kutusu — **ZİL DEĞİL:** durmuş oturumu uyandırmaz.
+- **ORKESTRATÖR** (`orkestrator kayit|durum|birak`): sahadaki koordinatör oturum; saha olayları
+  (`bitti`·`bloke`·`kapandı`·`devir`) ona KENDİLİĞİNDEN düşer — kimse rapor yazmaz. Repo başına
+  **tek slot** (`--devral` ile devredilir), canlılık pid'le ölçülür, kapsam **repo**'dur
+  (projeler-arası eksen `/pm`). PM karar verir, orkestratör **haber alır**.
 - Canlılık **pid**'le ölçülür → kilidi **ELLE SİLME** · kapı **YAZIMI** ölçer, adı anmayı değil.
 
 Detay: `/Users/ybg/dev/agent-ide/docs/claim-anahtarlari.md`

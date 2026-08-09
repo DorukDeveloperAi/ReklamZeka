@@ -60,6 +60,114 @@ const kis = (s, n) => {
 };
 
 /**
+ * BİLDİRİ OKUMA UCU (seviye 0, 2026-08-09) — "beklediğin kaynak boşaldı" haberi.
+ *
+ * Yazan uç `release` / SessionEnd (`claims-lib: bildirSiradakine`); burası OKUYAN uçtur ve
+ * TÜKETİCİdir: haber bir kez basılır, dosya silinir. Blok `others` erken dönüşünden ÖNCE
+ * hesaplanır — haber, repoda başka canlı session kalmasa da (bırakan çoktan kapanmış
+ * olabilir!) sahibine ulaşmalıdır.
+ *
+ * Haber BAYAT OLABİLİR ve bunu SÖYLER: bırakma ile bu turun arasında kaynağı başkası
+ * kapmış olabilir. O yüzden satır, defteri OKUMA ANINDA ölçer ve iki farklı çare basar
+ * (al · yeniden bekle). Ölçülemeyen hiçbir şey iddia edilmez.
+ */
+function bildiriBloku(root, me) {
+  if (!me || !L.ledgerExists() || typeof L.bildiriOku !== "function") return [];
+  let gelen = [];
+  try {
+    gelen = L.bildiriOku(root, me);
+  } catch {
+    return [];
+  }
+  if (!gelen.length) return [];
+  /* İKİ CİNS HABER, İKİ AYRI SORU (2026-08-09): "sıra" haberi BANA ne düştüğünü söyler
+     (bekleyendim, kaynak boşaldı); SAHA haberleri orkestratöre başkalarının işini söyler
+     (bitti · bloke · kapandı · devir). Aynı kutuya düşerler, ama tek blokta karıştırılırsa
+     ikisi de okunmaz olur. Eski kayıtlarda `tip` yoktur → "sira" sayılır (geriye uyum). */
+  const saha = gelen.filter((b) => b?.tip && b.tip !== "sira");
+  const sira = gelen.filter((b) => !b?.tip || b.tip === "sira");
+  // Aynı kaynak birden çok kez bırakılmış olabilir — kaynak başına yalnız EN TAZE haber.
+  const enTaze = new Map();
+  for (const b of sira) if (b?.key) enTaze.set(b.key, b);
+  if (!enTaze.size) return sahaBloku(saha);
+  let claims = [];
+  try {
+    claims = L.activeClaims(root); // yalnız haber VARKEN okunur (nadir yol)
+  } catch {
+    /* ölçülemedi → "yeniden alınmış mı" iddiası kurulmaz */
+  }
+  const CLI = "node ~/.claude/skills/eszamanli/scripts/claim.mjs";
+  const satirlar = [`[eşzamanlılık] 🔓 BEKLEDİĞİN KAYNAK BOŞALDI (${enTaze.size} bildiri):`];
+  for (const b of enTaze.values()) {
+    const ts = Date.parse(b.ts || "");
+    const kimden = b.kimden ? String(b.kimden).slice(0, 8) : "?";
+    satirlar.push(
+      `  • ${b.key} — ${kimden}${b.kimdenBaslik ? ` "${kis(b.kimdenBaslik, 48)}"` : ""} bıraktı` +
+        `${Number.isFinite(ts) ? ` (${dk(ts)})` : ""}` +
+        `${b.neden === "SessionEnd" ? " [oturumu kapanarak]" : ""}`
+    );
+    if (b.bekleyenNiyet) satirlar.push(`      beklemedeki işin: ${kis(b.bekleyenNiyet, 96)}`);
+    const yeni = claims.find((c) => c.resource.key === b.key);
+    if (yeni) {
+      const s = L.sessionInfo(yeni.owner?.sessionId);
+      satirlar.push(
+        `      ⚠ kaynak YENİDEN alınmış (${String(yeni.owner?.sessionId).slice(0, 8)}` +
+          `${s?.title ? ` "${kis(s.title, 40)}"` : ""}) — sıraya gir:`,
+        `        ${CLI} wait --res "${b.key}" --intent "<beklemedeki iş>"   (run_in_background)`
+      );
+    } else {
+      satirlar.push(`      ŞİMDİ AL: ${CLI} claim --res "${b.key}" --intent "<beklemedeki iş>"`);
+    }
+  }
+  satirlar.push(`  (bu haber BİR KEZ basılır — beklemedeki maddeyi şimdi ele al ya da bırak.)`);
+  return [...sahaBloku(saha), ...satirlar];
+}
+
+/**
+ * SAHA HABERLERİ — yalnız ORKESTRATÖRÜN kutusuna düşer (kütüphane hedefi orada seçer;
+ * burası sadece ÇİZER). Koordinatörün tek soruşu vardır: *sahada ne oldu, neye elimi
+ * atmalıyım?* Satırlar bu yüzden olguyu ve varsa ÇAREYİ taşır, yorum taşımaz.
+ *
+ * TAVAN 12 SATIR + "+N daha": okunmamış kutu şişerse blok bir güne yayılmış günlüğe döner
+ * ve enjeksiyon bütçesini yakar. Kırpma SESSİZ DEĞİLDİR — kaç haberin gösterilmediği yazılır.
+ */
+function sahaBloku(saha) {
+  if (!saha?.length) return [];
+  const ikon = { bitti: "✅", bloke: "⛔", kapandi: "🔚", devir: "🔁" };
+  const goster = saha.slice(-12);
+  const satirlar = [`[orkestratör] Sahadan ${saha.length} haber:`];
+  for (const b of goster) {
+    const ts = Date.parse(b.ts || "");
+    const kim = b.kimden ? String(b.kimden).slice(0, 8) : "?";
+    const ne = Number.isFinite(ts) ? ` (${dk(ts)})` : "";
+    if (b.tip === "bitti")
+      satirlar.push(
+        `  ${ikon.bitti} bitti: ${b.key} ← ${kim}${ne}` +
+          `${b.niyet ? ` — ${kis(b.niyet, 72)}` : ""}${b.bekleyen ? ` · ${b.bekleyen} bekleyen vardı` : ""}`
+      );
+    else if (b.tip === "bloke")
+      satirlar.push(
+        `  ${ikon.bloke} bloke: ${kim} → ${b.key}${ne}` +
+          `${b.sahip ? ` (sahip: ${String(b.sahip).slice(0, 8)}${b.sahipNiyet ? ` — ${kis(b.sahipNiyet, 48)}` : ""})` : ""}`
+      );
+    else if (b.tip === "kapandi")
+      satirlar.push(
+        `  ${ikon.kapandi} kapandı: ${kim}${ne} — ${b.kilit || 0} kilit bırakıldı` +
+          `${b.bekledigi ? ` · ${b.bekledigi} bekleyişi yarım kaldı` : ""}`
+      );
+    else if (b.tip === "devir")
+      satirlar.push(
+        `  ${ikon.devir} devir: ${b.key} ← ${kim}${ne}${b.gorev ? ` — ${kis(b.gorev, 72)}` : ""}` +
+          `${b.devirId ? `\n      üstlen: node ~/.claude/skills/eszamanli/scripts/claim.mjs devir al --id ${b.devirId}` : ""}`
+      );
+  }
+  if (saha.length > goster.length)
+    satirlar.push(`  … +${saha.length - goster.length} haber daha GÖSTERİLMEDİ (tavan 12).`);
+  satirlar.push(`  (orkestratörsün: bu haberler BİR KEZ düşer — gerekeni şimdi planına al.)`);
+  return satirlar;
+}
+
+/**
  * SESSİZ EZME YOK (P2): kilidi DEVREDİLMİŞ olan eski sahip, ilk yazımında ne olduğunu
  * OKUR. Devir bir silme değil bir sahip değişimidir; `ownerMatch` artık false döndüğü
  * için eski sahip normal DENY yerdi ve "benim kilidim nereye gitti" sorusu cevapsız
@@ -160,6 +268,11 @@ function denyText(claim, repoRoot, cyc, me) {
     `   Komut ÇIKINCA kaynağı claim'leyip beklemedeki maddeyi bitir.`,
     `4. Durumu görmek için: node ~/.claude/skills/eszamanli/scripts/claim.mjs status`,
     ``,
+    `Sıraya İŞARET bırakıldı: sahip bırakırken sana BİLDİRİ düşer, ilk turunda okursun.`,
+    `  Ama bildiri bir POSTA KUTUSUDUR, ZİL DEĞİL — durmuş bir oturumu uyandırmaz.`,
+    `  İş BU oturumda bitecekse (3) şart: uyandıran tek şey senin kendi \`wait\` sürecindir.`,
+    `Ve SEN de bir kilit tutuyorsan: işin bitince BIRAK — bırakma, sıradakine haberi gönderir.`,
+    ``,
     `Kilit dosyasını ELLE SİLME: sahip crash ederse otomatik biçilir (pid ölçütü).`,
   ].join("\n");
 }
@@ -174,12 +287,27 @@ function denyText(claim, repoRoot, cyc, me) {
  */
 function markWanted(repoRoot, claim, me, intent) {
   try {
+    /* ORKESTRATÖRE "bloke" HABERİ — ama YALNIZ İLK KEZ. Kapı aynı çift (oturum × kaynak)
+       için turda turda DENY verir; her DENY'i haber saysaydık koordinatörün kutusu tek bir
+       tıkanıklığın yankısıyla dolardı. Yenilik ölçütü kuyruğun KENDİSİdir: kayıt zaten
+       varsa bu yeni bir tıkanıklık değil, sürenin uzamasıdır. */
+    const oncekiler = L.queueOf(repoRoot, claim.resource.key);
+    const yeni = !oncekiler.some((w) => w.sessionId === me.sessionId);
     L.enqueue(repoRoot, claim.resource.key, {
       sessionId: me.sessionId,
       since: new Date().toISOString(),
       intent: intent || null,
       pid: null, // işaret: aktif bekleyiş DEĞİL
     });
+    if (yeni)
+      L.bildirOrkestratore?.(repoRoot, {
+        tip: "bloke",
+        key: claim.resource.key,
+        kimden: me.sessionId,
+        sahip: claim.owner?.sessionId || null,
+        sahipNiyet: claim.intent || null,
+        niyet: intent || null,
+      });
   } catch {
     /* yut */
   }
@@ -223,15 +351,48 @@ function main() {
     const sid = p.session_id || p.sessionId;
     if (!sid || !L.ledgerExists()) return pass();
     const root = L.repoRootOf(p.cwd || process.cwd());
+    let kapananKilit = 0;
     for (const c of L.activeClaims(root)) {
-      if (c.owner?.sessionId === sid) L.archiveClaim(root, c, "session bitti (SessionEnd)");
+      if (c.owner?.sessionId !== sid) continue;
+      L.archiveClaim(root, c, "session bitti (SessionEnd)");
+      kapananKilit++;
+      /* BİLDİRİ (2026-08-09): kapanan oturum da "işini bitiren"dir — sırada uyanma yolu
+         OLMAYAN bekleyen varsa haberi burada bırakır. `release`i unutup kapanan oturum
+         en sık hâldir; haber vermeyi yalnız açık `release`e bağlamak kuralı delerdi. */
+      try {
+        L.bildirSiradakine?.(root, c.resource.key, { sessionId: sid, neden: "SessionEnd" });
+      } catch {
+        /* yut — haber, kapanışı asla bozmaz */
+      }
     }
     /* Sıradan da çık: biten bir session'ın kuyrukta yer tutması sırayı yalanlar.
        Kapanış KAYDI burada doğar (aşama 05): bekleyişin süresi `since` silinmeden ölçülür,
        `sonuc:"oldu"` = bekleyen öldü (session bitti), kilidi hiç alamadı. Bu, "kaç bekleyiş
        boşa gitti" sorusunun tek kaynağıdır. Eski claims-lib'e karşı güvenli: yoksa düz
        `dequeue`'ya düşülür — sıradan çıkış hiçbir yolda atlanmaz. */
-    for (const k of L.queuedKeysOf(root, sid)) {
+    /* Orkestratörlük kaydı da bu oturumla ölür (canlılık zaten pid'le ölçülüyor; kaydı
+       burada düşürmek defteri temiz tutar ve "ölü koordinatör" görüntüsünü hiç doğurmaz). */
+    try {
+      L.orkestratorBirak?.(root, sid);
+    } catch {
+      /* yut */
+    }
+    const bekledigi = L.queuedKeysOf(root, sid);
+    /* ORKESTRATÖRE "kapandı": bir oturumun ölümü sahanın en sessiz olayıdır — kilidini
+       bıraktı mı, yarım bir bekleyişi mi vardı, orkestratör bunu başka hiçbir yerden
+       öğrenemez. Kendi kaydı düşerken kendine yazmaz (kütüphane eler). */
+    try {
+      if (kapananKilit || bekledigi.length)
+        L.bildirOrkestratore?.(root, {
+          tip: "kapandi",
+          kimden: sid,
+          kilit: kapananKilit,
+          bekledigi: bekledigi.length,
+        });
+    } catch {
+      /* yut */
+    }
+    for (const k of bekledigi) {
       try {
         if (typeof L.dequeueKapanis === "function")
           L.dequeueKapanis(root, k, sid, "oldu", "session bitti (SessionEnd)");
@@ -325,15 +486,40 @@ function main() {
       }
     }
 
+    /* BİLDİRİ EN ÖNDE: "sıra sende" haberi, başka canlı session olup olmamasından
+       BAĞIMSIZ olarak sahibine ulaşmalı — bırakan oturum çoktan kapanmış olabilir. */
+    const bildiri = bildiriBloku(root, me);
+
+    /* ORKESTRATÖR GÖRÜNÜRLÜĞÜ: sahada bir koordinatör varsa herkes BİLİR — çünkü bu
+       oturumun bloke olması/işini bitirmesi ona otomatik haber düşürüyor. Görünmez bir
+       gözlemci, sözleşmesi ilan edilmemiş bir gözlemcidir. Kendine bunu yazmaz. */
+    let orkSatir = null;
+    try {
+      const o = L.orkestratorOku?.(root);
+      if (o && o.sessionId !== me) {
+        const os = L.sessionInfo(o.sessionId);
+        orkSatir =
+          `Bu repoda ORKESTRATÖR var: ${String(o.sessionId).slice(0, 8)}` +
+          `${os?.title ? ` "${kis(os.title, 44)}"` : ""}${o.kapsam ? ` · kapsam: ${kis(o.kapsam, 48)}` : ""}` +
+          ` — işini bitirmen/bloke olman ona OTOMATİK bildirilir (ayrıca rapor yazma).`;
+      }
+    } catch {
+      /* yut */
+    }
+
     const others = L.liveSessionsIn(root).filter((s) => s.sessionId !== me);
     /* Sarkık devir işareti TEK BAŞINA da haber değeridir (iş kaybolmasın); başka canlı
-       session yoksa blok yalnız o satırı taşır. İkisi de yoksa TEK BAYT basılmaz. */
+       session yoksa blok yalnız o satırı taşır. Üçü de yoksa TEK BAYT basılmaz. */
     if (!others.length) {
-      if (!devirSatir) return pass();
+      if (!devirSatir && !bildiri.length && !orkSatir) return pass();
       return out({
         hookSpecificOutput: {
           hookEventName: olay,
-          additionalContext: `[eşzamanlılık] ${devirSatir}`,
+          additionalContext: [
+            ...bildiri,
+            ...(orkSatir ? [`[eşzamanlılık] ${orkSatir}`] : []),
+            ...(devirSatir ? [`[eşzamanlılık] ${devirSatir}`] : []),
+          ].join("\n"),
         },
       });
     }
@@ -376,10 +562,12 @@ function main() {
       hookSpecificOutput: {
         hookEventName: olay,
         additionalContext: [
+          ...bildiri,
           `[eşzamanlılık] Bu repoda ${others.length} BAŞKA canlı Claude session'ı var:`,
           ...lines,
           heldLines.length ? `Tutulan kilitler:` : `Tutulan kilit yok.`,
           ...heldLines,
+          ...(orkSatir ? [orkSatir] : []),
           ...(devirSatir ? [devirSatir] : []),
           `Protokol: yıkıcı/uzun bir yazımdan ÖNCE kaynağı claim'le, bitince bırak.`,
           `  node ~/.claude/skills/eszamanli/scripts/claim.mjs claim --res <kaynak> --intent "..."`,

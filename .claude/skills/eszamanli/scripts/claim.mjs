@@ -5,6 +5,7 @@
  *   claim   --res <kaynak> [--intent "..."] [--todo "..."] [--breadth broad|focused]
  *   release [--res <kaynak> | --all]             # sahipsen bırakır; sıradaysan VAZGEÇER
  *   status  [--json]
+ *   orkestrator kayit [--kapsam "..."] [--devral] | birak | durum   # sahadaki koordinatör
  *   wait    --res <kaynak> [--timeout <sn>] [--no-acquire] [--intent "..."]
  *   free    --res <kaynak> [--repo <yol>]        # KİMLİKSİZ sonda: devralınabilir mi? exit 0/1
  *   devret  --res <kaynak> --gorev "..." [--kuru]  # parça B'yi devret (Maestro + kalıcı işaret)
@@ -351,6 +352,51 @@ function cmdClaim() {
   );
 }
 
+/**
+ * BIRAKMANIN İKİNCİ YARISI — sıradakine HABER VER (seviye 0, kullanıcı kararı 2026-08-09).
+ *
+ * Bırakma bugüne dek sonucu YALNIZ bırakanın ekranına basıyordu; bekleyen başka bir
+ * pencerede oturduğu için "sıra sana geldi" haberi ona hiç ulaşmıyordu. Kural artık şu:
+ * **eşzamanlılık sırasına girmiş bir işi bitiren, sıradakine bildiri bırakır.**
+ *
+ * Kimin haber ALDIĞINI kütüphane belirler (`bildirSiradakine`): canlı `wait` süreci olan
+ * bekleyen KENDİ uyanır (ona yazılmaz), pid'siz işaret bırakmış olan uyanamaz (ona yazılır).
+ * Bu satır o hükmü yalnızca GÖRÜNÜR kılar — haber verildiyse söylenir, verilmediyse NEDEN
+ * verilmediği söylenir. Sessiz bırakma yok.
+ */
+function birakmaRaporu(key, I, claim = null) {
+  let r;
+  try {
+    r = L.bildirSiradakine(ROOT, key, { sessionId: I.sessionId, intent: null, neden: "release" });
+  } catch {
+    return `BIRAKILDI: ${key}  (bildiri ölçülemedi)`;
+  }
+  /* SAHADAN ORKESTRATÖRE: bekleyen olsun olmasın, "bu iş bitti" haberi koordinatöre düşer.
+     Bekleyene giden bildiri SIRA sorusunun, buradaki İLERLEME sorusunun cevabıdır. */
+  const ork = L.bildirOrkestratore?.(ROOT, {
+    tip: "bitti",
+    key,
+    kimden: I.sessionId,
+    niyet: claim?.intent || null,
+    bekleyen: r.sessiz.length + r.aktif.length,
+  });
+  const ad = (w) => `${short(w.sessionId)} (${w.intent || "niyet yok"})`;
+  const orkSatir = ork ? `\n  ↳ orkestratöre bildirildi (sahadan ilerleme haberi)` : ``;
+  if (r.bildirilen.length)
+    return (
+      [
+        `BIRAKILDI: ${key} → BİLDİRİ GÖNDERİLDİ: ${r.bildirilen.length} bekleyen`,
+        ...r.bildirilen.map((w, i) => `  ${i + 1}. ${ad(w)} — ilk turunda okuyacak`),
+      ].join("\n") + orkSatir
+    );
+  if (r.aktif.length)
+    return (
+      `BIRAKILDI: ${key} → sıra: ${ad(r.aktif[0])} — bildiri GEREKMEZ, ` +
+      `bekleyen süreci kilidi kendi alıp oturumunu uyandıracak` + orkSatir
+    );
+  return `BIRAKILDI: ${key}  (sırada kimse yok)` + orkSatir;
+}
+
 /** release = "bu kaynakla işim bitti": sahipsen BIRAKIR, sıradaysan VAZGEÇERSİN.
  *  Vazgeçme yolu şart — kuyrukta unutulmuş bir istek sırayı yalanlar. */
 function cmdRelease() {
@@ -362,8 +408,7 @@ function cmdRelease() {
   if (all) {
     for (const c of mine) {
       L.archiveClaim(ROOT, c, "release");
-      const w = L.queueHead(ROOT, c.resource.key);
-      console.log(`BIRAKILDI: ${c.resource.key}` + (w ? ` → sıra: ${short(w.sessionId)} (${w.intent || "?"})` : ""));
+      console.log(birakmaRaporu(c.resource.key, I, c));
     }
     let cikti = 0;
     for (const k of L.queuedKeysOf(ROOT, I.sessionId)) {
@@ -380,11 +425,7 @@ function cmdRelease() {
   if (hedef.length) {
     for (const c of hedef) {
       L.archiveClaim(ROOT, c, "release");
-      const w = L.queueHead(ROOT, c.resource.key);
-      console.log(
-        `BIRAKILDI: ${c.resource.key}` +
-          (w ? ` → sıra: ${short(w.sessionId)} (${w.intent || "?"}) — bekleyen süreç kilidi kendi alacak` : "")
-      );
+      console.log(birakmaRaporu(c.resource.key, I, c));
     }
     return;
   }
@@ -416,10 +457,22 @@ function cmdStatus() {
       ownerAlive: L.procAlive(c.owner?.pid, c.owner?.procStart),
       queue: L.queueOf(ROOT, c.resource.key),
     }));
-    console.log(JSON.stringify({ repo: ROOT, claims: withQ, live }, null, 1));
+    console.log(
+      JSON.stringify({ repo: ROOT, orkestrator: L.orkestratorOku?.(ROOT) || null, claims: withQ, live }, null, 1)
+    );
     return;
   }
   console.log(`repo: ${ROOT}`);
+  {
+    const o = L.orkestratorOku?.(ROOT);
+    if (o) {
+      const s = L.sessionInfo(o.sessionId);
+      console.log(
+        `orkestratör: ${short(o.sessionId)}${s ? ` "${(s.title || "").slice(0, 40)}"` : ""}` +
+          `${o.sessionId === benSid ? " «SEN»" : ""}${o.kapsam ? ` · ${o.kapsam}` : ""}`
+      );
+    }
+  }
   console.log(`canlı session: ${live.length}`);
   for (const s of live)
     console.log(`  • ${short(s.sessionId)} "${s.title || "(başlıksız)"}" — ${s.dirName}, ${s.state}`);
@@ -442,6 +495,23 @@ function cmdStatus() {
     );
   }
   if (!claims.length) console.log("  (kilit yok — serbest)");
+
+  /* OKUNMAMIŞ BİLDİRİ — status TEŞHİS yüzeyidir, TÜKETMEZ (`tuket:false`). Haberi basıp
+     silen tek yer `claim-guard ctx`tir; status da tüketseydi insan bakışı modelin haberini
+     çalardı. Kimlik yumuşak: session dışından koşulursa bu blok hiç doğmaz. */
+  if (benSid && typeof L.bildiriOku === "function") {
+    let gelen = [];
+    try {
+      gelen = L.bildiriOku(ROOT, benSid, { tuket: false });
+    } catch {
+      /* yut */
+    }
+    if (gelen.length) {
+      console.log(`okunmamış bildiri: ${gelen.length} (ilk turunda otomatik okunacak)`);
+      for (const b of gelen)
+        console.log(`  • ${b.key} — ${short(b.kimden)} bıraktı${b.ts ? ` (${dk(b.ts)})` : ""}`);
+    }
+  }
 }
 
 /**
@@ -823,6 +893,16 @@ function cmdDevret() {
     }
   }
 
+  /* SAHADAN ORKESTRATÖRE: devredilen iş, üstlenecek birini arayan İŞTİR — koordinatörün
+     görmesi gereken tam olarak budur (Maestro ölüyken tek bulucusu odur). */
+  L.bildirOrkestratore?.(ROOT, {
+    tip: "devir",
+    key: resource.key,
+    kimden: I.sessionId,
+    gorev: gorev || null,
+    devirId: isaret ? devirId : null,
+  });
+
   // Kuyruk İŞARETİ (devir işaretinden AYRI şey): sahip status'ta "isteyen var" görsün,
   // elverişli ilk anda yol versin. Sıra TUTMAZ (pid yok) — devrin sırası iş kuyruğunda.
   L.enqueue(ROOT, resource.key, {
@@ -1056,9 +1136,68 @@ function cmdMukerrer() {
   );
 }
 
+/**
+ * `orkestrator kayit|birak|durum` — sahadaki koordinatör oturumu İLAN eder.
+ *
+ * Orkestratör, planı yürüten/aşamaları sırayla ateşleyen oturumdur: PM'in projeler-arası
+ * ve agentic olanının aksine repo İÇİNDE, elini işe sokmuş ve 0 token. Kayıt olduğu andan
+ * itibaren saha olayları (iş bitti · biri bloke oldu · oturum kapandı · iş devredildi)
+ * ona KENDİLİĞİNDEN düşer — kimse ona rapor yazmak zorunda değildir.
+ *
+ * TEK SLOT: canlı bir kayıt varken ikincisi sessizce KAPAMAZ, `--devral` ister. Gerekçe
+ * kilitlerdekiyle aynı: sessiz sahip değişimi, haberlerin nereye gittiğini ölçülemez kılar.
+ */
+function cmdOrkestrator() {
+  const alt = argv[1] || "durum";
+  if (alt === "durum") {
+    const o = L.orkestratorOku(ROOT); // kimliksiz okunur: insan da bakabilmeli
+    if (!o) return console.log(`orkestratör: YOK (repo: ${ROOT})`);
+    const s = L.sessionInfo(o.sessionId);
+    console.log(
+      `orkestratör: ${short(o.sessionId)}${s ? ` "${(s.title || "(başlıksız)").slice(0, 56)}" (${s.state})` : ""}\n` +
+        `  ${dk(o.since)} kayıtlı${o.kapsam ? ` · kapsam: ${o.kapsam}` : ""}` +
+        `${o.devralindi ? ` · devraldı: ${short(o.devralindi)}` : ""}`
+    );
+    return;
+  }
+  const I = me();
+  if (alt === "birak") {
+    console.log(
+      L.orkestratorBirak(ROOT, I.sessionId)
+        ? "ORKESTRATÖRLÜK BIRAKILDI — saha haberleri artık kimseye düşmüyor."
+        : "Sende değil: orkestratör kaydı başkasında ya da hiç yok."
+    );
+    return;
+  }
+  if (alt !== "kayit") {
+    console.error("Kullanım: orkestrator kayit [--kapsam \"...\"] [--devral] | birak | durum");
+    process.exit(5);
+  }
+  const r = L.orkestratorKayit(ROOT, I, { kapsam: flag("kapsam"), devral: has("devral") });
+  if (!r.ok) {
+    const s = L.sessionInfo(r.mevcut?.sessionId);
+    console.error(
+      `ORKESTRATÖR ZATEN VAR: ${short(r.mevcut?.sessionId)}${s ? ` "${(s.title || "").slice(0, 48)}" (${s.state})` : ""}\n` +
+        `  ${dk(r.mevcut?.since)} kayıtlı. Gerçekten sen devralacaksan: orkestrator kayit --devral`
+    );
+    process.exit(3);
+  }
+  console.log(
+    [
+      `ORKESTRATÖR SENSİN: ${ROOT}`,
+      r.oncekiSahip ? `  devralındı: ${short(r.oncekiSahip)}` : ``,
+      `  Saha olayları turlarının başında sana düşecek: iş bitti · bloke · oturum kapandı · devir.`,
+      `  Oturum kapanınca kayıt KENDİLİĞİNDEN düşer; erken bırakmak için: orkestrator birak`,
+    ]
+      .filter(Boolean)
+      .join("\n")
+  );
+}
+
 const table = {
   claim: cmdClaim,
   release: cmdRelease,
+  orkestrator: cmdOrkestrator,
   status: cmdStatus,
   wait: cmdWait,
   free: cmdFree,

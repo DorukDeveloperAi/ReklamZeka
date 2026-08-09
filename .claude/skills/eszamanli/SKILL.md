@@ -62,6 +62,66 @@ koruma diye bir şey olmazdı).
 `release` iki iş görür: sahipsen **bırakır**, sıradaysan **vazgeçersin**. Vazgeçme yolu
 şarttır — kuyrukta unutulmuş bir istek sırayı yalanlar.
 
+## BIRAKAN HABER VERİR — sözleşmenin ikinci yarısı ⭐
+
+**Eşzamanlılık sırasına girmiş bir işi bitiriyorsan, seni bekleyene HABER BIRAKMADAN
+bitmiş sayılmaz.** Kural kullanıcı kararıdır (2026-08-09) ve gerekçesi ölçülmüştür: sıra
+doğru kuruluyordu ama "sıra sana geldi" haberi hiç kimseye ulaşmıyordu — bırakan sonucu
+KENDİ ekranına basıyor, bekleyen başka bir pencerede sessizce oturuyordu (defter,
+2026-08-07/08: 25 bloke olayına karşılık 15 kapanış).
+
+Haberi **motor gönderir, sen unutamazsın** — tek koşul kilidi BIRAKMANDIR:
+
+```sh
+node $S release --res <kaynak>     # ← bildiri tam burada doğar
+```
+
+Kim haber alır, kim almaz (`claims-lib: bildirSiradakine` — hüküm tek yerde):
+
+| bekleyenin cinsi | uyanma yolu | ne olur |
+|---|---|---|
+| **AKTİF** (canlı `wait` süreci) | kendi süreci kilidi onun adına alır | bildiri **yazılmaz** — gereksiz, üstelik okunduğunda bayat olurdu |
+| **SESSİZ** (pid'siz "istedim" işareti) | **yok** | bildiri yazılır; bekleyen ilk turunda okur |
+
+Okuma ucu `claim-guard ctx`tir (SessionStart + UserPromptSubmit, zaten kayıtlı): haber
+**bir kez** basılır ve tüketilir. Araya başka bir sahip girdiyse satır bunu söyler ve
+"şimdi al" yerine "yeniden sıraya gir" der — bayat haber yalanlamaz.
+
+### ORKESTRATÖR — sahadaki koordinatör de haber alır
+
+Planı yürüten, aşamaları sırayla ateşleyen bir oturum varsa **kayıt olur** ve saha olayları
+ona kendiliğinden düşer; kimse ona rapor yazmaz:
+
+```sh
+node $S orkestrator kayit --kapsam "plan: bildiri v1"   # sahadaki koordinatör SENSİN
+node $S orkestrator durum | birak                        # gör · erken bırak
+```
+
+| olay | ne zaman düşer | ne söyler |
+|---|---|---|
+| ✅ `bitti` | bir kilit bırakıldı | hangi iş bitti · niyeti · kaç bekleyeni vardı |
+| ⛔ `bloke` | bir oturum kapıda durdu | kim, hangi kaynakta, sahibi kim (**yalnız İLK kez** — yankı bildirilmez) |
+| 🔚 `kapandi` | oturum kapandı | kaç kilit bırakıldı · kaç bekleyişi yarım kaldı |
+| 🔁 `devir` | iş devredildi | görev + `devir al --id` komutu (üstlenecek biri aranıyor) |
+
+**Orkestratör ≠ PM.** PM projeler-arası, agentic ve karar verir; orkestratör **repo içinde**,
+0 token ve yalnız **haber alır** — sahada elini işe sokmuş olan odur. **TEK SLOT:** canlı bir
+kayıt varken ikincisi sessizce kapamaz, `--devral` ister. Canlılık kilitlerdeki ölçütün
+aynısıdır (pid) — çökmüş orkestratör kimseyi bekletmez, oturum kapanınca kayıt kendiliğinden
+düşer. **Görünmez gözlemci yoktur:** sahadaki her oturum, turunun başında bu repoda bir
+orkestratör olduğunu ve olaylarının ona bildirildiğini okur.
+
+**KAPSAM REPO'DUR (ilanlı):** bu katman `~/.claude/claims/<repo>/` defterinde yaşar. Başka
+repoda da koordine edecekse orada AYRICA kayıt olur — projeler-arası eksen `/pm`'in işidir,
+burada ikinci bir küresel router yapılmaz.
+
+**İLANLI SINIR:** bildiri bir **posta kutusudur, ZİL DEĞİL** — durmuş bir oturumu
+UYANDIRMAZ (uyandırmanın tek yolu enjeksiyondur = Maestro, ve o ayrı bir katmandır).
+Seviye 0 taşıyıcısı bu yüzden iki şeyi birden söyler: *bırakırken haber ver* (bu bölüm) ve
+*bekleyeceksen kendi uyanma yolunu kur* (`wait`, aşağıdaki PARÇALA bölümü). Biri ötekinin
+yerine geçmez. Kapanan oturum da haber verir: SessionEnd (`release_all`) aynı motoru koşar.
+Okunmamış haberini görmek için: `node $S status`.
+
 ## BLOKE OLUNCA: PARÇALA — A şimdi, B kaynak devralınınca
 
 Kapı bir yazımı `ÇAKIŞMA KİLİDİ` ile reddettiğinde ya da `claim` `MEŞGUL` dediğinde
@@ -119,7 +179,9 @@ Kapı bir yazımı `ÇAKIŞMA KİLİDİ` ile reddettiğinde ya da `claim` `MEŞG
    `renameSync` ile atomiktir (POSIX: tek kazanan) ve **kaybeden işi KOŞMAZ** (exit 1 →
    "Bu işi KOŞMA"). Dedup bir niyet beyanı değil, bir mekanizmadır.
 4. **Kilidi bırak.** `release --res <kaynak>` — unutma. `status`unda bekleyen ya da
-   devir işareti görünüyorsa elverişli ilk anda bırak (küçük iş önceliklidir).
+   devir işareti görünüyorsa elverişli ilk anda bırak (küçük iş önceliklidir). Bırakma aynı
+   anda **haber vermedir**: sıradaki sessiz bekleyenlere bildiri tam burada düşer
+   (yukarıdaki *BIRAKAN HABER VERİR*). Bırakmayı atlarsan haber de doğmaz.
 
 ### Sıra GERÇEKTİR (ama yalnız gerçekten bekleyene)
 
