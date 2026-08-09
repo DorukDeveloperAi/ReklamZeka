@@ -287,18 +287,30 @@ function assertUnique(values: readonly string[], label: string): void {
 
 export function isOfficialGuidanceSourceUrl(value: string): boolean {
   try {
+    if (value !== value.trim() || /[\s\u0000-\u001f\u007f]/u.test(value)) return false;
+    // WHATWG URL normalizes dot segments before exposing pathname. Reject them
+    // from the raw path so the application and PostgreSQL validator make the
+    // same fail-closed decision instead of approving a rewritten URL.
+    const schemeEnd = value.indexOf("//");
+    const relativeAuthorityEnd = schemeEnd === -1 ? -1 : value.slice(schemeEnd + 2).search(/[/?#]/);
+    const rawAuthority = relativeAuthorityEnd === -1 ? value.slice(schemeEnd + 2)
+      : value.slice(schemeEnd + 2, schemeEnd + 2 + relativeAuthorityEnd);
+    const rawPathAndQuery = relativeAuthorityEnd === -1 ? "" : value.slice(schemeEnd + 2 + relativeAuthorityEnd);
+    const rawPath = rawPathAndQuery.split(/[?#]/, 1)[0]!;
+    if ((rawAuthority.includes(":") && !rawAuthority.endsWith(":443"))
+      || value.includes("\\") || /(^|\/)(?:\.|%2e){1,2}(?:\/|$)/i.test(rawPath)) return false;
     const url = new URL(value);
     const host = url.hostname.toLowerCase();
     const path = url.pathname.replace(/\/+$/, "") || "/";
-    if (url.protocol !== "https:" || url.username || url.password || url.hash) return false;
+    if (url.protocol !== "https:" || url.username || url.password || url.port || url.hash) return false;
     if ((host === "facebook.com" || host === "www.facebook.com")
-      && ["/business/help", "/business/ads-guide", "/business/news", "/business/m"].some((root) => path === root || path.startsWith(`${root}/`))) return true;
+      && ["/business/help", "/business/ads-guide"].some((root) => path === root || path.startsWith(`${root}/`))) return true;
     if (host === "developers.facebook.com" && (path === "/docs" || path.startsWith("/docs/"))) return true;
     if ((host === "meta.com" || host === "www.meta.com")
       && ["/help", "/business", "/policies", "/technologies"].some((root) => path === root || path.startsWith(`${root}/`))) return true;
-    if (host === "developers.meta.com") return path === "/" || path.startsWith("/docs/");
+    if (host === "developers.meta.com") return path === "/" || path === "/docs" || path.startsWith("/docs/");
     if (host === "transparency.meta.com") return path === "/policies" || path.startsWith("/policies/");
-    if (host === "developers.instagram.com") return path === "/" || path.startsWith("/docs/");
+    if (host === "developers.instagram.com") return path === "/" || path === "/docs" || path.startsWith("/docs/");
     if (host === "help.instagram.com") return path === "/" || /^\/[0-9]+(?:\/.*)?$/.test(path);
     if (host === "business.instagram.com") return path === "/blog" || path.startsWith("/blog/");
     return false;

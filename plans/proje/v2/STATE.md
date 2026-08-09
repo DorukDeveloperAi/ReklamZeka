@@ -15,12 +15,66 @@
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
 | 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.5 ve Slice 01 kapalı; geniş field/breakdown kataloğu, multi-business grouping ve export/rotation ileri işi açık |
-| 09 | kategori ve talimat | DEVAM | 08 | Guarded category/policy/practice lifecycle, target chooser, precedence, promotion dry-run ve Guidance Set hazır; facet/source/formalization/mutable promotion ile canlı DB kabulü açık |
+| 09 | kategori ve talimat | DEVAM | 08 | Guarded category/policy/practice/profile lifecycle, 11-facet guidance ve run binding hazır; authoritative policy impact/formalization/mutable promotion ile canlı DB kabulü açık |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
 | 11 | bütçe planlama | KAPALI | 09,10 | Checklist'teki envelope/constraint/forecast/scenario/ledger/target binding dilimleri kanıtlı; upstream context genişlemeleri A09/A10 altında izleniyor |
 | 12 | prompt/advisor | DEVAM | 09–11 | narrative envelope/claim guard temeli var; translator/ledger sırada |
 | 13 | eylem valfi ve rutin | AÇIK | 04,10–12 | planlandı; write kapalı |
 | 14 | kontrol merkezi | AÇIK | 07,09–13 | planlandı |
+
+## 2026-08-10 — A09 CategoryProfile, 11-facet guidance ve run-binding checkpoint'i
+
+- CategoryProfile için owner/admin create/revise/publish/pause/archive vertical'ı eklendi.
+  Aktif workspace kilidinden sonra membership rolü aynı transaction'da yeniden okunur;
+  registry/profile version+hash OCC, append-only profile revision, prior-profile
+  `category_profile` invalidation ve canonical audit birlikte commit/rollback olur. Audit
+  publish/pause/archive reason code'unu exact saklar; create/revise için reason `null` kalır.
+  UI parser'ı 20.000 definition, bundle başına 64 ref, typed opaque prefix, duplicate/sensitive
+  ref ve bounded text guard'larıyla fail-closed'dur. Definition mutation ile profile mutation
+  ayrı transaction'dır ve Studio bunu `profile bekliyor` olarak açık gösterir.
+- Guidance registry 11 facet'e genişledi: global, account-group, account, objective, funnel,
+  optimization, internal-category, lifecycle, entity, promotion-template ve topic. Altı
+  provenance türünün tamamı bounded kullanıcı authoring akışında ayrı source revision olarak
+  korunur; Studio çoklu source'u `sources[]` ile kayıpsız gösterir. Official Meta URL kabulü
+  yalnız docs/help/business catalog/policy yollarıdır; JS ve PostgreSQL aynı uppercase
+  scheme/host, default `:443`, case-sensitive path, non-default port, credential/fragment ve
+  literal/encoded dot-segment karar matrisini uygular.
+- `effective-guidance-pack/1.1.0` applied/suppressed/conflicting tüm kart ve kaynakları exact
+  ref/version/hash manifestinde taşır. Registry/context sınırları sessiz truncation yapmaz;
+  limit aşımı fail-closed'dur. `guidance-agent-tools/1.1.0` beş yeni facet'i explicit ve bounded
+  ister; eski eksik payload bilinçli breaking contract olarak reddedilir.
+- `guidance_analysis_run_bindings` set/card/source revision-hash manifestini aynı Decision Room
+  analysis-asset transaction'ında immutable bağlar; pre-1.1 replay'e sonradan uydurma binding
+  eklenmez. Yeni tablo ve mevcut guidance registry FORCE RLS, PUBLIC/anon/authenticated/
+  service_role revoke ve tombstoning-dışı UPDATE/DELETE reddi taşır. DB dizileri set/card/source
+  için 50/500/1.000 ile sınırlı; duplicate ref, JSON null/numeric scalar, decimal/overflow version
+  ve malformed hash fail-closed'dur.
+- Dış checkpoint mekanizması bu dalga tamamlanmadan ana değişiklikleri `39ca8b8` commit'ine
+  alıp remote'a push etti; ardından `450f268` merge ve `aa84ede` filing commit/push'u oluştu.
+  Ana ajan bunların hiçbirinde commit/push çalıştırmadı. Remote'a girmiş
+  `20260809205228_spotty_rogue` migration'ı bu nedenle değiştirilmedi; son hardening ayrı
+  forward-only `20260809212851_soft_mesmero` migration/journal/snapshot'ına taşındı ve eski
+  exact-ref CHECK drop/re-add ile bütün legacy satırları yeniden tarar. Historical
+  `plans/reklamzeka-sistemi/v2` değişmedi.
+- Trusted policy composition saf sözleşmesi exact current lifecycle, frozen CategoryProfile
+  ref/version/hash ve reviewed Meta objective mapping version/hash'ini doğrular; raw provenance
+  context'e kopyalanmaz ve tüm action/tool/network/SQL authority alanları false'dur. Katalog
+  yalnız self-hash validated olduğundan `productionAuthoritySourceBound=false`; persisted
+  tenant-bound authority-tier/decision/manual-lock loader ve strict-policy authoritative impact
+  reader açık kalır.
+- Ana entegrasyon kanıtı: hedefli 14 dosya/70 test ve son hardening 3 dosya/19 test; tam
+  `npm test` 228 dosya/1.383 test; production build, typecheck, `db:check`, architecture,
+  model/security boundaries, secret scan ve production dependency security yeşil. Gerçek
+  Chromium'da CategoryProfile ve Guidance fail-closed ekranları 390/768/1440 px'te
+  `scrollWidth == clientWidth`; policy/action/Meta authority kapalı metni görünür. Console yalnız
+  beklenen local-source 503'leri ve favicon 404 içerdi.
+- Canlı DB kapısı çevreseldir: `verify:guidance-studio-live`,
+  `verify:decision-room-analysis-assets-db`, `verify:category-profile-live` ve
+  `verify:supabase-security` redakte `postgres_connection_not_configured` ile exit 2 döndürdü.
+  `.env.local` veya `DIRECT_DATABASE_URL`/`DATABASE_URL` güvenli biçimde geri geldiğinde aynı
+  komutlar hazır continuation'dır. Yeni facet preview scope'ları için production tenant catalog
+  resolver'ı ve gerçek session happy path ayrıca açıktır. Meta write, real policy publish,
+  production action, deploy veya ana ajan tarafından git push yapılmadı.
 
 ## 2026-08-09 — A09 human-gated Practice, Promotion dry-run ve Strict Policy Studio
 

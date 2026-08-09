@@ -1387,7 +1387,8 @@ export const guidanceSources = pgTable("guidance_sources", {
   `),
   check("guidance_sources_official_publish_evidence", sql`
     ${table.sourceType} <> 'official_meta_guidance' or ${table.status} <> 'published' or (
-      ${table.sourceUrl} is not null and ${table.sourceUrl} ~ '^https://' and ${table.capturedAt} is not null
+      ${table.sourceUrl} is not null and guidance_official_source_url_allowed(${table.sourceUrl})
+      and ${table.capturedAt} is not null
       and ${table.reviewedAt} is not null and ${table.reviewBy} is not null
       and ${table.reviewedAt} >= ${table.capturedAt} and ${table.reviewBy} > ${table.reviewedAt}
     )
@@ -2478,6 +2479,9 @@ export const guidanceAnalysisRunBindings = pgTable("guidance_analysis_run_bindin
     jsonb_typeof(${table.selectedSetRefs}) = 'array'
     and jsonb_typeof(${table.cardRefs}) = 'array'
     and jsonb_typeof(${table.sourceRefs}) = 'array'
+    and jsonb_array_length(${table.selectedSetRefs}) <= 50
+    and jsonb_array_length(${table.cardRefs}) <= 500
+    and jsonb_array_length(${table.sourceRefs}) <= 1000
   `),
   check("guidance_analysis_run_bindings_guidance_only", sql`${table.authority} = 'guidance_only'`),
   check("guidance_analysis_run_bindings_no_forbidden_material", sql`

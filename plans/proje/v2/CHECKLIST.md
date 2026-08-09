@@ -80,6 +80,11 @@
 - [x] Kullanıcı tanımlı dimension, single/multi cardinality ve entity-level kataloğu.
 - [x] Meta/internal selector ve mapping preview motoru.
 - [x] Category profile: analysis/rule/budget/transfer/schedule/action/creative policy bundle bağları.
+  - [x] Append-only profile revision/hash-chain, parent/identity bütünlüğü ve frozen-context
+    `category_profile` component binding'i.
+  - [x] Owner/admin create/revise/publish/pause/archive; workspace lock sonrası membership
+    recheck, registry+version/hash OCC, reason-code audit ve prior-profile invalidation aynı transaction.
+  - [ ] Bağlı PostgreSQL verifier ve gerçek oturumlu happy-path browser kabulü; yerel DB/session yok.
 - [x] Campaign→adset→ad→creative inheritance, child override ve effective-context snapshot.
   - [x] Kesintisiz hierarchy path, child add/override/deny, manual-lock precedence,
     `parked_conflict` ve frozen category context/hash çekirdeği.
@@ -96,7 +101,10 @@
 - [ ] Precedence/inheritance/suppression/PARKED_CONFLICT resolver.
   - [x] MASTER dokuz kademe sırası, scope specificity/newer publication, exception,
     lossless suppression trace ve eşitlikte `PARKED_CONFLICT` saf resolver matrisi.
-  - [ ] Trusted authority-tier/decision binding adapterı ve frozen analysis composition.
+  - [x] Exact policy lifecycle, frozen CategoryProfile ref/version/hash ve reviewed objective
+    mapping kanıtını doğrulayan authority-free composition contract'ı; production binding'i
+    olmadığını `productionAuthoritySourceBound=false` ile açık tutar.
+  - [ ] Persisted tenant-bound authority-tier/decision/manual-lock loader ve frozen analysis composition.
 - [ ] Versioned draft/publish/pause/archive ve rol/audit API'leri.
   - [x] Guidance için immutable draft/revise/publish/archive, optimistic registry hash,
     analyst draft + owner/admin publish/archive ve mutation+audit tek transaction.
@@ -160,11 +168,17 @@
     AND, aynı facet alternatifleri OR çözülür ve Studio'da birlikte görünür.
   - [x] Guidance set draft/revise/review/archive authoring; ordered published-card refs,
     registry+version OCC, append-only history, audit+context invalidation ve role-aware UI.
-  - [ ] Account-group/funnel/optimization/lifecycle/promotion-template scope ve analysis-run binding.
+  - [x] Account-group/funnel/optimization/lifecycle/promotion-template dahil 11-facet registry,
+    agent contract 1.1 ve exact evaluated set/card/source revision-hash manifestli immutable
+    analysis-run binding'i; bounded/no-truncation ve append-only DB guard'ları.
+  - [ ] Yeni facet preview scope'larının tenant-bound authoritative kataloglardan sunucuda
+    çözülmesi ile bağlı PostgreSQL/gerçek session acceptance.
 - [ ] Owner statement + official Meta source + experiment/observation provenance ve freshness.
   - [x] Altı provenance türü, official source publish gate'i, review-by/freshness suppression ve
     frozen geçmiş bağlamı.
-  - [ ] Owner dışındaki source türleri için kullanıcı authoring ve analysis-run binding'i.
+  - [x] Owner dışındaki beş source türü için bounded kullanıcı authoring, çoklu-source lossless
+    Studio projection ve exact revision/hash analysis-run binding'i.
+  - [ ] Bağlı PostgreSQL ve gerçek oturumlu source authoring/run-binding acceptance.
 - [ ] G0→G4 progressive formalization, semantic diff, historical replay ve impact preview.
   - [x] Append-only hash-chainli saf maturity/transition contract; G2→G3 ve G3→G4 explicit
     owner/admin confirmation, fail-closed ambiguity ve A13 valve-ref-only G4 sınırı.

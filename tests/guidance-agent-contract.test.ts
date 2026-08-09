@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GuidanceAgentContract } from "@/application/guidance-agent-contract";
+import { GuidanceAgentContract, GUIDANCE_AGENT_TOOLS } from "@/application/guidance-agent-contract";
 import { createGuidanceRegistry } from "@/domain/guidance/registry";
 import { MCP_TOOL_SCHEMAS } from "@/mcp/tool-schemas";
 
@@ -51,6 +51,7 @@ describe("GuidanceAgentContract", () => {
     ]);
     expect(result.result.missing).toEqual([]);
     expect(result.result.timeframe).toEqual({ ref: "timeframe_last_7d", kind: "rolling" });
+    expect(result.contractVersion).toBe("guidance-agent-tools/1.1.0");
     expect(result.authority.canWriteMeta).toBe(false);
   });
 
@@ -104,5 +105,16 @@ describe("GuidanceAgentContract", () => {
       arguments: { ...base, accountGroupRefs: Array.from({ length: 26 }, (_, index) => `account_group_${index}`) } }))
       .rejects.toMatchObject({ code: "invalid_input" });
     expect(MCP_TOOL_SCHEMAS.guidance_effective_preview.safeParse({ ...base, lifecycle: undefined }).success).toBe(false);
+    expect(MCP_TOOL_SCHEMAS.guidance_effective_preview.safeParse({ ...base,
+      topics: ["budget", "budget"] }).success).toBe(false);
+    const previewTool = GUIDANCE_AGENT_TOOLS.find((tool) => tool.name === "guidance_effective_preview");
+    expect(previewTool?.inputSchema.properties).toMatchObject({
+      accountGroupRefs: { maxItems: 25, uniqueItems: true },
+      internalCategoryRefs: { maxItems: 100, uniqueItems: true,
+        items: { pattern: "^category_[a-f0-9]{24}$" } },
+      promotionTemplateRefs: { maxItems: 50, uniqueItems: true },
+      topics: { maxItems: 100, uniqueItems: true },
+      requiredTopics: { maxItems: 100, uniqueItems: true },
+    });
   });
 });

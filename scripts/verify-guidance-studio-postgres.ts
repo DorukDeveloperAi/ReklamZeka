@@ -103,16 +103,15 @@ if (!connectionString) {
   } finally {
     globalThis.fetch = originalFetch;
   }
-  const residue = (await database.execute(sql`select
+  const residue = ((await database.execute(sql`select
     (select count(*)::int from workspaces where id = ${workspaceId}::uuid) as workspace_count,
     (select count(*)::int from users where id = ${userId}::uuid) as user_count,
     (select count(*)::int from guidance_sources where workspace_id = ${workspaceId}::uuid) as source_count,
     (select count(*)::int from guidance_cards where workspace_id = ${workspaceId}::uuid) as card_count,
     (select count(*)::int from guidance_bindings where workspace_id = ${workspaceId}::uuid) as binding_count,
-    (select count(*)::int from audit_events where workspace_id = ${workspaceId}::uuid) as audit_count`)).rows[0]
-    as Record<string, unknown>;
+    (select count(*)::int from audit_events where workspace_id = ${workspaceId}::uuid) as audit_count`)).rows[0]) as Record<string, unknown>;
   await pool.end();
-  const residueCount = Object.values(residue).reduce((sum, value) => sum + Number(value), 0);
+  const residueCount = Object.values(residue).reduce<number>((sum, value) => sum + Number(value), 0);
   if (residueCount !== 0 || fetchCalls !== 0 || !evidence) throw new Error("guidance_studio_outer_rollback_failed");
   console.log(JSON.stringify({ ok: true, outerRollback: true, residueRows: residueCount,
     metaOrNetworkCalls: fetchCalls, ...evidence }));

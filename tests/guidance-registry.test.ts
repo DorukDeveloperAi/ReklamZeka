@@ -122,14 +122,22 @@ describe("Guidance registry provenance and publication boundary", () => {
       .toThrowError(expect.objectContaining<Partial<GuidanceRegistryValidationError>>({ code: "official_source_incomplete" }));
   });
 
-  it("allows only official Meta documentation/help/catalog paths for official classification", () => {
+  it("keeps host/default-port/path/dot-segment semantics fail-closed for SQL parity", () => {
     for (const sourceUrl of ["https://www.facebook.com/business/help/example",
+      "HTTPS://WWW.FACEBOOK.COM:443/business/help/example?locale=tr_TR",
       "https://developers.facebook.com/docs/marketing-api", "https://transparency.meta.com/policies/ad-standards/"]) {
       expect(isOfficialGuidanceSourceUrl(sourceUrl)).toBe(true);
     }
     for (const sourceUrl of ["https://example.com/meta", "https://user@facebook.com/business/help/1",
       "https://www.facebook.com/business/help/1#copied", "https://www.facebook.com/ordinary.user/posts/123",
-      "https://www.instagram.com/p/abc123", "https://developers.facebook.com/not-docs"]) {
+      "https://www.instagram.com/p/abc123", "https://developers.facebook.com/not-docs",
+      "https://www.facebook.com:444/business/help/1", "https://www.facebook.com:0443/business/help/1",
+      " https://www.facebook.com/business/help/1 ", "https://www.facebook.com/BUSINESS/HELP/1",
+      "https://www.facebook.com/business/other/../help/1",
+      "https://www.facebook.com/business/%2e%2e/help/1",
+      "https://www.facebook.com/business/help/1?x=\\foo",
+      "https://www.facebook.com/business/help/1 ",
+      "https://www.facebook.com/business/help/1?x=\tvalue"]) {
       const invalid = source(`invalid-${sourceUrl.length}`, "official_meta_guidance", {
         sourceUrl, reviewBy: "2026-09-01T09:00:00.000Z",
       });

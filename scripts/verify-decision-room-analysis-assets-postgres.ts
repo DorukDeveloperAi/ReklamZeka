@@ -54,6 +54,11 @@ let retryFrozen = false;
 let guidanceRevisionFrozen = false;
 let guidanceBindingImmutable = false;
 let exactGuidanceRefGuard = false;
+let guidanceRefCapsEnforced = false;
+let guidanceRefUniqueness = false;
+let guidanceScalarTypes = false;
+let officialGuidanceUrlParity = false;
+let guidanceConstraintsValidated = false;
 let crossTenantBlocked = false;
 let immutableRows = false;
 let rlsAndGrants = false;
@@ -297,6 +302,85 @@ try {
       exactGuidanceRefGuard = Boolean(reason && typeof reason === "object" && "constraint" in reason
         && reason.constraint === "guidance_analysis_run_bindings_exact_refs");
     }
+    const exactRef = { cardRef: "guidance_duplicate", version: 1, recordHash: "a".repeat(64) };
+    const duplicateCardRefs = JSON.stringify([exactRef, exactRef]);
+    const validCardRefs = JSON.stringify([exactRef]);
+    const refNotString = JSON.stringify([{ ...exactRef, cardRef: 123 }]);
+    const refNull = JSON.stringify([{ ...exactRef, cardRef: null }]);
+    const hashNotString = JSON.stringify([{ ...exactRef, recordHash: 123 }]);
+    const hashNull = JSON.stringify([{ ...exactRef, recordHash: null }]);
+    const versionNotNumber = JSON.stringify([{ ...exactRef, version: "1" }]);
+    const versionNull = JSON.stringify([{ ...exactRef, version: null }]);
+    const versionNotInteger = JSON.stringify([{ ...exactRef, version: 1.5 }]);
+    const versionDecimalZero = validCardRefs.replace('"version":1', '"version":1.0');
+    const versionOverflow = JSON.stringify([{ ...exactRef, version: 2_147_483_648 }]);
+    const guidanceGuard = resultRows(await transaction.execute(sql`
+      select
+        guidance_revision_refs_exact(${validCardRefs}::jsonb, 'cardRef') as valid_allowed,
+        guidance_revision_refs_exact(${duplicateCardRefs}::jsonb, 'cardRef') as duplicate_allowed,
+        guidance_revision_refs_exact(${refNotString}::jsonb, 'cardRef') as ref_scalar_allowed,
+        guidance_revision_refs_exact(${refNull}::jsonb, 'cardRef') as ref_null_allowed,
+        guidance_revision_refs_exact(${hashNotString}::jsonb, 'cardRef') as hash_scalar_allowed,
+        guidance_revision_refs_exact(${hashNull}::jsonb, 'cardRef') as hash_null_allowed,
+        guidance_revision_refs_exact(${versionNotNumber}::jsonb, 'cardRef') as version_string_allowed,
+        guidance_revision_refs_exact(${versionNull}::jsonb, 'cardRef') as version_null_allowed,
+        guidance_revision_refs_exact(${versionNotInteger}::jsonb, 'cardRef') as version_decimal_allowed,
+        guidance_revision_refs_exact(${versionDecimalZero}::jsonb, 'cardRef') as version_decimal_zero_allowed,
+        guidance_revision_refs_exact(${versionOverflow}::jsonb, 'cardRef') as version_overflow_allowed,
+        (select count(*)::int from pg_constraint where conname in (
+          'guidance_analysis_run_bindings_arrays', 'guidance_analysis_run_bindings_exact_refs',
+          'guidance_sources_official_publish_evidence') and convalidated) as validated_constraint_count
+    `))[0];
+    guidanceRefUniqueness = guidanceGuard?.valid_allowed === true && guidanceGuard.duplicate_allowed === false;
+    guidanceScalarTypes = guidanceGuard?.ref_scalar_allowed === false && guidanceGuard.ref_null_allowed === false
+      && guidanceGuard.hash_scalar_allowed === false && guidanceGuard.hash_null_allowed === false
+      && guidanceGuard.version_string_allowed === false && guidanceGuard.version_null_allowed === false
+      && guidanceGuard.version_decimal_allowed === false
+      && guidanceGuard.version_decimal_zero_allowed === false && guidanceGuard.version_overflow_allowed === false;
+    guidanceConstraintsValidated = Number(guidanceGuard?.validated_constraint_count) === 3;
+    const officialUrlGuard = resultRows(await transaction.execute(sql`select
+      guidance_official_source_url_allowed('HTTPS://WWW.FACEBOOK.COM:443/business/help/1?locale=tr_TR') as valid_default_port,
+      guidance_official_source_url_allowed('https://www.facebook.com:444/business/help/1') as nondefault_port,
+      guidance_official_source_url_allowed('https://www.facebook.com:0443/business/help/1') as padded_default_port,
+      guidance_official_source_url_allowed('https://www.facebook.com/BUSINESS/HELP/1') as uppercase_path,
+      guidance_official_source_url_allowed('https://www.facebook.com/business/other/../help/1') as literal_dot,
+      guidance_official_source_url_allowed('https://www.facebook.com/business/%2e%2e/help/1') as encoded_dot,
+      guidance_official_source_url_allowed(${"https://www.facebook.com/business/help/1?x=\\foo"}) as query_backslash,
+      guidance_official_source_url_allowed(${"https://www.facebook.com/business/help/1 "}) as trailing_whitespace,
+      guidance_official_source_url_allowed(${"https://www.facebook.com/business/help/1?x=\tvalue"}) as query_tab,
+      guidance_official_source_url_allowed('https://www.instagram.com/p/ordinary') as ordinary_content
+    `))[0];
+    officialGuidanceUrlParity = officialUrlGuard?.valid_default_port === true
+      && [officialUrlGuard.nondefault_port, officialUrlGuard.padded_default_port,
+        officialUrlGuard.uppercase_path, officialUrlGuard.literal_dot,
+        officialUrlGuard.encoded_dot, officialUrlGuard.query_backslash,
+        officialUrlGuard.trailing_whitespace, officialUrlGuard.query_tab,
+        officialUrlGuard.ordinary_content].every((value) => value === false);
+
+    await transaction.execute(sql.raw(`create temporary table guidance_binding_guard_probe
+      (like guidance_analysis_run_bindings including all) on commit drop`));
+    const revisionRefs = (kind: "set" | "card" | "source", count: number) => JSON.stringify(
+      Array.from({ length: count }, (_, index) => ({ [`${kind}Ref`]: `${kind}_${index.toString(16).padStart(24, "0")}`,
+        version: 1, recordHash: "b".repeat(64) })),
+    );
+    const rejectsCap = async (setCount: number, cardCount: number, sourceCount: number): Promise<boolean> => {
+      try {
+        await transaction.transaction(async (savepoint) => {
+          await savepoint.execute(sql`insert into guidance_binding_guard_probe (
+            workspace_id, run_id, registry_hash, pack_hash, selected_set_refs, card_refs,
+            source_refs, authority, binding_hash, occurred_at
+          ) values (${randomUUID()}::uuid, ${randomUUID()}::uuid, ${"c".repeat(64)}, ${"d".repeat(64)},
+            ${revisionRefs("set", setCount)}::jsonb, ${revisionRefs("card", cardCount)}::jsonb,
+            ${revisionRefs("source", sourceCount)}::jsonb, 'guidance_only', ${"e".repeat(64)}, ${now}::timestamptz)`);
+        });
+        return false;
+      } catch (reason) {
+        return Boolean(reason && typeof reason === "object" && "constraint" in reason
+          && reason.constraint === "guidance_analysis_run_bindings_arrays");
+      }
+    };
+    guidanceRefCapsEnforced = (await rejectsCap(51, 0, 0))
+      && (await rejectsCap(0, 501, 0)) && (await rejectsCap(0, 0, 1_001));
     try {
       await new DrizzleDecisionRoomAnalysisRuntimeAssetLoader(transaction as never, foreignWorkspaceId).loadExact(manualInput);
     } catch {
@@ -322,7 +406,7 @@ try {
         (select count(*)::int from information_schema.routine_privileges
           where routine_schema = 'public'
             and routine_name in ('guidance_revision_refs_exact', 'guidance_analysis_run_binding_immutable',
-              'guidance_registry_revision_immutable')
+              'guidance_registry_revision_immutable', 'guidance_official_source_url_allowed')
             and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) as routine_grants
       from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'public' and c.relname in (
@@ -346,7 +430,8 @@ await pool.end();
 
 const result = {
   tablesApplied, versionedRegistry, scheduleRevisionFrozen, manualCurrentFrozen, retryFrozen, guidanceRevisionFrozen,
-  guidanceBindingImmutable, exactGuidanceRefGuard,
+  guidanceBindingImmutable, exactGuidanceRefGuard, guidanceRefCapsEnforced, guidanceRefUniqueness,
+  guidanceScalarTypes, officialGuidanceUrlParity, guidanceConstraintsValidated,
   crossTenantBlocked, immutableRows, rlsAndGrants, temporaryRowsCommitted,
   metaCalls: 0, externalCalls: 0, actionAuthority: "none",
 };
