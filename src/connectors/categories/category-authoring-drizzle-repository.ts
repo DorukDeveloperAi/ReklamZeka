@@ -7,6 +7,7 @@ import type {
   CategoryAuthoringDimension,
   CategoryAuthoringRepository,
   CategoryAuthoringState,
+  CategoryAuthoringTarget,
 } from "@/application/category-authoring-service";
 import { CategoryAuthoringError } from "@/application/category-authoring-service";
 import { DrizzleCategoryArchiveImpactRepository } from "@/connectors/categories/category-archive-impact-drizzle-repository";
@@ -31,11 +32,14 @@ type DefinitionRow = Readonly<{ id: string; dimension_id: string; dimension_key:
   label: string; description: string | null; version: unknown }>;
 type AssignmentRow = Readonly<{ id: string; dimension_id: string; definition_id: string; entity_level: string;
   entity_id: string; operation: string; source: string; manual_lock: unknown; confidence: unknown; version: unknown }>;
+type TargetRow = Readonly<{ entity_level: string; id: string; label: string; via_ad_id: string | null }>;
 type InternalState = Readonly<{ state: CategoryAuthoringState; dimensions: readonly DimensionRow[];
   definitions: readonly DefinitionRow[]; assignments: readonly AssignmentRow[] }>;
 type ResolvedTarget = Readonly<{ target: CategoryHierarchyTarget; externalRef: string }>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EMBEDDED_UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
+const EMBEDDED_META_ID = /\b\d{8,}\b/g;
 const HASH = /^[a-f0-9]{64}$/;
 const LEVELS = new Set(["campaign", "ad_set", "ad", "creative"]);
 
@@ -50,6 +54,12 @@ function text(value: unknown, maximum = 2_000): string {
   if (typeof value !== "string" || !value.trim() || value.length > maximum
     || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)) throw new CategoryAuthoringError("conflict");
   return value;
+}
+
+function publicLabel(value: unknown, fallback: string): string {
+  const clean = text(value, 320).replace(EMBEDDED_UUID, "kimlik gizlendi")
+    .replace(EMBEDDED_META_ID, "kimlik gizlendi").replace(/\s+/g, " ").trim();
+  return clean || fallback;
 }
 
 function uuid(value: unknown): string {
@@ -125,9 +135,50 @@ async function loadState(database: Pick<Database, "execute">, workspaceId: strin
     where assignment.workspace_id = ${workspaceId}::uuid and assignment.archived_at is null
     order by assignment.dimension_id, assignment.definition_id, assignment.entity_level, entity_id, assignment.id
   `));
+  const targetRows = rows<TargetRow>(await database.execute(sql`
+    with campaign_targets as (
+      select 'campaign'::text as entity_level, campaign.id::text, campaign.name as label, null::text as via_ad_id
+      from ad_campaigns campaign
+      where campaign.workspace_id = ${workspaceId}::uuid and campaign.disappeared_at is null
+        and lower(coalesce(campaign.effective_status, campaign.configured_status, '')) = 'active'
+      order by campaign.name, campaign.id limit 20001
+    ), ad_set_targets as (
+      select 'ad_set'::text as entity_level, ad_set.id::text, ad_set.name as label, null::text as via_ad_id
+      from meta_ad_sets ad_set
+      where ad_set.workspace_id = ${workspaceId}::uuid and ad_set.disappeared_at is null
+        and lower(coalesce(ad_set.effective_status, ad_set.configured_status, '')) = 'active'
+      order by ad_set.name, ad_set.id limit 20001
+    ), ad_targets as (
+      select 'ad'::text as entity_level, ad.id::text, ad.name as label, null::text as via_ad_id
+      from meta_ads ad
+      where ad.workspace_id = ${workspaceId}::uuid and ad.disappeared_at is null
+        and lower(coalesce(ad.effective_status, ad.configured_status, '')) = 'active'
+      order by ad.name, ad.id limit 20001
+    ), creative_targets as (
+      select 'creative'::text as entity_level, creative.id::text,
+        coalesce(nullif(btrim(creative.name), ''), nullif(btrim(creative.headline), ''), 'Adsız kreatif')
+          || ' · ' || ad.name || ' üzerinden' as label,
+        ad.id::text as via_ad_id
+      from meta_creatives creative
+      join meta_ads ad on ad.workspace_id = creative.workspace_id and ad.creative_id = creative.id
+        and ad.disappeared_at is null
+        and lower(coalesce(ad.effective_status, ad.configured_status, '')) = 'active'
+      where creative.workspace_id = ${workspaceId}::uuid and creative.disappeared_at is null
+        and lower(coalesce(creative.effective_status, creative.configured_status, '')) = 'active'
+      order by label, creative.id, ad.id limit 20001
+    )
+    select entity_level, id, label, via_ad_id from campaign_targets
+    union all select entity_level, id, label, via_ad_id from ad_set_targets
+    union all select entity_level, id, label, via_ad_id from ad_targets
+    union all select entity_level, id, label, via_ad_id from creative_targets
+    order by entity_level, label, id, via_ad_id
+  `));
   if (dimensions.length > 100 || definitions.length > 10_000 || assignments.length > 20_000) {
     throw new CategoryAuthoringError("dependency_blocked");
   }
+  const targetCounts = new Map<string, number>();
+  for (const target of targetRows) targetCounts.set(target.entity_level, (targetCounts.get(target.entity_level) ?? 0) + 1);
+  if ([...targetCounts.values()].some((count) => count > 20_000)) throw new CategoryAuthoringError("dependency_blocked");
   const definitionMap = new Map(definitions.map((definition) => [uuid(definition.id), definition] as const));
   const publicDimensions: CategoryAuthoringDimension[] = dimensions.map((dimension) => {
     const dimensionId = uuid(dimension.id); const dimensionKey = text(dimension.key, 128);
@@ -160,7 +211,17 @@ async function loadState(database: Pick<Database, "execute">, workspaceId: strin
   const registryCore = Object.freeze({ dimensions: publicDimensions, assignments: publicAssignments });
   const registryHash = digest({ dimensions: publicDimensions, assignments: publicAssignments.map((assignment, index) =>
     Object.freeze({ ...assignment, source: assignments[index]!.source })) });
-  return Object.freeze({ state: Object.freeze({ registryHash, ...registryCore }),
+  const targets: CategoryAuthoringTarget[] = targetRows.map((target) => {
+    if (!LEVELS.has(target.entity_level)) throw new CategoryAuthoringError("conflict");
+    const level = target.entity_level as "campaign" | "ad_set" | "ad" | "creative";
+    const id = uuid(target.id);
+    const viaAdRef = target.via_ad_id === null ? null : categoryEntityPublicRef(workspaceId, "ad", uuid(target.via_ad_id));
+    if (level === "creative" ? viaAdRef === null : viaAdRef !== null) throw new CategoryAuthoringError("conflict");
+    return Object.freeze({ ref: categoryEntityPublicRef(workspaceId, level, id), level,
+      label: publicLabel(target.label, level === "campaign" ? "Adsız kampanya" : level === "ad_set"
+        ? "Adsız reklam seti" : level === "ad" ? "Adsız reklam" : "Adsız kreatif"), viaAdRef });
+  });
+  return Object.freeze({ state: Object.freeze({ registryHash, ...registryCore, targets: Object.freeze(targets) }),
     dimensions, definitions, assignments });
 }
 
@@ -198,16 +259,20 @@ async function entityCandidates(database: Pick<Database, "execute">, workspaceId
   level: "campaign" | "ad_set" | "ad" | "creative") {
   const result = level === "campaign" ? await database.execute(sql`
       select id::text, external_campaign_id as external_ref from ad_campaigns
-      where workspace_id = ${workspaceId}::uuid and disappeared_at is null order by id limit 20001
+      where workspace_id = ${workspaceId}::uuid and disappeared_at is null
+        and lower(coalesce(effective_status, configured_status, '')) = 'active' order by id limit 20001
     `) : level === "ad_set" ? await database.execute(sql`
       select id::text, external_ad_set_id as external_ref from meta_ad_sets
-      where workspace_id = ${workspaceId}::uuid and disappeared_at is null order by id limit 20001
+      where workspace_id = ${workspaceId}::uuid and disappeared_at is null
+        and lower(coalesce(effective_status, configured_status, '')) = 'active' order by id limit 20001
     `) : level === "ad" ? await database.execute(sql`
       select id::text, external_ad_id as external_ref from meta_ads
-      where workspace_id = ${workspaceId}::uuid and disappeared_at is null order by id limit 20001
+      where workspace_id = ${workspaceId}::uuid and disappeared_at is null
+        and lower(coalesce(effective_status, configured_status, '')) = 'active' order by id limit 20001
     `) : await database.execute(sql`
       select id::text, external_creative_id as external_ref from meta_creatives
-      where workspace_id = ${workspaceId}::uuid and disappeared_at is null order by id limit 20001
+      where workspace_id = ${workspaceId}::uuid and disappeared_at is null
+        and lower(coalesce(effective_status, configured_status, '')) = 'active' order by id limit 20001
     `);
   const candidates = rows<{ id: string; external_ref: string }>(result);
   if (candidates.length > 20_000) throw new CategoryAuthoringError("dependency_blocked");
@@ -233,14 +298,10 @@ async function resolveCreateTarget(database: Pick<Database, "execute">, workspac
   const ad = await resolvePublicEntity(database, workspaceId, "ad", command.viaAdRef);
   const links = rows(await database.execute(sql`
     select id from meta_ads where workspace_id = ${workspaceId}::uuid and id = ${ad.id}::uuid
-      and creative_id = ${entity.id}::uuid and disappeared_at is null limit 2
-  `));
-  const reuse = rows(await database.execute(sql`
-    select id from meta_ads where workspace_id = ${workspaceId}::uuid and creative_id = ${entity.id}::uuid
-      and disappeared_at is null order by id limit 2
+      and creative_id = ${entity.id}::uuid and disappeared_at is null
+      and lower(coalesce(effective_status, configured_status, '')) = 'active' limit 2
   `));
   if (links.length !== 1) throw new CategoryAuthoringError("not_found");
-  if (reuse.length !== 1) throw new CategoryAuthoringError("dependency_blocked");
   return Object.freeze({ target: Object.freeze({ level: "creative", id: entity.id, viaAdId: ad.id }),
     externalRef: entity.externalRef });
 }

@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 34885e9305b7 -->
+<!-- durum-damga: 15501aa2d97b -->
 
 ## Künye
 
@@ -14,13 +14,14 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 133 |
+| iş commit'i (tüm geçmiş) | 134 |
 | ilk / son iş | 2026-08-06 / 2026-08-09 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-09 | `feat` | harden category and Meta read contracts | `0237143f3` |
 | 2026-08-09 | `feat` | add selector mapping preview | `44c670e0b` |
 | 2026-08-09 | `chore` | quarantine legacy control plane | `cd675c679` |
 | 2026-08-09 | `feat` | guard lifecycle mutations | `6d0591f31` |
@@ -35,12 +36,11 @@
 | 2026-08-08 | `feat` | invalidate stale campaign contexts | `ee0e41193` |
 | 2026-08-08 | `feat` | add guidance context tools | `65cbab3a8` |
 | 2026-08-08 | `feat` | add category-bound studio | `9ddd42599` |
-| 2026-08-08 | `docs` | refresh deterministic project state | `ccba7d95e` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 30
-- `docs        ` █████████████████ 21
+- `feat        ` ████████████████████████ 31
+- `docs        ` ███████████████ 20
 - `test        ` ███ 4
 - `chore       ` ██ 3
 - `fix         ` ██ 2

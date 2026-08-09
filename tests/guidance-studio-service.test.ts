@@ -17,10 +17,11 @@ function memory(role: "owner" | "admin" | "analyst" | "viewer" = "owner") {
       if (input.expectedRegistryHash !== registry.registryHash) throw new Error("conflict");
       registry = next; audits.push(input.action);
       return { outcome: "inserted", registryHash: registry.registryHash, auditAppended: true,
-        contextInvalidationAppended: input.action === "guidance.published" || input.action === "guidance.archived" };
+        contextInvalidationAppended: ["guidance.published", "guidance.archived", "guidance_set.reviewed",
+          "guidance_set.archived"].includes(input.action) };
     },
   };
-  return { service: new GuidanceStudioService(repository, [{ userId, workspaceId, role }]), audits,
+  return { service: new GuidanceStudioService(repository, [{ userId, workspaceId, role }]), repository, audits,
     registry: () => registry as GuidanceRegistry };
 }
 
@@ -89,5 +90,67 @@ describe("GuidanceStudioService", () => {
     await expect(state.service.mutate(principal, { cardRef: created.item.cardRef, expectedVersion: 1,
       expectedRegistryHash: created.registryHash, operation: "revise", ...draft }))
       .rejects.toMatchObject({ code: "invalid_transition" });
+  });
+
+  it("authors ordered reviewed guidance sets from published cards and invalidates only effective transitions", async () => {
+    const state = memory(); let snapshot = await state.service.list(principal);
+    let first = await state.service.createDraft(principal, { ...draft, title: "Birinci", expectedRegistryHash: snapshot.registryHash });
+    first = await state.service.mutate(principal, { cardRef: first.item.cardRef, expectedVersion: 1,
+      expectedRegistryHash: first.registryHash, operation: "publish" });
+    let second = await state.service.createDraft(principal, { ...draft, title: "İkinci",
+      expectedRegistryHash: first.registryHash });
+    second = await state.service.mutate(principal, { cardRef: second.item.cardRef, expectedVersion: 1,
+      expectedRegistryHash: second.registryHash, operation: "publish" });
+
+    const created = await state.service.createSetDraft(principal, { name: "Bütçe değerlendirme sırası",
+      orderedCardRefs: [second.item.cardRef, first.item.cardRef], expectedRegistryHash: second.registryHash });
+    expect(created.set).toMatchObject({ version: 1, reviewStatus: "draft",
+      orderedCards: [{ cardRef: second.item.cardRef, status: "published" },
+        { cardRef: first.item.cardRef, status: "published" }] });
+    expect(created.contextInvalidated).toBe(false);
+    const revised = await state.service.mutateSet(principal, { setRef: created.set.setRef, expectedVersion: 1,
+      expectedRegistryHash: created.registryHash, operation: "revise", name: "Güncel bütçe sırası",
+      orderedCardRefs: [first.item.cardRef, second.item.cardRef] });
+    expect(revised.set.orderedCards.map((item) => item.cardRef)).toEqual([first.item.cardRef, second.item.cardRef]);
+    expect(revised.contextInvalidated).toBe(false);
+    await expect(state.service.mutateSet(principal, { setRef: created.set.setRef, expectedVersion: 1,
+      expectedRegistryHash: revised.registryHash, operation: "review" }))
+      .rejects.toMatchObject({ code: "conflict" });
+    const reviewed = await state.service.mutateSet(principal, { setRef: created.set.setRef, expectedVersion: 2,
+      expectedRegistryHash: revised.registryHash, operation: "review" });
+    expect(reviewed.set).toMatchObject({ version: 3, reviewStatus: "reviewed" });
+    expect(reviewed.contextInvalidated).toBe(true);
+    const archived = await state.service.mutateSet(principal, { setRef: created.set.setRef, expectedVersion: 3,
+      expectedRegistryHash: reviewed.registryHash, operation: "archive" });
+    expect(archived.set).toMatchObject({ version: 4, reviewStatus: "archived" });
+    expect(archived.contextInvalidated).toBe(true);
+    expect(state.registry().sets).toEqual([expect.objectContaining({ id: created.set.setRef, version: 4,
+      orderedCardIds: [first.item.cardRef, second.item.cardRef] })]);
+    expect(state.audits.slice(-4)).toEqual(["guidance_set.draft_created", "guidance_set.draft_revised",
+      "guidance_set.reviewed", "guidance_set.archived"]);
+  });
+
+  it("lets analysts draft/revise sets but denies review and rejects non-published or duplicate card refs", async () => {
+    const owner = memory(); const initial = await owner.service.list(principal);
+    const draftCard = await owner.service.createDraft(principal, { ...draft, expectedRegistryHash: initial.registryHash });
+    await expect(owner.service.createSetDraft(principal, { name: "Erken set",
+      orderedCardRefs: [draftCard.item.cardRef], expectedRegistryHash: draftCard.registryHash }))
+      .rejects.toMatchObject({ code: "invalid_transition" });
+    const published = await owner.service.mutate(principal, { cardRef: draftCard.item.cardRef, expectedVersion: 1,
+      expectedRegistryHash: draftCard.registryHash, operation: "publish" });
+    await expect(owner.service.createSetDraft(principal, { name: "Tekrarlı set",
+      orderedCardRefs: [published.item.cardRef, published.item.cardRef], expectedRegistryHash: published.registryHash }))
+      .rejects.toMatchObject({ code: "invalid_input" });
+
+    const analyst = new GuidanceStudioService(owner.repository,
+      [{ userId, workspaceId, role: "analyst" }]);
+    const created = await analyst.createSetDraft(principal, { name: "Analyst taslağı",
+      orderedCardRefs: [published.item.cardRef], expectedRegistryHash: published.registryHash });
+    const revised = await analyst.mutateSet(principal, { setRef: created.set.setRef, expectedVersion: 1,
+      expectedRegistryHash: created.registryHash, operation: "revise", name: "Analyst güncellemesi",
+      orderedCardRefs: [published.item.cardRef] });
+    await expect(analyst.mutateSet(principal, { setRef: created.set.setRef, expectedVersion: 2,
+      expectedRegistryHash: revised.registryHash, operation: "review" }))
+      .rejects.toMatchObject({ name: "AuthorizationError" });
   });
 });

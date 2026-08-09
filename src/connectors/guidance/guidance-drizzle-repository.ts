@@ -13,6 +13,16 @@ import {
   type GuidanceSource,
 } from "@/domain/guidance/registry";
 
+export type GuidanceAuditAction =
+  | "guidance.draft_created"
+  | "guidance.draft_revised"
+  | "guidance.published"
+  | "guidance.archived"
+  | "guidance_set.draft_created"
+  | "guidance_set.draft_revised"
+  | "guidance_set.reviewed"
+  | "guidance_set.archived";
+
 type ReklamZekaDatabase = NodePgDatabase<typeof schema>;
 type GuidanceDatabase = Pick<ReklamZekaDatabase, "select" | "insert" | "execute" | "transaction">;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -348,25 +358,27 @@ export class DrizzleGuidanceRegistryRepository {
   async saveAudited(registry: GuidanceRegistry, input: Readonly<{
     expectedRegistryHash: string | null;
     actorId: string;
-    action: "guidance.draft_created" | "guidance.draft_revised" | "guidance.published" | "guidance.archived";
+    action: GuidanceAuditAction;
     resourceId: string;
     occurredAt: string;
     metadata: Readonly<Record<string, string | number | boolean | null>>;
   }>): Promise<Readonly<{ outcome: "inserted" | "unchanged"; registryHash: string; auditAppended: boolean;
     contextInvalidationAppended: boolean }>> {
     const validated = validatedRegistry(registry);
-    if (!UUID.test(input.actorId) || !/^guidance_[a-f0-9]{24}$/.test(input.resourceId)
+    if (!UUID.test(input.actorId) || !/^(?:guidance|guidance_set)_[a-f0-9]{24}$/.test(input.resourceId)
       || !Number.isFinite(Date.parse(input.occurredAt))) throw new GuidanceRepositoryError("corrupt_store", "Guidance audit girdisi geçersiz");
     return this.database.transaction(async (transaction) => {
       const persisted = await persistRegistry(transaction as GuidanceDatabase, validated, input.expectedRegistryHash);
       if (persisted.outcome === "unchanged") return Object.freeze({ outcome: persisted.outcome,
         registryHash: persisted.registryHash, auditAppended: false, contextInvalidationAppended: false });
       let contextInvalidationAppended = false;
-      if (input.action === "guidance.published" || input.action === "guidance.archived") {
+      if (["guidance.published", "guidance.archived", "guidance_set.reviewed", "guidance_set.archived"]
+        .includes(input.action)) {
         const invalidation = Object.freeze({ workspaceId: validated.workspaceId,
           componentType: "guidance_registry", componentRef: "guidance-registry",
           componentVersion: persisted.previousRegistryHash, scopeKind: "workspace_component",
-          reasonCode: input.action === "guidance.archived" ? "source_removed" : "source_changed",
+          reasonCode: input.action === "guidance.archived" || input.action === "guidance_set.archived"
+            ? "source_removed" : "source_changed",
           observedAt: new Date(input.occurredAt).toISOString() });
         const eventHash = recordHash(invalidation);
         const inserted = await transaction.execute(sql`
@@ -387,7 +399,8 @@ export class DrizzleGuidanceRegistryRepository {
         order by occurred_at desc, created_at desc, id desc limit 1
       `))[0]?.event_hash ?? "GENESIS");
       const event = Object.freeze({ workspaceId: validated.workspaceId, actorId: input.actorId,
-        action: input.action, resourceType: "guidance_card", resourceId: input.resourceId,
+        action: input.action, resourceType: input.resourceId.startsWith("guidance_set_")
+          ? "guidance_set" : "guidance_card", resourceId: input.resourceId,
         occurredAt: new Date(input.occurredAt).toISOString(), metadata: Object.freeze({ ...input.metadata }),
         id: randomUUID(), previousHash });
       const eventHash = createHash("sha256").update(JSON.stringify(event)).digest("hex");

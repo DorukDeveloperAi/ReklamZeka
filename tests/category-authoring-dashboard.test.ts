@@ -1,21 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { isArchiveMutationReady, isRevisionMutationReady, loadCategoryAuthoringState,
+import { buildCategoryAssignmentCommand, isArchiveMutationReady, isRevisionMutationReady, loadCategoryAuthoringState,
   parseCategoryArchiveImpact, parseCategoryAuthoringState,
   runCategoryAuthoringMutation } from "@/app/dashboard/category-inventory-panel";
 
 const refs = { dimension: `dimension_${"a".repeat(24)}`, definition: `category_${"b".repeat(24)}`,
-  assignment: `assignment_${"c".repeat(24)}`, entity: `category_entity_${"d".repeat(24)}` };
+  assignment: `assignment_${"c".repeat(24)}`, entity: `category_entity_${"d".repeat(24)}`,
+  adEntity: `category_entity_${"f".repeat(24)}` };
 const hash = "e".repeat(64);
-const authority = { canCreate: true, canRevise: true, canArchive: true, canAssign: false,
+const authority = { canCreate: true, canRevise: true, canArchive: true, canAssign: true,
   canAuthorizeAction: false, canWriteMeta: false } as const;
 const authoringPayload = { contractVersion: "category-authoring/1.0.0", registryHash: hash,
   dimensions: [{ ref: refs.dimension, key: "service_line", name: "Hizmet", description: null,
-    cardinality: "single", allowedEntityLevels: ["campaign"], version: 3,
+    cardinality: "single", allowedEntityLevels: ["campaign", "creative"], version: 3,
     definitions: [{ ref: refs.definition, key: "hair", label: "Saç", description: null, version: 2 }] }],
   assignments: [{ ref: refs.assignment, dimensionRef: refs.dimension, definitionRef: refs.definition,
     entity: { level: "campaign", ref: refs.entity }, operation: "add", manualLock: false,
-    confidenceBasisPoints: 9_000, version: 1 }], authority };
+    confidenceBasisPoints: 9_000, version: 1 }], targets: [
+    { ref: refs.entity, level: "campaign", label: "Lead kampanyası", viaAdRef: null },
+    { ref: `category_entity_${"1".repeat(24)}`, level: "creative", label: "Kreatif · Reklam üzerinden",
+      viaAdRef: refs.adEntity },
+  ], authority };
 const exactBlockers = { activeDefinitions: 0, activeAssignments: 0, manualLocks: 0, guidanceDrafts: 0,
   guidancePublished: 0, activePromotionBindings: 0, activePromotionTemplateScopes: 0,
   activeAdvisedPractices: 0, activeCategoryProfiles: 0, autonomyDrafts: 0, autonomyPublished: 0,
@@ -68,7 +73,8 @@ describe("A09.7 guarded category authoring dashboard contract", () => {
 
   it("binds definition revision to the preview hash, registry hash, and matching expected version", async () => {
     const request = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ contractVersion: "category-authoring/1.0.0",
-      state: { registryHash: hash, dimensions: authoringPayload.dimensions, assignments: authoringPayload.assignments },
+      state: { registryHash: hash, dimensions: authoringPayload.dimensions, assignments: authoringPayload.assignments,
+        targets: authoringPayload.targets },
       auditAppended: true, invalidationsAppended: 1, authority, canAuthorizeAction: false, canWriteMeta: false }), { status: 200 }));
     const command = { operation: "revise_definition" as const, definitionRef: refs.definition, expectedVersion: 2,
       label: "Saç ekimi", description: "Güncel tanım", expectedRegistryHash: hash,
@@ -88,7 +94,8 @@ describe("A09.7 guarded category authoring dashboard contract", () => {
 
   it("sends the exact optimistic mutation envelope and preserves closed action/Meta authority", async () => {
     const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ contractVersion: "category-authoring/1.0.0",
-      state: { registryHash: hash, dimensions: authoringPayload.dimensions, assignments: authoringPayload.assignments },
+      state: { registryHash: hash, dimensions: authoringPayload.dimensions, assignments: authoringPayload.assignments,
+        targets: authoringPayload.targets },
       auditAppended: true, invalidationsAppended: 1, authority, canAuthorizeAction: false, canWriteMeta: false }), { status: 200 }));
     const command = { operation: "archive_definition" as const, definitionRef: refs.definition, expectedVersion: 2,
       expectedRegistryHash: hash, expectedImpactHash: impactPayload.impactHash };
@@ -99,14 +106,36 @@ describe("A09.7 guarded category authoring dashboard contract", () => {
         "X-ReklamZeka-Intent": "category-authoring-mutate" }, body: JSON.stringify({ command }) }));
   });
 
-  it("fails closed when authoring responses expose assignment, action, or Meta authority", async () => {
+  it("fails closed when role authority is inconsistent or action/Meta authority opens", async () => {
     expect(() => parseCategoryAuthoringState({ ...authoringPayload,
-      authority: { ...authority, canAssign: true } })).toThrow("güvenli sözleşmeyi");
+      authority: { ...authority, canAssign: false } })).toThrow("güvenli sözleşmeyi");
     const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ contractVersion: "category-authoring/1.0.0",
-      state: { registryHash: hash, dimensions: authoringPayload.dimensions, assignments: authoringPayload.assignments },
+      state: { registryHash: hash, dimensions: authoringPayload.dimensions, assignments: authoringPayload.assignments,
+        targets: authoringPayload.targets },
       auditAppended: true, invalidationsAppended: 0, authority, canAuthorizeAction: true, canWriteMeta: false }), { status: 200 }));
     await expect(runCategoryAuthoringMutation({ operation: "create_definition", dimensionRef: refs.dimension,
       key: "new_value", label: "Yeni", description: null, expectedRegistryHash: hash },
     request as unknown as typeof fetch)).rejects.toThrow("güvenli sözleşmeyi");
+  });
+
+  it("accepts only opaque workspace targets and exact creative via-ad paths", () => {
+    const state = parseCategoryAuthoringState(authoringPayload);
+    expect(state.targets).toHaveLength(2);
+    expect(buildCategoryAssignmentCommand(state, { dimensionRef: refs.dimension, definitionRef: refs.definition,
+      level: "creative", targetKey: `${state.targets[1]!.ref}:${refs.adEntity}`, operation: "override",
+      manualLock: true, confidencePercent: "92.5" })).toEqual({ operation: "create_assignment",
+      dimensionRef: refs.dimension, definitionRef: refs.definition, entityLevel: "creative",
+      entityRef: state.targets[1]!.ref, viaAdRef: refs.adEntity, assignmentOperation: "override", manualLock: true,
+      confidenceBasisPoints: 9_250, expectedRegistryHash: hash });
+    expect(() => parseCategoryAuthoringState({ ...authoringPayload, targets: [{
+      ref: "123456789012345", level: "campaign", label: "Leak", viaAdRef: null,
+    }] })).toThrow("güvenli sözleşmeyi");
+    expect(() => parseCategoryAuthoringState({ ...authoringPayload, targets: [{
+      ref: `category_entity_${"1".repeat(24)}`, level: "creative", label: "Ambiguous", viaAdRef: null,
+    }] })).toThrow("güvenli sözleşmeyi");
+    expect(buildCategoryAssignmentCommand({ ...state, authority: { ...state.authority, canCreate: false,
+      canRevise: false, canArchive: false, canAssign: false } }, { dimensionRef: refs.dimension,
+      definitionRef: refs.definition, level: "campaign", targetKey: `${refs.entity}:direct`, operation: "add",
+      manualLock: false, confidencePercent: "100" })).toBeNull();
   });
 });

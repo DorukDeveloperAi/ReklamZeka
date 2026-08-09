@@ -6,11 +6,12 @@ import {
   type GuidanceCard,
   type GuidanceRegistry,
   type GuidanceScopeFacet,
+  type GuidanceSet,
   type GuidanceStrength,
 } from "@/domain/guidance/registry";
 import { authorizeWorkspace, type WorkspaceMembership } from "@/security/authorization";
 
-export const GUIDANCE_STUDIO_VERSION = "guidance-studio/1.1.0" as const;
+export const GUIDANCE_STUDIO_VERSION = "guidance-studio/1.2.0" as const;
 
 export type GuidanceStudioScope = Readonly<{
   facet: GuidanceScopeFacet;
@@ -32,19 +33,32 @@ export type GuidanceStudioItem = Readonly<{
   scopes: readonly GuidanceStudioScope[];
   updatedAt: null;
 }>;
+export type GuidanceStudioSetItem = Readonly<{
+  setRef: string;
+  version: number;
+  name: string;
+  reviewStatus: GuidanceSet["reviewStatus"];
+  orderedCards: readonly Readonly<{
+    cardRef: string;
+    title: string;
+    version: number;
+    status: GuidanceCard["status"];
+  }>[];
+}>;
 
 const AUTHORITY_NONE = Object.freeze({
-  canDraft: false, canPublish: false, canArchive: false, canWriteMeta: false as const,
+  canDraft: false, canPublish: false, canReview: false, canArchive: false, canWriteMeta: false as const,
   canAuthorizeAction: false as const, canEnforcePolicy: false as const,
 });
 export type GuidanceStudioAuthority = Readonly<{
-  canDraft: boolean; canPublish: boolean; canArchive: boolean; canWriteMeta: false;
+  canDraft: boolean; canPublish: boolean; canReview: boolean; canArchive: boolean; canWriteMeta: false;
   canAuthorizeAction: false; canEnforcePolicy: false;
 }>;
 
 export type GuidanceStudioResult = Readonly<{
   contractVersion: typeof GUIDANCE_STUDIO_VERSION;
   items: readonly GuidanceStudioItem[];
+  sets: readonly GuidanceStudioSetItem[];
   categories: readonly GuidanceStudioCategory[];
   registryHash: string;
   authority: GuidanceStudioAuthority;
@@ -56,7 +70,8 @@ export type GuidanceStudioRepository = Readonly<{
   saveAudited(registry: GuidanceRegistry, input: Readonly<{
     expectedRegistryHash: string | null;
     actorId: string;
-    action: "guidance.draft_created" | "guidance.draft_revised" | "guidance.published" | "guidance.archived";
+    action: "guidance.draft_created" | "guidance.draft_revised" | "guidance.published" | "guidance.archived"
+      | "guidance_set.draft_created" | "guidance_set.draft_revised" | "guidance_set.reviewed" | "guidance_set.archived";
     resourceId: string;
     occurredAt: string;
     metadata: Readonly<Record<string, string | number | boolean | null>>;
@@ -123,7 +138,7 @@ function scopes(values: readonly GuidanceStudioScope[], categories: readonly Gui
   return Object.freeze(validated);
 }
 
-function identity(prefix: "guidance" | "source" | "binding"): string {
+function identity(prefix: "guidance" | "source" | "binding" | "guidance_set"): string {
   return `${prefix}_${randomBytes(12).toString("hex")}`;
 }
 
@@ -132,8 +147,36 @@ function authority(role: WorkspaceMembership["role"]) {
     ...AUTHORITY_NONE,
     canDraft: role !== "viewer",
     canPublish: role === "owner" || role === "admin",
+    canReview: role === "owner" || role === "admin",
     canArchive: role === "owner" || role === "admin",
   });
+}
+
+function projectSets(registry: GuidanceRegistry): readonly GuidanceStudioSetItem[] {
+  const cards = new Map(registry.cards.map((card) => [card.id, card] as const));
+  return Object.freeze(registry.sets.map((set) => Object.freeze({
+    setRef: set.id,
+    version: set.version,
+    name: set.name,
+    reviewStatus: set.reviewStatus,
+    orderedCards: Object.freeze(set.orderedCardIds.map((cardRef) => {
+      const card = cards.get(cardRef);
+      if (!card) throw new GuidanceStudioError("not_found");
+      return Object.freeze({ cardRef: card.id, title: card.title, version: card.version, status: card.status });
+    })),
+  })).sort((left, right) => left.reviewStatus.localeCompare(right.reviewStatus)
+    || left.name.localeCompare(right.name, "tr")));
+}
+
+function publishedCardRefs(values: readonly string[], registry: GuidanceRegistry): readonly string[] {
+  if (!Array.isArray(values) || values.length < 1 || values.length > 50
+    || values.some((value) => typeof value !== "string" || !REF.test(value))
+    || new Set(values).size !== values.length) throw new GuidanceStudioError("invalid_input");
+  const cards = new Map(registry.cards.map((card) => [card.id, card] as const));
+  if (values.some((value) => cards.get(value)?.status !== "published")) {
+    throw new GuidanceStudioError("invalid_transition");
+  }
+  return Object.freeze([...values]);
 }
 
 function project(registry: GuidanceRegistry): readonly GuidanceStudioItem[] {
@@ -163,7 +206,69 @@ export class GuidanceStudioService {
       this.repository.load(principal.workspaceId), this.repository.listActiveCategories(principal.workspaceId),
     ]);
     return Object.freeze({ contractVersion: GUIDANCE_STUDIO_VERSION, items: project(registry),
+      sets: projectSets(registry),
       categories: Object.freeze([...categories]), registryHash: registry.registryHash, authority: authority(membership.role) });
+  }
+
+  async createSetDraft(principal: TrustedDecisionRoomPrincipal, request: Readonly<{
+    name: string; orderedCardRefs: readonly string[]; expectedRegistryHash: string | null;
+  }>) {
+    const membership = authorizeWorkspace(principal.actor, principal.workspaceId, "guidance:draft", this.memberships);
+    const current = await this.repository.load(principal.workspaceId);
+    const name = text(request.name, 160);
+    const orderedCardIds = publishedCardRefs(request.orderedCardRefs, current);
+    const setRef = identity("guidance_set");
+    const next = createGuidanceRegistry({ workspaceId: current.workspaceId, sources: current.sources,
+      cards: current.cards, bindings: current.bindings, sets: [...current.sets, {
+        id: setRef, workspaceId: current.workspaceId, name, orderedCardIds, reviewStatus: "draft", version: 1,
+      }] });
+    const saved = await this.repository.saveAudited(next, { expectedRegistryHash: request.expectedRegistryHash,
+      actorId: principal.actor.userId, action: "guidance_set.draft_created", resourceId: setRef,
+      occurredAt: new Date().toISOString(), metadata: { version: 1, role: membership.role,
+        cardCount: orderedCardIds.length } });
+    return Object.freeze({ contractVersion: GUIDANCE_STUDIO_VERSION,
+      set: projectSets(next).find((item) => item.setRef === setRef)!, registryHash: saved.registryHash,
+      contextInvalidated: saved.contextInvalidationAppended, authority: authority(membership.role) });
+  }
+
+  async mutateSet(principal: TrustedDecisionRoomPrincipal, request: Readonly<{
+    setRef: string; expectedVersion: number; expectedRegistryHash: string;
+    operation: "revise" | "review" | "archive"; name?: string; orderedCardRefs?: readonly string[];
+  }>) {
+    const action = request.operation === "revise" ? "guidance:draft" : "guidance:publish";
+    const membership = authorizeWorkspace(principal.actor, principal.workspaceId, action, this.memberships);
+    if (!/^guidance_set_[a-f0-9]{24}$/.test(request.setRef)
+      || !Number.isSafeInteger(request.expectedVersion) || request.expectedVersion < 1
+      || !/^[a-f0-9]{64}$/.test(request.expectedRegistryHash)) throw new GuidanceStudioError("invalid_input");
+    const current = await this.repository.load(principal.workspaceId);
+    const set = current.sets.find((item) => item.id === request.setRef);
+    if (!set) throw new GuidanceStudioError("not_found");
+    if (set.version !== request.expectedVersion) throw new GuidanceStudioError("conflict");
+    if (request.operation === "revise" && set.reviewStatus !== "draft"
+      || request.operation === "review" && set.reviewStatus !== "draft"
+      || request.operation === "archive" && set.reviewStatus === "archived") {
+      throw new GuidanceStudioError("invalid_transition");
+    }
+    const nextName = request.operation === "revise" ? text(request.name, 160) : set.name;
+    const nextCardIds = request.operation === "revise"
+      ? publishedCardRefs(request.orderedCardRefs!, current)
+      : request.operation === "review" ? publishedCardRefs(set.orderedCardIds, current)
+        : Object.freeze([...set.orderedCardIds]);
+    const reviewStatus = request.operation === "review" ? "reviewed"
+      : request.operation === "archive" ? "archived" : "draft";
+    const version = set.version + 1;
+    const next = createGuidanceRegistry({ workspaceId: current.workspaceId, sources: current.sources,
+      cards: current.cards, bindings: current.bindings, sets: current.sets.map((item) => item.id === set.id
+        ? { ...item, name: nextName, orderedCardIds: nextCardIds, reviewStatus, version } : item) });
+    const auditAction = request.operation === "revise" ? "guidance_set.draft_revised"
+      : request.operation === "review" ? "guidance_set.reviewed" : "guidance_set.archived";
+    const saved = await this.repository.saveAudited(next, { expectedRegistryHash: request.expectedRegistryHash,
+      actorId: principal.actor.userId, action: auditAction, resourceId: set.id,
+      occurredAt: new Date().toISOString(), metadata: { version, role: membership.role,
+        cardCount: nextCardIds.length } });
+    return Object.freeze({ contractVersion: GUIDANCE_STUDIO_VERSION,
+      set: projectSets(next).find((item) => item.setRef === set.id)!, registryHash: saved.registryHash,
+      contextInvalidated: saved.contextInvalidationAppended, authority: authority(membership.role) });
   }
 
   async createDraft(principal: TrustedDecisionRoomPrincipal, request: DraftBody & Readonly<{ expectedRegistryHash: string | null }>) {

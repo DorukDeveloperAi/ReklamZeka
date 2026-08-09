@@ -49,14 +49,17 @@ type AuthoringDefinition = Readonly<{ ref: string; key: string; label: string; d
 type AuthoringDimension = Readonly<{ ref: string; key: string; name: string; description: string | null;
   cardinality: "single" | "multi"; allowedEntityLevels: readonly Level[]; version: number;
   definitions: readonly AuthoringDefinition[] }>;
-type AuthoringAuthority = Readonly<{ canCreate: boolean; canRevise: boolean; canArchive: boolean; canAssign: false;
+type AuthoringTarget = Readonly<{ ref: string; level: Level; label: string; viaAdRef: string | null }>;
+type AuthoringAuthority = Readonly<{ canCreate: boolean; canRevise: boolean; canArchive: boolean; canAssign: boolean;
   canAuthorizeAction: false; canWriteMeta: false }>;
 export type CategoryAuthoringState = Readonly<{ contractVersion: "category-authoring/1.0.0"; registryHash: string;
   dimensions: readonly AuthoringDimension[]; assignments: readonly Readonly<{ ref: string; dimensionRef: string;
     definitionRef: string; entity: Readonly<{ level: Level; ref: string }>; operation: "add" | "override" | "deny";
-    manualLock: boolean; confidenceBasisPoints: number; version: number }>[]; authority: AuthoringAuthority }>;
+    manualLock: boolean; confidenceBasisPoints: number; version: number }>[]; targets: readonly AuthoringTarget[];
+  authority: AuthoringAuthority }>;
 export type CategoryMutationCommand = Readonly<Record<string, unknown> & { operation: "create_dimension" |
-  "create_definition" | "revise_dimension" | "revise_definition" | "archive_dimension" | "archive_definition" }>;
+  "create_definition" | "revise_dimension" | "revise_definition" | "archive_dimension" | "archive_definition" |
+  "create_assignment" }>;
 type EffectiveHealth = Readonly<{ contractVersion: "category-effective-health/1.0.0"; status: "complete";
   evaluationBasis: "hierarchy_path"; limits: Readonly<{ maxHierarchyPaths: number; maxDimensions: number }>;
   counts: Readonly<{ dimensions: number; hierarchyPaths: number; evaluations: number; applied: number;
@@ -190,15 +193,24 @@ function authoringAssignment(value: unknown) {
     && nonNegative(value.confidenceBasisPoints) && value.confidenceBasisPoints <= 10_000
     && nonNegative(value.version) && value.version >= 1;
 }
+function authoringTarget(value: unknown): value is AuthoringTarget {
+  return object(value) && exactKeys(value, ["ref", "level", "label", "viaAdRef"])
+    && typeof value.ref === "string" && ENTITY_REF.test(value.ref) && LEVELS.includes(value.level as Level)
+    && typeof value.label === "string" && value.label.length > 0 && value.label.length <= 320
+    && (value.viaAdRef === null || typeof value.viaAdRef === "string" && ENTITY_REF.test(value.viaAdRef))
+    && (value.level === "creative" ? value.viaAdRef !== null : value.viaAdRef === null);
+}
 function authoringAuthority(value: unknown): value is AuthoringAuthority {
   return object(value) && exactKeys(value, ["canCreate", "canRevise", "canArchive", "canAssign", "canAuthorizeAction", "canWriteMeta"])
-    && ["canCreate", "canRevise", "canArchive"].every((key) => typeof value[key] === "boolean")
-    && value.canAssign === false && value.canAuthorizeAction === false && value.canWriteMeta === false;
+    && ["canCreate", "canRevise", "canArchive", "canAssign"].every((key) => typeof value[key] === "boolean")
+    && value.canCreate === value.canRevise && value.canCreate === value.canArchive && value.canCreate === value.canAssign
+    && value.canAuthorizeAction === false && value.canWriteMeta === false;
 }
 export function parseCategoryAuthoringState(value: unknown): CategoryAuthoringState {
   if (!object(value) || value.contractVersion !== "category-authoring/1.0.0" || typeof value.registryHash !== "string"
     || !HASH.test(value.registryHash) || !Array.isArray(value.dimensions) || !value.dimensions.every(authoringDimension)
-    || !Array.isArray(value.assignments) || !value.assignments.every(authoringAssignment) || !authoringAuthority(value.authority)) {
+    || !Array.isArray(value.assignments) || !value.assignments.every(authoringAssignment)
+    || !Array.isArray(value.targets) || !value.targets.every(authoringTarget) || !authoringAuthority(value.authority)) {
     throw new InventoryError("unsafe_response", "Kategori authoring kaynağı güvenli sözleşmeyi döndürmedi.");
   }
   return value as unknown as CategoryAuthoringState;
@@ -252,6 +264,23 @@ export async function runCategoryAuthoringMutation(command: CategoryMutationComm
   return Object.freeze({ state: parseCategoryAuthoringState({ contractVersion: payload.contractVersion, ...payload.state,
     authority: payload.authority }), invalidationsAppended: payload.invalidationsAppended });
 }
+export type CategoryAssignmentDraft = Readonly<{ dimensionRef: string; definitionRef: string; level: "" | Level;
+  targetKey: string; operation: "add" | "override" | "deny"; manualLock: boolean; confidencePercent: string }>;
+export function buildCategoryAssignmentCommand(authoring: CategoryAuthoringState,
+  draft: CategoryAssignmentDraft): CategoryMutationCommand | null {
+  if (!authoring.authority.canAssign || !draft.level || !draft.confidencePercent.trim()) return null;
+  const dimension = authoring.dimensions.find((item) => item.ref === draft.dimensionRef);
+  const target = authoring.targets.find((item) => item.level === draft.level
+    && `${item.ref}:${item.viaAdRef ?? "direct"}` === draft.targetKey);
+  const confidencePercent = Number(draft.confidencePercent);
+  if (!dimension || !dimension.allowedEntityLevels.includes(draft.level)
+    || !dimension.definitions.some((item) => item.ref === draft.definitionRef) || !target
+    || !Number.isFinite(confidencePercent) || confidencePercent < 0 || confidencePercent > 100) return null;
+  return Object.freeze({ operation: "create_assignment", dimensionRef: dimension.ref,
+    definitionRef: draft.definitionRef, entityLevel: draft.level, entityRef: target.ref, viaAdRef: target.viaAdRef,
+    assignmentOperation: draft.operation, manualLock: draft.manualLock,
+    confidenceBasisPoints: Math.round(confidencePercent * 100), expectedRegistryHash: authoring.registryHash });
+}
 function parseEffectiveHealth(value: unknown): EffectiveHealth {
   if (!object(value)) throw new InventoryError("unsafe_response", "Effective kategori kaynağı güvenli sözleşmeyi döndürmedi.");
   const limits = value.limits; const counts = value.counts; const dimensions = value.dimensions; const authority = value.authority;
@@ -303,6 +332,8 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
   const [revisionDraft, setRevisionDraft] = useState<RevisionDraft | null>(null);
   const [dimensionDraft, setDimensionDraft] = useState({ key: "", name: "", description: "", cardinality: "" as "" | "single" | "multi", levels: [] as Level[] });
   const [definitionDraft, setDefinitionDraft] = useState({ dimensionRef: "", key: "", label: "", description: "" });
+  const [assignmentDraft, setAssignmentDraft] = useState<CategoryAssignmentDraft>({ dimensionRef: "", definitionRef: "", level: "",
+    targetKey: "", operation: "add" as "add" | "override" | "deny", manualLock: false, confidencePercent: "100" });
   const refresh = useCallback(async () => {
     setLoading(true); setError(null); setSessionRequired(false); setAuthoring(null); setImpact(null);
     setArchiveConfirmed(false); setRevisionDraft(null);
@@ -386,6 +417,10 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
   const archiveReady = isArchiveMutationReady(impact, authoring);
   const revisionReady = isRevisionMutationReady(impact, authoring);
   const keyPattern = /^[a-z][a-z0-9_]{0,63}$/;
+  const assignmentDimension = authoring?.dimensions.find((item) => item.ref === assignmentDraft.dimensionRef) ?? null;
+  const assignmentTargets = assignmentDraft.level
+    ? authoring?.targets.filter((item) => item.level === assignmentDraft.level) ?? [] : [];
+  const assignmentCommand = authoring ? buildCategoryAssignmentCommand(authoring, assignmentDraft) : null;
   return <>
     <section className={styles.pageHero}><div><span className={styles.kicker}>CATEGORY REGISTRY</span><h1>İç kategori diliniz, Meta hiyerarşisiyle birlikte görünür.</h1><p>Envanter doğrudan kapsamı gösterir; owner/admin için registry authoring, denetim ve optimistic concurrency kapılarıyla açılır.</p></div><button className={styles.primaryButton} type="button" onClick={() => void refresh()} disabled={loading || mutating}>{loading ? "Yükleniyor" : "Envanteri yenile"}</button></section>
     <section className={styles.categorySafety}><span>{authoring?.authority.canCreate ? "Owner/admin authoring" : "Salt okunur"}</span><p><strong>Action authorization ve Meta write daima kapalı.</strong> Public-safe referanslar kullanılır; istemci rol üretmez ve teknik Meta ID’lerini taşımaz.</p></section>
@@ -425,6 +460,44 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
         </form>
       </div>
       <footer>Registry hash: <code>{authoring.registryHash.slice(0, 12)}…</code> · Her mutation denetim kaydı ve sunucu tarafı concurrency doğrulaması gerektirir.</footer>
+    </section> : null}
+    {authoring?.authority.canAssign ? <section className={`${styles.panel} ${styles.categoryAuthoring}`} aria-label="Kategori ataması">
+      <header className={styles.panelHeader}><div><span className={styles.kicker}>WORKSPACE-BOUND TARGETS</span><h2>İlk kategori atamasını oluştur</h2></div><span>Yalnız aktif mirror hedefleri</span></header>
+      <div className={styles.categoryAssignmentGrid}><form onSubmit={(event) => {
+        event.preventDefault();
+        if (!assignmentCommand) return;
+        void mutate(assignmentCommand)
+          .then((changed) => { if (changed) setAssignmentDraft({ dimensionRef: "", definitionRef: "", level: "",
+            targetKey: "", operation: "add", manualLock: false, confidencePercent: "100" }); });
+      }}>
+        <label>Boyut<select value={assignmentDraft.dimensionRef} onChange={(event) => setAssignmentDraft((draft) => ({
+          ...draft, dimensionRef: event.target.value, definitionRef: "", level: "", targetKey: "" }))} required>
+          <option value="">Seçin</option>{authoring.dimensions.filter((item) => item.definitions.length > 0)
+            .map((item) => <option key={item.ref} value={item.ref}>{item.name}</option>)}</select></label>
+        <label>Tanım<select value={assignmentDraft.definitionRef} disabled={!assignmentDimension}
+          onChange={(event) => setAssignmentDraft((draft) => ({ ...draft, definitionRef: event.target.value }))} required>
+          <option value="">Seçin</option>{assignmentDimension?.definitions.map((item) =>
+            <option key={item.ref} value={item.ref}>{item.label}</option>)}</select></label>
+        <label>Entity seviyesi<select value={assignmentDraft.level} disabled={!assignmentDimension}
+          onChange={(event) => setAssignmentDraft((draft) => ({ ...draft, level: event.target.value as "" | Level,
+            targetKey: "" }))} required><option value="">Seçin</option>{assignmentDimension?.allowedEntityLevels.map((level) =>
+            <option key={level} value={level}>{levelLabel(level)}</option>)}</select></label>
+        <label>Aktif hedef<select value={assignmentDraft.targetKey} disabled={!assignmentDraft.level}
+          onChange={(event) => setAssignmentDraft((draft) => ({ ...draft, targetKey: event.target.value }))} required>
+          <option value="">{assignmentDraft.level && assignmentTargets.length === 0 ? "Aktif hedef yok" : "Seçin"}</option>
+          {assignmentTargets.map((target) => <option key={`${target.ref}:${target.viaAdRef ?? "direct"}`}
+            value={`${target.ref}:${target.viaAdRef ?? "direct"}`}>{target.label}</option>)}</select></label>
+        <label>Atama işlemi<select value={assignmentDraft.operation} onChange={(event) => setAssignmentDraft((draft) => ({
+          ...draft, operation: event.target.value as "add" | "override" | "deny" }))}>
+          <option value="add">Ekle</option><option value="override">Geçersiz kıl</option><option value="deny">Reddet</option>
+        </select></label>
+        <label>Güven (%)<input type="number" min="0" max="100" step="0.01" value={assignmentDraft.confidencePercent}
+          onChange={(event) => setAssignmentDraft((draft) => ({ ...draft, confidencePercent: event.target.value }))} required /></label>
+        <label className={styles.categoryAssignmentLock}><input type="checkbox" checked={assignmentDraft.manualLock}
+          onChange={(event) => setAssignmentDraft((draft) => ({ ...draft, manualLock: event.target.checked }))} />Manuel kilit</label>
+        <button type="submit" disabled={mutating || !assignmentCommand}>{mutating ? "Atanıyor" : "Atamayı oluştur"}</button>
+      </form></div>
+      <footer>Kreatif hedefleri exact aktif reklam yolu ile seçilir. Bu işlem action authorization veya Meta write yetkisi vermez.</footer>
     </section> : null}
     <div className={styles.metaMetricGrid}>
       <article><span>Aktif boyut</span><strong>{number(snapshot.summary.dimensions)}</strong><small>Kategori eksenleri</small></article>

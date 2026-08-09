@@ -48,6 +48,20 @@ try {
       and grantee in ('PUBLIC', 'anon', 'authenticated')
       and privilege_type = 'EXECUTE'
   `);
+  const instructionPolicyTables = await pool.query<{ total: number; force_rls: number }>(`
+    select count(*)::int as total,
+      count(*) filter (where relation.relrowsecurity and relation.relforcerowsecurity)::int as force_rls
+    from pg_class relation
+    join pg_namespace namespace on namespace.oid = relation.relnamespace
+    where namespace.nspname = 'public' and relation.relkind = 'r'
+      and relation.relname in ('instruction_policy_raw_provenance', 'strict_instruction_policy_revisions')
+  `);
+  const instructionPolicyGrants = await pool.query<{ grant_count: number }>(`
+    select count(*)::int as grant_count from information_schema.role_table_grants
+    where table_schema = 'public'
+      and table_name in ('instruction_policy_raw_provenance', 'strict_instruction_policy_revisions')
+      and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')
+  `);
 
   const posture = {
     tables: tables.rows[0]?.total ?? 0,
@@ -55,6 +69,9 @@ try {
     apiRoleTableGrants: grants.rows[0]?.grant_count ?? 0,
     apiRolesWithSchemaCreate: schemaCreate.rows.filter((row) => row.can_create).length,
     publicApiRoutineExecuteGrants: routineGrants.rows[0]?.grant_count ?? 0,
+    strictPolicyTables: instructionPolicyTables.rows[0]?.total ?? 0,
+    strictPolicyForceRls: instructionPolicyTables.rows[0]?.force_rls ?? 0,
+    strictPolicyDirectGrants: instructionPolicyGrants.rows[0]?.grant_count ?? 0,
   };
 
   if (posture.tables === 0) throw new Error("Public uygulama tablosu bulunamadı");
@@ -67,6 +84,10 @@ try {
     || posture.publicApiRoutineExecuteGrants !== 0
   ) {
     throw new Error("Supabase Data API rolleri beklenmeyen doğrudan yetkiye sahip");
+  }
+  if (posture.strictPolicyTables !== 2 || posture.strictPolicyForceRls !== 2
+    || posture.strictPolicyDirectGrants !== 0) {
+    throw new Error("Strict instruction policy tabloları FORCE RLS/revoke sınırını karşılamıyor");
   }
 
   console.log(JSON.stringify({ status: "secure", ...posture }));

@@ -92,6 +92,22 @@ describe("effective campaign context", () => {
     expect(first.cadence.decision).toBe("no_change");
   });
 
+  it("additively binds a strict policy registry hash without breaking legacy v1 replay", () => {
+    const legacy = buildEffectiveCampaignContext(input());
+    const stored = JSON.parse(JSON.stringify(legacy)) as typeof legacy;
+    const { schemaVersion: _schema, contextHash: _hash, capabilities: _capabilities, ...storedInput } = stored;
+    const replay = buildEffectiveCampaignContext(storedInput);
+    expect(replay.contextHash).toBe(legacy.contextHash);
+    expect(replay.versions).not.toHaveProperty("instructionPolicyRegistry");
+    const policyAware = buildEffectiveCampaignContext({ ...input(), versions: {
+      ...input().versions, instructionPolicyRegistry: "9".repeat(64) } });
+    expect(policyAware.versions.instructionPolicyRegistry).toBe("9".repeat(64));
+    expect(policyAware.contextHash).not.toBe(legacy.contextHash);
+    expect(() => buildEffectiveCampaignContext({ ...input(), versions: {
+      ...input().versions, instructionPolicyRegistry: "not-a-registry-hash" } }))
+      .toThrowError(expect.objectContaining<Partial<EffectiveCampaignContextError>>({ code: "invalid_input" }));
+  });
+
   it("rejects cross-workspace or tampered category/guidance components", () => {
     const base = input();
     expect(() => buildEffectiveCampaignContext({ ...base, guidance: { ...base.guidance, workspaceId: "workspace-2" } }))

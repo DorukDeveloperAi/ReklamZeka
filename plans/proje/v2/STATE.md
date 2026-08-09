@@ -15,12 +15,63 @@
 | 06 | içgörü motoru | KAPALI | 03,04 | `check:insights` |
 | 07 | rapor ve saha pilotu | DEVAM | 05,06 | fixture hazır; gerçek 3 workspace/10 hesap kanıtı son kapanışta alınacak; A08'i engellemez |
 | 08 | Meta dijital ikizi | DEVAM | 03,04 | S1.1–S1.5 ve Slice 01 kapalı; geniş field/breakdown kataloğu, multi-business grouping ve export/rotation ileri işi açık |
-| 09 | kategori ve talimat | DEVAM | 08 | A09.6c kapalı; A09.6d dependency coverage ve A09.7 guarded category lifecycle kodu hazır, canlı DB+oturumlu browser kabulü açık |
+| 09 | kategori ve talimat | DEVAM | 08 | Guarded lifecycle, target chooser, strict policy lifecycle/precedence, progressive contract ve Guidance Set hazır; facet/source/promotion/UI entegrasyonları ile canlı DB kabulü açık |
 | 10 | zamansal analiz | DEVAM | 06,08,09 | objective schema/playbook temeli var; tam motor sırada |
 | 11 | bütçe planlama | KAPALI | 09,10 | Checklist'teki envelope/constraint/forecast/scenario/ledger/target binding dilimleri kanıtlı; upstream context genişlemeleri A09/A10 altında izleniyor |
 | 12 | prompt/advisor | DEVAM | 09–11 | narrative envelope/claim guard temeli var; translator/ledger sırada |
 | 13 | eylem valfi ve rutin | AÇIK | 04,10–12 | planlandı; write kapalı |
 | 14 | kontrol merkezi | AÇIK | 07,09–13 | planlandı |
+
+## 2026-08-09 — A09 policy lifecycle, target chooser ve Guidance Set checkpoint'i
+
+- İlk assignment için category authoring GET state'i aktif/non-disappeared campaign, ad set,
+  ad ve creative hedeflerini yalnız opaque `category_entity_*` refs ile döndürür. Creative reuse
+  exact aktif `viaAdRef` yoluyla seçilir; katalog sorgusu raw external Meta ID kolonlarını seçmez,
+  UUID/uzun numeric label parçalarını redakte eder. Owner/admin chooser mutation'ı registry hash,
+  manual-lock ve confidence taşır; analyst/viewer salt okunurdur, action/Meta authority yoktur.
+- `strict_instruction_policy_revisions` ve ayrı raw provenance store'u append-only migration,
+  FORCE RLS ve PUBLIC/anon/authenticated/service_role revoke ile eklendi. Analyst draft/revise;
+  owner/admin publish/pause/archive yapar. Cookie-only same-origin API, registry+version+policy
+  hash OCC, hash-chain audit ve lifecycle mutation'ıyla aynı transaction'da context invalidation
+  uygular; raw metin policy JSONB/audit/invalidation payload'ına girmez.
+- Yeni frozen context'ler exact `instructionPolicyRegistry` hash'i olmadan persist edilemez.
+  `sourceComponentsOf()` ile lifecycle writer aynı `instruction_policy / instruction-policy-registry /
+  registryHash` çiftini kullandığından invalidation artık gerçekten context kayıtlarıyla eşleşir;
+  pre-A09 context payloadlarının hash-stable historical replay'i korunur.
+- MASTER'daki dokuz policy otorite kademesini, scope specificity/yeni publication, explicit
+  exception, lossless suppression trace ve eşitlikte `PARKED_CONFLICT` semantiğini uygulayan saf
+  resolver eklendi. Authority tier ve decision/position bağlarını raw text'ten çıkarmaz; trusted
+  production binding adapterı hâlâ açıktır.
+- G0→G4 progressive formalization saf sözleşmesi normalized draft, assumption/question,
+  semantic diff, historical replay ile affected-scope/conflict/impact preview alanlarını exact,
+  hash-chainli ve fail-closed doğrular. G2→G3/G3→G4 explicit owner/admin confirmation ister;
+  G4 yalnız A13 valve ref'i taşır ve approve/execute/write/schedule/tool yetkisi üretmez. Gerçek
+  normalization/impact hesaplama, persistence/API/UI ve insan onaylı promotion ayrı açık iştir.
+- PromotionTemplate selector yayınlanmış immutable template/preset bütünlüğünü doğrulayarak
+  account, Page/Instagram, internal category, post/media ve alias/talimat üzerinden deterministik
+  dry-run yapar; unknown/eşit eşleşme veya targeting/creative değişiklik talebinde fail-closed
+  kalır. Starter category/playbook kataloğu altı mevcut objective playbook'una version/hash ile
+  referans verir; seed/persist/publish yapmaz ve owner adoption gerektirir.
+- Guidance Set authoring mevcut append-only registry üzerinde analyst draft/revise ve owner/admin
+  review/archive olarak bağlandı. Setler 1–50 unique current-published card ref'i sıralı taşır;
+  registry+set version OCC, guidance_set audit ve review/archive context invalidation'ı aynı
+  transaction'dadır. Same-origin API ve role-aware Studio UI action/approval/Meta authority taşımaz.
+- A09 re-audit'i eski AdvisedPractice kapanış işaretini düzeltti: decomposition R-09.21 tamamdır,
+  fakat canonical `standardization_candidate` ve explicit human-confirmed `standardized` eventleri
+  mevcut DB CHECK allowlist'inde yoktur. Bu iki event policy migration'ına karıştırılmadan ayrı
+  additive migration/role-audit/UI/live-verifier checkpoint'inde tamamlanacaktır.
+- Kanıt: birleşik hedefli 21 dosya/152 test; tam `npm test` 212 dosya/1.314 test; production
+  build, `db:check`, architecture, model boundary, security boundary 9 test, secret artifact
+  kontrolü ve `npm audit` (0 vulnerability) yeşil. Gerçek Chromium'da Guidance/Kategori
+  unavailable durumları 390/768/1440 px'te yatay taşma olmadan fail-closed kaldı; owner category
+  chooser request-interception testi opaque exact creative-via-ad POST ve raw ID redaksiyonunu
+  doğruladı. Console'daki hatalar yalnız beklenen 503 kaynakları ve favicon 404'tür.
+- Canlı PostgreSQL kanıtı dış blocker'dadır: `.env.local`, `DATABASE_URL` ve
+  `DIRECT_DATABASE_URL` yok. `verify:category-authoring-live`, `verify:category-profile-live`,
+  `verify:instruction-policy-live`, `verify:effective-campaign-context-db`,
+  `verify:guidance-studio-live` ve `verify:supabase-security` bu nedenle çalışamadı. Devam için
+  güvenli bağlantı geri yüklendikten sonra aynı komutlar çalıştırılmalıdır. Meta write, policy
+  production publish, deploy veya bu ajan tarafından git push yapılmadı.
 
 ## 2026-08-09 — A09 assignment, CategoryProfile ve strict policy contract dalgası
 

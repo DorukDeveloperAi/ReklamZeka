@@ -1119,6 +1119,102 @@ export const categoryProfileRevisions = pgTable("category_profile_revisions", {
   `),
 ]);
 
+/** Server-private raw instruction capture. Raw text never enters public policy projections. */
+export const instructionPolicyRawProvenance = pgTable("instruction_policy_raw_provenance", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceRef: text("workspace_ref").notNull(),
+  provenanceRef: text("provenance_ref").notNull(),
+  rawText: text("raw_text").notNull(),
+  rawTextHash: text("raw_text_hash").notNull(),
+  capturedByActorRef: text("captured_by_actor_ref").notNull(),
+  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("instruction_policy_raw_provenance_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("instruction_policy_raw_provenance_workspace_ref_unique").on(table.workspaceId, table.provenanceRef),
+  index("instruction_policy_raw_provenance_workspace_captured_idx").on(table.workspaceId, table.capturedAt),
+  check("instruction_policy_raw_provenance_identity", sql`
+    ${table.workspaceRef} ~ '^workspace_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.provenanceRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.capturedByActorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.rawTextHash} ~ '^[a-f0-9]{64}$'
+    and length(${table.rawText}) between 1 and 16000 and btrim(${table.rawText}) <> ''
+  `),
+]);
+
+/** Append-only strict policy revisions. The JSONB artifact is normalized, public-safe and authority-free. */
+export const strictInstructionPolicyRevisions = pgTable("strict_instruction_policy_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  rawProvenanceId: uuid("raw_provenance_id").notNull(),
+  workspaceRef: text("workspace_ref").notNull(),
+  policyRef: text("policy_ref").notNull(),
+  policyVersion: integer("policy_version").notNull(),
+  previousVersionHash: text("previous_version_hash"),
+  policyType: text("policy_type").notNull(),
+  status: text("status").notNull(),
+  rawProvenanceRef: text("raw_provenance_ref").notNull(),
+  rawTextHash: text("raw_text_hash").notNull(),
+  actorRef: text("actor_ref").notNull(),
+  actorRole: text("actor_role").notNull(),
+  canonicalHash: text("canonical_hash").notNull(),
+  policyPayload: jsonb("policy_payload").$type<Record<string, unknown>>().notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.rawProvenanceId],
+    foreignColumns: [instructionPolicyRawProvenance.workspaceId, instructionPolicyRawProvenance.id],
+    name: "strict_instruction_policy_revisions_provenance_scope_fk",
+  }).onDelete("restrict"),
+  uniqueIndex("strict_instruction_policy_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("strict_instruction_policy_revisions_workspace_version_unique")
+    .on(table.workspaceId, table.policyRef, table.policyVersion),
+  uniqueIndex("strict_instruction_policy_revisions_workspace_hash_unique").on(table.workspaceId, table.canonicalHash),
+  index("strict_instruction_policy_revisions_current_idx")
+    .on(table.workspaceId, table.policyRef, table.policyVersion),
+  index("strict_instruction_policy_revisions_provenance_idx").on(table.rawProvenanceId),
+  check("strict_instruction_policy_revisions_identity", sql`
+    ${table.workspaceRef} ~ '^workspace_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.policyRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.rawProvenanceRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.actorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.policyVersion} between 1 and 1000000
+    and ((${table.policyVersion} = 1 and ${table.previousVersionHash} is null)
+      or (${table.policyVersion} > 1 and ${table.previousVersionHash} ~ '^[a-f0-9]{64}$'))
+    and ${table.rawTextHash} ~ '^[a-f0-9]{64}$' and ${table.canonicalHash} ~ '^[a-f0-9]{64}$'
+    and ${table.policyType} in ('hard_constraint', 'target', 'preference', 'exception', 'prohibition', 'approval', 'schedule')
+    and ${table.status} in ('draft', 'published', 'paused', 'archived')
+    and ${table.actorRole} in ('owner', 'admin', 'analyst')
+  `),
+  check("strict_instruction_policy_revisions_payload_exact", sql`(
+    jsonb_typeof(${table.policyPayload}) = 'object'
+    and ${table.policyPayload} #>> '{dslVersion}' = 'strict-instruction-policy/1.0.0'
+    and ${table.policyPayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+    and ${table.policyPayload} #>> '{policyRef}' = ${table.policyRef}
+    and (${table.policyPayload} #>> '{policyVersion}')::integer = ${table.policyVersion}
+    and (${table.policyPayload} #>> '{previousVersionHash}') is not distinct from ${table.previousVersionHash}
+    and ${table.policyPayload} #>> '{policyType}' = ${table.policyType}
+    and ${table.policyPayload} #>> '{status}' = ${table.status}
+    and ${table.policyPayload} #>> '{source,rawProvenanceRef}' = ${table.rawProvenanceRef}
+    and ${table.policyPayload} #>> '{source,rawTextHash}' = ${table.rawTextHash}
+    and ${table.policyPayload} #>> '{canonicalHash}' = ${table.canonicalHash}
+    and ${table.policyPayload} #> '{authority,canExecute}' = 'false'::jsonb
+    and ${table.policyPayload} #> '{authority,canWriteMeta}' = 'false'::jsonb
+    and ${table.policyPayload} #> '{authority,canApprove}' = 'false'::jsonb
+    and ${table.policyPayload} #> '{authority,canSchedule}' = 'false'::jsonb
+    and ${table.policyPayload} #> '{authority,canCallTool}' = 'false'::jsonb
+    and ${table.policyPayload} #> '{authority,canAccessNetwork}' = 'false'::jsonb
+    and ${table.policyPayload} #> '{authority,canQuerySql}' = 'false'::jsonb
+  ) is true`),
+  check("strict_instruction_policy_revisions_no_raw_text", sql`
+    not (${table.policyPayload} ? 'rawText')
+    and not jsonb_path_exists(${table.policyPayload}, '$.**.rawText')
+    and ${table.policyPayload}::text !~* '"(token|secret|authorization|approvalgranted)"[[:space:]]*:'
+  `),
+]);
+
 function categoryAssignmentRevisionScope(): [AnyPgColumn, AnyPgColumn, AnyPgColumn] {
   return [categoryAssignments.id, categoryAssignments.workspaceId, categoryAssignments.dimensionId];
 }
@@ -1686,7 +1782,7 @@ export const effectiveCampaignContextComponents = pgTable("effective_campaign_co
   check("effective_campaign_context_components_type", sql`${table.componentType} in (
     'source_snapshot', 'category_resolution', 'category_profile', 'guidance_pack', 'meta_catalog',
     'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
-    'timeframe_resolver'
+    'timeframe_resolver', 'instruction_policy'
   )`),
   check("effective_campaign_context_components_required", sql`
     btrim(${table.componentRef}) <> '' and btrim(${table.componentVersion}) <> ''
@@ -1718,7 +1814,7 @@ export const effectiveCampaignContextInvalidations = pgTable("effective_campaign
   check("effective_campaign_context_invalidations_type", sql`${table.componentType} in (
     'source_snapshot', 'category_resolution', 'category_profile', 'guidance_pack', 'meta_catalog',
     'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
-    'timeframe_resolver'
+    'timeframe_resolver', 'instruction_policy'
   )`),
   check("effective_campaign_context_invalidations_required", sql`
     btrim(${table.componentRef}) <> '' and btrim(${table.componentVersion}) <> ''

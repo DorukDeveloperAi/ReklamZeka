@@ -3,6 +3,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   buildEffectiveCampaignContext,
+  EFFECTIVE_CONTEXT_INSTRUCTION_POLICY_COMPONENT_REF,
   EFFECTIVE_CAMPAIGN_CONTEXT_VERSION,
   type EffectiveCampaignContext,
   type EffectiveCampaignContextInput,
@@ -23,6 +24,7 @@ export const CONTEXT_SOURCE_COMPONENT_TYPES = Object.freeze([
   "metric_catalog",
   "formula_catalog",
   "timeframe_resolver",
+  "instruction_policy",
 ] as const);
 
 export type ContextSourceComponentType = typeof CONTEXT_SOURCE_COMPONENT_TYPES[number];
@@ -159,6 +161,11 @@ export function sourceComponentsOf(context: EffectiveCampaignContext): readonly 
     { componentType: "metric_catalog", componentRef: "metric-catalog", componentVersion: context.versions.metricCatalog },
     { componentType: "formula_catalog", componentRef: "formula-catalog", componentVersion: context.versions.formulaCatalog },
     { componentType: "timeframe_resolver", componentRef: "timeframe-resolver", componentVersion: context.versions.timeframeResolver },
+    ...(context.versions.instructionPolicyRegistry === undefined ? [] : [{
+      componentType: "instruction_policy" as const,
+      componentRef: EFFECTIVE_CONTEXT_INSTRUCTION_POLICY_COMPONENT_REF,
+      componentVersion: context.versions.instructionPolicyRegistry,
+    }]),
   ];
   const normalized = components.map((component) => Object.freeze({
     componentType: component.componentType,
@@ -376,6 +383,11 @@ export class DrizzleEffectiveCampaignContextRepository {
           throw new EffectiveCampaignContextRepositoryError("corrupt_store");
         }
         return Object.freeze({ outcome: "unchanged" as const, record });
+      }
+      // Missing only on immutable pre-A09 payloads. New persistence must bind the
+      // exact policy registry hash so future lifecycle invalidations can match.
+      if (context.versions.instructionPolicyRegistry === undefined) {
+        throw new EffectiveCampaignContextRepositoryError("invalid_input");
       }
       const sameIdentity = await transaction.select().from(schema.effectiveCampaignContexts).where(and(
         eq(schema.effectiveCampaignContexts.workspaceId, context.workspaceId),

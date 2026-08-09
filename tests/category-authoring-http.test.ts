@@ -14,9 +14,11 @@ function request(method: "GET" | "POST", body?: unknown, headers: Record<string,
 }
 function handlers(overrides: Record<string, unknown> = {}) {
   const service = { inspect: vi.fn(async () => ({ contractVersion: "category-authoring/1.0.0",
-    registryHash: "a".repeat(64), dimensions: [], assignments: [], authority: { canCreate: true } })),
+    registryHash: "a".repeat(64), dimensions: [], assignments: [], targets: [{
+      ref: `category_entity_${"1".repeat(24)}`, level: "campaign", label: "Lead kampanyası", viaAdRef: null,
+    }], authority: { canCreate: true } })),
   mutate: vi.fn(async () => ({ contractVersion: "category-authoring/1.0.0", state: { registryHash: "b".repeat(64),
-    dimensions: [], assignments: [] }, auditAppended: true, invalidationsAppended: 0 })), ...overrides };
+    dimensions: [], assignments: [], targets: [] }, auditAppended: true, invalidationsAppended: 0 })), ...overrides };
   return { service, http: createCategoryAuthoringHttpHandlers({ service: service as never,
     resolvePrincipal: vi.fn(async () => principal) }) };
 }
@@ -25,7 +27,10 @@ describe("category authoring HTTP", () => {
   it("serves cookie-only same-origin state without action authority", async () => {
     const { http } = handlers(); const response = await http.GET(request("GET"));
     expect(response.status).toBe(200); expect(response.headers.get("x-reklamzeka-meta-write")).toBe("disabled");
-    expect(await response.json()).toMatchObject({ registryHash: "a".repeat(64) });
+    const payload = await response.json();
+    expect(payload).toMatchObject({ registryHash: "a".repeat(64), targets: [{
+      ref: expect.stringMatching(/^category_entity_[a-f0-9]{24}$/), viaAdRef: null }] });
+    expect(JSON.stringify(payload)).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
   });
 
   it("accepts an exact owner mutation envelope", async () => {

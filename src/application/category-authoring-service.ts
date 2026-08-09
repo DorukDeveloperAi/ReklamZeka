@@ -31,10 +31,17 @@ export type CategoryAuthoringAssignment = Readonly<{
   confidenceBasisPoints: number;
   version: number;
 }>;
+export type CategoryAuthoringTarget = Readonly<{
+  ref: string;
+  level: CategoryCoverageLevel;
+  label: string;
+  viaAdRef: string | null;
+}>;
 export type CategoryAuthoringState = Readonly<{
   registryHash: string;
   dimensions: readonly CategoryAuthoringDimension[];
   assignments: readonly CategoryAuthoringAssignment[];
+  targets: readonly CategoryAuthoringTarget[];
 }>;
 
 type DimensionBody = Readonly<{
@@ -194,7 +201,7 @@ function normalize(command: CategoryAuthoringCommand): CategoryAuthoringCommand 
 function authority(role: WorkspaceMembership["role"]) {
   const canPublish = role === "owner" || role === "admin";
   return Object.freeze({ canCreate: canPublish, canRevise: canPublish, canArchive: canPublish,
-    canAssign: false as const, canAuthorizeAction: false as const, canWriteMeta: false as const });
+    canAssign: canPublish, canAuthorizeAction: false as const, canWriteMeta: false as const });
 }
 
 export class CategoryAuthoringService {

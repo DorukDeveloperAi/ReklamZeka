@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLocalPracticeLabRouteHandler } from "@/server/local-practice-lab-runtime";
 import { localDecisionRoomConfig, type LocalDecisionRoomEnvironment } from "@/server/local-decision-room-runtime";
-import { LOCAL_SESSION_COOKIE, mintLocalSessionCapability } from "@/security/local-session-capability";
+import { LOCAL_SESSION_COOKIE, LOCAL_SESSION_RUNTIME_SCOPES,
+  mintLocalSessionCapability } from "@/security/local-session-capability";
 
 const workspaceId = "11111111-1111-4111-a111-111111111111";
 const userId = "22222222-2222-4222-a222-222222222222";
@@ -46,7 +47,7 @@ describe("local Practice Lab route", () => {
       kind: "session", workspaceId, workspaceRef: "workspace_local", userId,
       readerRef: "reader_local_owner", osUid: process.getuid!(), issuedAt: now, expiresAt: now + 300,
     }, signingKey).claims;
-    expect(claims.scopes).toEqual(["approval_queue:decide", "approval_queue:read", "autonomy_rules:draft", "autonomy_rules:read", "category_registry:publish", "category_registry:read", "guidance:draft", "guidance:publish", "guidance:read", "policy_bundle:draft", "policy_bundle:publish", "policy_bundle:read", "budget_lab:draft", "budget_lab:read", "decision_room:mark_read", "decision_room:read", "practice_lab:read", "promotion_catalog:read", "promotion_preflight:read", "promotion_proposal:draft"]);
+    expect(claims.scopes).toEqual(LOCAL_SESSION_RUNTIME_SCOPES);
     const transaction = vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
       execute: vi.fn()
         .mockResolvedValueOnce({ rows: [{ id: workspaceId }] })

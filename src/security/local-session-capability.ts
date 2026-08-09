@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 export const LOCAL_SESSION_COOKIE = "__Host-rzka_local_session" as const;
-export type LocalSessionScope = "approval_queue:decide" | "approval_queue:read" | "autonomy_rules:read" | "autonomy_rules:draft" | "category_registry:read" | "category_registry:publish" | "guidance:read" | "guidance:draft" | "guidance:publish" | "policy_bundle:read" | "policy_bundle:draft" | "policy_bundle:publish" | "budget_lab:draft" | "budget_lab:read" | "decision_room:read" | "decision_room:mark_read" | "practice_lab:read" | "promotion_catalog:read" | "promotion_preflight:read" | "promotion_proposal:draft" | "local_session:bootstrap";
+export type LocalSessionScope = "approval_queue:decide" | "approval_queue:read" | "autonomy_rules:read" | "autonomy_rules:draft" | "category_registry:read" | "category_registry:publish" | "instruction_policy:read" | "instruction_policy:draft" | "instruction_policy:publish" | "guidance:read" | "guidance:draft" | "guidance:publish" | "policy_bundle:read" | "policy_bundle:draft" | "policy_bundle:publish" | "budget_lab:draft" | "budget_lab:read" | "decision_room:read" | "decision_room:mark_read" | "practice_lab:read" | "promotion_catalog:read" | "promotion_preflight:read" | "promotion_proposal:draft" | "local_session:bootstrap";
 export type LocalSessionKind = "bootstrap" | "session";
 
 export type LocalSessionClaims = Readonly<{
@@ -27,6 +27,7 @@ const TOKEN = /^rzs1\.([A-Za-z0-9_-]{64,2048})\.([A-Za-z0-9_-]{43})$/;
 export const LOCAL_SESSION_RUNTIME_SCOPES: readonly LocalSessionScope[] = Object.freeze([
   "approval_queue:decide", "approval_queue:read", "autonomy_rules:draft", "autonomy_rules:read",
   "category_registry:publish", "category_registry:read",
+  "instruction_policy:draft", "instruction_policy:publish", "instruction_policy:read",
   "guidance:draft", "guidance:publish", "guidance:read",
   "policy_bundle:draft", "policy_bundle:publish", "policy_bundle:read", "budget_lab:draft", "budget_lab:read",
   "decision_room:mark_read", "decision_room:read", "practice_lab:read", "promotion_catalog:read",

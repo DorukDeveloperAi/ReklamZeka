@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { getTableColumns, getTableName } from "drizzle-orm";
-import { getTableConfig } from "drizzle-orm/pg-core";
-import { describe, expect, it } from "vitest";
+import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
+import { describe, expect, it, vi } from "vitest";
 import {
   assertGuidanceRegistryEvolution,
+  DrizzleGuidanceRegistryRepository,
   GuidanceRepositoryError,
 } from "@/connectors/guidance/guidance-drizzle-repository";
 import {
@@ -161,5 +162,61 @@ describe("append-only guidance evolution", () => {
     const omitted = createGuidanceRegistry({ workspaceId, sources: [source()], cards: [], bindings: [], sets: [] });
     expect(() => assertGuidanceRegistryEvolution(current, omitted))
       .toThrowError(expect.objectContaining<Partial<GuidanceRepositoryError>>({ code: "invalid_evolution" }));
+  });
+
+  it("commits a reviewed set revision, workspace invalidation and guidance-set audit in one transaction", async () => {
+    const setRef = `guidance_set_${"a".repeat(24)}`;
+    const sourceRef = `source_${"b".repeat(24)}`;
+    const cardRef = `guidance_${"c".repeat(24)}`;
+    const bindingRef = `binding_${"d".repeat(24)}`;
+    const draftRegistry = createGuidanceRegistry({ workspaceId, sources: [{ ...source(), id: sourceRef,
+      sourceRef: cardRef }], cards: [{ ...card(), id: cardRef, sourceIds: [sourceRef] }],
+    bindings: [{ ...binding(), id: bindingRef, cardId: cardRef }], sets: [{ id: setRef, workspaceId,
+      name: "Reviewed sequence", orderedCardIds: [cardRef], reviewStatus: "draft", version: 1 }] });
+    const next = createGuidanceRegistry({ workspaceId, sources: draftRegistry.sources, cards: draftRegistry.cards,
+      bindings: draftRegistry.bindings, sets: [{ ...draftRegistry.sets[0]!, reviewStatus: "reviewed", version: 2 }] });
+    const stored = new Map<unknown, unknown[]>([[guidanceSources, []], [guidanceCards, []],
+      [guidanceBindings, []], [guidanceSets, []]]);
+    const dialect = new PgDialect();
+    const statements: string[] = [];
+    const tx = {
+      select: () => ({ from: (table: unknown) => ({ where: async () => stored.get(table) ?? [] }) }),
+      insert: (table: unknown) => ({ values: (values: unknown | unknown[]) => ({ onConflictDoNothing: async () => {
+        stored.get(table)!.push(...(Array.isArray(values) ? values : [values]));
+      } }) }),
+      execute: vi.fn(async (query: never) => {
+        const statement = dialect.sqlToQuery(query).sql;
+        statements.push(statement);
+        if (statement.includes("select id from workspaces")) return { rows: [{ id: workspaceId }] };
+        if (statement.includes("insert into effective_campaign_context_invalidations")) {
+          return { rows: [{ id: "22222222-2222-4222-8222-222222222222" }] };
+        }
+        return { rows: [] };
+      }),
+    };
+    const database = { transaction: vi.fn(async (callback: (value: typeof tx) => Promise<unknown>) => callback(tx)) };
+    const repository = new DrizzleGuidanceRegistryRepository(database as never);
+    const drafted = await repository.saveAudited(draftRegistry, {
+      expectedRegistryHash: null, actorId: "33333333-3333-4333-8333-333333333333",
+      action: "guidance_set.draft_created", resourceId: setRef, occurredAt: "2026-08-09T18:59:00.000Z",
+      metadata: { version: 1, role: "owner", cardCount: 1 },
+    });
+    expect(drafted).toMatchObject({ outcome: "inserted", auditAppended: true,
+      contextInvalidationAppended: false });
+    const result = await repository.saveAudited(next, {
+      expectedRegistryHash: draftRegistry.registryHash,
+      actorId: "33333333-3333-4333-8333-333333333333",
+      action: "guidance_set.reviewed", resourceId: setRef, occurredAt: "2026-08-09T19:00:00.000Z",
+      metadata: { version: 2, role: "owner", cardCount: 1 },
+    });
+    expect(result).toMatchObject({ outcome: "inserted", auditAppended: true,
+      contextInvalidationAppended: true });
+    expect(database.transaction).toHaveBeenCalledTimes(2);
+    expect(statements.join("\n")).toContain("insert into effective_campaign_context_invalidations");
+    expect(statements.join("\n")).toContain("insert into audit_events");
+    expect(stored.get(guidanceSets)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ setKey: setRef, version: 1, orderedCardIds: [cardRef], reviewStatus: "draft" }),
+      expect.objectContaining({ setKey: setRef, version: 2, orderedCardIds: [cardRef], reviewStatus: "reviewed" }),
+    ]));
   });
 });

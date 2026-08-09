@@ -52,7 +52,7 @@ export function guidanceStudioSessionRequiredResponse() {
 }
 
 export function createGuidanceStudioHttpHandlers(input: Readonly<{
-  service: Pick<GuidanceStudioService, "list" | "createDraft" | "mutate">;
+  service: Pick<GuidanceStudioService, "list" | "createDraft" | "mutate" | "createSetDraft" | "mutateSet">;
   resolvePrincipal(request: Request, operation: "read" | "draft" | "publish"): Promise<TrustedDecisionRoomPrincipal | null>;
 }>) {
   return Object.freeze({
@@ -63,26 +63,46 @@ export function createGuidanceStudioHttpHandlers(input: Readonly<{
       return NextResponse.json(await input.service.list(principal), { headers: HEADERS });
     } catch (reason) { return failure(reason); } },
     POST: async (request: Request) => { try {
-      requestShape(request, "POST", "guidance-studio-create", true);
-      const value = await body(request); exact(value, ["title", "body", "strength", "topic", "scopes", "expectedRegistryHash"]);
+      const intent = request.headers.get("x-reklamzeka-intent");
+      if (intent !== "guidance-studio-create" && intent !== "guidance-set-create") {
+        throw new GuidanceStudioError("invalid_input");
+      }
+      requestShape(request, "POST", intent, true);
+      const value = await body(request);
+      exact(value, intent === "guidance-set-create"
+        ? ["name", "orderedCardRefs", "expectedRegistryHash"]
+        : ["title", "body", "strength", "topic", "scopes", "expectedRegistryHash"]);
       const principal = await input.resolvePrincipal(request, "draft");
       if (!principal) throw new AuthorizationError();
-      return NextResponse.json(await input.service.createDraft(principal, value as never), { status: 201, headers: HEADERS });
+      const result = intent === "guidance-set-create"
+        ? await input.service.createSetDraft(principal, value as never)
+        : await input.service.createDraft(principal, value as never);
+      return NextResponse.json(result, { status: 201, headers: HEADERS });
     } catch (reason) { return failure(reason); } },
     PATCH: async (request: Request) => { try {
       const intent = request.headers.get("x-reklamzeka-intent");
-      const operation = intent === "guidance-studio-revise" ? "revise"
+      const cardOperation = intent === "guidance-studio-revise" ? "revise"
         : intent === "guidance-studio-publish" ? "publish" : intent === "guidance-studio-archive" ? "archive" : null;
-      if (!operation) throw new GuidanceStudioError("invalid_input");
+      const setOperation = intent === "guidance-set-revise" ? "revise"
+        : intent === "guidance-set-review" ? "review" : intent === "guidance-set-archive" ? "archive" : null;
+      if (!cardOperation && !setOperation) throw new GuidanceStudioError("invalid_input");
       requestShape(request, "PATCH", intent!, true);
       const value = await body(request);
-      exact(value, operation === "revise"
-        ? ["cardRef", "expectedVersion", "expectedRegistryHash", "operation", "title", "body", "strength", "topic", "scopes"]
-        : ["cardRef", "expectedVersion", "expectedRegistryHash", "operation"]);
+      exact(value, setOperation
+        ? setOperation === "revise"
+          ? ["setRef", "expectedVersion", "expectedRegistryHash", "operation", "name", "orderedCardRefs"]
+          : ["setRef", "expectedVersion", "expectedRegistryHash", "operation"]
+        : cardOperation === "revise"
+          ? ["cardRef", "expectedVersion", "expectedRegistryHash", "operation", "title", "body", "strength", "topic", "scopes"]
+          : ["cardRef", "expectedVersion", "expectedRegistryHash", "operation"]);
+      const operation = setOperation ?? cardOperation!;
       if (value.operation !== operation) throw new GuidanceStudioError("invalid_input");
       const principal = await input.resolvePrincipal(request, operation === "revise" ? "draft" : "publish");
       if (!principal) throw new AuthorizationError();
-      return NextResponse.json(await input.service.mutate(principal, value as never), { headers: HEADERS });
+      const result = setOperation
+        ? await input.service.mutateSet(principal, value as never)
+        : await input.service.mutate(principal, value as never);
+      return NextResponse.json(result, { headers: HEADERS });
     } catch (reason) { return failure(reason); } },
   });
 }

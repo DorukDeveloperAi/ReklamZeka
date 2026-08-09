@@ -124,6 +124,7 @@ function context(options: Readonly<{
     versions: {
       metaCatalog: "meta-v1", categoryResolver: "category-v1", guidanceRegistry: "guidance-v1",
       metricCatalog: "metric-v1", formulaCatalog: "formula-v1", timeframeResolver: "timeframe-v1",
+      instructionPolicyRegistry: "9".repeat(64),
     },
   };
   return buildEffectiveCampaignContext(input);
@@ -139,6 +140,7 @@ let nonexistentSnapshotBlocked = false;
 let futureSnapshotBlocked = false;
 let exactEntityInvalidated = false;
 let unrelatedEntityPreserved = false;
+let instructionPolicyWorkspaceInvalidated = false;
 let historicalReplayImmutable = false;
 let invalidationReplayIdempotent = false;
 let forbiddenPayloadBlocked = false;
@@ -257,6 +259,14 @@ try {
     unrelatedEntityPreserved = (await repository.loadLatestValid({
       workspaceId, entityType: "campaign", entityRef: "campaign-b",
     }))?.context.contextHash === contextB.contextHash;
+    const policyComponent = sourceComponentsOf(contextA).find((entry) => entry.componentType === "instruction_policy")!;
+    const policyInvalidation = await repository.invalidate({ workspaceId, ...policyComponent,
+      scope: { kind: "workspace_component" }, reasonCode: "source_changed",
+      observedAt: "2026-08-07T13:01:00.000Z" });
+    instructionPolicyWorkspaceInvalidated = policyInvalidation.outcome === "inserted"
+      && policyInvalidation.affectedContextCount === 2
+      && await repository.loadLatestValid({ workspaceId, entityType: "campaign", entityRef: "campaign-a" }) === null
+      && await repository.loadLatestValid({ workspaceId, entityType: "campaign", entityRef: "campaign-b" }) === null;
     const historical = await repository.loadHistorical(workspaceId, contextA.contextHash);
     historicalReplayImmutable = historical.context.contextHash === contextA.contextHash && historical.invalidated;
     invalidationReplayIdempotent = (await repository.invalidate(invalidation)).outcome === "unchanged";
@@ -340,7 +350,7 @@ console.log(JSON.stringify({
   inserted, idempotentReplay, identityConflictBlocked, foreignWorkspaceBlocked,
   foreignAccountBlocked, brokenHierarchyBlocked, nonexistentSnapshotBlocked,
   futureSnapshotBlocked,
-  exactEntityInvalidated, unrelatedEntityPreserved, historicalReplayImmutable,
+  exactEntityInvalidated, unrelatedEntityPreserved, instructionPolicyWorkspaceInvalidated, historicalReplayImmutable,
   invalidationReplayIdempotent, forbiddenPayloadBlocked, nullableAuthorityBypassBlocked,
   nestedAuthorityEscalationBlocked, crossTenantForeignKeyBlocked, noWriteAuthority,
   writeNetworkCalls: 0, temporaryRowsCommitted,

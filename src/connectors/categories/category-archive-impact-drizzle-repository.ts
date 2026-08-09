@@ -251,6 +251,9 @@ export class DrizzleCategoryArchiveImpactRepository implements CategoryArchiveIm
           lateral jsonb_path_query(alternative.alternative_payload, 'lax $.**.categoryRefs[*]') value
           where alternative.workspace_id = ${workspaceId}::uuid and jsonb_typeof(value) = 'string'
         union all select 'category_profile', profile.category_ref from ranked_profiles profile
+        union all select 'instruction_policy', value #>> '{}' from strict_instruction_policy_revisions policy,
+          lateral jsonb_path_query(policy.policy_payload #> '{scope,internalCategoryRefs}', 'lax $[*]') value
+          where policy.workspace_id = ${workspaceId}::uuid and jsonb_typeof(value) = 'string'
       )
       select
         (select count(*)::int from category_assignments assignment where assignment.workspace_id = ${workspaceId}::uuid

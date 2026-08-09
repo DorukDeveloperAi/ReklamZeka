@@ -73,8 +73,10 @@
   - [x] Workspace-scoped repository/application core ve gerçek CRUD/restart/rollback kabulü.
   - [x] Owner/admin assignment create/revise/unlock/archive; server-owned source/evidence,
     registry+version concurrency, manual-lock guard, audit ve selective context invalidation.
-  - [ ] İlk kez assignment yapılacak entity için tenant-bound salt-okur target catalog/chooser ve
-    bağlı PostgreSQL/oturumlu browser kabulü.
+  - [x] İlk kez assignment yapılacak entity için tenant-bound, aktif/non-disappeared salt-okur
+    target catalog/chooser; opaque ref ve creative için exact `viaAdRef`, owner/admin UI ve
+    raw Meta ID/UUID redaksiyonu.
+  - [ ] Target catalog bağlı PostgreSQL ve gerçek oturumlu browser kabulü; yerel DB/session yok.
 - [x] Kullanıcı tanımlı dimension, single/multi cardinality ve entity-level kataloğu.
 - [x] Meta/internal selector ve mapping preview motoru.
 - [x] Category profile: analysis/rule/budget/transfer/schedule/action/creative policy bundle bağları.
@@ -87,15 +89,27 @@
 - [ ] Raw natural-language → normalized draft + assumption/question/impact preview.
   - [x] `owner_statement` ham metni ayrı provenance kaydı olarak koruyan, guidance-only
     card + tek scope binding üreten gerçek taslak authoring akışı.
-  - [ ] Agent normalization, varsayım/soru, semantic diff ve affected-entity/impact preview.
+  - [x] G0→G4 saf sözleşmede normalized draft, varsayım/soru, semantic diff, replay ve
+    affected-scope/conflict/impact preview doğrulaması; ambiguity/partial sonuç fail-closed.
+  - [ ] Gerçek normalization/application servisi; diff ve impact'in authoritative resolver/
+    ledger/dependency reader'dan hesaplanması, persistence/API/UI ve insan onaylı kabul.
 - [ ] Precedence/inheritance/suppression/PARKED_CONFLICT resolver.
+  - [x] MASTER dokuz kademe sırası, scope specificity/newer publication, exception,
+    lossless suppression trace ve eşitlikte `PARKED_CONFLICT` saf resolver matrisi.
+  - [ ] Trusted authority-tier/decision binding adapterı ve frozen analysis composition.
 - [ ] Versioned draft/publish/pause/archive ve rol/audit API'leri.
   - [x] Guidance için immutable draft/revise/publish/archive, optimistic registry hash,
     analyst draft + owner/admin publish/archive ve mutation+audit tek transaction.
   - [x] Publish/archive ile eski guidance registry version'lı frozen context'lere atomik,
     append-only workspace invalidation; draft/revise invalidation üretmez.
-  - [ ] Strict policy pause/publish lifecycle, history/diff projection ve context invalidation binding'i.
+  - [x] Strict policy raw provenance + normalized append-only revision; analyst draft/revise,
+    owner/admin publish/pause/archive, registry+version+hash OCC, history/diff, audit ve exact
+    `instruction_policy` frozen-context invalidation binding'i.
+  - [ ] Strict policy Studio filtre/impact UI'si, canlı PostgreSQL verifier ve gerçek oturum kabulü.
 - [ ] Başlangıç objective/internal kategori playbook seti.
+  - [x] Altı canonical objective playbook'una version/hash ile bağlı, review-required ve
+    authority-free starter category/profile proposal kataloğu.
+  - [ ] Tenant persistence, owner adoption/confirmation ve eksik başlangıç dimension kapsamı.
 - [ ] Kategori coverage/unmatched/conflict/impact dashboard ve güvenli archive akışı.
   - [x] Rules fixture kaldırıldı; gerçek Guidance Studio loading/empty/conflict/error,
     create/revise/publish/archive ve aktif iç kategori selector yüzeyi.
@@ -126,7 +140,9 @@
 - [ ] PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run.
   - [x] Objective/optimization, actor/destination, placement, naming/tracking, reuse policy,
     budget/timeframe ve immutable preset ref sözleşmesi ile fail-closed preflight çekirdeği.
-  - [ ] Alias/talimat tabanlı deterministic öneri ve publish authoring dry-run akışı.
+  - [x] Account, Page/Instagram, internal category, post/media ve alias/talimat bağlı saf
+    deterministic selector; belirsizlikte publish-ready değil, targeting/creative icat etmez.
+  - [ ] Published-catalog Drizzle adapterı, rol/audit/OCC authoring API'si ve kullanıcı dry-run UI'si.
 - [ ] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi.
   - [x] Guidance-only pure registry/pack; provenance ayrımı, deterministic scope/conflict,
     freshness ve bounded context budget.
@@ -137,13 +153,22 @@
     timeframe bağlamlı deterministic effective-pack preview araçları.
   - [x] Tek guidance card için en fazla 12 çoklu facet binding authoring; farklı facet'ler
     AND, aynı facet alternatifleri OR çözülür ve Studio'da birlikte görünür.
-  - [ ] Guidance set authoring; account-group/lifecycle/template scope ve analysis-run binding.
+  - [x] Guidance set draft/revise/review/archive authoring; ordered published-card refs,
+    registry+version OCC, append-only history, audit+context invalidation ve role-aware UI.
+  - [ ] Account-group/funnel/optimization/lifecycle/promotion-template scope ve analysis-run binding.
 - [ ] Owner statement + official Meta source + experiment/observation provenance ve freshness.
   - [x] Altı provenance türü, official source publish gate'i, review-by/freshness suppression ve
     frozen geçmiş bağlamı.
   - [ ] Owner dışındaki source türleri için kullanıcı authoring ve analysis-run binding'i.
 - [ ] G0→G4 progressive formalization, semantic diff, historical replay ve impact preview.
-- [x] AdvisedPractice candidate→trial→outcome→standardization lifecycle ve decomposition review.
+  - [x] Append-only hash-chainli saf maturity/transition contract; G2→G3 ve G3→G4 explicit
+    owner/admin confirmation, fail-closed ambiguity ve A13 valve-ref-only G4 sınırı.
+  - [ ] Gerçek artifact üretimi, persistence/API/UI, authoritative replay/impact ve browser kabulü.
+- [ ] AdvisedPractice candidate→trial→outcome→standardization lifecycle.
+  - [x] Candidate/review/trial/outcome ve ayrı StandardizationReview decomposition çekirdeği.
+  - [ ] Explicit human-confirmed `standardization_candidate` ve `standardized` event/state,
+    additive DB allowlist migrationı, rol/audit API/UI ve canlı verifier.
+- [x] StandardizationReview feature/agenda/playbook/cadence/guidance/policy/human-judgment decomposition.
 
 ## A10 — Zamansal analiz
 

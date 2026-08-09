@@ -101,6 +101,7 @@ function context() {
     versions: {
       metaCatalog: "meta-v1", categoryResolver: "category-v1", guidanceRegistry: "guidance-v1",
       metricCatalog: "metric-v1", formulaCatalog: "formula-v1", timeframeResolver: "timeframe-v1",
+      instructionPolicyRegistry: "9".repeat(64),
     },
   };
   return buildEffectiveCampaignContext(input);
@@ -123,6 +124,8 @@ describe("effective campaign context persistence contract", () => {
     expect(components).toContainEqual({
       componentType: "metric_catalog", componentRef: "metric-catalog", componentVersion: "metric-v1",
     });
+    expect(components).toContainEqual({ componentType: "instruction_policy",
+      componentRef: "instruction-policy-registry", componentVersion: "9".repeat(64) });
     expect(sourceComponentsOf(context())).toEqual(components);
   });
 
@@ -132,6 +135,31 @@ describe("effective campaign context persistence contract", () => {
     await expect(repository.save({ ...context(), contextHash: "0".repeat(64) }))
       .rejects.toMatchObject({ code: "invalid_input" } satisfies Partial<EffectiveCampaignContextRepositoryError>);
     expect(database.transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a newly persisted legacy payload while old v1 replay remains buildable", async () => {
+    const current = context();
+    const { schemaVersion: _schema, contextHash: _contextHash, capabilities: _capabilities,
+      ...currentInput } = current;
+    const { instructionPolicyRegistry: _policy, ...legacyVersions } = current.versions;
+    const legacy = buildEffectiveCampaignContext({ ...currentInput, versions: legacyVersions });
+    expect(legacy.versions).not.toHaveProperty("instructionPolicyRegistry");
+    expect(sourceComponentsOf(legacy).some((component) => component.componentType === "instruction_policy")).toBe(false);
+
+    const executeResults = [{ rows: [{ id: workspaceId }] }, { rows: [{
+      metaConnectionId: "00000000-0000-0000-0000-000000000201",
+      adAccountId: "00000000-0000-0000-0000-000000000202",
+      campaignId: "00000000-0000-0000-0000-000000000203",
+    }] }];
+    const select = vi.fn()
+      .mockReturnValueOnce({ from: vi.fn(() => ({ where: vi.fn(async () => [{ publicRef: snapshotRef,
+        capturedAt: new Date("2026-08-07T11:00:00.000Z") }]) })) })
+      .mockReturnValueOnce({ from: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn(async () => []) })) })) });
+    const transaction = { execute: vi.fn(async () => executeResults.shift()), select };
+    const database = { transaction: vi.fn(async (callback: (tx: typeof transaction) => Promise<unknown>) => callback(transaction)) };
+    await expect(new DrizzleEffectiveCampaignContextRepository(database as never).save(legacy))
+      .rejects.toMatchObject({ code: "invalid_input" });
+    expect(select).toHaveBeenCalledTimes(2);
   });
 
   it("keeps the generated migration create-only, private and source-scope indexed", () => {

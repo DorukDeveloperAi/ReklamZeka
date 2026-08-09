@@ -312,6 +312,13 @@
 .categoryAuthoringGrid form > button:disabled, .categoryArchiveAction button:disabled { opacity: .42; cursor: not-allowed; }
 .categoryAuthoring > footer { padding: 11px 16px; border-top: 1px solid var(--rz-line); color: var(--rz-dim); font-size: .53rem; }
 .categoryAuthoring code { color: var(--rz-muted); }
+.categoryAssignmentGrid { border-top: 1px solid var(--rz-line); }
+.categoryAssignmentGrid form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 16px; }
+.categoryAssignmentGrid label { display: grid; gap: 6px; color: var(--rz-muted); font-size: .55rem; }
+.categoryAssignmentGrid input:not([type="checkbox"]), .categoryAssignmentGrid select { width: 100%; min-height: 36px; padding: 8px 10px; border: 1px solid var(--rz-line); border-radius: 8px; color: var(--rz-text); background: var(--rz-surface-3); box-sizing: border-box; }
+.categoryAssignmentGrid .categoryAssignmentLock { display: flex; align-items: center; gap: 7px; align-self: end; min-height: 36px; }
+.categoryAssignmentGrid button { min-height: 36px; align-self: end; padding: 0 12px; border: 1px solid rgba(184,242,84,.24); border-radius: 8px; color: #10140f; background: var(--rz-green); font-size: .57rem; font-weight: 800; cursor: pointer; }
+.categoryAssignmentGrid button:disabled { opacity: .42; cursor: not-allowed; }
 .categoryRegistry { overflow: hidden; }
 .categoryRegistry .panelHeader > span { color: var(--rz-dim); font: .53rem ui-monospace, monospace; }
 .categoryRegistry details { border-top: 1px solid var(--rz-line); }
@@ -915,6 +922,7 @@
   .categoryDefinitions { grid-template-columns: 1fr; }
   .categoryAuthoringGrid { grid-template-columns: 1fr; }
   .categoryAuthoringGrid form + form { border-left: 0; border-top: 1px solid var(--rz-line); }
+  .categoryAssignmentGrid form { grid-template-columns: 1fr; }
   .categoryRevisionForm { grid-template-columns: 1fr; }
   .categoryRevisionForm > strong { grid-column: auto; }
   .categoryRevisionForm > div { align-items: stretch; flex-direction: column; }

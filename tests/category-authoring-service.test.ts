@@ -12,7 +12,7 @@ const ownerId = "22222222-2222-4222-8222-222222222222";
 const analystId = "33333333-3333-4333-8333-333333333333";
 const viewerId = "44444444-4444-4444-8444-444444444444";
 const adminId = "55555555-5555-4555-8555-555555555555";
-const state: CategoryAuthoringState = Object.freeze({ registryHash: "a".repeat(64), dimensions: [], assignments: [] });
+const state: CategoryAuthoringState = Object.freeze({ registryHash: "a".repeat(64), dimensions: [], assignments: [], targets: [] });
 const memberships = [
   { userId: ownerId, workspaceId, role: "owner" as const },
   { userId: analystId, workspaceId, role: "analyst" as const },
@@ -100,8 +100,10 @@ describe("CategoryAuthoringService", () => {
     })).rejects.toMatchObject({ code: "invalid_input" });
   });
 
-  it("keeps assignment/mapping authority closed in this registry lifecycle slice", async () => {
+  it("opens assignment authoring only to an owner while action and Meta authority stay closed", async () => {
     expect((await new CategoryAuthoringService(repository(), memberships).inspect(principal(ownerId)))
+      .authority).toMatchObject({ canAssign: true, canAuthorizeAction: false, canWriteMeta: false });
+    expect((await new CategoryAuthoringService(repository(), memberships).inspect(principal(viewerId)))
       .authority.canAssign).toBe(false);
   });
 });

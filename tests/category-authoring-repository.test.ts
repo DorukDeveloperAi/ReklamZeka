@@ -10,6 +10,8 @@ const dimensionId = "22222222-2222-4222-8222-222222222222";
 const definitionId = "33333333-3333-4333-8333-333333333333";
 const assignmentId = "44444444-4444-4444-8444-444444444444";
 const campaignId = "55555555-5555-4555-8555-555555555555";
+const adId = "77777777-7777-4777-8777-777777777777";
+const creativeId = "88888888-8888-4888-8888-888888888888";
 
 function stateResults() { return [
   { rows: [{ id: workspaceId }] },
@@ -20,6 +22,11 @@ function stateResults() { return [
   { rows: [{ id: assignmentId, dimension_id: dimensionId, definition_id: definitionId,
     entity_level: "campaign", entity_id: campaignId, operation: "add", source: "manual", manual_lock: true,
     confidence: 1, version: 1 }] },
+  { rows: [
+    { entity_level: "campaign", id: campaignId,
+      label: "Lead 123456789012345 99999999-9999-4999-8999-999999999999", via_ad_id: null },
+    { entity_level: "creative", id: creativeId, label: "Kreatif · Reklam üzerinden", via_ad_id: adId },
+  ] },
 ]; }
 
 describe("DrizzleCategoryAuthoringRepository", () => {
@@ -30,11 +37,23 @@ describe("DrizzleCategoryAuthoringRepository", () => {
       ref: expect.stringMatching(/^dimension_[a-f0-9]{24}$/), definitions: [{
         ref: expect.stringMatching(/^category_[a-f0-9]{24}$/) }],
     }], assignments: [{ ref: expect.stringMatching(/^assignment_[a-f0-9]{24}$/),
-      entity: { ref: expect.stringMatching(/^category_entity_[a-f0-9]{24}$/) }, manualLock: true }] });
+      entity: { ref: expect.stringMatching(/^category_entity_[a-f0-9]{24}$/) }, manualLock: true }],
+    targets: [{ level: "campaign", ref: expect.stringMatching(/^category_entity_[a-f0-9]{24}$/), viaAdRef: null },
+      { level: "creative", ref: expect.stringMatching(/^category_entity_[a-f0-9]{24}$/),
+        viaAdRef: expect.stringMatching(/^category_entity_[a-f0-9]{24}$/) }] });
     const serialized = JSON.stringify(state);
-    for (const internal of [workspaceId, dimensionId, definitionId, assignmentId, campaignId]) {
+    for (const internal of [workspaceId, dimensionId, definitionId, assignmentId, campaignId, adId, creativeId]) {
       expect(serialized).not.toContain(internal);
     }
+    expect(serialized).not.toContain("123456789012345");
+    expect(serialized).not.toContain("99999999-9999-4999-8999-999999999999");
+    expect(state.targets[0]?.label).toContain("kimlik gizlendi");
+    const executeCalls = execute.mock.calls as unknown as [unknown][];
+    const targetCatalogSql = new PgDialect().sqlToQuery(executeCalls[4]![0] as never).sql;
+    expect(targetCatalogSql).toContain("lower(coalesce");
+    expect(targetCatalogSql).toContain("disappeared_at is null");
+    expect(targetCatalogSql).toContain("meta_creatives");
+    expect(targetCatalogSql).not.toContain("external_campaign_id");
   });
 
   it("checks the registry hash after the workspace lock and before any mutation", async () => {
@@ -48,7 +67,7 @@ describe("DrizzleCategoryAuthoringRepository", () => {
         expectedVersion: 1, expectedRegistryHash: "f".repeat(64), expectedImpactHash: "e".repeat(64) } }))
       .rejects.toMatchObject({ code: "conflict" });
     expect(database.transaction).toHaveBeenCalledTimes(1);
-    expect(tx.execute).toHaveBeenCalledTimes(5);
+    expect(tx.execute).toHaveBeenCalledTimes(6);
   });
 
   it("keeps registry projection assignment refs opaque even though mapping mutations are not exposed", async () => {
@@ -67,6 +86,46 @@ describe("DrizzleCategoryAuthoringRepository", () => {
       .inspect(workspaceId);
     expect(agent.registryHash).not.toBe(manual.registryHash);
     expect(JSON.stringify(agent)).not.toContain('"source"');
+  });
+
+  it("creates a manual creative assignment only through the selected active via-ad path", async () => {
+    const initial = stateResults();
+    (initial[1]!.rows[0] as { allowed_entity_levels: string[] }).allowed_entity_levels = ["creative"];
+    const current = await new DrizzleCategoryAuthoringRepository({ execute: vi.fn(async () => initial.shift()) } as never)
+      .inspect(workspaceId);
+    const creativeTarget = current.targets.find((target) => target.level === "creative")!;
+    const before = stateResults();
+    (before[1]!.rows[0] as { allowed_entity_levels: string[] }).allowed_entity_levels = ["creative"];
+    const after = stateResults();
+    const results = [
+      { rows: [{ id: workspaceId }] }, ...before,
+      { rows: [{ id: creativeId, external_ref: "creative_external_safe" }] },
+      { rows: [{ id: adId, external_ref: "ad_external_safe" }] },
+      { rows: [{ id: adId }] },
+      { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }, ...after,
+    ];
+    const tx = { execute: vi.fn(async () => results.shift()) };
+    const database = { transaction: vi.fn(async (callback: (value: typeof tx) => Promise<unknown>) => callback(tx)) };
+    const create = vi.spyOn(DrizzleCategoryRegistryRepository.prototype, "createAssignment")
+      .mockResolvedValue({ id: assignmentId } as never);
+    try {
+      await expect(new DrizzleCategoryAuthoringRepository(database as never).mutate({ workspaceId,
+        actorId: "66666666-6666-4666-8666-666666666666", actorRef: "reader_owner", role: "owner",
+        occurredAt: "2026-08-09T18:00:00.000Z", command: { operation: "create_assignment",
+          dimensionRef: current.dimensions[0]!.ref, definitionRef: current.dimensions[0]!.definitions[0]!.ref,
+          entityLevel: "creative", entityRef: creativeTarget.ref, viaAdRef: creativeTarget.viaAdRef,
+          assignmentOperation: "add", manualLock: true, confidenceBasisPoints: 9_500,
+          expectedRegistryHash: current.registryHash } })).resolves.toMatchObject({ auditAppended: true });
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ workspaceId, target: {
+        level: "creative", id: creativeId, viaAdId: adId }, source: "manual", manualLock: true, confidence: 0.95 }));
+      const executeCalls = tx.execute.mock.calls as unknown as [unknown][];
+      const statements = executeCalls.map((call) => new PgDialect().sqlToQuery(call[0] as never).sql);
+      const exactPathStatements = statements.filter((statement) => statement.includes("select id from meta_ads")
+        && statement.includes("creative_id"));
+      const exactPathSql = exactPathStatements[0];
+      expect(exactPathSql).toContain("lower(coalesce");
+      expect(exactPathStatements).toHaveLength(1);
+    } finally { create.mockRestore(); }
   });
 
   it("keeps ordinary revise/archive closed for locked or non-manual assignments", async () => {
@@ -95,7 +154,7 @@ describe("DrizzleCategoryAuthoringRepository", () => {
       await expect(new DrizzleCategoryAuthoringRepository(database as never).mutate({ workspaceId,
         actorId: "66666666-6666-4666-8666-666666666666", actorRef: "reader_test", role: "owner",
         occurredAt: "2026-08-09T18:00:00.000Z", command })).rejects.toMatchObject({ code: "manual_lock" });
-      expect(tx.execute).toHaveBeenCalledTimes(5);
+      expect(tx.execute).toHaveBeenCalledTimes(6);
     }
   });
 

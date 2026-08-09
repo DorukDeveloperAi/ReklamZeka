@@ -27,17 +27,33 @@ type GuidanceItem = Readonly<{
   scopes: readonly GuidanceScope[];
   updatedAt: string | null;
 }>;
+type GuidanceSetItem = Readonly<{
+  setRef: string;
+  version: number;
+  name: string;
+  reviewStatus: "draft" | "reviewed" | "archived";
+  orderedCards: readonly Readonly<{
+    cardRef: string;
+    title: string;
+    version: number;
+    status: GuidanceStatus;
+  }>[];
+}>;
 
 type GuidanceCategory = Readonly<{ ref: string; label: string; dimension: string }>;
 type GuidanceAuthority = Readonly<{
   canDraft: boolean;
   canPublish: boolean;
+  canReview: boolean;
   canArchive: boolean;
   canWriteMeta: false;
+  canAuthorizeAction: false;
+  canEnforcePolicy: false;
 }>;
 type GuidanceStudioSnapshot = Readonly<{
   contractVersion: string;
   items: readonly GuidanceItem[];
+  sets: readonly GuidanceSetItem[];
   categories: readonly GuidanceCategory[];
   authority: GuidanceAuthority;
   registryHash: string;
@@ -106,14 +122,27 @@ function isItem(value: unknown): value is GuidanceItem {
     && value.scopes.length >= 1 && value.scopes.length <= 12 && value.scopes.every(isScope);
 }
 
-function parseSnapshot(value: unknown): GuidanceStudioSnapshot {
+function isSetItem(value: unknown): value is GuidanceSetItem {
+  if (!isObject(value) || typeof value.setRef !== "string" || !Number.isInteger(value.version)
+    || Number(value.version) < 1 || typeof value.name !== "string"
+    || !["draft", "reviewed", "archived"].includes(String(value.reviewStatus))
+    || !Array.isArray(value.orderedCards) || value.orderedCards.length < 1 || value.orderedCards.length > 50) return false;
+  return value.orderedCards.every((card) => isObject(card) && typeof card.cardRef === "string"
+    && typeof card.title === "string" && Number.isInteger(card.version) && Number(card.version) > 0
+    && ["draft", "published", "archived"].includes(String(card.status)));
+}
+
+export function parseGuidanceStudioSnapshot(value: unknown): GuidanceStudioSnapshot {
   if (!isObject(value) || typeof value.contractVersion !== "string" || !Array.isArray(value.items)
-    || !value.items.every(isItem) || !Array.isArray(value.categories)
+    || !value.items.every(isItem) || !Array.isArray(value.sets) || !value.sets.every(isSetItem)
+    || !Array.isArray(value.categories)
     || !value.categories.every((category) => isObject(category) && typeof category.ref === "string"
       && typeof category.label === "string" && typeof category.dimension === "string")
     || !isObject(value.authority) || typeof value.authority.canDraft !== "boolean"
-    || typeof value.authority.canPublish !== "boolean" || typeof value.authority.canArchive !== "boolean"
-    || value.authority.canWriteMeta !== false || typeof value.registryHash !== "string") {
+    || typeof value.authority.canPublish !== "boolean" || typeof value.authority.canReview !== "boolean"
+    || typeof value.authority.canArchive !== "boolean"
+    || value.authority.canWriteMeta !== false || value.authority.canAuthorizeAction !== false
+    || value.authority.canEnforcePolicy !== false || typeof value.registryHash !== "string") {
     throw new GuidanceStudioRequestError("unsafe_response", "Talimat kaynağı beklenen güvenli sözleşmeyi döndürmedi.", 503);
   }
   return value as unknown as GuidanceStudioSnapshot;
@@ -168,6 +197,136 @@ function Status({ children, tone = "neutral" }: { children: React.ReactNode; ton
   return <span className={styles.statusPill} data-tone={tone}>{children}</span>;
 }
 
+type GuidanceSetDraft = Readonly<{ name: string; orderedCardRefs: readonly string[] }>;
+const EMPTY_SET_DRAFT: GuidanceSetDraft = Object.freeze({ name: "", orderedCardRefs: Object.freeze([]) });
+
+export function moveGuidanceSetCard(refs: readonly string[], cardRef: string, offset: -1 | 1): readonly string[] {
+  const index = refs.indexOf(cardRef);
+  const target = index + offset;
+  if (index < 0 || target < 0 || target >= refs.length) return refs;
+  const next = [...refs];
+  [next[index], next[target]] = [next[target]!, next[index]!];
+  return Object.freeze(next);
+}
+
+function setDraftFromItem(item: GuidanceSetItem): GuidanceSetDraft {
+  return { name: item.name, orderedCardRefs: item.orderedCards.map((card) => card.cardRef) };
+}
+
+function setStatusLabel(status: GuidanceSetItem["reviewStatus"]): string {
+  return status === "reviewed" ? "İncelendi" : status === "archived" ? "Arşivli" : "Taslak";
+}
+
+export function GuidanceSetStudio(props: Readonly<{
+  snapshot: GuidanceStudioSnapshot;
+  onRefresh(): Promise<void>;
+}>) {
+  const initial = props.snapshot.sets[0] ?? null;
+  const [selectedRef, setSelectedRef] = useState<string | null>(initial?.setRef ?? null);
+  const [creating, setCreating] = useState(false);
+  const [draft, setDraft] = useState<GuidanceSetDraft>(initial ? setDraftFromItem(initial) : EMPTY_SET_DRAFT);
+  const [baseline, setBaseline] = useState<GuidanceSetDraft>(initial ? setDraftFromItem(initial) : EMPTY_SET_DRAFT);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const selected = props.snapshot.sets.find((item) => item.setRef === selectedRef) ?? null;
+  const publishedCards = props.snapshot.items.filter((item) => item.status === "published");
+  const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
+  const editable = creating || selected?.reviewStatus === "draft";
+  const valid = Boolean(draft.name.trim() && draft.orderedCardRefs.length > 0
+    && draft.orderedCardRefs.every((ref) => publishedCards.some((card) => card.cardRef === ref)));
+
+  const select = useCallback((item: GuidanceSetItem) => {
+    const next = setDraftFromItem(item);
+    setSelectedRef(item.setRef); setCreating(false); setDraft(next); setBaseline(next); setMessage(null);
+  }, []);
+
+  useEffect(() => {
+    if (!creating && selectedRef === null && props.snapshot.sets[0]) select(props.snapshot.sets[0]);
+  }, [creating, props.snapshot.sets, select, selectedRef]);
+
+  function beginCreate() {
+    setSelectedRef(null); setCreating(true); setDraft(EMPTY_SET_DRAFT); setBaseline(EMPTY_SET_DRAFT); setMessage(null);
+  }
+
+  function toggleCard(cardRef: string) {
+    if (!editable) return;
+    setDraft((current) => ({ ...current, orderedCardRefs: current.orderedCardRefs.includes(cardRef)
+      ? current.orderedCardRefs.filter((ref) => ref !== cardRef) : [...current.orderedCardRefs, cardRef] }));
+  }
+
+  async function mutate(operation: "create" | "revise" | "review" | "archive") {
+    if (saving || !props.snapshot || operation !== "review" && operation !== "archive" && !valid
+      || operation !== "create" && !selected) return;
+    setSaving(true); setMessage(null);
+    const creatingSet = operation === "create";
+    const body = creatingSet
+      ? { name: draft.name.trim(), orderedCardRefs: draft.orderedCardRefs,
+          expectedRegistryHash: props.snapshot.registryHash }
+      : { setRef: selected!.setRef, expectedVersion: selected!.version,
+          expectedRegistryHash: props.snapshot.registryHash, operation,
+          ...(operation === "revise" ? { name: draft.name.trim(), orderedCardRefs: draft.orderedCardRefs } : {}) };
+    try {
+      const response = await fetch("/api/guidance-studio", { method: creatingSet ? "POST" : "PATCH",
+        credentials: "same-origin", headers: { "Content-Type": "application/json",
+          "X-ReklamZeka-Intent": `guidance-set-${operation}` }, body: JSON.stringify(body) });
+      const payload = await responsePayload(response);
+      if (!response.ok) throw errorFromResponse(response, payload);
+      const nextSet = isObject(payload) && isSetItem(payload.set) ? payload.set : null;
+      if (!nextSet) throw new GuidanceStudioRequestError("unsafe_response", "Guidance set yanıtı doğrulanamadı.", 503);
+      select(nextSet);
+      await props.onRefresh();
+      setMessage(operation === "create" ? "Guidance set taslağı oluşturuldu."
+        : operation === "revise" ? "Guidance set yeni sürümle güncellendi."
+          : operation === "review" ? "Guidance set incelendi ve analiz bağlamı geçersizleştirildi."
+            : "Guidance set arşivlendi.");
+    } catch (reason) {
+      setMessage(reason instanceof GuidanceStudioRequestError && reason.status === 409
+        ? "Set siz düzenlerken değişti; listeyi yenileyip tekrar değerlendirin."
+        : reason instanceof Error ? reason.message : "Guidance set işlemi tamamlanamadı.");
+    } finally { setSaving(false); }
+  }
+
+  return <section className={`${styles.panel} ${styles.guidanceState}`} aria-label="Guidance setleri">
+    <header className={styles.panelHeader}><div><span className={styles.kicker}>SIRALI GUIDANCE SETLERİ</span><h2>İnceleme setleri</h2><p>Yalnız yayınlanmış kartlar seçilebilir; sıra analiz gündemine taşınır.</p></div>
+      <button type="button" onClick={beginCreate} disabled={!props.snapshot.authority.canDraft || !publishedCards.length}>+ Set oluştur</button></header>
+    {message ? <p role="status">{message}</p> : null}
+    {!props.snapshot.sets.length && !creating ? <p>Henüz guidance set yok. Önce en az bir kart yayınlayın.</p> : <div className={styles.guidanceWorkspace}>
+      <div className={styles.guidanceIndex}>
+        {creating ? <button type="button" data-active="true" onClick={beginCreate}><span><strong>Yeni set</strong><small>Henüz kaydedilmedi</small></span><Status tone="guidance">Taslak</Status></button> : null}
+        {props.snapshot.sets.map((item) => <button type="button" key={item.setRef}
+          data-active={!creating && selectedRef === item.setRef} onClick={() => select(item)}><span><strong>{item.name}</strong>
+            <small>{item.orderedCards.length} kart · v{item.version}</small></span>
+          <Status tone={item.reviewStatus === "reviewed" ? "good" : "neutral"}>{setStatusLabel(item.reviewStatus)}</Status></button>)}
+      </div>
+      {(creating || selected) ? <div className={styles.guidanceEditor}>
+        <header><div><Status tone={selected?.reviewStatus === "reviewed" ? "good" : "guidance"}>{creating ? "Yeni taslak" : setStatusLabel(selected!.reviewStatus)}</Status>
+          <h2>{creating ? "Yeni guidance set" : selected!.name}</h2><p>{creating ? "Yayınlanmış kartlardan sıralı set" : `Sürüm ${selected!.version}`}</p></div><span>guidance_only</span></header>
+        <div className={styles.guidanceFields}><label>Set adı<input value={draft.name} maxLength={160}
+          disabled={saving || !editable} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>
+          <fieldset disabled={saving || !editable}><legend>Yayınlanmış kartlar</legend>{publishedCards.map((card) => <label key={card.cardRef}>
+            <input type="checkbox" checked={draft.orderedCardRefs.includes(card.cardRef)} onChange={() => toggleCard(card.cardRef)} /> {card.title} · v{card.version}</label>)}</fieldset>
+          <div><strong>Uygulama sırası</strong>{draft.orderedCardRefs.map((ref, index) => { const card = publishedCards.find((item) => item.cardRef === ref);
+            return <div key={ref}><span>{index + 1}. {card?.title ?? "Artık yayınlanmıyor"}</span>
+              {editable ? <><button type="button" disabled={saving || index === 0} onClick={() => setDraft((current) => ({ ...current,
+                orderedCardRefs: moveGuidanceSetCard(current.orderedCardRefs, ref, -1) }))}>Yukarı</button>
+                <button type="button" disabled={saving || index === draft.orderedCardRefs.length - 1} onClick={() => setDraft((current) => ({ ...current,
+                  orderedCardRefs: moveGuidanceSetCard(current.orderedCardRefs, ref, 1) }))}>Aşağı</button>
+                <button type="button" disabled={saving} onClick={() => setDraft((current) => ({ ...current,
+                  orderedCardRefs: current.orderedCardRefs.filter((candidate) => candidate !== ref) }))}>Çıkar</button></> : null}</div>; })}</div>
+        </div>
+        <footer>{!creating && selected?.reviewStatus !== "archived" ? <button className={styles.guidanceDangerButton}
+          type="button" disabled={saving || !props.snapshot.authority.canArchive} onClick={() => void mutate("archive")}>Arşivle</button> : <span />}
+          <div><span>Set action, approval veya Meta write yetkisi taşımaz.</span>
+            {!creating && selected?.reviewStatus === "draft" ? <button className={styles.secondaryButton} type="button"
+              disabled={saving || dirty || !props.snapshot.authority.canReview} onClick={() => void mutate("review")}>İncelendi olarak işaretle</button> : null}
+            {creating || selected?.reviewStatus === "draft" ? <button className={styles.primaryButton} type="button"
+              disabled={saving || !props.snapshot.authority.canDraft || !dirty || !valid}
+              onClick={() => void mutate(creating ? "create" : "revise")}>{saving ? "Kaydediliyor" : creating ? "Set taslağı oluştur" : "Yeni set sürümü kaydet"}</button> : null}</div></footer>
+      </div> : null}
+    </div>}
+  </section>;
+}
+
 export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void }> = {}) {
   const [snapshot, setSnapshot] = useState<GuidanceStudioSnapshot | null>(null);
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
@@ -210,7 +369,7 @@ export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void
       });
       const payload = await responsePayload(response);
       if (!response.ok) throw errorFromResponse(response, payload);
-      const next = parseSnapshot(payload);
+      const next = parseGuidanceStudioSnapshot(payload);
       setSnapshot(next);
       const preferred = options.preferredRef ?? selectedRefRef.current;
       const nextSelected = next.items.find((item) => item.cardRef === preferred) ?? next.items[0] ?? null;
@@ -369,5 +528,6 @@ export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void
         </footer>
       </section> : null}
     </div>}
+    <GuidanceSetStudio snapshot={snapshot} onRefresh={() => refresh({ preserveDraft: true })} />
   </>;
 }

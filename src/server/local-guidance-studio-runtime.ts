@@ -28,5 +28,7 @@ export function createLocalGuidanceStudioHandlers(input: Readonly<{
   return Object.freeze({ GET: (request: Request) => execute(request, "read"),
     POST: (request: Request) => execute(request, "draft"),
     PATCH: (request: Request) => execute(request,
-      request.headers.get("x-reklamzeka-intent") === "guidance-studio-revise" ? "draft" : "publish") });
+      ["guidance-studio-revise", "guidance-set-revise"].includes(
+        request.headers.get("x-reklamzeka-intent") ?? "",
+      ) ? "draft" : "publish") });
 }
