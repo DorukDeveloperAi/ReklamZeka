@@ -1968,25 +1968,38 @@ export function olayOku(repoRoot, { ofset = 0, tavan = 2000 } = {}) {
   return { satirlar: atlanan ? satirlar.slice(-tavan) : satirlar, ofset: bas + tuketilen, atlanan, boy };
 }
 
-/** İmleci oku (yoksa dosyanın SONU: geçmiş dökülmez). */
-export function imlecOku(repoRoot) {
+/* İMLEÇ ROL BAŞINADIR (2026-08-09, kullanıcı isteği: "diğer sessionların progresslerini de
+   görsün"). Her rol defteri KENDİ hızında tüketir: orkestratör her olayı okurken altyapı
+   yalnız üst-düzey olayları görür ve biri ötekinin imlecini ilerletmez. Orkestratörün yolu
+   ESKİ yerinde kalır (geriye uyum: canlı kayıt taşınma yüzünden sıfırlanmaz). */
+export const rolImlecPath = (repoRoot, ad) =>
+  ad === "orkestrator" ? orkestratorImlecPath(repoRoot) : join(rolDirOf(repoRoot), `${slugOf(ad)}.imlec.json`);
+
+/** İmleci oku (yoksa null → çağıran "şimdiden itibaren" kurar; geçmiş dökülmez). */
+export function imlecOku(repoRoot, ad = "orkestrator") {
   try {
-    const j = JSON.parse(readFileSync(orkestratorImlecPath(repoRoot), "utf8"));
+    const j = JSON.parse(readFileSync(rolImlecPath(repoRoot, ad), "utf8"));
     return Number.isFinite(j?.ofset) ? j.ofset : 0;
   } catch {
-    return null; // kayıt yok → çağıran "şimdiden itibaren" kurar
+    return null;
   }
 }
 
-export function imlecYaz(repoRoot, ofset) {
+export function imlecYaz(repoRoot, ofset, ad = "orkestrator") {
   try {
-    mkdirSync(join(ledgerDirOf(repoRoot), "orkestrator"), { recursive: true, mode: 0o700 });
-    atomicWrite(orkestratorImlecPath(repoRoot), { v: 1, ofset, ts: new Date().toISOString() });
+    mkdirSync(dirname(rolImlecPath(repoRoot, ad)), { recursive: true, mode: 0o700 });
+    atomicWrite(rolImlecPath(repoRoot, ad), { v: 1, ofset, ts: new Date().toISOString() });
     return true;
   } catch {
     return false;
   }
 }
+
+/* Rol başına BESLEME SÜZGECİ — orkestratör sahanın TAMAMINI görür (koordinasyon onun işi);
+   öteki roller yalnız ÜST-DÜZEY olayları (bir iş bitti · bir oturum kapandı · iş devredildi ·
+   döngü). Gerekçe bağlam bütçesidir: altyapı rolünün her `claimsiz` yazımı görmesi ona hiçbir
+   karar kazandırmaz, ama her turunun başına yazılır. */
+export const ROL_SUZGEC = { orkestrator: null, varsayilan: ["birakildi", "kapandi", "devir", "cevrim"] };
 
 /** Defterin ŞU ANKİ sonu — kayıt anında imleç buraya konur (yeni orkestratör arşivle karşılanmaz). */
 export function olaySonu(repoRoot) {

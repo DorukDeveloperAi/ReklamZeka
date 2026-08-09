@@ -1563,7 +1563,8 @@ console.log("\n㉓ ORKESTRATÖR: saha olayları koordinatöre KENDİLİĞİNDEN 
   const k2 = runCli(W.sessionId, ["orkestrator", "kayit"]);
   ok("ikinci kayıt sessizce KAPMAZ (--devral ister)",
      k2.code === 3 && /ORKESTRATÖR ZATEN VAR/.test(k2.out) && /--devral/.test(k2.out), k2.out);
-  ok("status orkestratörü GÖSTERİR", /orkestratör: sess-o/.test(runCli(W.sessionId, ["status"]).out));
+  ok("status ROL TABLOSUNU gösterir", /roller:[\s\S]*orkestrator\s+sess-o/.test(runCli(W.sessionId, ["status"]).out),
+     runCli(W.sessionId, ["status"]).out);
   /* REGRESYON (2026-08-09): kayıt defterin KÖKÜNDE dururken `activeClaims` onu sahipsiz
      claim sanıp arşive atıyordu — orkestratörlük ilk taramada sessizce buharlaşıyordu. */
   runCli(W.sessionId, ["status"]); // defteri TARAT (activeClaims)
@@ -1596,7 +1597,8 @@ console.log("\n㉓ ORKESTRATÖR: saha olayları koordinatöre KENDİLİĞİNDEN 
   // Sahadaki oturum, gözlendiğini BİLİR (görünmez gözlemci yok).
   const mw = runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: W.sessionId, cwd: REPO })
     .dec?.additionalContext || "";
-  ok("sahadakiler orkestratörün VARLIĞINI görür", /Bu repoda ORKESTRATÖR var/.test(mw), mw.slice(0, 300));
+  ok("sahadakiler rol sahiplerini (orkestratör dahil) GÖRÜR",
+     /ROL SAHİBİ oturumlar: .*orkestrator=sess-o/.test(mw), mw.slice(0, 400));
 
   // Kendi olayı kendine yazılmaz + oturum kapanınca kayıt düşer.
   runCli(O.sessionId, ["claim", "--res", "scripts/orkestrator-b.txt", "--intent", "orkestratörün kendi işi"]);
@@ -1760,6 +1762,54 @@ console.log("\n㉕ ROL TABLOSU: kalıcı oturumların ADI (tekil ⊕ çoğul)");
   runGuard("release_all", { hook_event_name: "SessionEnd", session_id: R2.sessionId, cwd: REPO });
   ok("SessionEnd üstlenilen rolleri düşürür",
      !/altyapi\s+sess-r2/.test(runCli(R3.sessionId, ["rol", "durum"]).out));
+}
+
+console.log("\n㉕b ROL BESLEMESİ: her rol ilerlemeyi görür, orkestratör HEPSİNİ");
+{
+  /* Kullanıcı isteği (2026-08-09): "diğer session'ların progress'lerini de görsün".
+     Ama bağlam bütçesi: orkestratör dışındaki roller yalnız ÜST-DÜZEY olayları görür.
+     Bu testin asıl koruduğu şey `??` tuzağıdır — orkestratörün süzgeci bilerek null'dur
+     ve `null ?? varsayilan` onu bir kez sessizce süzgeçli beslemeye düşürmüştü. */
+  const A = spawnSession("sess-alt", "ALTYAPI rolü");
+  const O2 = spawnSession("sess-ork3", "ORKESTRATÖR");
+  const W4 = spawnSession("sess-w4", "sahada çalışan");
+  const KEY = "scripts/rol-besleme.txt";
+  writeFileSync(join(REPO, KEY), "//");
+  runCli(A.sessionId, ["rol", "kayit", "--rol", "altyapi"]);
+  runCli(O2.sessionId, ["rol", "kayit", "--rol", "orkestrator", "--devral"]);
+
+  runCli(W4.sessionId, ["claim", "--res", KEY, "--intent", "rol beslemesi turu"]);
+  runGuard("write", { hook_event_name: "PreToolUse", session_id: A.sessionId, cwd: REPO,
+                      tool_name: "Write", tool_input: { file_path: join(REPO, KEY) } });
+  runCli(W4.sessionId, ["release", "--res", KEY]);
+
+  const mo = runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: O2.sessionId, cwd: REPO })
+    .dec?.additionalContext || "";
+  ok("orkestratör HER olayı görür (alindi + bloke dahil)",
+     /🔒 aldı: sess-w4/.test(mo) && /⛔ bloke: sess-alt/.test(mo), mo.slice(0, 600));
+
+  const ma = runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: A.sessionId, cwd: REPO })
+    .dec?.additionalContext || "";
+  ok("öteki rol İLERLEME bloğu alır", /\[rol:altyapi\] Sahadan \d+ ilerleme/.test(ma), ma.slice(0, 500));
+  ok("öteki rol SÜZÜLMÜŞ görür (alindi/bloke gürültüsü YOK)",
+     !/🔒 aldı/.test(ma) && !/⛔ bloke/.test(ma) && /✅ bitti/.test(ma), ma.slice(0, 500));
+  ok("imleçler AYRI: biri ötekinin beslemesini tüketmez",
+     !/Sahadan/.test(runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: A.sessionId, cwd: REPO }).dec?.additionalContext || ""));
+
+  // Rolsüz worker besleme ALMAZ (bileceği şey kendi kutusundadır).
+  const mw = runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: W4.sessionId, cwd: REPO })
+    .dec?.additionalContext || "";
+  ok("ROLSÜZ oturum besleme ALMAZ", !/Sahadan/.test(mw), mw.slice(0, 300));
+
+  // kutu: TÜKETMEZ.
+  runCli(A.sessionId, ["bildir", "--hedef", W4.sessionId, "--mesaj", "kutu testi"]);
+  const k1 = runCli(W4.sessionId, ["kutu"]);
+  ok("kutu bildiriyi gösterir", /✉ sess-alt/.test(k1.out) && /kutu testi/.test(k1.out), k1.out);
+  ok("kutu TÜKETMEZ (ikinci bakışta da orada)", /kutu testi/.test(runCli(W4.sessionId, ["kutu"]).out));
+  ok("ama ctx TÜKETİR",
+     /kutu testi/.test(runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: W4.sessionId, cwd: REPO }).dec?.additionalContext || "") &&
+     !/kutu testi/.test(runCli(W4.sessionId, ["kutu"]).out));
+  runCli(W4.sessionId, ["release", "--all"]);
 }
 
 console.log("\n⑫ salt-okunurluk");
