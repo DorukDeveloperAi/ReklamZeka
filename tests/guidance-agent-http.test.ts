@@ -30,7 +30,8 @@ describe("Guidance agent HTTP", () => {
   it("maps stale/cross-tenant refs and missing authoritative catalogs without leaking details", async () => {
     const handlers = createGuidanceAgentHttpHandlers({ contract: { execute: vi.fn()
       .mockRejectedValueOnce(new GuidanceFacetScopeError("unknown_scope_ref"))
-      .mockRejectedValueOnce(new GuidanceFacetScopeError("catalog_unavailable")) } as never,
+      .mockRejectedValueOnce(new GuidanceFacetScopeError("catalog_unavailable"))
+      .mockRejectedValueOnce(new GuidanceFacetScopeError("stale_catalog")) } as never,
     resolvePrincipal: async () => principal });
     const body = { context: {} };
     const unknown = await handlers.POST(request("/api/guidance-context", "POST", "guidance-effective-preview", body));
@@ -41,5 +42,9 @@ describe("Guidance agent HTTP", () => {
     expect(unavailable.status).toBe(503);
     expect(await unavailable.json()).toEqual({ error: { code: "catalog_unavailable",
       message: "Guidance kapsam kataloğu kullanılamıyor." } });
+    const stale = await handlers.POST(request("/api/guidance-context", "POST", "guidance-effective-preview", body));
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toEqual({ error: { code: "stale_catalog",
+      message: "Guidance kapsam kataloğu değişti; yeniden listeleyin." } });
   });
 });

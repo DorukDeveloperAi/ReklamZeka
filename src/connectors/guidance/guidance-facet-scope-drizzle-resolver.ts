@@ -20,6 +20,7 @@ import { currentPromotionTemplateAuthoringHeadSql } from
 import * as schema from "@/db/schema";
 import { META_OBJECTIVE_MAPPING_VERSION } from "@/domain/meta/objective-mapping";
 import type { GuidanceEntityType } from "@/domain/guidance/registry";
+import { CAMPAIGN_OBJECTIVES } from "@/analyses/schema";
 
 type Database = NodePgDatabase<typeof schema>;
 type ScopeDatabase = Pick<Database, "execute">;
@@ -49,6 +50,7 @@ type Candidate = Readonly<{
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const HASH = /^[a-f0-9]{64}$/;
+const CANONICAL_OBJECTIVES = new Set<string>(CAMPAIGN_OBJECTIVES);
 const MAX_CAPTURE_ROWS = 5_000;
 const FACETS = Object.freeze([
   "global", "account_group", "account", "objective", "funnel", "optimization", "internal_category",
@@ -91,6 +93,7 @@ function safeLabel(value: unknown): string {
 function candidate(row: CandidateRow, workspaceId: string): Candidate {
   if (row.facet === "_capture") fail("unsafe_source");
   if (!UUID.test(row.internal_id) || row.account_id !== null && !UUID.test(row.account_id)
+    || row.facet === "objective" && !CANONICAL_OBJECTIVES.has(row.canonical_value)
     || !REF.test(row.canonical_value) && ["account", "entity", "promotion_template"]
       .includes(row.facet)) fail("unsafe_source");
   const accountRef = row.account_id === null ? null : promotionRegistryPublicRef("account", workspaceId, row.account_id);

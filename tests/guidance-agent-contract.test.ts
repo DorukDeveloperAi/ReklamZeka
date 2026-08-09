@@ -135,6 +135,10 @@ describe("GuidanceAgentContract", () => {
     expect(MCP_TOOL_SCHEMAS.guidance_effective_preview.safeParse({ ...base, lifecycle: undefined }).success).toBe(false);
     expect(MCP_TOOL_SCHEMAS.guidance_effective_preview.safeParse({ ...base,
       topics: ["topic_budget", "topic_budget"] }).success).toBe(false);
+    expect(MCP_TOOL_SCHEMAS.guidance_effective_preview.safeParse({ ...base,
+      contractVersion: "guidance-agent-tools/1.1.0" }).success).toBe(false);
+    const { expectedCatalogHash: _omitted, ...withoutCatalogGuard } = base;
+    expect(MCP_TOOL_SCHEMAS.guidance_effective_preview.safeParse(withoutCatalogGuard).success).toBe(false);
     const previewTool = GUIDANCE_AGENT_TOOLS.find((tool) => tool.name === "guidance_effective_preview");
     expect(previewTool?.inputSchema.properties).toMatchObject({
       accountGroupRefs: { maxItems: 25, uniqueItems: true },
