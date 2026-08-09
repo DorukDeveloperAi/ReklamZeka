@@ -1,24 +1,14 @@
 # DEVRALIŞ — ReklamZeka
 
 > **TÜREVDİR, elle düzenlenmez.** Her `aide filing` koşumunda yeniden üretilir.
-> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-09 07:58
+> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-09 14:24
 
 Bu belge bir sonraki Claude hesabının **ilk okuyacağı** dosyadır: neyin yarıda kaldığını
 ve hangi komutla devam edileceğini söyler.
 
 ## Açık oturumlar
 
-1 canlı oturum. Devam etmek için komutu kopyala-yapıştır:
-
-### commit and push
-
-- **durum:** `done` · son hareket: 2026-08-08 07:06
-- **ne için açıldı:** codex tarafından ciddi ilerleme kaydedilmişti ama commmit ve push yapıldı mı emin değilim en son durumu
-- **nerede kaldı:** commit and push
-
-```bash
-cd /Users/ybg/dev/ReklamZeka && claude --resume 9a339aed-a0cc-4fd9-9711-7e8e4e5529ff
-```
+_Bu projede canlı oturum yok._
 
 ## Planlar
 
