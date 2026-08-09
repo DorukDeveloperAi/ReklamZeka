@@ -40,7 +40,8 @@ export type InstructionPolicyLifecycleCommand =
   | Readonly<{ operation: "revise_draft"; expectedRegistryHash: string; expectedVersion: number;
       expectedPolicyHash: string; rawText: string; policy: unknown }>
   | Readonly<{ operation: "publish" | "pause" | "archive"; expectedRegistryHash: string;
-      policyRef: string; expectedVersion: number; expectedPolicyHash: string; reasonCode: string }>;
+      policyRef: string; expectedVersion: number; expectedPolicyHash: string; expectedImpactHash: string;
+      reasonCode: string }>;
 
 export type InstructionPolicyLifecycleRepository = Readonly<{
   inspect(workspaceId: string): Promise<InstructionPolicyLifecycleState>;
@@ -57,7 +58,8 @@ export type InstructionPolicyLifecycleRepository = Readonly<{
 }>;
 
 export class InstructionPolicyLifecycleError extends Error {
-  constructor(readonly code: "invalid_input" | "not_found" | "conflict" | "invalid_transition") {
+  constructor(readonly code: "invalid_input" | "not_found" | "conflict" | "invalid_transition" | "forbidden"
+    | "dependency_blocked") {
     super(`Talimat politikası lifecycle işlemi reddedildi: ${code}`);
     this.name = "InstructionPolicyLifecycleError";
   }
@@ -136,7 +138,7 @@ function normalize(principal: TrustedDecisionRoomPrincipal, role: "owner" | "adm
   }
   if (!REASON.test(command.reasonCode)) throw new InstructionPolicyLifecycleError("invalid_input");
   return Object.freeze({ ...command, policyRef: reference(command.policyRef), expectedVersion: positive(command.expectedVersion),
-    expectedPolicyHash: hash(command.expectedPolicyHash) });
+    expectedPolicyHash: hash(command.expectedPolicyHash), expectedImpactHash: hash(command.expectedImpactHash) });
 }
 
 export class InstructionPolicyLifecycleService {
@@ -168,4 +170,10 @@ export class InstructionPolicyLifecycleService {
 
 export function lifecycleStatus(operation: "publish" | "pause" | "archive"): "published" | "paused" | "archived" {
   return operation === "publish" ? "published" : operation === "pause" ? "paused" : "archived";
+}
+
+export function lifecycleInvalidationReason(operation: InstructionPolicyLifecycleCommand["operation"]):
+  "source_changed" | "source_removed" | null {
+  if (operation === "create_draft" || operation === "revise_draft") return null;
+  return operation === "archive" ? "source_removed" : "source_changed";
 }

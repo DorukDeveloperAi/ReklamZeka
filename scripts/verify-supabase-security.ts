@@ -88,6 +88,20 @@ try {
         'guidance_analysis_run_bindings'
       )
   `);
+  const promotionAuthoring = await pool.query<{ total: number; force_rls: number; grant_count: number;
+    routine_grant_count: number }>(`
+    select count(*)::int as total,
+      count(*) filter (where relation.relrowsecurity and relation.relforcerowsecurity)::int as force_rls,
+      (select count(*)::int from information_schema.role_table_grants where table_schema = 'public'
+        and table_name in ('audience_preset_authoring_revisions', 'promotion_template_authoring_revisions')
+        and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) as grant_count,
+      (select count(*)::int from information_schema.routine_privileges where routine_schema = 'public'
+        and routine_name = 'promotion_authoring_revision_guard'
+        and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) as routine_grant_count
+    from pg_class relation join pg_namespace namespace on namespace.oid = relation.relnamespace
+    where namespace.nspname = 'public' and relation.relkind = 'r'
+      and relation.relname in ('audience_preset_authoring_revisions', 'promotion_template_authoring_revisions')
+  `);
 
   const posture = {
     tables: tables.rows[0]?.total ?? 0,
@@ -102,6 +116,10 @@ try {
     guidanceRunBindingForceRls: guidanceRunBinding.rows[0]?.force_rls ?? 0,
     guidanceRunBindingDirectGrants: guidanceRunBinding.rows[0]?.grant_count ?? 0,
     guidanceRoutineDirectGrants: guidanceRunBinding.rows[0]?.routine_grant_count ?? 0,
+    promotionAuthoringTables: promotionAuthoring.rows[0]?.total ?? 0,
+    promotionAuthoringForceRls: promotionAuthoring.rows[0]?.force_rls ?? 0,
+    promotionAuthoringDirectGrants: promotionAuthoring.rows[0]?.grant_count ?? 0,
+    promotionAuthoringRoutineDirectGrants: promotionAuthoring.rows[0]?.routine_grant_count ?? 0,
   };
 
   if (posture.tables === 0) throw new Error("Public uygulama tablosu bulunamadı");
@@ -122,6 +140,10 @@ try {
   if (posture.guidanceRunBindingTables !== 5 || posture.guidanceRunBindingForceRls !== 5
     || posture.guidanceRunBindingDirectGrants !== 0 || posture.guidanceRoutineDirectGrants !== 0) {
     throw new Error("Guidance analysis-run binding FORCE RLS/revoke sınırını karşılamıyor");
+  }
+  if (posture.promotionAuthoringTables !== 2 || posture.promotionAuthoringForceRls !== 2
+    || posture.promotionAuthoringDirectGrants !== 0 || posture.promotionAuthoringRoutineDirectGrants !== 0) {
+    throw new Error("Promotion authoring tabloları FORCE RLS/revoke sınırını karşılamıyor");
   }
 
   console.log(JSON.stringify({ status: "secure", ...posture }));

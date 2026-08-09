@@ -36,13 +36,27 @@ describe("starter objective/internal-category playbook catalog", () => {
   });
 
   it("covers the canonical starter examples while keeping owner-defined values explicit", () => {
+    expect(STARTER_CATEGORY_PLAYBOOK_CATALOG.dimensions.map((dimension) => dimension.dimensionKey)).toEqual([
+      "service_line", "brand_clinic", "geo_market", "language", "campaign_role", "funnel_intent",
+      "audience_strategy", "destination", "budget_pool", "operating_mode", "lifecycle", "experiment",
+      "protection_class", "custom",
+    ]);
+    expect(new Set(STARTER_CATEGORY_PLAYBOOK_CATALOG.categoryTemplates.map((template) => template.dimensionKey)))
+      .toEqual(new Set(STARTER_CATEGORY_PLAYBOOK_CATALOG.dimensions.map((dimension) => dimension.dimensionKey)));
     expect(STARTER_CATEGORY_PLAYBOOK_CATALOG.categoryTemplates.map((template) => template.templateRef)).toEqual([
       "starter_category_template_audience_strategy_prospecting",
       "starter_category_template_audience_strategy_retargeting",
       "starter_category_template_campaign_role_promotion",
       "starter_category_template_campaign_role_evergreen",
+      "starter_category_template_service_line_owner_defined",
+      "starter_category_template_brand_clinic_owner_defined",
       "starter_category_template_geo_market_owner_defined",
       "starter_category_template_language_owner_defined",
+      "starter_category_template_budget_pool_owner_defined",
+      "starter_category_template_operating_mode_owner_defined",
+      "starter_category_template_lifecycle_owner_defined",
+      "starter_category_template_experiment_owner_defined",
+      "starter_category_template_custom_owner_defined",
       "starter_category_template_destination_lead_form",
       "starter_category_template_destination_whatsapp",
       "starter_category_template_funnel_intent_sales",
@@ -50,7 +64,10 @@ describe("starter objective/internal-category playbook catalog", () => {
     ]);
     expect(STARTER_CATEGORY_PLAYBOOK_CATALOG.categoryTemplates
       .filter((template) => template.kind === "owner_defined_value")
-      .map((template) => template.dimensionKey)).toEqual(["geo_market", "language"]);
+      .map((template) => template.dimensionKey)).toEqual([
+        "service_line", "brand_clinic", "geo_market", "language", "budget_pool", "operating_mode",
+        "lifecycle", "experiment", "custom",
+      ]);
     expect(STARTER_CATEGORY_PLAYBOOK_CATALOG).toMatchObject({
       catalogStatus: "reviewed_bootstrap_proposal",
       seedPolicy: "never_auto_seed",

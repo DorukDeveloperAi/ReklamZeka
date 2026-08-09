@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CategoryProfileStudio } from "./category-profile-studio";
+import { StarterCategoryAdoption } from "./starter-category-adoption";
 import styles from "./operating-dashboard.module.css";
 
 type Level = "campaign" | "ad_set" | "ad" | "creative";
@@ -410,9 +411,9 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
     } finally { setMutating(false); }
   }, [refresh]);
 
-  if (loading && !snapshot) return <section className={`${styles.panel} ${styles.categoryState}`} aria-busy="true"><strong>İÇ KATEGORİLER</strong><h2>Kategori envanteri yükleniyor</h2><p>Aktif tanımlar ve doğrudan atama kapsamı okunuyor.</p></section>;
-  if (error && !snapshot) return <><section className={`${styles.panel} ${styles.categoryState}`} role="alert"><strong>{sessionRequired ? "YEREL OTURUM GEREKLİ" : "BAĞLANTI KURULAMADI"}</strong><h2>{sessionRequired ? "Dashboard oturumunu bağlayın" : "Kategori kaynağı kullanılamıyor"}</h2><p>{error}</p>{sessionRequired && props.onOpenSession ? <button type="button" onClick={props.onOpenSession}>Decision Room’da oturumu bağla</button> : <button type="button" onClick={() => void refresh()}>Yeniden dene</button>}</section><CategoryProfileStudio /></>;
-  if (!snapshot) return null;
+  if (loading && !snapshot) return <><section className={`${styles.panel} ${styles.categoryState}`} aria-busy="true"><strong>İÇ KATEGORİLER</strong><h2>Kategori envanteri yükleniyor</h2><p>Aktif tanımlar ve doğrudan atama kapsamı okunuyor.</p></section><StarterCategoryAdoption /></>;
+  if (error && !snapshot) return <><section className={`${styles.panel} ${styles.categoryState}`} role="alert"><strong>{sessionRequired ? "YEREL OTURUM GEREKLİ" : "BAĞLANTI KURULAMADI"}</strong><h2>{sessionRequired ? "Dashboard oturumunu bağlayın" : "Kategori kaynağı kullanılamıyor"}</h2><p>{error}</p>{sessionRequired && props.onOpenSession ? <button type="button" onClick={props.onOpenSession}>Decision Room’da oturumu bağla</button> : <button type="button" onClick={() => void refresh()}>Yeniden dene</button>}</section><StarterCategoryAdoption /><CategoryProfileStudio /></>;
+  if (!snapshot) return <StarterCategoryAdoption />;
   const healthTotal = snapshot.health.dimensionsWithoutDefinitions + snapshot.health.definitionsWithoutDirectAssignments
     + snapshot.health.staleTargetAssignments + snapshot.health.assignmentsUnderArchivedRegistry;
   const archiveReady = isArchiveMutationReady(impact, authoring);
@@ -500,6 +501,7 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
       </form></div>
       <footer>Kreatif hedefleri exact aktif reklam yolu ile seçilir. Bu işlem action authorization veya Meta write yetkisi vermez.</footer>
     </section> : null}
+    <StarterCategoryAdoption />
     <CategoryProfileStudio />
     <div className={styles.metaMetricGrid}>
       <article><span>Aktif boyut</span><strong>{number(snapshot.summary.dimensions)}</strong><small>Kategori eksenleri</small></article>

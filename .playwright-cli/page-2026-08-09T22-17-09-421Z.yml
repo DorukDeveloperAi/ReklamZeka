@@ -1,0 +1,113 @@
+- generic [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e28] [cursor=pointer]
+  - alert [ref=e22]: Günaydın. Sistem sakin, üç karar sizi bekliyor.
+  - main [ref=e32]:
+    - complementary [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e35]: RZ
+        - generic [ref=e36]:
+          - strong [ref=e37]: ReklamZeka
+          - generic [ref=e38]: Operating System
+        - generic [ref=e39]: DEMO
+      - navigation "Ana navigasyon" [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]: Çalışma
+          - button "Bugün 3" [ref=e43] [cursor=pointer]:
+            - generic [ref=e44]: ⌂
+            - strong [ref=e45]: Bugün
+            - generic [ref=e46]: "3"
+          - button [ref=e47] [cursor=pointer]:
+            - generic [ref=e48]: ◫
+            - strong [ref=e49]: Kampanyalar
+          - button "Analizler 2" [ref=e50] [cursor=pointer]:
+            - generic [ref=e51]: ⌁
+            - strong [ref=e52]: Analizler
+            - generic [ref=e53]: "2"
+          - button [ref=e54] [cursor=pointer]:
+            - generic [ref=e55]: ◇
+            - strong [ref=e56]: Decision Room
+          - button [ref=e57] [cursor=pointer]:
+            - generic [ref=e58]: ₺
+            - strong [ref=e59]: Bütçeler
+        - generic [ref=e60]:
+          - generic [ref=e61]: Yönetim
+          - button [ref=e62] [cursor=pointer]:
+            - generic [ref=e63]: ≡
+            - strong [ref=e64]: Kurallar & akışlar
+          - button [ref=e65] [cursor=pointer]:
+            - generic [ref=e66]: §
+            - strong [ref=e67]: Strict policies
+          - button [ref=e68] [cursor=pointer]:
+            - generic [ref=e69]: ⊞
+            - strong [ref=e70]: İç kategoriler
+          - button [ref=e71] [cursor=pointer]:
+            - generic [ref=e72]: ◉
+            - strong [ref=e73]: Autonomy Studio
+          - button [ref=e74] [cursor=pointer]:
+            - generic [ref=e75]: ◈
+            - strong [ref=e76]: Practice Lab
+          - button [ref=e77] [cursor=pointer]:
+            - generic [ref=e78]: ◎
+            - strong [ref=e79]: Meta bağlantısı
+          - button "Orchestrator Agent ●" [ref=e80] [cursor=pointer]:
+            - generic [ref=e81]: ✦
+            - strong [ref=e82]: Orchestrator Agent
+            - generic [ref=e83]: ●
+          - button [ref=e84] [cursor=pointer]:
+            - generic [ref=e85]: ✓
+            - strong [ref=e86]: Onay kuyruğu
+          - button [active] [ref=e87] [cursor=pointer]:
+            - generic [ref=e88]: ↗
+            - strong [ref=e89]: Gönderi öne çıkarma
+          - button [ref=e90] [cursor=pointer]:
+            - generic [ref=e91]: ↺
+            - strong [ref=e92]: Timeline
+      - generic [ref=e93]:
+        - generic [ref=e95]:
+          - strong [ref=e96]: Meta Mirror
+          - generic [ref=e97]: güncel · kontrol ediliyor
+        - button "Bağlantı ayarları" [ref=e98] [cursor=pointer]: •••
+    - generic [ref=e99]:
+      - generic [ref=e100]:
+        - button "DM Demo Marka Meta kontrol ediliyor ⌄" [ref=e101] [cursor=pointer]:
+          - generic [ref=e102]: DM
+          - generic [ref=e103]:
+            - strong [ref=e104]: Demo Marka
+            - generic [ref=e105]: Meta kontrol ediliyor
+          - generic [ref=e106]: ⌄
+        - generic [ref=e107]:
+          - button "Ara" [ref=e108] [cursor=pointer]: ⌕
+          - button "Bildirimler" [ref=e109] [cursor=pointer]: ♢
+          - button "approval_only ⌄" [ref=e110] [cursor=pointer]:
+            - text: approval_only
+            - generic [ref=e112]: ⌄
+          - button "AY" [ref=e113] [cursor=pointer]
+      - generic "Gönderi öne çıkarma" [ref=e289]:
+        - region "PromotionTemplate authoring dry-run" [ref=e290]:
+          - generic [ref=e291]:
+            - generic [ref=e292]:
+              - generic [ref=e293]: PUBLISHED TEMPLATE AUTHORING · DRY-RUN
+              - heading "Alias ve talimattan güvenli şablon önerisi" [level=2] [ref=e294]
+            - generic [ref=e295]: NO PUBLISH · NO META WRITE
+          - paragraph [ref=e296]: Hesap, Page/Instagram ve iç kategori sunucunun yayınlanmış kapsamından çözülür. Form workspace, kullanıcı, ham Meta ID, hedefleme veya creative malzemesi kabul etmez.
+          - alert [ref=e297]:
+            - strong [ref=e298]: PromotionTemplate authoring yerel çalışma alanına henüz bağlanmadı.
+            - paragraph [ref=e299]: Güvenilir katalog olmadan şablon veya hedef kitle uydurulmaz.
+            - button "Tekrar kontrol et" [ref=e300]
+        - alert "PromotionTemplate lifecycle" [ref=e301]:
+          - strong [ref=e302]: PromotionTemplate authoring yerel çalışma alanına henüz bağlanmadı.
+          - button "Tekrar kontrol et" [ref=e303]
+        - generic [ref=e304]:
+          - generic [ref=e305]:
+            - generic [ref=e306]: EXISTING POST PROMOTION · K4 PREFLIGHT
+            - heading "Mevcut gönderiyi, kilitli şablon ve hedef kitleyle değerlendirin." [level=1] [ref=e307]
+            - paragraph [ref=e308]: Yalnız yayınlanmış Page/Instagram gönderileri ve sunucunun sunduğu referanslar kullanılabilir. Ön kontrol kendiliğinden taslak kaydetmez; ayrı komut yalnız K4 onay kuyruğu taslağı oluşturabilir. Kreatif üretme, hedef kitle değiştirme, onaylama ve Meta write kapalıdır.
+          - generic [ref=e309]: EPHEMERAL · APPROVAL REQUIRED
+        - alert [ref=e310]:
+          - strong [ref=e311]: Kaynak henüz bağlı değil
+          - heading "Öne çıkarma seçim kataloğu ve yerel kimlik bağlama katmanı henüz etkin değil." [level=2] [ref=e312]
+          - paragraph [ref=e313]: Güvenilir seçenek kataloğu olmadan gönderi, hesap, şablon veya hedef kitle uydurulmaz. Meta write ve proposal persistence kapalı kalır.
+          - button "Tekrar kontrol et" [ref=e314] [cursor=pointer]
+      - generic [ref=e286]:
+        - generic [ref=e287]: Existing-post preflight · yalnız server-provided ref kataloğu
+        - generic [ref=e288]: Ephemeral K4 preview · persist/approve/execute/Meta/creative kapalı

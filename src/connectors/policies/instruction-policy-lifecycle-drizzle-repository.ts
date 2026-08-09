@@ -3,12 +3,16 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   InstructionPolicyLifecycleError,
+  lifecycleInvalidationReason,
   lifecycleStatus,
   type InstructionPolicyLifecycleRepository,
   type InstructionPolicyLifecycleState,
   type InstructionPolicyPublicDiff,
   type InstructionPolicyPublicRevision,
 } from "@/application/instruction-policy-lifecycle-service";
+import { type InstructionPolicyImpactRepository } from "@/application/instruction-policy-impact-service";
+import { DrizzleInstructionPolicyImpactRepository } from
+  "@/connectors/policies/instruction-policy-impact-drizzle-repository";
 import { assertStrictInstructionPolicyArtifact, parseRawInstructionProvenance,
   parseStrictInstructionPolicy, type StrictInstructionPolicy } from "@/domain/policies/instruction-policy-dsl";
 import { EFFECTIVE_CONTEXT_INSTRUCTION_POLICY_COMPONENT_REF } from "@/analyses/effective-campaign-context";
@@ -140,7 +144,9 @@ function lifecycleArtifact(current: StrictInstructionPolicy, status: "published"
 }
 
 export class DrizzleInstructionPolicyLifecycleRepository implements InstructionPolicyLifecycleRepository {
-  constructor(private readonly database: Database) {}
+  constructor(private readonly database: Database,
+    private readonly impactRepositoryFactory: (database: Database) => InstructionPolicyImpactRepository =
+      (database) => new DrizzleInstructionPolicyImpactRepository(database)) {}
 
   async inspect(workspaceId: string): Promise<InstructionPolicyLifecycleState> {
     if (!UUID.test(workspaceId)) throw new InstructionPolicyLifecycleError("invalid_input");
@@ -155,6 +161,12 @@ export class DrizzleInstructionPolicyLifecycleRepository implements InstructionP
       const tx = transaction as unknown as Database;
       if (rows(await tx.execute(sql`select id from workspaces where id = ${input.workspaceId}::uuid
         and lifecycle_state = 'active' for update`)).length !== 1) throw new InstructionPolicyLifecycleError("not_found");
+      const memberships = rows<{ role: string }>(await tx.execute(sql`select role::text from memberships
+        where workspace_id = ${input.workspaceId}::uuid and user_id = ${input.actorId}::uuid limit 2`));
+      if (memberships.length !== 1 || memberships[0]!.role !== input.role
+        || !["owner", "admin", "analyst"].includes(memberships[0]!.role)) {
+        throw new InstructionPolicyLifecycleError("forbidden");
+      }
       const before = await load(tx, input.workspaceId);
       if (before.state.registryHash !== input.command.expectedRegistryHash) {
         throw new InstructionPolicyLifecycleError("conflict");
@@ -162,6 +174,7 @@ export class DrizzleInstructionPolicyLifecycleRepository implements InstructionP
       const command = input.command;
       let policy: StrictInstructionPolicy;
       let rawProvenanceId: string;
+      let recomputedImpact: Awaited<ReturnType<InstructionPolicyImpactRepository["preview"]>> = null;
       if (command.operation === "create_draft" || command.operation === "revise_draft") {
         policy = assertStrictInstructionPolicyArtifact(command.policy);
         const current = currentFor(before.internal, policy.policyRef);
@@ -190,6 +203,22 @@ export class DrizzleInstructionPolicyLifecycleRepository implements InstructionP
         const allowed = command.operation === "publish" ? current.policy.status === "draft" || current.policy.status === "paused"
           : command.operation === "pause" ? current.policy.status === "published" : current.policy.status !== "archived";
         if (!allowed) throw new InstructionPolicyLifecycleError("invalid_transition");
+        if (!["owner", "admin"].includes(input.role)) throw new InstructionPolicyLifecycleError("forbidden");
+        const impact = await this.impactRepositoryFactory(tx).preview(input.workspaceId, command.policyRef, command.operation);
+        if (!impact) throw new InstructionPolicyLifecycleError("not_found");
+        if (impact.operation !== command.operation || impact.registryHash !== before.state.registryHash
+          || impact.target.policyRef !== command.policyRef || impact.target.policyVersion !== command.expectedVersion
+          || impact.target.policyHash !== command.expectedPolicyHash || impact.target.status !== current.policy.status
+          || impact.impactHash !== command.expectedImpactHash) {
+          throw new InstructionPolicyLifecycleError("conflict");
+        }
+        const integrityFailed = Object.values(impact.coverage.integrity).some((value) => value !== 0);
+        if (!impact.coverage.complete || impact.coverage.partialOrUnknown.length !== 0 || integrityFailed
+          || impact.disposition !== "review_required" || !impact.mutationAllowed
+          || Object.values(impact.exactBlockers).some((value) => value !== 0)) {
+          throw new InstructionPolicyLifecycleError("dependency_blocked");
+        }
+        recomputedImpact = impact;
         policy = lifecycleArtifact(current.policy, nextStatus, command.reasonCode);
         rawProvenanceId = current.rawProvenanceId;
       }
@@ -203,11 +232,12 @@ export class DrizzleInstructionPolicyLifecycleRepository implements InstructionP
         ${policy.canonicalHash}, ${JSON.stringify(policy)}::jsonb, ${input.occurredAt}::timestamptz)`);
 
       let contextInvalidationAppended = false;
+      const invalidationReasonCode = lifecycleInvalidationReason(command.operation);
       if (command.operation === "publish" || command.operation === "pause" || command.operation === "archive") {
         const invalidation = Object.freeze({ workspaceId: input.workspaceId, componentType: "instruction_policy",
           componentRef: EFFECTIVE_CONTEXT_INSTRUCTION_POLICY_COMPONENT_REF, componentVersion: before.state.registryHash,
           scopeKind: "workspace_component", entityType: null, entityRef: null,
-          reasonCode: command.operation === "archive" ? "source_removed" : "source_changed",
+          reasonCode: invalidationReasonCode!,
           observedAt: input.occurredAt });
         const inserted = rows(await tx.execute(sql`insert into effective_campaign_context_invalidations (
           workspace_id, event_hash, component_type, component_ref, component_version,
@@ -227,7 +257,13 @@ export class DrizzleInstructionPolicyLifecycleRepository implements InstructionP
         action: `instruction_policy.${command.operation}`, resourceType: "strict_instruction_policy",
         resourceId: policy.policyRef, occurredAt: input.occurredAt, previousHash,
         metadata: Object.freeze({ role: input.role, policyVersion: policy.policyVersion,
-          expectedRegistryHash: command.expectedRegistryHash, contextInvalidationAppended }) });
+          expectedRegistryHash: command.expectedRegistryHash,
+          expectedImpactHash: "expectedImpactHash" in command ? command.expectedImpactHash : null,
+          actualImpactHash: recomputedImpact?.impactHash ?? null,
+          invalidationPlanContexts: recomputedImpact?.invalidationPlan.contextsNeedingInvalidation ?? 0,
+          invalidationEventsAppended: contextInvalidationAppended ? 1 : 0,
+          invalidationReasonCode,
+          reasonCode: "reasonCode" in command ? command.reasonCode : null, contextInvalidationAppended }) });
       await tx.execute(sql`insert into audit_events (id, workspace_id, actor_id, action, resource_type, resource_id,
         metadata, previous_hash, event_hash, occurred_at) values (${event.id}::uuid, ${event.workspaceId}::uuid,
         ${event.actorId}::uuid, ${event.action}, ${event.resourceType}, ${event.resourceId},

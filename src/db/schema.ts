@@ -1807,7 +1807,7 @@ export const effectiveCampaignContextComponents = pgTable("effective_campaign_co
   check("effective_campaign_context_components_type", sql`${table.componentType} in (
     'source_snapshot', 'category_resolution', 'category_profile', 'guidance_pack', 'meta_catalog',
     'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
-    'timeframe_resolver', 'instruction_policy'
+    'timeframe_resolver', 'instruction_policy', 'promotion_registry'
   )`),
   check("effective_campaign_context_components_required", sql`
     btrim(${table.componentRef}) <> '' and btrim(${table.componentVersion}) <> ''
@@ -1839,7 +1839,7 @@ export const effectiveCampaignContextInvalidations = pgTable("effective_campaign
   check("effective_campaign_context_invalidations_type", sql`${table.componentType} in (
     'source_snapshot', 'category_resolution', 'category_profile', 'guidance_pack', 'meta_catalog',
     'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
-    'timeframe_resolver', 'instruction_policy'
+    'timeframe_resolver', 'instruction_policy', 'promotion_registry'
   )`),
   check("effective_campaign_context_invalidations_required", sql`
     btrim(${table.componentRef}) <> '' and btrim(${table.componentVersion}) <> ''
@@ -3146,6 +3146,173 @@ export const promotionTemplateBindingCategories = pgTable("promotion_template_bi
     name: "promotion_template_binding_categories_category_scope_fk" }).onDelete("restrict"),
   check("promotion_template_binding_categories_identity", sql`
     ${table.categoryRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+  `),
+]);
+
+/** Append-only authoring lifecycle for independently reusable immutable AudiencePreset versions. */
+export const audiencePresetAuthoringRevisions = pgTable("audience_preset_authoring_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceRef: text("workspace_ref").notNull(),
+  presetRef: text("preset_ref").notNull(),
+  lifecycleVersion: integer("lifecycle_version").notNull(),
+  previousRecordHash: text("previous_record_hash"),
+  status: text("status").notNull(),
+  presetRevision: integer("preset_revision").notNull(),
+  presetHash: text("preset_hash").notNull(),
+  presetPayload: jsonb("preset_payload").$type<Record<string, unknown>>().notNull(),
+  publishedPresetHash: text("published_preset_hash"),
+  publishedPresetPayload: jsonb("published_preset_payload").$type<Record<string, unknown>>(),
+  actorRef: text("actor_ref").notNull(),
+  actorRole: text("actor_role").notNull(),
+  reasonCode: text("reason_code").notNull(),
+  recordHash: text("record_hash").notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("audience_preset_authoring_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("audience_preset_authoring_version_unique")
+    .on(table.workspaceId, table.presetRef, table.lifecycleVersion),
+  uniqueIndex("audience_preset_authoring_hash_unique").on(table.workspaceId, table.recordHash),
+  index("audience_preset_authoring_current_idx").on(table.workspaceId, table.presetRef, table.lifecycleVersion),
+  check("audience_preset_authoring_identity", sql`
+    ${table.workspaceRef} ~ '^workspace_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.presetRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.lifecycleVersion} between 1 and 1000000 and ${table.presetRevision} between 1 and 1000000
+    and ((${table.lifecycleVersion} = 1 and ${table.previousRecordHash} is null)
+      or (${table.lifecycleVersion} > 1 and ${table.previousRecordHash} ~ '^[a-f0-9]{64}$'))
+    and ${table.presetHash} ~ '^[a-f0-9]{64}$' and ${table.recordHash} ~ '^[a-f0-9]{64}$'
+    and ${table.status} in ('draft', 'published', 'archived')
+    and ${table.actorRole} in ('owner', 'admin', 'analyst')
+    and (${table.status} = 'draft' or ${table.actorRole} in ('owner', 'admin'))
+    and ${table.actorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.reasonCode} ~ '^[a-z][a-z0-9_]{1,63}$'
+  `),
+  check("audience_preset_authoring_payload_exact", sql`(
+    jsonb_typeof(${table.presetPayload}) = 'object'
+    and ${table.presetPayload} #>> '{version}' = 'audience-preset-draft-material/1.0.0'
+    and ${table.presetPayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+    and ${table.presetPayload} #>> '{presetRef}' = ${table.presetRef}
+    and (${table.presetPayload} #>> '{revision}')::integer = ${table.presetRevision}
+    and ${table.presetPayload} #>> '{materialHash}' = ${table.presetHash}
+    and ${table.presetPayload} #> '{authority,canAuthorizeAction}' = 'false'::jsonb
+    and ${table.presetPayload} #> '{authority,canExecuteWrite}' = 'false'::jsonb
+    and ${table.presetPayload} #> '{authority,canWriteMeta}' = 'false'::jsonb
+    and ${table.presetPayload} #> '{authority,canGrantApproval}' = 'false'::jsonb
+    and not (${table.presetPayload} ? 'state') and not (${table.presetPayload} ? 'publishedAt')
+    and ((${table.status} = 'draft' and ${table.publishedPresetHash} is null and ${table.publishedPresetPayload} is null)
+      or (${table.status} = 'published' and ${table.publishedPresetHash} ~ '^[a-f0-9]{64}$'
+          and ${table.publishedPresetPayload} #>> '{presetHash}' = ${table.publishedPresetHash}
+          and ${table.publishedPresetPayload} #>> '{state}' = 'published')
+      or (${table.status} = 'archived' and (
+        (${table.publishedPresetHash} is null and ${table.publishedPresetPayload} is null)
+        or (${table.publishedPresetHash} ~ '^[a-f0-9]{64}$'
+          and ${table.publishedPresetPayload} #>> '{presetHash}' = ${table.publishedPresetHash}
+          and ${table.publishedPresetPayload} #>> '{state}' = 'published'))))
+  ) is true`),
+  check("audience_preset_authoring_no_authority", sql`
+    ${table.presetPayload}::text !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json)|authorization|approvalgranted)"[[:space:]]*:'
+    and ${table.presetPayload}::text !~* '"(canAuthorizeAction|canExecuteWrite|canWriteMeta|canGrantApproval)"[[:space:]]*:[[:space:]]*true'
+  `),
+]);
+
+/** Append-only mutable template lifecycle bound to one exact published immutable preset triple. */
+export const promotionTemplateAuthoringRevisions = pgTable("promotion_template_authoring_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceRef: text("workspace_ref").notNull(),
+  templateRef: text("template_ref").notNull(),
+  lifecycleVersion: integer("lifecycle_version").notNull(),
+  previousRecordHash: text("previous_record_hash"),
+  status: text("status").notNull(),
+  presetRef: text("preset_ref").notNull(),
+  presetRevision: integer("preset_revision").notNull(),
+  presetHash: text("preset_hash").notNull(),
+  presetPayload: jsonb("preset_payload").$type<Record<string, unknown>>().notNull(),
+  templateRevision: integer("template_revision").notNull(),
+  templateHash: text("template_hash").notNull(),
+  templatePayload: jsonb("template_payload").$type<Record<string, unknown>>().notNull(),
+  bindingRef: text("binding_ref").notNull(),
+  bindingHash: text("binding_hash").notNull(),
+  bindingPayload: jsonb("binding_payload").$type<Record<string, unknown>>().notNull(),
+  publishedTemplateHash: text("published_template_hash"),
+  publishedTemplatePayload: jsonb("published_template_payload").$type<Record<string, unknown>>(),
+  publishedBindingHash: text("published_binding_hash"),
+  publishedBindingPayload: jsonb("published_binding_payload").$type<Record<string, unknown>>(),
+  actorRef: text("actor_ref").notNull(),
+  actorRole: text("actor_role").notNull(),
+  reasonCode: text("reason_code").notNull(),
+  recordHash: text("record_hash").notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("promotion_template_authoring_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("promotion_template_authoring_version_unique")
+    .on(table.workspaceId, table.templateRef, table.lifecycleVersion),
+  uniqueIndex("promotion_template_authoring_hash_unique").on(table.workspaceId, table.recordHash),
+  index("promotion_template_authoring_current_idx").on(table.workspaceId, table.templateRef, table.lifecycleVersion),
+  index("promotion_template_authoring_preset_idx")
+    .on(table.workspaceId, table.presetRef, table.presetRevision, table.presetHash),
+  check("promotion_template_authoring_identity", sql`
+    ${table.workspaceRef} ~ '^workspace_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.templateRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.presetRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.bindingRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.lifecycleVersion} between 1 and 1000000
+    and ${table.presetRevision} between 1 and 1000000 and ${table.templateRevision} between 1 and 1000000
+    and ((${table.lifecycleVersion} = 1 and ${table.previousRecordHash} is null)
+      or (${table.lifecycleVersion} > 1 and ${table.previousRecordHash} ~ '^[a-f0-9]{64}$'))
+    and ${table.presetHash} ~ '^[a-f0-9]{64}$' and ${table.templateHash} ~ '^[a-f0-9]{64}$'
+    and ${table.bindingHash} ~ '^[a-f0-9]{64}$' and ${table.recordHash} ~ '^[a-f0-9]{64}$'
+    and ${table.status} in ('draft', 'published', 'archived')
+    and ${table.actorRole} in ('owner', 'admin', 'analyst')
+    and (${table.status} = 'draft' or ${table.actorRole} in ('owner', 'admin'))
+    and ${table.actorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.reasonCode} ~ '^[a-z][a-z0-9_]{1,63}$'
+  `),
+  check("promotion_template_authoring_payload_exact", sql`(
+    jsonb_typeof(${table.presetPayload}) = 'object'
+    and jsonb_typeof(${table.templatePayload}) = 'object' and jsonb_typeof(${table.bindingPayload}) = 'object'
+    and ${table.presetPayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+    and ${table.presetPayload} #>> '{presetRef}' = ${table.presetRef}
+    and (${table.presetPayload} #>> '{revision}')::integer = ${table.presetRevision}
+    and ${table.presetPayload} #>> '{presetHash}' = ${table.presetHash}
+    and ${table.templatePayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+    and ${table.templatePayload} #>> '{templateRef}' = ${table.templateRef}
+    and (${table.templatePayload} #>> '{revision}')::integer = ${table.templateRevision}
+    and ${table.templatePayload} #>> '{materialHash}' = ${table.templateHash}
+    and ${table.templatePayload} #>> '{audiencePreset,presetRef}' = ${table.presetRef}
+    and (${table.templatePayload} #>> '{audiencePreset,revision}')::integer = ${table.presetRevision}
+    and ${table.templatePayload} #>> '{audiencePreset,presetHash}' = ${table.presetHash}
+    and ${table.bindingPayload} #>> '{bindingRef}' = ${table.bindingRef}
+    and ${table.bindingPayload} #>> '{materialHash}' = ${table.bindingHash}
+    and ${table.bindingPayload} #>> '{template,templateRef}' = ${table.templateRef}
+    and (${table.bindingPayload} #>> '{template,revision}')::integer = ${table.templateRevision}
+    and ${table.bindingPayload} #>> '{template,materialHash}' = ${table.templateHash}
+    and not (${table.templatePayload} ? 'state') and not (${table.templatePayload} ? 'publishedAt')
+    and not (${table.bindingPayload} ? 'effectiveFrom')
+    and ((${table.status} = 'draft' and ${table.publishedTemplateHash} is null
+      and ${table.publishedTemplatePayload} is null and ${table.publishedBindingHash} is null
+      and ${table.publishedBindingPayload} is null)
+      or (${table.status} = 'published' and ${table.publishedTemplateHash} ~ '^[a-f0-9]{64}$'
+          and ${table.publishedBindingHash} ~ '^[a-f0-9]{64}$'
+          and ${table.publishedTemplatePayload} #>> '{templateHash}' = ${table.publishedTemplateHash}
+          and ${table.publishedBindingPayload} #>> '{bindingHash}' = ${table.publishedBindingHash})
+      or (${table.status} = 'archived' and (
+        (${table.publishedTemplateHash} is null and ${table.publishedTemplatePayload} is null
+          and ${table.publishedBindingHash} is null and ${table.publishedBindingPayload} is null)
+        or (${table.publishedTemplateHash} ~ '^[a-f0-9]{64}$'
+          and ${table.publishedBindingHash} ~ '^[a-f0-9]{64}$'
+          and ${table.publishedTemplatePayload} #>> '{templateHash}' = ${table.publishedTemplateHash}
+          and ${table.publishedBindingPayload} #>> '{bindingHash}' = ${table.publishedBindingHash}))))
+  ) is true`),
+  check("promotion_template_authoring_no_authority", sql`
+    (${table.presetPayload}::text || ${table.templatePayload}::text || ${table.bindingPayload}::text
+      || coalesce(${table.publishedTemplatePayload}::text, '') || coalesce(${table.publishedBindingPayload}::text, ''))
+      !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json)|authorization|approvalgranted)"[[:space:]]*:'
+    and (${table.presetPayload}::text || ${table.templatePayload}::text || ${table.bindingPayload}::text
+      || coalesce(${table.publishedTemplatePayload}::text, '') || coalesce(${table.publishedBindingPayload}::text, ''))
+      !~* '"(canAuthorizeAction|canExecuteWrite|canWriteMeta|canGrantApproval)"[[:space:]]*:[[:space:]]*true'
   `),
 ]);
 

@@ -213,6 +213,38 @@ function selection(value: unknown): PromotionTemplateAuthoringSelection {
   return Object.freeze(value as unknown as PromotionTemplateAuthoringSelection);
 }
 
+/** Server-private draft source resolution. Public responses still expose only refs. */
+export function resolvePromotionTemplateAuthoringCandidate(input: Readonly<{
+  candidates: readonly PromotionTemplateSelectorCandidate[];
+  workspaceRef: string;
+  selection: PromotionTemplateAuthoringSelection;
+  evaluatedAt: string;
+}>): PromotionTemplateSelectorCandidate {
+  const command = selection(input.selection);
+  const evaluatedAt = instant(input.evaluatedAt);
+  const groups = groupScopes(input.candidates);
+  const group = command.scopeRef === null ? null : groups.find((candidate) => candidate.ref === command.scopeRef);
+  if (!group) fail("invalid_input");
+  const first = group.candidates[0]!;
+  let result: PromotionTemplateSelectionDryRun;
+  try {
+    result = dryRunPromotionTemplateSelection({ version: PROMOTION_TEMPLATE_SELECTOR_VERSION,
+      workspaceRef: input.workspaceRef, evaluatedAt, accountRef: first.binding.accountRef,
+      actor: first.binding.actor, internalCategoryRefs: first.binding.internalCategoryRefs,
+      postType: command.postType, instruction: command.instruction }, input.candidates);
+  } catch {
+    fail("catalog_integrity_rejected");
+  }
+  if (result.status !== "recommended" || !result.publishReady || !result.recommendation) fail("invalid_input");
+  const found = input.candidates.filter((candidate) =>
+    candidate.template.templateRef === result.recommendation!.promotionTemplate.templateRef
+    && candidate.template.revision === result.recommendation!.promotionTemplate.revision
+    && candidate.preset.presetRef === result.recommendation!.audiencePreset.presetRef
+    && candidate.preset.revision === result.recommendation!.audiencePreset.revision);
+  if (found.length !== 1) fail("catalog_integrity_rejected");
+  return found[0]!;
+}
+
 /**
  * Role-aware, read-only authoring preview over immutable published documents.
  * The caller supplies only an opaque server-issued scope ref; account, actor,

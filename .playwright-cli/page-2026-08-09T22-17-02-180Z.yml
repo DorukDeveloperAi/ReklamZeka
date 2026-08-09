@@ -1,0 +1,240 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e28] [cursor=pointer]
+  - alert [ref=e22]: Günaydın. Sistem sakin, üç karar sizi bekliyor.
+  - main [ref=e32]:
+    - complementary [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e35]: RZ
+        - generic [ref=e36]:
+          - strong [ref=e37]: ReklamZeka
+          - generic [ref=e38]: Operating System
+        - generic [ref=e39]: DEMO
+      - navigation "Ana navigasyon" [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]: Çalışma
+          - button "Bugün 3" [ref=e43] [cursor=pointer]:
+            - generic [ref=e44]: ⌂
+            - strong [ref=e45]: Bugün
+            - generic [ref=e46]: "3"
+          - button [ref=e47] [cursor=pointer]:
+            - generic [ref=e48]: ◫
+            - strong [ref=e49]: Kampanyalar
+          - button "Analizler 2" [ref=e50] [cursor=pointer]:
+            - generic [ref=e51]: ⌁
+            - strong [ref=e52]: Analizler
+            - generic [ref=e53]: "2"
+          - button [ref=e54] [cursor=pointer]:
+            - generic [ref=e55]: ◇
+            - strong [ref=e56]: Decision Room
+          - button [ref=e57] [cursor=pointer]:
+            - generic [ref=e58]: ₺
+            - strong [ref=e59]: Bütçeler
+        - generic [ref=e60]:
+          - generic [ref=e61]: Yönetim
+          - button [ref=e62] [cursor=pointer]:
+            - generic [ref=e63]: ≡
+            - strong [ref=e64]: Kurallar & akışlar
+          - button [ref=e65] [cursor=pointer]:
+            - generic [ref=e66]: §
+            - strong [ref=e67]: Strict policies
+          - button [ref=e68] [cursor=pointer]:
+            - generic [ref=e69]: ⊞
+            - strong [ref=e70]: İç kategoriler
+          - button [ref=e71] [cursor=pointer]:
+            - generic [ref=e72]: ◉
+            - strong [ref=e73]: Autonomy Studio
+          - button [ref=e74] [cursor=pointer]:
+            - generic [ref=e75]: ◈
+            - strong [ref=e76]: Practice Lab
+          - button [ref=e77] [cursor=pointer]:
+            - generic [ref=e78]: ◎
+            - strong [ref=e79]: Meta bağlantısı
+          - button "Orchestrator Agent ●" [ref=e80] [cursor=pointer]:
+            - generic [ref=e81]: ✦
+            - strong [ref=e82]: Orchestrator Agent
+            - generic [ref=e83]: ●
+          - button [ref=e84] [cursor=pointer]:
+            - generic [ref=e85]: ✓
+            - strong [ref=e86]: Onay kuyruğu
+          - button [ref=e87] [cursor=pointer]:
+            - generic [ref=e88]: ↗
+            - strong [ref=e89]: Gönderi öne çıkarma
+          - button [ref=e90] [cursor=pointer]:
+            - generic [ref=e91]: ↺
+            - strong [ref=e92]: Timeline
+      - generic [ref=e93]:
+        - generic [ref=e95]:
+          - strong [ref=e96]: Meta Mirror
+          - generic [ref=e97]: güncel · kontrol ediliyor
+        - button "Bağlantı ayarları" [ref=e98] [cursor=pointer]: •••
+    - generic [ref=e99]:
+      - generic [ref=e100]:
+        - button "DM Demo Marka Meta kontrol ediliyor ⌄" [ref=e101] [cursor=pointer]:
+          - generic [ref=e102]: DM
+          - generic [ref=e103]:
+            - strong [ref=e104]: Demo Marka
+            - generic [ref=e105]: Meta kontrol ediliyor
+          - generic [ref=e106]: ⌄
+        - generic [ref=e107]:
+          - button "Ara" [ref=e108] [cursor=pointer]: ⌕
+          - button "Bildirimler" [ref=e109] [cursor=pointer]: ♢
+          - button "approval_only ⌄" [ref=e110] [cursor=pointer]:
+            - text: approval_only
+            - generic [ref=e112]: ⌄
+          - button "AY" [ref=e113] [cursor=pointer]
+      - generic "Bugün" [ref=e114]:
+        - generic [ref=e115]:
+          - generic [ref=e116]:
+            - generic [ref=e117]: 7 AĞUSTOS CUMA · OPERATING REVIEW
+            - heading "Günaydın. Sistem sakin, üç karar sizi bekliyor." [level=1] [ref=e118]
+            - paragraph [ref=e119]: Veriler işlendi, kategori ve talimatlar uygulandı. Hiçbir Meta değişikliği onayınız olmadan yürütülmez.
+          - button "✦ Orchestrator ile çalış" [ref=e120] [cursor=pointer]
+        - region "Sistem durumu" [ref=e121]:
+          - generic [ref=e122]:
+            - strong [ref=e124]: Pipeline güncel
+            - generic [ref=e125]: 4 saat önce · L0→L4 tamam
+          - generic [ref=e126]:
+            - strong [ref=e127]: 32 aktif kampanya
+            - generic [ref=e128]: 4 hesap · 11 iç kategori
+          - generic [ref=e129]:
+            - strong [ref=e130]: "Otonomi: approval_only"
+            - generic [ref=e131]: K1–K4 onaya sunulur
+          - button "Tüm timeline →" [ref=e132] [cursor=pointer]
+        - region "Temel metrikler" [ref=e133]:
+          - article [ref=e134]:
+            - generic [ref=e135]:
+              - generic [ref=e136]: 7 günlük harcama
+              - generic [ref=e137]: Plan içinde
+            - strong [ref=e138]: ₺695
+            - generic [ref=e139]:
+              - generic [ref=e140]: Önceki döneme göre +%6,4
+              - img "Son dönem eğilimi" [ref=e141]
+          - article [ref=e143]:
+            - generic [ref=e144]:
+              - generic [ref=e145]: Sonuç
+              - generic [ref=e146]: Meta proxy
+            - strong [ref=e147]: "125"
+            - generic [ref=e148]:
+              - generic [ref=e149]: CPA ₺6
+              - img "Son dönem eğilimi" [ref=e150]
+          - article [ref=e152]:
+            - generic [ref=e153]:
+              - generic [ref=e154]: Nitelikli lead
+              - generic [ref=e155]: Manual signal
+            - strong [ref=e156]: "82"
+            - generic [ref=e157]:
+              - generic [ref=e158]: "%65,6 qualification"
+              - img "Son dönem eğilimi" [ref=e159]
+          - article [ref=e161]:
+            - generic [ref=e162]:
+              - generic [ref=e163]: Planlanan aylık bütçe
+              - generic [ref=e164]: Ağu
+            - strong [ref=e165]: ₺128.000
+            - generic [ref=e166]: "%34,1 gerçekleşti"
+        - generic [ref=e170]:
+          - region [ref=e171]:
+            - generic [ref=e172]:
+              - generic [ref=e173]:
+                - generic [ref=e174]: KARAR MASASI
+                - heading "Öncelikli kararlar" [level=2] [ref=e175]
+              - button "Tümünü gör →" [ref=e176] [cursor=pointer]
+            - generic [ref=e177]:
+              - article [ref=e178]:
+                - generic [ref=e179]: "01"
+                - generic [ref=e180]:
+                  - generic [ref=e181]:
+                    - generic [ref=e182]: K2
+                    - generic [ref=e183]: GCC · Doktor Tanıtım · Leads
+                  - heading "GCC günlük bütçesini %8 azalt" [level=3] [ref=e184]
+                  - paragraph [ref=e185]: Pacing hedefin %14 üzerinde · quality guardrail stabil
+                  - generic [ref=e186]: Max değişim %10 · approval_only
+                - generic [ref=e187]:
+                  - generic [ref=e188]: Salt okunur
+                  - button "GCC günlük bütçesini %8 azalt için gerçek onay kuyruğunu aç" [ref=e189] [cursor=pointer]: →
+              - article [ref=e190]:
+                - generic [ref=e191]: "02"
+                - generic [ref=e192]:
+                  - generic [ref=e193]:
+                    - generic [ref=e194]: K2
+                    - generic [ref=e195]: Ad · AR Testimonial 03
+                  - heading "Yorgun reklamı duraklat" [level=3] [ref=e196]
+                  - paragraph [ref=e197]: Frequency 4,8 · CTR 7g içinde %31 düştü
+                  - generic [ref=e198]: Creative fatigue review · insan onayı
+                - generic [ref=e199]:
+                  - generic [ref=e200]: Salt okunur
+                  - button "Yorgun reklamı duraklat için gerçek onay kuyruğunu aç" [ref=e201] [cursor=pointer]: →
+              - article [ref=e202]:
+                - generic [ref=e203]: "03"
+                - generic [ref=e204]:
+                  - generic [ref=e205]:
+                    - generic [ref=e206]: K1
+                    - generic [ref=e207]: İstanbul · Saç Ekimi · WhatsApp
+                  - heading "İstanbul kampanyasını izleme listesine al" [level=3] [ref=e208]
+                  - paragraph [ref=e209]: CPL arttı fakat korunan bölge floor'u aktif
+                  - generic [ref=e210]: no-transfer · no-change preferred
+                - generic [ref=e211]:
+                  - generic [ref=e212]: Salt okunur
+                  - button "İstanbul kampanyasını izleme listesine al için gerçek onay kuyruğunu aç" [ref=e213] [cursor=pointer]: →
+          - complementary [ref=e214]:
+            - generic [ref=e215]:
+              - generic [ref=e216]: ✦
+              - generic [ref=e217]:
+                - generic [ref=e218]: REKLAMZEKA ORCHESTRATOR
+                - heading "Agent session bekleniyor" [level=2] [ref=e219]
+              - generic [ref=e220]: Bağlı değil
+            - paragraph [ref=e221]: API doğrulaması olmadan bağlı gösterilmez
+            - generic [ref=e222]:
+              - generic [ref=e223]: Aktif bağlam
+              - strong [ref=e224]: Tüm Meta portföyü
+              - generic [ref=e225]: 11 kategori · 18 guidance · 7 policy · 4 experiment
+            - blockquote [ref=e226]: “İstanbul kampanyasında CPL yükseldi; fakat no-transfer ve korunan floor nedeniyle bütçe taşıma önermedim. 48 saat izle daha güvenli.”
+            - generic [ref=e227]:
+              - button "Session merkezini aç" [ref=e228] [cursor=pointer]
+              - button "CLI'da devam et" [disabled] [ref=e229] [cursor=pointer]
+        - region [ref=e230]:
+          - generic [ref=e231]:
+            - generic [ref=e232]:
+              - generic [ref=e233]: PORTFÖY
+              - heading "Kampanya sağlığı" [level=2] [ref=e234]
+            - button "32 kampanyayı aç →" [ref=e235] [cursor=pointer]
+          - table "Kampanya sağlığı" [ref=e236]:
+            - row "Kampanya ve bağlam 7g harcama Sonuç CPA Aylık bütçe Durum" [ref=e237]:
+              - generic [ref=e238]: Kampanya ve bağlam
+              - generic [ref=e239]: 7g harcama
+              - generic [ref=e240]: Sonuç
+              - generic [ref=e241]: CPA
+              - generic [ref=e242]: Aylık bütçe
+              - generic [ref=e243]: Durum
+            - row "İstanbul · Saç Ekimi · WhatsApp OUTCOME_LEADS · Doktor tanıtım İstanbul · TR · Prospecting ₺318 54 ₺5,89 ₺42.000 İzle" [ref=e244] [cursor=pointer]:
+              - generic [ref=e245]:
+                - strong [ref=e246]: İstanbul · Saç Ekimi · WhatsApp
+                - generic [ref=e247]: OUTCOME_LEADS · Doktor tanıtım
+                - generic [ref=e248]: İstanbul · TR · Prospecting
+              - generic [ref=e249]: ₺318
+              - generic [ref=e250]: "54"
+              - generic [ref=e251]: ₺5,89
+              - strong [ref=e253]: ₺42.000
+              - generic [ref=e256]: İzle
+            - row "GCC · Doktor Tanıtım · Leads OUTCOME_LEADS · Uluslararası hasta GCC · AR · Evergreen ₺241 42 ₺5,74 ₺51.000 Stabil" [ref=e258] [cursor=pointer]:
+              - generic [ref=e259]:
+                - strong [ref=e260]: GCC · Doktor Tanıtım · Leads
+                - generic [ref=e261]: OUTCOME_LEADS · Uluslararası hasta
+                - generic [ref=e262]: GCC · AR · Evergreen
+              - generic [ref=e263]: ₺241
+              - generic [ref=e264]: "42"
+              - generic [ref=e265]: ₺5,74
+              - strong [ref=e267]: ₺51.000
+              - generic [ref=e270]: Stabil
+            - row "TR · Marka · Evergreen Awareness OUTCOME_AWARENESS · Marka koruma Türkiye · TR · No-pause ₺136 29 ₺4,69 ₺35.000 Korunan" [ref=e272] [cursor=pointer]:
+              - generic [ref=e273]:
+                - strong [ref=e274]: TR · Marka · Evergreen Awareness
+                - generic [ref=e275]: OUTCOME_AWARENESS · Marka koruma
+                - generic [ref=e276]: Türkiye · TR · No-pause
+              - generic [ref=e277]: ₺136
+              - generic [ref=e278]: "29"
+              - generic [ref=e279]: ₺4,69
+              - strong [ref=e281]: ₺35.000
+              - generic [ref=e284]: Korunan
+      - generic [ref=e286]:
+        - generic [ref=e287]: Demo snapshot · TRY · Europe/Istanbul · platform_default · 7g tıklama / 0g görüntüleme · platform_default · 7g tıklama / 1g görüntüleme
+        - generic [ref=e288]: Deterministik veriler mevcut fixture/API'dan; operasyon bağlamı ürün vizyonu demosudur.

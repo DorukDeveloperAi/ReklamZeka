@@ -20,9 +20,9 @@ function exact(value: unknown, keys: readonly string[]): asserts value is Record
 const KEYS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   create_draft: ["operation", "expectedRegistryHash", "rawText", "policy"],
   revise_draft: ["operation", "expectedRegistryHash", "expectedVersion", "expectedPolicyHash", "rawText", "policy"],
-  publish: ["operation", "expectedRegistryHash", "policyRef", "expectedVersion", "expectedPolicyHash", "reasonCode"],
-  pause: ["operation", "expectedRegistryHash", "policyRef", "expectedVersion", "expectedPolicyHash", "reasonCode"],
-  archive: ["operation", "expectedRegistryHash", "policyRef", "expectedVersion", "expectedPolicyHash", "reasonCode"],
+  publish: ["operation", "expectedRegistryHash", "policyRef", "expectedVersion", "expectedPolicyHash", "expectedImpactHash", "reasonCode"],
+  pause: ["operation", "expectedRegistryHash", "policyRef", "expectedVersion", "expectedPolicyHash", "expectedImpactHash", "reasonCode"],
+  archive: ["operation", "expectedRegistryHash", "policyRef", "expectedVersion", "expectedPolicyHash", "expectedImpactHash", "reasonCode"],
 });
 
 function shape(request: Request, method: "GET" | "POST", intent: string): void {
@@ -57,6 +57,10 @@ function failure(reason: unknown) {
       "Talimat politikası siz çalışırken değişti; görünümü yenileyin.", 409);
     if (reason.code === "invalid_transition") return responseError("invalid_transition",
       "Talimat politikası bu lifecycle geçişine uygun değil.", 409);
+    if (reason.code === "dependency_blocked") return responseError("dependency_blocked",
+      "Dependency kapsamı tam ve güvenli değil; lifecycle mutation kapalı tutuldu.", 409);
+    if (reason.code === "forbidden") return responseError("forbidden",
+      "Talimat politikası işlemi için güncel çalışma alanı rolü yetersiz.", 403);
     return responseError("invalid_input", "Talimat politikası isteği geçersiz.", 400);
   }
   if (reason instanceof SyntaxError) return responseError("invalid_input", "Talimat politikası isteği geçersiz.", 400);

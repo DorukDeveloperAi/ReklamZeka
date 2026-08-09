@@ -23,7 +23,26 @@ export type InstructionPolicyMutation =
   | Readonly<{ operation: "revise_draft"; expectedRegistryHash: string; expectedVersion: number;
       expectedPolicyHash: string; rawText: string; policy: unknown }>
   | Readonly<{ operation: "publish" | "pause" | "archive"; expectedRegistryHash: string; policyRef: string;
-      expectedVersion: number; expectedPolicyHash: string; reasonCode: string }>;
+      expectedVersion: number; expectedPolicyHash: string; expectedImpactHash: string; reasonCode: string }>;
+type ImpactOperation = "publish" | "pause" | "archive";
+export type InstructionPolicyImpact = Readonly<{ contractVersion: "instruction-policy-impact/1.0.0";
+  impactHash: string; operation: ImpactOperation; registryHash: string;
+  target: Readonly<{ policyRef: string; policyVersion: number; policyHash: string; status: PolicyStatus }>;
+  exactBlockers: Readonly<{ currentInboundExceptions: number; enabledSchedules: number; nonTerminalActionUnits: number }>;
+  historicalImpact: Readonly<{ historicalInboundExceptions: number; directAppliedContexts: number;
+    directSuppressedContexts: number; directParkedContexts: number; alreadyInvalidatedContexts: number;
+    budgetProposals: number; currentAnalysisTemplates: number; supersededAnalysisTemplates: number;
+    runAssets: number; decisionLedgerRecords: number; terminalActionUnits: number }>;
+  invalidationPlan: Readonly<{ registryComponents: number; contextsNeedingInvalidation: number }>;
+  coverage: Readonly<{ complete: boolean; manifestVersion: string; exactRelational: readonly string[];
+    exactContractRef: readonly string[]; partialOrUnknown: readonly string[]; nonAuthoritativeNotes: readonly string[];
+    integrity: Readonly<{
+      unclassifiedJsonbColumns: number; missingManifestJsonbColumns: number; brokenPolicyRevisionChains: number;
+      unresolvedExceptionRefs: number; malformedContextPolicies: number; inconsistentContextComponents: number;
+      corruptActionLifecycleRows: number; rowCapExceeded: number }> }>;
+  disposition: "blocked" | "review_required"; mutationAllowed: boolean;
+  authority: Readonly<{ canPublish: false; canPause: false; canArchive: false; canApprove: false;
+    canExecute: false; canSchedule: false; canCallTool: false; canWriteMeta: false }> }>;
 
 const HASH = /^[a-f0-9]{64}$/;
 const POLICY_TYPES: readonly PolicyType[] = ["hard_constraint", "target", "preference", "exception", "prohibition", "approval", "schedule"];
@@ -35,6 +54,15 @@ const STUDIO_AUTHORITY_KEYS = ["canRead", "canDraft", "canPublish", "canPause", 
   "canExecute", "canWriteMeta", "canSchedule", "canCallTool"] as const;
 const POLICY_AUTHORITY_KEYS = ["canExecute", "canWriteMeta", "canApprove", "canSchedule", "canCallTool",
   "canAccessNetwork", "canQuerySql"] as const;
+const IMPACT_AUTHORITY_KEYS = ["canPublish", "canPause", "canArchive", "canApprove", "canExecute", "canSchedule",
+  "canCallTool", "canWriteMeta"] as const;
+const BLOCKER_KEYS = ["currentInboundExceptions", "enabledSchedules", "nonTerminalActionUnits"] as const;
+const HISTORY_KEYS = ["historicalInboundExceptions", "directAppliedContexts", "directSuppressedContexts",
+  "directParkedContexts", "alreadyInvalidatedContexts", "budgetProposals", "currentAnalysisTemplates",
+  "supersededAnalysisTemplates", "runAssets", "decisionLedgerRecords", "terminalActionUnits"] as const;
+const INTEGRITY_KEYS = ["unclassifiedJsonbColumns", "missingManifestJsonbColumns", "brokenPolicyRevisionChains",
+  "unresolvedExceptionRefs", "malformedContextPolicies", "inconsistentContextComponents",
+  "corruptActionLifecycleRows", "rowCapExceeded"] as const;
 
 class PolicyStudioError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = "PolicyStudioError"; }
@@ -98,6 +126,47 @@ export function parseInstructionPolicyStudioSnapshot(value: unknown): Instructio
   return value as unknown as InstructionPolicyStudioSnapshot;
 }
 
+function boundedCountRecord(value: unknown, keys: readonly string[]): boolean {
+  return exact(value, keys) && keys.every((key) => Number.isSafeInteger(value[key])
+    && Number(value[key]) >= 0 && Number(value[key]) <= 20_000);
+}
+
+function boundedRefs(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.length <= 64 && value.every((entry) => typeof entry === "string"
+    && entry.length > 0 && entry.length <= 128 && /^[a-z0-9_.:-]+$/.test(entry));
+}
+
+export function parseInstructionPolicyImpact(value: unknown): InstructionPolicyImpact {
+  if (!exact(value, ["contractVersion", "impactHash", "operation", "registryHash", "target", "exactBlockers",
+    "historicalImpact", "invalidationPlan", "coverage", "disposition", "mutationAllowed", "authority"])
+    || value.contractVersion !== "instruction-policy-impact/1.0.0" || typeof value.impactHash !== "string"
+    || !HASH.test(value.impactHash) || !["publish", "pause", "archive"].includes(String(value.operation))
+    || typeof value.registryHash !== "string" || !HASH.test(value.registryHash)
+    || !exact(value.target, ["policyRef", "policyVersion", "policyHash", "status"])
+    || typeof value.target.policyRef !== "string" || !/^policy_[a-z0-9][a-z0-9_.:-]{0,126}$/.test(value.target.policyRef)
+    || !Number.isSafeInteger(value.target.policyVersion) || Number(value.target.policyVersion) < 1
+    || typeof value.target.policyHash !== "string" || !HASH.test(value.target.policyHash)
+    || !STATUSES.includes(value.target.status as PolicyStatus) || !boundedCountRecord(value.exactBlockers, BLOCKER_KEYS)
+    || !boundedCountRecord(value.historicalImpact, HISTORY_KEYS)
+    || !boundedCountRecord(value.invalidationPlan, ["registryComponents", "contextsNeedingInvalidation"])
+    || !exact(value.coverage, ["complete", "manifestVersion", "exactRelational", "exactContractRef", "partialOrUnknown",
+      "nonAuthoritativeNotes", "integrity"])
+    || typeof value.coverage.complete !== "boolean" || typeof value.coverage.manifestVersion !== "string"
+    || !/^instruction-policy-dependency-manifest\/1\.0\.0$/.test(value.coverage.manifestVersion)
+    || !boundedRefs(value.coverage.exactRelational) || !boundedRefs(value.coverage.exactContractRef)
+    || !boundedRefs(value.coverage.partialOrUnknown) || !boundedRefs(value.coverage.nonAuthoritativeNotes)
+    || !boundedCountRecord(value.coverage.integrity, INTEGRITY_KEYS)
+    || !["blocked", "review_required"].includes(String(value.disposition)) || typeof value.mutationAllowed !== "boolean"
+    || !closedAuthority(value.authority, IMPACT_AUTHORITY_KEYS)) {
+    throw new PolicyStudioError("unsafe_response", "Dependency etki kaynağı güvenli sözleşmeyi döndürmedi.");
+  }
+  if (value.mutationAllowed && (value.disposition !== "review_required" || value.coverage.complete !== true
+    || value.coverage.partialOrUnknown.length !== 0)) {
+    throw new PolicyStudioError("unsafe_response", "Dependency etki kaynağı çelişkili mutation yetkisi döndürdü.");
+  }
+  return value as unknown as InstructionPolicyImpact;
+}
+
 function editablePolicy(policy: Policy): Record<string, unknown> {
   return Object.fromEntries(POLICY_INPUT_KEYS.map((key) => [key, policy[key]]));
 }
@@ -124,7 +193,7 @@ function provenanceRef(): string {
 
 export function buildInstructionPolicyMutation(input: Readonly<{ operation: "create_draft" | "revise_draft" | "publish" | "pause" | "archive";
   snapshot: InstructionPolicyStudioSnapshot; selected: Revision | null; rawText?: string; policy?: unknown;
-  reasonCode?: string }>): InstructionPolicyMutation | null {
+  reasonCode?: string; impact?: InstructionPolicyImpact | null; impactConfirmed?: boolean }>): InstructionPolicyMutation | null {
   const { operation, snapshot, selected } = input;
   if (operation === "create_draft") return snapshot.authority.canDraft && typeof input.rawText === "string"
     && input.rawText.trim() && input.policy ? { operation, expectedRegistryHash: snapshot.registryHash,
@@ -136,10 +205,32 @@ export function buildInstructionPolicyMutation(input: Readonly<{ operation: "cre
   const allowed = operation === "publish" ? snapshot.authority.canPublish && (selected?.policy.status === "draft" || selected?.policy.status === "paused")
     : operation === "pause" ? snapshot.authority.canPause && selected?.policy.status === "published"
       : snapshot.authority.canArchive && selected?.policy.status !== "archived";
-  return allowed && selected && typeof input.reasonCode === "string" && /^[a-z][a-z0-9_]{1,63}$/.test(input.reasonCode)
+  const impact = input.impact;
+  const impactSafe = impact && input.impactConfirmed === true && impact.operation === operation
+    && impact.registryHash === snapshot.registryHash && impact.target.policyRef === selected?.policy.policyRef
+    && impact.target.policyVersion === selected?.policy.policyVersion
+    && impact.target.policyHash === selected?.policy.canonicalHash && impact.coverage.complete
+    && impact.coverage.partialOrUnknown.length === 0 && impact.disposition === "review_required"
+    && impact.mutationAllowed && Object.values(impact.coverage.integrity).every((count) => count === 0)
+    && Object.values(impact.exactBlockers).every((count) => count === 0);
+  return allowed && selected && impactSafe && typeof input.reasonCode === "string" && /^[a-z][a-z0-9_]{1,63}$/.test(input.reasonCode)
     ? { operation, expectedRegistryHash: snapshot.registryHash, policyRef: selected.policy.policyRef,
       expectedVersion: selected.policy.policyVersion, expectedPolicyHash: selected.policy.canonicalHash,
-      reasonCode: input.reasonCode } : null;
+      expectedImpactHash: impact.impactHash, reasonCode: input.reasonCode } : null;
+}
+
+export async function loadInstructionPolicyImpact(policyRef: string, operation: ImpactOperation,
+  request: typeof fetch = fetch): Promise<InstructionPolicyImpact> {
+  const query = new URLSearchParams({ view: "dependency-impact", policyRef, operation });
+  const response = await request(`/api/instruction-policy-impact?${query.toString()}`, { cache: "no-store",
+    credentials: "same-origin", headers: { "X-ReklamZeka-Intent": "instruction-policy-impact-preview" } });
+  let payload: unknown = null; try { payload = await response.json(); } catch { /* public fallback below */ }
+  if (!response.ok) {
+    const message = object(payload) && object(payload.error) && typeof payload.error.message === "string"
+      ? payload.error.message : "Dependency etki önizlemesi kullanılamıyor.";
+    throw new PolicyStudioError(String(response.status), message);
+  }
+  return parseInstructionPolicyImpact(payload);
 }
 
 export async function runInstructionPolicyMutation(command: InstructionPolicyMutation,
@@ -194,6 +285,10 @@ export function InstructionPolicyStudioView(props: Readonly<{ snapshot: Instruct
   const [reasonCode, setReasonCode] = useState("owner_reviewed");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [impact, setImpact] = useState<InstructionPolicyImpact | null>(null);
+  const [impactOperation, setImpactOperation] = useState<ImpactOperation | null>(null);
+  const [impactConfirmed, setImpactConfirmed] = useState(false);
+  const [impactLoading, setImpactLoading] = useState(false);
   const filtered = useMemo(() => props.snapshot.current.filter((entry) => {
     const haystack = `${entry.policy.policyRef} ${entry.policy.policyType} ${entry.policy.reasonCode} ${entry.rawProvenance.rawText} ${JSON.stringify(entry.policy.clause)}`.toLowerCase();
     return (status === "all" || entry.policy.status === status) && (type === "all" || entry.policy.policyType === type)
@@ -203,6 +298,7 @@ export function InstructionPolicyStudioView(props: Readonly<{ snapshot: Instruct
   const select = useCallback((revision: Revision) => {
     setSelectedRef(revision.policy.policyRef); setCreating(false); setRawText(revision.rawProvenance.rawText);
     setNormalized(JSON.stringify(editablePolicy(revision.policy), null, 2)); setMessage(null);
+    setImpact(null); setImpactOperation(null); setImpactConfirmed(false);
   }, []);
 
   useEffect(() => {
@@ -216,8 +312,19 @@ export function InstructionPolicyStudioView(props: Readonly<{ snapshot: Instruct
     }
   }, [creating, selected?.policy.canonicalHash]);
 
+  useEffect(() => { setImpact(null); setImpactOperation(null); setImpactConfirmed(false); }, [props.snapshot.registryHash]);
+
   function beginCreate() {
     setCreating(true); setSelectedRef(""); setRawText(""); setNormalized("{}"); setMessage(null);
+    setImpact(null); setImpactOperation(null); setImpactConfirmed(false);
+  }
+
+  async function previewImpact(operation: ImpactOperation) {
+    if (!selected || impactLoading || saving) return;
+    setImpactLoading(true); setMessage(null); setImpact(null); setImpactOperation(operation); setImpactConfirmed(false);
+    try { setImpact(await loadInstructionPolicyImpact(selected.policy.policyRef, operation)); }
+    catch (reason) { setMessage(reason instanceof Error ? reason.message : "Dependency etki önizlemesi kullanılamıyor."); }
+    finally { setImpactLoading(false); }
   }
 
   async function mutate(operation: InstructionPolicyMutation["operation"]) {
@@ -235,15 +342,19 @@ export function InstructionPolicyStudioView(props: Readonly<{ snapshot: Instruct
           ? provenanceRef() : source.rawProvenanceRef, rawTextHash: await sha256(rawText) } };
       }
       const command = buildInstructionPolicyMutation({ operation, snapshot: props.snapshot, selected,
-        rawText, policy, reasonCode });
+        rawText, policy, reasonCode, impact, impactConfirmed });
       if (!command) throw new PolicyStudioError("forbidden", "Bu rol veya lifecycle durumu işleme izin vermiyor.");
       await runInstructionPolicyMutation(command); await props.onReload();
+      setImpact(null); setImpactOperation(null); setImpactConfirmed(false);
       setMessage(operation === "create_draft" ? "Politika taslağı oluşturuldu."
         : operation === "revise_draft" ? "Taslak yeni sürümle kaydedildi."
           : operation === "publish" ? "Politika yayınlandı ve context geçersizleştirildi."
             : operation === "pause" ? "Politika duraklatıldı." : "Politika arşivlendi.");
       if (operation === "create_draft") setCreating(false);
     } catch (reason) {
+      if (reason instanceof PolicyStudioError && reason.code === "conflict") {
+        setImpact(null); setImpactOperation(null); setImpactConfirmed(false); await props.onReload();
+      }
       setMessage(reason instanceof PolicyStudioError && reason.code === "conflict"
         ? "Politika siz çalışırken değişti; listeyi yenileyip tekrar değerlendirin."
         : reason instanceof Error ? reason.message : "Talimat politikası işlemi tamamlanamadı.");
@@ -252,6 +363,10 @@ export function InstructionPolicyStudioView(props: Readonly<{ snapshot: Instruct
 
   const history = selected ? props.snapshot.history.filter((entry) => entry.policy.policyRef === selected.policy.policyRef) : [];
   const diffs = selected ? props.snapshot.diffs.filter((entry) => entry.policyRef === selected.policy.policyRef) : [];
+  const impactReady = Boolean(impact && impactConfirmed && impact.coverage.complete
+    && impact.coverage.partialOrUnknown.length === 0 && impact.mutationAllowed && impact.disposition === "review_required"
+    && Object.values(impact.exactBlockers).every((count) => count === 0)
+    && Object.values(impact.coverage.integrity).every((count) => count === 0));
 
   return <div className={styles.studio}>
     <section className={styles.hero}><div><span className={styles.kicker}>STRICT POLICY STUDIO</span>
@@ -285,7 +400,22 @@ export function InstructionPolicyStudioView(props: Readonly<{ snapshot: Instruct
             <label>Normalize strict DSL JSON<textarea data-code="true" value={normalized}
               disabled={saving || !props.snapshot.authority.canDraft || !creating && selected?.policy.status !== "draft"}
               onChange={(event) => setNormalized(event.target.value)} /></label></div>
-          <div className={styles.impact}><strong>Dependency impact: henüz hesaplanmadı.</strong><p>Bir dependency reader sonucu bağlanmadığı için etkilenen analiz, bütçe veya aksiyon sayısı gösterilmez; yayın kararı için sayı uydurulmaz.</p></div>
+          <div className={styles.impact}>{impact ? <><strong>Persisted dependency impact · {impactOperation}</strong>
+            <div className={styles.impactGrid}><span>Inbound exception blocker <b>{impact.exactBlockers.currentInboundExceptions}</b></span>
+              <span>Enabled schedule blocker <b>{impact.exactBlockers.enabledSchedules}</b></span>
+              <span>Nonterminal action blocker <b>{impact.exactBlockers.nonTerminalActionUnits}</b></span>
+              <span>Context invalidation <b>{impact.invalidationPlan.contextsNeedingInvalidation}</b></span>
+              <span>Budget history <b>{impact.historicalImpact.budgetProposals}</b></span>
+              <span>Analysis/run history <b>{impact.historicalImpact.currentAnalysisTemplates
+                + impact.historicalImpact.supersededAnalysisTemplates + impact.historicalImpact.runAssets}</b></span></div>
+            {!impact.coverage.complete || impact.coverage.partialOrUnknown.length ? <p role="alert"><strong>Kapsam tamamlanmadı; mutation fail-closed.</strong><br />
+              Partial/unknown: {impact.coverage.partialOrUnknown.join(" · ") || "integrity check"}</p> : null}
+            {impact.coverage.nonAuthoritativeNotes.length ? <p><small>Performans/operasyon notu (authority belirlemez): {
+              impact.coverage.nonAuthoritativeNotes.join(" · ")}</small></p> : null}
+            <label className={styles.confirm}><input type="checkbox" checked={impactConfirmed}
+              disabled={!impact.mutationAllowed || !impact.coverage.complete || impact.coverage.partialOrUnknown.length > 0}
+              onChange={(event) => setImpactConfirmed(event.target.checked)} />Bu etki hash’ini ve invalidation planını onaylıyorum.</label>
+          </> : <><strong>Dependency impact: henüz hesaplanmadı.</strong><p>Publish/pause/archive öncesi persisted bağımlılıklar yeniden taranır; kapsam eksikse mutation kapalı kalır.</p></>}</div>
           <label>Lifecycle gerekçe kodu<input value={reasonCode} pattern="[a-z][a-z0-9_]{1,63}" maxLength={64}
             disabled={saving || creating} onChange={(event) => setReasonCode(event.target.value)} /></label>
           <div className={styles.actions}><span className={styles.meta}>OCC: registry hash + sürüm + policy hash</span>
@@ -294,11 +424,20 @@ export function InstructionPolicyStudioView(props: Readonly<{ snapshot: Instruct
               {selected!.policy.status === "draft" ? <button type="button" disabled={saving || !props.snapshot.authority.canDraft}
                 onClick={() => void mutate("revise_draft")}>Yeni taslak sürümü kaydet</button> : null}
               {(selected!.policy.status === "draft" || selected!.policy.status === "paused") ? <button className={styles.primary}
-                type="button" disabled={saving || !props.snapshot.authority.canPublish} onClick={() => void mutate("publish")}>Yayınla</button> : null}
-              {selected!.policy.status === "published" ? <button type="button" disabled={saving || !props.snapshot.authority.canPause}
-                onClick={() => void mutate("pause")}>Duraklat</button> : null}
+                type="button" disabled={saving || impactLoading || !props.snapshot.authority.canPublish
+                  || impactOperation === "publish" && Boolean(impact) && !impactReady}
+                onClick={() => impactOperation === "publish" && impact ? void mutate("publish") : void previewImpact("publish")}>
+                {impactOperation === "publish" && impact ? "Yayınla" : "Yayın etkisini incele"}</button> : null}
+              {selected!.policy.status === "published" ? <button type="button"
+                disabled={saving || impactLoading || !props.snapshot.authority.canPause
+                  || impactOperation === "pause" && Boolean(impact) && !impactReady}
+                onClick={() => impactOperation === "pause" && impact ? void mutate("pause") : void previewImpact("pause")}>
+                {impactOperation === "pause" && impact ? "Duraklat" : "Duraklatma etkisini incele"}</button> : null}
               {selected!.policy.status !== "archived" ? <button className={styles.danger} type="button"
-                disabled={saving || !props.snapshot.authority.canArchive} onClick={() => void mutate("archive")}>Arşivle</button> : null}</>}
+                disabled={saving || impactLoading || !props.snapshot.authority.canArchive
+                  || impactOperation === "archive" && Boolean(impact) && !impactReady}
+                onClick={() => impactOperation === "archive" && impact ? void mutate("archive") : void previewImpact("archive")}>
+                {impactOperation === "archive" && impact ? "Arşivle" : "Arşiv etkisini incele"}</button> : null}</>}
           </div>
           {!creating ? <><section><div className={styles.sectionHeader}><h3>Ham ve normalize sürüm geçmişi</h3><span>{history.length} sürüm</span></div>
             <div className={styles.history}>{history.map((entry) => <article className={styles.historyItem} key={`${entry.policy.policyRef}:${entry.policy.policyVersion}`}>

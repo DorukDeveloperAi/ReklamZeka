@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { InstructionPolicyLifecycleService, type InstructionPolicyLifecycleRepository } from
+import { InstructionPolicyLifecycleService, lifecycleInvalidationReason, type InstructionPolicyLifecycleRepository } from
   "@/application/instruction-policy-lifecycle-service";
 import { parseStrictInstructionPolicy } from "@/domain/policies/instruction-policy-dsl";
 import { AuthorizationError } from "@/security/authorization";
@@ -34,6 +34,13 @@ function repository(): InstructionPolicyLifecycleRepository & { mutate: ReturnTy
 }
 
 describe("InstructionPolicyLifecycleService", () => {
+  it("maps lifecycle invalidation reasons without treating drafts as context changes", () => {
+    expect(lifecycleInvalidationReason("create_draft")).toBeNull();
+    expect(lifecycleInvalidationReason("revise_draft")).toBeNull();
+    expect(lifecycleInvalidationReason("publish")).toBe("source_changed");
+    expect(lifecycleInvalidationReason("pause")).toBe("source_changed");
+    expect(lifecycleInvalidationReason("archive")).toBe("source_removed");
+  });
   it("keeps viewer history read-only and authority-free", async () => {
     const result = await new InstructionPolicyLifecycleService(repository(), memberships).inspect(principal("viewer"));
     expect(result).toMatchObject({ registryHash: "a".repeat(64), authority: { canRead: true, canDraft: false,
@@ -62,7 +69,7 @@ describe("InstructionPolicyLifecycleService", () => {
   it("denies analyst publish and viewer draft before persistence", async () => {
     const command = { operation: "publish" as const, expectedRegistryHash: "a".repeat(64),
       policyRef: "policy_health_priority", expectedVersion: 1, expectedPolicyHash: "b".repeat(64),
-      reasonCode: "owner_publish" };
+      expectedImpactHash: "c".repeat(64), reasonCode: "owner_publish" };
     await expect(new InstructionPolicyLifecycleService(repository(), memberships).mutate(principal("analyst"), command))
       .rejects.toBeInstanceOf(AuthorizationError);
     await expect(new InstructionPolicyLifecycleService(repository(), memberships).mutate(principal("viewer"), {

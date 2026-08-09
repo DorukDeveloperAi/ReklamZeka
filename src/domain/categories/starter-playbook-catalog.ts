@@ -15,9 +15,12 @@ import {
 } from "@/domain/categories/public-reference";
 
 export const STARTER_CATEGORY_PLAYBOOK_CATALOG_VERSION =
-  "starter-category-playbooks/1.0.0" as const;
+  "starter-category-playbooks/1.1.0" as const;
 
-const ALL_CATEGORY_LEVELS = Object.freeze(["campaign"] as const);
+const CAMPAIGN_LEVEL = Object.freeze(["campaign"] as const);
+const CAMPAIGN_AD_SET_LEVELS = Object.freeze(["campaign", "ad_set"] as const);
+const DELIVERY_LEVELS = Object.freeze(["campaign", "ad_set", "ad"] as const);
+const ALL_CATEGORY_LEVELS = Object.freeze(["campaign", "ad_set", "ad", "creative"] as const);
 const NO_AUTHORITY = Object.freeze({
   canPersist: false as const,
   canPublish: false as const,
@@ -33,11 +36,18 @@ const NO_AUTHORITY = Object.freeze({
 
 export type StarterCategoryDimensionKey =
   | "audience_strategy"
+  | "brand_clinic"
+  | "budget_pool"
   | "campaign_role"
+  | "custom"
+  | "experiment"
   | "geo_market"
   | "language"
   | "destination"
   | "funnel_intent"
+  | "lifecycle"
+  | "operating_mode"
+  | "service_line"
   | "protection_class";
 
 export type StarterObjectivePlaybookRef = Readonly<{
@@ -52,7 +62,7 @@ export type StarterCategoryDimensionTemplate = Readonly<{
   dimensionKey: StarterCategoryDimensionKey;
   label: string;
   suggestedCardinality: "single" | "multi";
-  suggestedEntityLevels: typeof ALL_CATEGORY_LEVELS;
+  suggestedEntityLevels: readonly (typeof ALL_CATEGORY_LEVELS)[number][];
 }>;
 
 export type StarterCategoryTemplate = Readonly<{
@@ -146,20 +156,34 @@ function objectivePlaybookRef(objective: CampaignObjective): StarterObjectivePla
 const OBJECTIVE_REFS = Object.freeze(CAMPAIGN_OBJECTIVES.map(objectivePlaybookRef));
 
 const DIMENSIONS: readonly StarterCategoryDimensionTemplate[] = deepFreeze([
-  { dimensionRef: categoryDimensionPublicRef("audience_strategy"), dimensionKey: "audience_strategy",
-    label: "Kitle stratejisi", suggestedCardinality: "single", suggestedEntityLevels: ALL_CATEGORY_LEVELS },
-  { dimensionRef: categoryDimensionPublicRef("campaign_role"), dimensionKey: "campaign_role",
-    label: "Kampanya rolü", suggestedCardinality: "single", suggestedEntityLevels: ALL_CATEGORY_LEVELS },
-  { dimensionRef: categoryDimensionPublicRef("destination"), dimensionKey: "destination",
-    label: "Hedef deneyim", suggestedCardinality: "single", suggestedEntityLevels: ALL_CATEGORY_LEVELS },
-  { dimensionRef: categoryDimensionPublicRef("funnel_intent"), dimensionKey: "funnel_intent",
-    label: "Huni niyeti", suggestedCardinality: "single", suggestedEntityLevels: ALL_CATEGORY_LEVELS },
+  { dimensionRef: categoryDimensionPublicRef("service_line"), dimensionKey: "service_line",
+    label: "Hizmet hattı", suggestedCardinality: "multi", suggestedEntityLevels: CAMPAIGN_LEVEL },
+  { dimensionRef: categoryDimensionPublicRef("brand_clinic"), dimensionKey: "brand_clinic",
+    label: "Marka / klinik", suggestedCardinality: "multi", suggestedEntityLevels: CAMPAIGN_LEVEL },
   { dimensionRef: categoryDimensionPublicRef("geo_market"), dimensionKey: "geo_market",
-    label: "Bölge pazarı", suggestedCardinality: "multi", suggestedEntityLevels: ALL_CATEGORY_LEVELS },
+    label: "Bölge pazarı", suggestedCardinality: "multi", suggestedEntityLevels: CAMPAIGN_LEVEL },
   { dimensionRef: categoryDimensionPublicRef("language"), dimensionKey: "language",
-    label: "Dil", suggestedCardinality: "multi", suggestedEntityLevels: ALL_CATEGORY_LEVELS },
+    label: "Dil", suggestedCardinality: "multi", suggestedEntityLevels: CAMPAIGN_LEVEL },
+  { dimensionRef: categoryDimensionPublicRef("campaign_role"), dimensionKey: "campaign_role",
+    label: "Kampanya rolü", suggestedCardinality: "single", suggestedEntityLevels: CAMPAIGN_LEVEL },
+  { dimensionRef: categoryDimensionPublicRef("funnel_intent"), dimensionKey: "funnel_intent",
+    label: "Huni niyeti", suggestedCardinality: "single", suggestedEntityLevels: CAMPAIGN_LEVEL },
+  { dimensionRef: categoryDimensionPublicRef("audience_strategy"), dimensionKey: "audience_strategy",
+    label: "Kitle stratejisi", suggestedCardinality: "single", suggestedEntityLevels: CAMPAIGN_AD_SET_LEVELS },
+  { dimensionRef: categoryDimensionPublicRef("destination"), dimensionKey: "destination",
+    label: "Hedef deneyim", suggestedCardinality: "single", suggestedEntityLevels: DELIVERY_LEVELS },
+  { dimensionRef: categoryDimensionPublicRef("budget_pool"), dimensionKey: "budget_pool",
+    label: "Bütçe havuzu", suggestedCardinality: "single", suggestedEntityLevels: CAMPAIGN_LEVEL },
+  { dimensionRef: categoryDimensionPublicRef("operating_mode"), dimensionKey: "operating_mode",
+    label: "Çalışma modu", suggestedCardinality: "single", suggestedEntityLevels: CAMPAIGN_LEVEL },
+  { dimensionRef: categoryDimensionPublicRef("lifecycle"), dimensionKey: "lifecycle",
+    label: "Yaşam döngüsü", suggestedCardinality: "single", suggestedEntityLevels: CAMPAIGN_LEVEL },
+  { dimensionRef: categoryDimensionPublicRef("experiment"), dimensionKey: "experiment",
+    label: "Deney", suggestedCardinality: "multi", suggestedEntityLevels: CAMPAIGN_AD_SET_LEVELS },
   { dimensionRef: categoryDimensionPublicRef("protection_class"), dimensionKey: "protection_class",
-    label: "Koruma sınıfı", suggestedCardinality: "multi", suggestedEntityLevels: ALL_CATEGORY_LEVELS },
+    label: "Koruma sınıfı", suggestedCardinality: "multi", suggestedEntityLevels: CAMPAIGN_LEVEL },
+  { dimensionRef: categoryDimensionPublicRef("custom"), dimensionKey: "custom",
+    label: "Özel boyut", suggestedCardinality: "multi", suggestedEntityLevels: ALL_CATEGORY_LEVELS },
 ]);
 
 function categoryTemplate(input: Readonly<{
@@ -184,10 +208,11 @@ function categoryTemplate(input: Readonly<{
 }
 
 function ownerDefinedTemplate(input: Readonly<{
-  dimensionKey: "geo_market" | "language";
+  dimensionKey: StarterCategoryDimensionKey;
   label: string;
   description: string;
   color: string;
+  ownerConfigurationFields?: StarterCategoryTemplate["ownerConfigurationFields"];
 }>): StarterCategoryTemplate {
   return Object.freeze({
     templateRef: `starter_category_template_${input.dimensionKey}_owner_defined`,
@@ -198,7 +223,8 @@ function ownerDefinedTemplate(input: Readonly<{
     description: input.description,
     color: input.color,
     kind: "owner_defined_value" as const,
-    ownerConfigurationFields: Object.freeze(["category_key", "label", "description"] as const),
+    ownerConfigurationFields: Object.freeze(["category_key", "label", "description",
+      ...(input.ownerConfigurationFields ?? [])] as const),
   });
 }
 
@@ -211,10 +237,25 @@ const CATEGORIES: readonly StarterCategoryTemplate[] = deepFreeze([
     description: "Kullanıcının süreli promosyon çalışması olarak değerlendirebileceği örnek iç kategori.", color: "#EA580C" }),
   categoryTemplate({ dimensionKey: "campaign_role", categoryKey: "evergreen", label: "Sürekli",
     description: "Kullanıcının sürekli çalışma olarak değerlendirebileceği örnek iç kategori.", color: "#0F766E" }),
+  ownerDefinedTemplate({ dimensionKey: "service_line", label: "Hizmet hattını tanımla",
+    description: "Hizmet hattı değeri workspace sahibi tarafından tanımlanmalıdır.", color: "#0E7490" }),
+  ownerDefinedTemplate({ dimensionKey: "brand_clinic", label: "Marka veya kliniği tanımla",
+    description: "Marka/klinik değeri workspace sahibi tarafından tanımlanmalıdır.", color: "#4338CA" }),
   ownerDefinedTemplate({ dimensionKey: "geo_market", label: "Bölgeyi tanımla",
     description: "Bölge değeri ve anlamı workspace sahibi tarafından tanımlanmalıdır.", color: "#0369A1" }),
   ownerDefinedTemplate({ dimensionKey: "language", label: "Dili tanımla",
     description: "Dil değeri ve anlamı workspace sahibi tarafından tanımlanmalıdır.", color: "#4F46E5" }),
+  ownerDefinedTemplate({ dimensionKey: "budget_pool", label: "Bütçe havuzunu tanımla",
+    description: "Bütçe havuzu ve bağlı kurallar workspace sahibi tarafından tanımlanmalıdır.", color: "#B91C1C",
+    ownerConfigurationFields: ["budget_policy_refs", "transfer_policy_refs", "approval_policy_refs"] }),
+  ownerDefinedTemplate({ dimensionKey: "operating_mode", label: "Çalışma modunu tanımla",
+    description: "Çalışma modu workspace sahibi tarafından tanımlanmalıdır.", color: "#475569" }),
+  ownerDefinedTemplate({ dimensionKey: "lifecycle", label: "Yaşam döngüsünü tanımla",
+    description: "Yaşam döngüsü değeri workspace sahibi tarafından tanımlanmalıdır.", color: "#0F766E" }),
+  ownerDefinedTemplate({ dimensionKey: "experiment", label: "Deney değerini tanımla",
+    description: "Deney kimliği ve anlamı workspace sahibi tarafından tanımlanmalıdır.", color: "#7E22CE" }),
+  ownerDefinedTemplate({ dimensionKey: "custom", label: "Özel değeri tanımla",
+    description: "Özel kategori değeri workspace sahibi tarafından tanımlanmalıdır.", color: "#334155" }),
   categoryTemplate({ dimensionKey: "destination", categoryKey: "lead_form", label: "Lead form",
     description: "Kullanıcının lead form hedef deneyimi olarak değerlendirebileceği örnek iç kategori.", color: "#0891B2" }),
   categoryTemplate({ dimensionKey: "destination", categoryKey: "whatsapp", label: "WhatsApp",

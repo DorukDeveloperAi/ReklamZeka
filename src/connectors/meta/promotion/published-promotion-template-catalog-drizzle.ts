@@ -128,6 +128,30 @@ export class DrizzlePublishedPromotionTemplateCatalog implements PublishedPromot
           and (binding.expires_at is null or binding.expires_at > ${evaluatedAt}::timestamptz)
           and connection.status = 'active' and connection.revoked_at is null and connection.disconnected_at is null
           and account.disappeared_at is null and actor.disappeared_at is null and category.archived_at is null
+          and not exists (
+            select 1 from promotion_template_authoring_revisions lifecycle
+            where lifecycle.workspace_id = template.workspace_id and lifecycle.template_ref = template.template_ref
+              and lifecycle.status = 'archived'
+              and not exists (select 1 from promotion_template_authoring_revisions newer
+                where newer.workspace_id = lifecycle.workspace_id and newer.template_ref = lifecycle.template_ref
+                  and newer.lifecycle_version > lifecycle.lifecycle_version)
+          )
+          and (
+            not exists (select 1 from promotion_template_authoring_revisions managed
+              where managed.workspace_id = template.workspace_id and managed.template_ref = template.template_ref
+                and managed.status = 'published')
+            or exists (
+              select 1 from promotion_template_authoring_revisions published
+              where published.workspace_id = template.workspace_id and published.template_ref = template.template_ref
+                and published.status = 'published' and published.published_template_hash = template.template_hash
+                and published.published_binding_hash = binding.binding_hash
+                and not exists (select 1 from promotion_template_authoring_revisions newer_published
+                  where newer_published.workspace_id = published.workspace_id
+                    and newer_published.template_ref = published.template_ref
+                    and newer_published.status = 'published'
+                    and newer_published.lifecycle_version > published.lifecycle_version)
+            )
+          )
         order by binding.binding_ref, edge.category_ref
         limit 10001
       `));

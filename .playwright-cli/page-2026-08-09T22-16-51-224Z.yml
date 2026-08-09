@@ -1,0 +1,25 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - text: REKLAM KARAR DESTEĞİ
+      - heading "Ne değiştiğini değil, neden değiştiğini görün." [level=1] [ref=e4]
+      - paragraph [ref=e5]: ReklamZeka ücretli medya verisini birleştirir, sapmaları kanıtıyla açıklar ve güvenli sonraki adımı önerir. Hesabınızda siz onaylamadan hiçbir şeyi değiştirmez.
+      - status [ref=e6]: Teknik MVP hazır · Kontrollü saha pilotu sırada
+      - generic [ref=e8]:
+        - link "Pilot yolculuğunu başlat" [ref=e9] [cursor=pointer]:
+          - /url: /pilot
+          - text: Pilot yolculuğunu başlat
+          - generic [ref=e10]: →
+        - link "Doğrudan dashboard'u aç" [ref=e11] [cursor=pointer]:
+          - /url: /dashboard
+    - region "Ürün ilkeleri" [ref=e12]:
+      - article [ref=e13]:
+        - heading "Birleşik görünüm" [level=2] [ref=e14]
+        - paragraph [ref=e15]: Meta Ads ve Google Ads verisini kaynak bağını kaybetmeden ortak metriklerde karşılaştır.
+      - article [ref=e16]:
+        - heading "Açıklanabilir içgörü" [level=2] [ref=e17]
+        - paragraph [ref=e18]: Her sapmanın zaman aralığını, karşılaştırmasını, güvenini ve kanıtını gör.
+      - article [ref=e19]:
+        - heading "İnsan onayı" [level=2] [ref=e20]
+        - paragraph [ref=e21]: İlk sürüm reklam hesabına yazmaz; karar ve sorumluluk kullanıcıda kalır.
+  - alert [ref=e22]

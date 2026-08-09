@@ -316,6 +316,13 @@
       "when": 1786310931533,
       "tag": "20260809212851_soft_mesmero",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1786312923119,
+      "tag": "20260809220203_promotion_template_authoring_lifecycle",
+      "breakpoints": true
     }
   ]
 }

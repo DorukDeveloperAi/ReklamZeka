@@ -39,14 +39,14 @@ describe("instruction policy lifecycle HTTP", () => {
       rawText: "Kullanıcı talimatı", provenanceRef: "provenance_health" } }] });
     expect((await http.GET(request("GET", undefined, { authorization: "Bearer forged" }))).status).toBe(400);
     const command = { operation: "archive", expectedRegistryHash: "a".repeat(64), policyRef: "policy_health",
-      expectedVersion: 1, expectedPolicyHash: "b".repeat(64), reasonCode: "owner_archive",
+      expectedVersion: 1, expectedPolicyHash: "b".repeat(64), expectedImpactHash: "c".repeat(64), reasonCode: "owner_archive",
       workspaceId: principal.workspaceId, actorId: principal.actor.userId };
     expect((await http.POST(request("POST", { command }))).status).toBe(400);
   });
 
   it("accepts only the exact lifecycle OCC envelope", async () => {
     const command = { operation: "publish", expectedRegistryHash: "a".repeat(64), policyRef: "policy_health",
-      expectedVersion: 1, expectedPolicyHash: "b".repeat(64), reasonCode: "owner_publish" };
+      expectedVersion: 1, expectedPolicyHash: "b".repeat(64), expectedImpactHash: "c".repeat(64), reasonCode: "owner_publish" };
     const { service, http } = setup(); expect((await http.POST(request("POST", { command }))).status).toBe(200);
     expect(service.mutate).toHaveBeenCalledWith(principal, command);
     expect((await http.POST(request("POST", { command: { ...command, canExecute: true } }))).status).toBe(400);
@@ -56,8 +56,8 @@ describe("instruction policy lifecycle HTTP", () => {
 
   it("maps conflict and transition failures without leaking internals", async () => {
     const command = { operation: "archive", expectedRegistryHash: "a".repeat(64), policyRef: "policy_health",
-      expectedVersion: 1, expectedPolicyHash: "b".repeat(64), reasonCode: "owner_archive" };
-    for (const code of ["conflict", "invalid_transition"] as const) {
+      expectedVersion: 1, expectedPolicyHash: "b".repeat(64), expectedImpactHash: "c".repeat(64), reasonCode: "owner_archive" };
+    for (const code of ["conflict", "invalid_transition", "dependency_blocked"] as const) {
       const response = await setup(vi.fn(async () => { throw new InstructionPolicyLifecycleError(code); })).http
         .POST(request("POST", { command }));
       expect(response.status).toBe(409); const payload = await response.json();
@@ -65,5 +65,13 @@ describe("instruction policy lifecycle HTTP", () => {
       expect(payload.authority).toEqual({ canApprove: false, canExecute: false, canWriteMeta: false,
         canSchedule: false, canCallTool: false });
     }
+  });
+
+  it("maps a revoked same-transaction membership to forbidden", async () => {
+    const command = { operation: "publish", expectedRegistryHash: "a".repeat(64), policyRef: "policy_health",
+      expectedVersion: 1, expectedPolicyHash: "b".repeat(64), expectedImpactHash: "c".repeat(64), reasonCode: "owner_publish" };
+    const response = await setup(vi.fn(async () => { throw new InstructionPolicyLifecycleError("forbidden"); })).http
+      .POST(request("POST", { command }));
+    expect(response.status).toBe(403); expect(await response.json()).toMatchObject({ error: { code: "forbidden" } });
   });
 });

@@ -4,9 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   PromotionTemplateAuthoringSurface,
+  PromotionTemplateLifecycleSurface,
   requestPromotionTemplateAuthoringCatalog,
   requestPromotionTemplateAuthoringDryRun,
+  requestPromotionTemplateLifecycle,
+  requestPromotionTemplateLifecycleMutation,
 } from "@/app/dashboard/promotion-preflight-panel";
+import { PROMOTION_TEMPLATE_LIFECYCLE_SERVICE_VERSION } from
+  "@/application/promotion-template-lifecycle-service";
 import {
   PROMOTION_TEMPLATE_AUTHORING_VERSION,
   type PromotionTemplateAuthoringInspection,
@@ -64,13 +69,32 @@ describe("PromotionTemplate authoring dashboard", () => {
     expect(html).toContain("Kapsam 1 · Instagram · 1 kategori");
     expect(html).toContain("Promotion template alias veya talimatı");
     expect(html).toContain("promotion_template_version_aaaaaaaaaaaaaaaaaaaaaaaa");
-    expect(html).toContain("Draft persist: kapalı");
-    expect(html).toContain("Publish: kapalı");
+    expect(html).toContain("Dry-run persist: kapalı");
+    expect(html).toContain("Lifecycle: ayrı guard");
     expect(html).toContain("Targeting/creative: kapalı");
     expect(html).not.toContain("account_doruk");
     expect(html).not.toContain("actor_doruk");
     expect(html).not.toContain("category_hair");
     expect(html).not.toContain("Hedefleme ekle");
+  });
+
+  it("renders role-aware OCC lifecycle controls without targeting or Meta authority", () => {
+    const value = { contractVersion: PROMOTION_TEMPLATE_LIFECYCLE_SERVICE_VERSION, registryHash: "a".repeat(64),
+      presetCurrent: [{ presetRef: "audience_hair", lifecycleVersion: 1, recordHash: "b".repeat(64), status: "draft",
+        presetRevision: 3, presetMaterialHash: "c".repeat(64), publishedPresetHash: null, actorRole: "analyst",
+        reasonCode: "preset_draft_created", recordedAt: "2026-08-10T00:00:00.000Z" }], presetHistory: [],
+      templateCurrent: [], templateHistory: [], authority: { canRead: true, canDraft: true, canRevise: true,
+        canPublish: false, canArchive: false, canAuthorizeAction: false, canExecuteWrite: false, canWriteMeta: false,
+        canGrantApproval: false } } as const;
+    const html = renderToStaticMarkup(createElement(PromotionTemplateLifecycleSurface, { state: { status: "ready",
+      value, alias: "Yeni alias", mutating: false, message: null }, selection, recommended: true,
+      onAlias: vi.fn(), onMutate: vi.fn(), onRetry: vi.fn() }));
+    expect(html).toContain("Mutable template, immutable audience preset");
+    expect(html).toContain("AudiencePreset taslağı oluştur");
+    expect(html).toContain("Revise");
+    expect(html).toMatch(/<button disabled=""[^>]*>Publish<\/button>/);
+    expect(html).not.toContain("targeting");
+    expect(html).toContain("Meta write: yok");
   });
 
   it("keeps viewer read-only and unresolved questions explicit", () => {
@@ -113,5 +137,28 @@ describe("PromotionTemplate authoring dashboard", () => {
     const unsafeTargeting = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...inspection,
       catalog: { ...inspection.catalog, targeting: {} } }), { status: 200 }));
     await expect(requestPromotionTemplateAuthoringCatalog(unsafeTargeting as typeof fetch)).rejects.toThrow("Güvenli");
+  });
+
+  it("uses separate lifecycle intents and rejects payload-bearing lifecycle responses", async () => {
+    const value = { contractVersion: PROMOTION_TEMPLATE_LIFECYCLE_SERVICE_VERSION, registryHash: "a".repeat(64),
+      presetCurrent: [], presetHistory: [], templateCurrent: [], templateHistory: [], authority: { canRead: true,
+        canDraft: true, canRevise: true, canPublish: false, canArchive: false, canAuthorizeAction: false,
+        canExecuteWrite: false, canWriteMeta: false, canGrantApproval: false } } as const;
+    const get = vi.fn().mockResolvedValue(new Response(JSON.stringify(value), { status: 200 }));
+    await expect(requestPromotionTemplateLifecycle(get as typeof fetch)).resolves.toEqual(value);
+    expect(get).toHaveBeenCalledWith("/api/promotion-template-authoring", expect.objectContaining({ method: "GET",
+      credentials: "same-origin", headers: { "X-ReklamZeka-Intent": "promotion-template-lifecycle-read" } }));
+    const command = { operation: "create_preset_draft" as const, expectedRegistryHash: value.registryHash,
+      selection, alias: "Yeni alias" };
+    const mutation = vi.fn().mockResolvedValue(new Response(JSON.stringify({ contractVersion: value.contractVersion,
+      state: { registryHash: value.registryHash, presetCurrent: [], presetHistory: [], templateCurrent: [], templateHistory: [] },
+      auditAppended: true, contextInvalidationAppended: false, publishedMaterial: false, authority: value.authority }),
+    { status: 200 }));
+    await expect(requestPromotionTemplateLifecycleMutation(mutation as typeof fetch, command)).resolves.toEqual(value);
+    expect(mutation).toHaveBeenCalledWith("/api/promotion-template-authoring", expect.objectContaining({
+      body: JSON.stringify({ command }), headers: { "Content-Type": "application/json",
+        "X-ReklamZeka-Intent": "promotion-template-lifecycle-draft" } }));
+    const unsafe = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...value, targeting: {} }), { status: 200 }));
+    await expect(requestPromotionTemplateLifecycle(unsafe as typeof fetch)).rejects.toThrow("Lifecycle");
   });
 });

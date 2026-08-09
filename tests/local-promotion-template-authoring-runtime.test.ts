@@ -37,6 +37,12 @@ function request(method: "GET" | "POST", credential: "cookie" | "bearer" = "cook
   }, ...(method === "POST" ? { body: JSON.stringify({ selection: { scopeRef: null, postType: null, instruction: null } }) } : {}) });
 }
 
+function lifecycleRequest() {
+  return new Request(`${origin}/api/promotion-template-authoring`, { headers: { Host: "localhost:3000",
+    "Sec-Fetch-Site": "same-origin", Cookie: `${LOCAL_SESSION_COOKIE}=${encodeURIComponent(token())}`,
+    "X-ReklamZeka-Intent": "promotion-template-lifecycle-read" } });
+}
+
 describe("local PromotionTemplate authoring runtime", () => {
   it("binds the cookie principal and dedicated catalog read scope before returning a source-backed catalog", async () => {
     const execute = vi.fn()
@@ -74,5 +80,20 @@ describe("local PromotionTemplate authoring runtime", () => {
       .GET(request("GET", "bearer"));
     expect(response.status).toBe(400);
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("binds lifecycle reads to the cookie session and returns only an empty bounded OCC summary", async () => {
+    const execute = vi.fn()
+      .mockResolvedValueOnce({ rows: [{ workspace_id: workspaceId, user_id: userId, role: "analyst", lifecycle_state: "active" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    const response = await createLocalPromotionTemplateAuthoringHandlers({ database: { execute } as never, config })
+      .GET(lifecycleRequest());
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload).toMatchObject({ contractVersion: "promotion-template-lifecycle-service/1.0.0",
+      presetCurrent: [], templateCurrent: [], authority: { canDraft: true, canPublish: false, canWriteMeta: false } });
+    expect(JSON.stringify(payload)).not.toContain("targeting");
+    expect(execute).toHaveBeenCalledTimes(3);
   });
 });

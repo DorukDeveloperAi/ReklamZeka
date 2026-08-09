@@ -18,6 +18,11 @@ import {
   type PromotionTemplateAuthoringInspection,
   type PromotionTemplateAuthoringSelection,
 } from "@/application/promotion-template-authoring";
+import {
+  PROMOTION_TEMPLATE_LIFECYCLE_SERVICE_VERSION,
+  type PromotionTemplateLifecycleCommand,
+  type PromotionTemplateLifecyclePublicState,
+} from "@/application/promotion-template-lifecycle-service";
 import styles from "./operating-dashboard.module.css";
 
 export type { PromotionPreflightCatalog, PromotionPreflightOption };
@@ -50,6 +55,16 @@ type PromotionTemplateAuthoringState =
     evaluating: boolean;
     message: string | null;
   }>;
+type PromotionTemplateLifecycleEnvelope = Readonly<PromotionTemplateLifecyclePublicState & {
+  contractVersion: typeof PROMOTION_TEMPLATE_LIFECYCLE_SERVICE_VERSION;
+  authority: Readonly<{ canRead: true; canDraft: boolean; canRevise: boolean; canPublish: boolean;
+    canArchive: boolean; canAuthorizeAction: false; canExecuteWrite: false; canWriteMeta: false; canGrantApproval: false }>;
+}>;
+type PromotionTemplateLifecycleState =
+  | Readonly<{ status: "loading" }>
+  | Readonly<{ status: "error"; message: string }>
+  | Readonly<{ status: "ready"; value: PromotionTemplateLifecycleEnvelope; alias: string; mutating: boolean;
+      message: string | null }>;
 
 const SAFE_REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const PROMOTION_SCOPE_REF = /^promotion_scope_[a-f0-9]{24}$/;
@@ -141,6 +156,65 @@ function parsePromotionTemplateAuthoringDryRun(value: unknown): PromotionTemplat
     throw new Error("Güvenli PromotionTemplate dry-run sözleşmesi doğrulanamadı.");
   }
   return value as unknown as PromotionTemplateAuthoringDryRunEnvelope;
+}
+
+function parsePromotionTemplateLifecycle(value: unknown): PromotionTemplateLifecycleEnvelope {
+  const rootKeys = ["contractVersion", "registryHash", "presetCurrent", "presetHistory", "templateCurrent",
+    "templateHistory", "authority"] as const;
+  const presetKeys = ["presetRef", "lifecycleVersion", "recordHash", "status", "presetRevision",
+    "presetMaterialHash", "publishedPresetHash", "actorRole", "reasonCode", "recordedAt"] as const;
+  const templateKeys = ["templateRef", "lifecycleVersion", "recordHash", "status", "presetRef", "presetRevision",
+    "presetHash", "templateRevision", "templateMaterialHash", "publishedTemplateHash", "publishedBindingHash",
+    "actorRole", "reasonCode", "recordedAt"] as const;
+  const authorityKeys = ["canRead", "canDraft", "canRevise", "canPublish", "canArchive", "canAuthorizeAction",
+    "canExecuteWrite", "canWriteMeta", "canGrantApproval"] as const;
+  if (!exactObject(value, rootKeys) || value.contractVersion !== PROMOTION_TEMPLATE_LIFECYCLE_SERVICE_VERSION
+    || typeof value.registryHash !== "string" || !HASH.test(value.registryHash)
+    || !exactObject(value.authority, authorityKeys) || value.authority.canRead !== true
+    || value.authority.canAuthorizeAction !== false || value.authority.canExecuteWrite !== false
+    || value.authority.canWriteMeta !== false || value.authority.canGrantApproval !== false
+    || ["canDraft", "canRevise", "canPublish", "canArchive"].some((key) =>
+      typeof (value.authority as Record<string, unknown>)[key] !== "boolean")) throw new Error("Lifecycle sözleşmesi doğrulanamadı.");
+  for (const [key, keys] of [["presetCurrent", presetKeys], ["presetHistory", presetKeys],
+    ["templateCurrent", templateKeys], ["templateHistory", templateKeys]] as const) {
+    const items = value[key];
+    if (!Array.isArray(items) || items.length > 10_000 || items.some((item) => !exactObject(item, keys))) {
+      throw new Error("Lifecycle sözleşmesi doğrulanamadı.");
+    }
+  }
+  const serialized = JSON.stringify(value);
+  if (/"(?:targeting|source|aliases|accountRefs|actorRef|internalCategoryRefs|budget|timeframe|publishedAt)"/.test(serialized)) {
+    throw new Error("Lifecycle yanıtı güvenli özet sınırını aştı.");
+  }
+  return value as unknown as PromotionTemplateLifecycleEnvelope;
+}
+
+export async function requestPromotionTemplateLifecycle(fetcher: typeof fetch): Promise<PromotionTemplateLifecycleEnvelope> {
+  const response = await fetcher("/api/promotion-template-authoring", { method: "GET", credentials: "same-origin",
+    cache: "no-store", headers: { "X-ReklamZeka-Intent": "promotion-template-lifecycle-read" } });
+  const payload = await response.json() as unknown;
+  if (!response.ok) throw new Error(payload && typeof payload === "object" && "error" in payload
+    ? (payload as ErrorEnvelope).error?.message ?? "Lifecycle okunamadı." : "Lifecycle okunamadı.");
+  return parsePromotionTemplateLifecycle(payload);
+}
+
+export async function requestPromotionTemplateLifecycleMutation(fetcher: typeof fetch,
+  command: PromotionTemplateLifecycleCommand): Promise<PromotionTemplateLifecycleEnvelope> {
+  const publication = command.operation.startsWith("publish_") || command.operation.startsWith("archive_");
+  const response = await fetcher("/api/promotion-template-authoring", { method: "POST", credentials: "same-origin",
+    cache: "no-store", headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": publication
+      ? "promotion-template-lifecycle-publish" : "promotion-template-lifecycle-draft" },
+    body: JSON.stringify({ command }) });
+  const payload = await response.json() as unknown;
+  if (!response.ok) throw new Error(payload && typeof payload === "object" && "error" in payload
+    ? (payload as ErrorEnvelope).error?.message ?? "Lifecycle değişikliği reddedildi." : "Lifecycle değişikliği reddedildi.");
+  if (!exactObject(payload, ["contractVersion", "state", "auditAppended", "contextInvalidationAppended",
+    "publishedMaterial", "authority"]) || payload.auditAppended !== true || !exactObject(payload.state,
+      ["registryHash", "presetCurrent", "presetHistory", "templateCurrent", "templateHistory"])) {
+    throw new Error("Lifecycle mutation kanıtı doğrulanamadı.");
+  }
+  return parsePromotionTemplateLifecycle({ contractVersion: payload.contractVersion, ...payload.state,
+    authority: payload.authority });
 }
 
 export async function requestPromotionTemplateAuthoringCatalog(fetcher: typeof fetch): Promise<PromotionTemplateAuthoringInspection> {
@@ -365,7 +439,7 @@ export function PromotionTemplateAuthoringSurface(props: Readonly<{
         </label>
       </div>
       <footer><p>{ready.inspection.role === "viewer" ? "Viewer rolü salt okunurdur; dry-run başlatamaz."
-        : "Bu sadece deterministik önizlemedir; draft persistence ve publish mutation şema/audit/OCC desteği gelene kadar kapalıdır."}</p>
+        : "Bu deterministik seçim önizlemesidir; lifecycle taslak/yayın işlemleri aşağıdaki ayrı OCC ve audit sınırındadır."}</p>
         <button disabled={!complete || ready.evaluating || !ready.inspection.capabilities.canDryRun}
           onClick={props.onEvaluate}>{ready.evaluating ? "Çözülüyor…" : "Template dry-run çalıştır"}</button></footer>
       {ready.message ? <p className={styles.promotionPreflightMessage} role="alert">{ready.message}</p> : null}
@@ -378,14 +452,93 @@ export function PromotionTemplateAuthoringSurface(props: Readonly<{
           <div><dt>Immutable AudiencePreset</dt><dd>{ready.result.recommendation.audiencePreset.versionRef}</dd></div>
         </dl> : <div className={styles.promotionPreflightReasons}>{ready.result.questions.map((item) =>
           <p key={`${item.code}:${item.field}`}><span>{item.field}</span><strong>{item.prompt}</strong><i data-disposition="blocked">blocked</i></p>)}</div>}
-        <footer><span>Draft persist: kapalı</span><span>Publish: kapalı</span><span>Meta write: kapalı</span><span>Targeting/creative: kapalı</span></footer>
+        <footer><span>Dry-run persist: kapalı</span><span>Lifecycle: ayrı guard</span><span>Meta write: kapalı</span><span>Targeting/creative: kapalı</span></footer>
       </div> : null}
     </> : null}
   </section>;
 }
 
+export function PromotionTemplateLifecycleSurface(props: Readonly<{
+  state: PromotionTemplateLifecycleState;
+  selection: PromotionTemplateAuthoringSelection | null;
+  recommended: boolean;
+  onAlias(value: string): void;
+  onMutate(command: PromotionTemplateLifecycleCommand): void;
+  onRetry(): void;
+}>) {
+  if (props.state.status === "loading") return <section className={styles.panel} aria-label="PromotionTemplate lifecycle" role="status">
+    <strong>Template/preset lifecycle doğrulanıyor…</strong></section>;
+  if (props.state.status === "error") return <section className={styles.panel} aria-label="PromotionTemplate lifecycle" role="alert">
+    <strong>{props.state.message}</strong><button onClick={props.onRetry}>Tekrar kontrol et</button></section>;
+  const { value, alias, mutating, message } = props.state;
+  const usablePresets = value.presetHistory.filter((item) => item.status === "published" && item.publishedPresetHash
+    && value.presetCurrent.find((head) => head.presetRef === item.presetRef)?.status !== "archived")
+    .sort((left, right) => right.lifecycleVersion - left.lifecycleVersion);
+  const selectedPreset = usablePresets[0] ?? null;
+  const selection = props.selection;
+  const createReady = props.recommended && Boolean(selection?.scopeRef && selection.postType && selection.instruction)
+    && alias.trim().length > 0;
+  const presetOcc = (item: PromotionTemplateLifecycleEnvelope["presetCurrent"][number]) => ({
+    expectedRegistryHash: value.registryHash, presetRef: item.presetRef, expectedLifecycleVersion: item.lifecycleVersion,
+    expectedRecordHash: item.recordHash, expectedPresetRevision: item.presetRevision,
+    expectedPresetHash: item.presetMaterialHash,
+  });
+  const templateOcc = (item: PromotionTemplateLifecycleEnvelope["templateCurrent"][number]) => ({
+    expectedRegistryHash: value.registryHash, templateRef: item.templateRef, expectedLifecycleVersion: item.lifecycleVersion,
+    expectedRecordHash: item.recordHash, expectedPresetRevision: item.presetRevision, expectedPresetHash: item.presetHash,
+    expectedTemplateRevision: item.templateRevision, expectedTemplateHash: item.templateMaterialHash,
+  });
+  return <section className={`${styles.panel} ${styles.promotionPreflightForm}`} aria-label="PromotionTemplate lifecycle">
+    <header className={styles.panelHeader}><div><span className={styles.kicker}>AUTHORING LIFECYCLE · OCC + AUDIT</span>
+      <h2>Mutable template, immutable audience preset</h2></div><span className={styles.readOnlyBadge}>NO META WRITE</span></header>
+    <p>Taslaklar yayın yetkisi taşımaz. Analyst taslak/revise edebilir; yalnız owner/admin immutable sürüm yayınlayabilir veya arşivleyebilir.</p>
+    <label><span>Yeni alias</span><input aria-label="Lifecycle alias" value={alias} maxLength={80} disabled={mutating || !value.authority.canDraft}
+      onChange={(event) => props.onAlias(event.target.value)} /></label>
+    <div><button disabled={!createReady || mutating || !value.authority.canDraft} onClick={() => props.onMutate({
+      operation: "create_preset_draft", expectedRegistryHash: value.registryHash, selection: selection!, alias: alias.trim(),
+    })}>AudiencePreset taslağı oluştur</button>
+    <button disabled={!createReady || !selectedPreset || mutating || !value.authority.canDraft} onClick={() => props.onMutate({
+      operation: "create_template_draft", expectedRegistryHash: value.registryHash, selection: selection!, alias: alias.trim(),
+      audiencePreset: { presetRef: selectedPreset!.presetRef, revision: selectedPreset!.presetRevision,
+        presetHash: selectedPreset!.publishedPresetHash! },
+    })}>PromotionTemplate taslağı oluştur</button></div>
+    {message ? <p role="alert">{message}</p> : null}
+    <div className={styles.promotionPreflightReasons}>
+      {value.presetCurrent.map((item) => <p key={item.presetRef}><span>AudiencePreset v{item.presetRevision}</span>
+        <strong>{item.presetRef} · {item.status}</strong><i>{item.reasonCode}</i>
+        {item.status === "draft" ? <><button disabled={mutating || !value.authority.canRevise || !alias.trim()}
+          onClick={() => props.onMutate({ operation: "revise_preset_draft", ...presetOcc(item), alias: alias.trim() })}>Revise</button>
+          <button disabled={mutating || !value.authority.canPublish}
+            onClick={() => props.onMutate({ operation: "publish_preset", ...presetOcc(item), reasonCode: "owner_publish" })}>Publish</button></> : null}
+        {item.status !== "archived" ? <button disabled={mutating || !value.authority.canArchive}
+          onClick={() => props.onMutate({ operation: "archive_preset", ...presetOcc(item), reasonCode: "owner_archive" })}>Archive</button> : null}
+      </p>)}
+      {value.templateCurrent.map((item) => <p key={item.templateRef}><span>PromotionTemplate v{item.templateRevision}</span>
+        <strong>{item.templateRef} · {item.status}</strong><i>preset {item.presetRef}@{item.presetRevision}</i>
+        {item.status === "draft" ? <><button disabled={mutating || !value.authority.canRevise || !alias.trim() || !selectedPreset}
+          onClick={() => props.onMutate({ operation: "revise_template_draft", ...templateOcc(item), alias: alias.trim(),
+            audiencePreset: { presetRef: selectedPreset!.presetRef, revision: selectedPreset!.presetRevision,
+              presetHash: selectedPreset!.publishedPresetHash! } })}>Revise</button>
+          <button disabled={mutating || !value.authority.canPublish}
+            onClick={() => props.onMutate({ operation: "publish_template", ...templateOcc(item), reasonCode: "owner_publish" })}>Publish</button></> : null}
+        {item.status !== "archived" ? <button disabled={mutating || !value.authority.canArchive}
+          onClick={() => props.onMutate({ operation: "archive_template", ...templateOcc(item), reasonCode: "owner_archive" })}>Archive</button> : null}
+      </p>)}
+      {value.presetCurrent.length + value.templateCurrent.length === 0 ? <p><strong>Henüz lifecycle kaydı yok.</strong></p> : null}
+    </div>
+    <footer><span>Audit: zorunlu</span><span>OCC: exact hash/version</span><span>Approval: yok</span><span>Meta write: yok</span></footer>
+  </section>;
+}
+
 function PromotionTemplateAuthoringPanel() {
   const [state, setState] = useState<PromotionTemplateAuthoringState>({ status: "loading" });
+  const [lifecycle, setLifecycle] = useState<PromotionTemplateLifecycleState>({ status: "loading" });
+  const loadLifecycle = useCallback(async () => {
+    setLifecycle({ status: "loading" });
+    try { setLifecycle({ status: "ready", value: await requestPromotionTemplateLifecycle(fetch), alias: "", mutating: false,
+      message: null }); }
+    catch (error) { setLifecycle({ status: "error", message: error instanceof Error ? error.message : "Lifecycle okunamadı." }); }
+  }, []);
   const load = useCallback(async () => {
     setState({ status: "loading" });
     try {
@@ -397,7 +550,7 @@ function PromotionTemplateAuthoringPanel() {
       setState({ status: error && typeof error === "object" && "unavailable" in error ? "unavailable" : "error", message });
     }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); void loadLifecycle(); }, [load, loadLifecycle]);
   const evaluate = useCallback(async () => {
     if (state.status !== "ready" || !state.inspection.capabilities.canDryRun) return;
     setState((current) => current.status === "ready" ? { ...current, evaluating: true, result: null, message: null } : current);
@@ -409,9 +562,23 @@ function PromotionTemplateAuthoringPanel() {
         message: error instanceof Error ? error.message : "PromotionTemplate dry-run tamamlanamadı." } : current);
     }
   }, [state]);
-  return <PromotionTemplateAuthoringSurface state={state} onRetry={() => void load()}
+  const mutateLifecycle = useCallback(async (command: PromotionTemplateLifecycleCommand) => {
+    setLifecycle((current) => current.status === "ready" ? { ...current, mutating: true, message: null } : current);
+    try {
+      const value = await requestPromotionTemplateLifecycleMutation(fetch, command);
+      setLifecycle((current) => ({ status: "ready", value, alias: current.status === "ready" ? current.alias : "",
+        mutating: false, message: "Lifecycle kaydı audit ile eklendi." }));
+    } catch (error) { setLifecycle((current) => current.status === "ready" ? { ...current, mutating: false,
+      message: error instanceof Error ? error.message : "Lifecycle değişikliği reddedildi." } : current); }
+  }, []);
+  return <><PromotionTemplateAuthoringSurface state={state} onRetry={() => void load()}
     onChange={(selection) => setState((current) => current.status === "ready"
-      ? { ...current, selection, result: null, message: null } : current)} onEvaluate={() => void evaluate()} />;
+      ? { ...current, selection, result: null, message: null } : current)} onEvaluate={() => void evaluate()} />
+    <PromotionTemplateLifecycleSurface state={lifecycle}
+      selection={state.status === "ready" ? state.selection : null}
+      recommended={state.status === "ready" && state.result?.status === "recommended"}
+      onAlias={(alias) => setLifecycle((current) => current.status === "ready" ? { ...current, alias, message: null } : current)}
+      onMutate={(command) => void mutateLifecycle(command)} onRetry={() => void loadLifecycle()} /></>;
 }
 
 export function PromotionPreflightSurface(props: Readonly<{

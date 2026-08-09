@@ -4,6 +4,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
 import { Pool } from "pg";
 import { InstructionPolicyLifecycleService } from "@/application/instruction-policy-lifecycle-service";
+import { DrizzleInstructionPolicyImpactRepository } from
+  "@/connectors/policies/instruction-policy-impact-drizzle-repository";
 import { DrizzleInstructionPolicyLifecycleRepository } from
   "@/connectors/policies/instruction-policy-lifecycle-drizzle-repository";
 import { parseStrictInstructionPolicy } from "@/domain/policies/instruction-policy-dsl";
@@ -53,14 +55,37 @@ if (!connectionString) {
       const created = await service.mutate(principal, { operation: "create_draft",
         expectedRegistryHash: initial.registryHash, rawText, policy: draft });
       const current = created.state.current[0]!.policy;
+      const impact = await new DrizzleInstructionPolicyImpactRepository(outer as never)
+        .preview(workspaceId, policyRef, "publish");
+      if (!impact) throw new Error("impact_not_found");
       const publish = { operation: "publish" as const, expectedRegistryHash: created.state.registryHash,
         policyRef, expectedVersion: current.policyVersion, expectedPolicyHash: current.canonicalHash,
-        reasonCode: "owner_verified" };
-      const published = await service.mutate(principal, publish);
-      let staleRejected = false;
+        expectedImpactHash: impact.impactHash, reasonCode: "owner_verified" };
+      let dependencyBlocked = false;
       try { await service.mutate(principal, publish); } catch (reason) {
-        staleRejected = reason instanceof Error && "code" in reason && reason.code === "conflict";
+        dependencyBlocked = reason instanceof Error && "code" in reason && reason.code === "dependency_blocked";
       }
+      const revisedRaw = `${rawText} Portföy düzeyinde.`;
+      const { authority: _authority, canonicalHash: _canonicalHash, ...draftInput } = current;
+      const revisedPolicy = parseStrictInstructionPolicy({ ...draftInput, policyVersion: 2,
+        previousVersionHash: current.canonicalHash, status: "draft", reasonCode: "field_revise",
+        source: { ...current.source, rawProvenanceRef: `${provenanceRef}_rev2`,
+          rawTextHash: createHash("sha256").update(revisedRaw).digest("hex") } });
+      const revised = await service.mutate(principal, { operation: "revise_draft",
+        expectedRegistryHash: created.state.registryHash, expectedVersion: 1,
+        expectedPolicyHash: current.canonicalHash, rawText: revisedRaw, policy: revisedPolicy });
+      let staleRejected = false;
+      try { await service.mutate(principal, { operation: "revise_draft", expectedRegistryHash: created.state.registryHash,
+        expectedVersion: 1, expectedPolicyHash: current.canonicalHash, rawText: revisedRaw, policy: revisedPolicy }); }
+      catch (reason) { staleRejected = reason instanceof Error && "code" in reason && reason.code === "conflict"; }
+      await outer.execute(sql`update memberships set role = 'analyst' where workspace_id = ${workspaceId}::uuid
+        and user_id = ${userId}::uuid`);
+      let membershipDowngradeRejected = false;
+      try { await service.mutate(principal, publish); } catch (reason) {
+        membershipDowngradeRejected = reason instanceof Error && "code" in reason && reason.code === "forbidden";
+      }
+      await outer.execute(sql`update memberships set role = 'owner' where workspace_id = ${workspaceId}::uuid
+        and user_id = ${userId}::uuid`);
       const counts = (await outer.execute(sql`select
         (select count(*)::int from instruction_policy_raw_provenance where workspace_id = ${workspaceId}::uuid) as raw_count,
         (select count(*)::int from strict_instruction_policy_revisions where workspace_id = ${workspaceId}::uuid) as revision_count,
@@ -72,16 +97,24 @@ if (!connectionString) {
           and policy_payload::text like ${`%${rawText}%`}) as raw_in_policy_count,
         (select count(*)::int from audit_events where workspace_id = ${workspaceId}::uuid
           and coalesce(metadata::text, '') like ${`%${rawText}%`}) as raw_in_audit_count`)).rows[0] as Record<string, unknown>;
-      const serialized = JSON.stringify(published);
-      evidence = { draftCreated: created.auditAppended, published: published.state.current[0]?.policy.status === "published",
-        staleRejected, rawVisibleToWorkspace: serialized.includes(rawText),
-        rawAbsentFromPolicyArtifact: !JSON.stringify(published.state.current[0]?.policy).includes(rawText),
+      const serialized = JSON.stringify(revised);
+      evidence = { draftCreated: created.auditAppended, draftRevised: revised.auditAppended,
+        dependencyCoverageIncomplete: impact.coverage.complete === false,
+        dependencyBlocked, membershipDowngradeRejected, staleRejected,
+        exactDependencyFamiliesRead: impact.coverage.exactRelational.length >= 7,
+        partialUnknownRetained: impact.coverage.partialOrUnknown.includes("opaque_action_policy_context")
+          && impact.coverage.partialOrUnknown.length >= 5,
+        explainGapIsNonAuthoritative: impact.coverage.nonAuthoritativeNotes
+          .includes("action_context_hash_index_explain_not_verified"),
+        rawVisibleToWorkspace: serialized.includes(revisedRaw),
+        rawAbsentFromPolicyArtifact: !JSON.stringify(revised.state.current[0]?.policy).includes(revisedRaw),
         rawAbsentFromAudit: Number(counts.raw_in_audit_count) === 0,
         rawSeparatedByStorage: Number(counts.raw_in_policy_count) === 0, frozenContextsPreserved: true,
-        contextInvalidationAppended: published.contextInvalidationAppended,
+        guardedMutationLeftNoInvalidation: Number(counts.invalidation_count) === 0,
         rawCount: Number(counts.raw_count), revisionCount: Number(counts.revision_count),
         invalidationCount: Number(counts.invalidation_count), auditCount: Number(counts.audit_count) };
-      if (!Object.values(evidence).every((value) => typeof value === "number" ? value >= 1 : value === true)) {
+      if (!Object.entries(evidence).every(([key, value]) => typeof value === "number"
+        ? key === "invalidationCount" ? value === 0 : value >= 2 : value === true)) {
         throw new Error("verifier_assertion_failed");
       }
       throw rollback;
