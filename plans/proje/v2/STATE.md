@@ -122,6 +122,13 @@
 
 ## 2026-08-09 — Dış checkpoint/push sınırı olayı
 
+- Aynı olay bu A09 checkpoint'i stage edilirken tekrarlandı: dış mekanizma doğrulanmış çalışma
+  setini `9b372d2` commit'ine alıp `origin/main`e push etti; ardından `6d173cb` merge'i ve
+  `.claude`-only `45e3313` checkpoint/push'u oluştu. Ana ajan `git commit` veya `git push`
+  çalıştırmadı. `9b372d2` bu bölümdeki A09 kod/plan kanıtını içerir, fakat ayrıca dış mekanizmanın
+  `docs/DURUM.md` ve `docs/durum/2026-08-09.json` güncellemelerini de kapsadığı için istenen
+  ajan-sahipli tek mantıksal yerel commit sınırı dışarıdan ihlal edilmiştir. Remote history
+  değiştirilmeyecek; halen dirty `.claude` dosyaları dış kullanıcı değişikliği olarak korunur.
 - Ana ajan ve subagentlar commit/push çağırmamışken eşzamanlı dış checkpoint mekanizması çalışma
   ağacındaki henüz tamamlanmamış dosyaları `a0e1a66` ve `c62877a` commit'lerine aldı ve
   `origin/main`e taşıdı. İkinci commit ayrıca bu goal kapsamı dışındaki `.claude` Aide dosyalarını
