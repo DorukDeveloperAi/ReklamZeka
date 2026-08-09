@@ -87,16 +87,18 @@ describe("Meta read-only inventory", () => {
     await expect(discoverMetaInventory({ token, fetchImpl })).rejects.toMatchObject({ code: "authentication" });
   });
 
-  it("returns a redacted configuration error when the server token is absent", async () => {
+  it("keeps the public route fail-closed without a network call even when a server token exists", async () => {
     const previous = process.env.META_ACCESS_TOKEN;
-    delete process.env.META_ACCESS_TOKEN;
+    process.env.META_ACCESS_TOKEN = token;
+    const network = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network must remain unreachable"));
     try {
       const response = await getMetaInventory();
       expect(response.status).toBe(503);
       const body = await response.text();
-      expect(body).toContain("Meta bağlantısı henüz yapılandırılmadı");
+      expect(body).toContain("Meta portföyü güvenli oturum bağlantısı kurulana kadar kullanılamıyor");
       expect(body).not.toContain(token);
       expect(response.headers.get("cache-control")).toContain("no-store");
+      expect(network).not.toHaveBeenCalled();
     } finally {
       if (previous === undefined) delete process.env.META_ACCESS_TOKEN;
       else process.env.META_ACCESS_TOKEN = previous;

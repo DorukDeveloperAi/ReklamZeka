@@ -18,14 +18,16 @@ const authoringPayload = { contractVersion: "category-authoring/1.0.0", registry
     confidenceBasisPoints: 9_000, version: 1 }], authority };
 const exactBlockers = { activeDefinitions: 0, activeAssignments: 0, manualLocks: 0, guidanceDrafts: 0,
   guidancePublished: 0, activePromotionBindings: 0, activePromotionTemplateScopes: 0,
-  activeAdvisedPractices: 0, autonomyDrafts: 0, autonomyPublished: 0, guardrailDrafts: 0, guardrailPublished: 0 };
+  activeAdvisedPractices: 0, activeCategoryProfiles: 0, autonomyDrafts: 0, autonomyPublished: 0,
+  guardrailDrafts: 0, guardrailPublished: 0 };
 const integrity = { unclassifiedJsonbColumns: 0, missingManifestJsonbColumns: 0, unresolvedCategoryRefs: 0,
   inconsistentPromotionEdges: 0, malformedCategoryContracts: 0, corruptLifecycleRows: 0, ambiguousLineage: 0 };
 const impactPayload = { contractVersion: "category-archive-impact/2.0.0", impactHash: "f".repeat(64),
   target: { kind: "definition", ref: refs.definition, label: "Saç", version: 2 }, exactBlockers,
   conservativeBlockers: { nonTerminalActionProposalUnits: 0 }, historicalImpact: { archivedGuidance: 0,
     expiredPromotionBindings: 0, supersededPromotionTemplateScopes: 0, retiredAdvisedPractices: 0,
-    supersededAdvisedPractices: 0, effectiveContexts: 1, alreadyInvalidatedContexts: 0,
+    supersededAdvisedPractices: 0, historicalCategoryProfiles: 0,
+    effectiveContexts: 1, alreadyInvalidatedContexts: 0,
     budgetProposals: 0, terminalActionProposalUnits: 0 }, invalidationPlan: {
     categoryResolutionComponents: 1, contextsNeedingInvalidation: 1 }, coverage: { complete: true,
     precision: "exact_with_conservative_action_queue", manifestVersion: "category-dependency-manifest/1.0.0",

@@ -6,6 +6,8 @@ import {
   EffectiveCampaignContextRepositoryError,
   sourceComponentsOf,
 } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
+import { bindCategoryProfiles, createCategoryProfile } from "@/domain/categories/category-profile";
+import { categoryDefinitionPublicRef } from "@/domain/categories/public-reference";
 import { resolveEffectiveCategory, type CategoryDefinition, type CategoryDimension } from "@/domain/categories/registry";
 import {
   buildEffectiveGuidancePack,
@@ -55,7 +57,7 @@ function category() {
     id: "category-1", workspaceId, dimensionId: dimension.id, key: "protected",
     label: "Protected", version: 1, archivedAt: null,
   };
-  return resolveEffectiveCategory({
+  const frozen = resolveEffectiveCategory({
     dimension, definitions: [definition], path: { workspaceId, nodes: [{ level: "campaign", id: "campaign-1" }] },
     assignments: [{
       id: "assignment-1", workspaceId, dimensionId: dimension.id, definitionId: definition.id,
@@ -64,6 +66,14 @@ function category() {
       version: 1, archivedAt: null,
     }],
   }).frozenContext;
+  return bindCategoryProfiles(frozen, [createCategoryProfile({ workspaceRef: "workspace_context_test",
+    profileRef: "category_profile_protected", categoryRef: categoryDefinitionPublicRef("protection", "protected"),
+    parentCategoryRef: null, label: "Protected", description: "Protected budget profile", color: "#A31F34",
+    ownerRef: "actor_context_owner", status: "active", bindings: {
+      analysisPlaybookRefs: ["analysis_playbook_protection_v1"], ruleInstructionBundleRefs: [],
+      budgetPolicyRefs: ["budget_policy_protection_v1"], transferPolicyRefs: ["transfer_policy_protection_v1"],
+      schedulePolicyRefs: [], actionPolicyRefs: ["guardrail_protection_v1"], creativePolicyRefs: [],
+    } })]);
 }
 
 function context() {
@@ -105,6 +115,10 @@ describe("effective campaign context persistence contract", () => {
     expect(components).toContainEqual({
       componentType: "category_resolution", componentRef: "dimension-1",
       componentVersion: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(components).toContainEqual({
+      componentType: "category_profile", componentRef: "category_profile_protected",
+      componentVersion: context().categories[0]?.profileBindings?.[0]?.profileHash,
     });
     expect(components).toContainEqual({
       componentType: "metric_catalog", componentRef: "metric-catalog", componentVersion: "metric-v1",

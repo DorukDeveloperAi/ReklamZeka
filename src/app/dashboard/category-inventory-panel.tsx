@@ -28,12 +28,13 @@ export type ArchiveImpact = Readonly<{ contractVersion: "category-archive-impact
   target: Readonly<{ kind: "dimension" | "definition"; ref: string; label: string; version: number }>;
   exactBlockers: Readonly<{ activeDefinitions: number; activeAssignments: number; manualLocks: number;
     guidanceDrafts: number; guidancePublished: number; activePromotionBindings: number;
-    activePromotionTemplateScopes: number; activeAdvisedPractices: number; autonomyDrafts: number;
+    activePromotionTemplateScopes: number; activeAdvisedPractices: number; activeCategoryProfiles: number; autonomyDrafts: number;
     autonomyPublished: number; guardrailDrafts: number; guardrailPublished: number }>;
   conservativeBlockers: Readonly<{ nonTerminalActionProposalUnits: number }>;
   historicalImpact: Readonly<{ archivedGuidance: number; expiredPromotionBindings: number;
     supersededPromotionTemplateScopes: number; retiredAdvisedPractices: number;
-    supersededAdvisedPractices: number; effectiveContexts: number; alreadyInvalidatedContexts: number;
+    supersededAdvisedPractices: number; historicalCategoryProfiles: number;
+    effectiveContexts: number; alreadyInvalidatedContexts: number;
     budgetProposals: number; terminalActionProposalUnits: number }>;
   invalidationPlan: Readonly<{ categoryResolutionComponents: number; contextsNeedingInvalidation: number }>;
   coverage: Readonly<{ complete: boolean; precision: "exact_with_conservative_action_queue";
@@ -121,10 +122,10 @@ function parse(value: unknown): Snapshot {
   return value as unknown as Snapshot;
 }
 const EXACT_BLOCKERS = ["activeDefinitions", "activeAssignments", "manualLocks", "guidanceDrafts", "guidancePublished",
-  "activePromotionBindings", "activePromotionTemplateScopes", "activeAdvisedPractices", "autonomyDrafts",
+  "activePromotionBindings", "activePromotionTemplateScopes", "activeAdvisedPractices", "activeCategoryProfiles", "autonomyDrafts",
   "autonomyPublished", "guardrailDrafts", "guardrailPublished"] as const;
 const HISTORICAL_IMPACT = ["archivedGuidance", "expiredPromotionBindings", "supersededPromotionTemplateScopes",
-  "retiredAdvisedPractices", "supersededAdvisedPractices", "effectiveContexts", "alreadyInvalidatedContexts",
+  "retiredAdvisedPractices", "supersededAdvisedPractices", "historicalCategoryProfiles", "effectiveContexts", "alreadyInvalidatedContexts",
   "budgetProposals", "terminalActionProposalUnits"] as const;
 const INTEGRITY_COUNTS = ["unclassifiedJsonbColumns", "missingManifestJsonbColumns", "unresolvedCategoryRefs",
   "inconsistentPromotionEdges", "malformedCategoryContracts", "corruptLifecycleRows", "ambiguousLineage"] as const;

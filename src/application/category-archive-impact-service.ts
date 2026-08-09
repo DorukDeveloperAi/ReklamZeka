@@ -8,12 +8,13 @@ export type CategoryArchiveImpact = Readonly<{
   target: Readonly<{ kind: CategoryArchiveTargetKind; ref: string; label: string; version: number }>;
   exactBlockers: Readonly<{ activeDefinitions: number; activeAssignments: number; manualLocks: number;
     guidanceDrafts: number; guidancePublished: number; activePromotionBindings: number;
-    activePromotionTemplateScopes: number; activeAdvisedPractices: number;
+    activePromotionTemplateScopes: number; activeAdvisedPractices: number; activeCategoryProfiles: number;
     autonomyDrafts: number; autonomyPublished: number; guardrailDrafts: number; guardrailPublished: number }>;
   conservativeBlockers: Readonly<{ nonTerminalActionProposalUnits: number }>;
   historicalImpact: Readonly<{ archivedGuidance: number; expiredPromotionBindings: number;
     supersededPromotionTemplateScopes: number; retiredAdvisedPractices: number;
-    supersededAdvisedPractices: number; effectiveContexts: number; alreadyInvalidatedContexts: number;
+    supersededAdvisedPractices: number; historicalCategoryProfiles: number;
+    effectiveContexts: number; alreadyInvalidatedContexts: number;
     budgetProposals: number; terminalActionProposalUnits: number }>;
   invalidationPlan: Readonly<{ categoryResolutionComponents: number; contextsNeedingInvalidation: number }>;
   coverage: Readonly<{ complete: boolean; precision: "exact_with_conservative_action_queue";

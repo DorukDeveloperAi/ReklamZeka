@@ -316,6 +316,39 @@ export class DrizzleCategoryRegistryRepository implements CategoryRegistryReposi
     });
   }
 
+  async unlockAssignment(input: Parameters<CategoryRegistryRepository["unlockAssignment"]>[0]) {
+    this.assertDraftIdentity(input.workspaceId, input.nextId);
+    return this.database.transaction(async (tx) => {
+      const rows = await tx.select().from(schema.categoryAssignments).where(and(
+        eq(schema.categoryAssignments.workspaceId, input.workspaceId),
+        eq(schema.categoryAssignments.id, input.assignmentId),
+        eq(schema.categoryAssignments.version, input.expectedVersion),
+        isNull(schema.categoryAssignments.archivedAt),
+      )).limit(1);
+      const current = rows[0];
+      if (!current) throw new CategoryRegistryPersistenceError("conflict");
+      if (current.source !== "manual" || current.manualLock !== true) {
+        throw new CategoryRegistryPersistenceError("manual_lock");
+      }
+      const archived = await tx.update(schema.categoryAssignments).set({ archivedAt: new Date() }).where(and(
+        eq(schema.categoryAssignments.workspaceId, input.workspaceId),
+        eq(schema.categoryAssignments.id, input.assignmentId),
+        eq(schema.categoryAssignments.version, input.expectedVersion),
+        isNull(schema.categoryAssignments.archivedAt),
+      )).returning({ id: schema.categoryAssignments.id });
+      if (!archived[0]) throw new CategoryRegistryPersistenceError("conflict");
+      const created = await tx.insert(schema.categoryAssignments).values({
+        id: input.nextId, workspaceId: input.workspaceId, dimensionId: current.dimensionId,
+        definitionId: current.definitionId, entityLevel: current.entityLevel,
+        campaignId: current.campaignId, adSetId: current.adSetId, adId: current.adId, creativeId: current.creativeId,
+        operation: current.operation, source: "manual", manualLock: false, evidence: [...input.evidence],
+        confidence: current.confidence, version: input.expectedVersion + 1, supersedesAssignmentId: current.id,
+      }).returning();
+      if (!created[0]) throw new CategoryRegistryPersistenceError("conflict");
+      return mapAssignment(created[0]);
+    });
+  }
+
   async archiveAssignment(input: Parameters<CategoryRegistryRepository["archiveAssignment"]>[0]): Promise<void> {
     await this.database.transaction(async (tx) => {
       const current = await tx.select().from(schema.categoryAssignments).where(and(

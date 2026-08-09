@@ -34,7 +34,7 @@ describe("explicit workspace tombstone purge adapter", () => {
 
     expect(evidence.candidateCount).toBe(1);
     expect(evidence.revision).toMatch(/^[a-f0-9]{64}$/);
-    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(73);
+    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(74);
     const allSchemaTables = Object.values(schema)
       .flatMap((value) => isTable(value) ? [getTableName(value)] : [])
       .sort();
@@ -80,7 +80,7 @@ describe("explicit workspace tombstone purge adapter", () => {
     expect(result).toEqual({ purgedRowCount: 0, membershipCount: 0 });
     expect(inspectCalls).toBe(3);
     const deletes = statements.filter((statement) => statement.includes("delete from"));
-    expect(deletes).toHaveLength(73);
+    expect(deletes).toHaveLength(74);
     expect(deletes.findIndex((statement) => statement.includes("delete from local_agent_handoffs")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from local_agent_sessions")));
     expect(deletes.findIndex((statement) => statement.includes("delete from local_agent_sessions")))
@@ -116,6 +116,8 @@ describe("explicit workspace tombstone purge adapter", () => {
     expect(deletes.findIndex((statement) => statement.includes("delete from meta_change_events")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from meta_change_snapshots")));
     expect(deletes.findIndex((statement) => statement.includes("delete from category_assignments")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from category_definitions")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from category_profile_revisions")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from category_definitions")));
     expect(deletes.findIndex((statement) => statement.includes("delete from guidance_bindings")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from guidance_cards")));

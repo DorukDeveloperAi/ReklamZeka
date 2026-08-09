@@ -101,6 +101,13 @@ export interface CategoryRegistryRepository {
     evidence: readonly CategoryAssignmentEvidence[];
     confidence: number;
   }>): Promise<CategoryAssignment>;
+  unlockAssignment(input: Readonly<{
+    workspaceId: string;
+    assignmentId: string;
+    expectedVersion: number;
+    nextId: string;
+    evidence: readonly CategoryAssignmentEvidence[];
+  }>): Promise<CategoryAssignment>;
   archiveAssignment(input: Readonly<{
     workspaceId: string;
     assignmentId: string;
@@ -147,6 +154,9 @@ export class CategoryRegistryService {
   }
   reviseAssignment(input: Parameters<CategoryRegistryRepository["reviseAssignment"]>[0]) {
     return this.repository.reviseAssignment(input);
+  }
+  unlockAssignment(input: Parameters<CategoryRegistryRepository["unlockAssignment"]>[0]) {
+    return this.repository.unlockAssignment(input);
   }
   archiveAssignment(input: Parameters<CategoryRegistryRepository["archiveAssignment"]>[0]) {
     return this.repository.archiveAssignment(input);

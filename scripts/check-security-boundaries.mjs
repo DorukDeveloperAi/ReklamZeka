@@ -20,6 +20,14 @@ const FORBIDDEN_RUNTIME_MARKERS = Object.freeze([
   ["import gspread", "Google Sheets ikinci veri düzlemi"],
   ["Google Sheets kanon", "Google Sheets kanon iddiası"],
 ]);
+const FORBIDDEN_API_META_MARKERS = Object.freeze([
+  ["META_ACCESS_TOKEN", "API route doğrudan Meta secret okuyamaz"],
+  ["discoverMetaInventory", "API route canlı Meta inventory connector'ını çağıramaz"],
+  ["@/connectors/meta/inventory", "API route canlı Meta inventory connector'ını import edemez"],
+  ["@/connectors/meta/graph-client", "API route doğrudan Meta Graph client import edemez"],
+  ["MetaGraphClient", "API route doğrudan Meta Graph client kullanamaz"],
+  ["graph.facebook.com", "API route doğrudan Meta Graph origin'ine erişemez"],
+]);
 
 function sourceFiles(root, relative) {
   const absolute = resolve(root, relative);
@@ -53,6 +61,11 @@ export function checkSecurityBoundaries(rootInput = DEFAULT_ROOT) {
     const source = readFileSync(resolve(root, relative), "utf8");
     for (const [marker, reason] of FORBIDDEN_RUNTIME_MARKERS) {
       if (source.includes(marker)) failures.push(`${relative}: ${reason}`);
+    }
+    if (relative.startsWith("src/app/api/")) {
+      for (const [marker, reason] of FORBIDDEN_API_META_MARKERS) {
+        if (source.includes(marker)) failures.push(`${relative}: ${reason}`);
+      }
     }
   }
   return Object.freeze({ ok: failures.length === 0, root, failures: Object.freeze(failures) });

@@ -17,5 +17,7 @@ describe("category dependency JSONB manifest", () => {
     expect(assessCategoryJsonbCatalog(actual)).toEqual({ unclassifiedColumns: 0, missingManifestColumns: 0 });
     expect(new Set(CATEGORY_JSONB_MANIFEST.map((entry) => `${entry.table}.${entry.column}`)).size)
       .toBe(CATEGORY_JSONB_MANIFEST.length);
+    expect(CATEGORY_JSONB_MANIFEST).toContainEqual({ table: "category_profile_revisions",
+      column: "profile_payload", policy: "category_contract" });
   });
 });

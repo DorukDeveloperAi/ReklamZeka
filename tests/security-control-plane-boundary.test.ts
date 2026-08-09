@@ -13,7 +13,7 @@ const required = ["src/security/authorization.ts", "src/security/secrets.ts", "s
 
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-async function fixture(source = "export const graph = 'https://graph.facebook.com';\n") {
+async function fixture(source = "export const graph = 'https://graph.facebook.com';\n", relative = "src/runtime.ts") {
   const root = await mkdtemp(join(tmpdir(), "reklamzeka-security-boundary-")); roots.push(root);
   await Promise.all(required.map(async (relative) => { const path = join(root, relative);
     await mkdir(dirname(path), { recursive: true }); await writeFile(path, "safe\n"); }));
@@ -21,7 +21,9 @@ async function fixture(source = "export const graph = 'https://graph.facebook.co
   await mkdir(dirname(migration), { recursive: true });
   await writeFile(migration, "audit_events_append_only\nconnection_secrets\n");
   await writeFile(join(root, ".env.example"), "SECRET_ENCRYPTION_KEY=\n");
-  await writeFile(join(root, "src/runtime.ts"), source);
+  const sourcePath = join(root, relative);
+  await mkdir(dirname(sourcePath), { recursive: true });
+  await writeFile(sourcePath, source);
   return root;
 }
 
@@ -45,6 +47,16 @@ describe("single Meta transport security boundary", () => {
     ["Sheets", "import gspread\n", "Google Sheets ikinci veri düzlemi"],
   ])("rejects %s runtime source", async (_name, source, reason) => {
     const result = await run(await fixture(source));
+    expect(result.status).toBe(1); expect(result.stderr).toContain(reason);
+  });
+
+  it.each([
+    ["direct Meta secret", "export const token = process.env.META_ACCESS_TOKEN;\n", "API route doğrudan Meta secret okuyamaz"],
+    ["live inventory connector", "import { discoverMetaInventory } from '@/connectors/meta/inventory';\n", "API route canlı Meta inventory connector'ını çağıramaz"],
+    ["direct Graph client", "import { MetaGraphClient } from '@/connectors/meta/graph-client';\n", "API route doğrudan Meta Graph client import edemez"],
+    ["direct Graph origin", "export const origin = 'https://graph.facebook.com';\n", "API route doğrudan Meta Graph origin'ine erişemez"],
+  ])("rejects API route %s access", async (_name, source, reason) => {
+    const result = await run(await fixture(source, "src/app/api/meta/inventory/route.ts"));
     expect(result.status).toBe(1); expect(result.stderr).toContain(reason);
   });
 });

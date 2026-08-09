@@ -24,6 +24,7 @@ const categoryContract = new Set([
   "budget_proposal_alternatives.alternative_payload",
   "promotion_template_revisions.payload",
   "promotion_template_bindings.payload",
+  "category_profile_revisions.profile_payload",
 ]);
 
 const categoryProjection = new Set([
@@ -79,6 +80,7 @@ const columns = [
   "meta_ads.tracking_specs",
   "meta_ads.provenance",
   "category_assignments.evidence",
+  "category_profile_revisions.profile_payload",
   "guidance_cards.source_ids",
   "guidance_sets.ordered_card_ids",
   "advised_practice_definitions.payload",

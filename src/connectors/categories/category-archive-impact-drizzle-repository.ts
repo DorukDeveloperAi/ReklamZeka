@@ -19,6 +19,7 @@ type ImpactRow = Readonly<Record<
   "archived_guidance" | "active_promotion_bindings" | "expired_promotion_bindings" |
   "active_promotion_template_scopes" | "superseded_promotion_template_scopes" |
   "active_advised_practices" | "retired_advised_practices" | "superseded_advised_practices" |
+  "active_category_profiles" | "historical_category_profiles" |
   "autonomy_drafts" | "autonomy_published" | "guardrail_drafts" | "guardrail_published" |
   "effective_contexts" | "invalidated_contexts" | "budget_proposals" | "component_count" |
   "contexts_needing_invalidation" | "nonterminal_action_units" | "terminal_action_units" |
@@ -171,6 +172,11 @@ export class DrizzleCategoryArchiveImpactRepository implements CategoryArchiveIm
         select id, practice_ref, version, payload,
           row_number() over (partition by practice_ref order by version desc) as rank
         from advised_practice_definitions where workspace_id = ${workspaceId}::uuid
+      ), ranked_profiles as (
+        select category_definition_id, category_ref, profile_ref, version, status, previous_profile_hash,
+          profile_hash, profile_payload,
+          row_number() over (partition by category_definition_id order by version desc) as rank
+        from category_profile_revisions where workspace_id = ${workspaceId}::uuid
       ), latest_practice_events as (
         select distinct on (definition_id) definition_id, event_type, sequence
         from advised_practice_events where workspace_id = ${workspaceId}::uuid
@@ -244,6 +250,7 @@ export class DrizzleCategoryArchiveImpactRepository implements CategoryArchiveIm
         union all select 'budget_alternative', value #>> '{}' from budget_proposal_alternatives alternative,
           lateral jsonb_path_query(alternative.alternative_payload, 'lax $.**.categoryRefs[*]') value
           where alternative.workspace_id = ${workspaceId}::uuid and jsonb_typeof(value) = 'string'
+        union all select 'category_profile', profile.category_ref from ranked_profiles profile
       )
       select
         (select count(*)::int from category_assignments assignment where assignment.workspace_id = ${workspaceId}::uuid
@@ -294,6 +301,10 @@ export class DrizzleCategoryArchiveImpactRepository implements CategoryArchiveIm
           select 1 from jsonb_path_query(practice.payload #> '{scope,internalCategoryRefs}', 'lax $[*]') value
           where jsonb_typeof(value) = 'string' and value #>> '{}' ${dependencyRefList}
         )) as superseded_advised_practices,
+        (select count(*)::int from ranked_profiles profile where profile.rank = 1
+          and profile.status <> 'archived' and profile.category_ref ${dependencyRefList}) as active_category_profiles,
+        (select count(*)::int from ranked_profiles profile where (profile.rank > 1 or profile.status = 'archived')
+          and profile.category_ref ${dependencyRefList}) as historical_category_profiles,
         (select count(*)::int from latest_autonomy rule where rule.scope_level = 'internal_category'
           and rule.scope_ref ${dependencyRefList} and rule.state = 'draft') as autonomy_drafts,
         (select count(*)::int from latest_autonomy rule where rule.scope_level = 'internal_category'
@@ -337,7 +348,14 @@ export class DrizzleCategoryArchiveImpactRepository implements CategoryArchiveIm
           + (select count(*)::int from ranked_practices practice
             where jsonb_typeof(practice.payload #> '{scope,internalCategoryRefs}') is distinct from 'array'
               or exists (select 1 from jsonb_path_query(practice.payload #> '{scope,internalCategoryRefs}', 'lax $[*]') value
-                where jsonb_typeof(value) <> 'string'))) as malformed_category_contracts,
+                where jsonb_typeof(value) <> 'string'))
+          + (select count(*)::int from ranked_profiles profile
+            where jsonb_typeof(profile.profile_payload) is distinct from 'object'
+              or profile.profile_payload->>'categoryRef' is distinct from profile.category_ref
+              or profile.profile_payload->>'profileRef' is distinct from profile.profile_ref
+              or (profile.profile_payload->>'version')::integer is distinct from profile.version
+              or jsonb_typeof(profile.profile_payload #> '{bindings,analysisPlaybookRefs}') is distinct from 'array'))
+          as malformed_category_contracts,
         ((select count(*)::int from ranked_practices practice left join latest_practice_events event
             on event.definition_id = practice.id where practice.rank = 1 and event.definition_id is null)
           + (select count(*)::int from (select definition_id from advised_practice_events
@@ -346,6 +364,12 @@ export class DrizzleCategoryArchiveImpactRepository implements CategoryArchiveIm
           + (select count(*)::int from advised_practice_events event where event.workspace_id = ${workspaceId}::uuid
             and (event.sequence < 1 or event.payload->>'eventType' is distinct from event.event_type
               or event.payload->>'practiceRef' is distinct from event.practice_ref))
+          + (select count(*)::int from (
+              select profile_ref, version, previous_profile_hash,
+                lag(profile_hash) over (partition by profile_ref order by version) as expected_previous_hash
+              from category_profile_revisions where workspace_id = ${workspaceId}::uuid
+            ) profile where (profile.version = 1 and profile.previous_profile_hash is not null)
+              or (profile.version > 1 and profile.previous_profile_hash is distinct from profile.expected_previous_hash))
           + (select count(*)::int from action_states where event_type not in (
               'awaiting_approval', 'unit_approved', 'unit_rejected', 'unit_changes_requested', 'unit_expired',
               'unit_stale', 'unit_superseded', 'unit_dependency_failed'))) as corrupt_lifecycle_rows
@@ -359,7 +383,8 @@ export class DrizzleCategoryArchiveImpactRepository implements CategoryArchiveIm
       guidanceDrafts: count(row.guidance_drafts), guidancePublished: count(row.guidance_published),
       activePromotionBindings: count(row.active_promotion_bindings),
       activePromotionTemplateScopes: count(row.active_promotion_template_scopes),
-      activeAdvisedPractices: count(row.active_advised_practices), autonomyDrafts: count(row.autonomy_drafts),
+      activeAdvisedPractices: count(row.active_advised_practices),
+      activeCategoryProfiles: count(row.active_category_profiles), autonomyDrafts: count(row.autonomy_drafts),
       autonomyPublished: count(row.autonomy_published), guardrailDrafts: count(row.guardrail_drafts),
       guardrailPublished: count(row.guardrail_published),
     });
@@ -369,6 +394,7 @@ export class DrizzleCategoryArchiveImpactRepository implements CategoryArchiveIm
       supersededPromotionTemplateScopes: count(row.superseded_promotion_template_scopes),
       retiredAdvisedPractices: count(row.retired_advised_practices),
       supersededAdvisedPractices: count(row.superseded_advised_practices),
+      historicalCategoryProfiles: count(row.historical_category_profiles),
       effectiveContexts: count(row.effective_contexts), alreadyInvalidatedContexts: count(row.invalidated_contexts),
       budgetProposals: count(row.budget_proposals), terminalActionProposalUnits: count(row.terminal_action_units) });
     const invalidationPlan = Object.freeze({ categoryResolutionComponents: count(row.component_count),
@@ -384,7 +410,8 @@ export class DrizzleCategoryArchiveImpactRepository implements CategoryArchiveIm
       manifestVersion: CATEGORY_DEPENDENCY_MANIFEST_VERSION,
       exactRelational: Object.freeze(["category_assignments", "promotion_template_bindings", "effective_campaign_contexts"]),
       exactContractRef: Object.freeze(["guidance_bindings", "autonomy_rules", "action_guardrail_policies",
-        "promotion_template_scopes", "advised_practices", "budget_json_artifacts", "legacy_category_ref_families"]),
+        "promotion_template_scopes", "advised_practices", "category_profiles", "budget_json_artifacts",
+        "legacy_category_ref_families"]),
       conservative: Object.freeze(["action_proposal_payloads"]), partialOrUnknown: Object.freeze([]), integrity });
     const target = Object.freeze({ kind, ref: targetRef, label: dimension?.name ?? definition!.label,
       version: dimension?.version ?? definition!.version });

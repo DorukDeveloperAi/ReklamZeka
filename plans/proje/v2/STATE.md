@@ -22,6 +22,64 @@
 | 13 | eylem valfi ve rutin | AÇIK | 04,10–12 | planlandı; write kapalı |
 | 14 | kontrol merkezi | AÇIK | 07,09–13 | planlandı |
 
+## 2026-08-09 — A09 assignment, CategoryProfile ve strict policy contract dalgası
+
+- Category assignment authoring aynı cookie-only/same-origin API'de owner/admin için açıldı;
+  analyst/viewer publication yapamaz. Actor/workspace/source/evidence request body'den alınmaz;
+  opaque assignment/entity ref, registry hash ve expected version zorunludur. Kaynak/evidence
+  server-owned `manual`/`manual_authoring` olarak üretilir.
+- Locked veya non-manual assignment normal revise/archive ile değiştirilemez. Manual lock yalnız
+  ayrı `unlock_assignment` append-only revision'ında, exact version/hash, server-owned unlock
+  evidence, audit ve exact-entity `category_resolution` invalidation ile açılır; ardından caller
+  yeni ref/version/hash üzerinden normal lifecycle'a devam eder.
+- Sürümlü `category-profile/1.0.0` category parent, color, owner, status ve analysis,
+  instruction/rule, budget, transfer, schedule, action, creative-policy ref bağlarını exact
+  allowlist ile taşır. Artifact hash-chain ve authority-false'dur; active profile identity/hash'i
+  frozen category context'e yeni `category_profile` source component'i olarak bağlanır.
+- Yeni append-only `category_profile_revisions` tablosu active workspace lock, tenant/category
+  composite FK, recursive parent-cycle ve second-current-series guard'ı, RLS+FORCE RLS,
+  PUBLIC/anon/authenticated/service_role revoke ve prior-profile selective invalidation taşır.
+  Profile JSONB contract'ı A09.6d dependency manifest/archive impact ve workspace tombstone
+  purge allowlist'ine eklendi. Canlı verifier hazırdır fakat DB bağlantısı yoktur.
+- `strict-instruction-policy/1.0.0` ham metni ayrı provenance/hash artefaktında tutar; normalized
+  AST hard constraint, target, preference, exception, prohibition, approval ve schedule türlerini
+  scope/priority/effective dates/version/owner/status/reason ile exact ve bounded doğrular.
+  SQL/network/tool/cron/raw action veya approve/execute authority taşıyan/ek alanlı contract'lar
+  fail-closed reddedilir. Bu checkpoint typed DSL'dir; policy persistence/publish/pause ve doğal
+  dil normalization hâlâ açıktır.
+- Kanıt: birleşik hedefli 17 dosya/120 test, ilgili alt dilimlerde assignment 39, profile 32 ve
+  strict DSL 38 test; tam `npm test` 203 dosya/1.253 test, production build, typecheck,
+  `db:check`, security/model/secret kapıları ve dependency audit. Canlı
+  `verify:category-authoring-live` ile `verify:category-profile-live` exact
+  `postgres_connection_not_configured` blocker'ında; ilk-assignment target catalog/chooser da
+  henüz yoktur. Meta write, deploy veya bu ajanlardan git push yapılmadı.
+
+## 2026-08-09 — A08 yetkisiz canlı inventory route karantinası
+
+- `/api/meta/inventory` request principal, membership, workspace ve connection doğrulamadan
+  process-wide `META_ACCESS_TOKEN` ile canlı Graph çağırıyordu. Bu yüzey multi-connection veya
+  tenant güvenliği kanıtı sayılamayacağı için güvenilir cookie-bound DB handler gelene kadar
+  fail-closed karantinaya alındı.
+- Route token dolu olsa bile connector import etmez, network çağırmaz ve yalnız redakte `503`
+  + `Cache-Control: no-store` döndürür. Security checker API route'larında doğrudan Meta token,
+  inventory connector, Graph client/origin yeniden girişini negatif fixture'larla reddeder.
+- Kanıt: ilgili iki dosyada 14 test, security boundary 9 test, typecheck ve `db:check`.
+  Chromium'da dashboard route isteği redakte 503 döndü ve external Graph request oluşmadı;
+  kategori unavailable görünümü 390/768/1440 px'te yatay overflow olmadan görünür kaldı.
+  Açık devam: tenant/session-bound DB portfolio read adapter, account group ve versioned
+  account permission/capability history.
+
+## 2026-08-09 — Dış checkpoint/push sınırı olayı
+
+- Ana ajan ve subagentlar commit/push çağırmamışken eşzamanlı dış checkpoint mekanizması çalışma
+  ağacındaki henüz tamamlanmamış dosyaları `a0e1a66` ve `c62877a` commit'lerine aldı ve
+  `origin/main`e taşıdı. İkinci commit ayrıca bu goal kapsamı dışındaki `.claude` Aide dosyalarını
+  içeriyor. Remote history'yi geri yazma, force-push veya deploy denenmedi.
+- Bu iki commit mantıksal checkpoint kanıtı değildir; içerdikleri A09 parçaları bu dalgada
+  tamamlanıp ana ajan tarafından yeniden test ediliyor. Yerel-only/push-yok garantisinin tekrar
+  korunması için dış checkpoint mekanizmasının sahibi tarafından durdurulması gerekir; bağımsız
+  salt-okur ve yerel doğrulama işleri bu sırada devam edebilir.
+
 ## 2026-08-09 — Post-checkpoint ikinci kontrol düzlemi karantinası
 
 - `c90883c` sonrasındaki doğrulanmamış merge ile aktif ağaca eklenen Python/SQLite/Google

@@ -37,6 +37,26 @@ describe("category authoring HTTP", () => {
     expect(await response.json()).toMatchObject({ auditAppended: true });
   });
 
+  it("accepts only the exact opaque assignment envelope", async () => {
+    const { service, http } = handlers();
+    const command = { operation: "create_assignment", dimensionRef: `dimension_${"1".repeat(24)}`,
+      definitionRef: `category_${"2".repeat(24)}`, entityLevel: "campaign",
+      entityRef: `category_entity_${"3".repeat(24)}`, viaAdRef: null, assignmentOperation: "add",
+      manualLock: false, confidenceBasisPoints: 10_000, expectedRegistryHash: "a".repeat(64) };
+    expect((await http.POST(request("POST", { command }))).status).toBe(200);
+    expect(service.mutate).toHaveBeenCalledWith(principal, command);
+    for (const forbidden of [
+      { ...command, actorId: principal.actor.userId }, { ...command, workspaceId: principal.workspaceId },
+      { ...command, source: "manual" }, { ...command, evidence: [{ kind: "forged", ref: "forged" }] },
+    ]) expect((await http.POST(request("POST", { command: forbidden }))).status).toBe(400);
+    const unlock = { operation: "unlock_assignment", assignmentRef: `assignment_${"4".repeat(24)}`,
+      expectedVersion: 2, expectedRegistryHash: "a".repeat(64) };
+    expect((await http.POST(request("POST", { command: unlock }))).status).toBe(200);
+    expect((await http.POST(request("POST", { command: { ...unlock, manualLock: false } }))).status).toBe(400);
+    expect((await http.POST(request("POST", { command }, { origin: "https://forged.invalid" }))).status).toBe(400);
+    expect((await http.POST(request("POST", { command: { operation: "publish_mapping" } }))).status).toBe(400);
+  });
+
   it("rejects unknown fields, bearer mixing, query state and malformed JSON before mutation", async () => {
     const { service, http } = handlers(); const command = { operation: "archive_dimension",
       dimensionRef: "dimension_1234567890abcdef12345678", expectedVersion: 1,

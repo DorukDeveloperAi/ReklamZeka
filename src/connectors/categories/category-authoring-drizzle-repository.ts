@@ -142,7 +142,9 @@ async function loadState(database: Pick<Database, "execute">, workspaceId: strin
   const publicAssignments: CategoryAuthoringAssignment[] = assignments.map((assignment) => {
     const definition = definitionMap.get(uuid(assignment.definition_id));
     if (!definition || uuid(definition.dimension_id) !== uuid(assignment.dimension_id) || !LEVELS.has(assignment.entity_level)
-      || !["add", "override", "deny"].includes(assignment.operation) || typeof assignment.manual_lock !== "boolean") {
+      || !["add", "override", "deny"].includes(assignment.operation)
+      || !["manual", "agent", "deterministic"].includes(assignment.source)
+      || typeof assignment.manual_lock !== "boolean") {
       throw new CategoryAuthoringError("conflict");
     }
     const dimension = dimensions.find((item) => uuid(item.id) === uuid(assignment.dimension_id));
@@ -156,7 +158,9 @@ async function loadState(database: Pick<Database, "execute">, workspaceId: strin
       confidenceBasisPoints: confidenceBasisPoints(assignment.confidence), version: integer(assignment.version) });
   });
   const registryCore = Object.freeze({ dimensions: publicDimensions, assignments: publicAssignments });
-  return Object.freeze({ state: Object.freeze({ registryHash: digest(registryCore), ...registryCore }),
+  const registryHash = digest({ dimensions: publicDimensions, assignments: publicAssignments.map((assignment, index) =>
+    Object.freeze({ ...assignment, source: assignments[index]!.source })) });
+  return Object.freeze({ state: Object.freeze({ registryHash, ...registryCore }),
     dimensions, definitions, assignments });
 }
 
@@ -276,6 +280,55 @@ function auditAction(operation: CategoryAuthoringCommand["operation"]): string {
   return `category.${operation}`;
 }
 
+export async function appendAssignmentInvalidations(input: Readonly<{
+  database: Pick<Database, "execute">;
+  workspaceId: string;
+  dimensionId: string;
+  target: ResolvedTarget;
+  reasonCode: "source_changed" | "source_removed";
+  occurredAt: string;
+}>): Promise<number> {
+  const level = input.target.target.level;
+  const affected = rows<{ component_ref: string; component_version: string; entity_type: string; entity_ref: string }>(
+    await input.database.execute(sql`
+      select distinct component.component_ref, component.component_version, context.entity_type, context.entity_ref
+      from effective_campaign_context_components component
+      join effective_campaign_contexts context on context.workspace_id = component.workspace_id
+        and context.id = component.context_id
+      where component.workspace_id = ${input.workspaceId}::uuid
+        and component.component_type = 'category_resolution'
+        and component.component_ref = ${input.dimensionId}
+        and (
+          (context.entity_type = ${level} and context.entity_ref = ${input.target.externalRef})
+          or (${level} = 'campaign' and context.campaign_ref = ${input.target.externalRef})
+          or coalesce(context.context_payload #> '{identity,hierarchyRefs}', '[]'::jsonb)
+            @> ${JSON.stringify([input.target.externalRef])}::jsonb
+        )
+      order by component.component_ref, component.component_version, context.entity_type, context.entity_ref
+    `),
+  );
+  let appended = 0;
+  for (const component of affected) {
+    if (!LEVELS.has(component.entity_type)) throw new CategoryAuthoringError("conflict");
+    const invalidation = Object.freeze({ workspaceId: input.workspaceId, componentType: "category_resolution",
+      componentRef: text(component.component_ref), componentVersion: text(component.component_version),
+      scopeKind: "exact_entity_component", entityType: component.entity_type, entityRef: text(component.entity_ref, 512),
+      reasonCode: input.reasonCode, observedAt: new Date(input.occurredAt).toISOString() });
+    const inserted = rows(await input.database.execute(sql`
+      insert into effective_campaign_context_invalidations (
+        workspace_id, event_hash, component_type, component_ref, component_version,
+        scope_kind, entity_type, entity_ref, reason_code, observed_at
+      ) values (${input.workspaceId}::uuid, ${digest(invalidation)}, 'category_resolution',
+        ${invalidation.componentRef}, ${invalidation.componentVersion}, 'exact_entity_component',
+        ${invalidation.entityType}, ${invalidation.entityRef}, ${invalidation.reasonCode},
+        ${invalidation.observedAt}::timestamptz)
+      on conflict (workspace_id, event_hash) do nothing returning id
+    `));
+    appended += inserted.length;
+  }
+  return appended;
+}
+
 export class DrizzleCategoryAuthoringRepository implements CategoryAuthoringRepository {
   constructor(private readonly database: Database) {}
 
@@ -301,6 +354,7 @@ export class DrizzleCategoryAuthoringRepository implements CategoryAuthoringRepo
         let dimensionId: string | null = null;
         let resourceId = "";
         let invalidationReason: "source_changed" | "source_removed" = "source_changed";
+        let assignmentInvalidationTarget: ResolvedTarget | null = null;
 
         const requireImpact = async (targetRef: string, expectedImpactHash: string) => {
           const impact = await new DrizzleCategoryArchiveImpactRepository(tx).preview(input.workspaceId, targetRef);
@@ -340,15 +394,58 @@ export class DrizzleCategoryAuthoringRepository implements CategoryAuthoringRepo
           await registry.reviseDefinition({ workspaceId: input.workspaceId, definitionId: uuid(current.id),
             expectedVersion: command.expectedVersion, nextId: randomUUID(), label: command.label,
             description: command.description ?? undefined });
-        } else {
+        } else if (command.operation === "archive_definition") {
           const current = findDefinition(before, command.definitionRef);
           await requireImpact(command.definitionRef, command.expectedImpactHash); dimensionId = uuid(current.dimension_id); resourceId = command.definitionRef;
           invalidationReason = "source_removed";
           await registry.archiveDefinition(input.workspaceId, uuid(current.id), command.expectedVersion);
+        } else if (command.operation === "create_assignment") {
+          const dimension = findDimension(before, input.workspaceId, command.dimensionRef);
+          const definition = findDefinition(before, command.definitionRef);
+          dimensionId = uuid(dimension.id);
+          if (uuid(definition.dimension_id) !== dimensionId) throw new CategoryAuthoringError("not_found");
+          assignmentInvalidationTarget = await resolveCreateTarget(tx, input.workspaceId, command);
+          const created = await registry.createAssignment({ id: randomUUID(), workspaceId: input.workspaceId,
+            dimensionId, definitionId: uuid(definition.id), target: assignmentInvalidationTarget.target,
+            operation: command.assignmentOperation, source: "manual", manualLock: command.manualLock,
+            evidence: Object.freeze([{ kind: "manual_authoring", ref: text(input.actorRef, 128),
+              observedAt: new Date(input.occurredAt).toISOString() }]), confidence: command.confidenceBasisPoints / 10_000 });
+          resourceId = categoryAssignmentPublicRef(input.workspaceId, created.id);
+        } else if (command.operation === "revise_assignment") {
+          const current = findAssignment(before, input.workspaceId, command.assignmentRef);
+          if (current.source !== "manual" || current.manual_lock !== false) throw new CategoryAuthoringError("manual_lock");
+          dimensionId = uuid(current.dimension_id); resourceId = command.assignmentRef;
+          assignmentInvalidationTarget = await resolveStoredTarget(tx, input.workspaceId, current);
+          await registry.reviseAssignment({ workspaceId: input.workspaceId, assignmentId: uuid(current.id),
+            expectedVersion: command.expectedVersion, nextId: randomUUID(), target: assignmentInvalidationTarget.target,
+            operation: command.assignmentOperation, source: "manual", manualLock: command.manualLock,
+            evidence: Object.freeze([{ kind: "manual_authoring", ref: text(input.actorRef, 128),
+              observedAt: new Date(input.occurredAt).toISOString() }]), confidence: command.confidenceBasisPoints / 10_000 });
+        } else if (command.operation === "unlock_assignment") {
+          const current = findAssignment(before, input.workspaceId, command.assignmentRef);
+          if (current.source !== "manual" || current.manual_lock !== true) throw new CategoryAuthoringError("manual_lock");
+          dimensionId = uuid(current.dimension_id); resourceId = command.assignmentRef;
+          assignmentInvalidationTarget = await resolveStoredTarget(tx, input.workspaceId, current);
+          await registry.unlockAssignment({ workspaceId: input.workspaceId, assignmentId: uuid(current.id),
+            expectedVersion: command.expectedVersion, nextId: randomUUID(),
+            evidence: Object.freeze([{ kind: "manual_unlock", ref: text(input.actorRef, 128),
+              observedAt: new Date(input.occurredAt).toISOString() }]) });
+        } else {
+          const current = findAssignment(before, input.workspaceId, command.assignmentRef);
+          if (current.source !== "manual" || current.manual_lock !== false) throw new CategoryAuthoringError("manual_lock");
+          dimensionId = uuid(current.dimension_id); resourceId = command.assignmentRef;
+          invalidationReason = "source_removed";
+          assignmentInvalidationTarget = await resolveStoredTarget(tx, input.workspaceId, current);
+          await registry.archiveAssignment({ workspaceId: input.workspaceId, assignmentId: uuid(current.id),
+            expectedVersion: command.expectedVersion });
         }
 
         let invalidationsAppended = 0;
-        if (dimensionId && command.operation !== "create_dimension") {
+        if (dimensionId && assignmentInvalidationTarget) {
+          invalidationsAppended = await appendAssignmentInvalidations({ database: tx, workspaceId: input.workspaceId,
+            dimensionId, target: assignmentInvalidationTarget, reasonCode: invalidationReason,
+            occurredAt: input.occurredAt });
+        } else if (dimensionId && command.operation !== "create_dimension") {
           const components = rows<{ component_ref: string; component_version: string }>(await tx.execute(sql`
             select distinct component_ref, component_version from effective_campaign_context_components
             where workspace_id = ${input.workspaceId}::uuid and component_type = 'category_resolution'
@@ -380,7 +477,7 @@ export class DrizzleCategoryAuthoringRepository implements CategoryAuthoringRepo
         `))[0]?.event_hash ?? "GENESIS");
         const event = Object.freeze({ workspaceId: input.workspaceId, actorId: input.actorId,
           action: auditAction(command.operation), resourceType: command.operation.includes("dimension")
-            ? "category_dimension" : "category_definition",
+            ? "category_dimension" : command.operation.includes("assignment") ? "category_assignment" : "category_definition",
           resourceId, occurredAt: new Date(input.occurredAt).toISOString(), metadata: Object.freeze({
             role: input.role, expectedRegistryHash: command.expectedRegistryHash, invalidationsAppended,
             guardedImpact: "expectedImpactHash" in command,

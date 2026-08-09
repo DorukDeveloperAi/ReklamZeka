@@ -65,6 +65,8 @@ export type CategoryAuthoringCommand =
       entityLevel: CategoryCoverageLevel; entityRef: string; viaAdRef: string | null; expectedRegistryHash: string }>)
   | (AssignmentBody & Readonly<{ operation: "revise_assignment"; assignmentRef: string; expectedVersion: number;
       expectedRegistryHash: string }>)
+  | Readonly<{ operation: "unlock_assignment"; assignmentRef: string; expectedVersion: number;
+      expectedRegistryHash: string }>
   | Readonly<{ operation: "archive_assignment"; assignmentRef: string; expectedVersion: number;
       expectedRegistryHash: string }>;
 
@@ -180,6 +182,9 @@ function normalize(command: CategoryAuthoringCommand): CategoryAuthoringCommand 
   if (command.operation === "revise_assignment") return Object.freeze({ operation: command.operation,
     assignmentRef: ref(command.assignmentRef, "assignment"), expectedVersion: expectedVersion(command.expectedVersion),
     expectedRegistryHash: command.expectedRegistryHash, ...assignmentBody(command) });
+  if (command.operation === "unlock_assignment") return Object.freeze({ operation: command.operation,
+    assignmentRef: ref(command.assignmentRef, "assignment"), expectedVersion: expectedVersion(command.expectedVersion),
+    expectedRegistryHash: command.expectedRegistryHash });
   if (command.operation === "archive_assignment") return Object.freeze({ operation: command.operation,
     assignmentRef: ref(command.assignmentRef, "assignment"), expectedVersion: expectedVersion(command.expectedVersion),
     expectedRegistryHash: command.expectedRegistryHash });

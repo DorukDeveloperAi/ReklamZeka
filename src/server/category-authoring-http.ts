@@ -30,16 +30,22 @@ const COMMAND_KEYS: Readonly<Record<string, readonly string[]>> = Object.freeze(
     "assignmentOperation", "manualLock", "confidenceBasisPoints", "expectedRegistryHash"],
   revise_assignment: ["operation", "assignmentRef", "expectedVersion", "assignmentOperation", "manualLock",
     "confidenceBasisPoints", "expectedRegistryHash"],
+  unlock_assignment: ["operation", "assignmentRef", "expectedVersion", "expectedRegistryHash"],
   archive_assignment: ["operation", "assignmentRef", "expectedVersion", "expectedRegistryHash"],
 });
 
 function requestShape(request: Request, method: "GET" | "POST", intent: string): void {
   const url = new URL(request.url);
+  const origin = request.headers.get("origin");
+  let originMatches = method === "GET";
+  if (method === "POST" && origin) {
+    try { originMatches = new URL(origin).origin === url.origin; } catch { originMatches = false; }
+  }
   if (request.method !== method || url.search || request.headers.has("authorization") || !request.headers.get("cookie")
     || request.headers.has("x-workspace-id") || request.headers.has("x-workspace-ref")
     || request.headers.get("sec-fetch-site") !== "same-origin"
     || request.headers.get("x-reklamzeka-intent") !== intent
-    || method === "POST" && (request.headers.get("origin") === null
+    || method === "POST" && (!originMatches
       || request.headers.get("content-type")?.toLowerCase() !== "application/json")) {
     throw new CategoryAuthoringError("invalid_input");
   }

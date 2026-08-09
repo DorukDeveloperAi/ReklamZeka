@@ -146,6 +146,8 @@ function build(input: CategoryProfileDraft): CategoryProfileRevision {
       canWriteMeta: false as const, canGrantApproval: false as const }),
   });
   if (core.parentCategoryRef === core.categoryRef) fail("invalid_input");
+  if (/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\bbearer\s+|\bsk-[a-z0-9_-]+/i
+    .test(JSON.stringify(core))) fail("invalid_input");
   return Object.freeze({ ...core, profileHash: digest(core) });
 }
 
@@ -164,7 +166,8 @@ export function reviseCategoryProfile(input: Readonly<{
     : current.status === "active" ? ["active", "paused", "archived"] : ["paused", "active", "archived"];
   if (!allowed.includes(nextStatus)) fail("invalid_transition");
   return build({ workspaceRef: current.workspaceRef, profileRef: current.profileRef,
-    categoryRef: current.categoryRef, parentCategoryRef: input.changes.parentCategoryRef ?? current.parentCategoryRef,
+    categoryRef: current.categoryRef, parentCategoryRef: Object.hasOwn(input.changes, "parentCategoryRef")
+      ? input.changes.parentCategoryRef ?? null : current.parentCategoryRef,
     version: current.version + 1, previousProfileHash: current.profileHash,
     label: input.changes.label ?? current.label, description: input.changes.description ?? current.description,
     color: input.changes.color ?? current.color, ownerRef: input.changes.ownerRef ?? current.ownerRef,
@@ -198,6 +201,8 @@ export function bindCategoryProfiles(
   context: FrozenCategoryContext,
   profiles: readonly CategoryProfileRevision[],
 ): FrozenCategoryContext {
+  const { resolutionHash, ...unhashedContext } = context;
+  if (!/^[a-f0-9]{64}$/.test(resolutionHash) || digest(unhashedContext) !== resolutionHash) fail("inauthentic_profile");
   const effectiveByRef = new Set(context.effectiveDefinitions.map((definition) =>
     categoryDefinitionPublicRef(context.dimension.key, definition.key)));
   const bindings = profiles.map(assertValidCategoryProfile).map((profile) => {
@@ -206,7 +211,6 @@ export function bindCategoryProfiles(
       profileVersion: profile.version, profileHash: profile.profileHash });
   }).sort((left, right) => left.categoryRef.localeCompare(right.categoryRef));
   if (new Set(bindings.map((binding) => binding.categoryRef)).size !== bindings.length) fail("invalid_input");
-  const { resolutionHash: _resolutionHash, ...current } = context;
-  const core = Object.freeze({ ...current, profileBindings: Object.freeze(bindings) });
+  const core = Object.freeze({ ...unhashedContext, profileBindings: Object.freeze(bindings) });
   return Object.freeze({ ...core, resolutionHash: digest(core) });
 }

@@ -71,17 +71,19 @@
 - [ ] Category definition, çoklu assignment, evidence/confidence/manual lock.
   - [x] Versioned Postgres şeması, RLS, manual-lock/source guard ve pure resolver çekirdeği.
   - [x] Workspace-scoped repository/application core ve gerçek CRUD/restart/rollback kabulü.
-  - [ ] Assignment/mapping rol/audit mutation API'si; dimension/definition lifecycle bu sınırı
-    açmadan owner/admin guard, audit ve concurrency ile teslim edildi.
+  - [x] Owner/admin assignment create/revise/unlock/archive; server-owned source/evidence,
+    registry+version concurrency, manual-lock guard, audit ve selective context invalidation.
+  - [ ] İlk kez assignment yapılacak entity için tenant-bound salt-okur target catalog/chooser ve
+    bağlı PostgreSQL/oturumlu browser kabulü.
 - [x] Kullanıcı tanımlı dimension, single/multi cardinality ve entity-level kataloğu.
 - [x] Meta/internal selector ve mapping preview motoru.
-- [ ] Category profile: analysis/rule/budget/transfer/schedule/action/creative policy bundle bağları.
+- [x] Category profile: analysis/rule/budget/transfer/schedule/action/creative policy bundle bağları.
 - [x] Campaign→adset→ad→creative inheritance, child override ve effective-context snapshot.
   - [x] Kesintisiz hierarchy path, child add/override/deny, manual-lock precedence,
     `parked_conflict` ve frozen category context/hash çekirdeği.
   - [x] Tüm category/guidance/policy/data refs'lerini birleştiren saf EffectiveCampaignContext.
   - [x] Context persistence, selective invalidation ve public redaction projection'ı.
-- [ ] Strict instruction/policy DSL ve negatif parser matrisi.
+- [x] Strict instruction/policy DSL ve negatif parser matrisi.
 - [ ] Raw natural-language → normalized draft + assumption/question/impact preview.
   - [x] `owner_statement` ham metni ayrı provenance kaydı olarak koruyan, guidance-only
     card + tek scope binding üreten gerçek taslak authoring akışı.
