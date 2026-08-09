@@ -1,4 +1,9 @@
 import { stableHash, type MetaEntityLevel } from "./types";
+import {
+  META_OBJECTIVE_MAPPING_VERSION,
+  normalizeMetaCampaignObjective,
+  type CanonicalMetaObjective,
+} from "@/domain/meta/objective-mapping";
 
 export const META_INVENTORY_MATERIALIZATION_VERSION = "meta-inventory-materialization/1.0.0" as const;
 export const META_INVENTORY_FIELD_CATALOG_VERSION = "meta-inventory-field-catalog/2.0.0" as const;
@@ -9,7 +14,7 @@ export type MetaInventoryUnknownReason =
   | "invalid_type"
   | "invalid_value"
   | "unrequested_field"
-  | "mapping_not_reviewed"
+  | "mapping_unresolved"
   | "reference_unresolved"
   | "field_not_requested";
 
@@ -49,9 +54,9 @@ type CommonRecord = Readonly<{
 export type CanonicalMetaInventoryCampaign = CommonRecord & Readonly<{
   level: "campaign";
   objectiveSource: string | null;
-  legacyObjectiveSource: null;
-  canonicalObjective: null;
-  objectiveMappingVersion: null;
+  legacyObjectiveSource: string | null;
+  canonicalObjective: CanonicalMetaObjective | null;
+  objectiveMappingVersion: typeof META_OBJECTIVE_MAPPING_VERSION;
   buyingType: string | null;
   specialAdCategories: readonly string[] | null;
   dailyBudgetMinor: number | null;
@@ -273,14 +278,17 @@ function parseRecord(input: ParseMetaInventoryPageInput, rawValue: unknown): Can
   if (input.entityLevel === "campaign") {
     const unsupported = [...base.unsupportedFields];
     const objectiveSource = optionalText(raw, "objective", unsupported, STATUS);
-    if (objectiveSource !== null) issue(unsupported, "canonical_objective", "mapping_not_reviewed");
+    const objectiveMapping = normalizeMetaCampaignObjective(objectiveSource);
+    if (objectiveMapping.status === "uncertain") issue(unsupported, "canonical_objective", "mapping_unresolved");
     const dailyBudgetMinor = amount(raw, "daily_budget", unsupported);
     const lifetimeBudgetMinor = amount(raw, "lifetime_budget", unsupported);
     const buyingType = optionalText(raw, "buying_type", unsupported, STATUS);
     const specialAdCategories = stringArray(raw, "special_ad_categories", unsupported);
     return Object.freeze({
       ...base, level: "campaign", unsupportedFields: Object.freeze(unsupported), objectiveSource,
-      legacyObjectiveSource: null, canonicalObjective: null, objectiveMappingVersion: null,
+      legacyObjectiveSource: objectiveMapping.sourceKind === "legacy" ? objectiveSource : null,
+      canonicalObjective: objectiveMapping.canonicalObjective,
+      objectiveMappingVersion: META_OBJECTIVE_MAPPING_VERSION,
       buyingType, specialAdCategories,
       dailyBudgetMinor, lifetimeBudgetMinor,
       campaignBudgetOptimization: dailyBudgetMinor !== null || lifetimeBudgetMinor !== null ? true : null,

@@ -38,6 +38,28 @@
   production build ve dependency audit. Yerel secret bulunmadığı için secret-artifact sonucu
   dürüst `SKIP`; production/deploy/Meta write yapılmadı.
 
+## 2026-08-09 — A09.8a reviewed objective mapping ve selector preview
+
+- Sürümlü `meta-objective-mapping/1.0.0` kataloğu Meta'nın current ve legacy campaign
+  objective değerlerini altı kanonik objective playbook'una açıkça bağlar. Null, malformed veya
+  katalog dışı değer tahmin edilmez; `uncertain` ve `mapping_unresolved` olarak korunur.
+- Saf `category-selector-preview/1.0.0` motoru account, platform, name pattern, objective,
+  optimization, geo, language, budget model, status, creative attribute ve entity-ID
+  kriterlerini strict schema ile doğrular. Kriterler arası AND, aynı kriterdeki değerler OR'dur;
+  kesin mismatch belirsizlikten baskındır ve her sonuç deterministic reason trace taşır.
+- Preview yalnız önerilen public category ref, reviewed evidence ve confidence döndürür;
+  category mutation/assignment, policy mutation ve action execution authority alanlarının
+  tamamı yapısal olarak `false` kalır. Raw campaign fixture → canonical objective → preview
+  zinciri materializer'a bağlandı; bilinmeyen objective publish/assignment üretmez.
+- Kanıt: hedefli üç dosyada 17/17 test; tam `npm test` 199 dosya/1.188 test; production build,
+  `db:check`, architecture/security/model/secret kapıları ve dependency audit. DB/migration/UI
+  değişmedi; secret taraması yerel secret bulunmadığı için dürüst `SKIP`, Meta write/deploy yok.
+- A09 audit'i ayrıca campaign→adset→ad→creative inheritance üst maddesinin ve
+  AdvisedPractice lifecycle/decomposition requirement'larının mevcut domain, persistence,
+  canlı rollback ve Practice Lab kanıtlarıyla daha önce tamamlandığını doğruladı; checklist
+  bu gerçek kanıta göre düzeltildi. PromotionTemplate ile provenance maddeleri, tamamlanmış
+  çekirdek ve açık authoring/binding sınırlarını ayrı gösterecek biçimde bölündü.
+
 ## 2026-08-09 — A09.6d/A09.7 guarded category lifecycle teknik checkpoint'i
 
 - Başlangıç yeniden haritalaması `c90883c` son doğrulanmış işlevsel checkpoint'ini doğruladı.

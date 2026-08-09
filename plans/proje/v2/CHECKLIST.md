@@ -71,11 +71,12 @@
 - [ ] Category definition, çoklu assignment, evidence/confidence/manual lock.
   - [x] Versioned Postgres şeması, RLS, manual-lock/source guard ve pure resolver çekirdeği.
   - [x] Workspace-scoped repository/application core ve gerçek CRUD/restart/rollback kabulü.
-  - [ ] Rol/audit mutation API'si.
+  - [ ] Assignment/mapping rol/audit mutation API'si; dimension/definition lifecycle bu sınırı
+    açmadan owner/admin guard, audit ve concurrency ile teslim edildi.
 - [x] Kullanıcı tanımlı dimension, single/multi cardinality ve entity-level kataloğu.
-- [ ] Meta/internal selector ve mapping preview motoru.
+- [x] Meta/internal selector ve mapping preview motoru.
 - [ ] Category profile: analysis/rule/budget/transfer/schedule/action/creative policy bundle bağları.
-- [ ] Campaign→adset→ad→creative inheritance, child override ve effective-context snapshot.
+- [x] Campaign→adset→ad→creative inheritance, child override ve effective-context snapshot.
   - [x] Kesintisiz hierarchy path, child add/override/deny, manual-lock precedence,
     `parked_conflict` ve frozen category context/hash çekirdeği.
   - [x] Tüm category/guidance/policy/data refs'lerini birleştiren saf EffectiveCampaignContext.
@@ -121,6 +122,9 @@
     - [ ] Canlı PostgreSQL rollback/concurrency verifier ve oturumlu browser create→revise→
       preview→archive kabulü; yerel `.env.local`/DB/session binding'i bulunmadığı için açık.
 - [ ] PromotionTemplate + immutable AudiencePresetVersion, selector/alias ve publish dry-run.
+  - [x] Objective/optimization, actor/destination, placement, naming/tracking, reuse policy,
+    budget/timeframe ve immutable preset ref sözleşmesi ile fail-closed preflight çekirdeği.
+  - [ ] Alias/talimat tabanlı deterministic öneri ve publish authoring dry-run akışı.
 - [ ] GuidanceSource/Card/Set/Binding ve global/group/objective/category/entity/topic scope matrisi.
   - [x] Guidance-only pure registry/pack; provenance ayrımı, deterministic scope/conflict,
     freshness ve bounded context budget.
@@ -133,8 +137,11 @@
     AND, aynı facet alternatifleri OR çözülür ve Studio'da birlikte görünür.
   - [ ] Guidance set authoring; account-group/lifecycle/template scope ve analysis-run binding.
 - [ ] Owner statement + official Meta source + experiment/observation provenance ve freshness.
+  - [x] Altı provenance türü, official source publish gate'i, review-by/freshness suppression ve
+    frozen geçmiş bağlamı.
+  - [ ] Owner dışındaki source türleri için kullanıcı authoring ve analysis-run binding'i.
 - [ ] G0→G4 progressive formalization, semantic diff, historical replay ve impact preview.
-- [ ] AdvisedPractice candidate→trial→outcome→standardization lifecycle ve decomposition review.
+- [x] AdvisedPractice candidate→trial→outcome→standardization lifecycle ve decomposition review.
 
 ## A10 — Zamansal analiz
 

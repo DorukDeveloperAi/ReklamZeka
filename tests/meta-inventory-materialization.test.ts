@@ -32,21 +32,40 @@ function campaign(overrides: Readonly<Record<string, unknown>> = {}): Readonly<R
 }
 
 describe("Meta canonical inventory parser", () => {
-  it("materializes requested campaign facts without inventing an objective mapping or retaining raw material", () => {
+  it("materializes a reviewed canonical objective mapping without retaining raw material", () => {
     const page = parse("campaign", [campaign({ access_token: "must-never-persist" })]);
     const row = page.records[0]!;
     expect(row).toMatchObject({
       level: "campaign", externalId: "campaign_1", configuredStatus: "ACTIVE",
-      objectiveSource: "OUTCOME_LEADS", canonicalObjective: null, objectiveMappingVersion: null,
+      objectiveSource: "OUTCOME_LEADS", legacyObjectiveSource: null,
+      canonicalObjective: "lead_generation", objectiveMappingVersion: "meta-objective-mapping/1.0.0",
       specialAdCategories: [], dailyBudgetMinor: 12000, campaignBudgetOptimization: true,
       trace: { sourceRevision: "2026-08-07T11:30:00.000Z", sourceGraphVersion: "v23.0" },
     });
     expect(row.unsupportedFields).toEqual(expect.arrayContaining([
-      { field: "canonical_objective", reason: "mapping_not_reviewed" },
       { field: "access_token", reason: "unrequested_field" },
     ]));
     expect(JSON.stringify(page)).not.toContain("must-never-persist");
     expect(page.pageHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("maps reviewed legacy objectives and keeps unknown objectives reasoned and uncertain", () => {
+    const legacy = parse("campaign", [campaign({ objective: "LEAD_GENERATION" })]).records[0]!;
+    expect(legacy).toMatchObject({
+      legacyObjectiveSource: "LEAD_GENERATION",
+      canonicalObjective: "lead_generation",
+      objectiveMappingVersion: "meta-objective-mapping/1.0.0",
+    });
+    expect(legacy.unsupportedFields).not.toContainEqual({ field: "canonical_objective", reason: "mapping_unresolved" });
+
+    const unknown = parse("campaign", [campaign({ objective: "OUTCOME_FUTURE" })]).records[0]!;
+    expect(unknown).toMatchObject({
+      objectiveSource: "OUTCOME_FUTURE",
+      legacyObjectiveSource: null,
+      canonicalObjective: null,
+      objectiveMappingVersion: "meta-objective-mapping/1.0.0",
+    });
+    expect(unknown.unsupportedFields).toContainEqual({ field: "canonical_objective", reason: "mapping_unresolved" });
   });
 
   it("keeps missing and malformed optional fields as reasoned unknowns without mutating a frozen issue list", () => {
