@@ -26,6 +26,11 @@ const COMMAND_KEYS: Readonly<Record<string, readonly string[]>> = Object.freeze(
   revise_definition: ["operation", "definitionRef", "expectedVersion", "label", "description",
     "expectedRegistryHash", "expectedImpactHash"],
   archive_definition: ["operation", "definitionRef", "expectedVersion", "expectedRegistryHash", "expectedImpactHash"],
+  create_assignment: ["operation", "dimensionRef", "definitionRef", "entityLevel", "entityRef", "viaAdRef",
+    "assignmentOperation", "manualLock", "confidenceBasisPoints", "expectedRegistryHash"],
+  revise_assignment: ["operation", "assignmentRef", "expectedVersion", "assignmentOperation", "manualLock",
+    "confidenceBasisPoints", "expectedRegistryHash"],
+  archive_assignment: ["operation", "assignmentRef", "expectedVersion", "expectedRegistryHash"],
 });
 
 function requestShape(request: Request, method: "GET" | "POST", intent: string): void {

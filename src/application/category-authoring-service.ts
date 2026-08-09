@@ -44,6 +44,11 @@ type DimensionBody = Readonly<{
   allowedEntityLevels: readonly CategoryCoverageLevel[];
 }>;
 type DefinitionBody = Readonly<{ label: string; description: string | null }>;
+type AssignmentBody = Readonly<{
+  assignmentOperation: "add" | "override" | "deny";
+  manualLock: boolean;
+  confidenceBasisPoints: number;
+}>;
 export type CategoryAuthoringCommand =
   | (DimensionBody & Readonly<{ operation: "create_dimension"; key: string; expectedRegistryHash: string }>)
   | (DimensionBody & Readonly<{ operation: "revise_dimension"; dimensionRef: string; expectedVersion: number;
@@ -55,7 +60,13 @@ export type CategoryAuthoringCommand =
   | (DefinitionBody & Readonly<{ operation: "revise_definition"; definitionRef: string; expectedVersion: number;
       expectedRegistryHash: string; expectedImpactHash: string }>)
   | Readonly<{ operation: "archive_definition"; definitionRef: string; expectedVersion: number;
-      expectedRegistryHash: string; expectedImpactHash: string }>;
+      expectedRegistryHash: string; expectedImpactHash: string }>
+  | (AssignmentBody & Readonly<{ operation: "create_assignment"; dimensionRef: string; definitionRef: string;
+      entityLevel: CategoryCoverageLevel; entityRef: string; viaAdRef: string | null; expectedRegistryHash: string }>)
+  | (AssignmentBody & Readonly<{ operation: "revise_assignment"; assignmentRef: string; expectedVersion: number;
+      expectedRegistryHash: string }>)
+  | Readonly<{ operation: "archive_assignment"; assignmentRef: string; expectedVersion: number;
+      expectedRegistryHash: string }>;
 
 export type CategoryAuthoringRepository = Readonly<{
   inspect(workspaceId: string): Promise<CategoryAuthoringState>;
@@ -117,6 +128,17 @@ function dimensionBody(command: DimensionBody): DimensionBody {
     cardinality: command.cardinality, allowedEntityLevels: Object.freeze([...command.allowedEntityLevels].sort()) });
 }
 
+function assignmentBody(command: AssignmentBody): AssignmentBody {
+  if (!["add", "override", "deny"].includes(command.assignmentOperation)
+    || typeof command.manualLock !== "boolean"
+    || !Number.isSafeInteger(command.confidenceBasisPoints)
+    || command.confidenceBasisPoints < 0 || command.confidenceBasisPoints > 10_000) {
+    throw new CategoryAuthoringError("invalid_input");
+  }
+  return Object.freeze({ assignmentOperation: command.assignmentOperation, manualLock: command.manualLock,
+    confidenceBasisPoints: command.confidenceBasisPoints });
+}
+
 function normalize(command: CategoryAuthoringCommand): CategoryAuthoringCommand {
   hash(command.expectedRegistryHash);
   if (command.operation === "create_dimension") {
@@ -144,6 +166,23 @@ function normalize(command: CategoryAuthoringCommand): CategoryAuthoringCommand 
   if (command.operation === "archive_definition") return Object.freeze({ ...command,
     definitionRef: ref(command.definitionRef, "category"), expectedVersion: expectedVersion(command.expectedVersion),
     expectedImpactHash: hash(command.expectedImpactHash) });
+  if (command.operation === "create_assignment") {
+    if (!LEVELS.has(command.entityLevel)) throw new CategoryAuthoringError("invalid_input");
+    const viaAdRef = command.viaAdRef === null ? null : ref(command.viaAdRef, "category_entity");
+    if (command.entityLevel === "creative" ? viaAdRef === null : viaAdRef !== null) {
+      throw new CategoryAuthoringError("invalid_input");
+    }
+    return Object.freeze({ operation: command.operation,
+      dimensionRef: ref(command.dimensionRef, "dimension"), definitionRef: ref(command.definitionRef, "category"),
+      entityLevel: command.entityLevel, entityRef: ref(command.entityRef, "category_entity"), viaAdRef,
+      expectedRegistryHash: command.expectedRegistryHash, ...assignmentBody(command) });
+  }
+  if (command.operation === "revise_assignment") return Object.freeze({ operation: command.operation,
+    assignmentRef: ref(command.assignmentRef, "assignment"), expectedVersion: expectedVersion(command.expectedVersion),
+    expectedRegistryHash: command.expectedRegistryHash, ...assignmentBody(command) });
+  if (command.operation === "archive_assignment") return Object.freeze({ operation: command.operation,
+    assignmentRef: ref(command.assignmentRef, "assignment"), expectedVersion: expectedVersion(command.expectedVersion),
+    expectedRegistryHash: command.expectedRegistryHash });
   throw new CategoryAuthoringError("invalid_input");
 }
 
