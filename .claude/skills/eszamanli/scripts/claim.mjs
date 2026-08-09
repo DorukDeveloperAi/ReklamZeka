@@ -6,6 +6,8 @@
  *   release [--res <kaynak> | --all]             # sahipsen bırakır; sıradaysan VAZGEÇER
  *   status  [--json]
  *   orkestrator kayit [--kapsam "..."] [--devral] | birak | durum   # sahadaki koordinatör
+ *   rol     kayit --rol <ad> [--kapsam "..."] [--devral] | birak | durum  # kalıcı oturum rolleri
+ *   bildir  (--rol <ad> | --hedef <session>) --mesaj "..." [--res <kaynak>]  # roller arası haber
  *   wait    --res <kaynak> [--timeout <sn>] [--no-acquire] [--intent "..."]
  *   free    --res <kaynak> [--repo <yol>]        # KİMLİKSİZ sonda: devralınabilir mi? exit 0/1
  *   devret  --res <kaynak> --gorev "..." [--kuru]  # parça B'yi devret (Maestro + kalıcı işaret)
@@ -118,11 +120,32 @@ function limitliSatir(sessionId) {
   return `  ⚠ sahip LİMİTLİ (${lim.sinif}${reset ? `, reset ~${reset}` : ", reset penceresi yok"}) — kilidi birazdan devredilecek (kendi limit devri ∨ bayatlık kademesi).`;
 }
 
+/**
+ * İŞARET BIRAK + ZİNCİRİN GERİ YÖNÜ: kilidi TUTANA "seni bekleyen doğdu" haberi.
+ *
+ * Kuyruğa girişin TEK kapısı burasıdır (üç blokaj dalı da buradan geçer), çünkü haberin
+ * dedup ölçütü "kuyrukta ZATEN var mıydım" sorusudur ve bu ancak enqueue'dan ÖNCE ölçülebilir.
+ * Aynı tıkanıklığın her turdaki tekrarı sahibin kutusunu doldurmaz — kapı yolundaki
+ * `markWanted` ile bire bir aynı kural.
+ */
+function isaretBirak(claim, I, intent) {
+  const key = claim.resource.key;
+  const yeni = !L.queueOf(ROOT, key).some((w) => w.sessionId === I.sessionId);
+  L.enqueue(ROOT, key, {
+    sessionId: I.sessionId,
+    since: new Date().toISOString(),
+    intent: intent || null,
+    pid: null, // işaret: sıra TUTMAZ (sırayı yalnız canlı bir wait süreci tutar)
+  });
+  if (yeni) L.bildirSahibe?.(ROOT, claim, { sessionId: I.sessionId, intent });
+}
+
 /** MEŞGUL raporu — neden bloke olduğunu ve nasıl devam edeceğini SÖYLER. */
 function mesgul(cur, I, targetKey, why) {
   const s = L.sessionInfo(cur.owner?.sessionId);
   const q = L.queueOf(ROOT, cur.resource.key);
   const yer = q.findIndex((x) => x.sessionId === I.sessionId);
+
   console.log(
     [
       `MEŞGUL: ${targetKey}${why && why !== "aynı kaynak" ? `  (çakışma: ${cur.resource.key} — ${why})` : ""}`,
@@ -220,16 +243,19 @@ function mutabakatCekil(claim, I) {
   const kayip = mutabakatTuru(claim, I);
   if (!kayip) return false;
   L.archiveClaim(ROOT, claim, `mutabakat: ${kayip.rakip.resource.key} daha eski`);
-  L.enqueue(ROOT, kayip.rakip.resource.key, {
-    sessionId: I.sessionId,
-    since: new Date().toISOString(),
-    intent: flag("intent"),
-    pid: null,
-  });
+  isaretBirak(kayip.rakip, I, flag("intent"));
   return true;
 }
 
 function cycleRapor(cyc, targetKey) {
+  /* DEFTERE: DÖNGÜ sistemin en pahalı hâlidir (iki canlı pid, otomatik biçme devrede DEĞİL)
+     ve bugüne dek hiçbir yere yazılmıyordu — orkestratör bunu görmezse çözecek kimse yok. */
+  L.yazOlay(ROOT, {
+    tip: "cevrim",
+    key: targetKey,
+    engellenen: (process.env.CLAUDE_CODE_SESSION_ID || process.env.CLAUDE_SESSION_ID || "").slice(0, 8) || null,
+    why: `zincir: ${cyc.chain.join(" → ")} → (ben) · tuttuklarım: ${cyc.release.join(", ")}`,
+  });
   console.error(
     [
       `DÖNGÜ (deadlock) — kuyruğa YAZILMADIN: ${targetKey}`,
@@ -265,12 +291,7 @@ function cmdClaim() {
        defterde ZATEN yazılı (owner + kuyruk) → yürü, kuyruğa YAZILMA, çözümü SÖYLE. */
     const cyc = L.waitCycle(ROOT, active, I.sessionId, resource.key);
     if (cyc) cycleRapor(cyc, resource.key);
-    L.enqueue(ROOT, resource.key, {
-      sessionId: I.sessionId,
-      since: new Date().toISOString(),
-      intent: flag("intent"),
-      pid: null, // işaret: sıra TUTMAZ (sırayı yalnız canlı bir wait süreci tutar)
-    });
+    isaretBirak(cur, I, flag("intent"));
     mesgul(cur, I, resource.key, "aynı kaynak");
   }
 
@@ -283,12 +304,7 @@ function cmdClaim() {
     if (cf) {
       const cyc = L.waitCycle(ROOT, active, I.sessionId, c.resource.key);
       if (cyc) cycleRapor(cyc, c.resource.key);
-      L.enqueue(ROOT, c.resource.key, {
-        sessionId: I.sessionId,
-        since: new Date().toISOString(),
-        intent: flag("intent"),
-        pid: null,
-      });
+      isaretBirak(c, I, flag("intent"));
       mesgul(c, I, resource.key, cf.why);
     }
   }
@@ -334,18 +350,23 @@ function cmdClaim() {
   const kayip = mutabakatTuru(claim, I);
   if (kayip) {
     L.archiveClaim(ROOT, claim, `mutabakat: ${kayip.rakip.resource.key} önce yazılmış`);
-    L.enqueue(ROOT, kayip.rakip.resource.key, {
-      sessionId: I.sessionId,
-      since: new Date().toISOString(),
-      intent: flag("intent"),
-      pid: null,
-    });
+    isaretBirak(kayip.rakip, I, flag("intent"));
     console.log(`MUTABAKAT — kilit GERİ VERİLDİ: ${resource.key} (yarışı ${short(kayip.rakip.owner?.sessionId)} ÖNCE YAZARAK kazandı)`);
     mesgul(kayip.rakip, I, resource.key, kayip.why);
   }
 
   // aldın → sıradan çık; bekleyişin süresi `since` SİLİNMEDEN kapanış kaydına yazılır (05.3)
   L.dequeueKapanis(ROOT, resource.key, I.sessionId, "aldi", "claim ile alındı");
+  /* DEFTERE: kilit ALINDI. Bugüne dek defter yalnız BLOKAJI görüyordu — kaynağın ne zaman
+     kimin eline geçtiği hiçbir yerde yazmıyordu, yani "sahada ne oluyor" sorusu yarım
+     cevaplanıyordu. Orkestratör beslemesi bu defterin projeksiyonudur (2026-08-09). */
+  L.yazOlay(ROOT, {
+    tip: "alindi",
+    key: resource.key,
+    sahip: I.sessionId,
+    why: flag("intent") || null,
+    queueLen: L.activeQueue(ROOT, resource.key).length,
+  });
   console.log(
     `CLAIM ALINDI: ${resource.key}${claim.breadth === "broad" ? " (breadth: broad — küçük işlere yol ver)" : ""}\n` +
       `  İş bitince BIRAK: node ${process.argv[1]} release --res "${resource.key}"`
@@ -371,17 +392,17 @@ function birakmaRaporu(key, I, claim = null) {
   } catch {
     return `BIRAKILDI: ${key}  (bildiri ölçülemedi)`;
   }
-  /* SAHADAN ORKESTRATÖRE: bekleyen olsun olmasın, "bu iş bitti" haberi koordinatöre düşer.
-     Bekleyene giden bildiri SIRA sorusunun, buradaki İLERLEME sorusunun cevabıdır. */
-  const ork = L.bildirOrkestratore?.(ROOT, {
-    tip: "bitti",
+  /* DEFTERE: kilit BIRAKILDI = o iş bitti. Orkestratör bunu buradan öğrenir (besleme
+     defterin projeksiyonudur) — ayrıca ona elle haber GÖNDERİLMEZ, çift raporlama olurdu. */
+  L.yazOlay(ROOT, {
+    tip: "birakildi",
     key,
-    kimden: I.sessionId,
-    niyet: claim?.intent || null,
-    bekleyen: r.sessiz.length + r.aktif.length,
+    sahip: I.sessionId,
+    why: claim?.intent || "release",
+    queueLen: r.sessiz.length + r.aktif.length,
   });
   const ad = (w) => `${short(w.sessionId)} (${w.intent || "niyet yok"})`;
-  const orkSatir = ork ? `\n  ↳ orkestratöre bildirildi (sahadan ilerleme haberi)` : ``;
+  const orkSatir = L.orkestratorOku?.(ROOT) ? `\n  ↳ orkestratör deftere düşen bu olayı turunda görecek` : ``;
   if (r.bildirilen.length)
     return (
       [
@@ -464,13 +485,17 @@ function cmdStatus() {
   }
   console.log(`repo: ${ROOT}`);
   {
-    const o = L.orkestratorOku?.(ROOT);
-    if (o) {
-      const s = L.sessionInfo(o.sessionId);
-      console.log(
-        `orkestratör: ${short(o.sessionId)}${s ? ` "${(s.title || "").slice(0, 40)}"` : ""}` +
-          `${o.sessionId === benSid ? " «SEN»" : ""}${o.kapsam ? ` · ${o.kapsam}` : ""}`
-      );
+    // ROL TABLOSU: yalnız DOLU roller basılır (boş kadro her status'u şişirirdi).
+    const dolu = (L.rolListe?.(ROOT) || []).filter((r) => r.sahip);
+    if (dolu.length) {
+      console.log(`roller:`);
+      for (const r of dolu) {
+        const s = L.sessionInfo(r.sahip.sessionId);
+        console.log(
+          `  ${r.ad.padEnd(11)} ${short(r.sahip.sessionId)}${r.sahip.sessionId === benSid ? " «SEN»" : ""}` +
+            `${s ? ` "${(s.title || "").slice(0, 36)}"` : ""}${r.sahip.kapsam ? ` · ${String(r.sahip.kapsam).slice(0, 44)}` : ""}`
+        );
+      }
     }
   }
   console.log(`canlı session: ${live.length}`);
@@ -499,6 +524,17 @@ function cmdStatus() {
   /* OKUNMAMIŞ BİLDİRİ — status TEŞHİS yüzeyidir, TÜKETMEZ (`tuket:false`). Haberi basıp
      silen tek yer `claim-guard ctx`tir; status da tüketseydi insan bakışı modelin haberini
      çalardı. Kimlik yumuşak: session dışından koşulursa bu blok hiç doğmaz. */
+  {
+    /* Orkestratörsem: defterde okunmamış kaç saha olayı birikmiş? (TÜKETMEZ — imleç
+       yalnız `ctx` çizimi tarafından ilerletilir; status teşhis yüzeyidir.) */
+    const o = L.orkestratorOku?.(ROOT);
+    if (o && o.sessionId === benSid && typeof L.olayOku === "function") {
+      const ofset = L.imlecOku?.(ROOT);
+      const r = L.olayOku(ROOT, { ofset: Number.isFinite(ofset) ? ofset : L.olaySonu(ROOT) });
+      if (r.satirlar.length)
+        console.log(`okunmamış saha olayı: ${r.satirlar.length}${r.atlanan ? ` (+${r.atlanan} tavan dışı)` : ""}`);
+    }
+  }
   if (benSid && typeof L.bildiriOku === "function") {
     let gelen = [];
     try {
@@ -555,6 +591,15 @@ async function cmdWait() {
      yükselir (yerini kaybetmeden — ilk isteyen ilk sırada). Bunu atlarsak işaret
      sonsuza dek pasif kalır: sıra tutmaz, çevrim grafiğinde görünmez. */
   L.enqueue(ROOT, resource.key, entry);
+  /* DEFTERE: AKTİF bekleyiş başladı (kapanışı `kapanis` satırı yazar → süre ölçülebilir).
+     Orkestratör "kim ne zamandan beri bekliyor"u başka hiçbir yerden göremez. */
+  L.yazOlay(ROOT, {
+    tip: "bekleyis",
+    key: resource.key,
+    engellenen: I.sessionId,
+    why: flag("intent") || null,
+    queueLen: L.activeQueue(ROOT, resource.key).length,
+  });
 
   /* KİMİ BEKLİYORUM (kullanıcı kararı 2026-07-27): bu süreç arka planda koşar ve
      çıkana dek tek satır basmazdı — çıktısına bakan "takıldı mı, kim tutuyor?"
@@ -562,6 +607,10 @@ async function cmdWait() {
      satırı artık sahibi söyler: kim (başlık) · ne yapıyor (niyet) · kaçıncı sıradayım. */
   {
     const cur0 = findClaim(resource, raw);
+    /* ZİNCİRİN GERİ YÖNÜ (aktif uç): işaret bırakan "belki dönerim" der, AKTİF bekleyen
+       gerçekten park etmiştir — sahibin bunu bilmesi en yüksek değerli haberdir. */
+    if (cur0 && !L.ownerMatch(cur0, I))
+      L.bildirSahibe?.(ROOT, cur0, { sessionId: I.sessionId, intent: flag("intent") });
     if (cur0 && !L.ownerMatch(cur0, I)) {
       const s0 = L.sessionInfo(cur0.owner?.sessionId);
       const aktif = L.queueOf(ROOT, resource.key).filter(L.waiterActive);
@@ -680,6 +729,12 @@ async function cmdWait() {
        Yalnız girişte bakmak yetmez: zincir bekleme SIRASINDA da kapanabilir. */
     const cyc = L.waitCycle(ROOT, L.activeClaims(ROOT), I.sessionId, resource.key);
     if (cyc) {
+      L.yazOlay(ROOT, {
+        tip: "cevrim",
+        key: resource.key,
+        engellenen: I.sessionId,
+        why: `bekleyiş sırasında doğdu · zincir: ${cyc.chain.join(" → ")} · tuttuklarım: ${cyc.release.join(", ")}`,
+      });
       console.error(
         [
           `DÖNGÜ (deadlock): ${resource.key} — BEKLEME BİTTİ, çözüm sende.`,
@@ -893,24 +948,32 @@ function cmdDevret() {
     }
   }
 
-  /* SAHADAN ORKESTRATÖRE: devredilen iş, üstlenecek birini arayan İŞTİR — koordinatörün
-     görmesi gereken tam olarak budur (Maestro ölüyken tek bulucusu odur). */
-  L.bildirOrkestratore?.(ROOT, {
+  /* DEFTERE: devredilen iş, üstlenecek birini arayan İŞTİR — orkestratörün görmesi gereken
+     tam olarak budur (Maestro ölüyken işin tek bulucusu odur). `why` görevi ve devir id'sini
+     taşır: şema sabittir, olay başına yeni alan açılmaz. */
+  L.yazOlay(ROOT, {
     tip: "devir",
     key: resource.key,
-    kimden: I.sessionId,
-    gorev: gorev || null,
-    devirId: isaret ? devirId : null,
+    engellenen: I.sessionId,
+    why: [gorev ? `görev: ${gorev}` : null, isaret ? `devir id: ${devirId}` : null]
+      .filter(Boolean)
+      .join(" · ") || "devret",
   });
 
-  // Kuyruk İŞARETİ (devir işaretinden AYRI şey): sahip status'ta "isteyen var" görsün,
-  // elverişli ilk anda yol versin. Sıra TUTMAZ (pid yok) — devrin sırası iş kuyruğunda.
-  L.enqueue(ROOT, resource.key, {
-    sessionId: I.sessionId,
-    since: new Date().toISOString(),
-    intent: title,
-    pid: null,
-  });
+  /* Kuyruk İŞARETİ (devir işaretinden AYRI şey): sahip status'ta "isteyen var" görsün,
+     elverişli ilk anda yol versin. Sıra TUTMAZ (pid yok) — devrin sırası iş kuyruğunda.
+     Sahibi olan bir kilit varsa haber de düşer: onu bekleyen artık bir DEVREDİLMİŞ iştir. */
+  {
+    const cur = findClaim(resource, raw);
+    if (cur && !L.ownerMatch(cur, I)) isaretBirak(cur, I, title);
+    else
+      L.enqueue(ROOT, resource.key, {
+        sessionId: I.sessionId,
+        since: new Date().toISOString(),
+        intent: title,
+        pid: null,
+      });
+  }
 
   if (maestroOk) {
     console.log(
@@ -1194,8 +1257,167 @@ function cmdOrkestrator() {
   );
 }
 
+/**
+ * `rol kayit|birak|durum --rol <ad>` — kalıcı oturumların ADI.
+ *
+ * Hex kimlik her oturumda değişir; rol kararlıdır. `orkestrator` komutu bu tablonun
+ * `--rol orkestrator` kısayolu olarak YAŞAMAYA DEVAM EDER (eski çağrılar kırılmaz).
+ *
+ * ÇOĞUL ROLE KAYIT YOK: `worker` slot tutmaz — aynı anda N tane olması normaldir ve tek
+ * bir "worker" adresi uydurmak, haberin hangi worker'a gittiğini ölçülemez kılardı.
+ */
+function cmdRol() {
+  const alt = argv[1] || "durum";
+  if (alt === "durum" || alt === "list") {
+    const roller = L.rolListe(ROOT); // kimliksiz okunur: insan da bakabilmeli
+    const benSid = process.env.CLAUDE_CODE_SESSION_ID || process.env.CLAUDE_SESSION_ID || null;
+    for (const r of roller) {
+      if (!r.tekil) {
+        const canli = L.liveSessionsIn(ROOT);
+        console.log(`  worker      ÇOĞUL — ${canli.length} canlı oturum · adreslenmez (bildir --hedef <id>)`);
+        continue;
+      }
+      const s = r.sahip ? L.sessionInfo(r.sahip.sessionId) : null;
+      console.log(
+        `  ${r.ad.padEnd(11)} ${
+          r.sahip
+            ? `${short(r.sahip.sessionId)}${r.sahip.sessionId === benSid ? " «SEN»" : ""}` +
+              `${s ? ` "${(s.title || "").slice(0, 36)}"` : ""}${r.sahip.kapsam ? ` · ${String(r.sahip.kapsam).slice(0, 40)}` : ""}`
+            : `— (boş) · ${r.ne}`
+        }`
+      );
+    }
+    return;
+  }
+  const I = me();
+  const ad = flag("rol");
+  if (!ad) {
+    console.error(`Kullanım: rol kayit --rol <${Object.keys(L.ROLLER).join("|")}> [--kapsam "..."] [--devral] | rol birak --rol <ad> | rol durum`);
+    process.exit(5);
+  }
+  if (alt === "birak") {
+    console.log(
+      L.rolBirak(ROOT, ad, I.sessionId)
+        ? `ROL BIRAKILDI: ${ad}`
+        : `Sende değil: ${ad} rolü başkasında ya da hiç kayıtlı değil.`
+    );
+    return;
+  }
+  if (alt !== "kayit") {
+    console.error("Kullanım: rol kayit|birak|durum");
+    process.exit(5);
+  }
+  const r =
+    ad === "orkestrator"
+      ? L.orkestratorKayit(ROOT, I, { kapsam: flag("kapsam"), devral: has("devral") })
+      : L.rolKayit(ROOT, ad, I, { kapsam: flag("kapsam"), devral: has("devral") });
+  if (!r.ok) {
+    if (r.neden === "tanimsiz")
+      console.error(`TANIMSIZ ROL: "${ad}" — kapalı küme: ${r.roller.join(" · ")}`);
+    else if (r.neden === "cogul")
+      console.error(
+        `ÇOĞUL ROL: "${ad}" slot TUTMAZ (aynı anda N tane olur, bu normaldir).\n` +
+          `  Kayda gerek yok: işini claim'le ve yap. Sana yazacak olan \`bildir --hedef <sessionId>\` kullanır.`
+      );
+    else {
+      const s = L.sessionInfo(r.mevcut?.sessionId);
+      console.error(
+        `ROL DOLU: ${ad} ← ${short(r.mevcut?.sessionId)}${s ? ` "${(s.title || "").slice(0, 44)}" (${s.state})` : ""}\n` +
+          `  ${dk(r.mevcut?.since)} kayıtlı. Gerçekten sen devralacaksan: rol kayit --rol ${ad} --devral`
+      );
+    }
+    process.exit(3);
+  }
+  console.log(
+    [
+      `ROL SENDE: ${ad}${r.oncekiSahip ? ` (devralındı: ${short(r.oncekiSahip)})` : ""}`,
+      `  ${L.ROLLER[ad].ne}`,
+      ad === "orkestrator"
+        ? `  Saha olayları turlarının başında sana düşecek (defter beslemesi).`
+        : `  Sana \`bildir --rol ${ad} --mesaj "…"\` ile seslenilecek; kutunu her turun başında okursun.`,
+      `  Oturum kapanınca kayıt kendiliğinden düşer; erken bırakmak: rol birak --rol ${ad}`,
+    ].join("\n")
+  );
+}
+
+/**
+ * `bildir --rol <ad> | --hedef <session> --mesaj "..." [--res <kaynak>]` — ROLLER ARASI EL.
+ *
+ * Saha olaylarını okuyan koordinatörün "şu oturum devam etsin" diyebileceği kanal. Hedefin
+ * posta kutusuna kayıt bırakır; hedef İLK TURUNDA okur (`claim-guard ctx`, tek sefer).
+ *
+ * İLANLI SINIR — POSTA KUTUSU, ZİL DEĞİL: durmuş bir oturumu UYANDIRMAZ. Uyandırma
+ * enjeksiyondur (Maestro) ve o katman ayrıdır/kilitlidir. Hedef canlı değilse komut UYARIR
+ * ama YAZAR: oturum geri döndüğünde mesaj orada olsun (haberi düşürmek, sessiz kayıptır).
+ * Kimseye özel yetki gerekmez — orkestratör olmayan da kullanabilir; koordinasyon tek
+ * yönlü bir ayrıcalık değildir.
+ */
+function cmdBildir() {
+  const I = me();
+  const mesaj = flag("mesaj");
+  const rol = flag("rol");
+  let hedef = flag("hedef");
+  if ((!hedef && !rol) || !mesaj) {
+    console.error('Kullanım: bildir (--rol <ad> | --hedef <sessionId>) --mesaj "<metin>" [--res <kaynak>]');
+    process.exit(5);
+  }
+  /* ROL ÇÖZÜMÜ — BELİRSİZLİKTE ADRES ÜRETİLMEZ. "En iyi tahmin" bir muhatap seçmek,
+     haberin sessizce yanlış oturuma gitmesi demektir; yanlış adres, adressizlikten beterdir
+     çünkü gönderen "ilettim" sanır (kullanıcı kararı 2026-08-09: çoğul rolde karışıklığı
+     ÖNLE). Bu yüzden çözülemeyen her hâl exit 5 ile ve NEDENİYLE durur. */
+  if (rol) {
+    const c = L.rolCoz(ROOT, rol);
+    if (!c.ok) {
+      if (c.neden === "tanimsiz") console.error(`TANIMSIZ ROL: "${rol}" — kapalı küme: ${c.roller.join(" · ")}`);
+      else if (c.neden === "cogul")
+        console.error(
+          `ÇOĞUL ROL: "${rol}" adreslenemez — aynı anda N tane olabilir ve hangisi olduğu ÖLÇÜLEMEZ.\n` +
+            `  Muhatabı sen seç: node ${process.argv[1]} status  →  bildir --hedef <sessionId>` +
+            (c.adaylar?.length
+              ? `\n  canlı oturumlar:\n` +
+                c.adaylar.map((s) => `    ${short(s.sessionId)} "${(s.title || "").slice(0, 48)}" (${s.state})`).join("\n")
+              : "")
+        );
+      else console.error(`ROL SAHİPSİZ: "${rol}" — o rolü üstlenmiş canlı oturum yok (rol durum ile bak).`);
+      process.exit(5);
+    }
+    hedef = c.sessionId;
+  }
+  if (hedef === I.sessionId) {
+    console.error("HATA: hedef SENSİN — kendine bildiri yazmak gürültüdür.");
+    process.exit(5);
+  }
+  const s = L.sessionInfo(hedef);
+  const key = flag("res") ? resolveRes(flag("res")).key : null;
+  const yazildi = L.bildir(ROOT, {
+    hedef,
+    tip: "elle",
+    key,
+    kimden: I.sessionId,
+    kimdenBaslik: L.sessionInfo(I.sessionId)?.title || null,
+    mesaj: String(mesaj),
+  });
+  if (!yazildi) {
+    console.error(`BİLDİRİ YAZILAMADI: ${short(hedef)} — kutu açılamadı.`);
+    process.exit(5);
+  }
+  console.log(
+    [
+      `BİLDİRİ GÖNDERİLDİ → ${rol ? `[${rol}] ` : ""}${short(hedef)}${s ? ` "${(s.title || "(başlıksız)").slice(0, 48)}" (${s.state})` : ""}`,
+      key ? `  kaynak: ${key}` : ``,
+      s
+        ? `  Hedef ilk turunda okuyacak (posta kutusu — ZİL DEĞİL, oturumu uyandırmaz).`
+        : `  ⚠ hedef ŞU AN CANLI DEĞİL — mesaj kutuda bekliyor, oturum dönerse okur.`,
+    ]
+      .filter(Boolean)
+      .join("\n")
+  );
+}
+
 const table = {
   claim: cmdClaim,
+  bildir: cmdBildir,
+  rol: cmdRol,
   release: cmdRelease,
   orkestrator: cmdOrkestrator,
   status: cmdStatus,

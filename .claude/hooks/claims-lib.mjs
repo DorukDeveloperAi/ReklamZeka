@@ -29,6 +29,9 @@ import {
   realpathSync,
   unlinkSync,
   appendFileSync,
+  openSync,
+  readSync,
+  closeSync,
 } from "node:fs";
 
 export const CLAUDE = join(homedir(), ".claude");
@@ -701,8 +704,13 @@ export const olayPath = (repoRoot) => join(ledgerDirOf(repoRoot), "olay.jsonl");
 /**
  * Deftere TEK satır ekle. Dönüş yazıldı mı — ama HİÇBİR çağıran bunu okumaz (05.4).
  * Şema SABİTtir: alanı olmayan olay `null` taşır (eksik alan yerine null → okuyucu tek şema
- * görür). `tip` üç değerden biri: `deny` (kapı reddetti) · `mesgul` (CLI bloke oldu) ·
- * `kapanis` (bekleyiş bitti).
+ * görür). `tip` sözlüğü (2026-08-09'da tamamlandı — defter artık eşzamanlılığın TEK kaynağı,
+ * orkestratör beslemesi bunun projeksiyonudur; deftere düşmeyen olay kimseye ulaşmaz):
+ *   `deny` kapı reddetti · `mesgul` CLI bloke oldu · `kapanis` bekleyiş bitti (`sonuc`) ·
+ *   `claimsiz` claim'siz ilk yazım · `alindi` kilit alındı · `birakildi` kilit bırakıldı ·
+ *   `bekleyis` aktif bekleyiş başladı · `devir` iş/kilit devredildi · `cevrim` deadlock görüldü.
+ * YENİ TİP EKLERKEN: yalnız buraya ekle — okuyucu (`olayOku`) tipten bağımsızdır, çizim
+ * (`claim-guard: sahaBloku`) tanımadığı tipi ham satır olarak basar, yani hiçbir olay DÜŞMEZ.
  */
 export function yazOlay(repoRoot, kayit) {
   try {
@@ -1743,6 +1751,143 @@ export function bildirSiradakine(repoRoot, key, kimden = {}) {
   return { aktif, sessiz, bildirilen };
 }
 
+/**
+ * ZİNCİRİN GERİ YÖNÜ — kilidi TUTANA "seni bekleyen var" haberi.
+ *
+ * Bildiri bugüne dek yalnız İLERİ akıyordu (bitiren → sıradaki). Oysa bir oturum kilit
+ * aşamasında bloke olduğunda bu bilginin asıl muhatabı kilidi tutandır: küçük bir işi
+ * bekletiyor olabilir ve bunu ancak `status`a bakarsa görür. Sıra bir zincirse, zincirin
+ * gerisindeki halkanın varlığı öndekine SÖYLENİR.
+ *
+ * YALNIZ YENİ BEKLEYEN İÇİN: yankı bildirilmez. Ölçüt kuyruğun kendisidir — kayıt zaten
+ * varsa bu yeni bir tıkanıklık değil, bekleyişin uzamasıdır (çağıran `yeniMi` ile söyler).
+ * Sahip = ben isem yazılmaz (kendi kilidime kendim engel değilim).
+ */
+export function bildirSahibe(repoRoot, claim, bekleyen = {}) {
+  try {
+    const sahip = claim?.owner?.sessionId;
+    if (!sahip || sahip === bekleyen.sessionId) return null;
+    const k = claim?.resource?.key;
+    if (!k) return null;
+    return bildir(repoRoot, {
+      hedef: sahip,
+      tip: "bekleyenVar",
+      key: k,
+      kimden: bekleyen.sessionId || null,
+      kimdenBaslik: bekleyen.sessionId ? sessionInfo(bekleyen.sessionId)?.title || null : null,
+      bekleyenNiyet: bekleyen.intent || null,
+      kuyruk: activeQueue(repoRoot, k).length + queueOf(repoRoot, k).filter((w) => !waiterActive(w)).length,
+    });
+  } catch {
+    return null; // haber, kapının kararını ASLA etkilemez
+  }
+}
+
+/* ═══════════════ ROL TABLOSU — kalıcı oturumların adı olsun (seviye 0) ═══════════════
+ *
+ * Oturumlar birbirine hex kimlikle sesleniyordu (`bildir --hedef 06584495`) ve o kimlik HER
+ * oturumda değişiyor: "altyapıya söyle" demek için önce `status`a bakmak gerekiyordu. Rol,
+ * kimliğin ÜSTÜNDEKİ kararlı addır — oturum yenilenince bağ kopmaz.
+ *
+ * KAPALI KÜME (vendor'lardaki gibi): tanınmayan rol kabul EDİLMEZ. Gerekçe kullanıcı
+ * kararıdır (2026-08-09): serbest metin rol adı, "altyapi" ile "altyapı"yı iki ayrı role
+ * çevirir ve haber sessizce yanlış kutuya düşer.
+ *
+ * TEKİL ⊕ ÇOĞUL — bu ayrım bu tablonun ASIL işidir:
+ *   · TEKİL rol (orkestrator·altyapi·pm·vizyon·plan) tek slottur: canlı bir sahibi varken
+ *     ikincisi sessizce kapamaz, `--devral` ister. `bildir --rol X` tek muhatap bulur.
+ *   · ÇOĞUL rol (worker) slot TUTMAZ: aynı anda N tane olur ve bu normaldir. `--rol worker`
+ *     ile bildiri göndermek YASAKTIR — hangi worker olduğu belirsizdir ve belirsiz adres,
+ *     yanlış adresten beterdir (haber gider, yanlış yere gider, kimse fark etmez).
+ * Çoğul rolde muhatap seçmek çağıranın işidir: `rol durum` adayları listeler, `bildir
+ * --hedef <sessionId>` ile tek tek yazılır.
+ */
+export const ROLLER = {
+  orkestrator: { tekil: true, ne: "repo içi koordinasyon — saha olayları buraya akar" },
+  altyapi: { tekil: true, ne: "kit · boot · sync · kurulum · filing · vendor · seviye 0" },
+  pm: { tekil: true, ne: "projeler-arası üst hedef ve dağıtım" },
+  vizyon: { tekil: true, ne: "kutup yıldızı (utopya/) — epizodik, sürekli açık olması beklenmez" },
+  plan: { tekil: true, ne: "roadmap üretimi/revizyonu — plan başına açılır" },
+  worker: { tekil: false, ne: "işi yapan oturum(lar) — ÇOĞUL, slot tutmaz, adreslenmez" },
+};
+export const rolDirOf = (repoRoot) => join(ledgerDirOf(repoRoot), "rol");
+export const rolPath = (repoRoot, ad) => join(rolDirOf(repoRoot), `${slugOf(ad)}.json`);
+export const rolGecerli = (ad) => Object.prototype.hasOwnProperty.call(ROLLER, String(ad || ""));
+
+/** Rolün CANLI sahibi (yoksa/ölmüşse null). Canlılık ölçütü claim'lerinkinin AYNISI. */
+export function rolOku(repoRoot, ad) {
+  let j;
+  try {
+    j = JSON.parse(readFileSync(rolPath(repoRoot, ad), "utf8"));
+  } catch {
+    return null;
+  }
+  if (!j?.sessionId) return null;
+  const s = sessionInfo(j.sessionId);
+  const canli = procAlive(j.pid, j.procStart) || (s && procAlive(s.pid, s.procStart));
+  return canli ? j : null;
+}
+
+/** Tüm roller: tanımlı küme ⊕ canlı sahibi (yoksa null). Teşhis ve `bildir` çözümü için. */
+export function rolListe(repoRoot) {
+  return Object.entries(ROLLER).map(([ad, tanim]) => ({ ad, ...tanim, sahip: tanim.tekil ? rolOku(repoRoot, ad) : null }));
+}
+
+export function rolKayit(repoRoot, ad, kimlik, { kapsam = null, devral = false } = {}) {
+  if (!rolGecerli(ad)) return { ok: false, neden: "tanimsiz", roller: Object.keys(ROLLER) };
+  if (!ROLLER[ad].tekil) return { ok: false, neden: "cogul" }; // worker slot tutmaz
+  const mevcut = rolOku(repoRoot, ad);
+  if (mevcut && mevcut.sessionId !== kimlik.sessionId && !devral)
+    return { ok: false, neden: "dolu", mevcut };
+  const kayit = {
+    v: 1,
+    rol: ad,
+    sessionId: kimlik.sessionId,
+    pid: kimlik.pid ?? null,
+    procStart: kimlik.procStart ?? null,
+    since: new Date().toISOString(),
+    kapsam,
+    devralindi: mevcut && mevcut.sessionId !== kimlik.sessionId ? mevcut.sessionId : null,
+  };
+  mkdirSync(rolDirOf(repoRoot), { recursive: true, mode: 0o700 });
+  atomicWrite(rolPath(repoRoot, ad), kayit);
+  return { ok: true, kayit, oncekiSahip: kayit.devralindi };
+}
+
+/** Bırak — yalnız KENDİ kaydını (üçüncü taraf başkasının rolünü düşüremez). */
+export function rolBirak(repoRoot, ad, sessionId) {
+  let j;
+  try {
+    j = JSON.parse(readFileSync(rolPath(repoRoot, ad), "utf8"));
+  } catch {
+    return false;
+  }
+  if (j?.sessionId !== sessionId) return false;
+  try {
+    unlinkSync(rolPath(repoRoot, ad));
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+/** Bu oturumun ÜSTLENDİĞİ roller (kapanışta hepsini bırakmak için). */
+export function rolleriOf(repoRoot, sessionId) {
+  return Object.keys(ROLLER).filter((ad) => rolOku(repoRoot, ad)?.sessionId === sessionId);
+}
+
+/**
+ * `bildir --rol <ad>` çözümü. BELİRSİZLİKTE ADRES ÜRETMEZ — bu fonksiyonun asıl sözü budur:
+ * çoğul rolde (worker) ya da sahipsiz rolde bir "en iyi tahmin" döndürmek, haberin sessizce
+ * yanlış oturuma gitmesi demektir. Hüküm açıkça `neden` ile döner, çağıran onu BASAR.
+ */
+export function rolCoz(repoRoot, ad) {
+  if (!rolGecerli(ad)) return { ok: false, neden: "tanimsiz", roller: Object.keys(ROLLER) };
+  if (!ROLLER[ad].tekil) return { ok: false, neden: "cogul", adaylar: liveSessionsIn(repoRoot) };
+  const r = rolOku(repoRoot, ad);
+  return r ? { ok: true, sessionId: r.sessionId, kayit: r } : { ok: false, neden: "sahipsiz" };
+}
+
 /* ══════════ ORKESTRATÖR — sahadaki tek koordinatör oturum (seviye 0) ══════════
  *
  * Bildiri, "sıradaki bekleyen"i çözdü ama bir boşluk daha vardı: planı yürüten,
@@ -1767,65 +1912,147 @@ export function bildirSiradakine(repoRoot, key, kimden = {}) {
    için taramanın dışındadır — `devir/` ve `bildiri/` de bu yüzden alt dizindir. */
 export const orkestratorPath = (repoRoot) =>
   join(ledgerDirOf(repoRoot), "orkestrator", "kayit.json");
+export const orkestratorImlecPath = (repoRoot) =>
+  join(ledgerDirOf(repoRoot), "orkestrator", "imlec.json");
 
-/** Bu repoda CANLI orkestratör (yoksa/ölmüşse null). Kayıt SİLİNMEZ — hüküm ölçümdür. */
+/**
+ * DEFTER OKUYUCUSU — orkestratör beslemesinin tek kaynağı.
+ *
+ * `olay.jsonl` bugüne dek yalnız YAZILIYORDU (belgesinde "okuyucu yüzey YOKTUR" diye ilan
+ * edilmişti). Besleme onun PROJEKSİYONUdur: dört olayı elle bağlamak yerine defteri okumak,
+ * "yeni bir olay tipi eklendi ama biri bağlamayı unuttu" sınıfını tümüyle ortadan kaldırır.
+ *
+ * İmleç BAYT OFSETİdir (satır sayısı değil): dosya yalnız sona eklenerek büyür (`appendFileSync`,
+ * PIPE_BUF altı satırlar bölünmez) → ofset kararlı bir kesme noktasıdır. Dosya KÜÇÜLDÜYSE
+ * (rotasyon · elle temizlik) ofset 0'a düşer: ölçüm yokluğunda geçmiş UYDURULMAZ, baştan okunur.
+ * Son satır yarım yazılmışsa (eşzamanlı append) o satır TÜKETİLMEZ — ofset onun başında bırakılır.
+ */
+export function olayOku(repoRoot, { ofset = 0, tavan = 2000 } = {}) {
+  const f = olayPath(repoRoot);
+  let boy = 0;
+  try {
+    boy = statSync(f).size;
+  } catch {
+    return { satirlar: [], ofset: 0, atlanan: 0, boy: 0 }; // defter yok = olay yok
+  }
+  let bas = Number.isFinite(ofset) && ofset >= 0 ? ofset : 0;
+  if (bas > boy) bas = 0; // dosya küçüldü → baştan
+  if (bas === boy) return { satirlar: [], ofset: boy, atlanan: 0, boy };
+  let ham = "";
+  try {
+    const fd = openSync(f, "r");
+    try {
+      const buf = Buffer.allocUnsafe(boy - bas);
+      readSync(fd, buf, 0, buf.length, bas);
+      ham = buf.toString("utf8");
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return { satirlar: [], ofset, atlanan: 0, boy };
+  }
+  /* Yarım satır koruması: son "\n"den sonrası bir sonraki okumaya bırakılır. */
+  const sonNl = ham.lastIndexOf("\n");
+  const tuketilen = sonNl < 0 ? 0 : sonNl + 1;
+  const govde = ham.slice(0, tuketilen);
+  const satirlar = [];
+  for (const l of govde.split("\n")) {
+    if (!l) continue;
+    try {
+      satirlar.push(JSON.parse(l));
+    } catch {
+      /* bozuk satır ATLANIR, silinmez — ölçülemeyene hüküm verilmez */
+    }
+  }
+  const atlanan = Math.max(0, satirlar.length - tavan);
+  return { satirlar: atlanan ? satirlar.slice(-tavan) : satirlar, ofset: bas + tuketilen, atlanan, boy };
+}
+
+/** İmleci oku (yoksa dosyanın SONU: geçmiş dökülmez). */
+export function imlecOku(repoRoot) {
+  try {
+    const j = JSON.parse(readFileSync(orkestratorImlecPath(repoRoot), "utf8"));
+    return Number.isFinite(j?.ofset) ? j.ofset : 0;
+  } catch {
+    return null; // kayıt yok → çağıran "şimdiden itibaren" kurar
+  }
+}
+
+export function imlecYaz(repoRoot, ofset) {
+  try {
+    mkdirSync(join(ledgerDirOf(repoRoot), "orkestrator"), { recursive: true, mode: 0o700 });
+    atomicWrite(orkestratorImlecPath(repoRoot), { v: 1, ofset, ts: new Date().toISOString() });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Defterin ŞU ANKİ sonu — kayıt anında imleç buraya konur (yeni orkestratör arşivle karşılanmaz). */
+export function olaySonu(repoRoot) {
+  try {
+    return statSync(olayPath(repoRoot)).size;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Orkestratör = rol tablosundaki `orkestrator` rolü (2026-08-09'da genelleştirildi).
+ *
+ * ESKİ YOL SESSİZCE DÜŞÜRÜLMEZ: genelleştirmeden önce kaydolmuş CANLI bir orkestratör
+ * `orkestrator/kayit.json`'da duruyor olabilir ve onu görmezden gelmek, çalışan bir
+ * koordinasyonu bir dosya taşıma yüzünden yok saymak olurdu. Yeni kayıt varsa o geçerlidir;
+ * yoksa eski dosyaya BAKILIR (okuma yolu geriye uyumlu, yazma yolu yalnız yeniye yazar).
+ */
 export function orkestratorOku(repoRoot) {
+  const yeni = rolOku(repoRoot, "orkestrator");
+  if (yeni) return yeni;
   let j;
   try {
-    j = JSON.parse(readFileSync(orkestratorPath(repoRoot), "utf8"));
+    j = JSON.parse(readFileSync(orkestratorPath(repoRoot), "utf8")); // eski yol
   } catch {
     return null;
   }
   if (!j?.sessionId) return null;
   const s = sessionInfo(j.sessionId);
-  const canli = procAlive(j.pid, j.procStart) || (s && procAlive(s.pid, s.procStart));
-  return canli ? j : null;
+  return procAlive(j.pid, j.procStart) || (s && procAlive(s.pid, s.procStart)) ? j : null;
 }
 
 /** Kayıt ol. Başkası CANLI kayıtlıysa devralma AÇIK BEYAN ister (sessiz kapma yok). */
 export function orkestratorKayit(repoRoot, kimlik, { kapsam = null, devral = false } = {}) {
-  const mevcut = orkestratorOku(repoRoot);
-  if (mevcut && mevcut.sessionId !== kimlik.sessionId && !devral)
-    return { ok: false, neden: "dolu", mevcut };
-  const kayit = {
-    v: 1,
-    sessionId: kimlik.sessionId,
-    pid: kimlik.pid ?? null,
-    procStart: kimlik.procStart ?? null,
-    since: new Date().toISOString(),
-    kapsam,
-    devralindi: mevcut && mevcut.sessionId !== kimlik.sessionId ? mevcut.sessionId : null,
-  };
-  mkdirSync(join(ledgerDirOf(repoRoot), "orkestrator"), { recursive: true, mode: 0o700 });
-  atomicWrite(orkestratorPath(repoRoot), kayit);
-  return { ok: true, kayit, oncekiSahip: kayit.devralindi };
+  const r = rolKayit(repoRoot, "orkestrator", kimlik, { kapsam, devral });
+  if (!r.ok) return r;
+  /* İMLEÇ DEFTERİN SONUNA: yeni orkestratör, kaydolmadan önceki günlerin arşiviyle
+     karşılanmaz. "Kaydolduğum andan itibaren" sözleşmesi burada kurulur. */
+  imlecYaz(repoRoot, olaySonu(repoRoot));
+  return r;
 }
 
-/** Bırak — yalnız KENDİ kaydını (başkasınınkini üçüncü taraf silemez). */
+/** Bırak — yalnız KENDİ kaydını (başkasınınkini üçüncü taraf silemez). Eski yol da temizlenir. */
 export function orkestratorBirak(repoRoot, sessionId) {
-  let j;
+  const yeni = rolBirak(repoRoot, "orkestrator", sessionId);
+  let eski = false;
   try {
-    j = JSON.parse(readFileSync(orkestratorPath(repoRoot), "utf8"));
+    const j = JSON.parse(readFileSync(orkestratorPath(repoRoot), "utf8"));
+    if (j?.sessionId === sessionId) {
+      unlinkSync(orkestratorPath(repoRoot));
+      eski = true;
+    }
   } catch {
-    return false;
+    /* eski kayıt yok */
   }
-  if (j?.sessionId !== sessionId) return false;
-  try {
-    unlinkSync(orkestratorPath(repoRoot));
-  } catch {
-    return false;
-  }
-  return true;
+  return yeni || eski;
 }
 
 /**
- * Sahadan orkestratöre olay düşür. KENDİ olayını kendine YAZMAZ (orkestratör de sahada
- * çalışır; kendi bıraktığı kilidi kendine haber vermek gürültüdür).
+ * Orkestratörün posta kutusuna HEDEFLİ bir kayıt bırak (elle bildiriler · özel durumlar).
  *
- * Tipler: `bitti` (kilit bırakıldı = o iş bitti) · `bloke` (bir oturum kapıda durdu) ·
- * `kapandi` (oturum açık kilitle/işle kapandı) · `devir` (iş devredildi, üstlenen aranıyor).
- * Hepsi AYNI posta kutusuna düşer; okuma ucu tipe göre ayırır. Hata YUTULUR — haber,
- * haber verdiren işi (release · DENY · kapanış) ASLA bozmaz.
+ * DİKKAT — SAHA BESLEMESİ ARTIK BURADAN GEÇMEZ (2026-08-09): olayların orkestratöre akışı
+ * `olay.jsonl` PROJEKSİYONUdur (`olayOku` + imleç, çizim `claim-guard: sahaBloku`). Dört olayı
+ * elle bağlamak kırılgandı: beşinci olay eklendiğinde biri çağırmayı unutursa besleme sessizce
+ * eksilirdi. Bu fonksiyon yalnız defterde KARŞILIĞI OLMAYAN, kişiye özel haberler içindir.
+ * KENDİ olayını kendine yazmaz. Hata YUTULUR — haber, haber verdiren işi ASLA bozmaz.
  */
 export function bildirOrkestratore(repoRoot, olay = {}) {
   try {

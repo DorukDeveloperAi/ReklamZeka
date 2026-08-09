@@ -1011,6 +1011,114 @@ export const categoryDefinitions = pgTable("category_definitions", {
   check("category_definitions_version_positive", sql`${table.version} >= 1`),
 ]);
 
+/** Immutable CategoryProfile revisions; references are advisory inputs and never action authority. */
+export const categoryProfileRevisions = pgTable("category_profile_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  categoryDefinitionId: uuid("category_definition_id").notNull(),
+  parentCategoryDefinitionId: uuid("parent_category_definition_id"),
+  workspaceRef: text("workspace_ref").notNull(),
+  profileRef: text("profile_ref").notNull(),
+  categoryRef: text("category_ref").notNull(),
+  parentCategoryRef: text("parent_category_ref"),
+  schemaVersion: text("schema_version").notNull(),
+  version: integer("version").notNull(),
+  previousProfileHash: text("previous_profile_hash"),
+  label: text("label").notNull(),
+  description: text("description").notNull(),
+  color: text("color").notNull(),
+  ownerRef: text("owner_ref").notNull(),
+  status: text("status").notNull(),
+  profileHash: text("profile_hash").notNull(),
+  profilePayload: jsonb("profile_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.categoryDefinitionId],
+    foreignColumns: [categoryDefinitions.workspaceId, categoryDefinitions.id],
+    name: "category_profile_revisions_definition_scope_fk",
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.workspaceId, table.parentCategoryDefinitionId],
+    foreignColumns: [categoryDefinitions.workspaceId, categoryDefinitions.id],
+    name: "category_profile_revisions_parent_scope_fk",
+  }).onDelete("restrict"),
+  uniqueIndex("category_profile_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("category_profile_revisions_workspace_profile_version_unique")
+    .on(table.workspaceId, table.profileRef, table.version),
+  uniqueIndex("category_profile_revisions_workspace_definition_version_unique")
+    .on(table.workspaceId, table.categoryDefinitionId, table.version),
+  uniqueIndex("category_profile_revisions_workspace_hash_unique").on(table.workspaceId, table.profileHash),
+  index("category_profile_revisions_latest_idx").on(table.workspaceId, table.profileRef, table.version),
+  index("category_profile_revisions_definition_idx").on(table.workspaceId, table.categoryDefinitionId, table.version),
+  check("category_profile_revisions_identity", sql`
+    ${table.schemaVersion} = 'category-profile/1.0.0'
+    and ${table.version} between 1 and 1000000
+    and ${table.workspaceRef} ~ '^workspace_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.profileRef} ~ '^category_profile_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.categoryRef} ~ '^category_[a-f0-9]{24}$'
+    and (${table.parentCategoryRef} is null or ${table.parentCategoryRef} ~ '^category_[a-f0-9]{24}$')
+    and ((${table.parentCategoryDefinitionId} is null and ${table.parentCategoryRef} is null)
+      or (${table.parentCategoryDefinitionId} is not null and ${table.parentCategoryRef} is not null))
+    and ${table.categoryDefinitionId} is distinct from ${table.parentCategoryDefinitionId}
+    and ${table.ownerRef} ~ '^actor_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.color} ~ '^#[0-9A-F]{6}$'
+    and ${table.profileHash} ~ '^[a-f0-9]{64}$'
+    and ((${table.version} = 1 and ${table.previousProfileHash} is null)
+      or (${table.version} > 1 and ${table.previousProfileHash} ~ '^[a-f0-9]{64}$'))
+    and ${table.status} in ('draft', 'active', 'paused', 'archived')
+  `),
+  check("category_profile_revisions_payload_exact", sql`(
+    jsonb_typeof(${table.profilePayload}) = 'object'
+    and ${table.profilePayload} #>> '{schemaVersion}' = ${table.schemaVersion}
+    and ${table.profilePayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+    and ${table.profilePayload} #>> '{profileRef}' = ${table.profileRef}
+    and ${table.profilePayload} #>> '{categoryRef}' = ${table.categoryRef}
+    and (${table.profilePayload} #>> '{parentCategoryRef}') is not distinct from ${table.parentCategoryRef}
+    and (${table.profilePayload} #>> '{version}')::integer = ${table.version}
+    and (${table.profilePayload} #>> '{previousProfileHash}') is not distinct from ${table.previousProfileHash}
+    and ${table.profilePayload} #>> '{label}' = ${table.label}
+    and ${table.profilePayload} #>> '{description}' = ${table.description}
+    and ${table.profilePayload} #>> '{color}' = ${table.color}
+    and ${table.profilePayload} #>> '{ownerRef}' = ${table.ownerRef}
+    and ${table.profilePayload} #>> '{status}' = ${table.status}
+    and ${table.profilePayload} #>> '{profileHash}' = ${table.profileHash}
+    and ${table.profilePayload} #> '{authority,canAuthorizeAction}' = 'false'::jsonb
+    and ${table.profilePayload} #> '{authority,canExecuteWrite}' = 'false'::jsonb
+    and ${table.profilePayload} #> '{authority,canWriteMeta}' = 'false'::jsonb
+    and ${table.profilePayload} #> '{authority,canGrantApproval}' = 'false'::jsonb
+  ) is true`),
+  check("category_profile_revisions_bindings", sql`(
+    jsonb_typeof(${table.profilePayload} #> '{bindings}') = 'object'
+    and jsonb_typeof(${table.profilePayload} #> '{bindings,analysisPlaybookRefs}') = 'array'
+    and jsonb_array_length(${table.profilePayload} #> '{bindings,analysisPlaybookRefs}') between 1 and 64
+    and jsonb_typeof(${table.profilePayload} #> '{bindings,ruleInstructionBundleRefs}') = 'array'
+    and jsonb_array_length(${table.profilePayload} #> '{bindings,ruleInstructionBundleRefs}') <= 64
+    and jsonb_typeof(${table.profilePayload} #> '{bindings,budgetPolicyRefs}') = 'array'
+    and jsonb_array_length(${table.profilePayload} #> '{bindings,budgetPolicyRefs}') <= 64
+    and jsonb_typeof(${table.profilePayload} #> '{bindings,transferPolicyRefs}') = 'array'
+    and jsonb_array_length(${table.profilePayload} #> '{bindings,transferPolicyRefs}') <= 64
+    and jsonb_typeof(${table.profilePayload} #> '{bindings,schedulePolicyRefs}') = 'array'
+    and jsonb_array_length(${table.profilePayload} #> '{bindings,schedulePolicyRefs}') <= 64
+    and jsonb_typeof(${table.profilePayload} #> '{bindings,actionPolicyRefs}') = 'array'
+    and jsonb_array_length(${table.profilePayload} #> '{bindings,actionPolicyRefs}') <= 64
+    and jsonb_typeof(${table.profilePayload} #> '{bindings,creativePolicyRefs}') = 'array'
+    and jsonb_array_length(${table.profilePayload} #> '{bindings,creativePolicyRefs}') <= 64
+    and not jsonb_path_exists(${table.profilePayload}, '$.bindings.analysisPlaybookRefs[*] ? (!(@ like_regex "^analysis_playbook_[a-z0-9][a-z0-9_.:-]{0,126}$"))')
+    and not jsonb_path_exists(${table.profilePayload}, '$.bindings.ruleInstructionBundleRefs[*] ? (!(@ like_regex "^(instruction_bundle_|rule_bundle_)[a-z0-9][a-z0-9_.:-]{0,126}$"))')
+    and not jsonb_path_exists(${table.profilePayload}, '$.bindings.budgetPolicyRefs[*] ? (!(@ like_regex "^(budget_policy_|budget_envelope_)[a-z0-9][a-z0-9_.:-]{0,126}$"))')
+    and not jsonb_path_exists(${table.profilePayload}, '$.bindings.transferPolicyRefs[*] ? (!(@ like_regex "^transfer_policy_[a-z0-9][a-z0-9_.:-]{0,126}$"))')
+    and not jsonb_path_exists(${table.profilePayload}, '$.bindings.schedulePolicyRefs[*] ? (!(@ like_regex "^(schedule_policy_|cadence_profile_)[a-z0-9][a-z0-9_.:-]{0,126}$"))')
+    and not jsonb_path_exists(${table.profilePayload}, '$.bindings.actionPolicyRefs[*] ? (!(@ like_regex "^(action_policy_|approval_policy_|guardrail_|autonomy_rule_)[a-z0-9][a-z0-9_.:-]{0,126}$"))')
+    and not jsonb_path_exists(${table.profilePayload}, '$.bindings.creativePolicyRefs[*] ? (!(@ like_regex "^creative_policy_[a-z0-9][a-z0-9_.:-]{0,126}$"))')
+  ) is true`),
+  check("category_profile_revisions_no_forbidden_material", sql`
+    ${table.profilePayload}::text !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json)|authorization|approvalgranted)"[[:space:]]*:'
+    and ${table.profilePayload}::text !~* '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
+    and ${table.profilePayload}::text !~* '"(canAuthorizeAction|canExecuteWrite|canWriteMeta|canGrantApproval)"[[:space:]]*:[[:space:]]*true'
+  `),
+]);
+
 function categoryAssignmentRevisionScope(): [AnyPgColumn, AnyPgColumn, AnyPgColumn] {
   return [categoryAssignments.id, categoryAssignments.workspaceId, categoryAssignments.dimensionId];
 }
@@ -1576,7 +1684,7 @@ export const effectiveCampaignContextComponents = pgTable("effective_campaign_co
     .on(table.workspaceId, table.componentType, table.componentRef, table.componentVersion),
   index("effective_campaign_context_components_context_idx").on(table.contextId),
   check("effective_campaign_context_components_type", sql`${table.componentType} in (
-    'source_snapshot', 'category_resolution', 'guidance_pack', 'meta_catalog',
+    'source_snapshot', 'category_resolution', 'category_profile', 'guidance_pack', 'meta_catalog',
     'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
     'timeframe_resolver'
   )`),
@@ -1608,7 +1716,7 @@ export const effectiveCampaignContextInvalidations = pgTable("effective_campaign
     .on(table.workspaceId, table.entityType, table.entityRef, table.observedAt),
   check("effective_campaign_context_invalidations_hash_format", sql`${table.eventHash} ~ '^[a-f0-9]{64}$'`),
   check("effective_campaign_context_invalidations_type", sql`${table.componentType} in (
-    'source_snapshot', 'category_resolution', 'guidance_pack', 'meta_catalog',
+    'source_snapshot', 'category_resolution', 'category_profile', 'guidance_pack', 'meta_catalog',
     'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
     'timeframe_resolver'
   )`),

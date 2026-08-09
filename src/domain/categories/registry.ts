@@ -71,6 +71,13 @@ export type FrozenCategoryContext = Readonly<{
     entityLevel: CategoryEntityLevel;
     manualLock: boolean;
   }>[];
+  /** Optional additive evidence; absent on historical snapshots created before CategoryProfile. */
+  profileBindings?: readonly Readonly<{
+    categoryRef: string;
+    profileRef: string;
+    profileVersion: number;
+    profileHash: string;
+  }>[];
   resolutionHash: string;
 }>;
 

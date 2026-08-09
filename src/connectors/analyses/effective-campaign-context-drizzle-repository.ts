@@ -15,6 +15,7 @@ type ContextDatabase = Pick<Database, "select" | "insert" | "execute" | "transac
 export const CONTEXT_SOURCE_COMPONENT_TYPES = Object.freeze([
   "source_snapshot",
   "category_resolution",
+  "category_profile",
   "guidance_pack",
   "meta_catalog",
   "category_resolver",
@@ -142,6 +143,11 @@ export function sourceComponentsOf(context: EffectiveCampaignContext): readonly 
       componentRef: category.dimension.id,
       componentVersion: category.resolutionHash,
     })),
+    ...context.categories.flatMap((category) => (category.profileBindings ?? []).map((profile) => ({
+      componentType: "category_profile" as const,
+      componentRef: profile.profileRef,
+      componentVersion: profile.profileHash,
+    }))),
     {
       componentType: "guidance_pack",
       componentRef: "effective-guidance-pack",

@@ -53,10 +53,14 @@ yazımı `claim-guard` REDDEDER. `C=~/.claude/skills/eszamanli/scripts/claim.mjs
 - **BIRAKAN HABER VERİR (2026-08-09):** `release` (ve SessionEnd), uyanma yolu OLMAYAN sıradaki
   bekleyenlere **bildiri** bırakır; aktif `wait` süreci olana yazılmaz (o kendi uyanır). Okuma
   `ctx` hook'unda, **tek sefer**. Posta kutusu — **ZİL DEĞİL:** durmuş oturumu uyandırmaz.
-- **ORKESTRATÖR** (`orkestrator kayit|durum|birak`): sahadaki koordinatör oturum; saha olayları
-  (`bitti`·`bloke`·`kapandı`·`devir`) ona KENDİLİĞİNDEN düşer — kimse rapor yazmaz. Repo başına
-  **tek slot** (`--devral` ile devredilir), canlılık pid'le ölçülür, kapsam **repo**'dur
-  (projeler-arası eksen `/pm`). PM karar verir, orkestratör **haber alır**.
+- **ZİNCİRİN İKİ YÖNÜ:** bitirince İLERİ (sıradakine), kilit aşamasında bloke olunca GERİ
+  (kilidi TUTANA) haber gider — ikisi de yalnız YENİ bekleyende, yankı bildirilmez.
+- **ORKESTRATÖR** (`orkestrator kayit|durum|birak`): sahadaki koordinatör oturum. Beslemesi
+  **`olay.jsonl`'ın projeksiyonudur** (imleç: `orkestrator/imlec.json`) — alindi·birakildi·
+  deny·bekleyis·kapanis·kapandi·devir·cevrim **yapısal olarak** akar, elle bağlanmaz; gürültü
+  katlanır (tavan 12 satır, >500 olayda yalnız sayaç). Eli: `bildir --hedef <sid> --mesaj "…"`.
+  Repo başına **tek slot** (`--devral`), canlılık pid'le, kapsam **repo** (projeler-arası eksen
+  `/pm`). PM karar verir, orkestratör **haber alır**.
 - Canlılık **pid**'le ölçülür → kilidi **ELLE SİLME** · kapı **YAZIMI** ölçer, adı anmayı değil.
 
 Detay: `/Users/ybg/dev/agent-ide/docs/claim-anahtarlari.md`

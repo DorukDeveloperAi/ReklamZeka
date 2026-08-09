@@ -21,6 +21,7 @@ import {
 import {
   CategoryRegistryPersistenceError,
   CategoryRegistryService,
+  type CategoryHierarchyTarget,
 } from "@/domain/categories/service";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -29,9 +30,10 @@ type DimensionRow = Readonly<{ id: string; key: string; name: string; descriptio
 type DefinitionRow = Readonly<{ id: string; dimension_id: string; dimension_key: string; key: string;
   label: string; description: string | null; version: unknown }>;
 type AssignmentRow = Readonly<{ id: string; dimension_id: string; definition_id: string; entity_level: string;
-  entity_id: string; operation: string; manual_lock: unknown; confidence: unknown; version: unknown }>;
+  entity_id: string; operation: string; source: string; manual_lock: unknown; confidence: unknown; version: unknown }>;
 type InternalState = Readonly<{ state: CategoryAuthoringState; dimensions: readonly DimensionRow[];
   definitions: readonly DefinitionRow[]; assignments: readonly AssignmentRow[] }>;
+type ResolvedTarget = Readonly<{ target: CategoryHierarchyTarget; externalRef: string }>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH = /^[a-f0-9]{64}$/;
@@ -113,7 +115,7 @@ async function loadState(database: Pick<Database, "execute">, workspaceId: strin
       case assignment.entity_level when 'campaign' then assignment.campaign_id::text
         when 'ad_set' then assignment.ad_set_id::text when 'ad' then assignment.ad_id::text
         when 'creative' then assignment.creative_id::text end as entity_id,
-      assignment.operation::text, assignment.manual_lock, assignment.confidence, assignment.version
+      assignment.operation::text, assignment.source::text, assignment.manual_lock, assignment.confidence, assignment.version
     from category_assignments assignment
     join category_dimensions dimension on dimension.workspace_id = assignment.workspace_id
       and dimension.id = assignment.dimension_id and dimension.archived_at is null
@@ -169,6 +171,92 @@ function findDefinition(state: InternalState, targetRef: string): DefinitionRow 
     text(item.dimension_key, 128), text(item.key, 128)) === targetRef);
   if (result.length !== 1) throw new CategoryAuthoringError("not_found");
   return result[0]!;
+}
+
+function findAssignment(state: InternalState, workspaceId: string, targetRef: string): AssignmentRow {
+  const result = state.assignments.filter((item) => categoryAssignmentPublicRef(workspaceId, uuid(item.id)) === targetRef);
+  if (result.length !== 1) throw new CategoryAuthoringError("not_found");
+  return result[0]!;
+}
+
+function assignmentTarget(assignment: AssignmentRow, viaAdId?: string): CategoryHierarchyTarget {
+  const id = uuid(assignment.entity_id);
+  if (assignment.entity_level === "campaign" || assignment.entity_level === "ad_set" || assignment.entity_level === "ad") {
+    return Object.freeze({ level: assignment.entity_level, id });
+  }
+  if (assignment.entity_level === "creative" && viaAdId) {
+    return Object.freeze({ level: "creative", id, viaAdId: uuid(viaAdId) });
+  }
+  throw new CategoryAuthoringError("conflict");
+}
+
+async function entityCandidates(database: Pick<Database, "execute">, workspaceId: string,
+  level: "campaign" | "ad_set" | "ad" | "creative") {
+  const result = level === "campaign" ? await database.execute(sql`
+      select id::text, external_campaign_id as external_ref from ad_campaigns
+      where workspace_id = ${workspaceId}::uuid and disappeared_at is null order by id limit 20001
+    `) : level === "ad_set" ? await database.execute(sql`
+      select id::text, external_ad_set_id as external_ref from meta_ad_sets
+      where workspace_id = ${workspaceId}::uuid and disappeared_at is null order by id limit 20001
+    `) : level === "ad" ? await database.execute(sql`
+      select id::text, external_ad_id as external_ref from meta_ads
+      where workspace_id = ${workspaceId}::uuid and disappeared_at is null order by id limit 20001
+    `) : await database.execute(sql`
+      select id::text, external_creative_id as external_ref from meta_creatives
+      where workspace_id = ${workspaceId}::uuid and disappeared_at is null order by id limit 20001
+    `);
+  const candidates = rows<{ id: string; external_ref: string }>(result);
+  if (candidates.length > 20_000) throw new CategoryAuthoringError("dependency_blocked");
+  return candidates.map((candidate) => Object.freeze({ id: uuid(candidate.id), externalRef: text(candidate.external_ref, 512) }));
+}
+
+async function resolvePublicEntity(database: Pick<Database, "execute">, workspaceId: string,
+  level: "campaign" | "ad_set" | "ad" | "creative", targetRef: string) {
+  const matches = (await entityCandidates(database, workspaceId, level))
+    .filter((candidate) => categoryEntityPublicRef(workspaceId, level, candidate.id) === targetRef);
+  if (matches.length !== 1) throw new CategoryAuthoringError("not_found");
+  return matches[0]!;
+}
+
+async function resolveCreateTarget(database: Pick<Database, "execute">, workspaceId: string,
+  command: Extract<CategoryAuthoringCommand, { operation: "create_assignment" }>): Promise<ResolvedTarget> {
+  const entity = await resolvePublicEntity(database, workspaceId, command.entityLevel, command.entityRef);
+  if (command.entityLevel !== "creative") {
+    return Object.freeze({ target: Object.freeze({ level: command.entityLevel, id: entity.id }) as CategoryHierarchyTarget,
+      externalRef: entity.externalRef });
+  }
+  if (!command.viaAdRef) throw new CategoryAuthoringError("invalid_input");
+  const ad = await resolvePublicEntity(database, workspaceId, "ad", command.viaAdRef);
+  const links = rows(await database.execute(sql`
+    select id from meta_ads where workspace_id = ${workspaceId}::uuid and id = ${ad.id}::uuid
+      and creative_id = ${entity.id}::uuid and disappeared_at is null limit 2
+  `));
+  const reuse = rows(await database.execute(sql`
+    select id from meta_ads where workspace_id = ${workspaceId}::uuid and creative_id = ${entity.id}::uuid
+      and disappeared_at is null order by id limit 2
+  `));
+  if (links.length !== 1) throw new CategoryAuthoringError("not_found");
+  if (reuse.length !== 1) throw new CategoryAuthoringError("dependency_blocked");
+  return Object.freeze({ target: Object.freeze({ level: "creative", id: entity.id, viaAdId: ad.id }),
+    externalRef: entity.externalRef });
+}
+
+async function resolveStoredTarget(database: Pick<Database, "execute">, workspaceId: string,
+  assignment: AssignmentRow): Promise<ResolvedTarget> {
+  const level = assignment.entity_level;
+  if (!LEVELS.has(level)) throw new CategoryAuthoringError("conflict");
+  const entityLevel = level as "campaign" | "ad_set" | "ad" | "creative";
+  const entity = (await entityCandidates(database, workspaceId, entityLevel))
+    .filter((candidate) => candidate.id === uuid(assignment.entity_id));
+  if (entity.length !== 1) throw new CategoryAuthoringError("not_found");
+  if (entityLevel !== "creative") return Object.freeze({ target: assignmentTarget(assignment),
+    externalRef: entity[0]!.externalRef });
+  const viaAds = rows<{ id: string }>(await database.execute(sql`
+    select id::text from meta_ads where workspace_id = ${workspaceId}::uuid
+      and creative_id = ${entity[0]!.id}::uuid and disappeared_at is null order by id limit 2
+  `));
+  if (viaAds.length !== 1) throw new CategoryAuthoringError("dependency_blocked");
+  return Object.freeze({ target: assignmentTarget(assignment, viaAds[0]!.id), externalRef: entity[0]!.externalRef });
 }
 
 function translate(error: unknown): never {

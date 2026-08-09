@@ -6,7 +6,7 @@ rol: ajan
 
 # Eşzamanlı session protokolü
 
-<!-- kanit-damga kaynak: packages/kit/templates/hooks/claims-lib.mjs, packages/kit/templates/hooks/claim-guard.mjs, packages/kit/templates/skills/eszamanli/scripts/claim.mjs sha: 553bb79553535bef -->
+<!-- kanit-damga kaynak: packages/kit/templates/hooks/claims-lib.mjs, packages/kit/templates/hooks/claim-guard.mjs, packages/kit/templates/skills/eszamanli/scripts/claim.mjs sha: acbcc6433f5fbd76 -->
 
 İki Claude session'ı aynı repoda çalışırken birbirinin yazdığını ezer. Bu protokol
 çakışmayı **imkânsız** kılar (sert kapı) ve bloke olan session'ı **durdurmaz** (izole et,
@@ -87,6 +87,20 @@ Okuma ucu `claim-guard ctx`tir (SessionStart + UserPromptSubmit, zaten kayıtlı
 **bir kez** basılır ve tüketilir. Araya başka bir sahip girdiyse satır bunu söyler ve
 "şimdi al" yerine "yeniden sıraya gir" der — bayat haber yalanlamaz.
 
+### ZİNCİRİN İKİ YÖNÜ
+
+Zincir **eşzamanlılık kuyruğunun kendisidir** — ayrı bir bağımlılık modeli yok. Haber iki yöne
+birden akar:
+
+| yön | ne zaman | kime | ne der |
+|---|---|---|---|
+| **ileri** | işini bitirip kilidi bıraktın | uyanma yolu olmayan sıradakiler | 🔓 beklediğin kaynak boşaldı · şimdi al |
+| **geri** | kilit aşamasında bloke oldun | kilidi **TUTAN** oturum | ⏳ seni bekleyen var · işin bittiyse bırak |
+
+Geri yön 2026-08-09'da eklendi: "bitir de sıra bana gelsin" bilgisinin asıl muhatabı kilidi
+tutandır ve o, bugüne dek ancak `status`a bakarsa görüyordu. Kural her iki yolda da aynı:
+**yalnız YENİ bekleyen bildirilir**, yankı bildirilmez (ölçüt kuyruğun kendisi).
+
 ### ORKESTRATÖR — sahadaki koordinatör de haber alır
 
 Planı yürüten, aşamaları sırayla ateşleyen bir oturum varsa **kayıt olur** ve saha olayları
@@ -97,12 +111,42 @@ node $S orkestrator kayit --kapsam "plan: bildiri v1"   # sahadaki koordinatör 
 node $S orkestrator durum | birak                        # gör · erken bırak
 ```
 
-| olay | ne zaman düşer | ne söyler |
+**Besleme = olay defterinin projeksiyonu, elle bağlanan bir liste DEĞİL.** `olay.jsonl`
+eşzamanlılığın tek yazım noktasıdır; orkestratör onu bir **imleçle** okur
+(`orkestrator/imlec.json`, bayt ofseti — kayıt anında defterin SONUNA konur, her çizimden
+sonra ilerler). Sonuç: **her olay yapısal olarak akar**, yeni bir tip eklendiğinde kod
+değişmez, "biri bağlamayı unuttu" diye sessizce eksilmez.
+
+| olay | ne zaman | satırda |
 |---|---|---|
-| ✅ `bitti` | bir kilit bırakıldı | hangi iş bitti · niyeti · kaç bekleyeni vardı |
-| ⛔ `bloke` | bir oturum kapıda durdu | kim, hangi kaynakta, sahibi kim (**yalnız İLK kez** — yankı bildirilmez) |
-| 🔚 `kapandi` | oturum kapandı | kaç kilit bırakıldı · kaç bekleyişi yarım kaldı |
-| 🔁 `devir` | iş devredildi | görev + `devir al --id` komutu (üstlenecek biri aranıyor) |
+| 🔒 `alindi` | kilit alındı | kim · hangi kaynak · niyet |
+| ✅ `birakildi` | kilit bırakıldı (iş bitti) | kim · niyet · kaç bekleyeni vardı |
+| ⛔ `deny`·`mesgul` | bir oturum kapıda/CLI'da durdu | kim → hangi kaynak · sahibi kim |
+| ⏳ `bekleyis` | aktif bekleyiş başladı | kim · hangi kaynak |
+| ⏱ `kapanis` | bekleyiş bitti | sonuç (`aldi`·`devraldi`·`vazgecti`·`oldu`) · süre |
+| 🔚 `kapandi` | oturum kapandı | kaç kilit bırakıldı · kaç bekleyiş yarım kaldı |
+| 🔁 `devir` | iş devredildi | görev · devir id |
+| 💀 `cevrim` | deadlock görüldü | bekleme zinciri |
+| ✍ `claimsiz` | claim'siz yazım | **tek satıra katlanır** (sayı · oturum · yol) |
+
+**Gürültü bütçesi sözleşmedir** (ölçüldü: 163 olayın 123'ü `claimsiz`): aynı
+(tip·kaynak·oturum) üçlüsü tek satır + `×N` · tavan **12 satır**, aşan `… +N GÖSTERİLMEDİ`
+ile ilan edilir · okunmamış **500'ü aşarsa** yalnız sayaç özeti basılır (imleç yine ilerler).
+
+**Ölçülen bağlam maliyeti:** tavanı dolduran 54 olaylık bir turda blok **1.543 bayt ≈ 480
+token / 17 satır** (katlama + kırpma sonrası). Sakin turda **tek bayt basılmaz** ve blok
+yalnız orkestratöre gider — sahadaki oturumlar bu bedeli hiç ödemez.
+
+### ORKESTRATÖRÜN ELİ — "şu oturum devam etsin"
+
+```sh
+node $S bildir --hedef <sessionId> --mesaj "kaynak boşaldı, a07'yi sürdür" [--res <kaynak>]
+```
+
+Hedefin posta kutusuna düşer, hedef **ilk turunda** okur (tek sefer, tüketimli). Saha
+bloğunun sonunda bu komut **kopyalanabilir hâlde, gerçek bir kimlikle** basılır. Hedef canlı
+değilse komut uyarır ama **yazar** — oturum dönerse okur; haberi düşürmek sessiz kayıptır.
+Ayrıcalık değildir: orkestratör olmayan da kullanabilir.
 
 **Orkestratör ≠ PM.** PM projeler-arası, agentic ve karar verir; orkestratör **repo içinde**,
 0 token ve yalnız **haber alır** — sahada elini işe sokmuş olan odur. **TEK SLOT:** canlı bir
