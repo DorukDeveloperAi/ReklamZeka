@@ -24,7 +24,9 @@ const result = await new Promise<Record<string, unknown>>((resolveResult) => {
           const listAuthority = message.result?.structuredContent?.authority as Record<string, unknown> | undefined;
           if (listAuthority?.canWriteMeta !== false || listAuthority.canPublish !== false) return finish({ ok: false, stage: "list_authority" });
           send({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "guidance_effective_preview", arguments: {
-            accountRef: "account_acceptance", objective: "OUTCOME_LEADS", internalCategoryRefs: [], entity: null,
+            accountRef: "account_acceptance", accountGroupRefs: [], objective: "OUTCOME_LEADS",
+            funnel: null, optimization: null, internalCategoryRefs: [], lifecycle: null,
+            promotionTemplateRefs: [], entity: null,
             topics: [], requiredTopics: [], evaluatedAt: new Date().toISOString(),
             timeframe: { ref: "timeframe_last_7d", kind: "rolling" },
           } } }); }

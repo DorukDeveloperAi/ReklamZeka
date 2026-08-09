@@ -1,7 +1,14 @@
 import { createHash } from "node:crypto";
 
 export const GUIDANCE_REGISTRY_VERSION = "guidance-registry/1.0.0" as const;
-export const EFFECTIVE_GUIDANCE_PACK_VERSION = "effective-guidance-pack/1.0.0" as const;
+export const EFFECTIVE_GUIDANCE_PACK_VERSION = "effective-guidance-pack/1.1.0" as const;
+export const GUIDANCE_REGISTRY_LIMITS = Object.freeze({
+  sources: 1_000, cards: 500, bindings: 6_000, sets: 250,
+  sourcesPerCard: 12, bindingsPerCard: 12, cardsPerSet: 50,
+  evaluatedCards: 500, evaluatedSources: 1_000,
+  accountGroups: 25, internalCategories: 100, promotionTemplates: 50,
+  topics: 100, requiredTopics: 100, guidanceSets: 50,
+});
 
 export type GuidanceSourceType =
   | "owner_statement"
@@ -28,7 +35,18 @@ export type GuidanceSource = Readonly<{
 }>;
 
 export type GuidanceStrength = "must" | "should" | "consider" | "avoid" | "question";
-export type GuidanceScopeFacet = "global" | "account" | "objective" | "internal_category" | "entity" | "topic";
+export type GuidanceScopeFacet =
+  | "global"
+  | "account_group"
+  | "account"
+  | "objective"
+  | "funnel"
+  | "optimization"
+  | "internal_category"
+  | "lifecycle"
+  | "entity"
+  | "promotion_template"
+  | "topic";
 export type GuidanceEntityType = "campaign" | "ad_set" | "ad" | "creative" | "post";
 
 export type GuidanceCard = Readonly<{
@@ -85,9 +103,14 @@ export type GuidanceRegistry = Readonly<{
 export type GuidanceContext = Readonly<{
   workspaceId: string;
   accountId: string;
+  accountGroupIds?: readonly string[];
   objective: string | null;
+  funnel?: string | null;
+  optimization?: string | null;
   internalCategoryIds: readonly string[];
+  lifecycle?: string | null;
   entity: Readonly<{ type: GuidanceEntityType; id: string }> | null;
+  promotionTemplateIds?: readonly string[];
   topics: readonly string[];
   requiredTopics: readonly string[];
   guidanceSetIds?: readonly string[];
@@ -114,6 +137,8 @@ export type GuidancePackReason =
 
 export type AppliedGuidanceCard = Readonly<{
   cardId: string;
+  cardVersion: number;
+  cardHash: string;
   title: string;
   body: string;
   strength: GuidanceStrength;
@@ -133,6 +158,9 @@ export type EffectiveGuidancePack = Readonly<{
   /** Internal tenant scope; public projections must redact it. */
   workspaceId: string;
   registryHash: string;
+  selectedSets: readonly Readonly<{ setId: string; setVersion: number; setHash: string }>[];
+  evaluatedCards: readonly Readonly<{ cardId: string; cardVersion: number; cardHash: string }>[];
+  evaluatedSources: readonly Readonly<{ sourceId: string; sourceVersion: number; sourceHash: string }>[];
   evaluatedAt: string;
   applied: readonly AppliedGuidanceCard[];
   suppressed: readonly Readonly<{ cardId: string; reason: Exclude<GuidancePackReason, "applied"> }>[];
@@ -147,6 +175,8 @@ export type EffectiveGuidancePack = Readonly<{
   }>[];
   sources: readonly Readonly<{
     sourceId: string;
+    sourceVersion: number;
+    sourceHash: string;
     sourceType: GuidanceSourceType;
     sourceRef: string;
     sourceUrl: string | null;
@@ -202,7 +232,10 @@ const SOURCE_TYPES = new Set<GuidanceSourceType>([
 const SOURCE_STATUSES = new Set(["draft", "published", "archived"]);
 const CARD_STATUSES = new Set(["draft", "published", "archived"]);
 const STRENGTHS = new Set<GuidanceStrength>(["must", "should", "consider", "avoid", "question"]);
-const FACETS = new Set<GuidanceScopeFacet>(["global", "account", "objective", "internal_category", "entity", "topic"]);
+const FACETS = new Set<GuidanceScopeFacet>([
+  "global", "account_group", "account", "objective", "funnel", "optimization",
+  "internal_category", "lifecycle", "entity", "promotion_template", "topic",
+]);
 const ENTITY_TYPES = new Set<GuidanceEntityType>(["campaign", "ad_set", "ad", "creative", "post"]);
 const BINDING_MODES = new Set(["default", "exception"]);
 const SET_REVIEW_STATUSES = new Set(["draft", "reviewed", "archived"]);
@@ -231,6 +264,13 @@ function requireText(value: unknown, label: string): asserts value is string {
   }
 }
 
+function requireBoundedText(value: unknown, label: string, max: number): asserts value is string {
+  requireText(value, label);
+  if (value.length > max) {
+    throw new GuidanceRegistryValidationError("invalid_registry", `${label} en fazla ${max} karakter olabilir`);
+  }
+}
+
 function validIso(value: unknown): value is string {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
@@ -245,13 +285,35 @@ function assertUnique(values: readonly string[], label: string): void {
   }
 }
 
+export function isOfficialGuidanceSourceUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    const path = url.pathname.replace(/\/+$/, "") || "/";
+    if (url.protocol !== "https:" || url.username || url.password || url.hash) return false;
+    if ((host === "facebook.com" || host === "www.facebook.com")
+      && ["/business/help", "/business/ads-guide", "/business/news", "/business/m"].some((root) => path === root || path.startsWith(`${root}/`))) return true;
+    if (host === "developers.facebook.com" && (path === "/docs" || path.startsWith("/docs/"))) return true;
+    if ((host === "meta.com" || host === "www.meta.com")
+      && ["/help", "/business", "/policies", "/technologies"].some((root) => path === root || path.startsWith(`${root}/`))) return true;
+    if (host === "developers.meta.com") return path === "/" || path.startsWith("/docs/");
+    if (host === "transparency.meta.com") return path === "/policies" || path.startsWith("/policies/");
+    if (host === "developers.instagram.com") return path === "/" || path.startsWith("/docs/");
+    if (host === "help.instagram.com") return path === "/" || /^\/[0-9]+(?:\/.*)?$/.test(path);
+    if (host === "business.instagram.com") return path === "/blog" || path.startsWith("/blog/");
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function assertOfficialSource(source: GuidanceSource): void {
   if (source.sourceType !== "official_meta_guidance" || source.status !== "published") return;
   if (
     typeof source.sourceRef !== "string"
     || !source.sourceRef.trim()
     || typeof source.sourceUrl !== "string"
-    || !/^https:\/\//i.test(source.sourceUrl)
+    || !isOfficialGuidanceSourceUrl(source.sourceUrl)
     || !validIso(source.capturedAt)
     || !validIso(source.reviewedAt)
     || !validIso(source.reviewBy)
@@ -285,6 +347,9 @@ function assertBinding(binding: GuidanceBinding): void {
   if (!binding.value?.trim()) {
     throw new GuidanceRegistryValidationError("invalid_binding", "Scoped binding değeri zorunludur");
   }
+  if (binding.value.length > 128) {
+    throw new GuidanceRegistryValidationError("invalid_binding", "Scoped binding değeri çok uzundur");
+  }
   if ((binding.facet === "entity") !== (binding.entityType !== null)) {
     throw new GuidanceRegistryValidationError("invalid_binding", "Entity binding entityType ve value birlikte taşımalıdır");
   }
@@ -298,7 +363,13 @@ export function createGuidanceRegistry(input: Readonly<{
   bindings: readonly GuidanceBinding[];
   sets: readonly GuidanceSet[];
 }>): GuidanceRegistry {
-  requireText(input.workspaceId, "Workspace ID");
+  requireBoundedText(input.workspaceId, "Workspace ID", 128);
+  if (input.sources.length > GUIDANCE_REGISTRY_LIMITS.sources
+    || input.cards.length > GUIDANCE_REGISTRY_LIMITS.cards
+    || input.bindings.length > GUIDANCE_REGISTRY_LIMITS.bindings
+    || input.sets.length > GUIDANCE_REGISTRY_LIMITS.sets) {
+    throw new GuidanceRegistryValidationError("invalid_registry", "Guidance registry güvenli cardinality sınırını aşıyor");
+  }
   assertUnique(input.sources.map((row) => row.id), "Source");
   assertUnique(input.cards.map((row) => row.id), "Card");
   assertUnique(input.bindings.map((row) => row.id), "Binding");
@@ -307,14 +378,20 @@ export function createGuidanceRegistry(input: Readonly<{
   const cards = new Map(input.cards.map((row) => [row.id, row] as const));
 
   for (const source of input.sources) {
-    requireText(source.id, "Source ID");
-    requireText(source.title, "Source title");
-    requireText(source.content, "Source content");
+    requireBoundedText(source.id, "Source ID", 128);
+    requireBoundedText(source.title, "Source title", 160);
+    requireBoundedText(source.content, "Source content", 12_000);
     if (!SOURCE_TYPES.has(source.sourceType) || !SOURCE_STATUSES.has(source.status)) {
       throw new GuidanceRegistryValidationError("invalid_registry", "Source type/status allowlist dışında");
     }
     assertOfficialSource(source);
-    requireText(source.sourceRef, "Source ref");
+    requireBoundedText(source.sourceRef, "Source ref", 2_048);
+    if (source.author !== null && source.author.length > 128) {
+      throw new GuidanceRegistryValidationError("invalid_registry", "Source author çok uzun");
+    }
+    if (source.sourceUrl !== null && source.sourceUrl.length > 2_048) {
+      throw new GuidanceRegistryValidationError("invalid_registry", "Source URL çok uzun");
+    }
     if (source.workspaceId !== input.workspaceId || !Number.isSafeInteger(source.version) || source.version < 1) {
       throw new GuidanceRegistryValidationError("invalid_registry", "Source workspace/version geçersizdir");
     }
@@ -323,11 +400,18 @@ export function createGuidanceRegistry(input: Readonly<{
     }
   }
   for (const card of input.cards) {
-    requireText(card.id, "Card ID");
-    requireText(card.title, "Card title");
-    requireText(card.body, "Card body");
-    requireText(card.topic, "Card topic");
-    requireText(card.ownerRef, "Card owner ref");
+    requireBoundedText(card.id, "Card ID", 128);
+    requireBoundedText(card.title, "Card title", 160);
+    requireBoundedText(card.body, "Card body", 12_000);
+    requireBoundedText(card.topic, "Card topic", 80);
+    requireBoundedText(card.ownerRef, "Card owner ref", 128);
+    if (card.rationale !== null && card.rationale.length > 4_000) {
+      throw new GuidanceRegistryValidationError("invalid_registry", "Card rationale çok uzun");
+    }
+    if (card.decisionKey !== null && card.decisionKey.length > 128
+      || card.positionKey !== null && card.positionKey.length > 128) {
+      throw new GuidanceRegistryValidationError("invalid_registry", "Decision/position key çok uzun");
+    }
     if (!SOURCE_TYPES.has(card.sourceType) || !CARD_STATUSES.has(card.status) || !STRENGTHS.has(card.strength)) {
       throw new GuidanceRegistryValidationError("invalid_registry", "Card sourceType/status/strength allowlist dışında");
     }
@@ -342,7 +426,8 @@ export function createGuidanceRegistry(input: Readonly<{
         "Card workspace/version/authority geçersizdir",
       );
     }
-    if (card.sourceIds.length === 0 || new Set(card.sourceIds).size !== card.sourceIds.length) {
+    if (card.sourceIds.length === 0 || card.sourceIds.length > GUIDANCE_REGISTRY_LIMITS.sourcesPerCard
+      || new Set(card.sourceIds).size !== card.sourceIds.length) {
       throw new GuidanceRegistryValidationError("invalid_reference", "Card en az bir benzersiz source ref taşımalıdır");
     }
     const referenced = card.sourceIds.map((id) => sources.get(id));
@@ -366,27 +451,34 @@ export function createGuidanceRegistry(input: Readonly<{
     }
   }
   const bindingCards = new Set<string>();
+  const bindingCounts = new Map<string, number>();
   for (const binding of input.bindings) {
-    requireText(binding.id, "Binding ID");
+    requireBoundedText(binding.id, "Binding ID", 128);
     if (binding.workspaceId !== input.workspaceId || !cards.has(binding.cardId)) {
       throw new GuidanceRegistryValidationError("invalid_reference", "Binding workspace/card ref geçersizdir");
     }
     assertBinding(binding);
+    const count = (bindingCounts.get(binding.cardId) ?? 0) + 1;
+    if (count > GUIDANCE_REGISTRY_LIMITS.bindingsPerCard) {
+      throw new GuidanceRegistryValidationError("invalid_binding", "Tek card binding sınırını aşıyor");
+    }
+    bindingCounts.set(binding.cardId, count);
     bindingCards.add(binding.cardId);
   }
   if (input.cards.some((card) => card.status === "published" && !bindingCards.has(card.id))) {
     throw new GuidanceRegistryValidationError("invalid_binding", "Published card en az bir scope binding taşımalıdır");
   }
   for (const set of input.sets) {
-    requireText(set.id, "Set ID");
-    requireText(set.name, "Set name");
+    requireBoundedText(set.id, "Set ID", 128);
+    requireBoundedText(set.name, "Set name", 160);
     if (!SET_REVIEW_STATUSES.has(set.reviewStatus)) {
       throw new GuidanceRegistryValidationError("invalid_registry", "Set review status allowlist dışında");
     }
     if (set.workspaceId !== input.workspaceId || !Number.isSafeInteger(set.version) || set.version < 1) {
       throw new GuidanceRegistryValidationError("invalid_registry", "Set workspace/version geçersizdir");
     }
-    if (new Set(set.orderedCardIds).size !== set.orderedCardIds.length
+    if (set.orderedCardIds.length > GUIDANCE_REGISTRY_LIMITS.cardsPerSet
+      || new Set(set.orderedCardIds).size !== set.orderedCardIds.length
       || set.orderedCardIds.some((id) => !cards.has(id))) {
       throw new GuidanceRegistryValidationError("invalid_reference", "Set card sırası tekrarlı veya bilinmeyen ref taşıyor");
     }
@@ -423,18 +515,28 @@ type Candidate = Readonly<{
 
 const FACET_ORDER: Readonly<Record<GuidanceScopeFacet, number>> = {
   global: 0,
-  account: 1,
-  objective: 2,
-  internal_category: 3,
-  entity: 4,
-  topic: 5,
+  account_group: 1,
+  account: 2,
+  objective: 3,
+  funnel: 4,
+  optimization: 5,
+  internal_category: 6,
+  lifecycle: 7,
+  entity: 8,
+  promotion_template: 9,
+  topic: 10,
 };
 const SCOPE_WEIGHT: Readonly<Record<GuidanceScopeFacet, number>> = {
   global: 0,
+  account_group: 5,
   account: 10,
   objective: 20,
+  funnel: 22,
+  optimization: 24,
   internal_category: 30,
+  lifecycle: 32,
   entity: 40,
+  promotion_template: 35,
   topic: 1,
 };
 const STRENGTH_RANK: Readonly<Record<GuidanceStrength, number>> = {
@@ -448,10 +550,15 @@ const STRENGTH_RANK: Readonly<Record<GuidanceStrength, number>> = {
 function bindingMatches(binding: GuidanceBinding, context: GuidanceContext): boolean {
   switch (binding.facet) {
     case "global": return true;
+    case "account_group": return (context.accountGroupIds ?? []).includes(binding.value!);
     case "account": return binding.value === context.accountId;
     case "objective": return binding.value === context.objective;
+    case "funnel": return binding.value === (context.funnel ?? null);
+    case "optimization": return binding.value === (context.optimization ?? null);
     case "internal_category": return context.internalCategoryIds.includes(binding.value!);
+    case "lifecycle": return binding.value === (context.lifecycle ?? null);
     case "entity": return binding.entityType === context.entity?.type && binding.value === context.entity.id;
+    case "promotion_template": return (context.promotionTemplateIds ?? []).includes(binding.value!);
     case "topic": return context.topics.includes(binding.value!);
   }
 }
@@ -491,19 +598,39 @@ function candidateOrder(left: Candidate, right: Candidate): number {
 }
 
 function validateContext(registry: GuidanceRegistry, context: GuidanceContext): void {
+  const accountGroups = context.accountGroupIds ?? [];
+  const promotionTemplates = context.promotionTemplateIds ?? [];
+  const requestedSets = context.guidanceSetIds ?? [];
   if (
     context.workspaceId !== registry.workspaceId
-    || !context.accountId.trim()
+    || !context.accountId.trim() || context.accountId.length > 128
     || !Number.isFinite(Date.parse(context.evaluatedAt))
-    || context.topics.some((topic) => !topic.trim())
-    || context.requiredTopics.some((topic) => !topic.trim())
+    || context.internalCategoryIds.length > GUIDANCE_REGISTRY_LIMITS.internalCategories
+    || context.topics.length > GUIDANCE_REGISTRY_LIMITS.topics
+    || context.requiredTopics.length > GUIDANCE_REGISTRY_LIMITS.requiredTopics
+    || accountGroups.length > GUIDANCE_REGISTRY_LIMITS.accountGroups
+    || promotionTemplates.length > GUIDANCE_REGISTRY_LIMITS.promotionTemplates
+    || requestedSets.length > GUIDANCE_REGISTRY_LIMITS.guidanceSets
+    || context.internalCategoryIds.some((ref) => !ref.trim() || ref.length > 128)
+    || new Set(context.internalCategoryIds).size !== context.internalCategoryIds.length
+    || context.topics.some((topic) => !topic.trim() || topic.length > 80)
+    || new Set(context.topics).size !== context.topics.length
+    || context.requiredTopics.some((topic) => !topic.trim() || topic.length > 80)
+    || new Set(context.requiredTopics).size !== context.requiredTopics.length
+    || accountGroups.some((ref) => !ref.trim() || ref.length > 128)
+    || new Set(accountGroups).size !== accountGroups.length
+    || promotionTemplates.some((ref) => !ref.trim() || ref.length > 128)
+    || new Set(promotionTemplates).size !== promotionTemplates.length
+    || [context.funnel, context.optimization, context.lifecycle]
+      .some((value) => value !== undefined && value !== null && (!value.trim() || value.length > 80))
+    || context.objective !== null && (!context.objective.trim() || context.objective.length > 80)
+    || context.entity !== null && (!context.entity.id.trim() || context.entity.id.length > 128)
     || !Number.isSafeInteger(context.budget.maxCards) || context.budget.maxCards < 1 || context.budget.maxCards > 100
     || !Number.isSafeInteger(context.budget.maxSources) || context.budget.maxSources < 1 || context.budget.maxSources > 100
     || !Number.isSafeInteger(context.budget.maxCharacters) || context.budget.maxCharacters < 1 || context.budget.maxCharacters > 100_000
   ) throw new GuidanceContextValidationError("Effective guidance context kapsamı veya bütçesi geçersizdir");
-  const requestedSets = context.guidanceSetIds ?? [];
   if (new Set(requestedSets).size !== requestedSets.length
-    || requestedSets.some((id) => !registry.sets.some((set) => set.id === id))) {
+    || requestedSets.some((id) => id.length > 128 || !registry.sets.some((set) => set.id === id))) {
     throw new GuidanceContextValidationError("Guidance set seçimi geçersizdir");
   }
 }
@@ -541,6 +668,10 @@ export function buildEffectiveGuidancePack(
     bindingMap.set(binding.cardId, [...(bindingMap.get(binding.cardId) ?? []), binding]);
   }
   const requestedSets = context.guidanceSetIds;
+  const selectedSets = registry.sets
+    .filter((set) => requestedSets?.includes(set.id) && set.reviewStatus === "reviewed")
+    .map((set) => ({ setId: set.id, setVersion: set.version, setHash: digest(set) }))
+    .sort((left, right) => compareText(left.setId, right.setId));
   const selectedCardIds = requestedSets
     ? new Set(registry.sets.filter((set) => requestedSets.includes(set.id) && set.reviewStatus === "reviewed")
       .flatMap((set) => set.orderedCardIds))
@@ -637,6 +768,8 @@ export function buildEffectiveGuidancePack(
     usedCharacters += characters;
     applied.push({
       cardId: candidate.card.id,
+      cardVersion: candidate.card.version,
+      cardHash: digest(candidate.card),
       title: candidate.card.title,
       body: candidate.card.body,
       strength: candidate.card.strength,
@@ -657,6 +790,8 @@ export function buildEffectiveGuidancePack(
     const source = sources.get(id)!;
     return {
       sourceId: source.id,
+      sourceVersion: source.version,
+      sourceHash: digest(source),
       sourceType: source.sourceType,
       sourceRef: source.sourceRef,
       sourceUrl: source.sourceUrl,
@@ -670,10 +805,31 @@ export function buildEffectiveGuidancePack(
     const reason = missingReason(topic, applied, suppressed, conflicting, cards);
     return reason ? [{ topic, reason }] : [];
   });
+  const evaluatedCardIds = [...new Set([
+    ...applied.map((entry) => entry.cardId), ...suppressed.map((entry) => entry.cardId),
+    ...conflicting.flatMap((entry) => entry.cardIds),
+  ])].sort(compareText);
+  const evaluatedCards = evaluatedCardIds.map((cardId) => {
+    const card = cards.get(cardId)!;
+    return { cardId, cardVersion: card.version, cardHash: digest(card) };
+  });
+  const evaluatedSourceIds = [...new Set(evaluatedCardIds.flatMap((cardId) => cards.get(cardId)!.sourceIds))]
+    .sort(compareText);
+  if (evaluatedCardIds.length > GUIDANCE_REGISTRY_LIMITS.evaluatedCards
+    || evaluatedSourceIds.length > GUIDANCE_REGISTRY_LIMITS.evaluatedSources) {
+    throw new GuidanceContextValidationError("Evaluated guidance revision manifest güvenli sınırı aşıyor");
+  }
+  const evaluatedSources = evaluatedSourceIds.map((sourceId) => {
+    const source = sources.get(sourceId)!;
+    return { sourceId, sourceVersion: source.version, sourceHash: digest(source) };
+  });
   const core = stableValue({
     schemaVersion: EFFECTIVE_GUIDANCE_PACK_VERSION,
     workspaceId: context.workspaceId,
     registryHash: registry.registryHash,
+    selectedSets,
+    evaluatedCards,
+    evaluatedSources,
     evaluatedAt,
     applied,
     suppressed: suppressed.sort((a, b) => compareText(a.cardId, b.cardId) || compareText(a.reason, b.reason)),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GuidanceAgentContract } from "@/application/guidance-agent-contract";
 import { createGuidanceRegistry } from "@/domain/guidance/registry";
+import { MCP_TOOL_SCHEMAS } from "@/mcp/tool-schemas";
 
 const workspaceId = "11111111-1111-4111-8111-111111111111"; const userId = "22222222-2222-4222-8222-222222222222";
 const principal = { actor: { userId }, workspaceId, workspaceRef: "workspace_test", readerRef: "reader_test" } as const;
@@ -37,7 +38,8 @@ describe("GuidanceAgentContract", () => {
 
   it("adds semantic timeframe topic and resolves a deterministic public-safe pack", async () => {
     const result = await contract.execute(principal, { name: "guidance_effective_preview", arguments: {
-      accountRef: "account_aaaaaaaaaaaaaaaaaaaaaaaa", objective: "OUTCOME_LEADS", internalCategoryRefs: [],
+      accountRef: "account_aaaaaaaaaaaaaaaaaaaaaaaa", accountGroupRefs: [], objective: "OUTCOME_LEADS",
+      funnel: null, optimization: null, internalCategoryRefs: [], lifecycle: null, promotionTemplateRefs: [],
       entity: { type: "campaign", ref: "campaign_aaaaaaaaaaaaaaaaaaaaaaaa" }, topics: ["cadence"],
       requiredTopics: ["cadence", "timeframe:rolling"], evaluatedAt: "2026-08-08T10:00:00.000Z",
       timeframe: { ref: "timeframe_last_7d", kind: "rolling" },
@@ -54,9 +56,53 @@ describe("GuidanceAgentContract", () => {
 
   it("rejects non-public category and account identifiers", async () => {
     await expect(contract.execute(principal, { name: "guidance_effective_preview", arguments: {
-      accountRef: "123", objective: null, internalCategoryRefs: ["category_bad"], entity: null,
+      accountRef: "123", accountGroupRefs: [], objective: null, funnel: null, optimization: null,
+      internalCategoryRefs: ["category_bad"], lifecycle: null, entity: null, promotionTemplateRefs: [],
       topics: [], requiredTopics: [], evaluatedAt: capturedAt,
       timeframe: { ref: "timeframe_last_7d", kind: "rolling" },
     } })).rejects.toMatchObject({ code: "invalid_input" });
+  });
+
+  it("passes all extended facets through the MCP validator into deterministic matching", async () => {
+    const scopedRegistry = createGuidanceRegistry({ workspaceId,
+      sources: [source("source_cccccccccccccccccccccccc", "Tam kapsamlı guidance")],
+      cards: [card("guidance_cccccccccccccccccccccccc", "source_cccccccccccccccccccccccc",
+        "Tam kapsamlı guidance", "budget")],
+      bindings: ([
+        { facet: "account_group", value: "account_group_primary" },
+        { facet: "funnel", value: "consideration" },
+        { facet: "optimization", value: "LEAD" },
+        { facet: "lifecycle", value: "evergreen" },
+        { facet: "promotion_template", value: "promotion_template_lead" },
+      ] as const).map((scope, index) => ({ id: `binding_${String(index).padStart(24, "a")}`, workspaceId,
+        cardId: "guidance_cccccccccccccccccccccccc", ...scope, entityType: null,
+        mode: "default" as const, priority: 50, version: 1 })), sets: [] });
+    const scopedContract = new GuidanceAgentContract({ load: async () => scopedRegistry },
+      [{ userId, workspaceId, role: "viewer" }]);
+    const arguments_ = { accountRef: "account_aaaaaaaaaaaaaaaaaaaaaaaa",
+      accountGroupRefs: ["account_group_primary"], objective: "OUTCOME_LEADS", funnel: "consideration",
+      optimization: "LEAD", internalCategoryRefs: [], lifecycle: "evergreen", entity: null,
+      promotionTemplateRefs: ["promotion_template_lead"], topics: ["budget"], requiredTopics: ["budget"],
+      evaluatedAt: "2026-08-08T10:00:00.000Z", timeframe: { ref: "timeframe_last_7d", kind: "rolling" as const } };
+    expect(MCP_TOOL_SCHEMAS.guidance_effective_preview.safeParse(arguments_).success).toBe(true);
+    const matched = await scopedContract.execute(principal,
+      { name: "guidance_effective_preview", arguments: arguments_ });
+    expect("applied" in matched.result && matched.result.applied.map((item) => item.cardId))
+      .toEqual(["guidance_cccccccccccccccccccccccc"]);
+    const missed = await scopedContract.execute(principal, { name: "guidance_effective_preview",
+      arguments: { ...arguments_, lifecycle: "seasonal" } });
+    expect("suppressed" in missed.result && missed.result.suppressed)
+      .toContainEqual({ cardId: "guidance_cccccccccccccccccccccccc", reason: "scope_not_matched" });
+  });
+
+  it("fails closed on missing or over-limit extended facet refs", async () => {
+    const base = { accountRef: "account_aaaaaaaaaaaaaaaaaaaaaaaa", accountGroupRefs: [], objective: null,
+      funnel: null, optimization: null, internalCategoryRefs: [], lifecycle: null, entity: null,
+      promotionTemplateRefs: [], topics: [], requiredTopics: [], evaluatedAt: capturedAt,
+      timeframe: { ref: "timeframe_last_7d", kind: "rolling" as const } };
+    await expect(contract.execute(principal, { name: "guidance_effective_preview",
+      arguments: { ...base, accountGroupRefs: Array.from({ length: 26 }, (_, index) => `account_group_${index}`) } }))
+      .rejects.toMatchObject({ code: "invalid_input" });
+    expect(MCP_TOOL_SCHEMAS.guidance_effective_preview.safeParse({ ...base, lifecycle: undefined }).success).toBe(false);
   });
 });

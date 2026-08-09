@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./operating-dashboard.module.css";
 
-type GuidanceFacet = "global" | "account" | "objective" | "internal_category" | "entity" | "topic";
+type GuidanceFacet = "global" | "account_group" | "account" | "objective" | "funnel" | "optimization"
+  | "internal_category" | "lifecycle" | "entity" | "promotion_template" | "topic";
 type GuidanceEntityType = null | "campaign" | "ad_set" | "ad" | "creative" | "post";
 type GuidanceStrength = "must" | "should" | "consider" | "avoid" | "question";
 type GuidanceStatus = "draft" | "published" | "archived";
+type GuidanceSourceType = "owner_statement" | "official_meta_guidance" | "business_strategy"
+  | "observed_result" | "experiment_outcome" | "operating_note";
 
 type GuidanceScope = Readonly<{
   facet: GuidanceFacet;
@@ -24,6 +27,8 @@ type GuidanceItem = Readonly<{
   strength: GuidanceStrength;
   topic: string;
   status: GuidanceStatus;
+  sources: readonly Readonly<{ type: GuidanceSourceType; ref: string; url: string | null; capturedAt: string | null;
+    reviewedAt: string | null; reviewBy: string | null }>[];
   scopes: readonly GuidanceScope[];
   updatedAt: string | null;
 }>;
@@ -65,6 +70,7 @@ type Draft = Readonly<{
   strength: GuidanceStrength;
   topic: string;
   scopes: readonly GuidanceScope[];
+  source: Readonly<{ type: GuidanceSourceType; ref: string; url: string; capturedAt: string; reviewBy: string }>;
 }>;
 
 const EMPTY_DRAFT: Draft = Object.freeze({
@@ -73,14 +79,28 @@ const EMPTY_DRAFT: Draft = Object.freeze({
   strength: "should",
   topic: "",
   scopes: Object.freeze([Object.freeze({ facet: "global", value: null, entityType: null, mode: "default", priority: 50 })]),
+  source: Object.freeze({ type: "owner_statement", ref: "owner_statement_manual", url: "", capturedAt: "", reviewBy: "" }),
 });
 const FACETS: readonly Readonly<{ value: GuidanceFacet; label: string }>[] = Object.freeze([
   { value: "global", label: "Tüm çalışma alanı" },
+  { value: "account_group", label: "Hesap grubu" },
   { value: "account", label: "Reklam hesabı" },
   { value: "objective", label: "Meta objective" },
+  { value: "funnel", label: "Funnel aşaması" },
+  { value: "optimization", label: "Optimizasyon olayı" },
   { value: "internal_category", label: "İç kategori" },
+  { value: "lifecycle", label: "Yaşam döngüsü" },
   { value: "entity", label: "Tek varlık" },
+  { value: "promotion_template", label: "Promotion template" },
   { value: "topic", label: "Konu" },
+]);
+const SOURCE_TYPES: readonly Readonly<{ value: GuidanceSourceType; label: string }>[] = Object.freeze([
+  { value: "owner_statement", label: "Owner anlatımı" },
+  { value: "official_meta_guidance", label: "Resmî Meta kaynağı" },
+  { value: "business_strategy", label: "İş stratejisi" },
+  { value: "observed_result", label: "Gözlemlenen sonuç" },
+  { value: "experiment_outcome", label: "Deney sonucu" },
+  { value: "operating_note", label: "Operasyon notu" },
 ]);
 const STRENGTHS: readonly Readonly<{ value: GuidanceStrength; label: string }>[] = Object.freeze([
   { value: "must", label: "Mutlaka dikkate al" },
@@ -104,7 +124,8 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function isScope(value: unknown): value is GuidanceScope {
   if (!isObject(value)) return false;
-  return ["global", "account", "objective", "internal_category", "entity", "topic"].includes(String(value.facet))
+  return ["global", "account_group", "account", "objective", "funnel", "optimization", "internal_category",
+    "lifecycle", "entity", "promotion_template", "topic"].includes(String(value.facet))
     && (value.value === null || typeof value.value === "string")
     && (value.entityType === null || ENTITY_TYPES.includes(value.entityType as Exclude<GuidanceEntityType, null>))
     && (value.mode === "default" || value.mode === "exception")
@@ -114,10 +135,17 @@ function isScope(value: unknown): value is GuidanceScope {
 
 function isItem(value: unknown): value is GuidanceItem {
   if (!isObject(value)) return false;
+  const sources = value.sources;
   return typeof value.cardRef === "string" && Number.isInteger(value.version) && Number(value.version) > 0
     && typeof value.title === "string" && typeof value.body === "string" && typeof value.topic === "string"
     && ["must", "should", "consider", "avoid", "question"].includes(String(value.strength))
     && ["draft", "published", "archived"].includes(String(value.status))
+    && Array.isArray(sources) && sources.length >= 1 && sources.every((source) => isObject(source)
+      && SOURCE_TYPES.some((entry) => entry.value === source.type)
+      && typeof source.ref === "string" && (source.url === null || typeof source.url === "string")
+      && (source.capturedAt === null || typeof source.capturedAt === "string")
+      && (source.reviewedAt === null || typeof source.reviewedAt === "string")
+      && (source.reviewBy === null || typeof source.reviewBy === "string"))
     && (value.updatedAt === null || typeof value.updatedAt === "string") && Array.isArray(value.scopes)
     && value.scopes.length >= 1 && value.scopes.length <= 12 && value.scopes.every(isScope);
 }
@@ -160,8 +188,11 @@ function errorFromResponse(response: Response, payload: unknown): GuidanceStudio
 }
 
 function draftFromItem(item: GuidanceItem): Draft {
+  const source = item.sources[0]!;
   return { title: item.title, body: item.body, strength: item.strength, topic: item.topic,
-    scopes: item.scopes.map((scope) => ({ ...scope })) };
+    scopes: item.scopes.map((scope) => ({ ...scope })), source: { type: source.type, ref: source.ref,
+      url: source.url ?? "", capturedAt: source.capturedAt?.slice(0, 16) ?? "",
+      reviewBy: source.reviewBy?.slice(0, 16) ?? "" } };
 }
 
 function labelForScope(scope: GuidanceScope, categories: readonly GuidanceCategory[]): string {
@@ -343,10 +374,12 @@ export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void
 
   const selected = snapshot?.items.find((item) => item.cardRef === selectedRef) ?? null;
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(baseline), [baseline, draft]);
-  const valid = Boolean(draft.title.trim() && draft.body.trim() && draft.topic.trim() && draft.scopes.length
+  const valid = Boolean(draft.title.trim() && draft.body.trim() && draft.topic.trim() && draft.source.ref.trim() && draft.scopes.length
     && draft.scopes.every((scope) => (scope.facet === "global" || scope.value?.trim())
       && (scope.facet !== "entity" || scope.entityType))
-    && (draft.scopes.length === 1 || draft.scopes.every((scope) => scope.facet !== "global")));
+    && (draft.scopes.length === 1 || draft.scopes.every((scope) => scope.facet !== "global"))
+    && (draft.source.type !== "official_meta_guidance"
+      || /^https:\/\//i.test(draft.source.url) && draft.source.capturedAt && draft.source.reviewBy));
 
   const selectItem = useCallback((item: GuidanceItem) => {
     const next = draftFromItem(item);
@@ -438,7 +471,11 @@ export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void
     const isCreate = operation === "create";
     const body = isCreate
       ? { title: draft.title.trim(), body: draft.body.trim(), strength: draft.strength, topic: draft.topic.trim(),
-          scopes: draft.scopes, expectedRegistryHash: snapshot.registryHash }
+          scopes: draft.scopes, source: { type: draft.source.type, ref: draft.source.ref.trim(),
+            url: draft.source.url.trim() || null,
+            capturedAt: draft.source.capturedAt ? new Date(draft.source.capturedAt).toISOString() : null,
+            reviewBy: draft.source.reviewBy ? new Date(draft.source.reviewBy).toISOString() : null },
+          expectedRegistryHash: snapshot.registryHash }
       : { cardRef: selected!.cardRef, expectedVersion: selected!.version, expectedRegistryHash: snapshot.registryHash,
           operation, ...(operation === "revise" ? { title: draft.title.trim(), body: draft.body.trim(),
             strength: draft.strength, topic: draft.topic.trim(), scopes: draft.scopes } : {}) };
@@ -506,6 +543,18 @@ export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void
           <label>Başlık<input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} disabled={editorLocked} maxLength={160} /></label>
           <label>Konu<input value={draft.topic} onChange={(event) => setDraft((current) => ({ ...current, topic: event.target.value }))} disabled={editorLocked} placeholder="budget_allocation" maxLength={80} /></label>
           <label className={styles.guidanceBodyField}>Talimat metni<textarea value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))} disabled={editorLocked} maxLength={6000} placeholder="Bu kapsamda karar verirken..." /></label>
+          <label>Kaynak türü<select value={draft.source.type} onChange={(event) => setDraft((current) => ({ ...current,
+            source: { ...current.source, type: event.target.value as GuidanceSourceType } }))} disabled={!creating || editorLocked}>{SOURCE_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+          <label>Kaynak referansı<input value={draft.source.ref} onChange={(event) => setDraft((current) => ({ ...current,
+            source: { ...current.source, ref: event.target.value } }))} disabled={!creating || editorLocked} placeholder="source_document_ref" /></label>
+          {draft.source.type === "official_meta_guidance" ? <>
+            <label>Resmî HTTPS URL<input type="url" value={draft.source.url} onChange={(event) => setDraft((current) => ({ ...current,
+              source: { ...current.source, url: event.target.value } }))} disabled={!creating || editorLocked} /></label>
+            <label>Yakalanma zamanı<input type="datetime-local" value={draft.source.capturedAt} onChange={(event) => setDraft((current) => ({ ...current,
+              source: { ...current.source, capturedAt: event.target.value } }))} disabled={!creating || editorLocked} /></label>
+            <label>Yeniden inceleme tarihi<input type="datetime-local" value={draft.source.reviewBy} onChange={(event) => setDraft((current) => ({ ...current,
+              source: { ...current.source, reviewBy: event.target.value } }))} disabled={!creating || editorLocked} /></label>
+          </> : null}
           <label>Karar ağırlığı<select value={draft.strength} onChange={(event) => setDraft((current) => ({ ...current, strength: event.target.value as GuidanceStrength }))} disabled={editorLocked}>{STRENGTHS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
           {draft.scopes.map((scope, index) => <div className={styles.guidanceScopeGroup} key={`${index}-${scope.facet}`}>
             <div><strong>Kapsam {index + 1}</strong>{creating && draft.scopes.length > 1 ? <button type="button" onClick={() => removeScope(index)}>Kaldır</button> : null}</div>
@@ -518,7 +567,7 @@ export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void
           </div>)}
           {creating && draft.scopes.length < 12 ? <button className={styles.secondaryButton} type="button" onClick={addScope}>+ Kapsam ekle</button> : null}
         </div>
-        <div className={styles.guidanceFacts}><div><span>Otorite</span><strong>Yalnız analitik guidance</strong></div><div><span>Kapsam</span><strong>{labelForScopes(draft.scopes, snapshot.categories)}</strong></div><div><span>Kayıt</span><strong>{dirty ? "Kaydedilmemiş değişiklik" : "Sunucuyla eşleşiyor"}</strong></div></div>
+        <div className={styles.guidanceFacts}><div><span>Otorite</span><strong>Yalnız analitik guidance</strong></div><div><span>Kapsam</span><strong>{labelForScopes(draft.scopes, snapshot.categories)}</strong></div><div><span>Kaynaklar</span><strong>{selected ? selected.sources.map((source) => `${source.type} · ${source.ref}`).join(" + ") : `${draft.source.type} · ${draft.source.ref}`}</strong></div><div><span>Kayıt</span><strong>{dirty ? "Kaydedilmemiş değişiklik" : "Sunucuyla eşleşiyor"}</strong></div></div>
         <footer>
           {!creating && selected?.status !== "archived" ? <button className={styles.guidanceDangerButton} type="button" onClick={() => void mutate("archive")} disabled={saving || !authority.canArchive}>Arşivle</button> : <span />}
           <div><span>{saving ? "İşlem sürüyor…" : selected?.status === "published" ? "Yayındaki talimat salt okunurdur; değiştirmek için arşivleyip yeni talimat oluşturun." : selected?.status === "archived" ? "Arşivli talimat yeni analiz bağlamlarında uygulanmaz." : "Taslak yayınlanana kadar uygulanmaz."}</span>

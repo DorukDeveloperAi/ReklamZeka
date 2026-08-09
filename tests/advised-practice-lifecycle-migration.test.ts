@@ -22,7 +22,8 @@ describe("advised-practice standardization migration", () => {
 
   it("keeps journal and generated snapshot aligned", () => {
     const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")) as { entries: { idx: number; tag: string }[] };
-    expect(journal.entries.at(-1)).toMatchObject({ idx: 42, tag: "20260809202132_advised_practice_standardization_lifecycle" });
+    expect(journal.entries).toContainEqual(expect.objectContaining({ idx: 42,
+      tag: "20260809202132_advised_practice_standardization_lifecycle" }));
     const snapshot = JSON.parse(readFileSync("drizzle/meta/20260809202132_snapshot.json", "utf8")) as { tables?: Record<string, unknown> };
     expect(snapshot.tables).toHaveProperty("public.advised_practice_events");
   });

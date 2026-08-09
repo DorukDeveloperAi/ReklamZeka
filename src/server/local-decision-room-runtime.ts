@@ -185,7 +185,7 @@ export function assertTrustedLocalDecisionRoomRequest(
     "policy-bundle-confirm-human-presence", "policy-bundle-publish-approval-policy",
     "policy-bundle-publish-guardrail-policy", "guidance-studio-publish", "guidance-studio-archive",
     "guidance-set-review", "guidance-set-archive",
-    "category-authoring-mutate", "practice-lab-standardize",
+    "category-authoring-mutate", "category-profile-mutate", "practice-lab-standardize",
   ].includes(request.headers.get("x-reklamzeka-intent") ?? "")) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if ((operation === "mark_read" || operation === "draft" || operation === "decide" || operation === "publish") && credential === "cookie"
     && (origin !== config.origin || fetchSite !== "same-origin")) {

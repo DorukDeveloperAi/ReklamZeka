@@ -1468,7 +1468,10 @@ export const guidanceBindings = pgTable("guidance_bindings", {
   check("guidance_bindings_version_positive", sql`${table.version} >= 1`),
   check("guidance_bindings_priority_range", sql`${table.priority} between 0 and 100`),
   check("guidance_bindings_required_text", sql`btrim(${table.bindingKey}) <> '' and btrim(${table.cardKey}) <> ''`),
-  check("guidance_bindings_facet_allowlist", sql`${table.facet} in ('global', 'account', 'objective', 'internal_category', 'entity', 'topic')`),
+  check("guidance_bindings_facet_allowlist", sql`${table.facet} in (
+    'global', 'account_group', 'account', 'objective', 'funnel', 'optimization',
+    'internal_category', 'lifecycle', 'entity', 'promotion_template', 'topic'
+  )`),
   check("guidance_bindings_entity_type_allowlist", sql`${table.entityType} is null or ${table.entityType} in ('campaign', 'ad_set', 'ad', 'creative', 'post')`),
   check("guidance_bindings_mode_allowlist", sql`${table.mode} in ('default', 'exception')`),
   check("guidance_bindings_scope_consistent", sql`
@@ -2436,6 +2439,51 @@ export const decisionRoomRunAnalysisAssets = pgTable("decision_room_run_analysis
     and jsonb_typeof(${table.resolvedTimeframe}) = 'object'
     and ${table.resolvedTimeframe} #>> '{resolverVersion}' = 'analysis-timeframe-resolver/1.0.0'
   ) is true`),
+]);
+
+/** Immutable, advisory-only guidance revision selection frozen on first analysis-run claim. */
+export const guidanceAnalysisRunBindings = pgTable("guidance_analysis_run_bindings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  runId: uuid("run_id").notNull(),
+  registryHash: text("registry_hash").notNull(),
+  packHash: text("pack_hash").notNull(),
+  selectedSetRefs: jsonb("selected_set_refs").$type<readonly Readonly<{
+    setRef: string; version: number; recordHash: string;
+  }>[]>().notNull(),
+  cardRefs: jsonb("card_refs").$type<readonly Readonly<{
+    cardRef: string; version: number; recordHash: string;
+  }>[]>().notNull(),
+  sourceRefs: jsonb("source_refs").$type<readonly Readonly<{
+    sourceRef: string; version: number; recordHash: string;
+  }>[]>().notNull(),
+  authority: text("authority").notNull().default("guidance_only"),
+  bindingHash: text("binding_hash").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.runId],
+    foreignColumns: [decisionRoomRuns.workspaceId, decisionRoomRuns.id],
+    name: "guidance_analysis_run_bindings_run_scope_fk",
+  }).onDelete("cascade"),
+  uniqueIndex("guidance_analysis_run_bindings_run_unique").on(table.workspaceId, table.runId),
+  uniqueIndex("guidance_analysis_run_bindings_hash_unique").on(table.workspaceId, table.bindingHash),
+  index("guidance_analysis_run_bindings_run_idx").on(table.runId),
+  check("guidance_analysis_run_bindings_hashes", sql`
+    ${table.registryHash} ~ '^[a-f0-9]{64}$' and ${table.packHash} ~ '^[a-f0-9]{64}$'
+    and ${table.bindingHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("guidance_analysis_run_bindings_arrays", sql`
+    jsonb_typeof(${table.selectedSetRefs}) = 'array'
+    and jsonb_typeof(${table.cardRefs}) = 'array'
+    and jsonb_typeof(${table.sourceRefs}) = 'array'
+  `),
+  check("guidance_analysis_run_bindings_guidance_only", sql`${table.authority} = 'guidance_only'`),
+  check("guidance_analysis_run_bindings_no_forbidden_material", sql`
+    concat_ws('|', ${table.selectedSetRefs}::text, ${table.cardRefs}::text, ${table.sourceRefs}::text)
+      !~* '(token|secret|prompt|raw[_-]?(payload|request|response|json)|authorization|canwrite|canauthorize|canexecute|canenforce)'
+  `),
 ]);
 
 /** Deduplicated in-app-only completion notifications. */

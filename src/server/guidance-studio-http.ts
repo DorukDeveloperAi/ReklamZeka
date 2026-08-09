@@ -71,7 +71,9 @@ export function createGuidanceStudioHttpHandlers(input: Readonly<{
       const value = await body(request);
       exact(value, intent === "guidance-set-create"
         ? ["name", "orderedCardRefs", "expectedRegistryHash"]
-        : ["title", "body", "strength", "topic", "scopes", "expectedRegistryHash"]);
+        : Object.hasOwn(value, "source")
+          ? ["title", "body", "strength", "topic", "scopes", "source", "expectedRegistryHash"]
+          : ["title", "body", "strength", "topic", "scopes", "expectedRegistryHash"]);
       const principal = await input.resolvePrincipal(request, "draft");
       if (!principal) throw new AuthorizationError();
       const result = intent === "guidance-set-create"

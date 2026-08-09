@@ -1,0 +1,43 @@
+.studio {
+  display: grid;
+  gap: 16px;
+  border: 1px solid #dfe6e2;
+  border-radius: 18px;
+  padding: 20px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgb(24 43 36 / 5%);
+}
+.header, .row, .actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.header h2, .editor h3 { margin: 4px 0; color: #17231f; }
+.header p, .boundary, .error, .empty { margin: 0; color: #66736e; line-height: 1.5; }
+.kicker { color: #22845d; font-size: 11px; font-weight: 800; letter-spacing: .13em; }
+.guard { border-radius: 999px; padding: 7px 10px; background: #edf8f2; color: #296a4f; font-size: 11px; font-weight: 800; }
+.workspace { display: grid; grid-template-columns: minmax(240px, .75fr) minmax(0, 1.55fr); gap: 14px; }
+.index { display: grid; align-content: start; gap: 8px; max-height: 640px; overflow: auto; }
+.index button { display: grid; gap: 5px; width: 100%; border: 1px solid #e0e6e3; border-radius: 11px; padding: 11px; background: #fff; color: #26352f; text-align: left; cursor: pointer; }
+.index button[data-active="true"] { border-color: #4a9d79; background: #f2faf6; }
+.index small { color: #74817c; }
+.status { width: max-content; border-radius: 999px; padding: 3px 8px; background: #eef2f0; color: #5a6762; font-size: 11px; font-weight: 750; }
+.status[data-status="active"] { background: #e6f6ed; color: #216b4b; }
+.status[data-status="draft"] { background: #eaf1ff; color: #345f98; }
+.status[data-status="paused"] { background: #fff3d7; color: #876110; }
+.editor { display: grid; gap: 14px; min-width: 0; }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.fields label { display: grid; gap: 6px; color: #405049; font-size: 12px; font-weight: 750; }
+.fields label[data-wide="true"] { grid-column: 1 / -1; }
+.fields input, .fields textarea, .fields select { width: 100%; min-height: 40px; border: 1px solid #d8dfdc; border-radius: 9px; padding: 8px 10px; background: #fff; color: #17231f; font: inherit; }
+.fields textarea { min-height: 75px; resize: vertical; }
+.bindings { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; border: 0; padding: 0; margin: 0; }
+.bindings legend { grid-column: 1 / -1; margin-bottom: 6px; font-weight: 800; color: #33443d; }
+.boundary { border: 1px dashed #d9b460; border-radius: 11px; padding: 11px; background: #fffaf0; color: #755b22; }
+.actions { border-top: 1px solid #e7ece9; padding-top: 13px; justify-content: flex-end; }
+.actions button, .retry { min-height: 40px; border: 1px solid #cdd8d3; border-radius: 9px; padding: 8px 13px; background: #fff; color: #2c4037; font-weight: 750; cursor: pointer; }
+.actions button:disabled { cursor: not-allowed; opacity: .45; }
+.actions .primary { border-color: #1c7854; background: #1c7854; color: #fff; }
+.actions .danger { border-color: #e2b7b7; color: #963b3b; }
+.message { margin: 0; color: #356e55; }
+.error, .empty { border: 1px solid #e3e7e5; border-radius: 14px; padding: 17px; background: #fafcfb; }
+.error { border-color: #ecd0d0; background: #fff8f8; color: #8b4242; }
+.error button { margin-top: 10px; }
+@media (max-width: 980px) { .workspace { grid-template-columns: 1fr; } .index { max-height: 280px; } }
+@media (max-width: 680px) { .studio { padding: 15px; } .fields, .bindings { grid-template-columns: 1fr; } .fields label[data-wide="true"] { grid-column: auto; } .actions button { flex: 1 1 130px; } }

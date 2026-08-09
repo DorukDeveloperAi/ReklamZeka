@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 15501aa2d97b -->
+<!-- durum-damga: 34832dc232c8 -->
 
 ## Künye
 
@@ -14,13 +14,15 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 134 |
+| iş commit'i (tüm geçmiş) | 136 |
 | ilk / son iş | 2026-08-06 / 2026-08-09 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-09 | `feat` | complete human-gated authoring flows | `68fe5b8ee` |
+| 2026-08-09 | `docs` | record external checkpoint takeover | `bfaf4bcd5` |
 | 2026-08-09 | `feat` | harden category and Meta read contracts | `0237143f3` |
 | 2026-08-09 | `feat` | add selector mapping preview | `44c670e0b` |
 | 2026-08-09 | `chore` | quarantine legacy control plane | `cd675c679` |
@@ -34,16 +36,14 @@
 | 2026-08-08 | `fix` | guide local session recovery | `49d98f771` |
 | 2026-08-08 | `feat` | add multi-scope authoring | `19eac50de` |
 | 2026-08-08 | `feat` | invalidate stale campaign contexts | `ee0e41193` |
-| 2026-08-08 | `feat` | add guidance context tools | `65cbab3a8` |
-| 2026-08-08 | `feat` | add category-bound studio | `9ddd42599` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 31
-- `docs        ` ███████████████ 20
-- `test        ` ███ 4
+- `feat        ` ████████████████████████ 32
+- `docs        ` ████████████████ 21
 - `chore       ` ██ 3
 - `fix         ` ██ 2
+- `test        ` ██ 2
 
 ## Planlar
 

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -7,10 +8,12 @@ import { GuidanceSetStudio, moveGuidanceSetCard,
 const cardRef = `guidance_${"a".repeat(24)}`;
 const setRef = `guidance_set_${"b".repeat(24)}`;
 const snapshot = {
-  contractVersion: "guidance-studio/1.2.0",
+  contractVersion: "guidance-studio/1.3.0",
   registryHash: "c".repeat(64),
   items: [{ cardRef, version: 3, title: "Bütçeyi koru", body: "Bölgesel bütçeyi koru.",
-    strength: "must", topic: "budget", status: "published", scopes: [{ facet: "global",
+    strength: "must", topic: "budget", status: "published", sources: [{ type: "owner_statement",
+      ref: "owner_statement_budget", url: null, capturedAt: "2026-08-09T18:00:00.000Z",
+      reviewedAt: null, reviewBy: null }], scopes: [{ facet: "global",
       value: null, entityType: null, mode: "default", priority: 80 }], updatedAt: null }],
   sets: [{ setRef, version: 2, name: "Bütçe sırası", reviewStatus: "draft",
     orderedCards: [{ cardRef, title: "Bütçeyi koru", version: 3, status: "published" }] }],
@@ -20,6 +23,15 @@ const snapshot = {
 } as const;
 
 describe("Guidance set dashboard", () => {
+  it("exposes the complete facet and provenance selectors without action authority", () => {
+    const source = readFileSync("src/app/dashboard/guidance-studio-panel.tsx", "utf8");
+    for (const label of ["Hesap grubu", "Funnel aşaması", "Optimizasyon olayı", "Yaşam döngüsü",
+      "Promotion template", "Resmî Meta kaynağı", "İş stratejisi", "Gözlemlenen sonuç",
+      "Deney sonucu", "Operasyon notu"]) expect(source).toContain(label);
+    expect(source).toContain("selected.sources.map");
+    expect(source).not.toMatch(/canWriteMeta:\s*true|canAuthorizeAction:\s*true|canEnforcePolicy:\s*true/);
+  });
+
   it("accepts only the no-authority set contract and preserves ordered card movement", () => {
     expect(parseGuidanceStudioSnapshot(snapshot).sets[0]).toMatchObject({ setRef, reviewStatus: "draft" });
     expect(moveGuidanceSetCard(["first", "second", "third"], "second", -1))

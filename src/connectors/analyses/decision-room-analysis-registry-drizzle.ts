@@ -21,6 +21,7 @@ import {
 import type { DecisionRoomDraftPort } from "@/application/decision-room";
 import type { FindingObservationReadPort } from "@/analyses/finding-observation-builder";
 import { buildEffectiveCampaignContext, type EffectiveCampaignContext } from "@/analyses/effective-campaign-context";
+import type { EffectiveGuidancePack } from "@/domain/guidance/registry";
 import { resolveAnalysisTimeframe, validateResolvedAnalysisTimeframe, type ResolvedAnalysisTimeframe } from "@/analyses/timeframe-resolver";
 import * as schema from "@/db/schema";
 import { DrizzleDecisionRoomInbox, DrizzleDecisionRoomRunStore } from "@/connectors/decisions/decision-room-drizzle-adapters";
@@ -74,6 +75,73 @@ function hash(value: string): string {
 function instant(value: string): string {
   if (!Number.isFinite(Date.parse(value))) throw new DecisionRoomAnalysisAssetPersistenceError("invalid_input");
   return new Date(value).toISOString();
+}
+
+async function bindGuidanceRun(
+  database: Pick<Database, "execute">,
+  workspaceId: string,
+  runId: string,
+  occurredAt: string,
+  pack: EffectiveGuidancePack,
+): Promise<void> {
+  // Pre-1.1 packs remain replayable exactly as captured; they predate revision-hash
+  // projections and are never guessed or silently rebound to a newer registry row.
+  if ((pack.schemaVersion as string) !== "effective-guidance-pack/1.1.0") return;
+  const selectedSetRefs = pack.selectedSets.map((set) => ({ setRef: set.setId,
+    version: set.setVersion, recordHash: set.setHash }));
+  const cardRefs = pack.evaluatedCards.map((card) => ({ cardRef: card.cardId,
+    version: card.cardVersion, recordHash: card.cardHash }));
+  const sourceRefs = pack.evaluatedSources.map((source) => ({ sourceRef: source.sourceId,
+    version: source.sourceVersion, recordHash: source.sourceHash }));
+  if (new Set(selectedSetRefs.map((entry) => entry.setRef)).size !== selectedSetRefs.length
+    || new Set(cardRefs.map((entry) => entry.cardRef)).size !== cardRefs.length
+    || new Set(sourceRefs.map((entry) => entry.sourceRef)).size !== sourceRefs.length) {
+    throw new DecisionRoomAnalysisAssetPersistenceError("corrupt_store");
+  }
+  const exactRows = rows<{ set_count: number | string; card_count: number | string; source_count: number | string }>(
+    await database.execute(sql`
+      select
+        (select count(*)::int from jsonb_to_recordset(${JSON.stringify(selectedSetRefs)}::jsonb)
+          as expected("setRef" text, version integer, "recordHash" text)
+          join guidance_sets persisted on persisted.workspace_id = ${workspaceId}::uuid
+            and persisted.set_key = expected."setRef" and persisted.version = expected.version
+            and persisted.record_hash = expected."recordHash") as set_count,
+        (select count(*)::int from jsonb_to_recordset(${JSON.stringify(cardRefs)}::jsonb)
+          as expected("cardRef" text, version integer, "recordHash" text)
+          join guidance_cards persisted on persisted.workspace_id = ${workspaceId}::uuid
+            and persisted.card_key = expected."cardRef" and persisted.version = expected.version
+            and persisted.record_hash = expected."recordHash") as card_count,
+        (select count(*)::int from jsonb_to_recordset(${JSON.stringify(sourceRefs)}::jsonb)
+          as expected("sourceRef" text, version integer, "recordHash" text)
+          join guidance_sources persisted on persisted.workspace_id = ${workspaceId}::uuid
+            and persisted.source_key = expected."sourceRef" and persisted.version = expected.version
+            and persisted.record_hash = expected."recordHash") as source_count
+    `),
+  )[0];
+  if (!exactRows || Number(exactRows.set_count) !== selectedSetRefs.length
+    || Number(exactRows.card_count) !== cardRefs.length || Number(exactRows.source_count) !== sourceRefs.length) {
+    throw new DecisionRoomAnalysisAssetPersistenceError("asset_scope_mismatch");
+  }
+  const bindingCore = Object.freeze({ version: "guidance-analysis-run-binding/1.0.0", workspaceId,
+    runId, registryHash: pack.registryHash, packHash: pack.packHash, selectedSetRefs, cardRefs, sourceRefs,
+    authority: "guidance_only", occurredAt });
+  const bindingHash = analysisAssetDefinitionHash(bindingCore);
+  const inserted = rows<{ binding_hash: string }>(await database.execute(sql`
+    insert into guidance_analysis_run_bindings (
+      workspace_id, run_id, registry_hash, pack_hash, selected_set_refs, card_refs,
+      source_refs, authority, binding_hash, occurred_at
+    ) values (
+      ${workspaceId}::uuid, ${runId}::uuid, ${pack.registryHash}, ${pack.packHash},
+      ${JSON.stringify(selectedSetRefs)}::jsonb, ${JSON.stringify(cardRefs)}::jsonb,
+      ${JSON.stringify(sourceRefs)}::jsonb, 'guidance_only', ${bindingHash}, ${occurredAt}::timestamptz
+    ) on conflict (workspace_id, run_id) do nothing returning binding_hash
+  `));
+  if (inserted[0]?.binding_hash === bindingHash) return;
+  const existing = rows<{ binding_hash: string }>(await database.execute(sql`
+    select binding_hash from guidance_analysis_run_bindings
+    where workspace_id = ${workspaceId}::uuid and run_id = ${runId}::uuid limit 1
+  `))[0];
+  if (existing?.binding_hash !== bindingHash) throw new DecisionRoomAnalysisAssetPersistenceError("corrupt_store");
 }
 
 async function active(database: Pick<Database, "execute">, workspaceId: string): Promise<void> {
@@ -431,7 +499,9 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
           occurredAt: frozenAt, resolvedTimeframe: existing.resolved_timeframe,
         });
         if (existing.asset_hash !== expectedHash) throw new DecisionRoomAnalysisAssetPersistenceError("corrupt_store");
-        return runtimeAssets(input, frozenAt, existing, existing.resolved_timeframe);
+        const assets = runtimeAssets(input, frozenAt, existing, existing.resolved_timeframe);
+        await bindGuidanceRun(transaction, this.workspaceId, run.id, frozenAt, assets.context.guidance);
+        return assets;
       }
       const selectionSql = run.trigger_kind === "scheduled" ? sql`
         select template.id::text as template_id, timeframe.id::text as timeframe_id,
@@ -512,6 +582,7 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
           ${assetHash}, ${occurredAt}::timestamptz, ${JSON.stringify(assets.resolvedTimeframe)}::jsonb
         )
       `);
+      await bindGuidanceRun(transaction, this.workspaceId, run.id, occurredAt, assets.context.guidance);
       return assets;
     });
   }

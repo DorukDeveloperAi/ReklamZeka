@@ -2,16 +2,18 @@ import { randomBytes } from "node:crypto";
 import type { TrustedDecisionRoomPrincipal } from "@/application/decision-room-agent-contract";
 import {
   createGuidanceRegistry,
+  isOfficialGuidanceSourceUrl,
   type GuidanceBinding,
   type GuidanceCard,
   type GuidanceRegistry,
   type GuidanceScopeFacet,
   type GuidanceSet,
+  type GuidanceSourceType,
   type GuidanceStrength,
 } from "@/domain/guidance/registry";
 import { authorizeWorkspace, type WorkspaceMembership } from "@/security/authorization";
 
-export const GUIDANCE_STUDIO_VERSION = "guidance-studio/1.2.0" as const;
+export const GUIDANCE_STUDIO_VERSION = "guidance-studio/1.3.0" as const;
 
 export type GuidanceStudioScope = Readonly<{
   facet: GuidanceScopeFacet;
@@ -30,6 +32,14 @@ export type GuidanceStudioItem = Readonly<{
   strength: GuidanceStrength;
   topic: string;
   status: GuidanceCard["status"];
+  sources: readonly Readonly<{
+    type: GuidanceSourceType;
+    ref: string;
+    url: string | null;
+    capturedAt: string | null;
+    reviewedAt: string | null;
+    reviewBy: string | null;
+  }>[];
   scopes: readonly GuidanceStudioScope[];
   updatedAt: null;
 }>;
@@ -88,8 +98,15 @@ export class GuidanceStudioError extends Error {
 
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const STRENGTHS = new Set<GuidanceStrength>(["must", "should", "consider", "avoid", "question"]);
-const FACETS = new Set<GuidanceScopeFacet>(["global", "account", "objective", "internal_category", "entity", "topic"]);
+const FACETS = new Set<GuidanceScopeFacet>([
+  "global", "account_group", "account", "objective", "funnel", "optimization",
+  "internal_category", "lifecycle", "entity", "promotion_template", "topic",
+]);
 const ENTITIES = new Set(["campaign", "ad_set", "ad", "creative", "post"]);
+const SOURCE_TYPES = new Set<GuidanceSourceType>([
+  "owner_statement", "official_meta_guidance", "business_strategy", "observed_result",
+  "experiment_outcome", "operating_note",
+]);
 
 function text(value: unknown, max: number): string {
   if (typeof value !== "string") throw new GuidanceStudioError("invalid_input");
@@ -112,8 +129,8 @@ function scope(value: GuidanceStudioScope, categories: readonly GuidanceStudioCa
     if (value.value !== null || value.entityType !== null) throw new GuidanceStudioError("invalid_input");
   } else {
     if (typeof value.value !== "string") throw new GuidanceStudioError("invalid_input");
-    const validValue = value.facet === "objective" ? /^[A-Z][A-Z0-9_]{1,79}$/.test(value.value)
-      : value.facet === "topic" ? /^[a-z][a-z0-9_.:-]{0,79}$/.test(value.value)
+    const validValue = ["objective", "optimization"].includes(value.facet) ? /^[A-Z][A-Z0-9_]{1,79}$/.test(value.value)
+      : ["topic", "funnel", "lifecycle"].includes(value.facet) ? /^[a-z][a-z0-9_.:-]{0,79}$/.test(value.value)
         : REF.test(value.value);
     if (!validValue) throw new GuidanceStudioError("invalid_input");
     if (value.facet === "entity") {
@@ -185,17 +202,45 @@ function project(registry: GuidanceRegistry): readonly GuidanceStudioItem[] {
   return Object.freeze(registry.cards.map((card) => {
     const cardBindings = [...(bindings.get(card.id) ?? [])].sort((left, right) => left.id.localeCompare(right.id, "en"));
     if (!cardBindings.length) throw new GuidanceStudioError("not_found");
+    const cardSources = card.sourceIds.map((sourceId) => registry.sources.find((candidate) => candidate.id === sourceId));
+    if (cardSources.some((source) => !source)) throw new GuidanceStudioError("not_found");
     return Object.freeze({
       cardRef: card.id, version: card.version, title: card.title, body: card.body,
       strength: card.strength, topic: card.topic, status: card.status,
+      sources: Object.freeze(cardSources.map((source) => Object.freeze({ type: source!.sourceType,
+        ref: source!.sourceRef, url: source!.sourceUrl, capturedAt: source!.capturedAt,
+        reviewedAt: source!.reviewedAt, reviewBy: source!.reviewBy }))),
       scopes: Object.freeze(cardBindings.map((binding) => Object.freeze({ facet: binding.facet, value: binding.value,
         entityType: binding.entityType, mode: binding.mode, priority: binding.priority }))), updatedAt: null,
     });
   }).sort((left, right) => left.status.localeCompare(right.status) || left.title.localeCompare(right.title, "tr")));
 }
 
+type SourceDraft = Readonly<{ type: GuidanceSourceType; ref: string; url: string | null;
+  capturedAt: string | null; reviewBy: string | null }>;
 type DraftBody = Readonly<{ title: string; body: string; strength: GuidanceStrength; topic: string;
-  scopes: readonly GuidanceStudioScope[] }>;
+  scopes: readonly GuidanceStudioScope[]; source?: SourceDraft }>;
+
+function sourceDraft(value: SourceDraft | undefined, fallbackRef: string): SourceDraft {
+  if (value === undefined) return Object.freeze({ type: "owner_statement", ref: fallbackRef,
+    url: null, capturedAt: new Date().toISOString(), reviewBy: null });
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || Object.keys(value).length !== 5
+    || Object.keys(value).some((key) => !["type", "ref", "url", "capturedAt", "reviewBy"].includes(key))
+    || !SOURCE_TYPES.has(value.type) || !REF.test(value.ref)
+    || value.url !== null && (typeof value.url !== "string" || !/^https:\/\//i.test(value.url) || value.url.length > 2_048)
+    || value.capturedAt !== null && !Number.isFinite(Date.parse(value.capturedAt))
+    || value.reviewBy !== null && !Number.isFinite(Date.parse(value.reviewBy))) {
+    throw new GuidanceStudioError("invalid_input");
+  }
+  if (value.type === "official_meta_guidance"
+    && (value.url === null || value.capturedAt === null || value.reviewBy === null
+      || !isOfficialGuidanceSourceUrl(value.url))) {
+    throw new GuidanceStudioError("invalid_input");
+  }
+  return Object.freeze({ ...value, capturedAt: value.capturedAt === null ? null : new Date(value.capturedAt).toISOString(),
+    reviewBy: value.reviewBy === null ? null : new Date(value.reviewBy).toISOString() });
+}
 
 export class GuidanceStudioService {
   constructor(private readonly repository: GuidanceStudioRepository, private readonly memberships: readonly WorkspaceMembership[]) {}
@@ -280,11 +325,12 @@ export class GuidanceStudioService {
     if (!STRENGTHS.has(request.strength)) throw new GuidanceStudioError("invalid_input");
     const bindingScopes = scopes(request.scopes, categories);
     const cardRef = identity("guidance"); const sourceRef = identity("source");
+    const provenance = sourceDraft(request.source, cardRef);
     const next = createGuidanceRegistry({ workspaceId: principal.workspaceId,
-      sources: [...current.sources, { id: sourceRef, workspaceId: principal.workspaceId, sourceType: "owner_statement",
-        title, sourceRef: cardRef, sourceUrl: null, content: body, author: principal.readerRef, capturedAt: new Date().toISOString(),
-        reviewedAt: null, reviewBy: null, status: "draft", version: 1 }],
-      cards: [...current.cards, { id: cardRef, workspaceId: principal.workspaceId, sourceType: "owner_statement",
+      sources: [...current.sources, { id: sourceRef, workspaceId: principal.workspaceId, sourceType: provenance.type,
+        title, sourceRef: provenance.ref, sourceUrl: provenance.url, content: body, author: principal.readerRef,
+        capturedAt: provenance.capturedAt, reviewedAt: null, reviewBy: provenance.reviewBy, status: "draft", version: 1 }],
+      cards: [...current.cards, { id: cardRef, workspaceId: principal.workspaceId, sourceType: provenance.type,
         sourceIds: [sourceRef], title, body, rationale: null, strength: request.strength, topic,
         decisionKey: null, positionKey: null, authority: "guidance_only", status: "draft",
         effectiveFrom: null, effectiveTo: null, ownerRef: principal.readerRef, version: 1 }],
@@ -293,7 +339,7 @@ export class GuidanceStudioService {
     const saved = await this.repository.saveAudited(next, { expectedRegistryHash: request.expectedRegistryHash,
       actorId: principal.actor.userId, action: "guidance.draft_created", resourceId: cardRef,
       occurredAt: new Date().toISOString(), metadata: { version: 1, role: membership.role,
-        bindingCount: bindingScopes.length } });
+        bindingCount: bindingScopes.length, sourceType: provenance.type } });
     return Object.freeze({ contractVersion: GUIDANCE_STUDIO_VERSION, item: project(next).find((item) => item.cardRef === cardRef)!,
       registryHash: saved.registryHash, contextInvalidated: saved.contextInvalidationAppended,
       authority: authority(membership.role) });
@@ -335,7 +381,10 @@ export class GuidanceStudioService {
     const version = card.version + 1;
     const replace = <T extends { id: string }>(rows: readonly T[], id: string, value: T) => rows.map((row) => row.id === id ? value : row);
     const next = createGuidanceRegistry({ workspaceId: current.workspaceId,
-      sources: replace(current.sources, source.id, { ...source, title: nextTitle, content: nextBody, status: nextStatus, version: source.version + 1 }),
+      sources: replace(current.sources, source.id, { ...source, title: nextTitle, content: nextBody,
+        reviewedAt: request.operation === "publish" && source.sourceType === "official_meta_guidance"
+          ? new Date().toISOString() : source.reviewedAt,
+        status: nextStatus, version: source.version + 1 }),
       cards: replace(current.cards, card.id, { ...card, title: nextTitle, body: nextBody, topic: nextTopic,
         strength: nextStrength, status: nextStatus, effectiveFrom: nextStatus === "published" ? new Date().toISOString() : card.effectiveFrom,
         version }),
@@ -347,7 +396,8 @@ export class GuidanceStudioService {
       : request.operation === "publish" ? "guidance.published" : "guidance.archived";
     const saved = await this.repository.saveAudited(next, { expectedRegistryHash: request.expectedRegistryHash,
       actorId: principal.actor.userId, action: auditAction, resourceId: card.id, occurredAt: new Date().toISOString(),
-      metadata: { version, role: membership.role, bindingCount: nextScopes.length } });
+      metadata: { version, role: membership.role, bindingCount: nextScopes.length,
+        sourceType: source.sourceType } });
     return Object.freeze({ contractVersion: GUIDANCE_STUDIO_VERSION, item: project(next).find((item) => item.cardRef === card.id)!,
       registryHash: saved.registryHash, contextInvalidated: saved.contextInvalidationAppended,
       authority: authority(membership.role) });

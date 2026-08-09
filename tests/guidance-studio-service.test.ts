@@ -66,6 +66,60 @@ describe("GuidanceStudioService", () => {
       expectedRegistryHash: created.registryHash, operation: "publish" })).rejects.toMatchObject({ name: "AuthorizationError" });
   });
 
+  it("authors non-owner provenance and requires owner review evidence before official publication", async () => {
+    const analystState = memory("analyst"); const initial = await analystState.service.list(principal);
+    const strategy = await analystState.service.createDraft(principal, { ...draft,
+      source: { type: "business_strategy", ref: "strategy_quarterly", url: null,
+        capturedAt: "2026-08-09T18:00:00.000Z", reviewBy: null }, expectedRegistryHash: initial.registryHash });
+    expect(analystState.registry().sources[0]).toMatchObject({ sourceType: "business_strategy",
+      sourceRef: "strategy_quarterly", status: "draft" });
+    await expect(analystState.service.mutate(principal, { cardRef: strategy.item.cardRef, expectedVersion: 1,
+      expectedRegistryHash: strategy.registryHash, operation: "publish" }))
+      .rejects.toMatchObject({ name: "AuthorizationError" });
+
+    const ownerState = memory("owner"); const ownerInitial = await ownerState.service.list(principal);
+    const official = await ownerState.service.createDraft(principal, { ...draft,
+      source: { type: "official_meta_guidance", ref: "meta_business_help", url: "https://www.facebook.com/business/help/example",
+        capturedAt: "2026-08-09T18:00:00.000Z", reviewBy: "2027-08-09T18:00:00.000Z" },
+      scopes: [{ facet: "funnel", value: "consideration", entityType: null, mode: "default", priority: 70 }],
+      expectedRegistryHash: ownerInitial.registryHash });
+    const published = await ownerState.service.mutate(principal, { cardRef: official.item.cardRef, expectedVersion: 1,
+      expectedRegistryHash: official.registryHash, operation: "publish" });
+    expect(published.item).toMatchObject({ status: "published", sources: [{ type: "official_meta_guidance",
+      ref: "meta_business_help", url: "https://www.facebook.com/business/help/example" }] });
+    expect(ownerState.registry().sources[0]?.reviewedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("rejects non-Meta HTTPS hosts before an official draft reaches persistence", async () => {
+    const state = memory("owner"); const initial = await state.service.list(principal);
+    await expect(state.service.createDraft(principal, { ...draft,
+      source: { type: "official_meta_guidance", ref: "meta_fake", url: "https://example.com/meta-help",
+        capturedAt: "2026-08-09T18:00:00.000Z", reviewBy: "2027-08-09T18:00:00.000Z" },
+      expectedRegistryHash: initial.registryHash })).rejects.toMatchObject({ code: "invalid_input" });
+    expect(state.registry().sources).toEqual([]);
+  });
+
+  it("projects every same-type source without silently truncating provenance", async () => {
+    const state = memory("owner"); const current = state.registry();
+    const cardRef = `guidance_${"a".repeat(24)}`;
+    const sourceRefs = [`source_${"b".repeat(24)}`, `source_${"c".repeat(24)}`] as const;
+    const next = createGuidanceRegistry({ workspaceId, sources: sourceRefs.map((id, index) => ({ id, workspaceId,
+      sourceType: "observed_result" as const, title: `Gözlem ${index + 1}`, sourceRef: `evidence_observation_${index + 1}`,
+      sourceUrl: null, content: `Gözlem ${index + 1}`, author: "reader_test", capturedAt: "2026-08-09T18:00:00.000Z",
+      reviewedAt: "2026-08-09T19:00:00.000Z", reviewBy: null, status: "published" as const, version: 1 })),
+    cards: [{ id: cardRef, workspaceId, sourceType: "observed_result", sourceIds: sourceRefs,
+      title: "Birleşik gözlem", body: "İki ayrı kanıtı birlikte değerlendir.", rationale: null, strength: "consider",
+      topic: "evidence", decisionKey: null, positionKey: null, authority: "guidance_only", status: "published",
+      effectiveFrom: null, effectiveTo: null, ownerRef: "reader_test", version: 1 }], bindings: [{
+      id: `binding_${"d".repeat(24)}`, workspaceId, cardId: cardRef, facet: "global", value: null,
+      entityType: null, mode: "default", priority: 50, version: 1 }], sets: [] });
+    await state.repository.saveAudited(next, { expectedRegistryHash: current.registryHash,
+      actorId: userId, action: "guidance.published", resourceId: cardRef,
+      occurredAt: "2026-08-09T20:00:00.000Z", metadata: { version: 1 } });
+    expect((await state.service.list(principal)).items[0]?.sources.map((source) => source.ref))
+      .toEqual(["evidence_observation_1", "evidence_observation_2"]);
+  });
+
   it("rejects an internal category ref that is not in the active canonical catalog", async () => {
     const state = memory(); const initial = await state.service.list(principal);
     await expect(state.service.createDraft(principal, { ...draft, expectedRegistryHash: initial.registryHash,

@@ -16,6 +16,7 @@ import {
   DrizzleDecisionRoomAnalysisRuntimeAssetLoader,
 } from "@/connectors/analyses/decision-room-analysis-registry-drizzle";
 import { DrizzleEffectiveCampaignContextRepository } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
+import { DrizzleGuidanceRegistryRepository } from "@/connectors/guidance/guidance-drizzle-repository";
 import {
   DrizzleDecisionRoomRunStore,
   DrizzleDecisionRoomScheduleRegistry,
@@ -27,7 +28,11 @@ import { buildEffectiveGuidancePack, createGuidanceRegistry } from "@/domain/gui
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const databaseUrl = process.env.DATABASE_URL?.trim();
-if (!databaseUrl) throw new Error("DATABASE_URL yapılandırılmadı");
+if (!databaseUrl) {
+  console.error(JSON.stringify({ ok: false, blocker: "postgres_connection_not_configured",
+    requiredOneOf: ["DATABASE_URL"], continuation: "npm run verify:decision-room-analysis-assets-db" }));
+  process.exit(2);
+}
 
 const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 20_000 });
 const database = drizzle(pool, { schema });
@@ -46,6 +51,9 @@ let versionedRegistry = false;
 let scheduleRevisionFrozen = false;
 let manualCurrentFrozen = false;
 let retryFrozen = false;
+let guidanceRevisionFrozen = false;
+let guidanceBindingImmutable = false;
+let exactGuidanceRefGuard = false;
 let crossTenantBlocked = false;
 let immutableRows = false;
 let rlsAndGrants = false;
@@ -105,9 +113,11 @@ try {
       select to_regclass('public.analysis_timeframe_definitions')::text as timeframe,
         to_regclass('public.analysis_template_definitions')::text as template,
         to_regclass('public.decision_room_schedule_analysis_bindings')::text as schedule_binding,
-        to_regclass('public.decision_room_run_analysis_assets')::text as run_asset
+        to_regclass('public.decision_room_run_analysis_assets')::text as run_asset,
+        to_regclass('public.guidance_analysis_run_bindings')::text as guidance_binding
     `))[0];
-    tablesApplied = Boolean(applied?.timeframe && applied?.template && applied?.schedule_binding && applied?.run_asset);
+    tablesApplied = Boolean(applied?.timeframe && applied?.template && applied?.schedule_binding
+      && applied?.run_asset && applied?.guidance_binding);
     if (!tablesApplied) throw new Error("Analiz asset migration uygulanmadı");
 
     await transaction.insert(schema.workspaces).values([
@@ -136,10 +146,24 @@ try {
       fieldCatalogVersion: "fields-v1", capturedAt: new Date(now), canonicalPayload: { entities: [] },
       safeAggregate: { entityCounts: { campaign: 1, adSet: 0, ad: 0 }, knownFieldCount: 1, unknownFieldCount: 0 },
     });
-    const guidanceRegistry = createGuidanceRegistry({ workspaceId, sources: [], cards: [], bindings: [], sets: [] });
+    const guidanceRegistry = createGuidanceRegistry({ workspaceId, sources: [{ id: "source_verify", workspaceId,
+      sourceType: "observed_result", title: "Observed verifier", sourceRef: "evidence_verify",
+      sourceUrl: null, content: "Verified deterministic observation", author: "actor_verify",
+      capturedAt: now, reviewedAt: now, reviewBy: null, status: "published", version: 1 }],
+    cards: [{ id: "guidance_verify", workspaceId, sourceType: "observed_result", sourceIds: ["source_verify"],
+      title: "Observed verifier", body: "Verified deterministic observation", rationale: null,
+      strength: "consider", topic: "verification", decisionKey: null, positionKey: null,
+      authority: "guidance_only", status: "published", effectiveFrom: now, effectiveTo: null,
+      ownerRef: "actor_verify", version: 1 }], bindings: [{ id: "binding_verify", workspaceId,
+      cardId: "guidance_verify", facet: "account_group", value: "account_group_verify", entityType: null,
+      mode: "default", priority: 50, version: 1 }], sets: [{ id: "guidance_set_verify", workspaceId,
+      name: "Verifier set", orderedCardIds: ["guidance_verify"], reviewStatus: "reviewed", version: 1 }] });
+    await new DrizzleGuidanceRegistryRepository(transaction as never).save(guidanceRegistry,
+      { expectedRegistryHash: null });
     const guidance = buildEffectiveGuidancePack(guidanceRegistry, {
-      workspaceId, accountId: "account_safe", objective: "sales", internalCategoryIds: [],
-      entity: { type: "campaign", id: "campaign_safe" }, topics: [], requiredTopics: [], evaluatedAt: now,
+      workspaceId, accountId: "account_safe", accountGroupIds: ["account_group_verify"], objective: "sales",
+      internalCategoryIds: [], entity: { type: "campaign", id: "campaign_safe" }, topics: ["verification"],
+      requiredTopics: ["verification"], guidanceSetIds: ["guidance_set_verify"], evaluatedAt: now,
       budget: { maxCards: 10, maxSources: 10, maxCharacters: 10_000 },
     });
     const context = buildEffectiveCampaignContext({
@@ -234,6 +258,45 @@ try {
       publishedAt: "2026-08-07T12:04:00Z",
     });
     retryFrozen = (await loader.loadExact(manualInput)).resolvedTimeframe.inclusiveDayCount === 3;
+    const guidanceBindings = resultRows(await transaction.execute(sql`
+      select registry_hash, pack_hash, binding_hash, selected_set_refs, card_refs, source_refs, authority
+      from guidance_analysis_run_bindings where workspace_id = ${workspaceId}::uuid
+      order by occurred_at, id
+    `));
+    guidanceRevisionFrozen = guidanceBindings.length === 2
+      && guidanceBindings.every((row) => row.registry_hash === guidanceRegistry.registryHash
+        && row.pack_hash === guidance.packHash && row.authority === "guidance_only"
+        && Array.isArray(row.selected_set_refs) && row.selected_set_refs.length === 1
+        && Array.isArray(row.card_refs) && row.card_refs.length === 1
+        && Array.isArray(row.source_refs) && row.source_refs.length === 1);
+    try {
+      await transaction.transaction(async (savepoint) => {
+        await savepoint.execute(sql`update guidance_analysis_run_bindings set authority = 'guidance_only'
+          where workspace_id = ${workspaceId}::uuid`);
+      });
+    } catch (reason) {
+      guidanceBindingImmutable = reason instanceof Error
+        && reason.message.includes("guidance_analysis_run_binding_immutable");
+    }
+    const manualRun = resultRows(await transaction.execute(sql`select id::text from decision_room_runs
+      where workspace_id = ${workspaceId}::uuid and run_ref = ${manual.runRef} limit 1`))[0];
+    try {
+      await transaction.transaction(async (savepoint) => {
+        await savepoint.execute(sql`
+          insert into guidance_analysis_run_bindings (
+            workspace_id, run_id, registry_hash, pack_hash, selected_set_refs, card_refs,
+            source_refs, authority, binding_hash, occurred_at
+          ) values (
+            ${workspaceId}::uuid, ${String(manualRun?.id)}::uuid, ${guidance.registryHash}, ${guidance.packHash},
+            '[]'::jsonb, '[{"cardRef":"guidance_verify","version":0,"recordHash":"bad"}]'::jsonb,
+            '[]'::jsonb, 'guidance_only', ${"8".repeat(64)}, ${now}::timestamptz
+          )
+        `);
+      });
+    } catch (reason) {
+      exactGuidanceRefGuard = Boolean(reason && typeof reason === "object" && "constraint" in reason
+        && reason.constraint === "guidance_analysis_run_bindings_exact_refs");
+    }
     try {
       await new DrizzleDecisionRoomAnalysisRuntimeAssetLoader(transaction as never, foreignWorkspaceId).loadExact(manualInput);
     } catch {
@@ -248,18 +311,29 @@ try {
     }
     const security = resultRows(await transaction.execute(sql`
       select count(*) filter (where c.relrowsecurity)::int as rls_count,
+        count(*) filter (where c.relname = 'guidance_analysis_run_bindings'
+          and c.relrowsecurity and c.relforcerowsecurity)::int as guidance_force_rls,
         (select count(*)::int from information_schema.role_table_grants
           where table_schema = 'public' and table_name in (
             'analysis_timeframe_definitions', 'analysis_template_definitions',
-            'decision_room_schedule_analysis_bindings', 'decision_room_run_analysis_assets'
-          ) and grantee in ('anon', 'authenticated')) as api_grants
+            'decision_room_schedule_analysis_bindings', 'decision_room_run_analysis_assets',
+            'guidance_analysis_run_bindings'
+          ) and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) as api_grants,
+        (select count(*)::int from information_schema.routine_privileges
+          where routine_schema = 'public'
+            and routine_name in ('guidance_revision_refs_exact', 'guidance_analysis_run_binding_immutable',
+              'guidance_registry_revision_immutable')
+            and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) as routine_grants
       from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'public' and c.relname in (
         'analysis_timeframe_definitions', 'analysis_template_definitions',
-        'decision_room_schedule_analysis_bindings', 'decision_room_run_analysis_assets'
+        'decision_room_schedule_analysis_bindings', 'decision_room_run_analysis_assets',
+        'guidance_analysis_run_bindings'
       )
     `))[0];
-    rlsAndGrants = Number(security?.rls_count) === 4 && Number(security?.api_grants) === 0;
+    rlsAndGrants = Number(security?.rls_count) === 5 && Number(security?.guidance_force_rls) === 1
+      && Number(security?.api_grants) === 0
+      && Number(security?.routine_grants) === 0;
     throw rollback;
   });
 } catch (error) {
@@ -271,7 +345,8 @@ temporaryRowsCommitted = Number(resultRows(residue)[0]?.count ?? -1) !== 0;
 await pool.end();
 
 const result = {
-  tablesApplied, versionedRegistry, scheduleRevisionFrozen, manualCurrentFrozen, retryFrozen,
+  tablesApplied, versionedRegistry, scheduleRevisionFrozen, manualCurrentFrozen, retryFrozen, guidanceRevisionFrozen,
+  guidanceBindingImmutable, exactGuidanceRefGuard,
   crossTenantBlocked, immutableRows, rlsAndGrants, temporaryRowsCommitted,
   metaCalls: 0, externalCalls: 0, actionAuthority: "none",
 };

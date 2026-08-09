@@ -6,7 +6,11 @@ if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const databaseUrl = process.env.DIRECT_DATABASE_URL?.trim()
   || process.env.DATABASE_URL?.trim();
 
-if (!databaseUrl) throw new Error("Supabase PostgreSQL bağlantısı yapılandırılmadı");
+if (!databaseUrl) {
+  console.error(JSON.stringify({ ok: false, blocker: "postgres_connection_not_configured",
+    requiredOneOf: ["DIRECT_DATABASE_URL", "DATABASE_URL"], continuation: "npm run verify:supabase-security" }));
+  process.exit(2);
+}
 
 const pool = new Pool({
   connectionString: databaseUrl,
@@ -62,6 +66,28 @@ try {
       and table_name in ('instruction_policy_raw_provenance', 'strict_instruction_policy_revisions')
       and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')
   `);
+  const guidanceRunBinding = await pool.query<{ total: number; force_rls: number; grant_count: number;
+    routine_grant_count: number }>(`
+    select count(*)::int as total,
+      count(*) filter (where relation.relrowsecurity and relation.relforcerowsecurity)::int as force_rls,
+      (select count(*)::int from information_schema.role_table_grants
+        where table_schema = 'public' and table_name in (
+          'guidance_sources', 'guidance_cards', 'guidance_bindings', 'guidance_sets',
+          'guidance_analysis_run_bindings'
+        )
+          and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) as grant_count,
+      (select count(*)::int from information_schema.routine_privileges
+        where routine_schema = 'public' and routine_name in (
+          'guidance_revision_refs_exact', 'guidance_analysis_run_binding_immutable',
+          'guidance_registry_revision_immutable'
+        ) and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')) as routine_grant_count
+    from pg_class relation join pg_namespace namespace on namespace.oid = relation.relnamespace
+    where namespace.nspname = 'public' and relation.relkind = 'r'
+      and relation.relname in (
+        'guidance_sources', 'guidance_cards', 'guidance_bindings', 'guidance_sets',
+        'guidance_analysis_run_bindings'
+      )
+  `);
 
   const posture = {
     tables: tables.rows[0]?.total ?? 0,
@@ -72,6 +98,10 @@ try {
     strictPolicyTables: instructionPolicyTables.rows[0]?.total ?? 0,
     strictPolicyForceRls: instructionPolicyTables.rows[0]?.force_rls ?? 0,
     strictPolicyDirectGrants: instructionPolicyGrants.rows[0]?.grant_count ?? 0,
+    guidanceRunBindingTables: guidanceRunBinding.rows[0]?.total ?? 0,
+    guidanceRunBindingForceRls: guidanceRunBinding.rows[0]?.force_rls ?? 0,
+    guidanceRunBindingDirectGrants: guidanceRunBinding.rows[0]?.grant_count ?? 0,
+    guidanceRoutineDirectGrants: guidanceRunBinding.rows[0]?.routine_grant_count ?? 0,
   };
 
   if (posture.tables === 0) throw new Error("Public uygulama tablosu bulunamadı");
@@ -88,6 +118,10 @@ try {
   if (posture.strictPolicyTables !== 2 || posture.strictPolicyForceRls !== 2
     || posture.strictPolicyDirectGrants !== 0) {
     throw new Error("Strict instruction policy tabloları FORCE RLS/revoke sınırını karşılamıyor");
+  }
+  if (posture.guidanceRunBindingTables !== 5 || posture.guidanceRunBindingForceRls !== 5
+    || posture.guidanceRunBindingDirectGrants !== 0 || posture.guidanceRoutineDirectGrants !== 0) {
+    throw new Error("Guidance analysis-run binding FORCE RLS/revoke sınırını karşılamıyor");
   }
 
   console.log(JSON.stringify({ status: "secure", ...posture }));

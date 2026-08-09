@@ -27,7 +27,7 @@
     "mcp:stdio": "node --import tsx scripts/reklamzeka-mcp.ts",
     "verify:mcp-live": "tsx scripts/verify-reklamzeka-mcp-live.ts",
     "verify:guidance-agent-live": "tsx scripts/verify-guidance-agent-mcp-live.ts",
-    "verify:guidance-studio-live": "node --env-file=.env.local --import tsx scripts/verify-guidance-studio-postgres.ts",
+    "verify:guidance-studio-live": "tsx scripts/verify-guidance-studio-postgres.ts",
     "local-workspace:bootstrap": "tsx scripts/bootstrap-local-workspace.ts",
     "verify:local-workspace-bootstrap-db": "tsx scripts/verify-local-workspace-bootstrap-postgres.ts",
     "verify:local-agent-session-db": "tsx scripts/verify-local-agent-session-postgres.ts",

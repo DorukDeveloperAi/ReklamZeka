@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildEffectiveGuidancePack,
   createGuidanceRegistry,
+  GuidanceContextValidationError,
+  GUIDANCE_REGISTRY_LIMITS,
   GuidanceRegistryValidationError,
+  isOfficialGuidanceSourceUrl,
   type GuidanceBinding,
   type GuidanceCard,
   type GuidanceContext,
@@ -119,6 +122,22 @@ describe("Guidance registry provenance and publication boundary", () => {
       .toThrowError(expect.objectContaining<Partial<GuidanceRegistryValidationError>>({ code: "official_source_incomplete" }));
   });
 
+  it("allows only official Meta documentation/help/catalog paths for official classification", () => {
+    for (const sourceUrl of ["https://www.facebook.com/business/help/example",
+      "https://developers.facebook.com/docs/marketing-api", "https://transparency.meta.com/policies/ad-standards/"]) {
+      expect(isOfficialGuidanceSourceUrl(sourceUrl)).toBe(true);
+    }
+    for (const sourceUrl of ["https://example.com/meta", "https://user@facebook.com/business/help/1",
+      "https://www.facebook.com/business/help/1#copied", "https://www.facebook.com/ordinary.user/posts/123",
+      "https://www.instagram.com/p/abc123", "https://developers.facebook.com/not-docs"]) {
+      const invalid = source(`invalid-${sourceUrl.length}`, "official_meta_guidance", {
+        sourceUrl, reviewBy: "2026-09-01T09:00:00.000Z",
+      });
+      expect(() => createGuidanceRegistry({ workspaceId, sources: [invalid], cards: [], bindings: [], sets: [] }))
+        .toThrowError(expect.objectContaining<Partial<GuidanceRegistryValidationError>>({ code: "official_source_incomplete" }));
+    }
+  });
+
   it("keeps owner, official, strategy, observation and experiment provenance in separate cards", () => {
     const owner = source("owner-1");
     const official = source("meta-1", "official_meta_guidance", {
@@ -150,6 +169,58 @@ describe("Guidance registry provenance and publication boundary", () => {
 });
 
 describe("Effective guidance pack", () => {
+  it("fails closed at registry/context caps and never truncates exact evaluated revision coverage", () => {
+    const sharedSource = source("bounded-source");
+    const cards = Array.from({ length: GUIDANCE_REGISTRY_LIMITS.evaluatedCards }, (_, index) =>
+      card(`bounded-card-${index}`, sharedSource.id));
+    const bindings = cards.map((entry, index) => binding(`bounded-binding-${index}`, entry.id));
+    const registry = createGuidanceRegistry({ workspaceId, sources: [sharedSource], cards, bindings, sets: [] });
+    const pack = buildEffectiveGuidancePack(registry, context({ budget: {
+      maxCards: 100, maxSources: 100, maxCharacters: 100_000,
+    } }));
+
+    expect(pack.evaluatedCards).toHaveLength(GUIDANCE_REGISTRY_LIMITS.evaluatedCards);
+    expect(new Set(pack.evaluatedCards.map((entry) => entry.cardId)).size).toBe(cards.length);
+    expect(pack.applied.length + pack.suppressed.length).toBe(cards.length);
+    expect(() => createGuidanceRegistry({ workspaceId, sources: [sharedSource],
+      cards: [...cards, card("one-card-too-many", sharedSource.id)], bindings, sets: [] }))
+      .toThrowError(expect.objectContaining<Partial<GuidanceRegistryValidationError>>({ code: "invalid_registry" }));
+    expect(() => buildEffectiveGuidancePack(registry, context({
+      accountGroupIds: Array.from({ length: GUIDANCE_REGISTRY_LIMITS.accountGroups + 1 }, (_, index) => `group-${index}`),
+    }))).toThrowError(GuidanceContextValidationError);
+  });
+
+  it("matches the complete account-group/funnel/optimization/lifecycle/template facet matrix conjunctively", () => {
+    const owner = source("owner");
+    const scoped = card("full-scope", owner.id);
+    const facets: readonly Partial<GuidanceBinding>[] = [
+      { facet: "account_group", value: "account_group_primary" },
+      { facet: "account", value: "account-1" },
+      { facet: "objective", value: "LEAD_GENERATION" },
+      { facet: "funnel", value: "consideration" },
+      { facet: "optimization", value: "LEAD" },
+      { facet: "internal_category", value: "regional-protected" },
+      { facet: "lifecycle", value: "evergreen" },
+      { facet: "entity", value: "campaign-1", entityType: "campaign" },
+      { facet: "promotion_template", value: "promotion_template_lead" },
+      { facet: "topic", value: "budget" },
+    ];
+    const registry = createGuidanceRegistry({ workspaceId, sources: [owner], cards: [scoped],
+      bindings: facets.map((facet, index) => binding(`binding-${index}`, scoped.id, facet)), sets: [] });
+    const matched = buildEffectiveGuidancePack(registry, context({ accountGroupIds: ["account_group_primary"],
+      funnel: "consideration", optimization: "LEAD", lifecycle: "evergreen",
+      promotionTemplateIds: ["promotion_template_lead"] }));
+    expect(matched.applied[0]?.scopeReason).toEqual([
+      "matched:account_group", "matched:account", "matched:objective", "matched:funnel",
+      "matched:optimization", "matched:internal_category", "matched:lifecycle", "matched:entity",
+      "matched:promotion_template", "matched:topic",
+    ]);
+    const missed = buildEffectiveGuidancePack(registry, context({ accountGroupIds: ["account_group_primary"],
+      funnel: "consideration", optimization: "LEAD", lifecycle: "seasonal",
+      promotionTemplateIds: ["promotion_template_lead"] }));
+    expect(missed.suppressed).toContainEqual({ cardId: scoped.id, reason: "scope_not_matched" });
+  });
+
   it("filters global→account→objective→category→entity→topic and applies a scoped exception", () => {
     const owner = source("owner");
     const global = card("global-transfer", owner.id, {
@@ -186,6 +257,8 @@ describe("Effective guidance pack", () => {
       { cardId: global.id, reason: "overridden_by_higher_precedence" },
       { cardId: wrongAccount.id, reason: "scope_not_matched" },
     ]));
+    expect(pack.evaluatedCards.map((entry) => entry.cardId)).toEqual([exception.id, global.id, wrongAccount.id].sort());
+    expect(pack.evaluatedSources).toEqual([expect.objectContaining({ sourceId: owner.id, sourceVersion: 1 })]);
   });
 
   it("reports equal-precedence opposing cards as unresolved instead of inventing a semantic winner", () => {
