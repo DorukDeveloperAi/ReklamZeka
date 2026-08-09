@@ -6,6 +6,7 @@
  *   release [--res <kaynak> | --all]             # sahipsen bırakır; sıradaysan VAZGEÇER
  *   status  [--json]
  *   orkestrator kayit [--kapsam "..."] [--devral] | birak | durum   # sahadaki koordinatör
+ *   kutu    [--json]                                              # gelen kutum (TÜKETMEZ)
  *   rol     kayit --rol <ad> [--kapsam "..."] [--devral] | birak | durum  # kalıcı oturum rolleri
  *   bildir  (--rol <ad> | --hedef <session>) --mesaj "..." [--res <kaynak>]  # roller arası haber
  *   wait    --res <kaynak> [--timeout <sn>] [--no-acquire] [--intent "..."]
@@ -1258,6 +1259,52 @@ function cmdOrkestrator() {
 }
 
 /**
+ * `kutu [--json]` — GELEN KUTUSU: bana ne yazılmış, sahada ne olmuş? (TÜKETMEZ)
+ *
+ * Haberler zaten her turun başında `claim-guard ctx` ile otomatik basılır ve orada TÜKETİLİR.
+ * Bu komut ONDAN AYRIDIR: istediğin an bakarsın, hiçbir şeyi okunmuş saymaz. Gerekçesi
+ * kullanıcı isteğidir (2026-08-09): "kendim tetiklediğimde diğer session'ların söylediklerini
+ * ve progress'leri görmeliyim" — tetikleyen sensin, kutu SORULUR.
+ */
+function cmdKutu() {
+  const benSid = process.env.CLAUDE_CODE_SESSION_ID || process.env.CLAUDE_SESSION_ID || null;
+  if (!benSid) {
+    console.error("HATA: kimlik yok — bu komut bir Claude oturumunun Bash aracından çalışmalı.");
+    process.exit(5);
+  }
+  const gelen = L.bildiriOku?.(ROOT, benSid, { tuket: false }) || [];
+  const roller = L.rolleriOf?.(ROOT, benSid) || [];
+  let ilerleme = { satirlar: [] };
+  if (roller.length) {
+    const rolAd = roller.includes("orkestrator") ? "orkestrator" : roller[0];
+    const ofset = L.imlecOku?.(ROOT, rolAd);
+    const r = L.olayOku?.(ROOT, { ofset: Number.isFinite(ofset) ? ofset : L.olaySonu(ROOT) }) || { satirlar: [] };
+    const SUZ = L.ROL_SUZGEC || {}; // `??` değil VARLIK ölçütü — orkestratörün süzgeci bilerek null
+    const suz = Object.prototype.hasOwnProperty.call(SUZ, rolAd) ? SUZ[rolAd] : SUZ.varsayilan || null;
+    ilerleme = { rol: rolAd, satirlar: suz ? r.satirlar.filter((e) => suz.includes(e.tip)) : r.satirlar };
+  }
+  if (has("json")) {
+    console.log(JSON.stringify({ session: benSid, roller, bildiri: gelen, ilerleme }, null, 1));
+    return;
+  }
+  console.log(`kutu: ${short(benSid)}${roller.length ? ` · roller: ${roller.join(", ")}` : " · rol yok"}`);
+  if (!gelen.length) console.log("  bildiri yok");
+  for (const b of gelen) {
+    const t = b.tip || "sira";
+    const kim = short(b.kimden);
+    if (t === "elle") console.log(`  ✉ ${kim}${b.key ? ` · ${b.key}` : ""} (${dk(b.ts)}): ${b.mesaj}`);
+    else if (t === "bekleyenVar") console.log(`  ⏳ ${b.key} ← ${kim} seni bekliyor (${dk(b.ts)})`);
+    else console.log(`  🔓 ${b.key} boşaldı — ${kim} bıraktı (${dk(b.ts)})`);
+  }
+  if (roller.length)
+    console.log(
+      `okunmamış ilerleme (${ilerleme.rol}): ${ilerleme.satirlar.length}` +
+        (ilerleme.satirlar.length ? ` — ilk turunda otomatik basılacak` : "")
+    );
+  console.log(`(TÜKETMEZ: bu satırlar bir sonraki turunda yine karşına çıkar.)`);
+}
+
+/**
  * `rol kayit|birak|durum --rol <ad>` — kalıcı oturumların ADI.
  *
  * Hex kimlik her oturumda değişir; rol kararlıdır. `orkestrator` komutu bu tablonun
@@ -1417,6 +1464,7 @@ function cmdBildir() {
 const table = {
   claim: cmdClaim,
   bildir: cmdBildir,
+  kutu: cmdKutu,
   rol: cmdRol,
   release: cmdRelease,
   orkestrator: cmdOrkestrator,

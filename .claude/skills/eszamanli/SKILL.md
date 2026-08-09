@@ -6,7 +6,7 @@ rol: ajan
 
 # Eşzamanlı session protokolü
 
-<!-- kanit-damga kaynak: packages/kit/templates/hooks/claims-lib.mjs, packages/kit/templates/hooks/claim-guard.mjs, packages/kit/templates/skills/eszamanli/scripts/claim.mjs sha: acbcc6433f5fbd76 -->
+<!-- kanit-damga kaynak: packages/kit/templates/hooks/claims-lib.mjs, packages/kit/templates/hooks/claim-guard.mjs, packages/kit/templates/skills/eszamanli/scripts/claim.mjs sha: 57ea7cb202227e96 -->
 
 İki Claude session'ı aynı repoda çalışırken birbirinin yazdığını ezer. Bu protokol
 çakışmayı **imkânsız** kılar (sert kapı) ve bloke olan session'ı **durdurmaz** (izole et,
@@ -100,6 +100,35 @@ birden akar:
 Geri yön 2026-08-09'da eklendi: "bitir de sıra bana gelsin" bilgisinin asıl muhatabı kilidi
 tutandır ve o, bugüne dek ancak `status`a bakarsa görüyordu. Kural her iki yolda da aynı:
 **yalnız YENİ bekleyen bildirilir**, yankı bildirilmez (ölçüt kuyruğun kendisi).
+
+### ROLLER — kalıcı oturumların adı (hex kimlik değil)
+
+Hex kimlik her oturumda değişir; **rol kararlıdır**. Kapalı küme (tanımsız rol reddedilir):
+
+| rol | tekil? | ne yapar |
+|---|---|---|
+| `orkestrator` | ✅ | repo içi koordinasyon — saha olaylarının TAMAMI buraya akar |
+| `altyapi` | ✅ | kit · boot · sync · kurulum · filing · vendor · seviye 0 |
+| `pm` | ✅ | projeler-arası üst hedef ve dağıtım |
+| `vizyon` · `plan` | ✅ | epizodik; sürekli açık olmaları beklenmez |
+| `worker` | ❌ **ÇOĞUL** | işi yapan oturum(lar) — slot tutmaz, **adreslenmez** |
+
+```sh
+node $S rol kayit --rol altyapi --kapsam "kit·boot·sync"   # tekil rol: dolusa --devral ister
+node $S rol durum                                          # kadro tablosu
+node $S bildir --rol altyapi --mesaj "kit sapması var"     # role seslen
+node $S kutu                                               # gelen kutum (TÜKETMEZ)
+```
+
+**ÇOĞUL role bildiri YASAK.** `--rol worker` reddedilir ve canlı adayları listeler: hangi
+worker olduğu ölçülemezken bir muhatap seçmek, haberin sessizce yanlış oturuma gitmesi
+demektir — ve gönderen "ilettim" sanır. Belirsiz adres, adressizlikten beterdir.
+
+**Her rol sahibi ilerleme görür, orkestratör hepsini.** Beslemenin süzgeci roldedir:
+orkestratör `alindi`·`deny`·`claimsiz` dahil her şeyi (tavan 12), öteki roller yalnız
+üst-düzeyi görür — `birakildi`·`kapandi`·`devir`·`cevrim` (tavan 5). **İmleçler ayrıdır:**
+biri ötekinin beslemesini tüketmez. Rolsüz worker besleme almaz; bilmesi gereken zaten kendi
+kutusundadır.
 
 ### ORKESTRATÖR — sahadaki koordinatör de haber alır
 
