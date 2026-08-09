@@ -183,29 +183,44 @@ function bildiriBloku(root, me) {
  */
 function sahaBloku(root, me) {
   if (!me || !L.ledgerExists() || typeof L.olayOku !== "function") return [];
-  let o = null;
+  /* KİM BESLEME ALIR: rol sahibi HER oturum (kullanıcı kararı 2026-08-09 — "diğer
+     session'ların progress'lerini de görsün"). Orkestratör sahanın TAMAMINI görür; öteki
+     roller yalnız üst-düzey olayları ve daha kısa bir tavanla. Rolsüz worker hiçbir şey
+     almaz: onun bilmesi gereken zaten kendi posta kutusundadır. */
+  let benimRoller = [];
   try {
-    o = L.orkestratorOku?.(root);
+    benimRoller = L.rolleriOf?.(root, me) || [];
+    if (!benimRoller.length && L.orkestratorOku?.(root)?.sessionId === me) benimRoller = ["orkestrator"];
   } catch {
     return [];
   }
-  if (!o || o.sessionId !== me) return []; // besleme YALNIZ orkestratöre akar
+  if (!benimRoller.length) return [];
+  const rolAd = benimRoller.includes("orkestrator") ? "orkestrator" : benimRoller[0];
+  /* `??` KULLANILMAZ: orkestratörün süzgeci BİLEREK `null`dur (= süzme yok) ve `null ??
+     varsayilan` onu varsayılana düşürürdü — orkestratör sahanın tamamını görmeyi tam da
+     bu satırda kaybederdi (ölçüldü: besleme "1 olay" gösterdi, deny/alindi düştü).
+     Ölçüt VARLIK: anahtar tabloda var mı? */
+  const SUZ = L.ROL_SUZGEC || {};
+  const suz = Object.prototype.hasOwnProperty.call(SUZ, rolAd) ? SUZ[rolAd] : SUZ.varsayilan || null;
+  const satirTavan = rolAd === "orkestrator" ? 12 : 5;
   let r;
   try {
-    const ofset = L.imlecOku?.(root);
+    const ofset = L.imlecOku?.(root, rolAd);
     r = L.olayOku(root, { ofset: Number.isFinite(ofset) ? ofset : L.olaySonu(root) });
   } catch {
     return [];
   }
   const ilerlet = () => {
     try {
-      L.imlecYaz?.(root, r.ofset);
+      L.imlecYaz?.(root, r.ofset, rolAd);
     } catch {
       /* yut — okunamayan imleç en fazla tekrar basar, olayı kaybetmez */
     }
   };
+  // Rol süzgeci: orkestratör dışındaki roller yalnız üst-düzey olayları görür.
+  if (suz) r = { ...r, satirlar: r.satirlar.filter((e) => suz.includes(e.tip)) };
   if (!r.satirlar.length) {
-    ilerlet();
+    ilerlet(); // süzgeçten hiçbir şey geçmediyse de imleç ilerler (aynı olaylar tekrar taranmaz)
     return [];
   }
   const sid = (x) => (x ? String(x).slice(0, 8) : "?");
@@ -237,8 +252,12 @@ function sahaBloku(root, me) {
   const ikon = { alindi: "🔒", birakildi: "✅", deny: "⛔", mesgul: "⛔", bekleyis: "⏳",
                  kapanis: "⏱", kapandi: "🔚", devir: "🔁", cevrim: "💀" };
   const tumu = [...katli.values()];
-  const goster = tumu.slice(-12);
-  const satirlar = [`[orkestratör] Sahadan ${r.satirlar.length} olay:`];
+  const goster = tumu.slice(-satirTavan);
+  const satirlar = [
+    rolAd === "orkestrator"
+      ? `[orkestratör] Sahadan ${r.satirlar.length} olay:`
+      : `[rol:${rolAd}] Sahadan ${r.satirlar.length} ilerleme:`,
+  ];
   for (const { n, son: e } of goster) {
     const t = Date.parse(e.ts || "");
     const ne = Number.isFinite(t) ? ` (${dk(t)})` : "";
@@ -270,7 +289,7 @@ function sahaBloku(root, me) {
     else satirlar.push(`  • ${e.tip}:${anahtar} ${kimlik}${ne}${niye}${carpan}`);
   }
   if (tumu.length > goster.length)
-    satirlar.push(`  … +${tumu.length - goster.length} olay GÖSTERİLMEDİ (tavan 12).`);
+    satirlar.push(`  … +${tumu.length - goster.length} olay GÖSTERİLMEDİ (tavan ${satirTavan}).`);
   if (claimsiz.length) {
     const oturum = new Set(claimsiz.map((e) => e.engellenen)).size;
     const yol = new Set(claimsiz.map((e) => e.key)).size;
@@ -289,7 +308,11 @@ function sahaBloku(root, me) {
     `  ↳ devam ettir: node ~/.claude/skills/eszamanli/scripts/claim.mjs bildir --hedef ` +
       `${sid(ornek?.engellenen || ornek?.sahip)} --mesaj "<ne yapsın>"`
   );
-  satirlar.push(`  (orkestratörsün: bu olaylar BİR KEZ düşer — gerekeni şimdi planına al.)`);
+  satirlar.push(
+    rolAd === "orkestrator"
+      ? `  (orkestratörsün: bu olaylar BİR KEZ düşer — gerekeni şimdi planına al.)`
+      : `  ([${rolAd}] rolündesin: bu ilerleme satırları BİR KEZ düşer.)`
+  );
   ilerlet();
   return satirlar;
 }
