@@ -60,6 +60,264 @@ const kis = (s, n) => {
 };
 
 /**
+ * BİLDİRİ OKUMA UCU (seviye 0) — POSTA KUTUSU: bu oturuma ÖZEL haberler.
+ *
+ * Üç cins, üç ayrı soru — bir arada basılırsa üçü de okunmaz olur:
+ *   `sira`        bekleyendim, kaynak boşaldı  → zincirin İLERİ yönü
+ *   `bekleyenVar` kilidimi bekleyen doğdu      → zincirin GERİ yönü (2026-08-09)
+ *   `elle`        biri bana doğrudan yazdı     → orkestratörün "devam et" kanalı
+ * Tanımadığı tipi ham olarak basar: haber DÜŞMEZ (ileri uyum).
+ *
+ * TÜKETİCİdir: haber bir kez basılır, kutu silinir. `others` erken dönüşünden ÖNCE
+ * hesaplanır — bırakan çoktan kapanmış olsa da haber sahibine ulaşmalıdır.
+ */
+function bildiriBloku(root, me) {
+  if (!me || !L.ledgerExists() || typeof L.bildiriOku !== "function") return [];
+  let gelen = [];
+  try {
+    gelen = L.bildiriOku(root, me);
+  } catch {
+    return [];
+  }
+  if (!gelen.length) return [];
+  const tipi = (b) => b?.tip || "sira";
+  const sira = gelen.filter((b) => tipi(b) === "sira");
+  const bekleyenVar = gelen.filter((b) => tipi(b) === "bekleyenVar");
+  const elle = gelen.filter((b) => tipi(b) === "elle");
+  const diger = gelen.filter((b) => !["sira", "bekleyenVar", "elle"].includes(tipi(b)));
+  const CLI = "node ~/.claude/skills/eszamanli/scripts/claim.mjs";
+  const yas = (b) => {
+    const t = Date.parse(b?.ts || "");
+    return Number.isFinite(t) ? ` (${dk(t)})` : "";
+  };
+  const out = [];
+
+  /* ── ⏳ ZİNCİRİN GERİ YÖNÜ: seni bekleyen var ───────────────────────────────
+     Kaynak başına EN TAZE haber: aynı kilide üç kişi geldiyse üç satır değil, en son
+     durum + kuyruk derinliği. Sahibin kararı tek: yol ver ya da verme. */
+  if (bekleyenVar.length) {
+    const enTaze = new Map();
+    for (const b of bekleyenVar) if (b?.key) enTaze.set(b.key, b);
+    out.push(`[eşzamanlılık] ⏳ SENİ BEKLEYEN VAR (${enTaze.size} kaynak):`);
+    for (const b of enTaze.values()) {
+      out.push(
+        `  • ${b.key} ← ${String(b.kimden || "?").slice(0, 8)}` +
+          `${b.kimdenBaslik ? ` "${kis(b.kimdenBaslik, 44)}"` : ""}${yas(b)}` +
+          `${b.kuyruk > 1 ? ` · kuyruk ${b.kuyruk}` : ""}`
+      );
+      if (b.bekleyenNiyet) out.push(`      bekleyenin işi: ${kis(b.bekleyenNiyet, 88)}`);
+      out.push(`      İŞİN BİTTİYSE BIRAK (haber ona otomatik gider): ${CLI} release --res "${b.key}"`);
+    }
+  }
+
+  /* ── ✉ ELLE BİLDİRİ: doğrudan sana yazılmış (orkestratörün "devam et" kanalı) ── */
+  if (elle.length) {
+    out.push(`[eşzamanlılık] ✉ SANA MESAJ (${elle.length}):`);
+    for (const b of elle.slice(-6)) {
+      out.push(
+        `  • ${String(b.kimden || "?").slice(0, 8)}${b.kimdenBaslik ? ` "${kis(b.kimdenBaslik, 40)}"` : ""}` +
+          `${b.key ? ` · ${b.key}` : ""}${yas(b)}: ${kis(b.mesaj, 220)}`
+      );
+    }
+    if (elle.length > 6) out.push(`  … +${elle.length - 6} mesaj daha GÖSTERİLMEDİ (tavan 6).`);
+  }
+
+  /* ── 🔓 ZİNCİRİN İLERİ YÖNÜ: beklediğin kaynak boşaldı ─────────────────────
+     Haber BAYAT OLABİLİR ve bunu SÖYLER: bırakma ile bu tur arasında kaynağı başkası
+     kapmış olabilir → satır defteri OKUMA ANINDA ölçer, iki farklı çare basar. */
+  if (sira.length) {
+    const enTaze = new Map();
+    for (const b of sira) if (b?.key) enTaze.set(b.key, b);
+    if (enTaze.size) {
+      let claims = [];
+      try {
+        claims = L.activeClaims(root); // yalnız haber VARKEN okunur (nadir yol)
+      } catch {
+        /* ölçülemedi → "yeniden alınmış mı" iddiası kurulmaz */
+      }
+      out.push(`[eşzamanlılık] 🔓 BEKLEDİĞİN KAYNAK BOŞALDI (${enTaze.size} bildiri):`);
+      for (const b of enTaze.values()) {
+        out.push(
+          `  • ${b.key} — ${String(b.kimden || "?").slice(0, 8)}` +
+            `${b.kimdenBaslik ? ` "${kis(b.kimdenBaslik, 48)}"` : ""} bıraktı${yas(b)}` +
+            `${b.neden === "SessionEnd" ? " [oturumu kapanarak]" : ""}`
+        );
+        if (b.bekleyenNiyet) out.push(`      beklemedeki işin: ${kis(b.bekleyenNiyet, 96)}`);
+        const yeni = claims.find((c) => c.resource.key === b.key);
+        if (yeni) {
+          const s = L.sessionInfo(yeni.owner?.sessionId);
+          out.push(
+            `      ⚠ kaynak YENİDEN alınmış (${String(yeni.owner?.sessionId).slice(0, 8)}` +
+              `${s?.title ? ` "${kis(s.title, 40)}"` : ""}) — sıraya gir:`,
+            `        ${CLI} wait --res "${b.key}" --intent "<beklemedeki iş>"   (run_in_background)`
+          );
+        } else {
+          out.push(`      ŞİMDİ AL: ${CLI} claim --res "${b.key}" --intent "<beklemedeki iş>"`);
+        }
+      }
+    }
+  }
+
+  for (const b of diger.slice(-4)) out.push(`  • ${tipi(b)}: ${kis(JSON.stringify(b), 180)}`);
+  if (out.length) out.push(`  (bu haberler BİR KEZ basılır — gerekeni şimdi ele al.)`);
+  return out;
+}
+
+/**
+ * SAHA BESLEMESİ — orkestratörün gözü: `olay.jsonl`'ın PROJEKSİYONU (2026-08-09).
+ *
+ * Neden defter, neden elle bağlanan olaylar değil: elle bağlamada beşinci bir olay tipi
+ * eklendiğinde biri çağırmayı unutursa besleme SESSİZCE eksilirdi — ve eksildiği hiçbir
+ * yerden görülmezdi. Defter zaten eşzamanlılığın tek yazım noktası; onu okumak "her olay
+ * akar"ı YAPISAL kılar. Yeni tip eklemek için burada kod değişmez: tanınmayan tip ham
+ * satır olarak basılır.
+ *
+ * İMLEÇ: `orkestrator/imlec.json` (bayt ofseti). Kayıt anında defterin SONUNA konur, her
+ * çizimden sonra ilerler → aynı olay iki kez basılmaz, geçmiş arşivi hiç dökülmez.
+ *
+ * GÜRÜLTÜ BÜTÇESİ SÖZLEŞMEDİR, süs değil (ölçüldü: 163 olayın 123'ü `claimsiz`):
+ *   · `claimsiz` yığını TEK satıra katlanır (sayı · oturum · yol),
+ *   · aynı (tip,key,oturum) üçlüsü tek satır + ×N,
+ *   · tavan 12 satır, aşan `… +N GÖSTERİLMEDİ` ile İLAN edilir (sessiz kırpma yasak),
+ *   · okunmamış > 500 olay → yalnız SAYAÇ özeti (gövde basılmaz, imleç yine ilerler).
+ */
+function sahaBloku(root, me) {
+  if (!me || !L.ledgerExists() || typeof L.olayOku !== "function") return [];
+  /* KİM BESLEME ALIR: rol sahibi HER oturum (kullanıcı kararı 2026-08-09 — "diğer
+     session'ların progress'lerini de görsün"). Orkestratör sahanın TAMAMINI görür; öteki
+     roller yalnız üst-düzey olayları ve daha kısa bir tavanla. Rolsüz worker hiçbir şey
+     almaz: onun bilmesi gereken zaten kendi posta kutusundadır. */
+  let benimRoller = [];
+  try {
+    benimRoller = L.rolleriOf?.(root, me) || [];
+    if (!benimRoller.length && L.orkestratorOku?.(root)?.sessionId === me) benimRoller = ["orkestrator"];
+  } catch {
+    return [];
+  }
+  if (!benimRoller.length) return [];
+  const rolAd = benimRoller.includes("orkestrator") ? "orkestrator" : benimRoller[0];
+  /* `??` KULLANILMAZ: orkestratörün süzgeci BİLEREK `null`dur (= süzme yok) ve `null ??
+     varsayilan` onu varsayılana düşürürdü — orkestratör sahanın tamamını görmeyi tam da
+     bu satırda kaybederdi (ölçüldü: besleme "1 olay" gösterdi, deny/alindi düştü).
+     Ölçüt VARLIK: anahtar tabloda var mı? */
+  const SUZ = L.ROL_SUZGEC || {};
+  const suz = Object.prototype.hasOwnProperty.call(SUZ, rolAd) ? SUZ[rolAd] : SUZ.varsayilan || null;
+  const satirTavan = rolAd === "orkestrator" ? 12 : 5;
+  let r;
+  try {
+    const ofset = L.imlecOku?.(root, rolAd);
+    r = L.olayOku(root, { ofset: Number.isFinite(ofset) ? ofset : L.olaySonu(root) });
+  } catch {
+    return [];
+  }
+  const ilerlet = () => {
+    try {
+      L.imlecYaz?.(root, r.ofset, rolAd);
+    } catch {
+      /* yut — okunamayan imleç en fazla tekrar basar, olayı kaybetmez */
+    }
+  };
+  // Rol süzgeci: orkestratör dışındaki roller yalnız üst-düzey olayları görür.
+  if (suz) r = { ...r, satirlar: r.satirlar.filter((e) => suz.includes(e.tip)) };
+  if (!r.satirlar.length) {
+    ilerlet(); // süzgeçten hiçbir şey geçmediyse de imleç ilerler (aynı olaylar tekrar taranmaz)
+    return [];
+  }
+  const sid = (x) => (x ? String(x).slice(0, 8) : "?");
+  const say = {};
+  for (const e of r.satirlar) say[e.tip] = (say[e.tip] || 0) + 1;
+
+  // ── ÇOK BİRİKMİŞSE: gövde yerine sayaç özeti (bağlam bütçesi kararı, İLANLI) ──
+  if (r.satirlar.length + r.atlanan > 500) {
+    ilerlet();
+    return [
+      `[orkestratör] Sahadan ${r.satirlar.length + r.atlanan} olay birikmiş — GÖVDE BASILMADI (tavan).`,
+      `  ${Object.entries(say).map(([k, v]) => `${k}:${v}`).join(" · ")}`,
+      `  Defteri kendin oku: ~/.claude/claims/<repo>/olay.jsonl (imleç ilerletildi).`,
+    ];
+  }
+
+  const claimsiz = r.satirlar.filter((e) => e.tip === "claimsiz");
+  const kalan = r.satirlar.filter((e) => e.tip !== "claimsiz");
+  // Aynı (tip,key,oturum) üçlüsünü katla: yankı satır değil, çarpandır.
+  const katli = new Map();
+  for (const e of kalan) {
+    const k = `${e.tip}|${e.key}|${e.engellenen || e.sahip}`;
+    const v = katli.get(k);
+    if (v) {
+      v.n++;
+      v.son = e;
+    } else katli.set(k, { n: 1, son: e, ilk: e });
+  }
+  const ikon = { alindi: "🔒", birakildi: "✅", deny: "⛔", mesgul: "⛔", bekleyis: "⏳",
+                 kapanis: "⏱", kapandi: "🔚", devir: "🔁", cevrim: "💀" };
+  const tumu = [...katli.values()];
+  const goster = tumu.slice(-satirTavan);
+  const satirlar = [
+    rolAd === "orkestrator"
+      ? `[orkestratör] Sahadan ${r.satirlar.length} olay:`
+      : `[rol:${rolAd}] Sahadan ${r.satirlar.length} ilerleme:`,
+  ];
+  for (const { n, son: e } of goster) {
+    const t = Date.parse(e.ts || "");
+    const ne = Number.isFinite(t) ? ` (${dk(t)})` : "";
+    const carpan = n > 1 ? ` ×${n}` : "";
+    const kimlik = e.engellenen ? sid(e.engellenen) : sid(e.sahip);
+    const anahtar = e.key ? ` ${e.key}` : "";
+    const niye = e.why ? ` — ${kis(e.why, 72)}` : "";
+    if (e.tip === "alindi") satirlar.push(`  🔒 aldı: ${sid(e.sahip)}${anahtar}${ne}${niye}${carpan}`);
+    else if (e.tip === "birakildi")
+      satirlar.push(
+        `  ✅ bitti:${anahtar} ← ${sid(e.sahip)}${ne}${niye}` +
+          `${e.queueLen ? ` · ${e.queueLen} bekleyen vardı` : ""}${carpan}`
+      );
+    else if (e.tip === "deny" || e.tip === "mesgul")
+      satirlar.push(
+        `  ⛔ bloke: ${sid(e.engellenen)} →${anahtar}${ne} (sahip: ${sid(e.sahip)})${niye}${carpan}`
+      );
+    else if (e.tip === "bekleyis")
+      satirlar.push(`  ⏳ bekliyor: ${sid(e.engellenen)} →${anahtar}${ne}${niye}${carpan}`);
+    else if (e.tip === "kapanis")
+      satirlar.push(
+        `  ⏱ bekleyiş bitti: ${sid(e.engellenen)} →${anahtar} · ${e.sonuc || "?"}` +
+          `${Number.isFinite(e.sure_ms) ? ` (${Math.round(e.sure_ms / 60000)} dk)` : ""}${ne}${carpan}`
+      );
+    else if (e.tip === "kapandi") satirlar.push(`  🔚 kapandı: ${kimlik}${ne}${niye}${carpan}`);
+    else if (e.tip === "devir") satirlar.push(`  🔁 devir:${anahtar} ← ${kimlik}${ne}${niye}${carpan}`);
+    else if (e.tip === "cevrim")
+      satirlar.push(`  💀 DÖNGÜ:${anahtar} · ${kimlik}${ne}${niye}${carpan} — kimse çözmezse iki taraf da bekler`);
+    else satirlar.push(`  • ${e.tip}:${anahtar} ${kimlik}${ne}${niye}${carpan}`);
+  }
+  if (tumu.length > goster.length)
+    satirlar.push(`  … +${tumu.length - goster.length} olay GÖSTERİLMEDİ (tavan ${satirTavan}).`);
+  if (claimsiz.length) {
+    const oturum = new Set(claimsiz.map((e) => e.engellenen)).size;
+    const yol = new Set(claimsiz.map((e) => e.key)).size;
+    satirlar.push(`  ✍ ${claimsiz.length} claim'siz yazım · ${oturum} oturum · ${yol} yol (katlandı)`);
+  }
+  if (r.atlanan) satirlar.push(`  ⚠ ${r.atlanan} eski olay okuma tavanına takıldı (defterden okunabilir).`);
+  /* ORKESTRATÖRÜN ELİ: haberi alan, ilgiliyi tek komutla devam ettirir. Komut ÖRNEĞİ
+     gerçek bir kimlikle basılır — şablon değil, kopyalanabilir olsun. */
+  const sonlar = [...katli.values()].map((v) => v.son).reverse();
+  /* Örnek hedef seçiminde ÖNCELİK BLOKE OLANDadır: "devam et" denecek oturum, tıkanmış
+     olandır — işini bitirmiş olan zaten devam ediyor. */
+  const ornek =
+    sonlar.find((e) => ["deny", "mesgul", "bekleyis", "cevrim"].includes(e.tip)) ||
+    sonlar.find((e) => ["birakildi", "kapandi", "devir"].includes(e.tip));
+  satirlar.push(
+    `  ↳ devam ettir: node ~/.claude/skills/eszamanli/scripts/claim.mjs bildir --hedef ` +
+      `${sid(ornek?.engellenen || ornek?.sahip)} --mesaj "<ne yapsın>"`
+  );
+  satirlar.push(
+    rolAd === "orkestrator"
+      ? `  (orkestratörsün: bu olaylar BİR KEZ düşer — gerekeni şimdi planına al.)`
+      : `  ([${rolAd}] rolündesin: bu ilerleme satırları BİR KEZ düşer.)`
+  );
+  ilerlet();
+  return satirlar;
+}
+
+/**
  * SESSİZ EZME YOK (P2): kilidi DEVREDİLMİŞ olan eski sahip, ilk yazımında ne olduğunu
  * OKUR. Devir bir silme değil bir sahip değişimidir; `ownerMatch` artık false döndüğü
  * için eski sahip normal DENY yerdi ve "benim kilidim nereye gitti" sorusu cevapsız
@@ -160,6 +418,11 @@ function denyText(claim, repoRoot, cyc, me) {
     `   Komut ÇIKINCA kaynağı claim'leyip beklemedeki maddeyi bitir.`,
     `4. Durumu görmek için: node ~/.claude/skills/eszamanli/scripts/claim.mjs status`,
     ``,
+    `Sıraya İŞARET bırakıldı: sahip bırakırken sana BİLDİRİ düşer, ilk turunda okursun.`,
+    `  Ama bildiri bir POSTA KUTUSUDUR, ZİL DEĞİL — durmuş bir oturumu uyandırmaz.`,
+    `  İş BU oturumda bitecekse (3) şart: uyandıran tek şey senin kendi \`wait\` sürecindir.`,
+    `Ve SEN de bir kilit tutuyorsan: işin bitince BIRAK — bırakma, sıradakine haberi gönderir.`,
+    ``,
     `Kilit dosyasını ELLE SİLME: sahip crash ederse otomatik biçilir (pid ölçütü).`,
   ].join("\n");
 }
@@ -174,12 +437,22 @@ function denyText(claim, repoRoot, cyc, me) {
  */
 function markWanted(repoRoot, claim, me, intent) {
   try {
+    /* ORKESTRATÖRE "bloke" HABERİ — ama YALNIZ İLK KEZ. Kapı aynı çift (oturum × kaynak)
+       için turda turda DENY verir; her DENY'i haber saysaydık koordinatörün kutusu tek bir
+       tıkanıklığın yankısıyla dolardı. Yenilik ölçütü kuyruğun KENDİSİdir: kayıt zaten
+       varsa bu yeni bir tıkanıklık değil, sürenin uzamasıdır. */
+    const oncekiler = L.queueOf(repoRoot, claim.resource.key);
+    const yeni = !oncekiler.some((w) => w.sessionId === me.sessionId);
     L.enqueue(repoRoot, claim.resource.key, {
       sessionId: me.sessionId,
       since: new Date().toISOString(),
       intent: intent || null,
       pid: null, // işaret: aktif bekleyiş DEĞİL
     });
+    /* ZİNCİRİN GERİ YÖNÜ: kilidi TUTANA "seni bekleyen doğdu" haberi. Orkestratöre AYRICA
+       yazılmaz — blokaj zaten `olayDeny` ile deftere düşüyor ve besleme defterin
+       projeksiyonudur (iki yoldan raporlamak aynı olayı iki kez gösterirdi). */
+    if (yeni) L.bildirSahibe?.(repoRoot, claim, { sessionId: me.sessionId, intent });
   } catch {
     /* yut */
   }
@@ -223,15 +496,61 @@ function main() {
     const sid = p.session_id || p.sessionId;
     if (!sid || !L.ledgerExists()) return pass();
     const root = L.repoRootOf(p.cwd || process.cwd());
+    let kapananKilit = 0;
     for (const c of L.activeClaims(root)) {
-      if (c.owner?.sessionId === sid) L.archiveClaim(root, c, "session bitti (SessionEnd)");
+      if (c.owner?.sessionId !== sid) continue;
+      L.archiveClaim(root, c, "session bitti (SessionEnd)");
+      kapananKilit++;
+      // DEFTERE: bu kilit bırakıldı (orkestratör beslemesi defterin projeksiyonudur).
+      try {
+        L.yazOlay?.(root, {
+          tip: "birakildi",
+          key: c.resource.key,
+          sahip: sid,
+          why: "session bitti (SessionEnd)",
+        });
+      } catch {
+        /* yut */
+      }
+      /* BİLDİRİ (2026-08-09): kapanan oturum da "işini bitiren"dir — sırada uyanma yolu
+         OLMAYAN bekleyen varsa haberi burada bırakır. `release`i unutup kapanan oturum
+         en sık hâldir; haber vermeyi yalnız açık `release`e bağlamak kuralı delerdi. */
+      try {
+        L.bildirSiradakine?.(root, c.resource.key, { sessionId: sid, neden: "SessionEnd" });
+      } catch {
+        /* yut — haber, kapanışı asla bozmaz */
+      }
     }
     /* Sıradan da çık: biten bir session'ın kuyrukta yer tutması sırayı yalanlar.
        Kapanış KAYDI burada doğar (aşama 05): bekleyişin süresi `since` silinmeden ölçülür,
        `sonuc:"oldu"` = bekleyen öldü (session bitti), kilidi hiç alamadı. Bu, "kaç bekleyiş
        boşa gitti" sorusunun tek kaynağıdır. Eski claims-lib'e karşı güvenli: yoksa düz
        `dequeue`'ya düşülür — sıradan çıkış hiçbir yolda atlanmaz. */
-    for (const k of L.queuedKeysOf(root, sid)) {
+    /* ÜSTLENİLEN ROLLER bu oturumla ölür (canlılık zaten pid'le ölçülüyor; kaydı burada
+       düşürmek defteri temiz tutar ve "ölü koordinatör/altyapı" görüntüsünü hiç doğurmaz).
+       Tek tek değil TOPLUCA: bir oturum birden çok rol üstlenmiş olabilir. */
+    try {
+      for (const ad of L.rolleriOf?.(root, sid) || []) L.rolBirak?.(root, ad, sid);
+      L.orkestratorBirak?.(root, sid); // eski yol da temizlensin (geriye uyum)
+    } catch {
+      /* yut */
+    }
+    const bekledigi = L.queuedKeysOf(root, sid);
+    /* ORKESTRATÖRE "kapandı": bir oturumun ölümü sahanın en sessiz olayıdır — kilidini
+       bıraktı mı, yarım bir bekleyişi mi vardı, orkestratör bunu başka hiçbir yerden
+       öğrenemez. Kendi kaydı düşerken kendine yazmaz (kütüphane eler). */
+    try {
+      if (kapananKilit || bekledigi.length)
+        L.yazOlay?.(root, {
+          tip: "kapandi",
+          key: null,
+          engellenen: sid,
+          why: `${kapananKilit} kilit bırakıldı · ${bekledigi.length} bekleyiş yarım kaldı`,
+        });
+    } catch {
+      /* yut */
+    }
+    for (const k of bekledigi) {
       try {
         if (typeof L.dequeueKapanis === "function")
           L.dequeueKapanis(root, k, sid, "oldu", "session bitti (SessionEnd)");
@@ -325,15 +644,48 @@ function main() {
       }
     }
 
+    /* BİLDİRİ EN ÖNDE: "sıra sende" haberi, başka canlı session olup olmamasından
+       BAĞIMSIZ olarak sahibine ulaşmalı — bırakan oturum çoktan kapanmış olabilir. */
+    const bildiri = bildiriBloku(root, me);
+    /* Saha beslemesi AYRI hesaplanır: posta kutusu bu oturuma ÖZEL haberleri, besleme ise
+       koordinatörün gözünü taşır. Kişisel olan önce basılır — "sıra sana geldi" bilgisinin
+       muhatabı sensin; saha bloğu ondan sonra gelir. */
+    const saha = sahaBloku(root, me);
+
+    /* ORKESTRATÖR GÖRÜNÜRLÜĞÜ: sahada bir koordinatör varsa herkes BİLİR — çünkü bu
+       oturumun bloke olması/işini bitirmesi ona otomatik haber düşürüyor. Görünmez bir
+       gözlemci, sözleşmesi ilan edilmemiş bir gözlemcidir. Kendine bunu yazmaz. */
+    let orkSatir = null;
+    try {
+      const roller = (L.rolListe?.(root) || []).filter((r) => r.sahip && r.sahip.sessionId !== me);
+      if (roller.length) {
+        const ork = roller.find((r) => r.ad === "orkestrator");
+        orkSatir =
+          `Bu repoda ROL SAHİBİ oturumlar: ` +
+          roller
+            .map((r) => `${r.ad}=${String(r.sahip.sessionId).slice(0, 8)}`)
+            .join(" · ") +
+          (ork ? ` — işini bitirmen/bloke olman orkestratöre OTOMATİK bildirilir (ayrıca rapor yazma).` : "") +
+          `\n  Birine seslenmek için: node ~/.claude/skills/eszamanli/scripts/claim.mjs bildir --rol <ad> --mesaj "…"`;
+      }
+    } catch {
+      /* yut */
+    }
+
     const others = L.liveSessionsIn(root).filter((s) => s.sessionId !== me);
     /* Sarkık devir işareti TEK BAŞINA da haber değeridir (iş kaybolmasın); başka canlı
-       session yoksa blok yalnız o satırı taşır. İkisi de yoksa TEK BAYT basılmaz. */
+       session yoksa blok yalnız o satırı taşır. Üçü de yoksa TEK BAYT basılmaz. */
     if (!others.length) {
-      if (!devirSatir) return pass();
+      if (!devirSatir && !bildiri.length && !saha.length && !orkSatir) return pass();
       return out({
         hookSpecificOutput: {
           hookEventName: olay,
-          additionalContext: `[eşzamanlılık] ${devirSatir}`,
+          additionalContext: [
+            ...bildiri,
+            ...saha,
+            ...(orkSatir ? [`[eşzamanlılık] ${orkSatir}`] : []),
+            ...(devirSatir ? [`[eşzamanlılık] ${devirSatir}`] : []),
+          ].join("\n"),
         },
       });
     }
@@ -376,10 +728,13 @@ function main() {
       hookSpecificOutput: {
         hookEventName: olay,
         additionalContext: [
+          ...bildiri,
+          ...saha,
           `[eşzamanlılık] Bu repoda ${others.length} BAŞKA canlı Claude session'ı var:`,
           ...lines,
           heldLines.length ? `Tutulan kilitler:` : `Tutulan kilit yok.`,
           ...heldLines,
+          ...(orkSatir ? [orkSatir] : []),
           ...(devirSatir ? [devirSatir] : []),
           `Protokol: yıkıcı/uzun bir yazımdan ÖNCE kaynağı claim'le, bitince bırak.`,
           `  node ~/.claude/skills/eszamanli/scripts/claim.mjs claim --res <kaynak> --intent "..."`,
