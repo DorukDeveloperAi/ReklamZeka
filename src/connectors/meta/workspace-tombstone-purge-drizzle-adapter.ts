@@ -43,10 +43,12 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "instruction_policy_raw_provenance",
   "strict_instruction_policy_revisions",
   "tenant_authority_snapshots",
+  "tenant_authority_snapshot_heads",
   "account_groups",
   "account_group_revisions",
   "account_group_account_bindings",
   "policy_authority_catalog_revisions",
+  "policy_authority_catalogs",
   "policy_authority_bindings",
   "policy_manual_lock_revisions",
   "authority_topics",
@@ -205,10 +207,12 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from progressive_formalization_revisions where workspace_id = ${workspaceId}::uuid
       union all select 'tenant_authority_snapshots', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from tenant_authority_snapshots where workspace_id = ${workspaceId}::uuid
+      union all select 'tenant_authority_snapshot_heads', count(*)::int, coalesce(md5(string_agg(workspace_id::text || ':' || xmin::text || ':' || ctid::text, ',' order by workspace_id)), md5('')) from tenant_authority_snapshot_heads where workspace_id = ${workspaceId}::uuid
       union all select 'account_groups', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from account_groups where workspace_id = ${workspaceId}::uuid
       union all select 'account_group_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from account_group_revisions where workspace_id = ${workspaceId}::uuid
       union all select 'account_group_account_bindings', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from account_group_account_bindings where workspace_id = ${workspaceId}::uuid
       union all select 'policy_authority_catalog_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from policy_authority_catalog_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'policy_authority_catalogs', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from policy_authority_catalogs where workspace_id = ${workspaceId}::uuid
       union all select 'policy_authority_bindings', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from policy_authority_bindings where workspace_id = ${workspaceId}::uuid
       union all select 'policy_manual_lock_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from policy_manual_lock_revisions where workspace_id = ${workspaceId}::uuid
       union all select 'authority_topics', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from authority_topics where workspace_id = ${workspaceId}::uuid
@@ -511,6 +515,8 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from policy_authority_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from policy_manual_lock_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from policy_authority_catalog_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from policy_authority_catalogs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from tenant_authority_snapshot_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from tenant_authority_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from account_group_account_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from account_group_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

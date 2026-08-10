@@ -130,6 +130,11 @@
   - [x] A09.2b server-private authoritative G3 historical replay preview: G2 provenance,
     frozen context, repository-bound authority snapshot ve strict impact birlikte çözülür;
     evidence eksikse blocked, G4/publish/approve/execute/Meta-write yapısal olarak kapalıdır.
+  - [x] A09.2c server-private authority catalog materializer: owner/admin + workspace recheck,
+    policy-registry/catalog/snapshot-head OCC, relational fact revalidation, append-only
+    catalog/snapshot/binding, audit ve `policy_authority` invalidation tek transaction'dadır.
+    Current kullanım deterministic head, tarihsel replay explicit immutable snapshot ref/hash kullanır;
+    HTTP/MCP/UI ve bütün write capability'leri kapalıdır.
   - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
     context ailelerinin authoritative binding'i; canlı PostgreSQL verifier ve gerçek oturum kabulü.
 - [ ] Başlangıç objective/internal kategori playbook seti.

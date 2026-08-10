@@ -67,6 +67,22 @@
   architecture/model/security-boundaries ve secret-artifact kontrolleri yeşil. Authority catalog
   materialization lifecycle ve canlı PostgreSQL/browser kabulü sonraki sınırdır.
 
+## 2026-08-10 — A09.2c private authority catalog materialization
+
+- Private materializer; aktif workspace ve owner/admin membership'ini transaction içinde yeniden
+  doğrular, published-policy registry ile catalog/snapshot head hash'lerini OCC ile kilitler. Yalnız
+  current account-group/topic/semantic ve manual-lock kaynakları kanıtlandığında append-only catalog
+  revision, tenant snapshot ve relational authority binding'leri birlikte yazar; aynı transaction
+  `policy_authority` invalidation ve audit hash-chain kaydını da ekler.
+- Catalog ve snapshot için deterministic current-head tabloları eklendi. Repository loader current
+  kullanımda bu head'i, tarihsel replay'de ise explicit immutable snapshot ref/hash çiftini çözer;
+  belirsizlik, stale head veya eksik kaynakta fail-closed kalır. Materializer herhangi bir HTTP/MCP/UI
+  route'u ya da publish/approve/execute/Meta-write capability'si vermez; G4 kapalıdır.
+- Sadece bu private persistence dilimi tamamlandı. Canlı verifier erişilebilir yerel PostgreSQL'de
+  `authority_catalog_materialization_schema_missing` ile durdu; bu instance'a migration uygulanmadan
+  RLS/OCC rollback kabulü tamamlanmış sayılmaz. Gerçek oturum/browser kanıtı da açık; impact coverage
+  yalnız doğrulayabildiği kapsamda mutation'ı kapalı tutar.
+
 ## 2026-08-10 — A09 atomic starter, authoritative facet preview ve progressive persistence
 
 - Starter adoption artık zero-write blocker değildir. Owner/admin confirmation, aktif workspace

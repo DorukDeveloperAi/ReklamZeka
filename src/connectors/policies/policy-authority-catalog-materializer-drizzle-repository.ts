@@ -52,10 +52,23 @@ export class DrizzlePolicyAuthorityCatalogMaterializerRepository {
       if (rows(await tx.execute(sql`select id from workspaces where id = ${input.workspaceId}::uuid and lifecycle_state = 'active' for update`)).length !== 1) fail("not_found");
       const membership = rows<{ role: unknown }>(await tx.execute(sql`select role::text from memberships where workspace_id = ${input.workspaceId}::uuid and user_id = ${input.actorId}::uuid for update`));
       if (membership.length !== 1 || membership[0]!.role !== input.role) fail("forbidden");
-      const policyRows = rows<{ policy_ref: unknown; policy_version: unknown; canonical_hash: unknown }>(await tx.execute(sql`
-        select policy_ref, policy_version, canonical_hash from strict_instruction_policy_revisions where workspace_id = ${input.workspaceId}::uuid and status = 'published' for update`));
+      const policyRows = rows<{ id: unknown; policy_ref: unknown; policy_version: unknown; canonical_hash: unknown }>(await tx.execute(sql`
+        select policy.id::text, policy.policy_ref, policy.policy_version, policy.canonical_hash
+          from strict_instruction_policy_revisions policy where policy.workspace_id = ${input.workspaceId}::uuid and policy.status = 'published'
+            and policy.policy_version = (select max(candidate.policy_version) from strict_instruction_policy_revisions candidate
+              where candidate.workspace_id = policy.workspace_id and candidate.policy_ref = policy.policy_ref and candidate.status = 'published') for update`));
       const registry = policyRows.map((row) => ({ policyRef: String(row.policy_ref), policyVersion: Number(row.policy_version), canonicalHash: String(row.canonical_hash), status: "published" })).sort((a, b) => a.policyRef.localeCompare(b.policyRef));
       if (digest(registry) !== input.expectedPolicyRegistryHash || catalog.bindings.some((binding) => !policyRows.some((row) => row.policy_ref === binding.policyRef && Number(row.policy_version) === binding.policyVersion && row.canonical_hash === binding.policyHash))) fail("conflict");
+      const groupFacts = rows<{ group_ref: unknown; current_revision: unknown; current_revision_hash: unknown }>(await tx.execute(sql`
+        select group_ref, current_revision, current_revision_hash from account_groups where workspace_id = ${input.workspaceId}::uuid and current_revision > 0 for update`));
+      const topicFacts = rows<{ topic_ref: unknown; current_revision: unknown; current_revision_hash: unknown }>(await tx.execute(sql`
+        select topic_ref, current_revision, current_revision_hash from authority_topics where workspace_id = ${input.workspaceId}::uuid and current_revision > 0 for update`));
+      if (scope.accountGroupRefs.some((ref) => !groupFacts.some((row) => row.group_ref === ref && HASH.test(String(row.current_revision_hash))))
+        || scope.topicRefs.some((ref) => !topicFacts.some((row) => row.topic_ref === ref && HASH.test(String(row.current_revision_hash))))) fail("incomplete_authority");
+      for (const lock of input.manualLocks) {
+        const lockRows = rows<{ operation: unknown }>(await tx.execute(sql`select operation from policy_manual_lock_revisions lock join strict_instruction_policy_revisions policy on policy.workspace_id = lock.workspace_id and policy.id = lock.policy_revision_id where lock.workspace_id = ${input.workspaceId}::uuid and lock.lock_ref = ${lock.lockRef} and policy.policy_ref = ${lock.policyRef} and policy.policy_version = ${lock.policyVersion} and policy.canonical_hash = ${lock.policyHash} order by lock.sequence desc limit 1 for update`));
+        if (lockRows.length !== 1 || lockRows[0]!.operation !== "lock") fail("incomplete_authority");
+      }
       const catalogHead = rows<{ id: unknown; current_revision: unknown; current_revision_hash: unknown }>(await tx.execute(sql`select id::text, current_revision, current_revision_hash from policy_authority_catalogs where workspace_id = ${input.workspaceId}::uuid and catalog_ref = ${catalog.catalogRef} for update`));
       if (catalogHead.length > 1) fail("corrupt_store");
       const oldCatalogHash = catalogHead[0]?.current_revision_hash === null || catalogHead.length === 0 ? "GENESIS" : String(catalogHead[0]!.current_revision_hash);
@@ -79,10 +92,31 @@ export class DrizzlePolicyAuthorityCatalogMaterializerRepository {
       if (oldSnapshotHash !== input.expectedSnapshotHeadHash) fail("conflict");
       await tx.execute(sql`insert into tenant_authority_snapshots (id, workspace_id, snapshot_ref, snapshot_hash, repository_ref, repository_revision, verified_at, expires_at, snapshot_payload)
         values (${snapshotId}::uuid, ${input.workspaceId}::uuid, ${snapshot.snapshotRef}, ${snapshotHash}, ${input.repositoryRef}, ${input.repositoryRevision}, ${input.occurredAt}::timestamptz, ${input.expiresAt}::timestamptz, ${JSON.stringify(snapshot)}::jsonb)`);
+      for (const binding of catalog.bindings) {
+        const policy = policyRows.find((row) => row.policy_ref === binding.policyRef && Number(row.policy_version) === binding.policyVersion && row.canonical_hash === binding.policyHash);
+        if (!policy || typeof policy.id !== "string" || !UUID.test(policy.id)) fail("corrupt_store");
+        const facts = rows<{ semantic_ref: unknown; revision: unknown; revision_hash: unknown }>(await tx.execute(sql`
+          select distinct on (semantic_ref) semantic_ref, revision, revision_hash from policy_semantic_binding_revisions
+          where workspace_id = ${input.workspaceId}::uuid and policy_revision_id = ${policy.id}::uuid order by semantic_ref, revision desc for update`));
+        if (facts.length === 0 || facts.some((fact) => !REF.test(String(fact.semantic_ref)) || !HASH.test(String(fact.revision_hash)))) fail("incomplete_authority");
+        const tierRef = `authority_tier_${binding.authorityTier}`; const decisionRef = `decision_${binding.decision?.decisionKey ?? "default"}_${binding.decision?.positionKey ?? "default"}`;
+        for (const fact of facts) await tx.execute(sql`insert into policy_authority_bindings (id, workspace_id, policy_revision_id, authority_snapshot_id, authority_catalog_revision_id, authority_tier_ref, decision_ref, binding_kind, binding_ref, binding_version, binding_hash)
+          values (${randomUUID()}::uuid, ${input.workspaceId}::uuid, ${policy.id}::uuid, ${snapshotId}::uuid, ${revisionId}::uuid, ${tierRef}, ${decisionRef}, 'semantic', ${String(fact.semantic_ref)}, ${String(fact.revision)}, ${String(fact.revision_hash)})`);
+        for (const fact of groupFacts.filter((entry) => scope.accountGroupRefs.includes(String(entry.group_ref)))) await tx.execute(sql`insert into policy_authority_bindings (id, workspace_id, policy_revision_id, authority_snapshot_id, authority_catalog_revision_id, authority_tier_ref, decision_ref, binding_kind, binding_ref, binding_version, binding_hash)
+          values (${randomUUID()}::uuid, ${input.workspaceId}::uuid, ${policy.id}::uuid, ${snapshotId}::uuid, ${revisionId}::uuid, ${tierRef}, ${decisionRef}, 'account_group', ${String(fact.group_ref)}, ${String(fact.current_revision)}, ${String(fact.current_revision_hash)})`);
+        for (const fact of topicFacts.filter((entry) => scope.topicRefs.includes(String(entry.topic_ref)))) await tx.execute(sql`insert into policy_authority_bindings (id, workspace_id, policy_revision_id, authority_snapshot_id, authority_catalog_revision_id, authority_tier_ref, decision_ref, binding_kind, binding_ref, binding_version, binding_hash)
+          values (${randomUUID()}::uuid, ${input.workspaceId}::uuid, ${policy.id}::uuid, ${snapshotId}::uuid, ${revisionId}::uuid, ${tierRef}, ${decisionRef}, 'topic', ${String(fact.topic_ref)}, ${String(fact.current_revision)}, ${String(fact.current_revision_hash)})`);
+      }
       if (snapshotHead.length === 0) await tx.execute(sql`insert into tenant_authority_snapshot_heads (workspace_id, current_snapshot_id, current_snapshot_hash, updated_at) values (${input.workspaceId}::uuid, ${snapshotId}::uuid, ${snapshotHash}, ${input.occurredAt}::timestamptz)`);
       else await tx.execute(sql`update tenant_authority_snapshot_heads set current_snapshot_id = ${snapshotId}::uuid, current_snapshot_hash = ${snapshotHash}, updated_at = ${input.occurredAt}::timestamptz where workspace_id = ${input.workspaceId}::uuid and current_snapshot_hash = ${oldSnapshotHash}`);
       await tx.execute(sql`insert into effective_campaign_context_invalidations (workspace_id, event_hash, component_type, component_ref, component_version, scope_kind, entity_type, entity_ref, reason_code, observed_at)
         values (${input.workspaceId}::uuid, ${digest({ workspaceId: input.workspaceId, snapshotHash, catalogHash: catalog.catalogHash, occurredAt: input.occurredAt })}, 'policy_authority', 'policy_authority_catalog', ${snapshotHash}, 'workspace_component', null, null, 'source_changed', ${input.occurredAt}::timestamptz) on conflict (workspace_id, event_hash) do nothing`);
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`audit:${input.workspaceId}`}, 0))`);
+      const previousAuditHash = String(rows<{ event_hash: unknown }>(await tx.execute(sql`select event_hash from audit_events where workspace_id = ${input.workspaceId}::uuid order by occurred_at desc, created_at desc, id desc limit 1`))[0]?.event_hash ?? "GENESIS");
+      const audit = Object.freeze({ id: randomUUID(), workspaceId: input.workspaceId, actorId: input.actorId, action: "policy_authority_catalog.materialized",
+        resourceType: "policy_authority_catalog", resourceId: catalog.catalogRef, metadata: { catalogHash: catalog.catalogHash, snapshotRef: snapshot.snapshotRef, snapshotHash, revision }, previousHash: previousAuditHash, occurredAt: input.occurredAt });
+      await tx.execute(sql`insert into audit_events (id, workspace_id, actor_id, action, resource_type, resource_id, metadata, previous_hash, event_hash, occurred_at)
+        values (${audit.id}::uuid, ${audit.workspaceId}::uuid, ${audit.actorId}::uuid, ${audit.action}, ${audit.resourceType}, ${audit.resourceId}, ${JSON.stringify(audit.metadata)}::jsonb, ${audit.previousHash}, ${digest(audit)}, ${audit.occurredAt}::timestamptz)`);
       return Object.freeze({ catalogRef: catalog.catalogRef, catalogRevision: revision, catalogHash: catalog.catalogHash, snapshotRef: snapshot.snapshotRef, snapshotHash, capabilities: CAPABILITIES });
     });
   }
