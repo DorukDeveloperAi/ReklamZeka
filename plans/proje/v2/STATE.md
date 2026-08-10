@@ -2597,6 +2597,21 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   Bu checkpoint ağ çağrısı yapmaz ve gerçek Meta write açmaz.
 - Kanıt: `tests/meta-write-spec.test.ts`, `tests/autonomy-valve.test.ts`, `npm run typecheck`.
 
+## 2026-08-10 — A13 separate execution admission boundary
+
+- `action-execution-admission/1.0.0`, approval kararını execute yerine geçirmez. Hedef unit'in
+  approval grant'i tüketilmemiş/geçerli olmalı; yalnız hedef ve dependency closure'ının exact
+  current freshness'i kabul edilir; ayrı human-presence kanıtı exact unit/hash/scope ve policy'nin
+  grant-consumer rolüne bağlıdır.
+- Admission, typed status/budget write-spec'i taşır fakat `admitted_for_disabled_executor` ile
+  döner: execute, Meta write ve network dispatch capability'leri false'tur. Raw Graph, K0/K1/K4,
+  stale/bozuk plan veya bağımlılık hiçbir executor'a ulaşamaz.
+- Sonraki bağımlılık: server-private idempotent execution ledger, opaque Meta target resolution,
+  human execution ceremony, read-after-write verify ve rollback. Bu checkpoint gerçek Meta write
+  veya bir ağ çağrısı yapmaz.
+- Kanıt: `tests/action-execution-admission.test.ts`, `tests/meta-write-spec.test.ts`,
+  `tests/approval-lifecycle.test.ts`, `npm run typecheck`.
+
 ## 2026-08-10 — A10 private timeframe-bound L3 context composer
 
 - `TimeframeBoundAnalysisContextComposer`, input olarak yalnız workspace/entity/timeframe alır. Son geçerli,

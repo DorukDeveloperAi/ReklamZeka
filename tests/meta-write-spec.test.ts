@@ -22,6 +22,9 @@ describe("typed Meta write spec", () => {
 
     const budget = createMetaWriteSpec({ ...unit, actionPlan: plan({ kind: "budget_change", entity: { level: "campaign", ref: "campaign_main" }, budgetKind: "daily", currency: "TRY", beforeDecimal: "100", afterDecimal: "90", budgetOwnerRef: "campaign_main" }) });
     expect(budget).toMatchObject({ actionType: "budget_decrease", mutation: { kind: "budget", budgetKind: "daily", currency: "TRY", desiredDecimal: "90" } });
+
+    const activateAd = createMetaWriteSpec({ ...unit, actionPlan: plan({ kind: "status_change", entity: { level: "ad", ref: "ad_one" }, fromStatus: "PAUSED", toStatus: "ACTIVE" }, { entity: { level: "ad", ref: "ad_one" } }) });
+    expect(activateAd).toMatchObject({ actionType: "status_activate", target: { entityLevel: "ad", entityRef: "ad_one" }, mutation: { kind: "status", desiredStatus: "ACTIVE" } });
   });
 
   it("rejects K0/K1/K4, denied plans, forged hashes and raw Graph-shaped input", () => {

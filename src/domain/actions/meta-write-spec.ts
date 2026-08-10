@@ -85,14 +85,27 @@ function validatePlan(plan: ActionPlan): ActionPlan {
 
 function mutationFor(actionType: ActionType, action: TypedActionIntent): MetaWriteSpec["mutation"] {
   if (actionType === "status_pause" || actionType === "status_activate") {
-    if (action.kind !== "status_change" || action.entity.level === "ad" && actionType !== "status_pause"
-      || action.toStatus !== (actionType === "status_pause" ? "PAUSED" : "ACTIVE")) fail("invalid_plan");
+    const expected = actionType === "status_pause"
+      ? { fromStatus: "ACTIVE" as const, toStatus: "PAUSED" as const }
+      : { fromStatus: "PAUSED" as const, toStatus: "ACTIVE" as const };
+    if (action.kind !== "status_change" || !["campaign", "adset", "ad"].includes(action.entity.level)
+      || action.fromStatus !== expected.fromStatus || action.toStatus !== expected.toStatus) fail("invalid_plan");
     return Object.freeze({ kind: "status", desiredStatus: action.toStatus });
   }
   if (actionType === "budget_decrease" || actionType === "budget_increase") {
     if (action.kind !== "budget_change" || !["campaign", "adset"].includes(action.entity.level)
-      || action.budgetOwnerRef !== action.entity.ref || !DECIMAL.test(action.afterDecimal)
+      || action.budgetOwnerRef !== action.entity.ref || !DECIMAL.test(action.beforeDecimal) || !DECIMAL.test(action.afterDecimal)
       || !/^[A-Z]{3}$/.test(action.currency)) fail("invalid_plan");
+    const decimal = (value: string) => {
+      const [whole, fraction = ""] = value.split(".");
+      return { coefficient: BigInt(`${whole}${fraction}`), scale: fraction.length };
+    };
+    const before = decimal(action.beforeDecimal); const after = decimal(action.afterDecimal);
+    const scale = Math.max(before.scale, after.scale);
+    const beforeValue = before.coefficient * 10n ** BigInt(scale - before.scale);
+    const afterValue = after.coefficient * 10n ** BigInt(scale - after.scale);
+    if ((actionType === "budget_decrease" && afterValue >= beforeValue)
+      || (actionType === "budget_increase" && afterValue <= beforeValue)) fail("invalid_plan");
     return Object.freeze({ kind: "budget", budgetKind: action.budgetKind, currency: action.currency, desiredDecimal: action.afterDecimal });
   }
   fail("unsupported_action");
