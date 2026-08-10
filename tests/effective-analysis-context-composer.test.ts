@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildEffectiveCampaignContext } from "@/analyses/effective-campaign-context";
 import { EffectiveAnalysisContextComposer, EffectiveAnalysisContextComposerError,
-  type EffectiveAnalysisContextFacts, type RepositoryVerifiedAuthority } from "@/application/effective-analysis-context-composer";
-import { CurrentCategoryCompositionResolver } from "@/application/current-category-composition-resolver";
+  type EffectiveAnalysisContextFacts, type EffectiveAnalysisContextReadySource, type RepositoryVerifiedAuthority } from "@/application/effective-analysis-context-composer";
 import { bindCategoryProfiles, createCategoryProfile } from "@/domain/categories/category-profile";
 import { categoryDefinitionPublicRef } from "@/domain/categories/public-reference";
 import { resolveEffectiveCategory, type CategoryDefinition, type CategoryDimension } from "@/domain/categories/registry";
@@ -12,7 +11,7 @@ import { DECISION_CADENCE_VERSION } from "@/domain/decisions/cadence";
 
 const workspaceId = "workspace_private_composer";
 const request = Object.freeze({ workspaceId, accountRef: "account_primary", entityType: "campaign" as const,
-  entityRef: "campaign_primary", capturedAt: "2026-08-10T15:00:00.000Z" });
+  entityRef: "campaign_primary" });
 
 function category() {
   const dimension: CategoryDimension = { id: "dimension_primary", workspaceId, key: "service", version: 1,
@@ -67,11 +66,6 @@ function facts(): EffectiveAnalysisContextFacts {
   };
 }
 
-function categoryResolver() {
-  const frozen = category();
-  return { resolve: vi.fn(async () => ({ workspaceId, dimensions: [{ frozenContext: frozen, values: [] }] })) } as unknown as CurrentCategoryCompositionResolver;
-}
-
 function authority(): RepositoryVerifiedAuthority {
   return { compose: (base) => {
     const context = buildEffectiveCampaignContext({ ...base, versions: { ...base.versions, instructionPolicyRegistry: "c".repeat(64), policyAuthority: "d".repeat(64) },
@@ -83,11 +77,16 @@ function authority(): RepositoryVerifiedAuthority {
   } };
 }
 
-function composer(options: Readonly<{ invalidated?: boolean; authority?: RepositoryVerifiedAuthority }> = {}) {
+function source(options: Readonly<{ authority?: RepositoryVerifiedAuthority }> = {}): EffectiveAnalysisContextReadySource {
+  return { status: "ready", capturedAt: "2026-08-10T15:00:00.000Z", facts: facts(),
+    categories: { workspaceId, dimensions: [{ frozenContext: category() }] },
+    lifecycle: { registryHash: "c".repeat(64), current: [], history: [], diffs: [] }, authority: options.authority ?? authority() };
+}
+
+function composer(options: Readonly<{ invalidated?: boolean; authority?: RepositoryVerifiedAuthority; source?: EffectiveAnalysisContextReadySource }> = {}) {
   const save = vi.fn(async (context) => ({ outcome: "inserted" as const,
     record: { context, sourceComponents: [], invalidated: options.invalidated ?? false } }));
-  const instance = new EffectiveAnalysisContextComposer({ loadCurrent: vi.fn(async () => facts()) }, categoryResolver(),
-    { loadAuthority: vi.fn(async () => options.authority ?? authority()) }, { inspect: vi.fn(async () => ({ registryHash: "c".repeat(64), current: [], history: [], diffs: [] })) }, { save });
+  const instance = new EffectiveAnalysisContextComposer({ loadCurrent: vi.fn(async () => options.source ?? source(options)) }, { save });
   return { instance, save };
 }
 
@@ -117,5 +116,16 @@ describe("EffectiveAnalysisContextComposer", () => {
   it("rejects a save that is already invalidated", async () => {
     await expect(composer({ invalidated: true }).instance.composeAndSave(request))
       .rejects.toMatchObject({ code: "invalidated_save" } satisfies Partial<EffectiveAnalysisContextComposerError>);
+  });
+
+  it("rejects a repository source that truthfully remains not ready", async () => {
+    const unavailable = { status: "not_ready" as const, capturedAt: "2026-08-10T15:00:00.000Z",
+      reason: "current_source_bundle_unavailable" as const,
+      capabilities: { canCompose: false as const, canAuthorizeAction: false as const, canExecute: false as const,
+        canExecuteWrite: false as const, canWriteMeta: false as const,
+        canApprove: false as const, canSchedule: false as const, canCallTool: false as const,
+        canAccessNetwork: false as const, canQuerySql: false as const } };
+    await expect(composer({ source: unavailable as never }).instance.composeAndSave(request))
+      .rejects.toMatchObject({ code: "source_rejected" } satisfies Partial<EffectiveAnalysisContextComposerError>);
   });
 });

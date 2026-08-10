@@ -260,10 +260,17 @@
     profile hash'i için aynı transaction'da exact-entity invalidation append eder. Forward migration
     iki component enum'unu `cadence_profile` ile genişletir ve RLS/FORCE/revoke korumasını yineler.
   - [x] A10.4c-2 private effective-analysis-context composer: dış girdi yalnız
-    `workspaceId/accountRef/entityType/entityRef/capturedAt`; config-v2 projection, all-dimension
+    `workspaceId/accountRef/entityType/entityRef`; config-v2 projection, all-dimension
     category resolver ve repository-verified authority closure ile bileşir, sadece
     `evidence_bound` save yapar ve invalidated dönüşü reddeder. Current config/cadence/guidance/
     evidence için ortak tutarlı Drizzle read adapter'ı bu dar saf portun dışında açık kalır.
+  - [x] A10.4c-4 current-source snapshot checkpoint: composer artık caller clock veya ayrı
+    `Promise.all` reader'ları değil tek repository-owned source bundle kabul eder. Private Drizzle
+    checkpoint aktif workspace/account scope'u bir kısa `REPEATABLE READ, READ ONLY` snapshot'ta
+    doğrular, DB clock üretir ve config/guidance/data/history/category/lifecycle/authority setinin
+    tamamı aynı transaction-local adapterda doğrulanmadığı için dürüstçe `not_ready` + tüm false
+    capability sonucu döner; partial context veya authority üretmez. Ready bundle adapteri sonraki
+    dilimde bu checkpoint'i genişletecektir.
   - [x] A10.4c-3 server-private current cadence reader: tenant/account/campaign scope içinden tek
     current immutable cadence revision'ı ref/revision/version/hash/payload ile `REPEATABLE READ,
     READ ONLY` snapshot'ta çözer; missing/ambiguous/paused/future/tahrif edilmiş profile fail-closed

@@ -1,6 +1,5 @@
 import type { EffectiveCampaignContext, EffectiveCampaignContextInput } from "@/analyses/effective-campaign-context";
 import { buildEffectiveCampaignContext } from "@/analyses/effective-campaign-context";
-import type { CurrentCategoryCompositionResolver } from "@/application/current-category-composition-resolver";
 import type { InstructionPolicyLifecycleState } from "@/application/instruction-policy-lifecycle-service";
 import type { StoredEffectiveCampaignContext } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
 import type { CanonicalMetaAnalysisConfigSnapshotV2 } from "@/domain/meta/analysis-config-projection";
@@ -16,7 +15,6 @@ export type EffectiveAnalysisContextRequest = Readonly<{
   accountRef: string;
   entityType: "campaign" | "ad_set" | "ad" | "creative";
   entityRef: string;
-  capturedAt: string;
 }>;
 
 export type EffectiveAnalysisContextFacts = Readonly<{
@@ -37,10 +35,6 @@ export type EffectiveAnalysisContextFacts = Readonly<{
   versions: Omit<EffectiveCampaignContextInput["versions"], "instructionPolicyRegistry" | "policyAuthority">;
 }>;
 
-export type EffectiveAnalysisContextFactsReader = Readonly<{
-  loadCurrent(input: EffectiveAnalysisContextRequest): Promise<EffectiveAnalysisContextFacts>;
-}>;
-
 export type RepositoryVerifiedAuthority = Readonly<{
   compose(baseContext: EffectiveCampaignContextInput, lifecycle: InstructionPolicyLifecycleState): Readonly<{
     context: EffectiveCampaignContext;
@@ -49,12 +43,43 @@ export type RepositoryVerifiedAuthority = Readonly<{
   }>;
 }>;
 
-export type EffectiveAnalysisContextAuthorityLoader = Readonly<{
-  loadAuthority(input: Readonly<{ workspaceId: string; accountRef: string; evaluatedAt: string }>): Promise<RepositoryVerifiedAuthority>;
+export type EffectiveAnalysisContextReadySource = Readonly<{
+  status: "ready";
+  capturedAt: string;
+  facts: EffectiveAnalysisContextFacts;
+  categories: Readonly<{ workspaceId: string; dimensions: readonly { frozenContext: EffectiveCampaignContextInput["categories"][number] }[] }>;
+  lifecycle: InstructionPolicyLifecycleState;
+  authority: RepositoryVerifiedAuthority;
 }>;
 
-export type EffectiveAnalysisContextLifecycleReader = Readonly<{
-  inspect(workspaceId: string): Promise<InstructionPolicyLifecycleState>;
+/**
+ * A source adapter must fail closed until every context component is read and
+ * validated from the same repository snapshot. These flags are descriptive,
+ * never a grant, and deliberately all false.
+ */
+export type EffectiveAnalysisContextNotReadySource = Readonly<{
+  status: "not_ready";
+  capturedAt: string;
+  reason: "current_source_bundle_unavailable";
+  capabilities: Readonly<{
+    canCompose: false;
+    canAuthorizeAction: false;
+    canExecute: false;
+    canExecuteWrite: false;
+    canWriteMeta: false;
+    canApprove: false;
+    canSchedule: false;
+    canCallTool: false;
+    canAccessNetwork: false;
+    canQuerySql: false;
+  }>;
+}>;
+
+export type EffectiveAnalysisContextSource = EffectiveAnalysisContextReadySource | EffectiveAnalysisContextNotReadySource;
+
+/** The composer receives one repository-owned source bundle, never partial readers. */
+export type EffectiveAnalysisContextSourceReader = Readonly<{
+  loadCurrent(input: EffectiveAnalysisContextRequest): Promise<EffectiveAnalysisContextSource>;
 }>;
 
 export type EvidenceBoundEffectiveContextWriter = Readonly<{
@@ -80,19 +105,15 @@ function required(value: unknown): string {
 
 function request(value: EffectiveAnalysisContextRequest): EffectiveAnalysisContextRequest {
   if (!value || typeof value !== "object" || Array.isArray(value)
-    || Object.keys(value).length !== 5
-    || Object.keys(value).some((key) => !["workspaceId", "accountRef", "entityType", "entityRef", "capturedAt"].includes(key))) {
-    throw new EffectiveAnalysisContextComposerError("invalid_input");
-  }
-  const capturedAt = required(value.capturedAt);
-  if (!Number.isFinite(Date.parse(capturedAt)) || new Date(capturedAt).toISOString() !== capturedAt) {
+    || Object.keys(value).length !== 4
+    || Object.keys(value).some((key) => !["workspaceId", "accountRef", "entityType", "entityRef"].includes(key))) {
     throw new EffectiveAnalysisContextComposerError("invalid_input");
   }
   if (!(["campaign", "ad_set", "ad", "creative"] as const).includes(value.entityType)) {
     throw new EffectiveAnalysisContextComposerError("invalid_input");
   }
   return Object.freeze({ workspaceId: required(value.workspaceId), accountRef: required(value.accountRef),
-    entityType: value.entityType, entityRef: required(value.entityRef), capturedAt });
+    entityType: value.entityType, entityRef: required(value.entityRef) });
 }
 
 function categoryTarget(input: EffectiveAnalysisContextRequest, identity: EffectiveAnalysisContextFacts["identity"]): CategoryHierarchyTarget {
@@ -119,15 +140,11 @@ function allFalse(value: Record<string, unknown>, expected?: readonly string[]):
 }
 
 /**
- * Small, server-private orchestration seam. Production Drizzle adapters are
- * deliberately not implied: current config-v2/cadence/guidance/evidence reads
- * still need one consistent repository snapshot adapter.
+ * Small, server-private orchestration seam. The source reader owns snapshot
+ * consistency; this composer never stitches independently read components.
  */
 export class EffectiveAnalysisContextComposer {
-  constructor(private readonly facts: EffectiveAnalysisContextFactsReader,
-    private readonly categories: Pick<CurrentCategoryCompositionResolver, "resolve">,
-    private readonly authority: EffectiveAnalysisContextAuthorityLoader,
-    private readonly lifecycle: EffectiveAnalysisContextLifecycleReader,
+  constructor(private readonly sourceReader: EffectiveAnalysisContextSourceReader,
     private readonly writer: EvidenceBoundEffectiveContextWriter) {}
 
   async composeAndSave(candidate: EffectiveAnalysisContextRequest): Promise<Readonly<{
@@ -135,24 +152,26 @@ export class EffectiveAnalysisContextComposer {
     outcome: "inserted" | "unchanged";
   }>> {
     const input = request(candidate);
-    let facts: EffectiveAnalysisContextFacts;
-    try { facts = await this.facts.loadCurrent(input); }
+    let source: EffectiveAnalysisContextSource;
+    try { source = await this.sourceReader.loadCurrent(input); }
     catch { throw new EffectiveAnalysisContextComposerError("source_rejected"); }
+    if (source.status !== "ready" || !Number.isFinite(Date.parse(source.capturedAt))
+      || new Date(source.capturedAt).toISOString() !== source.capturedAt) {
+      throw new EffectiveAnalysisContextComposerError("source_rejected");
+    }
+    const facts = source.facts;
     const target = categoryTarget(input, facts.identity);
-    let categoryComposition;
-    let lifecycle: InstructionPolicyLifecycleState;
-    let authority: RepositoryVerifiedAuthority;
-    try {
-      [categoryComposition, lifecycle, authority] = await Promise.all([
-        this.categories.resolve(input.workspaceId, target),
-        this.lifecycle.inspect(input.workspaceId),
-        this.authority.loadAuthority({ workspaceId: input.workspaceId, accountRef: input.accountRef, evaluatedAt: input.capturedAt }),
-      ]);
-    } catch { throw new EffectiveAnalysisContextComposerError("source_rejected"); }
+    const categoryComposition = source.categories;
+    const lifecycle = source.lifecycle;
+    const authority = source.authority;
+    if (categoryComposition.workspaceId !== input.workspaceId || categoryComposition.dimensions.length === 0
+      || categoryComposition.dimensions.some((entry) => entry.frozenContext.path.at(-1)?.id !== target.id)) {
+      throw new EffectiveAnalysisContextComposerError("source_rejected");
+    }
     let base: EffectiveCampaignContextInput;
     try {
       const projection = projectMetaAnalysisConfig(facts.metaAnalysisConfigSnapshot, facts.identity.campaignRef);
-      base = Object.freeze({ workspaceId: input.workspaceId, capturedAt: input.capturedAt,
+      base = Object.freeze({ workspaceId: input.workspaceId, capturedAt: source.capturedAt,
         identity: { connectionRef: facts.identity.connectionRef, accountRef: input.accountRef, campaignRef: facts.identity.campaignRef,
           entityRef: input.entityRef, entityType: input.entityType, hierarchyRefs: facts.identity.hierarchyRefs },
         meta: { ...facts.meta, objective: projection.objective, optimizationEvent: projection.optimizationEvent },

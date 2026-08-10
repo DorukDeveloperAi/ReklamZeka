@@ -2058,3 +2058,19 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   reader gerekir; bu reader HTTP/UI/Decision Room/composer'a bağlanmadı ve schema değiştirmedi.
 - Kanıt: `tests/current-decision-cadence-reader.test.ts` (8 test), `npx tsc --noEmit` ve
   `git diff --check` geçti.
+
+## 2026-08-10 — A10.4c-4 current-source snapshot checkpoint
+
+- `EffectiveAnalysisContextComposer` artık caller-supplied `capturedAt` veya bağımsız category/
+  lifecycle/authority `Promise.all` çağrıları almaz; tek repository-owned source bundle içindeki
+  captured time, facts, category composition, lifecycle ve authority closure'ı ile çalışır.
+  `not_ready` bundle veya geçersiz/partial bundle fail-closed `source_rejected` olur.
+- Yeni server-private `DrizzleCurrentEffectiveAnalysisContextSourceReader` yalnız aktif tenant/account
+  scope'unu ve DB clock'u tek kısa `REPEATABLE READ, READ ONLY` transaction içinde doğrular.
+  Bu adapter config-v2, guidance, data/history, category, lifecycle ve authority'nin eksiksiz
+  transaction-local current reader'larını henüz birleştirmediği için `ready` iddiasında bulunmaz:
+  yalnız `current_source_bundle_unavailable`, `not_ready` ve bütün capability bayrakları false
+  sonucu verir. UI, HTTP, Decision Room, action authority veya schema/migration eklenmedi.
+- Kanıt: `tests/effective-analysis-context-composer.test.ts`,
+  `tests/current-effective-analysis-context-source-drizzle-reader.test.ts`, `npm run typecheck`
+  ve `git diff --check`.
