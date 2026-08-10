@@ -81,8 +81,21 @@
   ancak aktif connection'da `ads_read` + `accounts.read`, account'ta `ads_read` ve
   `meta-account-capability/1.0.0` read evidence birlikte olduğunda verilir. Her eksik/corrupt kanıt
   `partial`/`unavailable` kalır; publish/approve/execute/Meta-write her durumda false'tur.
-- Bu yalnız read model foundation'ıdır: account capability snapshot'ını gerçek live sync ile materialize
-  etme, group-scope inheritance ve dashboard/browser acceptance henüz açık kalır.
+- Bu yalnız read model foundation'ıdır: group-scope inheritance ve dashboard/browser acceptance henüz
+  açık kalır.
+
+## 2026-08-10 — A08 source-bound account-read capability evidence
+
+- Canonical `/me/adaccounts` asset discovery artık `meta-account-capability/1.0.0` evidence'ına
+  dönüştürülür ve mevcut private asset persistence transaction'ında yalnız aynı tenant/connection'ın
+  bilinen `ad_accounts` satırlarına yazılır. Evidence source snapshot hash'i, source status ve exact
+  checked time taşır; daha yeni checked time'dan eski snapshot overwrite edemez.
+- Verified listede görünen hesap `ads_read` + `canReadAccount:true` alır. Listede görünmeyen bilinen
+  hesap ile empty/permission-missing/unsupported/unavailable discovery `ads_read` taşımayan,
+  `canReadAccount:false` kanıtına güncellenir; eski permission sessizce korunmaz. Her capability setinde
+  publish/approve/execute/Meta-write false'tur.
+- Bu source evidence, group inheritance veya Meta write authority değildir. Concrete PostgreSQL live
+  acceptance için yerel connection environment'i bulunmadığından, salt kod/test kanıtı ile sınırlıdır.
 
 ## 2026-08-10 — A09 authority materializer consistency hardening
 

@@ -46,6 +46,20 @@ function assetSnapshot(overrides: Partial<MetaAssetMirrorSnapshotInput> = {}) {
       provenance: { sourceEdge: "/act-1", fetchedAt, sourceGraphVersion: "v24.0", fieldCatalogVersion: "assets-v1", rawPayloadHash: hash },
     }],
     discoveries: [{
+      resource: "ad_accounts",
+      sourceType: "connection",
+      sourceExternalId: null,
+      status: "verified",
+      reason: null,
+      itemCount: 1,
+      provenance: {
+        sourceEdge: "/me/adaccounts",
+        fetchedAt,
+        sourceGraphVersion: "v24.0",
+        fieldCatalogVersion: "assets-v1",
+        rawPayloadHash: hash,
+      },
+    }, {
       resource: "pages",
       sourceType: "connection",
       sourceExternalId: null,
@@ -97,6 +111,7 @@ class FakeRepository implements MetaAssetContentRepository {
   resolveCalls = 0;
   transactionCalls = 0;
   checkpointCalls = 0;
+  accountCapabilityCalls = 0;
   batches: number[] = [];
   knownActors = new Set(["page-1"]);
   private readonly values = new Map<string, Stored>();
@@ -127,6 +142,11 @@ class FakeRepository implements MetaAssetContentRepository {
       upsertEdges: async (rows) => {
         this.batches.push(rows.length);
         return rows.map((row) => this.upsert(`edge:${row.edge.sourceExternalId}:${row.edge.targetExternalAssetId}:${row.edge.relationship}`, row.sourceRevision, row.edge.provenance.rawPayloadHash));
+      },
+      materializeAccountReadCapabilities: async (resolvedScope, snapshot) => {
+        expect(resolvedScope.workspaceId).toBe(scope.workspaceId);
+        expect(snapshot.connectionExternalKey).toBe(scope.connectionExternalKey);
+        this.accountCapabilityCalls += 1;
       },
       validateReferences: async (rows) => {
         for (const row of rows) {
@@ -180,11 +200,12 @@ describe("Meta asset/content persistence run", () => {
     const repository = new FakeRepository();
     const run = await MetaAssetContentPersistenceRun.begin({ repository, scope, batchSize: 250 });
     const page = { sliceKey: "creative:1", cursor: "after-1", checkpoint: { page: 1 }, assetSnapshot: assetSnapshot(), content: [contentRecord()] };
-    expect(await run.writePage(page)).toMatchObject({ inserted: 4, updated: 0, unchanged: 0, stale: 0, cursor: "after-1", recordCount: 4 });
-    expect(await run.writePage(page)).toMatchObject({ inserted: 0, unchanged: 4 });
+    expect(await run.writePage(page)).toMatchObject({ inserted: 5, updated: 0, unchanged: 0, stale: 0, cursor: "after-1", recordCount: 5 });
+    expect(await run.writePage(page)).toMatchObject({ inserted: 0, unchanged: 5 });
     expect(repository.resolveCalls).toBe(1);
     expect(repository.transactionCalls).toBe(2);
     expect(repository.checkpointCalls).toBe(2);
+    expect(repository.accountCapabilityCalls).toBe(2);
     expect(repository.batches.every((size) => size <= 250)).toBe(true);
   });
 

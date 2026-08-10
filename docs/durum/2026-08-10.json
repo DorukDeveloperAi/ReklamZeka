@@ -4,149 +4,149 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "4a155dd3f",
+      "hash": "4e5d6e4b8",
       "tarih": "2026-08-10",
-      "konu": "feat(a10): parse canonical Meta insight pages",
+      "konu": "feat(a08): add portfolio capability reader",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "c6996a264",
+      "hash": "e6bdb2d88",
       "tarih": "2026-08-10",
-      "konu": "feat(a10): add bounded compact agent context",
+      "konu": "feat(a10): sequence interactive campaign briefs",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "02fb6a3e6",
+      "hash": "dacf92810",
       "tarih": "2026-08-10",
-      "konu": "test(a10): verify cadence experiment adapters",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "3096ba3bb",
-      "tarih": "2026-08-10",
-      "konu": "test(a10): verify policy-configured dry run",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "0a9a46161",
-      "tarih": "2026-08-10",
-      "konu": "docs(a12): record local MCP live acceptance",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "dd5c1be06",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): add interactive campaign brief templates",
+      "konu": "feat(a10): compose timeframe-bound L3 contexts",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "a7d587658",
+      "hash": "23a8f1b8f",
       "tarih": "2026-08-10",
-      "konu": "feat(a09): verify complete relational authority impact",
+      "konu": "feat(a10): require L3 evidence for decision runs",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "00a5179d1",
+      "hash": "ec7cce9f9",
       "tarih": "2026-08-10",
-      "konu": "feat(a09): add private authority topic lifecycle",
+      "konu": "feat(a10): materialize L3 windows by timeframe",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "39a63938a",
+      "hash": "e35b9fa41",
       "tarih": "2026-08-10",
-      "konu": "feat(a09): add private account group lifecycle",
+      "konu": "feat(a10): bind L2 L3 context evidence",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "f61886e20",
+      "hash": "df68847d9",
       "tarih": "2026-08-10",
-      "konu": "feat(a09): add private semantic binding lifecycle",
+      "konu": "feat(a10): reject invalidated L3 windows",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "bb12209de",
+      "hash": "823e95527",
       "tarih": "2026-08-10",
-      "konu": "fix(a09): accept renewed authority snapshots",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "a530aa6f5",
-      "tarih": "2026-08-10",
-      "konu": "test(a09): verify authority impact fail-closed",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "2506a492e",
-      "tarih": "2026-08-10",
-      "konu": "feat(a09): evaluate authority impact by family",
+      "konu": "feat(a10): persist invalidation-aware L3 windows",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "50a11045d",
+      "hash": "7ca0df3ca",
       "tarih": "2026-08-10",
-      "konu": "feat(a09): persist verified policy compositions",
+      "konu": "feat(a10): add deterministic L3 window contract",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "7a3d94be2",
+      "hash": "340e7dc99",
       "tarih": "2026-08-10",
-      "konu": "fix(a09): invalidate persisted authority contexts",
+      "konu": "feat(a10): reject invalidated L2 features",
       "tur": "is",
       "kapsam": [
-        "fix"
+        "feat"
+      ]
+    },
+    {
+      "hash": "27e7770f2",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): journal L1 feature invalidations",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "63d6ee213",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): materialize attested L2 features",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "eb2c689be",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): attest private L2 source manifests",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "413262efd",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): add immutable L2 feature storage",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "bf64f2b00",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): expose private L2 source manifest",
+      "tur": "is",
+      "kapsam": [
+        "feat"
       ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 41
+      "adet": 46
     },
     {
       "kapsam": "fix",
-      "adet": 9
+      "adet": 6
     },
     {
       "kapsam": "test",
@@ -154,10 +154,10 @@
     },
     {
       "kapsam": "docs",
-      "adet": 4
+      "adet": 2
     }
   ],
-  "isSayisi": 193,
+  "isSayisi": 210,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-10",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "3fdca371f1f6"
+  "damga": "a26cf2c0d6d0"
 }

@@ -35,6 +35,10 @@
     ve read-readiness bağımsız kalır. Grup üyeliği permission/capability genişletemez; connection
     `ads_read`+`accounts.read`, account `ads_read` ve sürümlü account-read evidence eksikse sonucu
     `partial/unavailable` bırakır; publish/approve/execute/Meta-write yapısal olarak false'tur.
+  - [x] `/me/adaccounts` canonical asset discovery'sinden `meta-account-capability/1.0.0`
+    account-read evidence materialization: aynı asset persistence transaction'ında connection'ın tüm
+    bilinen hesapları source listesine karşı yeniden değerlendirir. Listede yok/empty/permission-missing/
+    unavailable hesap eski grant'i korumaz; `ads_read` ve `canReadAccount=false` ile fail-closed güncellenir.
 - [x] Facebook Page, Instagram, pixel/dataset, app/WhatsApp destination asset graph.
   - [x] Asset ve edge canonical şeması, capability/provenance/orphan alanları.
   - [x] Parçalı canlı sync, ownership/capability çözümlemesi ve iki hesap kanıtı.

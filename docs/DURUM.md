@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 3fdca371f1f6 -->
+<!-- durum-damga: a26cf2c0d6d0 -->
 
 ## Künye
 
@@ -14,35 +14,35 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 193 |
+| iş commit'i (tüm geçmiş) | 210 |
 | ilk / son iş | 2026-08-06 / 2026-08-10 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
-| 2026-08-10 | `feat` | parse canonical Meta insight pages | `4a155dd3f` |
-| 2026-08-10 | `feat` | add bounded compact agent context | `c6996a264` |
-| 2026-08-10 | `test` | verify cadence experiment adapters | `02fb6a3e6` |
-| 2026-08-10 | `test` | verify policy-configured dry run | `3096ba3bb` |
-| 2026-08-10 | `docs` | record local MCP live acceptance | `0a9a46161` |
-| 2026-08-10 | `feat` | add interactive campaign brief templates | `dd5c1be06` |
-| 2026-08-10 | `feat` | verify complete relational authority impact | `a7d587658` |
-| 2026-08-10 | `feat` | add private authority topic lifecycle | `00a5179d1` |
-| 2026-08-10 | `feat` | add private account group lifecycle | `39a63938a` |
-| 2026-08-10 | `feat` | add private semantic binding lifecycle | `f61886e20` |
-| 2026-08-10 | `fix` | accept renewed authority snapshots | `bb12209de` |
-| 2026-08-10 | `test` | verify authority impact fail-closed | `a530aa6f5` |
-| 2026-08-10 | `feat` | evaluate authority impact by family | `2506a492e` |
-| 2026-08-10 | `feat` | persist verified policy compositions | `50a11045d` |
-| 2026-08-10 | `fix` | invalidate persisted authority contexts | `7a3d94be2` |
+| 2026-08-10 | `feat` | add portfolio capability reader | `4e5d6e4b8` |
+| 2026-08-10 | `feat` | sequence interactive campaign briefs | `e6bdb2d88` |
+| 2026-08-10 | `feat` | compose timeframe-bound L3 contexts | `dacf92810` |
+| 2026-08-10 | `feat` | require L3 evidence for decision runs | `23a8f1b8f` |
+| 2026-08-10 | `feat` | materialize L3 windows by timeframe | `ec7cce9f9` |
+| 2026-08-10 | `feat` | bind L2 L3 context evidence | `e35b9fa41` |
+| 2026-08-10 | `feat` | reject invalidated L3 windows | `df68847d9` |
+| 2026-08-10 | `feat` | persist invalidation-aware L3 windows | `823e95527` |
+| 2026-08-10 | `feat` | add deterministic L3 window contract | `7ca0df3ca` |
+| 2026-08-10 | `feat` | reject invalidated L2 features | `340e7dc99` |
+| 2026-08-10 | `feat` | journal L1 feature invalidations | `27e7770f2` |
+| 2026-08-10 | `feat` | materialize attested L2 features | `63d6ee213` |
+| 2026-08-10 | `feat` | attest private L2 source manifests | `eb2c689be` |
+| 2026-08-10 | `feat` | add immutable L2 feature storage | `413262efd` |
+| 2026-08-10 | `feat` | expose private L2 source manifest | `bf64f2b00` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 41
-- `fix         ` █████ 9
-- `test        ` ████ 6
-- `docs        ` ██ 4
+- `feat        ` ████████████████████████ 46
+- `fix         ` ███ 6
+- `test        ` ███ 6
+- `docs        ` █ 2
 
 ## Planlar
 

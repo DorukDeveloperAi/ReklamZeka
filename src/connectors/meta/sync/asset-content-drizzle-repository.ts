@@ -8,6 +8,7 @@ import {
 import type { SQLWrapper } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "@/db/schema";
+import { deriveMetaAccountReadCapabilityEvidence } from "@/domain/meta/account-read-capability-evidence";
 import {
   classifyMetaCanonicalDelta,
   hashMetaContentPayload,
@@ -207,6 +208,7 @@ export class DrizzleMetaAssetContentRepository implements MetaAssetContentReposi
         upsertAssets: (rows) => this.upsertAssets(database, rows),
         upsertDiscoveries: (rows) => this.upsertDiscoveries(database, rows),
         upsertEdges: (rows) => this.upsertEdges(database, rows),
+        materializeAccountReadCapabilities: (scope, snapshot) => this.materializeAccountReadCapabilities(database, scope, snapshot),
         validateReferences: (rows) => this.validateReferences(database, rows),
         upsertContent: (rows) => this.upsertContent(database, rows),
         upsertPostMediaItems: (rows) => this.upsertPostMediaItems(database, rows),
@@ -216,6 +218,34 @@ export class DrizzleMetaAssetContentRepository implements MetaAssetContentReposi
         saveCheckpoint: (input) => this.saveCheckpoint(database, input),
       });
     });
+  }
+
+  private async materializeAccountReadCapabilities(
+    database: ReklamZekaDatabase,
+    scope: MetaAssetContentScope,
+    snapshot: import("@/domain/meta/asset-mirror").CanonicalMetaAssetMirrorSnapshot,
+  ): Promise<void> {
+    const accounts = await database.select({ id: schema.adAccounts.id, externalAccountId: schema.adAccounts.externalAccountId })
+      .from(schema.adAccounts).innerJoin(schema.dataSources, and(
+        eq(schema.adAccounts.workspaceId, schema.dataSources.workspaceId),
+        eq(schema.adAccounts.dataSourceId, schema.dataSources.id),
+      )).where(and(
+        eq(schema.adAccounts.workspaceId, scope.workspaceId),
+        eq(schema.dataSources.workspaceId, scope.workspaceId),
+        eq(schema.dataSources.metaConnectionId, scope.connectionId),
+      ));
+    const evidence = deriveMetaAccountReadCapabilityEvidence(snapshot, accounts.map((account) => account.externalAccountId));
+    const byExternalId = new Map(evidence.map((entry) => [entry.externalAccountId, entry]));
+    if (byExternalId.size !== accounts.length) throw persistenceError("cross_account", "Account capability evidence kapsamı çözülemedi");
+    for (const account of accounts) {
+      const entry = byExternalId.get(account.externalAccountId);
+      if (!entry) throw persistenceError("cross_account", "Account capability evidence hesabı bulunamadı");
+      await database.update(schema.adAccounts).set({ permissionSnapshot: entry.permissionSnapshot,
+        capabilitySnapshot: entry.capabilitySnapshot }).where(and(
+        eq(schema.adAccounts.workspaceId, scope.workspaceId), eq(schema.adAccounts.id, account.id),
+        sql`coalesce(${schema.adAccounts.capabilitySnapshot} ->> 'checkedAt', '') <= ${entry.capabilitySnapshot.checkedAt}`,
+      ));
+    }
   }
 
   private async inventoryActorMap(
