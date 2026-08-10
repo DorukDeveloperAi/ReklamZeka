@@ -27,6 +27,17 @@
   sütuna iner, yatay taşma üretmez ve etkileşimli button içermez. Mevcut API'lerin local ortamda
   unavailable dönmesi panelin güvenlik durumunu değiştirmez.
 
+## 2026-08-10 — A14 seçili kampanya → dinamik brief bağlamı
+
+- Kampanyalar ekranındaki seçili campaign, proposal-only brief'in başlangıç sınıflandırmasını artık
+  doğrudan belirler. İstanbul örneği WhatsApp lead akışıyla, GCC örneği uluslararası/Arapça/form
+  akışıyla ve awareness örneği üst-huni ölçüm sınırıyla başlar. Kullanıcı brief alanlarını yalnız
+  geçici olarak değiştirebilir ve "Bağlamı geri yükle" ile seçili campaign varsayımına dönebilir.
+- Bu bağ bugün dashboard'un açıkça demo olan campaign projection'ından gelir; persisted current effective
+  context veya bir campaign mutation'ı iddia etmez. Yeni kampanya/proposal/approval/execute/Meta write
+  oluşmaz. Tarayıcıda GCC → geçici WhatsApp → bağlamdan form geri yükleme ve GCC → İstanbul WhatsApp
+  bağlam geçişi doğrulandı.
+
 ## 2026-08-10 — A13 execution-time Meta mirror revalidation
 
 - Disabled admission ledger, approval/grant zincirini yeniden bağladıktan sonra current persisted Meta

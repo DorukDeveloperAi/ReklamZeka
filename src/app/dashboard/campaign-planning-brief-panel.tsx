@@ -10,6 +10,7 @@ import {
   type ClassificationState,
   type ConversionRoute,
   type DeliveryHealth,
+  type InteractiveCampaignTemplateRequest,
 } from "@/domain/campaigns/interactive-campaign-template";
 import styles from "./operating-dashboard.module.css";
 
@@ -39,6 +40,18 @@ const INITIAL_DRAFT: BriefDraft = Object.freeze({
   creativeReady: true,
 });
 
+export type CampaignPlanningBriefContext = Readonly<{
+  campaignRef: string;
+  campaignLabel: string;
+  input: InteractiveCampaignTemplateRequest;
+}>;
+
+const DEFAULT_CONTEXT: CampaignPlanningBriefContext = Object.freeze({
+  campaignRef: "new_campaign_draft",
+  campaignLabel: "Yeni kampanya taslağı",
+  input: INITIAL_DRAFT,
+});
+
 const goalLabels: Readonly<Record<CampaignBusinessGoal, string>> = Object.freeze({
   lead_acquisition: "Nitelikli talep toplama",
   upper_funnel_education: "Üst huni eğitim",
@@ -60,20 +73,20 @@ const routeLabels: Readonly<Record<ConversionRoute, string>> = Object.freeze({
  * can explore an operating pattern without creating a campaign, proposal or
  * approval record.
  */
-export function CampaignPlanningBriefPanel() {
-  const [draft, setDraft] = useState<BriefDraft>(INITIAL_DRAFT);
+function CampaignPlanningBriefPanelContent({ context }: Readonly<{ context: CampaignPlanningBriefContext }>) {
+  const [draft, setDraft] = useState<BriefDraft>(() => Object.freeze({ ...context.input }));
   const brief = useMemo(() => createInteractiveCampaignBrief(draft), [draft]);
   const change = <Key extends keyof BriefDraft>(key: Key, value: BriefDraft[Key]) =>
     setDraft((current) => Object.freeze({ ...current, [key]: value }));
 
   return <section className={`${styles.panel} ${styles.campaignPlanningBrief}`} aria-labelledby="campaign-planning-brief-title">
     <header className={styles.panelHeader}>
-      <div><span className={styles.kicker}>PROPOSAL-ONLY PLANNING</span><h2 id="campaign-planning-brief-title">Taslak kampanya briefi</h2></div>
+      <div><span className={styles.kicker}>PROPOSAL-ONLY PLANNING · CONTEXT BOUND</span><h2 id="campaign-planning-brief-title">Taslak kampanya briefi</h2></div>
       <span className={styles.statusPill} data-tone={brief.readiness === "ready_for_human_review" ? "good" : "warning"}>
         {brief.readiness === "ready_for_human_review" ? "İnsan incelemesine hazır" : brief.readiness === "blocked" ? "Önce engeli çöz" : "Eksik karar var"}
       </span>
     </header>
-    <p>Excel’deki çalışma mantığını sıraya koyar: pazar → dil → hizmet → iş amacı → dönüşüm yolu → kapasite/kreatif. Bu yüzey kayıt veya Meta işlemi yapmaz.</p>
+    <p><strong>Seçili bağlam: {context.campaignLabel}</strong> · Excel’deki çalışma mantığını sıraya koyar: pazar → dil → hizmet → iş amacı → dönüşüm yolu → kapasite/kreatif. Bu yüzey kayıt veya Meta işlemi yapmaz.</p>
     <div className={styles.briefControls}>
       <label htmlFor="brief-business-goal"><span>İş amacı</span><select id="brief-business-goal" value={draft.businessGoal} onChange={(event) => change("businessGoal", event.target.value as CampaignBusinessGoal)}>
         {Object.entries(goalLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -105,6 +118,10 @@ export function CampaignPlanningBriefPanel() {
       <div><span>İzlenecek sıra</span><ol>{brief.launchSequence.map((item) => <li key={item.step}><strong>{item.step}</strong><small>{item.reason}</small></li>)}</ol></div>
       <div><span>Ölçüm sınırı</span><strong>{brief.measurement.primaryOutcome}</strong><small>{brief.measurement.doNotCompareWith.join(" · ")} ile varsayılan olarak kıyaslama.</small></div>
     </div>
-    <footer>Salt taslak · campaign create / publish / approval / execute / Meta write: kapalı</footer>
+    <footer><span>Salt taslak · campaign create / publish / approval / execute / Meta write: kapalı</span><button type="button" onClick={() => setDraft(Object.freeze({ ...context.input }))}>Bağlamı geri yükle</button></footer>
   </section>;
+}
+
+export function CampaignPlanningBriefPanel({ context = DEFAULT_CONTEXT }: Readonly<{ context?: CampaignPlanningBriefContext }>) {
+  return <CampaignPlanningBriefPanelContent key={context.campaignRef} context={context} />;
 }

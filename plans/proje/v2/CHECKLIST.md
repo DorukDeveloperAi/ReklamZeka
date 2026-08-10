@@ -657,6 +657,9 @@
     execute/Meta-write yetkileri kapalı.
   - [ ] Şablonları mevcut kampanya bağlamı ve kullanıcı girdisiyle Dashboard'da etkileşimli brief/
     öneri yüzeyine bağlama; eksik bağlam `needs_input`, kesinti `blocked` kalır.
+    - [x] Seçili dashboard demo campaign'i, brief başlangıç inputunu deterministik belirler; kullanıcı
+      geçici değişikliği "Bağlamı geri yükle" ile geri alabilir. Persisted current context bağlama
+      hâlâ açık olduğundan bu yalnız demo/read-only bağdır.
   - [ ] Brief, öneri, approval ve execution-safety durumunu aynı salt-okunur zaman çizelgesinde gösterme.
 
 - [ ] Bugün/portfolio hiyerarşi ve internal/Meta filtreler.

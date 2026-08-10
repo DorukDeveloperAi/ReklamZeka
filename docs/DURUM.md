@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: a26cf2c0d6d0 -->
+<!-- durum-damga: 3d73e12990e5 -->
 
 ## Künye
 
@@ -14,34 +14,34 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 210 |
+| iş commit'i (tüm geçmiş) | 221 |
 | ilk / son iş | 2026-08-06 / 2026-08-10 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-10 | `feat` | expose execution safety status | `cf83522f6` |
+| 2026-08-10 | `feat` | define verify and rollback contract | `158da5ad7` |
+| 2026-08-10 | `feat` | bind admission ceremony to persisted source | `7f5858125` |
+| 2026-08-10 | `feat` | add separate execution admission ceremony | `83b8600fe` |
+| 2026-08-10 | `feat` | revalidate admission against Meta mirror | `ce1807263` |
+| 2026-08-10 | `feat` | bind eligibility into execution admission | `1d59e1932` |
+| 2026-08-10 | `feat` | add Meta write eligibility matrix | `cd904ed39` |
+| 2026-08-10 | `feat` | add interactive campaign brief panel | `638674a54` |
+| 2026-08-10 | `feat` | persist disabled execution admissions | `8c7af77a0` |
+| 2026-08-10 | `feat` | add disabled execution admission gate | `46e402276` |
+| 2026-08-10 | `feat` | add typed Meta write spec boundary | `e913e65bf` |
 | 2026-08-10 | `feat` | add portfolio capability reader | `4e5d6e4b8` |
 | 2026-08-10 | `feat` | sequence interactive campaign briefs | `e6bdb2d88` |
 | 2026-08-10 | `feat` | compose timeframe-bound L3 contexts | `dacf92810` |
 | 2026-08-10 | `feat` | require L3 evidence for decision runs | `23a8f1b8f` |
-| 2026-08-10 | `feat` | materialize L3 windows by timeframe | `ec7cce9f9` |
-| 2026-08-10 | `feat` | bind L2 L3 context evidence | `e35b9fa41` |
-| 2026-08-10 | `feat` | reject invalidated L3 windows | `df68847d9` |
-| 2026-08-10 | `feat` | persist invalidation-aware L3 windows | `823e95527` |
-| 2026-08-10 | `feat` | add deterministic L3 window contract | `7ca0df3ca` |
-| 2026-08-10 | `feat` | reject invalidated L2 features | `340e7dc99` |
-| 2026-08-10 | `feat` | journal L1 feature invalidations | `27e7770f2` |
-| 2026-08-10 | `feat` | materialize attested L2 features | `63d6ee213` |
-| 2026-08-10 | `feat` | attest private L2 source manifests | `eb2c689be` |
-| 2026-08-10 | `feat` | add immutable L2 feature storage | `413262efd` |
-| 2026-08-10 | `feat` | expose private L2 source manifest | `bf64f2b00` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 46
-- `fix         ` ███ 6
-- `test        ` ███ 6
+- `feat        ` ████████████████████████ 48
+- `fix         ` ███ 5
+- `test        ` ███ 5
 - `docs        ` █ 2
 
 ## Planlar
