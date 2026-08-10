@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: e99f8a62ec4b -->
+<!-- durum-damga: 6ecf82b402cd -->
 
 ## Künye
 
@@ -14,13 +14,14 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 227 |
-| ilk / son iş | 2026-08-06 / 2026-08-10 |
+| iş commit'i (tüm geçmiş) | 228 |
+| ilk / son iş | 2026-08-06 / 2026-08-11 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-11 | `feat` | bridge campaign context approval scope | `15f8aab25` |
 | 2026-08-10 | `feat` | scope approval inbox by campaign context | `6a2ec7a98` |
 | 2026-08-10 | `feat` | bind briefs to persisted context state | `b2180c942` |
 | 2026-08-10 | `feat` | expose read-only campaign context | `6df768290` |
@@ -35,7 +36,6 @@
 | 2026-08-10 | `feat` | bind eligibility into execution admission | `1d59e1932` |
 | 2026-08-10 | `feat` | add Meta write eligibility matrix | `cd904ed39` |
 | 2026-08-10 | `feat` | add interactive campaign brief panel | `638674a54` |
-| 2026-08-10 | `feat` | persist disabled execution admissions | `8c7af77a0` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
