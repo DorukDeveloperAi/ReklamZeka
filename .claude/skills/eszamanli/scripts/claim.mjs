@@ -1283,8 +1283,11 @@ function cmdKutu() {
     const suz = Object.prototype.hasOwnProperty.call(SUZ, rolAd) ? SUZ[rolAd] : SUZ.varsayilan || null;
     ilerleme = { rol: rolAd, satirlar: suz ? r.satirlar.filter((e) => suz.includes(e.tip)) : r.satirlar };
   }
+  // ölü-okuyucu hükmü (otonomi-merdiveni:14): üstlenilen her tekil rol için rapor
+  const okuyucu = {};
+  for (const ad of roller) if (L.okuyucuDurumu) okuyucu[ad] = L.okuyucuDurumu(ROOT, ad);
   if (has("json")) {
-    console.log(JSON.stringify({ session: benSid, roller, bildiri: gelen, ilerleme }, null, 1));
+    console.log(JSON.stringify({ session: benSid, roller, bildiri: gelen, okuyucu, ilerleme }, null, 1));
     return;
   }
   console.log(`kutu: ${short(benSid)}${roller.length ? ` · roller: ${roller.join(", ")}` : " · rol yok"}`);
@@ -1292,9 +1295,15 @@ function cmdKutu() {
   for (const b of gelen) {
     const t = b.tip || "sira";
     const kim = short(b.kimden);
-    if (t === "elle") console.log(`  ✉ ${kim}${b.key ? ` · ${b.key}` : ""} (${dk(b.ts)}): ${b.mesaj}`);
-    else if (t === "bekleyenVar") console.log(`  ⏳ ${b.key} ← ${kim} seni bekliyor (${dk(b.ts)})`);
-    else console.log(`  🔓 ${b.key} boşaldı — ${kim} bıraktı (${dk(b.ts)})`);
+    const rolEk = b.rol ? ` [rol:${b.rol}]` : "";
+    if (t === "elle") console.log(`  ✉ ${kim}${rolEk}${b.key ? ` · ${b.key}` : ""} (${dk(b.ts)}): ${b.mesaj}`);
+    else if (t === "bekleyenVar") console.log(`  ⏳ ${b.key} ← ${kim}${rolEk} seni bekliyor (${dk(b.ts)})`);
+    else console.log(`  🔓 ${b.key} boşaldı — ${kim}${rolEk} bıraktı (${dk(b.ts)})`);
+  }
+  for (const [ad, d] of Object.entries(okuyucu)) {
+    const damga = L.damgaSatiri?.(d);
+    if (damga) console.log(`  ⚠ rol:${ad} — ${damga}`);
+    else if (d.bekleyen > 0) console.log(`  rol:${ad} kutusu: ${d.bekleyen} bekleyen (temiz)`);
   }
   if (roller.length)
     console.log(
@@ -1325,13 +1334,21 @@ function cmdRol() {
         continue;
       }
       const s = r.sahip ? L.sessionInfo(r.sahip.sessionId) : null;
+      // kutu eki (otonomi-merdiveni:14): sessiz doluş üç yüzeyden biri burasıdır
+      const d = L.okuyucuDurumu?.(ROOT, r.ad);
+      const damga = d && L.damgaSatiri?.(d);
+      const kutuEk = damga
+        ? ` · ⚠ ${damga}`
+        : d?.bekleyen > 0
+          ? ` · kutu: ${d.bekleyen} bekleyen`
+          : "";
       console.log(
         `  ${r.ad.padEnd(11)} ${
           r.sahip
             ? `${short(r.sahip.sessionId)}${r.sahip.sessionId === benSid ? " «SEN»" : ""}` +
               `${s ? ` "${(s.title || "").slice(0, 36)}"` : ""}${r.sahip.kapsam ? ` · ${String(r.sahip.kapsam).slice(0, 40)}` : ""}`
             : `— (boş) · ${r.ne}`
-        }`
+        }${kutuEk}`
       );
     }
     return;
@@ -1357,7 +1374,7 @@ function cmdRol() {
   const r =
     ad === "orkestrator"
       ? L.orkestratorKayit(ROOT, I, { kapsam: flag("kapsam"), devral: has("devral") })
-      : L.rolKayit(ROOT, ad, I, { kapsam: flag("kapsam"), devral: has("devral") });
+      : L.rolKayit(ROOT, ad, I, { kapsam: flag("kapsam"), devral: has("devral"), kadans: flag("kadans") });
   if (!r.ok) {
     if (r.neden === "tanimsiz")
       console.error(`TANIMSIZ ROL: "${ad}" — kapalı küme: ${r.roller.join(" · ")}`);
@@ -1411,10 +1428,22 @@ function cmdBildir() {
   /* ROL ÇÖZÜMÜ — BELİRSİZLİKTE ADRES ÜRETİLMEZ. "En iyi tahmin" bir muhatap seçmek,
      haberin sessizce yanlış oturuma gitmesi demektir; yanlış adres, adressizlikten beterdir
      çünkü gönderen "ilettim" sanır (kullanıcı kararı 2026-08-09: çoğul rolde karışıklığı
-     ÖNLE). Bu yüzden çözülemeyen her hâl exit 5 ile ve NEDENİYLE durur. */
+     ÖNLE). Çözülemeyen hâller exit 5 ile ve NEDENİYLE durur — TEK İSTİSNA (otonomi-
+     merdiveni:14, ölü-okuyucu kapısı): rol KAYITLI ama sahibi ölü/kırık ise yazım
+     REDDEDİLMEZ (iş kaybolmaz) — rol kutusuna yazılır, ⚠ damga basılır, exit 0. */
+  let rolKutu = null; // rol-adresli yazım → KALICI rol kutusu (sahibinden uzun yaşar)
+  let oluUyari = null;
   if (rol) {
     const c = L.rolCoz(ROOT, rol);
-    if (!c.ok) {
+    if (c.ok) {
+      rolKutu = rol;
+      hedef = c.sessionId; // bilgi amaçlı (çıktı); yazım rol kutusuna gider
+    } else if (c.neden === "sahipsiz" && L.rolKaydiOku?.(ROOT, rol)) {
+      rolKutu = rol; // kayıt VAR, sahibi ölü → kabul + damga (RED yok)
+      hedef = L.rolKaydiOku(ROOT, rol).sessionId;
+      const d = L.okuyucuDurumu?.(ROOT, rol);
+      oluUyari = (d && L.damgaSatiri?.(d)) || "okuyucu ölü — mesaj kutuda bekleyecek";
+    } else {
       if (c.neden === "tanimsiz") console.error(`TANIMSIZ ROL: "${rol}" — kapalı küme: ${c.roller.join(" · ")}`);
       else if (c.neden === "cogul")
         console.error(
@@ -1425,19 +1454,21 @@ function cmdBildir() {
                 c.adaylar.map((s) => `    ${short(s.sessionId)} "${(s.title || "").slice(0, 48)}" (${s.state})`).join("\n")
               : "")
         );
-      else console.error(`ROL SAHİPSİZ: "${rol}" — o rolü üstlenmiş canlı oturum yok (rol durum ile bak).`);
+      else
+        console.error(
+          `ROL SAHİPSİZ: "${rol}" — hiç kayıt yok, adres üretilmez (rol durum ile bak; kayıtlı-ama-ölü rol olsaydı kutusuna yazılırdı).`
+        );
       process.exit(5);
     }
-    hedef = c.sessionId;
   }
-  if (hedef === I.sessionId) {
+  if (!rolKutu && hedef === I.sessionId) {
     console.error("HATA: hedef SENSİN — kendine bildiri yazmak gürültüdür.");
     process.exit(5);
   }
   const s = L.sessionInfo(hedef);
   const key = flag("res") ? resolveRes(flag("res")).key : null;
   const yazildi = L.bildir(ROOT, {
-    hedef,
+    ...(rolKutu ? { hedefRol: rolKutu } : { hedef }),
     tip: "elle",
     key,
     kimden: I.sessionId,
@@ -1445,16 +1476,30 @@ function cmdBildir() {
     mesaj: String(mesaj),
   });
   if (!yazildi) {
-    console.error(`BİLDİRİ YAZILAMADI: ${short(hedef)} — kutu açılamadı.`);
+    console.error(`BİLDİRİ YAZILAMADI: ${rolKutu ? `rol:${rolKutu}` : short(hedef)} — kutu açılamadı.`);
     process.exit(5);
+  }
+  if (yazildi.dedupe) {
+    console.log(
+      `zaten kutuda (imza eşleşti: ${yazildi.imza}) — yeniden yazılmadı (yankı bildirilmez).`
+    );
+    return;
+  }
+  // Damga yazım SONRASI ölçülür — bu mesaj da "bekleyen" sayısına dahil olsun.
+  if (oluUyari && L.okuyucuDurumu && L.damgaSatiri) {
+    const d2 = L.okuyucuDurumu(ROOT, rolKutu);
+    oluUyari = L.damgaSatiri(d2) || oluUyari;
   }
   console.log(
     [
-      `BİLDİRİ GÖNDERİLDİ → ${rol ? `[${rol}] ` : ""}${short(hedef)}${s ? ` "${(s.title || "(başlıksız)").slice(0, 48)}" (${s.state})` : ""}`,
+      `BİLDİRİ GÖNDERİLDİ → ${rolKutu ? `[rol:${rolKutu} kutusu] ` : ""}${short(hedef)}${s ? ` "${(s.title || "(başlıksız)").slice(0, 48)}" (${s.state})` : ""}`,
       key ? `  kaynak: ${key}` : ``,
-      s
-        ? `  Hedef ilk turunda okuyacak (posta kutusu — ZİL DEĞİL, oturumu uyandırmaz).`
-        : `  ⚠ hedef ŞU AN CANLI DEĞİL — mesaj kutuda bekliyor, oturum dönerse okur.`,
+      oluUyari ? `  ⚠ ${oluUyari}` : ``,
+      oluUyari
+        ? `  Yazım KABUL edildi (iş kaybolmaz); rol devralınınca ilk turda okunur.`
+        : s
+          ? `  Hedef ilk turunda okuyacak (posta kutusu — ZİL DEĞİL, oturumu uyandırmaz).`
+          : `  ⚠ hedef ŞU AN CANLI DEĞİL — mesaj kutuda bekliyor, oturum dönerse okur.`,
     ]
       .filter(Boolean)
       .join("\n")

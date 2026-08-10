@@ -1658,14 +1658,57 @@ export const BILDIRI_TTL_MS = 12 * 60 * 60 * 1000;
 export const bildiriDirOf = (repoRoot) => join(ledgerDirOf(repoRoot), "bildiri");
 export const bildiriPath = (repoRoot, sessionId) =>
   join(bildiriDirOf(repoRoot), `${slugOf(sessionId)}.jsonl`);
+/** ROL KUTUSU (otonomi-merdiveni:14) — rol-adresli posta SAHİBİNDEN UZUN YAŞAR: sahibi
+ *  değişince eski hex kutudaki mesaj yetim kalırdı (ölçülen boşluk #1). `rol-` öneki
+ *  REZERVEDİR: sessionId slug'ı hex+tire olduğundan çakışmaz. TTL UYGULANMAZ — kutu
+ *  kanondur (keşif §3.2, kayıp yok); retention ayrı iş (TODO-ELLE, İLANLI). */
+export const bildiriRolPath = (repoRoot, ad) =>
+  join(bildiriDirOf(repoRoot), `rol-${slugOf(ad)}.jsonl`);
+/** Son-okuma damgası — `okuyucuDurumu`nun `sonOkuma` kaynağı; TEK yazarı `bildiriOku`nun
+ *  tüketim yoludur (okuyucunun KENDİ defteri — pmDurumu emsali; ikinci tazelik ölçütü yok). */
+export const bildiriRolOkumaPath = (repoRoot, ad) =>
+  join(bildiriDirOf(repoRoot), `rol-${slugOf(ad)}.okuma.json`);
 
-/** Tek bir bildiri satırı yaz (append; hedef başına dosya). Hatayı YUTMAZ — çağıran sarar. */
+const mesajNormalize = (m) => String(m ?? "").trim().replace(/\s+/g, " ");
+/** Mesaj imzası — dedupe anahtarı (ts KASTEN dışarıda: aynı içerik kutu tüketilene dek
+ *  ikinci kez yazılmaz; "yankı bildirilmez" kuralının mekanik hâli). */
+export function bildiriImza(hedefKutu, kayit) {
+  return sha1(
+    [hedefKutu, kayit?.tip, kayit?.key, kayit?.kimden, mesajNormalize(kayit?.mesaj)]
+      .map((x) => String(x ?? ""))
+      .join("")
+  );
+}
+
+/** Tek bir bildiri satırı yaz (append; hedef başına dosya). Hatayı YUTMAZ — çağıran sarar.
+ *  `kayit.hedefRol` → kalıcı rol kutusu · `kayit.hedef` → sessionId kutusu (mevcut yol).
+ *  DEDUPE yazım ÖNCESİ: kutuda okunmamış aynı `imza` varsa yazılmaz, `{dedupe:true}` döner —
+ *  çağıran RAPORLAR, sessiz yutulmaz. Satır şeması additive (`+imza`); eski satırlar imzasızdır
+ *  ve dedupe onları eş saymaz (ileri uyum). */
 export function bildir(repoRoot, kayit) {
   const hedef = kayit?.hedef;
-  if (!hedef) return null;
-  const satir = { v: BILDIRI_SURUM, ts: new Date().toISOString(), ...kayit };
+  const hedefRol = kayit?.hedefRol;
+  if (!hedef && !hedefRol) return null;
+  const dosya = hedefRol
+    ? bildiriRolPath(repoRoot, hedefRol)
+    : bildiriPath(repoRoot, hedef);
+  const hedefKutu = hedefRol ? `rol:${hedefRol}` : String(hedef);
+  const imza = bildiriImza(hedefKutu, kayit);
+  try {
+    for (const l of readFileSync(dosya, "utf8").split("\n")) {
+      if (!l) continue;
+      try {
+        if (JSON.parse(l)?.imza === imza) return { dedupe: true, imza };
+      } catch {
+        /* bozuk satır dedupe'a katılmaz */
+      }
+    }
+  } catch {
+    /* kutu yok — ilk mesaj */
+  }
+  const satir = { v: BILDIRI_SURUM, ts: new Date().toISOString(), imza, ...kayit };
   mkdirSync(bildiriDirOf(repoRoot), { recursive: true, mode: 0o700 });
-  appendFileSync(bildiriPath(repoRoot, hedef), JSON.stringify(satir) + "\n", { mode: 0o600 });
+  appendFileSync(dosya, JSON.stringify(satir) + "\n", { mode: 0o600 });
   return satir;
 }
 
@@ -1677,33 +1720,84 @@ export function bildir(repoRoot, kayit) {
 export function bildiriOku(repoRoot, sessionId, { tuket = true, now = Date.now() } = {}) {
   if (!sessionId) return [];
   const f = bildiriPath(repoRoot, sessionId);
-  let ham;
+  let rows = [];
   try {
-    ham = readFileSync(f, "utf8");
-  } catch {
-    return []; // kutu yok = haber yok (en sık hâl; tek stat maliyeti)
-  }
-  const rows = ham
-    .split("\n")
-    .filter(Boolean)
-    .map((l) => {
+    rows = readFileSync(f, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => {
+        try {
+          return JSON.parse(l);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean)
+      .filter((r) => {
+        const t = Date.parse(r?.ts || "");
+        return !Number.isFinite(t) || now - t <= BILDIRI_TTL_MS;
+      });
+    if (tuket) {
       try {
-        return JSON.parse(l);
+        unlinkSync(f);
       } catch {
-        return null;
+        /* yoktu/yarışıldı — haber zaten okundu */
       }
-    })
-    .filter(Boolean)
-    .filter((r) => {
-      const t = Date.parse(r?.ts || "");
-      return !Number.isFinite(t) || now - t <= BILDIRI_TTL_MS;
-    });
-  if (tuket) {
-    try {
-      unlinkSync(f);
-    } catch {
-      /* yoktu/yarışıldı — haber zaten okundu */
     }
+  } catch {
+    /* sid kutusu yok = o eksende haber yok (en sık hâl; tek stat) — rol kutuları yine okunur */
+  }
+  // ROL KUTULARI (otonomi-merdiveni:14): üstlenilen rollerin KALICI kutuları da okunur —
+  // rol sahibi hiçbir yeni komut öğrenmeden rol postasını ilk turunda alır. TTL UYGULANMAZ
+  // (kutu kanondur); satırlar `rol:<ad>` kaynağı taşır (ctx ham basar — ileri uyum).
+  // Tüketim rol kutusunu silerken SON-OKUMA damgasını yazar (`okuyucuDurumu`nun kaynağı);
+  // damga yazılamazsa tüketim YİNE yapılır — kapı ürünü asla kilitlemez.
+  // Eşleme HAM kayıtladır (rolleriOf DEĞİL): okuma hakkı kayıt SAHİPLİĞİNDEN gelir,
+  // canlılıktan değil — okuyan süreç zaten canlıdır; kaydın pid alanı bayatsa bile
+  // kutu sahibine teslim edilir (canlı-süzgeç burada haberi sessizce hapsederdi).
+  try {
+    const sahiplik = Object.keys(ROLLER).filter(
+      (ad) => rolKaydiOku(repoRoot, ad)?.sessionId === sessionId
+    );
+    for (const ad of sahiplik) {
+      const rf = bildiriRolPath(repoRoot, ad);
+      let rham;
+      try {
+        rham = readFileSync(rf, "utf8");
+      } catch {
+        continue; // bu rolün kutusu yok
+      }
+      const rr = rham
+        .split("\n")
+        .filter(Boolean)
+        .map((l) => {
+          try {
+            return { ...JSON.parse(l), rol: ad };
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+      rows = rows.concat(rr);
+      if (tuket) {
+        try {
+          unlinkSync(rf);
+        } catch {
+          /* yarışıldı */
+        }
+        try {
+          writeFileSync(
+            bildiriRolOkumaPath(repoRoot, ad),
+            JSON.stringify({ v: 1, ts: new Date().toISOString(), sessionId }),
+            { mode: 0o600 }
+          );
+        } catch {
+          /* damga yazılamadı — tüketim bozulmaz */
+        }
+      }
+    }
+  } catch {
+    /* rol defteri okunamadı — sid satırları yine döner */
   }
   return rows;
 }
@@ -1803,16 +1897,31 @@ export function bildirSahibe(repoRoot, claim, bekleyen = {}) {
  * --hedef <sessionId>` ile tek tek yazılır.
  */
 export const ROLLER = {
-  orkestrator: { tekil: true, ne: "repo içi koordinasyon — saha olayları buraya akar" },
-  altyapi: { tekil: true, ne: "kit · boot · sync · kurulum · filing · vendor · seviye 0" },
-  pm: { tekil: true, ne: "projeler-arası üst hedef ve dağıtım" },
-  vizyon: { tekil: true, ne: "kutup yıldızı (utopya/) — epizodik, sürekli açık olması beklenmez" },
-  plan: { tekil: true, ne: "roadmap üretimi/revizyonu — plan başına açılır" },
+  // `kadans`: rolün beklenen tur sıklığı — ölü-okuyucu kapısının tazelik eşiği bundan
+  // türer (eşik = max(1sa, 2×kadans); pmDurumu kuralının genellemesi, otonomi-merdiveni:14).
+  // `rol kayit --kadans` kayıtta ezer; vizyon epizodiktir, geniş eşik alır.
+  orkestrator: { tekil: true, kadans: "2h", ne: "repo içi koordinasyon — saha olayları buraya akar" },
+  altyapi: { tekil: true, kadans: "2h", ne: "kit · boot · sync · kurulum · filing · vendor · seviye 0" },
+  pm: { tekil: true, kadans: "2h", ne: "projeler-arası üst hedef ve dağıtım" },
+  vizyon: { tekil: true, kadans: "1d", ne: "kutup yıldızı (utopya/) — epizodik, sürekli açık olması beklenmez" },
+  plan: { tekil: true, kadans: "4h", ne: "roadmap üretimi/revizyonu — plan başına açılır" },
   worker: { tekil: false, ne: "işi yapan oturum(lar) — ÇOĞUL, slot tutmaz, adreslenmez" },
 };
 export const rolDirOf = (repoRoot) => join(ledgerDirOf(repoRoot), "rol");
 export const rolPath = (repoRoot, ad) => join(rolDirOf(repoRoot), `${slugOf(ad)}.json`);
 export const rolGecerli = (ad) => Object.prototype.hasOwnProperty.call(ROLLER, String(ad || ""));
+
+/** HAM rol kaydı — canlılık HÜKÜMSÜZ. "Kayıt yok" ile "kayıt var, sahibi ölü" AYRILIR
+ *  (ölü-okuyucu kapısının temeli — otonomi-merdiveni:14): ilki adres üretmez (RED),
+ *  ikincisi rol kutusuna yazım + damga demektir. Kaydı SİLMEZ, hükmü ölçüm verir. */
+export function rolKaydiOku(repoRoot, ad) {
+  try {
+    const j = JSON.parse(readFileSync(rolPath(repoRoot, ad), "utf8"));
+    return j?.sessionId ? j : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Rolün CANLI sahibi (yoksa/ölmüşse null). Canlılık ölçütü claim'lerinkinin AYNISI. */
 export function rolOku(repoRoot, ad) {
@@ -1833,7 +1942,7 @@ export function rolListe(repoRoot) {
   return Object.entries(ROLLER).map(([ad, tanim]) => ({ ad, ...tanim, sahip: tanim.tekil ? rolOku(repoRoot, ad) : null }));
 }
 
-export function rolKayit(repoRoot, ad, kimlik, { kapsam = null, devral = false } = {}) {
+export function rolKayit(repoRoot, ad, kimlik, { kapsam = null, devral = false, kadans = null } = {}) {
   if (!rolGecerli(ad)) return { ok: false, neden: "tanimsiz", roller: Object.keys(ROLLER) };
   if (!ROLLER[ad].tekil) return { ok: false, neden: "cogul" }; // worker slot tutmaz
   const mevcut = rolOku(repoRoot, ad);
@@ -1847,6 +1956,7 @@ export function rolKayit(repoRoot, ad, kimlik, { kapsam = null, devral = false }
     procStart: kimlik.procStart ?? null,
     since: new Date().toISOString(),
     kapsam,
+    kadans: kadans || null, // tazelik eşiği ezmesi; yoksa ROLLER varsayılanı geçerli
     devralindi: mevcut && mevcut.sessionId !== kimlik.sessionId ? mevcut.sessionId : null,
   };
   mkdirSync(rolDirOf(repoRoot), { recursive: true, mode: 0o700 });
@@ -1874,6 +1984,104 @@ export function rolBirak(repoRoot, ad, sessionId) {
 /** Bu oturumun ÜSTLENDİĞİ roller (kapanışta hepsini bırakmak için). */
 export function rolleriOf(repoRoot, sessionId) {
   return Object.keys(ROLLER).filter((ad) => rolOku(repoRoot, ad)?.sessionId === sessionId);
+}
+
+/* ─────────── ÖLÜ-OKUYUCU KAPISI (otonomi-merdiveni:14 — keşif §3.3) ───────────
+ * 104-not vakasının çaresi: "okuyucusu ölmüş kutuya yazım sürer, kimse görmez" hâli
+ * ÖLÇÜLÜR ve İLAN edilir — yazım REDDEDİLMEZ (iş kaybolmaz), sessiz doluş yasaktır.
+ * Canlılık MEVCUT hüküm sahiplerinden okunur (procAlive/sessionInfo ⊕ usageHalt) —
+ * yeni canlılık tanımı YOKTUR. Tazelik eşiği rol kadansından türer (pmDurumu deseninin
+ * genellemesi) — ikinci tazelik ölçütü (mtime/TTL) YAZILMAZ.
+ * İLANLI KÖR NOKTA: kırık'ın `kimlik·yanitsiz·kanitsiz` sınıfları pane/transcript sondası
+ * ister, bu katmanda ölçülmez — dört-sınıf zengin hüküm farkındalık yüzeyinin (17) işidir. */
+
+/** Kadans dizgisinden tazelik eşiği (ms): eşik = max(1sa, 2×kadans). pmDurumu kuralı birebir. */
+export function kadansEsigi(frekansStr) {
+  let saat = 2;
+  const m = /^(\d+(?:\.\d+)?)\s*([hmd])$/i.exec(String(frekansStr ?? "").trim());
+  if (m) saat = +m[1] * ({ h: 1, m: 1 / 60, d: 24 }[m[2].toLowerCase()] ?? 1);
+  return Math.max(1, saat * 2) * 3_600_000;
+}
+
+/** Rol kutusunun okuyucu hükmü. `bekliyor ⇔ bekleyen>0 ∧ (okuyucu yok/ölü/kırık ∨
+ *  son okuma yaşı > eşik)`. Rol hiç koşmamışsa (kayıt yok ∧ okuma izi yok) HÜKÜM VERİLMEZ
+ *  (pmDurumu kuralı: yeni kurulum "ölü" demek değildir). Salt-okur, yan etkisiz. */
+export function okuyucuDurumu(repoRoot, ad, now = Date.now()) {
+  const ham = rolKaydiOku(repoRoot, ad);
+  let bekleyen = 0;
+  try {
+    bekleyen = readFileSync(bildiriRolPath(repoRoot, ad), "utf8")
+      .split("\n")
+      .filter((l) => {
+        if (!l) return false;
+        try {
+          JSON.parse(l);
+          return true;
+        } catch {
+          return false;
+        }
+      }).length;
+  } catch {
+    /* kutu yok — bekleyen 0 */
+  }
+  let sonOkuma = null;
+  try {
+    sonOkuma = JSON.parse(readFileSync(bildiriRolOkumaPath(repoRoot, ad), "utf8"))?.ts ?? null;
+  } catch {
+    /* okuma izi yok */
+  }
+  const esikMs = kadansEsigi(ham?.kadans || ROLLER[ad]?.kadans || "2h");
+  const esikSaat = esikMs / 3_600_000;
+  const s = ham ? sessionInfo(ham.sessionId) : null;
+  const canli = ham
+    ? procAlive(ham.pid, ham.procStart) || !!(s && procAlive(s.pid, s.procStart))
+    : false;
+  const kirik = ham && canli && usageHalt(s?.limit, now) ? "limit" : null;
+  const adaylar = [
+    s?.updated,
+    sonOkuma ? Date.parse(sonOkuma) : NaN,
+    ham?.since ? Date.parse(ham.since) : NaN,
+  ].filter((x) => Number.isFinite(x));
+  const sonGorulme = adaylar.length ? Math.max(...adaylar) : null;
+  if (!ham && !sonOkuma)
+    // hiç koşmamış rol: hüküm yok — ama bekleyen sayısı yine RAPORLANIR (görünürlük)
+    return { okuyucu: null, canli: false, kirik: null, sonGorulme, sonOkuma: null, bekleyen, esikSaat, bekliyor: false, hukum: null };
+  const okumaTaban = sonOkuma
+    ? Date.parse(sonOkuma)
+    : ham?.since
+      ? Date.parse(ham.since)
+      : NaN;
+  const okumuyor = Number.isFinite(okumaTaban) ? now - okumaTaban > esikMs : true;
+  const bekliyor = bekleyen > 0 && (!ham || !canli || kirik !== null || okumuyor);
+  return {
+    okuyucu: ham?.sessionId ?? null,
+    canli,
+    kirik,
+    sonGorulme,
+    sonOkuma,
+    bekleyen,
+    esikSaat,
+    bekliyor,
+    hukum: bekliyor ? "bekliyor" : "temiz",
+  };
+}
+
+/** Damga metni TEK yerde üretilir — CLI ve `bildir` uyarısı AYNI satırı basar
+ *  (ikinci yazar drift üretirdi). `bekliyor` değilse null (damga basılmaz). */
+export function damgaSatiri(d, now = Date.now()) {
+  if (!d?.bekliyor) return null;
+  const sa = (ms) => (ms / 3_600_000).toFixed(1);
+  const yasMs = d.sonOkuma
+    ? now - Date.parse(d.sonOkuma)
+    : d.sonGorulme
+      ? now - d.sonGorulme
+      : null;
+  let hal;
+  if (!d.okuyucu) hal = "okuyucu YOK (kayıt düşmüş)";
+  else if (!d.canli) hal = `okuyucu ${yasMs != null ? `${sa(yasMs)} sa'dir ` : ""}ölü`;
+  else if (d.kirik) hal = `okuyucu kırık(${d.kirik})`;
+  else hal = `okuyucu canlı ama ${yasMs != null ? `${sa(yasMs)} sa'dir ` : ""}okumuyor`;
+  return `bekleyen ${d.bekleyen} mesaj · ${hal} (eşik ${d.esikSaat} sa)`;
 }
 
 /**
