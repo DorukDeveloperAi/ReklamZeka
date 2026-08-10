@@ -277,7 +277,9 @@ function akisTazeleMain() {
   }
 
   // (b) SLOT — `04`ün adayları. `--json` bu aşamada eklendi (insan metnini parse etmek yerine).
-  try {
+  // Skill kurulu değilse sessiz (kit işi) — `main()`in OTURUM bekçisiyle aynı sözleşme;
+  // bekçisiz hâli planla-kos kurulmamış evde her kapanışta err defterine yazıyordu.
+  if (existsSync(SLOT)) try {
     const out = execFileSync(process.execPath, [SLOT, 'oner', '--json', '--n', '2', '--proje', root],
       { encoding: 'utf8', timeout: 20_000, stdio: ['ignore', 'pipe', 'ignore'], env: ENV });
     adaylar = (JSON.parse(out || '{}').adaylar || []).slice(0, 2);
