@@ -800,7 +800,9 @@ export const metaChangeSnapshots = pgTable("meta_change_snapshots", {
   index("meta_change_snapshots_connection_idx").on(table.metaConnectionId),
   index("meta_change_snapshots_account_idx").on(table.adAccountId),
   check("meta_change_snapshots_hash_format", sql`${table.snapshotHash} ~ '^[a-f0-9]{64}$'`),
-  check("meta_change_snapshots_public_ref_format", sql`${table.publicRef} ~ '^snapshot_[a-f0-9]{20}$'`),
+  // Historical snapshot refs use 20 hex chars; L2 daily-observation refs bind
+  // the full 32-char content-hash prefix. Both are immutable public aliases.
+  check("meta_change_snapshots_public_ref_format", sql`${table.publicRef} ~ '^snapshot_[a-f0-9]{20}([a-f0-9]{12})?$'`),
   check("meta_change_snapshots_schema_version_positive", sql`${table.schemaVersion} >= 1`),
 ]);
 

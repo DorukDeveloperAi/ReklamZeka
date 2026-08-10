@@ -374,7 +374,10 @@
   - [x] Cookie-only server-bound `DecisionCadenceProfile` yayınlama API'si: actor/rol/clock istemciden
     alınmaz; owner/admin membership, current-hash OCC ve append-only audit repository transaction'ında tekrar
     doğrulanır. Action/approval/Meta-write authority yapısal olarak `false` kalır.
-  - [ ] Policy-configured canlı PostgreSQL dry-run acceptance.
+  - [x] Policy-configured canlı PostgreSQL dry-run acceptance: gerçek cookie-only local-session
+    `decision_room:dry_run` capability, server-bound operator settlement ref/cutoff, immutable
+    context/template/cadence ve L2 daily insight ile outer rollback'te completed run+ledger üretir.
+    Handler/header ve sonuçta action authority `none`, Meta network/write sıfır, fixture kalıntısı sıfırdır.
 - [x] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
   - [x] Deterministik on-pass agenda, category/topic subset ve context/timeframe-bound finding çekirdeği.
   - [x] A10.2c agenda hash+payload'ı ilk run claim'inde immutable Decision Room run assetine freeze edilir;

@@ -3,6 +3,19 @@
 > Kümülatif ilerleme defteri. v1'in ayrıntılı tur geçmişi
 > [v1 STATE](../v1/STATE.md)'te değişmeden korunur.
 
+## 2026-08-10 — A10 policy-configured PostgreSQL dry-run kabulü
+
+- `npm run verify:decision-room-dry-run-db`, tek outer rollback içinde gerçek cookie-only
+  `decision_room:dry_run` capability'si, server-bound operator settlement policy ref/cutoff'ı,
+  immutable effective context/cadence/template ve L2 daily insight ile completed Decision Room run
+  ve decision ledger üretir. Handler `analysis-dry-run` access mode'u ve `actionAuthority:none`
+  döndürür; Meta network/write çağrısı ve rollback sonrası fixture kalıntısı sıfırdır.
+- Canlı zincir 32-haneli L2 content-hash snapshot alias'ını 20-haneli tarihsel Meta snapshot alias'ı
+  ile birlikte forward-only schema kontrolünde kabul eder. Context, template ve observation aynı
+  immutable alias'a bağlıdır; eski 20-haneli alias biçimi replay-uyumlu kalır.
+- Bu kabul Meta write, campaign create/publish, approval veya action execution açmaz. Browser
+  acceptance ayrı açık çevresel kabul noktasıdır.
+
 ## 2026-08-10 — Local MCP/session canlı kabulü
 
 - Yerel geliştirme sunucusu ve yönetilen `.env.local` session yapılandırmasıyla `npm run verify:mcp-live`
