@@ -1,0 +1,2 @@
+-- Snapshot reconciliation: the preceding forward migration was authored before
+-- its generated snapshot and already contains this schema's physical DDL.

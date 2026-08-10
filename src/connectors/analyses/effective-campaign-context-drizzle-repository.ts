@@ -4,6 +4,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   buildEffectiveCampaignContext,
   EFFECTIVE_CONTEXT_INSTRUCTION_POLICY_COMPONENT_REF,
+  EFFECTIVE_CONTEXT_POLICY_AUTHORITY_COMPONENT_REF,
   EFFECTIVE_CONTEXT_PROMOTION_REGISTRY_COMPONENT_REF,
   EFFECTIVE_CAMPAIGN_CONTEXT_VERSION,
   type EffectiveCampaignContext,
@@ -27,6 +28,7 @@ export const CONTEXT_SOURCE_COMPONENT_TYPES = Object.freeze([
   "timeframe_resolver",
   "instruction_policy",
   "promotion_registry",
+  "policy_authority",
 ] as const);
 
 export type ContextSourceComponentType = typeof CONTEXT_SOURCE_COMPONENT_TYPES[number];
@@ -172,6 +174,11 @@ export function sourceComponentsOf(context: EffectiveCampaignContext): readonly 
       componentType: "promotion_registry" as const,
       componentRef: EFFECTIVE_CONTEXT_PROMOTION_REGISTRY_COMPONENT_REF,
       componentVersion: context.versions.promotionRegistry,
+    }]),
+    ...(context.versions.policyAuthority === undefined ? [] : [{
+      componentType: "policy_authority" as const,
+      componentRef: EFFECTIVE_CONTEXT_POLICY_AUTHORITY_COMPONENT_REF,
+      componentVersion: context.versions.policyAuthority,
     }]),
   ];
   const normalized = components.map((component) => Object.freeze({

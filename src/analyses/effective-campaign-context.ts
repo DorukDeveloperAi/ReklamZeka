@@ -12,6 +12,7 @@ import { inspectMetaPersistenceWrite } from "@/domain/meta/data-lifecycle";
 export const EFFECTIVE_CAMPAIGN_CONTEXT_VERSION = "effective-campaign-context/1.0.0" as const;
 export const EFFECTIVE_CONTEXT_INSTRUCTION_POLICY_COMPONENT_REF = "instruction-policy-registry" as const;
 export const EFFECTIVE_CONTEXT_PROMOTION_REGISTRY_COMPONENT_REF = "promotion_registry_workspace" as const;
+export const EFFECTIVE_CONTEXT_POLICY_AUTHORITY_COMPONENT_REF = "policy_authority_workspace" as const;
 
 type Observed<T> =
   | Readonly<{ state: "known"; value: T }>
@@ -76,6 +77,18 @@ export type EffectiveCampaignContextInput = Readonly<{
     instructionPolicyRegistry?: string;
     /** Optional only for replaying contexts frozen before PromotionTemplate lifecycle binding existed. */
     promotionRegistry?: string;
+    policyAuthority?: string;
+  }>;
+  /** Present only for contexts composed through the repository-verified A09 authority loader. */
+  policyAuthorityEvidence?: Readonly<{
+    snapshotRef: string;
+    snapshotHash: string;
+    catalogHash: string;
+    scopeHash: string;
+    accountGroupBindingHashes: readonly string[];
+    topicBindingHashes: readonly string[];
+    manualLockBindingHashes: readonly string[];
+    semanticBindingHashes: readonly string[];
   }>;
 }>;
 
@@ -168,14 +181,24 @@ function authenticGuidance(pack: EffectiveGuidancePack): boolean {
  * authentic category/guidance components; public/agent projections must redact tenant IDs.
  */
 export function buildEffectiveCampaignContext(input: EffectiveCampaignContextInput): EffectiveCampaignContext {
-  exactKeys(input, ["workspaceId", "capturedAt", "identity", "meta", "categories", "guidance", "policies", "cadence", "data", "history", "versions"]);
+  exactKeys(input, ["workspaceId", "capturedAt", "identity", "meta", "categories", "guidance", "policies", "cadence", "data", "history", "versions", "policyAuthorityEvidence"]);
   exactKeys(input.identity, ["connectionRef", "accountRef", "campaignRef", "entityRef", "entityType", "hierarchyRefs"]);
   exactKeys(input.meta, ["objective", "optimizationEvent", "configuredStatus", "effectiveStatus", "budgetOwnerRef", "targetingSignature", "actorRef", "destinationRef"]);
   exactKeys(input.cadence, ["profileRef", "decision", "reason", "cooldownUntil"]);
   exactKeys(input.data, ["trustStatus", "snapshotRefs", "featureRefs", "windowRefs", "blockers"]);
   exactKeys(input.history, ["changeRefs", "decisionRefs", "experimentRefs", "practiceRefs", "outcomeRefs"]);
   exactKeys(input.versions, ["metaCatalog", "categoryResolver", "guidanceRegistry", "metricCatalog", "formulaCatalog",
-    "timeframeResolver", "instructionPolicyRegistry", "promotionRegistry"]);
+    "timeframeResolver", "instructionPolicyRegistry", "promotionRegistry", "policyAuthority"]);
+  if (input.policyAuthorityEvidence !== undefined) {
+    exactKeys(input.policyAuthorityEvidence, ["snapshotRef", "snapshotHash", "catalogHash", "scopeHash", "accountGroupBindingHashes", "topicBindingHashes", "manualLockBindingHashes", "semanticBindingHashes"]);
+    if (input.versions.policyAuthority === undefined || !/^authority_snapshot_[a-z0-9][a-z0-9_.:-]{0,126}$/.test(input.policyAuthorityEvidence.snapshotRef)
+      || ![input.policyAuthorityEvidence.snapshotHash, input.policyAuthorityEvidence.catalogHash, input.policyAuthorityEvidence.scopeHash,
+        ...input.policyAuthorityEvidence.accountGroupBindingHashes, ...input.policyAuthorityEvidence.topicBindingHashes,
+        ...input.policyAuthorityEvidence.manualLockBindingHashes, ...input.policyAuthorityEvidence.semanticBindingHashes]
+        .every((value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value))) throw new EffectiveCampaignContextError("invalid_input");
+    for (const values of [input.policyAuthorityEvidence.accountGroupBindingHashes, input.policyAuthorityEvidence.topicBindingHashes,
+      input.policyAuthorityEvidence.manualLockBindingHashes, input.policyAuthorityEvidence.semanticBindingHashes]) uniqueSorted(values);
+  } else if (input.versions.policyAuthority !== undefined) throw new EffectiveCampaignContextError("invalid_input");
 
   const policyReport = inspectMetaPersistenceWrite(input);
   if (!policyReport.compliant) throw new EffectiveCampaignContextError("forbidden_material");
@@ -235,6 +258,9 @@ export function buildEffectiveCampaignContext(input: EffectiveCampaignContextInp
   if (input.versions.promotionRegistry !== undefined && !/^[a-f0-9]{64}$/.test(input.versions.promotionRegistry)) {
     throw new EffectiveCampaignContextError("invalid_input");
   }
+  if (input.versions.policyAuthority !== undefined && !/^[a-f0-9]{64}$/.test(input.versions.policyAuthority)) {
+    throw new EffectiveCampaignContextError("invalid_input");
+  }
   const core = stableValue({
     schemaVersion: EFFECTIVE_CAMPAIGN_CONTEXT_VERSION,
     workspaceId,
@@ -259,6 +285,16 @@ export function buildEffectiveCampaignContext(input: EffectiveCampaignContextInp
       practiceRefs: uniqueSorted(input.history.practiceRefs),
       outcomeRefs: uniqueSorted(input.history.outcomeRefs),
     },
+    ...(input.policyAuthorityEvidence === undefined ? {} : { policyAuthorityEvidence: {
+      snapshotRef: input.policyAuthorityEvidence.snapshotRef,
+      snapshotHash: input.policyAuthorityEvidence.snapshotHash,
+      catalogHash: input.policyAuthorityEvidence.catalogHash,
+      scopeHash: input.policyAuthorityEvidence.scopeHash,
+      accountGroupBindingHashes: uniqueSorted(input.policyAuthorityEvidence.accountGroupBindingHashes),
+      topicBindingHashes: uniqueSorted(input.policyAuthorityEvidence.topicBindingHashes),
+      manualLockBindingHashes: uniqueSorted(input.policyAuthorityEvidence.manualLockBindingHashes),
+      semanticBindingHashes: uniqueSorted(input.policyAuthorityEvidence.semanticBindingHashes),
+    } }),
     versions: Object.fromEntries(Object.entries(input.versions).map(([key, value]) => [key, required(value)])),
     capabilities: { containsRawL0: false, canAuthorizeAction: false, canExecuteWrite: false },
   }) as Omit<EffectiveCampaignContext, "contextHash">;

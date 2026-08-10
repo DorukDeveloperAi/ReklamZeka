@@ -20,7 +20,8 @@ type CountRow = Readonly<Record<"registry_components" | "contexts_needing_invali
   "superseded_analysis_templates" | "enabled_schedules" | "run_assets" | "decision_ledger_records" |
   "nonterminal_action_units" | "terminal_action_units" | "malformed_context_policies" |
   "unresolved_context_policy_refs" | "inconsistent_context_components" | "corrupt_action_lifecycle_rows" |
-  "affected_contexts", unknown>>;
+  "corrupt_trusted_authority_rows" | "corrupt_manual_lock_rows" | "corrupt_account_group_rows" |
+  "corrupt_topic_rows" | "corrupt_opaque_action_context_rows" | "missing_authority_bridge_rows" | "affected_contexts", unknown>>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const POLICY_REF = /^policy_[a-z0-9][a-z0-9_.:-]{0,126}$/;
@@ -191,6 +192,61 @@ export class DrizzleInstructionPolicyImpactRepository implements InstructionPoli
         (select count(*)::int from action_states where event_type not in ('awaiting_approval', 'unit_approved',
           'unit_rejected', 'unit_changes_requested', 'unit_expired', 'unit_stale', 'unit_superseded',
           'unit_dependency_failed')) as corrupt_action_lifecycle_rows,
+        (select count(*)::int from policy_authority_bindings binding
+          join strict_instruction_policy_revisions policy on policy.workspace_id = binding.workspace_id and policy.id = binding.policy_revision_id
+          join tenant_authority_snapshots snapshot on snapshot.workspace_id = binding.workspace_id and snapshot.id = binding.authority_snapshot_id
+          join policy_authority_catalog_revisions catalog on catalog.workspace_id = binding.workspace_id and catalog.id = binding.authority_catalog_revision_id
+          where binding.workspace_id = ${workspaceId}::uuid and policy.policy_ref = ${policyRef}
+            and (snapshot.snapshot_payload #>> '{policyAuthority,catalogHash}' is distinct from catalog.revision_hash
+              or snapshot.verified_at >= snapshot.expires_at
+              or (binding.binding_kind = 'semantic' and not exists (select 1 from policy_semantic_binding_revisions semantic
+                where semantic.workspace_id = binding.workspace_id and semantic.policy_revision_id = binding.policy_revision_id
+                  and semantic.semantic_ref = binding.binding_ref and semantic.revision::text = binding.binding_version
+                  and semantic.revision_hash = binding.binding_hash)))) as corrupt_trusted_authority_rows,
+        (select count(*)::int from strict_instruction_policy_revisions policy
+          where policy.workspace_id = ${workspaceId}::uuid and policy.policy_ref = ${policyRef}
+            and policy.policy_version = (select max(current.policy_version) from strict_instruction_policy_revisions current
+              where current.workspace_id = policy.workspace_id and current.policy_ref = policy.policy_ref)
+            and policy.status = 'published' and not exists (select 1 from policy_authority_bindings binding
+              where binding.workspace_id = policy.workspace_id and binding.policy_revision_id = policy.id)) as missing_authority_bridge_rows,
+        (select count(*)::int from policy_manual_lock_revisions lock join strict_instruction_policy_revisions policy
+          on policy.workspace_id = lock.workspace_id and policy.id = lock.policy_revision_id
+          where lock.workspace_id = ${workspaceId}::uuid and policy.policy_ref = ${policyRef}
+            and (lock.payload #>> '{lockRef}' is distinct from lock.lock_ref or lock.payload #>> '{revisionHash}' is distinct from lock.revision_hash
+              or lock.payload #>> '{actor,ref}' is distinct from lock.actor_ref or lock.payload #>> '{actor,role}' is distinct from lock.actor_role
+              or lock.payload #>> '{operation}' is distinct from lock.operation or lock.actor_role not in ('owner', 'admin')
+              or (lock.sequence = 1 and lock.previous_revision_hash is not null)
+              or (lock.sequence > 1 and not exists (select 1 from policy_manual_lock_revisions prior
+                where prior.workspace_id = lock.workspace_id and prior.policy_revision_id = lock.policy_revision_id
+                  and prior.lock_ref = lock.lock_ref and prior.sequence = lock.sequence - 1
+                  and prior.revision_hash = lock.previous_revision_hash and prior.recorded_at <= lock.recorded_at)))) as corrupt_manual_lock_rows,
+        (select count(*)::int from policy_authority_bindings binding join strict_instruction_policy_revisions policy
+          on policy.workspace_id = binding.workspace_id and policy.id = binding.policy_revision_id
+          left join account_groups account_group on account_group.workspace_id = binding.workspace_id and account_group.group_ref = binding.binding_ref
+          left join account_group_revisions group_revision on group_revision.workspace_id = binding.workspace_id and group_revision.account_group_id = account_group.id
+            and group_revision.revision = account_group.current_revision and group_revision.revision_hash = account_group.current_revision_hash
+          where binding.workspace_id = ${workspaceId}::uuid and policy.policy_ref = ${policyRef} and binding.binding_kind = 'account_group'
+            and (group_revision.id is null or group_revision.status <> 'active' or (group_revision.revision > 1 and not exists (select 1 from account_group_revisions prior
+              where prior.workspace_id = group_revision.workspace_id and prior.account_group_id = group_revision.account_group_id
+                and prior.revision = group_revision.revision - 1 and prior.revision_hash = group_revision.previous_revision_hash)))) as corrupt_account_group_rows,
+        (select count(*)::int from policy_authority_bindings binding join strict_instruction_policy_revisions policy
+          on policy.workspace_id = binding.workspace_id and policy.id = binding.policy_revision_id
+          left join authority_topics topic on topic.workspace_id = binding.workspace_id and topic.topic_ref = binding.binding_ref
+          left join authority_topic_revisions topic_revision on topic_revision.workspace_id = binding.workspace_id and topic_revision.topic_id = topic.id
+            and topic_revision.revision = topic.current_revision and topic_revision.revision_hash = topic.current_revision_hash
+          where binding.workspace_id = ${workspaceId}::uuid and policy.policy_ref = ${policyRef} and binding.binding_kind = 'topic'
+            and (binding.binding_ref !~ '^topic_[a-z0-9][a-z0-9_.:-]{0,126}$' or btrim(binding.binding_version) = ''
+              or topic_revision.id is null or topic_revision.status <> 'active' or topic_revision.revision::text <> binding.binding_version
+              or topic_revision.revision_hash <> binding.binding_hash or (topic_revision.revision > 1 and not exists (select 1 from authority_topic_revisions prior
+                where prior.workspace_id = topic_revision.workspace_id and prior.topic_id = topic_revision.topic_id
+                  and prior.revision = topic_revision.revision - 1 and prior.revision_hash = topic_revision.previous_revision_hash)))) as corrupt_topic_rows,
+        (select count(*)::int from action_proposal_units unit
+          where unit.workspace_id = ${workspaceId}::uuid and unit.context_hash in (select context_hash from affected_contexts)
+            and (not exists (select 1 from action_proposal_unit_frozen_contexts bridge join effective_campaign_contexts context
+                on context.workspace_id = bridge.workspace_id and context.id = bridge.context_id
+              where bridge.workspace_id = unit.workspace_id and bridge.action_proposal_unit_id = unit.id
+                and bridge.context_hash = unit.context_hash and context.context_hash = unit.context_hash)
+              or exists (select 1 from affected_contexts affected where affected.context_hash = unit.context_hash and affected.invalidated))) as corrupt_opaque_action_context_rows,
         (select count(*)::int from affected_contexts) as affected_contexts
     `));
     if (dependency.length !== 1) fail("corrupt_store"); const row = dependency[0]!;
@@ -210,15 +266,22 @@ export class DrizzleInstructionPolicyImpactRepository implements InstructionPoli
       missingManifestJsonbColumns: catalog.missingManifestColumns, brokenPolicyRevisionChains,
       unresolvedExceptionRefs, malformedContextPolicies: count(row.malformed_context_policies)
         + count(row.unresolved_context_policy_refs), inconsistentContextComponents: count(row.inconsistent_context_components),
-      corruptActionLifecycleRows: count(row.corrupt_action_lifecycle_rows),
+      corruptActionLifecycleRows: count(row.corrupt_action_lifecycle_rows) + count(row.corrupt_trusted_authority_rows)
+        + count(row.corrupt_manual_lock_rows) + count(row.corrupt_account_group_rows) + count(row.corrupt_topic_rows)
+        + count(row.corrupt_opaque_action_context_rows) + count(row.missing_authority_bridge_rows),
       rowCapExceeded: affectedContexts > ROW_CAP || Object.values(cappedCounts).some((value) => value > ROW_CAP) ? 1 : 0 });
+    const authorityFamiliesExact = count(row.corrupt_trusted_authority_rows) === 0 && count(row.corrupt_manual_lock_rows) === 0
+      && count(row.corrupt_account_group_rows) === 0 && count(row.corrupt_topic_rows) === 0
+      && count(row.corrupt_opaque_action_context_rows) === 0 && count(row.missing_authority_bridge_rows) === 0;
+    const authorityFamilies = ["trusted_authority_catalog", "manual_policy_locks", "account_group_scope", "topic_scope", "opaque_action_policy_context"];
     const coverage = Object.freeze({ complete: false as const,
       manifestVersion: INSTRUCTION_POLICY_DEPENDENCY_MANIFEST_VERSION,
       exactRelational: Object.freeze(["effective_context_components", "budget_proposals", "analysis_templates",
-        "decision_room_schedules", "run_analysis_assets", "decision_ledger", "action_proposal_units"]),
+        "decision_room_schedules", "run_analysis_assets", "decision_ledger", "action_proposal_units",
+        ...(authorityFamiliesExact ? authorityFamilies : [])]),
       exactContractRef: Object.freeze(["strict_policy_exception_refs", "effective_context_policy_trace"]),
-      partialOrUnknown: Object.freeze(["trusted_authority_catalog", "manual_policy_locks",
-        "account_group_scope", "topic_scope", "opaque_action_policy_context"]),
+      partialOrUnknown: Object.freeze([...(authorityFamiliesExact ? [] : authorityFamilies), ...(catalog.unclassifiedColumns > 0 || catalog.missingManifestColumns > 0
+          ? ["unclassified_jsonb_dependency_columns"] : [])]),
       nonAuthoritativeNotes: Object.freeze(["action_context_hash_index_explain_not_verified"]), integrity });
     const targetSummary = Object.freeze({ policyRef: target.policy.policyRef, policyVersion: target.policy.policyVersion,
       policyHash: target.policy.canonicalHash, status: target.policy.status });

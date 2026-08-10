@@ -39,7 +39,7 @@ describe("progressive formalization persistence migration", () => {
 
   it("is journaled, catalogued and included in explicit workspace purge", () => {
     const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")) as { entries: { tag: string }[] };
-    expect(journal.entries.at(-1)?.tag).toBe(tag);
+    expect(journal.entries.some((entry) => entry.tag === tag)).toBe(true);
     expect(existsSync("drizzle/meta/20260809225244_snapshot.json")).toBe(true);
     expect(CATEGORY_JSONB_MANIFEST).toContainEqual({ table: "progressive_formalization_revisions",
       column: "revision_payload", policy: "category_contract" });

@@ -11,6 +11,12 @@ export type InstructionPolicyJsonbPolicy =
 
 const policyContract = new Set([
   "strict_instruction_policy_revisions.policy_payload",
+  "tenant_authority_snapshots.snapshot_payload",
+  "account_group_revisions.payload",
+  "policy_authority_catalog_revisions.payload",
+  "policy_manual_lock_revisions.payload",
+  "authority_topic_revisions.payload",
+  "policy_semantic_binding_revisions.payload",
   "progressive_formalization_revisions.revision_payload",
 ]);
 const policyProjection = new Set(["effective_campaign_contexts.context_payload"]);
@@ -21,7 +27,14 @@ const opaquePolicyContext = new Set([
   "action_proposal_units.summary_payload",
 ]);
 
-export const INSTRUCTION_POLICY_JSONB_MANIFEST = Object.freeze(CATEGORY_JSONB_MANIFEST.map((entry) => {
+const policyAuthorityJsonbColumns = Object.freeze([...policyContract]
+  .filter((key) => !CATEGORY_JSONB_MANIFEST.some((entry) => `${entry.table}.${entry.column}` === key))
+  .map((key) => {
+    const [table, column] = key.split(".");
+    return Object.freeze({ table: table!, column: column! });
+  }));
+
+export const INSTRUCTION_POLICY_JSONB_MANIFEST = Object.freeze([...CATEGORY_JSONB_MANIFEST, ...policyAuthorityJsonbColumns].map((entry) => {
   const key = `${entry.table}.${entry.column}`;
   const policy: InstructionPolicyJsonbPolicy = policyContract.has(key) ? "policy_contract"
     : policyProjection.has(key) ? "policy_projection"

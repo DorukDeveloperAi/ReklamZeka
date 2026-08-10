@@ -1215,6 +1215,93 @@ export const strictInstructionPolicyRevisions = pgTable("strict_instruction_poli
   `),
 ]);
 
+/** Repository-verified, tenant-scoped provenance for authority-free policy composition. */
+export const tenantAuthoritySnapshots = pgTable("tenant_authority_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  snapshotRef: text("snapshot_ref").notNull(),
+  snapshotHash: text("snapshot_hash").notNull(),
+  repositoryRef: text("repository_ref").notNull(),
+  repositoryRevision: text("repository_revision").notNull(),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  snapshotPayload: jsonb("snapshot_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("tenant_authority_snapshots_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("tenant_authority_snapshots_workspace_ref_unique").on(table.workspaceId, table.snapshotRef),
+  uniqueIndex("tenant_authority_snapshots_workspace_hash_unique").on(table.workspaceId, table.snapshotHash),
+  index("tenant_authority_snapshots_verified_idx").on(table.workspaceId, table.verifiedAt),
+  check("tenant_authority_snapshots_identity", sql`${table.snapshotRef} ~ '^authority_snapshot_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.snapshotHash} ~ '^[a-f0-9]{64}$' and ${table.repositoryRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$' and btrim(${table.repositoryRevision}) <> '' and ${table.expiresAt} > ${table.verifiedAt}`),
+  check("tenant_authority_snapshots_exact", sql`(${table.snapshotPayload} #>> '{schemaVersion}' = 'tenant-authority-snapshot/1.0.0' and ${table.snapshotPayload} #>> '{snapshotRef}' = ${table.snapshotRef} and ${table.snapshotPayload} #>> '{snapshotHash}' = ${table.snapshotHash} and ${table.snapshotPayload} #>> '{repository,ref}' = ${table.repositoryRef} and ${table.snapshotPayload} #>> '{repository,revision}' = ${table.repositoryRevision} and ${table.snapshotPayload} #> '{repository,verified}' = 'true'::jsonb and ${table.snapshotPayload} #> '{authority,productionAuthoritySourceBound}' = 'false'::jsonb and ${table.snapshotPayload} #> '{authority,canPublish}' = 'false'::jsonb and ${table.snapshotPayload} #> '{authority,canApprove}' = 'false'::jsonb and ${table.snapshotPayload} #> '{authority,canExecute}' = 'false'::jsonb and ${table.snapshotPayload} #> '{authority,canWriteMeta}' = 'false'::jsonb) is true`),
+]);
+
+/** Append-only tenant-local account-group ledger and exact account membership. */
+export const accountGroups = pgTable("account_groups", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), groupRef: text("group_ref").notNull(), currentRevision: integer("current_revision").notNull().default(0), currentRevisionHash: text("current_revision_hash"), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("account_groups_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("account_groups_workspace_ref_unique").on(table.workspaceId, table.groupRef),
+  check("account_groups_identity", sql`${table.groupRef} ~ '^account_group_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.currentRevision} >= 0 and ((${table.currentRevision} = 0 and ${table.currentRevisionHash} is null) or (${table.currentRevision} > 0 and ${table.currentRevisionHash} ~ '^[a-f0-9]{64}$'))`),
+]);
+
+export const accountGroupRevisions = pgTable("account_group_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), accountGroupId: uuid("account_group_id").notNull(),
+  groupRef: text("group_ref").notNull(), revision: integer("revision").notNull(), previousRevisionHash: text("previous_revision_hash"), revisionHash: text("revision_hash").notNull(), status: text("status").notNull(), payload: jsonb("payload").$type<Record<string, unknown>>().notNull(), recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.accountGroupId], foreignColumns: [accountGroups.workspaceId, accountGroups.id], name: "account_group_revisions_group_scope_fk" }).onDelete("restrict"), uniqueIndex("account_group_revisions_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("account_group_revisions_workspace_version_unique").on(table.workspaceId, table.groupRef, table.revision), uniqueIndex("account_group_revisions_workspace_hash_unique").on(table.workspaceId, table.revisionHash), index("account_group_revisions_head_idx").on(table.workspaceId, table.groupRef, table.revision),
+  check("account_group_revisions_identity", sql`${table.groupRef} ~ '^account_group_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.revision} between 1 and 1000000 and ((${table.revision} = 1 and ${table.previousRevisionHash} is null) or (${table.revision} > 1 and ${table.previousRevisionHash} ~ '^[a-f0-9]{64}$')) and ${table.revisionHash} ~ '^[a-f0-9]{64}$' and ${table.status} in ('draft', 'active', 'archived')`),
+  check("account_group_revisions_no_authority", sql`${table.payload} #> '{authority,canPublish}' = 'false'::jsonb and ${table.payload} #> '{authority,canApprove}' = 'false'::jsonb and ${table.payload} #> '{authority,canExecute}' = 'false'::jsonb and ${table.payload} #> '{authority,canWriteMeta}' = 'false'::jsonb`),
+]);
+
+export const accountGroupAccountBindings = pgTable("account_group_account_bindings", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), accountGroupRevisionId: uuid("account_group_revision_id").notNull(), adAccountId: uuid("ad_account_id").notNull(), bindingRef: text("binding_ref").notNull(), bindingHash: text("binding_hash").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.accountGroupRevisionId], foreignColumns: [accountGroupRevisions.workspaceId, accountGroupRevisions.id], name: "account_group_account_bindings_revision_scope_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.adAccountId], foreignColumns: [adAccounts.workspaceId, adAccounts.id], name: "account_group_account_bindings_account_scope_fk" }).onDelete("restrict"), uniqueIndex("account_group_account_bindings_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("account_group_account_bindings_exact_unique").on(table.accountGroupRevisionId, table.adAccountId), index("account_group_account_bindings_account_idx").on(table.workspaceId, table.adAccountId), check("account_group_account_bindings_identity", sql`${table.bindingRef} ~ '^account_group_binding_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.bindingHash} ~ '^[a-f0-9]{64}$'`),
+]);
+
+/** Tenant-owned topic ledger; authority scopes resolve revisions, never free-form topic text. */
+export const authorityTopics = pgTable("authority_topics", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), topicRef: text("topic_ref").notNull(), currentRevision: integer("current_revision").notNull().default(0), currentRevisionHash: text("current_revision_hash"), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("authority_topics_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("authority_topics_workspace_ref_unique").on(table.workspaceId, table.topicRef), check("authority_topics_identity", sql`${table.topicRef} ~ '^topic_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.currentRevision} >= 0 and ((${table.currentRevision} = 0 and ${table.currentRevisionHash} is null) or (${table.currentRevision} > 0 and ${table.currentRevisionHash} ~ '^[a-f0-9]{64}$'))`),
+]);
+export const authorityTopicRevisions = pgTable("authority_topic_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), topicId: uuid("topic_id").notNull(), topicRef: text("topic_ref").notNull(), revision: integer("revision").notNull(), previousRevisionHash: text("previous_revision_hash"), revisionHash: text("revision_hash").notNull(), status: text("status").notNull(), payload: jsonb("payload").$type<Record<string, unknown>>().notNull(), recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.topicId], foreignColumns: [authorityTopics.workspaceId, authorityTopics.id], name: "authority_topic_revisions_topic_scope_fk" }).onDelete("restrict"), uniqueIndex("authority_topic_revisions_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("authority_topic_revisions_workspace_version_unique").on(table.workspaceId, table.topicRef, table.revision), uniqueIndex("authority_topic_revisions_workspace_hash_unique").on(table.workspaceId, table.revisionHash), index("authority_topic_revisions_head_idx").on(table.workspaceId, table.topicRef, table.revision), check("authority_topic_revisions_identity", sql`${table.topicRef} ~ '^topic_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.revision} between 1 and 1000000 and ((${table.revision} = 1 and ${table.previousRevisionHash} is null) or (${table.revision} > 1 and ${table.previousRevisionHash} ~ '^[a-f0-9]{64}$')) and ${table.revisionHash} ~ '^[a-f0-9]{64}$' and ${table.status} in ('active', 'archived')`), check("authority_topic_revisions_no_authority", sql`${table.payload} #> '{authority,canPublish}' = 'false'::jsonb and ${table.payload} #> '{authority,canApprove}' = 'false'::jsonb and ${table.payload} #> '{authority,canExecute}' = 'false'::jsonb and ${table.payload} #> '{authority,canWriteMeta}' = 'false'::jsonb`),
+]);
+export const categoryTopicBindings = pgTable("category_topic_bindings", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), categoryDefinitionId: uuid("category_definition_id").notNull(), topicRevisionId: uuid("topic_revision_id").notNull(), bindingRef: text("binding_ref").notNull(), bindingHash: text("binding_hash").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.categoryDefinitionId], foreignColumns: [categoryDefinitions.workspaceId, categoryDefinitions.id], name: "category_topic_bindings_category_scope_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.topicRevisionId], foreignColumns: [authorityTopicRevisions.workspaceId, authorityTopicRevisions.id], name: "category_topic_bindings_topic_scope_fk" }).onDelete("restrict"), uniqueIndex("category_topic_bindings_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("category_topic_bindings_exact_unique").on(table.categoryDefinitionId, table.topicRevisionId), index("category_topic_bindings_topic_lookup_idx").on(table.workspaceId, table.topicRevisionId), check("category_topic_bindings_identity", sql`${table.bindingRef} ~ '^category_topic_binding_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.bindingHash} ~ '^[a-f0-9]{64}$'`),
+]);
+export const policySemanticBindingRevisions = pgTable("policy_semantic_binding_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), policyRevisionId: uuid("policy_revision_id").notNull(), semanticRef: text("semantic_ref").notNull(), revision: integer("revision").notNull(), previousRevisionHash: text("previous_revision_hash"), revisionHash: text("revision_hash").notNull(), payload: jsonb("payload").$type<Record<string, unknown>>().notNull(), recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.policyRevisionId], foreignColumns: [strictInstructionPolicyRevisions.workspaceId, strictInstructionPolicyRevisions.id], name: "policy_semantic_binding_revisions_policy_scope_fk" }).onDelete("restrict"), uniqueIndex("policy_semantic_binding_revisions_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("policy_semantic_binding_revisions_exact_unique").on(table.policyRevisionId, table.semanticRef, table.revision), uniqueIndex("policy_semantic_binding_revisions_workspace_hash_unique").on(table.workspaceId, table.revisionHash), index("policy_semantic_binding_revisions_lookup_idx").on(table.workspaceId, table.semanticRef, table.revision), check("policy_semantic_binding_revisions_identity", sql`${table.semanticRef} ~ '^semantic_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.revision} between 1 and 1000000 and ((${table.revision} = 1 and ${table.previousRevisionHash} is null) or (${table.revision} > 1 and ${table.previousRevisionHash} ~ '^[a-f0-9]{64}$')) and ${table.revisionHash} ~ '^[a-f0-9]{64}$'`), check("policy_semantic_binding_revisions_no_authority", sql`${table.payload} #> '{authority,canPublish}' = 'false'::jsonb and ${table.payload} #> '{authority,canApprove}' = 'false'::jsonb and ${table.payload} #> '{authority,canExecute}' = 'false'::jsonb and ${table.payload} #> '{authority,canWriteMeta}' = 'false'::jsonb`),
+]);
+
+/** Exact policy authority-tier/decision/account-group/topic/semantic bindings. */
+export const policyAuthorityCatalogRevisions = pgTable("policy_authority_catalog_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), catalogRef: text("catalog_ref").notNull(), revision: integer("revision").notNull(), previousRevisionHash: text("previous_revision_hash"), revisionHash: text("revision_hash").notNull(), payload: jsonb("payload").$type<Record<string, unknown>>().notNull(), recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("policy_authority_catalog_revisions_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("policy_authority_catalog_revisions_version_unique").on(table.workspaceId, table.catalogRef, table.revision), uniqueIndex("policy_authority_catalog_revisions_hash_unique").on(table.workspaceId, table.revisionHash),
+  check("policy_authority_catalog_revisions_identity", sql`${table.catalogRef} ~ '^authority_catalog_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.revision} >= 1 and ((${table.revision} = 1 and ${table.previousRevisionHash} is null) or (${table.revision} > 1 and ${table.previousRevisionHash} ~ '^[a-f0-9]{64}$')) and ${table.revisionHash} ~ '^[a-f0-9]{64}$'`), check("policy_authority_catalog_revisions_no_authority", sql`${table.payload} #> '{authority,canPublish}' = 'false'::jsonb and ${table.payload} #> '{authority,canApprove}' = 'false'::jsonb and ${table.payload} #> '{authority,canExecute}' = 'false'::jsonb and ${table.payload} #> '{authority,canWriteMeta}' = 'false'::jsonb`),
+]);
+
+export const policyAuthorityBindings = pgTable("policy_authority_bindings", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), policyRevisionId: uuid("policy_revision_id").notNull(), authoritySnapshotId: uuid("authority_snapshot_id").notNull(), authorityCatalogRevisionId: uuid("authority_catalog_revision_id").notNull(), authorityTierRef: text("authority_tier_ref").notNull(), decisionRef: text("decision_ref").notNull(), bindingKind: text("binding_kind").notNull(), bindingRef: text("binding_ref").notNull(), bindingVersion: text("binding_version").notNull(), bindingHash: text("binding_hash").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.policyRevisionId], foreignColumns: [strictInstructionPolicyRevisions.workspaceId, strictInstructionPolicyRevisions.id], name: "policy_authority_bindings_policy_scope_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.authoritySnapshotId], foreignColumns: [tenantAuthoritySnapshots.workspaceId, tenantAuthoritySnapshots.id], name: "policy_authority_bindings_snapshot_scope_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.authorityCatalogRevisionId], foreignColumns: [policyAuthorityCatalogRevisions.workspaceId, policyAuthorityCatalogRevisions.id], name: "policy_authority_bindings_catalog_scope_fk" }).onDelete("restrict"), uniqueIndex("policy_authority_bindings_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("policy_authority_bindings_exact_unique").on(table.policyRevisionId, table.bindingKind, table.bindingRef, table.bindingVersion), index("policy_authority_bindings_lookup_idx").on(table.workspaceId, table.bindingKind, table.bindingRef, table.bindingVersion), check("policy_authority_bindings_kind", sql`${table.bindingKind} in ('account_group', 'topic', 'semantic')`), check("policy_authority_bindings_identity", sql`${table.authorityTierRef} ~ '^authority_tier_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.decisionRef} ~ '^decision_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.bindingRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$' and btrim(${table.bindingVersion}) <> '' and ${table.bindingHash} ~ '^[a-f0-9]{64}$'`),
+]);
+
+/** Manual locks can only be superseded by another immutable revision. */
+export const policyManualLockRevisions = pgTable("policy_manual_lock_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), policyRevisionId: uuid("policy_revision_id").notNull(), lockRef: text("lock_ref").notNull(), actorRef: text("actor_ref").notNull(), actorRole: text("actor_role").notNull(), sequence: integer("sequence").notNull(), previousRevisionHash: text("previous_revision_hash"), revisionHash: text("revision_hash").notNull(), operation: text("operation").notNull(), reasonCode: text("reason_code").notNull(), payload: jsonb("payload").$type<Record<string, unknown>>().notNull(), recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.policyRevisionId], foreignColumns: [strictInstructionPolicyRevisions.workspaceId, strictInstructionPolicyRevisions.id], name: "policy_manual_lock_revisions_policy_scope_fk" }).onDelete("restrict"), uniqueIndex("policy_manual_lock_revisions_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("policy_manual_lock_revisions_sequence_unique").on(table.policyRevisionId, table.lockRef, table.sequence), uniqueIndex("policy_manual_lock_revisions_workspace_hash_unique").on(table.workspaceId, table.revisionHash), index("policy_manual_lock_revisions_head_idx").on(table.workspaceId, table.policyRevisionId, table.lockRef, table.sequence), check("policy_manual_lock_revisions_identity", sql`${table.lockRef} ~ '^manual_lock_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.actorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.actorRole} in ('owner', 'admin') and ${table.sequence} >= 1 and ((${table.sequence} = 1 and ${table.previousRevisionHash} is null) or (${table.sequence} > 1 and ${table.previousRevisionHash} ~ '^[a-f0-9]{64}$')) and ${table.revisionHash} ~ '^[a-f0-9]{64}$' and ${table.operation} in ('lock', 'unlock') and ${table.reasonCode} ~ '^[a-z][a-z0-9_]{2,63}$'`), check("policy_manual_lock_revisions_exact", sql`(${table.payload} #>> '{lockRef}' = ${table.lockRef} and ${table.payload} #>> '{actor,ref}' = ${table.actorRef} and ${table.payload} #>> '{actor,role}' = ${table.actorRole} and ${table.payload} #>> '{operation}' = ${table.operation} and ${table.payload} #>> '{revisionHash}' = ${table.revisionHash}) is true`), check("policy_manual_lock_revisions_no_authority", sql`${table.payload} #> '{authority,canPublish}' = 'false'::jsonb and ${table.payload} #> '{authority,canApprove}' = 'false'::jsonb and ${table.payload} #> '{authority,canExecute}' = 'false'::jsonb and ${table.payload} #> '{authority,canWriteMeta}' = 'false'::jsonb`),
+]);
+
 /** Immutable G0-G4 formalization events; maturity never carries action or Meta-write authority. */
 export const progressiveFormalizationRevisions = pgTable("progressive_formalization_revisions", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -1939,7 +2026,7 @@ export const effectiveCampaignContextComponents = pgTable("effective_campaign_co
   check("effective_campaign_context_components_type", sql`${table.componentType} in (
     'source_snapshot', 'category_resolution', 'category_profile', 'guidance_pack', 'meta_catalog',
     'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
-    'timeframe_resolver', 'instruction_policy', 'promotion_registry'
+    'timeframe_resolver', 'instruction_policy', 'promotion_registry', 'policy_authority'
   )`),
   check("effective_campaign_context_components_required", sql`
     btrim(${table.componentRef}) <> '' and btrim(${table.componentVersion}) <> ''
@@ -1971,7 +2058,7 @@ export const effectiveCampaignContextInvalidations = pgTable("effective_campaign
   check("effective_campaign_context_invalidations_type", sql`${table.componentType} in (
     'source_snapshot', 'category_resolution', 'category_profile', 'guidance_pack', 'meta_catalog',
     'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
-    'timeframe_resolver', 'instruction_policy', 'promotion_registry'
+    'timeframe_resolver', 'instruction_policy', 'promotion_registry', 'policy_authority'
   )`),
   check("effective_campaign_context_invalidations_required", sql`
     btrim(${table.componentRef}) <> '' and btrim(${table.componentVersion}) <> ''
@@ -3791,6 +3878,27 @@ export const actionProposalUnits = pgTable("action_proposal_units", {
     and (${table.unitPayload}::text || ${table.actionPlanPayload}::text || ${table.summaryPayload}::text)
       !~* '"[^"[:space:]]*raw[_-]?(payload|request|response|json)"[[:space:]]*:'
   `),
+]);
+
+/**
+ * Relational evidence that an advisory action unit was built against one frozen
+ * context. This is provenance only: it cannot convert a unit into executable work.
+ */
+export const actionProposalUnitFrozenContexts = pgTable("action_proposal_unit_frozen_contexts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  actionProposalUnitId: uuid("action_proposal_unit_id").notNull(),
+  contextId: uuid("context_id").notNull(),
+  contextHash: text("context_hash").notNull(),
+  bindingHash: text("binding_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.actionProposalUnitId], foreignColumns: [actionProposalUnits.workspaceId, actionProposalUnits.id], name: "action_proposal_unit_frozen_contexts_unit_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.contextId], foreignColumns: [effectiveCampaignContexts.workspaceId, effectiveCampaignContexts.id], name: "action_proposal_unit_frozen_contexts_context_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("action_proposal_unit_frozen_contexts_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("action_proposal_unit_frozen_contexts_unit_unique").on(table.actionProposalUnitId),
+  index("action_proposal_unit_frozen_contexts_context_idx").on(table.workspaceId, table.contextId),
+  check("action_proposal_unit_frozen_contexts_hashes", sql`${table.contextHash} ~ '^[a-f0-9]{64}$' and ${table.bindingHash} ~ '^[a-f0-9]{64}$'`),
 ]);
 
 /** Immutable edges preserve the proposal DAG without carrying approval state. */

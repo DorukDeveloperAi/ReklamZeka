@@ -31,6 +31,12 @@ const categoryContract = new Set([
   "category_profile_revisions.profile_payload",
   "strict_instruction_policy_revisions.policy_payload",
   "progressive_formalization_revisions.revision_payload",
+  "tenant_authority_snapshots.snapshot_payload",
+  "account_group_revisions.payload",
+  "policy_authority_catalog_revisions.payload",
+  "policy_manual_lock_revisions.payload",
+  "authority_topic_revisions.payload",
+  "policy_semantic_binding_revisions.payload",
 ]);
 
 const categoryProjection = new Set([
@@ -89,6 +95,12 @@ const columns = [
   "category_profile_revisions.profile_payload",
   "strict_instruction_policy_revisions.policy_payload",
   "progressive_formalization_revisions.revision_payload",
+  "tenant_authority_snapshots.snapshot_payload",
+  "account_group_revisions.payload",
+  "policy_authority_catalog_revisions.payload",
+  "policy_manual_lock_revisions.payload",
+  "authority_topic_revisions.payload",
+  "policy_semantic_binding_revisions.payload",
   "guidance_cards.source_ids",
   "guidance_sets.ordered_card_ids",
   "advised_practice_definitions.payload",

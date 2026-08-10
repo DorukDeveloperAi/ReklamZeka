@@ -115,6 +115,17 @@ describe("effective campaign context", () => {
       .toThrowError(expect.objectContaining<Partial<EffectiveCampaignContextError>>({ code: "invalid_input" }));
   });
 
+  it("requires immutable repository authority evidence whenever a policy authority version is frozen", () => {
+    const base = input();
+    expect(() => buildEffectiveCampaignContext({ ...base, versions: { ...base.versions, policyAuthority: "a".repeat(64) } }))
+      .toThrowError(expect.objectContaining<Partial<EffectiveCampaignContextError>>({ code: "invalid_input" }));
+    const context = buildEffectiveCampaignContext({ ...base, versions: { ...base.versions, policyAuthority: "a".repeat(64) },
+      policyAuthorityEvidence: { snapshotRef: "authority_snapshot_primary", snapshotHash: "b".repeat(64), catalogHash: "c".repeat(64),
+        scopeHash: "d".repeat(64), accountGroupBindingHashes: [], topicBindingHashes: [], manualLockBindingHashes: [], semanticBindingHashes: ["e".repeat(64)] } });
+    expect(context.policyAuthorityEvidence?.snapshotHash).toBe("b".repeat(64));
+    expect(context.contextHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
   it("rejects cross-workspace or tampered category/guidance components", () => {
     const base = input();
     expect(() => buildEffectiveCampaignContext({ ...base, guidance: { ...base.guidance, workspaceId: "workspace-2" } }))

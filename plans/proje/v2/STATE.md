@@ -22,6 +22,25 @@
 | 13 | eylem valfi ve rutin | AÇIK | 04,10–12 | planlandı; write kapalı |
 | 14 | kontrol merkezi | AÇIK | 07,09–13 | planlandı |
 
+## 2026-08-10 — A09.1 trusted authority safety foundation
+
+- A09 trusted-authority işi aşamalı checkpoint'e ayrıldı. Tenant-bound authority snapshot, account-group
+  revision/account binding, strict catalog/manual-lock, topic/semantic/category-topic relational temeli,
+  frozen `policy_authority` context evidence'i ve action-unit↔frozen-context bridge'i forward-only
+  migration ile eklendi. Yeni public tablolar FORCE RLS, API-role revoke, tenant-composite FK/index ve
+  append-only/tombstone kontrolleri taşır.
+- Public `composeTrustedPolicyContext` source-bound authority üretemez. Yalnız server-private repository
+  loader; aktif workspace, snapshot hash'i, account eşleşmesi, current account-group head, temporal
+  manual-lock head ve doğrulanmış catalog/scope bağlarından sonra source-bound compose closure döndürür.
+  Tüm publish/approve/execute/Meta-write capability'leri yine false'dur.
+- Etki kapsamı henüz yalnız gerçekten doğrulanmış aileler için kesin sayılır; authority/manual-lock/
+  account-group/topic/semantic/opaque-unit taramalarında eksik veya belirsiz bağ varsa lifecycle mutation
+  izni açılmaz ve `partial/blocked` kalır. Bu checkpoint A13/G4 yetkisi vermez.
+- Kanıt: `npm test` 249 dosya/1.473 test, production build, `db:check`, `check:security` (0 vulnerability),
+  architecture/model/security-boundaries ve secret-artifact kontrolleri yeşil. Canlı PostgreSQL ve gerçek
+  browser kabulü çevresel olarak hâlâ `postgres_connection_not_configured` / local session yokluğu nedeniyle
+  parkta; bu nedenle DB-backed authority verifier ve browser E2E tamamlanmış sayılmaz.
+
 ## 2026-08-10 — A09 atomic starter, authoritative facet preview ve progressive persistence
 
 - Starter adoption artık zero-write blocker değildir. Owner/admin confirmation, aktif workspace

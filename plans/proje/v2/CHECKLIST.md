@@ -104,6 +104,10 @@
   - [x] Exact policy lifecycle, frozen CategoryProfile ref/version/hash ve reviewed objective
     mapping kanıtını doğrulayan authority-free composition contract'ı; production binding'i
     olmadığını `productionAuthoritySourceBound=false` ile açık tutar.
+  - [x] A09.1 repository-bound tenant authority proof, account-group/head ve temporal manual-lock
+    doğrulaması; frozen `policy_authority` evidence/invalidation bileşeni ve action unit↔context
+    relational bridge. Public/saf compose yolu source-bound değerini açamaz; eksik impact aileleri
+    mutation vermeden fail-closed kalır.
   - [ ] Persisted tenant-bound authority-tier/decision/manual-lock loader ve frozen analysis composition.
 - [ ] Versioned draft/publish/pause/archive ve rol/audit API'leri.
   - [x] Guidance için immutable draft/revise/publish/archive, optimistic registry hash,
@@ -118,6 +122,8 @@
   - [x] Persisted exception/context/budget/analysis/schedule/ledger/action dependency reader;
     deterministic impact hash, transaction-içi OCC recheck, audit/invalidation atomikliği ve
     incomplete coverage'da publish/pause/archive fail-closed Studio akışı.
+  - [x] A09.1 account-group, authority catalog, manual-lock, topic/semantic revision ve
+    category-topic relational substrate; RLS/revoke/append-only/tombstone guard temeli.
   - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
     context ailelerinin authoritative binding'i; canlı PostgreSQL verifier ve gerçek oturum kabulü.
 - [ ] Başlangıç objective/internal kategori playbook seti.
