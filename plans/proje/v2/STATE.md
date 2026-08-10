@@ -2612,6 +2612,22 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: `tests/action-execution-admission.test.ts`, `tests/meta-write-spec.test.ts`,
   `tests/approval-lifecycle.test.ts`, `npm run typecheck`.
 
+## 2026-08-10 — A13 durable disabled-execution admission ledger
+
+- `action_execution_attempts` ve `action_execution_events`, approved unit → disabled-executor
+  admission geçişinin kalıcı ve idempotent kaydıdır. Repository çağıranın plan/hedef/ref'lerini
+  güvenmez; workspace, unit, approve kararı ve grant'i aynı transaction içinde tekrar çözer,
+  DB'deki immutable planla typed write-spec hash'ini yeniden üretir.
+- İlk ve tek mevcut olay `admitted`tir. Event payload'ı yapısal olarak
+  `executionAuthority: none` ve `networkDispatched: false` taşır; RLS/FORCE RLS, public-role
+  revoke, append-only+tombstone koruması ve tenant-composite FK'ler migration ile eklenmiştir.
+- Bu bir executor değildir: insan execution ceremony, tek-kullanımlık grant tüketimi, opaque
+  Meta target çözümü, dispatch, read-after-write ve rollback sonraki merkezi checkpoint'tir.
+  Bu checkpoint ağ çağrısı ve gerçek Meta write yapmaz.
+- Kanıt: `tests/action-execution-admission-drizzle-repository.test.ts`,
+  `tests/action-execution-admission.test.ts`, `tests/meta-workspace-tombstone-purge-drizzle-adapter.test.ts`,
+  `npm run typecheck`, `npm run db:check`.
+
 ## 2026-08-10 — A10 private timeframe-bound L3 context composer
 
 - `TimeframeBoundAnalysisContextComposer`, input olarak yalnız workspace/entity/timeframe alır. Son geçerli,

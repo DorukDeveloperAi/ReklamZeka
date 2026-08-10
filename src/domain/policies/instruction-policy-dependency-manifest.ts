@@ -26,6 +26,8 @@ const opaquePolicyContext = new Set([
   "action_proposal_units.unit_payload",
   "action_proposal_units.action_plan_payload",
   "action_proposal_units.summary_payload",
+  "action_execution_attempts.admission_payload",
+  "action_execution_events.event_payload",
 ]);
 
 const policyAuthorityJsonbColumns = Object.freeze([...policyContract]

@@ -4648,6 +4648,97 @@ export const actionApprovalEvidenceGrants = pgTable("action_approval_evidence_gr
 ]);
 
 /**
+ * One immutable execution identity for one approved ActionUnit decision. This
+ * is an admission ledger only: a row cannot itself grant a Meta write.
+ */
+export const actionExecutionAttempts = pgTable("action_execution_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  bundleId: uuid("bundle_id").notNull(),
+  unitId: uuid("unit_id").notNull(),
+  decisionEventId: uuid("decision_event_id").notNull(),
+  approvalGrantId: uuid("approval_grant_id").notNull(),
+  executionRef: text("execution_ref").notNull(),
+  unitRef: text("unit_ref").notNull(),
+  approvalDecisionRef: text("approval_decision_ref").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  admissionHash: text("admission_hash").notNull(),
+  writeSpecHash: text("write_spec_hash").notNull(),
+  admissionPayload: jsonb("admission_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("action_execution_attempts_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("action_execution_attempts_workspace_ref_unique").on(table.workspaceId, table.executionRef),
+  uniqueIndex("action_execution_attempts_workspace_idempotency_unique").on(table.workspaceId, table.idempotencyKey),
+  uniqueIndex("action_execution_attempts_decision_unique").on(table.workspaceId, table.decisionEventId),
+  index("action_execution_attempts_unit_idx").on(table.workspaceId, table.unitId, table.createdAt),
+  foreignKey({ columns: [table.workspaceId, table.bundleId], foreignColumns: [actionProposalBundles.workspaceId, actionProposalBundles.id], name: "action_execution_attempts_bundle_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.bundleId, table.unitId, table.unitRef], foreignColumns: [actionProposalUnits.workspaceId, actionProposalUnits.bundleId, actionProposalUnits.id, actionProposalUnits.unitRef], name: "action_execution_attempts_unit_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.decisionEventId], foreignColumns: [actionApprovalDecisionEvents.workspaceId, actionApprovalDecisionEvents.id], name: "action_execution_attempts_decision_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.approvalGrantId], foreignColumns: [actionApprovalEvidenceGrants.workspaceId, actionApprovalEvidenceGrants.id], name: "action_execution_attempts_grant_scope_fk" }).onDelete("cascade"),
+  check("action_execution_attempts_identity", sql`
+    ${table.executionRef} ~ '^action_execution_[a-f0-9]{20}$'
+    and ${table.unitRef} ~ '^action_unit_[a-f0-9]{20}$'
+    and ${table.approvalDecisionRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.idempotencyKey} ~ '^[a-f0-9]{64}$'
+    and ${table.admissionHash} ~ '^[a-f0-9]{64}$'
+    and ${table.writeSpecHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("action_execution_attempts_payload_exact", sql`
+    jsonb_typeof(${table.admissionPayload}) = 'object'
+    and ${table.admissionPayload} #>> '{version}' = 'action-execution-admission/1.0.0'
+    and ${table.admissionPayload} #>> '{unitRef}' = ${table.unitRef}
+    and ${table.admissionPayload} #>> '{approvalDecisionRef}' = ${table.approvalDecisionRef}
+    and ${table.admissionPayload} #>> '{admissionHash}' = ${table.admissionHash}
+    and ${table.admissionPayload} #>> '{writeSpec,specHash}' = ${table.writeSpecHash}
+    and ${table.admissionPayload} #>> '{disposition}' = 'admitted_for_disabled_executor'
+    and ${table.admissionPayload} #>> '{capabilities,canExecute}' = 'false'
+    and ${table.admissionPayload} #>> '{capabilities,canWriteMeta}' = 'false'
+    and ${table.admissionPayload} #>> '{capabilities,canDispatchNetwork}' = 'false'
+  `),
+  check("action_execution_attempts_no_forbidden_material", sql`
+    ${table.admissionPayload}::text !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
+  `),
+]);
+
+/** Append-only execution timeline. New events, never mutable status columns. */
+export const actionExecutionEvents = pgTable("action_execution_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  executionAttemptId: uuid("execution_attempt_id").notNull(),
+  sequence: integer("sequence").notNull(),
+  eventRef: text("event_ref").notNull(),
+  previousHash: text("previous_hash").notNull(),
+  eventHash: text("event_hash").notNull(),
+  eventType: text("event_type").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  eventPayload: jsonb("event_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("action_execution_events_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("action_execution_events_attempt_sequence_unique").on(table.executionAttemptId, table.sequence),
+  uniqueIndex("action_execution_events_workspace_ref_unique").on(table.workspaceId, table.eventRef),
+  uniqueIndex("action_execution_events_workspace_hash_unique").on(table.workspaceId, table.eventHash),
+  index("action_execution_events_attempt_idx").on(table.workspaceId, table.executionAttemptId, table.sequence),
+  foreignKey({ columns: [table.workspaceId, table.executionAttemptId], foreignColumns: [actionExecutionAttempts.workspaceId, actionExecutionAttempts.id], name: "action_execution_events_attempt_scope_fk" }).onDelete("cascade"),
+  check("action_execution_events_identity", sql`
+    ${table.sequence} >= 1
+    and ${table.eventRef} ~ '^action_execution_event_[a-f0-9]{20}$'
+    and ${table.previousHash} ~ '^[a-f0-9]{64}$'
+    and ${table.eventHash} ~ '^[a-f0-9]{64}$'
+    and ${table.eventType} in ('admitted', 'dispatch_claimed', 'write_accepted', 'verified', 'failed', 'parked')
+  `),
+  check("action_execution_events_payload_shape", sql`
+    jsonb_typeof(${table.eventPayload}) = 'object'
+    and ${table.eventPayload} #>> '{executionAuthority}' = 'none'
+    and ${table.eventPayload} #>> '{networkDispatched}' = 'false'
+  `),
+  check("action_execution_events_no_forbidden_material", sql`
+    ${table.eventPayload}::text !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
+  `),
+]);
+
+/**
  * Append-only normalized autonomy rules. Guidance references are provenance only;
  * publication always carries an explicit owner/admin decision and grants no execution authority.
  */

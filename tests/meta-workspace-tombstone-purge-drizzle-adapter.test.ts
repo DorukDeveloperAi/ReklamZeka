@@ -34,7 +34,7 @@ describe("explicit workspace tombstone purge adapter", () => {
 
     expect(evidence.candidateCount).toBe(1);
     expect(evidence.revision).toMatch(/^[a-f0-9]{64}$/);
-    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(109);
+    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(111);
     const allSchemaTables = Object.values(schema)
       .flatMap((value) => isTable(value) ? [getTableName(value)] : [])
       .sort();
@@ -80,7 +80,11 @@ describe("explicit workspace tombstone purge adapter", () => {
     expect(result).toEqual({ purgedRowCount: 0, membershipCount: 0 });
     expect(inspectCalls).toBe(3);
     const deletes = statements.filter((statement) => statement.includes("delete from"));
-    expect(deletes).toHaveLength(109);
+    expect(deletes).toHaveLength(111);
+    expect(deletes.findIndex((statement) => statement.includes("delete from action_execution_events")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from action_execution_attempts")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from action_execution_attempts")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from action_approval_evidence_grants")));
     expect(deletes.findIndex((statement) => statement.includes("delete from guidance_analysis_run_bindings")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from decision_room_runs")));
     expect(deletes.findIndex((statement) => statement.includes("delete from strict_instruction_policy_revisions")))

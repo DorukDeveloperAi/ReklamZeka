@@ -133,6 +133,24 @@ function validatePresence(value: ExecutionHumanPresenceEvidence, unit: ActionUni
   return Object.freeze({ ...value, actor: Object.freeze({ ...value.actor }), issuedAt, expiresAt });
 }
 
+/** Validates a stored/public boundary admission without recreating authority. */
+export function assertValidActionExecutionAdmission(value: unknown): asserts value is ActionExecutionAdmission {
+  exact(value, ["version", "unitRef", "approvalDecisionRef", "approvalGrantRef", "executionPresenceRef", "writeSpec", "dependencyUnitRefs", "evaluatedAt", "disposition", "capabilities", "admissionHash"], "invalid_input");
+  if (value.version !== ACTION_EXECUTION_ADMISSION_VERSION || value.disposition !== "admitted_for_disabled_executor"
+    || !Array.isArray(value.dependencyUnitRefs) || value.dependencyUnitRefs.length > 100
+    || new Set(value.dependencyUnitRefs).size !== value.dependencyUnitRefs.length) fail("invalid_input");
+  ref(value.unitRef, "invalid_input"); ref(value.approvalDecisionRef, "invalid_input");
+  ref(value.approvalGrantRef, "invalid_input"); ref(value.executionPresenceRef, "invalid_input");
+  instant(value.evaluatedAt, "invalid_input");
+  for (const dependency of value.dependencyUnitRefs) ref(dependency, "invalid_input");
+  exact(value.capabilities, ["canExecute", "canWriteMeta", "canDispatchNetwork"], "invalid_input");
+  if (value.capabilities.canExecute !== false || value.capabilities.canWriteMeta !== false || value.capabilities.canDispatchNetwork !== false) fail("invalid_input");
+  const writeSpec = value.writeSpec as MetaWriteSpec;
+  if (!writeSpec || typeof writeSpec !== "object" || writeSpec.unitRef !== value.unitRef || !HASH.test(writeSpec.specHash)) fail("invalid_input");
+  const { admissionHash, ...core } = value;
+  if (digest(core) !== hash(admissionHash, "invalid_input")) fail("invalid_input");
+}
+
 /**
  * Admission is intentionally not execution: it is the deterministic boundary
  * between an approved unit and a future server-private write executor. The

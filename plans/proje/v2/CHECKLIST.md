@@ -570,6 +570,9 @@
     dependency closure freshness'i ve ayrı action-bound human-presence kanıtını birlikte
     doğrular. Çıktı yalnız disabled executor adaydır; execution/Meta-write/network capability
     yapısal olarak false kalır.
+  - [x] Server-private, append-only admission ledger; unit/approve karar/grant zincirini
+    tenant içinde yeniden bağlar, typed spec hash'ini doğrular ve yalnız `admitted` olayı yazar.
+    İdempotent kayıt vardır; dispatch, Meta transportu ve write authority yoktur.
 - [ ] Campaign/adset/ad pause/activate eligibility ve parent/effective-status matrisi.
 - [ ] Campaign/adset budget owner write; ad-level budget negatif testi.
 - [ ] K0–K4 valve, account allowlist, caps, kill switch ve çift anahtar.
