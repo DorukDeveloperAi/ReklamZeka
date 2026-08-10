@@ -264,6 +264,11 @@
     category resolver ve repository-verified authority closure ile bileşir, sadece
     `evidence_bound` save yapar ve invalidated dönüşü reddeder. Current config/cadence/guidance/
     evidence için ortak tutarlı Drizzle read adapter'ı bu dar saf portun dışında açık kalır.
+  - [x] A10.4c-3 server-private current cadence reader: tenant/account/campaign scope içinden tek
+    current immutable cadence revision'ı ref/revision/version/hash/payload ile `REPEATABLE READ,
+    READ ONLY` snapshot'ta çözer; missing/ambiguous/paused/future/tahrif edilmiş profile fail-closed
+    reddedilir. Karar yalnız repository kaynaklı campaign zamanları ve boş kanıtla domain evaluator'da
+    advisory olarak hesaplanır; evidence reader gelene dek sonuç observe/blocked dışında güçlenemez.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.
