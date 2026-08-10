@@ -3,6 +3,19 @@
 > Kümülatif ilerleme defteri. v1'in ayrıntılı tur geçmişi
 > [v1 STATE](../v1/STATE.md)'te değişmeden korunur.
 
+## 2026-08-10 — Dinamik kampanya brief şablonları
+
+- `interactive-campaign-template/1.0.0`, operasyonel sınıflandırmayı pazar → dil → hizmet →
+  dönüşüm yolu olarak taşır; delivery health ve randevu/operasyon kapasitesini performans başarısından
+  ayrı ön koşul yapar. Bu, kampanya bütçe/harcama takibindeki lead ile üst-huni ayrımı ve kesinti
+  gözlemlerini karar sözleşmesine taşır; çalışma kitabındaki dönemsel sonuçlardan kalıcı bütçe kuralı
+  türetmez.
+- Lead acquisition, upper-funnel education, market/service learning, continuity recovery ve
+  classification triage şablonları yalnız soru, ölçüm ayrımı ve insan-incelemeli sıra üretir. Kesinti
+  veya sınıflandırılmamış kayıt `blocked`; eksik kapasite/dil/hizmet/rota `needs_input` kalır. Form ve
+  WhatsApp varsayılan olarak farklı sonuç yollarıdır. Campaign create/publish/approve/execute/Meta write
+  capability'leri yapısal olarak false'tur.
+
 ## 2026-08-10 — A09 complete relational authority-impact acceptance
 
 - `verify:instruction-policy-authority-impact-db`, tek outer rollback altında gerçek draft → empty

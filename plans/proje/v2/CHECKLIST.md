@@ -260,6 +260,11 @@
 
 - [x] Kampanya objective/funnel/event/classification temel sözleşmesi.
 - [x] Altı objective için primary/diagnostic/guardrail/min-sample karar playbook temeli.
+- [x] İşletim taksonomisine dayalı, insan-incelemeli interaktif kampanya brief şablonları: pazar/dil/
+  hizmet/dönüşüm yolu sınıflandırmasını delivery health ve kapasiteden ayrı tutar; lead edinimi,
+  üst-huni eğitim, pazar-hizmet öğrenmesi, kesinti toparlanması ve sınıflandırma triage'ını
+  deterministic seçer. Form ve WhatsApp sonucu varsayılan olarak aynı KPI değildir; hiçbir campaign
+  create/publish/approval/Meta-write yetkisi vermez.
 - [ ] Meta config + çoklu internal category + policy composition.
   - [x] A10.4a immutable/replay-safe `meta-analysis-config-snapshot/2.0.0`: reviewed
     campaign objective ve ad-set optimization-goal mapping sürümleri hash'e freeze edilir;
