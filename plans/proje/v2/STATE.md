@@ -2086,3 +2086,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - `DrizzleCurrentEffectiveAnalysisContextSourceReader` bu reader'ı yalnız validation olarak çağırır;
   guidance/data/history/category/lifecycle/authority closure aynı snapshotta tamamlanmadığından halen
   `not_ready` döner ve capability üretmez. Schema/migration, HTTP/UI/action/Decision Room wiring yoktur.
+
+## 2026-08-10 — A10.4c-6 transaction-local cadence validation
+
+- `CurrentDecisionCadenceReader.readCurrent` bağımsız çağrılarda kısa `REPEATABLE READ, READ ONLY`
+  snapshot'ını açmayı sürdürür. `readCurrentInTransaction` ise caller-owned snapshot ile exact
+  `capturedAt` alır, yeniden transaction açmaz ve query içindeki `transaction_timestamp()` ile eşitliği
+  doğrular. Böylece profile/current-head/hash/payload/temporal/domain fail-closed kontrolleri aynen
+  korunurken drift veya nested transaction kabul edilmez.
+- `DrizzleCurrentEffectiveAnalysisContextSourceReader`, hierarchy ile campaign ref'ini aynı snapshotta
+  doğruladıktan sonra cadence reader'ı yalnız validation için çağırır. Guidance/data/history/category/
+  lifecycle/authority closure henüz mevcut olmadığından bundle yine dürüstçe `not_ready` döner; HTTP/UI,
+  Decision Room, action authority veya schema/migration eklenmedi.

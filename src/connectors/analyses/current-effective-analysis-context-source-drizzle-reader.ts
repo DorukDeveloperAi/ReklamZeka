@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { EffectiveAnalysisContextNotReadySource, EffectiveAnalysisContextRequest,
   EffectiveAnalysisContextSource } from "@/application/effective-analysis-context-composer";
+import { CurrentDecisionCadenceReader, type CurrentDecisionCadence } from "@/connectors/decisions/current-decision-cadence-reader";
 import { CurrentMetaHierarchyConfigReader, type CurrentMetaHierarchyConfig } from "@/connectors/meta/current-meta-hierarchy-config-reader";
 import * as schema from "@/db/schema";
 
@@ -36,7 +37,8 @@ const NO_SOURCE_CAPABILITIES = Object.freeze({
  */
 export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
   constructor(private readonly database: Database,
-    private readonly hierarchyReader: Pick<CurrentMetaHierarchyConfigReader, "readCurrent"> = new CurrentMetaHierarchyConfigReader()) {}
+    private readonly hierarchyReader: Pick<CurrentMetaHierarchyConfigReader, "readCurrent"> = new CurrentMetaHierarchyConfigReader(),
+    private readonly cadenceReader: Pick<CurrentDecisionCadenceReader, "readCurrentInTransaction"> = new CurrentDecisionCadenceReader(database)) {}
 
   async loadCurrent(input: EffectiveAnalysisContextRequest): Promise<EffectiveAnalysisContextSource> {
     if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).length !== 4
@@ -59,6 +61,12 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
       const hierarchy: CurrentMetaHierarchyConfig = await this.hierarchyReader.readCurrent(tx, input);
       if (hierarchy.capturedAt !== capturedAt || hierarchy.identity.accountRef !== input.accountRef
         || hierarchy.identity.hierarchyRefs.at(-1) !== input.entityRef) throw new Error("corrupt_store");
+      const cadence: CurrentDecisionCadence = await this.cadenceReader.readCurrentInTransaction(tx, {
+        workspaceId: input.workspaceId, accountRef: input.accountRef, campaignRef: hierarchy.identity.campaignRef,
+      }, capturedAt);
+      if (cadence.decision.evaluatedAt !== capturedAt || cadence.decision.actionAuthority !== "none") {
+        throw new Error("corrupt_store");
+      }
       const unavailable: EffectiveAnalysisContextNotReadySource = Object.freeze({
         status: "not_ready", capturedAt, reason: "current_source_bundle_unavailable", capabilities: NO_SOURCE_CAPABILITIES,
       });

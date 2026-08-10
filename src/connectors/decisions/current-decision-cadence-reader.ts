@@ -69,6 +69,23 @@ export type CurrentDecisionCadence = Readonly<{
   decision: DecisionCadenceResult;
 }>;
 
+export type CurrentDecisionCadenceInput = Readonly<{
+  workspaceId: string;
+  accountRef: string;
+  campaignRef: string;
+}>;
+
+function inputIsValid(input: unknown): input is CurrentDecisionCadenceInput {
+  return !!input && typeof input === "object" && !Array.isArray(input)
+    && Object.keys(input).length === 3
+    && Object.keys(input).every((key) => ["workspaceId", "accountRef", "campaignRef"].includes(key))
+    && UUID.test((input as CurrentDecisionCadenceInput).workspaceId)
+    && typeof (input as CurrentDecisionCadenceInput).accountRef === "string"
+    && (input as CurrentDecisionCadenceInput).accountRef.trim().length > 0
+    && typeof (input as CurrentDecisionCadenceInput).campaignRef === "string"
+    && (input as CurrentDecisionCadenceInput).campaignRef.trim().length > 0;
+}
+
 /**
  * Read-only, server-private cadence source. It deliberately accepts only the
  * stable tenant/campaign identity; no route or caller can inject a profile,
@@ -77,17 +94,31 @@ export type CurrentDecisionCadence = Readonly<{
 export class CurrentDecisionCadenceReader {
   constructor(private readonly database: Database) {}
 
-  async readCurrent(input: Readonly<{ workspaceId: string; accountRef: string; campaignRef: string }>): Promise<CurrentDecisionCadence> {
-    if (!input || typeof input !== "object" || Array.isArray(input)
-      || Object.keys(input).length !== 3
-      || Object.keys(input).some((key) => !["workspaceId", "accountRef", "campaignRef"].includes(key))
-      || !UUID.test(input.workspaceId) || !input.accountRef.trim() || !input.campaignRef.trim()) {
-      fail("invalid_input");
-    }
+  /** Owns a short read-only snapshot for callers without an existing one. */
+  async readCurrent(input: CurrentDecisionCadenceInput): Promise<CurrentDecisionCadence> {
+    if (!inputIsValid(input)) fail("invalid_input");
     return this.database.transaction(async (transaction) => {
       const tx = transaction as unknown as Database;
       await tx.execute(sql`set transaction isolation level repeatable read, read only`);
-      const candidates = rows<Readonly<{
+      const clock = rows<Readonly<{ captured_at: unknown }>>(await tx.execute(sql`
+        select to_char(transaction_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as captured_at
+      `));
+      if (clock.length !== 1) fail("corrupt_store");
+      const capturedAt = iso(clock[0]!.captured_at);
+      return this.readCurrentInTransaction(tx, input, capturedAt);
+    });
+  }
+
+  /**
+   * Reads only from a caller-owned `REPEATABLE READ, READ ONLY` transaction.
+   * `capturedAt` is the source seam's transaction timestamp, never a caller
+   * clock; the query re-reads that same timestamp and rejects any mismatch.
+   */
+  async readCurrentInTransaction(transaction: Database, input: CurrentDecisionCadenceInput,
+    capturedAt: string): Promise<CurrentDecisionCadence> {
+    if (!inputIsValid(input) || !Number.isFinite(Date.parse(capturedAt))
+      || new Date(capturedAt).toISOString() !== capturedAt) fail("invalid_input");
+    const candidates = rows<Readonly<{
         revision_id: unknown;
         profile_ref: unknown;
         revision: unknown;
@@ -99,14 +130,14 @@ export class CurrentDecisionCadenceReader {
         last_material_change_at: unknown;
         campaign_status: unknown;
         database_now: unknown;
-      }>>(await tx.execute(sql`
+      }>>(await transaction.execute(sql`
         select cadence.id::text as revision_id,
           cadence.profile_ref, cadence.revision, cadence.profile_version, cadence.profile_hash, cadence.profile_payload,
           cadence.created_at::text as profile_created_at,
           coalesce(campaign.start_at, campaign.first_seen_at)::text as observed_from,
           campaign.source_updated_at::text as last_material_change_at,
           coalesce(campaign.effective_status, campaign.configured_status)::text as campaign_status,
-          clock_timestamp()::text as database_now
+          to_char(transaction_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as database_now
         from workspaces workspace
         join ad_accounts account
           on account.workspace_id = workspace.id and account.external_account_id = ${input.accountRef}
@@ -120,63 +151,63 @@ export class CurrentDecisionCadenceReader {
         order by cadence.profile_ref asc
         limit 2
       `));
-      if (candidates.length === 0) fail("not_found");
-      if (candidates.length !== 1) fail("ambiguous");
-      const row = candidates[0]!;
-      const databaseNow = iso(row.database_now);
-      const profileCreatedAt = iso(row.profile_created_at);
-      const observedFrom = iso(row.observed_from);
-      const lastMaterialChangeAt = nullableIso(row.last_material_change_at);
-      if (Date.parse(profileCreatedAt) > Date.parse(databaseNow)
-        || Date.parse(observedFrom) > Date.parse(databaseNow)
-        || (lastMaterialChangeAt !== null && Date.parse(lastMaterialChangeAt) > Date.parse(databaseNow))) {
-        fail("future");
-      }
-      if (typeof row.campaign_status !== "string" || row.campaign_status.toUpperCase() !== "ACTIVE") {
-        fail("paused");
-      }
-      if (typeof row.revision_id !== "string" || !UUID.test(row.revision_id)
-        || typeof row.profile_ref !== "string" || !PROFILE_REF.test(row.profile_ref)
-        || typeof row.revision !== "number" || !Number.isSafeInteger(row.revision) || row.revision < 1
-        || row.profile_version !== DECISION_CADENCE_VERSION
-        || typeof row.profile_hash !== "string" || !HASH.test(row.profile_hash)
-        || !row.profile_payload || typeof row.profile_payload !== "object" || Array.isArray(row.profile_payload)) {
-        fail("corrupt_store");
-      }
-      const profileRevision = row.revision;
-      const profile = row.profile_payload as DecisionCadenceProfile;
-      if (digest(profile) !== row.profile_hash) fail("corrupt_store");
-      let decision: DecisionCadenceResult;
-      try {
-        // The only durable evidence available at this narrow source boundary is
-        // the empty set. The domain evaluator therefore keeps the result
-        // blocked after observation/settling gates until a later evidence
-        // reader can prove stronger repository-owned evidence.
-        decision = evaluateDecisionCadence({
-          profile,
-          now: databaseNow,
-          observationStartedAt: observedFrom,
-          lastMaterialChangeAt,
-          learning: { state: "not_applicable", startedAt: null },
-          lastDecision: null,
-          recentDecisions: [],
-          evidence: { refs: [], score: 0 },
-          requestedDisposition: "test",
-          recommendationSource: "deterministic_policy",
-          emergencyGuardrail: { breached: false, evidenceRef: null },
-        });
-      } catch {
-        fail("corrupt_store");
-      }
-      return Object.freeze({
-        revisionId: row.revision_id,
-        profileRef: row.profile_ref,
-        profileRevision,
-        profileVersion: DECISION_CADENCE_VERSION,
-        profileHash: row.profile_hash,
-        profile: Object.freeze({ ...profile }),
-        decision,
+    if (candidates.length === 0) fail("not_found");
+    if (candidates.length !== 1) fail("ambiguous");
+    const row = candidates[0]!;
+    const databaseNow = iso(row.database_now);
+    if (databaseNow !== capturedAt) fail("corrupt_store");
+    const profileCreatedAt = iso(row.profile_created_at);
+    const observedFrom = iso(row.observed_from);
+    const lastMaterialChangeAt = nullableIso(row.last_material_change_at);
+    if (Date.parse(profileCreatedAt) > Date.parse(databaseNow)
+      || Date.parse(observedFrom) > Date.parse(databaseNow)
+      || (lastMaterialChangeAt !== null && Date.parse(lastMaterialChangeAt) > Date.parse(databaseNow))) {
+      fail("future");
+    }
+    if (typeof row.campaign_status !== "string" || row.campaign_status.toUpperCase() !== "ACTIVE") {
+      fail("paused");
+    }
+    if (typeof row.revision_id !== "string" || !UUID.test(row.revision_id)
+      || typeof row.profile_ref !== "string" || !PROFILE_REF.test(row.profile_ref)
+      || typeof row.revision !== "number" || !Number.isSafeInteger(row.revision) || row.revision < 1
+      || row.profile_version !== DECISION_CADENCE_VERSION
+      || typeof row.profile_hash !== "string" || !HASH.test(row.profile_hash)
+      || !row.profile_payload || typeof row.profile_payload !== "object" || Array.isArray(row.profile_payload)) {
+      fail("corrupt_store");
+    }
+    const profileRevision = row.revision;
+    const profile = row.profile_payload as DecisionCadenceProfile;
+    if (digest(profile) !== row.profile_hash) fail("corrupt_store");
+    let decision: DecisionCadenceResult;
+    try {
+      // The only durable evidence available at this narrow source boundary is
+      // the empty set. The domain evaluator therefore keeps the result
+      // blocked after observation/settling gates until a later evidence
+      // reader can prove stronger repository-owned evidence.
+      decision = evaluateDecisionCadence({
+        profile,
+        now: databaseNow,
+        observationStartedAt: observedFrom,
+        lastMaterialChangeAt,
+        learning: { state: "not_applicable", startedAt: null },
+        lastDecision: null,
+        recentDecisions: [],
+        evidence: { refs: [], score: 0 },
+        requestedDisposition: "test",
+        recommendationSource: "deterministic_policy",
+        emergencyGuardrail: { breached: false, evidenceRef: null },
       });
+    } catch {
+      fail("corrupt_store");
+    }
+    return Object.freeze({
+      revisionId: row.revision_id,
+      profileRef: row.profile_ref,
+      profileRevision,
+      profileVersion: DECISION_CADENCE_VERSION,
+      profileHash: row.profile_hash,
+      profile: Object.freeze({ ...profile }),
+      decision,
     });
   }
 }

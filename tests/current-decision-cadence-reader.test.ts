@@ -25,9 +25,16 @@ function candidate(overrides: Record<string, unknown> = {}) {
 }
 
 function reader(rows: readonly unknown[]) {
-  const execute = vi.fn(async () => ({ rows }));
-  const database = { execute, transaction: async (work: (tx: unknown) => Promise<unknown>) => work({ execute }) };
-  return { execute, reader: new CurrentDecisionCadenceReader(database as never) };
+  const execute = vi.fn(async (query: unknown) => {
+    const rendered = new PgDialect().sqlToQuery(query as never).sql;
+    if (rendered.includes("select to_char(transaction_timestamp()")) {
+      return { rows: [{ captured_at: "2026-08-10T12:00:00.000Z" }] };
+    }
+    return { rows };
+  });
+  const transaction = vi.fn(async (work: (tx: unknown) => Promise<unknown>) => work({ execute }));
+  const database = { execute, transaction };
+  return { execute, transaction, reader: new CurrentDecisionCadenceReader(database as never) };
 }
 
 describe("CurrentDecisionCadenceReader", () => {
@@ -41,7 +48,26 @@ describe("CurrentDecisionCadenceReader", () => {
     expect(rendered).toContain("cadence.superseded_at is null");
     expect(rendered).toContain("cadence.ad_account_id = account.id");
     expect(rendered).toContain("cadence.campaign_id = campaign.id");
-    expect(rendered).toContain("clock_timestamp()");
+    expect(rendered).toContain("transaction_timestamp()");
+    expect(harness.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the caller transaction and exact captured snapshot without opening a nested transaction", async () => {
+    const harness = reader([candidate()]);
+    const transaction = { execute: harness.execute };
+    await expect(harness.reader.readCurrentInTransaction(transaction as never,
+      { workspaceId, accountRef: "account_primary", campaignRef: "campaign_primary" }, "2026-08-10T12:00:00.000Z"))
+      .resolves.toMatchObject({ revisionId, decision: { evaluatedAt: "2026-08-10T12:00:00.000Z" } });
+    expect(harness.transaction).not.toHaveBeenCalled();
+    expect((harness.execute.mock.calls as unknown[][]).map(([query]) => new PgDialect().sqlToQuery(query as never).sql).join("\n"))
+      .toContain("transaction_timestamp()");
+  });
+
+  it("rejects a cadence row observed from a different transaction snapshot", async () => {
+    await expect(reader([candidate({ database_now: "2026-08-10T12:00:00.001Z" })]).reader.readCurrentInTransaction({ execute: vi.fn(async () => ({
+      rows: [candidate({ database_now: "2026-08-10T12:00:00.001Z" })],
+    })) } as never, { workspaceId, accountRef: "account_primary", campaignRef: "campaign_primary" }, "2026-08-10T12:00:00.000Z"))
+      .rejects.toEqual(expect.objectContaining<Partial<CurrentDecisionCadenceReaderError>>({ code: "corrupt_store" }));
   });
 
   it.each([

@@ -281,6 +281,10 @@
     Meta snapshot ve campaign'in tüm ad-set config gözlemlerini doğrular; canonical config-v2 + source
     snapshot evidence üretir. Current-source seam bunu yalnız validation için çağırır ve halen `not_ready`
     kalır; geniş ready bundle/UI/HTTP/action wiring'i yoktur.
+  - [x] A10.4c-6 transaction-local cadence validation: public cadence read kendi kısa `REPEATABLE READ,
+    READ ONLY` snapshot'ını açmayı sürdürür; mevcut current-source snapshot'ında ise nested transaction
+    açmadan exact aynı tx clock ile ref/revision/version/hash/payload ve advisory domain sonucu doğrulanır.
+    Source seam bunu yalnız validation için kullanır ve halen `not_ready`, tüm capability'ler false kalır.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.
