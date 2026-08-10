@@ -2332,6 +2332,61 @@ export const experimentRecordRevisions = pgTable("experiment_record_revisions", 
   `),
 ]);
 
+/**
+ * Canonical owner-entered/CSV business evidence. The source is represented only
+ * by its opaque ref and SHA-256 content hash; raw CSV or CRM material is never
+ * persisted here.
+ */
+export const businessOutcomeBatches = pgTable("business_outcome_batches", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  batchId: text("batch_id").notNull(),
+  sourceKind: text("source_kind").notNull(), sourceRef: text("source_ref").notNull(), contentHash: text("content_hash").notNull(),
+  observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+  actorId: uuid("actor_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  actorRef: text("actor_ref").notNull(), actorRole: text("actor_role").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("business_outcome_batches_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("business_outcome_batches_workspace_batch_unique").on(table.workspaceId, table.batchId),
+  uniqueIndex("business_outcome_batches_workspace_source_unique").on(table.workspaceId, table.sourceRef, table.contentHash),
+  index("business_outcome_batches_workspace_observed_idx").on(table.workspaceId, table.observedAt),
+  check("business_outcome_batches_shape", sql`(
+    ${table.batchId} ~ '^outcome_batch_[a-f0-9]{24}$' and ${table.sourceKind} in ('manual', 'csv')
+    and ${table.sourceRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.contentHash} ~ '^[a-f0-9]{64}$'
+    and ${table.actorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.actorRole} in ('owner', 'admin', 'analyst')
+  ) is true`),
+]);
+
+/** Immutable normalized signal rows; these are business evidence, never Meta metrics or action authority. */
+export const businessOutcomeSignals = pgTable("business_outcome_signals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  batchId: text("batch_id").notNull(), signalRef: text("signal_ref").notNull(), entityRef: text("entity_ref").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(), outcomeKind: text("outcome_kind").notNull(),
+  quantity: integer("quantity").notNull(), valueMinor: bigint("value_minor", { mode: "number" }), currency: text("currency"),
+  metaEntityRef: text("meta_entity_ref"), mappingStatus: text("mapping_status").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.batchId], foreignColumns: [businessOutcomeBatches.workspaceId, businessOutcomeBatches.batchId], name: "business_outcome_signals_batch_scope_fk" }).onDelete("cascade"),
+  uniqueIndex("business_outcome_signals_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("business_outcome_signals_workspace_signal_unique").on(table.workspaceId, table.signalRef),
+  index("business_outcome_signals_entity_time_idx").on(table.workspaceId, table.entityRef, table.occurredAt),
+  index("business_outcome_signals_outcome_time_idx").on(table.workspaceId, table.outcomeKind, table.occurredAt),
+  check("business_outcome_signals_shape", sql`(
+    ${table.signalRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.entityRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.outcomeKind} in ('qualified_lead', 'appointment', 'sale', 'revenue', 'invalid_lead') and ${table.quantity} >= 1
+    and ${table.mappingStatus} in ('verified', 'unmapped')
+    and ((${table.outcomeKind} = 'revenue' and ${table.valueMinor} >= 0 and ${table.currency} ~ '^[A-Z]{3}$')
+      or (${table.outcomeKind} <> 'revenue' and ${table.valueMinor} is null and ${table.currency} is null))
+    and ((${table.mappingStatus} = 'verified' and ${table.metaEntityRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$')
+      or (${table.mappingStatus} = 'unmapped' and ${table.metaEntityRef} is null))
+  ) is true`),
+]);
+
 /** Append-only template revisions, each bound to one exact context and timeframe revision. */
 export const analysisTemplateDefinitions = pgTable("analysis_template_definitions", {
   id: uuid("id").primaryKey().defaultRandom(),

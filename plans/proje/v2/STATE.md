@@ -1889,3 +1889,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Decision Room runtime'ı bugün kendisi experiment planı üretmediğinden otomatik adapter bilinçli olarak
   eklenmedi. Gerçek runtime-originated plan contract'i oluştuğunda planın exact frozen cadence/run assetine
   bağlanması ayrı bir checkpoint'tir; bu API onu varsayarak sahte bir bağlantı kurmaz.
+
+## 2026-08-10 — A10 BusinessOutcomeSignal normalized persistence
+
+- `business_outcome_batches` immutable manual/CSV source provenance'ını yalnız opaque source ref, SHA-256
+  content hash ve observed time ile tutar; raw CSV/CRM payload saklanmaz. Bağlı `business_outcome_signals`
+  qualified lead, appointment, sale, revenue ve invalid lead'i entity/time/outcome indeksleriyle normalize eder.
+- Server-private writer önce saf canonical batch hash'ini yeniden üretir; ardından active workspace ve actor
+  membership rolünü transaction içinde kilitli doğrular, batch/signal satırlarını atomik yazar ve hash-chain
+  audit event ekler. Outcome evidence hiçbir zaman Meta metriği veya action/approval/execute yetkisi değildir.
+- İki public tablo FORCE RLS, API role revoke, composite batch FK, immutable/tombstone trigger ve explicit
+  workspace purge listesi taşır. Yerel ortamda `postgres_connection_not_configured` olduğundan migration
+  rollback/RLS live acceptance ve cookie-bound authoring/read route'u sonraki açıktır.

@@ -318,6 +318,10 @@
   - [x] Manual/CSV source ref+content hash'li immutable BusinessOutcomeSignal contract: qualified lead,
     appointment, sale, revenue ve invalid lead canonicalize edilir; missing/verified mapping Meta
     metriğine dönüşmez ve `metaProxyEligible=false` kalır.
+  - [x] A10.3 tenant-bound normalized BusinessOutcome batch/signal persistence: raw CSV saklamadan source
+    hash/provenance, immutable batch→signal rows, membership recheck, audit, FORCE RLS/revoke ve tombstone
+    purge sözleşmesi; query path entity/outcome/time indexleriyle bounded kalır.
+  - [ ] Cookie-bound manual/CSV authoring/read yüzeyi ve frozen context/L4–L5 binding'i.
 
 ## A11 — Bütçe planlama
 
