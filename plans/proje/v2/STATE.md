@@ -32,6 +32,16 @@
   veya action execution eklenmemiştir; gerçek session/DB acceptance ve read-after-write/rollback sonraki
   açık kapılardır.
 
+## 2026-08-10 — A13 verify / rollback fail-closed contract
+
+- `action-execution-verification/1.0.0`, frozen admission ve immutable action plan'dan doğrulanacak
+  target değeri ile önceki değeri taşıyan rollback adayını hash-bound üretir. `accepted` transport,
+  current mirror'da expected-value eşleşmesinden; bu eşleşme de platform review/delivery sonucundan
+  ayrıdır. Böylece pending review/delivery, write verification ile karıştırılmaz.
+- Retryable transport veya read eksikliği `parked`, read-after-write farkı `failed` kalır. Doğrulanmış
+  satır bile rollback'i otomatikleştirmez: yalnız yeni, ayrı insan onaylı action adayına dönüşebilir;
+  limited/rejected platform state manual recovery ister. Transport/DB event append/UI/Meta write yoktur.
+
 ## 2026-08-10 — A10 cadence/experiment adapter canlı kabulü
 
 - `npm run verify:cadence-experiment-lifecycle-db`, gerçek owner cookie session'ı ile local

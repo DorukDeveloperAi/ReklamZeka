@@ -600,6 +600,12 @@
     en-dar resolver, expiry/conflict/child-widening/kill-switch ve budget/protection guard'ları.
 - [x] Approval state machine, expiry, stale-plan ve separation of duties.
 - [ ] Idempotent execute, Meta error taxonomy, read-after-write ve rollback.
+  - [x] `action-execution-verification/1.0.0` frozen admission+plan'dan expected target value ve
+    yalnız yeni approved action'a dönüşebilecek prior-value rollback adayını üretir. Transport kabulü,
+    read-after-write eşleşmesi ve Meta review/delivery ayrı tutulur; retryable hata/read eksikliği
+    `parked`, değer farkı `failed`, rollback ise otomatik değil yeni insan onayı gerektirir.
+  - [ ] Gerçek typed Meta transport, idempotent dispatch/event append, live read-after-write ve
+    yeni rollback action lifecycle'i; açık insan onayı olmadan eklenmez.
 - [ ] Hourly/daily/weekly/monthly/after-sync scheduler; DST/misfire/idempotency.
   - [x] Decision Room daily/weekly timezone+DST, skip/run_once catch-up ve duplicate-slot çekirdeği.
   - [x] Immutable schedule revision, exact hierarchy binding ve kalıcı lease/run store.
