@@ -65,7 +65,8 @@ yazımı `claim-guard` REDDEDER. `C=~/.claude/skills/eszamanli/scripts/claim.mjs
   deny·bekleyis·kapanis·kapandi·devir·cevrim **yapısal olarak** akar, elle bağlanmaz; gürültü
   katlanır (tavan 12 satır, >500 olayda yalnız sayaç). Eli: `bildir --hedef <sid> --mesaj "…"`.
   Repo başına **tek slot** (`--devral`), canlılık pid'le, kapsam **repo** (projeler-arası eksen
-  `/pm`). PM karar verir, orkestratör **haber alır**.
+  `/pm`). PM karar verir, orkestratör **haber alır**. Beslemenin İKİNCİ kanalı commit'lerdir
+  (otonomi-merdiveni:16): İŞ satır satır · cp TEK satıra katlanır · imleç `orkestrator/commit-imlec.json`.
 - Canlılık **pid**'le ölçülür → kilidi **ELLE SİLME** · kapı **YAZIMI** ölçer, adı anmayı değil.
 
 Detay: `/Users/ybg/dev/agent-ide/docs/claim-anahtarlari.md`
