@@ -364,7 +364,7 @@
       "pkg": "hook:session-status"
     },
     ".claude/aide/docs/terimler.md": {
-      "hash": "464cbb0ee32a9b24",
+      "hash": "d17326592300465e",
       "pkg": "doc:terimler"
     },
     ".claude/aide/docs/claude-md-sozlesmesi.md": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-10T13:09:50.487Z",
+  "updatedAt": "2026-08-10T14:04:00.417Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",
