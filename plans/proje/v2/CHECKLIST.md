@@ -259,6 +259,11 @@
     Cadence ref/revision/version/hash selective source component'e bağlanır; supersede publish eski
     profile hash'i için aynı transaction'da exact-entity invalidation append eder. Forward migration
     iki component enum'unu `cadence_profile` ile genişletir ve RLS/FORCE/revoke korumasını yineler.
+  - [x] A10.4c-2 private effective-analysis-context composer: dış girdi yalnız
+    `workspaceId/accountRef/entityType/entityRef/capturedAt`; config-v2 projection, all-dimension
+    category resolver ve repository-verified authority closure ile bileşir, sadece
+    `evidence_bound` save yapar ve invalidated dönüşü reddeder. Current config/cadence/guidance/
+    evidence için ortak tutarlı Drizzle read adapter'ı bu dar saf portun dışında açık kalır.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.

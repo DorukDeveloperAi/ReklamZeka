@@ -2028,3 +2028,18 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   approval/Meta-write capability eklemez.
 - Kanıt: context/persistence, cadence publisher ve forward migration için 3 hedef test dosyasında
   12 test; `npm run typecheck`, `npm run db:check` ve `git diff --check` geçti.
+
+## 2026-08-10 — A10.4c-2 private effective-analysis-context composer
+
+- `EffectiveAnalysisContextComposer` yalnız beş scope alanını kabul eder; çağıranın meta,
+  category, guidance, policy, cadence, evidence veya version bileşeni göndermesine izin vermez.
+  Objective/optimization doğrudan current config-v2 snapshot projection'ından gelir; categories
+  `CurrentCategoryCompositionResolver` üzerinden, policy authority ise yalnız
+  repository-verified authority loader'ın private `compose` closure'ı üzerinden bağlanır.
+- Composer `productionAuthoritySourceBound=true`, policy-authority evidence/version ve tüm context/
+  composition capability bayraklarının false olmasını zorunlu tutar. Yalnız `evidence_bound`
+  persistence çağrısı yapılır; eşzamanlı veya mevcut invalidation dönen save sonucu kullanılmaz.
+- Bu katman kasten Drizzle production adapteri iddia etmez: config-v2, cadence, guidance ve outcome
+  evidence'in tek read-only consistent snapshot altında current read'ini sağlayacak adapter henüz
+  mevcut source portlarda yoktur. Kanıt: `tests/effective-analysis-context-composer.test.ts` (3 test),
+  `npm run typecheck` ve `git diff --check`.
