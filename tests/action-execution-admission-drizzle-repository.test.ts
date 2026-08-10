@@ -39,6 +39,8 @@ function admission() {
     authorization: { authorizationRef: "presence_approval", unitRef: unit.unitRef, unitHash: unit.unitHash, scopeHash: unit.scopeHash,
       actor: { actorRef: "actor_owner", role: "owner" }, issuedAt: at, expiresAt: "2026-08-10T12:01:00.000Z", humanPresence: true, canExecute: false }, grantRef: "grant_one" }).lifecycle;
   return admitActionExecution({ lifecycle, unitRef: unit.unitRef, actionPlan,
+    eligibilitySnapshot: { workspaceRef: "workspace_alpha", accountRef: "account_main", capturedAt: at,
+      target: { entityLevel: "campaign", entityRef: "campaign_main", configuredStatus: "ACTIVE", effectiveStatus: "ACTIVE", budgetOwnerRef: "campaign_main" }, ancestors: [], sourceSnapshotHash: "d".repeat(64) },
     currentFreshness: [{ unitRef: unit.unitRef, planRevision: unit.plan.revision, planHash: unit.plan.planHash, sourceHash: unit.sourceHash, contextHash: unit.contextHash, specHash: unit.specHash }],
     executionPresence: { authorizationRef: "presence_execute", unitRef: unit.unitRef, unitHash: unit.unitHash, scopeHash: unit.scopeHash,
       actor: { actorRef: "actor_owner", role: "owner" }, issuedAt: at, expiresAt: "2026-08-10T12:01:00.000Z", humanPresence: true }, evaluatedAt: "2026-08-10T12:00:30.000Z" });

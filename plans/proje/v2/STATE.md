@@ -2641,6 +2641,20 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: `tests/meta-write-eligibility.test.ts`, `tests/meta-write-spec.test.ts`,
   `tests/autonomy-valve.test.ts`, `npm run typecheck`.
 
+## 2026-08-10 — A13 eligibility-bound disabled admission
+
+- `action-execution-admission/1.0.0`, artık typed write-spec yanında aynı unit scope'una ait
+  eligibility snapshot/result hash'ini de immutable admission hash'ine dahil eder. Target state,
+  parent chain, budget owner veya workspace/account scope'u uygun değilse disabled-executor
+  admission dahi üretilmez.
+- Bu checkpoint caller-provided source snapshot'ı salt domain sözleşmesinde bağlar; sonraki server-
+  private executor checkpoint'i aynı snapshotı current persisted Meta mirror'dan yeniden çözmek
+  zorundadır. Bu nedenle execution/Meta-write/network capability'leri false kalır ve yeni transport,
+  DB write veya HTTP endpoint yoktur.
+- Kanıt: `tests/action-execution-admission.test.ts`,
+  `tests/action-execution-admission-drizzle-repository.test.ts`,
+  `tests/meta-write-eligibility.test.ts`, `npm run typecheck`.
+
 ## 2026-08-10 — A10 interactive proposal-only campaign brief surface
 
 - Kampanyalar görünümündeki `CampaignPlanningBriefPanel`, çalışma kitabında görünen sıralamayı

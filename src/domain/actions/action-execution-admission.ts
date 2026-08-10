@@ -10,6 +10,10 @@ import {
 } from "@/domain/actions/approval-lifecycle";
 import { type ActionPlan } from "@/domain/actions/autonomy-valve";
 import { createMetaWriteSpec, type MetaWriteSpec } from "@/domain/actions/meta-write-spec";
+import {
+  assessMetaWriteEligibility,
+  type MetaWriteEligibilitySnapshot,
+} from "@/domain/actions/meta-write-eligibility";
 
 export const ACTION_EXECUTION_ADMISSION_VERSION = "action-execution-admission/1.0.0" as const;
 
@@ -31,6 +35,8 @@ export type ActionExecutionAdmission = Readonly<{
   approvalGrantRef: string;
   executionPresenceRef: string;
   writeSpec: MetaWriteSpec;
+  eligibilitySnapshotHash: string;
+  eligibilityHash: string;
   dependencyUnitRefs: readonly string[];
   evaluatedAt: string;
   /** A future server-private executor may consume this admission; it is not a write capability. */
@@ -49,6 +55,7 @@ export class ActionExecutionAdmissionError extends Error {
     | "dependency_not_ready"
     | "freshness_mismatch"
     | "action_plan_mismatch"
+    | "write_not_eligible"
     | "unsupported_action") {
     super(`Action execution admission reddedildi: ${code}`);
     this.name = "ActionExecutionAdmissionError";
@@ -135,12 +142,13 @@ function validatePresence(value: ExecutionHumanPresenceEvidence, unit: ActionUni
 
 /** Validates a stored/public boundary admission without recreating authority. */
 export function assertValidActionExecutionAdmission(value: unknown): asserts value is ActionExecutionAdmission {
-  exact(value, ["version", "unitRef", "approvalDecisionRef", "approvalGrantRef", "executionPresenceRef", "writeSpec", "dependencyUnitRefs", "evaluatedAt", "disposition", "capabilities", "admissionHash"], "invalid_input");
+  exact(value, ["version", "unitRef", "approvalDecisionRef", "approvalGrantRef", "executionPresenceRef", "writeSpec", "eligibilitySnapshotHash", "eligibilityHash", "dependencyUnitRefs", "evaluatedAt", "disposition", "capabilities", "admissionHash"], "invalid_input");
   if (value.version !== ACTION_EXECUTION_ADMISSION_VERSION || value.disposition !== "admitted_for_disabled_executor"
     || !Array.isArray(value.dependencyUnitRefs) || value.dependencyUnitRefs.length > 100
     || new Set(value.dependencyUnitRefs).size !== value.dependencyUnitRefs.length) fail("invalid_input");
   ref(value.unitRef, "invalid_input"); ref(value.approvalDecisionRef, "invalid_input");
   ref(value.approvalGrantRef, "invalid_input"); ref(value.executionPresenceRef, "invalid_input");
+  hash(value.eligibilitySnapshotHash, "invalid_input"); hash(value.eligibilityHash, "invalid_input");
   instant(value.evaluatedAt, "invalid_input");
   for (const dependency of value.dependencyUnitRefs) ref(dependency, "invalid_input");
   exact(value.capabilities, ["canExecute", "canWriteMeta", "canDispatchNetwork"], "invalid_input");
@@ -160,11 +168,12 @@ export function admitActionExecution(input: Readonly<{
   lifecycle: ApprovalLifecycle;
   unitRef: string;
   actionPlan: ActionPlan;
+  eligibilitySnapshot: MetaWriteEligibilitySnapshot;
   currentFreshness: readonly UnitFreshness[];
   executionPresence: ExecutionHumanPresenceEvidence;
   evaluatedAt: string;
 }>): ActionExecutionAdmission {
-  exact(input, ["lifecycle", "unitRef", "actionPlan", "currentFreshness", "executionPresence", "evaluatedAt"], "invalid_input");
+  exact(input, ["lifecycle", "unitRef", "actionPlan", "eligibilitySnapshot", "currentFreshness", "executionPresence", "evaluatedAt"], "invalid_input");
   const evaluatedAt = instant(input.evaluatedAt, "invalid_input");
   if (!Array.isArray(input.currentFreshness) || input.currentFreshness.length > 100) fail("invalid_input");
   try { assertValidApprovalLifecycle(input.lifecycle); } catch { fail("lifecycle_invalid"); }
@@ -199,6 +208,12 @@ export function admitActionExecution(input: Readonly<{
     if (reason instanceof Error && reason.name === "MetaWriteSpecError") fail("unsupported_action");
     throw reason;
   }
+  let eligibility;
+  try { eligibility = assessMetaWriteEligibility({ writeSpec, snapshot: input.eligibilitySnapshot }); }
+  catch { fail("write_not_eligible"); }
+  if (input.eligibilitySnapshot.workspaceRef !== unit.scope.workspaceRef
+    || input.eligibilitySnapshot.accountRef !== unit.scope.accountRef
+    || eligibility.disposition !== "eligible_for_separate_human_execution") fail("write_not_eligible");
   const core = Object.freeze({
     version: ACTION_EXECUTION_ADMISSION_VERSION,
     unitRef: unit.unitRef,
@@ -206,6 +221,8 @@ export function admitActionExecution(input: Readonly<{
     approvalGrantRef: grant.grantRef,
     executionPresenceRef: executionPresence.authorizationRef,
     writeSpec,
+    eligibilitySnapshotHash: eligibility.snapshotHash,
+    eligibilityHash: eligibility.eligibilityHash,
     dependencyUnitRefs: Object.freeze(closure.filter((candidate) => candidate.unitRef !== unit.unitRef).map((candidate) => candidate.unitRef)),
     evaluatedAt,
     disposition: "admitted_for_disabled_executor" as const,
