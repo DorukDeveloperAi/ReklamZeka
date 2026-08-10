@@ -61,7 +61,7 @@ export type ContextInvalidationInput = Readonly<ContextSourceComponentRef & {
 export type StoredEffectiveCampaignContext = Readonly<{
   context: EffectiveCampaignContext;
   /** Server-private IDs needed only to bind current L2/L3 evidence. */
-  analysisDataScope?: Readonly<{ metaConnectionId: string; adAccountId: string }>;
+  analysisDataScope?: Readonly<{ metaConnectionId: string; adAccountId: string; campaignId: string }>;
   sourceComponents: readonly ContextSourceComponentRef[];
   invalidated: boolean;
 }>;
@@ -599,7 +599,11 @@ async function loadRecord(database: ContextDatabase, row: ContextRow): Promise<S
   }
   return Object.freeze({
     context,
-    analysisDataScope: Object.freeze({ metaConnectionId: row.metaConnectionId, adAccountId: row.adAccountId }),
+    analysisDataScope: Object.freeze({
+      metaConnectionId: row.metaConnectionId,
+      adAccountId: row.adAccountId,
+      campaignId: row.campaignId,
+    }),
     sourceComponents: Object.freeze(components.map((component) => Object.freeze(component))),
     invalidated: await isInvalidated(database, row),
   });

@@ -1,7 +1,15 @@
+import { createHash } from "node:crypto";
 import { projectEffectiveCampaignContext } from "@/analyses/effective-campaign-context-public";
 import type { StoredEffectiveCampaignContext } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
 
-export const CAMPAIGN_CONTEXT_READ_MODEL_VERSION = "campaign-context-read-model/1.0.0" as const;
+export const CAMPAIGN_CONTEXT_READ_MODEL_VERSION = "campaign-context-read-model/1.1.0" as const;
+
+function approvalQueueCampaignRef(workspaceId: string, campaignId: string): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(campaignId)) {
+    throw new CampaignContextReadError("unsafe_source");
+  }
+  return `entity_${createHash("sha256").update(`${workspaceId}:entity:${campaignId.toLowerCase()}`).digest("hex").slice(0, 16)}`;
+}
 
 export class CampaignContextReadError extends Error {
   constructor(readonly code: "invalid_input" | "source_unavailable" | "unsafe_source") {
@@ -32,6 +40,14 @@ export class CampaignContextReadService {
     if (context.identity.campaignRef !== input.campaignRef || context.writeOperations !== 0) {
       throw new CampaignContextReadError("unsafe_source");
     }
-    return Object.freeze({ contractVersion: CAMPAIGN_CONTEXT_READ_MODEL_VERSION, view: "context" as const, campaignRef: input.campaignRef, context });
+    if (!record.analysisDataScope) throw new CampaignContextReadError("unsafe_source");
+    const queueCampaignRef = approvalQueueCampaignRef(input.workspaceId, record.analysisDataScope.campaignId);
+    return Object.freeze({
+      contractVersion: CAMPAIGN_CONTEXT_READ_MODEL_VERSION,
+      view: "context" as const,
+      campaignRef: input.campaignRef,
+      approvalQueueCampaignRef: queueCampaignRef,
+      context,
+    });
   }
 }

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
+  approvalQueueScopeAfterCampaignSelection,
   OperatingDashboard,
   resolveAgentSessionSelection,
 } from "@/app/dashboard/operating-dashboard";
@@ -32,5 +33,11 @@ describe("local agent session dashboard", () => {
     expect(resolveAgentSessionSelection([first], "")).toBe(first.sessionRef);
     expect(resolveAgentSessionSelection([first, second], "")).toBe("");
     expect(resolveAgentSessionSelection([first, second], second.sessionRef)).toBe(second.sessionRef);
+  });
+
+  it("clears a resolved approval queue scope before changing campaigns", () => {
+    const scope = "entity_1eb4e78c07f9c395";
+    expect(approvalQueueScopeAfterCampaignSelection("cmp-istanbul", "cmp-istanbul", scope)).toBe(scope);
+    expect(approvalQueueScopeAfterCampaignSelection("cmp-istanbul", "cmp-gcc", scope)).toBeNull();
   });
 });

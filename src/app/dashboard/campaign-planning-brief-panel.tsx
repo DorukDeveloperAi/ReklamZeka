@@ -75,7 +75,10 @@ const routeLabels: Readonly<Record<ConversionRoute, string>> = Object.freeze({
  * can explore an operating pattern without creating a campaign, proposal or
  * approval record.
  */
-function CampaignPlanningBriefPanelContent({ context }: Readonly<{ context: CampaignPlanningBriefContext }>) {
+function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef }: Readonly<{
+  context: CampaignPlanningBriefContext;
+  onApprovalQueueCampaignRef?: (campaignRef: string | null) => void;
+}>) {
   const [draft, setDraft] = useState<BriefDraft>(() => Object.freeze({ ...context.input }));
   const [sourceState, setSourceState] = useState<"unbound" | "loading" | "empty" | "ready" | "unavailable">("unbound");
   const brief = useMemo(() => createInteractiveCampaignBrief(draft), [draft]);
@@ -83,14 +86,26 @@ function CampaignPlanningBriefPanelContent({ context }: Readonly<{ context: Camp
     setDraft((current) => Object.freeze({ ...current, [key]: value }));
 
   useEffect(() => {
-    if (!context.persistedCampaignRef || !/^ref_[a-f0-9]{12}$/.test(context.persistedCampaignRef)) { setSourceState("unbound"); return; }
+    if (!context.persistedCampaignRef || !/^ref_[a-f0-9]{12}$/.test(context.persistedCampaignRef)) {
+      onApprovalQueueCampaignRef?.(null);
+      setSourceState("unbound");
+      return;
+    }
     let active = true; setSourceState("loading");
     void fetch(`/api/campaign-context?campaignRef=${encodeURIComponent(context.persistedCampaignRef)}`, { cache: "no-store", credentials: "same-origin" })
-      .then(async (response) => ({ response, payload: await response.json() as { view?: string } }))
-      .then(({ response, payload }) => { if (active) setSourceState(!response.ok ? "unavailable" : payload.view === "context" ? "ready" : "empty"); })
-      .catch(() => { if (active) setSourceState("unavailable"); });
+      .then(async (response) => ({ response, payload: await response.json() as { view?: string; approvalQueueCampaignRef?: string } }))
+      .then(({ response, payload }) => {
+        if (!active) return;
+        const queueCampaignRef = payload.view === "context" && typeof payload.approvalQueueCampaignRef === "string"
+          && /^entity_[a-f0-9]{16}$/.test(payload.approvalQueueCampaignRef)
+          ? payload.approvalQueueCampaignRef
+          : null;
+        onApprovalQueueCampaignRef?.(queueCampaignRef);
+        setSourceState(!response.ok ? "unavailable" : payload.view === "context" ? "ready" : "empty");
+      })
+      .catch(() => { if (active) { onApprovalQueueCampaignRef?.(null); setSourceState("unavailable"); } });
     return () => { active = false; };
-  }, [context.persistedCampaignRef]);
+  }, [context.persistedCampaignRef, onApprovalQueueCampaignRef]);
 
   return <section className={`${styles.panel} ${styles.campaignPlanningBrief}`} aria-labelledby="campaign-planning-brief-title">
     <header className={styles.panelHeader}>
@@ -142,6 +157,9 @@ function CampaignPlanningBriefPanelContent({ context }: Readonly<{ context: Camp
   </section>;
 }
 
-export function CampaignPlanningBriefPanel({ context = DEFAULT_CONTEXT }: Readonly<{ context?: CampaignPlanningBriefContext }>) {
-  return <CampaignPlanningBriefPanelContent key={context.campaignRef} context={context} />;
+export function CampaignPlanningBriefPanel({ context = DEFAULT_CONTEXT, onApprovalQueueCampaignRef }: Readonly<{
+  context?: CampaignPlanningBriefContext;
+  onApprovalQueueCampaignRef?: (campaignRef: string | null) => void;
+}>) {
+  return <CampaignPlanningBriefPanelContent key={context.campaignRef} context={context} onApprovalQueueCampaignRef={onApprovalQueueCampaignRef} />;
 }

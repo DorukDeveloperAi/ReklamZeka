@@ -668,8 +668,11 @@
       persisted campaign ref ile brief/timeline bağlaması açık.
     - [x] Brief paneli yalnız doğrulanmış persisted public ref olduğunda context read yolunu kullanır;
       demo bağlamı explicit unbound kalır ve gerçek kampanya verisi taklit etmez.
-    - [x] Aynı persisted campaign ref, Approval Queue'nun tenant-bound campaign filtresine aktarılır;
-      gerçek context/ActionUnit bulunduğunda brief ve inbox tek scope'ta birleşir.
+    - [x] Context public ref'i ile Approval Queue'nun tenant-bound `entity_…` campaign alias'ı
+      bilinçli olarak ayrıdır: server private campaign UUID'den queue alias'ını üretir; brief yalnız
+      doğrulanmış alias'ı inbox'a aktarır ve campaign değişiminde eski scope'u temizler. Hedefli testler
+      ve tam kalite kapıları geçti; gerçek persisted context bulunmadığından canlı semantic birleşim kabulü
+      bu işaretle tamamlanmış sayılmaz.
   - [ ] Brief, öneri, approval ve execution-safety durumunu aynı salt-okunur zaman çizelgesinde gösterme.
     - [x] Exact, tenant-bound keyset ActionUnit filtresi: opaque `entityRef` veya onunla aynı istekte
       kullanılamayan `campaignRef` database içinde yeniden çözülür. Campaign filtresi direct campaign ile

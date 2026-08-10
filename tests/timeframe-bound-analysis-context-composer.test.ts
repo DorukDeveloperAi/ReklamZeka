@@ -38,7 +38,7 @@ function window() {
 describe("TimeframeBoundAnalysisContextComposer", () => {
   it("derives L2/L3 data only from the latest valid repository context and exact timeframe", async () => {
     const source = sourceContext(); const l3 = window();
-    const record = { context: source, analysisDataScope: { metaConnectionId, adAccountId }, sourceComponents: [], invalidated: false } as const;
+    const record = { context: source, analysisDataScope: { metaConnectionId, adAccountId, campaignId: "30000000-0000-4000-8000-000000000004" }, sourceComponents: [], invalidated: false } as const;
     const loadLatestValid = vi.fn(async () => record);
     const materializeForTimeframe = vi.fn(async () => ({ window: l3, outcome: "inserted" as const }));
     const save = vi.fn(async (context) => ({ outcome: "inserted" as const, record: { ...record, context, invalidated: false } }));

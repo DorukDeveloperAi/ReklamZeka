@@ -57,14 +57,14 @@
   kimliği ve ham context browser'a taşınmaz.
 - `/api/campaign-context` local-session `decision_room:read` sınırına bağlı, tek-parametreli ve
   `read-only`/`Action-Authority: none` yanıt verir. UI henüz demo kimlikleriyle bu route'u çağırmaz;
-  gerçek persisted ref geldiğinde brief/timeline birleşiminin kaynağı budur. Bağlı PostgreSQL/session
-  bu ortamda yoktur; canlı kabul açık kalır.
+  gerçek persisted ref geldiğinde brief/timeline birleşiminin kaynağı budur.
 - Brief paneli, yalnız geçerli `persistedCampaignRef` verildiğinde bu read yolunu kullanır; demo seçiminde
   açıkça `persisted kaynağa bağlı değil` durumunu gösterir. Böylece demo, canlı approval/context verisi
   gibi görünmez.
-- Aynı ref Approval Queue listesine de tenant-bound campaign filtresi olarak aktarılır; böylece gerçek
-  source bağlandığında brief ve ActionUnit timeline aynı campaign scope'u paylaşır. Yerel DB/session
-  olmadığından live PostgreSQL ve gerçek-session browser kabulü açıktır.
+- Context `ref_…` kimliği Approval Queue filtresinin `entity_…` kimliği değildir. Context read service
+  private persisted campaign UUID'sinden ayrı, tenant-bound `approvalQueueCampaignRef` üretir; brief
+  bu değeri yalnız formatı doğrulandıktan sonra inbox'a aktarır ve farklı campaign seçilince önce temizler.
+  Böylece iki public alias birbirinin yerine geçirilemez.
 
 ## 2026-08-10 — A14 entity/campaign-scoped Approval Queue read boundary
 
@@ -75,9 +75,25 @@
   yanıt fail-closed olur.
 - Campaign filtresi, direct campaign ActionUnit'inin yanı sıra ad-set ve ad ActionUnit'lerini tenant-scoped
   üst campaign ilişkisiyle çözer. Böylece gerçek child hareketler doğru campaign timeline kaynağına dahil
-  olur. Dashboard'a sahte veya fixture tabanlı birleşik timeline bağlanmadı. `DATABASE_URL` ve
-  `DIRECT_DATABASE_URL` bu ortamda yoktur; gerçek PostgreSQL query-plan/live acceptance sonraki bağlantılı
-  ortamda çalıştırılacaktır.
+  olur. Dashboard'a sahte veya fixture tabanlı birleşik timeline bağlanmadı. PostgreSQL ve local-session
+  ortamı 2026-08-11'de doğrulandı; bu campaign-context/inbox birleşimi için özel live HTTP kabulü sıradadır.
+
+## 2026-08-11 — A14 context → Approval Queue alias bridge acceptance boundary
+
+- Context/inbox bağının iki alias sözleşmesi hedefli servis, HTTP, dashboard ve verifier testleri ile;
+  ardından tam kalite kapıları (`npm test`, production build, DB, security, architecture, model API,
+  security-boundary ve secret-artifact kontrolleri) geçilerek doğrulandı. Sözleşme salt-okunurdur;
+  context ve inbox yanıtları `Action-Authority: none` taşır ve Meta/model/action write capability'si açmaz.
+- `verify:campaign-context-approval-queue-live`, gerçek local session ile iki local HTTP handler'ını aynı
+  outer rollback transaction'ında çağırır; capability token'ı yazdırmaz ve network/write çağrı sayıları
+  sıfırdır. Mevcut veritabanında geçerli frozen campaign context bulunmadığı için sonuç dürüstçe
+  `no_valid_campaign_context` fail-closed blocker'ıdır. Bu verifier **semantic live başarı veya ortak
+  campaign scope kanıtı değildir**; gerçek persisted context + ActionUnit fixture'ı oluştuğunda yeniden
+  çalıştırılacaktır.
+- Browser audit yalnız demo/unbound ve read-only UI sınırını kapsar: persisted frozen context bulunmadığı
+  için tarayıcıdan context alias'ının gerçek Approval Queue sonucu ile birleştiği kanıtlanmadı. Bu nedenle
+  A14'ün gerçek-session browser semantic acceptance işi açık kalır; demo görünüm canlı context/timeline
+  gibi sunulmaz.
 
 ## 2026-08-10 — A13 execution-time Meta mirror revalidation
 
