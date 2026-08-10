@@ -444,8 +444,12 @@ function limitliSatir(sessionId) {
 function denyText(claim, repoRoot, cyc, me) {
   const o = claim.owner || {};
   const s = L.sessionInfo(o.sessionId); // KOPYA değil, okuma anında çözümlenir (Ders 4)
+  /* `state` HAM basılmaz (lines[] ile aynı gerekçe): "durum: idle" okuyanı "sahip boşta,
+     kilidi bırakmış sayılır" hükmüne davet eder — oysa `idle` yalnız son mesajdan beri
+     geçen süredir. Sahibin işi zaten AŞAĞIDA `niyet:` satırında ÖLÇÜLÜ duruyor; burada
+     yalnız nabız olgusu basılır (kademe satırı da bayatlığı ayrıca söyler). */
   const who = s
-    ? `"${s.title || "(başlıksız)"}" — ${s.dirName}, durum: ${s.state}, son nabız ${dk(s.updated)}`
+    ? `"${s.title || "(başlıksız)"}" (etiket) — ${s.dirName}, son nabız ${dk(s.updated)}${s.state === "generating" ? ", ŞU AN üretiyor" : ""}`
     : `session ${String(o.sessionId).slice(0, 8)}`;
   const devredildi = devredildiBlok(repoRoot, me);
   /* ÇEVRİM: beklemeye devam edersen DEADLOCK. Kuyruğa yazılmak çözmez → sıra SENDE.
@@ -809,9 +813,24 @@ function main() {
       });
     }
     const held = L.ledgerExists() ? L.activeClaims(root) : [];
-    const lines = others
-      .slice(0, 6)
-      .map((s) => `  • "${s.title || "(başlıksız)"}" (${s.dirName}, ${s.state}, ${dk(s.updated)})`);
+    /* HER SATIR "ne yapıyor" TAŞIR (2026-08-10 kullanıcı kararı — gerekçe: claims-lib
+       `neYapiyor` başlığı). Üç sert kural bu satırda MEKANİK olarak uygulanır:
+         · başlık yalnız ETİKET sütununda durur — iş oradan okunmaz (doğduğunda donar);
+         · `state` kelimesi BASILMAZ. "idle" bir hüküm sanılıp "boşta" diye raporlandı;
+           yerine ölçülen süre (`son mesaj N dk`) ve yalnız `generating` için "ŞU AN
+           üretiyor" yazılır — biri olgu, öteki yoktur;
+         · ölçülemeyene "boşta" DEĞİL `ölçülemedi` yazılır.
+       Böylece hata yapısal olarak önlenir: satır, doldurulmamış sütunla basılamaz. */
+    const lines = others.slice(0, 6).map((s) => {
+      const n = L.neYapiyor(root, s.sessionId, { claims: held });
+      const kilit = n.kilit?.length ? `  [kilit: ${kis(n.kilit.join(" · "), 44)}]` : "";
+      const ne = n.olculdu ? `${kis(n.metin, 92)}${kilit}` : "ölçülemedi (kilit yok · defterde iz yok)";
+      return (
+        `  • ${String(s.sessionId).slice(0, 8)} · ${s.dirName} · son mesaj ${dk(s.updated)}` +
+        `${s.state === "generating" ? " · ŞU AN üretiyor" : ""} · etiket: "${kis(s.title, 44) || "(başlıksız)"}"\n` +
+        `      ne yapıyor: ${ne}`
+      );
+    });
     const heldLines = held.map((c) => {
       /* Sahibe SIRAYI göster: kaç kişi gerçekten bekliyor (canlı wait) + kaç kişi istedi.
          "broad" bir claim'i tutarken kuyruk büyüyorsa yol vermek SENİN kararın —
@@ -838,7 +857,9 @@ function main() {
       const lim = limitliSatir(c.owner?.sessionId);
       return [
         satir,
-        `      sahip: "${kis(s?.title, 56) || "(başlıksız)"}"${s?.state ? ` (${s.state}` : ""}${s?.updated ? `, ${dk(s.updated)})` : s?.state ? ")" : ""}`,
+        /* `state` burada da ham basılmaz (yukarıdaki lines[] ile aynı gerekçe): "idle"
+           kelimesi sahibi "boşta" sanmaya davettir — sahip kilidi TUTUYOR, boşta değil. */
+        `      sahip etiketi: "${kis(s?.title, 56) || "(başlıksız)"}"${s?.updated ? ` · son mesaj ${dk(s.updated)}` : ""}${s?.state === "generating" ? " · ŞU AN üretiyor" : ""}`,
         ...(lim ? [`    ${lim.trim()}`] : []),
         `      sahip ne yapıyor: ${kis(c.intent, 96) || "(niyet belirtilmemiş)"}`,
       ].join("\n");
@@ -851,7 +872,8 @@ function main() {
           ...bildiri.satirlar,
           ...saha,
           ...commitler,
-          `[eşzamanlılık] Bu repoda ${others.length} BAŞKA canlı Claude session'ı var:`,
+          `[eşzamanlılık] Bu repoda ${others.length} BAŞKA canlı Claude session'ı var — HEPSİ ÇALIŞIYOR sayılır;` +
+            ` "ne yapıyor" ÖLÇÜMDÜR, etiketten okunmaz. Rapora "boşta" yazma: ölçülemeyene "ölçülemedi" yaz.`,
           ...lines,
           heldLines.length ? `Tutulan kilitler:` : `Tutulan kilit yok.`,
           ...heldLines,
