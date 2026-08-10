@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { ANALYSIS_METRICS, CAMPAIGN_OBJECTIVES, FUNNEL_STAGES, OPTIMIZATION_EVENTS, type AnalysisMetric, type CampaignObjective, type FunnelStage, type OptimizationEvent } from "@/analyses/schema";
 
 export const ROBUST_COHORT_CONTRACT_VERSION = "robust-cohort/1.0.0" as const;
 
@@ -10,10 +11,10 @@ export type CohortAssessmentStatus = "finding" | "clear" | "insufficient_data";
  * optimization events, metric definitions, category policies, or policy sets.
  */
 export type CohortCompatibilityProfile = Readonly<{
-  objectiveRef: string;
-  funnelRef: string;
-  optimizationEventRef: string;
-  metricKey: string;
+  objective: CampaignObjective;
+  funnel: FunnelStage;
+  optimizationEvent: OptimizationEvent;
+  metricKey: AnalysisMetric;
   categoryProfileHash: string;
   policySetHash: string;
 }>;
@@ -81,13 +82,17 @@ function median(values: readonly number[]): number {
 }
 function hash(value: unknown): string { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 function equalProfile(left: CohortCompatibilityProfile, right: CohortCompatibilityProfile): boolean {
-  return left.objectiveRef === right.objectiveRef && left.funnelRef === right.funnelRef
-    && left.optimizationEventRef === right.optimizationEventRef && left.metricKey === right.metricKey
+  return left.objective === right.objective && left.funnel === right.funnel
+    && left.optimizationEvent === right.optimizationEvent && left.metricKey === right.metricKey
     && left.categoryProfileHash === right.categoryProfileHash && left.policySetHash === right.policySetHash;
 }
 function validateProfile(profile: CohortCompatibilityProfile): void {
-  requireRef(profile.objectiveRef, "objectiveRef"); requireRef(profile.funnelRef, "funnelRef");
-  requireRef(profile.optimizationEventRef, "optimizationEventRef"); requireRef(profile.metricKey, "metricKey");
+  if (!(CAMPAIGN_OBJECTIVES as readonly string[]).includes(profile.objective)
+    || !(FUNNEL_STAGES as readonly string[]).includes(profile.funnel)
+    || !(OPTIMIZATION_EVENTS as readonly string[]).includes(profile.optimizationEvent)
+    || !(ANALYSIS_METRICS as readonly string[]).includes(profile.metricKey)) {
+    throw new RobustCohortContractError("objective/funnel/optimizationEvent/metricKey kanonik katalogda olmalıdır");
+  }
   requireHash(profile.categoryProfileHash, "categoryProfileHash"); requireHash(profile.policySetHash, "policySetHash");
 }
 

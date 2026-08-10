@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { calculateRobustCohort, RobustCohortContractError, type RobustCohortInput } from "@/analyses/cohort-calculator";
 
-const profile = Object.freeze({ objectiveRef: "objective_lead_generation", funnelRef: "funnel_lead", optimizationEventRef: "event_lead",
-  metricKey: "metric_cpl", categoryProfileHash: "a".repeat(64), policySetHash: "b".repeat(64) });
+const profile = Object.freeze({ objective: "lead_generation" as const, funnel: "conversion" as const, optimizationEvent: "lead" as const,
+  metricKey: "cplMinor" as const, categoryProfileHash: "a".repeat(64), policySetHash: "b".repeat(64) });
 function input(): RobustCohortInput {
   return { cohortRef: "cohort_lead_cpl", profile, direction: "lower_is_better", minimumMemberCount: 3,
     minimumSampleSize: 10, findingThresholdRobustZ: 2.5, observations: [
@@ -28,7 +28,7 @@ describe("robust cohort calculator", () => {
 
   it("rejects mixed objective/config/category/policy profiles instead of comparing them", () => {
     const source = input();
-    expect(() => calculateRobustCohort({ ...source, observations: [{ ...source.observations[0]!, profile: { ...profile, objectiveRef: "objective_sales" } }, ...source.observations.slice(1)] }))
+    expect(() => calculateRobustCohort({ ...source, observations: [{ ...source.observations[0]!, profile: { ...profile, objective: "sales" } }, ...source.observations.slice(1)] }))
       .toThrow("karıştıramaz");
   });
 
