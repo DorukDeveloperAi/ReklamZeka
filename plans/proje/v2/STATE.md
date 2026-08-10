@@ -3,6 +3,17 @@
 > Kümülatif ilerleme defteri. v1'in ayrıntılı tur geçmişi
 > [v1 STATE](../v1/STATE.md)'te değişmeden korunur.
 
+## 2026-08-10 — A10 cadence/experiment adapter canlı kabulü
+
+- `npm run verify:cadence-experiment-lifecycle-db`, gerçek owner cookie session'ı ile local
+  cadence publish ve experiment plan→outcome HTTP handler'larını aynı outer rollback PostgreSQL
+  transaction'ında çalıştırır. Cadence revision, experiment head zinciri ve üç audit event'i kalıcı
+  akışta doğrulanır; stale outcome `409`, direct revision update append-only guard tarafından reddedilir.
+- Live kabul, experiment resolver'ın intent'i yanlışlıkla `draft` allowlist'inde aradığını ve geçerli
+  iki revisionlı plan→outcome geçmişinin repository tarafından bozuk sayıldığını ortaya çıkardı. Resolver
+  artık publish-intent allowlist'ini, repository ise yalnız gerçek current head'i kilitler. Endpointler
+  action/approval/Meta-write authority açmaz; rollback sonrası fixture sıfırdır.
+
 ## 2026-08-10 — A10 policy-configured PostgreSQL dry-run kabulü
 
 - `npm run verify:decision-room-dry-run-db`, tek outer rollback içinde gerçek cookie-only

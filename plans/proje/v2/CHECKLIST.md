@@ -389,7 +389,7 @@
 - [ ] DecisionCadenceProfile, no-change/repeat suppression ve ExperimentRecord lifecycle.
   - [x] Settle/observation/learning/cooldown/evidence/repeat saf karar kapısı ve tek değişkenli experiment çekirdeği.
   - [x] Manual/scheduled ortak executor, idempotency/overlap/retry/lease ve in-app inbox çekirdeği.
-  - [ ] Cadence/experiment PostgreSQL persistence ve Decision Room adapter binding'i.
+  - [x] Cadence/experiment PostgreSQL persistence ve Decision Room adapter binding'i.
     - [x] A10.1 tenant-scoped immutable `DecisionCadenceProfile` revision persistence:
       owner/admin membership recheck, current-hash OCC, audit kaydı, RLS/FORCE RLS ve tombstone
       purge sözleşmesi; tüm action/approval/Meta-write capability'leri false.
@@ -403,6 +403,9 @@
     - [x] A10.2e ExperimentRecord plan/outcome endpoint'i ayrı local-session scope/intent altında yalnız
       owner/admin/analyst'e açılır; actor/rol/clock istemciden alınmaz, append-only plan→outcome hash zinciri
       ve audit transaction'ı korunur. Endpoint action/approval/Meta-write authority üretmez.
+    - [x] Canlı local-session PostgreSQL acceptance: gerçek owner cookie capability ile cadence publish,
+      experiment plan→outcome, stale outcome conflict, immutable revision guard ve audit chain aynı outer
+      rollback'te doğrulanır; action/Meta write ve kalıcı fixture sıfırdır.
 - [ ] L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.

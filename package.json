@@ -75,6 +75,7 @@
     "verify:finding-observation-read-db": "tsx scripts/verify-finding-observation-read-postgres.ts",
     "verify:decision-room-analysis-assets-db": "tsx scripts/verify-decision-room-analysis-assets-postgres.ts",
     "verify:decision-room-dry-run-db": "tsx scripts/verify-decision-room-dry-run-postgres.ts",
+    "verify:cadence-experiment-lifecycle-db": "tsx scripts/verify-cadence-experiment-lifecycle-postgres.ts",
     "verify:supabase-security": "tsx scripts/verify-supabase-security.ts",
     "check:security": "npm audit --omit=dev",
     "check:secret-artifacts": "node scripts/check-secret-artifacts.mjs"

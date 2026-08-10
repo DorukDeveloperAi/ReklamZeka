@@ -5,6 +5,7 @@ import {
   createLocalDecisionRoomRouteHandlers,
   localDecisionRoomConfig,
   resolveTrustedLocalPolicyBundlePrincipal,
+  resolveTrustedLocalExperimentRecordPrincipal,
   resolveTrustedLocalPromotionLifecyclePrincipal,
   resolveTrustedLocalSessionIdentity,
   type LocalDecisionRoomEnvironment,
@@ -132,6 +133,19 @@ describe("local Decision Room principal boundary", () => {
       request: lifecycle("promotion-template-lifecycle-publish", "bearer"), database: readDatabase() as never,
       config, requiredScope: "promotion_lifecycle:publish",
     })).rejects.toBeInstanceOf(LocalDecisionRoomBoundaryError);
+  });
+
+  it("binds experiment evidence to its publish-intent allowlist while retaining cookie scope", async () => {
+    const config = localDecisionRoomConfig(environment())!;
+    const token = sessionToken();
+    const experiment = request("/api/experiment-records", {
+      Cookie: `${LOCAL_SESSION_COOKIE}=${encodeURIComponent(token)}`,
+      Origin: "http://localhost:3000", "X-ReklamZeka-Intent": "experiment-record-mutate",
+    });
+    await expect(resolveTrustedLocalExperimentRecordPrincipal({ request: experiment,
+      database: readDatabase() as never, config })).resolves.toMatchObject({
+      membership: { workspaceId, userId, role: "viewer" },
+    });
   });
 
   it("is disabled unless all server-only bindings are explicitly enabled", () => {

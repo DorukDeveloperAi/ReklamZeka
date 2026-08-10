@@ -390,7 +390,7 @@ export async function resolveTrustedLocalExperimentRecordPrincipal(input: Readon
   verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
     now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
     requiredScope: "experiment_record:mutate", expected: input.config });
-  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", "cookie");
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "publish", "cookie");
   return bindPrincipal(input.database, input.config);
 }
 
