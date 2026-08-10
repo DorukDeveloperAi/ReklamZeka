@@ -1,7 +1,12 @@
 import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import type { EffectiveAnalysisContextNotReadySource, EffectiveAnalysisContextRequest,
-  EffectiveAnalysisContextSource } from "@/application/effective-analysis-context-composer";
+import { buildEffectiveCampaignContext } from "@/analyses/effective-campaign-context";
+import { META_INSIGHT_CAPABILITY_CATALOG_VERSION } from "@/domain/meta/insights/capability-catalog";
+import { META_METRIC_FORMULA_CATALOG_VERSION } from "@/domain/meta/insights/metric-engine";
+import { TIMEFRAME_RESOLVER_VERSION } from "@/analyses/timeframe-resolver";
+import { CATEGORY_PROFILE_VERSION } from "@/domain/categories/category-profile";
+import type { EffectiveAnalysisContextFacts, EffectiveAnalysisContextRequest,
+  EffectiveAnalysisContextSource, EffectiveAnalysisContextReadySource, RepositoryVerifiedAuthority } from "@/application/effective-analysis-context-composer";
 import { DrizzleCurrentCategoryCompositionReader, resolveCurrentCategoryCompositionInSnapshot,
   type CurrentCategoryComposition } from "@/application/current-category-composition-resolver";
 import { categoryDefinitionPublicRef } from "@/domain/categories/public-reference";
@@ -15,6 +20,8 @@ import type { GuidanceCampaignSelection } from "@/connectors/guidance/guidance-c
 import { CurrentMetaHierarchyConfigReader, type CurrentMetaHierarchyConfig } from "@/connectors/meta/current-meta-hierarchy-config-reader";
 import { DrizzleInstructionPolicyLifecycleRepository } from "@/connectors/policies/instruction-policy-lifecycle-drizzle-repository";
 import { DrizzleTrustedPolicyAuthorityRepository, type LoadedTrustedPolicyAuthority } from "@/connectors/policies/trusted-policy-authority-drizzle-repository";
+import { DrizzlePromotionTemplateLifecycleRepository } from "@/connectors/meta/promotion/promotion-template-lifecycle-drizzle-repository";
+import type { PromotionTemplateLifecycleState } from "@/application/promotion-template-lifecycle-service";
 import type { InstructionPolicyLifecycleState } from "@/application/instruction-policy-lifecycle-service";
 import * as schema from "@/db/schema";
 
@@ -34,13 +41,6 @@ function inputIsValid(input: EffectiveAnalysisContextRequest): boolean {
     && ["campaign", "ad_set", "ad", "creative"].includes(input.entityType);
 }
 
-const NO_SOURCE_CAPABILITIES = Object.freeze({
-  canCompose: false as const, canAuthorizeAction: false as const, canExecute: false as const,
-  canExecuteWrite: false as const, canWriteMeta: false as const,
-  canApprove: false as const, canSchedule: false as const, canCallTool: false as const,
-  canAccessNetwork: false as const, canQuerySql: false as const,
-});
-
 export type CurrentCategoryCompositionSnapshotResolver = Readonly<{
   resolveInTransaction(transaction: Database, workspaceRef: string, workspaceId: string,
     target: CategoryHierarchyTarget): Promise<CurrentCategoryComposition>;
@@ -55,11 +55,84 @@ type CurrentTrustedPolicyAuthoritySnapshotReader = Readonly<{
     evaluatedAt: string }>): Promise<LoadedTrustedPolicyAuthority>;
 }>;
 
+type CurrentPromotionRegistrySnapshotReader = Readonly<{
+  inspectInTransaction(transaction: Pick<Database, "execute">, workspaceId: string): Promise<PromotionTemplateLifecycleState>;
+}>;
+
 const currentCategoryCompositionSnapshotResolver: CurrentCategoryCompositionSnapshotResolver = Object.freeze({
   resolveInTransaction: (transaction, workspaceRef, workspaceId, target) =>
     resolveCurrentCategoryCompositionInSnapshot(
       DrizzleCurrentCategoryCompositionReader.inTransaction(transaction, workspaceRef), workspaceId, target),
 });
+
+const UNKNOWN_META = Object.freeze({ state: "unknown" as const, reason: "not_available_in_current_hierarchy" });
+
+function cadenceFacts(cadence: CurrentDecisionCadence): EffectiveAnalysisContextFacts["cadence"] {
+  const decision = cadence.decision.reason === "eligible" ? "eligible" : cadence.decision.disposition;
+  if (decision !== "eligible" && decision !== "observe" && decision !== "no_change" && decision !== "blocked") {
+    throw new Error("cadence_unavailable");
+  }
+  return Object.freeze({ profileRef: cadence.profileRef, decision, reason: cadence.decision.reason,
+    cooldownUntil: cadence.decision.nextEligibleAt });
+}
+
+/**
+ * Converts only repository-verified values from the single source snapshot to
+ * the composer bundle. Data deliberately remains unready until an analysis
+ * window is bound; its sole reference is the public Meta source snapshot.
+ */
+export function buildReadyEffectiveAnalysisContextSourceInSnapshot(input: Readonly<{
+  request: EffectiveAnalysisContextRequest;
+  capturedAt: string;
+  hierarchy: CurrentMetaHierarchyConfig;
+  categories: CurrentCategoryComposition;
+  guidance: EffectiveGuidancePack;
+  cadence: CurrentDecisionCadence;
+  lifecycle: InstructionPolicyLifecycleState;
+  authority: LoadedTrustedPolicyAuthority;
+  promotion: PromotionTemplateLifecycleState;
+}>): EffectiveAnalysisContextReadySource {
+  const { request, capturedAt, hierarchy, categories, guidance, cadence, lifecycle, authority, promotion } = input;
+  if (hierarchy.capturedAt !== capturedAt || hierarchy.identity.accountRef !== request.accountRef
+    || hierarchy.identity.hierarchyRefs.at(-1) !== request.entityRef || categories.workspaceId !== request.workspaceId
+    || categories.dimensions.length === 0 || guidance.workspaceId !== request.workspaceId || guidance.evaluatedAt !== capturedAt
+    || cadence.decision.evaluatedAt !== capturedAt || !/^[a-f0-9]{64}$/.test(lifecycle.registryHash)
+    || !/^[a-f0-9]{64}$/.test(promotion.registryHash)
+    || authority.authoritySnapshot.workspaceId !== request.workspaceId
+    || authority.authoritySnapshot.verifiedAt > capturedAt || authority.authoritySnapshot.expiresAt <= capturedAt
+    || authority.catalog.instructionPolicyRegistryHash !== lifecycle.registryHash) throw new Error("current_source_bundle_unavailable");
+  const facts: EffectiveAnalysisContextFacts = Object.freeze({
+    identity: hierarchy.identity,
+    meta: Object.freeze({ configuredStatus: UNKNOWN_META, effectiveStatus: UNKNOWN_META, budgetOwnerRef: UNKNOWN_META,
+      targetingSignature: UNKNOWN_META, actorRef: UNKNOWN_META, destinationRef: UNKNOWN_META }),
+    metaAnalysisConfigSnapshot: hierarchy.metaAnalysisConfigSnapshot,
+    guidance,
+    cadence: cadenceFacts(cadence),
+    cadenceEvidence: Object.freeze({ profileRevision: cadence.profileRevision, profileVersion: cadence.profileVersion, profileHash: cadence.profileHash }),
+    data: Object.freeze({ trustStatus: "not_ready" as const, snapshotRefs: Object.freeze([hierarchy.sourceSnapshotEvidence.publicRef]),
+      featureRefs: Object.freeze([]), windowRefs: Object.freeze([]), blockers: Object.freeze(["analysis_window_not_bound"]) }),
+    history: Object.freeze({ changeRefs: Object.freeze([]), decisionRefs: Object.freeze([]), experimentRefs: Object.freeze([]),
+      practiceRefs: Object.freeze([]), outcomeRefs: Object.freeze([]) }),
+    versions: Object.freeze({ metaCatalog: hierarchy.metaAnalysisConfigSnapshot.version, categoryResolver: CATEGORY_PROFILE_VERSION,
+      guidanceRegistry: guidance.registryHash, metricCatalog: META_INSIGHT_CAPABILITY_CATALOG_VERSION,
+      formulaCatalog: META_METRIC_FORMULA_CATALOG_VERSION, timeframeResolver: TIMEFRAME_RESOLVER_VERSION,
+      promotionRegistry: promotion.registryHash }),
+  });
+  const source: EffectiveAnalysisContextReadySource = Object.freeze({ status: "ready", capturedAt, facts,
+    categories: Object.freeze({ workspaceId: categories.workspaceId, dimensions: categories.dimensions.map((dimension) =>
+      Object.freeze({ frozenContext: dimension.frozenContext })) }), lifecycle,
+    authority: authority as RepositoryVerifiedAuthority });
+  // Prove all pre-authority evidence is already a valid persistence payload.
+  const projection = projectMetaAnalysisConfig(facts.metaAnalysisConfigSnapshot, facts.identity.campaignRef);
+  buildEffectiveCampaignContext({ workspaceId: request.workspaceId, capturedAt, identity: { connectionRef: facts.identity.connectionRef,
+    accountRef: request.accountRef, campaignRef: facts.identity.campaignRef, entityRef: request.entityRef,
+    entityType: request.entityType, hierarchyRefs: facts.identity.hierarchyRefs }, meta: { ...facts.meta,
+    objective: projection.objective, optimizationEvent: projection.optimizationEvent },
+  metaAnalysisConfigEvidence: { snapshot: facts.metaAnalysisConfigSnapshot }, categories: source.categories.dimensions.map((entry) => entry.frozenContext),
+  guidance: facts.guidance, policies: [], cadence: facts.cadence, cadenceEvidence: facts.cadenceEvidence,
+  data: facts.data, history: facts.history, versions: facts.versions });
+  return source;
+}
 
 function categoryTarget(input: EffectiveAnalysisContextRequest, hierarchy: CurrentMetaHierarchyConfig): CategoryHierarchyTarget {
   const path = hierarchy.identity.hierarchyRefs;
@@ -147,7 +220,8 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
     private readonly selectionReader: Pick<CurrentGuidanceCampaignSelectionReader, "readCurrentInTransaction"> = new CurrentGuidanceCampaignSelectionReader(),
     private readonly categoryResolver: CurrentCategoryCompositionSnapshotResolver = currentCategoryCompositionSnapshotResolver,
     private readonly lifecycleReader: CurrentInstructionPolicyLifecycleSnapshotReader = new DrizzleInstructionPolicyLifecycleRepository(database),
-    private readonly authorityReader: CurrentTrustedPolicyAuthoritySnapshotReader = new DrizzleTrustedPolicyAuthorityRepository(database)) {}
+    private readonly authorityReader: CurrentTrustedPolicyAuthoritySnapshotReader = new DrizzleTrustedPolicyAuthorityRepository(database),
+    private readonly promotionReader: CurrentPromotionRegistrySnapshotReader = new DrizzlePromotionTemplateLifecycleRepository(database)) {}
 
   async loadCurrent(input: EffectiveAnalysisContextRequest): Promise<EffectiveAnalysisContextSource> {
     if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).length !== 4
@@ -226,10 +300,9 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
         || authority.catalog.instructionPolicyRegistryHash !== lifecycle.registryHash) {
         throw new Error("policy_authority_unavailable");
       }
-      const unavailable: EffectiveAnalysisContextNotReadySource = Object.freeze({
-        status: "not_ready", capturedAt, reason: "current_source_bundle_unavailable", capabilities: NO_SOURCE_CAPABILITIES,
-      });
-      return unavailable;
+      const promotion = await this.promotionReader.inspectInTransaction(tx, input.workspaceId);
+      return buildReadyEffectiveAnalysisContextSourceInSnapshot({ request: input, capturedAt, hierarchy, categories,
+        guidance: pack, cadence, lifecycle, authority, promotion });
     });
   }
 }

@@ -166,6 +166,11 @@ async function exactPublishedPreset(database: Database, workspaceId: string, sta
 export class DrizzlePromotionTemplateLifecycleRepository implements PromotionTemplateLifecycleRepository {
   constructor(private readonly database: Database) {}
   async inspect(workspaceId: string) { if (!UUID.test(workspaceId)) fail("invalid_input"); return load(this.database, workspaceId); }
+  /** Reads immutable authoring heads inside a caller-owned read snapshot. */
+  async inspectInTransaction(transaction: Executor, workspaceId: string): Promise<PromotionTemplateLifecycleState> {
+    if (!UUID.test(workspaceId)) fail("invalid_input");
+    return load(transaction, workspaceId);
+  }
   async mutate(input: Parameters<PromotionTemplateLifecycleRepository["mutate"]>[0]) {
     if (!UUID.test(input.workspaceId) || !UUID.test(input.actorId) || !Number.isFinite(Date.parse(input.occurredAt))) fail("invalid_input");
     return this.database.transaction(async (transaction) => {

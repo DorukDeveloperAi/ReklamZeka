@@ -8,6 +8,9 @@ import type { GuidanceCampaignSelection } from "@/connectors/guidance/guidance-c
 import type { CurrentMetaHierarchyConfig } from "@/connectors/meta/current-meta-hierarchy-config-reader";
 import { createGuidanceRegistry } from "@/domain/guidance/registry";
 import { normalizeMetaAnalysisConfigSnapshotV2, META_ANALYSIS_CONFIG_SNAPSHOT_VERSION } from "@/domain/meta/analysis-config-projection";
+import { bindCategoryProfiles, createCategoryProfile } from "@/domain/categories/category-profile";
+import { categoryDefinitionPublicRef } from "@/domain/categories/public-reference";
+import { resolveEffectiveCategory, type CategoryDefinition, type CategoryDimension } from "@/domain/categories/registry";
 
 const input = Object.freeze({ workspaceId: "61b10d7d-132c-4c6d-b49f-cddc9b10d025", accountRef: "account_primary",
   entityType: "campaign" as const, entityRef: "campaign_primary" });
@@ -20,8 +23,24 @@ function stable(value: unknown): unknown {
 }
 function digest(value: unknown): string { return createHash("sha256").update(JSON.stringify(stable(value))).digest("hex"); }
 
+function categoryComposition() {
+  const dimension: CategoryDimension = { id: "dimension_primary", workspaceId: input.workspaceId, key: "service", version: 1,
+    cardinality: "single", allowedEntityLevels: ["campaign"], archivedAt: null };
+  const definition: CategoryDefinition = { id: "definition_primary", workspaceId: input.workspaceId, dimensionId: dimension.id,
+    key: "lead", label: "Lead", version: 1, archivedAt: null };
+  const frozen = resolveEffectiveCategory({ dimension, definitions: [definition], path: { workspaceId: input.workspaceId,
+    nodes: [{ level: "campaign", id: input.entityRef }] }, assignments: [{ id: "assignment_primary", workspaceId: input.workspaceId,
+      dimensionId: dimension.id, definitionId: definition.id, entity: { level: "campaign", id: input.entityRef }, operation: "add",
+      source: "manual", manualLock: false, evidence: [{ kind: "owner", ref: "owner_evidence" }], confidence: 1, version: 1, archivedAt: null }] }).frozenContext;
+  return { workspaceId: input.workspaceId, dimensions: [{ values: [definition], frozenContext: bindCategoryProfiles(frozen,
+    [createCategoryProfile({ workspaceRef: "workspace_primary", profileRef: "category_profile_lead",
+      categoryRef: categoryDefinitionPublicRef("service", "lead"), parentCategoryRef: null, label: "Lead", description: "Lead profile",
+      color: "#A31F34", ownerRef: "actor_owner", status: "active", bindings: { analysisPlaybookRefs: ["analysis_playbook_lead"], ruleInstructionBundleRefs: [],
+        budgetPolicyRefs: [], transferPolicyRefs: [], schedulePolicyRefs: [], actionPolicyRefs: [], creativePolicyRefs: [] } })]) }] };
+}
+
 describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
-  it("uses one repeatable read-only scope snapshot and explicitly remains not ready", async () => {
+  it("uses one repeatable read-only scope snapshot and returns an evidence-bound ready bundle", async () => {
     const execute = vi.fn(async (_query: unknown) => ({ rows: execute.mock.calls.length === 2
       ? [{ captured_at: "2026-08-10T15:00:00.000Z" }]
       : execute.mock.calls.length === 3 ? [{ workspace_ref: "workspace_primary" }]
@@ -32,9 +51,12 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
       campaigns: [{ externalCampaignId: input.entityRef, objective: { state: "known", value: "OUTCOME_LEADS" } }], adSets: [] });
     const hierarchy: CurrentMetaHierarchyConfig = { capturedAt: "2026-08-10T15:00:00.000Z", identity: {
       connectionRef: "connection_primary", accountRef: input.accountRef, campaignRef: input.entityRef, hierarchyRefs: [input.entityRef] },
-      metaAnalysisConfigSnapshot, sourceSnapshotEvidence: {} as never };
+      metaAnalysisConfigSnapshot, sourceSnapshotEvidence: { snapshotId: "11111111-1111-4111-8111-111111111111",
+        publicRef: "snapshot_primary", snapshotHash: "e".repeat(64), capturedAt: "2026-08-10T14:00:00.000Z" } };
     const readCurrent = vi.fn(async () => hierarchy);
-    const readCurrentInTransaction = vi.fn(async () => ({ decision: {
+    const readCurrentInTransaction = vi.fn(async () => ({ profileRef: "cadence_primary", profileRevision: 1,
+      profileVersion: "decision-cadence/1.0.0", profileHash: "d".repeat(64), decision: {
+      disposition: "blocked", reason: "insufficient_evidence", nextEligibleAt: null,
       evaluatedAt: "2026-08-10T15:00:00.000Z", actionAuthority: "none",
     } } as CurrentDecisionCadence));
     const registry = createGuidanceRegistry({ workspaceId: input.workspaceId, sources: [{ id: "source_primary", workspaceId: input.workspaceId,
@@ -52,8 +74,7 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
       selectedSetRef: "set_primary", selectedSetVersion: 1, selectedSetHash: setHash, topics: ["quality"],
       requiredTopics: [], budget: { maxCards: 10, maxSources: 20, maxCharacters: 1000 }, sourceSelectionHash: "b".repeat(64),
       effectiveAt: "2026-08-10T15:00:00.000Z", previousSelectionHash: "GENESIS", selectionHash: "c".repeat(64) } as GuidanceCampaignSelection));
-    const resolveInTransaction = vi.fn(async () => ({ workspaceId: input.workspaceId,
-      dimensions: [{ values: [{ key: "lead" }], frozenContext: { dimension: { key: "service" }, path: [{ id: input.entityRef }] } }] }));
+    const resolveInTransaction = vi.fn(async () => categoryComposition());
     const inspectInTransaction = vi.fn(async () => ({ registryHash: "a".repeat(64), current: [], history: [], diffs: [] }));
     const loadInTransaction = vi.fn(async () => ({ catalog: { instructionPolicyRegistryHash: "a".repeat(64) }, authoritySnapshot: {
       workspaceId: input.workspaceId, verifiedAt: "2026-08-10T14:00:00.000Z", expiresAt: "2026-08-10T16:00:00.000Z",
@@ -64,12 +85,15 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
       { inspectInTransaction } as never, { loadInTransaction } as never).loadCurrent(input);
     expect(database.transaction).toHaveBeenCalledTimes(1);
     expect(new PgDialect().sqlToQuery(execute.mock.calls[0]![0] as never).sql.toLowerCase()).toContain("repeatable read, read only");
-    expect(result).toEqual({ status: "not_ready", capturedAt: "2026-08-10T15:00:00.000Z",
-      reason: "current_source_bundle_unavailable", capabilities: {
-        canCompose: false, canAuthorizeAction: false, canExecute: false, canExecuteWrite: false, canWriteMeta: false, canApprove: false,
-        canSchedule: false, canCallTool: false, canAccessNetwork: false, canQuerySql: false,
-      } });
-    expect(execute).toHaveBeenCalledTimes(3);
+    expect(result.status).toBe("ready");
+    if (result.status === "ready") {
+      expect(result.facts.data).toEqual({ trustStatus: "not_ready", snapshotRefs: ["snapshot_primary"],
+        featureRefs: [], windowRefs: [], blockers: ["analysis_window_not_bound"] });
+      expect(result.facts.history).toEqual({ changeRefs: [], decisionRefs: [], experimentRefs: [], practiceRefs: [], outcomeRefs: [] });
+      expect(result.facts.cadenceEvidence).toEqual({ profileRevision: 1, profileVersion: "decision-cadence/1.0.0", profileHash: "d".repeat(64) });
+      expect(result.facts.versions.promotionRegistry).toMatch(/^[a-f0-9]{64}$/);
+    }
+    expect(execute).toHaveBeenCalledTimes(5);
     expect(readCurrent).toHaveBeenCalledWith(expect.anything(), input);
     expect(readCurrentInTransaction).toHaveBeenCalledWith(expect.anything(), {
       workspaceId: input.workspaceId, accountRef: input.accountRef, campaignRef: input.entityRef,
