@@ -1900,4 +1900,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   audit event ekler. Outcome evidence hiçbir zaman Meta metriği veya action/approval/execute yetkisi değildir.
 - İki public tablo FORCE RLS, API role revoke, composite batch FK, immutable/tombstone trigger ve explicit
   workspace purge listesi taşır. Yerel ortamda `postgres_connection_not_configured` olduğundan migration
-  rollback/RLS live acceptance ve cookie-bound authoring/read route'u sonraki açıktır.
+  rollback/RLS live acceptance ile bounded read route'u sonraki açıktır.
+
+## 2026-08-10 — A10 BusinessOutcome cookie-bound authoring
+
+- `/api/business-outcomes` yalnız cookie-only same-origin `business-outcome-record` intent'i ve ayrı
+  `business_outcome:record` scope'u ile source metadata + canonical signal satırlarını kabul eder. Batch ID,
+  actor, role, workspace ve clock body'den alınmaz; batch hash server-side yeniden üretilir.
+- Raw CSV/CRM alanı, caller workspace/identity ve action authority key'leri exact request shape öncesinde
+  reddedilir. Owner/admin/analyst normalized business evidence yazabilir; viewer reddedilir. Response
+  `metaProxyEligible:false` ile publish/approval/execute/Meta-write capability üretmez.
+- Bounded read/query endpoint'i ve EffectiveCampaignContext/L4–L5 frozen binding'i hâlâ açık; persistence
+  bu aşamada analysis context'ine zımni olarak enjekte edilmez.

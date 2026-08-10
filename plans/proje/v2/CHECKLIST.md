@@ -321,7 +321,9 @@
   - [x] A10.3 tenant-bound normalized BusinessOutcome batch/signal persistence: raw CSV saklamadan source
     hash/provenance, immutable batch→signal rows, membership recheck, audit, FORCE RLS/revoke ve tombstone
     purge sözleşmesi; query path entity/outcome/time indexleriyle bounded kalır.
-  - [ ] Cookie-bound manual/CSV authoring/read yüzeyi ve frozen context/L4–L5 binding'i.
+  - [x] Cookie-bound manual/CSV canonical authoring endpoint'i: batch identity, actor/role/clock sunucuda
+    çözülür; raw source/tenant/action injection reddedilir ve action/Meta authority false kalır.
+  - [ ] Bounded read yüzeyi ve frozen context/L4–L5 binding'i.
 
 ## A11 — Bütçe planlama
 
