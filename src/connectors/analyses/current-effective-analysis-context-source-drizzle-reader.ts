@@ -99,6 +99,9 @@ export function buildReadyEffectiveAnalysisContextSourceInSnapshot(input: Readon
     || cadence.decision.evaluatedAt !== capturedAt || !/^[a-f0-9]{64}$/.test(lifecycle.registryHash)
     || !/^[a-f0-9]{64}$/.test(promotion.registryHash)
     || authority.authoritySnapshot.workspaceId !== request.workspaceId
+    || !Number.isFinite(Date.parse(authority.scope.evaluatedAt))
+    || new Date(authority.scope.evaluatedAt).toISOString() !== authority.scope.evaluatedAt
+    || Date.parse(authority.scope.evaluatedAt) > Date.parse(capturedAt)
     || authority.authoritySnapshot.verifiedAt > capturedAt || authority.authoritySnapshot.expiresAt <= capturedAt
     || authority.catalog.instructionPolicyRegistryHash !== lifecycle.registryHash) throw new Error("current_source_bundle_unavailable");
   const facts: EffectiveAnalysisContextFacts = Object.freeze({
@@ -296,6 +299,9 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
       });
       if (!/^[a-f0-9]{64}$/.test(lifecycle.registryHash)
         || authority.authoritySnapshot.workspaceId !== input.workspaceId
+        || !Number.isFinite(Date.parse(authority.scope.evaluatedAt))
+        || new Date(authority.scope.evaluatedAt).toISOString() !== authority.scope.evaluatedAt
+        || Date.parse(authority.scope.evaluatedAt) > Date.parse(capturedAt)
         || authority.authoritySnapshot.verifiedAt > capturedAt || authority.authoritySnapshot.expiresAt <= capturedAt
         || authority.catalog.instructionPolicyRegistryHash !== lifecycle.registryHash) {
         throw new Error("policy_authority_unavailable");

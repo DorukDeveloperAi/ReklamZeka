@@ -120,7 +120,11 @@ export class DrizzlePolicyAuthorityCatalogMaterializerRepository {
 
       const snapshotCore = Object.freeze({ schemaVersion: "tenant-authority-snapshot/1.0.0", snapshotRef: `authority_snapshot_${digest({ catalogHash: catalog.catalogHash, repositoryRef: input.repositoryRef, repositoryRevision: input.repositoryRevision, expiresAt: input.expiresAt }).slice(0, 24)}`,
         repository: { ref: input.repositoryRef, revision: input.repositoryRevision, verified: true }, authority: CAPABILITIES,
-        validity: { expiresAt: input.expiresAt }, policyAuthority: { catalogHash: catalog.catalogHash, scope, manualLocks: input.manualLocks } });
+        // Both ends are in the signed immutable payload.  A later read can
+        // therefore use this pre-materialized snapshot only inside its exact
+        // validity window; it cannot rely on a mutable wall-clock assertion.
+        validity: { notBefore: input.occurredAt, expiresAt: input.expiresAt },
+        policyAuthority: { catalogHash: catalog.catalogHash, scope, manualLocks: input.manualLocks } });
       const snapshotHash = digest(snapshotCore); const snapshot = Object.freeze({ ...snapshotCore, snapshotHash }); const snapshotId = randomUUID();
       const snapshotHead = rows<{ current_snapshot_hash: unknown }>(await tx.execute(sql`select current_snapshot_hash from tenant_authority_snapshot_heads where workspace_id = ${input.workspaceId}::uuid for update`));
       if (snapshotHead.length > 1) fail("corrupt_store");

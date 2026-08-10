@@ -54,7 +54,7 @@ describe("DrizzlePolicyAuthorityCatalogMaterializerRepository", () => {
     const snapshotCore = { schemaVersion: "tenant-authority-snapshot/1.0.0", snapshotRef,
       repository: { ref: "repository_policy_authority", revision: "42", verified: true },
       authority: { productionAuthoritySourceBound: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false },
-      validity: { expiresAt: "2026-08-11T10:00:00.000Z" },
+      validity: { notBefore: "2026-08-10T10:00:00.000Z", expiresAt: "2026-08-11T10:00:00.000Z" },
       policyAuthority: { catalogHash: catalog.catalogHash, scope, manualLocks: [] } };
     const snapshotHash = digest(snapshotCore);
     const execute = vi.fn(async (query: unknown) => {

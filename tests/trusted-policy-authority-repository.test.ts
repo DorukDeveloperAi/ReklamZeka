@@ -105,6 +105,7 @@ describe("DrizzleTrustedPolicyAuthorityRepository", () => {
     const core = { schemaVersion: "tenant-authority-snapshot/1.0.0", snapshotRef: "authority_snapshot_primary",
       repository: { ref: "repository_policy_authority", revision: "42", verified: true },
       authority: { productionAuthoritySourceBound: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false },
+      validity: { notBefore: "2026-08-09T00:00:00.000Z", expiresAt: "2026-08-10T00:00:00.000Z" },
       policyAuthority: { catalogHash: catalog.catalogHash, scope, manualLocks: [] } };
     const snapshotHash = digest(core); const row = { snapshot_id: "22222222-2222-4222-8222-222222222222",
       snapshot_ref: core.snapshotRef, snapshot_hash: snapshotHash, repository_ref: core.repository.ref, repository_revision: "42",
@@ -116,9 +117,23 @@ describe("DrizzleTrustedPolicyAuthorityRepository", () => {
           bindingVersion: "1", bindingHash: "d".repeat(64), authorityTierRef: "authority_tier_metric", decisionRef: "decision_budget" }],
       account_group_refs: ["account_group_primary"], manual_lock_rows: [], current_snapshot_count: 1 };
     const execute = vi.fn(async () => execute.mock.calls.length === 1 ? { rows: [{ id: workspaceId }] } : { rows: [row] });
-    const loaded = await new DrizzleTrustedPolicyAuthorityRepository({ execute } as never).load({ workspaceId,
-      accountRef: "account_primary", evaluatedAt: "2026-08-09T12:00:00.000Z" });
-    expect(() => loaded.compose({ workspaceId, capturedAt: "2026-08-09T12:00:00.000Z",
+    const repository = new DrizzleTrustedPolicyAuthorityRepository({ execute } as never);
+    const loaded = await repository.load({ workspaceId,
+      accountRef: "account_primary", evaluatedAt: "2026-08-09T13:00:00.000Z" });
+    // The snapshot's immutable authority scope predates the read snapshot but
+    // its signed validity interval covers it, so a pre-materialized proof is usable.
+    expect(loaded.scope.evaluatedAt).toBe("2026-08-09T12:00:00.000Z");
+    expect(() => loaded.compose({ workspaceId, capturedAt: "2026-08-09T13:00:00.000Z",
       identity: { accountRef: "account_other" } } as never, {} as never)).toThrowError(expect.objectContaining({ code: "workspace_scope_mismatch" }));
+    const project = (repository as unknown as { project(value: unknown, input: unknown): unknown }).project.bind(repository);
+    for (const invalid of [
+      { ...row, snapshot_payload: { ...row.snapshot_payload, validity: { expiresAt: row.expires_at } } },
+      { ...row, snapshot_payload: { ...row.snapshot_payload, validity: { notBefore: "2026-08-09T14:00:00.000Z", expiresAt: row.expires_at } } },
+      { ...row, expires_at: "2026-08-09T12:30:00.000Z", snapshot_payload: { ...row.snapshot_payload,
+        validity: { notBefore: row.verified_at, expiresAt: "2026-08-09T12:30:00.000Z" } } },
+    ]) {
+      expect(() => project(invalid, { workspaceId, accountRef: "account_primary", evaluatedAt: "2026-08-09T13:00:00.000Z" }))
+        .toThrowError(expect.objectContaining({ code: "corrupt_store" }));
+    }
   });
 });

@@ -431,8 +431,13 @@ export function composeTrustedPolicyContext(input: Readonly<{
     || !Array.isArray(input.manualLocks) || input.manualLocks.length > 1_000) fail("invalid_input");
   const current = assertLifecycle(input.lifecycle, workspaceRef);
   const catalog = assertCatalog(input.catalog); const scope = assertScope(input.scope);
+  const capturedAt = new Date(input.baseContext.capturedAt).toISOString();
+  // A repository-verified authority snapshot is immutable and may have been
+  // materialized before this read snapshot.  It is never allowed to describe
+  // a future scope, but the repository separately proves that its immutable
+  // validity interval still covers `capturedAt`.
   if (catalog.workspaceRef !== workspaceRef || scope.workspaceRef !== workspaceRef
-    || scope.evaluatedAt !== new Date(input.baseContext.capturedAt).toISOString()) fail("scope_mismatch");
+    || Date.parse(scope.evaluatedAt) > Date.parse(capturedAt)) fail("scope_mismatch");
   const baseObjective = input.baseContext.meta.objective;
   if (baseObjective.state === "known") {
     if (scope.objectiveEvidence.canonicalObjective !== baseObjective.value) fail("scope_mismatch");

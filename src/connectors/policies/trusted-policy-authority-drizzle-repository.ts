@@ -162,7 +162,8 @@ export class DrizzleTrustedPolicyAuthorityRepository {
           'policyVersion', policy.policy_version, 'policyHash', policy.canonical_hash, 'operation', lock.operation,
           'revisionHash', lock.revision_hash, 'recordedAt', lock.recorded_at::text) order by lock.lock_ref, lock.sequence)
           from (select distinct on (lock.workspace_id, lock.policy_revision_id, lock.lock_ref) lock.*
-            from policy_manual_lock_revisions lock where lock.recorded_at <= ${input.evaluatedAt}::timestamptz
+            from policy_manual_lock_revisions lock
+            where lock.recorded_at <= (snapshot.snapshot_payload #>> '{policyAuthority,scope,evaluatedAt}')::timestamptz
             order by lock.workspace_id, lock.policy_revision_id, lock.lock_ref, lock.sequence desc) lock
           join strict_instruction_policy_revisions policy
             on policy.workspace_id = lock.workspace_id and policy.id = lock.policy_revision_id
@@ -183,18 +184,19 @@ export class DrizzleTrustedPolicyAuthorityRepository {
     if (!Number.isSafeInteger(snapshotCount) || snapshotCount < 1) fail("corrupt_store");
     if (snapshotCount !== 1) fail("ambiguous_authority");
     const verifiedAt = iso(row.verified_at); const expiresAt = iso(row.expires_at);
-    if (Date.parse(verifiedAt) > Date.parse(input.evaluatedAt) || Date.parse(expiresAt) <= Date.parse(input.evaluatedAt)
-      || (input.snapshotRef !== undefined && (row.snapshot_ref !== input.snapshotRef || row.snapshot_hash !== input.snapshotHash))) fail("corrupt_store");
+    if (input.snapshotRef !== undefined && (row.snapshot_ref !== input.snapshotRef || row.snapshot_hash !== input.snapshotHash)) fail("corrupt_store");
     const payload = row.snapshot_payload && typeof row.snapshot_payload === "object" && !Array.isArray(row.snapshot_payload)
       ? row.snapshot_payload as Record<string, unknown> : fail("corrupt_store");
     const payloadKeys = Object.keys(payload).sort();
-    const legacyKeys = ["authority", "policyAuthority", "repository", "schemaVersion", "snapshotHash", "snapshotRef"];
     const renewedKeys = ["authority", "policyAuthority", "repository", "schemaVersion", "snapshotHash", "snapshotRef", "validity"];
-    if (JSON.stringify(payloadKeys) !== JSON.stringify(legacyKeys) && JSON.stringify(payloadKeys) !== JSON.stringify(renewedKeys)) fail("corrupt_store");
+    if (JSON.stringify(payloadKeys) !== JSON.stringify(renewedKeys)) fail("corrupt_store");
     const repository = exact(payload.repository, ["ref", "revision", "verified"]);
     const authority = exact(payload.authority, ["productionAuthoritySourceBound", "canPublish", "canApprove", "canExecute", "canWriteMeta"]);
     const policyAuthority = exact(payload.policyAuthority, ["catalogHash", "scope", "manualLocks"]);
-    if (payload.validity !== undefined && exact(payload.validity, ["expiresAt"]).expiresAt !== expiresAt) fail("corrupt_store");
+    const validity = exact(payload.validity, ["notBefore", "expiresAt"]);
+    const notBefore = iso(validity.notBefore);
+    if (validity.expiresAt !== expiresAt || notBefore !== verifiedAt
+      || Date.parse(notBefore) > Date.parse(input.evaluatedAt) || Date.parse(expiresAt) <= Date.parse(input.evaluatedAt)) fail("corrupt_store");
     if (payload.schemaVersion !== "tenant-authority-snapshot/1.0.0" || payload.snapshotRef !== row.snapshot_ref || payload.snapshotHash !== row.snapshot_hash
       || repository.ref !== row.repository_ref || repository.revision !== row.repository_revision || repository.verified !== true
       || Object.values(authority).some((value) => value !== false) || policyAuthority.catalogHash !== row.catalog_revision_hash) fail("corrupt_store");
@@ -212,13 +214,15 @@ export class DrizzleTrustedPolicyAuthorityRepository {
       scope = createPolicyScopeSnapshot({ workspaceRef: rawScope.workspaceRef as string, evaluatedAt: rawScope.evaluatedAt as string,
         accountGroupRefs: rawScope.accountGroupRefs as string[], objectiveRefs: rawScope.objectiveRefs as string[],
         topicRefs: rawScope.topicRefs as string[], canonicalObjective: exact(rawScope.objectiveEvidence, ["canonicalObjective", "mappingVersion", "mappingHash"]).canonicalObjective as never });
-      if (scope.scopeHash !== rawScope.scopeHash || scope.workspaceRef !== catalog.workspaceRef || scope.evaluatedAt !== input.evaluatedAt) fail("corrupt_store");
+      if (scope.scopeHash !== rawScope.scopeHash || scope.workspaceRef !== catalog.workspaceRef
+        || Date.parse(scope.evaluatedAt) > Date.parse(input.evaluatedAt)
+        || Date.parse(scope.evaluatedAt) < Date.parse(notBefore)) fail("corrupt_store");
       manualLocks = list(policyAuthority.manualLocks).map((raw) => {
         const lock = exact(raw, ["schemaVersion", "workspaceRef", "lockRef", "policyRef", "policyVersion", "policyHash", "state", "evaluatedAt", "lockHash"]);
         const rebuilt = createFrozenPolicyManualLock({ workspaceRef: lock.workspaceRef as string, lockRef: lock.lockRef as string,
           policyRef: lock.policyRef as string, policyVersion: lock.policyVersion as number, policyHash: lock.policyHash as string,
           evaluatedAt: lock.evaluatedAt as string });
-        if (rebuilt.lockHash !== lock.lockHash || rebuilt.workspaceRef !== catalog.workspaceRef || rebuilt.evaluatedAt !== input.evaluatedAt) fail("corrupt_store");
+        if (rebuilt.lockHash !== lock.lockHash || rebuilt.workspaceRef !== catalog.workspaceRef || rebuilt.evaluatedAt !== scope.evaluatedAt) fail("corrupt_store");
         return rebuilt;
       });
     } catch (error) { if (error instanceof TrustedPolicyAuthorityRepositoryError) throw error; fail("corrupt_store"); }

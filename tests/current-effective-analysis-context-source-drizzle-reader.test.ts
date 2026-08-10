@@ -76,7 +76,7 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
       effectiveAt: "2026-08-10T15:00:00.000Z", previousSelectionHash: "GENESIS", selectionHash: "c".repeat(64) } as GuidanceCampaignSelection));
     const resolveInTransaction = vi.fn(async () => categoryComposition());
     const inspectInTransaction = vi.fn(async () => ({ registryHash: "a".repeat(64), current: [], history: [], diffs: [] }));
-    const loadInTransaction = vi.fn(async () => ({ catalog: { instructionPolicyRegistryHash: "a".repeat(64) }, authoritySnapshot: {
+    const loadInTransaction = vi.fn(async () => ({ scope: { evaluatedAt: "2026-08-10T14:00:00.000Z" }, catalog: { instructionPolicyRegistryHash: "a".repeat(64) }, authoritySnapshot: {
       workspaceId: input.workspaceId, verifiedAt: "2026-08-10T14:00:00.000Z", expiresAt: "2026-08-10T16:00:00.000Z",
     } }));
     const result = await new DrizzleCurrentEffectiveAnalysisContextSourceReader(database as never,
@@ -110,7 +110,7 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
     });
   });
 
-  it("rejects unbound or expired authority evidence before a source can advance", async () => {
+  it("rejects future or expired authority evidence before a source can advance", async () => {
     const execute = vi.fn(async () => ({ rows: execute.mock.calls.length === 2
       ? [{ captured_at: "2026-08-10T15:00:00.000Z" }]
       : execute.mock.calls.length === 3 ? [{ workspace_ref: "workspace_primary" }] : [] }));
@@ -141,8 +141,8 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
       { resolveInTransaction: vi.fn(async () => ({ workspaceId: input.workspaceId, dimensions: [{ values: [{ key: "lead" }],
         frozenContext: { dimension: { key: "service" }, path: [{ id: input.entityRef }] } }] })) } as never,
       { inspectInTransaction: vi.fn(async () => ({ registryHash: "a".repeat(64), current: [], history: [], diffs: [] })) } as never,
-      { loadInTransaction: vi.fn(async () => ({ catalog: { instructionPolicyRegistryHash: "a".repeat(64) }, authoritySnapshot: {
-        workspaceId: input.workspaceId, verifiedAt: "2026-08-10T14:00:00.000Z", expiresAt: hierarchy.capturedAt } })) } as never).loadCurrent(input))
+      { loadInTransaction: vi.fn(async () => ({ scope: { evaluatedAt: "2026-08-10T16:00:00.000Z" }, catalog: { instructionPolicyRegistryHash: "a".repeat(64) }, authoritySnapshot: {
+        workspaceId: input.workspaceId, verifiedAt: "2026-08-10T14:00:00.000Z", expiresAt: "2026-08-10T17:00:00.000Z" } })) } as never).loadCurrent(input))
       .rejects.toThrow("policy_authority_unavailable");
   });
 
