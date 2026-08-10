@@ -42,8 +42,13 @@
   etmeden canonical objective ile eşleşir; unknown token eşleşmez. Sessiz legacy payload kabulü yoktur:
   MCP/HTTP çağrısı explicit `guidance-agent-tools/1.2.0` negotiation ister. Persisted account-group
   kataloğu henüz yoktur; non-empty account-group selection `catalog_unavailable` kalır.
-- Progressive formalization G0→G2 gerçek vertical'ı eklendi: latest persisted GuidanceSource hash'i,
-  published GuidanceCard/binding scope'u ve reviewed GuidanceSet identity'si server-side çözülür;
+- Progressive formalization G0→G2 gerçek vertical'ı eklendi: caller'ın opaque `source_key` seçimi
+  current GuidanceSource stream'ine tenant-bound çözülür; revision payload'ına DB `source_ref` ve
+  server-side content hash'i yazılır. G1 published GuidanceCard/binding scope'u, G2 ise reviewed
+  GuidanceSet ref/version/hash'i ile ordered kartların exact current ref/version/hash manifestini
+  tek `reviewedGuidanceHash` altında dondurur. Set veya kart daha sonra revise edilirse G3/G4
+  `persistedGuidance=false` ve `reviewed_guidance_set_not_found` ile fail-closed kalır; eski
+  set-hash-only G2 kayıtları sessizce exact review sayılmaz ve yeniden owner review ister.
   append-only revision/hash chain, role/owner confirmation, registry/head OCC ve audit tek transaction'dadır.
   Yeni tablo FORCE RLS, API rollerine sıfır grant, exact top-level/nested JSONB, tombstoning-only DELETE
   ve arbitrary UPDATE/active DELETE reddi taşır. Cookie-only API ve Strict Policy Studio içindeki panel
@@ -51,13 +56,21 @@
   `production_policy_authority_catalog_unavailable`, `conflict_preview_unknown` ve
   `impact_preview_incomplete`; G4 ise risk/cap/approval/rollout/action-valve kanıtı yokken blocked'dır.
   Hiçbir G4 satırı A13 approval/execute/schedule/tool/network/Meta authority vermez.
-- Kanıt: guidance fix seti 6 dosya/48 test; starter seti 6 dosya/28 test; progressive seti 9 dosya/
-  42 test ana ajan tarafından yeniden çalıştırıldı ve yeşildir. Subagent full-unit koşumu 248 dosya/
-  1.464 test, production build, typecheck, `db:check`, architecture/model/security sınırları ve npm
-  production audit'i yeşil raporladı. Starter gerçek browser fail-closed ve mocked exact submit,
-  progressive panel 390/768/1440 responsive/fail-closed kabulü geçti; Meta/action/policy write açılmadı.
-  Bağımsız starter re-review ACCEPT; progressive ve guidance son re-review sonuçları bu checkpoint'in
-  final gate'inde ayrıca kaydedilecektir.
+- Kanıt: progressive repository/UI/MCP hedefli kapısı `tests/progressive-formalization-*.test.ts` ve
+  `tests/reklamzeka-mcp.test.ts` üzerinde 7 dosya/38 test; tam `npm test` 248 dosya/1.467 test;
+  production build, typecheck, `db:check`, architecture/model/security-boundaries, secret-artifact
+  kontrolü ve production dependency audit'i (0 vulnerability) ana ajan koşumunda yeşildir.
+  `scripts/verify-progressive-formalization-postgres.ts` gerçek repository/service membership,
+  source-key çözümü, OCC ve persisted audit satırını doğrular; bu ortamda exact
+  `postgres_connection_not_configured` blocker'ı ve continuation döndürdü. Gerçek Chromium'da
+  Strict Policy → Progressive panel 390/768/1440 px'te body/document scroll width viewport'a eşit,
+  PostgreSQL yokluğu açık fail-closed ve Meta-write kapalıdır; console yalnız beklenen 503'ler ile
+  favicon 404 içerdi. Meta/action/policy write açılmadı.
+- Private local MCP ortamı ve session henüz yapılandırılmadığı için `.codex/config.toml` bilinçli
+  güvenli fallback olarak `required = false` ve `default_tools_approval_mode = "prompt"` tutar;
+  `tests/reklamzeka-mcp.test.ts` exact allowlist, secret-free config ve bu iki değeri doğrular.
+  Private MCP/session kurulup `npm run verify:mcp-live` gerçek E2E yeşil olmadan `required=true`
+  geri getirilmeyecektir.
 - Canlı kapılar çevreseldir: `.env.local`, `DATABASE_URL` ve `DIRECT_DATABASE_URL` yok;
   `verify:starter-category-adoption-live`, `verify:progressive-formalization-live`,
   `verify:guidance-registry-db` ve `verify:supabase-security` yalnız redakte

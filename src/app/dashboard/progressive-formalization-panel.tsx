@@ -61,11 +61,13 @@ export function parseProgressiveFormalizationPreview(value: unknown): Progressiv
     || typeof value.previewHash !== "string" || !HASH.test(value.previewHash)
     || !["ready", "blocked"].includes(String(value.disposition)) || !Array.isArray(value.blockers)
     || value.blockers.length > 32 || value.blockers.some((item) => typeof item !== "string" || !/^[a-z0-9_]{2,96}$/.test(item))
-    || value.evidence.persistedGuidance !== true || value.evidence.persistedPolicy !== true
+    || typeof value.evidence.persistedGuidance !== "boolean" || typeof value.evidence.persistedPolicy !== "boolean"
     || typeof value.evidence.productionAuthoritySourceBound !== "boolean"
     || !Number.isSafeInteger(value.evidence.historicalRunsEvaluated)
     || Number(value.evidence.historicalRunsEvaluated) < 0 || Number(value.evidence.historicalRunsEvaluated) > 1000
     || value.disposition === "ready" && value.blockers.length !== 0
+    || value.disposition === "ready" && (value.evidence.persistedGuidance !== true || value.evidence.persistedPolicy !== true
+      || value.evidence.productionAuthoritySourceBound !== true)
     || value.target === "G3" && value.disposition === "ready" && !object(value.normalizedDraft)
     || value.target === "G4" && value.disposition === "ready" && !object(value.g4Payload)) {
     throw new FormalizationUiError("Formalization preview güvenli sözleşmeyle eşleşmiyor.");
@@ -114,6 +116,7 @@ export function ProgressiveFormalizationPanel() {
   const [message, setMessage] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   const reload = useCallback(async () => { setBusy(true); try { const next = await loadProgressiveFormalization();
     setSnapshot(next); setSelectedRef((current) => current || next.flows[0]?.formalizationRef || ""); setMessage(null);
+    setConfirmed(false); setConfirmationRef(""); setPreview(null);
   } catch (reason) { setSnapshot(null); setMessage(reason instanceof Error ? reason.message : "Formalization kullanılamıyor."); }
   finally { setBusy(false); } }, []);
   useEffect(() => { void reload(); }, [reload]);
@@ -142,7 +145,7 @@ export function ProgressiveFormalizationPanel() {
           expectedHeadHash: selected.headHash, expectedPreviewHash: preview.previewHash,
           ownerConfirmation: { confirmed: true, confirmationRef } };
       }
-      await runProgressiveFormalizationCommand(command); setPreview(null); await reload();
+      await runProgressiveFormalizationCommand(command); setConfirmed(false); setConfirmationRef(""); setPreview(null); await reload();
     } catch (reason) { setMessage(reason instanceof Error ? reason.message : "Formalization geçişi tamamlanamadı."); }
     finally { setBusy(false); }
   }
@@ -160,7 +163,7 @@ export function ProgressiveFormalizationPanel() {
     <div className={styles.grid}><div className={styles.list}><button type="button" data-active={!selectedRef} onClick={() => setSelectedRef("")}>Yeni G0</button>
       {snapshot.flows.map((flow) => <button type="button" key={flow.formalizationRef} data-active={flow.formalizationRef === selectedRef}
         onClick={() => { setSelectedRef(flow.formalizationRef); setPreview(null); }}><strong>{flow.formalizationRef}</strong><span>{flow.level}</span></button>)}</div>
-      <div className={styles.form}>{!selected ? <><label>Persisted guidance source ref<input value={sourceRef} onChange={(event) => setSourceRef(event.target.value)} /></label>
+      <div className={styles.form}>{!selected ? <><label>Guidance source key<input value={sourceRef} onChange={(event) => setSourceRef(event.target.value)} /></label>
         <button type="button" disabled={busy || !snapshot.authority.canCapture} onClick={() => void mutate("capture_g0")}>G0 yakala</button></>
         : <><p><strong>{selected.level}</strong> · head {selected.headHash.slice(0, 12)}…</p>
           {selected.level === "G0" ? <><label>Published guidance card ref’leri (virgülle)<textarea value={cardRefs} onChange={(event) => setCardRefs(event.target.value)} /></label>

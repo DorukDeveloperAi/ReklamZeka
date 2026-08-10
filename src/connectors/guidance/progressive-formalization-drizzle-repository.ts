@@ -78,11 +78,11 @@ function findFlow(state: ProgressiveFormalizationState, formalizationRef: string
 function basePreview(input: Readonly<{ target: "G3" | "G4"; formalizationRef: string; headHash: string;
   blockers: readonly FormalizationBlocker[]; normalizedDraft: ProgressiveFormalizationPreview["normalizedDraft"];
   g4Payload: ProgressiveFormalizationPreview["g4Payload"]; historicalRunsEvaluated: number;
-  productionAuthoritySourceBound: boolean }>): ProgressiveFormalizationPreview {
+  productionAuthoritySourceBound: boolean; persistedGuidance: boolean; persistedPolicy: boolean }>): ProgressiveFormalizationPreview {
   const core = Object.freeze({ target: input.target, formalizationRef: input.formalizationRef,
     headHash: input.headHash, blockers: Object.freeze([...input.blockers].sort()),
     normalizedDraftHash: input.normalizedDraft?.draftHash ?? null, g4Payload: input.g4Payload,
-    evidence: { persistedGuidance: true as const, persistedPolicy: true as const,
+    evidence: { persistedGuidance: input.persistedGuidance, persistedPolicy: input.persistedPolicy,
       productionAuthoritySourceBound: input.productionAuthoritySourceBound,
       historicalRunsEvaluated: input.historicalRunsEvaluated } });
   return Object.freeze({ contractVersion: PROGRESSIVE_FORMALIZATION_STUDIO_VERSION, target: input.target,
@@ -93,37 +93,63 @@ function basePreview(input: Readonly<{ target: "G3" | "G4"; formalizationRef: st
       canSchedule: false as const, canCallTool: false as const }) });
 }
 
+/** Pins a G2 review to the exact set and current card revisions, not merely set membership. */
+function reviewedGuidanceManifest(set: Row | undefined, orderedCardRefs: readonly string[], cardRows: readonly Row[]): string | null {
+  if (!set || typeof set.set_key !== "string" || !Number.isSafeInteger(Number(set.version))
+    || !/^[a-f0-9]{64}$/.test(String(set.record_hash)) || !Array.isArray(set.ordered_card_ids)
+    || JSON.stringify(set.ordered_card_ids) !== JSON.stringify(orderedCardRefs)) return null;
+  const byRef = new Map(cardRows.map((card) => [String(card.card_key), card] as const));
+  const cards = orderedCardRefs.map((ref) => byRef.get(ref));
+  if (cards.some((card, index) => !card || card.card_key !== orderedCardRefs[index]
+    || !Number.isSafeInteger(Number(card.version)) || card.status !== "published"
+    || !/^[a-f0-9]{64}$/.test(String(card.record_hash)))) return null;
+  return digest({ set: { ref: set.set_key, version: Number(set.version), recordHash: set.record_hash,
+    orderedCardRefs }, cards: cards.map((card, index) => ({ ref: orderedCardRefs[index], version: Number(card!.version),
+      recordHash: card!.record_hash, status: "published" })) });
+}
+
 async function persistedPreview(database: Executor, input: Readonly<{ workspaceId: string; workspaceRef: string;
   formalizationRef: string; target: "G3" | "G4"; policyRef: string | null }>): Promise<ProgressiveFormalizationPreview> {
   const state = await load(database, input.workspaceId); const flow = findFlow(state, input.formalizationRef);
   if (input.target === "G3") {
     if (flow.level !== "G2" || input.policyRef === null) throw new ProgressiveFormalizationStudioError("invalid_transition");
+    const g0 = flow.revisions[0]!;
     const g2 = flow.revisions[2]!;
-    const guidanceSetRef = (g2.payload as { guidanceSetRef: string }).guidanceSetRef;
+    const captured = g0.payload as { rawProvenanceRef: string; rawTextHash: string };
+    const reviewed = g2.payload as { guidanceSetRef: string; reviewedGuidanceHash: string };
+    const guidanceSetRef = reviewed.guidanceSetRef;
     const policyRows = rows(await database.execute(sql`select policy_payload from strict_instruction_policy_revisions
       where workspace_id = ${input.workspaceId}::uuid and policy_ref = ${input.policyRef}
       order by policy_version desc limit 2`));
-    if (policyRows.length === 0) throw new ProgressiveFormalizationStudioError("not_found");
+    if (policyRows.length === 0) return basePreview({ target: "G3", formalizationRef: input.formalizationRef,
+      headHash: flow.headHash, blockers: ["strict_policy_draft_not_found"], normalizedDraft: null, g4Payload: null,
+      historicalRunsEvaluated: 0, productionAuthoritySourceBound: false, persistedGuidance: false, persistedPolicy: false });
     let strictPolicy;
     try { strictPolicy = assertStrictInstructionPolicyArtifact(policyRows[0]!.policy_payload); }
     catch { throw new ProgressiveFormalizationStudioError("conflict"); }
     if (strictPolicy.status !== "draft" || strictPolicy.workspaceRef !== input.workspaceRef) {
       throw new ProgressiveFormalizationStudioError("invalid_transition");
     }
-    const setRows = rows(await database.execute(sql`select version, ordered_card_ids, record_hash
+    const setRows = rows(await database.execute(sql`select set_key, version, ordered_card_ids, record_hash, review_status
       from guidance_sets where workspace_id = ${input.workspaceId}::uuid and set_key = ${guidanceSetRef}
       order by version desc limit 2`));
-    if (setRows.length === 0 || !Array.isArray(setRows[0]!.ordered_card_ids)) {
-      throw new ProgressiveFormalizationStudioError("conflict");
-    }
-    const orderedCardRefs = setRows[0]!.ordered_card_ids as readonly string[];
-    const cardRows = rows(await database.execute(sql`select distinct on (card_key) card_key, version, record_hash
+    const scoped = (flow.revisions[1]!.payload as { guidanceCardRefs: readonly string[] }).guidanceCardRefs;
+    const currentSet = setRows[0];
+    const orderedCardRefs = scoped;
+    const cardRows = rows(await database.execute(sql`select distinct on (card_key) card_key, version, status, record_hash
       from guidance_cards where workspace_id = ${input.workspaceId}::uuid and card_key = any(${orderedCardRefs}::text[])
       order by card_key, version desc`));
     const byRef = new Map(cardRows.map((row) => [String(row.card_key), row] as const));
     const promoted = new Set(strictPolicy.source.promotedFromGuidanceRefs);
-    const exactMatch = orderedCardRefs.length > 0 && orderedCardRefs.length === promoted.size
-      && orderedCardRefs.every((cardRef) => promoted.has(cardRef) && byRef.has(cardRef));
+    const currentCardsPublished = orderedCardRefs.length > 0 && cardRows.length === orderedCardRefs.length
+      && orderedCardRefs.every((cardRef) => byRef.get(cardRef)?.card_key === cardRef
+        && byRef.get(cardRef)?.status === "published" && /^[a-f0-9]{64}$/.test(String(byRef.get(cardRef)?.record_hash)));
+    const setMatchesReview = currentSet?.set_key === guidanceSetRef && currentSet.review_status === "reviewed"
+      && reviewedGuidanceManifest(currentSet, scoped, cardRows) === reviewed.reviewedGuidanceHash;
+    const exactMatch = setMatchesReview && currentCardsPublished && orderedCardRefs.length === promoted.size
+      && orderedCardRefs.every((cardRef) => promoted.has(cardRef) && byRef.has(cardRef))
+      && strictPolicy.source.rawProvenanceRef === captured.rawProvenanceRef
+      && strictPolicy.source.rawTextHash === captured.rawTextHash;
     const semanticItems = orderedCardRefs.map((cardRef) => ({ meaningRef: `meaning_${digest(cardRef).slice(0, 24)}`,
       sourceStatementHash: String(byRef.get(cardRef)?.record_hash ?? digest({ missing: cardRef })),
       normalizedClauseRef: promoted.has(cardRef) ? `policy_clause_${digest(strictPolicy.clause).slice(0, 24)}` : null,
@@ -134,7 +160,7 @@ async function persistedPreview(database: Executor, input: Readonly<{ workspaceI
     if (bindingRows.length > 1_000) throw new ProgressiveFormalizationStudioError("conflict");
     const matchingRuns = bindingRows.filter((row) => Array.isArray(row.selected_set_refs)
       && (row.selected_set_refs as readonly Row[]).some((set) => set.setRef === guidanceSetRef
-        && Number(set.version) === Number(setRows[0]!.version) && set.recordHash === setRows[0]!.record_hash));
+        && Number(set.version) === Number(currentSet?.version) && set.recordHash === currentSet?.record_hash));
     const evaluatedRevisionRefs = matchingRuns.map((row) => `analysis_revision_${String(row.binding_hash).slice(0, 24)}`).sort();
     const unknownOutcomeRefs = matchingRuns.map((row) => `outcome_unknown_${String(row.binding_hash).slice(0, 24)}`).sort();
     const replayStatus = matchingRuns.length === 0 ? "no_history" as const : "incomplete" as const;
@@ -160,24 +186,48 @@ async function persistedPreview(database: Executor, input: Readonly<{ workspaceI
         unresolvedDependencyRefs: unresolved, previewHash: digest({ affectedScopeRefs, policyCount, unresolved }) } });
     const blockers: FormalizationBlocker[] = ["production_policy_authority_catalog_unavailable",
       "conflict_preview_unknown", "impact_preview_incomplete"];
+    if (!setMatchesReview) blockers.push("reviewed_guidance_set_not_found");
+    if (!currentCardsPublished) blockers.push("guidance_card_not_published");
     if (!exactMatch) blockers.push("semantic_diff_unresolved");
     if (matchingRuns.length > 0) blockers.push("historical_replay_incomplete");
     return basePreview({ target: "G3", formalizationRef: input.formalizationRef, headHash: flow.headHash,
       blockers, normalizedDraft, g4Payload: null, historicalRunsEvaluated: matchingRuns.length,
-      productionAuthoritySourceBound: false });
+      productionAuthoritySourceBound: false, persistedGuidance: setMatchesReview && currentCardsPublished,
+      persistedPolicy: strictPolicy.status === "draft" });
   }
   if (flow.level !== "G3") throw new ProgressiveFormalizationStudioError("invalid_transition");
   const draft = (flow.revisions[3]!.payload as { normalizedDraft: { strictPolicy: { policyRef: string } } }).normalizedDraft;
+  const g2 = flow.revisions[2]!.payload as { guidanceSetRef: string; reviewedGuidanceHash: string };
+  const scoped = (flow.revisions[1]!.payload as { guidanceCardRefs: readonly string[] }).guidanceCardRefs;
+  const setRows = rows(await database.execute(sql`select set_key, ordered_card_ids, record_hash, review_status from guidance_sets
+    where workspace_id = ${input.workspaceId}::uuid and set_key = ${g2.guidanceSetRef} order by version desc limit 2`));
+  const currentSet = setRows[0];
+  const cardRows = rows(await database.execute(sql`select distinct on (card_key) card_key, version, status, record_hash
+    from guidance_cards where workspace_id = ${input.workspaceId}::uuid and card_key = any(${scoped}::text[])
+    order by card_key, version desc`));
+  const cardsByRef = new Map(cardRows.map((row) => [String(row.card_key), row] as const));
+  const currentCardsPublished = scoped.length > 0 && cardRows.length === scoped.length && scoped.every((cardRef) =>
+    cardsByRef.get(cardRef)?.card_key === cardRef && cardsByRef.get(cardRef)?.status === "published"
+      && /^[a-f0-9]{64}$/.test(String(cardsByRef.get(cardRef)?.record_hash)));
+  const setMatchesReview = currentSet?.set_key === g2.guidanceSetRef && currentSet.review_status === "reviewed"
+    && reviewedGuidanceManifest(currentSet, scoped, cardRows) === g2.reviewedGuidanceHash;
   const published = rows(await database.execute(sql`select policy_payload from strict_instruction_policy_revisions
     where workspace_id = ${input.workspaceId}::uuid and policy_ref = ${draft.strictPolicy.policyRef}
       and status = 'published' order by policy_version desc limit 2`));
+  let persistedPolicy = false;
+  if (published.length > 0) {
+    try { persistedPolicy = assertStrictInstructionPolicyArtifact(published[0]!.policy_payload).status === "published"; }
+    catch { persistedPolicy = false; }
+  }
   const blockers: FormalizationBlocker[] = ["production_policy_authority_catalog_unavailable",
     "g4_risk_evidence_unavailable", "g4_cap_policy_unavailable", "g4_approval_policy_unavailable",
     "g4_rollout_evidence_unavailable", "g4_action_valve_unavailable"];
-  if (published.length === 0) blockers.unshift("strict_policy_draft_not_found");
+  if (!setMatchesReview) blockers.unshift("reviewed_guidance_set_not_found");
+  if (!currentCardsPublished) blockers.unshift("guidance_card_not_published");
+  if (!persistedPolicy) blockers.unshift("published_policy_missing");
   return basePreview({ target: "G4", formalizationRef: input.formalizationRef, headHash: flow.headHash,
     blockers, normalizedDraft: null, g4Payload: null, historicalRunsEvaluated: 0,
-    productionAuthoritySourceBound: false });
+    productionAuthoritySourceBound: false, persistedGuidance: setMatchesReview && currentCardsPublished, persistedPolicy });
 }
 
 export type ProgressiveFormalizationPreviewResolver = (database: Executor, input: Readonly<{
@@ -228,15 +278,16 @@ export class DrizzleProgressiveFormalizationRepository implements ProgressiveFor
       const command = input.command;
       if (command.operation === "capture_g0") {
         formalizationRef = `formalization_${randomBytes(12).toString("hex")}`; previous = null;
-        const provenance = rows(await tx.execute(sql`select source_ref, version, status, content, record_hash from guidance_sources
-          where workspace_id = ${input.workspaceId}::uuid and source_ref = ${command.rawProvenanceRef}
+        const provenance = rows(await tx.execute(sql`select source_key, source_ref, version, status, content, record_hash from guidance_sources
+          where workspace_id = ${input.workspaceId}::uuid and source_key = ${command.rawProvenanceRef}
           order by version desc limit 2`));
-        if (provenance.length === 0 || provenance.length > 2 || provenance[0]!.source_ref !== command.rawProvenanceRef
-          || provenance[0]!.status === "archived" || typeof provenance[0]!.content !== "string"
+        if (provenance.length === 0 || provenance.length > 2 || provenance[0]!.source_key !== command.rawProvenanceRef
+          || provenance[0]!.status === "archived" || typeof provenance[0]!.source_ref !== "string"
+          || typeof provenance[0]!.content !== "string"
           || !/^[a-f0-9]{64}$/.test(String(provenance[0]!.record_hash))) {
           throw new ProgressiveFormalizationStudioError("not_found");
         }
-        payload = { rawProvenanceRef: command.rawProvenanceRef,
+        payload = { rawProvenanceRef: provenance[0]!.source_ref,
           rawTextHash: createHash("sha256").update(provenance[0]!.content).digest("hex") };
       } else {
         formalizationRef = command.formalizationRef; const flow = findFlow(before, formalizationRef);
@@ -274,13 +325,17 @@ export class DrizzleProgressiveFormalizationRepository implements ProgressiveFor
             from guidance_sets where workspace_id = ${input.workspaceId}::uuid and set_key = ${command.guidanceSetRef}
             order by version desc limit 2`));
           const scoped = (previous.payload as { guidanceCardRefs: readonly string[] }).guidanceCardRefs;
+          const cards = rows(await tx.execute(sql`select distinct on (card_key) card_key, version, status, record_hash
+            from guidance_cards where workspace_id = ${input.workspaceId}::uuid and card_key = any(${scoped}::text[])
+            order by card_key, version desc`));
+          const reviewedGuidanceHash = reviewedGuidanceManifest(sets[0], scoped, cards);
           if (sets.length === 0 || sets.length > 2 || sets[0]!.set_key !== command.guidanceSetRef
             || sets[0]!.review_status !== "reviewed" || !/^[a-f0-9]{64}$/.test(String(sets[0]!.record_hash))
             || !Array.isArray(sets[0]!.ordered_card_ids)
-            || JSON.stringify(sets[0]!.ordered_card_ids) !== JSON.stringify(scoped)) {
+            || JSON.stringify(sets[0]!.ordered_card_ids) !== JSON.stringify(scoped) || reviewedGuidanceHash === null) {
             throw new ProgressiveFormalizationStudioError("invalid_transition");
           }
-          payload = { guidanceSetRef: command.guidanceSetRef, reviewedGuidanceHash: String(sets[0]!.record_hash),
+          payload = { guidanceSetRef: command.guidanceSetRef, reviewedGuidanceHash,
             confirmation: { ...command.ownerConfirmation, confirmedAt: input.occurredAt } };
         } else if (command.operation === "promote_g3") {
           const preview = await this.resolvePreview(tx, { workspaceId: input.workspaceId, workspaceRef: input.workspaceRef,

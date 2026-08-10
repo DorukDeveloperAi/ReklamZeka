@@ -29,6 +29,7 @@ export type FormalizationBlocker =
   | "reviewed_guidance_set_not_found"
   | "guidance_set_card_mismatch"
   | "strict_policy_draft_not_found"
+  | "published_policy_missing"
   | "semantic_diff_unresolved"
   | "historical_replay_incomplete"
   | "conflict_preview_unknown"
@@ -60,8 +61,8 @@ export type ProgressiveFormalizationPreview = Readonly<{
     approvalMode: "approval_only";
   }> | null;
   evidence: Readonly<{
-    persistedGuidance: true;
-    persistedPolicy: true;
+    persistedGuidance: boolean;
+    persistedPolicy: boolean;
     productionAuthoritySourceBound: boolean;
     historicalRunsEvaluated: number;
   }>;

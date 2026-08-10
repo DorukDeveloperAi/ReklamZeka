@@ -168,7 +168,8 @@ describe("MCP v2 protocol conformance", () => {
     const enabledBlock = /enabled_tools\s*=\s*\[([\s\S]*?)\]/.exec(config)?.[1] ?? "";
     const configured = [...enabledBlock.matchAll(/"([a-z0-9_]+)"/g)].map((match) => match[1]);
     expect(configured).toEqual(REKLAMZEKA_MCP_TOOL_NAMES);
-    expect(config).toContain('default_tools_approval_mode = "writes"');
+    expect(config).toContain("required = false");
+    expect(config).toContain('default_tools_approval_mode = "prompt"');
     expect(config).not.toMatch(/META_ACCESS_TOKEN|DATABASE_URL|SIGNING_KEY|env_vars|\[mcp_servers\.reklamzeka\.env\]/);
     for (const name of ["register_agent_session", "heartbeat_agent_session", "get_handoff_context"]) {
       expect(config).toContain(`[mcp_servers.reklamzeka.tools.${name}]\napproval_mode = "auto"`);

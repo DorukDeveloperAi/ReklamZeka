@@ -54,6 +54,18 @@ describe("progressive formalization dashboard boundary", () => {
       .toThrow("güvenli sözleşmeyle");
   });
 
+  it("accepts blocked missing persistence evidence but never accepts ready evidence gaps", () => {
+    expect(parseProgressiveFormalizationPreview({ ...preview, evidence: { ...preview.evidence,
+      persistedGuidance: false, persistedPolicy: false } })).toMatchObject({ disposition: "blocked",
+      evidence: { persistedGuidance: false, persistedPolicy: false } });
+    const ready = { ...preview, disposition: "ready" as const, blockers: [], normalizedDraft: {} };
+    for (const evidence of [
+      { ...ready.evidence, persistedGuidance: false },
+      { ...ready.evidence, persistedPolicy: false },
+      { ...ready.evidence, productionAuthoritySourceBound: false },
+    ]) expect(() => parseProgressiveFormalizationPreview({ ...ready, evidence })).toThrow("güvenli sözleşmeyle");
+  });
+
   it("posts only the exact OCC command and verifies audit plus closed authority", async () => {
     const command = { operation: "capture_g0", expectedRegistryHash: "a".repeat(64),
       rawProvenanceRef: "source_owner_note" } as const;

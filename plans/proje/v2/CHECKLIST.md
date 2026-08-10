@@ -204,7 +204,8 @@
 - [ ] G0→G4 progressive formalization, semantic diff, historical replay ve impact preview.
   - [x] Append-only hash-chainli saf maturity/transition contract; G2→G3 ve G3→G4 explicit
     owner/admin confirmation, fail-closed ambiguity ve A13 valve-ref-only G4 sınırı.
-  - [x] G0 source capture, G1 persisted card/binding scope ve G2 reviewed-set owner confirmation için
+  - [x] G0 opaque source-key→current persisted source-ref/content-hash capture, G1 persisted
+    card/binding scope ve G2 exact reviewed set + ordered card revision/hash manifestli owner confirmation;
     append-only PostgreSQL persistence, workspace lock/membership/OCC/audit, cookie-only API ve responsive UI.
   - [x] G3/G4 storage contract, exact JSONB/hash-chain/RLS/revoke/immutability ve injected-ready replay;
     production preview eksik authority/risk/cap/approval/rollout/valve kanıtında fail-closed kalır.
