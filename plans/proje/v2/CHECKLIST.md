@@ -326,6 +326,8 @@
   - [x] Cookie-bound bounded read yüzeyi: ayrı `business_outcome:read` scope/intent'i, tenant+entity
     keyset cursor'ı ve yalnız normalized public projection; raw source/content hash/actor/audit verisi ile
     action/Meta-write authority dönmez.
+  - [x] L4 için deterministic compact BusinessOutcomeEvidence envelope'u: entity/head/window-bound manifest,
+    outcome/currency/mapping summary ve immutable hash; raw source veya Meta proxy/action authority taşımaz.
   - [ ] Frozen context/L4–L5 binding'i.
 
 ## A11 — Bütçe planlama

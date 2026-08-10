@@ -1927,3 +1927,14 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   provenance/timeframe/invalidation sözleşmesiyle yapılacak bu sonraki iş fail-closed açık kalır. Yerel
   PostgreSQL/session ortamı bulunmadığından gerçek route/RLS acceptance blocker'ı
   `postgres_connection_not_configured` olarak sürer.
+
+## 2026-08-10 — A10 BusinessOutcome L4 evidence contract
+
+- `business-outcome-evidence/1.0.0`, normalized satırlardan entity ve half-open zaman penceresine bağlı,
+  sıralama-deterministik compact evidence envelope üretir. Summary outcome adetlerini, gelir-currency toplamını
+  ve verified/unmapped mapping sayısını taşır; raw import/content hash/actor/audit alanı veya Meta proxy/action
+  authority taşımaz.
+- Evidence hash'i source-head hash ve source manifest hash'ini kapsar. Pencere dışı/duplicate signal, yanlış
+  entity, geçersiz revenue veya malformed timestamp fail-closed reddedilir. Henüz `EffectiveCampaignContext`
+  ya da PostgreSQL materialization head'ine bağlanmadığından yeni outcome geldiğinde context invalidation mekanizması
+  bu checkpoint'te iddia edilmez; bu sonraki L4→L5 persistence dilimidir.
