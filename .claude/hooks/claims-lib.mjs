@@ -2247,7 +2247,156 @@ export function orkestratorKayit(repoRoot, kimlik, { kapsam = null, devral = fal
   /* İMLEÇ DEFTERİN SONUNA: yeni orkestratör, kaydolmadan önceki günlerin arşiviyle
      karşılanmaz. "Kaydolduğum andan itibaren" sözleşmesi burada kurulur. */
   imlecYaz(repoRoot, olaySonu(repoRoot));
+  /* COMMIT KANALI da aynı sözleşmeyle kurulur (otonomi-merdiveni:16): imleç o anki HEAD'e.
+     HEAD ölçülemezse imleç yazılmaz — ilk çizim null görür ve kendisi kurar. */
+  try {
+    const head = gitHead(repoRoot);
+    if (head) commitImlecYaz(repoRoot, { son: head, sonListe: [head] });
+  } catch {
+    /* yut */
+  }
   return r;
+}
+
+/* ══════════ COMMIT KANALI — farkındalığın ikinci bacağı (otonomi-merdiveni:16) ══════════
+ *
+ * Olay beslemesi (olayOku + imleç + sahaBloku) posta/olay kanalını taşır; bu bölüm AYNI
+ * imleçli-projeksiyon desenini İKİNCİ kaynağa (git geçmişi) uygular: orkestratör turu
+ * başında "kim neyi kapattı/değiştirdi"yi görür. KANAL SALT-OKURDUR — yalnız `rev-parse`
+ * + `log` koşar, git'e TEK BAYT yazmaz; her hata yutulur (kapı ürünü asla kilitlemez).
+ *
+ * D1 · İmleç = son görülen commit SHA'sı (`orkestrator/commit-imlec.json`; olay imleci
+ *      `orkestrator/imlec.json` ELLENMEZ). `sonListe` (≤40) kopukluk penceresinde mükerrer
+ *      basımı eleyen tampondur. Alt dizin kuralı: imleç defter KÖKÜNE konmaz — kökteki
+ *      dosya "sahipsiz claim" diye arşivlenir (ölçülmüş hata sınıfı).
+ * D2 · Ucuz yol önce: HEAD değişmediyse `git log` HİÇ koşmaz (tek rev-parse).
+ * D3 · Kopuk imleç TANIMLI: `rev-parse --verify` düşerse `--since=<imleç.ts>` penceresi +
+ *      tek İLAN satırı; sessiz sıfırlama YOK. Amend/rebase imleci çoğu zaman düşürmez —
+ *      yeniden yazılmış commit yeni sha ile gelir ve bu DOĞRUDUR (yeni olgu, mükerrer değil).
+ * D5 · Sınıflandırıcı `packages/core/src/commit-mesaji.ts → commitTuru`nun MİNİMAL KOPYASIDIR
+ *      (claims-lib self-contained — core'u import edemez); sıra kanonla AYNI, şüphede İŞ.
+ *      İki kopya `commit-sinif-sozlesme.test.mjs` ile kilitlidir — kilitsiz kopya drift'tir.
+ */
+export const COMMIT_IMLEC_TAMPON = 40;
+export const commitImlecPath = (repoRoot) =>
+  join(ledgerDirOf(repoRoot), "orkestrator", "commit-imlec.json");
+
+/** null = imleç yok ("şimdiden itibaren" kur, geçmişi dökme — olay imleci semantiği). */
+export function commitImlecOku(repoRoot) {
+  try {
+    const j = JSON.parse(readFileSync(commitImlecPath(repoRoot), "utf8"));
+    return j?.son ? { son: String(j.son), ts: j.ts ?? null, sonListe: Array.isArray(j.sonListe) ? j.sonListe : [] } : null;
+  } catch {
+    return null;
+  }
+}
+
+export function commitImlecYaz(repoRoot, { son, sonListe = [] }) {
+  const dosya = commitImlecPath(repoRoot);
+  mkdirSync(join(ledgerDirOf(repoRoot), "orkestrator"), { recursive: true, mode: 0o700 });
+  atomicWrite(dosya, {
+    v: 1,
+    son: String(son),
+    ts: new Date().toISOString(),
+    sonListe: [...new Set([...sonListe, String(son)])].slice(-COMMIT_IMLEC_TAMPON),
+  });
+}
+
+/** git çağrısı — SALT-OKUR (yalnız rev-parse|log); hata = null (fırlatma yok). */
+function gitOku(repoRoot, args) {
+  try {
+    const r = spawnSync("git", ["-C", repoRoot, ...args], {
+      encoding: "utf8",
+      timeout: 10_000,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    return r.status === 0 ? r.stdout : null;
+  } catch {
+    return null;
+  }
+}
+
+export function gitHead(repoRoot) {
+  return gitOku(repoRoot, ["rev-parse", "HEAD"])?.trim() || null;
+}
+
+/** D5 kopyası — kanon sırayla BİREBİR: trailer → ^Merge → ^cp( → ^auto: → ^aide tasima: →
+ *  ŞÜPHEDE İŞ. (Sözleşme testi core kopyasıyla kilitler.) */
+export function commitTuruKit(konu, trailerDeger = "") {
+  const t = String(trailerDeger ?? "").trim().toLowerCase();
+  if (t === "checkpoint") return "checkpoint";
+  if (t === "is") return "is";
+  if (t === "birlesme") return "birlesme";
+  const k = String(konu ?? "");
+  if (/^Merge\b/.test(k)) return "birlesme";
+  if (/^cp\(/.test(k)) return "checkpoint";
+  if (/^auto:\s/i.test(k)) return "checkpoint";
+  if (/^aide tasima:\s/i.test(k)) return "checkpoint";
+  return "is";
+}
+
+/** `cp(a,b): N dosya · +x/-y` konusundan özet — parse edilemeyen alan null (tahmin yazılmaz). */
+export function cpOzet(konu) {
+  const m = /^cp\(([^)]*)\):\s*(?:(\d+)\s*dosya)?(?:\s*·\s*\+(\d+)\/-(\d+))?/.exec(String(konu ?? ""));
+  if (!m) return { kapsamlar: [], dosya: null, art: null, eks: null };
+  return {
+    kapsamlar: m[1].split(",").map((s) => s.trim()).filter(Boolean),
+    dosya: m[2] ? +m[2] : null,
+    art: m[3] ? +m[3] : null,
+    eks: m[4] ? +m[4] : null,
+  };
+}
+
+const COMMIT_FORMAT = "%H%x1f%ct%x1f%s%x1f%(trailers:key=Aide-Tur,valueonly)";
+
+function commitSatirlari(ham) {
+  if (!ham) return [];
+  return ham
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => {
+      const [sha, ct, konu, trailer] = l.split("");
+      if (!sha) return null;
+      return { sha, ts: (+ct || 0) * 1000, konu: konu ?? "", tur: commitTuruKit(konu, trailer) };
+    })
+    .filter(Boolean)
+    .reverse(); // git log yeni→eski verir; kanal kronolojik (eski→yeni) akar
+}
+
+/**
+ * İmleçten bu yana yeni commit'ler. Dönüş: { yeni, head, kopuk, atlanan }.
+ * - imleç yok → HEAD'e kurulur, `yeni` boş ("şimdiden itibaren").
+ * - HEAD == imleç → tek rev-parse, log KOŞMAZ (D2).
+ * - imleç ulaşılamaz (rebase+gc) → `--since=<imleç.ts>` penceresi, `sonListe` elenir,
+ *   `kopuk:true` (çizim tek İLAN satırı basar) — sessiz sıfırlama YOK (D3).
+ * Git yok / repo değil → { yeni:[], head:null } (kapı ürünü kilitlemez).
+ */
+export function commitOku(repoRoot, { tavan = 120 } = {}) {
+  const bos = { yeni: [], head: null, kopuk: false, atlanan: 0 };
+  const head = gitHead(repoRoot);
+  if (!head) return bos;
+  const imlec = commitImlecOku(repoRoot);
+  if (!imlec) {
+    commitImlecYaz(repoRoot, { son: head });
+    return { ...bos, head };
+  }
+  if (imlec.son === head) return { ...bos, head }; // ucuz yol — log koşmadı
+  const ulasilir = gitOku(repoRoot, ["rev-parse", "--verify", "--quiet", `${imlec.son}^{commit}`]);
+  let yeni;
+  let kopuk = false;
+  if (ulasilir) {
+    yeni = commitSatirlari(
+      gitOku(repoRoot, ["log", `--format=${COMMIT_FORMAT}`, "-n", String(tavan + 1), `${imlec.son}..HEAD`])
+    );
+  } else {
+    kopuk = true;
+    const pencere = imlec.ts || new Date(0).toISOString();
+    yeni = commitSatirlari(
+      gitOku(repoRoot, ["log", `--format=${COMMIT_FORMAT}`, "-n", String(tavan + 1), `--since=${pencere}`])
+    ).filter((c) => !imlec.sonListe.includes(c.sha) && c.sha !== imlec.son);
+  }
+  const atlanan = Math.max(0, yeni.length - tavan);
+  return { yeni: yeni.slice(-tavan), head, kopuk, atlanan };
 }
 
 /** Bırak — yalnız KENDİ kaydını (başkasınınkini üçüncü taraf silemez). Eski yol da temizlenir. */
