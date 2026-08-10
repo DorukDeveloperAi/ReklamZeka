@@ -2074,3 +2074,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: `tests/effective-analysis-context-composer.test.ts`,
   `tests/current-effective-analysis-context-source-drizzle-reader.test.ts`, `npm run typecheck`
   ve `git diff --check`.
+
+## 2026-08-10 — A10.4c-5 transaction-local Meta hierarchy/config validation
+
+- `CurrentMetaHierarchyConfigReader` yeni transaction açmadan caller'ın `REPEATABLE READ, READ ONLY`
+  snapshot'ında active connection/account, exact campaign/ad-set/ad/creative hierarchy ve disappeared
+  olmayan current satırları doğrular. Tx clock'a kadar tek latest authentic `meta_change_snapshot` ile
+  campaign'in tüm current ad-set config gözlemlerini bağlar; canonical config-v2, hierarchy identity ve
+  immutable source snapshot evidence döndürür. Missing/ambiguous/future/cross-scope/corrupt veri
+  fail-closed reddedilir.
+- `DrizzleCurrentEffectiveAnalysisContextSourceReader` bu reader'ı yalnız validation olarak çağırır;
+  guidance/data/history/category/lifecycle/authority closure aynı snapshotta tamamlanmadığından halen
+  `not_ready` döner ve capability üretmez. Schema/migration, HTTP/UI/action/Decision Room wiring yoktur.

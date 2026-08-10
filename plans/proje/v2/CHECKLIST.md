@@ -276,6 +276,11 @@
     READ ONLY` snapshot'ta çözer; missing/ambiguous/paused/future/tahrif edilmiş profile fail-closed
     reddedilir. Karar yalnız repository kaynaklı campaign zamanları ve boş kanıtla domain evaluator'da
     advisory olarak hesaplanır; evidence reader gelene dek sonuç observe/blocked dışında güçlenemez.
+  - [x] A10.4c-5 typed transaction-local Meta hierarchy/config reader: caller-owned mevcut snapshot
+    içinde active connection/account, exact non-disappeared hierarchy, tx clock öncesi latest authentic
+    Meta snapshot ve campaign'in tüm ad-set config gözlemlerini doğrular; canonical config-v2 + source
+    snapshot evidence üretir. Current-source seam bunu yalnız validation için çağırır ve halen `not_ready`
+    kalır; geniş ready bundle/UI/HTTP/action wiring'i yoktur.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.

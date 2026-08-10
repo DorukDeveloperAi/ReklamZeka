@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { EffectiveAnalysisContextNotReadySource, EffectiveAnalysisContextRequest,
   EffectiveAnalysisContextSource } from "@/application/effective-analysis-context-composer";
+import { CurrentMetaHierarchyConfigReader, type CurrentMetaHierarchyConfig } from "@/connectors/meta/current-meta-hierarchy-config-reader";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -34,7 +35,8 @@ const NO_SOURCE_CAPABILITIES = Object.freeze({
  * component required for a valid context bundle.
  */
 export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
-  constructor(private readonly database: Database) {}
+  constructor(private readonly database: Database,
+    private readonly hierarchyReader: Pick<CurrentMetaHierarchyConfigReader, "readCurrent"> = new CurrentMetaHierarchyConfigReader()) {}
 
   async loadCurrent(input: EffectiveAnalysisContextRequest): Promise<EffectiveAnalysisContextSource> {
     if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).length !== 4
@@ -53,6 +55,10 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
       if (scope.length !== 1 || typeof scope[0]!.captured_at !== "string") throw new Error("scope_not_found");
       const capturedAt = scope[0]!.captured_at;
       if (!Number.isFinite(Date.parse(capturedAt)) || new Date(capturedAt).toISOString() !== capturedAt) throw new Error("corrupt_store");
+      // This is validation only: the broader source bundle remains deliberately unavailable.
+      const hierarchy: CurrentMetaHierarchyConfig = await this.hierarchyReader.readCurrent(tx, input);
+      if (hierarchy.capturedAt !== capturedAt || hierarchy.identity.accountRef !== input.accountRef
+        || hierarchy.identity.hierarchyRefs.at(-1) !== input.entityRef) throw new Error("corrupt_store");
       const unavailable: EffectiveAnalysisContextNotReadySource = Object.freeze({
         status: "not_ready", capturedAt, reason: "current_source_bundle_unavailable", capabilities: NO_SOURCE_CAPABILITIES,
       });
