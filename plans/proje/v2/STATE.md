@@ -1972,3 +1972,14 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Outcome evidence Meta metric veya success/proxy metriği değildir (`metaProxyEligible:false` korunur); finding/teklif
   eligibility'sini değiştirmez ve result hâlâ action authorization/Meta write capability vermez. Entity-scope dışı
   evidence L5 consumer tarafından fail-closed reddedilir.
+
+## 2026-08-10 — Decision Room replay ve guidance DB guard düzeltmesi
+
+- Frozen Decision Room asset replay'i artık persisted full `AnalysisAgenda` payload'unu yeniden üretilen agenda ile
+  hash-eşit doğrular; core `agendaHash` ile full-object hash'ini karşılaştıran yanlış kontrol kaldırıldı. Bu, ilk
+  claim'deki agenda/timeframe/context/cadence varlığını değiştirmez; replay drift'inde fail-closed kalır.
+- İleri yönlü iki migration, official guidance URL fonksiyonundaki şema-isimli `coalesce` hatasını ve backslash
+  bypass'ını düzeltti; Decision Room asset tablolarından PUBLIC/anon/authenticated/service_role izinlerini geri aldı.
+  `verify:decision-room-analysis-assets-db` canlı kabulü agenda freeze/replay, binding immutability/ref caps,
+  URL negatifleri, RLS/revoke, cross-tenant negatifleri ve outer rollback'i geçti. Hiçbir action/Meta-write yüzeyi
+  eklenmedi.
