@@ -17,6 +17,7 @@ describe("campaign planning brief panel", () => {
     expect(html).toContain("pazar → dil → hizmet → iş amacı → dönüşüm yolu → kapasite/kreatif");
     expect(html).toContain("Nitelikli form talebi");
     expect(html).toContain("SALT-OKUNUR ÖNERİ");
+    expect(html).toContain("Demo bağlamı persisted kaynağa bağlı değil");
     expect(html).toContain("Kampanya yapısını insan incelemesine alın");
     expect(html).toContain("campaign create / publish / approval / execute / Meta write: kapalı");
     expect(html).not.toMatch(/Meta.{0,30}(yaz|write).{0,30}(başlat|çalıştır|onayla)/i);

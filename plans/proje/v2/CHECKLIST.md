@@ -666,6 +666,8 @@
     - [x] Opaque public campaign ref → latest-valid frozen context için session-bound read boundary;
       public redaction, invalidation fail-closed ve zero-write HTTP contract'i. Dashboard'ın gerçek
       persisted campaign ref ile brief/timeline bağlaması açık.
+    - [x] Brief paneli yalnız doğrulanmış persisted public ref olduğunda context read yolunu kullanır;
+      demo bağlamı explicit unbound kalır ve gerçek kampanya verisi taklit etmez.
   - [ ] Brief, öneri, approval ve execution-safety durumunu aynı salt-okunur zaman çizelgesinde gösterme.
     - [x] Exact, tenant-bound keyset ActionUnit filtresi: opaque `entityRef` veya onunla aynı istekte
       kullanılamayan `campaignRef` database içinde yeniden çözülür. Campaign filtresi direct campaign ile

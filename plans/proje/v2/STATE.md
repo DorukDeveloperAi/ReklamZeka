@@ -59,6 +59,9 @@
   `read-only`/`Action-Authority: none` yanıt verir. UI henüz demo kimlikleriyle bu route'u çağırmaz;
   gerçek persisted ref geldiğinde brief/timeline birleşiminin kaynağı budur. Bağlı PostgreSQL/session
   bu ortamda yoktur; canlı kabul açık kalır.
+- Brief paneli, yalnız geçerli `persistedCampaignRef` verildiğinde bu read yolunu kullanır; demo seçiminde
+  açıkça `persisted kaynağa bağlı değil` durumunu gösterir. Böylece demo, canlı approval/context verisi
+  gibi görünmez.
 
 ## 2026-08-10 — A14 entity/campaign-scoped Approval Queue read boundary
 
