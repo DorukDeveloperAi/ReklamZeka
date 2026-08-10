@@ -3,7 +3,7 @@
  * campaign writer. It turns a human-confirmed commercial intent into the
  * questions and review sequence needed before a campaign may be proposed.
  */
-export const INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION = "interactive-campaign-template/1.1.0" as const;
+export const INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION = "interactive-campaign-template/1.2.0" as const;
 
 export type CampaignBusinessGoal =
   | "lead_acquisition"
@@ -55,6 +55,19 @@ export type InteractiveCampaignBrief = Readonly<{
     question: string;
     reason: string;
   }> | null;
+  /**
+   * The immediate read-only operating recommendation for this exact brief.
+   * It is deliberately a review instruction rather than an ActionUnit or a
+   * Meta mutation proposal.
+   */
+  recommendation: Readonly<{
+    status: "blocked" | "needs_input" | "ready_for_human_review";
+    kind: "resolve_classification" | "restore_delivery" | "complete_brief" | "review_campaign_structure";
+    headline: string;
+    rationale: string;
+    nextStep: string;
+    laneRefs: readonly string[];
+  }>;
   /**
    * A human-review-only campaign structure.  These are planning lanes, not
    * Meta objects and never authorize a create, publish, or budget mutation.
@@ -129,6 +142,38 @@ function campaignLanes(input: InteractiveCampaignTemplateRequest, templateRef: C
     measurementBoundary: "Sonuç, aynı anda açılmış dönüşüm kampanyasının sonucu olarak yorumlanmaz." }]);
 }
 
+function recommendation(
+  input: InteractiveCampaignTemplateRequest,
+  templateRef: CampaignTemplateRef,
+  readiness: InteractiveCampaignBrief["readiness"],
+  lanes: InteractiveCampaignBrief["campaignLanes"],
+): InteractiveCampaignBrief["recommendation"] {
+  if (templateRef === "classification_triage") return Object.freeze({
+    status: "blocked", kind: "resolve_classification", headline: "Önce kampanya bağlamını doğrulayın",
+    rationale: "Sınıflandırılmamış bir kampanya için kıyas, bütçe veya yayın yönü önerilmez.",
+    nextStep: "Pazar, dil, hizmet, iş amacı ve dönüşüm yolunu insan incelemesiyle tamamlayın.", laneRefs: Object.freeze([]),
+  });
+  if (templateRef === "continuity_recovery") return Object.freeze({
+    status: "blocked", kind: "restore_delivery", headline: "Önce teslimat kesintisini ayırın",
+    rationale: "Kesinti verisiyle ölçekleme ya da yeni şerit kararı güvenilir değildir.",
+    nextStep: "Teslimatın ve hesabın sağlığını doğrulayın; ardından yeni gözlem penceresini başlatın.", laneRefs: Object.freeze([]),
+  });
+  if (readiness === "needs_input") return Object.freeze({
+    status: "needs_input", kind: "complete_brief", headline: "Brief'i tamamlayın",
+    rationale: "Eksik pazar, hizmet, dönüşüm yolu, kapasite veya kreatif bilgisi kampanya yapısını belirsiz bırakır.",
+    nextStep: "Ekrandaki sonraki kararı yanıtlayın; sistem eksik bilgiyle bütçe veya yayın önermez.",
+    laneRefs: Object.freeze(lanes.map((lane) => lane.laneRef)),
+  });
+  return Object.freeze({
+    status: "ready_for_human_review", kind: "review_campaign_structure", headline: "Kampanya yapısını insan incelemesine alın",
+    rationale: "Bağlam tamam; önerilen şerit ve ölçüm sınırı aynı karar çerçevesinde gözden geçirilebilir.",
+    nextStep: input.businessGoal === "lead_acquisition"
+      ? "Dönüşüm şeridini, kapasiteyi ve kreatif mesajını birlikte inceleyin; ardından ayrı proposal/onay akışına geçin."
+      : "Önerilen şeridi ve ölçüm penceresini inceleyin; herhangi bir aksiyon için ayrı proposal/onay gerekir.",
+    laneRefs: Object.freeze(lanes.map((lane) => lane.laneRef)),
+  });
+}
+
 function assertRequest(input: InteractiveCampaignTemplateRequest): void {
   if (!input || typeof input !== "object"
     || !["lead_acquisition", "upper_funnel_education", "market_service_learning", "continuity_recovery", "classification_triage"].includes(input.businessGoal)
@@ -158,19 +203,21 @@ export function createInteractiveCampaignBrief(input: InteractiveCampaignTemplat
 
   if (templateRef === "classification_triage") {
     question("Kampanyayı pazar, dil, hizmet, iş amacı ve dönüşüm yoluna bağlayın.", questions);
+    const lanes = campaignLanes(input, templateRef);
     return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef, readiness: "blocked",
       humanReviewRequired: true, classification: Object.freeze({ market: input.market, language: input.language,
         serviceRef: input.serviceRef, countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }),
-      questions: Object.freeze(questions), nextDecision: nextDecision(input, templateRef), campaignLanes: campaignLanes(input, templateRef), launchSequence: Object.freeze([{ step: "Sınıflandırmayı doğrula", reason: "Sınıflandırılmamış kampanya ölçekleme veya kıyas için güvenilir değildir." }]),
+      questions: Object.freeze(questions), nextDecision: nextDecision(input, templateRef), campaignLanes: lanes, recommendation: recommendation(input, templateRef, "blocked", lanes), launchSequence: Object.freeze([{ step: "Sınıflandırmayı doğrula", reason: "Sınıflandırılmamış kampanya ölçekleme veya kıyas için güvenilir değildir." }]),
       measurement: Object.freeze({ primaryOutcome: "Sınıflandırma tamamlanması", doNotCompareWith: Object.freeze(["lead CPL", "üst huni erişimi"]) }), authority: AUTHORITY });
   }
   if (templateRef === "continuity_recovery") {
     question("Teslimat kesintisinin bitişini ve hesap sağlığını doğrulayın.", questions);
     question("Toparlanma penceresi bitmeden performans hükmü vermeyin.", questions);
+    const lanes = campaignLanes(input, templateRef);
     return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef, readiness: "blocked",
       humanReviewRequired: true, classification: Object.freeze({ market: input.market, language: input.language,
         serviceRef: input.serviceRef, countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }),
-      questions: Object.freeze(questions), nextDecision: nextDecision(input, templateRef), campaignLanes: campaignLanes(input, templateRef), launchSequence: Object.freeze([{ step: "Teslimatı geri doğrula", reason: "Kesinti günleri performans sinyalini yanıltabilir." },
+      questions: Object.freeze(questions), nextDecision: nextDecision(input, templateRef), campaignLanes: lanes, recommendation: recommendation(input, templateRef, "blocked", lanes), launchSequence: Object.freeze([{ step: "Teslimatı geri doğrula", reason: "Kesinti günleri performans sinyalini yanıltabilir." },
         { step: "Yeni öğrenme penceresi aç", reason: "Toparlanma sonrası ölçüm, kesinti öncesi ve sırası sonuçlarından ayrılmalıdır." }]),
       measurement: Object.freeze({ primaryOutcome: "Sağlıklı teslimat sürekliliği", doNotCompareWith: Object.freeze(["kesinti günü CPL", "kesinti günü erişim"]) }), authority: AUTHORITY });
   }
@@ -199,11 +246,12 @@ export function createInteractiveCampaignBrief(input: InteractiveCampaignTemplat
         { step: "Ölçüm penceresini belirle", reason: "Erişim, frekans ve etkileşim birlikte yorumlanır." }]
       : [{ step: "Hipotezi yaz", reason: "Yeni pazar/hizmet deneyi tek bir öğrenme sorusuna bağlanır." },
         { step: "İnsan incelemeli küçük test taslağı oluştur", reason: "Bütçe veya yayın önerisi otomatik üretilmez." }];
+  const lanes = campaignLanes(input, templateRef);
   return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef,
     readiness: ready ? "ready_for_human_review" : "needs_input", humanReviewRequired: true,
     classification: Object.freeze({ market: input.market, language: input.language, serviceRef: input.serviceRef,
       countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }), questions: Object.freeze(questions),
-    nextDecision: nextDecision(input, templateRef), campaignLanes: campaignLanes(input, templateRef),
+    nextDecision: nextDecision(input, templateRef), campaignLanes: lanes, recommendation: recommendation(input, templateRef, ready ? "ready_for_human_review" : "needs_input", lanes),
     launchSequence: Object.freeze(sequence), measurement: Object.freeze({ primaryOutcome,
       doNotCompareWith: Object.freeze(templateRef === "lead_acquisition" ? ["üst huni erişimi", "farklı dönüşüm yolu"] : ["lead CPL"]) }), authority: AUTHORITY });
 }

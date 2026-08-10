@@ -38,6 +38,18 @@
   oluşmaz. Tarayıcıda GCC → geçici WhatsApp → bağlamdan form geri yükleme ve GCC → İstanbul WhatsApp
   bağlam geçişi doğrulandı.
 
+## 2026-08-10 — A14 brief → salt-okunur öneri
+
+- `interactive-campaign-template/1.2.0`, aynı kampanya brief'inden tek deterministik öneri üretir:
+  sınıflandırma eksikse bağlamı çöz, teslimat kesintisiyse toparlanmayı ayır, eksik bilgi varsa brief'i
+  tamamla, bağlam kapalıysa kampanya şeridini insan incelemesine al. Bu öneri ActionUnit, onay veya
+  Meta değişikliği değildir.
+- Dashboard brief paneli önerinin nedenini ve sonraki insan adımını seçili bağlamla birlikte gösterir.
+  Ayrı persisted proposal/onay timeline bağlantısı hâlâ açıktır; demo campaign bağlamı gerçek approval
+  kaydı gibi sunulmaz. Tarayıcı kabulünde GCC kampanyasında kapasite `bilinmiyor` seçimi öneriyi
+  `Brief'i tamamlayın` durumuna geçirir; bağlamı geri yükleyince yalnız insan inceleme önerisi döner.
+  Brief panelinde create/publish/execute kontrolü yoktur.
+
 ## 2026-08-10 — A14 entity/campaign-scoped Approval Queue read boundary
 
 - Approval Queue read modeli `entityRef` veya onunla aynı istekte kullanılamayan `campaignRef` ile

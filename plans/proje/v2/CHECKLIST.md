@@ -660,6 +660,9 @@
     - [x] Seçili dashboard demo campaign'i, brief başlangıç inputunu deterministik belirler; kullanıcı
       geçici değişikliği "Bağlamı geri yükle" ile geri alabilir. Persisted current context bağlama
       hâlâ açık olduğundan bu yalnız demo/read-only bağdır.
+    - [x] Aynı brief'ten deterministik salt-okunur öneri: sınıflandırma/kesinti/eksik bilgi için önce
+      insanın çözmesi gereken adımı, kapalı bağlamda kampanya şeridi incelemesini gösterir. ActionUnit,
+      approval veya Meta write üretmez.
   - [ ] Brief, öneri, approval ve execution-safety durumunu aynı salt-okunur zaman çizelgesinde gösterme.
     - [x] Exact, tenant-bound keyset ActionUnit filtresi: opaque `entityRef` veya onunla aynı istekte
       kullanılamayan `campaignRef` database içinde yeniden çözülür. Campaign filtresi direct campaign ile

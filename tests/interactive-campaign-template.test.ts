@@ -13,12 +13,13 @@ describe("interactive campaign template", () => {
     expect(brief.measurement.doNotCompareWith).toContain("farklı dönüşüm yolu");
     expect(brief.nextDecision).toBeNull();
     expect(brief.campaignLanes).toEqual([expect.objectContaining({ laneRef: "conversion_lane", sequence: 1, route: "lead_form" })]);
+    expect(brief.recommendation).toMatchObject({ status: "ready_for_human_review", kind: "review_campaign_structure", laneRefs: ["conversion_lane"] });
   });
 
   it("routes interrupted delivery and unclassified records to blocking templates before performance guidance", () => {
-    expect(createInteractiveCampaignBrief({ ...base, deliveryHealth: "interrupted" })).toMatchObject({ templateRef: "continuity_recovery", readiness: "blocked" });
+    expect(createInteractiveCampaignBrief({ ...base, deliveryHealth: "interrupted" })).toMatchObject({ templateRef: "continuity_recovery", readiness: "blocked", recommendation: { kind: "restore_delivery" } });
     const unclassified = createInteractiveCampaignBrief({ ...base, classification: "unclassified" });
-    expect(unclassified).toMatchObject({ templateRef: "classification_triage", readiness: "blocked", nextDecision: { field: "classification" } });
+    expect(unclassified).toMatchObject({ templateRef: "classification_triage", readiness: "blocked", nextDecision: { field: "classification" }, recommendation: { kind: "resolve_classification" } });
     expect(unclassified.campaignLanes).toEqual([]);
   });
 
@@ -28,6 +29,7 @@ describe("interactive campaign template", () => {
     expect(brief).toMatchObject({ readiness: "needs_input", templateRef: "lead_acquisition" });
     expect(brief.questions).toHaveLength(5);
     expect(brief.nextDecision).toMatchObject({ field: "language" });
+    expect(brief.recommendation).toMatchObject({ status: "needs_input", kind: "complete_brief" });
   });
 
   it("keeps upper-funnel education separate from lead measurement", () => {
