@@ -124,6 +124,9 @@
     incomplete coverage'da publish/pause/archive fail-closed Studio akışı.
   - [x] A09.1 account-group, authority catalog, manual-lock, topic/semantic revision ve
     category-topic relational substrate; RLS/revoke/append-only/tombstone guard temeli.
+  - [x] A09.2a private owner/admin manual lock/unlock transaction: confirmation, current policy
+    head OCC, workspace/membership recheck, append-only audit ve `policy_authority` invalidation;
+    action unit'leri artık exact persisted, non-invalidated frozen context bridge'i olmadan yazılamaz.
   - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
     context ailelerinin authoritative binding'i; canlı PostgreSQL verifier ve gerçek oturum kabulü.
 - [ ] Başlangıç objective/internal kategori playbook seti.

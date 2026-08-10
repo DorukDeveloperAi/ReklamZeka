@@ -175,6 +175,78 @@ type AuthenticScope = Readonly<{
   adId: string | null;
 }>;
 
+type FrozenContextBinding = Readonly<{ contextId: string; contextHash: string; bindingHash: string }>;
+
+/**
+ * A proposal never gets to supply an arbitrary hash-shaped context reference.  Resolve
+ * the one immutable context row inside the same transaction that creates its unit,
+ * then reject an invalidated, cross-account, cross-entity, missing, or ambiguous row.
+ */
+async function resolveFrozenContext(
+  database: QueueDatabase,
+  workspaceId: string,
+  unit: ActionUnit,
+  actionPlan: ActionPlan,
+): Promise<FrozenContextBinding> {
+  const entityType = actionPlan.action.entity.level === "adset" ? "ad_set" : actionPlan.action.entity.level;
+  const candidates = await database.select({
+    id: schema.effectiveCampaignContexts.id,
+    workspaceId: schema.effectiveCampaignContexts.workspaceId,
+    contextHash: schema.effectiveCampaignContexts.contextHash,
+    accountRef: schema.effectiveCampaignContexts.accountRef,
+    entityRef: schema.effectiveCampaignContexts.entityRef,
+    entityType: schema.effectiveCampaignContexts.entityType,
+  }).from(schema.effectiveCampaignContexts).where(and(
+    eq(schema.effectiveCampaignContexts.workspaceId, workspaceId),
+    eq(schema.effectiveCampaignContexts.contextHash, unit.contextHash),
+    eq(schema.effectiveCampaignContexts.accountRef, unit.scope.accountRef),
+    eq(schema.effectiveCampaignContexts.entityRef, unit.scope.entityRef),
+    eq(schema.effectiveCampaignContexts.entityType, entityType),
+  )).limit(2);
+  const matching = candidates.filter((context) => context.workspaceId === workspaceId
+    && context.contextHash === unit.contextHash && context.accountRef === unit.scope.accountRef
+    && context.entityRef === unit.scope.entityRef && context.entityType === entityType);
+  if (matching.length !== 1 || !UUID.test(matching[0]!.id)) {
+    throw new ActionProposalQueueRepositoryError(matching.length > 1 ? "scope_ambiguity" : "workspace_scope_mismatch");
+  }
+  const context = matching[0]!;
+  const components = await database.select({
+    componentType: schema.effectiveCampaignContextComponents.componentType,
+    componentRef: schema.effectiveCampaignContextComponents.componentRef,
+    componentVersion: schema.effectiveCampaignContextComponents.componentVersion,
+    workspaceId: schema.effectiveCampaignContextComponents.workspaceId,
+    contextId: schema.effectiveCampaignContextComponents.contextId,
+  }).from(schema.effectiveCampaignContextComponents).where(and(
+    eq(schema.effectiveCampaignContextComponents.workspaceId, workspaceId),
+    eq(schema.effectiveCampaignContextComponents.contextId, context.id),
+  )).limit(1_001);
+  const matchingComponents = components.filter((component) => component.workspaceId === workspaceId && component.contextId === context.id);
+  if (matchingComponents.length === 0 || matchingComponents.length > 1_000) throw new ActionProposalQueueRepositoryError("corrupt_store");
+  const invalidations = await database.select({
+    componentType: schema.effectiveCampaignContextInvalidations.componentType,
+    componentRef: schema.effectiveCampaignContextInvalidations.componentRef,
+    componentVersion: schema.effectiveCampaignContextInvalidations.componentVersion,
+    entityType: schema.effectiveCampaignContextInvalidations.entityType,
+    entityRef: schema.effectiveCampaignContextInvalidations.entityRef,
+    workspaceId: schema.effectiveCampaignContextInvalidations.workspaceId,
+  }).from(schema.effectiveCampaignContextInvalidations).where(eq(
+    schema.effectiveCampaignContextInvalidations.workspaceId, workspaceId,
+  )).limit(1_001);
+  if (invalidations.length > 1_000) throw new ActionProposalQueueRepositoryError("corrupt_store");
+  // An invalidation is relevant only when it names one of this context's exact,
+  // persisted source components.  This prevents unrelated workspace events from
+  // poisoning a valid historical context while still failing closed on its own evidence.
+  const invalidated = invalidations.some((invalidation) => invalidation.workspaceId === workspaceId
+    && matchingComponents.some((component) => component.componentType === invalidation.componentType
+      && component.componentRef === invalidation.componentRef && component.componentVersion === invalidation.componentVersion)
+    && (invalidation.entityType === null || invalidation.entityType === entityType)
+    && (invalidation.entityRef === null || invalidation.entityRef === unit.scope.entityRef));
+  if (invalidated) throw new ActionProposalQueueRepositoryError("policy_conflict");
+  const bindingHash = digest({ schemaVersion: "action-proposal-unit-frozen-context/1.0.0",
+    workspaceId, unitRef: unit.unitRef, unitHash: unit.unitHash, contextId: context.id, contextHash: context.contextHash });
+  return Object.freeze({ contextId: context.id, contextHash: context.contextHash, bindingHash });
+}
+
 type TrustedPolicySource = Readonly<{
   definitionId: string;
   canonicalHash: string;
@@ -364,6 +436,7 @@ export class DrizzleActionProposalQueueRepository {
         const staged = summaries.get(unit.unitRef);
         if (!staged) throw new ActionProposalQueueRepositoryError("corrupt_store");
         const scope = await authenticScope(transaction, this.workspaceId, unit, staged.actionPlan);
+        const frozenContext = await resolveFrozenContext(transaction, this.workspaceId, unit, staged.actionPlan);
         const inserted = await transaction.insert(schema.actionProposalUnits).values({
           workspaceId: this.workspaceId,
           bundleId,
@@ -392,6 +465,13 @@ export class DrizzleActionProposalQueueRepository {
           summaryPayload: staged.summary,
         }).returning({ id: schema.actionProposalUnits.id });
         if (!inserted[0]) throw new ActionProposalQueueRepositoryError("corrupt_store");
+        await transaction.insert(schema.actionProposalUnitFrozenContexts).values({
+          workspaceId: this.workspaceId,
+          actionProposalUnitId: inserted[0].id,
+          contextId: frozenContext.contextId,
+          contextHash: frozenContext.contextHash,
+          bindingHash: frozenContext.bindingHash,
+        });
         unitIds.set(unit.unitRef, inserted[0].id);
       }
 

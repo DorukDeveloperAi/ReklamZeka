@@ -261,10 +261,27 @@ class AtomicQueueDatabase {
   };
 }
 
+function bindFrozenContexts(database: AtomicQueueDatabase, proposal: StagedActionProposal) {
+  const contexts = proposal.lifecycle.bundle.units.map((unit, index) => ({
+    id: `70000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+    workspaceId,
+    contextHash: unit.contextHash,
+    accountRef: unit.scope.accountRef,
+    entityRef: unit.scope.entityRef,
+    entityType: unit.scope.entityRef === "adset_67890" ? "ad_set" : "campaign",
+  }));
+  database.setTable(schema.effectiveCampaignContexts, contexts);
+  database.setTable(schema.effectiveCampaignContextComponents, contexts.map((context) => ({
+    workspaceId, contextId: context.id, componentType: "policy_authority",
+    componentRef: "policy_authority_workspace", componentVersion: "a".repeat(64),
+  })));
+}
+
 describe("DrizzleActionProposalQueueRepository", () => {
   it("atomically persists staged payloads, exact target bindings, DAG and initial event", async () => {
     const database = new AtomicQueueDatabase();
     const proposal = staged();
+    bindFrozenContexts(database, proposal);
     const result = await new DrizzleActionProposalQueueRepository(database as never, workspaceId).appendInitial(proposal);
     expect(result.outcome).toBe("inserted");
     expect(database.table(schema.actionApprovalPolicySnapshots)).toHaveLength(1);
@@ -281,6 +298,7 @@ describe("DrizzleActionProposalQueueRepository", () => {
   it("supports exact replay across repository restart and rejects identity conflict", async () => {
     const database = new AtomicQueueDatabase();
     const proposal = staged();
+    bindFrozenContexts(database, proposal);
     await new DrizzleActionProposalQueueRepository(database as never, workspaceId).appendInitial(proposal);
     expect((await new DrizzleActionProposalQueueRepository(database as never, workspaceId).appendInitial(proposal)).outcome)
       .toBe("unchanged");
@@ -294,6 +312,7 @@ describe("DrizzleActionProposalQueueRepository", () => {
     const database = new AtomicQueueDatabase();
     database.setTable(schema.approvalPolicyDefinitionRevisions, definitionRows(trusted.definitions));
     const proposal = stagedPromotion(trusted.published.policy);
+    bindFrozenContexts(database, proposal);
     const repository = new DrizzleActionProposalQueueRepository(database as never, workspaceId);
     await expect(repository.appendInitial(proposal)).resolves.toMatchObject({ outcome: "inserted" });
     expect(database.table(schema.actionApprovalPolicySnapshots)).toEqual([expect.objectContaining({
@@ -423,6 +442,7 @@ describe("DrizzleActionProposalQueueRepository", () => {
     expect(unbound.table(schema.actionProposalBundles)).toHaveLength(0);
 
     const rollback = new AtomicQueueDatabase();
+    bindFrozenContexts(rollback, proposal);
     rollback.failTable = schema.actionProposalInitialEvents;
     await expect(new DrizzleActionProposalQueueRepository(rollback as never, workspaceId).appendInitial(proposal))
       .rejects.toThrow("injected_insert_failure");
@@ -468,5 +488,34 @@ describe("DrizzleActionProposalQueueRepository", () => {
     expect(migration).toContain("canAccessRawGraph}' = 'false'");
     expect(migration.indexOf("action_proposal_units_dependency_binding_unique"))
       .toBeLessThan(migration.indexOf("action_proposal_dependencies_unit_scope_fk"));
+  });
+
+  it("requires exactly one current tenant context for every newly persisted unit", async () => {
+    const proposal = staged();
+    for (const entry of [
+      { expected: "inserted", setup: (database: AtomicQueueDatabase) => bindFrozenContexts(database, proposal) },
+      { expected: "workspace_scope_mismatch", setup: (database: AtomicQueueDatabase) => database.setTable(schema.effectiveCampaignContexts, []) },
+      { expected: "scope_ambiguity", setup: (database: AtomicQueueDatabase) => {
+        bindFrozenContexts(database, proposal);
+        const first = database.table(schema.effectiveCampaignContexts)[0]!;
+        database.setTable(schema.effectiveCampaignContexts, [first, { ...first, id: "70000000-0000-4000-8000-000000000099" }]);
+      },
+      }, { expected: "policy_conflict", setup: (database: AtomicQueueDatabase) => {
+        bindFrozenContexts(database, proposal);
+        database.setTable(schema.effectiveCampaignContextInvalidations, [{ workspaceId, componentType: "policy_authority",
+          componentRef: "policy_authority_workspace", componentVersion: "a".repeat(64), entityType: null, entityRef: null }]);
+      } },
+    ]) {
+      const database = new AtomicQueueDatabase(); entry.setup(database);
+      if (entry.expected !== "inserted") {
+        await expect(new DrizzleActionProposalQueueRepository(database as never, workspaceId).appendInitial(proposal))
+          .rejects.toMatchObject({ code: entry.expected });
+      } else {
+        await expect(new DrizzleActionProposalQueueRepository(database as never, workspaceId).appendInitial(proposal))
+          .resolves.toMatchObject({ outcome: "inserted" });
+        expect(database.table(schema.actionProposalUnitFrozenContexts)).toHaveLength(proposal.lifecycle.bundle.units.length);
+      }
+      expect(database.table(schema.actionProposalBundles).length).toBeLessThanOrEqual(1);
+    }
   });
 });

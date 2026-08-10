@@ -41,6 +41,19 @@
   browser kabulü çevresel olarak hâlâ `postgres_connection_not_configured` / local session yokluğu nedeniyle
   parkta; bu nedenle DB-backed authority verifier ve browser E2E tamamlanmış sayılmaz.
 
+## 2026-08-10 — A09.2a manual-lock ve frozen action provenance
+
+- Yeni private manual-lock portu yalnız owner/admin confirmed lock/unlock çağrısını aktif workspace
+  ve membership recheck altında işler; exact published policy head OCC'si, append-only lock chain,
+  audit kaydı ve `policy_authority` context invalidation aynı transaction'dadır. HTTP/MCP route'u,
+  policy publish veya action capability eklenmedi.
+- Action proposal queue artık her unit için aynı tenant/account/entity/hash'e ait tek bir persisted,
+  invalidated olmayan EffectiveCampaignContext çözmek ve `action_proposal_unit_frozen_contexts`
+  bridge'ini atomik yazmak zorunda. Eksik, belirsiz, cross-scope veya stale bağ fail-closed reddedilir.
+- Kanıt: `npm test` 250 dosya/1.476 test, production build, `db:check`, `check:security` (0 vulnerability),
+  architecture/model/security-boundaries ve secret-artifact kontrolleri yeşil. Yetki kataloğu
+  materialization ve authoritative G3 preview sonraki küçük slice'tır; G4/A13 kapalıdır.
+
 ## 2026-08-10 — A09 atomic starter, authoritative facet preview ve progressive persistence
 
 - Starter adoption artık zero-write blocker değildir. Owner/admin confirmation, aktif workspace
