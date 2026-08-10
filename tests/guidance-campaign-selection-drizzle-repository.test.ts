@@ -24,7 +24,7 @@ const input = Object.freeze({ workspaceId, workspaceRef: "workspace_primary", ac
 function repository(responses: readonly unknown[][]) {
   let index = 0;
   const execute = vi.fn(async () => ({ rows: responses[index++] ?? [] }));
-  const guidanceReader = { readCurrentInTransaction: vi.fn(async () => ({ capturedAt: occurredAt, registryHash: "b".repeat(64),
+  const guidanceReader = { readCurrentInTransaction: vi.fn(async () => ({ capturedAt: occurredAt, registryHash: "b".repeat(64), registry: {} as never,
     reviewedSets: [{ setRef: input.selectedSetRef, setVersion: input.selectedSetVersion, setHash: input.selectedSetHash, cards: [] }] })) };
   return { execute, guidanceReader, repository: new DrizzleGuidanceCampaignSelectionRepository({ execute,
     transaction: async (work: (transaction: unknown) => Promise<unknown>) => work({ execute }) } as never, guidanceReader) };
