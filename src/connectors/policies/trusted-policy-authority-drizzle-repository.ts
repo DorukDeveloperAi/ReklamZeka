@@ -77,23 +77,33 @@ type AuthorityRow = Readonly<{ snapshot_id: unknown; snapshot_ref: unknown; snap
 export class DrizzleTrustedPolicyAuthorityRepository {
   constructor(private readonly database: Database) {}
 
-  async load(input: Readonly<{ workspaceId: string; accountRef: string; evaluatedAt: string }>): Promise<LoadedTrustedPolicyAuthority> {
+  async load(input: Readonly<{ workspaceId: string; accountRef: string; evaluatedAt: string;
+    /** Historical replay must name both immutable snapshot ref and hash; current loads use protected heads. */
+    snapshotRef?: string; snapshotHash?: string }>): Promise<LoadedTrustedPolicyAuthority> {
     if (!UUID.test(input.workspaceId) || !REF.test(input.accountRef)
-      || !Number.isFinite(Date.parse(input.evaluatedAt)) || new Date(input.evaluatedAt).toISOString() !== input.evaluatedAt) fail("invalid_input");
+      || !Number.isFinite(Date.parse(input.evaluatedAt)) || new Date(input.evaluatedAt).toISOString() !== input.evaluatedAt
+      || ((input.snapshotRef === undefined) !== (input.snapshotHash === undefined))
+      || (input.snapshotRef !== undefined && (!REF.test(input.snapshotRef) || !HASH.test(input.snapshotHash!)))) fail("invalid_input");
     const active = rows(await this.database.execute(sql`select id from workspaces where id = ${input.workspaceId}::uuid
       and lifecycle_state = 'active' limit 2`));
     if (active.length !== 1) fail("workspace_scope_mismatch");
     const result = rows<AuthorityRow>(await this.database.execute(sql`
       with selected_snapshot as (
+        select snapshot.* from tenant_authority_snapshot_heads head
+          join tenant_authority_snapshots snapshot on snapshot.workspace_id = head.workspace_id
+            and snapshot.id = head.current_snapshot_id and snapshot.snapshot_hash = head.current_snapshot_hash
+        where head.workspace_id = ${input.workspaceId}::uuid and ${input.snapshotRef === undefined}
+        union all
         select snapshot.* from tenant_authority_snapshots snapshot
-        where snapshot.workspace_id = ${input.workspaceId}::uuid
-          and snapshot.verified_at <= ${input.evaluatedAt}::timestamptz
-          and snapshot.expires_at > ${input.evaluatedAt}::timestamptz
-        order by snapshot.verified_at desc, snapshot.id desc limit 2
+        where snapshot.workspace_id = ${input.workspaceId}::uuid and ${input.snapshotRef !== undefined}
+          and snapshot.snapshot_ref = ${input.snapshotRef ?? ""} and snapshot.snapshot_hash = ${input.snapshotHash ?? ""}
       ), linked_catalog as (
         select catalog.* from policy_authority_catalog_revisions catalog
         join selected_snapshot snapshot on snapshot.workspace_id = catalog.workspace_id
           and catalog.revision_hash = snapshot.snapshot_payload #>> '{policyAuthority,catalogHash}'
+        where ${input.snapshotRef !== undefined} or exists (select 1 from policy_authority_catalogs catalog_head
+          where catalog_head.workspace_id = catalog.workspace_id and catalog_head.catalog_ref = catalog.catalog_ref
+            and catalog_head.current_revision = catalog.revision and catalog_head.current_revision_hash = catalog.revision_hash)
       )
       select snapshot.id::text as snapshot_id, snapshot.snapshot_ref, snapshot.snapshot_hash,
         snapshot.repository_ref, snapshot.repository_revision, snapshot.verified_at::text, snapshot.expires_at::text,
@@ -149,7 +159,7 @@ export class DrizzleTrustedPolicyAuthorityRepository {
     return this.project(result[0]!, input);
   }
 
-  private project(row: AuthorityRow, input: Readonly<{ workspaceId: string; accountRef: string; evaluatedAt: string }>): LoadedTrustedPolicyAuthority {
+  private project(row: AuthorityRow, input: Readonly<{ workspaceId: string; accountRef: string; evaluatedAt: string; snapshotRef?: string; snapshotHash?: string }>): LoadedTrustedPolicyAuthority {
     if (![row.snapshot_id, row.catalog_id].every((value) => typeof value === "string" && UUID.test(value))
       || typeof row.snapshot_ref !== "string" || !REF.test(row.snapshot_ref) || typeof row.snapshot_hash !== "string" || !HASH.test(row.snapshot_hash)
       || typeof row.repository_ref !== "string" || !REF.test(row.repository_ref) || typeof row.repository_revision !== "string" || !row.repository_revision.trim()
@@ -158,7 +168,8 @@ export class DrizzleTrustedPolicyAuthorityRepository {
     if (!Number.isSafeInteger(snapshotCount) || snapshotCount < 1) fail("corrupt_store");
     if (snapshotCount !== 1) fail("ambiguous_authority");
     const verifiedAt = iso(row.verified_at); const expiresAt = iso(row.expires_at);
-    if (Date.parse(verifiedAt) > Date.parse(input.evaluatedAt) || Date.parse(expiresAt) <= Date.parse(input.evaluatedAt)) fail("corrupt_store");
+    if (Date.parse(verifiedAt) > Date.parse(input.evaluatedAt) || Date.parse(expiresAt) <= Date.parse(input.evaluatedAt)
+      || (input.snapshotRef !== undefined && (row.snapshot_ref !== input.snapshotRef || row.snapshot_hash !== input.snapshotHash))) fail("corrupt_store");
     const payload = exact(row.snapshot_payload, ["schemaVersion", "snapshotRef", "snapshotHash", "repository", "authority", "policyAuthority"]);
     const repository = exact(payload.repository, ["ref", "revision", "verified"]);
     const authority = exact(payload.authority, ["productionAuthoritySourceBound", "canPublish", "canApprove", "canExecute", "canWriteMeta"]);

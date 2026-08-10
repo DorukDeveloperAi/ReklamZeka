@@ -1236,6 +1236,17 @@ export const tenantAuthoritySnapshots = pgTable("tenant_authority_snapshots", {
   check("tenant_authority_snapshots_exact", sql`(${table.snapshotPayload} #>> '{schemaVersion}' = 'tenant-authority-snapshot/1.0.0' and ${table.snapshotPayload} #>> '{snapshotRef}' = ${table.snapshotRef} and ${table.snapshotPayload} #>> '{snapshotHash}' = ${table.snapshotHash} and ${table.snapshotPayload} #>> '{repository,ref}' = ${table.repositoryRef} and ${table.snapshotPayload} #>> '{repository,revision}' = ${table.repositoryRevision} and ${table.snapshotPayload} #> '{repository,verified}' = 'true'::jsonb and ${table.snapshotPayload} #> '{authority,productionAuthoritySourceBound}' = 'false'::jsonb and ${table.snapshotPayload} #> '{authority,canPublish}' = 'false'::jsonb and ${table.snapshotPayload} #> '{authority,canApprove}' = 'false'::jsonb and ${table.snapshotPayload} #> '{authority,canExecute}' = 'false'::jsonb and ${table.snapshotPayload} #> '{authority,canWriteMeta}' = 'false'::jsonb) is true`),
 ]);
 
+/** Deterministic, OCC-protected current snapshot pointer; historical snapshots remain immutable. */
+export const tenantAuthoritySnapshotHeads = pgTable("tenant_authority_snapshot_heads", {
+  workspaceId: uuid("workspace_id").primaryKey().references(() => workspaces.id, { onDelete: "cascade" }),
+  currentSnapshotId: uuid("current_snapshot_id").notNull(), currentSnapshotHash: text("current_snapshot_hash").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.currentSnapshotId], foreignColumns: [tenantAuthoritySnapshots.workspaceId, tenantAuthoritySnapshots.id], name: "tenant_authority_snapshot_heads_snapshot_scope_fk" }).onDelete("restrict"),
+  index("tenant_authority_snapshot_heads_current_idx").on(table.workspaceId, table.currentSnapshotId),
+  check("tenant_authority_snapshot_heads_hash", sql`${table.currentSnapshotHash} ~ '^[a-f0-9]{64}$'`),
+]);
+
 /** Append-only tenant-local account-group ledger and exact account membership. */
 export const accountGroups = pgTable("account_groups", {
   id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), groupRef: text("group_ref").notNull(), currentRevision: integer("current_revision").notNull().default(0), currentRevisionHash: text("current_revision_hash"), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -1287,6 +1298,16 @@ export const policyAuthorityCatalogRevisions = pgTable("policy_authority_catalog
 }, (table) => [
   uniqueIndex("policy_authority_catalog_revisions_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("policy_authority_catalog_revisions_version_unique").on(table.workspaceId, table.catalogRef, table.revision), uniqueIndex("policy_authority_catalog_revisions_hash_unique").on(table.workspaceId, table.revisionHash),
   check("policy_authority_catalog_revisions_identity", sql`${table.catalogRef} ~ '^authority_catalog_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.revision} >= 1 and ((${table.revision} = 1 and ${table.previousRevisionHash} is null) or (${table.revision} > 1 and ${table.previousRevisionHash} ~ '^[a-f0-9]{64}$')) and ${table.revisionHash} ~ '^[a-f0-9]{64}$'`), check("policy_authority_catalog_revisions_no_authority", sql`${table.payload} #> '{authority,canPublish}' = 'false'::jsonb and ${table.payload} #> '{authority,canApprove}' = 'false'::jsonb and ${table.payload} #> '{authority,canExecute}' = 'false'::jsonb and ${table.payload} #> '{authority,canWriteMeta}' = 'false'::jsonb`),
+]);
+
+/** Deterministic, OCC-protected current catalog revision pointer. */
+export const policyAuthorityCatalogs = pgTable("policy_authority_catalogs", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  catalogRef: text("catalog_ref").notNull(), currentRevision: integer("current_revision").notNull().default(0), currentRevisionHash: text("current_revision_hash"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("policy_authority_catalogs_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("policy_authority_catalogs_workspace_ref_unique").on(table.workspaceId, table.catalogRef),
+  check("policy_authority_catalogs_identity", sql`${table.catalogRef} ~ '^authority_catalog_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.currentRevision} >= 0 and ((${table.currentRevision} = 0 and ${table.currentRevisionHash} is null) or (${table.currentRevision} > 0 and ${table.currentRevisionHash} ~ '^[a-f0-9]{64}$'))`),
 ]);
 
 export const policyAuthorityBindings = pgTable("policy_authority_bindings", {
