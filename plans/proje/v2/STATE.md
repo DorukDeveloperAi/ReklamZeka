@@ -2208,3 +2208,19 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   data trust durumu bu root tarafından da değiştirilmez.
 - Kanıt: `tests/effective-analysis-context-composer-runtime.test.ts`,
   `tests/effective-analysis-context-composer.test.ts`, `npx tsc --noEmit`, `git diff --check`.
+
+## 2026-08-10 — A10.4c-13 narrow PostgreSQL root-persistence smoke
+
+- `verify:ready-effective-analysis-context-root-db`, outer rollback altında concrete private composition
+  root'un evidence-bound context yazımını, `productionAuthoritySourceBound:true` kanıtını, tüm capability
+  bayraklarının false kalışını, exact data blocker'ını, source-component invalidation sonrası replay
+  reddini ve tenant mismatch reddini test eder. Network/action çağrısı sıfır, geçici satırlar rollback
+  sonrasında yoktur.
+- Bu **closed-world current-source acceptance değildir**: test, root/persistence sınırını izole etmek için
+  source reader'ı scope-checked ready bundle ile değiştirir. Canonical Meta hierarchy/config, category
+  profile/assignment, reviewed guidance/selection, policy lifecycle, relational authority catalog/snapshot/
+  bindings, promotion registry ve cadence reader'ın birlikte seedlendiği gerçek source-reader acceptance
+  hâlâ açık bir sonraki dar checkpoint'tir. Bu nedenle hiçbir yeni action, Meta write, HTTP/UI veya G4
+  yetkisi açılmaz.
+- Kanıt: `npm run verify:ready-effective-analysis-context-root-db`, `npm run typecheck`,
+  `npm run check:secret-artifacts`, `git diff --check`.

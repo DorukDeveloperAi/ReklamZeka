@@ -60,6 +60,7 @@
     "verify:promotion-template-lifecycle-live": "node --import tsx scripts/verify-promotion-template-lifecycle-postgres.ts",
     "verify:guidance-registry-db": "tsx scripts/verify-guidance-registry-postgres.ts",
     "verify:effective-campaign-context-db": "tsx scripts/verify-effective-campaign-context-postgres.ts",
+    "verify:ready-effective-analysis-context-root-db": "tsx scripts/verify-ready-effective-analysis-context-root-postgres.ts",
     "verify:business-outcome-evidence-db": "tsx scripts/verify-business-outcome-evidence-postgres.ts",
     "verify:decision-ledger-db": "tsx scripts/verify-decision-ledger-postgres.ts",
     "verify:advised-practice-db": "tsx scripts/verify-advised-practice-postgres.ts",

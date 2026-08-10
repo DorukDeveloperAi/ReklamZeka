@@ -311,6 +311,10 @@
     dört scope anahtarıyla (`workspaceId/accountRef/entityType/entityRef`) sınırlıdır; caller facts/
     context enjeksiyonu, HTTP, MCP, Decision Room veya action/write adapter'ı eklenmez. Rejected source
     ve invalidated persistence sonucu fail-closed kalır.
+  - [x] A10.4c-13 dar PostgreSQL root-persistence smoke: outer rollback içinde private root'un
+    evidence-bound context yazımı, policy-authority bindingi, invalidation sonrası replay reddi,
+    tenant mismatch reddi ve sıfır network/action çağrısı doğrulanır. Bu kabul, kaynak okuyucuyu
+    scope-checked test bundle ile izole eder; closed-world current-source kabulü değildir.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.
