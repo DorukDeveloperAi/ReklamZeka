@@ -580,6 +580,10 @@
     İdempotent kayıt vardır; dispatch, Meta transportu ve write authority yoktur. Ledger yazmadan
     hemen önce current persisted Meta mirror'dan account/target/parent/budget-owner ve latest snapshot
     yeniden çözülür; frozen eligibility snapshot/result hash ile birebir eşleşmeyen aday fail-closed'dur.
+  - [x] Ayrı `admit_execution` insan-varlığı seremonisi yalnız owner/admin'in tek-kullanımlık,
+    action-unit bağlı proof'unu tüketir. Server-owned source lifecycle/freshness/plan/eligibility
+    yükler; browser bu kanıtları veya execution evidence'i enjekte edemez. Sonuç yalnız disabled
+    admission ledger çağrısıdır; HTTP/Meta executor hâlâ yoktur.
 - [ ] Campaign/adset/ad pause/activate eligibility ve parent/effective-status matrisi.
   - [x] `meta-write-eligibility/1.0.0`, frozen source snapshot üstünde campaign/adset/ad target
     eşleşmesini, pause için effective ACTIVE'i ve activate için bütün parent effective ACTIVE

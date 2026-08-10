@@ -9,6 +9,7 @@ const ACTION_LABELS = Object.freeze({
   approve: "ONAYLA",
   reject: "REDDET",
   request_changes: "DEĞİŞİKLİK İSTE",
+  admit_execution: "UYGULAMA ADIMINI HAZIRLA",
   publish_approval_policy: "ONAY POLİTİKASINI YAYINLA",
   publish_guardrail_policy: "KORUMA POLİTİKASINI YAYINLA",
 });
@@ -47,7 +48,7 @@ export class MacOsHumanPresenceCeremony {
       `ActionUnit: ${input.unitRef}`,
       `Karar: ${action}`,
       "",
-      "Bu onay yalnız karar kanıtı oluşturur.",
+      "Bu işlem yalnız uygulama-admission kaydı oluşturur.",
       "Meta üzerinde değişiklik veya execute yapmaz.",
     ].join("\n");
     try {

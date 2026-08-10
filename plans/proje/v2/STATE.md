@@ -12,6 +12,16 @@
 - Bu yalnız stale veya dış müdahale edilmiş adayları fail-closed tutan read-side güvenlik bağıdır. Meta
   transportu, dispatch, executor, read-after-write veya rollback ve bütün write capability'leri kapalıdır.
 
+## 2026-08-10 — A13 ayrı execution-admission seremonisi
+
+- `ActionExecutionAdmissionService`, approval anından bağımsız `admit_execution` human-presence
+  proof'unu tek kez tüketir. Plan/freshness/eligibility browser'dan kabul edilmez; yalnız server-owned
+  source portundan yüklenir ve admission ledger'a disabled sonuç yazdırır. Owner/admin dışı roller ve
+  proof replay'i fail-closed'dur.
+- Bu checkpoint bir execute veya transport API'si açmaz. Sıradaki somut bağ, aynı source portunun
+  persisted queue/lifecycle/mirror okuyucusuyla private runtime'da kurulması; ardından read-after-write
+  ve rollback tasarımıdır.
+
 ## 2026-08-10 — A10 cadence/experiment adapter canlı kabulü
 
 - `npm run verify:cadence-experiment-lifecycle-db`, gerçek owner cookie session'ı ile local
