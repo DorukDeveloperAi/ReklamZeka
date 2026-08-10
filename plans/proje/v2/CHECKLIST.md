@@ -668,6 +668,8 @@
       persisted campaign ref ile brief/timeline bağlaması açık.
     - [x] Brief paneli yalnız doğrulanmış persisted public ref olduğunda context read yolunu kullanır;
       demo bağlamı explicit unbound kalır ve gerçek kampanya verisi taklit etmez.
+    - [x] Aynı persisted campaign ref, Approval Queue'nun tenant-bound campaign filtresine aktarılır;
+      gerçek context/ActionUnit bulunduğunda brief ve inbox tek scope'ta birleşir.
   - [ ] Brief, öneri, approval ve execution-safety durumunu aynı salt-okunur zaman çizelgesinde gösterme.
     - [x] Exact, tenant-bound keyset ActionUnit filtresi: opaque `entityRef` veya onunla aynı istekte
       kullanılamayan `campaignRef` database içinde yeniden çözülür. Campaign filtresi direct campaign ile

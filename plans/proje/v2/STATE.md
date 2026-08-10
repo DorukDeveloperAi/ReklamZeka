@@ -62,6 +62,9 @@
 - Brief paneli, yalnız geçerli `persistedCampaignRef` verildiğinde bu read yolunu kullanır; demo seçiminde
   açıkça `persisted kaynağa bağlı değil` durumunu gösterir. Böylece demo, canlı approval/context verisi
   gibi görünmez.
+- Aynı ref Approval Queue listesine de tenant-bound campaign filtresi olarak aktarılır; böylece gerçek
+  source bağlandığında brief ve ActionUnit timeline aynı campaign scope'u paylaşır. Yerel DB/session
+  olmadığından live PostgreSQL ve gerçek-session browser kabulü açıktır.
 
 ## 2026-08-10 — A14 entity/campaign-scoped Approval Queue read boundary
 

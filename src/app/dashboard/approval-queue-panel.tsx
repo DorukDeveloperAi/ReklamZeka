@@ -207,7 +207,7 @@ function ApprovalQueueDetail({ item, loading, decision }: Readonly<{
   </section>;
 }
 
-export function ApprovalQueuePanel() {
+export function ApprovalQueuePanel({ campaignRef = null }: Readonly<{ campaignRef?: string | null }>) {
   const [state, setState] = useState<ApprovalQueueDashboardState>({ status: "loading" });
   const [decisionBusy, setDecisionBusy] = useState(false);
   const [decisionConfirmed, setDecisionConfirmed] = useState(false);
@@ -217,7 +217,9 @@ export function ApprovalQueuePanel() {
   const load = useCallback(async () => {
     setState({ status: "loading" });
     try {
-      const response = await fetch("/api/approval-queue?view=list&limit=50", { cache: "no-store" });
+      const query = new URLSearchParams({ view: "list", limit: "50" });
+      if (campaignRef !== null) query.set("campaignRef", campaignRef);
+      const response = await fetch(`/api/approval-queue?${query}`, { cache: "no-store" });
       const payload = await response.json() as Envelope<ApprovalQueueListResult> | ErrorEnvelope;
       if (!response.ok) {
         const message = "error" in payload ? payload.error?.message : undefined;
@@ -229,7 +231,7 @@ export function ApprovalQueuePanel() {
     } catch {
       setState({ status: "error", message: "Onay kuyruğu bağlantısı şu anda kullanılamıyor." });
     }
-  }, []);
+  }, [campaignRef]);
 
   useEffect(() => { void load(); }, [load]);
 
