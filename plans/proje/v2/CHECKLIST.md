@@ -577,7 +577,12 @@
     tenant içinde yeniden bağlar, typed spec hash'ini doğrular ve yalnız `admitted` olayı yazar.
     İdempotent kayıt vardır; dispatch, Meta transportu ve write authority yoktur.
 - [ ] Campaign/adset/ad pause/activate eligibility ve parent/effective-status matrisi.
+  - [x] `meta-write-eligibility/1.0.0`, frozen source snapshot üstünde campaign/adset/ad target
+    eşleşmesini, pause için effective ACTIVE'i ve activate için bütün parent effective ACTIVE
+    zincirini fail-closed doğrular. Unknown/inactive parent veya stale target adaylığı bloklar.
 - [ ] Campaign/adset budget owner write; ad-level budget negatif testi.
+  - [x] Aynı matriste budget yalnız campaign/adset'in exact aktif budget owner olması halinde
+    separate-human-execution adayına dönüşür; ad-level veya foreign/missing owner bloklanır.
 - [ ] K0–K4 valve, account allowlist, caps, kill switch ve çift anahtar.
   - [x] Saf K0–K4 typed action sınıflandırması; workspace default `approval_only`, scoped
     en-dar resolver, expiry/conflict/child-widening/kill-switch ve budget/protection guard'ları.

@@ -2628,6 +2628,19 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   `tests/action-execution-admission.test.ts`, `tests/meta-workspace-tombstone-purge-drizzle-adapter.test.ts`,
   `npm run typecheck`, `npm run db:check`.
 
+## 2026-08-10 — A13 parent-state and budget-owner eligibility matrix
+
+- `meta-write-eligibility/1.0.0`, typed write-spec ile immutable source snapshot'ı yeniden
+  bağlar. Pause adayında target'ın effective ACTIVE olması; activate adayında target'ın configured
+  PAUSED ve tüm parent'ların effective ACTIVE olması; budget adayında ise campaign/adset'in exact
+  active budget owner olması zorunludur. Unknown, inactive veya cross-target durumların tamamı
+  reason-coded `blocked` döner.
+- Sonuç yalnız `eligible_for_separate_human_execution` adaylığıdır. Execute, Meta write ve network
+  dispatch capability'leri yapısal olarak false kalır; hiçbir database mutation, HTTP endpoint,
+  Graph request veya gerçek Meta write eklenmedi.
+- Kanıt: `tests/meta-write-eligibility.test.ts`, `tests/meta-write-spec.test.ts`,
+  `tests/autonomy-valve.test.ts`, `npm run typecheck`.
+
 ## 2026-08-10 — A10 interactive proposal-only campaign brief surface
 
 - Kampanyalar görünümündeki `CampaignPlanningBriefPanel`, çalışma kitabında görünen sıralamayı
