@@ -2043,3 +2043,18 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   evidence'in tek read-only consistent snapshot altında current read'ini sağlayacak adapter henüz
   mevcut source portlarda yoktur. Kanıt: `tests/effective-analysis-context-composer.test.ts` (3 test),
   `npm run typecheck` ve `git diff --check`.
+
+## 2026-08-10 — A10.4c-3 current cadence reader
+
+- Server-private `CurrentDecisionCadenceReader`, çağırandan profile, clock, evidence, learning veya
+  action isteği almadan yalnız workspace/account/campaign scope'u ile current immutable cadence
+  revision'ını okur. Tek `REPEATABLE READ, READ ONLY` snapshot'ta profile ref/revision/version/hash/
+  payload, scope bağları ve DB clock doğrulanır; missing/ambiguous/paused/future/tahrif edilmiş
+  payload fail-closed reddedilir.
+- Profile hash'i canonical payload digest'i ve mevcut domain cadence evaluator'ı ile doğrulanır.
+  Bu dar kaynakta kalıcı finding/evidence closure'ı bulunmadığından evaluator yalnız empty,
+  repository-owned evidence kullanır; sonuç observation gate'i sonrası `insufficient_evidence`
+  blocked olur, action/approval/Meta-write yetkisi üretmez. Daha güçlü karar için future evidence
+  reader gerekir; bu reader HTTP/UI/Decision Room/composer'a bağlanmadı ve schema değiştirmedi.
+- Kanıt: `tests/current-decision-cadence-reader.test.ts` (8 test), `npx tsc --noEmit` ve
+  `git diff --check` geçti.

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 import { CurrentDecisionCadenceReader, CurrentDecisionCadenceReaderError } from "@/connectors/decisions/current-decision-cadence-reader";
@@ -11,10 +12,9 @@ const profile = { version: DECISION_CADENCE_VERSION, settleHours: 24, minimumObs
   minimumEvidenceScore: 0.8 };
 
 function hash(value: unknown) {
-  const crypto = require("node:crypto") as typeof import("node:crypto");
   const stable = (entry: unknown): unknown => Array.isArray(entry) ? entry.map(stable) : entry && typeof entry === "object"
     ? Object.fromEntries(Object.entries(entry as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, child]) => [key, stable(child)])) : entry;
-  return crypto.createHash("sha256").update(JSON.stringify(stable(value))).digest("hex");
+  return createHash("sha256").update(JSON.stringify(stable(value))).digest("hex");
 }
 
 function candidate(overrides: Record<string, unknown> = {}) {
@@ -50,6 +50,7 @@ describe("CurrentDecisionCadenceReader", () => {
     ["paused", [candidate({ campaign_status: "PAUSED" })], "paused"],
     ["future", [candidate({ observed_from: "2026-08-11T00:00:00.000Z" })], "future"],
     ["malformed", [candidate({ profile_hash: "a".repeat(64) })], "corrupt_store"],
+    ["contract-invalid", [candidate({ profile_payload: { ...profile, maxActionsPerWindow: 4 }, profile_hash: hash({ ...profile, maxActionsPerWindow: 4 }) })], "corrupt_store"],
   ] as const)("fails closed on %s current data", async (_name, rows, code) => {
     await expect(reader(rows).reader.readCurrent({ workspaceId, accountRef: "account_primary", campaignRef: "campaign_primary" }))
       .rejects.toEqual(expect.objectContaining<Partial<CurrentDecisionCadenceReaderError>>({ code }));

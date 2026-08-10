@@ -12,7 +12,7 @@ import * as schema from "@/db/schema";
 type Database = NodePgDatabase<typeof schema>;
 type Row = Readonly<Record<string, unknown>>;
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{3,}-[0-9a-f-]{8,}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const PROFILE_REF = /^cadence_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 
@@ -137,12 +137,13 @@ export class CurrentDecisionCadenceReader {
       }
       if (typeof row.revision_id !== "string" || !UUID.test(row.revision_id)
         || typeof row.profile_ref !== "string" || !PROFILE_REF.test(row.profile_ref)
-        || !Number.isSafeInteger(row.revision) || row.revision < 1
+        || typeof row.revision !== "number" || !Number.isSafeInteger(row.revision) || row.revision < 1
         || row.profile_version !== DECISION_CADENCE_VERSION
         || typeof row.profile_hash !== "string" || !HASH.test(row.profile_hash)
         || !row.profile_payload || typeof row.profile_payload !== "object" || Array.isArray(row.profile_payload)) {
         fail("corrupt_store");
       }
+      const profileRevision = row.revision;
       const profile = row.profile_payload as DecisionCadenceProfile;
       if (digest(profile) !== row.profile_hash) fail("corrupt_store");
       let decision: DecisionCadenceResult;
@@ -170,7 +171,7 @@ export class CurrentDecisionCadenceReader {
       return Object.freeze({
         revisionId: row.revision_id,
         profileRef: row.profile_ref,
-        profileRevision: row.revision,
+        profileRevision,
         profileVersion: DECISION_CADENCE_VERSION,
         profileHash: row.profile_hash,
         profile: Object.freeze({ ...profile }),
