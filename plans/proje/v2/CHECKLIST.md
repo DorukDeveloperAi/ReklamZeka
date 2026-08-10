@@ -434,6 +434,9 @@
   - [x] Private L2 current reader: persisted feature payload'ını yeniden doğrular; exact feature'a bağlı
     herhangi bir L1 invalidation varsa replacement/fallback üretmeden `stale` döner. Karar runtime'ına
     veya action yüzeyine henüz bağlanmaz.
+  - [x] Saf L3 window artifact: yalnız same-scope, settled ve `ready` L2 feature'ları doğrulanmış
+    resolved timeframe içine freeze eder; exact feature/source-manifest hash listesi ve all-false
+    capability seti taşır. Relational persistence/invalidation tüketimi sonraki checkpoint'tir.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.

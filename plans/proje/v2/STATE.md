@@ -2480,3 +2480,14 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   hangi future context'e gireceğine dair policy sonraki checkpoint'te kalır.
 - Kanıt: `tests/deterministic-feature-snapshot-drizzle-repository.test.ts`,
   `tests/deterministic-feature-snapshot.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 saf L3 window artifact
+
+- `deterministic-window-snapshot/1.0.0`, verified resolved timeframe ile yalnız aynı tenant/connection/
+  account/entity scope'ta, settled ve `ready` durumundaki L2 feature'ları exact ref/hash/source-manifest
+  listesiyle freeze eder. Window hash ve ref tüm canonical bileşenlerden türetilir.
+- L2 feature pencerenin dışına taşarsa, scope karışırsa veya settled/ready değilse artifact oluşmaz. Raw,
+  action ve write authority yapısal olarak yoktur.
+- Bu saf contract henüz database'e yazılmaz ya da Decision Room'a bağlanmaz; sonraki checkpoint immutable
+  L3 header+feature binding persistence ve L2 invalidation tüketimidir.
+- Kanıt: `tests/deterministic-window-snapshot.test.ts`, `npm run typecheck`, `git diff --check`.
