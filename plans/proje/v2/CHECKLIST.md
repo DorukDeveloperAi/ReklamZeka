@@ -577,7 +577,9 @@
     result hash'ini immutable admission hash'ine bağlar; blocked eligibility admission oluşturmaz.
   - [x] Server-private, append-only admission ledger; unit/approve karar/grant zincirini
     tenant içinde yeniden bağlar, typed spec hash'ini doğrular ve yalnız `admitted` olayı yazar.
-    İdempotent kayıt vardır; dispatch, Meta transportu ve write authority yoktur.
+    İdempotent kayıt vardır; dispatch, Meta transportu ve write authority yoktur. Ledger yazmadan
+    hemen önce current persisted Meta mirror'dan account/target/parent/budget-owner ve latest snapshot
+    yeniden çözülür; frozen eligibility snapshot/result hash ile birebir eşleşmeyen aday fail-closed'dur.
 - [ ] Campaign/adset/ad pause/activate eligibility ve parent/effective-status matrisi.
   - [x] `meta-write-eligibility/1.0.0`, frozen source snapshot üstünde campaign/adset/ad target
     eşleşmesini, pause için effective ACTIVE'i ve activate için bütün parent effective ACTIVE

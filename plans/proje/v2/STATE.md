@@ -3,6 +3,15 @@
 > Kümülatif ilerleme defteri. v1'in ayrıntılı tur geçmişi
 > [v1 STATE](../v1/STATE.md)'te değişmeden korunur.
 
+## 2026-08-10 — A13 execution-time Meta mirror revalidation
+
+- Disabled admission ledger, approval/grant zincirini yeniden bağladıktan sonra current persisted Meta
+  mirror'dan aynı account ve exact campaign/ad set/ad hiyerarşisini, latest authentic snapshot hash'ini
+  ve status/budget-owner matrisini tekrar çözer. Frozen admission'ın eligibility snapshot/result hash'i
+  bu yeniden hesaplanan sonuçla eşleşmezse hiçbir attempt/event yazılmaz.
+- Bu yalnız stale veya dış müdahale edilmiş adayları fail-closed tutan read-side güvenlik bağıdır. Meta
+  transportu, dispatch, executor, read-after-write veya rollback ve bütün write capability'leri kapalıdır.
+
 ## 2026-08-10 — A10 cadence/experiment adapter canlı kabulü
 
 - `npm run verify:cadence-experiment-lifecycle-db`, gerçek owner cookie session'ı ile local

@@ -49,6 +49,7 @@ function admission() {
 class Database {
   readonly dialect = new PgDialect(); readonly queries: string[] = [];
   readonly attempts: Array<{ execution_ref: string; admission_hash: string; write_spec_hash: string }> = [];
+  campaignEffectiveStatus: "ACTIVE" | "PAUSED" | "UNKNOWN" = "ACTIVE";
   events = 0;
   execute = vi.fn(async (query: Parameters<PgDialect["sqlToQuery"]>[0]) => {
     const { sql: statement } = this.dialect.sqlToQuery(query); this.queries.push(statement);
@@ -56,6 +57,11 @@ class Database {
     if (statement.includes("from workspaces w")) return { rows: [{ workspace_id: workspaceId, bundle_id: bundleId, unit_id: unitId,
       unit_ref: unit.unitRef, unit_hash: unit.unitHash, entity_ref: "campaign_main", source_hash: actionPlan.planHash,
       context_hash: actionPlan.contextHash, action_type: "status_pause", action_plan_payload: actionPlan,
+      unit_payload: { scope: { workspaceRef: "workspace_alpha", accountRef: "account_main", entityRef: "campaign_main", actionType: "status_pause" } },
+      account_ref: "account_main", campaign_ref: "campaign_main", ad_set_ref: null, ad_ref: null,
+      campaign_configured_status: "ACTIVE", campaign_effective_status: this.campaignEffectiveStatus,
+      ad_set_configured_status: null, ad_set_effective_status: null, target_configured_status: null, target_effective_status: null,
+      campaign_budget_optimization: true, source_snapshot_hash: "d".repeat(64), source_snapshot_captured_at: at, database_now: at,
       decision_event_id: decisionId, approval_decision_ref: "decision_one", command_kind: "approve", approval_grant_id: grantId, approval_grant_ref: "grant_one" }] };
     if (statement.includes("select execution_ref, admission_hash")) return { rows: this.attempts };
     if (statement.includes("insert into action_execution_attempts")) { this.attempts.push({ execution_ref: `action_execution_${"x".repeat(20)}`, admission_hash: admissionValue.admissionHash, write_spec_hash: admissionValue.writeSpec.specHash }); return { rows: [{ id: attemptId }] }; }
@@ -73,5 +79,15 @@ describe("DrizzleActionExecutionAdmissionRepository", () => {
     expect(database.events).toBe(1);
     expect(database.queries.join("\n")).toContain("for update of w, u, d, g");
     expect(database.queries.join("\n")).not.toMatch(/fetch\(|https?:\/\/|graph\.facebook/i);
+  });
+
+  it("fails closed when the current Meta mirror no longer supports the frozen eligibility admission", async () => {
+    const database = new Database();
+    database.campaignEffectiveStatus = "PAUSED";
+    await expect(new DrizzleActionExecutionAdmissionRepository(database as never, workspaceId)
+      .admit({ workspaceId, admission: admission() }))
+      .rejects.toMatchObject({ code: "source_corrupt" });
+    expect(database.events).toBe(0);
+    expect(database.attempts).toHaveLength(0);
   });
 });
