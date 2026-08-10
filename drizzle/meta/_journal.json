@@ -442,6 +442,13 @@
       "when": 1786375200000,
       "tag": "20260810180000_guidance_campaign_selection",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1786377900000,
+      "tag": "20260810184500_guidance_selection_tombstone_purge",
+      "breakpoints": true
     }
   ]
 }
