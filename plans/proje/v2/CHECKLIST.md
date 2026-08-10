@@ -142,7 +142,9 @@
     önlemidir; exact-impact coverage hâlâ incomplete ve `mutationAllowed=false` kalır.
   - [x] A09.3b immutable effective-context policy-composition sidecar: source-bound authority
     snapshot/catalog/scope ve exact strict revisionler save transaction'ında doğrulanıp append-only
-    kaydedilir; legacy context sidecar-less kalır ve promotion authority vermez.
+    kaydedilir; registry doğrulaması snapshot JSON kısayoluna değil relational catalog revision
+    payload'ına bağlıdır. Aynı immutable fact farklı historical snapshotlarda snapshot-kapsamlı binding
+    ile saklanır; legacy context sidecar-less kalır ve promotion authority vermez.
   - [x] Migration journal ile canlı PostgreSQL schema/RLS/OCC/rollback kabulü: 52/52 migration,
     authority catalog, frozen context, progressive formalization ve Supabase security verifier'ları geçti.
   - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
