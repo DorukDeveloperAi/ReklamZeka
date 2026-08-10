@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 82c254eff5ea -->
+<!-- durum-damga: 4bdfe80e40a8 -->
 
 ## Künye
 
@@ -14,13 +14,14 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 139 |
+| iş commit'i (tüm geçmiş) | 140 |
 | ilk / son iş | 2026-08-06 / 2026-08-10 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-10 | `fix` | recover migrations and verify authority flows | `8b999b063` |
 | 2026-08-10 | `fix` | bind cohorts to metric catalog | `92876f6ab` |
 | 2026-08-10 | `feat` | harden policy and promotion authoring | `904a45278` |
 | 2026-08-10 | `feat` | harden run binding rollout | `a5855809f` |
@@ -35,7 +36,6 @@
 | 2026-08-08 | `feat` | scan effective portfolio health | `c90883c4c` |
 | 2026-08-08 | `feat` | preview archive impact safely | `86284c17a` |
 | 2026-08-08 | `feat` | surface evidence confidence health | `e65579e21` |
-| 2026-08-08 | `feat` | add read-only inventory dashboard | `c0c3f2f70` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
