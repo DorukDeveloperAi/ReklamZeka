@@ -2546,3 +2546,16 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   Bu checkpoint HTTP/action/Meta write eklemez; current context'i L3'e bağlayan private authoring/composition
   akışı hâlâ sonraki bağımlılıktır. Kanıt: `tests/decision-room-analysis-runtime.test.ts`,
   `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 private timeframe-bound L3 context composer
+
+- `TimeframeBoundAnalysisContextComposer`, input olarak yalnız workspace/entity/timeframe alır. Son geçerli,
+  invalidate edilmemiş context repository'den çözülür; private mirror UUID'leri ve server clock ile L3
+  materializer çağrılır. Caller context/fact, L2 feature, window ref, database ID veya capture time
+  enjekte edemez.
+- Yeni context mevcut immutable context'in canonical bileşenlerini korur ancak yalnız materializer'ın exact
+  L2 feature refs ve L3 window ref'iyle `data.ready` olur; evidence-bound writer bütün relational recheck'leri
+  tekrar uygular. Authority snapshot, context'in yeni capture anında geçerli değilse persistence reddeder.
+- Tek server-private Drizzle root bu reader/materializer/writer'ı aynı database sınırında kurar; HTTP, MCP,
+  action veya Meta write yüzeyi eklenmedi. Kanıt: `tests/timeframe-bound-analysis-context-composer.test.ts`,
+  `tests/timeframe-bound-analysis-context-composer-runtime.test.ts`, `npm run typecheck`, `git diff --check`.

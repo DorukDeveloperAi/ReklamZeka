@@ -60,6 +60,8 @@ export type ContextInvalidationInput = Readonly<ContextSourceComponentRef & {
 
 export type StoredEffectiveCampaignContext = Readonly<{
   context: EffectiveCampaignContext;
+  /** Server-private IDs needed only to bind current L2/L3 evidence. */
+  analysisDataScope?: Readonly<{ metaConnectionId: string; adAccountId: string }>;
   sourceComponents: readonly ContextSourceComponentRef[];
   invalidated: boolean;
 }>;
@@ -389,6 +391,8 @@ async function policyCompositionEvidence(database: ContextDatabase, context: Eff
     select snapshot.snapshot_ref from tenant_authority_snapshots snapshot
     where snapshot.workspace_id = ${context.workspaceId}::uuid
       and snapshot.snapshot_ref = ${evidence.snapshotRef} and snapshot.snapshot_hash = ${evidence.snapshotHash}
+      and snapshot.verified_at <= ${context.capturedAt}::timestamptz
+      and snapshot.expires_at > ${context.capturedAt}::timestamptz
       and snapshot.snapshot_payload #>> '{policyAuthority,catalogHash}' = ${evidence.catalogHash}
       and snapshot.snapshot_payload #>> '{policyAuthority,scope,scopeHash}' = ${evidence.scopeHash}
       and exists (select 1 from policy_authority_catalog_revisions catalog
@@ -595,6 +599,7 @@ async function loadRecord(database: ContextDatabase, row: ContextRow): Promise<S
   }
   return Object.freeze({
     context,
+    analysisDataScope: Object.freeze({ metaConnectionId: row.metaConnectionId, adAccountId: row.adAccountId }),
     sourceComponents: Object.freeze(components.map((component) => Object.freeze(component))),
     invalidated: await isInvalidated(database, row),
   });
