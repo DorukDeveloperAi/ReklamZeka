@@ -106,6 +106,11 @@ function stable(value: unknown): unknown {
 export function starterCategoryAdoptionDigest(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(stable(value))).digest("hex");
 }
+export function starterCategoryProfileDraftManifestDigest(
+  drafts: readonly StarterCategoryProfileDraftPlan[],
+): string {
+  return starterCategoryAdoptionDigest(drafts.map(({ disposition: _disposition, ...draft }) => draft));
+}
 function sameStrings(left: readonly string[], right: readonly string[]) {
   return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
 }

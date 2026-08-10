@@ -41,6 +41,8 @@ describe("StarterCategoryAdoption dashboard", () => {
         canWriteMeta: false, canPublishPolicy: false } } as const;
     expect(parseStarterCategoryAdoptionSuccess(success, preview)).toMatchObject({ outcome: "inserted",
       profileDraftsCreated: 7 });
+    expect(parseStarterCategoryAdoptionSuccess({ ...success, result: { ...success.result,
+      categoryInvalidationsAppended: 3 } }, preview)).toMatchObject({ categoryInvalidationsAppended: 3 });
     expect(() => parseStarterCategoryAdoptionSuccess({ ...success, planHash: "e".repeat(64) }, preview))
       .toThrow("unsafe_response");
     expect(() => parseStarterCategoryAdoptionSuccess({ ...success,

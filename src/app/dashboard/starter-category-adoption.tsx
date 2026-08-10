@@ -186,13 +186,13 @@ export function parseStarterCategoryAdoptionSuccess(value: unknown, preview: Pla
     || !integer(value.result.profileDraftsCreated, 7) || typeof value.result.auditAppended !== "boolean"
     || !integer(value.result.categoryInvalidationsAppended, 10_000)
     || !integer(value.result.profileInvalidationsAppended, 10_000)
-    || value.result.categoryInvalidationsAppended !== 0 || value.result.profileInvalidationsAppended !== 0
     || (value.result.outcome === "inserted" && (value.result.dimensionsCreated !== preview.summary.dimensionsToCreate
       || value.result.definitionsCreated !== preview.summary.definitionsToCreate
       || value.result.profileDraftsCreated !== preview.summary.profileDraftsToCreate || value.result.auditAppended !== true))
     || (value.result.outcome === "unchanged" && (value.result.dimensionsCreated !== 0
       || value.result.definitionsCreated !== 0 || value.result.profileDraftsCreated !== 0
-      || value.result.auditAppended !== false))
+      || value.result.auditAppended !== false || value.result.categoryInvalidationsAppended !== 0
+      || value.result.profileInvalidationsAppended !== 0))
     || !exact(value.authority, ["canPersist", "canConfirm", "canAuthorizeAction", "canWriteMeta", "canPublishPolicy"])
     || value.authority.canPersist !== true || value.authority.canConfirm !== true
     || value.authority.canAuthorizeAction !== false || value.authority.canWriteMeta !== false

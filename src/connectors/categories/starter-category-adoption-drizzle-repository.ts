@@ -5,13 +5,17 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import {
   buildStarterCategoryAdoptionPlan,
+  starterCategoryProfileDraftManifestDigest,
   starterCategoryProfileOwnerRef,
   StarterCategoryAdoptionError,
   type StarterCategoryAdoptionCommand,
   type StarterCategoryAdoptionInventory,
   type StarterCategoryAdoptionRepository,
 } from "@/application/starter-category-adoption-service";
-import { DrizzleCategoryAuthoringRepository } from "@/connectors/categories/category-authoring-drizzle-repository";
+import {
+  appendCategoryResolutionWorkspaceInvalidations,
+  DrizzleCategoryAuthoringRepository,
+} from "@/connectors/categories/category-authoring-drizzle-repository";
 import { DrizzleCategoryProfileLifecycleRepository } from
   "@/connectors/categories/category-profile-lifecycle-drizzle-repository";
 import { DrizzleCategoryProfileRepository } from "@/connectors/categories/category-profile-drizzle-repository";
@@ -113,11 +117,17 @@ export class DrizzleStarterCategoryAdoptionRepository implements StarterCategory
           && plan.profileRegistryHash === input.command.expectedProfileRegistryHash
           && exactTargets(plan.targetRefs, input.command.targetRefs);
         if (!exactPlan) {
+          const proposalManifestHash = digest(plan.profileProposals);
+          const profileDraftManifestHash = starterCategoryProfileDraftManifestDigest(plan.profileDrafts);
           const replay = rows<{ event_hash: string }>(await tx.execute(sql`
             select event_hash from audit_events where workspace_id = ${input.workspaceId}::uuid
               and action = 'starter_category.core_adopted'
               and metadata #>> '{planHash}' = ${input.command.planHash}
               and metadata #>> '{targetRefsHash}' = ${digest(input.command.targetRefs)}
+              and metadata #>> '{catalogVersion}' = ${STARTER_CATEGORY_PLAYBOOK_CATALOG.schemaVersion}
+              and metadata #>> '{catalogHash}' = ${STARTER_CATEGORY_PLAYBOOK_CATALOG.catalogHash}
+              and metadata #>> '{proposalManifestHash}' = ${proposalManifestHash}
+              and metadata #>> '{profileDraftManifestHash}' = ${profileDraftManifestHash}
             order by occurred_at desc, created_at desc, id desc limit 2
           `));
           const currentSafe = replay.length === 1 && plan.categoryCommands.length === 0
@@ -136,7 +146,7 @@ export class DrizzleStarterCategoryAdoptionRepository implements StarterCategory
 
         const registry = new CategoryRegistryService(new DrizzleCategoryRegistryRepository(tx));
         let dimensionsCreated = 0; let definitionsCreated = 0; let profileDraftsCreated = 0;
-        let profileInvalidationsAppended = 0;
+        let categoryInvalidationsAppended = 0; let profileInvalidationsAppended = 0;
         for (const command of plan.categoryCommands.filter((entry) => entry.operation === "create_dimension")) {
           await registry.createDimension({ id: randomUUID(), workspaceId: input.workspaceId, key: command.key,
             name: command.name, description: command.description, cardinality: command.cardinality,
@@ -144,6 +154,7 @@ export class DrizzleStarterCategoryAdoptionRepository implements StarterCategory
           dimensionsCreated += 1;
         }
         const afterDimensions = await new DrizzleCategoryAuthoringRepository(tx).inspect(input.workspaceId);
+        const definitionDimensionIds = new Set<string>();
         for (const command of plan.categoryCommands.filter((entry) => entry.operation === "create_definition")) {
           const dimension = afterDimensions.dimensions.find((entry) => entry.ref === command.dimensionRef);
           if (!dimension) throw new StarterCategoryAdoptionError("conflict");
@@ -155,7 +166,13 @@ export class DrizzleStarterCategoryAdoptionRepository implements StarterCategory
           await registry.createDefinition({ id: randomUUID(), workspaceId: input.workspaceId,
             dimensionId: dimensionRow[0]!.id, key: command.key, label: command.label,
             description: command.description });
+          definitionDimensionIds.add(dimensionRow[0]!.id);
           definitionsCreated += 1;
+        }
+        for (const dimensionId of [...definitionDimensionIds].sort()) {
+          categoryInvalidationsAppended += await appendCategoryResolutionWorkspaceInvalidations({ database: tx,
+            workspaceId: input.workspaceId, dimensionId, reasonCode: "source_changed",
+            occurredAt: input.occurredAt });
         }
 
         const afterCategories = await new DrizzleCategoryAuthoringRepository(tx).inspect(input.workspaceId);
@@ -199,10 +216,19 @@ export class DrizzleStarterCategoryAdoptionRepository implements StarterCategory
           select event_hash from audit_events where workspace_id = ${input.workspaceId}::uuid
           order by occurred_at desc, created_at desc, id desc limit 1
         `))[0]?.event_hash ?? "GENESIS");
+        const proposalManifestHash = digest(plan.profileProposals);
+        const profileDraftManifestHash = starterCategoryProfileDraftManifestDigest(plan.profileDrafts);
+        if (plan.profileProposals.length !== 42 || plan.profileDrafts.length !== 7) {
+          throw new StarterCategoryAdoptionError("conflict");
+        }
         const event = Object.freeze({ id: randomUUID(), workspaceId: input.workspaceId, actorId: input.actorId,
           action: "starter_category.core_adopted", resourceType: "starter_category_playbook",
           resourceId: STARTER_CATEGORY_PLAYBOOK_CATALOG.catalogHash, occurredAt: new Date(input.occurredAt).toISOString(),
           previousHash, metadata: Object.freeze({ role: input.role, planHash: input.command.planHash,
+            catalogVersion: STARTER_CATEGORY_PLAYBOOK_CATALOG.schemaVersion,
+            catalogHash: STARTER_CATEGORY_PLAYBOOK_CATALOG.catalogHash,
+            proposalManifestHash, proposalCount: plan.profileProposals.length,
+            profileDraftManifestHash, profileDraftCount: plan.profileDrafts.length,
             expectedRegistryHash: input.command.expectedRegistryHash,
             expectedProfileRegistryHash: input.command.expectedProfileRegistryHash,
             actualRegistryHash: afterPlan.registryHash, actualProfileRegistryHash: afterPlan.profileRegistryHash,
@@ -210,7 +236,7 @@ export class DrizzleStarterCategoryAdoptionRepository implements StarterCategory
             pendingOwnerConfigurationAcknowledged: true, pendingOwnerConfigurationCount:
               plan.blockers.find((blocker) => blocker.code === "pending_owner_configuration")?.refs.length ?? 0,
             dimensionsCreated, definitionsCreated, profileDraftsCreated,
-            categoryInvalidationsAppended: 0, profileInvalidationsAppended }) });
+            categoryInvalidationsAppended, profileInvalidationsAppended }) });
         await tx.execute(sql`
           insert into audit_events (id, workspace_id, actor_id, action, resource_type, resource_id,
             metadata, previous_hash, event_hash, occurred_at)
@@ -220,7 +246,7 @@ export class DrizzleStarterCategoryAdoptionRepository implements StarterCategory
         `);
         return Object.freeze({ outcome: "inserted" as const, registryHash: afterPlan.registryHash,
           profileRegistryHash: afterPlan.profileRegistryHash, dimensionsCreated, definitionsCreated,
-          profileDraftsCreated, auditAppended: true, categoryInvalidationsAppended: 0,
+          profileDraftsCreated, auditAppended: true, categoryInvalidationsAppended,
           profileInvalidationsAppended });
       });
     } catch (reason) { return translate(reason); }

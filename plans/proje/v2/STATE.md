@@ -22,6 +22,55 @@
 | 13 | eylem valfi ve rutin | AÇIK | 04,10–12 | planlandı; write kapalı |
 | 14 | kontrol merkezi | AÇIK | 07,09–13 | planlandı |
 
+## 2026-08-10 — A09 atomic starter, authoritative facet preview ve progressive persistence
+
+- Starter adoption artık zero-write blocker değildir. Owner/admin confirmation, aktif workspace
+  satır kilidi ve DB membership recheck sonrasında category/profile registry hash'lerini ve exact
+  plan/target manifestini aynı outer transaction'da yeniden doğrular. MASTER'ın 14 dimension'ı,
+  yedi concrete definition'ı ve category başına altı objective playbook ref'i birleştirilmiş yedi
+  draft CategoryProfile atomik yazılır. Kırk iki objective×category proposal preview'da kayıpsızdır;
+  audit `catalogVersion/catalogHash`, 42-proposal manifest hash/count ve yedi profile-draft manifest
+  hash/count taşır. Owner-defined değerler otomatik yazılmaz; açık acknowledgement ile
+  `core_adopted_with_owner_configuration_pending` kalır. Partial-existing dimension altında yeni
+  definition oluşturulursa normal category authoring ile aynı `category_resolution` component
+  invalidation helper'ı kullanılır; mutation, invalidation ve audit aynı rollback sınırındadır.
+- Guidance preview katalogu tek bounded PostgreSQL capture'ında aktif account, canonical objective,
+  funnel, optimization, internal category, lifecycle, entity, effective PromotionTemplate ve latest
+  card/binding topic değerlerini tenant-bound opaque ref olarak üretir. `catalogHash` capture zamanından
+  bağımsız içerik hash'idir; preview zorunlu `expectedCatalogHash` ile stale kataloğu 409/fail-closed
+  reddeder. Reviewed current/legacy Meta objective tokenları immutable eski binding'leri rewrite
+  etmeden canonical objective ile eşleşir; unknown token eşleşmez. Sessiz legacy payload kabulü yoktur:
+  MCP/HTTP çağrısı explicit `guidance-agent-tools/1.2.0` negotiation ister. Persisted account-group
+  kataloğu henüz yoktur; non-empty account-group selection `catalog_unavailable` kalır.
+- Progressive formalization G0→G2 gerçek vertical'ı eklendi: latest persisted GuidanceSource hash'i,
+  published GuidanceCard/binding scope'u ve reviewed GuidanceSet identity'si server-side çözülür;
+  append-only revision/hash chain, role/owner confirmation, registry/head OCC ve audit tek transaction'dadır.
+  Yeni tablo FORCE RLS, API rollerine sıfır grant, exact top-level/nested JSONB, tombstoning-only DELETE
+  ve arbitrary UPDATE/active DELETE reddi taşır. Cookie-only API ve Strict Policy Studio içindeki panel
+  G0/G1/G2'yi role-aware sunar. G3/G4 storage ve replay sözleşmesi testlidir ancak production G3
+  `production_policy_authority_catalog_unavailable`, `conflict_preview_unknown` ve
+  `impact_preview_incomplete`; G4 ise risk/cap/approval/rollout/action-valve kanıtı yokken blocked'dır.
+  Hiçbir G4 satırı A13 approval/execute/schedule/tool/network/Meta authority vermez.
+- Kanıt: guidance fix seti 6 dosya/48 test; starter seti 6 dosya/28 test; progressive seti 9 dosya/
+  42 test ana ajan tarafından yeniden çalıştırıldı ve yeşildir. Subagent full-unit koşumu 248 dosya/
+  1.464 test, production build, typecheck, `db:check`, architecture/model/security sınırları ve npm
+  production audit'i yeşil raporladı. Starter gerçek browser fail-closed ve mocked exact submit,
+  progressive panel 390/768/1440 responsive/fail-closed kabulü geçti; Meta/action/policy write açılmadı.
+  Bağımsız starter re-review ACCEPT; progressive ve guidance son re-review sonuçları bu checkpoint'in
+  final gate'inde ayrıca kaydedilecektir.
+- Canlı kapılar çevreseldir: `.env.local`, `DATABASE_URL` ve `DIRECT_DATABASE_URL` yok;
+  `verify:starter-category-adoption-live`, `verify:progressive-formalization-live`,
+  `verify:guidance-registry-db` ve `verify:supabase-security` yalnız redakte
+  `postgres_connection_not_configured` döndürebilir. Local MCP/session yokluğu
+  `local_mcp_session_unavailable` olarak ayrı park edilir. Bağlantı sağlandığında hazır sıra:
+  `npm run db:migrate && npm run verify:starter-category-adoption-live && npm run
+  verify:progressive-formalization-live && npm run verify:guidance-registry-db && npm run
+  verify:guidance-agent-live && npm run verify:supabase-security`.
+- Dış checkpoint mekanizması review tamamlanmadan ortak dalgayı `a1e2613`, ardından guidance fix
+  parçasını `30cd2bc` olarak commit edip `origin/main`e push etti; ana ajan commit/push çalıştırmadı.
+  Bu olay izin verilen git push değildir ve geri yazılmadı. Checkpoint ile izlenen iki geçici
+  `.playwright-cli/*.yml` bu entegrasyonda silindi; generated `next-env.d.ts` production biçimindedir.
+
 ## 2026-08-10 — A09 strict impact, starter adoption ve promotion lifecycle checkpoint'i
 
 - Strict instruction policy için persisted dependency reader exception ref'leri, frozen

@@ -126,8 +126,11 @@
   - [x] MASTER'daki 14 canonical dimension için registry-hash bağlı deterministic tenant preview;
     owner/admin exact confirmation, strict browser parser ve atomik capability yoksa zero-write
     replay blocker'ı.
-  - [ ] Atomik category+CategoryProfile batch persistence, authoritative profile inventory ve
-    bağlı PostgreSQL/gerçek session adoption kabulü.
+  - [x] Tek outer transaction'da 14 dimension/7 concrete definition/7 merged draft CategoryProfile,
+    dual-registry OCC, membership recheck, exact replay, audit manifestleri ve partial-existing
+    dimension için `category_resolution` invalidation bağlı atomik adoption.
+  - [ ] Bağlı PostgreSQL'de partial-existing invalidation/audit-failure rollback verifier'ı ve
+    gerçek session adoption kabulü; yerel DB/session yok.
 - [ ] Kategori coverage/unmatched/conflict/impact dashboard ve güvenli archive akışı.
   - [x] Rules fixture kaldırıldı; gerçek Guidance Studio loading/empty/conflict/error,
     create/revise/publish/archive ve aktif iç kategori selector yüzeyi.
@@ -186,8 +189,12 @@
   - [x] Account-group/funnel/optimization/lifecycle/promotion-template dahil 11-facet registry,
     agent contract 1.1 ve exact evaluated set/card/source revision-hash manifestli immutable
     analysis-run binding'i; bounded/no-truncation ve append-only DB guard'ları.
-  - [ ] Yeni facet preview scope'larının tenant-bound authoritative kataloglardan sunucuda
-    çözülmesi ile bağlı PostgreSQL/gerçek session acceptance.
+  - [x] Aktif account, reviewed canonical objective, funnel, optimization, internal category,
+    lifecycle, entity, effective PromotionTemplate ve latest topic değerlerini tek bounded capture'da
+    opaque ref'lere çözen tenant-bound katalog; content-hash OCC, current/legacy objective compatibility,
+    topic-binding completeness ve explicit `guidance-agent-tools/1.2.0` negotiation.
+  - [ ] Persisted account-group authoritative katalogu ile bağlı PostgreSQL/gerçek MCP-session acceptance;
+    account-group seçimi bugün explicit partial/fail-closed, DB ve local MCP session yok.
 - [ ] Owner statement + official Meta source + experiment/observation provenance ve freshness.
   - [x] Altı provenance türü, official source publish gate'i, review-by/freshness suppression ve
     frozen geçmiş bağlamı.
@@ -197,7 +204,12 @@
 - [ ] G0→G4 progressive formalization, semantic diff, historical replay ve impact preview.
   - [x] Append-only hash-chainli saf maturity/transition contract; G2→G3 ve G3→G4 explicit
     owner/admin confirmation, fail-closed ambiguity ve A13 valve-ref-only G4 sınırı.
-  - [ ] Gerçek artifact üretimi, persistence/API/UI, authoritative replay/impact ve browser kabulü.
+  - [x] G0 source capture, G1 persisted card/binding scope ve G2 reviewed-set owner confirmation için
+    append-only PostgreSQL persistence, workspace lock/membership/OCC/audit, cookie-only API ve responsive UI.
+  - [x] G3/G4 storage contract, exact JSONB/hash-chain/RLS/revoke/immutability ve injected-ready replay;
+    production preview eksik authority/risk/cap/approval/rollout/valve kanıtında fail-closed kalır.
+  - [ ] G3 authoritative conflict/impact/historical-outcome resolver ile G4 A13 evidence binding'i ve
+    bağlı PostgreSQL/gerçek session acceptance.
 - [ ] AdvisedPractice candidate→trial→outcome→standardization lifecycle.
   - [x] Candidate/review/trial/outcome ve ayrı StandardizationReview decomposition çekirdeği.
   - [x] `validated|conditional → standardization_reviewed → standardization_candidate →

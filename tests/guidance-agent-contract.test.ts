@@ -132,6 +132,9 @@ describe("GuidanceAgentContract", () => {
     await expect(contract.execute(principal, { name: "guidance_effective_preview",
       arguments: { ...base, accountGroupRefs: Array.from({ length: 26 }, (_, index) => `account_group_${index}`) } }))
       .rejects.toMatchObject({ code: "invalid_input" });
+    await expect(contract.execute(principal, { name: "guidance_effective_preview",
+      arguments: { ...base, contractVersion: "guidance-agent-tools/1.1.0" as never } }))
+      .rejects.toMatchObject({ code: "invalid_input" });
     expect(MCP_TOOL_SCHEMAS.guidance_effective_preview.safeParse({ ...base, lifecycle: undefined }).success).toBe(false);
     expect(MCP_TOOL_SCHEMAS.guidance_effective_preview.safeParse({ ...base,
       topics: ["topic_budget", "topic_budget"] }).success).toBe(false);

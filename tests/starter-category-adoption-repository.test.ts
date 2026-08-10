@@ -1,7 +1,8 @@
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 
-import { buildStarterCategoryAdoptionPlan } from "@/application/starter-category-adoption-service";
+import { buildStarterCategoryAdoptionPlan, starterCategoryAdoptionDigest,
+  starterCategoryProfileDraftManifestDigest } from "@/application/starter-category-adoption-service";
 import type { CategoryAuthoringState } from "@/application/category-authoring-service";
 import { DrizzleCategoryAuthoringRepository } from "@/connectors/categories/category-authoring-drizzle-repository";
 import { DrizzleCategoryProfileLifecycleRepository } from
@@ -36,6 +37,10 @@ function dimensions(withDefinitions: boolean): CategoryAuthoringState {
 }
 const initialPlan = buildStarterCategoryAdoptionPlan(workspaceRef, emptyCategories, emptyProfiles, "actor_starter");
 const fullCategories = dimensions(true);
+const partialCategories = Object.freeze({ ...emptyCategories, registryHash: "9".repeat(64),
+  dimensions: Object.freeze([dimensions(false).dimensions.find((dimension) =>
+    dimension.key === "audience_strategy")!]) });
+const partialPlan = buildStarterCategoryAdoptionPlan(workspaceRef, partialCategories, emptyProfiles, "actor_starter");
 const finalProfiles = Object.freeze({ registryHash: "e".repeat(64), definitions: Object.freeze(initialPlan.profileDrafts.map((draft) => {
   const dimension = STARTER_CATEGORY_PLAYBOOK_CATALOG.categoryTemplates.find((template) =>
     template.templateRef === draft.categoryTemplateRef)!.dimensionKey;
@@ -50,8 +55,15 @@ const command = Object.freeze({ planHash: initialPlan.planHash, expectedRegistry
   expectedProfileRegistryHash: initialPlan.profileRegistryHash, targetRefs: initialPlan.targetRefs,
   confirmation: "adopt_starter_category_playbook" as const,
   acknowledgedPendingOwnerConfiguration: true as const });
+const partialCommand = Object.freeze({ planHash: partialPlan.planHash,
+  expectedRegistryHash: partialPlan.registryHash, expectedProfileRegistryHash: partialPlan.profileRegistryHash,
+  targetRefs: partialPlan.targetRefs, confirmation: "adopt_starter_category_playbook" as const,
+  acknowledgedPendingOwnerConfiguration: true as const });
+const existingDimensionId = "55555555-5555-4555-8555-555555555555";
+const createdDimensionId = "33333333-3333-4333-8333-333333333333";
 
-function fixture(options: Readonly<{ role?: string; auditFails?: boolean; replay?: boolean }> = {}) {
+function fixture(options: Readonly<{ role?: string; auditFails?: boolean; replay?: boolean;
+  frozenExistingDimension?: boolean }> = {}) {
   const statements: string[] = []; let auditMetadata: Record<string, unknown> | null = null; let rolledBack = false;
   const execute = vi.fn(async (statement: never) => {
     const rendered = new PgDialect().sqlToQuery(statement); statements.push(rendered.sql);
@@ -61,12 +73,19 @@ function fixture(options: Readonly<{ role?: string; auditFails?: boolean; replay
     if (rendered.sql.includes("action = 'starter_category.core_adopted'")) return { rows: options.replay
       ? [{ event_hash: "f".repeat(64) }] : [] };
     if (rendered.sql.includes("select id::text from category_dimensions")) {
-      return { rows: [{ id: "33333333-3333-4333-8333-333333333333" }] };
+      return { rows: [{ id: rendered.params.includes("audience_strategy") ? existingDimensionId : createdDimensionId }] };
     }
     if (rendered.sql.includes("select definition.id::text from category_definitions")) {
       return { rows: [{ id: "44444444-4444-4444-8444-444444444444" }] };
     }
     if (rendered.sql.includes("select event_hash from audit_events")) return { rows: [] };
+    if (rendered.sql.includes("select distinct component_ref, component_version from effective_campaign_context_components")) {
+      return { rows: options.frozenExistingDimension && rendered.params.includes(existingDimensionId)
+        ? [{ component_ref: existingDimensionId, component_version: "8".repeat(64) }] : [] };
+    }
+    if (rendered.sql.includes("insert into effective_campaign_context_invalidations")) {
+      return { rows: [{ id: "66666666-6666-4666-8666-666666666666" }] };
+    }
     if (options.auditFails && rendered.sql.includes("insert into audit_events")) throw new Error("audit_failed");
     if (rendered.sql.includes("insert into audit_events")) {
       const encoded = rendered.params.find((value) => typeof value === "string" && value.includes('"planHash"'));
@@ -81,10 +100,10 @@ function fixture(options: Readonly<{ role?: string; auditFails?: boolean; replay
   return { db, statements, get auditMetadata() { return auditMetadata; }, get rolledBack() { return rolledBack; } };
 }
 
-function spies(mode: "create" | "replay" = "create") {
+function spies(mode: "create" | "replay" | "partial" = "create") {
   const categoryStates = mode === "create" ? [emptyCategories, dimensions(false), fullCategories, fullCategories]
-    : [fullCategories];
-  const profileStates = mode === "create" ? [emptyProfiles, finalProfiles] : [finalProfiles];
+    : mode === "partial" ? [partialCategories, dimensions(false), fullCategories, fullCategories] : [fullCategories];
+  const profileStates = mode === "replay" ? [finalProfiles] : [emptyProfiles, finalProfiles];
   const inspectCategory = vi.spyOn(DrizzleCategoryAuthoringRepository.prototype, "inspect")
     .mockImplementation(async () => categoryStates.shift()!);
   const inspectProfiles = vi.spyOn(DrizzleCategoryProfileLifecycleRepository.prototype, "inspect")
@@ -115,9 +134,31 @@ describe("DrizzleStarterCategoryAdoptionRepository", () => {
       expect(mocked.createDefinition).toHaveBeenCalledTimes(7); expect(mocked.append).toHaveBeenCalledTimes(7);
       expect(fake.statements[0]).toContain("for update");
       expect(fake.auditMetadata).toMatchObject({ planHash: initialPlan.planHash, targetRefCount: 28,
+        catalogVersion: initialPlan.catalogVersion, catalogHash: initialPlan.catalogHash,
+        proposalManifestHash: starterCategoryAdoptionDigest(initialPlan.profileProposals), proposalCount: 42,
+        profileDraftManifestHash: starterCategoryProfileDraftManifestDigest(initialPlan.profileDrafts),
+        profileDraftCount: 7,
         pendingOwnerConfigurationAcknowledged: true, dimensionsCreated: 14, definitionsCreated: 7,
         profileDraftsCreated: 7, categoryInvalidationsAppended: 0, profileInvalidationsAppended: 0 });
       expect(fake.db.transaction).toHaveBeenCalledTimes(1);
+    } finally { mocked.restore(); }
+  });
+
+  it("invalidates exact frozen category-resolution components for a new definition under an existing dimension", async () => {
+    const fake = fixture({ frozenExistingDimension: true }); const mocked = spies("partial");
+    try {
+      const result = await new DrizzleStarterCategoryAdoptionRepository(fake.db as never).adopt({ workspaceId,
+        workspaceRef, actorId, actorRef: "actor_starter", role: "owner",
+        occurredAt: "2026-08-10T10:00:30.000Z", command: partialCommand });
+      expect(result).toMatchObject({ outcome: "inserted", dimensionsCreated: 13, definitionsCreated: 7,
+        profileDraftsCreated: 7, categoryInvalidationsAppended: 1 });
+      expect(fake.auditMetadata).toMatchObject({ categoryInvalidationsAppended: 1,
+        proposalManifestHash: starterCategoryAdoptionDigest(partialPlan.profileProposals), proposalCount: 42,
+        profileDraftManifestHash: starterCategoryProfileDraftManifestDigest(partialPlan.profileDrafts),
+        profileDraftCount: 7 });
+      expect(fake.statements.some((statement) => statement.includes("effective_campaign_context_components"))).toBe(true);
+      expect(fake.statements.some((statement) => statement.includes("insert into effective_campaign_context_invalidations")))
+        .toBe(true);
     } finally { mocked.restore(); }
   });
 
@@ -148,13 +189,15 @@ describe("DrizzleStarterCategoryAdoptionRepository", () => {
     }
   });
 
-  it("rolls category/profile work back when the final append-only audit fails", async () => {
-    const fake = fixture({ auditFails: true }); const mocked = spies();
+  it("rolls category/profile/invalidation work back when the final append-only audit fails", async () => {
+    const fake = fixture({ auditFails: true, frozenExistingDimension: true }); const mocked = spies("partial");
     try {
       await expect(new DrizzleStarterCategoryAdoptionRepository(fake.db as never).adopt({ workspaceId,
         workspaceRef, actorId, actorRef: "actor_starter", role: "owner",
-        occurredAt: "2026-08-10T10:03:00.000Z", command })).rejects.toThrow("audit_failed");
+        occurredAt: "2026-08-10T10:03:00.000Z", command: partialCommand })).rejects.toThrow("audit_failed");
       expect(mocked.append).toHaveBeenCalledTimes(7); expect(fake.rolledBack).toBe(true);
+      expect(fake.statements.some((statement) => statement.includes("insert into effective_campaign_context_invalidations")))
+        .toBe(true);
     } finally { mocked.restore(); }
   });
 });

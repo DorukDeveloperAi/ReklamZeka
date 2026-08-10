@@ -390,6 +390,44 @@ export async function appendAssignmentInvalidations(input: Readonly<{
   return appended;
 }
 
+/**
+ * Invalidates every frozen category resolution for one dimension after its
+ * definition material changes. Callers must pass their transaction client so
+ * the source mutation, invalidations and audit fact share one commit boundary.
+ */
+export async function appendCategoryResolutionWorkspaceInvalidations(input: Readonly<{
+  database: Pick<Database, "execute">;
+  workspaceId: string;
+  dimensionId: string;
+  reasonCode: "source_changed" | "source_removed";
+  occurredAt: string;
+}>): Promise<number> {
+  const components = rows<{ component_ref: string; component_version: string }>(await input.database.execute(sql`
+    select distinct component_ref, component_version from effective_campaign_context_components
+    where workspace_id = ${input.workspaceId}::uuid and component_type = 'category_resolution'
+      and component_ref = ${input.dimensionId}
+    order by component_ref, component_version
+  `));
+  let appended = 0;
+  for (const component of components) {
+    const invalidation = Object.freeze({ workspaceId: input.workspaceId, componentType: "category_resolution",
+      componentRef: text(component.component_ref), componentVersion: text(component.component_version),
+      scopeKind: "workspace_component", entityType: null, entityRef: null,
+      reasonCode: input.reasonCode, observedAt: new Date(input.occurredAt).toISOString() });
+    const inserted = rows(await input.database.execute(sql`
+      insert into effective_campaign_context_invalidations (
+        workspace_id, event_hash, component_type, component_ref, component_version,
+        scope_kind, entity_type, entity_ref, reason_code, observed_at
+      ) values (${input.workspaceId}::uuid, ${digest(invalidation)}, 'category_resolution',
+        ${invalidation.componentRef}, ${invalidation.componentVersion}, 'workspace_component', null, null,
+        ${invalidation.reasonCode}, ${invalidation.observedAt}::timestamptz)
+      on conflict (workspace_id, event_hash) do nothing returning id
+    `));
+    appended += inserted.length;
+  }
+  return appended;
+}
+
 export class DrizzleCategoryAuthoringRepository implements CategoryAuthoringRepository {
   constructor(private readonly database: Database) {}
 
@@ -507,28 +545,9 @@ export class DrizzleCategoryAuthoringRepository implements CategoryAuthoringRepo
             dimensionId, target: assignmentInvalidationTarget, reasonCode: invalidationReason,
             occurredAt: input.occurredAt });
         } else if (dimensionId && command.operation !== "create_dimension") {
-          const components = rows<{ component_ref: string; component_version: string }>(await tx.execute(sql`
-            select distinct component_ref, component_version from effective_campaign_context_components
-            where workspace_id = ${input.workspaceId}::uuid and component_type = 'category_resolution'
-              and component_ref = ${dimensionId}
-            order by component_ref, component_version
-          `));
-          for (const component of components) {
-            const invalidation = Object.freeze({ workspaceId: input.workspaceId, componentType: "category_resolution",
-              componentRef: text(component.component_ref), componentVersion: text(component.component_version),
-              scopeKind: "workspace_component", entityType: null, entityRef: null,
-              reasonCode: invalidationReason, observedAt: new Date(input.occurredAt).toISOString() });
-            const inserted = rows(await tx.execute(sql`
-              insert into effective_campaign_context_invalidations (
-                workspace_id, event_hash, component_type, component_ref, component_version,
-                scope_kind, entity_type, entity_ref, reason_code, observed_at
-              ) values (${input.workspaceId}::uuid, ${digest(invalidation)}, 'category_resolution',
-                ${invalidation.componentRef}, ${invalidation.componentVersion}, 'workspace_component', null, null,
-                ${invalidation.reasonCode}, ${invalidation.observedAt}::timestamptz)
-              on conflict (workspace_id, event_hash) do nothing returning id
-            `));
-            invalidationsAppended += inserted.length;
-          }
+          invalidationsAppended = await appendCategoryResolutionWorkspaceInvalidations({ database: tx,
+            workspaceId: input.workspaceId, dimensionId, reasonCode: invalidationReason,
+            occurredAt: input.occurredAt });
         }
 
         await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`audit:${input.workspaceId}`}, 0))`);

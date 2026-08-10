@@ -5,7 +5,11 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-import { buildStarterCategoryAdoptionPlan } from "@/application/starter-category-adoption-service";
+import {
+  buildStarterCategoryAdoptionPlan,
+  starterCategoryAdoptionDigest,
+  starterCategoryProfileDraftManifestDigest,
+} from "@/application/starter-category-adoption-service";
 import { DrizzleStarterCategoryAdoptionRepository } from
   "@/connectors/categories/starter-category-adoption-drizzle-repository";
 import * as schema from "@/db/schema";
@@ -81,13 +85,21 @@ async function verify(connectionString: string) {
         const metadata = audits[0]?.metadata as Record<string, unknown> | undefined;
         evidence.auditExact = audits.length === 1 && audits[0]?.action === "starter_category.core_adopted"
           && metadata?.planHash === plan.planHash && metadata?.targetRefCount === 28
-          && metadata?.pendingOwnerConfigurationAcknowledged === true;
+          && metadata?.pendingOwnerConfigurationAcknowledged === true
+          && metadata?.catalogVersion === plan.catalogVersion && metadata?.catalogHash === plan.catalogHash
+          && metadata?.proposalManifestHash === starterCategoryAdoptionDigest(plan.profileProposals)
+          && metadata?.proposalCount === 42
+          && metadata?.profileDraftManifestHash === starterCategoryProfileDraftManifestDigest(plan.profileDrafts)
+          && metadata?.profileDraftCount === 7;
         const invalidations = await tx.select({ id: schema.effectiveCampaignContextInvalidations.id })
           .from(schema.effectiveCampaignContextInvalidations)
           .where(eq(schema.effectiveCampaignContextInvalidations.workspaceId, ids.workspace));
         evidence.invalidationExact = invalidations.length === 0
           && metadata?.categoryInvalidationsAppended === 0 && metadata?.profileInvalidationsAppended === 0;
-        evidence.atomicRollbackClean = Object.values({ ...evidence, rollbackClean: true }).every(Boolean);
+        evidence.atomicRollbackClean = [evidence.fourteenDimensionsCreated, evidence.sevenDefinitionsCreated,
+          evidence.sevenMergedProfilesCreated, evidence.exactSixObjectiveBindings,
+          evidence.exactReplayIdempotent, evidence.membershipRechecked, evidence.stalePlanZeroWrite,
+          evidence.auditExact, evidence.invalidationExact].every(Boolean);
         if (!evidence.atomicRollbackClean) throw new Error("Starter adoption PostgreSQL acceptance failed");
         throw rollback;
       });
@@ -106,7 +118,9 @@ async function verify(connectionString: string) {
 }
 
 if (!databaseUrl) {
-  process.stderr.write(`${JSON.stringify({ ok: false, blocker: "postgres_connection_not_configured" })}\n`);
+  process.stderr.write(`${JSON.stringify({ ok: false, blocker: "postgres_connection_not_configured",
+    requiredOneOf: ["DIRECT_DATABASE_URL", "DATABASE_URL"],
+    continuation: "npm run verify:starter-category-adoption-live" })}\n`);
   process.exitCode = 2;
 } else {
   await verify(databaseUrl).catch(() => {
