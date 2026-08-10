@@ -127,6 +127,9 @@
   - [x] A09.2a private owner/admin manual lock/unlock transaction: confirmation, current policy
     head OCC, workspace/membership recheck, append-only audit ve `policy_authority` invalidation;
     action unit'leri artık exact persisted, non-invalidated frozen context bridge'i olmadan yazılamaz.
+  - [x] A09.2b server-private authoritative G3 historical replay preview: G2 provenance,
+    frozen context, repository-bound authority snapshot ve strict impact birlikte çözülür;
+    evidence eksikse blocked, G4/publish/approve/execute/Meta-write yapısal olarak kapalıdır.
   - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
     context ailelerinin authoritative binding'i; canlı PostgreSQL verifier ve gerçek oturum kabulü.
 - [ ] Başlangıç objective/internal kategori playbook seti.

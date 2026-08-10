@@ -54,6 +54,19 @@
   architecture/model/security-boundaries ve secret-artifact kontrolleri yeşil. Yetki kataloğu
   materialization ve authoritative G3 preview sonraki küçük slice'tır; G4/A13 kapalıdır.
 
+## 2026-08-10 — A09.2b authoritative G3 historical replay preview
+
+- Server-private G3 preview root'u exact frozen historical context'i, G2 source/card provenance'ını,
+  current strict-policy lifecycle'ını, tenant authority repository snapshot'ını ve strict impact
+  reader'ı birlikte çözer. Snapshot yüklenemediğinde, G2/policy bağlantısı uyuşmadığında veya impact
+  coverage tam olmadığında preview `blocked` olur.
+- Başarılı source-bound replay dahi yalnız review sonucu üretir; authority alanları ve ayrıca G4
+  alanı publish/approve/execute/Meta-write için false'tur. HTTP, MCP, dashboard veya mutation adapter
+  eklenmedi; historical context invalidated olsa dahi explicit replay için immutable okunabilir.
+- Kanıt: `npm test` 253 dosya/1.481 test, production build, `db:check`, `check:security` (0 vulnerability),
+  architecture/model/security-boundaries ve secret-artifact kontrolleri yeşil. Authority catalog
+  materialization lifecycle ve canlı PostgreSQL/browser kabulü sonraki sınırdır.
+
 ## 2026-08-10 — A09 atomic starter, authoritative facet preview ve progressive persistence
 
 - Starter adoption artık zero-write blocker değildir. Owner/admin confirmation, aktif workspace
