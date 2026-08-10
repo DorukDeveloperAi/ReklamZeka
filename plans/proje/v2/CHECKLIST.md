@@ -108,7 +108,8 @@
     doğrulaması; frozen `policy_authority` evidence/invalidation bileşeni ve action unit↔context
     relational bridge. Public/saf compose yolu source-bound değerini açamaz; eksik impact aileleri
     mutation vermeden fail-closed kalır.
-  - [ ] Persisted tenant-bound authority-tier/decision/manual-lock loader ve frozen analysis composition.
+  - [x] Persisted tenant-bound authority-tier/decision/manual-lock loader ve frozen analysis composition;
+    deterministic catalog/snapshot head ve immutable historical ref/hash canlı PostgreSQL verifier ile doğrulandı.
 - [ ] Versioned draft/publish/pause/archive ve rol/audit API'leri.
   - [x] Guidance için immutable draft/revise/publish/archive, optimistic registry hash,
     analyst draft + owner/admin publish/archive ve mutation+audit tek transaction.
@@ -135,8 +136,10 @@
     catalog/snapshot/binding, audit ve `policy_authority` invalidation tek transaction'dadır.
     Current kullanım deterministic head, tarihsel replay explicit immutable snapshot ref/hash kullanır;
     HTTP/MCP/UI ve bütün write capability'leri kapalıdır.
+  - [x] Migration journal ile canlı PostgreSQL schema/RLS/OCC/rollback kabulü: 52/52 migration,
+    authority catalog, frozen context, progressive formalization ve Supabase security verifier'ları geçti.
   - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
-    context ailelerinin authoritative binding'i; canlı PostgreSQL verifier ve gerçek oturum kabulü.
+    context ailelerinin complete exact-impact coverage'ı ve gerçek oturumlu browser kabulü.
 - [ ] Başlangıç objective/internal kategori playbook seti.
   - [x] Altı canonical objective playbook'una version/hash ile bağlı, review-required ve
     authority-free starter category/profile proposal kataloğu.

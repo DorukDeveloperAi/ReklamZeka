@@ -83,6 +83,27 @@
   RLS/OCC rollback kabulü tamamlanmış sayılmaz. Gerçek oturum/browser kanıtı da açık; impact coverage
   yalnız doğrulayabildiği kapsamda mutation'ı kapalı tutar.
 
+## 2026-08-10 — PostgreSQL migration recovery ve A09 canlı kabulü
+
+- Yerel migration journal'ındaki dört PostgreSQL portability hatası giderildi: composite foreign key'ler
+  hedef composite unique index'lerinden sonra oluşturulur; progressive-formalization JSONB nested-key
+  kontrolleri açık parantezlerle değerlendirilir. Her düzeltme önce gerçek PostgreSQL transaction'ında
+  uygulanıp rollback ile sınandı. Journal artık 52/52 uygulanmış migration ve bilinmeyen hash olmadan
+  tamamdır.
+- `verify:policy-authority-catalog-db` owner/admin recheck, head OCC, immutable catalog/snapshot,
+  invalidation/audit ve capability'lerin false kaldığını doğruladı. `verify:effective-campaign-context-db`
+  cross-tenant, hierarchy, snapshot, invalidation ve nested-authority negatiflerini rollback ile doğruladı.
+  `verify:progressive-formalization-live` source-key çözümü, membership, OCC, immutable/tombstone,
+  audit atomikliği ve default G3/G4 block davranışını doğruladı. `verify:supabase-security`, 98 public
+  tablonun tamamında RLS ve API rolleri için sıfır direct grant raporladı.
+- Progressive preview repository’sinde scoped guidance listeleri artık gerçek parameterized
+  `ARRAY[...]::text[]` bağlanır; scalar-to-array PostgreSQL cast hatası canlı doğrulayıcıda yakalanıp
+  giderildi. G4, publish/approve/execute/Meta-write yetkisi vermez; exact impact coverage ve gerçek
+  oturumlu browser kabulü hâlâ açık sınırdır.
+- Kanıt: hedefli migration/repository testleri; `npm test` 256 dosya/1.496 test; production build,
+  `db:check`, dependency audit (0 vulnerability), architecture/model/security-boundaries ve
+  secret-artifact kontrolleri yeşil.
+
 ## 2026-08-10 — A10 robust cohort calculator
 
 - Saf cohort calculator yalnız aynı objective, funnel, optimization event, metric, category-profile

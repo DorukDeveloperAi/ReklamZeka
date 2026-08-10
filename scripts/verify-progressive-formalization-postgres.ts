@@ -66,8 +66,10 @@ const g4 = transition(g3, { schemaVersion: PROGRESSIVE_FORMALIZATION_VERSION, tr
 
 const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 10_000 });
 const client = await pool.connect();
+const database = drizzle({ client });
+const rollback = Symbol("progressive_formalization_verifier_rollback");
 try {
-  await client.query("begin");
+  await database.transaction(async (transaction) => {
   await client.query("insert into workspaces (id, name) values ($1, $2)", [workspaceId, "Progressive verifier"]);
   const serviceActorId = randomUUID(); const serviceSourceKey = "source_progressive_stream";
   const serviceSourceRef = "source_progressive_persisted"; const serviceText = "Persisted owner source";
@@ -109,8 +111,23 @@ try {
     formalizationRef: g3FormalizationRef, occurredAt: at(8), actor: { actorRef, role: "owner" }, payload: {
       guidanceSetRef: "guidance_set_progressive_verify", reviewedGuidanceHash: h("reviewed"), confirmation: {
         confirmed: true, confirmationRef: "confirmation_progressive_g3_preview", confirmedAt: at(8) } } });
+  const g3Draft = createNormalizedPolicyDraft({ schemaVersion: NORMALIZED_POLICY_DRAFT_VERSION, workspaceRef,
+    formalizationRef: g3FormalizationRef, guidanceSetRef: "guidance_set_progressive_verify", strictPolicy,
+    assumptions: [], questions: [], semanticDiff: { status: "resolved", items: [{
+      meaningRef: "meaning_progressive_g3_preview", sourceStatementHash: h("meaning-g3-preview"),
+      normalizedClauseRef: "policy_clause_progressive_g3_preview", disposition: "preserved", reasonCode: "exact_mapping" }],
+    diffHash: h("diff-g3-preview") }, historicalReplay: { status: "no_history", evaluatedRevisionRefs: [],
+    changedOutcomeRefs: [], unknownOutcomeRefs: [], replayHash: h("replay-g3-preview") },
+    conflictPreview: { status: "clear", conflictRefs: [], previewHash: h("conflict-g3-preview") },
+    impactPreview: { status: "complete", affectedScopeRefs: ["scope_global"], affectedEntityCount: 0,
+      affectedPolicyCount: 0, affectedBudgetCount: 0, affectedAutomationCount: 0,
+      unresolvedDependencyRefs: [], previewHash: h("impact-g3-preview") } });
+  const g3g3 = transition(g3g2, { schemaVersion: PROGRESSIVE_FORMALIZATION_VERSION, transition: "promote_g3", workspaceRef,
+    formalizationRef: g3FormalizationRef, occurredAt: at(9), actor: { actorRef, role: "owner" }, payload: {
+      normalizedDraft: g3Draft, confirmation: { confirmed: true,
+        confirmationRef: "confirmation_progressive_g4_preview", confirmedAt: at(9) } } });
   for (const revision of [g3g0, g3g1, g3g2]) await insertRevision(revision);
-  const repository = new DrizzleProgressiveFormalizationRepository(drizzle({ client }) as never);
+  const repository = new DrizzleProgressiveFormalizationRepository(transaction as never);
   const service = new ProgressiveFormalizationService(repository, [{ workspaceId, userId: serviceActorId, role: "owner" }]);
   const servicePrincipal = { actor: { userId: serviceActorId }, workspaceId, workspaceRef,
     readerRef: actorRef } as const;
@@ -131,13 +148,15 @@ try {
     rawProvenanceRef: serviceSourceKey }).then(() => { throw new Error("repository_occ_not_enforced"); }, () => undefined);
   const g3Preview = await repository.preview({ workspaceId, workspaceRef, formalizationRef: g3FormalizationRef, target: "G3",
     policyRef: "policy_progressive_verify" });
-  const g4Preview = await repository.preview({ workspaceId, workspaceRef, formalizationRef, target: "G4", policyRef: null });
+  await insertRevision(g3g3);
+  const g4Preview = await repository.preview({ workspaceId, workspaceRef, formalizationRef: g3FormalizationRef,
+    target: "G4", policyRef: null });
   if (g3Preview.disposition !== "blocked" || g4Preview.disposition !== "blocked"
     || g4Preview.evidence.persistedPolicy !== false || !g4Preview.blockers.includes("published_policy_missing")) {
     throw new Error("default_g3_g4_blocking_failed");
   }
   const count = Number((await client.query<{ count: string }>("select count(*) from progressive_formalization_revisions where workspace_id = $1", [workspaceId])).rows[0]!.count);
-  if (count !== 9) throw new Error("progressive_revision_count_mismatch");
+  if (count !== 10) throw new Error("progressive_revision_count_mismatch");
   await client.query("savepoint immutable_check");
   let immutable = false;
   try { await client.query("update progressive_formalization_revisions set actor_role = actor_role where workspace_id = $1", [workspaceId]); }
@@ -149,8 +168,7 @@ try {
   if (!activeDeleteBlocked) throw new Error("progressive_revision_active_delete_not_blocked");
   await client.query("update workspaces set lifecycle_state = 'tombstoning' where id = $1", [workspaceId]);
   const deleted = (await client.query("delete from progressive_formalization_revisions where workspace_id = $1", [workspaceId])).rowCount;
-  if (deleted !== 9) throw new Error("progressive_revision_tombstone_delete_failed");
-  await client.query("rollback");
+  if (deleted !== 10) throw new Error("progressive_revision_tombstone_delete_failed");
   console.log(JSON.stringify({ ok: true, chainLength: 5, headHash: g4.revisionHash, immutable,
     activeDeleteBlocked, tombstoneDeleteCount: deleted,
     rejectedCorruptRows: ["extra_top_level", "extra_nested", "authority_open", "secret_material", "broken_chain"],
@@ -158,7 +176,8 @@ try {
       defaultG3G4Blocked: true },
     authority: { canApprove: false, canExecute: false, canWriteMeta: false, canSchedule: false, canCallTool: false },
     transaction: "outer_rollback" }));
+  throw rollback;
+  });
 } catch (reason) {
-  await client.query("rollback").catch(() => undefined);
-  throw reason;
+  if (reason !== rollback) throw reason;
 } finally { client.release(); await pool.end(); }

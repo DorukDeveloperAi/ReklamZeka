@@ -51,11 +51,9 @@ CREATE TABLE "policy_semantic_binding_revisions" (
 );
 --> statement-breakpoint
 ALTER TABLE "authority_topic_revisions" ADD CONSTRAINT "authority_topic_revisions_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "authority_topic_revisions" ADD CONSTRAINT "authority_topic_revisions_topic_scope_fk" FOREIGN KEY ("workspace_id","topic_id") REFERENCES "public"."authority_topics"("workspace_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "authority_topics" ADD CONSTRAINT "authority_topics_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "category_topic_bindings" ADD CONSTRAINT "category_topic_bindings_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "category_topic_bindings" ADD CONSTRAINT "category_topic_bindings_category_scope_fk" FOREIGN KEY ("workspace_id","category_definition_id") REFERENCES "public"."category_definitions"("workspace_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "category_topic_bindings" ADD CONSTRAINT "category_topic_bindings_topic_scope_fk" FOREIGN KEY ("workspace_id","topic_revision_id") REFERENCES "public"."authority_topic_revisions"("workspace_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "policy_semantic_binding_revisions" ADD CONSTRAINT "policy_semantic_binding_revisions_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "policy_semantic_binding_revisions" ADD CONSTRAINT "policy_semantic_binding_revisions_policy_scope_fk" FOREIGN KEY ("workspace_id","policy_revision_id") REFERENCES "public"."strict_instruction_policy_revisions"("workspace_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "authority_topic_revisions_workspace_row_unique" ON "authority_topic_revisions" USING btree ("workspace_id","id");--> statement-breakpoint
@@ -72,6 +70,8 @@ CREATE UNIQUE INDEX "policy_semantic_binding_revisions_exact_unique" ON "policy_
 CREATE UNIQUE INDEX "policy_semantic_binding_revisions_workspace_hash_unique" ON "policy_semantic_binding_revisions" USING btree ("workspace_id","revision_hash");--> statement-breakpoint
 CREATE INDEX "policy_semantic_binding_revisions_lookup_idx" ON "policy_semantic_binding_revisions" USING btree ("workspace_id","semantic_ref","revision");
 --> statement-breakpoint
+ALTER TABLE "authority_topic_revisions" ADD CONSTRAINT "authority_topic_revisions_topic_scope_fk" FOREIGN KEY ("workspace_id","topic_id") REFERENCES "public"."authority_topics"("workspace_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "category_topic_bindings" ADD CONSTRAINT "category_topic_bindings_topic_scope_fk" FOREIGN KEY ("workspace_id","topic_revision_id") REFERENCES "public"."authority_topic_revisions"("workspace_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE authority_topics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE authority_topics FORCE ROW LEVEL SECURITY;
 ALTER TABLE authority_topic_revisions ENABLE ROW LEVEL SECURITY;
