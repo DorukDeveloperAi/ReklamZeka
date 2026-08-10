@@ -340,6 +340,67 @@ function sahaBloku(root, me) {
 }
 
 /**
+ * COMMIT KANALI ÇİZİMİ (otonomi-merdiveni:16) — farkındalığın ikinci bacağı: İŞ commit'leri
+ * satır satır (en yeni 12), CHECKPOINT'ler TEK satıra katlanır (cp özeti KONUDAN parse edilir
+ * — diff koşulmaz; "repo canlı" sinyali kaybolmasın diye gizlenmez, `claimsiz` katlaması
+ * emsali). Yalnız ORKESTRATÖR rolüne basılır (bu aşamada — İLANLI; diğer roller ayrı karar).
+ * İmleç basım SONRASI ilerletilir: yazılamazsa en fazla tekrar basılır, commit kaybolmaz.
+ * Kanal SALT-OKUR; her hata yutulur — guard kararı commit kanalı yüzünden DEĞİŞMEZ.
+ */
+function commitBloku(root, me) {
+  try {
+    if (!me || typeof L.commitOku !== "function") return [];
+    let ork = false;
+    try {
+      ork =
+        (L.rolleriOf?.(root, me) || []).includes("orkestrator") ||
+        L.orkestratorOku?.(root)?.sessionId === me;
+    } catch {
+      return [];
+    }
+    if (!ork) return [];
+    const r = L.commitOku(root);
+    if (!r.head) return []; // git yok/repo değil — sessiz (kanal bu ortamda tanımsız)
+    if (!r.yeni.length && !r.atlanan) {
+      // yeni commit yok — imleç zaten HEAD'de (ucuz yol); blok basılmaz.
+      return [];
+    }
+    const isler = r.yeni.filter((c) => c.tur === "is");
+    const cpler = r.yeni.filter((c) => c.tur !== "is"); // checkpoint + birlesme katlanır
+    const satirlar = [`[orkestratör] Commit kanalı — ${r.yeni.length} yeni commit:`];
+    if (r.kopuk) satirlar.push(`  ⚠ imleç kopuktu (rebase/gc) — zaman penceresiyle okundu; mükerrer olabilirler elendi.`);
+    const ISTAVAN = 12;
+    for (const c of isler.slice(-ISTAVAN)) {
+      const t = Number.isFinite(c.ts) && c.ts > 0 ? ` (${dk(c.ts)})` : "";
+      satirlar.push(`  ⚙ ${kis(c.konu, 88)} · ${c.sha.slice(0, 8)}${t}`);
+    }
+    if (isler.length > ISTAVAN) satirlar.push(`  … +${isler.length - ISTAVAN} İŞ commit'i GÖSTERİLMEDİ (tavan ${ISTAVAN}).`);
+    if (cpler.length) {
+      const oz = cpler.map((c) => L.cpOzet?.(c.konu) || { kapsamlar: [], dosya: null, art: null, eks: null });
+      const kapsamSay = {};
+      let art = 0, eks = 0, sayili = false;
+      for (const o of oz) {
+        for (const k of o.kapsamlar) kapsamSay[k] = (kapsamSay[k] || 0) + 1;
+        if (o.art != null) { art += o.art; eks += o.eks || 0; sayili = true; }
+      }
+      const kapsamMetin = Object.entries(kapsamSay).map(([k, v]) => (v > 1 ? `${k}×${v}` : k)).join(" ") || "?";
+      satirlar.push(`  ⧗ ${cpler.length} checkpoint · kapsam: ${kapsamMetin}${sayili ? ` · +${art}/-${eks}` : ""}`);
+    }
+    if (r.atlanan) satirlar.push(`  ⚠ en az ${r.atlanan} commit daha birikmişti — GÖVDE KIRPILDI; git log'u kendin oku.`);
+    // İmleç basım SONRASI ilerler (sahaBloku `ilerlet` deseni).
+    try {
+      const imlec = L.commitImlecOku?.(root);
+      L.commitImlecYaz?.(root, { son: r.head, sonListe: imlec?.sonListe || [] });
+    } catch {
+      /* yut — en fazla tekrar basılır */
+    }
+    return satirlar;
+  } catch {
+    return [];
+  }
+}
+
+/**
  * SESSİZ EZME YOK (P2): kilidi DEVREDİLMİŞ olan eski sahip, ilk yazımında ne olduğunu
  * OKUR. Devir bir silme değil bir sahip değişimidir; `ownerMatch` artık false döndüğü
  * için eski sahip normal DENY yerdi ve "benim kilidim nereye gitti" sorusu cevapsız
@@ -704,6 +765,9 @@ function main() {
        koordinatörün gözünü taşır. Kişisel olan önce basılır — "sıra sana geldi" bilgisinin
        muhatabı sensin; saha bloğu ondan sonra gelir. */
     const saha = sahaBloku(root, me);
+    /* Commit kanalı — sahanın İKİNCİ kaynağı (git geçmişi); yalnız orkestratöre basılır.
+       İki blok ayrı imleçlidir, tavanları bağımsızdır (MASTER Karar bekleyenler #6). */
+    const commitler = commitBloku(root, me);
 
     /* ORKESTRATÖR GÖRÜNÜRLÜĞÜ: sahada bir koordinatör varsa herkes BİLİR — çünkü bu
        oturumun bloke olması/işini bitirmesi ona otomatik haber düşürüyor. Görünmez bir
@@ -729,7 +793,7 @@ function main() {
     /* Sarkık devir işareti TEK BAŞINA da haber değeridir (iş kaybolmasın); başka canlı
        session yoksa blok yalnız o satırı taşır. Üçü de yoksa TEK BAYT basılmaz. */
     if (!others.length) {
-      if (!devirSatir && !bildiri.satirlar.length && !saha.length && !orkSatir) return pass();
+      if (!devirSatir && !bildiri.satirlar.length && !saha.length && !commitler.length && !orkSatir) return pass();
       return out({
         ...(bildiri.ozet.length ? { systemMessage: bildiri.ozet.join("\n") } : {}),
         hookSpecificOutput: {
@@ -737,6 +801,7 @@ function main() {
           additionalContext: [
             ...bildiri.satirlar,
             ...saha,
+            ...commitler,
             ...(orkSatir ? [`[eşzamanlılık] ${orkSatir}`] : []),
             ...(devirSatir ? [`[eşzamanlılık] ${devirSatir}`] : []),
           ].join("\n"),
@@ -785,6 +850,7 @@ function main() {
         additionalContext: [
           ...bildiri.satirlar,
           ...saha,
+          ...commitler,
           `[eşzamanlılık] Bu repoda ${others.length} BAŞKA canlı Claude session'ı var:`,
           ...lines,
           heldLines.length ? `Tutulan kilitler:` : `Tutulan kilit yok.`,
