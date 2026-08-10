@@ -45,10 +45,6 @@ CREATE TABLE "business_outcome_signals" (
   ) is true)
 );
 --> statement-breakpoint
-ALTER TABLE "business_outcome_batches" ADD CONSTRAINT "business_outcome_batches_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "business_outcome_batches" ADD CONSTRAINT "business_outcome_batches_actor_id_users_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "business_outcome_signals" ADD CONSTRAINT "business_outcome_signals_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "business_outcome_signals" ADD CONSTRAINT "business_outcome_signals_batch_scope_fk" FOREIGN KEY ("workspace_id","batch_id") REFERENCES "public"."business_outcome_batches"("workspace_id","batch_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "business_outcome_batches_workspace_row_unique" ON "business_outcome_batches" USING btree ("workspace_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "business_outcome_batches_workspace_batch_unique" ON "business_outcome_batches" USING btree ("workspace_id","batch_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "business_outcome_batches_workspace_source_unique" ON "business_outcome_batches" USING btree ("workspace_id","source_ref","content_hash");--> statement-breakpoint
@@ -58,6 +54,10 @@ CREATE UNIQUE INDEX "business_outcome_signals_workspace_signal_unique" ON "busin
 CREATE INDEX "business_outcome_signals_entity_time_idx" ON "business_outcome_signals" USING btree ("workspace_id","entity_ref","occurred_at");--> statement-breakpoint
 CREATE INDEX "business_outcome_signals_outcome_time_idx" ON "business_outcome_signals" USING btree ("workspace_id","outcome_kind","occurred_at");
 --> statement-breakpoint
+ALTER TABLE "business_outcome_batches" ADD CONSTRAINT "business_outcome_batches_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "business_outcome_batches" ADD CONSTRAINT "business_outcome_batches_actor_id_users_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "business_outcome_signals" ADD CONSTRAINT "business_outcome_signals_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "business_outcome_signals" ADD CONSTRAINT "business_outcome_signals_batch_scope_fk" FOREIGN KEY ("workspace_id","batch_id") REFERENCES "public"."business_outcome_batches"("workspace_id","batch_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE FUNCTION business_outcome_immutable_guard() RETURNS trigger
 LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 BEGIN

@@ -328,7 +328,9 @@
     action/Meta-write authority dönmez.
   - [x] L4 için deterministic compact BusinessOutcomeEvidence envelope'u: entity/head/window-bound manifest,
     outcome/currency/mapping summary ve immutable hash; raw source veya Meta proxy/action authority taşımaz.
-  - [ ] Frozen context/L4–L5 binding'i.
+  - [x] Tenant-bound L4 evidence persistence: entity head OCC/append guard, immutable head-window snapshot,
+    source-component invalidation ve frozen context save sırasında exact snapshot/hash/head payload doğrulaması.
+  - [ ] Server-private materializer→context composer binding'i ve L5 analysis consumer'ları.
 
 ## A11 — Bütçe planlama
 

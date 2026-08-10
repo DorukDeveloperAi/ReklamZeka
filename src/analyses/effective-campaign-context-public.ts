@@ -131,6 +131,10 @@ export function projectEffectiveCampaignContext(context: EffectiveCampaignContex
       experimentRefs: context.history.experimentRefs.map(publicRef),
       practiceRefs: context.history.practiceRefs.map(publicRef),
       outcomeRefs: context.history.outcomeRefs.map(publicRef),
+      ...(context.history.outcomeEvidence === undefined ? {} : { outcomeEvidence: context.history.outcomeEvidence.map((evidence) => ({
+        evidenceRef: publicRef(evidence.evidenceRef), windowStart: evidence.windowStart, windowEnd: evidence.windowEnd,
+        materializedAt: evidence.materializedAt, summary: evidence.summary,
+      })) }),
     },
     versions: context.versions,
     capabilities: context.capabilities,

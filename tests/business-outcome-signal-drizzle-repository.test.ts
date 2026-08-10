@@ -33,13 +33,13 @@ describe("DrizzleBusinessOutcomeSignalRepository", () => {
 
   it("canonicalizes before active membership, appends normalized rows and an audit event in one transaction", async () => {
     const harness = repository([[{ id: workspaceId }], [{ role: "analyst" }], [{ batch_id: batch.batchId }],
-      [{ signal_ref: "signal_lead" }, { signal_ref: "signal_revenue" }], [], [], []]);
+      [{ signal_ref: "signal_lead" }, { signal_ref: "signal_revenue" }], [], [{ current_head_hash: "b".repeat(64) }], [], [], []]);
     await expect(harness.repository.record({ workspaceId, actorId, actorRef: "reader_analyst", role: "analyst", batch,
       occurredAt: "2026-08-10T12:00:00.000Z" })).resolves.toMatchObject({ outcome: "inserted", batchId: batch.batchId,
       summary: { metaProxyEligible: false }, capabilities: { canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false } });
     const rendered = (harness.execute.mock.calls as unknown[][]).map(([query]) => new PgDialect().sqlToQuery(query as never).sql).join("\n");
     expect(rendered).toContain("for update"); expect(rendered).toContain("jsonb_to_recordset");
-    expect(rendered).toContain("insert into business_outcome_batches"); expect(rendered).toContain("insert into business_outcome_signals");
+    expect(rendered).toContain("insert into business_outcome_batches"); expect(rendered).toContain("insert into business_outcome_signals"); expect(rendered).toContain("business_outcome_entity_heads");
     expect(rendered).toContain("pg_advisory_xact_lock"); expect(rendered).toContain("insert into audit_events");
     expect(rendered).not.toMatch(/raw_csv|raw_payload|prompt|token/i);
   });

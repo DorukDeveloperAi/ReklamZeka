@@ -8,6 +8,7 @@ import {
 import type { FrozenCategoryContext } from "@/domain/categories/registry";
 import type { EffectiveGuidancePack } from "@/domain/guidance/registry";
 import { inspectMetaPersistenceWrite } from "@/domain/meta/data-lifecycle";
+import { validateBusinessOutcomeEvidence, type BusinessOutcomeEvidenceSnapshot } from "@/analyses/business-outcome-evidence";
 
 export const EFFECTIVE_CAMPAIGN_CONTEXT_VERSION = "effective-campaign-context/1.0.0" as const;
 export const EFFECTIVE_CONTEXT_INSTRUCTION_POLICY_COMPONENT_REF = "instruction-policy-registry" as const;
@@ -65,6 +66,8 @@ export type EffectiveCampaignContextInput = Readonly<{
     experimentRefs: readonly string[];
     practiceRefs: readonly string[];
     outcomeRefs: readonly string[];
+    /** Optional only when server-private persistence verifies the matching L4 evidence snapshot. */
+    outcomeEvidence?: readonly BusinessOutcomeEvidenceSnapshot[];
   }>;
   versions: Readonly<{
     metaCatalog: string;
@@ -186,7 +189,7 @@ export function buildEffectiveCampaignContext(input: EffectiveCampaignContextInp
   exactKeys(input.meta, ["objective", "optimizationEvent", "configuredStatus", "effectiveStatus", "budgetOwnerRef", "targetingSignature", "actorRef", "destinationRef"]);
   exactKeys(input.cadence, ["profileRef", "decision", "reason", "cooldownUntil"]);
   exactKeys(input.data, ["trustStatus", "snapshotRefs", "featureRefs", "windowRefs", "blockers"]);
-  exactKeys(input.history, ["changeRefs", "decisionRefs", "experimentRefs", "practiceRefs", "outcomeRefs"]);
+  exactKeys(input.history, ["changeRefs", "decisionRefs", "experimentRefs", "practiceRefs", "outcomeRefs", "outcomeEvidence"]);
   exactKeys(input.versions, ["metaCatalog", "categoryResolver", "guidanceRegistry", "metricCatalog", "formulaCatalog",
     "timeframeResolver", "instructionPolicyRegistry", "promotionRegistry", "policyAuthority"]);
   if (input.policyAuthorityEvidence !== undefined) {
@@ -284,6 +287,14 @@ export function buildEffectiveCampaignContext(input: EffectiveCampaignContextInp
       experimentRefs: uniqueSorted(input.history.experimentRefs),
       practiceRefs: uniqueSorted(input.history.practiceRefs),
       outcomeRefs: uniqueSorted(input.history.outcomeRefs),
+      ...(input.history.outcomeEvidence === undefined ? {} : { outcomeEvidence: (() => {
+        if (!Array.isArray(input.history.outcomeEvidence)) throw new EffectiveCampaignContextError("invalid_input");
+        const evidence = input.history.outcomeEvidence.map((entry) => {
+          try { return validateBusinessOutcomeEvidence(entry); } catch { throw new EffectiveCampaignContextError("inauthentic_component"); }
+        }).sort((left, right) => compareText(left.entityRef, right.entityRef) || compareText(left.evidenceHash, right.evidenceHash));
+        if (new Set(evidence.map((entry) => entry.entityRef)).size !== evidence.length) throw new EffectiveCampaignContextError("invalid_input");
+        return Object.freeze(evidence);
+      })() }),
     },
     ...(input.policyAuthorityEvidence === undefined ? {} : { policyAuthorityEvidence: {
       snapshotRef: input.policyAuthorityEvidence.snapshotRef,

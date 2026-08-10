@@ -29,6 +29,7 @@ export const CONTEXT_SOURCE_COMPONENT_TYPES = Object.freeze([
   "instruction_policy",
   "promotion_registry",
   "policy_authority",
+  "business_outcome_evidence",
 ] as const);
 
 export type ContextSourceComponentType = typeof CONTEXT_SOURCE_COMPONENT_TYPES[number];
@@ -180,6 +181,11 @@ export function sourceComponentsOf(context: EffectiveCampaignContext): readonly 
       componentRef: EFFECTIVE_CONTEXT_POLICY_AUTHORITY_COMPONENT_REF,
       componentVersion: context.versions.policyAuthority,
     }]),
+    ...(context.history.outcomeEvidence ?? []).map((evidence) => ({
+      componentType: "business_outcome_evidence" as const,
+      componentRef: evidence.entityRef,
+      componentVersion: evidence.sourceHeadHash,
+    })),
   ];
   const normalized = components.map((component) => Object.freeze({
     componentType: component.componentType,
@@ -198,6 +204,24 @@ function resultRows<T>(result: unknown): readonly T[] {
     throw new EffectiveCampaignContextRepositoryError("corrupt_store");
   }
   return result.rows as readonly T[];
+}
+
+/** Evidence can enter a frozen context only when the exact immutable L4 row exists in the same tenant. */
+async function assertBusinessOutcomeEvidence(database: ContextDatabase, context: EffectiveCampaignContext): Promise<void> {
+  for (const evidence of context.history.outcomeEvidence ?? []) {
+    const matches = resultRows<{ evidence_payload: unknown }>(await database.execute(sql`
+      select evidence_payload from business_outcome_evidence_snapshots
+      where workspace_id = ${context.workspaceId}::uuid and evidence_ref = ${evidence.evidenceRef}
+        and evidence_hash = ${evidence.evidenceHash} and entity_ref = ${evidence.entityRef}
+        and source_head_hash = ${evidence.sourceHeadHash} and source_manifest_hash = ${evidence.sourceManifestHash}
+        and window_start = ${evidence.windowStart}::timestamptz and window_end = ${evidence.windowEnd}::timestamptz
+        and materialized_at = ${evidence.materializedAt}::timestamptz
+      limit 2 for share
+    `));
+    if (matches.length !== 1 || JSON.stringify(stableValue(matches[0]!.evidence_payload)) !== JSON.stringify(stableValue(evidence))) {
+      throw new EffectiveCampaignContextRepositoryError("corrupt_store");
+    }
+  }
 }
 
 async function assertWorkspace(database: ContextDatabase, workspaceId: string, lock: boolean): Promise<void> {
@@ -387,6 +411,7 @@ export class DrizzleEffectiveCampaignContextRepository {
     return this.database.transaction(async (transaction) => {
       await assertWorkspace(transaction, context.workspaceId, true);
       const mirror = await assertMirrorScope(transaction, context);
+      await assertBusinessOutcomeEvidence(transaction, context);
       const sameHash = await transaction.select().from(schema.effectiveCampaignContexts).where(and(
         eq(schema.effectiveCampaignContexts.workspaceId, context.workspaceId),
         eq(schema.effectiveCampaignContexts.contextHash, context.contextHash),

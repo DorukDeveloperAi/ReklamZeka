@@ -68,6 +68,41 @@ export class DrizzleBusinessOutcomeSignalRepository {
           ) returning signal_ref
         `));
         if (signals.length !== batch.signals.length || new Set(signals.map((row) => row.signal_ref)).size !== batch.signals.length) fail("corrupt_store");
+        for (const entityRef of [...new Set(batch.signals.map((signal) => signal.entityRef))].sort()) {
+          const existingHead = rows<{ current_revision: unknown; current_head_hash: unknown }>(await tx.execute(sql`
+            select current_revision, current_head_hash from business_outcome_entity_heads
+            where workspace_id = ${input.workspaceId}::uuid and entity_ref = ${entityRef} limit 2 for update
+          `));
+          if (existingHead.length > 1) fail("corrupt_store");
+          const previousHeadHash = existingHead[0]?.current_head_hash === null || existingHead[0]?.current_head_hash === undefined ? "GENESIS" : String(existingHead[0]!.current_head_hash);
+          const previousRevision = existingHead[0] === undefined ? 0 : Number(existingHead[0]!.current_revision);
+          if (!Number.isSafeInteger(previousRevision) || previousRevision < 0 || previousHeadHash !== "GENESIS" && !/^[a-f0-9]{64}$/.test(previousHeadHash)) fail("corrupt_store");
+          const entitySignals = batch.signals.filter((signal) => signal.entityRef === entityRef).map((signal) => ({ signalRef: signal.signalRef, occurredAt: signal.occurredAt, outcome: signal.outcome, quantity: signal.quantity, valueMinor: signal.valueMinor, currency: signal.currency, mappingStatus: signal.mappingStatus })).sort((left, right) => left.signalRef.localeCompare(right.signalRef));
+          const nextHeadHash = digest({ version: "business-outcome-entity-head/1.0.0", workspaceId: input.workspaceId, entityRef,
+            previousHeadHash, previousRevision, batchId: batch.batchId, signals: entitySignals });
+          if (existingHead.length === 0) {
+            const created = rows<{ current_head_hash: unknown }>(await tx.execute(sql`
+              insert into business_outcome_entity_heads (workspace_id, entity_ref, current_revision, current_head_hash, updated_at)
+              values (${input.workspaceId}::uuid, ${entityRef}, 1, ${nextHeadHash}, ${occurredAt}::timestamptz) returning current_head_hash
+            `));
+            if (created.length !== 1 || typeof created[0]!.current_head_hash !== "string" || !/^[a-f0-9]{64}$/.test(created[0]!.current_head_hash)) fail("conflict");
+          } else {
+            const advanced = rows<{ current_head_hash: unknown }>(await tx.execute(sql`
+              update business_outcome_entity_heads set current_revision = ${previousRevision + 1}, current_head_hash = ${nextHeadHash}, updated_at = ${occurredAt}::timestamptz
+              where workspace_id = ${input.workspaceId}::uuid and entity_ref = ${entityRef} and current_revision = ${previousRevision} and current_head_hash = ${previousHeadHash}
+              returning current_head_hash
+            `));
+            if (advanced.length !== 1 || typeof advanced[0]!.current_head_hash !== "string" || !/^[a-f0-9]{64}$/.test(advanced[0]!.current_head_hash)) fail("conflict");
+            const invalidation = Object.freeze({ workspaceId: input.workspaceId, componentType: "business_outcome_evidence", componentRef: entityRef,
+              componentVersion: previousHeadHash, scopeKind: "workspace_component", reasonCode: "source_changed", observedAt: occurredAt, nextHeadHash });
+            const invalidated = rows<{ event_hash: unknown }>(await tx.execute(sql`
+              insert into effective_campaign_context_invalidations (workspace_id, event_hash, component_type, component_ref, component_version, scope_kind, entity_type, entity_ref, reason_code, observed_at)
+              values (${input.workspaceId}::uuid, ${digest(invalidation)}, 'business_outcome_evidence', ${entityRef}, ${previousHeadHash}, 'workspace_component', null, null, 'source_changed', ${occurredAt}::timestamptz)
+              on conflict (workspace_id, event_hash) do nothing returning event_hash
+            `));
+            if (invalidated.length > 1) fail("corrupt_store");
+          }
+        }
       }
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`audit:${input.workspaceId}`}, 0))`);
       const previousHash = String(rows<{ event_hash: unknown }>(await tx.execute(sql`select event_hash from audit_events where workspace_id = ${input.workspaceId}::uuid order by occurred_at desc, created_at desc, id desc limit 1`))[0]?.event_hash ?? "GENESIS");

@@ -115,6 +115,14 @@ describe("effective campaign context", () => {
       .toThrowError(expect.objectContaining<Partial<EffectiveCampaignContextError>>({ code: "invalid_input" }));
   });
 
+  it("freezes compact outcome evidence only when its immutable envelope is authentic", async () => {
+    const { buildBusinessOutcomeEvidence } = await import("@/analyses/business-outcome-evidence");
+    const evidence = buildBusinessOutcomeEvidence({ entityRef: "campaign_primary", sourceHeadHash: "a".repeat(64), windowStart: "2026-08-01T00:00:00.000Z", windowEnd: "2026-08-07T00:00:00.000Z", materializedAt: "2026-08-07T12:00:00.000Z", signals: [] });
+    const frozen = buildEffectiveCampaignContext({ ...input(), history: { ...input().history, outcomeEvidence: [evidence] } });
+    expect(frozen.history.outcomeEvidence).toEqual([evidence]);
+    expect(() => buildEffectiveCampaignContext({ ...input(), history: { ...input().history, outcomeEvidence: [{ ...evidence, evidenceHash: "b".repeat(64) }] } })).toThrowError(expect.objectContaining<Partial<EffectiveCampaignContextError>>({ code: "inauthentic_component" }));
+  });
+
   it("requires immutable repository authority evidence whenever a policy authority version is frozen", () => {
     const base = input();
     expect(() => buildEffectiveCampaignContext({ ...base, versions: { ...base.versions, policyAuthority: "a".repeat(64) } }))

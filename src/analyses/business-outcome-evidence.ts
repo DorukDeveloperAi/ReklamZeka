@@ -86,3 +86,32 @@ export function buildBusinessOutcomeEvidence(input: Readonly<{
   const evidenceHash = hash(core);
   return Object.freeze({ ...core, evidenceRef: `outcome_evidence_${evidenceHash.slice(0, 24)}`, evidenceHash });
 }
+
+/** Validates a persisted compact evidence envelope before it can enter an L5 context. */
+export function validateBusinessOutcomeEvidence(value: unknown): BusinessOutcomeEvidenceSnapshot {
+  if (!value || typeof value !== "object" || Array.isArray(value)) fail("corrupt_source");
+  const candidate = value as Record<string, unknown>;
+  const allowed = ["version", "evidenceRef", "evidenceHash", "entityRef", "sourceHeadHash", "sourceManifestHash", "windowStart", "windowEnd", "materializedAt", "summary"];
+  if (Object.keys(candidate).length !== allowed.length || Object.keys(candidate).some((key) => !allowed.includes(key)) || candidate.version !== BUSINESS_OUTCOME_EVIDENCE_VERSION
+    || typeof candidate.evidenceRef !== "string" || !/^outcome_evidence_[a-f0-9]{24}$/.test(candidate.evidenceRef) || typeof candidate.evidenceHash !== "string" || !HASH.test(candidate.evidenceHash)
+    || !candidate.summary || typeof candidate.summary !== "object" || Array.isArray(candidate.summary)) fail("corrupt_source");
+  const summary = candidate.summary as Record<string, unknown>; const summaryKeys = ["signalCount", "batchCount", "totals", "revenueMinorByCurrency", "verifiedSignalCount", "unmappedSignalCount", "metaProxyEligible"];
+  if (Object.keys(summary).length !== summaryKeys.length || Object.keys(summary).some((key) => !summaryKeys.includes(key)) || summary.metaProxyEligible !== false
+    || !Number.isSafeInteger(summary.signalCount) || (summary.signalCount as number) < 0 || !Number.isSafeInteger(summary.batchCount) || (summary.batchCount as number) < 0
+    || !Number.isSafeInteger(summary.verifiedSignalCount) || !Number.isSafeInteger(summary.unmappedSignalCount) || (summary.verifiedSignalCount as number) + (summary.unmappedSignalCount as number) !== summary.signalCount
+    || !summary.totals || typeof summary.totals !== "object" || Array.isArray(summary.totals) || !summary.revenueMinorByCurrency || typeof summary.revenueMinorByCurrency !== "object" || Array.isArray(summary.revenueMinorByCurrency)) fail("corrupt_source");
+  const totals = summary.totals as Record<string, unknown>; const outcomes: BusinessOutcomeKind[] = ["qualified_lead", "appointment", "sale", "revenue", "invalid_lead"];
+  if (Object.keys(totals).length !== outcomes.length || outcomes.some((outcome) => !Number.isSafeInteger(totals[outcome]) || (totals[outcome] as number) < 0)) fail("corrupt_source");
+  const revenueMinorByCurrency = summary.revenueMinorByCurrency as Record<string, unknown>;
+  if (Object.entries(revenueMinorByCurrency).some(([currency, amount]) => !CURRENCY.test(currency) || !Number.isSafeInteger(amount) || (amount as number) < 0)) fail("corrupt_source");
+  const entityRef = ref(candidate.entityRef, "corrupt_source"); const sourceHeadHash = typeof candidate.sourceHeadHash === "string" && HASH.test(candidate.sourceHeadHash) ? candidate.sourceHeadHash : fail("corrupt_source");
+  const sourceManifestHash = typeof candidate.sourceManifestHash === "string" && HASH.test(candidate.sourceManifestHash) ? candidate.sourceManifestHash : fail("corrupt_source");
+  const core = Object.freeze({ version: BUSINESS_OUTCOME_EVIDENCE_VERSION, entityRef, sourceHeadHash, sourceManifestHash,
+    windowStart: instant(candidate.windowStart, "corrupt_source"), windowEnd: instant(candidate.windowEnd, "corrupt_source"), materializedAt: instant(candidate.materializedAt, "corrupt_source"),
+    summary: Object.freeze({ signalCount: summary.signalCount as number, batchCount: summary.batchCount as number,
+      totals: Object.freeze(Object.fromEntries(outcomes.map((outcome) => [outcome, totals[outcome] as number])) as Record<BusinessOutcomeKind, number>),
+      revenueMinorByCurrency: Object.freeze(Object.fromEntries(Object.entries(revenueMinorByCurrency).sort(([left], [right]) => left.localeCompare(right)).map(([currency, amount]) => [currency, amount as number]))),
+      verifiedSignalCount: summary.verifiedSignalCount as number, unmappedSignalCount: summary.unmappedSignalCount as number, metaProxyEligible: false as const }) });
+  if (Date.parse(core.windowStart) >= Date.parse(core.windowEnd) || hash(core) !== candidate.evidenceHash || candidate.evidenceRef !== `outcome_evidence_${candidate.evidenceHash.slice(0, 24)}`) fail("corrupt_source");
+  return Object.freeze({ ...core, evidenceRef: candidate.evidenceRef, evidenceHash: candidate.evidenceHash });
+}

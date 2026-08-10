@@ -132,6 +132,15 @@ describe("effective campaign context persistence contract", () => {
     expect(sourceComponentsOf(context())).toEqual(components);
   });
 
+  it("adds an exact business-outcome evidence source component for selective head invalidation", async () => {
+    const { buildBusinessOutcomeEvidence } = await import("@/analyses/business-outcome-evidence");
+    const evidence = buildBusinessOutcomeEvidence({ entityRef: "campaign_primary", sourceHeadHash: "a".repeat(64),
+      windowStart: "2026-08-01T00:00:00.000Z", windowEnd: "2026-08-07T00:00:00.000Z", materializedAt: "2026-08-07T12:00:00.000Z", signals: [] });
+    const existing = context(); const { schemaVersion: _schemaVersion, contextHash: _contextHash, capabilities: _capabilities, ...input } = existing;
+    const frozen = buildEffectiveCampaignContext({ ...input, history: { ...input.history, outcomeEvidence: [evidence] } });
+    expect(sourceComponentsOf(frozen)).toContainEqual({ componentType: "business_outcome_evidence", componentRef: "campaign_primary", componentVersion: "a".repeat(64) });
+  });
+
   it("rejects an inauthentic context before opening a database transaction", async () => {
     const database = { transaction: vi.fn() };
     const repository = new DrizzleEffectiveCampaignContextRepository(database as never);

@@ -1938,3 +1938,18 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   entity, geçersiz revenue veya malformed timestamp fail-closed reddedilir. Henüz `EffectiveCampaignContext`
   ya da PostgreSQL materialization head'ine bağlanmadığından yeni outcome geldiğinde context invalidation mekanizması
   bu checkpoint'te iddia edilmez; bu sonraki L4→L5 persistence dilimidir.
+
+## 2026-08-10 — A10 BusinessOutcome persisted L4 evidence
+
+- `business_outcome_entity_heads` her entity için source head/revision'ı, `business_outcome_evidence_snapshots`
+  ise o head, half-open zaman penceresi ve compact envelope hash'iyle immutable L4 fact'i saklar. Head yalnız
+  dar revision/hash OCC update'iyle ilerler; snapshot update/delete reddeder, yalnız workspace tombstoning
+  purge yoluna izin verir. Her iki tablo FORCE RLS, API-role revoke, tenant indeksleri ve purge allowlist taşır.
+- Yeni normalized batch önceki entity head'e bağlı `business_outcome_evidence` context component'i için append-only
+  invalidation yazar. Materializer aktif workspace ve current head'i kilitli okur; head `updated_at` timestamp'i
+  materialization zamanı olduğundan aynı head+pencere tekrarında deterministik aynı evidence hash'i çıkar.
+- Frozen `EffectiveCampaignContext` compact evidence'i hash içinde taşır ve repository save sırasında aynı tenantta
+  exact immutable snapshot/ref/hash/head/payload yoksa fail-closed reddeder. Public projection yalnız summary ve
+  redacted evidence ref gösterir. `npm run verify:business-outcome-evidence-db`, applied migration üzerinde
+  RLS/FORCE RLS, PUBLIC/anon/authenticated/service_role revoke, head/snapshot guards, deterministic materialization
+  ve outer rollback temizliğini geçti. Otomatik composer/analysis consumer henüz eklenmedi.

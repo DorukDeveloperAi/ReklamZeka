@@ -119,6 +119,8 @@ const columns = [
   "decision_cadence_profile_revisions.profile_payload",
   "experiment_record_revisions.plan_payload",
   "experiment_record_revisions.outcome_payload",
+  // Compact outcome evidence has no category interpretation; retain it as an opaque, immutable source fact.
+  "business_outcome_evidence_snapshots.evidence_payload",
   "analysis_template_definitions.definition_payload",
   "decision_room_run_analysis_assets.resolved_timeframe",
   "decision_room_run_analysis_assets.agenda_payload",

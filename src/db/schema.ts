@@ -2047,7 +2047,7 @@ export const effectiveCampaignContextComponents = pgTable("effective_campaign_co
   check("effective_campaign_context_components_type", sql`${table.componentType} in (
     'source_snapshot', 'category_resolution', 'category_profile', 'guidance_pack', 'meta_catalog',
     'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
-    'timeframe_resolver', 'instruction_policy', 'promotion_registry', 'policy_authority'
+    'timeframe_resolver', 'instruction_policy', 'promotion_registry', 'policy_authority', 'business_outcome_evidence'
   )`),
   check("effective_campaign_context_components_required", sql`
     btrim(${table.componentRef}) <> '' and btrim(${table.componentVersion}) <> ''
@@ -2079,7 +2079,7 @@ export const effectiveCampaignContextInvalidations = pgTable("effective_campaign
   check("effective_campaign_context_invalidations_type", sql`${table.componentType} in (
     'source_snapshot', 'category_resolution', 'category_profile', 'guidance_pack', 'meta_catalog',
     'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
-    'timeframe_resolver', 'instruction_policy', 'promotion_registry', 'policy_authority'
+    'timeframe_resolver', 'instruction_policy', 'promotion_registry', 'policy_authority', 'business_outcome_evidence'
   )`),
   check("effective_campaign_context_invalidations_required", sql`
     btrim(${table.componentRef}) <> '' and btrim(${table.componentVersion}) <> ''
@@ -2385,6 +2385,60 @@ export const businessOutcomeSignals = pgTable("business_outcome_signals", {
     and ((${table.mappingStatus} = 'verified' and ${table.metaEntityRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$')
       or (${table.mappingStatus} = 'unmapped' and ${table.metaEntityRef} is null))
   ) is true`),
+]);
+
+/** Mutable per-entity head. Immutable evidence snapshots retain every historical head they used. */
+export const businessOutcomeEntityHeads = pgTable("business_outcome_entity_heads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  entityRef: text("entity_ref").notNull(),
+  currentRevision: integer("current_revision").notNull().default(0),
+  currentHeadHash: text("current_head_hash"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("business_outcome_entity_heads_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("business_outcome_entity_heads_workspace_entity_unique").on(table.workspaceId, table.entityRef),
+  check("business_outcome_entity_heads_shape", sql`(
+    ${table.entityRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.currentRevision} >= 0
+    and ((${table.currentRevision} = 0 and ${table.currentHeadHash} is null) or (${table.currentRevision} > 0 and ${table.currentHeadHash} ~ '^[a-f0-9]{64}$'))
+  ) is true`),
+]);
+
+/** Immutable L4 evidence snapshots, bound to one exact entity-head and time window. */
+export const businessOutcomeEvidenceSnapshots = pgTable("business_outcome_evidence_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  evidenceRef: text("evidence_ref").notNull(), evidenceHash: text("evidence_hash").notNull(),
+  entityRef: text("entity_ref").notNull(), sourceHeadHash: text("source_head_hash").notNull(), sourceManifestHash: text("source_manifest_hash").notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(), windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
+  materializedAt: timestamp("materialized_at", { withTimezone: true }).notNull(), evidencePayload: jsonb("evidence_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("business_outcome_evidence_snapshots_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("business_outcome_evidence_snapshots_workspace_hash_unique").on(table.workspaceId, table.evidenceHash),
+  uniqueIndex("business_outcome_evidence_snapshots_workspace_ref_unique").on(table.workspaceId, table.evidenceRef),
+  index("business_outcome_evidence_snapshots_lookup_idx").on(table.workspaceId, table.entityRef, table.sourceHeadHash, table.windowStart, table.windowEnd),
+  check("business_outcome_evidence_snapshots_shape", sql`(
+    ${table.evidenceRef} ~ '^outcome_evidence_[a-f0-9]{24}$' and ${table.evidenceHash} ~ '^[a-f0-9]{64}$'
+    and ${table.entityRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.sourceHeadHash} ~ '^[a-f0-9]{64}$' and ${table.sourceManifestHash} ~ '^[a-f0-9]{64}$'
+    and ${table.windowStart} < ${table.windowEnd} and jsonb_typeof(${table.evidencePayload}) = 'object'
+  ) is true`),
+  check("business_outcome_evidence_snapshots_payload_exact", sql`(
+    ${table.evidencePayload} #>> '{version}' = 'business-outcome-evidence/1.0.0'
+    and ${table.evidencePayload} #>> '{evidenceRef}' = ${table.evidenceRef}
+    and ${table.evidencePayload} #>> '{evidenceHash}' = ${table.evidenceHash}
+    and ${table.evidencePayload} #>> '{entityRef}' = ${table.entityRef}
+    and ${table.evidencePayload} #>> '{sourceHeadHash}' = ${table.sourceHeadHash}
+    and ${table.evidencePayload} #>> '{sourceManifestHash}' = ${table.sourceManifestHash}
+    and (${table.evidencePayload} #>> '{windowStart}')::timestamptz = ${table.windowStart}
+    and (${table.evidencePayload} #>> '{windowEnd}')::timestamptz = ${table.windowEnd}
+    and (${table.evidencePayload} #>> '{materializedAt}')::timestamptz = ${table.materializedAt}
+  ) is true`),
+  check("business_outcome_evidence_snapshots_no_forbidden_material", sql`
+    ${table.evidencePayload}::text !~* '"[^"[:space:]]*(token|secret|content_hash|raw[_-]?(payload|request|response|json)|actor|audit)"[[:space:]]*:'
+  `),
 ]);
 
 /** Append-only template revisions, each bound to one exact context and timeframe revision. */
