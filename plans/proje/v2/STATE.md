@@ -10,8 +10,8 @@
   tenant-composite foreign key'ler korunur. Materializer current group/topic head revision+hash+active
   durumunu ve semantic ref'in en güncel immutable revision'ını transaction içinde yeniden doğrular.
 - Aynı catalog hash'i mevcut current immutable catalog revision'ını tekrar kullanır. Geçerli aynı current
-  snapshot (kaynak binding sayısı dahil) audit veya invalidation yazmadan idempotent döner; süre yenilemesi
-  validity-bound yeni snapshot/binding üretebilir. Catalog head değişiminde OCC fail-closed kalır.
+  snapshot (kaynak binding sayısı dahil) audit veya invalidation yazmadan idempotent döner; expiry-bound
+  yenileme yeni snapshot/binding üretebilir. Catalog head değişiminde OCC fail-closed kalır.
 - Effective-context policy composition registry hash'i snapshot payload içindeki var olmayan bir JSON yolu
   yerine authority catalog revision payload'ından doğrulanır. Bu checkpoint capability/impact coverage veya
   action yüzeyi açmaz.

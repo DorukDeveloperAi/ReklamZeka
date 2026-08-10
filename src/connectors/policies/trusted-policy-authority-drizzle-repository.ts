@@ -185,10 +185,16 @@ export class DrizzleTrustedPolicyAuthorityRepository {
     const verifiedAt = iso(row.verified_at); const expiresAt = iso(row.expires_at);
     if (Date.parse(verifiedAt) > Date.parse(input.evaluatedAt) || Date.parse(expiresAt) <= Date.parse(input.evaluatedAt)
       || (input.snapshotRef !== undefined && (row.snapshot_ref !== input.snapshotRef || row.snapshot_hash !== input.snapshotHash))) fail("corrupt_store");
-    const payload = exact(row.snapshot_payload, ["schemaVersion", "snapshotRef", "snapshotHash", "repository", "authority", "policyAuthority"]);
+    const payload = row.snapshot_payload && typeof row.snapshot_payload === "object" && !Array.isArray(row.snapshot_payload)
+      ? row.snapshot_payload as Record<string, unknown> : fail("corrupt_store");
+    const payloadKeys = Object.keys(payload).sort();
+    const legacyKeys = ["authority", "policyAuthority", "repository", "schemaVersion", "snapshotHash", "snapshotRef"];
+    const renewedKeys = ["authority", "policyAuthority", "repository", "schemaVersion", "snapshotHash", "snapshotRef", "validity"];
+    if (JSON.stringify(payloadKeys) !== JSON.stringify(legacyKeys) && JSON.stringify(payloadKeys) !== JSON.stringify(renewedKeys)) fail("corrupt_store");
     const repository = exact(payload.repository, ["ref", "revision", "verified"]);
     const authority = exact(payload.authority, ["productionAuthoritySourceBound", "canPublish", "canApprove", "canExecute", "canWriteMeta"]);
     const policyAuthority = exact(payload.policyAuthority, ["catalogHash", "scope", "manualLocks"]);
+    if (payload.validity !== undefined && exact(payload.validity, ["expiresAt"]).expiresAt !== expiresAt) fail("corrupt_store");
     if (payload.schemaVersion !== "tenant-authority-snapshot/1.0.0" || payload.snapshotRef !== row.snapshot_ref || payload.snapshotHash !== row.snapshot_hash
       || repository.ref !== row.repository_ref || repository.revision !== row.repository_revision || repository.verified !== true
       || Object.values(authority).some((value) => value !== false) || policyAuthority.catalogHash !== row.catalog_revision_hash) fail("corrupt_store");

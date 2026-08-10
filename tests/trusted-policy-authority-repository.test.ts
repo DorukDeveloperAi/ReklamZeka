@@ -63,6 +63,18 @@ describe("DrizzleTrustedPolicyAuthorityRepository", () => {
     }
   });
 
+  it("scopes identical authority facts to their immutable snapshot without weakening tenant keys", () => {
+    const migration = readFileSync("drizzle/20260810193000_policy_authority_binding_snapshot_uniqueness.sql", "utf8");
+    expect(migration).toContain('DROP INDEX IF EXISTS "policy_authority_bindings_exact_unique"');
+    expect(migration).toContain('"policy_authority_bindings_snapshot_exact_unique"');
+    expect(migration).toContain('"authority_snapshot_id", "policy_revision_id", "binding_kind", "binding_ref", "binding_version"');
+    expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|TRUNCATE|DELETE FROM/);
+    const renderedSchema = readFileSync("src/db/schema.ts", "utf8");
+    expect(renderedSchema).toContain('policy_authority_bindings_snapshot_exact_unique');
+    expect(renderedSchema).toContain('policy_authority_bindings_snapshot_scope_fk');
+    expect(renderedSchema).toContain('policy_authority_bindings_catalog_scope_fk');
+  });
+
   it("fails closed when no current repository-verified tenant snapshot exists", async () => {
     const execute = vi.fn(async () => execute.mock.calls.length === 1 ? { rows: [{ id: workspaceId }] } : { rows: [] });
     await expect(new DrizzleTrustedPolicyAuthorityRepository({ execute } as never).load({ workspaceId,
