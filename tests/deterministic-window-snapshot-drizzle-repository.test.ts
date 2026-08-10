@@ -23,4 +23,25 @@ describe("DrizzleDeterministicWindowSnapshotRepository", () => {
       window: value.window,
     });
   });
+
+  it("materializes the complete current L2 set for one exact timeframe under the workspace lock", async () => {
+    const value = fixture();
+    const executeResults = [
+      { rows: [{ id: scope.workspaceId }] },
+      { rows: [{ feature_payload: value.feature }] },
+      { rows: [{ id: scope.workspaceId }] },
+      { rows: [{ id: "40000000-0000-4000-8000-000000000004", feature_payload: value.feature }] },
+      { rows: [] },
+    ];
+    const execute = vi.fn(async (): Promise<any> => executeResults.shift());
+    const repository = new DrizzleDeterministicWindowSnapshotRepository({
+      transaction: async (work: (tx: unknown) => Promise<unknown>) => work({ execute }),
+    } as never);
+
+    await expect(repository.materializeForTimeframe({
+      workspaceId: scope.workspaceId, metaConnectionId: scope.metaConnectionId, adAccountId: scope.adAccountId,
+      entityLevel: scope.entityLevel, externalEntityId: scope.externalEntityId, timeframe: value.window.resolvedTimeframe,
+    })).resolves.toEqual({ window: value.window, outcome: "unchanged" });
+    expect(execute).toHaveBeenCalledTimes(5);
+  });
 });

@@ -2520,3 +2520,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   kalır. Kanıt: `tests/effective-campaign-context-persistence.test.ts`,
   `tests/meta-sync-persistence.test.ts`, `tests/deterministic-window-snapshot-drizzle-repository.test.ts`,
   `npm run typecheck`, `npm run db:check`.
+
+## 2026-08-10 — A10 private timeframe-bound L2→L3 materialization
+
+- `materializeForTimeframe`, serbest bir eski window ref'i kabul etmez. Aynı workspace lock altında yalnız
+  exact connection/account/entity scope ve resolved timeframe içine bütünüyle sığan, invalidation-free L2
+  feature payloadlarını re-authenticate eder; boş, bozuk veya stale set fail-closed kalır.
+- Seçilen set saf L3 contract ile yeniden kurulur ve var olan immutable save recheck'inden geçer. Böylece L2
+  yazarlarıyla aynı workspace lock sınırında snapshot seti kaymaz; yeni tablo, HTTP/MCP, action veya Meta
+  write yüzeyi eklenmez.
+- Decision Room/template timeframe bindingi henüz bu private primitive'i çağırmaz; bu bağlantı ayrı
+  checkpoint'te kurulacaktır. Kanıt: `tests/deterministic-window-snapshot-drizzle-repository.test.ts`,
+  `tests/deterministic-window-snapshot.test.ts`, `npm run typecheck`, `git diff --check`.

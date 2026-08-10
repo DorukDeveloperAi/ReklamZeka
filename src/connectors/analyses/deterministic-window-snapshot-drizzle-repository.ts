@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { buildDeterministicWindowSnapshot, type DeterministicWindowSnapshot } from "@/analyses/deterministic-window-snapshot";
 import { assertDeterministicFeatureSnapshot, type DeterministicFeatureSnapshot } from "@/analyses/deterministic-feature-snapshot";
+import { validateResolvedAnalysisTimeframe, type ResolvedAnalysisTimeframe } from "@/analyses/timeframe-resolver";
 
 type Database = NodePgDatabase<any>;
 type Row = Readonly<Record<string, unknown>>;
@@ -29,14 +30,17 @@ export class DrizzleDeterministicWindowSnapshotRepository {
     if (window.windowRef !== input.windowRef || window.scope.workspaceId !== input.workspaceId) fail("corrupt_store");
     return Object.freeze({ state: found[0]!.invalidations === 0 ? "ready" : "stale", window });
   }
-  async save(input: Readonly<{ window: DeterministicWindowSnapshot; features: readonly DeterministicFeatureSnapshot[] }>): Promise<Readonly<{ window: DeterministicWindowSnapshot; outcome: "inserted" | "unchanged" }>> {
+  private expected(input: Readonly<{ window: DeterministicWindowSnapshot; features: readonly DeterministicFeatureSnapshot[] }>): DeterministicWindowSnapshot {
     const expected = (() => {
       try { input.features.forEach(assertDeterministicFeatureSnapshot); return buildDeterministicWindowSnapshot({ timeframe: input.window.resolvedTimeframe, features: input.features }); }
       catch { return fail("invalid_input"); }
     })();
     if (expected.windowHash !== input.window.windowHash || expected.windowRef !== input.window.windowRef) fail("invalid_input");
-    return this.database.transaction(async (transaction) => {
-      const tx = transaction as Database; const scope = expected.scope;
+    return expected;
+  }
+
+  private async persist(tx: Database, expected: DeterministicWindowSnapshot, featureCount: number): Promise<Readonly<{ window: DeterministicWindowSnapshot; outcome: "inserted" | "unchanged" }>> {
+      const scope = expected.scope;
       if (rows(await tx.execute(sql`select id from workspaces where id = ${scope.workspaceId}::uuid and lifecycle_state = 'active' for update`)).length !== 1) fail("not_found");
       const current = rows<{ id: unknown; feature_payload: unknown }>(await tx.execute(sql`
         select feature.id::text as id, feature.feature_payload from deterministic_feature_snapshots feature
@@ -44,7 +48,7 @@ export class DrizzleDeterministicWindowSnapshotRepository {
         where feature.workspace_id = ${scope.workspaceId}::uuid and feature.feature_hash = any(${expected.featureHashes}::text[])
         group by feature.id having count(invalidation.id) = 0 for share
       `));
-      if (current.length !== input.features.length) fail("source_changed");
+      if (current.length !== featureCount) fail("source_changed");
       for (const row of current) try { assertDeterministicFeatureSnapshot(row.feature_payload); } catch { fail("corrupt_store"); }
       const inserted = rows<{ id: unknown }>(await tx.execute(sql`
         insert into deterministic_window_snapshots (workspace_id, meta_connection_id, ad_account_id, entity_level, external_entity_id, window_ref, window_hash, start_date, end_date, window_payload)
@@ -57,6 +61,44 @@ export class DrizzleDeterministicWindowSnapshotRepository {
         select ${scope.workspaceId}::uuid, ${inserted[0]!.id}::uuid, feature.id, feature.feature_ref, feature.feature_hash from deterministic_feature_snapshots feature
         where feature.workspace_id = ${scope.workspaceId}::uuid and feature.feature_hash = any(${expected.featureHashes}::text[])`);
       return Object.freeze({ window: expected, outcome: "inserted" as const });
+  }
+
+  async save(input: Readonly<{ window: DeterministicWindowSnapshot; features: readonly DeterministicFeatureSnapshot[] }>): Promise<Readonly<{ window: DeterministicWindowSnapshot; outcome: "inserted" | "unchanged" }>> {
+    const expected = this.expected(input);
+    return this.database.transaction(async (transaction) => this.persist(transaction as Database, expected, input.features.length));
+  }
+
+  /** Resolves all current, valid L2 features for one exact scope/timeframe under a workspace lock. */
+  async materializeForTimeframe(input: Readonly<{
+    workspaceId: string; metaConnectionId: string; adAccountId: string;
+    entityLevel: "campaign" | "ad_set" | "ad"; externalEntityId: string;
+    timeframe: ResolvedAnalysisTimeframe;
+  }>): Promise<Readonly<{ window: DeterministicWindowSnapshot; outcome: "inserted" | "unchanged" }>> {
+    try { validateResolvedAnalysisTimeframe(input.timeframe); } catch { return fail("invalid_input"); }
+    if (!input.workspaceId || !input.metaConnectionId || !input.adAccountId || !input.externalEntityId
+      || !["campaign", "ad_set", "ad"].includes(input.entityLevel)) fail("invalid_input");
+    return this.database.transaction(async (transaction) => {
+      const tx = transaction as Database;
+      if (rows(await tx.execute(sql`select id from workspaces where id = ${input.workspaceId}::uuid and lifecycle_state = 'active' for update`)).length !== 1) fail("not_found");
+      const selected = rows<{ feature_payload: unknown }>(await tx.execute(sql`
+        select feature.feature_payload from deterministic_feature_snapshots feature
+        where feature.workspace_id = ${input.workspaceId}::uuid
+          and feature.meta_connection_id = ${input.metaConnectionId}::uuid
+          and feature.ad_account_id = ${input.adAccountId}::uuid
+          and feature.entity_level = ${input.entityLevel}::meta_insight_entity_level
+          and feature.external_entity_id = ${input.externalEntityId}
+          and feature.start_date >= ${input.timeframe.startDate}::date
+          and feature.end_date <= ${input.timeframe.endDate}::date
+          and not exists (select 1 from deterministic_feature_snapshot_invalidations invalidation
+            where invalidation.workspace_id = feature.workspace_id and invalidation.feature_snapshot_id = feature.id)
+        order by feature.feature_ref for share
+      `));
+      if (selected.length === 0) fail("not_found");
+      const features: DeterministicFeatureSnapshot[] = [];
+      try { for (const row of selected) { assertDeterministicFeatureSnapshot(row.feature_payload); features.push(row.feature_payload); } }
+      catch { return fail("corrupt_store"); }
+      const window = buildDeterministicWindowSnapshot({ timeframe: input.timeframe, features });
+      return this.persist(tx, window, features.length);
     });
   }
 }

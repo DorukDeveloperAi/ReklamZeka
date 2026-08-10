@@ -447,6 +447,9 @@
     scope'taki, hash-authenticated ve invalidation-free immutable artefactlar olarak kaydedilir; L1 kaynak
     değişimi exact L2 component üzerinden ilgili frozen context'leri invalidate eder. Yeni ready analytical
     context için feature/window ikilisinden biri eksikse fail-closed olur.
+  - [x] Private L2→L3 timeframe materializer: caller'ın bir window ref'i seçmesine izin vermeden, aynı kısa
+    workspace kilidi altında exact scope/timeframe için tüm current, invalidation-free L2 feature setini okur
+    ve deterministic L3 artefact olarak saklar. Decision Room bindingi sonraki checkpoint'tir.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.
