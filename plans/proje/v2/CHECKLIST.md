@@ -450,6 +450,9 @@
   - [x] Private L2→L3 timeframe materializer: caller'ın bir window ref'i seçmesine izin vermeden, aynı kısa
     workspace kilidi altında exact scope/timeframe için tüm current, invalidation-free L2 feature setini okur
     ve deterministic L3 artefact olarak saklar. Decision Room bindingi sonraki checkpoint'tir.
+  - [x] Decision Room L3 admission gate: yeni run asset'i yalnız ready, blockersız ve hash-biçimli frozen
+    L2 feature + L3 window referanslarını taşıyan context ile çalışır; L1 observation ref'i L2 ref'iyle
+    karıştırılmaz. Tarihsel frozen run replay davranışı değişmez.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.

@@ -175,6 +175,12 @@ export function validateDecisionRoomAnalysisRuntimeAssets(
     || !Array.isArray(assets.checks) || assets.checks.length < 1 || assets.checks.length > MAX_CHECKS) {
     throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
   }
+  if (assets.context.data.trustStatus !== "ready" || assets.context.data.blockers.length !== 0
+    || assets.context.data.featureRefs.length === 0 || assets.context.data.windowRefs.length === 0
+    || assets.context.data.featureRefs.some((featureRef) => !/^feature_[a-f0-9]{24}$/.test(featureRef))
+    || assets.context.data.windowRefs.some((windowRef) => !/^window_[a-f0-9]{24}$/.test(windowRef))) {
+    throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
+  }
   if (assets.requestedPasses.length < 1 || new Set(assets.requestedPasses).size !== assets.requestedPasses.length
     || assets.requestedPasses.some((pass) => !PASSES.includes(pass))) {
     throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
@@ -213,7 +219,7 @@ export function validateDecisionRoomAnalysisRuntimeAssets(
       || !Array.isArray(check.expectedSnapshotRefs) || check.expectedSnapshotRefs.length < 1
       || new Set(check.expectedSnapshotRefs).size !== check.expectedSnapshotRefs.length
       || check.expectedSnapshotRefs.some((snapshot: string) => !REF.test(snapshot)
-        || !assets.context.data.featureRefs.includes(snapshot))) {
+        || !assets.context.data.snapshotRefs.includes(snapshot))) {
       throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
     }
     identities.add(identity);

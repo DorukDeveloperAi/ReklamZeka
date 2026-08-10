@@ -2532,3 +2532,17 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Decision Room/template timeframe bindingi henüz bu private primitive'i çağırmaz; bu bağlantı ayrı
   checkpoint'te kurulacaktır. Kanıt: `tests/deterministic-window-snapshot-drizzle-repository.test.ts`,
   `tests/deterministic-window-snapshot.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 Decision Room L3 admission boundary
+
+- Yeni Decision Room analysis run'ı, yalnız `ready`/blockersız frozen context'te en az bir canonical L2
+  `feature_…` ve L3 `window_…` referansı varsa başlar. Context persistence bu ref'leri already exact
+  tenant/mirror/entity L2/L3 artefactlarına bağladığından, run asset loader invalidated context'i zaten
+  seçmez; bu gate serbest veya pre-L3 context'i deterministic olarak reddeder.
+- Observation reader'ın L1 `snapshotRef` çıktısı context'in `snapshotRefs` listesine karşı doğrulanır;
+  önceki yanlış L2 `featureRefs` karşılaştırması kaldırıldı. Böylece L1 evidence ile L2 feature kimliği
+  birbirinin yerine geçirilemez.
+- Mevcut claim edilmiş run asset'inin historical replay yolu yeni current-admission kontrolüne zorlanmaz.
+  Bu checkpoint HTTP/action/Meta write eklemez; current context'i L3'e bağlayan private authoring/composition
+  akışı hâlâ sonraki bağımlılıktır. Kanıt: `tests/decision-room-analysis-runtime.test.ts`,
+  `npm run typecheck`, `git diff --check`.

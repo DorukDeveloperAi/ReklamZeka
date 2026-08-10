@@ -23,6 +23,8 @@ import { buildEffectiveGuidancePack, createGuidanceRegistry } from "@/domain/gui
 const now = "2026-08-07T12:00:00.000Z";
 const workspaceId = "10000000-0000-4000-8000-000000000001";
 const snapshotRef = "snapshot_l2_safe";
+const featureRef = "feature_aaaaaaaaaaaaaaaaaaaaaaaa";
+const windowRef = "window_bbbbbbbbbbbbbbbbbbbbbbbb";
 const timeframe = resolveAnalysisTimeframe({
   timeframe: { kind: "rolling", days: 1, timezone: "Europe/Istanbul" },
   comparison: "none",
@@ -51,8 +53,8 @@ function context() {
     categories: [], guidance, policies: [],
     cadence: { profileRef: "cadence_safe", decision: "eligible", reason: "window_open", cooldownUntil: null },
     data: {
-      trustStatus: "ready", snapshotRefs: ["snapshot_source_safe"], featureRefs: [snapshotRef],
-      windowRefs: ["window_safe"], blockers: [],
+      trustStatus: "ready", snapshotRefs: [snapshotRef], featureRefs: [featureRef],
+      windowRefs: [windowRef], blockers: [],
     },
     history: { changeRefs: [], decisionRefs: [], experimentRefs: [], practiceRefs: [], outcomeRefs: [] },
     versions: {
@@ -195,6 +197,20 @@ describe("DecisionRoomDeterministicAnalysisRuntime", () => {
       expect.objectContaining<Partial<DecisionRoomAnalysisRuntimeError>>({ code: "evidence_not_frozen" }),
     );
     expect(storage.ledger()).toHaveLength(0);
+  });
+
+  it("rejects a current Decision Room asset without frozen L3 evidence", async () => {
+    const withoutWindow = assets();
+    const { schemaVersion: _schemaVersion, contextHash: _contextHash, capabilities: _capabilities, ...inputContext } = withoutWindow.context;
+    const contextWithoutWindow = buildEffectiveCampaignContext({ ...inputContext, data: {
+      ...inputContext.data, featureRefs: [], windowRefs: [],
+    } });
+    const runtime = new DecisionRoomDeterministicAnalysisRuntime(
+      { loadExact: async () => ({ ...withoutWindow, context: contextWithoutWindow,
+        agenda: buildAnalysisAgenda({ context: contextWithoutWindow, resolvedTimeframe: timeframe, requestedPasses: ["ad"] }) }) },
+      { read: vi.fn() }, drafts().port,
+    );
+    await expect(runtime.execute(input())).rejects.toMatchObject({ code: "asset_not_bound" });
   });
 
   it("fails closed when the frozen agenda payload is stale or tampered", async () => {
