@@ -3,6 +3,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { EffectiveAnalysisContextNotReadySource, EffectiveAnalysisContextRequest,
   EffectiveAnalysisContextSource } from "@/application/effective-analysis-context-composer";
 import { CurrentDecisionCadenceReader, type CurrentDecisionCadence } from "@/connectors/decisions/current-decision-cadence-reader";
+import { CurrentReviewedGuidanceReader, type CurrentReviewedGuidanceManifest } from "@/connectors/guidance/current-reviewed-guidance-reader";
 import { CurrentMetaHierarchyConfigReader, type CurrentMetaHierarchyConfig } from "@/connectors/meta/current-meta-hierarchy-config-reader";
 import * as schema from "@/db/schema";
 
@@ -38,7 +39,8 @@ const NO_SOURCE_CAPABILITIES = Object.freeze({
 export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
   constructor(private readonly database: Database,
     private readonly hierarchyReader: Pick<CurrentMetaHierarchyConfigReader, "readCurrent"> = new CurrentMetaHierarchyConfigReader(),
-    private readonly cadenceReader: Pick<CurrentDecisionCadenceReader, "readCurrentInTransaction"> = new CurrentDecisionCadenceReader(database)) {}
+    private readonly cadenceReader: Pick<CurrentDecisionCadenceReader, "readCurrentInTransaction"> = new CurrentDecisionCadenceReader(database),
+    private readonly guidanceReader: Pick<CurrentReviewedGuidanceReader, "readCurrentInTransaction"> = new CurrentReviewedGuidanceReader()) {}
 
   async loadCurrent(input: EffectiveAnalysisContextRequest): Promise<EffectiveAnalysisContextSource> {
     if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).length !== 4
@@ -67,6 +69,12 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
       if (cadence.decision.evaluatedAt !== capturedAt || cadence.decision.actionAuthority !== "none") {
         throw new Error("corrupt_store");
       }
+      // Validation only. This reader does not choose topics, bindings, budgets,
+      // or a reviewed set; those selection inputs remain unavailable here.
+      const guidance: CurrentReviewedGuidanceManifest = await this.guidanceReader.readCurrentInTransaction(
+        tx, input.workspaceId, capturedAt,
+      );
+      if (guidance.capturedAt !== capturedAt || !Array.isArray(guidance.reviewedSets)) throw new Error("corrupt_store");
       const unavailable: EffectiveAnalysisContextNotReadySource = Object.freeze({
         status: "not_ready", capturedAt, reason: "current_source_bundle_unavailable", capabilities: NO_SOURCE_CAPABILITIES,
       });

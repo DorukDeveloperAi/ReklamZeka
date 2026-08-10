@@ -2098,3 +2098,19 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   doğruladıktan sonra cadence reader'ı yalnız validation için çağırır. Guidance/data/history/category/
   lifecycle/authority closure henüz mevcut olmadığından bundle yine dürüstçe `not_ready` döner; HTTP/UI,
   Decision Room, action authority veya schema/migration eklenmedi.
+
+## 2026-08-10 — A10.4c-7 transaction-local reviewed-guidance manifest
+
+- Server-private `CurrentReviewedGuidanceReader` caller-owned aynı read-only snapshot içinde active
+  workspace ve exact transaction clock'u doğrular; latest source/card/binding/set revisionlarını canonical
+  immutable record hash'i, lifecycle/timestamp sınırları ve mevcut `createGuidanceRegistry` cap/reference
+  sözleşmesiyle denetler. Her current reviewed set için sıra korunarak set/card/source key-ref/version/hash
+  manifesti döner. Stale review, unpublished/archived/missing dependency, future timestamp veya tahrif
+  edilmiş payload/revision fail-closed reddedilir.
+- Reader bilinçli olarak topic, account/category scope, budget veya set selection seçmez. Current-source
+  seam onu yalnız validation için aynı transactionda çağırır; data/history/category/lifecycle/authority ve
+  selection closure eksik olduğundan sonuç hâlâ `not_ready` ve tüm capability bayrakları false'tur. HTTP/UI,
+  Decision Room, action authority ve schema/migration eklenmedi.
+- Kanıt: `tests/current-reviewed-guidance-reader.test.ts`,
+  `tests/current-effective-analysis-context-source-drizzle-reader.test.ts`, `npx tsc --noEmit` ve
+  `git diff --check`.

@@ -285,6 +285,11 @@
     READ ONLY` snapshot'ını açmayı sürdürür; mevcut current-source snapshot'ında ise nested transaction
     açmadan exact aynı tx clock ile ref/revision/version/hash/payload ve advisory domain sonucu doğrulanır.
     Source seam bunu yalnız validation için kullanır ve halen `not_ready`, tüm capability'ler false kalır.
+  - [x] A10.4c-7 transaction-local reviewed-guidance manifest validation: caller-owned aynı snapshotta
+    latest source/card/binding/set revisionları canonical record hash, lifecycle/timestamp ve registry cap
+    sözleşmesiyle doğrulanır; her current reviewed set için sıralı exact set/card/source ref/version/hash
+    manifesti üretilir. Reader topic/scope/budget/set selection yapmaz; stale/unpublished/archived/missing/
+    future/tampered revision fail-closed olur ve source seam validation sonrası dahi `not_ready` kalır.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.
