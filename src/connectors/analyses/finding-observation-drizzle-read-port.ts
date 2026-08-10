@@ -48,12 +48,24 @@ export type FindingObservationFeatureSourceItem = Readonly<{
   dailyInsightId: string;
   snapshotRef: string;
   contentHash: string;
+  sourcePayloadHash: string;
 }>;
 
 export type FindingObservationFeatureSourceRead = Readonly<{
   read: FindingObservationReadResult;
   sourceManifest: readonly FindingObservationFeatureSourceItem[];
 }>;
+
+// The L2 writer must accept only a read result produced by this adapter. The
+// proof is runtime-opaque: callers can use an issued value but cannot mint a
+// structurally similar object that reaches persistence.
+const featureSourceReadProofs = new WeakSet<object>();
+
+export function assertRepositoryFeatureSourceRead(value: unknown): asserts value is FindingObservationFeatureSourceRead {
+  if (!value || typeof value !== "object" || !featureSourceReadProofs.has(value)) {
+    throw new FindingObservationReadAdapterError("integrity_violation", "L2 source manifest repository proof taşımıyor");
+  }
+}
 
 export type FindingObservationReadAdapterErrorCode =
   | "invalid_query"
@@ -542,6 +554,7 @@ export class DrizzleFindingObservationReadPort implements FindingObservationRead
         dailyInsightId: internalId,
         snapshotRef: `snapshot_${digest(`${internalId}:${row.contentHash}`).slice(0, 32)}`,
         contentHash: row.contentHash,
+        sourcePayloadHash: row.sourcePayloadHash,
       }));
       const snapshotRefs = sourceManifest.length > 0
         ? sourceManifest.map(({ snapshotRef }) => snapshotRef)
@@ -555,10 +568,12 @@ export class DrizzleFindingObservationReadPort implements FindingObservationRead
         qualityStatus: assessment.reasons.length === 0 ? "ready" : "degraded",
         qualityReasonCodes: assessment.reasons,
       });
-      return Object.freeze({
+      const featureRead = Object.freeze({
         read,
         sourceManifest: Object.freeze([...sourceManifest].sort((left, right) => left.snapshotRef.localeCompare(right.snapshotRef))),
       });
+      featureSourceReadProofs.add(featureRead);
+      return featureRead;
     } catch (error) {
       if (error instanceof FindingObservationReadAdapterError) throw error;
       fail("persistence_failure", "Canonical insight read başarısız", error);

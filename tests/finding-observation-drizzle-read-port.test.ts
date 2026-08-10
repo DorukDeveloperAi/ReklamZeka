@@ -5,6 +5,7 @@ import {
   buildFindingObservations,
 } from "@/analyses/finding-observation-builder";
 import {
+  assertRepositoryFeatureSourceRead,
   DrizzleFindingObservationReadPort,
   FINDING_OBSERVATION_SETTLEMENT_POLICY_VERSION,
   FindingObservationReadAdapterError,
@@ -140,7 +141,10 @@ describe("DrizzleFindingObservationReadPort", () => {
       dailyInsightId: ids.insight,
       snapshotRef: expect.stringMatching(/^snapshot_[a-f0-9]{32}$/),
       contentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      sourcePayloadHash: "source-hash-1",
     }]);
+    expect(() => assertRepositoryFeatureSourceRead(featureRead)).not.toThrow();
+    expect(() => assertRepositoryFeatureSourceRead({ ...featureRead })).toThrowError(FindingObservationReadAdapterError);
     expect(JSON.stringify(featureRead.read)).not.toContain(ids.insight);
   });
 
