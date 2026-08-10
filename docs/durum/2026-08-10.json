@@ -4,6 +4,60 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "6a2ec7a98",
+      "tarih": "2026-08-10",
+      "konu": "feat(a14): scope approval inbox by campaign context",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "b2180c942",
+      "tarih": "2026-08-10",
+      "konu": "feat(a14): bind briefs to persisted context state",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "6df768290",
+      "tarih": "2026-08-10",
+      "konu": "feat(a14): expose read-only campaign context",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "025aab9fe",
+      "tarih": "2026-08-10",
+      "konu": "feat(a14): derive read-only campaign recommendations",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "76b74e4a3",
+      "tarih": "2026-08-10",
+      "konu": "feat(a14): scope approval reads by campaign hierarchy",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "eca77a011",
+      "tarih": "2026-08-10",
+      "konu": "feat(a14): scope approval queue reads by entity",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "cf83522f6",
       "tarih": "2026-08-10",
       "konu": "feat(a14): expose execution safety status",
@@ -83,81 +137,27 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "46e402276",
-      "tarih": "2026-08-10",
-      "konu": "feat(a13): add disabled execution admission gate",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "e913e65bf",
-      "tarih": "2026-08-10",
-      "konu": "feat(a13): add typed Meta write spec boundary",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "4e5d6e4b8",
-      "tarih": "2026-08-10",
-      "konu": "feat(a08): add portfolio capability reader",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "e6bdb2d88",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): sequence interactive campaign briefs",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "dacf92810",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): compose timeframe-bound L3 contexts",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "23a8f1b8f",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): require L3 evidence for decision runs",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 48
-    },
-    {
-      "kapsam": "fix",
-      "adet": 5
+      "adet": 49
     },
     {
       "kapsam": "test",
       "adet": 5
     },
     {
+      "kapsam": "fix",
+      "adet": 4
+    },
+    {
       "kapsam": "docs",
       "adet": 2
     }
   ],
-  "isSayisi": 221,
+  "isSayisi": 227,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-10",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "3d73e12990e5"
+  "damga": "e99f8a62ec4b"
 }
