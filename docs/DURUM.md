@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: d413a87d7470 -->
+<!-- durum-damga: 39950fea3c12 -->
 
 ## Künye
 
@@ -14,36 +14,36 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 162 |
+| iş commit'i (tüm geçmiş) | 175 |
 | ilk / son iş | 2026-08-06 / 2026-08-10 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-10 | `feat` | wire private analysis context composer | `add0d55b4` |
+| 2026-08-10 | `docs` | record ready source bundle evidence | `4c85d52ad` |
+| 2026-08-10 | `feat` | assemble ready analysis source bundles | `ec66e64c6` |
+| 2026-08-10 | `feat` | bind authority to source snapshots | `4fcf60ffe` |
+| 2026-08-10 | `test` | cover guidance selection revisions | `fe302fdfd` |
+| 2026-08-10 | `feat` | compose selected guidance snapshots | `b8adfacd0` |
+| 2026-08-10 | `feat` | compose categories in source snapshots | `7a23913f7` |
+| 2026-08-10 | `feat` | bind guidance selections to campaigns | `e0ddf6972` |
+| 2026-08-10 | `feat` | validate reviewed guidance manifests | `ede8d665f` |
+| 2026-08-10 | `feat` | share cadence snapshot reads | `695003a0e` |
+| 2026-08-10 | `feat` | validate current Meta hierarchy config | `59c51bc78` |
+| 2026-08-10 | `feat` | add current source snapshot seam | `20cef249d` |
+| 2026-08-10 | `fix` | harden current cadence reader | `62daebfec` |
 | 2026-08-10 | `feat` | compose evidence-bound analysis contexts | `f64d77c3c` |
 | 2026-08-10 | `test` | cover cadence context live verifier | `1d2ee6e20` |
-| 2026-08-10 | `feat` | bind cadence evidence to contexts | `5c5f4a382` |
-| 2026-08-10 | `feat` | compose current category profiles | `cd3026f76` |
-| 2026-08-10 | `feat` | freeze meta analysis config evidence | `f7089add3` |
-| 2026-08-10 | `fix` | harden agenda replay and guidance guards | `593a8a249` |
-| 2026-08-10 | `feat` | expose frozen outcome evidence to findings | `57dfc870b` |
-| 2026-08-10 | `feat` | compose persisted outcome evidence into context | `aa8935439` |
-| 2026-08-10 | `feat` | persist outcome evidence snapshots | `e84ca60ed` |
-| 2026-08-10 | `feat` | add compact business outcome evidence | `7cafd712a` |
-| 2026-08-10 | `feat` | add bounded business outcome reads | `ec1e91b6e` |
-| 2026-08-10 | `feat` | add server-bound business outcome intake | `95b840c88` |
-| 2026-08-10 | `feat` | persist normalized business outcomes | `9fc14ef87` |
-| 2026-08-10 | `feat` | expose experiment evidence lifecycle | `7c5cb9999` |
-| 2026-08-10 | `feat` | add server-bound cadence publication | `c2269a8f3` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 38
-- `docs        ` ████████ 13
-- `fix         ` ███ 5
+- `feat        ` ████████████████████████ 43
+- `docs        ` ███ 6
+- `fix         ` ███ 6
 - `chore       ` ██ 3
-- `test        ` █ 1
+- `test        ` █ 2
 
 ## Planlar
 

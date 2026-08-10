@@ -4,6 +4,123 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "add0d55b4",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): wire private analysis context composer",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4c85d52ad",
+      "tarih": "2026-08-10",
+      "konu": "docs(a10): record ready source bundle evidence",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "ec66e64c6",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): assemble ready analysis source bundles",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4fcf60ffe",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): bind authority to source snapshots",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "fe302fdfd",
+      "tarih": "2026-08-10",
+      "konu": "test(a10): cover guidance selection revisions",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "b8adfacd0",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): compose selected guidance snapshots",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7a23913f7",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): compose categories in source snapshots",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e0ddf6972",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): bind guidance selections to campaigns",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ede8d665f",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): validate reviewed guidance manifests",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "695003a0e",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): share cadence snapshot reads",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "59c51bc78",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): validate current Meta hierarchy config",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "20cef249d",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): add current source snapshot seam",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "62daebfec",
+      "tarih": "2026-08-10",
+      "konu": "fix(a10): harden current cadence reader",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
       "hash": "f64d77c3c",
       "tarih": "2026-08-10",
       "konu": "feat(a10): compose evidence-bound analysis contexts",
@@ -20,137 +137,20 @@
       "kapsam": [
         "test"
       ]
-    },
-    {
-      "hash": "5c5f4a382",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): bind cadence evidence to contexts",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "cd3026f76",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): compose current category profiles",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "f7089add3",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): freeze meta analysis config evidence",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "593a8a249",
-      "tarih": "2026-08-10",
-      "konu": "fix(a10): harden agenda replay and guidance guards",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "57dfc870b",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): expose frozen outcome evidence to findings",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "aa8935439",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): compose persisted outcome evidence into context",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "e84ca60ed",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): persist outcome evidence snapshots",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "7cafd712a",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): add compact business outcome evidence",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "ec1e91b6e",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): add bounded business outcome reads",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "95b840c88",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): add server-bound business outcome intake",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "9fc14ef87",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): persist normalized business outcomes",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "7c5cb9999",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): expose experiment evidence lifecycle",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "c2269a8f3",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): add server-bound cadence publication",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 38
+      "adet": 43
     },
     {
       "kapsam": "docs",
-      "adet": 13
+      "adet": 6
     },
     {
       "kapsam": "fix",
-      "adet": 5
+      "adet": 6
     },
     {
       "kapsam": "chore",
@@ -158,10 +158,10 @@
     },
     {
       "kapsam": "test",
-      "adet": 1
+      "adet": 2
     }
   ],
-  "isSayisi": 162,
+  "isSayisi": 175,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-10",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "d413a87d7470"
+  "damga": "39950fea3c12"
 }
