@@ -91,7 +91,7 @@ klasöre, `aide filing donan` klasörden çalışana. Detay: `docs/filing-katman
 | **çalışan kopya** | Claude'un günlük kullandığı hâl (`~/.claude`). Hesaba bağlı — değişince gider. |
 | **`filing yaz`** | çalışan kopya **──▶ KLASÖR**. Tam ayna: silme de yansır, sır elenir. YIKICI. |
 | **`filing donan`** | **KLASÖR ──▶** çalışan kopya. Yeni hesap buradan donanır. **Asla ezmez, asla silmez.** |
-| **yüzey** (surface) | taşınan bir kalem (`memory`, `pm-persona`, `plan-mode` … 16 tane). (Sınıf 0'daki render-katı "yüzey"den AYRIDIR.) |
+| **yüzey** (surface) | taşınan bir kalem (`memory`, `pm-persona`, `plan-mode` …). **Sayı yazılmaz** — tek ölçüsü `bilgi.ts → YUZEYLER` (2026-08-10: 19 girdi = 17 ⊕ 2 şaltere-tabi codex). (Sınıf 0'daki render-katı "yüzey"den AYRIDIR.) |
 | **vendor** | aide'ın kanonunu TÜKETEN ajan ürünü (`claude` · `codex`). Kapalı küme. `claude` şaltersizdir — taşıyıcının kendisidir; ek her vendor `config.json → vendors.<v>.enabled` ile açılır ve **varsayılanı KAPALI**dır. |
 | **projeksiyon** | kanonun bir vendor ÇERÇEVESİNE deterministik çevirisi (0 token). Üç katman: **yol** (`vendorRel`) · **içerik** (projektör) · **kayıt** (hook emitter). Gövde passthrough, değişen yalnız çerçeve. Detay: `docs/vendor-katmani.md` |
 | **ayrık kanon** | her kanon dosyasının TEK sahip yüzeyi olması kuralı — `filing yaz` tam ayna olduğu için iki vendor aynı dizine aynalasa biri ötekini silerdi (vendor yüzeyleri `filing/vendor/<v>/` altına rezerve). |
