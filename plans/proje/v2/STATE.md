@@ -2368,3 +2368,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   `policy_authority` context sürümlerini invalidate eder ve aynı transaction'da audit hash-chain olayı üretir.
   HTTP/UI/MCP/action yüzeyi yoktur ve tüm yetkiler false kalır. Topic private writer, complete-positive live
   relational fixture ve gerçek browser acceptance hâlâ açık bağımlılıklardır.
+
+## 2026-08-10 — A10/A12 L5 compact agent context budget
+
+- Yeni saf `compact-agent-context/1.0.0`, yalnız authentic frozen `EffectiveCampaignContext`,
+  `AnalysisAgenda` ve deterministic finding run'ı kabul eder. Context/finding/agenda bağı veya hash'i
+  değişirse fail-closed olur; L0 raw/secret alan, dahili tenant/entity/snapshot referansı ve write authority
+  hiçbir çıktıya girmez.
+- Bağlam, public-safe aliaslarla yalnız gerekli meta/data/guidance/finding özetini taşır. Entity, finding,
+  guidance card ve source limitleri deterministic öncelik sırasıyla uygulanır; her kesinti `omitted`,
+  `truncated`, `moreAvailable` ve neden kodlarıyla görünürdür. Time-series ve drill-down bu saf pakette
+  sıfırdır; bunların typed transportu ile L2/L3 Postgres materialization hâlâ açık kalır.
+- Kanıt: `tests/compact-agent-context.test.ts`, `npm run typecheck`, `git diff --check`.

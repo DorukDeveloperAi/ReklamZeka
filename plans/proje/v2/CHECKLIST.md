@@ -493,6 +493,10 @@
   - [ ] Official Meta source claim guard, semantic retrieval/ranking ve analysis-run binding.
 - [ ] Act/test/observe/no-change + cadence ihlali proposal suppression eval'i.
 - [ ] L4/L5 compact context, bounded drill-down ve raw L0 access negatifleri.
+  - [x] Saf L5 compact-agent-context sözleşmesi: authentic frozen context/agenda/finding-run ile
+    deterministik public projection, entity/finding/guidance/source hard budget, açık
+    truncation/`moreAvailable` ve raw/internal-ref negatifleri. Drill-down transportu ve L2/L3
+    materialization bu checkpoint'in dışındadır.
 - [ ] draft_advised_practice authority boundary ve standardization bypass negatifleri.
 - [ ] ReklamZeka OrchestratorProfile ve altı vendor-agnostic skill manifesti/conformance eval'i.
 - [ ] RuleCoach owner+Meta source+evidence+conflict deliberation ve publish-bypass negatifleri.
