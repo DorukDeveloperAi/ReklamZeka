@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { AnalysisAgenda, AnalysisPassKey } from "@/analyses/agenda";
 import type { DeterministicAnalysisRun, DeterministicAnalysisRecord } from "@/analyses/deterministic-analysis";
+import type { BusinessOutcomeEvidenceSnapshot } from "@/analyses/business-outcome-evidence";
 import type { EffectiveCampaignContext } from "@/analyses/effective-campaign-context";
 import { ANALYSIS_METRICS, type AnalysisMetric } from "@/analyses/schema";
 import { inspectMetaPersistenceWrite } from "@/domain/meta/data-lifecycle";
@@ -10,7 +11,7 @@ import {
   type MetaMetricAggregationResult,
 } from "@/domain/meta/insights/metric-engine";
 
-export const DETERMINISTIC_FINDING_ENGINE_VERSION = "deterministic-finding-engine/1.0.0" as const;
+export const DETERMINISTIC_FINDING_ENGINE_VERSION = "deterministic-finding-engine/1.1.0" as const;
 
 export type FindingEntityType = "account" | "campaign" | "ad_set" | "ad" | "creative";
 export type FindingHierarchyNode = Readonly<{
@@ -72,6 +73,16 @@ export type DeterministicFindingRun = Readonly<{
   agendaId: string;
   contextHash: string;
   analysisRunId: string;
+  /** Compact L4 outcome evidence frozen in the same context; never a Meta metric or action input. */
+  outcomeEvidence: readonly Readonly<{
+    evidenceRef: string;
+    evidenceHash: string;
+    entityRef: string;
+    windowStart: string;
+    windowEnd: string;
+    materializedAt: string;
+    summary: BusinessOutcomeEvidenceSnapshot["summary"];
+  }>[];
   findings: readonly DeterministicFinding[];
   capabilities: Readonly<{
     containsRawData: false;
@@ -136,6 +147,22 @@ function authenticAnalysis(run: DeterministicAnalysisRun): boolean {
 function authenticMetrics(result: MetaMetricAggregationResult): boolean {
   return result.catalogVersion === META_METRIC_FORMULA_CATALOG_VERSION
     && digest({ catalogVersion: result.catalogVersion, metrics: result.metrics }) === result.resultHash;
+}
+
+function compactOutcomeEvidence(context: EffectiveCampaignContext): DeterministicFindingRun["outcomeEvidence"] {
+  const evidence = context.history.outcomeEvidence ?? [];
+  if (evidence.some((entry) => entry.entityRef !== context.identity.entityRef)) {
+    throw new DeterministicFindingEngineError("scope_mismatch");
+  }
+  return Object.freeze(evidence.map((entry) => Object.freeze({
+    evidenceRef: entry.evidenceRef,
+    evidenceHash: entry.evidenceHash,
+    entityRef: entry.entityRef,
+    windowStart: entry.windowStart,
+    windowEnd: entry.windowEnd,
+    materializedAt: entry.materializedAt,
+    summary: entry.summary,
+  })).sort((left, right) => compareText(left.evidenceRef, right.evidenceRef)));
 }
 
 function passFor(entityType: FindingEntityType): AnalysisPassKey {
@@ -388,6 +415,7 @@ export function buildDeterministicFindings(input: Readonly<{
     agendaId: input.agenda.agendaId,
     contextHash: input.context.contextHash,
     analysisRunId: input.analysis.runId,
+    outcomeEvidence: compactOutcomeEvidence(input.context),
     findings: Object.freeze(findings),
     capabilities: { containsRawData: false as const, canAuthorizeAction: false as const, canExecuteWrite: false as const },
   };

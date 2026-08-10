@@ -1963,3 +1963,12 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   zamanından yeniyse context hiç oluşturulmaz/persist edilmez. Başarılı akışta store zaten exact tenant snapshot
   ref/hash/head/payload doğrulamasını yapar. Response bütün publish/approve/execute/Meta-write capability'lerini
   false tutar; HTTP/MCP/UI/otomatik analysis consumer bu checkpoint'te eklenmedi.
+
+## 2026-08-10 — A10 BusinessOutcome L5 finding consumer
+
+- `deterministic-finding-engine/1.1.0`, authentic frozen context'teki entity-aligned BusinessOutcome L4 envelope'ını
+  finding run'ın hash'e bağlı `outcomeEvidence` alanına compact olarak taşır. Evidence ref/hash, pencere,
+  materialization zamanı ve summary görünür; raw source/CSV, actor/audit, source manifest veya Meta credential görünmez.
+- Outcome evidence Meta metric veya success/proxy metriği değildir (`metaProxyEligible:false` korunur); finding/teklif
+  eligibility'sini değiştirmez ve result hâlâ action authorization/Meta write capability vermez. Entity-scope dışı
+  evidence L5 consumer tarafından fail-closed reddedilir.

@@ -332,7 +332,8 @@
     source-component invalidation ve frozen context save sırasında exact snapshot/hash/head payload doğrulaması.
   - [x] Server-private materializer→context composer: workspace/entity base frozen context'ten türetilir,
     caller evidence reddedilir ve future/cross-entity evidence context persistence'a ulaşamaz.
-  - [ ] L5 analysis consumer'ları.
+  - [x] L5 analysis consumer: deterministic finding run yalnız authentic frozen context'teki compact
+    BusinessOutcome evidence'i hash'e bağlı `outcomeEvidence` olarak taşır; Meta metriği/proxy'si veya action input'u yapmaz.
 
 ## A11 — Bütçe planlama
 

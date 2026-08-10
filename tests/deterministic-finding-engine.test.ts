@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildAnalysisAgenda } from "@/analyses/agenda";
 import { analyze } from "@/analyses/deterministic-analysis";
 import { buildEffectiveCampaignContext } from "@/analyses/effective-campaign-context";
+import { buildBusinessOutcomeEvidence } from "@/analyses/business-outcome-evidence";
 import {
   buildDeterministicFindings,
   DeterministicFindingEngineError,
@@ -16,7 +17,7 @@ import { aggregateMetaMetrics } from "@/domain/meta/insights/metric-engine";
 const workspaceId = "finding-workspace";
 const snapshots = ["snapshot-a", "snapshot-b"] as const;
 
-function context(protectedGuidance = true) {
+function context(protectedGuidance = true, includeOutcomeEvidence = false) {
   const sources = protectedGuidance ? [{
     id: "source-protected", workspaceId, sourceType: "owner_statement" as const,
     title: "Owner protection", sourceRef: "owner:protection", sourceUrl: null,
@@ -38,27 +39,27 @@ function context(protectedGuidance = true) {
   const registry = createGuidanceRegistry({ workspaceId, sources, cards, bindings, sets: [] });
   const guidance = buildEffectiveGuidancePack(registry, {
     workspaceId, accountId: "account-1", objective: "sales", internalCategoryIds: [],
-    entity: { type: "campaign", id: "campaign-1" }, topics: ["roas_floor"], requiredTopics: [],
+    entity: { type: "campaign", id: "campaign_primary" }, topics: ["roas_floor"], requiredTopics: [],
     evaluatedAt: "2026-08-07T08:00:00.000Z",
     budget: { maxCards: 10, maxSources: 10, maxCharacters: 10_000 },
   });
   return buildEffectiveCampaignContext({
     workspaceId, capturedAt: "2026-08-07T08:00:00.000Z",
     identity: {
-      connectionRef: "connection-1", accountRef: "account-1", campaignRef: "campaign-1",
-      entityRef: "campaign-1", entityType: "campaign", hierarchyRefs: ["campaign-1"],
+      connectionRef: "connection-1", accountRef: "account-1", campaignRef: "campaign_primary",
+      entityRef: "campaign_primary", entityType: "campaign", hierarchyRefs: ["campaign_primary"],
     },
     meta: {
       objective: { state: "known", value: "sales" }, optimizationEvent: { state: "known", value: "purchase" },
       configuredStatus: { state: "known", value: "ACTIVE" }, effectiveStatus: { state: "known", value: "ACTIVE" },
-      budgetOwnerRef: { state: "known", value: "campaign-1" },
+      budgetOwnerRef: { state: "known", value: "campaign_primary" },
       targetingSignature: { state: "unknown", reason: "not_loaded" },
       actorRef: { state: "known", value: "actor-1" }, destinationRef: { state: "known", value: null },
     },
     categories: [], guidance, policies: [],
     cadence: { profileRef: "cadence-1", decision: "eligible", reason: "window_open", cooldownUntil: null },
     data: { trustStatus: "ready", snapshotRefs: snapshots, featureRefs: [], windowRefs: ["window-1"], blockers: [] },
-    history: { changeRefs: [], decisionRefs: [], experimentRefs: [], practiceRefs: [], outcomeRefs: [] },
+    history: { changeRefs: [], decisionRefs: [], experimentRefs: [], practiceRefs: [], outcomeRefs: [], ...(includeOutcomeEvidence ? { outcomeEvidence: [buildBusinessOutcomeEvidence({ entityRef: "campaign_primary", sourceHeadHash: "a".repeat(64), windowStart: "2026-08-01T00:00:00.000Z", windowEnd: "2026-08-07T00:00:00.000Z", materializedAt: "2026-08-07T08:00:00.000Z", signals: [] })] } : {}) },
     versions: {
       metaCatalog: "meta-v1", categoryResolver: "category-v1", guidanceRegistry: "guidance-v1",
       metricCatalog: "metric-v1", formulaCatalog: "formula-v1", timeframeResolver: "timeframe-v1",
@@ -72,8 +73,8 @@ const timeframe = resolveAnalysisTimeframe({
 });
 
 const hierarchy: readonly FindingHierarchyNode[] = [
-  { entityRef: "campaign-1", entityType: "campaign", parentEntityRef: null },
-  { entityRef: "adset-1", entityType: "ad_set", parentEntityRef: "campaign-1" },
+  { entityRef: "campaign_primary", entityType: "campaign", parentEntityRef: null },
+  { entityRef: "adset-1", entityType: "ad_set", parentEntityRef: "campaign_primary" },
   { entityRef: "ad-1", entityType: "ad", parentEntityRef: "adset-1" },
 ];
 
@@ -103,10 +104,10 @@ function input(protectedGuidance = true) {
     definitionRef: "analysis:sales@v1", contextRef: effectiveContext.contextHash,
     snapshotRefs: snapshots, resolvedTimeframe: timeframe,
     candidates: [
-      { checkKey: "roas_floor", entityRef: "campaign-1", metricKey: "roas", status: "finding", sourceSnapshotRefs: snapshots },
+      { checkKey: "roas_floor", entityRef: "campaign_primary", metricKey: "roas", status: "finding", sourceSnapshotRefs: snapshots },
       { checkKey: "roas_floor", entityRef: "adset-1", metricKey: "roas", status: "finding", sourceSnapshotRefs: snapshots },
       { checkKey: "roas_floor", entityRef: "ad-1", metricKey: "roas", status: "insufficient_data", missingDataReason: "comparison_window_not_loaded", sourceSnapshotRefs: ["snapshot-a"] },
-      { checkKey: "pacing_gap", entityRef: "campaign-1", metricKey: "spendMinor", status: "finding", sourceSnapshotRefs: snapshots },
+      { checkKey: "pacing_gap", entityRef: "campaign_primary", metricKey: "spendMinor", status: "finding", sourceSnapshotRefs: snapshots },
     ],
   });
   const pacingRecord = analysis.records.find((record) => record.checkKey === "pacing_gap")!;
@@ -128,14 +129,14 @@ describe("deterministic finding engine", () => {
     });
     expect(replay).toEqual(first);
     expect(first.findingRunId).toMatch(/^finding_run_[a-f0-9]{24}$/);
-    expect(first.findings.map((finding) => finding.entityRef)).toEqual(["campaign-1", "adset-1", "ad-1", "campaign-1"]);
+    expect(first.findings.map((finding) => finding.entityRef)).toEqual(["campaign_primary", "adset-1", "ad-1", "campaign_primary"]);
     expect(first.findings[0]?.drivers).toEqual([expect.objectContaining({ entityRef: "adset-1", depth: 1 })]);
     expect(first.findings.at(-1)?.passKey).toBe("budget_pacing");
   });
 
   it("keeps insufficient data and an unresolved driver explicit", () => {
     const result = buildDeterministicFindings(input(false));
-    const campaign = result.findings.find((finding) => finding.entityRef === "campaign-1")!;
+    const campaign = result.findings.find((finding) => finding.entityRef === "campaign_primary")!;
     const adSet = result.findings.find((finding) => finding.entityRef === "adset-1")!;
     const ad = result.findings.find((finding) => finding.entityRef === "ad-1")!;
     expect(campaign.drivers.map((driver) => driver.entityRef)).toEqual(["adset-1"]);
@@ -148,7 +149,7 @@ describe("deterministic finding engine", () => {
 
   it("shows a protected finding but suppresses proposal eligibility", () => {
     const result = buildDeterministicFindings(input(true));
-    const campaign = result.findings.find((finding) => finding.entityRef === "campaign-1")!;
+    const campaign = result.findings.find((finding) => finding.entityRef === "campaign_primary")!;
     expect(campaign.state).toBe("finding");
     expect(campaign.suppression).toEqual(expect.objectContaining({
       findingVisible: true,
@@ -156,6 +157,27 @@ describe("deterministic finding engine", () => {
       guidanceCardRefs: ["card-protected"],
     }));
     expect(campaign.suppression.reasons).toContain("protected_guidance");
+  });
+
+  it("carries only compact frozen business outcomes into the L5 finding run", () => {
+    const base = input(false);
+    const outcomeContext = context(false, true);
+    const outcomeAgenda = buildAnalysisAgenda({
+      context: outcomeContext, resolvedTimeframe: timeframe,
+      requestedPasses: ["campaign", "ad_set", "ad", "budget_pacing"],
+    });
+    const outcomeAnalysis = analyze({
+      definitionRef: base.analysis.definitionRef,
+      contextRef: outcomeContext.contextHash,
+      snapshotRefs: base.analysis.snapshotRefs,
+      resolvedTimeframe: base.analysis.resolvedTimeframe,
+      candidates: base.analysis.records.map(({ recordId: _recordId, ...candidate }) => candidate),
+    });
+    const result = buildDeterministicFindings({ ...base, context: outcomeContext, agenda: outcomeAgenda, analysis: outcomeAnalysis });
+    expect(result.outcomeEvidence).toEqual([expect.objectContaining({
+      entityRef: "campaign_primary", summary: expect.objectContaining({ metaProxyEligible: false }),
+    })]);
+    expect(result.capabilities).toEqual({ containsRawData: false, canAuthorizeAction: false, canExecuteWrite: false });
   });
 
   it("rejects prompt injection, raw/token material, writer authority and forged evidence", () => {
@@ -185,7 +207,7 @@ describe("deterministic finding engine", () => {
       definitionRef: "analysis:sales@v1", contextRef: base.context.contextHash,
       snapshotRefs: snapshots, resolvedTimeframe: timeframe,
       candidates: [{
-        checkKey: "invented", entityRef: "campaign-1", metricKey: "magicEfficiency",
+        checkKey: "invented", entityRef: "campaign_primary", metricKey: "magicEfficiency",
         status: "finding", sourceSnapshotRefs: snapshots,
       }],
     });
@@ -205,7 +227,7 @@ describe("deterministic finding engine", () => {
       definitionRef: "analysis:sales@v1", contextRef: base.context.contextHash,
       snapshotRefs: snapshots, resolvedTimeframe: shifted,
       candidates: [{
-        checkKey: "roas_floor", entityRef: "campaign-1", metricKey: "roas",
+        checkKey: "roas_floor", entityRef: "campaign_primary", metricKey: "roas",
         status: "finding", sourceSnapshotRefs: snapshots,
       }],
     });
