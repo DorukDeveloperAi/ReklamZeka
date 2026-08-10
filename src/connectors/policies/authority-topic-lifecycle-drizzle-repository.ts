@@ -73,7 +73,10 @@ export class DrizzleAuthorityTopicLifecycleRepository {
     ref(input.workspaceRef); ref(input.actorRef); ref(command.topicRef, TOPIC_REF);
     if (command.expectedHeadHash !== "GENESIS") hash(command.expectedHeadHash);
     const requestedCategories = categoryRefs(command.categoryRefs); iso(input.occurredAt);
-    if ((command.operation === "archive") !== (requestedCategories.length === 0)) fail("invalid_input");
+    // Category linkage is optional authority evidence. Archival is the only
+    // transition that must explicitly clear it; a topic may safely exist
+    // without a category bridge for account- or policy-scoped use.
+    if (command.operation === "archive" && requestedCategories.length !== 0) fail("invalid_input");
 
     return this.database.transaction(async (transaction) => {
       const tx = transaction as unknown as Database;

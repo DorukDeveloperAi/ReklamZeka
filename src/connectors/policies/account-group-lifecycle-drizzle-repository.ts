@@ -120,7 +120,7 @@ export class DrizzleAccountGroupLifecycleRepository {
 
       const accountRows = requestedAccounts.length === 0 ? [] : rows<{ id: unknown; external_account_id: unknown }>(await tx.execute(sql`
         select id::text, external_account_id from ad_accounts where workspace_id = ${input.workspaceId}::uuid
-          and disappeared_at is null and external_account_id = any(${requestedAccounts}::text[]) for update`));
+          and disappeared_at is null and external_account_id = any(array[${sql.join(requestedAccounts.map((accountRef) => sql`${accountRef}`), sql`, `)}]::text[]) for update`));
       const resolved = new Map<string, string>();
       for (const account of accountRows) {
         if (typeof account.id !== "string" || !UUID.test(account.id) || typeof account.external_account_id !== "string"

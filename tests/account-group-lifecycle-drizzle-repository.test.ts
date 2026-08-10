@@ -39,6 +39,7 @@ describe("DrizzleAccountGroupLifecycleRepository", () => {
     expect(rendered).toContain("for update");
     expect(rendered).toContain("pg_advisory_xact_lock");
     expect(rendered).toContain("disappeared_at is null");
+    expect(rendered).toContain("any(array[");
     expect(rendered).toContain("insert into account_groups");
     expect(rendered).toContain("insert into account_group_revisions");
     expect(rendered).toContain("insert into account_group_account_bindings");

@@ -216,13 +216,14 @@ export class DrizzleInstructionPolicyImpactRepository implements InstructionPoli
                 where semantic.workspace_id = binding.workspace_id and semantic.policy_revision_id = binding.policy_revision_id
                   and semantic.semantic_ref = binding.binding_ref and semantic.revision::text = binding.binding_version
                   and semantic.revision_hash = binding.binding_hash))
-              or not exists (select 1 from affected_contexts context
-                join effective_campaign_policy_compositions composition on composition.workspace_id = ${workspaceId}::uuid
-                  and composition.context_id = context.id
-                join effective_campaign_policy_composition_items item on item.workspace_id = composition.workspace_id
-                  and item.composition_id = composition.id
-                where item.policy_revision_id = binding.policy_revision_id and composition.authority_snapshot_ref = snapshot.snapshot_ref
-                  and composition.authority_snapshot_hash = snapshot.snapshot_hash and composition.authority_catalog_hash = catalog.revision_hash)))
+              or (exists (select 1 from affected_contexts)
+                and not exists (select 1 from affected_contexts context
+                  join effective_campaign_policy_compositions composition on composition.workspace_id = ${workspaceId}::uuid
+                    and composition.context_id = context.id
+                  join effective_campaign_policy_composition_items item on item.workspace_id = composition.workspace_id
+                    and item.composition_id = composition.id
+                  where item.policy_revision_id = binding.policy_revision_id and composition.authority_snapshot_ref = snapshot.snapshot_ref
+                    and composition.authority_snapshot_hash = snapshot.snapshot_hash and composition.authority_catalog_hash = catalog.revision_hash))))
           + (select count(*)::int from affected_contexts context
               join effective_campaign_policy_compositions composition on composition.workspace_id = ${workspaceId}::uuid
                 and composition.context_id = context.id
@@ -286,14 +287,15 @@ export class DrizzleInstructionPolicyImpactRepository implements InstructionPoli
           where binding.workspace_id = ${workspaceId}::uuid and policy.policy_ref = ${policyRef} and binding.binding_kind = 'account_group'
             and (group_revision.id is null or group_revision.status <> 'active'
               or binding.binding_version <> group_revision.revision::text or binding.binding_hash <> group_revision.revision_hash
-              or not exists (select 1 from affected_contexts context
-                join effective_campaign_policy_compositions composition on composition.workspace_id = ${workspaceId}::uuid
-                  and composition.context_id = context.id
-                join effective_campaign_policy_composition_items item on item.workspace_id = composition.workspace_id
-                  and item.composition_id = composition.id
-                join account_group_account_bindings membership on membership.workspace_id = group_revision.workspace_id
-                  and membership.account_group_revision_id = group_revision.id and membership.ad_account_id = context.ad_account_id
-                where item.policy_revision_id = binding.policy_revision_id)
+              or (exists (select 1 from affected_contexts)
+                and not exists (select 1 from affected_contexts context
+                  join effective_campaign_policy_compositions composition on composition.workspace_id = ${workspaceId}::uuid
+                    and composition.context_id = context.id
+                  join effective_campaign_policy_composition_items item on item.workspace_id = composition.workspace_id
+                    and item.composition_id = composition.id
+                  join account_group_account_bindings membership on membership.workspace_id = group_revision.workspace_id
+                    and membership.account_group_revision_id = group_revision.id and membership.ad_account_id = context.ad_account_id
+                  where item.policy_revision_id = binding.policy_revision_id))
               or (group_revision.revision > 1 and not exists (select 1 from account_group_revisions prior
               where prior.workspace_id = group_revision.workspace_id and prior.account_group_id = group_revision.account_group_id
                 and prior.revision = group_revision.revision - 1 and prior.revision_hash = group_revision.previous_revision_hash)))) as corrupt_account_group_rows,

@@ -3,6 +3,25 @@
 > Kümülatif ilerleme defteri. v1'in ayrıntılı tur geçmişi
 > [v1 STATE](../v1/STATE.md)'te değişmeden korunur.
 
+## 2026-08-10 — A09 complete relational authority-impact acceptance
+
+- `verify:instruction-policy-authority-impact-db`, tek outer rollback altında gerçek draft → empty
+  authority bootstrap → impact-OCC publish → private semantic/account-group/topic writer → bound catalog/
+  snapshot materialization zincirini çalıştırır. Authority bağları hiçbir sentetik SQL authority satırı
+  olmadan private owner/admin lifecycle yazarlarından gelir.
+- Publish sonrasında bağ yoksa preview `trusted_authority_catalog` ailesini partial/blocked tutar. Aynı
+  published policy için semantic fact, tenant-local non-disappeared account membership ve category-free
+  active topic kaydedilip snapshot yenilendiğinde beş aile exact, integrity sıfır ve
+  `coverage.complete=true` / `mutationAllowed=true` olur. Bu, policy publish ya da Meta/action write
+  çalıştırmaz; bütün capability değerleri false kalır.
+- Canlı doğrulama iki gerçek hatayı da kapattı: account-group writer tek elemanlı ref listesini artık
+  PostgreSQL `text[]` olarak taşır; topic lifecycle active fakat category-bağsız authority fact'e izin verir.
+  Impact reader, sidecar zorunluluğunu mevcut frozen contextlere uygular; context yoksa doğrulanmış
+  relational binding'i sahte bozukluk saymaz. Cross-tenant görünürlük, RLS/revoke, append-only guard,
+  network/action sıfır ve rollback sonrası sıfır kalıntı yine kanıtlandı.
+- Browser/session kabulü ayrı açık çevresel kapıdır. G4/A13, HTTP/MCP/UI write yüzeyi veya Meta write
+  eklenmedi.
+
 ## 2026-08-10 — A09 authority materializer consistency hardening
 
 - `policy_authority_bindings` exact-uniqueness'i global policy fact yerine immutable authority

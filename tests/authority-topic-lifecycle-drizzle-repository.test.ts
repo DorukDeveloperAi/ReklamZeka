@@ -104,4 +104,13 @@ describe("DrizzleAuthorityTopicLifecycleRepository", () => {
       expectedHeadHash: firstHash, categoryRefs: [] }))).resolves.toMatchObject({ revision: 2, status: "archived" });
     expect(sqls(archive.execute)).not.toContain("insert into category_topic_bindings");
   });
+
+  it("allows a category-free active topic but never permits category bindings while archiving", async () => {
+    const harness = repository([
+      [{ id: workspaceId }], [{ role: "owner" }], [], [], [], [], [{ id: topicId }], [], [], [], [],
+    ]);
+    await expect(harness.repository.mutate(input({ operation: "create_active", topicRef: command.topicRef,
+      expectedHeadHash: "GENESIS", categoryRefs: [] }))).resolves.toMatchObject({ revision: 1, status: "active" });
+    expect(sqls(harness.execute)).not.toContain("insert into category_topic_bindings");
+  });
 });

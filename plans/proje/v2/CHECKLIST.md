@@ -147,17 +147,15 @@
     ile saklanır; legacy context sidecar-less kalır ve promotion authority vermez.
   - [x] Migration journal ile canlı PostgreSQL schema/RLS/OCC/rollback kabulü: 52/52 migration,
     authority catalog, frozen context, progressive formalization ve Supabase security verifier'ları geçti.
-  - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
-    context ailelerinin complete exact-impact coverage'ı için canlı PostgreSQL kabulü ve gerçek oturumlu
-    browser kabulü. Repository preview aileleri immutable policy-composition sidecar ve relational zincir
-    üzerinden ayrı ayrı değerlendirir; gerçek live bootstrap/publish/OCC yolu authority bridge eksikliğini
-    fail-closed kanıtlar. `policy_semantic_binding_revisions` için private owner/admin writer, exact
-    published policy ref/version/hash, advisory-lock OCC, canonical fact/revision hash, audit ve
-    frozen-context invalidation ile eklendi. Complete-positive fixture, account-group/topic revision
-    writerı owner/admin active-workspace recheck, group-advisory OCC, immutable membership, exact retry,
-    context invalidation ve audit ile eklendi. Topic writerı ve gerçek oturumlu browser kabulü tamamlanana
-    kadar açık kalır; bu kanıtlar olmadan
-    legacy/missing/corrupt rows partial kalır.
+  - [x] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
+    context ailelerinin complete exact-impact coverage'ı için canlı PostgreSQL kabulü. Repository preview
+    aileleri immutable policy-composition sidecar ve relational zincir üzerinden ayrı ayrı değerlendirir;
+    verifier gerçek draft→empty bootstrap→publish-OCC ardından semantic/account-group/topic private
+    lifecycle writerları ve bound catalog/snapshot materialization'ı ile `coverage.complete=true` ve
+    `mutationAllowed=true` kanıtlar. Authority satırları sentetik SQL ile üretilmez; cross-tenant, RLS/
+    revoke, append-only, network/action sıfır ve outer rollback doğrulanır. Legacy/missing/corrupt rows
+    partial kalır; G4 yetkisi açılmaz.
+  - [ ] Gerçek oturumlu browser kabulü; local browser session kurulmadan tamamlanmış sayılmaz.
 - [ ] Başlangıç objective/internal kategori playbook seti.
   - [x] Altı canonical objective playbook'una version/hash ile bağlı, review-required ve
     authority-free starter category/profile proposal kataloğu.
