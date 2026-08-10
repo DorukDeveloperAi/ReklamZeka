@@ -4,6 +4,60 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "ac5d4c18b",
+      "tarih": "2026-08-10",
+      "konu": "docs(a10): reconcile completed finding capabilities",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "dc9990b5d",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): freeze agenda on decision room runs",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "98064fc02",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): persist experiment record lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "69f9d8ef0",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): freeze cadence revision on analysis runs",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c3a5f7793",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): persist cadence profile revisions",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "8b999b063",
+      "tarih": "2026-08-10",
+      "konu": "fix(db): recover migrations and verify authority flows",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
       "hash": "92876f6ab",
       "tarih": "2026-08-10",
       "konu": "fix(a10): bind cohorts to metric catalog",
@@ -83,70 +137,16 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "07fc6819b",
-      "tarih": "2026-08-08",
-      "konu": "chore(turev): merge sonrası türevleri üreticiden yeniden üret",
-      "tur": "is",
-      "kapsam": [
-        "chore"
-      ]
-    },
-    {
-      "hash": "8916ab22f",
-      "tarih": "2026-08-08",
-      "konu": "chore(vscode,oturum): tema ayarları ve oturum kasası kaydı",
-      "tur": "is",
-      "kapsam": [
-        "chore"
-      ]
-    },
-    {
-      "hash": "c90883c4c",
-      "tarih": "2026-08-08",
-      "konu": "feat(categories): scan effective portfolio health",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "86284c17a",
-      "tarih": "2026-08-08",
-      "konu": "feat(categories): preview archive impact safely",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "e65579e21",
-      "tarih": "2026-08-08",
-      "konu": "feat(categories): surface evidence confidence health",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "c0c3f2f70",
-      "tarih": "2026-08-08",
-      "konu": "feat(categories): add read-only inventory dashboard",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 31
+      "adet": 33
     },
     {
       "kapsam": "docs",
-      "adet": 21
+      "adet": 20
     },
     {
       "kapsam": "chore",
@@ -158,10 +158,10 @@
     },
     {
       "kapsam": "test",
-      "adet": 2
+      "adet": 1
     }
   ],
-  "isSayisi": 139,
+  "isSayisi": 145,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-10",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "82c254eff5ea"
+  "damga": "85aec0c2cf94"
 }

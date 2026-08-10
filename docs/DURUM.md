@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 82c254eff5ea -->
+<!-- durum-damga: 85aec0c2cf94 -->
 
 ## Künye
 
@@ -14,13 +14,19 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 139 |
+| iş commit'i (tüm geçmiş) | 145 |
 | ilk / son iş | 2026-08-06 / 2026-08-10 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-10 | `docs` | reconcile completed finding capabilities | `ac5d4c18b` |
+| 2026-08-10 | `feat` | freeze agenda on decision room runs | `dc9990b5d` |
+| 2026-08-10 | `feat` | persist experiment record lifecycle | `98064fc02` |
+| 2026-08-10 | `feat` | freeze cadence revision on analysis runs | `69f9d8ef0` |
+| 2026-08-10 | `feat` | persist cadence profile revisions | `c3a5f7793` |
+| 2026-08-10 | `fix` | recover migrations and verify authority flows | `8b999b063` |
 | 2026-08-10 | `fix` | bind cohorts to metric catalog | `92876f6ab` |
 | 2026-08-10 | `feat` | harden policy and promotion authoring | `904a45278` |
 | 2026-08-10 | `feat` | harden run binding rollout | `a5855809f` |
@@ -30,20 +36,14 @@
 | 2026-08-09 | `feat` | add selector mapping preview | `44c670e0b` |
 | 2026-08-09 | `chore` | quarantine legacy control plane | `cd675c679` |
 | 2026-08-09 | `feat` | guard lifecycle mutations | `6d0591f31` |
-| 2026-08-08 | `chore` | merge sonrası türevleri üreticiden yeniden üret | `07fc6819b` |
-| 2026-08-08 | `chore` | tema ayarları ve oturum kasası kaydı | `8916ab22f` |
-| 2026-08-08 | `feat` | scan effective portfolio health | `c90883c4c` |
-| 2026-08-08 | `feat` | preview archive impact safely | `86284c17a` |
-| 2026-08-08 | `feat` | surface evidence confidence health | `e65579e21` |
-| 2026-08-08 | `feat` | add read-only inventory dashboard | `c0c3f2f70` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 31
-- `docs        ` ████████████████ 21
+- `feat        ` ████████████████████████ 33
+- `docs        ` ███████████████ 20
 - `chore       ` ██ 3
 - `fix         ` ██ 3
-- `test        ` ██ 2
+- `test        ` █ 1
 
 ## Planlar
 

@@ -65,53 +65,53 @@ CREATE TABLE "progressive_formalization_revisions" (
     ("progressive_formalization_revisions"."revision_payload"
       - 'schemaVersion' - 'formalizationRef' - 'workspaceRef' - 'sequence' - 'previousRevisionHash'
       - 'fromLevel' - 'toLevel' - 'transition' - 'occurredAt' - 'actor' - 'payload' - 'authority' - 'revisionHash') = '{}'::jsonb
-    and ("progressive_formalization_revisions"."revision_payload" #> '{actor}' - 'actorRef' - 'role') = '{}'::jsonb
-    and ("progressive_formalization_revisions"."revision_payload" #> '{authority}' - 'canPublish' - 'canApprove' - 'canExecute' - 'canWriteMeta'
+    and (("progressive_formalization_revisions"."revision_payload" #> '{actor}') - 'actorRef' - 'role') = '{}'::jsonb
+    and (("progressive_formalization_revisions"."revision_payload" #> '{authority}') - 'canPublish' - 'canApprove' - 'canExecute' - 'canWriteMeta'
       - 'canGrant' - 'canSchedule' - 'canCallTool' - 'canAccessNetwork' - 'canQuerySql') = '{}'::jsonb
     and case "progressive_formalization_revisions"."transition"
       when 'capture_g0' then
-        ("progressive_formalization_revisions"."revision_payload" #> '{payload}' - 'rawProvenanceRef' - 'rawTextHash') = '{}'::jsonb
+        (("progressive_formalization_revisions"."revision_payload" #> '{payload}') - 'rawProvenanceRef' - 'rawTextHash') = '{}'::jsonb
         and "progressive_formalization_revisions"."revision_payload" #>> '{payload,rawProvenanceRef}' ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
         and "progressive_formalization_revisions"."revision_payload" #>> '{payload,rawTextHash}' ~ '^[a-f0-9]{64}$'
       when 'scope_g1' then
-        ("progressive_formalization_revisions"."revision_payload" #> '{payload}' - 'guidanceCardRefs' - 'scope') = '{}'::jsonb
+        (("progressive_formalization_revisions"."revision_payload" #> '{payload}') - 'guidanceCardRefs' - 'scope') = '{}'::jsonb
         and jsonb_typeof("progressive_formalization_revisions"."revision_payload" #> '{payload,guidanceCardRefs}') = 'array'
         and jsonb_array_length("progressive_formalization_revisions"."revision_payload" #> '{payload,guidanceCardRefs}') between 1 and 1000
-        and ("progressive_formalization_revisions"."revision_payload" #> '{payload,scope}' - 'global' - 'accountGroupRefs' - 'accountRefs'
+        and (("progressive_formalization_revisions"."revision_payload" #> '{payload,scope}') - 'global' - 'accountGroupRefs' - 'accountRefs'
           - 'objectiveRefs' - 'internalCategoryRefs' - 'entityRefs' - 'promotionTemplateRefs' - 'topicRefs') = '{}'::jsonb
       when 'review_g2' then
-        ("progressive_formalization_revisions"."revision_payload" #> '{payload}' - 'guidanceSetRef' - 'reviewedGuidanceHash' - 'confirmation') = '{}'::jsonb
+        (("progressive_formalization_revisions"."revision_payload" #> '{payload}') - 'guidanceSetRef' - 'reviewedGuidanceHash' - 'confirmation') = '{}'::jsonb
         and "progressive_formalization_revisions"."revision_payload" #>> '{payload,reviewedGuidanceHash}' ~ '^[a-f0-9]{64}$'
-        and ("progressive_formalization_revisions"."revision_payload" #> '{payload,confirmation}' - 'confirmed' - 'confirmationRef' - 'confirmedAt') = '{}'::jsonb
+        and (("progressive_formalization_revisions"."revision_payload" #> '{payload,confirmation}') - 'confirmed' - 'confirmationRef' - 'confirmedAt') = '{}'::jsonb
         and "progressive_formalization_revisions"."revision_payload" #> '{payload,confirmation,confirmed}' = 'true'::jsonb
       when 'promote_g3' then
-        ("progressive_formalization_revisions"."revision_payload" #> '{payload}' - 'normalizedDraft' - 'confirmation') = '{}'::jsonb
-        and ("progressive_formalization_revisions"."revision_payload" #> '{payload,confirmation}' - 'confirmed' - 'confirmationRef' - 'confirmedAt') = '{}'::jsonb
+        (("progressive_formalization_revisions"."revision_payload" #> '{payload}') - 'normalizedDraft' - 'confirmation') = '{}'::jsonb
+        and (("progressive_formalization_revisions"."revision_payload" #> '{payload,confirmation}') - 'confirmed' - 'confirmationRef' - 'confirmedAt') = '{}'::jsonb
         and "progressive_formalization_revisions"."revision_payload" #> '{payload,confirmation,confirmed}' = 'true'::jsonb
-        and ("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft}' - 'schemaVersion' - 'workspaceRef'
+        and (("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft}') - 'schemaVersion' - 'workspaceRef'
           - 'formalizationRef' - 'guidanceSetRef' - 'strictPolicy' - 'assumptions' - 'questions' - 'semanticDiff'
           - 'historicalReplay' - 'conflictPreview' - 'impactPreview' - 'authority' - 'draftHash') = '{}'::jsonb
-        and ("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft,authority}' - 'canPublish' - 'canApprove'
+        and (("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft,authority}') - 'canPublish' - 'canApprove'
           - 'canExecute' - 'canWriteMeta' - 'canGrant' - 'canCallTool' - 'canAccessNetwork' - 'canQuerySql') = '{}'::jsonb
-        and ("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft,strictPolicy}' - 'dslVersion' - 'workspaceRef'
+        and (("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft,strictPolicy}') - 'dslVersion' - 'workspaceRef'
           - 'policyRef' - 'policyVersion' - 'previousVersionHash' - 'policyType' - 'owner' - 'status' - 'reasonCode'
           - 'priority' - 'effectiveDates' - 'scope' - 'source' - 'clause' - 'authority' - 'canonicalHash') = '{}'::jsonb
-        and ("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft,semanticDiff}' - 'status' - 'items' - 'diffHash') = '{}'::jsonb
-        and ("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft,historicalReplay}' - 'status'
+        and (("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft,semanticDiff}') - 'status' - 'items' - 'diffHash') = '{}'::jsonb
+        and (("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft,historicalReplay}') - 'status'
           - 'evaluatedRevisionRefs' - 'changedOutcomeRefs' - 'unknownOutcomeRefs' - 'replayHash') = '{}'::jsonb
-        and ("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft,conflictPreview}' - 'status' - 'conflictRefs' - 'previewHash') = '{}'::jsonb
-        and ("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft,impactPreview}' - 'status' - 'affectedScopeRefs'
+        and (("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft,conflictPreview}') - 'status' - 'conflictRefs' - 'previewHash') = '{}'::jsonb
+        and (("progressive_formalization_revisions"."revision_payload" #> '{payload,normalizedDraft,impactPreview}') - 'status' - 'affectedScopeRefs'
           - 'affectedEntityCount' - 'affectedPolicyCount' - 'affectedBudgetCount' - 'affectedAutomationCount'
           - 'unresolvedDependencyRefs' - 'previewHash') = '{}'::jsonb
       when 'qualify_g4' then
-        ("progressive_formalization_revisions"."revision_payload" #> '{payload}' - 'publishedPolicyRef' - 'publishedPolicyHash'
+        (("progressive_formalization_revisions"."revision_payload" #> '{payload}') - 'publishedPolicyRef' - 'publishedPolicyHash'
           - 'riskAssessmentRef' - 'capPolicyRef' - 'approvalPolicyRef' - 'rolloutEvidenceRefs'
           - 'actionValveRef' - 'approvalMode' - 'confirmation') = '{}'::jsonb
         and "progressive_formalization_revisions"."revision_payload" #>> '{payload,approvalMode}' = 'approval_only'
         and "progressive_formalization_revisions"."revision_payload" #>> '{payload,publishedPolicyHash}' ~ '^[a-f0-9]{64}$'
         and jsonb_typeof("progressive_formalization_revisions"."revision_payload" #> '{payload,rolloutEvidenceRefs}') = 'array'
         and jsonb_array_length("progressive_formalization_revisions"."revision_payload" #> '{payload,rolloutEvidenceRefs}') between 1 and 1000
-        and ("progressive_formalization_revisions"."revision_payload" #> '{payload,confirmation}' - 'confirmed' - 'confirmationRef' - 'confirmedAt') = '{}'::jsonb
+        and (("progressive_formalization_revisions"."revision_payload" #> '{payload,confirmation}') - 'confirmed' - 'confirmationRef' - 'confirmedAt') = '{}'::jsonb
         and "progressive_formalization_revisions"."revision_payload" #> '{payload,confirmation,confirmed}' = 'true'::jsonb
       else false
     end

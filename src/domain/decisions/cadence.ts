@@ -295,6 +295,7 @@ export type ExperimentPlan = Readonly<{
   changedVariables: readonly string[];
   baselineRef: string;
   guardrailMetrics: readonly string[];
+  stopConditions: readonly ("guardrail_breach" | "contamination")[];
   minimumSampleSize: number;
   minimumWindowHours: number;
   minimumEvidenceScore: number;
@@ -326,6 +327,7 @@ function experimentRef(plan: ExperimentPlan): string {
     changedVariables: [...plan.changedVariables].sort(codePointCompare),
     baselineRef: plan.baselineRef,
     guardrailMetrics: [...new Set(plan.guardrailMetrics)].sort(codePointCompare),
+    stopConditions: [...new Set(plan.stopConditions)].sort(codePointCompare),
     minimumSampleSize: plan.minimumSampleSize,
     minimumWindowHours: plan.minimumWindowHours,
     minimumEvidenceScore: plan.minimumEvidenceScore,
@@ -337,7 +339,7 @@ function experimentRef(plan: ExperimentPlan): string {
 export function validateExperimentPlan(plan: ExperimentPlan): ExperimentPlan {
   experimentExactKeys(plan, [
     "version", "hypothesis", "primaryMetric", "desiredDirection", "primaryVariable", "changedVariables",
-    "baselineRef", "guardrailMetrics", "minimumSampleSize", "minimumWindowHours",
+    "baselineRef", "guardrailMetrics", "stopConditions", "minimumSampleSize", "minimumWindowHours",
     "minimumEvidenceScore", "minimumDetectableEffect",
   ], "invalid_plan");
   if (plan.version !== EXPERIMENT_CONTRACT_VERSION
@@ -350,6 +352,9 @@ export function validateExperimentPlan(plan: ExperimentPlan): ExperimentPlan {
     || plan.changedVariables[0] !== plan.primaryVariable
     || !Array.isArray(plan.guardrailMetrics) || plan.guardrailMetrics.length < 1
     || plan.guardrailMetrics.some((metric) => typeof metric !== "string" || !metric.trim())
+    || !Array.isArray(plan.stopConditions) || plan.stopConditions.length < 1
+    || !plan.stopConditions.includes("guardrail_breach")
+    || plan.stopConditions.some((condition) => !["guardrail_breach", "contamination"].includes(condition))
     || !Number.isInteger(plan.minimumSampleSize) || plan.minimumSampleSize < 1
     || !Number.isFinite(plan.minimumWindowHours) || plan.minimumWindowHours <= 0
     || !Number.isFinite(plan.minimumEvidenceScore) || plan.minimumEvidenceScore < 0 || plan.minimumEvidenceScore > 1
@@ -363,6 +368,7 @@ export function validateExperimentPlan(plan: ExperimentPlan): ExperimentPlan {
     primaryVariable: plan.primaryVariable.trim(),
     changedVariables: Object.freeze([...plan.changedVariables]),
     guardrailMetrics: Object.freeze([...new Set(plan.guardrailMetrics)].sort(codePointCompare)),
+    stopConditions: Object.freeze([...new Set(plan.stopConditions)].sort(codePointCompare)) as ExperimentPlan["stopConditions"],
   });
 }
 

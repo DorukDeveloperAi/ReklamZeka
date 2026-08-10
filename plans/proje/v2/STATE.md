@@ -78,10 +78,76 @@
   kullanımda bu head'i, tarihsel replay'de ise explicit immutable snapshot ref/hash çiftini çözer;
   belirsizlik, stale head veya eksik kaynakta fail-closed kalır. Materializer herhangi bir HTTP/MCP/UI
   route'u ya da publish/approve/execute/Meta-write capability'si vermez; G4 kapalıdır.
-- Sadece bu private persistence dilimi tamamlandı. Canlı verifier erişilebilir yerel PostgreSQL'de
-  `authority_catalog_materialization_schema_missing` ile durdu; bu instance'a migration uygulanmadan
-  RLS/OCC rollback kabulü tamamlanmış sayılmaz. Gerçek oturum/browser kanıtı da açık; impact coverage
-  yalnız doğrulayabildiği kapsamda mutation'ı kapalı tutar.
+- Canlı PostgreSQL şema kabulü de geçti: catalog ve snapshot head tabloları ile iki OCC trigger'ı
+  mevcuttur; verifier bütün publish/approve/execute/Meta-write capability'lerini `false` doğrular.
+  Gerçek oturum/browser kabulü ile impact coverage'ın daha geniş mutation kapsamı hâlâ açık kalır.
+
+## 2026-08-10 — A10.1 kalıcı DecisionCadenceProfile
+
+- `decision_cadence_profile_revisions` additive PostgreSQL tablosu tenant/account/campaign composite
+  foreign key'leri, immutable revision zinciri, tek güncel revision index'i, RLS + FORCE RLS ve API
+  rollerinden revoke ile eklendi. Tombstoning workspace altında kontrollü purge dışında delete reddedilir.
+- Server-private publisher aktif workspace ile owner/admin membership'ini transaction içinde doğrular;
+  current profile hash OCC ile supersede+insert yapar ve audit hash-chain olayı yazar. Cadence yalnız
+  advisory tempo girdisidir; publish/approve/execute/Meta-write capability'leri yapısal olarak false kalır.
+- Canlı PostgreSQL kabulü tablo, RLS/FORCE RLS, immutable trigger ve `service_role` için sıfır SELECT
+  grant'ini doğruladı. ExperimentRecord lifecycle'i sonraki A10.2b kapsamındadır.
+
+## 2026-08-10 — A10.2a cadence run-asset freeze binding
+
+- Yeni Decision Room run asset'i context `profileRef` değerini aynı tenant/account/campaign kapsamındaki
+  güncel cadence revision ile çözer; profile payload/hash template içindeki profil ile birebir eşleşmeden
+  asset oluşturmaz. Revision UUID ve hash, immutable run asset satırına ve asset hash'ine birlikte yazılır.
+- Legacy asset alanları nullable olarak korunur; loader bağsız veya hash'i uyuşmayan asset'i fail-closed
+  reddeder. Canlı PostgreSQL migration kabulü iki alanı ve tenant composite foreign key'i doğruladı.
+- ExperimentRecord append-only lifecycle'i A10.2b ile tamamlandı; hiçbir action/approval/Meta-write
+  capability'si oluşturmaz.
+
+## 2026-08-10 — A10.2c frozen AnalysisAgenda run binding
+
+- Her yeni Decision Room run asset'i exact deterministic `AnalysisAgenda` hash+payload'ını aynı immutable
+  satırda saklar; asset hash'i agenda hash'ini de kapsar. Loader yalnız context, resolved timeframe ve template
+  pass'lerinden aynı agenda yeniden üretilebiliyorsa historical asset'i açar; legacy veya tahrif edilmiş bağ
+  fail-closed reddedilir.
+- Runtime, ilk L2 okumasından önce frozen agenda ile yeniden oluşturulan agenda'nın birebir eşitliğini denetler
+  ve Decision Room sonucunun aynı `agendaRef`'i taşımasını zorunlu kılar. Bu bağ advisory-only'dir; action,
+  approval, Meta-write ve model capability'leri açmaz.
+- Additive migration canlı PostgreSQL'e uygulandı. Transactional asset verifier owner/member denetimli cadence
+  fixture'ı üzerinden agenda payload/hash freeze'ini, RLS/revoke ve immutable asset guard'larını doğruladı;
+  kalıcı fixture bırakmadı.
+
+## 2026-08-10 — A10.2b ExperimentRecord append-only lifecycle
+
+- Experiment plan artık explicit `guardrail_breach` stop condition'ı taşımadan geçerli değildir. Plan ve
+  outcome revision'ları aynı immutable hash zincirinde, exact cadence profile revision ve tenant account/
+  campaign kapsamıyla saklanır; outcome yalnız deterministic `winner|loser|inconclusive|guardrail_stopped`
+  advisory evidence üretir.
+- Private repository aktif workspace, member role ve cadence scope'unu transaction içinde yeniden doğrular;
+  plan/outcome kayıtları audit hash-chain olayları ile birlikte append edilir. RLS/FORCE RLS, API role revoke
+  ve tombstoning-purge koruması migration seviyesindedir.
+- Canlı PostgreSQL verifier tablo, chain trigger, RLS/FORCE RLS ve `service_role` SELECT grant'inin yokluğunu
+  doğruladı. HTTP/MCP/UI veya Meta/action write yüzeyi eklenmedi.
+
+## 2026-08-10 — PostgreSQL migration recovery ve A09 canlı kabulü
+
+- Yerel migration journal'ındaki dört PostgreSQL portability hatası giderildi: composite foreign key'ler
+  hedef composite unique index'lerinden sonra oluşturulur; progressive-formalization JSONB nested-key
+  kontrolleri açık parantezlerle değerlendirilir. Her düzeltme önce gerçek PostgreSQL transaction'ında
+  uygulanıp rollback ile sınandı. Journal artık 52/52 uygulanmış migration ve bilinmeyen hash olmadan
+  tamamdır.
+- `verify:policy-authority-catalog-db` owner/admin recheck, head OCC, immutable catalog/snapshot,
+  invalidation/audit ve capability'lerin false kaldığını doğruladı. `verify:effective-campaign-context-db`
+  cross-tenant, hierarchy, snapshot, invalidation ve nested-authority negatiflerini rollback ile doğruladı.
+  `verify:progressive-formalization-live` source-key çözümü, membership, OCC, immutable/tombstone,
+  audit atomikliği ve default G3/G4 block davranışını doğruladı. `verify:supabase-security`, 98 public
+  tablonun tamamında RLS ve API rolleri için sıfır direct grant raporladı.
+- Progressive preview repository’sinde scoped guidance listeleri artık gerçek parameterized
+  `ARRAY[...]::text[]` bağlanır; scalar-to-array PostgreSQL cast hatası canlı doğrulayıcıda yakalanıp
+  giderildi. G4, publish/approve/execute/Meta-write yetkisi vermez; exact impact coverage ve gerçek
+  oturumlu browser kabulü hâlâ açık sınırdır.
+- Kanıt: hedefli migration/repository testleri; `npm test` 256 dosya/1.496 test; production build,
+  `db:check`, dependency audit (0 vulnerability), architecture/model/security-boundaries ve
+  secret-artifact kontrolleri yeşil.
 
 ## 2026-08-10 — A10 robust cohort calculator
 

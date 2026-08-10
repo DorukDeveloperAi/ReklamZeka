@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildEffectiveCampaignContext } from "@/analyses/effective-campaign-context";
+import { buildAnalysisAgenda } from "@/analyses/agenda";
 import { resolveAnalysisTimeframe } from "@/analyses/timeframe-resolver";
 import {
   DECISION_ROOM_ANALYSIS_RUNTIME_VERSION,
@@ -67,6 +68,7 @@ function assets(): DecisionRoomAnalysisRuntimeAssets {
     workspaceRef: "workspace_safe", accountRef: "account_safe", campaignRef: "campaign_safe",
     timeframeRef: "timeframe_daily", templateRef: "template_daily", occurredAt: now,
     context: context(), resolvedTimeframe: timeframe, requestedPasses: ["ad"],
+    agenda: buildAnalysisAgenda({ context: context(), resolvedTimeframe: timeframe, requestedPasses: ["ad"] }),
     hierarchy: [
       { entityRef: "campaign_safe", entityType: "campaign", parentEntityRef: null },
       { entityRef: "adset_safe", entityType: "ad_set", parentEntityRef: "campaign_safe" },
@@ -192,6 +194,26 @@ describe("DecisionRoomDeterministicAnalysisRuntime", () => {
     await expect(unfrozen.execute(input())).rejects.toEqual(
       expect.objectContaining<Partial<DecisionRoomAnalysisRuntimeError>>({ code: "evidence_not_frozen" }),
     );
+    expect(storage.ledger()).toHaveLength(0);
+  });
+
+  it("fails closed when the frozen agenda payload is stale or tampered", async () => {
+    const storage = drafts();
+    const read = vi.fn();
+    const prepared = assets();
+    const runtime = new DecisionRoomDeterministicAnalysisRuntime(
+      { loadExact: async () => ({
+        ...prepared,
+        agenda: { ...prepared.agenda, agendaHash: "f".repeat(64) },
+      }) },
+      { read } as never,
+      storage.port,
+    );
+
+    await expect(runtime.execute(input())).rejects.toEqual(
+      expect.objectContaining<Partial<DecisionRoomAnalysisRuntimeError>>({ code: "asset_not_bound" }),
+    );
+    expect(read).not.toHaveBeenCalled();
     expect(storage.ledger()).toHaveLength(0);
   });
 

@@ -108,7 +108,8 @@
     doğrulaması; frozen `policy_authority` evidence/invalidation bileşeni ve action unit↔context
     relational bridge. Public/saf compose yolu source-bound değerini açamaz; eksik impact aileleri
     mutation vermeden fail-closed kalır.
-  - [ ] Persisted tenant-bound authority-tier/decision/manual-lock loader ve frozen analysis composition.
+  - [x] Persisted tenant-bound authority-tier/decision/manual-lock loader ve frozen analysis composition;
+    deterministic catalog/snapshot head ve immutable historical ref/hash canlı PostgreSQL verifier ile doğrulandı.
 - [ ] Versioned draft/publish/pause/archive ve rol/audit API'leri.
   - [x] Guidance için immutable draft/revise/publish/archive, optimistic registry hash,
     analyst draft + owner/admin publish/archive ve mutation+audit tek transaction.
@@ -135,8 +136,10 @@
     catalog/snapshot/binding, audit ve `policy_authority` invalidation tek transaction'dadır.
     Current kullanım deterministic head, tarihsel replay explicit immutable snapshot ref/hash kullanır;
     HTTP/MCP/UI ve bütün write capability'leri kapalıdır.
+  - [x] Migration journal ile canlı PostgreSQL schema/RLS/OCC/rollback kabulü: 52/52 migration,
+    authority catalog, frozen context, progressive formalization ve Supabase security verifier'ları geçti.
   - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
-    context ailelerinin authoritative binding'i; canlı PostgreSQL verifier ve gerçek oturum kabulü.
+    context ailelerinin complete exact-impact coverage'ı ve gerçek oturumlu browser kabulü.
 - [ ] Başlangıç objective/internal kategori playbook seti.
   - [x] Altı canonical objective playbook'una version/hash ile bağlı, review-required ve
     authority-free starter category/profile proposal kataloğu.
@@ -244,7 +247,7 @@
 - [ ] Meta config + çoklu internal category + policy composition.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
-- [ ] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.
+- [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.
   - [x] Deterministik analysis run/record, frozen window/context/snapshot refs ve
     insufficient-data reason sözleşmesi.
   - [x] Versioned metrik/formül kataloğu, provenance ve fail-closed aggregation motoru.
@@ -259,7 +262,7 @@
   - [x] Uyumlu objective/funnel/optimization-event/metric/category-policy profile'ı zorunlu,
     MAD tabanlı deterministic cohort calculator; mixed profile, düşük sample ve zero-MAD
     `finding` üretmeden fail-closed `insufficient_data` kalır.
-- [ ] Hierarchical driver ve creative fatigue/config diagnostics.
+- [x] Hierarchical driver ve creative fatigue/config diagnostics.
   - [x] Snapshot-bound creative fatigue/config diagnostics: ancak settled minimum gün ve
     impression kanıtında frequency artışı + CTR düşüşünü birlikte review finding sayar;
     config drift'i ayrı reason-coded görünür, action/write authority vermez.
@@ -275,14 +278,26 @@
   - [x] HMAC capability'li loopback-only local-session principal/route assembly; dashboard cookie,
     CLI bearer, her istekte aktif workspace üyeliği ve read/mark-read scope'u.
   - [ ] Rol yönetimi/audit mutation API'si ve gerçek analysis dry-run endpoint'i.
-- [ ] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
+- [x] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
   - [x] Deterministik on-pass agenda, category/topic subset ve context/timeframe-bound finding çekirdeği.
-  - [ ] Persistence, gerçek finding ailesi ve Decision Room application binding'i.
+  - [x] A10.2c agenda hash+payload'ı ilk run claim'inde immutable Decision Room run assetine freeze edilir;
+    runtime aynı context/timeframe/pass'lerden tekrar üretip birebir eşleşme olmadan L2 okuması ya da ledger
+    staging'i başlatmaz. Legacy bağsız asset fail-closed kalır.
+  - [x] Persisted template check'leri gerçek deterministic calculator ailesini runtime'da çalıştırır;
+    agenda pass assignment, frozen L2 evidence ve bounded driver graph ile ledger'a bağlanır.
 - [x] EffectiveGuidancePack scope filter/ranking/context-budget ve source/conflict trace.
 - [ ] DecisionCadenceProfile, no-change/repeat suppression ve ExperimentRecord lifecycle.
   - [x] Settle/observation/learning/cooldown/evidence/repeat saf karar kapısı ve tek değişkenli experiment çekirdeği.
   - [x] Manual/scheduled ortak executor, idempotency/overlap/retry/lease ve in-app inbox çekirdeği.
   - [ ] Cadence/experiment PostgreSQL persistence, rol/audit API'si ve Decision Room adapter binding'i.
+    - [x] A10.1 tenant-scoped immutable `DecisionCadenceProfile` revision persistence:
+      owner/admin membership recheck, current-hash OCC, audit kaydı, RLS/FORCE RLS ve tombstone
+      purge sözleşmesi; tüm action/approval/Meta-write capability'leri false.
+    - [x] A10.2a persisted cadence revision'ın Decision Room run assetine exact hash/id freeze binding'i;
+      current profile drift'i asset hash/replay yolunda fail-closed kalır.
+    - [x] A10.2b ExperimentRecord append-only plan→outcome lifecycle'i: explicit stop conditions,
+      frozen cadence revision, tenant scope, actor-role recheck, hash chain, audit, RLS ve tombstone guard;
+      outcome yalnız `winner|loser|inconclusive|guardrail_stopped` advisory evidence'dır.
 - [ ] L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.

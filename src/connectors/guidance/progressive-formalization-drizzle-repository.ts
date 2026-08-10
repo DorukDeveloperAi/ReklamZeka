@@ -34,6 +34,13 @@ function rows<T extends Row = Row>(result: unknown): readonly T[] {
     ? result.rows as readonly T[] : [];
 }
 
+/** Bind every scoped reference as its own parameter; pg must not coerce a scalar text parameter to text[]. */
+function textArray(values: readonly string[]) {
+  return values.length === 0
+    ? sql`array[]::text[]`
+    : sql`array[${sql.join(values.map((value) => sql`${value}`), sql`, `)}]::text[]`;
+}
+
 function stable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value as Record<string, unknown>)
@@ -137,7 +144,7 @@ async function persistedPreview(database: Executor, input: Readonly<{ workspaceI
     const currentSet = setRows[0];
     const orderedCardRefs = scoped;
     const cardRows = rows(await database.execute(sql`select distinct on (card_key) card_key, version, status, record_hash
-      from guidance_cards where workspace_id = ${input.workspaceId}::uuid and card_key = any(${orderedCardRefs}::text[])
+      from guidance_cards where workspace_id = ${input.workspaceId}::uuid and card_key = any(${textArray(orderedCardRefs)})
       order by card_key, version desc`));
     const byRef = new Map(cardRows.map((row) => [String(row.card_key), row] as const));
     const promoted = new Set(strictPolicy.source.promotedFromGuidanceRefs);
@@ -203,7 +210,7 @@ async function persistedPreview(database: Executor, input: Readonly<{ workspaceI
     where workspace_id = ${input.workspaceId}::uuid and set_key = ${g2.guidanceSetRef} order by version desc limit 2`));
   const currentSet = setRows[0];
   const cardRows = rows(await database.execute(sql`select distinct on (card_key) card_key, version, status, record_hash
-    from guidance_cards where workspace_id = ${input.workspaceId}::uuid and card_key = any(${scoped}::text[])
+    from guidance_cards where workspace_id = ${input.workspaceId}::uuid and card_key = any(${textArray(scoped)})
     order by card_key, version desc`));
   const cardsByRef = new Map(cardRows.map((row) => [String(row.card_key), row] as const));
   const currentCardsPublished = scoped.length > 0 && cardRows.length === scoped.length && scoped.every((cardRef) =>
@@ -296,14 +303,14 @@ export class DrizzleProgressiveFormalizationRepository implements ProgressiveFor
         if (command.operation === "scope_g1") {
           const cards = rows(await tx.execute(sql`select distinct on (card_key) card_key, version, status, record_hash
             from guidance_cards where workspace_id = ${input.workspaceId}::uuid
-              and card_key = any(${command.guidanceCardRefs}::text[]) order by card_key, version desc`));
+              and card_key = any(${textArray(command.guidanceCardRefs)}) order by card_key, version desc`));
           if (cards.length !== command.guidanceCardRefs.length || cards.some((card) => card.status !== "published"
             || !/^[a-f0-9]{64}$/.test(String(card.record_hash)))) {
             throw new ProgressiveFormalizationStudioError("invalid_transition");
           }
           const bindings = rows(await tx.execute(sql`select distinct on (binding_key) binding_key, card_key, facet, value
             from guidance_bindings where workspace_id = ${input.workspaceId}::uuid
-              and card_key = any(${command.guidanceCardRefs}::text[]) order by binding_key, version desc`));
+              and card_key = any(${textArray(command.guidanceCardRefs)}) order by binding_key, version desc`));
           const allowed = new Set(["global", "account_group", "account", "objective", "internal_category",
             "entity", "promotion_template", "topic"]);
           if (bindings.length === 0 || bindings.some((binding) => !allowed.has(String(binding.facet)))
@@ -326,7 +333,7 @@ export class DrizzleProgressiveFormalizationRepository implements ProgressiveFor
             order by version desc limit 2`));
           const scoped = (previous.payload as { guidanceCardRefs: readonly string[] }).guidanceCardRefs;
           const cards = rows(await tx.execute(sql`select distinct on (card_key) card_key, version, status, record_hash
-            from guidance_cards where workspace_id = ${input.workspaceId}::uuid and card_key = any(${scoped}::text[])
+            from guidance_cards where workspace_id = ${input.workspaceId}::uuid and card_key = any(${textArray(scoped)})
             order by card_key, version desc`));
           const reviewedGuidanceHash = reviewedGuidanceManifest(sets[0], scoped, cards);
           if (sets.length === 0 || sets.length > 2 || sets[0]!.set_key !== command.guidanceSetRef

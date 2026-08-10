@@ -1,0 +1,83 @@
+﻿Tarih;Gün;Reklam Hesabı;Günlük Bütçe (Bağlam);Gerçekleşen Harcama;Bütçe Kullanımı % (Bilgi);7 Günlük Tipik Harcama;Normal Harcama Oranı %;Harcama Yapan Set;Medyan Set;Set Kapsama %;Eşzamanlı Hesap;Ham Sinyal;Yorum;Tahmini Harcama Açığı;Tamamlanmış Gün
+2026-07-01;Çarşamba;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;53274.31;0.980208095676173;43386.455;1.2279018878126824;101;112.5;0.8977777777777778;0;Normal;Normal;0;Evet
+2026-07-01;Çarşamba;Doruk Hospital;82500;41826.3;0.5069854545454546;57268.65;0.730352470330626;12;12;1;0;Normal;Normal;15442.349999999999;Evet
+2026-07-02;Perşembe;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;48436.72;0.8912;43386.455;1.116401881647164;102;112.5;0.9066666666666666;0;Normal;Normal;0;Evet
+2026-07-02;Perşembe;Doruk Hospital;82500;81925.2;0.9930327272727273;57268.65;1.4305418409548678;12;12;1;0;Normal;Normal;0;Evet
+2026-07-03;Cuma;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;49637.11;0.9132862925482981;43386.455;1.144069272310909;102;112.5;0.9066666666666666;0;Normal;Normal;0;Evet
+2026-07-03;Cuma;Doruk Hospital;82500;45418.31;0.5505249696969696;57268.65;0.7930745704674372;12;12;1;0;Normal;Normal;11850.340000000004;Evet
+2026-07-04;Cumartesi;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;48869.7;0.8991665133394664;49637.11;0.9845395914468026;102;112.5;0.9066666666666666;1;Normal;Normal;767.4100000000035;Evet
+2026-07-04;Cumartesi;Doruk Hospital;82500;0;0;45418.31;0;0;12;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;45418.31;Evet
+2026-07-05;Pazar;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;27578.71;0.5074279668813247;49253.405;0.5599350948426814;102;112.5;0.9066666666666666;1;Normal;Normal;21674.695;Evet
+2026-07-05;Pazar;Doruk Hospital;82500;0;0;45418.31;0;0;12;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;45418.31;Evet
+2026-07-06;Pazartesi;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;11987.13;0.220554369825207;48869.7;0.2452875708260947;102;112.5;0.9066666666666666;1;Orta;Yüksek: Ödeme/teslimat kesintisi adayı;36882.57;Evet
+2026-07-06;Pazartesi;Doruk Hospital;82500;49355.87;0.5982529696969697;45418.31;1.0866954318643738;12;12;1;1;Normal;Normal;0;Evet
+2026-07-07;Salı;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;0;0;48653.21;0;0;112.5;0;2;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;48653.21;Evet
+2026-07-07;Salı;Doruk Hospital;82500;648.17;0.00785660606060606;47387.09;0.013678198007094338;12;12;1;2;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;46738.92;Evet
+2026-07-08;Çarşamba;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;50176.1;0.9232033118675252;48653.21;1.0313009151914128;93;112.5;0.8266666666666667;0;Normal;Normal;0;Evet
+2026-07-08;Çarşamba;Doruk Hospital;82500;45123.93;0.5469567272727273;45418.31;0.9935184730563511;12;12;1;0;Normal;Normal;294.3799999999974;Evet
+2026-07-09;Perşembe;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;29331.55;0.5396789328426863;48653.21;0.6028697798151448;93;112.5;0.8266666666666667;1;Normal;Normal;19321.66;Evet
+2026-07-09;Perşembe;Doruk Hospital;82500;0;0;45418.31;0;0;12;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;45418.31;Evet
+2026-07-10;Cuma;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;55812.62;1.026911131554738;39100.625;1.42740991991816;99;112.5;0.88;0;Normal;Normal;0;Evet
+2026-07-10;Cuma;Doruk Hospital;82500;44561.17;0.5401353939393939;45271.119999999995;0.9843178167449801;12;12;1;0;Normal;Normal;709.9499999999971;Evet
+2026-07-11;Cumartesi;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;10623.08;0.19545685372585098;39100.625;0.27168568277361294;99;112.5;0.88;1;Normal;Normal;28477.545;Evet
+2026-07-11;Cumartesi;Doruk Hospital;82500;0;0;44842.55;0;0;12;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;44842.55;Evet
+2026-07-12;Pazar;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;0;0;28455.129999999997;0;0;112.5;0;2;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;28455.129999999997;Evet
+2026-07-12;Pazar;Doruk Hospital;82500;0;0;44842.55;0;0;12;0;2;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;44842.55;Evet
+2026-07-13;Pazartesi;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;43891.33;0.807568169273229;29331.55;1.4963863143952503;115;112.5;1.0222222222222221;0;Normal;Normal;0;Evet
+2026-07-13;Pazartesi;Doruk Hospital;82500;29143.52;0.3532547878787879;44842.55;0.6499077327226038;12;12;1;0;Normal;Normal;15699.030000000002;Evet
+2026-07-14;Salı;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;11432.5;0.21034958601655934;43891.33;0.2604728542060585;115;112.5;1.0222222222222221;0;Normal;Normal;32458.83;Evet
+2026-07-14;Salı;Doruk Hospital;82500;77884.52;0.9440547878787879;36852.345;2.113421004823438;12;12;1;0;Normal;Normal;0;Evet
+2026-07-15;Çarşamba;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;42881.58;0.7889895124195032;36611.44;1.171261769545257;110;112.5;0.9777777777777777;0;Normal;Normal;0;Evet
+2026-07-15;Çarşamba;Doruk Hospital;82500;67941.91;0.8235383030303031;44842.55;1.5151214638775004;12;12;1;0;Normal;Normal;0;Evet
+2026-07-16;Perşembe;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;49251.4;0.9061895124195033;36106.565;1.3640566473160767;110;112.5;0.9777777777777777;0;Normal;Normal;0;Evet
+2026-07-16;Perşembe;Doruk Hospital;82500;63950.24;0.7751544242424242;56251.54;1.1368620307995123;12;12;1;0;Normal;Normal;0;Evet
+2026-07-17;Cuma;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;35216.41;0.6479560257589697;43386.455;0.8116913446834964;110;112.5;0.9777777777777777;0;Normal;Normal;8170.044999999998;Evet
+2026-07-17;Cuma;Doruk Hospital;82500;64019.47;0.7759935757575758;63950.24;1.0010825604407427;12;12;1;0;Normal;Normal;0;Evet
+2026-07-18;Cumartesi;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;61528.81;1.1320848206071756;39048.995;1.5756822934879628;110;112.5;0.9777777777777777;0;Normal;Normal;0;Evet
+2026-07-18;Cumartesi;Doruk Hospital;82500;60986.97;0.739236;64019.47;0.9526315978560898;12;12;1;0;Normal;Normal;3032.5;Evet
+2026-07-19;Pazar;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;0;0;43386.455;0;0;112.5;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;43386.455;Evet
+2026-07-19;Pazar;Doruk Hospital;82500;57268.65;0.6941654545454545;63984.854999999996;0.8950344577634818;12;12;1;1;Normal;Normal;6716.2049999999945;Evet
+2026-07-20;Pazartesi;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;35335.82;0.6501530818767249;43386.455;0.8144435861376551;110;112.5;0.9777777777777777;0;Normal;Normal;8050.635000000002;Evet
+2026-07-20;Pazartesi;Doruk Hospital;82500;57894.09;0.7017465454545454;63950.24;0.9052990262429038;12;12;1;0;Normal;Normal;6056.1500000000015;Evet
+2026-07-21;Salı;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;9020.49;0.1659703771849126;39108.7;0.2306517475651198;110;112.5;0.9777777777777777;2;Orta;Yüksek: Ödeme/teslimat kesintisi adayı;30088.21;Evet
+2026-07-21;Salı;Doruk Hospital;82500;7387.24;0.08954230303030303;63950.24;0.1155154382532419;12;12;1;2;Orta;Yüksek: Ödeme/teslimat kesintisi adayı;56563;Evet
+2026-07-22;Çarşamba;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;29884.45;0.549851885924563;39108.7;0.7641381585171587;124;112.5;1.1022222222222222;1;Normal;Normal;9224.249999999996;Evet
+2026-07-22;Çarşamba;Doruk Hospital;82500;0;0;60986.97;0;0;12;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;60986.97;Evet
+2026-07-23;Perşembe;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;34832.89;0.6408995400183992;35276.115000000005;0.9874355495212552;149;112.5;1.3244444444444445;1;Normal;Normal;443.2250000000058;Evet
+2026-07-23;Perşembe;Doruk Hospital;82500;0;0;59440.53;0;0;12;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;59440.53;Evet
+2026-07-24;Cuma;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;23191.41;0.4267048758049678;35024.65;0.6621453747574922;149;112.5;1.3244444444444445;1;Normal;Normal;11833.240000000002;Evet
+2026-07-24;Cuma;Doruk Hospital;82500;0;0;57894.09;0;0;12;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;57894.09;Evet
+2026-07-25;Cumartesi;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;67528.2;1.2424691812327506;32358.67;2.0868657457182263;149;112.5;1.3244444444444445;1;Normal;Normal;0;Evet
+2026-07-25;Cumartesi;Doruk Hospital;82500;0;0;57581.369999999995;0;0;12;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;57581.369999999995;Evet
+2026-07-26;Pazar;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;0;0;32358.67;0;0;112.5;0;2;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;32358.67;Evet
+2026-07-26;Pazar;Doruk Hospital;82500;0;0;57268.65;0;0;12;0;2;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;57268.65;Evet
+2026-07-27;Pazartesi;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;45179.5;0.8312695492180313;32358.67;1.396210042007289;149;112.5;1.3244444444444445;1;Normal;Normal;0;Evet
+2026-07-27;Pazartesi;Doruk Hospital;82500;0;0;57268.65;0;0;12;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;57268.65;Evet
+2026-07-28;Salı;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;55494.91;1.0210655013799448;32358.67;1.7149935395985065;147;112.5;1.3066666666666666;0;Normal;Normal;0;Evet
+2026-07-28;Salı;Doruk Hospital;82500;57091.72;0.6920208484848485;57268.65;0.9969105260906272;12;12;1;0;Normal;Normal;176.9300000000003;Evet
+2026-07-29;Çarşamba;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;21337.81;0.3926;40006.195;0.5333626454602843;147;112.5;1.3066666666666666;0;Normal;Normal;18668.385;Evet
+2026-07-29;Çarşamba;Doruk Hospital;82500;86628.76;1.0500455757575757;57268.65;1.5126733387289555;13;12;1.0833333333333333;0;Normal;Normal;0;Evet
+2026-07-30;Perşembe;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;70836.63;1.303341858325667;40006.195;1.7706415218942968;139;112.5;1.2355555555555555;0;Normal;Normal;0;Evet
+2026-07-30;Perşembe;Doruk Hospital;82500;46492.57;0.5635463030303031;57268.65;0.8118328265115381;14;12;1.1666666666666667;0;Normal;Normal;10776.080000000002;Evet
+2026-07-31;Cuma;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;2440.49;0.04490321987120515;50337.205;0.04848282696665418;139;112.5;1.2355555555555555;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;47896.715000000004;Evet
+2026-07-31;Cuma;Doruk Hospital;82500;71263.48;0.8637997575757576;57091.72;1.2482279391827746;14;12;1.1666666666666667;1;Normal;Normal;0;Evet
+2026-08-01;Cumartesi;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;67473.37;1.2414603495860164;50337.205;1.3404274234137552;138;112.5;1.2266666666666666;0;Normal;Normal;0;Evet
+2026-08-01;Cumartesi;Doruk Hospital;82500;99747.99;1.2090665454545455;64177.6;1.5542493019371246;14;12;1.1666666666666667;0;Normal;Normal;0;Evet
+2026-08-02;Pazar;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;0;0;50337.205;0;0;112.5;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;50337.205;Evet
+2026-08-02;Pazar;Doruk Hospital;82500;62449.91;0.7569686060606061;71263.48;0.87632417052886;14;12;1.1666666666666667;1;Normal;Normal;8813.569999999992;Evet
+2026-08-03;Pazartesi;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;0;0;50337.205;0;0;112.5;0;2;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;50337.205;Evet
+2026-08-03;Pazartesi;Doruk Hospital;82500;0;0;66856.695;0;0;12;0;2;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;66856.695;Evet
+2026-08-04;Salı;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;54319.94;0.9994469181232751;55494.91;0.9788274275965129;138;112.5;1.2266666666666666;1;Normal;Normal;1174.9700000000012;Evet
+2026-08-04;Salı;Doruk Hospital;82500;0;0;66856.695;0;0;12;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;66856.695;Evet
+2026-08-05;Çarşamba;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;29004.31;0.5336579576816928;54319.94;0.5339532775625304;138;112.5;1.2266666666666666;1;Normal;Normal;25315.63;Evet
+2026-08-05;Çarşamba;Doruk Hospital;82500;0;0;71263.48;0;0;12;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;71263.48;Evet
+2026-08-06;Perşembe;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;0;0;54319.94;0;0;112.5;0;1;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;54319.94;Evet
+2026-08-06;Perşembe;Doruk Hospital;82500;23515.14;0.285032;66856.695;0.351724535590639;12;12;1;1;Normal;Normal;43341.55500000001;Evet
+2026-08-07;Cuma;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;50692.42;0.9327032198712051;41662.125;1.2167507058269351;136;112.5;1.208888888888889;0;Normal;Normal;0;Evet
+2026-08-07;Cuma;Doruk Hospital;82500;63854.99;0.7739998787878788;66856.695;0.9551024022351089;12;12;1;0;Normal;Normal;3001.705000000009;Evet
+2026-08-08;Cumartesi;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;0;0;52506.18;0;0;112.5;0;2;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;52506.18;Evet
+2026-08-08;Cumartesi;Doruk Hospital;82500;2452.69;0.029729575757575757;63152.45;0.03883760645865679;12;12;1;2;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;60699.759999999995;Evet
+2026-08-09;Pazar;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;0;0;50692.42;0;0;112.5;0;2;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;50692.42;Evet
+2026-08-09;Pazar;Doruk Hospital;82500;0;0;42982.525;0;0;12;0;2;Yüksek;Yüksek: Ödeme/teslimat kesintisi adayı;42982.525;Evet
+2026-08-10;Pazartesi;Doruk Hastaneleri - SİNA ÖZEL Sağlık Hizmetleri A.ş;54350;5475.49;0.10074498620055197;50692.42;0.10801397921030402;136;112.5;1.208888888888889;0;Gün İçi;Gün içi düşük — olay sayımına dahil değil;45216.93;Hayır
+2026-08-10;Pazartesi;Doruk Hospital;82500;0;0;23515.14;0;0;12;0;0;Gün İçi;Gün içi düşük — olay sayımına dahil değil;23515.14;Hayır

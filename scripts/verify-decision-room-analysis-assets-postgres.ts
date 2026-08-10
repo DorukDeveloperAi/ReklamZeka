@@ -21,6 +21,7 @@ import {
   DrizzleDecisionRoomRunStore,
   DrizzleDecisionRoomScheduleRegistry,
 } from "@/connectors/decisions/decision-room-drizzle-adapters";
+import { DrizzleDecisionCadenceProfileRepository } from "@/connectors/decisions/decision-cadence-profile-drizzle-repository";
 import * as schema from "@/db/schema";
 import { DECISION_CADENCE_VERSION } from "@/domain/decisions/cadence";
 import { DECISION_ROOM_SCHEDULE_VERSION, type DecisionRoomSchedule } from "@/domain/decisions/schedule";
@@ -40,6 +41,7 @@ const rollback = Symbol("rollback");
 const now = "2026-08-07T12:00:00.000Z";
 const workspaceId = randomUUID();
 const foreignWorkspaceId = randomUUID();
+const actorId = randomUUID();
 const connectionId = randomUUID();
 const sourceId = randomUUID();
 const accountId = randomUUID();
@@ -51,6 +53,7 @@ let versionedRegistry = false;
 let scheduleRevisionFrozen = false;
 let manualCurrentFrozen = false;
 let retryFrozen = false;
+let agendaFrozen = false;
 let guidanceRevisionFrozen = false;
 let guidanceBindingImmutable = false;
 let exactGuidanceRefGuard = false;
@@ -129,6 +132,8 @@ try {
       { id: workspaceId, name: "Analysis asset verifier" },
       { id: foreignWorkspaceId, name: "Foreign analysis asset verifier" },
     ]);
+    await transaction.insert(schema.users).values({ id: actorId, email: `analysis-assets-${actorId}@example.invalid` });
+    await transaction.insert(schema.memberships).values({ workspaceId, userId: actorId, role: "owner" });
     await transaction.insert(schema.metaConnections).values({
       id: connectionId, workspaceId, externalConnectionKey: "analysis-assets", displayName: "Analysis assets",
       graphApiVersion: "v1", fieldCatalogVersion: "fields-v1", status: "active",
@@ -196,6 +201,13 @@ try {
     });
     await new DrizzleEffectiveCampaignContextRepository(transaction as never).save(context);
 
+    const cadenceProfile = template(1, "a".repeat(64), context.contextHash, "1000").cadence.profile;
+    await new DrizzleDecisionCadenceProfileRepository(transaction as never).publish({
+      workspaceId, workspaceRef: "workspace_safe", actorId, actorRef: "actor_verify", role: "owner",
+      accountRef: "account_safe", campaignRef: "campaign_safe", profileRef: "cadence_safe",
+      revision: 1, expectedCurrentHash: "GENESIS", profile: cadenceProfile, occurredAt: now,
+    });
+
     const registry = new DrizzleDecisionRoomAnalysisAssetRegistry(transaction as never, workspaceId);
     const timeframeV1 = timeframe(1, 7);
     const timeframeV1Result = await registry.publishTimeframe(timeframeV1, now);
@@ -255,6 +267,17 @@ try {
     };
     const manualAssets = await loader.loadExact(manualInput);
     manualCurrentFrozen = manualAssets.resolvedTimeframe.inclusiveDayCount === 3;
+    const frozenAgenda = resultRows(await transaction.execute(sql`
+      select agenda_hash, agenda_payload from decision_room_run_analysis_assets
+      where workspace_id = ${workspaceId}::uuid and run_id = (
+        select id from decision_room_runs
+        where workspace_id = ${workspaceId}::uuid and run_ref = ${manual.runRef}
+        limit 1
+      )
+      limit 1
+    `))[0];
+    agendaFrozen = frozenAgenda?.agenda_hash === manualAssets.agenda.agendaHash
+      && (frozenAgenda?.agenda_payload as { agendaHash?: unknown } | undefined)?.agendaHash === manualAssets.agenda.agendaHash;
 
     const timeframeV3 = timeframe(3, 1);
     const timeframeV3Result = await registry.publishTimeframe(timeframeV3, "2026-08-07T12:04:00Z");
@@ -430,7 +453,7 @@ temporaryRowsCommitted = Number(resultRows(residue)[0]?.count ?? -1) !== 0;
 await pool.end();
 
 const result = {
-  tablesApplied, versionedRegistry, scheduleRevisionFrozen, manualCurrentFrozen, retryFrozen, guidanceRevisionFrozen,
+  tablesApplied, versionedRegistry, scheduleRevisionFrozen, manualCurrentFrozen, retryFrozen, agendaFrozen, guidanceRevisionFrozen,
   guidanceBindingImmutable, exactGuidanceRefGuard, guidanceRefCapsEnforced, guidanceRefUniqueness,
   guidanceScalarTypes, officialGuidanceUrlParity, guidanceConstraintsValidated,
   crossTenantBlocked, immutableRows, rlsAndGrants, temporaryRowsCommitted,

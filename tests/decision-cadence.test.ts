@@ -50,6 +50,7 @@ const experimentPlan: ExperimentPlan = {
   changedVariables: ["offer_message"],
   baselineRef: "baseline_123",
   guardrailMetrics: ["cplMinor", "spendMinor"],
+  stopConditions: ["guardrail_breach", "contamination"],
   minimumSampleSize: 100,
   minimumWindowHours: 72,
   minimumEvidenceScore: 0.8,
@@ -171,6 +172,7 @@ describe("single-variable experiment contract", () => {
       hypothesis: experimentPlan.hypothesis,
       changedVariables: ["offer_message"],
       guardrailMetrics: ["cplMinor", "spendMinor"],
+      stopConditions: ["contamination", "guardrail_breach"],
     });
     expect(() => validateExperimentPlan({
       ...experimentPlan,
@@ -241,6 +243,7 @@ describe("single-variable experiment contract", () => {
       minimumWindowHours: experimentPlan.minimumWindowHours,
       minimumSampleSize: experimentPlan.minimumSampleSize,
       guardrailMetrics: ["spendMinor", "cplMinor"],
+      stopConditions: ["contamination", "guardrail_breach"],
       baselineRef: experimentPlan.baselineRef,
       changedVariables: experimentPlan.changedVariables,
       primaryVariable: experimentPlan.primaryVariable,

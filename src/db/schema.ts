@@ -2256,6 +2256,82 @@ export const analysisTimeframeDefinitions = pgTable("analysis_timeframe_definiti
   `),
 ]);
 
+/**
+ * Immutable, tenant-scoped cadence profiles. A profile is advisory-only: it
+ * constrains decision tempo but cannot authorize, approve, or execute work.
+ */
+export const decisionCadenceProfileRevisions = pgTable("decision_cadence_profile_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull(),
+  campaignId: uuid("campaign_id").notNull(),
+  profileRef: text("profile_ref").notNull(),
+  revision: integer("revision").notNull(),
+  profileVersion: text("profile_version").notNull(),
+  profileHash: text("profile_hash").notNull(),
+  profilePayload: jsonb("profile_payload").$type<Record<string, unknown>>().notNull(),
+  supersededAt: timestamp("superseded_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.adAccountId], foreignColumns: [adAccounts.workspaceId, adAccounts.id], name: "decision_cadence_profile_revisions_account_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.campaignId], foreignColumns: [adCampaigns.workspaceId, adCampaigns.id], name: "decision_cadence_profile_revisions_campaign_scope_fk" }).onDelete("cascade"),
+  uniqueIndex("decision_cadence_profile_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("decision_cadence_profile_revisions_workspace_ref_revision_unique").on(table.workspaceId, table.profileRef, table.revision),
+  uniqueIndex("decision_cadence_profile_revisions_workspace_ref_hash_unique").on(table.workspaceId, table.profileRef, table.profileHash),
+  uniqueIndex("decision_cadence_profile_revisions_workspace_current_unique").on(table.workspaceId, table.profileRef).where(sql`${table.supersededAt} is null`),
+  index("decision_cadence_profile_revisions_scope_idx").on(table.workspaceId, table.adAccountId, table.campaignId, table.profileRef),
+  check("decision_cadence_profile_revisions_shape", sql`(
+    ${table.profileRef} ~ '^cadence_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.revision} >= 1 and ${table.profileVersion} = 'decision-cadence/1.0.0'
+    and ${table.profileHash} ~ '^[a-f0-9]{64}$' and jsonb_typeof(${table.profilePayload}) = 'object'
+    and ${table.profilePayload} #>> '{version}' = ${table.profileVersion}
+  ) is true`),
+  check("decision_cadence_profile_revisions_no_forbidden_material", sql`
+    ${table.profilePayload}::text !~* '"[^"[:space:]]*(token|secret|prompt)"[[:space:]]*:'
+    and ${table.profilePayload}::text !~* '"authorization"[[:space:]]*:'
+    and ${table.profilePayload}::text !~* '"[^"[:space:]]*raw[_-]?(payload|request|response|json)"[[:space:]]*:'
+  `),
+]);
+
+/** Immutable experiment plan/outcome chain. It is advisory evidence, never an execution command. */
+export const experimentRecordRevisions = pgTable("experiment_record_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull(), campaignId: uuid("campaign_id").notNull(),
+  cadenceProfileRevisionId: uuid("cadence_profile_revision_id").notNull(),
+  experimentRef: text("experiment_ref").notNull(), sequence: integer("sequence").notNull(),
+  previousRecordHash: text("previous_record_hash").notNull(), recordHash: text("record_hash").notNull(),
+  eventType: text("event_type").notNull(), planHash: text("plan_hash").notNull(),
+  planPayload: jsonb("plan_payload").$type<Record<string, unknown>>().notNull(),
+  outcomePayload: jsonb("outcome_payload").$type<Record<string, unknown>>(),
+  actorRef: text("actor_ref").notNull(), actorRole: text("actor_role").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.adAccountId], foreignColumns: [adAccounts.workspaceId, adAccounts.id], name: "experiment_record_revisions_account_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.campaignId], foreignColumns: [adCampaigns.workspaceId, adCampaigns.id], name: "experiment_record_revisions_campaign_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.cadenceProfileRevisionId], foreignColumns: [decisionCadenceProfileRevisions.workspaceId, decisionCadenceProfileRevisions.id], name: "experiment_record_revisions_cadence_profile_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("experiment_record_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("experiment_record_revisions_sequence_unique").on(table.workspaceId, table.experimentRef, table.sequence),
+  uniqueIndex("experiment_record_revisions_hash_unique").on(table.workspaceId, table.recordHash),
+  index("experiment_record_revisions_scope_idx").on(table.workspaceId, table.adAccountId, table.campaignId, table.occurredAt),
+  check("experiment_record_revisions_shape", sql`(
+    ${table.experimentRef} ~ '^experiment_[a-f0-9]{20}$' and ${table.sequence} >= 1
+    and (${table.previousRecordHash} = 'GENESIS' or ${table.previousRecordHash} ~ '^[a-f0-9]{64}$')
+    and ${table.recordHash} ~ '^[a-f0-9]{64}$' and ${table.planHash} ~ '^[a-f0-9]{64}$'
+    and ${table.eventType} in ('planned', 'outcome_recorded') and ${table.actorRole} in ('owner', 'admin', 'analyst')
+    and jsonb_typeof(${table.planPayload}) = 'object' and ${table.planPayload} #>> '{version}' = 'decision-experiment/1.0.0'
+    and ((${table.eventType} = 'planned' and ${table.sequence} = 1 and ${table.previousRecordHash} = 'GENESIS' and ${table.outcomePayload} is null)
+      or (${table.eventType} = 'outcome_recorded' and ${table.sequence} > 1 and ${table.outcomePayload} is not null
+        and jsonb_typeof(${table.outcomePayload}) = 'object' and ${table.outcomePayload} #>> '{version}' = 'decision-experiment/1.0.0'
+        and ${table.outcomePayload} #>> '{actionAuthority}' = 'none'))
+  ) is true`),
+  check("experiment_record_revisions_no_forbidden_material", sql`
+    concat_ws('|', ${table.planPayload}::text, ${table.outcomePayload}::text) !~* '"[^"[:space:]]*(token|secret|prompt)"[[:space:]]*:'
+    and concat_ws('|', ${table.planPayload}::text, ${table.outcomePayload}::text) !~* '"authorization"[[:space:]]*:'
+  `),
+]);
+
 /** Append-only template revisions, each bound to one exact context and timeframe revision. */
 export const analysisTemplateDefinitions = pgTable("analysis_template_definitions", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -2645,6 +2721,12 @@ export const decisionRoomRunAnalysisAssets = pgTable("decision_room_run_analysis
   templateDefinitionId: uuid("template_definition_id").notNull(),
   timeframeDefinitionId: uuid("timeframe_definition_id").notNull(),
   contextId: uuid("context_id").notNull(),
+  /** Null only for legacy assets created before A10.2; new assets must bind both fields. */
+  cadenceProfileRevisionId: uuid("cadence_profile_revision_id"),
+  cadenceProfileHash: text("cadence_profile_hash"),
+  /** Null only for legacy assets; newly claimed runs freeze their exact agenda contract. */
+  agendaHash: text("agenda_hash"),
+  agendaPayload: jsonb("agenda_payload").$type<Record<string, unknown>>(),
   assetHash: text("asset_hash").notNull(),
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
   resolvedTimeframe: jsonb("resolved_timeframe").$type<Record<string, unknown>>().notNull(),
@@ -2670,15 +2752,28 @@ export const decisionRoomRunAnalysisAssets = pgTable("decision_room_run_analysis
     foreignColumns: [effectiveCampaignContexts.workspaceId, effectiveCampaignContexts.id],
     name: "decision_room_run_analysis_assets_context_scope_fk",
   }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.workspaceId, table.cadenceProfileRevisionId],
+    foreignColumns: [decisionCadenceProfileRevisions.workspaceId, decisionCadenceProfileRevisions.id],
+    name: "decision_room_run_analysis_assets_cadence_profile_scope_fk",
+  }).onDelete("restrict"),
   uniqueIndex("decision_room_run_analysis_assets_run_unique").on(table.workspaceId, table.runId),
   uniqueIndex("decision_room_run_analysis_assets_hash_unique").on(table.workspaceId, table.assetHash),
   index("decision_room_run_analysis_assets_template_idx").on(table.templateDefinitionId),
   index("decision_room_run_analysis_assets_timeframe_idx").on(table.timeframeDefinitionId),
   index("decision_room_run_analysis_assets_context_idx").on(table.contextId),
+  index("decision_room_run_analysis_assets_cadence_profile_idx").on(table.cadenceProfileRevisionId),
   check("decision_room_run_analysis_assets_shape", sql`(
     ${table.assetHash} ~ '^[a-f0-9]{64}$'
     and jsonb_typeof(${table.resolvedTimeframe}) = 'object'
     and ${table.resolvedTimeframe} #>> '{resolverVersion}' = 'analysis-timeframe-resolver/1.0.0'
+    and ((${table.cadenceProfileRevisionId} is null and ${table.cadenceProfileHash} is null)
+      or (${table.cadenceProfileRevisionId} is not null and ${table.cadenceProfileHash} ~ '^[a-f0-9]{64}$'))
+    and ((${table.agendaHash} is null and ${table.agendaPayload} is null)
+      or (${table.agendaHash} ~ '^[a-f0-9]{64}$'
+        and jsonb_typeof(${table.agendaPayload}) = 'object'
+        and ${table.agendaPayload} #>> '{contractVersion}' = 'analysis-agenda/1.0.0'
+        and ${table.agendaPayload} #>> '{agendaHash}' = ${table.agendaHash}))
   ) is true`),
 ]);
 

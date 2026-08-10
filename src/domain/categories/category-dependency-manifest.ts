@@ -37,6 +37,9 @@ const categoryContract = new Set([
   "policy_manual_lock_revisions.payload",
   "authority_topic_revisions.payload",
   "policy_semantic_binding_revisions.payload",
+  "decision_cadence_profile_revisions.profile_payload",
+  "experiment_record_revisions.plan_payload",
+  "experiment_record_revisions.outcome_payload",
 ]);
 
 const categoryProjection = new Set([
@@ -47,6 +50,9 @@ const categoryProjection = new Set([
 ]);
 
 const opaqueCategoryContext = new Set([
+  // Immutable historical run snapshot. Category selection is retained for replay,
+  // never interpreted as a mutable category dependency by archive operations.
+  "decision_room_run_analysis_assets.agenda_payload",
   "action_proposal_bundles.bundle_payload",
   "action_proposal_units.unit_payload",
   "action_proposal_units.action_plan_payload",
@@ -110,8 +116,12 @@ const columns = [
   "budget_proposal_versions.proposal_payload",
   "budget_proposal_alternatives.alternative_payload",
   "analysis_timeframe_definitions.definition_payload",
+  "decision_cadence_profile_revisions.profile_payload",
+  "experiment_record_revisions.plan_payload",
+  "experiment_record_revisions.outcome_payload",
   "analysis_template_definitions.definition_payload",
   "decision_room_run_analysis_assets.resolved_timeframe",
+  "decision_room_run_analysis_assets.agenda_payload",
   "guidance_analysis_run_bindings.selected_set_refs",
   "guidance_analysis_run_bindings.card_refs",
   "guidance_analysis_run_bindings.source_refs",

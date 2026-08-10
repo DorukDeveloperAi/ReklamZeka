@@ -13,6 +13,13 @@ describe("strict instruction policy lifecycle migration", () => {
     expect(migration).toContain("instruction_policy_raw_provenance_append_only_trigger");
   });
 
+  it("creates the composite provenance key before the revision scope foreign key", () => {
+    const uniqueIndex = migration.indexOf('CREATE UNIQUE INDEX "instruction_policy_raw_provenance_workspace_row_unique"');
+    const scopeForeignKey = migration.indexOf('ADD CONSTRAINT "strict_instruction_policy_revisions_provenance_scope_fk"');
+    expect(uniqueIndex).toBeGreaterThan(-1);
+    expect(scopeForeignKey).toBeGreaterThan(uniqueIndex);
+  });
+
   it("is journaled with the matching generated schema snapshot", () => {
     const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")) as { entries: { idx: number; tag: string }[] };
     const policy = journal.entries.find((entry) => entry.tag === "20260809194948_strict_instruction_policy_lifecycle");

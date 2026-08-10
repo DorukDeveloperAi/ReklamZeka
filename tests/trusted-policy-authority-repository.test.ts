@@ -45,6 +45,22 @@ describe("DrizzleTrustedPolicyAuthorityRepository", () => {
     expect(migration).toContain("policy_semantic_binding_revisions_policy_scope_fk");
     expect(migration).toContain("authority_topic_head_occ_conflict");
     expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|TRUNCATE|DELETE FROM/);
+    expect(migration.indexOf("authority_topic_revisions_topic_scope_fk"))
+      .toBeGreaterThan(migration.indexOf("authority_topics_workspace_row_unique"));
+    expect(migration.indexOf("category_topic_bindings_topic_scope_fk"))
+      .toBeGreaterThan(migration.indexOf("authority_topic_revisions_workspace_row_unique"));
+  });
+
+  it("creates authority composite target keys before their composite foreign keys", () => {
+    const migration = readFileSync("drizzle/20260810071633_awesome_madelyne_pryor.sql", "utf8");
+    for (const [indexName, foreignKey] of [
+      ["account_group_revisions_workspace_row_unique", "account_group_account_bindings_revision_scope_fk"],
+      ["account_groups_workspace_row_unique", "account_group_revisions_group_scope_fk"],
+      ["tenant_authority_snapshots_workspace_row_unique", "policy_authority_bindings_snapshot_scope_fk"],
+      ["policy_authority_catalog_revisions_workspace_row_unique", "policy_authority_bindings_catalog_scope_fk"],
+    ] as const) {
+      expect(migration.indexOf(foreignKey)).toBeGreaterThan(migration.indexOf(indexName));
+    }
   });
 
   it("fails closed when no current repository-verified tenant snapshot exists", async () => {

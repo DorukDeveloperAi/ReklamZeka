@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { AnalysisPassKey } from "@/analyses/agenda";
+import { buildAnalysisAgenda, type AnalysisAgenda, type AnalysisPassKey } from "@/analyses/agenda";
 import { analyze } from "@/analyses/deterministic-analysis";
 import type { EffectiveCampaignContext } from "@/analyses/effective-campaign-context";
 import {
@@ -62,6 +62,8 @@ export type DecisionRoomAnalysisRuntimeAssets = Readonly<{
   context: EffectiveCampaignContext;
   resolvedTimeframe: ResolvedAnalysisTimeframe;
   requestedPasses: readonly AnalysisPassKey[];
+  /** Exact immutable agenda persisted with this claimed run's analysis assets. */
+  agenda: AnalysisAgenda;
   hierarchy: readonly FindingHierarchyNode[];
   checks: readonly DecisionRoomAnalysisRuntimeCheck[];
   cadence: Readonly<{
@@ -149,7 +151,7 @@ export function validateDecisionRoomAnalysisRuntimeAssets(
 ): void {
   exact(assets, [
     "version", "workspaceRef", "accountRef", "campaignRef", "timeframeRef", "templateRef",
-    "occurredAt", "context", "resolvedTimeframe", "requestedPasses", "hierarchy", "checks", "cadence",
+    "occurredAt", "context", "resolvedTimeframe", "requestedPasses", "agenda", "hierarchy", "checks", "cadence",
   ], "asset_not_bound");
   if (assets.version !== DECISION_ROOM_ANALYSIS_RUNTIME_VERSION
     || assets.workspaceRef !== input.workspaceRef || assets.accountRef !== input.accountRef
@@ -175,6 +177,18 @@ export function validateDecisionRoomAnalysisRuntimeAssets(
   }
   if (assets.requestedPasses.length < 1 || new Set(assets.requestedPasses).size !== assets.requestedPasses.length
     || assets.requestedPasses.some((pass) => !PASSES.includes(pass))) {
+    throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
+  }
+  try {
+    const expectedAgenda = buildAnalysisAgenda({
+      context: assets.context,
+      resolvedTimeframe: assets.resolvedTimeframe,
+      requestedPasses: assets.requestedPasses,
+    });
+    if (JSON.stringify(stable(assets.agenda)) !== JSON.stringify(stable(expectedAgenda))) {
+      throw new Error("agenda mismatch");
+    }
+  } catch {
     throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
   }
   const hierarchy = new Map(assets.hierarchy.map((node) => [node.entityRef, node]));
@@ -398,6 +412,9 @@ export class DecisionRoomDeterministicAnalysisRuntime implements DecisionRoomAna
         recommendationSource: "deterministic_policy",
       },
     }, this.drafts);
+    if (room.agendaRef !== prepared.agenda.agendaId) {
+      throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
+    }
     return Object.freeze({
       analysisRef: room.roomRunRef,
       evidenceRefs: Object.freeze(evaluated.map((entry) => entry.finding.findingRef).sort(compare)),

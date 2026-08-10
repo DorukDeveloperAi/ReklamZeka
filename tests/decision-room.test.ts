@@ -234,6 +234,7 @@ describe("Decision Room application service", () => {
           version: EXPERIMENT_CONTRACT_VERSION, hypothesis: "Spend efficiency improves",
           primaryMetric: "roas", desiredDirection: "increase", primaryVariable: "budget",
           changedVariables: ["budget"], baselineRef: "baseline-1", guardrailMetrics: ["cpa"],
+          stopConditions: ["guardrail_breach", "contamination"],
           minimumSampleSize: 10, minimumWindowHours: 24, minimumEvidenceScore: 0.5,
           minimumDetectableEffect: 0.1,
         },

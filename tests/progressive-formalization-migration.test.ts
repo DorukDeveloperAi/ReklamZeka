@@ -15,9 +15,10 @@ describe("progressive formalization persistence migration", () => {
     expect(migration).toContain("progressive_formalization_payload_exact");
     expect(migration).toContain("progressive_formalization_nested_exact");
     expect(migration).toContain("- 'schemaVersion' - 'formalizationRef'");
-    expect(migration).toContain("#> '{payload,confirmation}' - 'confirmed' - 'confirmationRef' - 'confirmedAt'");
-    expect(migration).toContain("#> '{payload,normalizedDraft,authority}' - 'canPublish' - 'canApprove'");
-    expect(migration).toContain("#> '{payload,normalizedDraft,strictPolicy}' - 'dslVersion' - 'workspaceRef'");
+    expect(migration).toContain("((\"progressive_formalization_revisions\".\"revision_payload\" #> '{actor}') - 'actorRef' - 'role')");
+    expect(migration).toContain("#> '{payload,confirmation}') - 'confirmed' - 'confirmationRef' - 'confirmedAt'");
+    expect(migration).toContain("#> '{payload,normalizedDraft,authority}') - 'canPublish' - 'canApprove'");
+    expect(migration).toContain("#> '{payload,normalizedDraft,strictPolicy}') - 'dslVersion' - 'workspaceRef'");
     expect(migration).toContain("sequence\" <= 2 or \"progressive_formalization_revisions\".\"actor_role\" in ('owner', 'admin')");
     expect(migration).toContain("progressive_formalization_revision_guard");
     expect(migration).toContain("expected_previous <> NEW.previous_revision_hash");
