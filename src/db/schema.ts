@@ -1751,6 +1751,93 @@ export const guidanceSets = pgTable("guidance_sets", {
   check("guidance_sets_record_hash_format", sql`${table.recordHash} ~ '^[a-f0-9]{64}$'`),
 ]);
 
+/**
+ * Immutable, tenant-scoped guidance selection revisions. A revision freezes
+ * the reviewed manifest identity plus the bounded topic/budget input used to
+ * build a campaign's advisory guidance pack. The mutable head below is only
+ * an OCC pointer; it never replaces historical selection evidence.
+ */
+export const guidanceCampaignSelectionRevisions = pgTable("guidance_campaign_selection_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull(),
+  campaignId: uuid("campaign_id").notNull(),
+  selectionRef: text("selection_ref").notNull(),
+  revision: integer("revision").notNull(),
+  selectionVersion: text("selection_version").notNull(),
+  selectedSetRef: text("selected_set_ref").notNull(),
+  selectedSetVersion: integer("selected_set_version").notNull(),
+  selectedSetHash: text("selected_set_hash").notNull(),
+  topics: jsonb("topics").$type<readonly string[]>().notNull(),
+  requiredTopics: jsonb("required_topics").$type<readonly string[]>().notNull(),
+  budget: jsonb("budget").$type<Readonly<{ maxCards: number; maxSources: number; maxCharacters: number }>>().notNull(),
+  sourceSelectionHash: text("source_selection_hash").notNull(),
+  effectiveAt: timestamp("effective_at", { withTimezone: true }).notNull(),
+  previousSelectionHash: text("previous_selection_hash").notNull(),
+  selectionHash: text("selection_hash").notNull(),
+  actorRef: text("actor_ref").notNull(),
+  actorRole: text("actor_role").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("guidance_campaign_selection_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("guidance_campaign_selection_revisions_workspace_ref_revision_unique")
+    .on(table.workspaceId, table.selectionRef, table.revision),
+  uniqueIndex("guidance_campaign_selection_revisions_workspace_ref_hash_unique")
+    .on(table.workspaceId, table.selectionRef, table.selectionHash),
+  index("guidance_campaign_selection_revisions_campaign_idx")
+    .on(table.workspaceId, table.adAccountId, table.campaignId, table.createdAt),
+  foreignKey({ columns: [table.workspaceId, table.adAccountId], foreignColumns: [adAccounts.workspaceId, adAccounts.id],
+    name: "guidance_campaign_selection_revisions_account_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.campaignId], foreignColumns: [adCampaigns.workspaceId, adCampaigns.id],
+    name: "guidance_campaign_selection_revisions_campaign_scope_fk" }).onDelete("cascade"),
+  check("guidance_campaign_selection_revisions_identity", sql`
+    ${table.selectionRef} ~ '^guidance_selection_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.revision} >= 1 and ${table.selectionVersion} = 'guidance-campaign-selection/1.0.0'
+    and btrim(${table.selectedSetRef}) <> '' and ${table.selectedSetVersion} >= 1
+    and ${table.selectedSetHash} ~ '^[a-f0-9]{64}$' and ${table.sourceSelectionHash} ~ '^[a-f0-9]{64}$'
+    and ${table.selectionHash} ~ '^[a-f0-9]{64}$'
+    and ((${table.revision} = 1 and ${table.previousSelectionHash} = 'GENESIS')
+      or (${table.revision} > 1 and ${table.previousSelectionHash} ~ '^[a-f0-9]{64}$'))
+    and ${table.actorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.actorRole} in ('owner', 'admin') and ${table.effectiveAt} <= ${table.occurredAt}
+  `),
+  check("guidance_campaign_selection_revisions_topics", sql`
+    jsonb_typeof(${table.topics}) = 'array' and jsonb_array_length(${table.topics}) between 1 and 50
+    and jsonb_typeof(${table.requiredTopics}) = 'array' and jsonb_array_length(${table.requiredTopics}) <= 50
+    and jsonb_typeof(${table.budget}) = 'object'
+    and (${table.budget} #>> '{maxCards}')::integer between 1 and 100
+    and (${table.budget} #>> '{maxSources}')::integer between 1 and 500
+    and (${table.budget} #>> '{maxCharacters}')::integer between 256 and 200000
+  `),
+]);
+
+/** Mutable current pointer guarded by the writer's workspace row lock and expected hash. */
+export const guidanceCampaignSelectionHeads = pgTable("guidance_campaign_selection_heads", {
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull(),
+  campaignId: uuid("campaign_id").notNull(),
+  revisionId: uuid("revision_id").notNull(),
+  selectionRef: text("selection_ref").notNull(),
+  revision: integer("revision").notNull(),
+  selectionHash: text("selection_hash").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("guidance_campaign_selection_heads_scope_unique").on(table.workspaceId, table.adAccountId, table.campaignId),
+  uniqueIndex("guidance_campaign_selection_heads_workspace_revision_unique").on(table.workspaceId, table.revisionId),
+  foreignKey({ columns: [table.workspaceId, table.adAccountId], foreignColumns: [adAccounts.workspaceId, adAccounts.id],
+    name: "guidance_campaign_selection_heads_account_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.campaignId], foreignColumns: [adCampaigns.workspaceId, adCampaigns.id],
+    name: "guidance_campaign_selection_heads_campaign_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.revisionId],
+    foreignColumns: [guidanceCampaignSelectionRevisions.workspaceId, guidanceCampaignSelectionRevisions.id],
+    name: "guidance_campaign_selection_heads_revision_scope_fk" }).onDelete("cascade"),
+  check("guidance_campaign_selection_heads_identity", sql`
+    ${table.selectionRef} ~ '^guidance_selection_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.revision} >= 1 and ${table.selectionHash} ~ '^[a-f0-9]{64}$'
+  `),
+]);
+
 /** Append-only, advisory-only practice definition revisions. Conversation output cannot mint policy or automation. */
 export const advisedPracticeDefinitions = pgTable("advised_practice_definitions", {
   id: uuid("id").primaryKey().defaultRandom(),

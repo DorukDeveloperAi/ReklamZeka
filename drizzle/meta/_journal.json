@@ -435,6 +435,13 @@
       "when": 1786372200000,
       "tag": "20260810173000_effective_context_cadence_component",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1786375200000,
+      "tag": "20260810180000_guidance_campaign_selection",
+      "breakpoints": true
     }
   ]
 }

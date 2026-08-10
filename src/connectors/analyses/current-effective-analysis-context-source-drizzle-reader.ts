@@ -4,6 +4,8 @@ import type { EffectiveAnalysisContextNotReadySource, EffectiveAnalysisContextRe
   EffectiveAnalysisContextSource } from "@/application/effective-analysis-context-composer";
 import { CurrentDecisionCadenceReader, type CurrentDecisionCadence } from "@/connectors/decisions/current-decision-cadence-reader";
 import { CurrentReviewedGuidanceReader, type CurrentReviewedGuidanceManifest } from "@/connectors/guidance/current-reviewed-guidance-reader";
+import { CurrentGuidanceCampaignSelectionReader } from "@/connectors/guidance/current-guidance-campaign-selection-reader";
+import type { GuidanceCampaignSelection } from "@/connectors/guidance/guidance-campaign-selection-drizzle-repository";
 import { CurrentMetaHierarchyConfigReader, type CurrentMetaHierarchyConfig } from "@/connectors/meta/current-meta-hierarchy-config-reader";
 import * as schema from "@/db/schema";
 
@@ -40,7 +42,8 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
   constructor(private readonly database: Database,
     private readonly hierarchyReader: Pick<CurrentMetaHierarchyConfigReader, "readCurrent"> = new CurrentMetaHierarchyConfigReader(),
     private readonly cadenceReader: Pick<CurrentDecisionCadenceReader, "readCurrentInTransaction"> = new CurrentDecisionCadenceReader(database),
-    private readonly guidanceReader: Pick<CurrentReviewedGuidanceReader, "readCurrentInTransaction"> = new CurrentReviewedGuidanceReader()) {}
+    private readonly guidanceReader: Pick<CurrentReviewedGuidanceReader, "readCurrentInTransaction"> = new CurrentReviewedGuidanceReader(),
+    private readonly selectionReader: Pick<CurrentGuidanceCampaignSelectionReader, "readCurrentInTransaction"> = new CurrentGuidanceCampaignSelectionReader()) {}
 
   async loadCurrent(input: EffectiveAnalysisContextRequest): Promise<EffectiveAnalysisContextSource> {
     if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).length !== 4
@@ -75,6 +78,10 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
         tx, input.workspaceId, capturedAt,
       );
       if (guidance.capturedAt !== capturedAt || !Array.isArray(guidance.reviewedSets)) throw new Error("corrupt_store");
+      const selection: GuidanceCampaignSelection = await this.selectionReader.readCurrentInTransaction(tx, {
+        workspaceId: input.workspaceId, accountRef: input.accountRef, campaignRef: hierarchy.identity.campaignRef,
+      }, capturedAt);
+      if (selection.effectiveAt > capturedAt) throw new Error("corrupt_store");
       const unavailable: EffectiveAnalysisContextNotReadySource = Object.freeze({
         status: "not_ready", capturedAt, reason: "current_source_bundle_unavailable", capabilities: NO_SOURCE_CAPABILITIES,
       });

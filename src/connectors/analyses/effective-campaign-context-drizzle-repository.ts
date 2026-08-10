@@ -31,6 +31,7 @@ export const CONTEXT_SOURCE_COMPONENT_TYPES = Object.freeze([
   "policy_authority",
   "business_outcome_evidence",
   "cadence_profile",
+  "guidance_selection",
 ] as const);
 
 export type ContextSourceComponentType = typeof CONTEXT_SOURCE_COMPONENT_TYPES[number];

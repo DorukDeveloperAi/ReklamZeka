@@ -290,6 +290,14 @@
     sözleşmesiyle doğrulanır; her current reviewed set için sıralı exact set/card/source ref/version/hash
     manifesti üretilir. Reader topic/scope/budget/set selection yapmaz; stale/unpublished/archived/missing/
     future/tampered revision fail-closed olur ve source seam validation sonrası dahi `not_ready` kalır.
+  - [x] A10.4c-8 persisted campaign guidance selection lifecycle: owner/admin private publisher exact
+    workspace/account/campaign scope'ta immutable selection revision + OCC current-head yazar; reviewed
+    set ref/version/full manifest hash, sorted topic/required-topic seti, bounded budget, effective time,
+    source/record hash ve actor/audit provenance'i aynı transactionda doğrular. Previous selection component
+    kullanan exact campaign context'leri atomik invalidate eder; RLS/FORCE/revoke, tenant FKs ve immutable
+    revision trigger'ı public/API veya action authority açmaz. Transaction-local reader selection + reviewed
+    manifest closure'ını doğrular; data/history/category/lifecycle/authority eksik olduğundan source yine
+    dürüstçe `not_ready` kalır.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.

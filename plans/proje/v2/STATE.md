@@ -2114,3 +2114,23 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: `tests/current-reviewed-guidance-reader.test.ts`,
   `tests/current-effective-analysis-context-source-drizzle-reader.test.ts`, `npx tsc --noEmit` ve
   `git diff --check`.
+
+## 2026-08-10 — A10.4c-8 persisted campaign guidance selection
+
+- Forward-only `guidance_campaign_selection_revisions` immutable evidence tablosu ve ayrı OCC
+  `guidance_campaign_selection_heads` pointer'ı eklendi. Scope workspace/account/campaign composite FK
+  ve campaign→account trigger'ı ile zorlanır; exact reviewed GuidanceSet manifest ref/version/hash, sorted
+  topics/requiredTopics, bounded budget, effective time, source selection hash, chained selection hash ve
+  owner/admin actor provenance revisiona freeze edilir. Revision update/delete trigger ile engellenir;
+  relations RLS+FORCE ve PUBLIC/anon/authenticated/service_role revoke ile server-private kalır.
+- Private publisher active workspace + exact owner/admin membership + exact Meta scope + reviewed manifest
+  recheck + expected-current-hash/revision OCC uygular. Yeni revision/head, previous selection kullanan exact
+  campaign context invalidationı ve audit chain tek kısa transactiondadır. `CurrentGuidanceCampaignSelectionReader`
+  aynı caller-owned snapshotta head/revision hashini, time sınırını ve reviewed manifest closure'ını doğrular.
+  Source seam bunu validation için çağırır; geri kalan data/history/category/lifecycle/authority closure yoktur,
+  dolayısıyla `ready` veya herhangi bir action authority iddiası yoktur.
+- Kanıt: local `npm run db:migrate`,
+  `tests/guidance-campaign-selection-drizzle-repository.test.ts`,
+  `tests/current-guidance-campaign-selection-reader.test.ts`,
+  `tests/current-effective-analysis-context-source-drizzle-reader.test.ts`, `npx tsc --noEmit`,
+  `npm run db:check`, `git diff --check`.

@@ -3,6 +3,7 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import { DrizzleCurrentEffectiveAnalysisContextSourceReader } from "@/connectors/analyses/current-effective-analysis-context-source-drizzle-reader";
 import type { CurrentDecisionCadence } from "@/connectors/decisions/current-decision-cadence-reader";
 import type { CurrentReviewedGuidanceManifest } from "@/connectors/guidance/current-reviewed-guidance-reader";
+import type { GuidanceCampaignSelection } from "@/connectors/guidance/guidance-campaign-selection-drizzle-repository";
 import type { CurrentMetaHierarchyConfig } from "@/connectors/meta/current-meta-hierarchy-config-reader";
 
 const input = Object.freeze({ workspaceId: "61b10d7d-132c-4c6d-b49f-cddc9b10d025", accountRef: "account_primary",
@@ -21,8 +22,13 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
     } } as CurrentDecisionCadence));
     const readCurrentGuidance = vi.fn(async () => ({ capturedAt: "2026-08-10T15:00:00.000Z", registryHash: "a".repeat(64),
       reviewedSets: [] } as CurrentReviewedGuidanceManifest));
+    const readCurrentSelection = vi.fn(async () => ({ selectionRef: "guidance_selection_primary", revision: 1,
+      selectedSetRef: "set_primary", selectedSetVersion: 1, selectedSetHash: "a".repeat(64), topics: ["quality"],
+      requiredTopics: [], budget: { maxCards: 10, maxSources: 20, maxCharacters: 1000 }, sourceSelectionHash: "b".repeat(64),
+      effectiveAt: "2026-08-10T15:00:00.000Z", previousSelectionHash: "GENESIS", selectionHash: "c".repeat(64) } as GuidanceCampaignSelection));
     const result = await new DrizzleCurrentEffectiveAnalysisContextSourceReader(database as never,
-      { readCurrent }, { readCurrentInTransaction }, { readCurrentInTransaction: readCurrentGuidance }).loadCurrent(input);
+      { readCurrent }, { readCurrentInTransaction }, { readCurrentInTransaction: readCurrentGuidance },
+      { readCurrentInTransaction: readCurrentSelection }).loadCurrent(input);
     expect(database.transaction).toHaveBeenCalledTimes(1);
     expect(new PgDialect().sqlToQuery(execute.mock.calls[0]![0] as never).sql.toLowerCase()).toContain("repeatable read, read only");
     expect(result).toEqual({ status: "not_ready", capturedAt: "2026-08-10T15:00:00.000Z",
@@ -36,6 +42,9 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
       workspaceId: input.workspaceId, accountRef: input.accountRef, campaignRef: input.entityRef,
     }, "2026-08-10T15:00:00.000Z");
     expect(readCurrentGuidance).toHaveBeenCalledWith(expect.anything(), input.workspaceId, "2026-08-10T15:00:00.000Z");
+    expect(readCurrentSelection).toHaveBeenCalledWith(expect.anything(), {
+      workspaceId: input.workspaceId, accountRef: input.accountRef, campaignRef: input.entityRef,
+    }, "2026-08-10T15:00:00.000Z");
   });
 
   it("does not claim a source scope when the tenant/account read is missing or ambiguous", async () => {
