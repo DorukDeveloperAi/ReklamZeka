@@ -2416,3 +2416,14 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   L1-change invalidation yazmaz; bunlar sonraki L2 persistence checkpoint'inde relational source manifest ile
   bağlanacaktır.
 - Kanıt: `tests/deterministic-feature-snapshot.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 L2 private relational-source manifest seam
+
+- Canonical L1 observation adapter'ı, public `FindingObservationReadPort` sonucunu değiştirmeden
+  server-private `readForFeatureSnapshot()` yüzeyi ekler. Bu yüzey her opaque `snapshotRef` için
+  exact tenant-owned `meta_daily_insights.id` ve canonical `contentHash` taşır.
+- İç UUID hiç bir finding/context/model girdisine sızmaz; public `read()` yalnız hash-türetilmiş
+  snapshot referanslarını döndürmeye devam eder. Böylece sonraki L2 persistence migration'ı,
+  bağlamı bozmeden relational source-manifest FK'sini yazıcı tarafında yeniden doğrulayabilir.
+- Bu yalnız kanıt taşıma checkpoint'idir: feature header/item tablosu, selective invalidation ve L3
+  rollup henüz eklenmedi; herhangi bir yetki veya Meta write açılmaz.

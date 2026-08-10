@@ -417,6 +417,9 @@
   - [x] Saf immutable L2 feature snapshot contract: authenticated observation metric-result hash'i,
     source-manifest hash'i, formula catalog sürümü ve all-false capability seti freeze edilir. DB
     persistence/invalidation bağlantısı sonraki checkpoint'tir.
+  - [x] L2 yazıcı hazırlığı: public observation/finding sözleşmesine iç UUID eklemeden, yalnız
+    server-private adapter ile opaque snapshotRef ↔ canonical daily-insight id/contentHash manifest
+    bağını taşır. Relational feature header/item persistence ve invalidation hâlâ açık kalır.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.
