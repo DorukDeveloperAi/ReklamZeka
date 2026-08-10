@@ -228,7 +228,7 @@
       "pkg": "skill:pm"
     },
     ".claude/hooks/goal-tracker.mjs": {
-      "hash": "01a390fd1bcc6220",
+      "hash": "70edd9c76ffdacf5",
       "pkg": "hook:goal-tracker"
     },
     ".claude/hooks/oturum-kapanis.mjs": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-10T12:02:38.932Z",
+  "updatedAt": "2026-08-10T13:03:21.656Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",

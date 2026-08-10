@@ -26,6 +26,12 @@
  * Döngü kilidi üç katmanlı ve ŞÜPHE SERBEST BIRAKMA yönünedir: `stop_hook_active` ∧
  * aynı `prompt_id`'ye ikinci blok yok ∧ aynı açık-küme imzasına oturum başına tek blok.
  *
+ * POSTA EKSENİ (2026-08-10, otonomi-merdiveni:13 — nöbet turu Stop dalına biner):
+ * bekleyen YENİ posta da "açık iş" sayılır ve turu BİR KEZ uzatır; aynı okunmamış küme
+ * ikinci blok üretmez (kapı 6'nın imza kümesine posta imzası girer — zincir KOPYALANMAZ,
+ * GENİŞLETİLİR). Okuma TÜKETMEZ (`tuket:false`; tek tüketici claim-guard ctx). claims-lib
+ * yok/bozuksa eksen SESSİZ KAPALIDIR — todo ekseni tek bayt etkilenmez.
+ *
  * Usage (from settings.json hooks):
  *   node ~/.claude/hooks/goal-tracker.mjs todo          # PostToolUse, matcher TodoWrite
  *   node ~/.claude/hooks/goal-tracker.mjs session_start # SessionStart — plan bağı
@@ -287,32 +293,94 @@ function acikKumeImzasi(acik) {
   return createHash("sha1").update(gövde).digest("hex").slice(0, 16);
 }
 
-function reasonMetni(rec, acik) {
-  const suruyor = acik.filter((t) => t.status === "in_progress").length;
-  const bekleyen = acik.length - suruyor;
+/* ── POSTA EKSENİ (otonomi-merdiveni:13) — zincir KOPYALANMAZ, GENİŞLETİLİR ──
+ * Bekleyen YENİ posta da "açık iş"tir: turu BİR KEZ uzatır. Okuma TÜKETMEZ
+ * (`tuket:false`) — tüketimin tek sahibi claim-guard ctx kanalıdır; Stop çift
+ * tüketici olsaydı "haber bir kez basılır" sözleşmesi sessizce kırılırdı. */
+
+/** Posta oku — claims-lib yok/bozuk/eksik-fonksiyon ise SESSİZ KAPALI eksen:
+ *  `[]` döner, todo ekseni tek bayt etkilenmez (bir ölçüm aracı ölçtüğü şeyi bozamaz).
+ *  Import TEMBELdir ve kapı 2b'den sonra çağrılır — defteri olmayan oturumun
+ *  hızlı yolu (<500 ms) posta yüzünden yavaşlamaz. */
+async function postaOku(payload, sessionId) {
+  try {
+    const L = await import("./claims-lib.mjs");
+    if (typeof L.bildiriOku !== "function" || typeof L.repoRootOf !== "function")
+      return [];
+    const root = L.repoRootOf(payload.cwd || process.cwd());
+    return L.bildiriOku(root, sessionId, { tuket: false }) || [];
+  } catch {
+    return [];
+  }
+}
+
+/** Posta imzası: kararlı alan dizisi → sıralı birleşim → sha1-16 (acikKumeImzasi emsali).
+ *  BOŞ KÜME `null` DÖNER ve halkaya ASLA girmez — "posta tüketildi" durumu yeni imza,
+ *  dolayısıyla yeni blok hakkı DOĞURMAZ (sonsuz döngünün en sinsi kaynağı budur). */
+function postaImzasi(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const gövde = rows
+    .map((r) =>
+      [r?.ts, r?.kimden, r?.tip, r?.key, r?.mesaj]
+        .map((x) => String(x ?? ""))
+        .join("")
+    )
+    .sort()
+    .join("\n");
+  return createHash("sha1").update(gövde).digest("hex").slice(0, 16);
+}
+
+function reasonMetni(rec, acik, posta = []) {
   const satirlar = [];
   const hedef = rec?.goal?.text ? String(rec.goal.text).trim() : null;
   if (hedef) satirlar.push(`/goal hedefi: ${hedef}`);
-  satirlar.push(
-    `${acik.length} açık madde: ${suruyor} sürüyor, ${bekleyen} bekliyor.`
-  );
-  for (const t of acik.slice(0, REASON_MAX_ITEM)) {
-    satirlar.push(`  • [${t.status === "in_progress" ? "sürüyor" : "bekliyor"}] ${t.content}`);
+  // Posta-yalnız blokta "0 açık madde: 0 sürüyor, 0 bekliyor" YALANI basılmaz —
+  // todo satırları yalnız gerçekten açık madde varken doğar.
+  if (acik.length > 0) {
+    const suruyor = acik.filter((t) => t.status === "in_progress").length;
+    const bekleyen = acik.length - suruyor;
+    satirlar.push(
+      `${acik.length} açık madde: ${suruyor} sürüyor, ${bekleyen} bekliyor.`
+    );
+    for (const t of acik.slice(0, REASON_MAX_ITEM)) {
+      satirlar.push(`  • [${t.status === "in_progress" ? "sürüyor" : "bekliyor"}] ${t.content}`);
+    }
+    if (acik.length > REASON_MAX_ITEM)
+      satirlar.push(`  • … +${acik.length - REASON_MAX_ITEM} madde daha`);
   }
-  if (acik.length > REASON_MAX_ITEM)
-    satirlar.push(`  • … +${acik.length - REASON_MAX_ITEM} madde daha`);
+  // Posta eki ≤2 satır: sayı + bakma yolu. Gövde/gönderen DÖKÜLMEZ — içerik ctx
+  // kanalının ve `kutu` komutunun işidir (12-satır ctx bütçesine tek bayt yazılmaz).
+  if (posta.length > 0) {
+    const enYeni = Math.max(
+      0,
+      ...posta.map((r) => Date.parse(r?.ts || "") || 0)
+    );
+    const dk = enYeni > 0 ? Math.max(0, Math.round((Date.now() - enYeni) / 60000)) : null;
+    satirlar.push(
+      `✉ ${posta.length} okunmamış posta${dk !== null ? ` (en yenisi ${dk} dk önce)` : ""}`
+    );
+    satirlar.push(
+      "  TÜKETMEDEN bak: node ~/.claude/skills/eszamanli/scripts/claim.mjs kutu"
+    );
+  }
   satirlar.push(
     "Bitmediyse devam et. Kullanıcı durmanı istediyse ya da madde gerçekten kapandıysa " +
-      "TodoWrite ile defteri güncelle ve gerekçeyle dur — ikinci durma bloklanmaz."
+      "TodoWrite ile defteri güncelle ve gerekçeyle dur — ikinci durma bloklanmaz; " +
+      "posta ele alındıysa dur — aynı kutu ikinci blok üretmez."
   );
   return satirlar.join("\n");
 }
 
 /** T2 · Stop dalı. Karar zinciri — İLK DÜŞEN SERBEST BIRAKIR (şüphe serbest bırakma
- *  yönünedir: bir belirsizlik oturumu kilitlemektense bir erken durmayı kaçırsın). */
-function handleStop(payload, sessionId, now) {
+ *  yönünedir: bir belirsizlik oturumu kilitlemektense bir erken durmayı kaçırsın).
+ *  Posta genişlemesi (otonomi-merdiveni:13): altı kapının SIRASI ve semantiği AYNEN —
+ *  yalnız kapı 3'ün "açık iş" kümesi ve kapı 6'nın imza kümesi posta eksenini kapsar.
+ *  İLANLI SINIR (gevşetme değil): defteri olmayan oturum POSTAYLA DA bloklanmaz —
+ *  işaret `rec.stopDali`ye yazılır, defter yoksa yazacak yer yoktur ("kilit defteri
+ *  tutmayan kilit, kilit değildir"); o posta bir sonraki ctx turunda zaten basılır. */
+async function handleStop(payload, sessionId, now) {
   const cfg = loadStopConfig();
-  if (cfg.kapsam === "kapali") return; // 1 · kapalı
+  if (cfg.kapsam === "kapali") return; // 1 · kapalı (kademe posta eksenine de TAVANDIR)
 
   const preferredSlug = payload.cwd ? slugOf(payload.cwd) : null;
   const file = findGoalFile(sessionId, preferredSlug);
@@ -324,17 +392,28 @@ function handleStop(payload, sessionId, now) {
   if (cfg.kapsam === "goal" && !hedef) return; // 2b · yalnız /goal kademesi
 
   const acik = acikMaddeler(rec);
-  if (acik.length === 0) return; // 3 · açık iş yok
+  const posta = await postaOku(payload, sessionId); // kapı 2b'den SONRA — tembel eksen
+  if (acik.length === 0 && posta.length === 0) return; // 3 · açık iş yok (küme genişledi)
 
   if (payload.stop_hook_active === true) return; // 4 · zaten bu blokla dönmüşüz
 
   const promptId = payload.prompt_id ?? payload.promptId ?? null;
-  const imza = acikKumeImzasi(acik);
+  // Todo imzası YALNIZ açık madde varken doğar; posta imzası boş kümede null (R5) —
+  // boş kümelerin sabit hash'i halkayı kirletip yeni blok hakkı üretmesin.
+  const imza = acik.length > 0 ? acikKumeImzasi(acik) : null;
+  const postaImza = postaImzasi(posta);
   const isaret = rec.stopDali || null;
   if (isaret) {
     if (promptId && isaret.promptId === promptId) return; // 5 · aynı prompt'ta ikinci blok YOK
     const gorulen = Array.isArray(isaret.imzalar) ? isaret.imzalar : [];
-    if (isaret.acikKumeImza === imza || gorulen.includes(imza)) return; // 6 · aynı küme
+    const postaGorulen = Array.isArray(isaret.postaImzalar) ? isaret.postaImzalar : [];
+    const todoGorulmus =
+      imza === null || isaret.acikKumeImza === imza || gorulen.includes(imza);
+    const postaGorulmus =
+      postaImza === null ||
+      isaret.postaImza === postaImza ||
+      postaGorulen.includes(postaImza);
+    if (todoGorulmus && postaGorulmus) return; // 6 · yeni todo YOK ∧ yeni posta YOK
   }
 
   // İşaret ÖNCE diske yazılır: yazamıyorsak bloklamıyoruz (yoksa aynı Stop sonsuza
@@ -342,12 +421,22 @@ function handleStop(payload, sessionId, now) {
   const gorulen = Array.isArray(isaret?.imzalar) ? isaret.imzalar.slice() : [];
   if (isaret?.acikKumeImza && !gorulen.includes(isaret.acikKumeImza))
     gorulen.push(isaret.acikKumeImza);
-  gorulen.push(imza);
+  if (imza !== null) gorulen.push(imza);
+  const postaGorulen = Array.isArray(isaret?.postaImzalar)
+    ? isaret.postaImzalar.slice()
+    : [];
+  if (isaret?.postaImza && !postaGorulen.includes(isaret.postaImza))
+    postaGorulen.push(isaret.postaImza);
+  if (postaImza !== null) postaGorulen.push(postaImza);
   rec.stopDali = {
     promptId,
-    acikKumeImza: imza,
+    // Boş eksende eski imza korunur (geriye uyum: eski `stopDali` biçimi de böyle okunur);
+    // gorulen/postaGorulen halkaları zaten tarihçeyi taşır.
+    acikKumeImza: imza ?? isaret?.acikKumeImza ?? null,
+    postaImza: postaImza ?? isaret?.postaImza ?? null,
     ts: now,
     imzalar: gorulen.slice(-IMZA_TAVAN),
+    postaImzalar: postaGorulen.slice(-IMZA_TAVAN),
   };
   try {
     atomicWrite(file, rec);
@@ -356,7 +445,7 @@ function handleStop(payload, sessionId, now) {
   }
 
   process.stdout.write(
-    JSON.stringify({ decision: "block", reason: reasonMetni(rec, acik) })
+    JSON.stringify({ decision: "block", reason: reasonMetni(rec, acik, posta) })
   );
 }
 
@@ -400,7 +489,7 @@ function handlePrompt(payload, sessionId, now) {
   atomicWrite(file, rec);
 }
 
-function main() {
+async function main() {
   const payload = safeParse(readStdin());
   const sessionId =
     payload.session_id || payload.sessionId || process.env.CLAUDE_SESSION_ID;
@@ -411,11 +500,11 @@ function main() {
   else if (event === "session_start") handlePlanRef(payload, sessionId, now);
   else if (event === "session_end") handleSessionEnd(payload, sessionId, now);
   else if (event === "prompt") handlePrompt(payload, sessionId, now);
-  else if (event === "stop") handleStop(payload, sessionId, now);
+  else if (event === "stop") await handleStop(payload, sessionId, now);
 }
 
 try {
-  main();
+  await main();
 } catch {
   /* never disrupt the session */
 }
