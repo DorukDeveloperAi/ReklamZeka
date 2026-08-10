@@ -12,6 +12,23 @@ function stable(value: unknown): unknown { return Array.isArray(value) ? value.m
 function digest(value: unknown) { return createHash("sha256").update(JSON.stringify(stable(value))).digest("hex"); }
 
 describe("DrizzleTrustedPolicyAuthorityRepository", () => {
+  it("uses protected current heads and requires an exact immutable ref/hash pair for replay", async () => {
+    const migration = readFileSync("drizzle/20260810080038_chubby_deadpool.sql", "utf8");
+    for (const table of ["policy_authority_catalogs", "tenant_authority_snapshot_heads"]) {
+      expect(migration).toContain(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
+      expect(migration).toContain(`ALTER TABLE ${table} FORCE ROW LEVEL SECURITY`);
+    }
+    expect(migration).toContain("policy_authority_catalog_head_occ_conflict");
+    expect(migration).toContain("tenant_authority_snapshot_head_occ_conflict");
+    expect(migration).toContain("policy_authority_catalog_revisions_chain_trigger");
+    expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|TRUNCATE|DELETE FROM/);
+    const execute = vi.fn();
+    await expect(new DrizzleTrustedPolicyAuthorityRepository({ execute } as never).load({ workspaceId,
+      accountRef: "account_primary", evaluatedAt: "2026-08-09T12:00:00.000Z", snapshotRef: "authority_snapshot_primary" }))
+      .rejects.toMatchObject({ code: "invalid_input" });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it("keeps topic/category/semantic authority evidence tenant-scoped, revoked, and append-only", () => {
     const migration = readFileSync("drizzle/20260810073556_lean_inertia.sql", "utf8");
     for (const table of ["authority_topics", "authority_topic_revisions", "category_topic_bindings", "policy_semantic_binding_revisions"]) {
@@ -38,7 +55,8 @@ describe("DrizzleTrustedPolicyAuthorityRepository", () => {
     const rendered = new PgDialect().sqlToQuery((execute.mock.calls as unknown[][])[1]![0] as never).sql;
     for (const family of ["tenant_authority_snapshots", "policy_authority_catalog_revisions", "policy_authority_bindings",
       "policy_manual_lock_revisions", "account_group_account_bindings", "account_groups", "authority_topics",
-      "authority_topic_revisions", "policy_semantic_binding_revisions", "ad_accounts"]) expect(rendered).toContain(family);
+      "authority_topic_revisions", "policy_semantic_binding_revisions", "ad_accounts", "tenant_authority_snapshot_heads",
+      "policy_authority_catalogs"]) expect(rendered).toContain(family);
   });
 
   it("rejects malformed scope before reading tenant records", async () => {
