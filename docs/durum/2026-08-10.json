@@ -4,6 +4,60 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "f64d77c3c",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): compose evidence-bound analysis contexts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "1d2ee6e20",
+      "tarih": "2026-08-10",
+      "konu": "test(a10): cover cadence context live verifier",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "5c5f4a382",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): bind cadence evidence to contexts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "cd3026f76",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): compose current category profiles",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "f7089add3",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): freeze meta analysis config evidence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "593a8a249",
+      "tarih": "2026-08-10",
+      "konu": "fix(a10): harden agenda replay and guidance guards",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
       "hash": "57dfc870b",
       "tarih": "2026-08-10",
       "konu": "feat(a10): expose frozen outcome evidence to findings",
@@ -83,74 +137,20 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "c37cae7e5",
-      "tarih": "2026-08-10",
-      "konu": "fix(a10): preserve decision room reads with dry run config",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "b9504c59d",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): add server-bound decision room dry run",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "ac5d4c18b",
-      "tarih": "2026-08-10",
-      "konu": "docs(a10): reconcile completed finding capabilities",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "dc9990b5d",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): freeze agenda on decision room runs",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "98064fc02",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): persist experiment record lifecycle",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "69f9d8ef0",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): freeze cadence revision on analysis runs",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 36
+      "adet": 38
     },
     {
       "kapsam": "docs",
-      "adet": 16
+      "adet": 13
     },
     {
       "kapsam": "fix",
-      "adet": 4
+      "adet": 5
     },
     {
       "kapsam": "chore",
@@ -161,7 +161,7 @@
       "adet": 1
     }
   ],
-  "isSayisi": 156,
+  "isSayisi": 162,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-10",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "29b423337ab0"
+  "damga": "d413a87d7470"
 }

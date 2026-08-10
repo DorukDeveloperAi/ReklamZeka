@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 29b423337ab0 -->
+<!-- durum-damga: d413a87d7470 -->
 
 ## Künye
 
@@ -14,13 +14,19 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 156 |
+| iş commit'i (tüm geçmiş) | 162 |
 | ilk / son iş | 2026-08-06 / 2026-08-10 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-10 | `feat` | compose evidence-bound analysis contexts | `f64d77c3c` |
+| 2026-08-10 | `test` | cover cadence context live verifier | `1d2ee6e20` |
+| 2026-08-10 | `feat` | bind cadence evidence to contexts | `5c5f4a382` |
+| 2026-08-10 | `feat` | compose current category profiles | `cd3026f76` |
+| 2026-08-10 | `feat` | freeze meta analysis config evidence | `f7089add3` |
+| 2026-08-10 | `fix` | harden agenda replay and guidance guards | `593a8a249` |
 | 2026-08-10 | `feat` | expose frozen outcome evidence to findings | `57dfc870b` |
 | 2026-08-10 | `feat` | compose persisted outcome evidence into context | `aa8935439` |
 | 2026-08-10 | `feat` | persist outcome evidence snapshots | `e84ca60ed` |
@@ -30,18 +36,12 @@
 | 2026-08-10 | `feat` | persist normalized business outcomes | `9fc14ef87` |
 | 2026-08-10 | `feat` | expose experiment evidence lifecycle | `7c5cb9999` |
 | 2026-08-10 | `feat` | add server-bound cadence publication | `c2269a8f3` |
-| 2026-08-10 | `fix` | preserve decision room reads with dry run config | `c37cae7e5` |
-| 2026-08-10 | `feat` | add server-bound decision room dry run | `b9504c59d` |
-| 2026-08-10 | `docs` | reconcile completed finding capabilities | `ac5d4c18b` |
-| 2026-08-10 | `feat` | freeze agenda on decision room runs | `dc9990b5d` |
-| 2026-08-10 | `feat` | persist experiment record lifecycle | `98064fc02` |
-| 2026-08-10 | `feat` | freeze cadence revision on analysis runs | `69f9d8ef0` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 36
-- `docs        ` ███████████ 16
-- `fix         ` ███ 4
+- `feat        ` ████████████████████████ 38
+- `docs        ` ████████ 13
+- `fix         ` ███ 5
 - `chore       ` ██ 3
 - `test        ` █ 1
 
