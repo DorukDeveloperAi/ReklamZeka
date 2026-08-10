@@ -21,7 +21,7 @@ describe("Approval Queue model-agnostic agent contract", () => {
       readOnly: true, canApprove: false, canReject: false, canRequestChanges: false,
       canGrant: false, canExecute: false, canWriteMeta: false,
     } });
-    expect(h.repository.list).toHaveBeenCalledWith({ workspaceId, entityRef: null, before: null, limit: 11 });
+    expect(h.repository.list).toHaveBeenCalledWith({ workspaceId, entityRef: null, campaignRef: null, before: null, limit: 11 });
   });
 
   it("binds workspace to the trusted principal and rejects foreign membership", async () => {

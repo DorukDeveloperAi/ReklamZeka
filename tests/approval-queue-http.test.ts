@@ -29,6 +29,7 @@ function record(): ApprovalQueueRecord {
     risk: "K2",
     actionType: "status_pause",
     accountRef: "account_0123456789abcdef",
+    campaignRef: "entity_fedcba9876543210",
     entity: { type: "campaign", ref: "entity_fedcba9876543210", label: "Korunan kampanya" },
     beforeAfter: { field: "configured_status", before: "ACTIVE", after: "PAUSED" },
     autonomy: {
@@ -83,6 +84,10 @@ describe("Approval Queue GET-only HTTP boundary", () => {
     const filtered = await api.GET(new Request(`http://localhost/api/approval-queue?view=list&entityRef=${record().entity.ref}`));
     expect(filtered.status).toBe(200);
     expect(await filtered.json()).toMatchObject({ result: { view: "list", entityRef: record().entity.ref } });
+
+    const campaignScoped = await api.GET(new Request(`http://localhost/api/approval-queue?view=list&campaignRef=${record().campaignRef}`));
+    expect(campaignScoped.status).toBe(200);
+    expect(await campaignScoped.json()).toMatchObject({ result: { view: "list", campaignRef: record().campaignRef } });
   });
 
   it("rejects identities, unknown/duplicate params, malformed limits, and mixed views before auth", async () => {
@@ -94,6 +99,7 @@ describe("Approval Queue GET-only HTTP boundary", () => {
       "http://localhost/api/approval-queue?view=list&limit=101",
       `http://localhost/api/approval-queue?view=list&unitRef=${record().unitRef}`,
       "http://localhost/api/approval-queue?view=list&entityRef=campaign_12345",
+      `http://localhost/api/approval-queue?view=list&entityRef=${record().entity.ref}&campaignRef=${record().campaignRef}`,
       `http://localhost/api/approval-queue?view=detail&unitRef=${record().unitRef}&entityRef=${record().entity.ref}`,
       `http://localhost/api/approval-queue?view=detail&unitRef=${record().unitRef}&cursor=opaque`,
       "http://localhost/api/approval-queue?view=detail",
@@ -106,7 +112,7 @@ describe("Approval Queue GET-only HTTP boundary", () => {
     for (const role of ["viewer", "analyst"] as const) {
       const api = harness(undefined, role);
       expect((await api.GET(new Request("http://localhost/api/approval-queue"))).status).toBe(200);
-      expect(api.repository.list).toHaveBeenCalledWith({ workspaceId, entityRef: null, before: null, limit: 26 });
+      expect(api.repository.list).toHaveBeenCalledWith({ workspaceId, entityRef: null, campaignRef: null, before: null, limit: 26 });
     }
     const unauthorized = harness(undefined, "viewer");
     unauthorized.resolvePrincipal.mockResolvedValueOnce(null);

@@ -38,16 +38,18 @@
   oluşmaz. Tarayıcıda GCC → geçici WhatsApp → bağlamdan form geri yükleme ve GCC → İstanbul WhatsApp
   bağlam geçişi doğrulandı.
 
-## 2026-08-10 — A14 entity-scoped Approval Queue read boundary
+## 2026-08-10 — A14 entity/campaign-scoped Approval Queue read boundary
 
-- Approval Queue read modeli `entityRef` ile exact opaque entity filtresini tenant-bound SQL içinde
-  uygular. Filtre, public ref'i private entity UUID'den yalnız repository içinde yeniden türetir;
-  UI veya agent workspace/private ID gönderemez. Keyset pagination filtreyle birlikte korunur ve
-  dönmüş satırın entity ref'i istenen filtreyle birebir eşleşmiyorsa bütün yanıt fail-closed olur.
-- Bu yalnız direct ActionUnit entity scope'udur. Campaign'in ad-set/ad alt hareketlerini campaign
-  timeline'ına genişleten persisted hierarchy read modeli henüz yoktur; Dashboard'a sahte bir birleşik
-  timeline bağlanmadı. `DATABASE_URL` ve `DIRECT_DATABASE_URL` bu ortamda yoktur; gerçek PostgreSQL
-  query-plan/live acceptance sonraki bağlantılı ortamda çalıştırılacaktır.
+- Approval Queue read modeli `entityRef` veya onunla aynı istekte kullanılamayan `campaignRef` ile
+  exact opaque filtreyi tenant-bound SQL içinde uygular. Public ref, private UUID'den yalnız repository
+  içinde yeniden türetilir; UI veya agent workspace/private ID gönderemez. Keyset pagination filtreyle
+  birlikte korunur ve dönmüş satırın entity/campaign ref'i istenen filtreyle birebir eşleşmiyorsa bütün
+  yanıt fail-closed olur.
+- Campaign filtresi, direct campaign ActionUnit'inin yanı sıra ad-set ve ad ActionUnit'lerini tenant-scoped
+  üst campaign ilişkisiyle çözer. Böylece gerçek child hareketler doğru campaign timeline kaynağına dahil
+  olur. Dashboard'a sahte veya fixture tabanlı birleşik timeline bağlanmadı. `DATABASE_URL` ve
+  `DIRECT_DATABASE_URL` bu ortamda yoktur; gerçek PostgreSQL query-plan/live acceptance sonraki bağlantılı
+  ortamda çalıştırılacaktır.
 
 ## 2026-08-10 — A13 execution-time Meta mirror revalidation
 

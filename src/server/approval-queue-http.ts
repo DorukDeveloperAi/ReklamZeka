@@ -64,19 +64,21 @@ export function createApprovalQueueHttpHandler(input: Readonly<{
   return async function GET(request: Request) {
     try {
       const url = new URL(request.url);
-      if (!exactSearchParams(url, ["view", "unitRef", "entityRef", "limit", "cursor"])) {
+      if (!exactSearchParams(url, ["view", "unitRef", "entityRef", "campaignRef", "limit", "cursor"])) {
         throw new ApprovalQueueReadError("invalid_input");
       }
       const view = url.searchParams.get("view") ?? "list";
       const unitRef = url.searchParams.get("unitRef");
       const entityRef = url.searchParams.get("entityRef");
+      const campaignRef = url.searchParams.get("campaignRef");
       const rawLimit = url.searchParams.get("limit");
       const cursor = url.searchParams.get("cursor");
-      if (entityRef !== null && !ENTITY_REF.test(entityRef)) throw new ApprovalQueueReadError("invalid_input");
+      if (entityRef !== null && !ENTITY_REF.test(entityRef) || campaignRef !== null && !ENTITY_REF.test(campaignRef)
+        || entityRef !== null && campaignRef !== null) throw new ApprovalQueueReadError("invalid_input");
       let call: ApprovalQueueAgentCall;
       if (view === "list" && unitRef === null) {
-        call = { name: "approval_queue_list", arguments: { entityRef, limit: boundedLimit(rawLimit), cursor } };
-      } else if (view === "detail" && unitRef !== null && entityRef === null && rawLimit === null && cursor === null) {
+        call = { name: "approval_queue_list", arguments: { entityRef, campaignRef, limit: boundedLimit(rawLimit), cursor } };
+      } else if (view === "detail" && unitRef !== null && entityRef === null && campaignRef === null && rawLimit === null && cursor === null) {
         call = { name: "approval_queue_get", arguments: { unitRef } };
       } else {
         throw new ApprovalQueueReadError("invalid_input");

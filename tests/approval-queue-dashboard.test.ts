@@ -12,6 +12,7 @@ const item = {
   risk: "K2",
   actionType: "budget_decrease",
   accountRef: "account_1111111111111111",
+  campaignRef: "entity_2222222222222222",
   entity: { type: "campaign", ref: "entity_2222222222222222", label: "GCC Lead Kampanyası" },
   beforeAfter: { field: "daily_budget_minor", beforeMinor: 170_000, afterMinor: 156_400, currency: "TRY" },
   autonomy: {
@@ -32,9 +33,10 @@ function ready(selected: ApprovalQueueRecord | null = null) {
   return {
     status: "ready" as const,
     result: {
-      contractVersion: "approval-queue-read-model/1.1.0" as const,
+      contractVersion: "approval-queue-read-model/1.2.0" as const,
       view: "list" as const,
       entityRef: null,
+      campaignRef: null,
       items: [item],
       nextCursor: null,
       authority: {

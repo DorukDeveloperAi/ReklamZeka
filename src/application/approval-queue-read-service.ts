@@ -1,4 +1,4 @@
-export const APPROVAL_QUEUE_READ_MODEL_VERSION = "approval-queue-read-model/1.1.0" as const;
+export const APPROVAL_QUEUE_READ_MODEL_VERSION = "approval-queue-read-model/1.2.0" as const;
 
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i;
 const FULL_HASH = /\b[a-f0-9]{64}\b/i;
@@ -26,6 +26,7 @@ export type ApprovalQueueRecord = Readonly<{
   risk: ApprovalRisk;
   actionType: ApprovalActionType;
   accountRef: string;
+  campaignRef: string;
   entity: Readonly<{ type: "campaign" | "ad_set" | "ad"; ref: string; label: string | null }>;
   beforeAfter: ApprovalBeforeAfter;
   autonomy: Readonly<{
@@ -40,7 +41,7 @@ export type ApprovalQueueRecord = Readonly<{
 }>;
 
 export type ApprovalQueueRepository = Readonly<{
-  list(input: Readonly<{ workspaceId: string; entityRef: string | null; before: Readonly<{ createdAt: string; unitRef: string }> | null; limit: number }>): Promise<readonly ApprovalQueueRecord[]>;
+  list(input: Readonly<{ workspaceId: string; entityRef: string | null; campaignRef: string | null; before: Readonly<{ createdAt: string; unitRef: string }> | null; limit: number }>): Promise<readonly ApprovalQueueRecord[]>;
   get(input: Readonly<{ workspaceId: string; unitRef: string }>): Promise<ApprovalQueueRecord | null>;
 }>;
 
@@ -83,11 +84,11 @@ function validate(record: ApprovalQueueRecord): ApprovalQueueRecord {
     });
   };
   visit(record);
-  exact(record, ["unitRef", "bundleRef", "status", "risk", "actionType", "accountRef", "entity", "beforeAfter", "autonomy", "expiresAt", "createdAt", "dependencies", "summaryCode"]);
+  exact(record, ["unitRef", "bundleRef", "status", "risk", "actionType", "accountRef", "campaignRef", "entity", "beforeAfter", "autonomy", "expiresAt", "createdAt", "dependencies", "summaryCode"]);
   exact(record.entity, ["type", "ref", "label"]);
   exact(record.autonomy, ["profileRef", "decision", "trace"]);
   if (!UNIT_REF.test(record.unitRef) || record.bundleRef !== null && !BUNDLE_REF.test(record.bundleRef)
-    || !PUBLIC_REF.test(record.accountRef) || !PUBLIC_REF.test(record.entity.ref) || !PUBLIC_REF.test(record.autonomy.profileRef)
+    || !PUBLIC_REF.test(record.accountRef) || !PUBLIC_REF.test(record.campaignRef) || !PUBLIC_REF.test(record.entity.ref) || !PUBLIC_REF.test(record.autonomy.profileRef)
     || !["campaign", "ad_set", "ad"].includes(record.entity.type)
     || record.entity.label !== null && !safeText(record.entity.label)
     || !["K0", "K1", "K2", "K3", "K4"].includes(record.risk)
@@ -149,13 +150,16 @@ function parseCursor(value: unknown): Readonly<{ createdAt: string; unitRef: str
 export class ApprovalQueueReadService {
   constructor(private readonly repository: ApprovalQueueRepository) {}
 
-  async list(input: Readonly<{ workspaceId: string; entityRef?: string | null; limit?: number; cursor?: string | null }>) {
+  async list(input: Readonly<{ workspaceId: string; entityRef?: string | null; campaignRef?: string | null; limit?: number; cursor?: string | null }>) {
     const limit = input.limit ?? 25;
     const entityRef = input.entityRef ?? null;
+    const campaignRef = input.campaignRef ?? null;
     if (typeof input.workspaceId !== "string" || !UUID.test(input.workspaceId) || !Number.isInteger(limit) || limit < 1 || limit > 100
-      || entityRef !== null && (typeof entityRef !== "string" || !PUBLIC_REF.test(entityRef))) throw new ApprovalQueueReadError("invalid_input");
+      || entityRef !== null && (typeof entityRef !== "string" || !PUBLIC_REF.test(entityRef))
+      || campaignRef !== null && (typeof campaignRef !== "string" || !PUBLIC_REF.test(campaignRef))
+      || entityRef !== null && campaignRef !== null) throw new ApprovalQueueReadError("invalid_input");
     let records: readonly ApprovalQueueRecord[];
-    try { records = await this.repository.list({ workspaceId: input.workspaceId, entityRef, before: parseCursor(input.cursor), limit: limit + 1 }); }
+    try { records = await this.repository.list({ workspaceId: input.workspaceId, entityRef, campaignRef, before: parseCursor(input.cursor), limit: limit + 1 }); }
     catch (reason) { if (reason instanceof ApprovalQueueReadError) throw reason; throw new ApprovalQueueReadError("source_unavailable"); }
     if (!Array.isArray(records) || records.length > limit + 1) throw new ApprovalQueueReadError("unsafe_source");
     const safeRecords = records.map(validate);
@@ -163,7 +167,8 @@ export class ApprovalQueueReadService {
       && (safeRecords[index - 1]!.createdAt < record.createdAt || safeRecords[index - 1]!.createdAt === record.createdAt && safeRecords[index - 1]!.unitRef <= record.unitRef))) throw new ApprovalQueueReadError("unsafe_source");
     const page = Object.freeze(safeRecords.slice(0, limit));
     if (entityRef !== null && page.some((record) => record.entity.ref !== entityRef)) throw new ApprovalQueueReadError("unsafe_source");
-    return Object.freeze({ contractVersion: APPROVAL_QUEUE_READ_MODEL_VERSION, view: "list" as const, entityRef, items: page,
+    if (campaignRef !== null && page.some((record) => record.campaignRef !== campaignRef)) throw new ApprovalQueueReadError("unsafe_source");
+    return Object.freeze({ contractVersion: APPROVAL_QUEUE_READ_MODEL_VERSION, view: "list" as const, entityRef, campaignRef, items: page,
       nextCursor: records.length > limit ? cursor(page.at(-1)!) : null, authority: AUTHORITY });
   }
 

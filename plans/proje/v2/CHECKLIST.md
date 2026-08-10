@@ -661,9 +661,10 @@
       geçici değişikliği "Bağlamı geri yükle" ile geri alabilir. Persisted current context bağlama
       hâlâ açık olduğundan bu yalnız demo/read-only bağdır.
   - [ ] Brief, öneri, approval ve execution-safety durumunu aynı salt-okunur zaman çizelgesinde gösterme.
-    - [x] Direct ActionUnit entity scope için exact, tenant-bound keyset read filtresi; opaque
-      `entityRef` database içinde yeniden çözülür ve public source sonucu filtreyle eşleşmezse
-      fail-closed kalır. Campaign→child ActionUnit hierarchy ve Dashboard timeline bağlama açık.
+    - [x] Exact, tenant-bound keyset ActionUnit filtresi: opaque `entityRef` veya onunla aynı istekte
+      kullanılamayan `campaignRef` database içinde yeniden çözülür. Campaign filtresi direct campaign ile
+      ad-set/ad üst-campaign hiyerarşisini kapsar; public source sonucu filtreyle eşleşmezse fail-closed
+      kalır. Dashboard timeline bağlama açık.
 
 - [ ] Bugün/portfolio hiyerarşi ve internal/Meta filtreler.
 - [ ] Account-group switcher, multi-account connection health ve Page/Instagram asset graph.

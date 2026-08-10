@@ -41,6 +41,7 @@ type SourceRow = Readonly<{
   campaign_id: unknown;
   ad_set_id: unknown;
   ad_id: unknown;
+  campaign_scope_id: unknown;
   policy_snapshot_id: unknown;
   proposed_at: unknown;
   expires_at: unknown;
@@ -223,7 +224,7 @@ function currentStatus(eventType: unknown): ApprovalQueueRecord["status"] {
 
 function mapRow(row: SourceRow, workspaceId: string): ApprovalQueueRecord {
   exact(row, ["unit_ref", "bundle_ref", "initial_state", "risk", "action_type", "ad_account_id", "campaign_id",
-    "ad_set_id", "ad_id", "policy_snapshot_id", "proposed_at", "expires_at", "current_event_type",
+    "ad_set_id", "ad_id", "campaign_scope_id", "policy_snapshot_id", "proposed_at", "expires_at", "current_event_type",
     "action_plan_payload", "dependencies"]);
   if (typeof row.unit_ref !== "string" || !UNIT_REF.test(row.unit_ref)
     || typeof row.bundle_ref !== "string" || !BUNDLE_REF.test(row.bundle_ref)
@@ -244,6 +245,7 @@ function mapRow(row: SourceRow, workspaceId: string): ApprovalQueueRecord {
     || plan.capabilities.canGrantApproval !== false || plan.capabilities.canAccessRawGraph !== false
     || typeof plan.contextHash !== "string" || !HASH.test(plan.contextHash)) fail("corrupt_store");
   const binding = entityBinding(row, plan);
+  const campaignId = uuid(row.campaign_scope_id);
   const createdAt = instant(row.proposed_at);
   const expiresAt = instant(row.expires_at);
   if (expiresAt <= createdAt) fail("corrupt_store");
@@ -255,6 +257,7 @@ function mapRow(row: SourceRow, workspaceId: string): ApprovalQueueRecord {
     risk: row.risk as "K2" | "K3",
     actionType,
     accountRef: publicRef("account", workspaceId, row.ad_account_id),
+    campaignRef: publicRef("entity", workspaceId, campaignId),
     entity: Object.freeze({ type: binding.type, ref: publicRef("entity", workspaceId, binding.id), label: null }),
     beforeAfter: beforeAfter(actionType, plan.action),
     autonomy: Object.freeze({
@@ -289,10 +292,12 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
   }
 
   async list(input: Parameters<ApprovalQueueRepository["list"]>[0]): Promise<readonly ApprovalQueueRecord[]> {
-    validateInput(input, ["workspaceId", "entityRef", "before", "limit"]);
+    validateInput(input, ["workspaceId", "entityRef", "campaignRef", "before", "limit"]);
     this.assertBoundWorkspace(input.workspaceId);
     if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 101) fail("invalid_input");
     if (input.entityRef !== null && (typeof input.entityRef !== "string" || !PUBLIC_ENTITY_REF.test(input.entityRef))) fail("invalid_input");
+    if (input.campaignRef !== null && (typeof input.campaignRef !== "string" || !PUBLIC_ENTITY_REF.test(input.campaignRef))
+      || input.entityRef !== null && input.campaignRef !== null) fail("invalid_input");
     if (input.before !== null && (!input.before || typeof input.before !== "object"
       || Object.keys(input.before).sort().join("|") !== "createdAt|unitRef"
       || !Number.isFinite(Date.parse(input.before.createdAt)) || !UNIT_REF.test(input.before.unitRef))) fail("invalid_input");
@@ -301,6 +306,7 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
     const result = rows(await this.database.execute(sql`
       select unit.unit_ref, bundle.bundle_ref, unit.initial_state, unit.risk, unit.action_type,
         unit.ad_account_id, unit.campaign_id, unit.ad_set_id, unit.ad_id,
+        coalesce(unit.campaign_id, unit_ad_set.campaign_id, unit_ad.campaign_id) as campaign_scope_id,
         bundle.policy_snapshot_id, unit.proposed_at, unit.expires_at,
         current_event.event_type as current_event_type, unit.action_plan_payload,
         coalesce((
@@ -328,6 +334,10 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
       from action_proposal_units unit
       join action_proposal_bundles bundle
         on bundle.workspace_id = unit.workspace_id and bundle.id = unit.bundle_id
+      left join meta_ad_sets unit_ad_set
+        on unit_ad_set.workspace_id = unit.workspace_id and unit_ad_set.id = unit.ad_set_id
+      left join meta_ads unit_ad
+        on unit_ad.workspace_id = unit.workspace_id and unit_ad.id = unit.ad_id
       left join lateral (
         select event.value ->> 'eventType' as event_type
         from action_approval_decision_events decision
@@ -339,6 +349,8 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
       where unit.workspace_id = ${this.workspaceId}::uuid
         and (${input.entityRef}::text is null or concat('entity_', substring(encode(digest(${this.workspaceId}::text || ':entity:' ||
           coalesce(unit.campaign_id, unit.ad_set_id, unit.ad_id)::text, 'sha256'), 'hex') from 1 for 16)) = ${input.entityRef}::text)
+        and (${input.campaignRef}::text is null or concat('entity_', substring(encode(digest(${this.workspaceId}::text || ':entity:' ||
+          coalesce(unit.campaign_id, unit_ad_set.campaign_id, unit_ad.campaign_id)::text, 'sha256'), 'hex') from 1 for 16)) = ${input.campaignRef}::text)
         and (${beforeAt}::timestamptz is null
           or (unit.proposed_at, unit.unit_ref) < (${beforeAt}::timestamptz, ${beforeRef}::text))
       order by unit.proposed_at desc, unit.unit_ref desc
@@ -354,6 +366,7 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
     const result = rows(await this.database.execute(sql`
       select unit.unit_ref, bundle.bundle_ref, unit.initial_state, unit.risk, unit.action_type,
         unit.ad_account_id, unit.campaign_id, unit.ad_set_id, unit.ad_id,
+        coalesce(unit.campaign_id, unit_ad_set.campaign_id, unit_ad.campaign_id) as campaign_scope_id,
         bundle.policy_snapshot_id, unit.proposed_at, unit.expires_at,
         current_event.event_type as current_event_type, unit.action_plan_payload,
         coalesce((
@@ -381,6 +394,10 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
       from action_proposal_units unit
       join action_proposal_bundles bundle
         on bundle.workspace_id = unit.workspace_id and bundle.id = unit.bundle_id
+      left join meta_ad_sets unit_ad_set
+        on unit_ad_set.workspace_id = unit.workspace_id and unit_ad_set.id = unit.ad_set_id
+      left join meta_ads unit_ad
+        on unit_ad.workspace_id = unit.workspace_id and unit_ad.id = unit.ad_id
       left join lateral (
         select event.value ->> 'eventType' as event_type
         from action_approval_decision_events decision
