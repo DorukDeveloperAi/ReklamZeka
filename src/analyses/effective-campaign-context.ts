@@ -9,6 +9,12 @@ import type { FrozenCategoryContext } from "@/domain/categories/registry";
 import type { EffectiveGuidancePack } from "@/domain/guidance/registry";
 import { inspectMetaPersistenceWrite } from "@/domain/meta/data-lifecycle";
 import { validateBusinessOutcomeEvidence, type BusinessOutcomeEvidenceSnapshot } from "@/analyses/business-outcome-evidence";
+import {
+  META_ANALYSIS_CONFIG_SNAPSHOT_VERSION,
+  projectMetaAnalysisConfig,
+  type CanonicalMetaAnalysisConfigSnapshotV2,
+} from "@/domain/meta/analysis-config-projection";
+import { DECISION_CADENCE_VERSION } from "@/domain/decisions/cadence";
 
 export const EFFECTIVE_CAMPAIGN_CONTEXT_VERSION = "effective-campaign-context/1.0.0" as const;
 export const EFFECTIVE_CONTEXT_INSTRUCTION_POLICY_COMPONENT_REF = "instruction-policy-registry" as const;
@@ -40,6 +46,10 @@ export type EffectiveCampaignContextInput = Readonly<{
     actorRef: Observed<string | null>;
     destinationRef: Observed<string | null>;
   }>;
+  /** Optional for replaying historical contexts that predate the v2 config evidence contract. */
+  metaAnalysisConfigEvidence?: Readonly<{
+    snapshot: CanonicalMetaAnalysisConfigSnapshotV2;
+  }>;
   categories: readonly FrozenCategoryContext[];
   guidance: EffectiveGuidancePack;
   policies: readonly Readonly<{
@@ -52,6 +62,12 @@ export type EffectiveCampaignContextInput = Readonly<{
     decision: "eligible" | "observe" | "no_change" | "blocked";
     reason: string;
     cooldownUntil: string | null;
+  }>;
+  /** Optional for replaying historical contexts that predate persisted cadence evidence. */
+  cadenceEvidence?: Readonly<{
+    profileRevision: number;
+    profileVersion: typeof DECISION_CADENCE_VERSION;
+    profileHash: string;
   }>;
   data: Readonly<{
     trustStatus: "ready" | "degraded" | "not_ready";
@@ -110,6 +126,10 @@ export class EffectiveCampaignContextError extends Error {
     super(`Effective campaign context oluşturulamadı: ${code}`);
     this.name = "EffectiveCampaignContextError";
   }
+}
+
+function sameObservation(left: Observed<unknown>, right: Observed<unknown>): boolean {
+  return JSON.stringify(stableValue(left)) === JSON.stringify(stableValue(right));
 }
 
 function compareText(left: string, right: string): number {
@@ -184,7 +204,7 @@ function authenticGuidance(pack: EffectiveGuidancePack): boolean {
  * authentic category/guidance components; public/agent projections must redact tenant IDs.
  */
 export function buildEffectiveCampaignContext(input: EffectiveCampaignContextInput): EffectiveCampaignContext {
-  exactKeys(input, ["workspaceId", "capturedAt", "identity", "meta", "categories", "guidance", "policies", "cadence", "data", "history", "versions", "policyAuthorityEvidence"]);
+  exactKeys(input, ["workspaceId", "capturedAt", "identity", "meta", "metaAnalysisConfigEvidence", "categories", "guidance", "policies", "cadence", "cadenceEvidence", "data", "history", "versions", "policyAuthorityEvidence"]);
   exactKeys(input.identity, ["connectionRef", "accountRef", "campaignRef", "entityRef", "entityType", "hierarchyRefs"]);
   exactKeys(input.meta, ["objective", "optimizationEvent", "configuredStatus", "effectiveStatus", "budgetOwnerRef", "targetingSignature", "actorRef", "destinationRef"]);
   exactKeys(input.cadence, ["profileRef", "decision", "reason", "cooldownUntil"]);
@@ -230,6 +250,23 @@ export function buildEffectiveCampaignContext(input: EffectiveCampaignContextInp
   }
   validateObserved(input.meta.targetingSignature, (value) => value === null || typeof value === "string" && /^sha256:[a-f0-9]{64}$/.test(value));
 
+  if (input.metaAnalysisConfigEvidence !== undefined) {
+    exactKeys(input.metaAnalysisConfigEvidence, ["snapshot"]);
+    let projection;
+    try {
+      projection = projectMetaAnalysisConfig(input.metaAnalysisConfigEvidence.snapshot, input.identity.campaignRef);
+    } catch {
+      throw new EffectiveCampaignContextError("inauthentic_component");
+    }
+    if (input.metaAnalysisConfigEvidence.snapshot.version !== META_ANALYSIS_CONFIG_SNAPSHOT_VERSION
+      || input.metaAnalysisConfigEvidence.snapshot.workspaceId !== workspaceId
+      || input.metaAnalysisConfigEvidence.snapshot.externalAccountId !== input.identity.accountRef
+      || !sameObservation(input.meta.objective, projection.objective)
+      || !sameObservation(input.meta.optimizationEvent, projection.optimizationEvent)) {
+      throw new EffectiveCampaignContextError("inauthentic_component");
+    }
+  }
+
   if (input.guidance.workspaceId !== workspaceId) throw new EffectiveCampaignContextError("scope_mismatch");
   if (!authenticGuidance(input.guidance)) throw new EffectiveCampaignContextError("inauthentic_component");
   if (Date.parse(input.guidance.evaluatedAt) > Date.parse(input.capturedAt)) throw new EffectiveCampaignContextError("invalid_input");
@@ -250,6 +287,15 @@ export function buildEffectiveCampaignContext(input: EffectiveCampaignContextInp
   if (new Set(policies.map((policy) => policy.policyRef)).size !== policies.length) throw new EffectiveCampaignContextError("invalid_input");
   if (!["eligible", "observe", "no_change", "blocked"].includes(input.cadence.decision)) throw new EffectiveCampaignContextError("invalid_input");
   if (input.cadence.cooldownUntil !== null && !Number.isFinite(Date.parse(input.cadence.cooldownUntil))) throw new EffectiveCampaignContextError("invalid_input");
+  if (input.cadenceEvidence !== undefined) {
+    exactKeys(input.cadenceEvidence, ["profileRevision", "profileVersion", "profileHash"]);
+    if (!/^cadence_[a-z0-9][a-z0-9_.:-]{0,126}$/.test(input.cadence.profileRef)
+      || !Number.isSafeInteger(input.cadenceEvidence.profileRevision) || input.cadenceEvidence.profileRevision < 1
+      || input.cadenceEvidence.profileVersion !== DECISION_CADENCE_VERSION
+      || !/^[a-f0-9]{64}$/.test(input.cadenceEvidence.profileHash)) {
+      throw new EffectiveCampaignContextError("invalid_input");
+    }
+  }
   if (!["ready", "degraded", "not_ready"].includes(input.data.trustStatus)) throw new EffectiveCampaignContextError("invalid_input");
 
   const snapshotRefs = uniqueSorted(input.data.snapshotRefs);
@@ -270,10 +316,18 @@ export function buildEffectiveCampaignContext(input: EffectiveCampaignContextInp
     capturedAt: new Date(input.capturedAt).toISOString(),
     identity: { ...input.identity, hierarchyRefs },
     meta: input.meta,
+    ...(input.metaAnalysisConfigEvidence === undefined ? {} : { metaAnalysisConfigEvidence: {
+      snapshot: input.metaAnalysisConfigEvidence.snapshot,
+    } }),
     categories: [...input.categories].sort((left, right) => compareText(left.dimension.key, right.dimension.key) || compareText(left.dimension.id, right.dimension.id)),
     guidance: input.guidance,
     policies,
     cadence: { ...input.cadence, profileRef: required(input.cadence.profileRef), reason: required(input.cadence.reason) },
+    ...(input.cadenceEvidence === undefined ? {} : { cadenceEvidence: {
+      profileRevision: input.cadenceEvidence.profileRevision,
+      profileVersion: input.cadenceEvidence.profileVersion,
+      profileHash: input.cadenceEvidence.profileHash,
+    } }),
     data: {
       trustStatus: input.data.trustStatus,
       snapshotRefs,

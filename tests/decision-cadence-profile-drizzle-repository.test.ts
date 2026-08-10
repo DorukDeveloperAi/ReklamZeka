@@ -42,8 +42,24 @@ describe("DrizzleDecisionCadenceProfileRepository", () => {
     const rendered = (harness.execute.mock.calls as unknown[][]).map(([query]) => new PgDialect().sqlToQuery(query as never).sql).join("\n");
     expect(rendered).toContain("for update");
     expect(rendered).toContain("insert into decision_cadence_profile_revisions");
+    expect(rendered).not.toContain("'cadence_profile'");
     expect(rendered).toContain("pg_advisory_xact_lock");
     expect(rendered).toContain("insert into audit_events");
+  });
+
+  it("atomically invalidates the superseded cadence component, never the newly inserted hash", async () => {
+    const priorHash = "a".repeat(64);
+    const harness = repository([[{ id: workspaceId }], [{ role: "owner" }], [{ account_id: accountId, campaign_id: campaignId }], [{ revision: 1, profile_hash: priorHash }], [], [], [], [], [], []]);
+    await expect(harness.repository.publish({ workspaceId, workspaceRef: "workspace_primary", actorId, actorRef: "actor_owner",
+      role: "owner", accountRef: "account_primary", campaignRef: "campaign_primary", profileRef: "cadence_primary",
+      revision: 2, expectedCurrentHash: priorHash, profile, occurredAt: "2026-08-10T12:00:00.000Z" })).resolves.toMatchObject({ outcome: "inserted" });
+    const rendered = (harness.execute.mock.calls as unknown[][]).map(([query]) => new PgDialect().sqlToQuery(query as never).sql).join("\n");
+    expect(rendered).toContain("insert into effective_campaign_context_invalidations");
+    expect(rendered).toContain("'cadence_profile'");
+    expect(rendered).toContain("'exact_entity_component'");
+    const invalidation = (harness.execute.mock.calls as unknown[][]).find(([query]) => new PgDialect().sqlToQuery(query as never).sql.includes("effective_campaign_context_invalidations"));
+    expect(invalidation).toBeDefined();
+    expect(new PgDialect().sqlToQuery(invalidation![0] as never).params).toContain(priorHash);
   });
 
   it("rejects a non-owner before it can supersede or append a profile", async () => {

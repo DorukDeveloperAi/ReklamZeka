@@ -253,6 +253,12 @@
     tek canonical hierarchy path üzerinden bounded deterministic çözüm, her effective definition
     için exact latest active `CategoryProfile` ref/version/hash binding'i ve missing/ambiguous/
     stale/archived/parked/cap durumunda partial context vermeyen fail-closed sonuç.
+  - [x] A10.4c-1 frozen context/persistence contract: config-v2 evidence varsa top-level
+    objective/optimization ile hash-doğrulanmış exact eşleşir; explicit `evidence_bound` save modu
+    config+cadence evidence yoksa fail-closed reddeder, varsayılan legacy historical replay korunur.
+    Cadence ref/revision/version/hash selective source component'e bağlanır; supersede publish eski
+    profile hash'i için aynı transaction'da exact-entity invalidation append eder. Forward migration
+    iki component enum'unu `cadence_profile` ile genişletir ve RLS/FORCE/revoke korumasını yineler.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.

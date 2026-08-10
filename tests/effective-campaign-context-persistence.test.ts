@@ -15,6 +15,11 @@ import {
   type GuidanceCard,
   type GuidanceSource,
 } from "@/domain/guidance/registry";
+import {
+  META_ANALYSIS_CONFIG_SNAPSHOT_VERSION,
+  normalizeMetaAnalysisConfigSnapshotV2,
+} from "@/domain/meta/analysis-config-projection";
+import { DECISION_CADENCE_VERSION } from "@/domain/decisions/cadence";
 
 const workspaceId = "00000000-0000-0000-0000-000000000101";
 const snapshotRef = "snapshot_aaaaaaaaaaaaaaaaaaaa";
@@ -76,7 +81,7 @@ function category() {
     } })]);
 }
 
-function context() {
+function context(options: Readonly<{ evidenceBound?: boolean }> = {}) {
   const input: EffectiveCampaignContextInput = {
     workspaceId, capturedAt: "2026-08-07T12:00:00.000Z",
     identity: {
@@ -93,7 +98,7 @@ function context() {
       actorRef: { state: "known", value: null }, destinationRef: { state: "known", value: null },
     },
     categories: [category()], guidance: guidance(), policies: [],
-    cadence: { profileRef: "cadence-1", decision: "observe", reason: "stable_window", cooldownUntil: null },
+    cadence: { profileRef: options.evidenceBound ? "cadence_primary" : "cadence-1", decision: "observe", reason: "stable_window", cooldownUntil: null },
     data: {
       trustStatus: "ready", snapshotRefs: [snapshotRef], featureRefs: [], windowRefs: [], blockers: [],
     },
@@ -105,7 +110,16 @@ function context() {
       promotionRegistry: "8".repeat(64),
     },
   };
-  return buildEffectiveCampaignContext(input);
+  if (!options.evidenceBound) return buildEffectiveCampaignContext(input);
+  const snapshot = normalizeMetaAnalysisConfigSnapshotV2({
+    version: META_ANALYSIS_CONFIG_SNAPSHOT_VERSION, workspaceId, externalAccountId: "account-1",
+    capturedAt: "2026-08-07T11:00:00.000Z",
+    campaigns: [{ externalCampaignId: "campaign-1", objective: { state: "known", value: "OUTCOME_LEADS" } }],
+    adSets: [{ externalAdSetId: "adset-1", externalCampaignId: "campaign-1", optimizationGoal: { state: "known", value: "LEAD_GENERATION" } }],
+  });
+  return buildEffectiveCampaignContext({ ...input, metaAnalysisConfigEvidence: { snapshot }, cadenceEvidence: {
+    profileRevision: 3, profileVersion: DECISION_CADENCE_VERSION, profileHash: "7".repeat(64),
+  } });
 }
 
 describe("effective campaign context persistence contract", () => {
@@ -141,10 +155,30 @@ describe("effective campaign context persistence contract", () => {
     expect(sourceComponentsOf(frozen)).toContainEqual({ componentType: "business_outcome_evidence", componentRef: "campaign_primary", componentVersion: "a".repeat(64) });
   });
 
+  it("binds Meta config and cadence evidence to exact top-level values and source components", () => {
+    const frozen = context({ evidenceBound: true });
+    expect(frozen.metaAnalysisConfigEvidence?.snapshot.snapshotHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(frozen.cadenceEvidence).toEqual({ profileRevision: 3, profileVersion: DECISION_CADENCE_VERSION, profileHash: "7".repeat(64) });
+    expect(sourceComponentsOf(frozen)).toContainEqual({ componentType: "cadence_profile", componentRef: "cadence_primary", componentVersion: "7".repeat(64) });
+
+    const { schemaVersion: _schemaVersion, contextHash: _contextHash, capabilities: _capabilities, ...input } = frozen;
+    expect(() => buildEffectiveCampaignContext({ ...input, meta: { ...input.meta,
+      objective: { state: "known", value: "sales" },
+    } })).toThrowError(expect.objectContaining({ code: "inauthentic_component" }));
+  });
+
   it("rejects an inauthentic context before opening a database transaction", async () => {
     const database = { transaction: vi.fn() };
     const repository = new DrizzleEffectiveCampaignContextRepository(database as never);
     await expect(repository.save({ ...context(), contextHash: "0".repeat(64) }))
+      .rejects.toMatchObject({ code: "invalid_input" } satisfies Partial<EffectiveCampaignContextRepositoryError>);
+    expect(database.transaction).not.toHaveBeenCalled();
+  });
+
+  it("requires both frozen evidence families only for explicit evidence-bound persistence", async () => {
+    const database = { transaction: vi.fn() };
+    const repository = new DrizzleEffectiveCampaignContextRepository(database as never);
+    await expect(repository.save(context(), { mode: "evidence_bound" }))
       .rejects.toMatchObject({ code: "invalid_input" } satisfies Partial<EffectiveCampaignContextRepositoryError>);
     expect(database.transaction).not.toHaveBeenCalled();
   });

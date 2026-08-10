@@ -82,6 +82,12 @@ export class DrizzleDecisionCadenceProfileRepository {
       await tx.execute(sql`insert into decision_cadence_profile_revisions (workspace_id, ad_account_id, campaign_id, profile_ref,
         revision, profile_version, profile_hash, profile_payload) values (${input.workspaceId}::uuid, ${scope[0]!.account_id}::uuid,
         ${scope[0]!.campaign_id}::uuid, ${input.profileRef}, ${input.revision}, ${DECISION_CADENCE_VERSION}, ${profileHash}, ${JSON.stringify(input.profile)}::jsonb)`);
+      if (current[0]) await tx.execute(sql`insert into effective_campaign_context_invalidations (workspace_id, event_hash,
+        component_type, component_ref, component_version, scope_kind, entity_type, entity_ref, reason_code, observed_at)
+        values (${input.workspaceId}::uuid, ${digest({ workspaceId: input.workspaceId, profileRef: input.profileRef,
+          priorProfileHash: current[0]!.profile_hash, nextProfileHash: profileHash, occurredAt })}, 'cadence_profile',
+          ${input.profileRef}, ${String(current[0]!.profile_hash)}, 'exact_entity_component', 'campaign', ${input.campaignRef},
+          'source_changed', ${occurredAt}::timestamptz) on conflict (workspace_id, event_hash) do nothing`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`audit:${input.workspaceId}`}, 0))`);
       const previousHash = String(rows<{ event_hash: unknown }>(await tx.execute(sql`select event_hash from audit_events where workspace_id = ${input.workspaceId}::uuid
         order by occurred_at desc, created_at desc, id desc limit 1`))[0]?.event_hash ?? "GENESIS");

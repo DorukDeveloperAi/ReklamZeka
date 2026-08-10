@@ -2012,3 +2012,19 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: `tests/current-category-composition-resolver.test.ts`,
   `tests/category-profile-persistence.test.ts` ve `tests/category-registry.test.ts` ile 27 test;
   `npx tsc --noEmit` ve `git diff --check` geçti.
+
+## 2026-08-10 — A10.4c-1 frozen config/cadence context evidence
+
+- `EffectiveCampaignContext`, eklenmiş v2 Meta config kanıtında immutable snapshot'ı yeniden
+  projekte eder; context'in account/campaign scope'u ile top-level objective ve optimization
+  observations birebir uyuşmadan context hash'i üretmez. Kanıt hiç yoksa legacy frozen replay
+  uyumluluğu korunur; yalnız açık `evidence_bound` persistence modunda Meta config ve cadence
+  evidence ikisi de zorunludur.
+- Cadence evidence `profileRef` + immutable revision/version/hash taşır ve source component'e
+  `cadence_profile` olarak yazılır. Owner/admin private cadence publish, supersede edilen eski
+  hash için campaign-scope invalidation'ı yeni revision/audit ile aynı kısa transaction'da append eder.
+  İleri migration iki context component constraint'ini genişletir ve private RLS/FORCE/revoke
+  korumasını tekrar uygular. Bu dilim config DB reader/composer, Decision Room route veya action/
+  approval/Meta-write capability eklemez.
+- Kanıt: context/persistence, cadence publisher ve forward migration için 3 hedef test dosyasında
+  12 test; `npm run typecheck`, `npm run db:check` ve `git diff --check` geçti.

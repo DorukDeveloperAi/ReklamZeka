@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -9,6 +9,12 @@ import {
   EffectiveCampaignContextRepositoryError,
   sourceComponentsOf,
 } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
+import { DrizzleDecisionCadenceProfileRepository } from "@/connectors/decisions/decision-cadence-profile-drizzle-repository";
+import {
+  META_ANALYSIS_CONFIG_SNAPSHOT_VERSION,
+  normalizeMetaAnalysisConfigSnapshotV2,
+} from "@/domain/meta/analysis-config-projection";
+import { DECISION_CADENCE_VERSION, type DecisionCadenceProfile } from "@/domain/decisions/cadence";
 import * as schema from "@/db/schema";
 import { resolveEffectiveCategory, type CategoryDefinition, type CategoryDimension } from "@/domain/categories/registry";
 import {
@@ -44,6 +50,17 @@ const foreignCampaignId = randomUUID();
 const snapshotId = randomUUID();
 const snapshotRef = "snapshot_aaaaaaaaaaaaaaaaaaaa";
 const futureSnapshotRef = "snapshot_bbbbbbbbbbbbbbbbbbbb";
+const actorId = randomUUID();
+
+const cadenceProfile: DecisionCadenceProfile = Object.freeze({
+  version: DECISION_CADENCE_VERSION, settleHours: 24, minimumObservationHours: 12,
+  minimumLearningHours: 24, cooldownHours: 24, repeatSuppressionHours: 24, frequencyWindowHours: 168,
+  maxDecisionsPerWindow: 3, maxActionsPerWindow: 1, maximumHistoryEntries: 20,
+  minimumEvidenceCount: 2, minimumEvidenceScore: 0.8,
+});
+const initialCadenceProfileHash = createHash("sha256").update(JSON.stringify(Object.fromEntries(
+  Object.entries(cadenceProfile).sort(([left], [right]) => left.localeCompare(right)),
+))).digest("hex");
 
 function guidance(entityRef: string) {
   const source: GuidanceSource = {
@@ -100,9 +117,14 @@ function context(options: Readonly<{
   accountRef?: string;
   snapshotRefs?: readonly string[];
   cadenceReason?: string;
+  capturedAt?: string;
+  cadenceEvidence?: Readonly<{ profileRevision: number; profileHash: string }>;
+  metricCatalogVersion?: string;
+  instructionPolicyRegistryVersion?: string;
+  promotionRegistryVersion?: string;
 }>) {
   const input: EffectiveCampaignContextInput = {
-    workspaceId, capturedAt: "2026-08-07T12:00:00.000Z",
+    workspaceId, capturedAt: options.capturedAt ?? "2026-08-07T12:00:00.000Z",
     identity: {
       connectionRef: options.connectionRef ?? "connection-main",
       accountRef: options.accountRef ?? "account-main",
@@ -128,11 +150,26 @@ function context(options: Readonly<{
     history: { changeRefs: [], decisionRefs: [], experimentRefs: [], practiceRefs: [], outcomeRefs: [] },
     versions: {
       metaCatalog: "meta-v1", categoryResolver: "category-v1", guidanceRegistry: "guidance-v1",
-      metricCatalog: "metric-v1", formulaCatalog: "formula-v1", timeframeResolver: "timeframe-v1",
-      instructionPolicyRegistry: "9".repeat(64),
-      promotionRegistry: "8".repeat(64),
+      metricCatalog: options.metricCatalogVersion ?? "metric-v1", formulaCatalog: "formula-v1", timeframeResolver: "timeframe-v1",
+      instructionPolicyRegistry: options.instructionPolicyRegistryVersion ?? "9".repeat(64),
+      promotionRegistry: options.promotionRegistryVersion ?? "8".repeat(64),
     },
   };
+  if (options.cadenceEvidence) {
+    const snapshot = normalizeMetaAnalysisConfigSnapshotV2({
+      version: META_ANALYSIS_CONFIG_SNAPSHOT_VERSION, workspaceId, externalAccountId: input.identity.accountRef,
+      capturedAt: "2026-08-07T11:00:00.000Z",
+      campaigns: [{ externalCampaignId: input.identity.campaignRef, objective: { state: "known", value: "OUTCOME_LEADS" } }],
+      adSets: [{ externalAdSetId: "adset-main", externalCampaignId: input.identity.campaignRef,
+        optimizationGoal: { state: "known", value: "LEAD_GENERATION" } }],
+    });
+    return buildEffectiveCampaignContext({ ...input, metaAnalysisConfigEvidence: { snapshot }, cadence: {
+      ...input.cadence, profileRef: "cadence_primary",
+    }, cadenceEvidence: {
+      profileRevision: options.cadenceEvidence.profileRevision,
+      profileVersion: DECISION_CADENCE_VERSION, profileHash: options.cadenceEvidence.profileHash,
+    } });
+  }
   return buildEffectiveCampaignContext(input);
 }
 
@@ -154,6 +191,13 @@ let forbiddenPayloadBlocked = false;
 let nullableAuthorityBypassBlocked = false;
 let nestedAuthorityEscalationBlocked = false;
 let crossTenantForeignKeyBlocked = false;
+let cadenceSchemaAccepted = false;
+let evidenceBoundContextPersisted = false;
+let missingCadenceEvidenceBlocked = false;
+let tamperedCadenceEvidenceBlocked = false;
+let cadenceSupersedeInvalidationExact = false;
+let cadenceContextInvalidated = false;
+let cadenceRlsAndGrants = false;
 let noWriteAuthority = false;
 let temporaryRowsCommitted = true;
 
@@ -201,6 +245,8 @@ try {
         externalCampaignId: "campaign-foreign", name: "Foreign",
       },
     ]);
+    await transaction.insert(schema.users).values({ id: actorId, email: `effective-context-${actorId}@example.invalid` });
+    await transaction.insert(schema.memberships).values({ workspaceId, userId: actorId, role: "owner" });
     await transaction.insert(schema.metaChangeSnapshots).values({
       id: snapshotId, workspaceId, metaConnectionId: connectionId, adAccountId: accountId,
       publicRef: snapshotRef, snapshotHash: "a".repeat(64), schemaVersion: 1,
@@ -214,7 +260,15 @@ try {
       canonicalPayload: {}, safeAggregate: { entityCounts: { campaign: 2, adSet: 0, ad: 0 }, knownFieldCount: 1, unknownFieldCount: 0 },
     });
 
+    // The initial immutable fixture is intentionally direct: it lets the evidence-bound
+    // persistence path run before exercising the publisher's nested savepoint on supersede.
+    await transaction.insert(schema.decisionCadenceProfileRevisions).values({
+      workspaceId, adAccountId: accountId, campaignId: campaignAId, profileRef: "cadence_primary", revision: 1,
+      profileVersion: DECISION_CADENCE_VERSION, profileHash: initialCadenceProfileHash,
+      profilePayload: cadenceProfile,
+    });
     const repository = new DrizzleEffectiveCampaignContextRepository(transaction as never);
+    const cadenceRepository = new DrizzleDecisionCadenceProfileRepository(transaction as never);
     const contextA = context({ campaignRef: "campaign-a" });
     const contextB = context({ campaignRef: "campaign-b" });
     inserted = (await repository.save(contextA)).outcome === "inserted"
@@ -284,6 +338,64 @@ try {
     historicalReplayImmutable = historical.context.contextHash === contextA.contextHash && historical.invalidated;
     invalidationReplayIdempotent = (await repository.invalidate(invalidation)).outcome === "unchanged";
 
+    // Keep cadence evidence outside legacy invalidation-count assertions. Distinct versions
+    // prevent the already-proven legacy invalidations from masking cadence invalidation.
+    const evidenceContext = context({ campaignRef: "campaign-a", capturedAt: "2026-08-07T12:10:00.000Z",
+      metricCatalogVersion: "metric-v2", instructionPolicyRegistryVersion: "7".repeat(64),
+      promotionRegistryVersion: "6".repeat(64),
+      cadenceEvidence: { profileRevision: 1, profileHash: initialCadenceProfileHash } });
+    const evidenceSaved = await repository.save(evidenceContext, { mode: "evidence_bound" });
+    const cadenceComponent = evidenceSaved.record.sourceComponents.find((entry) => entry.componentType === "cadence_profile");
+    evidenceBoundContextPersisted = evidenceSaved.outcome === "inserted"
+      && evidenceSaved.record.context.metaAnalysisConfigEvidence?.snapshot.snapshotHash
+        === evidenceContext.metaAnalysisConfigEvidence?.snapshot.snapshotHash
+      && cadenceComponent?.componentRef === "cadence_primary"
+      && cadenceComponent.componentVersion === initialCadenceProfileHash;
+    cadenceSchemaAccepted = cadenceComponent !== undefined;
+    missingCadenceEvidenceBlocked = await repository.save(context({ campaignRef: "campaign-a" }), { mode: "evidence_bound" }).then(
+      () => false,
+      (error: unknown) => error instanceof EffectiveCampaignContextRepositoryError && error.code === "invalid_input",
+    );
+    tamperedCadenceEvidenceBlocked = await repository.save(context({ campaignRef: "campaign-a", capturedAt: "2026-08-07T12:20:00.000Z",
+      metricCatalogVersion: "metric-v2", instructionPolicyRegistryVersion: "7".repeat(64),
+      promotionRegistryVersion: "6".repeat(64),
+      cadenceEvidence: { profileRevision: 1, profileHash: "d".repeat(64) } }), { mode: "evidence_bound" }).then(
+      () => false,
+      (error: unknown) => error instanceof EffectiveCampaignContextRepositoryError && error.code === "workspace_scope_mismatch",
+    );
+    const secondCadence = await cadenceRepository.publish({
+      workspaceId, workspaceRef: "workspace_context", actorId, actorRef: "actor_owner", role: "owner",
+      accountRef: "account-main", campaignRef: "campaign-a", profileRef: "cadence_primary", revision: 2,
+      expectedCurrentHash: initialCadenceProfileHash, profile: { ...cadenceProfile, cooldownHours: 25 },
+      occurredAt: "2026-08-07T12:30:00.000Z",
+    });
+    const cadenceInvalidations = (await transaction.execute(sql`
+      select component_version, entity_type, entity_ref from effective_campaign_context_invalidations
+      where workspace_id = ${workspaceId}::uuid and component_type = 'cadence_profile'
+        and component_ref = 'cadence_primary'
+      order by observed_at asc
+    `)).rows as unknown as readonly Readonly<{ component_version: string; entity_type: string | null; entity_ref: string | null }>[];
+    cadenceSupersedeInvalidationExact = secondCadence.outcome === "inserted"
+      && secondCadence.profileHash !== initialCadenceProfileHash
+      && cadenceInvalidations.length === 1 && cadenceInvalidations[0]?.component_version === initialCadenceProfileHash
+      && cadenceInvalidations[0]?.entity_type === "campaign" && cadenceInvalidations[0]?.entity_ref === "campaign-a";
+    cadenceContextInvalidated = (await repository.loadHistorical(workspaceId, evidenceContext.contextHash)).invalidated
+      && await repository.loadLatestValid({ workspaceId, entityType: "campaign", entityRef: "campaign-a" }) === null;
+    const cadenceSecurity = (await transaction.execute(sql`
+      select bool_and(relation.relrowsecurity and relation.relforcerowsecurity) as rls_forced,
+        bool_and(not exists (
+          select 1 from aclexplode(coalesce(relation.relacl, acldefault('r', relation.relowner))) privilege
+          where privilege.grantee = 0 or pg_get_userbyid(privilege.grantee) in ('anon', 'authenticated', 'service_role')
+        )) as public_and_api_roles_revoked
+      from pg_class relation
+      join pg_namespace namespace on namespace.oid = relation.relnamespace
+      where namespace.nspname = 'public' and relation.relname in (
+        'effective_campaign_context_components', 'effective_campaign_context_invalidations'
+      )
+    `)).rows as unknown as readonly Readonly<{ rls_forced: boolean; public_and_api_roles_revoked: boolean }>[];
+    cadenceRlsAndGrants = cadenceSecurity.length === 1 && cadenceSecurity[0]?.rls_forced === true
+      && cadenceSecurity[0]?.public_and_api_roles_revoked === true;
+
     forbiddenPayloadBlocked = await transaction.transaction(async (savepoint) => {
       await savepoint.execute(sql`
         insert into effective_campaign_contexts (
@@ -348,8 +460,20 @@ try {
       || !exactEntityInvalidated || !unrelatedEntityPreserved || !historicalReplayImmutable
       || !instructionPolicyWorkspaceInvalidated || !promotionRegistryWorkspaceInvalidated
       || !invalidationReplayIdempotent || !forbiddenPayloadBlocked || !nullableAuthorityBypassBlocked
-      || !nestedAuthorityEscalationBlocked || !crossTenantForeignKeyBlocked || !noWriteAuthority) {
-      throw new Error("Effective campaign context PostgreSQL acceptance failed");
+      || !nestedAuthorityEscalationBlocked || !crossTenantForeignKeyBlocked
+      || !cadenceSchemaAccepted || !evidenceBoundContextPersisted || !missingCadenceEvidenceBlocked
+      || !tamperedCadenceEvidenceBlocked || !cadenceSupersedeInvalidationExact || !cadenceContextInvalidated
+      || !cadenceRlsAndGrants || !noWriteAuthority) {
+      throw new Error(`Effective campaign context PostgreSQL acceptance failed: ${JSON.stringify({
+        inserted, idempotentReplay, identityConflictBlocked, foreignWorkspaceBlocked, foreignAccountBlocked,
+        brokenHierarchyBlocked, nonexistentSnapshotBlocked, futureSnapshotBlocked, exactEntityInvalidated,
+        unrelatedEntityPreserved, instructionPolicyWorkspaceInvalidated, promotionRegistryWorkspaceInvalidated,
+        historicalReplayImmutable, invalidationReplayIdempotent, forbiddenPayloadBlocked,
+        nullableAuthorityBypassBlocked, nestedAuthorityEscalationBlocked, crossTenantForeignKeyBlocked,
+        cadenceSchemaAccepted, evidenceBoundContextPersisted, missingCadenceEvidenceBlocked,
+        tamperedCadenceEvidenceBlocked, cadenceSupersedeInvalidationExact, cadenceContextInvalidated,
+        cadenceRlsAndGrants, noWriteAuthority,
+      })}`);
     }
     throw rollback;
   });
@@ -368,5 +492,8 @@ console.log(JSON.stringify({
   promotionRegistryWorkspaceInvalidated, historicalReplayImmutable,
   invalidationReplayIdempotent, forbiddenPayloadBlocked, nullableAuthorityBypassBlocked,
   nestedAuthorityEscalationBlocked, crossTenantForeignKeyBlocked, noWriteAuthority,
+  cadenceSchemaAccepted, evidenceBoundContextPersisted, missingCadenceEvidenceBlocked,
+  tamperedCadenceEvidenceBlocked, cadenceSupersedeInvalidationExact, cadenceContextInvalidated,
+  cadenceRlsAndGrants,
   writeNetworkCalls: 0, temporaryRowsCommitted,
 }));

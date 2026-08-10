@@ -428,6 +428,13 @@
       "when": 1786370494000,
       "tag": "20260810170134_guidance_guard_and_asset_revoke",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1786372200000,
+      "tag": "20260810173000_effective_context_cadence_component",
+      "breakpoints": true
     }
   ]
 }

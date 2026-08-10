@@ -30,6 +30,7 @@ export const CONTEXT_SOURCE_COMPONENT_TYPES = Object.freeze([
   "promotion_registry",
   "policy_authority",
   "business_outcome_evidence",
+  "cadence_profile",
 ] as const);
 
 export type ContextSourceComponentType = typeof CONTEXT_SOURCE_COMPONENT_TYPES[number];
@@ -57,6 +58,9 @@ export type StoredEffectiveCampaignContext = Readonly<{
   sourceComponents: readonly ContextSourceComponentRef[];
   invalidated: boolean;
 }>;
+
+/** `evidence_bound` proves only the A10 config/cadence evidence closure; it grants no action authority. */
+export type EffectiveCampaignContextPersistenceMode = "legacy_compatible" | "evidence_bound";
 
 export class EffectiveCampaignContextRepositoryError extends Error {
   constructor(readonly code:
@@ -186,6 +190,11 @@ export function sourceComponentsOf(context: EffectiveCampaignContext): readonly 
       componentRef: evidence.entityRef,
       componentVersion: evidence.sourceHeadHash,
     })),
+    ...(context.cadenceEvidence === undefined ? [] : [{
+      componentType: "cadence_profile" as const,
+      componentRef: context.cadence.profileRef,
+      componentVersion: context.cadenceEvidence.profileHash,
+    }]),
   ];
   const normalized = components.map((component) => Object.freeze({
     componentType: component.componentType,
@@ -222,6 +231,26 @@ async function assertBusinessOutcomeEvidence(database: ContextDatabase, context:
       throw new EffectiveCampaignContextRepositoryError("corrupt_store");
     }
   }
+}
+
+/** Evidence-bound contexts may name cadence only when the exact immutable tenant row exists. */
+async function assertCadenceEvidence(
+  database: ContextDatabase,
+  context: EffectiveCampaignContext,
+  mirror: MirrorScope,
+): Promise<void> {
+  if (context.cadenceEvidence === undefined) return;
+  const matches = resultRows<{ id: string }>(await database.execute(sql`
+    select id::text as id from decision_cadence_profile_revisions
+    where workspace_id = ${context.workspaceId}::uuid
+      and ad_account_id = ${mirror.adAccountId}::uuid and campaign_id = ${mirror.campaignId}::uuid
+      and profile_ref = ${context.cadence.profileRef}
+      and revision = ${context.cadenceEvidence.profileRevision}
+      and profile_version = ${context.cadenceEvidence.profileVersion}
+      and profile_hash = ${context.cadenceEvidence.profileHash}
+    limit 2 for share
+  `));
+  if (matches.length !== 1) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
 }
 
 async function assertWorkspace(database: ContextDatabase, workspaceId: string, lock: boolean): Promise<void> {
@@ -401,17 +430,27 @@ async function loadRecord(database: ContextDatabase, row: ContextRow): Promise<S
 export class DrizzleEffectiveCampaignContextRepository {
   constructor(private readonly database: ContextDatabase) {}
 
-  async save(candidate: EffectiveCampaignContext): Promise<Readonly<{
+  async save(candidate: EffectiveCampaignContext, options: Readonly<{
+    mode?: EffectiveCampaignContextPersistenceMode;
+  }> = {}): Promise<Readonly<{
     outcome: "inserted" | "unchanged";
     record: StoredEffectiveCampaignContext;
   }>> {
     const context = authenticContext(candidate);
+    const mode = options.mode ?? "legacy_compatible";
+    if (mode !== "legacy_compatible" && mode !== "evidence_bound") {
+      throw new EffectiveCampaignContextRepositoryError("invalid_input");
+    }
+    if (mode === "evidence_bound" && (context.metaAnalysisConfigEvidence === undefined || context.cadenceEvidence === undefined)) {
+      throw new EffectiveCampaignContextRepositoryError("invalid_input");
+    }
     const expectedIdentityHash = identityHash(context);
     const components = sourceComponentsOf(context);
     return this.database.transaction(async (transaction) => {
       await assertWorkspace(transaction, context.workspaceId, true);
       const mirror = await assertMirrorScope(transaction, context);
       await assertBusinessOutcomeEvidence(transaction, context);
+      await assertCadenceEvidence(transaction, context, mirror);
       const sameHash = await transaction.select().from(schema.effectiveCampaignContexts).where(and(
         eq(schema.effectiveCampaignContexts.workspaceId, context.workspaceId),
         eq(schema.effectiveCampaignContexts.contextHash, context.contextHash),
