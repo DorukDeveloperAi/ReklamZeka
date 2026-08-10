@@ -263,8 +263,9 @@
 - [x] İşletim taksonomisine dayalı, insan-incelemeli interaktif kampanya brief şablonları: pazar/dil/
   hizmet/dönüşüm yolu sınıflandırmasını delivery health ve kapasiteden ayrı tutar; lead edinimi,
   üst-huni eğitim, pazar-hizmet öğrenmesi, kesinti toparlanması ve sınıflandırma triage'ını
-  deterministic seçer. Form ve WhatsApp sonucu varsayılan olarak aynı KPI değildir; hiçbir campaign
-  create/publish/approval/Meta-write yetkisi vermez.
+  deterministic seçer. Her brief, UI/sohbetin tek bir sonraki eksik kararı sorması için typed
+  `nextDecision` ve insan incelemeli, sıralı campaign lane'leri taşır. Form ve WhatsApp sonucu
+  varsayılan olarak aynı KPI değildir; hiçbir campaign create/publish/approval/Meta-write yetkisi vermez.
 - [ ] Meta config + çoklu internal category + policy composition.
   - [x] A10.4a immutable/replay-safe `meta-analysis-config-snapshot/2.0.0`: reviewed
     campaign objective ve ad-set optimization-goal mapping sürümleri hash'e freeze edilir;

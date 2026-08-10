@@ -2407,6 +2407,18 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   `tests/insights-materialization.test.ts`, `npm run verify:meta-sync-db`, `npm run typecheck`,
   `git diff --check`.
 
+## 2026-08-10 — A10 interaktif kampanya brief karar akışı
+
+- Excel'deki operasyonel kırılımı (`pazar → dil → iş amacı → ana grup`, dönüşüm yolu ve bütçe
+  seviyesi) yansıtan brief contract'i `1.1.0`'a yükseltildi. Brief artık yalnız serbest metin sorular
+  değil, chat/UI için tek deterministik `nextDecision` ve insan incelemeli sıralı campaign lane'leri
+  üretir.
+- Lead, upper-funnel education ve market/service learning ayrı lane/ölçüm sınırlarında kalır. Form,
+  WhatsApp ve upper-funnel erişimi kıyaslanmaz; sınıflandırılmamış veya delivery-interrupted kayıtlar
+  lane üretmeden triage/recovery'de bloklanır. Bu bir planning aid'dir; campaign yaratma, approval,
+  publish, execute veya Meta-write yetkisi taşımaz.
+- Kanıt: `tests/interactive-campaign-template.test.ts`, `npm run typecheck`, `git diff --check`.
+
 ## 2026-08-10 — A10 immutable L2 feature snapshot contract
 
 - `deterministic-feature-snapshot/1.0.0`, yalnız authentic L1 observation metric sonucu ve aynı
