@@ -249,6 +249,10 @@
     campaign objective ve ad-set optimization-goal mapping sürümleri hash'e freeze edilir;
     missing/unmapped/mixed/ambiguous ve legacy-v1 eksiklikleri explicit reason-coded unknown
     kalır, action/Meta-write authority taşımaz.
+  - [x] A10.4b server-private all-active-dimension current category composition reader/resolver:
+    tek canonical hierarchy path üzerinden bounded deterministic çözüm, her effective definition
+    için exact latest active `CategoryProfile` ref/version/hash binding'i ve missing/ambiguous/
+    stale/archived/parked/cap durumunda partial context vermeyen fail-closed sonuç.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.

@@ -135,9 +135,24 @@ describe("Drizzle CategoryProfile repository", () => {
       .latestArtifact(artifact.profileRef)).resolves.toEqual(artifact);
     expect(new PgDialect().sqlToQuery(db.execute.mock.calls[1]![0]).sql).toMatch(/order by version desc limit 1/i);
     expect(Object.getOwnPropertyNames(DrizzleCategoryProfileRepository.prototype).sort())
-      .toEqual(["append", "constructor", "latestArtifact"]);
+      .toEqual(["append", "constructor", "currentActiveArtifacts", "latestArtifact"]);
     expect(() => new DrizzleCategoryProfileRepository({} as never, "raw", artifact.workspaceRef))
       .toThrow(CategoryProfileRepositoryError);
+  });
+
+  it("loads exactly one current active artifact per requested definition and rejects stale heads", async () => {
+    const active = reviseCategoryProfile({ current: profile(), changes: { status: "active" } });
+    const db = database([workspace, { rows: [stored(active)] }]);
+    await expect(new DrizzleCategoryProfileRepository(db as never, workspaceId, active.workspaceRef)
+      .currentActiveArtifacts([definitionId])).resolves.toEqual([{ categoryDefinitionId: definitionId, profile: active }]);
+    const query = new PgDialect().sqlToQuery(db.execute.mock.calls[1]![0]);
+    expect(query.sql).toMatch(/distinct on \(category_definition_id\)/i);
+    expect(query.sql).toMatch(/order by category_definition_id, version desc/i);
+
+    const paused = reviseCategoryProfile({ current: active, changes: { status: "paused" } });
+    const stale = database([workspace, { rows: [stored(paused)] }]);
+    await expect(new DrizzleCategoryProfileRepository(stale as never, workspaceId, active.workspaceRef)
+      .currentActiveArtifacts([definitionId])).rejects.toEqual(expect.objectContaining({ code: "revision_conflict" }));
   });
 });
 

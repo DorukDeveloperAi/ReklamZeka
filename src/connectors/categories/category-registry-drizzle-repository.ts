@@ -376,6 +376,21 @@ export class DrizzleCategoryRegistryRepository implements CategoryRegistryReposi
     return this.resolveWith(this.database, workspaceId, dimensionId, path, "current");
   }
 
+  /**
+   * Private composition read primitive.  It intentionally resolves every
+   * active dimension from one canonical hierarchy path; callers must not
+   * independently reconstruct a path for each dimension.
+   */
+  async resolveAllCurrent(workspaceId: string, target: CategoryHierarchyTarget): Promise<readonly EffectiveCategoryResolution[]> {
+    const path = await this.canonicalPath(this.database, workspaceId, target);
+    const dimensions = (await this.database.select().from(schema.categoryDimensions).where(and(
+      eq(schema.categoryDimensions.workspaceId, workspaceId), isNull(schema.categoryDimensions.archivedAt),
+    ))).map(mapDimension).sort((left, right) => left.key.localeCompare(right.key) || left.id.localeCompare(right.id));
+    if (dimensions.length === 0 || dimensions.length > 100) throw new CategoryRegistryPersistenceError("invalid_input");
+    return Object.freeze(await Promise.all(dimensions.map((dimension) =>
+      this.resolveWith(this.database, workspaceId, dimension.id, path, "current"))));
+  }
+
   async replayFrozen(context: FrozenCategoryContext, target: CategoryHierarchyTarget) {
     const path = await this.canonicalPath(this.database, context.workspaceId, target);
     if (!samePath(path, { workspaceId: context.workspaceId, nodes: context.path })) {

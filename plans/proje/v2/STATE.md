@@ -1995,3 +1995,20 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   authority taşımaz.
 - Eski `meta-change` v1 snapshot'ları okunabilir kalır; önceden saklanmamış objective/optimization bilgisi
   `legacy_snapshot_missing_*` olarak görünür. Odak testleri (7 test) ve `npm run typecheck` geçti.
+
+## 2026-08-10 — A10.4b Çok-boyutlu güncel kategori composition reader'ı
+
+- Server-private `CurrentCategoryCompositionResolver`, tüm aktif dimension'ları yalnız bir
+  canonical hierarchy path'ten sıralı çözer. Her effective definition için batch current head
+  sorgusundan gelen tam active `CategoryProfile` bağlanır; profile ref/version/hash frozen
+  category context hash'ine yeniden yazılır. Unmatched dimension, missing/ambiguous/stale veya
+  archived/paused profile, manual-lock/parked conflict ve 100 dimension/500 effective definition
+  cap'i hiçbir partial context dönmeden reddedilir.
+- Concrete Drizzle reader bütün read'i tek `REPEATABLE READ, READ ONLY` transaction içinde
+  yürütür; active dimension'ları deterministic key/id sırasıyla okur. Profile reader
+  `DISTINCT ON(category_definition_id) ... version desc` ile yalnız aynı snapshot'taki latest
+  head'i kabul eder ve eski active revision'a fallback yapmaz. Bu read port HTTP/UI/policy/action/
+  Meta authority sunmaz; migration veya schema değişikliği yapılmadı.
+- Kanıt: `tests/current-category-composition-resolver.test.ts`,
+  `tests/category-profile-persistence.test.ts` ve `tests/category-registry.test.ts` ile 27 test;
+  `npx tsc --noEmit` ve `git diff --check` geçti.
