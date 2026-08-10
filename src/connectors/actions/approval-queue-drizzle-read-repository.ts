@@ -28,6 +28,7 @@ const CURRENCY = /^[A-Z]{3}$/;
 const DECIMAL = /^(0|[1-9]\d{0,29})(?:\.(\d{1,12}))?$/;
 const CODE = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const PRIVATE_REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
+const PUBLIC_ENTITY_REF = /^entity_[a-f0-9]{16}$/;
 const ACTION_TYPES: readonly ApprovalActionType[] = ["status_pause", "status_activate", "budget_decrease", "budget_increase"];
 
 type SourceRow = Readonly<{
@@ -288,9 +289,10 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
   }
 
   async list(input: Parameters<ApprovalQueueRepository["list"]>[0]): Promise<readonly ApprovalQueueRecord[]> {
-    validateInput(input, ["workspaceId", "before", "limit"]);
+    validateInput(input, ["workspaceId", "entityRef", "before", "limit"]);
     this.assertBoundWorkspace(input.workspaceId);
     if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 101) fail("invalid_input");
+    if (input.entityRef !== null && (typeof input.entityRef !== "string" || !PUBLIC_ENTITY_REF.test(input.entityRef))) fail("invalid_input");
     if (input.before !== null && (!input.before || typeof input.before !== "object"
       || Object.keys(input.before).sort().join("|") !== "createdAt|unitRef"
       || !Number.isFinite(Date.parse(input.before.createdAt)) || !UNIT_REF.test(input.before.unitRef))) fail("invalid_input");
@@ -335,6 +337,8 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
         order by decision.ordinal desc, (event.value ->> 'sequence')::integer desc limit 1
       ) current_event on true
       where unit.workspace_id = ${this.workspaceId}::uuid
+        and (${input.entityRef}::text is null or concat('entity_', substring(encode(digest(${this.workspaceId}::text || ':entity:' ||
+          coalesce(unit.campaign_id, unit.ad_set_id, unit.ad_id)::text, 'sha256'), 'hex') from 1 for 16)) = ${input.entityRef}::text)
         and (${beforeAt}::timestamptz is null
           or (unit.proposed_at, unit.unit_ref) < (${beforeAt}::timestamptz, ${beforeRef}::text))
       order by unit.proposed_at desc, unit.unit_ref desc

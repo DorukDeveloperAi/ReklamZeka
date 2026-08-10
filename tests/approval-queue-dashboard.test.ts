@@ -32,8 +32,9 @@ function ready(selected: ApprovalQueueRecord | null = null) {
   return {
     status: "ready" as const,
     result: {
-      contractVersion: "approval-queue-read-model/1.0.0" as const,
+      contractVersion: "approval-queue-read-model/1.1.0" as const,
       view: "list" as const,
+      entityRef: null,
       items: [item],
       nextCursor: null,
       authority: {

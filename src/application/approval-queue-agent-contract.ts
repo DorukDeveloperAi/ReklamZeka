@@ -4,7 +4,7 @@ import { authorizeWorkspace, type WorkspaceMembership } from "@/security/authori
 
 export const APPROVAL_QUEUE_AGENT_CONTRACT_VERSION = "approval-queue-agent-tools/1.0.0" as const;
 export type ApprovalQueueAgentCall =
-  | Readonly<{ name: "approval_queue_list"; arguments: Readonly<{ limit?: number; cursor?: string | null }> }>
+  | Readonly<{ name: "approval_queue_list"; arguments: Readonly<{ entityRef?: string | null; limit?: number; cursor?: string | null }> }>
   | Readonly<{ name: "approval_queue_get"; arguments: Readonly<{ unitRef: string }> }>;
 
 const AUTHORITY = Object.freeze({ readOnly: true as const, canApprove: false as const, canReject: false as const,
@@ -22,7 +22,7 @@ export class ApprovalQueueAgentContract {
     authorizeWorkspace(principal.actor, principal.workspaceId, "data:read", this.memberships);
     exact(call, ["name", "arguments"]);
     if (call.name !== "approval_queue_list" && call.name !== "approval_queue_get") throw new ApprovalQueueReadError("invalid_input");
-    exact(call.arguments, call.name === "approval_queue_list" ? ["limit", "cursor"] : ["unitRef"]);
+    exact(call.arguments, call.name === "approval_queue_list" ? ["entityRef", "limit", "cursor"] : ["unitRef"]);
     const result = call.name === "approval_queue_list"
       ? await this.service.list({ workspaceId: principal.workspaceId, ...call.arguments })
       : await this.service.get({ workspaceId: principal.workspaceId, ...call.arguments });
@@ -32,7 +32,7 @@ export class ApprovalQueueAgentContract {
 
 export const APPROVAL_QUEUE_AGENT_TOOLS = Object.freeze([
   Object.freeze({ name: "approval_queue_list", description: "List public-safe approval queue units for the server-bound workspace; no decision or execution authority.",
-    inputSchema: Object.freeze({ type: "object", additionalProperties: false, properties: Object.freeze({ limit: Object.freeze({ type: "integer", minimum: 1, maximum: 100 }), cursor: Object.freeze({ type: ["string", "null"] }) }) }) }),
+    inputSchema: Object.freeze({ type: "object", additionalProperties: false, properties: Object.freeze({ entityRef: Object.freeze({ type: ["string", "null"], pattern: "^entity_[a-f0-9]{16}$" }), limit: Object.freeze({ type: "integer", minimum: 1, maximum: 100 }), cursor: Object.freeze({ type: ["string", "null"] }) }) }) }),
   Object.freeze({ name: "approval_queue_get", description: "Read one public-safe action unit detail; cannot approve, reject, grant, execute, or write Meta.",
     inputSchema: Object.freeze({ type: "object", additionalProperties: false, required: ["unitRef"], properties: Object.freeze({ unitRef: Object.freeze({ type: "string", pattern: "^action_unit_[a-f0-9]{20}$" }) }) }) }),
 ]);

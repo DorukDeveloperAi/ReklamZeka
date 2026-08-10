@@ -77,7 +77,7 @@ describe("Approval Queue Drizzle read repository", () => {
   it("maps one tenant's persisted proposal to an exact public-safe read model", async () => {
     const fixture = database([sourceRow()]);
     const repository = new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId);
-    const result = await repository.list({ workspaceId, before: null, limit: 26 });
+    const result = await repository.list({ workspaceId, entityRef: null, before: null, limit: 26 });
 
     expect(result).toEqual([expect.objectContaining({
       unitRef,
@@ -108,15 +108,27 @@ describe("Approval Queue Drizzle read repository", () => {
     const repository = new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId);
     await repository.list({
       workspaceId,
+      entityRef: null,
       before: { createdAt: "2026-08-07T13:00:00.000Z", unitRef },
       limit: 26,
     });
     const query = fixture.queries[0]!;
     expect(query.sql).toContain("where unit.workspace_id = $1::uuid");
-    expect(query.sql).toContain("(unit.proposed_at, unit.unit_ref) < ($3::timestamptz, $4::text)");
+    expect(query.sql).toContain("(unit.proposed_at, unit.unit_ref) < ($6::timestamptz, $7::text)");
     expect(query.sql).toContain("order by unit.proposed_at desc, unit.unit_ref desc");
     expect(query.sql).not.toMatch(/\boffset\b/i);
-    expect(query.params).toEqual([workspaceId, "2026-08-07T13:00:00.000Z", "2026-08-07T13:00:00.000Z", unitRef, 26]);
+    expect(query.params).toEqual([workspaceId, null, workspaceId, null, "2026-08-07T13:00:00.000Z", "2026-08-07T13:00:00.000Z", unitRef, 26]);
+  });
+
+  it("filters by the derived public entity reference inside the tenant-scoped query", async () => {
+    const fixture = database([]);
+    const repository = new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId);
+    await repository.list({ workspaceId, entityRef: "entity_0123456789abcdef", before: null, limit: 26 });
+    const query = fixture.queries[0]!;
+    expect(query.sql).toContain("coalesce(unit.campaign_id, unit.ad_set_id, unit.ad_id)");
+    expect(query.sql).toContain("digest($3::text || ':entity:'");
+    expect(query.params).toEqual([workspaceId, "entity_0123456789abcdef", workspaceId, "entity_0123456789abcdef", null, null, null, 26]);
+    expect(query.sql).not.toContain("campaign_alpha");
   });
 
   it("returns tenant-bound detail and null for not found", async () => {
@@ -145,13 +157,13 @@ describe("Approval Queue Drizzle read repository", () => {
   it("rejects cross-tenant access and malformed inputs before database I/O", async () => {
     const fixture = database();
     const repository = new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId);
-    await expect(repository.list({ workspaceId: foreignWorkspaceId, before: null, limit: 26 }))
+    await expect(repository.list({ workspaceId: foreignWorkspaceId, entityRef: null, before: null, limit: 26 }))
       .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "workspace_scope_mismatch" }));
     await expect(repository.get({ workspaceId: foreignWorkspaceId, unitRef }))
       .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "workspace_scope_mismatch" }));
-    await expect(repository.list({ workspaceId, before: null, limit: 0 }))
+    await expect(repository.list({ workspaceId, entityRef: null, before: null, limit: 0 }))
       .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "invalid_input" }));
-    await expect(repository.list({ workspaceId: 7, before: null, limit: 26 } as never))
+    await expect(repository.list({ workspaceId: 7, entityRef: null, before: null, limit: 26 } as never))
       .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "invalid_input" }));
     await expect(repository.get({ workspaceId, unitRef, execute: true } as never))
       .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "invalid_input" }));
@@ -174,7 +186,7 @@ describe("Approval Queue Drizzle read repository", () => {
   ])("fails closed on malformed persisted %s", async (_label, make) => {
     const fixture = database([make()]);
     await expect(new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId)
-      .list({ workspaceId, before: null, limit: 26 }))
+      .list({ workspaceId, entityRef: null, before: null, limit: 26 }))
       .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "corrupt_store" }));
   });
 });

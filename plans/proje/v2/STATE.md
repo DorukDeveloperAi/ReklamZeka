@@ -38,6 +38,17 @@
   oluşmaz. Tarayıcıda GCC → geçici WhatsApp → bağlamdan form geri yükleme ve GCC → İstanbul WhatsApp
   bağlam geçişi doğrulandı.
 
+## 2026-08-10 — A14 entity-scoped Approval Queue read boundary
+
+- Approval Queue read modeli `entityRef` ile exact opaque entity filtresini tenant-bound SQL içinde
+  uygular. Filtre, public ref'i private entity UUID'den yalnız repository içinde yeniden türetir;
+  UI veya agent workspace/private ID gönderemez. Keyset pagination filtreyle birlikte korunur ve
+  dönmüş satırın entity ref'i istenen filtreyle birebir eşleşmiyorsa bütün yanıt fail-closed olur.
+- Bu yalnız direct ActionUnit entity scope'udur. Campaign'in ad-set/ad alt hareketlerini campaign
+  timeline'ına genişleten persisted hierarchy read modeli henüz yoktur; Dashboard'a sahte bir birleşik
+  timeline bağlanmadı. `DATABASE_URL` ve `DIRECT_DATABASE_URL` bu ortamda yoktur; gerçek PostgreSQL
+  query-plan/live acceptance sonraki bağlantılı ortamda çalıştırılacaktır.
+
 ## 2026-08-10 — A13 execution-time Meta mirror revalidation
 
 - Disabled admission ledger, approval/grant zincirini yeniden bağladıktan sonra current persisted Meta

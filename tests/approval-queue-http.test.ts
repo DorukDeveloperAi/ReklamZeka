@@ -79,6 +79,10 @@ describe("Approval Queue GET-only HTTP boundary", () => {
     const detail = await api.GET(new Request(`http://localhost/api/approval-queue?view=detail&unitRef=${record().unitRef}`));
     expect(detail.status).toBe(200);
     expect(await detail.json()).toMatchObject({ result: { view: "detail", item: { unitRef: record().unitRef } } });
+
+    const filtered = await api.GET(new Request(`http://localhost/api/approval-queue?view=list&entityRef=${record().entity.ref}`));
+    expect(filtered.status).toBe(200);
+    expect(await filtered.json()).toMatchObject({ result: { view: "list", entityRef: record().entity.ref } });
   });
 
   it("rejects identities, unknown/duplicate params, malformed limits, and mixed views before auth", async () => {
@@ -89,6 +93,8 @@ describe("Approval Queue GET-only HTTP boundary", () => {
       "http://localhost/api/approval-queue?view=list&limit=1e2",
       "http://localhost/api/approval-queue?view=list&limit=101",
       `http://localhost/api/approval-queue?view=list&unitRef=${record().unitRef}`,
+      "http://localhost/api/approval-queue?view=list&entityRef=campaign_12345",
+      `http://localhost/api/approval-queue?view=detail&unitRef=${record().unitRef}&entityRef=${record().entity.ref}`,
       `http://localhost/api/approval-queue?view=detail&unitRef=${record().unitRef}&cursor=opaque`,
       "http://localhost/api/approval-queue?view=detail",
     ];
@@ -100,7 +106,7 @@ describe("Approval Queue GET-only HTTP boundary", () => {
     for (const role of ["viewer", "analyst"] as const) {
       const api = harness(undefined, role);
       expect((await api.GET(new Request("http://localhost/api/approval-queue"))).status).toBe(200);
-      expect(api.repository.list).toHaveBeenCalledWith({ workspaceId, before: null, limit: 26 });
+      expect(api.repository.list).toHaveBeenCalledWith({ workspaceId, entityRef: null, before: null, limit: 26 });
     }
     const unauthorized = harness(undefined, "viewer");
     unauthorized.resolvePrincipal.mockResolvedValueOnce(null);

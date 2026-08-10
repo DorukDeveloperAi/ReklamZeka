@@ -33,7 +33,7 @@ describe("Approval Queue public read service", () => {
       beforeAfter: { beforeMinor: 100_000, afterMinor: 95_000 }, autonomy: { decision: "approval_required" },
       dependencies: [{ status: "approved" }] }], authority: { readOnly: true, canApprove: false, canReject: false, canRequestChanges: false, canGrant: false, canExecute: false, canWriteMeta: false } });
     expect(detail.item.unitRef).toBe(record().unitRef);
-    expect(repo.list).toHaveBeenCalledWith({ workspaceId, before: null, limit: 26 });
+    expect(repo.list).toHaveBeenCalledWith({ workspaceId, entityRef: null, before: null, limit: 26 });
     expect(JSON.stringify({ list, detail })).not.toContain(workspaceId);
   });
 
@@ -44,7 +44,7 @@ describe("Approval Queue public read service", () => {
     expect(page.nextCursor).not.toBeNull();
     const nextRepo = repository([]);
     await new ApprovalQueueReadService(nextRepo).list({ workspaceId, cursor: page.nextCursor });
-    expect(nextRepo.list).toHaveBeenCalledWith({ workspaceId, before: { createdAt: newer.createdAt, unitRef: newer.unitRef }, limit: 26 });
+    expect(nextRepo.list).toHaveBeenCalledWith({ workspaceId, entityRef: null, before: { createdAt: newer.createdAt, unitRef: newer.unitRef }, limit: 26 });
     await expect(new ApprovalQueueReadService(repository([older, newer])).list({ workspaceId }))
       .rejects.toEqual(expect.objectContaining({ code: "unsafe_source" }));
   });
@@ -67,6 +67,17 @@ describe("Approval Queue public read service", () => {
     await expect(new ApprovalQueueReadService(repository([])).get({ workspaceId, unitRef: record().unitRef }))
       .rejects.toEqual(expect.objectContaining({ code: "not_found" }));
     await expect(new ApprovalQueueReadService(repository([])).list({ workspaceId, limit: 101 })).rejects.toBeInstanceOf(ApprovalQueueReadError);
+  });
+
+  it("returns only the exact opaque entity scope and rejects a mismatched source row", async () => {
+    const exactEntityRef = record().entity.ref;
+    const foreign = record({ unitRef: "action_unit_dddddddddddddddddddd", entity: { ...record().entity, ref: "entity_0123456789abcdef" } });
+    const source = repository([record()]);
+    const result = await new ApprovalQueueReadService(source).list({ workspaceId, entityRef: exactEntityRef });
+    expect(result).toMatchObject({ entityRef: exactEntityRef, items: [{ entity: { ref: exactEntityRef } }] });
+    expect(source.list).toHaveBeenCalledWith({ workspaceId, entityRef: exactEntityRef, before: null, limit: 26 });
+    await expect(new ApprovalQueueReadService(repository([foreign])).list({ workspaceId, entityRef: exactEntityRef }))
+      .rejects.toEqual(expect.objectContaining({ code: "unsafe_source" }));
   });
 
   it("aligns canonical status action types and returns a deeply immutable projection", async () => {
