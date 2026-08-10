@@ -109,6 +109,12 @@ const columns = [
   "policy_semantic_binding_revisions.payload",
   "guidance_cards.source_ids",
   "guidance_sets.ordered_card_ids",
+  // Campaign guidance selection stores guidance topic labels and pack limits,
+  // not internal category references. Archive impact therefore has no
+  // category edge to resolve from these immutable selection facts.
+  "guidance_campaign_selection_revisions.topics",
+  "guidance_campaign_selection_revisions.required_topics",
+  "guidance_campaign_selection_revisions.budget",
   "advised_practice_definitions.payload",
   "advised_practice_events.payload",
   "effective_campaign_contexts.snapshot_refs",
