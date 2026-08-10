@@ -116,6 +116,20 @@
   fixture'ı üzerinden agenda payload/hash freeze'ini, RLS/revoke ve immutable asset guard'larını doğruladı;
   kalıcı fixture bırakmadı.
 
+## 2026-08-10 — A10 server-bound deterministic dry-run endpoint
+
+- `/api/decision-room` POST; yalnız cookie tabanlı `decision_room:dry_run` local-session scope'u, aktif
+  workspace membership'i ve server-derived `workspaceRef`/`readerRef` ile manual Decision Room run başlatır.
+  İstemci yalnız opaque request/account/campaign/timeframe/template ref'leri gönderebilir; action/approval/
+  Meta-write veya raw/prompt/settlement alanı kabul edilmez.
+- Observation reader attribution finality'yi request'ten veya sabit tahminden almaz. Yalnız explicit
+  `REKLAMZEKA_ANALYSIS_SETTLEMENT_POLICY_REF` ve `REKLAMZEKA_ANALYSIS_SETTLED_THROUGH_DATE` birlikte
+  geçerliyse compose edilir; yoksa public yüzey `source_not_configured` ile fail-closed 503 döndürür.
+- Kanıt: service/HTTP/local-config hedef testleri ve tam `npm test` (261 dosya/1.510 test), production
+  build, `db:check`, audit, architecture/model/security-boundaries/secret kontrolleri yeşil. Mevcut local
+  ortamda settlement policy yapılandırılmadığı için gerçek PostgreSQL endpoint run acceptance bilinçli açık
+  kalır; bir policy ref+cutoff sağlandığında rollback verifier ile tamamlanmalıdır.
+
 ## 2026-08-10 — A10.2b ExperimentRecord append-only lifecycle
 
 - Experiment plan artık explicit `guardrail_breach` stop condition'ı taşımadan geçerli değildir. Plan ve

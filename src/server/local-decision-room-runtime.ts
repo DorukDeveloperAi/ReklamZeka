@@ -170,7 +170,7 @@ export function assertTrustedLocalDecisionRoomRequest(
   if (operation === "mark_read" && request.headers.get("x-reklamzeka-intent") !== "mark-inbox-read") {
     throw new LocalDecisionRoomBoundaryError("untrusted_request");
   }
-  if (operation === "draft" && !["budget-lab-dry-run", "budget-lab-save-draft"].includes(
+  if (operation === "draft" && !["budget-lab-dry-run", "budget-lab-save-draft", "decision-room-dry-run"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   ) && !["autonomy-rule-create-draft", "guidance-studio-create", "guidance-studio-revise",
     "guidance-set-create", "guidance-set-revise", "instruction-policy-mutate",
@@ -337,6 +337,24 @@ export async function resolveTrustedLocalDraftPrincipal(input: Readonly<{
   exactKeys(input, ["request", "database", "config"]);
   const authenticated = authenticate(input.request, input.config, "draft");
   assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", authenticated.credential);
+  return bindPrincipal(input.database, input.config);
+}
+
+/** Cookie-only manual analysis trigger; it has a narrower scope than generic draft tools. */
+export async function resolveTrustedLocalDecisionRoomDryRunPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null
+    || input.request.headers.get("x-reklamzeka-intent") !== "decision-room-dry-run") {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: "decision_room:dry_run", expected: input.config });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", "cookie");
   return bindPrincipal(input.database, input.config);
 }
 

@@ -6,6 +6,11 @@ import {
   createLocalDecisionRoomRouteHandlers,
   localDecisionRoomConfig,
 } from "@/server/local-decision-room-runtime";
+import {
+  createLocalDecisionRoomDryRunHandler,
+  decisionRoomDryRunNotConfiguredResponse,
+  localDecisionRoomDryRunConfig,
+} from "@/server/local-decision-room-dry-run-runtime";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,6 +28,8 @@ function configuredHandlers() {
       REKLAMZEKA_LOCAL_USER_ID: process.env.REKLAMZEKA_LOCAL_USER_ID,
       REKLAMZEKA_LOCAL_READER_REF: process.env.REKLAMZEKA_LOCAL_READER_REF,
       REKLAMZEKA_LOCAL_SESSION_SIGNING_KEY: process.env.REKLAMZEKA_LOCAL_SESSION_SIGNING_KEY,
+      REKLAMZEKA_ANALYSIS_SETTLEMENT_POLICY_REF: process.env.REKLAMZEKA_ANALYSIS_SETTLEMENT_POLICY_REF,
+      REKLAMZEKA_ANALYSIS_SETTLED_THROUGH_DATE: process.env.REKLAMZEKA_ANALYSIS_SETTLED_THROUGH_DATE,
     };
     const config = localDecisionRoomConfig(environment);
     if (!config) return null;
@@ -40,7 +47,11 @@ function configuredHandlers() {
       pool.on("error", () => undefined);
       runtimeDatabase = drizzle(pool, { schema });
     }
-    return createLocalDecisionRoomRouteHandlers({ database: runtimeDatabase, config });
+    const dryRunConfig = localDecisionRoomDryRunConfig(environment);
+    return {
+      ...createLocalDecisionRoomRouteHandlers({ database: runtimeDatabase, config }),
+      POST: dryRunConfig ? createLocalDecisionRoomDryRunHandler({ database: runtimeDatabase, config: dryRunConfig }) : null,
+    };
   } catch {
     return null;
   }
@@ -60,4 +71,11 @@ export function PATCH(request: Request): Promise<Response> | Response;
 export function PATCH(request?: Request) {
   const handlers = configuredHandlers();
   return handlers && request ? handlers.PATCH(request) : decisionRoomNotConfiguredResponse();
+}
+
+export function POST(): ReturnType<typeof decisionRoomDryRunNotConfiguredResponse>;
+export function POST(request: Request): Promise<Response> | Response;
+export function POST(request?: Request) {
+  const handlers = configuredHandlers();
+  return handlers?.POST && request ? handlers.POST(request) : decisionRoomDryRunNotConfiguredResponse();
 }

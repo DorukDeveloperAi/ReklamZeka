@@ -277,7 +277,10 @@
     ve yarış-güvenli server-clock read-state.
   - [x] HMAC capability'li loopback-only local-session principal/route assembly; dashboard cookie,
     CLI bearer, her istekte aktif workspace üyeliği ve read/mark-read scope'u.
-  - [ ] Rol yönetimi/audit mutation API'si ve gerçek analysis dry-run endpoint'i.
+  - [x] Cookie-only, server-bound deterministic analysis dry-run endpoint'i: workspace/actor/clock ve
+    settlement policy istemciden alınmaz; explicit operator policy ref+cutoff yoksa fail-closed 503,
+    varsa yalnız advisory run/ledger/inbox sonucu ve `actionAuthority:none` üretir.
+  - [ ] Rol yönetimi/audit mutation API'si ve policy-configured canlı PostgreSQL dry-run acceptance.
 - [x] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
   - [x] Deterministik on-pass agenda, category/topic subset ve context/timeframe-bound finding çekirdeği.
   - [x] A10.2c agenda hash+payload'ı ilk run claim'inde immutable Decision Room run assetine freeze edilir;
