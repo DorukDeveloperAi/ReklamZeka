@@ -2440,3 +2440,13 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Drizzle meta snapshot zinciri önceki forward migrations için eksik snapshot ürettiği için generator
   fazladan tarihsel delta çıkardı; migration güvenle yalnız L2 delta'ya daraltıldı. `db:check` bu
   reconciled journal'ı doğrular. Henüz materialization writer veya L1-change invalidation yazıcısı yoktur.
+
+## 2026-08-10 — A10 L2 private materializer
+
+- `DrizzleDeterministicFeatureSnapshotRepository`, yalnız private read adapter'ın runtime-attested
+  source manifestini kabul eder; feature hash'i repository girişinde yeniden kurulur/doğrulanır.
+- Kısa transaction active workspace ile tenant account/connection scope'unu ve her selected L1 row'un
+  current `source_payload_hash` değerini recheck eder. Eşleşme kaybolursa immutable L2 insert yapılmadan
+  `source_changed` verir; aynı feature hash exact payloadla yalnız unchanged replay olur.
+- Bu katman action/approval/Meta-write authority taşımaz. L1 change sonrası L2/L3 consumer invalidation
+  henüz ayrı bir sonraki checkpoint'tir.

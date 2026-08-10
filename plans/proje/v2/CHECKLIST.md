@@ -424,6 +424,9 @@
     source-manifest item tabloları, composite tenant FK/index, FORCE RLS/revoke ve tombstone-only
     append-only guard ile forward migration olarak eklendi. Server-private materialization writer ve
     L1-change invalidation tüketicisi hâlâ açık kalır.
+  - [x] Server-private L2 materializer: yalnız runtime-attested canonical source manifest'i kabul eder;
+    active tenant/account/connection scope ve her L1 row'un current source payload hash'i aynı transactionda
+    yeniden doğrulanır. Immutable header+source item insert idempotenttir; stale source fail-closed olur.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDeterministicFeatureSnapshot, DeterministicFeatureSnapshotError } from "@/analyses/deterministic-feature-snapshot";
+import { assertDeterministicFeatureSnapshot, buildDeterministicFeatureSnapshot, DeterministicFeatureSnapshotError } from "@/analyses/deterministic-feature-snapshot";
 import { aggregateMetaMetrics } from "@/domain/meta/insights/metric-engine";
 import { normalizeMetaDailyInsight } from "@/domain/meta/insights/contract";
 
@@ -18,5 +18,10 @@ describe("deterministic L2 feature snapshot", () => {
     const scope = { workspaceId: "workspace", metaConnectionId: "connection", adAccountId: "account", entityLevel: "campaign" as const, externalEntityId: "campaign" };
     expect(() => buildDeterministicFeatureSnapshot({ scope, observation: { ...observation(), metricResult: { ...observation().metricResult, resultHash: "0".repeat(64) } } })).toThrowError(DeterministicFeatureSnapshotError);
     expect(() => buildDeterministicFeatureSnapshot({ scope, observation: observation(), rawPayload: {} } as never)).toThrowError(DeterministicFeatureSnapshotError);
+  });
+  it("re-authenticates persisted candidates instead of trusting their feature hash", () => {
+    const feature = buildDeterministicFeatureSnapshot({ scope: { workspaceId: "workspace", metaConnectionId: "connection", adAccountId: "account", entityLevel: "campaign", externalEntityId: "campaign" }, observation: observation() });
+    expect(() => assertDeterministicFeatureSnapshot(feature)).not.toThrow();
+    expect(() => assertDeterministicFeatureSnapshot({ ...feature, sourceManifestHash: "0".repeat(64) })).toThrowError(DeterministicFeatureSnapshotError);
   });
 });

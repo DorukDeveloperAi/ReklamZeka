@@ -92,3 +92,37 @@ export function buildDeterministicFeatureSnapshot(input: Readonly<{
   const featureHash = hash(core);
   return Object.freeze({ ...core, featureHash, featureRef: `feature_${featureHash.slice(0, 24)}` });
 }
+
+/** Re-authenticates a persisted candidate before any repository write or replay. */
+export function assertDeterministicFeatureSnapshot(value: unknown): asserts value is DeterministicFeatureSnapshot {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !inspectMetaPersistenceWrite(value).compliant) {
+    throw new DeterministicFeatureSnapshotError("forbidden_material");
+  }
+  const snapshot = value as DeterministicFeatureSnapshot;
+  const keys = ["contractVersion", "featureRef", "featureHash", "scope", "observationRef", "role", "startDate", "endDate", "timezone", "sampleSize", "settled", "qualityStatus", "qualityReasonCodes", "sourceManifestHash", "sourceSnapshotRefs", "formulaCatalogVersion", "metricResult", "capabilities"];
+  if (Object.keys(snapshot).length !== keys.length || Object.keys(snapshot).some((key) => !keys.includes(key))
+    || snapshot.contractVersion !== DETERMINISTIC_FEATURE_SNAPSHOT_VERSION
+    || snapshot.formulaCatalogVersion !== META_METRIC_FORMULA_CATALOG_VERSION
+    || !snapshot.scope || ![snapshot.scope.workspaceId, snapshot.scope.metaConnectionId, snapshot.scope.adAccountId, snapshot.scope.externalEntityId].every((entry) => typeof entry === "string" && entry.trim())
+    || !["campaign", "ad_set", "ad"].includes(snapshot.scope.entityLevel)
+    || !["primary", "comparison", "series", "pre", "post"].includes(snapshot.role)
+    || !Number.isSafeInteger(snapshot.sampleSize) || snapshot.sampleSize < 0 || typeof snapshot.settled !== "boolean"
+    || !["ready", "degraded"].includes(snapshot.qualityStatus) || !Array.isArray(snapshot.qualityReasonCodes)
+    || !Array.isArray(snapshot.sourceSnapshotRefs) || snapshot.capabilities?.containsRawL0 !== false
+    || snapshot.capabilities?.canAuthorizeAction !== false || snapshot.capabilities?.canExecuteWrite !== false) {
+    throw new DeterministicFeatureSnapshotError("inauthentic_component");
+  }
+  const sourceSnapshotRefs = refs(snapshot.sourceSnapshotRefs);
+  const qualityReasonCodes = Object.freeze([...new Set(snapshot.qualityReasonCodes)].sort());
+  const expectedSourceManifestHash = hash({ sourceSnapshotRefs, observationRef: snapshot.observationRef, startDate: snapshot.startDate, endDate: snapshot.endDate });
+  const expectedResultHash = hash({ catalogVersion: snapshot.metricResult?.catalogVersion, metrics: snapshot.metricResult?.metrics });
+  const core = { contractVersion: snapshot.contractVersion, scope: snapshot.scope, observationRef: snapshot.observationRef, role: snapshot.role,
+    startDate: snapshot.startDate, endDate: snapshot.endDate, timezone: snapshot.timezone, sampleSize: snapshot.sampleSize, settled: snapshot.settled,
+    qualityStatus: snapshot.qualityStatus, qualityReasonCodes, sourceManifestHash: snapshot.sourceManifestHash, sourceSnapshotRefs,
+    formulaCatalogVersion: snapshot.formulaCatalogVersion, metricResult: snapshot.metricResult, capabilities: snapshot.capabilities };
+  const expectedFeatureHash = hash(core);
+  if (snapshot.sourceManifestHash !== expectedSourceManifestHash || snapshot.metricResult?.resultHash !== expectedResultHash
+    || snapshot.featureHash !== expectedFeatureHash || snapshot.featureRef !== `feature_${expectedFeatureHash.slice(0, 24)}`) {
+    throw new DeterministicFeatureSnapshotError("inauthentic_component");
+  }
+}
