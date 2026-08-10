@@ -2284,3 +2284,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   yetkisi açılmaz.
 - Kanıt: `npm run verify:ready-effective-analysis-context-root-db`, `npm run typecheck`,
   `npm run check:secret-artifacts`, `git diff --check`.
+## 2026-08-10 — A09 policy semantic binding private lifecycle
+
+- `DrizzlePolicySemanticBindingLifecycleRepository`, yalnız server-private owner/admin çağrısında aktif
+  workspace ve üyeliği kilit altında yeniden doğrular; tam published `policyRef/version/hash` olmadan
+  semantic fact yazmaz. Kaynak tabloda zaten var olan append-only chain kullanılır: kaynak-advisory lock,
+  immutable previous hash OCC, canonical JSON fact/revision hash, exact-latest retry ve stale conflict
+  tek transaction içindedir.
+- Her yeni binding, persisted frozen `policy_authority` context sürümlerini gerçek kayıtlı ref/version
+  üzerinden invalidate eder ve audit hash-chain olayı yazar. HTTP/UI/MCP/action yüzeyi yoktur; bütün
+  publish/approve/execute/Meta-write ve diğer runtime yetkileri false döner.
+- Hedefli test, `typecheck` ve `db:check` geçti. Account-group/topic private writerları, complete-positive
+  live relational fixture ve gerçek browser acceptance hâlâ açık bağımlılıklardır.

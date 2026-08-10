@@ -151,8 +151,11 @@
     context ailelerinin complete exact-impact coverage'ı için canlı PostgreSQL kabulü ve gerçek oturumlu
     browser kabulü. Repository preview aileleri immutable policy-composition sidecar ve relational zincir
     üzerinden ayrı ayrı değerlendirir; gerçek live bootstrap/publish/OCC yolu authority bridge eksikliğini
-    fail-closed kanıtlar. Complete-positive fixture, account-group/topic/semantic revisionları için private
-    writer eksik olduğu sürece açık kalır; bu kanıtlar olmadan legacy/missing/corrupt rows partial kalır.
+    fail-closed kanıtlar. `policy_semantic_binding_revisions` için private owner/admin writer, exact
+    published policy ref/version/hash, advisory-lock OCC, canonical fact/revision hash, audit ve
+    frozen-context invalidation ile eklendi. Complete-positive fixture, account-group/topic revision
+    writerları ve gerçek oturumlu browser kabulü tamamlanana kadar açık kalır; bu kanıtlar olmadan
+    legacy/missing/corrupt rows partial kalır.
 - [ ] Başlangıç objective/internal kategori playbook seti.
   - [x] Altı canonical objective playbook'una version/hash ile bağlı, review-required ve
     authority-free starter category/profile proposal kataloğu.
