@@ -2177,3 +2177,20 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: `tests/current-effective-analysis-context-source-drizzle-reader.test.ts`,
   `tests/instruction-policy-lifecycle-repository.test.ts`,
   `tests/trusted-policy-authority-repository.test.ts`, `npx tsc --noEmit`, `git diff --check`.
+
+## 2026-08-10 — A10.4c-11 ready source bundle with unbound data window
+
+- `DrizzleCurrentEffectiveAnalysisContextSourceReader` artık same-snapshot hierarchy/config, category,
+  cadence, selected reviewed guidance pack, policy lifecycle, repository-verified authority ve promotion
+  lifecycle registry hash'ini tek `ready` bundle'da verir. Promotion lifecycle reader için yalnız
+  caller-owned transaction surface'i eklendi; schema/migration veya write/action yolu yoktur.
+- Config-v2 dışındaki mevcut hierarchy'de bulunmayan Meta gözlemleri explicit `unknown` kalır. Data
+  bilerek `trustStatus:not_ready`, yalnız exact public Meta source snapshot ref'i ve
+  `analysis_window_not_bound` blocker'ı taşır; history ref'leri boştur. Böylece bundle compose/save için
+  complete olsa da data veya action readiness iddiası yapmaz.
+- Bundle, authority composition öncesinde authentic effective-context input olarak yeniden doğrulanır;
+  authority closure instruction-policy/policy-authority evidence'ını ekler ve evidence-bound persistence
+  için gereken promotion registry hash'i source snapshot'tan gelir. Missing/expired/tampered bileşenler
+  fail-closed olur. HTTP/UI/Decision Room/action/Meta write eklenmedi.
+- Kanıt: `tests/current-effective-analysis-context-source-drizzle-reader.test.ts`,
+  `tests/effective-analysis-context-composer.test.ts`, `npm run typecheck`, `git diff --check`.

@@ -300,6 +300,12 @@
     revision trigger'ı public/API veya action authority açmaz. Transaction-local reader selection + reviewed
     manifest closure'ını doğrular; data/history/category/lifecycle/authority eksik olduğundan source yine
     dürüstçe `not_ready` kalır.
+  - [x] A10.4c-11 same-snapshot ready source bundle: exact hierarchy/config, category composition,
+    cadence evidence, persisted selected guidance pack, policy lifecycle/authority and promotion registry
+    hash'i repository-owned tek bundle'da birleşir. Data window henüz bağlanmadığı için data yalnız public
+    source snapshot ref'iyle `not_ready` ve `analysis_window_not_bound` kalır; history boş, mevcut olmayan
+    Meta fields explicit unknown, action/write authority yoktur. Authority composition ardından yalnız
+    evidence-bound save'a gider; invalid/tampered component fail-closed olur.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.
