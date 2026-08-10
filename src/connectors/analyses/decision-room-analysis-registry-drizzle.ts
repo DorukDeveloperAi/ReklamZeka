@@ -22,6 +22,7 @@ import type { DecisionRoomDraftPort } from "@/application/decision-room";
 import type { FindingObservationReadPort } from "@/analyses/finding-observation-builder";
 import { buildEffectiveCampaignContext, type EffectiveCampaignContext } from "@/analyses/effective-campaign-context";
 import type { EffectiveGuidancePack } from "@/domain/guidance/registry";
+import { evaluateDecisionCadence, type DecisionCadenceProfile } from "@/domain/decisions/cadence";
 import { resolveAnalysisTimeframe, validateResolvedAnalysisTimeframe, type ResolvedAnalysisTimeframe } from "@/analyses/timeframe-resolver";
 import * as schema from "@/db/schema";
 import { DrizzleDecisionRoomInbox, DrizzleDecisionRoomRunStore } from "@/connectors/decisions/decision-room-drizzle-adapters";
@@ -168,6 +169,7 @@ function restoreContext(payload: unknown): EffectiveCampaignContext {
 
 type AssetSelection = Readonly<{
   template_id: string; timeframe_id: string; context_id: string;
+  cadence_profile_id: string; cadence_profile_ref: string; cadence_profile_hash: string; cadence_profile_payload: unknown;
   template_hash: string; timeframe_hash: string; context_hash: string;
   template_payload: unknown; timeframe_payload: unknown; context_payload: unknown;
 }>;
@@ -200,6 +202,21 @@ function runtimeAssets(
   if (context.contextHash !== selection.context_hash) {
     throw new DecisionRoomAnalysisAssetPersistenceError("corrupt_store");
   }
+  let cadenceProfile: DecisionCadenceProfile;
+  try {
+    cadenceProfile = selection.cadence_profile_payload as DecisionCadenceProfile;
+    evaluateDecisionCadence({ profile: cadenceProfile, now: occurredAt, observationStartedAt: occurredAt,
+      lastMaterialChangeAt: null, learning: { state: "not_applicable", startedAt: null }, lastDecision: null,
+      recentDecisions: [], evidence: { refs: ["cadence_profile_validation"], score: 1 }, requestedDisposition: "test",
+      recommendationSource: "deterministic_policy", emergencyGuardrail: { breached: false, evidenceRef: null } });
+  } catch {
+    throw new DecisionRoomAnalysisAssetPersistenceError("corrupt_store");
+  }
+  if (analysisAssetDefinitionHash(cadenceProfile) !== selection.cadence_profile_hash
+    || analysisAssetDefinitionHash(template.cadence.profile) !== selection.cadence_profile_hash
+    || context.cadence.profileRef !== selection.cadence_profile_ref) {
+    throw new DecisionRoomAnalysisAssetPersistenceError("corrupt_store");
+  }
   let resolved: ResolvedAnalysisTimeframe;
   try {
     resolved = persistedResolved
@@ -226,7 +243,7 @@ function runtimeAssets(
     requestedPasses: template.requestedPasses,
     hierarchy: template.hierarchy,
     checks: template.checks,
-    cadence: template.cadence,
+    cadence: { ...template.cadence, profile: cadenceProfile },
   });
   try {
     validateDecisionRoomAnalysisRuntimeAssets({ ...input, actionAuthority: "none" }, assets);
@@ -300,12 +317,15 @@ export class DrizzleDecisionRoomAnalysisAssetRegistry {
       await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`${this.workspaceId}:analysis-template:${definition.templateRef}`}, 0))`);
       const scope = rows<{
         connection_id: string; account_id: string; campaign_id: string; context_id: string; context_payload: unknown;
-        timeframe_id: string; timeframe_payload: unknown;
+        timeframe_id: string; timeframe_payload: unknown; cadence_profile_id: string; cadence_profile_ref: string;
+        cadence_profile_hash: string; cadence_profile_payload: unknown;
       }>(await transaction.execute(sql`
         select context.meta_connection_id::text as connection_id,
           account.id::text as account_id, campaign.id::text as campaign_id,
           context.id::text as context_id, context.context_payload,
-          timeframe.id::text as timeframe_id, timeframe.definition_payload as timeframe_payload
+          timeframe.id::text as timeframe_id, timeframe.definition_payload as timeframe_payload,
+          cadence.id::text as cadence_profile_id, cadence.profile_ref as cadence_profile_ref,
+          cadence.profile_hash as cadence_profile_hash, cadence.profile_payload as cadence_profile_payload
         from ad_accounts account
         join ad_campaigns campaign on campaign.workspace_id = account.workspace_id and campaign.ad_account_id = account.id
         join effective_campaign_contexts context on context.workspace_id = campaign.workspace_id
@@ -314,6 +334,9 @@ export class DrizzleDecisionRoomAnalysisAssetRegistry {
         join analysis_timeframe_definitions timeframe on timeframe.workspace_id = campaign.workspace_id
           and timeframe.timeframe_ref = ${definition.timeframeRef}
           and timeframe.definition_hash = ${definition.timeframeDefinitionHash}
+        join decision_cadence_profile_revisions cadence on cadence.workspace_id = campaign.workspace_id
+          and cadence.ad_account_id = account.id and cadence.campaign_id = campaign.id
+          and cadence.profile_ref = context.context_payload #>> '{cadence,profileRef}' and cadence.superseded_at is null
         where account.workspace_id = ${this.workspaceId}::uuid
           and account.external_account_id = ${accountRef}
           and campaign.external_campaign_id = ${campaignRef}
@@ -355,6 +378,8 @@ export class DrizzleDecisionRoomAnalysisAssetRegistry {
         templateRef: definition.templateRef, triggerKind: "manual",
       }, at, {
         template_id: "publication", timeframe_id: scope[0]!.timeframe_id, context_id: scope[0]!.context_id,
+        cadence_profile_id: scope[0]!.cadence_profile_id, cadence_profile_ref: scope[0]!.cadence_profile_ref,
+        cadence_profile_hash: scope[0]!.cadence_profile_hash, cadence_profile_payload: scope[0]!.cadence_profile_payload,
         template_hash: definitionHash, timeframe_hash: definition.timeframeDefinitionHash,
         context_hash: definition.contextHash, template_payload: definition,
         timeframe_payload: scope[0]!.timeframe_payload, context_payload: scope[0]!.context_payload,
@@ -481,6 +506,8 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
       const existing = rows<AssetSelection & { asset_hash: string; occurred_at: Date | string; resolved_timeframe: unknown }>(await transaction.execute(sql`
         select asset.template_definition_id::text as template_id,
           asset.timeframe_definition_id::text as timeframe_id, asset.context_id::text,
+          asset.cadence_profile_revision_id::text as cadence_profile_id, cadence.profile_ref as cadence_profile_ref,
+          asset.cadence_profile_hash, cadence.profile_payload as cadence_profile_payload,
           template.definition_hash as template_hash, timeframe.definition_hash as timeframe_hash,
           context.context_hash, template.definition_payload as template_payload,
           timeframe.definition_payload as timeframe_payload, context.context_payload,
@@ -489,6 +516,8 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
         join analysis_template_definitions template on template.workspace_id = asset.workspace_id and template.id = asset.template_definition_id
         join analysis_timeframe_definitions timeframe on timeframe.workspace_id = asset.workspace_id and timeframe.id = asset.timeframe_definition_id
         join effective_campaign_contexts context on context.workspace_id = asset.workspace_id and context.id = asset.context_id
+        join decision_cadence_profile_revisions cadence on cadence.workspace_id = asset.workspace_id
+          and cadence.id = asset.cadence_profile_revision_id and cadence.profile_hash = asset.cadence_profile_hash
         where asset.workspace_id = ${this.workspaceId}::uuid and asset.run_id = ${run.id}::uuid limit 1
       `))[0];
       if (existing) {
@@ -496,7 +525,7 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
         const expectedHash = analysisAssetDefinitionHash({
           runRef: input.runRef, templateHash: existing.template_hash,
           timeframeHash: existing.timeframe_hash, contextHash: existing.context_hash,
-          occurredAt: frozenAt, resolvedTimeframe: existing.resolved_timeframe,
+          cadenceProfileHash: existing.cadence_profile_hash, occurredAt: frozenAt, resolvedTimeframe: existing.resolved_timeframe,
         });
         if (existing.asset_hash !== expectedHash) throw new DecisionRoomAnalysisAssetPersistenceError("corrupt_store");
         const assets = runtimeAssets(input, frozenAt, existing, existing.resolved_timeframe);
@@ -506,6 +535,8 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
       const selectionSql = run.trigger_kind === "scheduled" ? sql`
         select template.id::text as template_id, timeframe.id::text as timeframe_id,
           context.id::text as context_id, template.definition_hash as template_hash,
+          cadence.id::text as cadence_profile_id, cadence.profile_ref as cadence_profile_ref,
+          cadence.profile_hash as cadence_profile_hash, cadence.profile_payload as cadence_profile_payload,
           timeframe.definition_hash as timeframe_hash, context.context_hash,
           template.definition_payload as template_payload, timeframe.definition_payload as timeframe_payload,
           context.context_payload
@@ -515,6 +546,9 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
         join analysis_timeframe_definitions timeframe on timeframe.workspace_id = binding.workspace_id
           and timeframe.id = binding.timeframe_definition_id
         join effective_campaign_contexts context on context.workspace_id = template.workspace_id and context.id = template.context_id
+        join decision_cadence_profile_revisions cadence on cadence.workspace_id = template.workspace_id
+          and cadence.ad_account_id = template.ad_account_id and cadence.campaign_id = template.campaign_id
+          and cadence.profile_ref = context.context_payload #>> '{cadence,profileRef}' and cadence.superseded_at is null
         where binding.workspace_id = ${this.workspaceId}::uuid and binding.schedule_id = ${run.schedule_id}::uuid
           and template.account_ref = ${input.accountRef} and template.campaign_ref = ${input.campaignRef}
           and template.template_ref = ${input.templateRef} and timeframe.timeframe_ref = ${input.timeframeRef}
@@ -533,6 +567,8 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
       ` : sql`
         select template.id::text as template_id, timeframe.id::text as timeframe_id,
           context.id::text as context_id, template.definition_hash as template_hash,
+          cadence.id::text as cadence_profile_id, cadence.profile_ref as cadence_profile_ref,
+          cadence.profile_hash as cadence_profile_hash, cadence.profile_payload as cadence_profile_payload,
           timeframe.definition_hash as timeframe_hash, context.context_hash,
           template.definition_payload as template_payload, timeframe.definition_payload as timeframe_payload,
           context.context_payload
@@ -540,6 +576,9 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
         join analysis_timeframe_definitions timeframe on timeframe.workspace_id = template.workspace_id
           and timeframe.id = template.timeframe_definition_id
         join effective_campaign_contexts context on context.workspace_id = template.workspace_id and context.id = template.context_id
+        join decision_cadence_profile_revisions cadence on cadence.workspace_id = template.workspace_id
+          and cadence.ad_account_id = template.ad_account_id and cadence.campaign_id = template.campaign_id
+          and cadence.profile_ref = context.context_payload #>> '{cadence,profileRef}' and cadence.superseded_at is null
         join decision_room_runs candidate on candidate.workspace_id = template.workspace_id
           and candidate.id = ${run.id}::uuid and candidate.ad_account_id = template.ad_account_id
           and candidate.campaign_id = template.campaign_id
@@ -570,15 +609,16 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
       const assetHash = analysisAssetDefinitionHash({
         runRef: input.runRef, templateHash: candidates[0]!.template_hash,
         timeframeHash: candidates[0]!.timeframe_hash, contextHash: candidates[0]!.context_hash,
-        occurredAt, resolvedTimeframe: assets.resolvedTimeframe,
+        cadenceProfileHash: candidates[0]!.cadence_profile_hash, occurredAt, resolvedTimeframe: assets.resolvedTimeframe,
       });
       await transaction.execute(sql`
         insert into decision_room_run_analysis_assets (
           workspace_id, run_id, template_definition_id, timeframe_definition_id,
-          context_id, asset_hash, occurred_at, resolved_timeframe
+          context_id, cadence_profile_revision_id, cadence_profile_hash, asset_hash, occurred_at, resolved_timeframe
         ) values (
           ${this.workspaceId}::uuid, ${run.id}::uuid, ${candidates[0]!.template_id}::uuid,
           ${candidates[0]!.timeframe_id}::uuid, ${candidates[0]!.context_id}::uuid,
+          ${candidates[0]!.cadence_profile_id}::uuid, ${candidates[0]!.cadence_profile_hash},
           ${assetHash}, ${occurredAt}::timestamptz, ${JSON.stringify(assets.resolvedTimeframe)}::jsonb
         )
       `);

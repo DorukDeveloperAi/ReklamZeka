@@ -9,6 +9,7 @@ import { WORKSPACE_TOMBSTONE_PURGE_TABLES } from "@/connectors/meta/workspace-to
 
 const migrationPath = "drizzle/20260807143420_true_storm.sql";
 const readMigrationPath = "drizzle/20260807150835_fancy_may_parker.sql";
+const cadenceBindingMigrationPath = "drizzle/20260810124513_violet_nebula.sql";
 
 describe("Decision Room PostgreSQL persistence contract", () => {
   it("is additive, tenant-linked, private, and orders composite targets before foreign keys", () => {
@@ -45,6 +46,19 @@ describe("Decision Room PostgreSQL persistence contract", () => {
     expect(migration).toContain("decision_room_runs_read_page_idx");
     expect(migration).toContain("decision_room_inbox_items_read_page_idx");
     expect(migration).not.toMatch(/GRANT|DROP|TRUNCATE|DELETE FROM|ENABLE WRITE/i);
+  });
+
+  it("freezes the exact persisted cadence revision on every new run asset", () => {
+    const migration = readFileSync(cadenceBindingMigrationPath, "utf8");
+    expect(migration).toContain('ADD COLUMN "cadence_profile_revision_id" uuid');
+    expect(migration).toContain('ADD COLUMN "cadence_profile_hash" text');
+    expect(migration).toContain("decision_room_run_analysis_assets_cadence_profile_scope_fk");
+    expect(migration).toContain("decision_room_run_analysis_assets_cadence_profile_idx");
+    expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|TRUNCATE|DELETE FROM/);
+    const source = readFileSync("src/connectors/analyses/decision-room-analysis-registry-drizzle.ts", "utf8");
+    expect(source).toContain("decision_cadence_profile_revisions cadence");
+    expect(source).toContain("cadence_profile_revision_id, cadence_profile_hash");
+    expect(source).toContain("cadenceProfileHash");
   });
 
   it("fails closed before I/O on token/raw/prompt-shaped extra fields and external channels", async () => {

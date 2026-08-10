@@ -2682,6 +2682,9 @@ export const decisionRoomRunAnalysisAssets = pgTable("decision_room_run_analysis
   templateDefinitionId: uuid("template_definition_id").notNull(),
   timeframeDefinitionId: uuid("timeframe_definition_id").notNull(),
   contextId: uuid("context_id").notNull(),
+  /** Null only for legacy assets created before A10.2; new assets must bind both fields. */
+  cadenceProfileRevisionId: uuid("cadence_profile_revision_id"),
+  cadenceProfileHash: text("cadence_profile_hash"),
   assetHash: text("asset_hash").notNull(),
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
   resolvedTimeframe: jsonb("resolved_timeframe").$type<Record<string, unknown>>().notNull(),
@@ -2707,15 +2710,23 @@ export const decisionRoomRunAnalysisAssets = pgTable("decision_room_run_analysis
     foreignColumns: [effectiveCampaignContexts.workspaceId, effectiveCampaignContexts.id],
     name: "decision_room_run_analysis_assets_context_scope_fk",
   }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.workspaceId, table.cadenceProfileRevisionId],
+    foreignColumns: [decisionCadenceProfileRevisions.workspaceId, decisionCadenceProfileRevisions.id],
+    name: "decision_room_run_analysis_assets_cadence_profile_scope_fk",
+  }).onDelete("restrict"),
   uniqueIndex("decision_room_run_analysis_assets_run_unique").on(table.workspaceId, table.runId),
   uniqueIndex("decision_room_run_analysis_assets_hash_unique").on(table.workspaceId, table.assetHash),
   index("decision_room_run_analysis_assets_template_idx").on(table.templateDefinitionId),
   index("decision_room_run_analysis_assets_timeframe_idx").on(table.timeframeDefinitionId),
   index("decision_room_run_analysis_assets_context_idx").on(table.contextId),
+  index("decision_room_run_analysis_assets_cadence_profile_idx").on(table.cadenceProfileRevisionId),
   check("decision_room_run_analysis_assets_shape", sql`(
     ${table.assetHash} ~ '^[a-f0-9]{64}$'
     and jsonb_typeof(${table.resolvedTimeframe}) = 'object'
     and ${table.resolvedTimeframe} #>> '{resolverVersion}' = 'analysis-timeframe-resolver/1.0.0'
+    and ((${table.cadenceProfileRevisionId} is null and ${table.cadenceProfileHash} is null)
+      or (${table.cadenceProfileRevisionId} is not null and ${table.cadenceProfileHash} ~ '^[a-f0-9]{64}$'))
   ) is true`),
 ]);
 

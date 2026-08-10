@@ -91,8 +91,17 @@
   current profile hash OCC ile supersede+insert yapar ve audit hash-chain olayı yazar. Cadence yalnız
   advisory tempo girdisidir; publish/approve/execute/Meta-write capability'leri yapısal olarak false kalır.
 - Canlı PostgreSQL kabulü tablo, RLS/FORCE RLS, immutable trigger ve `service_role` için sıfır SELECT
-  grant'ini doğruladı. Bu yalnız cadence persistence dilimidir; ExperimentRecord lifecycle ve exact
-  Decision Room run-asset freeze binding'i sonraki A10.2 kapsamındadır.
+  grant'ini doğruladı. ExperimentRecord lifecycle'i sonraki A10.2b kapsamındadır.
+
+## 2026-08-10 — A10.2a cadence run-asset freeze binding
+
+- Yeni Decision Room run asset'i context `profileRef` değerini aynı tenant/account/campaign kapsamındaki
+  güncel cadence revision ile çözer; profile payload/hash template içindeki profil ile birebir eşleşmeden
+  asset oluşturmaz. Revision UUID ve hash, immutable run asset satırına ve asset hash'ine birlikte yazılır.
+- Legacy asset alanları nullable olarak korunur; loader bağsız veya hash'i uyuşmayan asset'i fail-closed
+  reddeder. Canlı PostgreSQL migration kabulü iki alanı ve tenant composite foreign key'i doğruladı.
+- ExperimentRecord append-only lifecycle'i sonraki A10.2b kapsamıdır; bu dilim hiçbir action/approval/
+  Meta-write capability'si oluşturmaz.
 
 ## 2026-08-10 — PostgreSQL migration recovery ve A09 canlı kabulü
 

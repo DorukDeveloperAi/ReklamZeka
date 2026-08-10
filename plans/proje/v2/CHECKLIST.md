@@ -289,7 +289,9 @@
     - [x] A10.1 tenant-scoped immutable `DecisionCadenceProfile` revision persistence:
       owner/admin membership recheck, current-hash OCC, audit kaydı, RLS/FORCE RLS ve tombstone
       purge sözleşmesi; tüm action/approval/Meta-write capability'leri false.
-    - [ ] ExperimentRecord persistence ve persisted cadence revision'ın Decision Room run assetine exact freeze binding'i.
+    - [x] A10.2a persisted cadence revision'ın Decision Room run assetine exact hash/id freeze binding'i;
+      current profile drift'i asset hash/replay yolunda fail-closed kalır.
+    - [ ] ExperimentRecord persistence lifecycle'i.
 - [ ] L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
