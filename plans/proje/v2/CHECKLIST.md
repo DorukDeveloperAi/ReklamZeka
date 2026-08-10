@@ -330,7 +330,9 @@
     outcome/currency/mapping summary ve immutable hash; raw source veya Meta proxy/action authority taşımaz.
   - [x] Tenant-bound L4 evidence persistence: entity head OCC/append guard, immutable head-window snapshot,
     source-component invalidation ve frozen context save sırasında exact snapshot/hash/head payload doğrulaması.
-  - [ ] Server-private materializer→context composer binding'i ve L5 analysis consumer'ları.
+  - [x] Server-private materializer→context composer: workspace/entity base frozen context'ten türetilir,
+    caller evidence reddedilir ve future/cross-entity evidence context persistence'a ulaşamaz.
+  - [ ] L5 analysis consumer'ları.
 
 ## A11 — Bütçe planlama
 

@@ -1952,4 +1952,14 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   exact immutable snapshot/ref/hash/head/payload yoksa fail-closed reddeder. Public projection yalnız summary ve
   redacted evidence ref gösterir. `npm run verify:business-outcome-evidence-db`, applied migration üzerinde
   RLS/FORCE RLS, PUBLIC/anon/authenticated/service_role revoke, head/snapshot guards, deterministic materialization
-  ve outer rollback temizliğini geçti. Otomatik composer/analysis consumer henüz eklenmedi.
+  ve outer rollback temizliğini geçti. L4→L5 composer aşağıda bağlıdır; analysis consumer henüz eklenmedi.
+
+## 2026-08-10 — A10 BusinessOutcome L4→L5 private composer
+
+- `BusinessOutcomeContextComposer`, L4 materializer sonucu ile `EffectiveCampaignContext` save portunu bağlayan
+  server-private application katmanıdır. Workspace/entity materializer inputuna yalnız base frozen context'ten geçer;
+  caller-provided `outcomeEvidence` peşinen reddedilir.
+- Evidence entity'si context entity'siyle birebir değilse veya evidence materialization zamanı context capture
+  zamanından yeniyse context hiç oluşturulmaz/persist edilmez. Başarılı akışta store zaten exact tenant snapshot
+  ref/hash/head/payload doğrulamasını yapar. Response bütün publish/approve/execute/Meta-write capability'lerini
+  false tutar; HTTP/MCP/UI/otomatik analysis consumer bu checkpoint'te eklenmedi.
