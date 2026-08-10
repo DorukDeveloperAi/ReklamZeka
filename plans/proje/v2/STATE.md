@@ -100,8 +100,20 @@
   asset oluşturmaz. Revision UUID ve hash, immutable run asset satırına ve asset hash'ine birlikte yazılır.
 - Legacy asset alanları nullable olarak korunur; loader bağsız veya hash'i uyuşmayan asset'i fail-closed
   reddeder. Canlı PostgreSQL migration kabulü iki alanı ve tenant composite foreign key'i doğruladı.
-- ExperimentRecord append-only lifecycle'i sonraki A10.2b kapsamıdır; bu dilim hiçbir action/approval/
-  Meta-write capability'si oluşturmaz.
+- ExperimentRecord append-only lifecycle'i A10.2b ile tamamlandı; hiçbir action/approval/Meta-write
+  capability'si oluşturmaz.
+
+## 2026-08-10 — A10.2b ExperimentRecord append-only lifecycle
+
+- Experiment plan artık explicit `guardrail_breach` stop condition'ı taşımadan geçerli değildir. Plan ve
+  outcome revision'ları aynı immutable hash zincirinde, exact cadence profile revision ve tenant account/
+  campaign kapsamıyla saklanır; outcome yalnız deterministic `winner|loser|inconclusive|guardrail_stopped`
+  advisory evidence üretir.
+- Private repository aktif workspace, member role ve cadence scope'unu transaction içinde yeniden doğrular;
+  plan/outcome kayıtları audit hash-chain olayları ile birlikte append edilir. RLS/FORCE RLS, API role revoke
+  ve tombstoning-purge koruması migration seviyesindedir.
+- Canlı PostgreSQL verifier tablo, chain trigger, RLS/FORCE RLS ve `service_role` SELECT grant'inin yokluğunu
+  doğruladı. HTTP/MCP/UI veya Meta/action write yüzeyi eklenmedi.
 
 ## 2026-08-10 — PostgreSQL migration recovery ve A09 canlı kabulü
 

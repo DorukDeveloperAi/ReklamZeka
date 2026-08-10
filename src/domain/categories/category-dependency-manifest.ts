@@ -38,6 +38,8 @@ const categoryContract = new Set([
   "authority_topic_revisions.payload",
   "policy_semantic_binding_revisions.payload",
   "decision_cadence_profile_revisions.profile_payload",
+  "experiment_record_revisions.plan_payload",
+  "experiment_record_revisions.outcome_payload",
 ]);
 
 const categoryProjection = new Set([
@@ -112,6 +114,8 @@ const columns = [
   "budget_proposal_alternatives.alternative_payload",
   "analysis_timeframe_definitions.definition_payload",
   "decision_cadence_profile_revisions.profile_payload",
+  "experiment_record_revisions.plan_payload",
+  "experiment_record_revisions.outcome_payload",
   "analysis_template_definitions.definition_payload",
   "decision_room_run_analysis_assets.resolved_timeframe",
   "guidance_analysis_run_bindings.selected_set_refs",

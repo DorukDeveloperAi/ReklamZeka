@@ -291,7 +291,9 @@
       purge sözleşmesi; tüm action/approval/Meta-write capability'leri false.
     - [x] A10.2a persisted cadence revision'ın Decision Room run assetine exact hash/id freeze binding'i;
       current profile drift'i asset hash/replay yolunda fail-closed kalır.
-    - [ ] ExperimentRecord persistence lifecycle'i.
+    - [x] A10.2b ExperimentRecord append-only plan→outcome lifecycle'i: explicit stop conditions,
+      frozen cadence revision, tenant scope, actor-role recheck, hash chain, audit, RLS ve tombstone guard;
+      outcome yalnız `winner|loser|inconclusive|guardrail_stopped` advisory evidence'dır.
 - [ ] L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.

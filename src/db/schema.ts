@@ -2293,6 +2293,45 @@ export const decisionCadenceProfileRevisions = pgTable("decision_cadence_profile
   `),
 ]);
 
+/** Immutable experiment plan/outcome chain. It is advisory evidence, never an execution command. */
+export const experimentRecordRevisions = pgTable("experiment_record_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull(), campaignId: uuid("campaign_id").notNull(),
+  cadenceProfileRevisionId: uuid("cadence_profile_revision_id").notNull(),
+  experimentRef: text("experiment_ref").notNull(), sequence: integer("sequence").notNull(),
+  previousRecordHash: text("previous_record_hash").notNull(), recordHash: text("record_hash").notNull(),
+  eventType: text("event_type").notNull(), planHash: text("plan_hash").notNull(),
+  planPayload: jsonb("plan_payload").$type<Record<string, unknown>>().notNull(),
+  outcomePayload: jsonb("outcome_payload").$type<Record<string, unknown>>(),
+  actorRef: text("actor_ref").notNull(), actorRole: text("actor_role").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.adAccountId], foreignColumns: [adAccounts.workspaceId, adAccounts.id], name: "experiment_record_revisions_account_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.campaignId], foreignColumns: [adCampaigns.workspaceId, adCampaigns.id], name: "experiment_record_revisions_campaign_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.cadenceProfileRevisionId], foreignColumns: [decisionCadenceProfileRevisions.workspaceId, decisionCadenceProfileRevisions.id], name: "experiment_record_revisions_cadence_profile_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("experiment_record_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("experiment_record_revisions_sequence_unique").on(table.workspaceId, table.experimentRef, table.sequence),
+  uniqueIndex("experiment_record_revisions_hash_unique").on(table.workspaceId, table.recordHash),
+  index("experiment_record_revisions_scope_idx").on(table.workspaceId, table.adAccountId, table.campaignId, table.occurredAt),
+  check("experiment_record_revisions_shape", sql`(
+    ${table.experimentRef} ~ '^experiment_[a-f0-9]{20}$' and ${table.sequence} >= 1
+    and (${table.previousRecordHash} = 'GENESIS' or ${table.previousRecordHash} ~ '^[a-f0-9]{64}$')
+    and ${table.recordHash} ~ '^[a-f0-9]{64}$' and ${table.planHash} ~ '^[a-f0-9]{64}$'
+    and ${table.eventType} in ('planned', 'outcome_recorded') and ${table.actorRole} in ('owner', 'admin', 'analyst')
+    and jsonb_typeof(${table.planPayload}) = 'object' and ${table.planPayload} #>> '{version}' = 'decision-experiment/1.0.0'
+    and ((${table.eventType} = 'planned' and ${table.sequence} = 1 and ${table.previousRecordHash} = 'GENESIS' and ${table.outcomePayload} is null)
+      or (${table.eventType} = 'outcome_recorded' and ${table.sequence} > 1 and ${table.outcomePayload} is not null
+        and jsonb_typeof(${table.outcomePayload}) = 'object' and ${table.outcomePayload} #>> '{version}' = 'decision-experiment/1.0.0'
+        and ${table.outcomePayload} #>> '{actionAuthority}' = 'none'))
+  ) is true`),
+  check("experiment_record_revisions_no_forbidden_material", sql`
+    concat_ws('|', ${table.planPayload}::text, ${table.outcomePayload}::text) !~* '"[^"[:space:]]*(token|secret|prompt)"[[:space:]]*:'
+    and concat_ws('|', ${table.planPayload}::text, ${table.outcomePayload}::text) !~* '"authorization"[[:space:]]*:'
+  `),
+]);
+
 /** Append-only template revisions, each bound to one exact context and timeframe revision. */
 export const analysisTemplateDefinitions = pgTable("analysis_template_definitions", {
   id: uuid("id").primaryKey().defaultRandom(),
