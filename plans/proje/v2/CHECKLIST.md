@@ -306,6 +306,11 @@
     source snapshot ref'iyle `not_ready` ve `analysis_window_not_bound` kalır; history boş, mevcut olmayan
     Meta fields explicit unknown, action/write authority yoktur. Authority composition ardından yalnız
     evidence-bound save'a gider; invalid/tampered component fail-closed olur.
+  - [x] A10.4c-12 server-private Drizzle composition root: yalnız shared database ile current ready
+    source reader ve append-only effective-context writer'ı kurar. Public request yüzeyi composer'ın
+    dört scope anahtarıyla (`workspaceId/accountRef/entityType/entityRef`) sınırlıdır; caller facts/
+    context enjeksiyonu, HTTP, MCP, Decision Room veya action/write adapter'ı eklenmez. Rejected source
+    ve invalidated persistence sonucu fail-closed kalır.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.

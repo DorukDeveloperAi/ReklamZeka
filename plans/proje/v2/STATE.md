@@ -2194,3 +2194,17 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   fail-closed olur. HTTP/UI/Decision Room/action/Meta write eklenmedi.
 - Kanıt: `tests/current-effective-analysis-context-source-drizzle-reader.test.ts`,
   `tests/effective-analysis-context-composer.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10.4c-12 server-private Drizzle composition root
+
+- `createDrizzleEffectiveAnalysisContextComposer` aynı Drizzle database boundary'sini yalnız
+  `DrizzleCurrentEffectiveAnalysisContextSourceReader` ve
+  `DrizzleEffectiveCampaignContextRepository`'ye verir; ardından bu iki private portla
+  `EffectiveAnalysisContextComposer` kurar. Root HTTP/UI/MCP/Decision Room/action surface'i veya
+  caller-owned facts/context injection noktası açmaz.
+- Composer'ın public girdisi dört scope anahtarıyla sınırlı kalır: `workspaceId`, `accountRef`,
+  `entityType`, `entityRef`. Ready source sonucu yalnız `evidence_bound` save'a gider; source
+  reddi veya invalidated record dönüşü fail-closed kalır. Data window bağlanmadığı için context
+  data trust durumu bu root tarafından da değiştirilmez.
+- Kanıt: `tests/effective-analysis-context-composer-runtime.test.ts`,
+  `tests/effective-analysis-context-composer.test.ts`, `npx tsc --noEmit`, `git diff --check`.
