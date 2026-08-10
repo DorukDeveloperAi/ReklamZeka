@@ -1737,9 +1737,12 @@ console.log("\n㉕ ROL TABLOSU: kalıcı oturumların ADI (tekil ⊕ çoğul)");
   const kw = runCli(R2.sessionId, ["rol", "kayit", "--rol", "worker"]);
   ok("ÇOĞUL role KAYIT yok (slot tutmaz)", kw.code === 3 && /ÇOĞUL ROL/.test(kw.out), kw.out);
 
-  // Rolle seslenme: tek muhatap → gider.
+  // Rolle seslenme: tek muhatap → gider. Etiket asama-14'te (otonomi-merdiveni/v2) değişti:
+  // rol-adresli posta artık KALICI rol kutusuna yazılır ve çıktı bunu SÖYLER
+  // ("[rol:<ad> kutusu]") — sahibi değişse de mesaj yetim kalmaz. Beklenti yeni etikete
+  // uyarlandı (hakem bulgusu 2026-08-10: eski pin 321/322 kırmızısıydı).
   const b = runCli(R3.sessionId, ["bildir", "--rol", "altyapi", "--mesaj", "kit sapması var, sync gerek"]);
-  ok("bildir --rol tek muhatabı BULUR", b.code === 0 && /\[altyapi\] sess-r1/.test(b.out), b.out);
+  ok("bildir --rol tek muhatabı BULUR (rol kutusuna)", b.code === 0 && /\[rol:altyapi kutusu\] sess-r1/.test(b.out), b.out);
   const m = runGuard("ctx", { hook_event_name: "UserPromptSubmit", session_id: R1.sessionId, cwd: REPO })
     .dec?.additionalContext || "";
   ok("rol sahibi mesajı okur", /✉ SANA MESAJ/.test(m) && /sync gerek/.test(m), m.slice(0, 300));

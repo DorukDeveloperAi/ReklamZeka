@@ -35,6 +35,33 @@ Claim **zorunlu değildir** — tek session çalışırken sıfır sürtünme ol
 
 Almadan önce bak: `node ~/.claude/skills/eszamanli/scripts/claim.mjs status`
 
+## Oturum listesini OKUMA kuralı (2026-08-10)
+
+**Listedeki her oturum ÇALIŞIYOR sayılır; ne yaptığı ÖLÇÜLÜR, adından okunmaz.**
+
+İki hatanın tek kökü var — *listede görünmek "çalışıyor" demektir, başlık ise "ne yaptığı"
+değildir* — ve ikisi de ölçüldü:
+
+- **Başlık = oturumun İLK mesajı, doğduğunda DONAR.** `"devam"` başlıklı bir sekme saatler
+  sonra DB köprüsü planı kuruyordu; okuyan onu tabloya anlamsız bir satır olarak yazdı ve
+  aktif, kilit tutan, plan üreten bir oturumu görmeden geçti. Başlık yalnız **etiket**
+  sütununda durur.
+- **`idle` bir hüküm DEĞİLDİR** — yalnız son mesajdan beri geçen süredir. "boşta, iş yok"
+  diye raporlamak, ölçülmemiş şeye "yok" demektir. Bu yüzden `state` kelimesi artık
+  bloğa hiç basılmaz.
+
+Üç alt madde, sırayla:
+
+1. Hiçbir oturum **"ne yapıyor" sütunu doldurulmadan** rapora girmez.
+2. Sütun ölçümden türer: `status`ta kilit tutanların **niyeti**, kilit tutmayan için
+   **olay defterinin** dokunduğu kaynak kaydı. Veri hep elinin altındadır — çek.
+3. Ölçemediysen **`ölçülemedi`** yaz, **"boşta" YAZMA**. "Boşta" bir hükümdür ve yanlış
+   olduğunda çalışan bir işi görünmez kılar.
+
+Kural **yapısaldır, hatırlanmaz**: itilen `[eşzamanlılık]` bloğu satırı artık kilit+niyet
+taşır (`claims-lib: neYapiyor` → üç kaynak: claim niyeti · beklediği kaynak · defterdeki
+son dokunuş; hiçbiri yoksa `olculdu:false`). Sütunu doldurulmamış satır basılamaz.
+
 ## Komutlar
 
 ```bash
