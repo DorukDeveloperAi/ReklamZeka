@@ -454,7 +454,15 @@ async function handleStop(payload, sessionId, now) {
  *  defter YOKSA hiçbir şey yazılmaz: her oturum için boş dosya üretmek nabzı kirletir. */
 function handlePrompt(payload, sessionId, now) {
   const raw = typeof payload.prompt === "string" ? payload.prompt : "";
-  const m = /^\s*\/goal(?:\s+([\s\S]*))?$/.exec(raw);
+  // FENCED-/goal (2026-08-10, otonomi-merdiveni:18 provasının BONUS bulgusu): agac.mjs'in
+  // ürettiği hazır komutlar ``` fenced blok içinde yapıştırılıyor ve /goal regex'i baştaki
+  // fence satırına takılıyordu → hedef defteri hiç doğmuyor, Stop koruması sessizce devre
+  // dışı kalıyordu. Soyucu YALNIZ prompt fence ile BAŞLIYORSA devreye girer (ortadaki kod
+  // blokları serbest metni /goal sanmasın); fence içindeki İLK satır alınır.
+  let govde = raw;
+  const fence = /^\s*```[^\n]*\n([\s\S]*?)\n?```\s*$/.exec(raw);
+  if (fence) govde = fence[1];
+  const m = /^\s*\/goal(?:\s+([\s\S]*))?$/.exec(govde);
   const cwd = payload.cwd || process.cwd();
   const preferredSlug = slugOf(cwd);
   const promptId = payload.prompt_id ?? payload.promptId ?? null;

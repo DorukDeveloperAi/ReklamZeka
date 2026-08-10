@@ -1,7 +1,7 @@
 # DEVRALIŞ — ReklamZeka
 
 > **TÜREVDİR, elle düzenlenmez.** Her `aide filing` koşumunda yeniden üretilir.
-> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-10 06:06
+> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-10 18:49
 
 Bu belge bir sonraki Claude hesabının **ilk okuyacağı** dosyadır: neyin yarıda kaldığını
 ve hangi komutla devam edileceğini söyler.
@@ -9,6 +9,16 @@ ve hangi komutla devam edileceğini söyler.
 ## Açık oturumlar
 
 _Bu projede canlı oturum yok._
+
+## Kapanmış oturumların devir notları
+
+Session-düzeyi kapanış fotoğrafları (`plans/oturumlar/devir/`) — canlı listede
+GÖRÜNMEYEN ama niyeti/açık hedefi kayıtlı oturumlar. Açık hedefli olanlar devralınmayı
+bekliyor olabilir (sıralı liste: `~/.claude/oturum/KILAVUZ.md`):
+
+- **`ot:2026-08-10/commit-and-push`** · kapanış 2026-08-10 06:06 (other) · hedef 5/5 kapalı
+- **`ot:2026-08-06/reklamzeka-faz-0-kurulum`** · kapanış 2026-08-06 12:39 (other) · hedef 17/17 kapalı
+  - niyet: Onaylı planın Faz 0'ı ayakta: repo iskeleti, terminoloji lint'i, şemalar, taksonomi çözücü, rubrik varsayılanl
 
 ## Planlar
 
