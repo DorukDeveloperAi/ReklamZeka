@@ -2256,6 +2256,43 @@ export const analysisTimeframeDefinitions = pgTable("analysis_timeframe_definiti
   `),
 ]);
 
+/**
+ * Immutable, tenant-scoped cadence profiles. A profile is advisory-only: it
+ * constrains decision tempo but cannot authorize, approve, or execute work.
+ */
+export const decisionCadenceProfileRevisions = pgTable("decision_cadence_profile_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull(),
+  campaignId: uuid("campaign_id").notNull(),
+  profileRef: text("profile_ref").notNull(),
+  revision: integer("revision").notNull(),
+  profileVersion: text("profile_version").notNull(),
+  profileHash: text("profile_hash").notNull(),
+  profilePayload: jsonb("profile_payload").$type<Record<string, unknown>>().notNull(),
+  supersededAt: timestamp("superseded_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.adAccountId], foreignColumns: [adAccounts.workspaceId, adAccounts.id], name: "decision_cadence_profile_revisions_account_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.campaignId], foreignColumns: [adCampaigns.workspaceId, adCampaigns.id], name: "decision_cadence_profile_revisions_campaign_scope_fk" }).onDelete("cascade"),
+  uniqueIndex("decision_cadence_profile_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("decision_cadence_profile_revisions_workspace_ref_revision_unique").on(table.workspaceId, table.profileRef, table.revision),
+  uniqueIndex("decision_cadence_profile_revisions_workspace_ref_hash_unique").on(table.workspaceId, table.profileRef, table.profileHash),
+  uniqueIndex("decision_cadence_profile_revisions_workspace_current_unique").on(table.workspaceId, table.profileRef).where(sql`${table.supersededAt} is null`),
+  index("decision_cadence_profile_revisions_scope_idx").on(table.workspaceId, table.adAccountId, table.campaignId, table.profileRef),
+  check("decision_cadence_profile_revisions_shape", sql`(
+    ${table.profileRef} ~ '^cadence_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.revision} >= 1 and ${table.profileVersion} = 'decision-cadence/1.0.0'
+    and ${table.profileHash} ~ '^[a-f0-9]{64}$' and jsonb_typeof(${table.profilePayload}) = 'object'
+    and ${table.profilePayload} #>> '{version}' = ${table.profileVersion}
+  ) is true`),
+  check("decision_cadence_profile_revisions_no_forbidden_material", sql`
+    ${table.profilePayload}::text !~* '"[^"[:space:]]*(token|secret|prompt)"[[:space:]]*:'
+    and ${table.profilePayload}::text !~* '"authorization"[[:space:]]*:'
+    and ${table.profilePayload}::text !~* '"[^"[:space:]]*raw[_-]?(payload|request|response|json)"[[:space:]]*:'
+  `),
+]);
+
 /** Append-only template revisions, each bound to one exact context and timeframe revision. */
 export const analysisTemplateDefinitions = pgTable("analysis_template_definitions", {
   id: uuid("id").primaryKey().defaultRandom(),

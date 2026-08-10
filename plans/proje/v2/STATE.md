@@ -78,10 +78,21 @@
   kullanımda bu head'i, tarihsel replay'de ise explicit immutable snapshot ref/hash çiftini çözer;
   belirsizlik, stale head veya eksik kaynakta fail-closed kalır. Materializer herhangi bir HTTP/MCP/UI
   route'u ya da publish/approve/execute/Meta-write capability'si vermez; G4 kapalıdır.
-- Sadece bu private persistence dilimi tamamlandı. Canlı verifier erişilebilir yerel PostgreSQL'de
-  `authority_catalog_materialization_schema_missing` ile durdu; bu instance'a migration uygulanmadan
-  RLS/OCC rollback kabulü tamamlanmış sayılmaz. Gerçek oturum/browser kanıtı da açık; impact coverage
-  yalnız doğrulayabildiği kapsamda mutation'ı kapalı tutar.
+- Canlı PostgreSQL şema kabulü de geçti: catalog ve snapshot head tabloları ile iki OCC trigger'ı
+  mevcuttur; verifier bütün publish/approve/execute/Meta-write capability'lerini `false` doğrular.
+  Gerçek oturum/browser kabulü ile impact coverage'ın daha geniş mutation kapsamı hâlâ açık kalır.
+
+## 2026-08-10 — A10.1 kalıcı DecisionCadenceProfile
+
+- `decision_cadence_profile_revisions` additive PostgreSQL tablosu tenant/account/campaign composite
+  foreign key'leri, immutable revision zinciri, tek güncel revision index'i, RLS + FORCE RLS ve API
+  rollerinden revoke ile eklendi. Tombstoning workspace altında kontrollü purge dışında delete reddedilir.
+- Server-private publisher aktif workspace ile owner/admin membership'ini transaction içinde doğrular;
+  current profile hash OCC ile supersede+insert yapar ve audit hash-chain olayı yazar. Cadence yalnız
+  advisory tempo girdisidir; publish/approve/execute/Meta-write capability'leri yapısal olarak false kalır.
+- Canlı PostgreSQL kabulü tablo, RLS/FORCE RLS, immutable trigger ve `service_role` için sıfır SELECT
+  grant'ini doğruladı. Bu yalnız cadence persistence dilimidir; ExperimentRecord lifecycle ve exact
+  Decision Room run-asset freeze binding'i sonraki A10.2 kapsamındadır.
 
 ## 2026-08-10 — PostgreSQL migration recovery ve A09 canlı kabulü
 
