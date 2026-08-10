@@ -31,7 +31,19 @@ function configuredHandlers() {
       REKLAMZEKA_ANALYSIS_SETTLEMENT_POLICY_REF: process.env.REKLAMZEKA_ANALYSIS_SETTLEMENT_POLICY_REF,
       REKLAMZEKA_ANALYSIS_SETTLED_THROUGH_DATE: process.env.REKLAMZEKA_ANALYSIS_SETTLED_THROUGH_DATE,
     };
-    const config = localDecisionRoomConfig(environment);
+    // The base Decision Room runtime has an exact environment allowlist. Keep
+    // dry-run-only settlement settings out of that parser so adding POST does
+    // not inadvertently disable the existing GET/PATCH surface.
+    const config = localDecisionRoomConfig({
+      DATABASE_URL: environment.DATABASE_URL,
+      REKLAMZEKA_LOCAL_SESSION_ENABLED: environment.REKLAMZEKA_LOCAL_SESSION_ENABLED,
+      REKLAMZEKA_LOCAL_ORIGIN: environment.REKLAMZEKA_LOCAL_ORIGIN,
+      REKLAMZEKA_LOCAL_WORKSPACE_ID: environment.REKLAMZEKA_LOCAL_WORKSPACE_ID,
+      REKLAMZEKA_LOCAL_WORKSPACE_REF: environment.REKLAMZEKA_LOCAL_WORKSPACE_REF,
+      REKLAMZEKA_LOCAL_USER_ID: environment.REKLAMZEKA_LOCAL_USER_ID,
+      REKLAMZEKA_LOCAL_READER_REF: environment.REKLAMZEKA_LOCAL_READER_REF,
+      REKLAMZEKA_LOCAL_SESSION_SIGNING_KEY: environment.REKLAMZEKA_LOCAL_SESSION_SIGNING_KEY,
+    });
     if (!config) return null;
     if (!runtimeDatabase) {
       const pool = new Pool({
