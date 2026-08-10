@@ -2392,3 +2392,17 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Bu yalnız L1 parse sınırıdır: canonical `meta_daily_insights` transaction writer'ı ile normal sync runtime
   binding'i henüz eklenmemiştir; dolayısıyla L2 incremental materialization iddiası yoktur.
 - Kanıt: `tests/insights-materialization.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 L1 canonical insight writer and sync binding
+
+- `DrizzleMetaInsightPagePersistence`, yalnız parser'ın canonical sayfasını kabul eder; active tenant
+  account/connection ve matching insights run+slice scope'unu transaction içinde doğrular. Değişen günlük
+  insight satırı ve metric seti aynı transactionda upsert edilir; aynı content hash yalnız unchanged olur.
+- Normal `MetaPartialReadSyncRuntime`, insight cursor'ını ilerletmeden önce source sayfasını bu server-private
+  writer'a geçirir. Writer hatası slice'ı fail-closed `malformed_response` yapar; writer bağlıyken generic
+  restart ledger insight raw payloadını `{}` dışında saklayamaz. Server production composition root writer'ı
+  inject eder; yeni HTTP/action/Meta-write yüzeyi açılmaz.
+- Bu checkpoint L1 persistence'ı kapatır; L2 feature snapshot/invalidation ve L3 rollup hâlâ açıktır.
+- Kanıt: `tests/meta-sync-integration.test.ts`, `tests/meta-read-sync-runtime.test.ts`,
+  `tests/insights-materialization.test.ts`, `npm run verify:meta-sync-db`, `npm run typecheck`,
+  `git diff --check`.

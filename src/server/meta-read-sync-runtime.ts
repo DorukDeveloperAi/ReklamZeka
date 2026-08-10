@@ -10,6 +10,7 @@ import { DrizzleEnvironmentMetaSecretRepository } from "@/connectors/meta/enviro
 import type { MetaSecretRepository } from "@/connectors/meta/secret-repository";
 import { MetaGraphSyncTransport } from "@/connectors/meta/sync/graph-transport";
 import { DrizzleMetaInventoryPagePersistence } from "@/connectors/meta/sync/inventory-drizzle-repository";
+import { DrizzleMetaInsightPagePersistence } from "@/connectors/meta/sync/insights-drizzle-repository";
 import { TransactionBackedMetaSyncPersistenceAdapter, DrizzleMetaSyncTransactionManager } from "@/connectors/meta/sync/persistence-adapter";
 import { planMetaReadSync } from "@/connectors/meta/sync/planner";
 import { MetaPartialReadSyncRuntime, type MetaSyncResult, type MetaSyncRuntimeOptions } from "@/connectors/meta/sync/runtime";
@@ -63,6 +64,7 @@ type ProductionMetaReadSyncDependencies = Readonly<{
   secrets: MetaSecretRepository;
   accounts: MetaSyncAccountScopeResolver;
   inventoryPagePersistence: MetaSyncRuntimeOptions["inventoryPagePersistence"];
+  insightPagePersistence?: MetaSyncRuntimeOptions["insightPagePersistence"];
   durablePersistence: MetaSyncRuntimeOptions["persistence"];
   fetchImpl?: MetaFetch;
   runtimeFactory?: RuntimeFactory;
@@ -138,6 +140,7 @@ export class ProductionMetaReadSyncService {
         transport,
         persistence: this.dependencies.durablePersistence,
         inventoryPagePersistence: this.dependencies.inventoryPagePersistence,
+        insightPagePersistence: this.dependencies.insightPagePersistence,
       });
       const result = await runtime.run({
         parentRunId: input.parentRunId,
@@ -200,6 +203,7 @@ export function createDrizzleProductionMetaReadSyncService(input: Readonly<{
       new DrizzleMetaSyncTransactionManager(input.database),
     ),
     inventoryPagePersistence: new DrizzleMetaInventoryPagePersistence(input.database),
+    insightPagePersistence: new DrizzleMetaInsightPagePersistence(input.database),
     fetchImpl: input.fetchImpl,
   });
 }

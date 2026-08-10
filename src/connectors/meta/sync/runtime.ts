@@ -2,6 +2,7 @@ import { ConnectorError } from "@/connectors/contract";
 import { META_SYNC_STREAMS, stableHash, type MetaParentSyncRun, type MetaReadRequest, type MetaReadTransport, type MetaStreamRun, type MetaSyncError, type MetaSyncErrorReason, type MetaSyncRecord, type MetaSyncSlice } from "./types";
 import type { MetaSyncDurableKey, MetaSyncDurablePersistence } from "./persistence-adapter";
 import { MetaInventoryMaterializationError, parseMetaInventoryPage, type MetaInventoryPagePersistencePort } from "./inventory-materialization";
+import type { MetaInsightSourcePagePersistencePort } from "./insights-materialization";
 
 type MutableStreamRun = { -readonly [Key in keyof MetaStreamRun]: MetaStreamRun[Key] } & { completedSliceIds: string[]; cursorBySlice: Record<string, { cursor: string | null; cursorId: string; updatedAt: string }> };
 type MutableParentRun = { -readonly [Key in keyof MetaParentSyncRun]: MetaParentSyncRun[Key] } & { streamRunIds: string[] };
@@ -53,6 +54,7 @@ export type MetaSyncRuntimeOptions = Readonly<{
   minPageSize?: number;
   persistence?: MetaSyncDurablePersistence;
   inventoryPagePersistence?: MetaInventoryPagePersistencePort;
+  insightPagePersistence?: MetaInsightSourcePagePersistencePort;
 }>;
 export type MetaSyncResult = Readonly<{ parentRun: MetaParentSyncRun; streamRuns: readonly MetaStreamRun[]; inserted: number; updated: number; unchanged: number; writeNetworkCalls: 0 }>;
 
@@ -183,6 +185,25 @@ export class MetaPartialReadSyncRuntime {
           } };
         }
       }
+      if (this.options.insightPagePersistence && slice.stream === "insights" && slice.entityLevel !== "account") {
+        try {
+          // The canonical writer has an exact sync-run/slice FK. Persist the current (not next)
+          // cursor first so a first page is materialized against an existing immutable scope.
+          stream.cursorBySlice[slice.id] = { cursor, cursorId, updatedAt: this.now().toISOString() };
+          this.store.saveStream(stream);
+          await this.persist(durableKey);
+          await this.options.insightPagePersistence.writeSourcePage({
+            workspaceId: parent.workspaceId, connectionId: parent.connectionId, externalAccountId: slice.accountId,
+            entityLevel: slice.entityLevel, parentRunId: parent.id, sliceId: slice.id, cursorId, observedAt,
+            records: page.records,
+          });
+        } catch (error) {
+          return { completed: false, inserted, updated, unchanged, error: {
+            reason: "malformed_response", retryable: false,
+            message: "Meta insight canonical materialization doğrulaması başarısız",
+          } };
+        }
+      }
       for (const payload of page.records) {
         const externalId = typeof payload.id === "string" ? payload.id : stableHash(payload);
         const identity = `${parent.workspaceId}:${parent.connectionId}:${slice.accountId}:${slice.stream}:${slice.entityLevel}:${slice.dateStart ?? "all"}:${slice.dateStop ?? "all"}:${externalId}`;
@@ -194,7 +215,8 @@ export class MetaPartialReadSyncRuntime {
           snapshotHash: stableHash(payload),
           // Canonical inventory persistence already holds the validated fields;
           // the generic restart ledger needs only identity and hash evidence.
-          payload: this.options.inventoryPagePersistence && slice.stream === "inventory" ? {} : payload,
+          payload: (this.options.inventoryPagePersistence && slice.stream === "inventory")
+            || (this.options.insightPagePersistence && slice.stream === "insights") ? {} : payload,
           firstSeenAt: this.now().toISOString(),
           lastSeenAt: this.now().toISOString(),
         });

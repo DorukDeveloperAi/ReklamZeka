@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   persistedMetaSyncStream,
   TransactionBackedMetaSyncPersistenceAdapter,
@@ -10,6 +10,7 @@ import { MetaPartialReadSyncRuntime, type MetaSyncStoreSnapshot } from "@/connec
 import type { MetaReadRequest, MetaReadTransport, MetaSyncSlice } from "@/connectors/meta/sync/types";
 import { MetaGraphClient } from "@/connectors/meta/graph-client";
 import { MetaGraphSyncTransport } from "@/connectors/meta/sync/graph-transport";
+import type { MetaInsightSourcePagePersistencePort } from "@/connectors/meta/sync/insights-materialization";
 
 class TransactionFixture implements MetaSyncTransactionManager {
   private snapshots = new Map<string, MetaSyncStoreSnapshot>();
@@ -178,5 +179,16 @@ describe("Meta S1.3 runtime persistence integration", () => {
     const transport = new Transport(async () => ({ records: [], nextCursor: null, usageHeadroom: 1 }));
     await expect(new MetaPartialReadSyncRuntime({ transport, persistence }).run({ ...key, plan: [slice] })).rejects.toThrow("transaction rollback");
     expect(transactions.snapshot(key)).toBeUndefined();
+  });
+
+  it("writes an insight page before advancing its durable cursor and never retains its raw payload", async () => {
+    const transactions = new TransactionFixture();
+    const persistence = new TransactionBackedMetaSyncPersistenceAdapter(transactions);
+    const writer: MetaInsightSourcePagePersistencePort = { writeSourcePage: vi.fn(async () => ({ inserted: 1, updated: 0, unchanged: 0, stale: 0, pageHash: "a".repeat(64) })) };
+    const transport = new Transport(async () => ({ records: [{ account_id: "account-a", campaign_id: "campaign-a" }], nextCursor: null, usageHeadroom: 1 }));
+    const result = await new MetaPartialReadSyncRuntime({ transport, persistence, insightPagePersistence: writer }).run({ ...key, plan: [slice] });
+    expect(result.parentRun.status).toBe("completed");
+    expect(writer.writeSourcePage).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: "workspace-a", externalAccountId: "account-a", entityLevel: "campaign" }));
+    expect(transactions.snapshot(key)?.records[0]?.payload).toEqual({});
   });
 });

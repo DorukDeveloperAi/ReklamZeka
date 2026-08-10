@@ -41,6 +41,23 @@ export interface MetaInsightPagePersistencePort {
   writePage(page: CanonicalMetaInsightPage): Promise<Readonly<{ inserted: number; updated: number; unchanged: number; stale: number; pageHash: string }>>;
 }
 
+/** Runtime-to-repository boundary: raw Graph records are private and must be canonicalized by the repository. */
+export type MetaInsightSourcePage = Readonly<{
+  workspaceId: string;
+  connectionId: string;
+  externalAccountId: string;
+  entityLevel: MetaInsightEntityLevel;
+  parentRunId: string;
+  sliceId: string;
+  cursorId: string;
+  observedAt: string;
+  records: readonly Readonly<Record<string, unknown>>[];
+}>;
+
+export interface MetaInsightSourcePagePersistencePort {
+  writeSourcePage(page: MetaInsightSourcePage): Promise<Readonly<{ inserted: number; updated: number; unchanged: number; stale: number; pageHash: string }>>;
+}
+
 const ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DECIMAL = /^-?\d+(?:\.\d+)?$/;
