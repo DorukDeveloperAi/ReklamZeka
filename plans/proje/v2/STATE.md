@@ -1873,6 +1873,19 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Application service owner/admin rolünü tekrar denetler; Drizzle publisher aktif workspace/membership, account-
   campaign tenant scope, expected-current-hash OCC, immutable revision ve hash-chain audit'i tek transaction'da
   uygular. Response action/approval/Meta-write yetkisi üretmez.
-- Bu yalnız cadence configuration mutation yüzeyidir. Experiment plan/outcome HTTP yüzeyi, run adapter'ı ve
-  policy-configured canlı PostgreSQL dry-run acceptance ayrı açık işlerdir. Yerel çevrede settlement policy ve
-  bağlanabilir PostgreSQL/session binding olmadığı için live dry-run doğrulanmadı.
+- Bu cadence configuration mutation yüzeyi experiment evidence endpoint'inden ayrıdır. Decision Room experiment
+  adapter'ı ve policy-configured canlı PostgreSQL dry-run acceptance açık işlerdir. Yerel çevrede settlement policy
+  ve bağlanabilir PostgreSQL/session binding olmadığı için live dry-run doğrulanmadı.
+
+## 2026-08-10 — A10 experiment evidence server-bound lifecycle
+
+- `/api/experiment-records` cookie-only same-origin `experiment-record-mutate` intent'i ve ayrı
+  `experiment_record:mutate` local-session scope'u altında plan veya outcome kaydeder. Workspace/actor/role ve
+  timestamp client body'den gelmez; active membership yeniden çözülür. Owner, admin ve analyst evidentiary
+  kayıt ekleyebilir; viewer reddedilir.
+- Plan kaydı exact cadence revision + account/campaign tenant scope'a bağlıdır; outcome yalnız plan head'in
+  expected record hash'iyle append edilir. Repository hash-chain ve audit event'ini tek transaction'da korur.
+  Endpoint response'u publish/approve/execute/Meta-write yetkisi taşımaz.
+- Decision Room runtime'ı bugün kendisi experiment planı üretmediğinden otomatik adapter bilinçli olarak
+  eklenmedi. Gerçek runtime-originated plan contract'i oluştuğunda planın exact frozen cadence/run assetine
+  bağlanması ayrı bir checkpoint'tir; bu API onu varsayarak sahte bir bağlantı kurmaz.

@@ -306,6 +306,9 @@
       outcome yalnız `winner|loser|inconclusive|guardrail_stopped` advisory evidence'dır.
     - [x] A10.2d Cadence profile publish endpoint'i ayrı local-session scope/intent altında yalnız owner/admin'e
       açılır; profile command dışında caller identity/authority kabul etmez ve persisted audit zincirini kullanır.
+    - [x] A10.2e ExperimentRecord plan/outcome endpoint'i ayrı local-session scope/intent altında yalnız
+      owner/admin/analyst'e açılır; actor/rol/clock istemciden alınmaz, append-only plan→outcome hash zinciri
+      ve audit transaction'ı korunur. Endpoint action/approval/Meta-write authority üretmez.
 - [ ] L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
