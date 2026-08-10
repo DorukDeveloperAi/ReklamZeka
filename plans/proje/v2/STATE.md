@@ -70,6 +70,20 @@
 - Browser/session kabulü ayrı açık çevresel kapıdır. G4/A13, HTTP/MCP/UI write yüzeyi veya Meta write
   eklenmedi.
 
+## 2026-08-10 — A08 multi-business portfolio capability read model
+
+- `DrizzleMetaPortfolioCapabilityRepository`, workspace'in bütün connection/data-source/ad-account
+  topolojisini ve yalnız current active account-group membership'ini tek kısa `REPEATABLE READ, READ ONLY`
+  snapshotta toplar. Dışarı yalnız opaque connection/account ref'leri, display name, currency/timezone,
+  spend cap, current group refs ve read-readiness çıkar; external account ID, connection key, raw payload
+  veya secret metadata çıkmaz.
+- Grup üyeliği shared context'tir; child account permission veya capability'sini genişletemez. `ready`
+  ancak aktif connection'da `ads_read` + `accounts.read`, account'ta `ads_read` ve
+  `meta-account-capability/1.0.0` read evidence birlikte olduğunda verilir. Her eksik/corrupt kanıt
+  `partial`/`unavailable` kalır; publish/approve/execute/Meta-write her durumda false'tur.
+- Bu yalnız read model foundation'ıdır: account capability snapshot'ını gerçek live sync ile materialize
+  etme, group-scope inheritance ve dashboard/browser acceptance henüz açık kalır.
+
 ## 2026-08-10 — A09 authority materializer consistency hardening
 
 - `policy_authority_bindings` exact-uniqueness'i global policy fact yerine immutable authority

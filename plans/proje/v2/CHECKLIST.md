@@ -30,6 +30,11 @@
 - [x] Account/campaign/adset/ad/creative/post çekirdek entity şeması, raw hash/provenance,
   first/last seen ve soft disappearance.
 - [ ] Multi-business connection, account group ve account-level permission/capability modeli.
+  - [x] Server-private, tenant-bound portfolio capability reader: bütün connection/account/current
+    account-group topolojisini tek kısa read-only snapshotta çözer; account currency/timezone/spend cap
+    ve read-readiness bağımsız kalır. Grup üyeliği permission/capability genişletemez; connection
+    `ads_read`+`accounts.read`, account `ads_read` ve sürümlü account-read evidence eksikse sonucu
+    `partial/unavailable` bırakır; publish/approve/execute/Meta-write yapısal olarak false'tur.
 - [x] Facebook Page, Instagram, pixel/dataset, app/WhatsApp destination asset graph.
   - [x] Asset ve edge canonical şeması, capability/provenance/orphan alanları.
   - [x] Parçalı canlı sync, ownership/capability çözümlemesi ve iki hesap kanıtı.
