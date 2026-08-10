@@ -2218,6 +2218,90 @@ export function olaySonu(repoRoot) {
   }
 }
 
+/* ═════════ NE YAPIYOR — bir oturumun İŞİ ÖLÇÜLÜR, ADINDAN OKUNMAZ (2026-08-10) ═════════
+ *
+ * ÖLÇÜLEN ARIZA (kullanıcı raporu): itilen eşzamanlılık bloğunun satırları yalnız BAŞLIK
+ * taşıyordu. Başlık oturumun İLK MESAJIDIR ve doğduğu anda DONAR — `"devam"` başlıklı bir
+ * sekme saatler sonra DB köprüsü planı kuruyordu; okuyan onu tabloya anlamsız bir satır
+ * olarak yazdı ve aktif, kilit tutan, plan üreten bir oturumu GÖRMEDEN geçti. İkinci hata
+ * aynı kökten: `state:"idle"` bir HÜKÜM sanıldı ve "boşta, iş yok" diye raporlandı. Oysa
+ * `idle` yalnız SON MESAJDAN BERİ GEÇEN SÜREdir; oturumun ne yaptığı hakkında hiçbir şey
+ * söylemez. Ortak kök: **listede görünmek "çalışıyor" demektir; başlık ise "ne yaptığı"
+ * değildir** — ikisi birbirine karıştı.
+ *
+ * KURAL (yapısal): listedeki her oturum ÇALIŞIYOR sayılır ve hiçbir satır "ne yapıyor"
+ * sütunu DOLDURULMADAN basılmaz. Sütun BAŞLIKTAN değil ölçümden türer; üç kaynak, azalan
+ * kanıt gücüyle:
+ *   (1) tuttuğu aktif claim'in `intent`i — sahibin kendi beyanı, en güçlü kanıt
+ *   (2) sırada beklediği kaynak — iş VAR ve BLOKE (bekleyiş, işsizlik değildir)
+ *   (3) olay defterindeki son dokunuşu — hangi kaynağa değdiği (`key` + `tip`)
+ *
+ * Üçü de susarsa hüküm YOKTUR: `olculdu:false`. Çağıran o satıra **"boşta" YAZMAZ**,
+ * `ölçülemedi` yazar — "boşta" bir hükümdür ve yanlış olduğunda çalışan bir işi görünmez
+ * kılar. Ölçemediğini bilmek, yanlış ölçmekten iyidir.
+ *
+ * SINIF: motor · 0 token · SALT-OKUR. Defterin yalnız KUYRUĞU okunur (`OLAY_KUYRUK_B`):
+ * her prompt'ta koşan bir kapı, sınırsız büyüyen bir dosyanın tamamını okuyamaz — kuyruk
+ * penceresinden eski bir oturumun izi düşerse hüküm "ölçülemedi"ye iner, uydurulmaz.
+ */
+export const OLAY_KUYRUK_B = 64 * 1024;
+
+export function neYapiyor(repoRoot, sessionId, { claims = null, now = Date.now() } = {}) {
+  const sid = String(sessionId || "");
+  const yok = { olculdu: false, kaynak: "yok", metin: null, kilit: [] };
+  if (!sid) return yok;
+
+  /* (1) TUTTUĞU KİLİT — niyet sahibin kendi beyanıdır; başka hiçbir kaynak bunu geçmez.
+     `claims` dışarıdan geçilebilir: çağıran zaten `activeClaims` okuduysa oturum başına
+     defter yeniden taranmaz (kapı her prompt'ta koşar). */
+  try {
+    const mine = (claims || activeClaims(repoRoot)).filter((c) => c?.owner?.sessionId === sid);
+    if (mine.length) {
+      const c = mine.find((x) => x.intent) || mine[0];
+      return {
+        olculdu: true,
+        kaynak: "claim",
+        metin: c.intent || "(niyet belirtilmemiş — kilit var, beyan yok)",
+        kilit: mine.map((x) => x?.resource?.key).filter(Boolean),
+      };
+    }
+  } catch {
+    /* yut — ölçüm arızası kapının kararını değiştirmez */
+  }
+
+  /* (2) BEKLEDİĞİ KAYNAK — bloke bir oturum boşta DEĞİLDİR; işi var, yolu kapalı. */
+  try {
+    const q = queuedKeysOf(repoRoot, sid);
+    if (q.length) return { olculdu: true, kaynak: "kuyruk", metin: `BLOKE — bekliyor: ${q.join(", ")}`, kilit: [] };
+  } catch {
+    /* yut */
+  }
+
+  /* (3) DEFTERDEKİ SON DOKUNUŞ — kilit tutmayanın izi burada: hangi kaynağa değdi. */
+  try {
+    const boy = olaySonu(repoRoot);
+    const { satirlar } = olayOku(repoRoot, { ofset: Math.max(0, boy - OLAY_KUYRUK_B) });
+    const s8 = sid.slice(0, 8); // defter sid'i 8 haneye kısaltarak yazar (yazOlay)
+    for (let i = satirlar.length - 1; i >= 0; i--) {
+      const o = satirlar[i];
+      if (!o?.key) continue;
+      if (o.sahip !== s8 && o.engellenen !== s8) continue;
+      const t = Date.parse(o.ts || "");
+      return {
+        olculdu: true,
+        kaynak: "olay",
+        metin: `son dokunuş: ${o.key} (${o.tip})`,
+        yas_ms: Number.isFinite(t) ? Math.max(0, now - t) : null,
+        kilit: [],
+      };
+    }
+  } catch {
+    /* yut */
+  }
+
+  return yok;
+}
+
 /**
  * Orkestratör = rol tablosundaki `orkestrator` rolü (2026-08-09'da genelleştirildi).
  *
