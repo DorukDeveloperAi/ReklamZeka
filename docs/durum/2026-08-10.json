@@ -4,6 +4,105 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "4a155dd3f",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): parse canonical Meta insight pages",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c6996a264",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): add bounded compact agent context",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "02fb6a3e6",
+      "tarih": "2026-08-10",
+      "konu": "test(a10): verify cadence experiment adapters",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "3096ba3bb",
+      "tarih": "2026-08-10",
+      "konu": "test(a10): verify policy-configured dry run",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "0a9a46161",
+      "tarih": "2026-08-10",
+      "konu": "docs(a12): record local MCP live acceptance",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "dd5c1be06",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): add interactive campaign brief templates",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "a7d587658",
+      "tarih": "2026-08-10",
+      "konu": "feat(a09): verify complete relational authority impact",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "00a5179d1",
+      "tarih": "2026-08-10",
+      "konu": "feat(a09): add private authority topic lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "39a63938a",
+      "tarih": "2026-08-10",
+      "konu": "feat(a09): add private account group lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "f61886e20",
+      "tarih": "2026-08-10",
+      "konu": "feat(a09): add private semantic binding lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "bb12209de",
+      "tarih": "2026-08-10",
+      "konu": "fix(a09): accept renewed authority snapshots",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
       "hash": "a530aa6f5",
       "tarih": "2026-08-10",
       "konu": "test(a09): verify authority impact fail-closed",
@@ -38,105 +137,6 @@
       "kapsam": [
         "fix"
       ]
-    },
-    {
-      "hash": "58335118f",
-      "tarih": "2026-08-10",
-      "konu": "test(a10): verify private root persistence",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "b6a051bfe",
-      "tarih": "2026-08-10",
-      "konu": "fix(a10): permit selection tombstone purge",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "21c384169",
-      "tarih": "2026-08-10",
-      "konu": "fix(a10): classify guidance selection storage",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "add0d55b4",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): wire private analysis context composer",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "4c85d52ad",
-      "tarih": "2026-08-10",
-      "konu": "docs(a10): record ready source bundle evidence",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "ec66e64c6",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): assemble ready analysis source bundles",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "4fcf60ffe",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): bind authority to source snapshots",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "fe302fdfd",
-      "tarih": "2026-08-10",
-      "konu": "test(a10): cover guidance selection revisions",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "b8adfacd0",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): compose selected guidance snapshots",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "7a23913f7",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): compose categories in source snapshots",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "e0ddf6972",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): bind guidance selections to campaigns",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -150,18 +150,14 @@
     },
     {
       "kapsam": "test",
-      "adet": 4
-    },
-    {
-      "kapsam": "chore",
-      "adet": 3
+      "adet": 6
     },
     {
       "kapsam": "docs",
-      "adet": 3
+      "adet": 4
     }
   ],
-  "isSayisi": 182,
+  "isSayisi": 193,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-10",
   "planlar": [
@@ -182,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "8366bd20c929"
+  "damga": "3fdca371f1f6"
 }

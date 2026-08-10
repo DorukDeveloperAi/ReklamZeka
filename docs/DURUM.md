@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 8366bd20c929 -->
+<!-- durum-damga: 3fdca371f1f6 -->
 
 ## Künye
 
@@ -14,36 +14,35 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 182 |
+| iş commit'i (tüm geçmiş) | 193 |
 | ilk / son iş | 2026-08-06 / 2026-08-10 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-10 | `feat` | parse canonical Meta insight pages | `4a155dd3f` |
+| 2026-08-10 | `feat` | add bounded compact agent context | `c6996a264` |
+| 2026-08-10 | `test` | verify cadence experiment adapters | `02fb6a3e6` |
+| 2026-08-10 | `test` | verify policy-configured dry run | `3096ba3bb` |
+| 2026-08-10 | `docs` | record local MCP live acceptance | `0a9a46161` |
+| 2026-08-10 | `feat` | add interactive campaign brief templates | `dd5c1be06` |
+| 2026-08-10 | `feat` | verify complete relational authority impact | `a7d587658` |
+| 2026-08-10 | `feat` | add private authority topic lifecycle | `00a5179d1` |
+| 2026-08-10 | `feat` | add private account group lifecycle | `39a63938a` |
+| 2026-08-10 | `feat` | add private semantic binding lifecycle | `f61886e20` |
+| 2026-08-10 | `fix` | accept renewed authority snapshots | `bb12209de` |
 | 2026-08-10 | `test` | verify authority impact fail-closed | `a530aa6f5` |
 | 2026-08-10 | `feat` | evaluate authority impact by family | `2506a492e` |
 | 2026-08-10 | `feat` | persist verified policy compositions | `50a11045d` |
 | 2026-08-10 | `fix` | invalidate persisted authority contexts | `7a3d94be2` |
-| 2026-08-10 | `test` | verify private root persistence | `58335118f` |
-| 2026-08-10 | `fix` | permit selection tombstone purge | `b6a051bfe` |
-| 2026-08-10 | `fix` | classify guidance selection storage | `21c384169` |
-| 2026-08-10 | `feat` | wire private analysis context composer | `add0d55b4` |
-| 2026-08-10 | `docs` | record ready source bundle evidence | `4c85d52ad` |
-| 2026-08-10 | `feat` | assemble ready analysis source bundles | `ec66e64c6` |
-| 2026-08-10 | `feat` | bind authority to source snapshots | `4fcf60ffe` |
-| 2026-08-10 | `test` | cover guidance selection revisions | `fe302fdfd` |
-| 2026-08-10 | `feat` | compose selected guidance snapshots | `b8adfacd0` |
-| 2026-08-10 | `feat` | compose categories in source snapshots | `7a23913f7` |
-| 2026-08-10 | `feat` | bind guidance selections to campaigns | `e0ddf6972` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
 - `feat        ` ████████████████████████ 41
 - `fix         ` █████ 9
-- `test        ` ██ 4
-- `chore       ` ██ 3
-- `docs        ` ██ 3
+- `test        ` ████ 6
+- `docs        ` ██ 4
 
 ## Planlar
 
