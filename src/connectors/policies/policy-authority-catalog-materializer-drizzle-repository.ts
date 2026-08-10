@@ -63,11 +63,35 @@ export class DrizzlePolicyAuthorityCatalogMaterializerRepository {
       const registry = policyRows.map((row) => ({ policyRef: String(row.policy_ref), policyVersion: Number(row.policy_version), canonicalHash: String(row.canonical_hash), status: "published" })).sort((a, b) => a.policyRef.localeCompare(b.policyRef));
       if (digest(registry) !== input.expectedPolicyRegistryHash || catalog.bindings.some((binding) => !policyRows.some((row) => row.policy_ref === binding.policyRef && Number(row.policy_version) === binding.policyVersion && row.canonical_hash === binding.policyHash))) fail("conflict");
       const groupFacts = rows<{ group_ref: unknown; current_revision: unknown; current_revision_hash: unknown }>(await tx.execute(sql`
-        select group_ref, current_revision, current_revision_hash from account_groups where workspace_id = ${input.workspaceId}::uuid and current_revision > 0 for update`));
+        select group_row.group_ref, group_row.current_revision, group_row.current_revision_hash
+          from account_groups group_row join account_group_revisions revision
+            on revision.workspace_id = group_row.workspace_id and revision.account_group_id = group_row.id
+              and revision.revision = group_row.current_revision and revision.revision_hash = group_row.current_revision_hash
+              and revision.status = 'active'
+          where group_row.workspace_id = ${input.workspaceId}::uuid and group_row.current_revision > 0 for update of group_row, revision`));
       const topicFacts = rows<{ topic_ref: unknown; current_revision: unknown; current_revision_hash: unknown }>(await tx.execute(sql`
-        select topic_ref, current_revision, current_revision_hash from authority_topics where workspace_id = ${input.workspaceId}::uuid and current_revision > 0 for update`));
+        select topic.topic_ref, topic.current_revision, topic.current_revision_hash
+          from authority_topics topic join authority_topic_revisions revision
+            on revision.workspace_id = topic.workspace_id and revision.topic_id = topic.id
+              and revision.revision = topic.current_revision and revision.revision_hash = topic.current_revision_hash
+              and revision.status = 'active'
+          where topic.workspace_id = ${input.workspaceId}::uuid and topic.current_revision > 0 for update of topic, revision`));
       if (scope.accountGroupRefs.some((ref) => !groupFacts.some((row) => row.group_ref === ref && HASH.test(String(row.current_revision_hash))))
         || scope.topicRefs.some((ref) => !topicFacts.some((row) => row.topic_ref === ref && HASH.test(String(row.current_revision_hash))))) fail("incomplete_authority");
+      const semanticFactsByPolicy = new Map<string, readonly { semantic_ref: unknown; revision: unknown; revision_hash: unknown }[]>();
+      for (const binding of catalog.bindings) {
+        const policy = policyRows.find((row) => row.policy_ref === binding.policyRef && Number(row.policy_version) === binding.policyVersion && row.canonical_hash === binding.policyHash);
+        if (!policy || typeof policy.id !== "string" || !UUID.test(policy.id)) fail("corrupt_store");
+        const facts = rows<{ semantic_ref: unknown; revision: unknown; revision_hash: unknown }>(await tx.execute(sql`
+          select semantic.semantic_ref, semantic.revision, semantic.revision_hash from policy_semantic_binding_revisions semantic
+          where semantic.workspace_id = ${input.workspaceId}::uuid and semantic.policy_revision_id = ${policy.id}::uuid
+            and not exists (select 1 from policy_semantic_binding_revisions later
+              where later.workspace_id = semantic.workspace_id and later.policy_revision_id = semantic.policy_revision_id
+                and later.semantic_ref = semantic.semantic_ref and later.revision > semantic.revision)
+          for update`));
+        if (facts.length === 0 || facts.some((fact) => !REF.test(String(fact.semantic_ref)) || !HASH.test(String(fact.revision_hash)))) fail("incomplete_authority");
+        semanticFactsByPolicy.set(policy.id, facts);
+      }
       for (const lock of input.manualLocks) {
         const lockRows = rows<{ operation: unknown }>(await tx.execute(sql`select operation from policy_manual_lock_revisions lock join strict_instruction_policy_revisions policy on policy.workspace_id = lock.workspace_id and policy.id = lock.policy_revision_id where lock.workspace_id = ${input.workspaceId}::uuid and lock.lock_ref = ${lock.lockRef} and policy.policy_ref = ${lock.policyRef} and policy.policy_version = ${lock.policyVersion} and policy.canonical_hash = ${lock.policyHash} order by lock.sequence desc limit 1 for update`));
         if (lockRows.length !== 1 || lockRows[0]!.operation !== "lock") fail("incomplete_authority");
@@ -76,32 +100,53 @@ export class DrizzlePolicyAuthorityCatalogMaterializerRepository {
       if (catalogHead.length > 1) fail("corrupt_store");
       const oldCatalogHash = catalogHead[0]?.current_revision_hash === null || catalogHead.length === 0 ? "GENESIS" : String(catalogHead[0]!.current_revision_hash);
       if (oldCatalogHash !== input.expectedCatalogHeadHash) fail("conflict");
-      const revision = catalogHead.length === 0 ? 1 : Number(catalogHead[0]!.current_revision) + 1;
+      const existingCatalogRevision = rows<{ id: unknown; revision: unknown }>(await tx.execute(sql`
+        select id::text, revision from policy_authority_catalog_revisions
+          where workspace_id = ${input.workspaceId}::uuid and catalog_ref = ${catalog.catalogRef}
+            and revision_hash = ${catalog.catalogHash} limit 2 for share`));
+      if (existingCatalogRevision.length > 1) fail("corrupt_store");
+      const reusingCatalogRevision = existingCatalogRevision.length === 1;
+      const revision = reusingCatalogRevision ? Number(existingCatalogRevision[0]!.revision) : catalogHead.length === 0 ? 1 : Number(catalogHead[0]!.current_revision) + 1;
       const catalogId = catalogHead.length === 0 ? randomUUID() : String(catalogHead[0]!.id);
-      const revisionId = randomUUID();
+      const revisionId = reusingCatalogRevision ? String(existingCatalogRevision[0]!.id) : randomUUID();
+      if (reusingCatalogRevision && (catalogHead.length === 0 || oldCatalogHash !== catalog.catalogHash || Number(catalogHead[0]!.current_revision) !== revision)) fail("conflict");
       if (catalogHead.length === 0) await tx.execute(sql`insert into policy_authority_catalogs (id, workspace_id, catalog_ref) values (${catalogId}::uuid, ${input.workspaceId}::uuid, ${catalog.catalogRef})`);
-      await tx.execute(sql`insert into policy_authority_catalog_revisions (id, workspace_id, catalog_ref, revision, previous_revision_hash, revision_hash, payload, recorded_at)
-        values (${revisionId}::uuid, ${input.workspaceId}::uuid, ${catalog.catalogRef}, ${revision}, ${revision === 1 ? null : oldCatalogHash}, ${catalog.catalogHash}, ${JSON.stringify(catalog)}::jsonb, ${input.occurredAt}::timestamptz)`);
-      await tx.execute(sql`update policy_authority_catalogs set current_revision = ${revision}, current_revision_hash = ${catalog.catalogHash}
-        where id = ${catalogId}::uuid and workspace_id = ${input.workspaceId}::uuid and current_revision = ${revision - 1}`);
+      if (!reusingCatalogRevision) {
+        await tx.execute(sql`insert into policy_authority_catalog_revisions (id, workspace_id, catalog_ref, revision, previous_revision_hash, revision_hash, payload, recorded_at)
+          values (${revisionId}::uuid, ${input.workspaceId}::uuid, ${catalog.catalogRef}, ${revision}, ${revision === 1 ? null : oldCatalogHash}, ${catalog.catalogHash}, ${JSON.stringify(catalog)}::jsonb, ${input.occurredAt}::timestamptz)`);
+        await tx.execute(sql`update policy_authority_catalogs set current_revision = ${revision}, current_revision_hash = ${catalog.catalogHash}
+          where id = ${catalogId}::uuid and workspace_id = ${input.workspaceId}::uuid and current_revision = ${revision - 1}`);
+      }
 
-      const snapshotCore = Object.freeze({ schemaVersion: "tenant-authority-snapshot/1.0.0", snapshotRef: `authority_snapshot_${catalog.catalogHash.slice(0, 24)}`,
+      const snapshotCore = Object.freeze({ schemaVersion: "tenant-authority-snapshot/1.0.0", snapshotRef: `authority_snapshot_${digest({ catalogHash: catalog.catalogHash, repositoryRef: input.repositoryRef, repositoryRevision: input.repositoryRevision, expiresAt: input.expiresAt }).slice(0, 24)}`,
         repository: { ref: input.repositoryRef, revision: input.repositoryRevision, verified: true }, authority: CAPABILITIES,
-        policyAuthority: { catalogHash: catalog.catalogHash, scope, manualLocks: input.manualLocks } });
+        validity: { expiresAt: input.expiresAt }, policyAuthority: { catalogHash: catalog.catalogHash, scope, manualLocks: input.manualLocks } });
       const snapshotHash = digest(snapshotCore); const snapshot = Object.freeze({ ...snapshotCore, snapshotHash }); const snapshotId = randomUUID();
       const snapshotHead = rows<{ current_snapshot_hash: unknown }>(await tx.execute(sql`select current_snapshot_hash from tenant_authority_snapshot_heads where workspace_id = ${input.workspaceId}::uuid for update`));
       if (snapshotHead.length > 1) fail("corrupt_store");
       const oldSnapshotHash = snapshotHead.length === 0 ? "GENESIS" : String(snapshotHead[0]!.current_snapshot_hash);
       if (oldSnapshotHash !== input.expectedSnapshotHeadHash) fail("conflict");
+      const expectedBindingCount = catalog.bindings.length === 0 ? 0 : [...semanticFactsByPolicy.values()].reduce((count, facts) => count + facts.length, 0)
+        + catalog.bindings.length * (groupFacts.filter((entry) => scope.accountGroupRefs.includes(String(entry.group_ref))).length
+          + topicFacts.filter((entry) => scope.topicRefs.includes(String(entry.topic_ref))).length);
+      const currentExactSnapshot = rows<{ id: unknown; binding_count: unknown }>(await tx.execute(sql`
+        select snapshot.id::text, (select count(*)::int from policy_authority_bindings binding
+          where binding.workspace_id = snapshot.workspace_id and binding.authority_snapshot_id = snapshot.id) as binding_count
+          from tenant_authority_snapshots snapshot join tenant_authority_snapshot_heads head
+          on head.workspace_id = snapshot.workspace_id and head.current_snapshot_id = snapshot.id and head.current_snapshot_hash = snapshot.snapshot_hash
+          where snapshot.workspace_id = ${input.workspaceId}::uuid and snapshot.snapshot_hash = ${snapshotHash}
+            and snapshot.expires_at > ${input.occurredAt}::timestamptz limit 2 for share`));
+      if (currentExactSnapshot.length > 1) fail("corrupt_store");
+      if (currentExactSnapshot.length === 1 && Number(currentExactSnapshot[0]!.binding_count) === expectedBindingCount) return Object.freeze({ catalogRef: catalog.catalogRef, catalogRevision: revision,
+        catalogHash: catalog.catalogHash, snapshotRef: snapshot.snapshotRef, snapshotHash, capabilities: CAPABILITIES });
+      if (currentExactSnapshot.length === 1) fail("corrupt_store");
       await tx.execute(sql`insert into tenant_authority_snapshots (id, workspace_id, snapshot_ref, snapshot_hash, repository_ref, repository_revision, verified_at, expires_at, snapshot_payload)
         values (${snapshotId}::uuid, ${input.workspaceId}::uuid, ${snapshot.snapshotRef}, ${snapshotHash}, ${input.repositoryRef}, ${input.repositoryRevision}, ${input.occurredAt}::timestamptz, ${input.expiresAt}::timestamptz, ${JSON.stringify(snapshot)}::jsonb)`);
       for (const binding of catalog.bindings) {
         const policy = policyRows.find((row) => row.policy_ref === binding.policyRef && Number(row.policy_version) === binding.policyVersion && row.canonical_hash === binding.policyHash);
         if (!policy || typeof policy.id !== "string" || !UUID.test(policy.id)) fail("corrupt_store");
-        const facts = rows<{ semantic_ref: unknown; revision: unknown; revision_hash: unknown }>(await tx.execute(sql`
-          select distinct on (semantic_ref) semantic_ref, revision, revision_hash from policy_semantic_binding_revisions
-          where workspace_id = ${input.workspaceId}::uuid and policy_revision_id = ${policy.id}::uuid order by semantic_ref, revision desc for update`));
-        if (facts.length === 0 || facts.some((fact) => !REF.test(String(fact.semantic_ref)) || !HASH.test(String(fact.revision_hash)))) fail("incomplete_authority");
+        const facts = semanticFactsByPolicy.get(policy.id);
+        if (!facts) fail("corrupt_store");
         const tierRef = `authority_tier_${binding.authorityTier}`; const decisionRef = `decision_${binding.decision?.decisionKey ?? "default"}_${binding.decision?.positionKey ?? "default"}`;
         for (const fact of facts) await tx.execute(sql`insert into policy_authority_bindings (id, workspace_id, policy_revision_id, authority_snapshot_id, authority_catalog_revision_id, authority_tier_ref, decision_ref, binding_kind, binding_ref, binding_version, binding_hash)
           values (${randomUUID()}::uuid, ${input.workspaceId}::uuid, ${policy.id}::uuid, ${snapshotId}::uuid, ${revisionId}::uuid, ${tierRef}, ${decisionRef}, 'semantic', ${String(fact.semantic_ref)}, ${String(fact.revision)}, ${String(fact.revision_hash)})`);

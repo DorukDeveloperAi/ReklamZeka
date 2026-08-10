@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 39950fea3c12 -->
+<!-- durum-damga: 8366bd20c929 -->
 
 ## Künye
 
@@ -14,13 +14,20 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 175 |
+| iş commit'i (tüm geçmiş) | 182 |
 | ilk / son iş | 2026-08-06 / 2026-08-10 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-10 | `test` | verify authority impact fail-closed | `a530aa6f5` |
+| 2026-08-10 | `feat` | evaluate authority impact by family | `2506a492e` |
+| 2026-08-10 | `feat` | persist verified policy compositions | `50a11045d` |
+| 2026-08-10 | `fix` | invalidate persisted authority contexts | `7a3d94be2` |
+| 2026-08-10 | `test` | verify private root persistence | `58335118f` |
+| 2026-08-10 | `fix` | permit selection tombstone purge | `b6a051bfe` |
+| 2026-08-10 | `fix` | classify guidance selection storage | `21c384169` |
 | 2026-08-10 | `feat` | wire private analysis context composer | `add0d55b4` |
 | 2026-08-10 | `docs` | record ready source bundle evidence | `4c85d52ad` |
 | 2026-08-10 | `feat` | assemble ready analysis source bundles | `ec66e64c6` |
@@ -29,21 +36,14 @@
 | 2026-08-10 | `feat` | compose selected guidance snapshots | `b8adfacd0` |
 | 2026-08-10 | `feat` | compose categories in source snapshots | `7a23913f7` |
 | 2026-08-10 | `feat` | bind guidance selections to campaigns | `e0ddf6972` |
-| 2026-08-10 | `feat` | validate reviewed guidance manifests | `ede8d665f` |
-| 2026-08-10 | `feat` | share cadence snapshot reads | `695003a0e` |
-| 2026-08-10 | `feat` | validate current Meta hierarchy config | `59c51bc78` |
-| 2026-08-10 | `feat` | add current source snapshot seam | `20cef249d` |
-| 2026-08-10 | `fix` | harden current cadence reader | `62daebfec` |
-| 2026-08-10 | `feat` | compose evidence-bound analysis contexts | `f64d77c3c` |
-| 2026-08-10 | `test` | cover cadence context live verifier | `1d2ee6e20` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 43
-- `docs        ` ███ 6
-- `fix         ` ███ 6
+- `feat        ` ████████████████████████ 41
+- `fix         ` █████ 9
+- `test        ` ██ 4
 - `chore       ` ██ 3
-- `test        ` █ 2
+- `docs        ` ██ 3
 
 ## Planlar
 

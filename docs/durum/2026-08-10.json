@@ -4,6 +4,69 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "a530aa6f5",
+      "tarih": "2026-08-10",
+      "konu": "test(a09): verify authority impact fail-closed",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "2506a492e",
+      "tarih": "2026-08-10",
+      "konu": "feat(a09): evaluate authority impact by family",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "50a11045d",
+      "tarih": "2026-08-10",
+      "konu": "feat(a09): persist verified policy compositions",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7a3d94be2",
+      "tarih": "2026-08-10",
+      "konu": "fix(a09): invalidate persisted authority contexts",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "58335118f",
+      "tarih": "2026-08-10",
+      "konu": "test(a10): verify private root persistence",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "b6a051bfe",
+      "tarih": "2026-08-10",
+      "konu": "fix(a10): permit selection tombstone purge",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "21c384169",
+      "tarih": "2026-08-10",
+      "konu": "fix(a10): classify guidance selection storage",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
       "hash": "add0d55b4",
       "tarih": "2026-08-10",
       "konu": "feat(a10): wire private analysis context composer",
@@ -74,94 +137,31 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "ede8d665f",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): validate reviewed guidance manifests",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "695003a0e",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): share cadence snapshot reads",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "59c51bc78",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): validate current Meta hierarchy config",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "20cef249d",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): add current source snapshot seam",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "62daebfec",
-      "tarih": "2026-08-10",
-      "konu": "fix(a10): harden current cadence reader",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "f64d77c3c",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): compose evidence-bound analysis contexts",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "1d2ee6e20",
-      "tarih": "2026-08-10",
-      "konu": "test(a10): cover cadence context live verifier",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 43
-    },
-    {
-      "kapsam": "docs",
-      "adet": 6
+      "adet": 41
     },
     {
       "kapsam": "fix",
-      "adet": 6
+      "adet": 9
+    },
+    {
+      "kapsam": "test",
+      "adet": 4
     },
     {
       "kapsam": "chore",
       "adet": 3
     },
     {
-      "kapsam": "test",
-      "adet": 2
+      "kapsam": "docs",
+      "adet": 3
     }
   ],
-  "isSayisi": 175,
+  "isSayisi": 182,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-10",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "39950fea3c12"
+  "damga": "8366bd20c929"
 }

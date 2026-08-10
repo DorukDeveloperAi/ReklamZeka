@@ -273,7 +273,10 @@ async function policyCompositionEvidence(database: ContextDatabase, context: Eff
       and snapshot.snapshot_ref = ${evidence.snapshotRef} and snapshot.snapshot_hash = ${evidence.snapshotHash}
       and snapshot.snapshot_payload #>> '{policyAuthority,catalogHash}' = ${evidence.catalogHash}
       and snapshot.snapshot_payload #>> '{policyAuthority,scope,scopeHash}' = ${evidence.scopeHash}
-      and snapshot.snapshot_payload #>> '{policyAuthority,catalog,instructionPolicyRegistryHash}' = ${context.versions.instructionPolicyRegistry}
+      and exists (select 1 from policy_authority_catalog_revisions catalog
+        where catalog.workspace_id = snapshot.workspace_id
+          and catalog.revision_hash = ${evidence.catalogHash}
+          and catalog.payload #>> '{instructionPolicyRegistryHash}' = ${context.versions.instructionPolicyRegistry})
     limit 2 for share
   `));
   if (authority.length !== 1) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");

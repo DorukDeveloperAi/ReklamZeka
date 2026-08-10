@@ -21,13 +21,15 @@ describe("DrizzlePolicyAuthorityCatalogMaterializerRepository", () => {
         categoryProfileVersion: null, categoryProfileHash: null, manualLockRef: null }] });
     const scope = createPolicyScopeSnapshot({ workspaceRef: "workspace_primary", evaluatedAt: "2026-08-10T10:00:00.000Z",
       accountGroupRefs: [], objectiveRefs: [], topicRefs: [], canonicalObjective: "lead_generation" });
-    let index = 0;
-    const responses = [
-      [{ id: workspaceId }], [{ role: "owner" }], [{ id: policyId, policy_ref: "policy_primary", policy_version: 1, canonical_hash: "a".repeat(64) }],
-      [], [], [], [], [], [], [], [], [{ semantic_ref: "semantic_budget", revision: 1, revision_hash: "b".repeat(64) }],
-      [], [], [{ component_version: "c".repeat(64) }], [], [], [], [],
-    ];
-    const execute = vi.fn(async () => ({ rows: responses[index++] ?? [] }));
+    const execute = vi.fn(async (query: unknown) => {
+      const statement = new PgDialect().sqlToQuery(query as never).sql;
+      if (statement.includes("from workspaces")) return { rows: [{ id: workspaceId }] };
+      if (statement.includes("from memberships")) return { rows: [{ role: "owner" }] };
+      if (statement.includes("from strict_instruction_policy_revisions policy")) return { rows: [{ id: policyId, policy_ref: "policy_primary", policy_version: 1, canonical_hash: "a".repeat(64) }] };
+      if (statement.includes("from policy_semantic_binding_revisions semantic")) return { rows: [{ semantic_ref: "semantic_budget", revision: 1, revision_hash: "b".repeat(64) }] };
+      if (statement.includes("from effective_campaign_context_components")) return { rows: [{ component_version: "c".repeat(64) }] };
+      return { rows: [] };
+    });
     const database = { execute, transaction: async (work: (transaction: unknown) => Promise<unknown>) => work({ execute }) };
     const result = await new DrizzlePolicyAuthorityCatalogMaterializerRepository(database as never).materialize({ workspaceId, workspaceRef: "workspace_primary",
       actorId, actorRef: "actor_owner", role: "owner", occurredAt: "2026-08-10T10:00:00.000Z", expiresAt: "2026-08-11T10:00:00.000Z",

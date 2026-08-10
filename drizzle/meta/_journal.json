@@ -456,6 +456,13 @@
       "when": 1786381200000,
       "tag": "20260810190000_effective_context_policy_composition",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1786383000000,
+      "tag": "20260810193000_policy_authority_binding_snapshot_uniqueness",
+      "breakpoints": true
     }
   ]
 }
