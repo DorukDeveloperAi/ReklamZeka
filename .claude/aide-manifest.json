@@ -228,7 +228,7 @@
       "pkg": "skill:pm"
     },
     ".claude/hooks/goal-tracker.mjs": {
-      "hash": "01a390fd1bcc6220",
+      "hash": "70edd9c76ffdacf5",
       "pkg": "hook:goal-tracker"
     },
     ".claude/hooks/oturum-kapanis.mjs": {
@@ -316,7 +316,7 @@
       "pkg": "hook:eszamanli-guard"
     },
     ".claude/hooks/claim-guard.mjs": {
-      "hash": "ce2c021aaedc218e",
+      "hash": "61535a417f224450",
       "pkg": "hook:eszamanli-guard"
     },
     ".claude/hooks/hook-nabiz.mjs": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-10T11:33:36.876Z",
+  "updatedAt": "2026-08-10T12:51:28.646Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",
