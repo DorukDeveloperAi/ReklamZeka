@@ -2294,5 +2294,10 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Her yeni binding, persisted frozen `policy_authority` context sürümlerini gerçek kayıtlı ref/version
   üzerinden invalidate eder ve audit hash-chain olayı yazar. HTTP/UI/MCP/action yüzeyi yoktur; bütün
   publish/approve/execute/Meta-write ve diğer runtime yetkileri false döner.
-- Hedefli test, `typecheck` ve `db:check` geçti. Account-group/topic private writerları, complete-positive
-  live relational fixture ve gerçek browser acceptance hâlâ açık bağımlılıklardır.
+- Hedefli test, `typecheck` ve `db:check` geçti. `DrizzleAccountGroupLifecycleRepository` de active workspace
+  ve owner/admin üyeliğini kilit altında yeniden doğrular; grup-advisory lock ve exact predecessor OCC ile
+  opaque account ref'lerini yalnız tenant-local, görünür `ad_accounts` satırlarına bağlayıp immutable active/
+  archived revision ve membership satırlarını yazar. Exact immutable retry no-op'tur; her yeni revision frozen
+  `policy_authority` context sürümlerini invalidate eder ve aynı transaction'da audit hash-chain olayı üretir.
+  HTTP/UI/MCP/action yüzeyi yoktur ve tüm yetkiler false kalır. Topic private writer, complete-positive live
+  relational fixture ve gerçek browser acceptance hâlâ açık bağımlılıklardır.

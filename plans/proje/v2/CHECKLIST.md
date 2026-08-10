@@ -154,7 +154,9 @@
     fail-closed kanıtlar. `policy_semantic_binding_revisions` için private owner/admin writer, exact
     published policy ref/version/hash, advisory-lock OCC, canonical fact/revision hash, audit ve
     frozen-context invalidation ile eklendi. Complete-positive fixture, account-group/topic revision
-    writerları ve gerçek oturumlu browser kabulü tamamlanana kadar açık kalır; bu kanıtlar olmadan
+    writerı owner/admin active-workspace recheck, group-advisory OCC, immutable membership, exact retry,
+    context invalidation ve audit ile eklendi. Topic writerı ve gerçek oturumlu browser kabulü tamamlanana
+    kadar açık kalır; bu kanıtlar olmadan
     legacy/missing/corrupt rows partial kalır.
 - [ ] Başlangıç objective/internal kategori playbook seti.
   - [x] Altı canonical objective playbook'una version/hash ile bağlı, review-required ve
