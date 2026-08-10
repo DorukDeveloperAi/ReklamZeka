@@ -102,6 +102,16 @@
   raporlanır. Sonuç snapshot-bound, input-sırası deterministik ve bütün action/Meta-write capability'leri
   false'tur; persistence, route ve otomatik creative müdahalesi eklenmedi.
 
+## 2026-08-10 — A10 BusinessOutcomeSignal provenance foundation
+
+- Manual veya CSV kaynaklı business outcome batch'i source ref/content hash/observed-at ile immutable
+  canonicalize edilir. Qualified lead, appointment, sale, revenue ve invalid lead için quantity;
+  revenue için ayrıca minor currency value zorunludur. Duplicate signal, forged batch veya eksik
+  verified mapping fail-closed reddedilir.
+- Outcome evidence'i Meta metric değildir: verified mapping dahi `metaProxyEligible=false` üretir;
+  eksik attribution sessiz proxy/success score'a dönüşmez. Bu dilim persistence, CSV upload/import
+  route'u veya action authority eklemez; bunlar ayrı tenant-bound lifecycle diliminde kalır.
+
 ## 2026-08-10 — A09 atomic starter, authoritative facet preview ve progressive persistence
 
 - Starter adoption artık zero-write blocker değildir. Owner/admin confirmation, aktif workspace

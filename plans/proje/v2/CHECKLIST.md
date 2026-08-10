@@ -289,6 +289,9 @@
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.
   - [x] Finding'e bağlı max-depth/max-driver sınırlı bottom-up driver çekirdeği.
 - [ ] Optional manual/CSV BusinessOutcomeSignal ve Meta-proxy mapping guard.
+  - [x] Manual/CSV source ref+content hash'li immutable BusinessOutcomeSignal contract: qualified lead,
+    appointment, sale, revenue ve invalid lead canonicalize edilir; missing/verified mapping Meta
+    metriğine dönüşmez ve `metaProxyEligible=false` kalır.
 
 ## A11 — Bütçe planlama
 
