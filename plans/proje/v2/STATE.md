@@ -2467,3 +2467,16 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   planına dönüştürmesi sonraki checkpoint'tir. Action/approval/Meta-write yetkisi açılmaz.
 - Kanıt: `tests/meta-sync-persistence.test.ts`, `tests/deterministic-feature-snapshot-migration.test.ts`,
   `tests/meta-workspace-tombstone-purge-drizzle-adapter.test.ts`, `npm run typecheck`, `npm run db:check`.
+
+## 2026-08-10 — A10 private current L2 reader
+
+- `DrizzleDeterministicFeatureSnapshotRepository.loadCurrent()` exact workspace/feature ref'i altında
+  persisted payload'ı tekrar hash-authenticate eder ve ilgili immutable invalidation event'lerini sıralı
+  okur. Payload, scope veya event hash'i bozuksa `corrupt_store` ile fail-closed olur.
+- Event yoksa `ready`, en az bir event varsa aynı historic feature ile `stale` döner; yeni L1 satırını
+  seçmez, feature'ı değiştirmez ve bir fallback türetmez. Bu, read-time selective rejection için private
+  primitive'tir.
+- Decision Room/context/action akışına bağlanmamıştır; L3 window materialization ve stale feature'ın
+  hangi future context'e gireceğine dair policy sonraki checkpoint'te kalır.
+- Kanıt: `tests/deterministic-feature-snapshot-drizzle-repository.test.ts`,
+  `tests/deterministic-feature-snapshot.test.ts`, `npm run typecheck`, `git diff --check`.

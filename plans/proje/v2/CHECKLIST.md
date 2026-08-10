@@ -431,6 +431,9 @@
     source payload hash'i değiştiğinde exact relational feature-source bağlarını çözer ve immutable,
     idempotent invalidation olayı yazar. Olay historic feature'ı değiştirmez; L2/L3 reader'ın selective
     stale-rejection tüketicisi hâlâ açık kalır.
+  - [x] Private L2 current reader: persisted feature payload'ını yeniden doğrular; exact feature'a bağlı
+    herhangi bir L1 invalidation varsa replacement/fallback üretmeden `stale` döner. Karar runtime'ına
+    veya action yüzeyine henüz bağlanmaz.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.

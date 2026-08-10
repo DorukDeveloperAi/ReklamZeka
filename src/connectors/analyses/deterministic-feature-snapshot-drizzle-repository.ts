@@ -9,7 +9,7 @@ import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
 type Row = Readonly<Record<string, unknown>>;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 
 export class DeterministicFeatureSnapshotRepositoryError extends Error {
@@ -18,6 +18,10 @@ export class DeterministicFeatureSnapshotRepositoryError extends Error {
     this.name = "DeterministicFeatureSnapshotRepositoryError";
   }
 }
+
+export type CurrentDeterministicFeatureSnapshot =
+  | Readonly<{ state: "ready"; feature: DeterministicFeatureSnapshot }>
+  | Readonly<{ state: "stale"; feature: DeterministicFeatureSnapshot; invalidationEventHashes: readonly string[] }>;
 
 function fail(code: DeterministicFeatureSnapshotRepositoryError["code"]): never {
   throw new DeterministicFeatureSnapshotRepositoryError(code);
@@ -37,6 +41,36 @@ function canonical(value: unknown): string { return JSON.stringify(stable(value)
 /** Private L2 materializer. It writes only a source-attested, exact L1-bound immutable feature. */
 export class DrizzleDeterministicFeatureSnapshotRepository {
   constructor(private readonly database: Database) {}
+
+  /**
+   * Private read path for frozen L2 evidence. It never silently substitutes a
+   * newer L1 source: any persisted invalidation makes the historical feature
+   * unavailable for current decision use while keeping it replayable.
+   */
+  async loadCurrent(input: Readonly<{ workspaceId: string; featureRef: string }>): Promise<CurrentDeterministicFeatureSnapshot> {
+    if (!UUID.test(input.workspaceId) || typeof input.featureRef !== "string" || !input.featureRef.trim()) fail("invalid_input");
+    const found = rows<{ feature_payload: unknown; invalidation_hashes: unknown }>(await this.database.execute(sql`
+      select feature.feature_payload,
+        coalesce(array_agg(invalidation.event_hash order by invalidation.event_hash)
+          filter (where invalidation.id is not null), array[]::text[]) as invalidation_hashes
+      from deterministic_feature_snapshots feature
+      left join deterministic_feature_snapshot_invalidations invalidation
+        on invalidation.workspace_id = feature.workspace_id and invalidation.feature_snapshot_id = feature.id
+      where feature.workspace_id = ${input.workspaceId}::uuid and feature.feature_ref = ${input.featureRef}
+      group by feature.id
+      limit 2
+    `));
+    if (found.length === 0) fail("not_found");
+    if (found.length !== 1 || !Array.isArray(found[0]!.invalidation_hashes)
+      || found[0]!.invalidation_hashes.some((value) => typeof value !== "string" || !HASH.test(value))) fail("corrupt_store");
+    try { assertDeterministicFeatureSnapshot(found[0]!.feature_payload); } catch { fail("corrupt_store"); }
+    const feature = found[0]!.feature_payload;
+    if (feature.scope.workspaceId !== input.workspaceId || feature.featureRef !== input.featureRef) fail("corrupt_store");
+    const invalidationEventHashes = Object.freeze([...found[0]!.invalidation_hashes].sort());
+    return invalidationEventHashes.length === 0
+      ? Object.freeze({ state: "ready" as const, feature })
+      : Object.freeze({ state: "stale" as const, feature, invalidationEventHashes });
+  }
 
   async save(input: Readonly<{ feature: DeterministicFeatureSnapshot; source: FindingObservationFeatureSourceRead }>): Promise<Readonly<{ feature: DeterministicFeatureSnapshot; outcome: "inserted" | "unchanged" }>> {
     try { assertRepositoryFeatureSourceRead(input.source); assertDeterministicFeatureSnapshot(input.feature); } catch { fail("invalid_input"); }

@@ -18,6 +18,22 @@ async function input() {
 }
 
 describe("DrizzleDeterministicFeatureSnapshotRepository", () => {
+  it("fails closed as stale when a persisted L1 change invalidates an otherwise authentic feature", async () => {
+    const candidate = await input();
+    const execute = vi.fn(async (): Promise<any> => ({ rows: [{ feature_payload: candidate.feature, invalidation_hashes: ["a".repeat(64)] }] }));
+    const repo = new DrizzleDeterministicFeatureSnapshotRepository({ execute } as never);
+    await expect(repo.loadCurrent({ workspaceId: ids.workspace, featureRef: candidate.feature.featureRef })).resolves.toEqual({
+      state: "stale", feature: candidate.feature, invalidationEventHashes: ["a".repeat(64)],
+    });
+  });
+
+  it("rejects forged persisted feature payloads instead of returning current evidence", async () => {
+    const candidate = await input();
+    const execute = vi.fn(async (): Promise<any> => ({ rows: [{ feature_payload: { ...candidate.feature, featureHash: "0".repeat(64) }, invalidation_hashes: [] }] }));
+    const repo = new DrizzleDeterministicFeatureSnapshotRepository({ execute } as never);
+    await expect(repo.loadCurrent({ workspaceId: ids.workspace, featureRef: candidate.feature.featureRef })).rejects.toEqual(expect.objectContaining<Partial<DeterministicFeatureSnapshotRepositoryError>>({ code: "corrupt_store" }));
+  });
+
   it("rechecks tenant L1 source hashes and persists an immutable header plus exact sources", async () => {
     const execute = vi.fn(async (): Promise<any> => ({ rows: [] })); let n = 0;
     execute.mockImplementation(async () => ({ rows: [ [{ id: ids.workspace }], [{ id: ids.account }], [{ id: ids.insight, source_payload_hash: "source-hash-1" }], [{ id: ids.feature }], [] ][n++] ?? [] }));
