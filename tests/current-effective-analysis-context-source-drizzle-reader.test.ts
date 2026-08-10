@@ -54,9 +54,14 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
       effectiveAt: "2026-08-10T15:00:00.000Z", previousSelectionHash: "GENESIS", selectionHash: "c".repeat(64) } as GuidanceCampaignSelection));
     const resolveInTransaction = vi.fn(async () => ({ workspaceId: input.workspaceId,
       dimensions: [{ values: [{ key: "lead" }], frozenContext: { dimension: { key: "service" }, path: [{ id: input.entityRef }] } }] }));
+    const inspectInTransaction = vi.fn(async () => ({ registryHash: "a".repeat(64), current: [], history: [], diffs: [] }));
+    const loadInTransaction = vi.fn(async () => ({ catalog: { instructionPolicyRegistryHash: "a".repeat(64) }, authoritySnapshot: {
+      workspaceId: input.workspaceId, verifiedAt: "2026-08-10T14:00:00.000Z", expiresAt: "2026-08-10T16:00:00.000Z",
+    } }));
     const result = await new DrizzleCurrentEffectiveAnalysisContextSourceReader(database as never,
       { readCurrent }, { readCurrentInTransaction }, { readCurrentInTransaction: readCurrentGuidance },
-      { readCurrentInTransaction: readCurrentSelection }, { resolveInTransaction } as never).loadCurrent(input);
+      { readCurrentInTransaction: readCurrentSelection }, { resolveInTransaction } as never,
+      { inspectInTransaction } as never, { loadInTransaction } as never).loadCurrent(input);
     expect(database.transaction).toHaveBeenCalledTimes(1);
     expect(new PgDialect().sqlToQuery(execute.mock.calls[0]![0] as never).sql.toLowerCase()).toContain("repeatable read, read only");
     expect(result).toEqual({ status: "not_ready", capturedAt: "2026-08-10T15:00:00.000Z",
@@ -75,6 +80,46 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
     }, "2026-08-10T15:00:00.000Z");
     expect(resolveInTransaction).toHaveBeenCalledWith(expect.anything(), "workspace_primary", input.workspaceId,
       { level: "campaign", id: input.entityRef });
+    expect(inspectInTransaction).toHaveBeenCalledWith(expect.anything(), input.workspaceId, "2026-08-10T15:00:00.000Z");
+    expect(loadInTransaction).toHaveBeenCalledWith(expect.anything(), {
+      workspaceId: input.workspaceId, accountRef: input.accountRef, evaluatedAt: "2026-08-10T15:00:00.000Z",
+    });
+  });
+
+  it("rejects unbound or expired authority evidence before a source can advance", async () => {
+    const execute = vi.fn(async () => ({ rows: execute.mock.calls.length === 2
+      ? [{ captured_at: "2026-08-10T15:00:00.000Z" }]
+      : execute.mock.calls.length === 3 ? [{ workspace_ref: "workspace_primary" }] : [] }));
+    const database = { execute, transaction: async (work: (tx: { execute: typeof execute }) => Promise<unknown>) => work({ execute }) };
+    const hierarchy: CurrentMetaHierarchyConfig = { capturedAt: "2026-08-10T15:00:00.000Z", identity: {
+      connectionRef: "connection_primary", accountRef: input.accountRef, campaignRef: input.entityRef, hierarchyRefs: [input.entityRef] },
+      metaAnalysisConfigSnapshot: normalizeMetaAnalysisConfigSnapshotV2({ version: META_ANALYSIS_CONFIG_SNAPSHOT_VERSION,
+        workspaceId: input.workspaceId, externalAccountId: input.accountRef, capturedAt: "2026-08-10T15:00:00.000Z",
+        campaigns: [{ externalCampaignId: input.entityRef, objective: { state: "known", value: "OUTCOME_LEADS" } }], adSets: [] }), sourceSnapshotEvidence: {} as never };
+    const registry = createGuidanceRegistry({ workspaceId: input.workspaceId, sources: [{ id: "source_primary", workspaceId: input.workspaceId,
+      sourceType: "owner_statement", title: "Source", sourceRef: "source:primary", sourceUrl: null, content: "Reviewed source", author: null,
+      capturedAt: null, reviewedAt: null, reviewBy: null, status: "published", version: 1 }], cards: [{ id: "card_primary", workspaceId: input.workspaceId,
+      sourceType: "owner_statement", sourceIds: ["source_primary"], title: "Quality", body: "Protect quality", rationale: null, strength: "should",
+      topic: "quality", decisionKey: null, positionKey: null, authority: "guidance_only", status: "published", effectiveFrom: null,
+      effectiveTo: null, ownerRef: "owner_primary", version: 1 }], bindings: [{ id: "binding_primary", workspaceId: input.workspaceId,
+      cardId: "card_primary", facet: "global", value: null, entityType: null, mode: "default", priority: 1, version: 1 }], sets: [{ id: "set_primary",
+      workspaceId: input.workspaceId, name: "Primary", orderedCardIds: ["card_primary"], reviewStatus: "reviewed", version: 1 }] });
+    const setHash = digest(registry.sets[0]);
+    await expect(new DrizzleCurrentEffectiveAnalysisContextSourceReader(database as never,
+      { readCurrent: vi.fn(async () => hierarchy) }, { readCurrentInTransaction: vi.fn(async () => ({ decision: {
+        evaluatedAt: hierarchy.capturedAt, actionAuthority: "none" } })) } as never,
+      { readCurrentInTransaction: vi.fn(async () => ({ capturedAt: hierarchy.capturedAt, registryHash: registry.registryHash, registry,
+        reviewedSets: [{ setRef: "set_primary", setVersion: 1, setHash, cards: [] }] })) },
+      { readCurrentInTransaction: vi.fn(async () => ({ selectionRef: "guidance_selection_primary", revision: 1, selectedSetRef: "set_primary",
+        selectedSetVersion: 1, selectedSetHash: setHash, topics: ["quality"], requiredTopics: [], budget: { maxCards: 10, maxSources: 20,
+          maxCharacters: 1000 }, sourceSelectionHash: "b".repeat(64), effectiveAt: hierarchy.capturedAt, previousSelectionHash: "GENESIS",
+        selectionHash: "c".repeat(64) })) },
+      { resolveInTransaction: vi.fn(async () => ({ workspaceId: input.workspaceId, dimensions: [{ values: [{ key: "lead" }],
+        frozenContext: { dimension: { key: "service" }, path: [{ id: input.entityRef }] } }] })) } as never,
+      { inspectInTransaction: vi.fn(async () => ({ registryHash: "a".repeat(64), current: [], history: [], diffs: [] })) } as never,
+      { loadInTransaction: vi.fn(async () => ({ catalog: { instructionPolicyRegistryHash: "a".repeat(64) }, authoritySnapshot: {
+        workspaceId: input.workspaceId, verifiedAt: "2026-08-10T14:00:00.000Z", expiresAt: hierarchy.capturedAt } })) } as never).loadCurrent(input))
+      .rejects.toThrow("policy_authority_unavailable");
   });
 
   it("does not claim a source scope when the tenant/account read is missing or ambiguous", async () => {

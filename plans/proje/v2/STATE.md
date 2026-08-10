@@ -2161,3 +2161,19 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: `tests/current-reviewed-guidance-reader.test.ts`,
   `tests/current-guidance-campaign-selection-reader.test.ts`,
   `tests/current-effective-analysis-context-source-drizzle-reader.test.ts`, `npx tsc --noEmit`.
+
+## 2026-08-10 — A10.4c-10 transaction-local policy lifecycle and authority validation
+
+- `DrizzleInstructionPolicyLifecycleRepository.inspectInTransaction`, caller-owned snapshot içinde yalnız
+  `capturedAt` anında kayıtlı revisionları okur; mevcut public `inspect` davranışı değişmez ve nested
+  transaction açılmaz. `DrizzleTrustedPolicyAuthorityRepository.loadInTransaction` da aynı transaction
+  executor ile mevcut tenant snapshot, relational backing, scope ve all-false authority proof doğrulamasını
+  aynen uygular.
+- Current-source seam selected guidance pack'ten sonra bu iki kanıtı aynı snapshotta bağlar: authority
+  snapshot workspace/time sınırları ve catalog registry hash'i lifecycle registry hash'i ile exact eşleşmelidir.
+  Uyuşmaz/expired authority `policy_authority_unavailable` ile fail-closed olur. Data/history closure eksik
+  kaldığından sonuç hâlâ `not_ready`; authority compose, context save, HTTP/UI/Decision Room/action veya
+  schema/migration eklenmedi.
+- Kanıt: `tests/current-effective-analysis-context-source-drizzle-reader.test.ts`,
+  `tests/instruction-policy-lifecycle-repository.test.ts`,
+  `tests/trusted-policy-authority-repository.test.ts`, `npx tsc --noEmit`, `git diff --check`.

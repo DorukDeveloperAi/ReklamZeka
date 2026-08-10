@@ -80,14 +80,29 @@ export class DrizzleTrustedPolicyAuthorityRepository {
   async load(input: Readonly<{ workspaceId: string; accountRef: string; evaluatedAt: string;
     /** Historical replay must name both immutable snapshot ref and hash; current loads use protected heads. */
     snapshotRef?: string; snapshotHash?: string }>): Promise<LoadedTrustedPolicyAuthority> {
+    return this.loadFrom(this.database, input);
+  }
+
+  /**
+   * Uses the caller-owned transaction for source composition. The same strict
+   * tenant snapshot proof as `load` is retained; this method never begins a
+   * nested transaction or accepts caller-supplied authority capabilities.
+   */
+  async loadInTransaction(transaction: Database, input: Readonly<{ workspaceId: string; accountRef: string; evaluatedAt: string;
+    snapshotRef?: string; snapshotHash?: string }>): Promise<LoadedTrustedPolicyAuthority> {
+    return this.loadFrom(transaction, input);
+  }
+
+  private async loadFrom(database: Database, input: Readonly<{ workspaceId: string; accountRef: string; evaluatedAt: string;
+    snapshotRef?: string; snapshotHash?: string }>): Promise<LoadedTrustedPolicyAuthority> {
     if (!UUID.test(input.workspaceId) || !REF.test(input.accountRef)
       || !Number.isFinite(Date.parse(input.evaluatedAt)) || new Date(input.evaluatedAt).toISOString() !== input.evaluatedAt
       || ((input.snapshotRef === undefined) !== (input.snapshotHash === undefined))
       || (input.snapshotRef !== undefined && (!REF.test(input.snapshotRef) || !HASH.test(input.snapshotHash!)))) fail("invalid_input");
-    const active = rows(await this.database.execute(sql`select id from workspaces where id = ${input.workspaceId}::uuid
+    const active = rows(await database.execute(sql`select id from workspaces where id = ${input.workspaceId}::uuid
       and lifecycle_state = 'active' limit 2`));
     if (active.length !== 1) fail("workspace_scope_mismatch");
-    const result = rows<AuthorityRow>(await this.database.execute(sql`
+    const result = rows<AuthorityRow>(await database.execute(sql`
       with selected_snapshot as (
         select snapshot.* from tenant_authority_snapshot_heads head
           join tenant_authority_snapshots snapshot on snapshot.workspace_id = head.workspace_id

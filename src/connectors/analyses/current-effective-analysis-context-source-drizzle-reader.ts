@@ -13,6 +13,9 @@ import { CurrentReviewedGuidanceReader, type CurrentReviewedGuidanceManifest } f
 import { CurrentGuidanceCampaignSelectionReader } from "@/connectors/guidance/current-guidance-campaign-selection-reader";
 import type { GuidanceCampaignSelection } from "@/connectors/guidance/guidance-campaign-selection-drizzle-repository";
 import { CurrentMetaHierarchyConfigReader, type CurrentMetaHierarchyConfig } from "@/connectors/meta/current-meta-hierarchy-config-reader";
+import { DrizzleInstructionPolicyLifecycleRepository } from "@/connectors/policies/instruction-policy-lifecycle-drizzle-repository";
+import { DrizzleTrustedPolicyAuthorityRepository, type LoadedTrustedPolicyAuthority } from "@/connectors/policies/trusted-policy-authority-drizzle-repository";
+import type { InstructionPolicyLifecycleState } from "@/application/instruction-policy-lifecycle-service";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -41,6 +44,15 @@ const NO_SOURCE_CAPABILITIES = Object.freeze({
 export type CurrentCategoryCompositionSnapshotResolver = Readonly<{
   resolveInTransaction(transaction: Database, workspaceRef: string, workspaceId: string,
     target: CategoryHierarchyTarget): Promise<CurrentCategoryComposition>;
+}>;
+
+type CurrentInstructionPolicyLifecycleSnapshotReader = Readonly<{
+  inspectInTransaction(transaction: Database, workspaceId: string, capturedAt: string): Promise<InstructionPolicyLifecycleState>;
+}>;
+
+type CurrentTrustedPolicyAuthoritySnapshotReader = Readonly<{
+  loadInTransaction(transaction: Database, input: Readonly<{ workspaceId: string; accountRef: string;
+    evaluatedAt: string }>): Promise<LoadedTrustedPolicyAuthority>;
 }>;
 
 const currentCategoryCompositionSnapshotResolver: CurrentCategoryCompositionSnapshotResolver = Object.freeze({
@@ -133,7 +145,9 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
     private readonly cadenceReader: Pick<CurrentDecisionCadenceReader, "readCurrentInTransaction"> = new CurrentDecisionCadenceReader(database),
     private readonly guidanceReader: Pick<CurrentReviewedGuidanceReader, "readCurrentInTransaction"> = new CurrentReviewedGuidanceReader(),
     private readonly selectionReader: Pick<CurrentGuidanceCampaignSelectionReader, "readCurrentInTransaction"> = new CurrentGuidanceCampaignSelectionReader(),
-    private readonly categoryResolver: CurrentCategoryCompositionSnapshotResolver = currentCategoryCompositionSnapshotResolver) {}
+    private readonly categoryResolver: CurrentCategoryCompositionSnapshotResolver = currentCategoryCompositionSnapshotResolver,
+    private readonly lifecycleReader: CurrentInstructionPolicyLifecycleSnapshotReader = new DrizzleInstructionPolicyLifecycleRepository(database),
+    private readonly authorityReader: CurrentTrustedPolicyAuthoritySnapshotReader = new DrizzleTrustedPolicyAuthorityRepository(database)) {}
 
   async loadCurrent(input: EffectiveAnalysisContextRequest): Promise<EffectiveAnalysisContextSource> {
     if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).length !== 4
@@ -199,6 +213,19 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
       // closure is equally source-bound.
       const pack = buildSelectedEffectiveGuidancePackInSnapshot({ request: input, capturedAt, hierarchy, categories, guidance, selection });
       if (pack.evaluatedAt !== capturedAt) throw new Error("guidance_pack_unavailable");
+      // Both policy history and authority backing must be read from this very
+      // snapshot. The authority repository only yields a repository-verified
+      // proof; no capability or composition result is surfaced here.
+      const lifecycle = await this.lifecycleReader.inspectInTransaction(tx, input.workspaceId, capturedAt);
+      const authority = await this.authorityReader.loadInTransaction(tx, {
+        workspaceId: input.workspaceId, accountRef: input.accountRef, evaluatedAt: capturedAt,
+      });
+      if (!/^[a-f0-9]{64}$/.test(lifecycle.registryHash)
+        || authority.authoritySnapshot.workspaceId !== input.workspaceId
+        || authority.authoritySnapshot.verifiedAt > capturedAt || authority.authoritySnapshot.expiresAt <= capturedAt
+        || authority.catalog.instructionPolicyRegistryHash !== lifecycle.registryHash) {
+        throw new Error("policy_authority_unavailable");
+      }
       const unavailable: EffectiveAnalysisContextNotReadySource = Object.freeze({
         status: "not_ready", capturedAt, reason: "current_source_bundle_unavailable", capabilities: NO_SOURCE_CAPABILITIES,
       });

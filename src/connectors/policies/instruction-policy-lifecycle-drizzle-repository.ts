@@ -97,7 +97,7 @@ function project(row: Row): InternalRevision {
       capturedAt: instant(row.captured_at) }), recordedAt: instant(row.recorded_at) });
 }
 
-async function load(database: Executor, workspaceId: string): Promise<Readonly<{
+async function load(database: Executor, workspaceId: string, evaluatedAt?: string): Promise<Readonly<{
   state: InstructionPolicyLifecycleState; internal: readonly InternalRevision[] }>> {
   const internal = rows<Row>(await database.execute(sql`
     select revision.id::text, revision.raw_provenance_id::text, revision.workspace_ref,
@@ -109,6 +109,7 @@ async function load(database: Executor, workspaceId: string): Promise<Readonly<{
     join instruction_policy_raw_provenance provenance on provenance.workspace_id = revision.workspace_id
       and provenance.id = revision.raw_provenance_id
     where revision.workspace_id = ${workspaceId}::uuid
+      ${evaluatedAt === undefined ? sql`` : sql`and revision.recorded_at <= ${evaluatedAt}::timestamptz`}
     order by revision.policy_ref, revision.policy_version
   `)).map(project);
   if (internal.length > 20_000) throw new InstructionPolicyLifecycleError("conflict");
@@ -151,6 +152,19 @@ export class DrizzleInstructionPolicyLifecycleRepository implements InstructionP
   async inspect(workspaceId: string): Promise<InstructionPolicyLifecycleState> {
     if (!UUID.test(workspaceId)) throw new InstructionPolicyLifecycleError("invalid_input");
     return (await load(this.database, workspaceId)).state;
+  }
+
+  /**
+   * Reads the lifecycle as it existed at the caller-owned snapshot instant.
+   * It intentionally does not open a transaction, so broader source bundles
+   * cannot accidentally mix policy evidence from a nested snapshot.
+   */
+  async inspectInTransaction(transaction: Database, workspaceId: string, capturedAt: string): Promise<InstructionPolicyLifecycleState> {
+    if (!UUID.test(workspaceId) || !Number.isFinite(Date.parse(capturedAt))
+      || new Date(capturedAt).toISOString() !== capturedAt) {
+      throw new InstructionPolicyLifecycleError("invalid_input");
+    }
+    return (await load(transaction, workspaceId, capturedAt)).state;
   }
 
   async mutate(input: Parameters<InstructionPolicyLifecycleRepository["mutate"]>[0]) {
