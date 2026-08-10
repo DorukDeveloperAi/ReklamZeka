@@ -2013,6 +2013,20 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   `tests/category-profile-persistence.test.ts` ve `tests/category-registry.test.ts` ile 27 test;
   `npx tsc --noEmit` ve `git diff --check` geçti.
 
+### A10 current-source transaction-local category prerequisite
+
+- Category composition saf çözüm yolu `resolveCurrentCategoryCompositionInSnapshot` olarak dışa
+  açıldı; caller-owned snapshot üzerinde `withConsistentSnapshot` çağırmaz. Mevcut public resolver
+  aynı RR/RO davranışını korur.
+- Category profile repository'ye nested transaction açmayan current-artifact read eklendi. Current
+  source adapter hierarchy doğrulamasından sonra workspace ref'i yalnız latest persisted active
+  category profile facts'ten tekil olarak türetir; caller/route alanı kabul etmez ve aynı snapshotta
+  composition'ı yalnız validation amacıyla doğrular. Eksik/ambiguous/stale category evidence source'u
+  fail-closed reddeder; bundle hâlâ `not_ready` olduğundan ready context veya authority üretilmez.
+- Kanıt: `tests/current-category-composition-resolver.test.ts` ve
+  `tests/current-effective-analysis-context-source-drizzle-reader.test.ts` (10 test),
+  `npm run typecheck`, `git diff --check`.
+
 ## 2026-08-10 — A10.4c-1 frozen config/cadence context evidence
 
 - `EffectiveCampaignContext`, eklenmiş v2 Meta config kanıtında immutable snapshot'ı yeniden

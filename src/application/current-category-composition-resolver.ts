@@ -49,14 +49,23 @@ export class CurrentCategoryCompositionResolver {
   constructor(private readonly reader: CurrentCategoryCompositionReader) {}
 
   async resolve(workspaceId: string, target: CategoryHierarchyTarget): Promise<CurrentCategoryComposition> {
-    return this.reader.withConsistentSnapshot((reader) => new CurrentCategoryCompositionResolver(reader)
-      .resolveWithoutSnapshot(workspaceId, target));
+    return this.reader.withConsistentSnapshot((reader) => resolveCurrentCategoryCompositionInSnapshot(reader, workspaceId, target));
   }
+}
 
-  private async resolveWithoutSnapshot(workspaceId: string, target: CategoryHierarchyTarget): Promise<CurrentCategoryComposition> {
+/**
+ * Resolves inside a snapshot owned by the caller. This deliberately never
+ * invokes `withConsistentSnapshot`, so a broader source bundle can preserve
+ * one RR/RO view without opening a nested transaction.
+ */
+export async function resolveCurrentCategoryCompositionInSnapshot(
+  reader: Pick<CurrentCategoryCompositionReader, "resolveAllCurrent" | "currentActiveArtifacts">,
+  workspaceId: string,
+  target: CategoryHierarchyTarget,
+): Promise<CurrentCategoryComposition> {
     if (!workspaceId.trim()) throw new CurrentCategoryCompositionError("invalid_input");
     let resolved: readonly EffectiveCategoryResolution[];
-    try { resolved = await this.reader.resolveAllCurrent(workspaceId, target); }
+    try { resolved = await reader.resolveAllCurrent(workspaceId, target); }
     catch (error) {
       const code = error && typeof error === "object" && "code" in error ? (error as { code?: unknown }).code : null;
       if (code === "manual_lock" || code === "parked_conflict") throw new CurrentCategoryCompositionError("parked_conflict");
@@ -84,7 +93,7 @@ export class CurrentCategoryCompositionResolver {
       throw new CurrentCategoryCompositionError("capacity_exceeded");
     }
     let bindings: readonly CurrentCategoryProfileBinding[];
-    try { bindings = await this.reader.currentActiveArtifacts(workspaceId, definitions.map((definition) => definition.id)); }
+    try { bindings = await reader.currentActiveArtifacts(workspaceId, definitions.map((definition) => definition.id)); }
     catch { throw new CurrentCategoryCompositionError("stale_profile"); }
     const expected = new Map(definitions.map((definition) => [definition.id, definition.categoryRef]));
     const byDefinition = new Map<string, CategoryProfileRevision>();
@@ -107,7 +116,6 @@ export class CurrentCategoryCompositionResolver {
       }));
       return Object.freeze({ workspaceId, dimensions: Object.freeze(dimensions) });
     } catch { throw new CurrentCategoryCompositionError("stale_profile"); }
-  }
 }
 
 /** Concrete server-private adapter; it exposes no mutation or action method. */
@@ -123,17 +131,27 @@ export class DrizzleCurrentCategoryCompositionReader implements CurrentCategoryC
       .currentActiveArtifacts(categoryDefinitionIds);
   }
 
+  /**
+   * Creates a reader bound to a caller-owned RR/RO transaction. The
+   * workspace ref is already repository-verified; this constructor performs
+   * no transaction control and exposes only reads.
+   */
+  static inTransaction(database: NodePgDatabase<typeof schema>, workspaceRef: string): CurrentCategoryCompositionReader {
+    let reader: CurrentCategoryCompositionReader;
+    reader = Object.freeze({
+      resolveAllCurrent: (workspaceId, target) => new DrizzleCategoryRegistryRepository(database)
+        .resolveAllCurrent(workspaceId, target),
+      currentActiveArtifacts: (workspaceId, definitionIds) => new DrizzleCategoryProfileRepository(
+        database, workspaceId, workspaceRef).currentActiveArtifactsInTransaction(database, definitionIds),
+      withConsistentSnapshot: (work) => work(reader),
+    });
+    return reader;
+  }
+
   async withConsistentSnapshot<T>(work: (reader: CurrentCategoryCompositionReader) => Promise<T>): Promise<T> {
     return this.database.transaction(async (transaction) => {
       await transaction.execute(sql`set transaction isolation level repeatable read, read only`);
-      let reader: CurrentCategoryCompositionReader;
-      reader = Object.freeze({
-        resolveAllCurrent: (workspaceId, target) => new DrizzleCategoryRegistryRepository(transaction as never)
-          .resolveAllCurrent(workspaceId, target),
-        currentActiveArtifacts: (workspaceId, definitionIds) => new DrizzleCategoryProfileRepository(
-          transaction as never, workspaceId, this.workspaceRef).currentActiveArtifacts(definitionIds),
-        withConsistentSnapshot: (nestedWork) => nestedWork(reader),
-      });
+      const reader = DrizzleCurrentCategoryCompositionReader.inTransaction(transaction as never, this.workspaceRef);
       return work(reader);
     });
   }

@@ -11,7 +11,10 @@ const input = Object.freeze({ workspaceId: "61b10d7d-132c-4c6d-b49f-cddc9b10d025
 
 describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
   it("uses one repeatable read-only scope snapshot and explicitly remains not ready", async () => {
-    const execute = vi.fn(async (_query: unknown) => ({ rows: [{ captured_at: "2026-08-10T15:00:00.000Z" }] }));
+    const execute = vi.fn(async (_query: unknown) => ({ rows: execute.mock.calls.length === 2
+      ? [{ captured_at: "2026-08-10T15:00:00.000Z" }]
+      : execute.mock.calls.length === 3 ? [{ workspace_ref: "workspace_primary" }]
+        : [] }));
     const database = { execute, transaction: vi.fn(async (work: (tx: { execute: typeof execute }) => Promise<unknown>) => work({ execute })) };
     const hierarchy: CurrentMetaHierarchyConfig = { capturedAt: "2026-08-10T15:00:00.000Z", identity: {
       connectionRef: "connection_primary", accountRef: input.accountRef, campaignRef: input.entityRef, hierarchyRefs: [input.entityRef] },
@@ -26,9 +29,11 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
       selectedSetRef: "set_primary", selectedSetVersion: 1, selectedSetHash: "a".repeat(64), topics: ["quality"],
       requiredTopics: [], budget: { maxCards: 10, maxSources: 20, maxCharacters: 1000 }, sourceSelectionHash: "b".repeat(64),
       effectiveAt: "2026-08-10T15:00:00.000Z", previousSelectionHash: "GENESIS", selectionHash: "c".repeat(64) } as GuidanceCampaignSelection));
+    const resolveInTransaction = vi.fn(async () => ({ workspaceId: input.workspaceId,
+      dimensions: [{ frozenContext: { path: [{ id: input.entityRef }] } }] }));
     const result = await new DrizzleCurrentEffectiveAnalysisContextSourceReader(database as never,
       { readCurrent }, { readCurrentInTransaction }, { readCurrentInTransaction: readCurrentGuidance },
-      { readCurrentInTransaction: readCurrentSelection }).loadCurrent(input);
+      { readCurrentInTransaction: readCurrentSelection }, { resolveInTransaction } as never).loadCurrent(input);
     expect(database.transaction).toHaveBeenCalledTimes(1);
     expect(new PgDialect().sqlToQuery(execute.mock.calls[0]![0] as never).sql.toLowerCase()).toContain("repeatable read, read only");
     expect(result).toEqual({ status: "not_ready", capturedAt: "2026-08-10T15:00:00.000Z",
@@ -36,7 +41,7 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
         canCompose: false, canAuthorizeAction: false, canExecute: false, canExecuteWrite: false, canWriteMeta: false, canApprove: false,
         canSchedule: false, canCallTool: false, canAccessNetwork: false, canQuerySql: false,
       } });
-    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute).toHaveBeenCalledTimes(3);
     expect(readCurrent).toHaveBeenCalledWith(expect.anything(), input);
     expect(readCurrentInTransaction).toHaveBeenCalledWith(expect.anything(), {
       workspaceId: input.workspaceId, accountRef: input.accountRef, campaignRef: input.entityRef,
@@ -45,6 +50,8 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
     expect(readCurrentSelection).toHaveBeenCalledWith(expect.anything(), {
       workspaceId: input.workspaceId, accountRef: input.accountRef, campaignRef: input.entityRef,
     }, "2026-08-10T15:00:00.000Z");
+    expect(resolveInTransaction).toHaveBeenCalledWith(expect.anything(), "workspace_primary", input.workspaceId,
+      { level: "campaign", id: input.entityRef });
   });
 
   it("does not claim a source scope when the tenant/account read is missing or ambiguous", async () => {

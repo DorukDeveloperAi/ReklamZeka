@@ -135,7 +135,7 @@ describe("Drizzle CategoryProfile repository", () => {
       .latestArtifact(artifact.profileRef)).resolves.toEqual(artifact);
     expect(new PgDialect().sqlToQuery(db.execute.mock.calls[1]![0]).sql).toMatch(/order by version desc limit 1/i);
     expect(Object.getOwnPropertyNames(DrizzleCategoryProfileRepository.prototype).sort())
-      .toEqual(["append", "constructor", "currentActiveArtifacts", "latestArtifact"]);
+      .toEqual(["append", "constructor", "currentActiveArtifacts", "currentActiveArtifactsInTransaction", "latestArtifact"]);
     expect(() => new DrizzleCategoryProfileRepository({} as never, "raw", artifact.workspaceRef))
       .toThrow(CategoryProfileRepositoryError);
   });

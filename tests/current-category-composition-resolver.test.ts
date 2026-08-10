@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { CurrentCategoryCompositionError, CurrentCategoryCompositionResolver,
-  DrizzleCurrentCategoryCompositionReader, type CurrentCategoryCompositionReader } from "@/application/current-category-composition-resolver";
+  DrizzleCurrentCategoryCompositionReader, resolveCurrentCategoryCompositionInSnapshot,
+  type CurrentCategoryCompositionReader } from "@/application/current-category-composition-resolver";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { createCategoryProfile } from "@/domain/categories/category-profile";
 import { resolveEffectiveCategory, type CategoryDefinition, type CategoryDimension,
@@ -56,6 +57,16 @@ describe("CurrentCategoryCompositionResolver", () => {
     expect(database.transaction).toHaveBeenCalledTimes(1);
     expect(new PgDialect().sqlToQuery(execute.mock.calls[0]![0] as never).sql)
       .toMatch(/set transaction isolation level repeatable read, read only/i);
+  });
+
+  it("resolves from a caller-owned reader without starting a nested snapshot", async () => {
+    const result = resolution("snapshot", "service");
+    const port = reader([result]);
+    const withConsistentSnapshot = vi.fn(port.withConsistentSnapshot);
+    const callerOwned = { ...port, withConsistentSnapshot };
+    const composed = await resolveCurrentCategoryCompositionInSnapshot(callerOwned, workspaceId, target);
+    expect(composed.workspaceId).toBe(workspaceId);
+    expect(withConsistentSnapshot).not.toHaveBeenCalled();
   });
 
   it("makes the all-dimension Drizzle read reuse exactly one canonical path", async () => {

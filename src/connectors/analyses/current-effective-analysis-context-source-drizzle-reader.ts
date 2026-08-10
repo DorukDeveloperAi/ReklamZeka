@@ -2,6 +2,9 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { EffectiveAnalysisContextNotReadySource, EffectiveAnalysisContextRequest,
   EffectiveAnalysisContextSource } from "@/application/effective-analysis-context-composer";
+import { DrizzleCurrentCategoryCompositionReader, resolveCurrentCategoryCompositionInSnapshot,
+  type CurrentCategoryComposition } from "@/application/current-category-composition-resolver";
+import type { CategoryHierarchyTarget } from "@/domain/categories/service";
 import { CurrentDecisionCadenceReader, type CurrentDecisionCadence } from "@/connectors/decisions/current-decision-cadence-reader";
 import { CurrentReviewedGuidanceReader, type CurrentReviewedGuidanceManifest } from "@/connectors/guidance/current-reviewed-guidance-reader";
 import { CurrentGuidanceCampaignSelectionReader } from "@/connectors/guidance/current-guidance-campaign-selection-reader";
@@ -11,6 +14,7 @@ import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const WORKSPACE_REF = /^workspace_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 
 function rows(value: unknown): readonly Readonly<Record<string, unknown>>[] {
   if (!value || typeof value !== "object" || !("rows" in value) || !Array.isArray(value.rows)) {
@@ -31,6 +35,31 @@ const NO_SOURCE_CAPABILITIES = Object.freeze({
   canAccessNetwork: false as const, canQuerySql: false as const,
 });
 
+export type CurrentCategoryCompositionSnapshotResolver = Readonly<{
+  resolveInTransaction(transaction: Database, workspaceRef: string, workspaceId: string,
+    target: CategoryHierarchyTarget): Promise<CurrentCategoryComposition>;
+}>;
+
+const currentCategoryCompositionSnapshotResolver: CurrentCategoryCompositionSnapshotResolver = Object.freeze({
+  resolveInTransaction: (transaction, workspaceRef, workspaceId, target) =>
+    resolveCurrentCategoryCompositionInSnapshot(
+      DrizzleCurrentCategoryCompositionReader.inTransaction(transaction, workspaceRef), workspaceId, target),
+});
+
+function categoryTarget(input: EffectiveAnalysisContextRequest, hierarchy: CurrentMetaHierarchyConfig): CategoryHierarchyTarget {
+  const path = hierarchy.identity.hierarchyRefs;
+  const expectedDepth = { campaign: 1, ad_set: 2, ad: 3, creative: 4 }[input.entityType];
+  if (path.length !== expectedDepth || path[0] !== hierarchy.identity.campaignRef || path.at(-1) !== input.entityRef) {
+    throw new Error("corrupt_store");
+  }
+  if (input.entityType === "creative") {
+    const viaAdId = path[2];
+    if (!viaAdId) throw new Error("corrupt_store");
+    return Object.freeze({ level: "creative", id: input.entityRef, viaAdId });
+  }
+  return Object.freeze({ level: input.entityType, id: input.entityRef });
+}
+
 /**
  * Server-private current-source checkpoint. It proves the active tenant and
  * account scope in one short repeatable/read-only transaction, then deliberately
@@ -43,7 +72,8 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
     private readonly hierarchyReader: Pick<CurrentMetaHierarchyConfigReader, "readCurrent"> = new CurrentMetaHierarchyConfigReader(),
     private readonly cadenceReader: Pick<CurrentDecisionCadenceReader, "readCurrentInTransaction"> = new CurrentDecisionCadenceReader(database),
     private readonly guidanceReader: Pick<CurrentReviewedGuidanceReader, "readCurrentInTransaction"> = new CurrentReviewedGuidanceReader(),
-    private readonly selectionReader: Pick<CurrentGuidanceCampaignSelectionReader, "readCurrentInTransaction"> = new CurrentGuidanceCampaignSelectionReader()) {}
+    private readonly selectionReader: Pick<CurrentGuidanceCampaignSelectionReader, "readCurrentInTransaction"> = new CurrentGuidanceCampaignSelectionReader(),
+    private readonly categoryResolver: CurrentCategoryCompositionSnapshotResolver = currentCategoryCompositionSnapshotResolver) {}
 
   async loadCurrent(input: EffectiveAnalysisContextRequest): Promise<EffectiveAnalysisContextSource> {
     if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).length !== 4
@@ -66,6 +96,30 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
       const hierarchy: CurrentMetaHierarchyConfig = await this.hierarchyReader.readCurrent(tx, input);
       if (hierarchy.capturedAt !== capturedAt || hierarchy.identity.accountRef !== input.accountRef
         || hierarchy.identity.hierarchyRefs.at(-1) !== input.entityRef) throw new Error("corrupt_store");
+      // This is persisted, validated category profile evidence—not an input
+      // from a route or the caller. A non-unique current ref is not trusted.
+      const workspaceRefs = rows(await tx.execute(sql`
+        select distinct current_profile.workspace_ref
+        from (
+          select distinct on (profile.category_definition_id)
+            profile.category_definition_id, profile.workspace_ref, profile.status
+          from category_profile_revisions profile
+          where profile.workspace_id = ${input.workspaceId}::uuid
+          order by profile.category_definition_id, profile.version desc
+        ) current_profile
+        join category_definitions definition on definition.workspace_id = ${input.workspaceId}::uuid
+          and definition.id = current_profile.category_definition_id and definition.archived_at is null
+        where current_profile.status = 'active'
+        limit 2
+      `));
+      if (workspaceRefs.length !== 1 || typeof workspaceRefs[0]!.workspace_ref !== "string"
+        || !WORKSPACE_REF.test(workspaceRefs[0]!.workspace_ref)) throw new Error("category_scope_unavailable");
+      const categories = await this.categoryResolver.resolveInTransaction(tx, workspaceRefs[0]!.workspace_ref,
+        input.workspaceId, categoryTarget(input, hierarchy));
+      if (categories.workspaceId !== input.workspaceId || categories.dimensions.length === 0
+        || categories.dimensions.some((dimension) => dimension.frozenContext.path.at(-1)?.id !== input.entityRef)) {
+        throw new Error("corrupt_store");
+      }
       const cadence: CurrentDecisionCadence = await this.cadenceReader.readCurrentInTransaction(tx, {
         workspaceId: input.workspaceId, accountRef: input.accountRef, campaignRef: hierarchy.identity.campaignRef,
       }, capturedAt);

@@ -267,7 +267,9 @@
   - [x] A10.4c-4 current-source snapshot checkpoint: composer artık caller clock veya ayrı
     `Promise.all` reader'ları değil tek repository-owned source bundle kabul eder. Private Drizzle
     checkpoint aktif workspace/account scope'u bir kısa `REPEATABLE READ, READ ONLY` snapshot'ta
-    doğrular, DB clock üretir ve config/guidance/data/history/category/lifecycle/authority setinin
+    doğrular, DB clock üretir; hierarchy sonrasında persisted current category profile facts'ten
+    tekil workspace ref türetip aynı caller-owned snapshotta all-dimension category composition'ı
+    validation-only okur. Config/guidance/data/history/lifecycle/authority setinin
     tamamı aynı transaction-local adapterda doğrulanmadığı için dürüstçe `not_ready` + tüm false
     capability sonucu döner; partial context veya authority üretmez. Ready bundle adapteri sonraki
     dilimde bu checkpoint'i genişletecektir.

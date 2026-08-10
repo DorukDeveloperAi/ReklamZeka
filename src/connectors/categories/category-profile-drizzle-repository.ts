@@ -252,27 +252,43 @@ export class DrizzleCategoryProfileRepository {
       || new Set(categoryDefinitionIds).size !== categoryDefinitionIds.length
       || categoryDefinitionIds.some((id) => !UUID.test(id))) fail("invalid_input");
     return this.database.transaction(async (transaction) => {
-      const workspace = rows<{ id: string; lifecycle_state: string }>(await transaction.execute(sql`
-        select id, lifecycle_state from workspaces where id = ${this.workspaceId}::uuid limit 1 for share
-      `));
-      if (workspace.length !== 1) fail("workspace_scope_mismatch");
-      if (workspace[0]!.lifecycle_state !== "active") fail("inactive_workspace");
-      const found = rows<StoredRow>(await transaction.execute(sql`
-        select distinct on (category_definition_id)
-          category_definition_id::text, workspace_ref, profile_ref, category_ref, version,
-          previous_profile_hash, status, profile_hash, profile_payload
-        from category_profile_revisions
-        where workspace_id = ${this.workspaceId}::uuid
-          and category_definition_id = any(${categoryDefinitionIds}::uuid[])
-        order by category_definition_id, version desc
-      `));
-      if (found.length !== categoryDefinitionIds.length
-        || new Set(found.map((row) => row.category_definition_id)).size !== found.length
-        || found.some((row) => !categoryDefinitionIds.includes(row.category_definition_id)
-          || row.status !== "active")) fail("revision_conflict");
-      return Object.freeze(found.map((row) => Object.freeze({
-        categoryDefinitionId: row.category_definition_id, profile: restore(row),
-      })).sort((left, right) => left.categoryDefinitionId.localeCompare(right.categoryDefinitionId)));
+      return this.currentActiveArtifactsInTransaction(transaction as Database, categoryDefinitionIds);
     });
+  }
+
+  /**
+   * Snapshot-owned current profile read. It does not begin a transaction;
+   * callers that compose several sources must supply their existing RR/RO
+   * transaction to avoid a drifting nested snapshot.
+   */
+  async currentActiveArtifactsInTransaction(transaction: Pick<Database, "execute">,
+    categoryDefinitionIds: readonly string[]): Promise<readonly Readonly<{
+      categoryDefinitionId: string;
+      profile: CategoryProfileRevision;
+    }>[]> {
+    if (categoryDefinitionIds.length === 0 || categoryDefinitionIds.length > 1_000
+      || new Set(categoryDefinitionIds).size !== categoryDefinitionIds.length
+      || categoryDefinitionIds.some((id) => !UUID.test(id))) fail("invalid_input");
+    const workspace = rows<{ id: string; lifecycle_state: string }>(await transaction.execute(sql`
+      select id, lifecycle_state from workspaces where id = ${this.workspaceId}::uuid limit 1
+    `));
+    if (workspace.length !== 1) fail("workspace_scope_mismatch");
+    if (workspace[0]!.lifecycle_state !== "active") fail("inactive_workspace");
+    const found = rows<StoredRow>(await transaction.execute(sql`
+      select distinct on (category_definition_id)
+        category_definition_id::text, workspace_ref, profile_ref, category_ref, version,
+        previous_profile_hash, status, profile_hash, profile_payload
+      from category_profile_revisions
+      where workspace_id = ${this.workspaceId}::uuid
+        and category_definition_id = any(${categoryDefinitionIds}::uuid[])
+      order by category_definition_id, version desc
+    `));
+    if (found.length !== categoryDefinitionIds.length
+      || new Set(found.map((row) => row.category_definition_id)).size !== found.length
+      || found.some((row) => !categoryDefinitionIds.includes(row.category_definition_id)
+        || row.status !== "active" || row.workspace_ref !== this.workspaceRef)) fail("revision_conflict");
+    return Object.freeze(found.map((row) => Object.freeze({
+      categoryDefinitionId: row.category_definition_id, profile: restore(row),
+    })).sort((left, right) => left.categoryDefinitionId.localeCompare(right.categoryDefinitionId)));
   }
 }
