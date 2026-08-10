@@ -8,6 +8,6 @@
 
 ### c2612865 — (başlıksız)
 
-- durum: CANLI · son aktivite: 2026-08-08T07:05:29.782Z · açık todo: 0/0
+- durum: ÖLÜ → yeniden başlatılabilir · son aktivite: 2026-08-08T07:05:29.782Z · açık todo: 0/0
 - brif: `plans/oturumlar/kasa/c2612865.md`
 - başlat: `aide open c2612865-6ca9-4722-a6a2-ded60b6f85aa --cwd /Users/ybg/dev/ReklamZeka`
