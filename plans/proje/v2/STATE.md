@@ -3,6 +3,17 @@
 > Kümülatif ilerleme defteri. v1'in ayrıntılı tur geçmişi
 > [v1 STATE](../v1/STATE.md)'te değişmeden korunur.
 
+## 2026-08-10 — Local MCP/session canlı kabulü
+
+- Yerel geliştirme sunucusu ve yönetilen `.env.local` session yapılandırmasıyla `npm run verify:mcp-live`
+  gerçek HTTP/STDIO zincirinde geçti: register, dashboard discovery, handoff consume, replay reddi ve boş
+  MCP stderr doğrulandı. Bu doğrulama yalnız local coordination/read yüzeyini kullanır; Meta network/write,
+  policy publish ve action execution sıfırdır.
+- `.codex/config.toml` güvenli varsayılanları korunur: `required = false` ve
+  `default_tools_approval_mode = "prompt"`. Bu checkpoint bunları değiştirmez.
+- Gerçek tarayıcı oturumu/responsive kabulü bu agent oturumunda callable browser-control surface olmadığı
+  için henüz çalıştırılmadı; açık kabul noktası olarak kalır.
+
 ## 2026-08-10 — Dinamik kampanya brief şablonları
 
 - `interactive-campaign-template/1.0.0`, operasyonel sınıflandırmayı pazar → dil → hizmet →
