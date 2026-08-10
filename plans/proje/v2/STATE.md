@@ -1912,3 +1912,18 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   `metaProxyEligible:false` ile publish/approval/execute/Meta-write capability üretmez.
 - Bounded read/query endpoint'i ve EffectiveCampaignContext/L4–L5 frozen binding'i hâlâ açık; persistence
   bu aşamada analysis context'ine zımni olarak enjekte edilmez.
+
+## 2026-08-10 — A10 BusinessOutcome bounded read
+
+- Aynı `/api/business-outcomes` yüzeyinin `GET` kolu yalnız cookie-only same-origin
+  `business-outcome-read` intent'i ve ayrı `business_outcome:read` scope'u altında çalışır. Her rolün
+  kendi aktif workspace membership'i server-side yeniden çözülür; body, bearer, forwarded veya tenant
+  header kabul edilmez.
+- Read model tenant ve opsiyonel entity filtresiyle `(occurred_at, signal_ref)` keyset cursor kullanır.
+  Projection yalnız normalized signal/source-ref/observed-at alanlarını taşır; raw source, content hash,
+  actor/role, audit-chain ve action/approval/execute/Meta-write authority dışarı verilmez. Cursor yalnız
+  sıralama anahtarlarını kodlar.
+- Bu increment outcome satırlarını EffectiveCampaignContext'e veya L4–L5 materialization'a bağlamaz;
+  provenance/timeframe/invalidation sözleşmesiyle yapılacak bu sonraki iş fail-closed açık kalır. Yerel
+  PostgreSQL/session ortamı bulunmadığından gerçek route/RLS acceptance blocker'ı
+  `postgres_connection_not_configured` olarak sürer.

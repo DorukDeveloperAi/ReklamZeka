@@ -81,4 +81,28 @@ export class DrizzleBusinessOutcomeSignalRepository {
         canApprove: false as const, canExecute: false as const, canWriteMeta: false as const }) });
     });
   }
+
+  async listPublic(input: Readonly<{ workspaceId: string; entityRef: string | null; before: Readonly<{ occurredAt: string; signalRef: string }> | null; limit: number }>) {
+    if (!UUID.test(input.workspaceId) || !Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 100
+      || input.entityRef !== null && !/^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/.test(input.entityRef)
+      || input.before !== null && (!instant(input.before.occurredAt) || !/^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/.test(input.before.signalRef))) fail("invalid_input");
+    const before = input.before ? instant(input.before.occurredAt) : null;
+    const rowsFound = rows<{ batch_id: unknown; signal_ref: unknown; entity_ref: unknown; occurred_at: Date | string; outcome_kind: unknown; quantity: unknown;
+      value_minor: number | null; currency: unknown; meta_entity_ref: unknown; mapping_status: unknown; source_kind: unknown; source_ref: unknown; observed_at: Date | string }>(await this.database.execute(sql`
+      select signal.batch_id, signal.signal_ref, signal.entity_ref, signal.occurred_at, signal.outcome_kind, signal.quantity,
+        signal.value_minor, signal.currency, signal.meta_entity_ref, signal.mapping_status, batch.source_kind, batch.source_ref, batch.observed_at
+      from business_outcome_signals signal join business_outcome_batches batch
+        on batch.workspace_id = signal.workspace_id and batch.batch_id = signal.batch_id
+      where signal.workspace_id = ${input.workspaceId}::uuid
+        and (${input.entityRef}::text is null or signal.entity_ref = ${input.entityRef})
+        and (${before}::timestamptz is null or (signal.occurred_at, signal.signal_ref) < (${before}::timestamptz, ${input.before?.signalRef ?? null}::text))
+      order by signal.occurred_at desc, signal.signal_ref desc limit ${input.limit}
+    `));
+    return rowsFound.map((row) => Object.freeze({ batchId: String(row.batch_id), signalRef: String(row.signal_ref), entityRef: String(row.entity_ref),
+      occurredAt: row.occurred_at instanceof Date ? row.occurred_at.toISOString() : instant(row.occurred_at), outcome: String(row.outcome_kind),
+      quantity: Number(row.quantity), valueMinor: row.value_minor === null ? null : Number(row.value_minor), currency: row.currency === null ? null : String(row.currency),
+      metaEntityRef: row.meta_entity_ref === null ? null : String(row.meta_entity_ref), mappingStatus: String(row.mapping_status), source: Object.freeze({
+        kind: String(row.source_kind), sourceRef: String(row.source_ref), observedAt: row.observed_at instanceof Date ? row.observed_at.toISOString() : instant(row.observed_at) }),
+    }));
+  }
 }

@@ -27,7 +27,8 @@ export type WorkspaceAction =
   | "policy_bundle:publish"
   | "decision_cadence:publish"
   | "experiment_record:mutate"
-  | "business_outcome:record";
+  | "business_outcome:record"
+  | "business_outcome:read";
 
 export type Actor = Readonly<{ userId: string }>;
 export type WorkspaceMembership = Readonly<{
@@ -43,7 +44,7 @@ const ROLE_ACTIONS: Readonly<Record<WorkspaceRole, ReadonlySet<WorkspaceAction>>
     "budget:draft", "promotion:draft", "category_registry:read", "category_registry:publish",
     "instruction_policy:read", "instruction_policy:draft", "instruction_policy:publish", "autonomy_rules:read", "autonomy_rules:draft",
     "guidance:read", "guidance:draft", "guidance:publish", "practice_lab:read", "practice_lab:draft", "practice_lab:standardize",
-    "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish", "decision_cadence:publish", "experiment_record:mutate", "business_outcome:record",
+    "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish", "decision_cadence:publish", "experiment_record:mutate", "business_outcome:record", "business_outcome:read",
   ]),
   admin: new Set([
     "member:manage", "connection:manage", "data:read", "sync:run",
@@ -51,10 +52,10 @@ const ROLE_ACTIONS: Readonly<Record<WorkspaceRole, ReadonlySet<WorkspaceAction>>
     "budget:draft", "promotion:draft", "category_registry:read", "category_registry:publish",
     "instruction_policy:read", "instruction_policy:draft", "instruction_policy:publish", "autonomy_rules:read", "autonomy_rules:draft",
     "guidance:read", "guidance:draft", "guidance:publish", "practice_lab:read", "practice_lab:draft", "practice_lab:standardize",
-    "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish", "decision_cadence:publish", "experiment_record:mutate", "business_outcome:record",
+    "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish", "decision_cadence:publish", "experiment_record:mutate", "business_outcome:record", "business_outcome:read",
   ]),
-  analyst: new Set(["data:read", "sync:run", "insight:feedback", "report:share", "budget:draft", "promotion:draft", "category_registry:read", "instruction_policy:read", "instruction_policy:draft", "autonomy_rules:read", "autonomy_rules:draft", "guidance:read", "guidance:draft", "practice_lab:read", "practice_lab:draft", "policy_bundle:read", "policy_bundle:draft", "experiment_record:mutate", "business_outcome:record"]),
-  viewer: new Set(["data:read", "category_registry:read", "instruction_policy:read", "autonomy_rules:read", "guidance:read", "practice_lab:read", "policy_bundle:read"]),
+  analyst: new Set(["data:read", "sync:run", "insight:feedback", "report:share", "budget:draft", "promotion:draft", "category_registry:read", "instruction_policy:read", "instruction_policy:draft", "autonomy_rules:read", "autonomy_rules:draft", "guidance:read", "guidance:draft", "practice_lab:read", "practice_lab:draft", "policy_bundle:read", "policy_bundle:draft", "experiment_record:mutate", "business_outcome:record", "business_outcome:read"]),
+  viewer: new Set(["data:read", "category_registry:read", "instruction_policy:read", "autonomy_rules:read", "guidance:read", "practice_lab:read", "policy_bundle:read", "business_outcome:read"]),
 };
 
 export class AuthorizationError extends Error {

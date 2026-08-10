@@ -323,7 +323,10 @@
     purge sözleşmesi; query path entity/outcome/time indexleriyle bounded kalır.
   - [x] Cookie-bound manual/CSV canonical authoring endpoint'i: batch identity, actor/role/clock sunucuda
     çözülür; raw source/tenant/action injection reddedilir ve action/Meta authority false kalır.
-  - [ ] Bounded read yüzeyi ve frozen context/L4–L5 binding'i.
+  - [x] Cookie-bound bounded read yüzeyi: ayrı `business_outcome:read` scope/intent'i, tenant+entity
+    keyset cursor'ı ve yalnız normalized public projection; raw source/content hash/actor/audit verisi ile
+    action/Meta-write authority dönmez.
+  - [ ] Frozen context/L4–L5 binding'i.
 
 ## A11 — Bütçe planlama
 

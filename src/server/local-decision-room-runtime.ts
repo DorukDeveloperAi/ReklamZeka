@@ -412,6 +412,24 @@ export async function resolveTrustedLocalBusinessOutcomePrincipal(input: Readonl
   return bindPrincipal(input.database, input.config);
 }
 
+/** Cookie-only bounded business-evidence read; its scope is separate from evidence intake. */
+export async function resolveTrustedLocalBusinessOutcomeReadPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null
+    || input.request.headers.get("x-reklamzeka-intent") !== "business-outcome-read") {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: "business_outcome:read", expected: input.config });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "read", "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
 /** Cookie-only, separately scoped Autonomy Studio binding. */
 export async function resolveTrustedLocalAutonomyRulePrincipal(input: Readonly<{
   request: Request;

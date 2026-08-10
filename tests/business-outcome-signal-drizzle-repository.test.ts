@@ -51,4 +51,12 @@ describe("DrizzleBusinessOutcomeSignalRepository", () => {
     const rendered = (harness.execute.mock.calls as unknown[][]).map(([query]) => new PgDialect().sqlToQuery(query as never).sql).join("\n");
     expect(rendered).not.toContain("insert into business_outcome_batches");
   });
+
+  it("reads normalized public rows with tenant and keyset bounds, excluding raw source and actor fields", async () => {
+    const harness = repository([[{ batch_id: batch.batchId, signal_ref: "signal_revenue", entity_ref: "campaign_primary", occurred_at: "2026-08-09T10:00:00.000Z", outcome_kind: "revenue", quantity: 1, value_minor: 12500, currency: "TRY", meta_entity_ref: "meta_campaign_primary", mapping_status: "verified", source_kind: "csv", source_ref: "source_outcomes", observed_at: "2026-08-10T09:00:00.000Z" }]]);
+    await expect(harness.repository.listPublic({ workspaceId, entityRef: "campaign_primary", before: { occurredAt: "2026-08-10T00:00:00.000Z", signalRef: "signal_z" }, limit: 25 })).resolves.toMatchObject([{ signalRef: "signal_revenue", source: { sourceRef: "source_outcomes" } }]);
+    const rendered = new PgDialect().sqlToQuery((harness.execute.mock.calls as unknown[][])[0]![0] as never).sql;
+    expect(rendered).toContain("signal.workspace_id"); expect(rendered).toContain("signal.occurred_at, signal.signal_ref");
+    expect(rendered).not.toMatch(/content_hash|actor_id|actor_ref|audit_events/i);
+  });
 });
