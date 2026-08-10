@@ -2505,3 +2505,18 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   kalır.
 - Kanıt: `tests/deterministic-window-snapshot-drizzle-repository.test.ts`,
   `tests/meta-workspace-tombstone-purge-drizzle-adapter.test.ts`, `npm run typecheck`, `npm run db:check`.
+
+## 2026-08-10 — A10 frozen context L2/L3 evidence closure
+
+- Frozen context'teki `featureRefs` ve `windowRefs`, save transaction'ında exact tenant, mirror ve entity
+  scope'taki immutable L2/L3 payloadlara yeniden bağlanır. L2 hash-authentication, L3'nün exact L2 bağları
+  ve yeni L1 invalidation yokluğu zorunludur; ready context'te feature/window çiftinden biri eksikse context
+  kaydedilmez. Historic/legacy boş data context'leri replay uyumluluğunu korur.
+- Effective-context component ve invalidation allowlist'i L2 feature/L3 window tipleriyle forward-only
+  genişletildi; RLS+FORCE ve public/API-role revoke yeniden açıkça uygulanır. L1 writer, değişen günlük
+  source'un bağlı L2 feature ref'i için idempotent context invalidation olayı da yazar; frozen payloadlar
+  asla değiştirilmez.
+- Bu checkpoint Decision Room'a L3 drill-down veya action yetkisi bağlamaz; bütün capability'ler false
+  kalır. Kanıt: `tests/effective-campaign-context-persistence.test.ts`,
+  `tests/meta-sync-persistence.test.ts`, `tests/deterministic-window-snapshot-drizzle-repository.test.ts`,
+  `npm run typecheck`, `npm run db:check`.

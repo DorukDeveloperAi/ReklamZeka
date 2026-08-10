@@ -13,6 +13,13 @@ function invalidationEventHash(input: Readonly<{ featureSnapshotId: string; dail
   ])).digest("hex");
 }
 
+function contextInvalidationEventHash(input: Readonly<{ featureRef: string; dailyInsightId: string; previousSourcePayloadHash: string; currentSourcePayloadHash: string }>): string {
+  return createHash("sha256").update(JSON.stringify([
+    "effective_campaign_context_l2_invalidation_v1", input.featureRef, input.dailyInsightId,
+    input.previousSourcePayloadHash, input.currentSourcePayloadHash,
+  ])).digest("hex");
+}
+
 /** Server-private L1 writer. It accepts only canonical parser output and never calls Meta. */
 export class DrizzleMetaInsightPagePersistence implements MetaInsightPagePersistencePort, MetaInsightSourcePagePersistencePort {
   constructor(private readonly database: Database) {}
@@ -96,7 +103,11 @@ export class DrizzleMetaInsightPagePersistence implements MetaInsightPagePersist
         const affected = await database.select({
           featureSnapshotId: schema.deterministicFeatureSnapshotSources.featureSnapshotId,
           dailyInsightId: schema.deterministicFeatureSnapshotSources.dailyInsightId,
-        }).from(schema.deterministicFeatureSnapshotSources).where(and(
+          featureRef: schema.deterministicFeatureSnapshots.featureRef,
+        }).from(schema.deterministicFeatureSnapshotSources).innerJoin(schema.deterministicFeatureSnapshots, and(
+          eq(schema.deterministicFeatureSnapshots.workspaceId, schema.deterministicFeatureSnapshotSources.workspaceId),
+          eq(schema.deterministicFeatureSnapshots.id, schema.deterministicFeatureSnapshotSources.featureSnapshotId),
+        )).where(and(
           eq(schema.deterministicFeatureSnapshotSources.workspaceId, page.workspaceId),
           inArray(schema.deterministicFeatureSnapshotSources.dailyInsightId, [...changedHashByInsightId.keys()]),
         ));
@@ -110,6 +121,26 @@ export class DrizzleMetaInsightPagePersistence implements MetaInsightPagePersist
             reasonCode: "l1_source_changed", observedAt: new Date(page.observedAt),
           };
         })).onConflictDoNothing();
+        const contextInvalidations = [...new Map(affected.map((row) => {
+          const hashes = changedHashByInsightId.get(row.dailyInsightId)!;
+          const value = {
+            workspaceId: page.workspaceId,
+            eventHash: contextInvalidationEventHash({ featureRef: row.featureRef, dailyInsightId: row.dailyInsightId,
+              previousSourcePayloadHash: hashes.previous, currentSourcePayloadHash: hashes.current }),
+            componentType: "deterministic_feature_snapshot" as const,
+            componentRef: row.featureRef,
+            componentVersion: row.featureRef,
+            scopeKind: "workspace_component" as const,
+            entityType: null,
+            entityRef: null,
+            reasonCode: "source_changed" as const,
+            observedAt: new Date(page.observedAt),
+          };
+          return [value.eventHash, value] as const;
+        })).values()];
+        if (contextInvalidations.length > 0) {
+          await database.insert(schema.effectiveCampaignContextInvalidations).values(contextInvalidations).onConflictDoNothing();
+        }
       }
       await database.delete(schema.metaDailyInsightMetrics).where(inArray(schema.metaDailyInsightMetrics.dailyInsightId, ids));
       await database.insert(schema.metaDailyInsightMetrics).values(changed.flatMap((record) => record.metrics.map((metric) => ({

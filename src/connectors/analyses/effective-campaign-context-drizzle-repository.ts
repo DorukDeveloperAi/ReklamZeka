@@ -10,6 +10,8 @@ import {
   type EffectiveCampaignContext,
   type EffectiveCampaignContextInput,
 } from "@/analyses/effective-campaign-context";
+import { assertDeterministicFeatureSnapshot, type DeterministicFeatureSnapshot } from "@/analyses/deterministic-feature-snapshot";
+import { buildDeterministicWindowSnapshot, type DeterministicWindowSnapshot } from "@/analyses/deterministic-window-snapshot";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -32,6 +34,8 @@ export const CONTEXT_SOURCE_COMPONENT_TYPES = Object.freeze([
   "business_outcome_evidence",
   "cadence_profile",
   "guidance_selection",
+  "deterministic_feature_snapshot",
+  "deterministic_window_snapshot",
 ] as const);
 
 export type ContextSourceComponentType = typeof CONTEXT_SOURCE_COMPONENT_TYPES[number];
@@ -150,6 +154,16 @@ export function sourceComponentsOf(context: EffectiveCampaignContext): readonly 
       componentRef: snapshotRef,
       componentVersion: snapshotRef,
     })),
+    ...context.data.featureRefs.map((featureRef) => ({
+      componentType: "deterministic_feature_snapshot" as const,
+      componentRef: featureRef,
+      componentVersion: featureRef,
+    })),
+    ...context.data.windowRefs.map((windowRef) => ({
+      componentType: "deterministic_window_snapshot" as const,
+      componentRef: windowRef,
+      componentVersion: windowRef,
+    })),
     ...context.categories.map((category) => ({
       componentType: "category_resolution" as const,
       componentRef: category.dimension.id,
@@ -231,6 +245,110 @@ async function assertBusinessOutcomeEvidence(database: ContextDatabase, context:
     if (matches.length !== 1 || JSON.stringify(stableValue(matches[0]!.evidence_payload)) !== JSON.stringify(stableValue(evidence))) {
       throw new EffectiveCampaignContextRepositoryError("corrupt_store");
     }
+  }
+}
+
+/**
+ * L2/L3 references are admissible in a frozen context only when their exact,
+ * tenant-scoped immutable payloads still authenticate and no captured L1 input
+ * has invalidated them. This is deliberately a save-time recheck: a caller may
+ * never turn a free-form ref into ready analytical evidence.
+ */
+async function assertDeterministicAnalysisData(
+  database: ContextDatabase,
+  context: EffectiveCampaignContext,
+  mirror: MirrorScope,
+): Promise<void> {
+  const { featureRefs, windowRefs } = context.data;
+  if (featureRefs.length === 0 && windowRefs.length === 0) return;
+  if (featureRefs.length === 0 || windowRefs.length === 0
+    || context.data.trustStatus !== "ready" || context.data.blockers.length > 0) {
+    throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+  }
+  const entityLevel = context.identity.entityType === "campaign" ? "campaign"
+    : context.identity.entityType === "ad_set" ? "ad_set"
+      : context.identity.entityType === "ad" ? "ad" : null;
+  if (entityLevel === null) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+  const featureRows = resultRows<{ feature_ref: string; feature_hash: string; feature_payload: unknown }>(await database.execute(sql`
+    select feature.feature_ref, feature.feature_hash, feature.feature_payload
+    from deterministic_feature_snapshots feature
+    where feature.workspace_id = ${context.workspaceId}::uuid
+      and feature.meta_connection_id = ${mirror.metaConnectionId}::uuid
+      and feature.ad_account_id = ${mirror.adAccountId}::uuid
+      and feature.entity_level = ${entityLevel}::meta_insight_entity_level
+      and feature.external_entity_id = ${context.identity.entityRef}
+      and feature.feature_ref = any(${featureRefs}::text[])
+      and not exists (
+        select 1 from deterministic_feature_snapshot_invalidations invalidation
+        where invalidation.workspace_id = feature.workspace_id
+          and invalidation.feature_snapshot_id = feature.id
+      )
+    for share
+  `));
+  if (featureRows.length !== featureRefs.length
+    || new Set(featureRows.map((row) => row.feature_ref)).size !== featureRefs.length) {
+    throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+  }
+  try {
+    for (const row of featureRows) {
+      assertDeterministicFeatureSnapshot(row.feature_payload);
+      const feature = row.feature_payload;
+      if (feature.featureRef !== row.feature_ref || feature.featureHash !== row.feature_hash
+        || feature.scope.workspaceId !== context.workspaceId
+        || feature.scope.metaConnectionId !== mirror.metaConnectionId
+        || feature.scope.adAccountId !== mirror.adAccountId
+        || feature.scope.entityLevel !== entityLevel
+        || feature.scope.externalEntityId !== context.identity.entityRef) throw new Error("scope");
+    }
+  } catch {
+    throw new EffectiveCampaignContextRepositoryError("corrupt_store");
+  }
+  const windowRows = resultRows<{ window_ref: string; window_hash: string; window_payload: unknown; features: unknown }>(await database.execute(sql`
+    select l3_window.window_ref, l3_window.window_hash, l3_window.window_payload,
+      coalesce(jsonb_agg(feature.feature_payload order by feature.feature_ref), '[]'::jsonb) as features
+    from deterministic_window_snapshots l3_window
+    join deterministic_window_snapshot_features binding
+      on binding.workspace_id = l3_window.workspace_id and binding.window_snapshot_id = l3_window.id
+    join deterministic_feature_snapshots feature
+      on feature.workspace_id = binding.workspace_id and feature.id = binding.feature_snapshot_id
+    where l3_window.workspace_id = ${context.workspaceId}::uuid
+      and l3_window.meta_connection_id = ${mirror.metaConnectionId}::uuid
+      and l3_window.ad_account_id = ${mirror.adAccountId}::uuid
+      and l3_window.entity_level = ${entityLevel}::meta_insight_entity_level
+      and l3_window.external_entity_id = ${context.identity.entityRef}
+      and l3_window.window_ref = any(${windowRefs}::text[])
+      and not exists (
+        select 1
+        from deterministic_window_snapshot_features affected_binding
+        join deterministic_feature_snapshot_invalidations invalidation
+          on invalidation.workspace_id = affected_binding.workspace_id
+         and invalidation.feature_snapshot_id = affected_binding.feature_snapshot_id
+        where affected_binding.workspace_id = l3_window.workspace_id
+          and affected_binding.window_snapshot_id = l3_window.id
+      )
+    group by l3_window.id
+  `));
+  if (windowRows.length !== windowRefs.length
+    || new Set(windowRows.map((row) => row.window_ref)).size !== windowRefs.length) {
+    throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+  }
+  const covered = new Set<string>();
+  try {
+    for (const row of windowRows) {
+      if (!Array.isArray(row.features)) throw new Error("features");
+      (row.features as unknown[]).forEach(assertDeterministicFeatureSnapshot);
+      const window = buildDeterministicWindowSnapshot({
+        timeframe: (row.window_payload as DeterministicWindowSnapshot).resolvedTimeframe,
+        features: row.features as DeterministicFeatureSnapshot[],
+      });
+      if (window.windowRef !== row.window_ref || window.windowHash !== row.window_hash) throw new Error("hash");
+      window.featureRefs.forEach((ref) => covered.add(ref));
+    }
+  } catch {
+    throw new EffectiveCampaignContextRepositoryError("corrupt_store");
+  }
+  if (covered.size !== featureRefs.length || featureRefs.some((ref) => !covered.has(ref))) {
+    throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
   }
 }
 
@@ -505,6 +623,7 @@ export class DrizzleEffectiveCampaignContextRepository {
     return this.database.transaction(async (transaction) => {
       await assertWorkspace(transaction, context.workspaceId, true);
       const mirror = await assertMirrorScope(transaction, context);
+      await assertDeterministicAnalysisData(transaction, context, mirror);
       await assertBusinessOutcomeEvidence(transaction, context);
       await assertCadenceEvidence(transaction, context, mirror);
       const policyComposition = await policyCompositionEvidence(transaction, context);

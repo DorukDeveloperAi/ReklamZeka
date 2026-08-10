@@ -62,6 +62,13 @@ describe("Meta sync persistence schema", () => {
     });
     expect(getTableColumns(metaDailyInsightMetrics)).toMatchObject({ aggregation: expect.anything(), actionType: expect.anything(), provenance: expect.anything() });
   });
+
+  it("propagates an L1 source change to frozen contexts through its exact L2 feature ref", () => {
+    const source = readFileSync("src/connectors/meta/sync/insights-drizzle-repository.ts", "utf8");
+    expect(source).toContain("effective_campaign_context_l2_invalidation_v1");
+    expect(source).toContain('componentType: "deterministic_feature_snapshot"');
+    expect(source).toContain("featureRef: schema.deterministicFeatureSnapshots.featureRef");
+  });
 });
 
 describe("Meta daily insight contract", () => {

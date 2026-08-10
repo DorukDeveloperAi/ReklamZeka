@@ -155,6 +155,24 @@ describe("effective campaign context persistence contract", () => {
     expect(sourceComponentsOf(frozen)).toContainEqual({ componentType: "business_outcome_evidence", componentRef: "campaign_primary", componentVersion: "a".repeat(64) });
   });
 
+  it("records frozen L2 features and L3 windows as invalidatable source components", () => {
+    const existing = context();
+    const { schemaVersion: _schemaVersion, contextHash: _contextHash, capabilities: _capabilities, ...input } = existing;
+    const frozen = buildEffectiveCampaignContext({ ...input, data: {
+      ...input.data,
+      featureRefs: ["feature_aaaaaaaaaaaaaaaaaaaaaaaa"],
+      windowRefs: ["window_bbbbbbbbbbbbbbbbbbbbbbbb"],
+    } });
+    expect(sourceComponentsOf(frozen)).toContainEqual({
+      componentType: "deterministic_feature_snapshot", componentRef: "feature_aaaaaaaaaaaaaaaaaaaaaaaa",
+      componentVersion: "feature_aaaaaaaaaaaaaaaaaaaaaaaa",
+    });
+    expect(sourceComponentsOf(frozen)).toContainEqual({
+      componentType: "deterministic_window_snapshot", componentRef: "window_bbbbbbbbbbbbbbbbbbbbbbbb",
+      componentVersion: "window_bbbbbbbbbbbbbbbbbbbbbbbb",
+    });
+  });
+
   it("binds Meta config and cadence evidence to exact top-level values and source components", () => {
     const frozen = context({ evidenceBound: true });
     expect(frozen.metaAnalysisConfigEvidence?.snapshot.snapshotHash).toMatch(/^[a-f0-9]{64}$/);
@@ -181,6 +199,28 @@ describe("effective campaign context persistence contract", () => {
     await expect(repository.save(context(), { mode: "evidence_bound" }))
       .rejects.toMatchObject({ code: "invalid_input" } satisfies Partial<EffectiveCampaignContextRepositoryError>);
     expect(database.transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects evidence-bound contexts whose claimed L2/L3 evidence is absent or stale", async () => {
+    const existing = context({ evidenceBound: true });
+    const { schemaVersion: _schemaVersion, contextHash: _contextHash, capabilities: _capabilities, ...input } = existing;
+    const frozen = buildEffectiveCampaignContext({ ...input, data: {
+      ...input.data,
+      featureRefs: ["feature_aaaaaaaaaaaaaaaaaaaaaaaa"],
+      windowRefs: ["window_bbbbbbbbbbbbbbbbbbbbbbbb"],
+    } });
+    const executeResults = [{ rows: [{ id: workspaceId }] }, { rows: [{
+      metaConnectionId: "00000000-0000-0000-0000-000000000201",
+      adAccountId: "00000000-0000-0000-0000-000000000202",
+      campaignId: "00000000-0000-0000-0000-000000000203",
+    }] }, { rows: [] }];
+    const select = vi.fn().mockReturnValue({ from: vi.fn(() => ({ where: vi.fn(async () => [{
+      publicRef: snapshotRef, capturedAt: new Date("2026-08-07T11:00:00.000Z"),
+    }]) })) });
+    const transaction = { execute: vi.fn(async () => executeResults.shift()), select };
+    await expect(new DrizzleEffectiveCampaignContextRepository({ transaction: async (callback: (tx: typeof transaction) => Promise<unknown>) => callback(transaction) } as never)
+      .save(frozen, { mode: "evidence_bound" }))
+      .rejects.toMatchObject({ code: "workspace_scope_mismatch" } satisfies Partial<EffectiveCampaignContextRepositoryError>);
   });
 
   it("rejects a newly persisted legacy payload while old v1 replay remains buildable", async () => {
@@ -258,5 +298,16 @@ describe("effective campaign context persistence contract", () => {
     expect(repository).toContain("if (current.has(row.policy_ref)) throw new EffectiveCampaignContextRepositoryError");
     expect(repository).toContain("if (evidence === undefined) return null");
     expect(repository).not.toContain("order by policy_ref, policy_version desc");
+  });
+
+  it("extends the existing context component allowlist with private L2/L3 evidence safely", () => {
+    const migration = readFileSync("drizzle/20260810184501_third_hulk.sql", "utf8");
+    expect(migration).toContain("'deterministic_feature_snapshot', 'deterministic_window_snapshot'");
+    for (const table of ["effective_campaign_context_components", "effective_campaign_context_invalidations"]) {
+      expect(migration).toContain(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`);
+      expect(migration).toContain(`ALTER TABLE "${table}" FORCE ROW LEVEL SECURITY`);
+    }
+    expect(migration).toContain("FROM PUBLIC, anon, authenticated, service_role");
+    expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|TRUNCATE/);
   });
 });

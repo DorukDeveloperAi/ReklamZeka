@@ -2136,7 +2136,8 @@ export const effectiveCampaignContextComponents = pgTable("effective_campaign_co
   check("effective_campaign_context_components_type", sql`${table.componentType} in (
     'source_snapshot', 'category_resolution', 'category_profile', 'guidance_pack', 'meta_catalog',
     'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
-    'timeframe_resolver', 'instruction_policy', 'promotion_registry', 'policy_authority', 'business_outcome_evidence', 'cadence_profile'
+    'timeframe_resolver', 'instruction_policy', 'promotion_registry', 'policy_authority', 'business_outcome_evidence', 'cadence_profile',
+    'deterministic_feature_snapshot', 'deterministic_window_snapshot'
   )`),
   check("effective_campaign_context_components_required", sql`
     btrim(${table.componentRef}) <> '' and btrim(${table.componentVersion}) <> ''
@@ -2205,7 +2206,8 @@ export const effectiveCampaignContextInvalidations = pgTable("effective_campaign
   check("effective_campaign_context_invalidations_type", sql`${table.componentType} in (
     'source_snapshot', 'category_resolution', 'category_profile', 'guidance_pack', 'meta_catalog',
     'category_resolver', 'guidance_registry', 'metric_catalog', 'formula_catalog',
-    'timeframe_resolver', 'instruction_policy', 'promotion_registry', 'policy_authority', 'business_outcome_evidence', 'cadence_profile'
+    'timeframe_resolver', 'instruction_policy', 'promotion_registry', 'policy_authority', 'business_outcome_evidence', 'cadence_profile',
+    'deterministic_feature_snapshot', 'deterministic_window_snapshot'
   )`),
   check("effective_campaign_context_invalidations_required", sql`
     btrim(${table.componentRef}) <> '' and btrim(${table.componentVersion}) <> ''

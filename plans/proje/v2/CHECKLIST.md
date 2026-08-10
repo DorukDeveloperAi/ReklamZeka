@@ -443,6 +443,10 @@
   - [x] Private L3 current reader: saklanan window payload'ı ve exact L2 bindingleri yeniden canonicalize
     edilir; bağlı L2 invalidation varsa replacement/fallback üretmeden `stale` döner. Decision Room,
     context veya action yüzeyine henüz bağlı değildir.
+  - [x] Frozen-context L2/L3 evidence closure: `featureRefs` ve `windowRefs` yalnız aynı tenant/mirror/entity
+    scope'taki, hash-authenticated ve invalidation-free immutable artefactlar olarak kaydedilir; L1 kaynak
+    değişimi exact L2 component üzerinden ilgili frozen context'leri invalidate eder. Yeni ready analytical
+    context için feature/window ikilisinden biri eksikse fail-closed olur.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.
