@@ -6,6 +6,7 @@
  *   node ~/.claude/hooks/claim-guard.mjs write     # PreToolUse, matcher "Edit|Write|NotebookEdit"
  *   node ~/.claude/hooks/claim-guard.mjs bash      # PreToolUse, matcher "Bash"
  *   node ~/.claude/hooks/claim-guard.mjs ctx       # SessionStart | UserPromptSubmit  (sync!)
+ *   node ~/.claude/hooks/claim-guard.mjs giden    # PostToolUse, "SendMessage|…send_message|Bash"
  *   node ~/.claude/hooks/claim-guard.mjs limit_devir   # Stop — kendi kilitlerini devret
  *   node ~/.claude/hooks/claim-guard.mjs release_all   # SessionEnd (async olabilir)
  *
@@ -70,16 +71,22 @@ const kis = (s, n) => {
  *
  * TÜKETİCİdir: haber bir kez basılır, kutu silinir. `others` erken dönüşünden ÖNCE
  * hesaplanır — bırakan çoktan kapanmış olsa da haber sahibine ulaşmalıdır.
+ *
+ * İKİ MUHATAP, İKİ KANAL (kullanıcı kararı 2026-08-10 — "bir session mesaj gönderdiğinde de
+ * aldığında da bunu printlesin bana"): gövde MODELE gider (`additionalContext`), `ozet` ise
+ * İNSANA (`systemMessage`). Kutu tüketici okunduğu için ikinci bir okuyucu haberi yerdi —
+ * bu yüzden alma ucu burada, gönderme ucu `mesaj-nabzi.mjs`te. Dönüş: `{ satirlar, ozet }`.
  */
 function bildiriBloku(root, me) {
-  if (!me || !L.ledgerExists() || typeof L.bildiriOku !== "function") return [];
+  const bos = { satirlar: [], ozet: [] };
+  if (!me || !L.ledgerExists() || typeof L.bildiriOku !== "function") return bos;
   let gelen = [];
   try {
     gelen = L.bildiriOku(root, me);
   } catch {
-    return [];
+    return bos;
   }
-  if (!gelen.length) return [];
+  if (!gelen.length) return bos;
   const tipi = (b) => b?.tip || "sira";
   const sira = gelen.filter((b) => tipi(b) === "sira");
   const bekleyenVar = gelen.filter((b) => tipi(b) === "bekleyenVar");
@@ -160,7 +167,22 @@ function bildiriBloku(root, me) {
 
   for (const b of diger.slice(-4)) out.push(`  • ${tipi(b)}: ${kis(JSON.stringify(b), 180)}`);
   if (out.length) out.push(`  (bu haberler BİR KEZ basılır — gerekeni şimdi ele al.)`);
-  return out;
+
+  /* İNSAN ÖZETİ — gövdenin kısaltması DEĞİL, farklı bir sorunun cevabı: kullanıcı "bana kim
+     ne yazdı"yı görmek ister, kilit kuyruğunun mekaniğini değil. Bu yüzden `elle` mesajları
+     TEK TEK ve metniyle, otomatik zincir haberleri (sira/bekleyenVar) tek sayaç satırında. */
+  const ozet = [];
+  for (const b of elle.slice(-3)) {
+    ozet.push(
+      `✉ MESAJ ALINDI ← ${String(b.kimden || "?").slice(0, 8)}` +
+        `${b.kimdenBaslik ? ` "${kis(b.kimdenBaslik, 32)}"` : ""}: ${kis(b.mesaj, 160)}`
+    );
+  }
+  if (elle.length > 3) ozet.push(`  … +${elle.length - 3} mesaj daha (gövdesi bağlama girdi)`);
+  const otomatik = sira.length + bekleyenVar.length + diger.length;
+  if (otomatik) ozet.push(`✉ ${otomatik} eşzamanlılık bildirisi alındı (kaynak · kuyruk haberi)`);
+
+  return { satirlar: out, ozet };
 }
 
 /**
@@ -600,6 +622,37 @@ function main() {
     return pass();
   }
 
+  /* ── GİDEN MESAJ (PostToolUse) — trafiğin İNSAN ucu ────────────────────────────
+     Alma ucu `ctx` dalındaki `bildiriBloku.ozet`tir; bu dal onun eşi. İkisi de aynı şeyi
+     yapar: zaten olan bir işi kullanıcıya da gösterir. Yeni bir mekanizma değil, mevcut
+     çıktının ikinci muhatabı (kullanıcı kararı 2026-08-10).
+
+     KANIT tool ÇIKTISIDIR, komut metni DEĞİL: `bildir` çözülemeyen rolde exit 5 ile durur —
+     komuta bakıp "gönderildi" basmak, gönderilmemiş mesajı gönderilmiş göstermek olurdu. */
+  if (mode === "giden") {
+    const tool = String(p.tool_name || "");
+    const ti = p.tool_input || {};
+    const tr = p.tool_response;
+    if (tr && typeof tr === "object" && (tr.is_error === true || tr.isError === true)) return pass();
+    const satirlar = [];
+    if (tool === "SendMessage") {
+      // Alma ucu bir SUBAGENT'tır (printi kullanıcıya ulaşmaz) → gönderim burada basılır.
+      satirlar.push(`📤 MESAJ GÖNDERİLDİ → ajan ${kis(ti.to || ti.agent_id || "?", 24)}: ${kis(ti.summary || ti.message, 140)}`);
+    } else if (tool.endsWith("send_message")) {
+      satirlar.push(`📤 MESAJ GÖNDERİLDİ → oturum ${String(ti.session_id || "?").slice(0, 8)}: ${kis(ti.message, 140)}`);
+    } else if (tool === "Bash") {
+      const govde = typeof tr === "string" ? tr : [tr?.stdout, tr?.stderr].filter((x) => typeof x === "string").join("\n");
+      for (const raw of String(govde).split("\n")) {
+        const l = raw.trim();
+        if (!l.includes("BİLDİRİ GÖNDERİLDİ")) continue; // `bildir` ⊕ `release`in otomatik haberi
+        satirlar.push(`📤 ${kis(l, 180)}`);
+        if (satirlar.length >= 4) break; // tavan: tek turdaki mesaj seli satır seline dönmesin
+      }
+    }
+    if (!satirlar.length) return pass();
+    return out({ systemMessage: satirlar.join("\n") });
+  }
+
   if (mode === "ctx") {
     // Farkındalık: bu repoda BAŞKA CANLI session varsa modele protokolü hatırlat.
     // Kapı zaten sert olduğu için bu katman unutulsa da çakışma imkânsızdır.
@@ -676,12 +729,13 @@ function main() {
     /* Sarkık devir işareti TEK BAŞINA da haber değeridir (iş kaybolmasın); başka canlı
        session yoksa blok yalnız o satırı taşır. Üçü de yoksa TEK BAYT basılmaz. */
     if (!others.length) {
-      if (!devirSatir && !bildiri.length && !saha.length && !orkSatir) return pass();
+      if (!devirSatir && !bildiri.satirlar.length && !saha.length && !orkSatir) return pass();
       return out({
+        ...(bildiri.ozet.length ? { systemMessage: bildiri.ozet.join("\n") } : {}),
         hookSpecificOutput: {
           hookEventName: olay,
           additionalContext: [
-            ...bildiri,
+            ...bildiri.satirlar,
             ...saha,
             ...(orkSatir ? [`[eşzamanlılık] ${orkSatir}`] : []),
             ...(devirSatir ? [`[eşzamanlılık] ${devirSatir}`] : []),
@@ -725,10 +779,11 @@ function main() {
       ].join("\n");
     });
     return out({
+      ...(bildiri.ozet.length ? { systemMessage: bildiri.ozet.join("\n") } : {}),
       hookSpecificOutput: {
         hookEventName: olay,
         additionalContext: [
-          ...bildiri,
+          ...bildiri.satirlar,
           ...saha,
           `[eşzamanlılık] Bu repoda ${others.length} BAŞKA canlı Claude session'ı var:`,
           ...lines,

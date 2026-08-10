@@ -141,6 +141,8 @@ ama yeni adı söyler.)
 | **kırık** (zombi) | **açık ama işlevsiz** koşum; ölümün aksine GÖRÜNMEZ (pencere duruyor, kayıt "koşuyor" diyor, iş ilerlemiyor). Ölü DEĞİL, biten DEĞİL. Sınıfları `kimlik`·`limit`·`yanitsiz`·`kanitsiz`; envanter `aide kirik` (motor · 0 token). Detay: `docs/kirik-kosum.md`. |
 | **soft-resume** (yumuşak devam) | kapalı/başka-hesap session'ının transcript'inden damıtılan brifle TAZE oturumda devam (hard `--resume`'un taşınabilir karşılığı). Toplama motor, damıtma ajan — **damıtan hep DEVRALANdır**: kapatan taraf agentic iş yapmaz. |
 | **stop dalı** | `goal-tracker.mjs stop` — açık iş bırakıp erken duran oturumu BİR KEZ geri çeviren motor (0 token · session-yerleşik). Açık işin TEK kaynağı hedef defteri (todo + `/goal`); **şüphe SERBEST BIRAKMA yönünedir.** Kademe `kaptan/stop-dali.json → kapsam`; kullanıcı kesmesi MUAF (yapısal). Detay: `docs/seviye-0.md`. |
+| **yedek yüklemi** | daemonun ne zaman devrede olduğunun TEK ölçütü olan kapalı yüklem: `YEDEK_DEVREDE ⟺ saat-güdümlü∧olay-karşılıksız ∨ rol-oturumu-yok ∨ oturum-kırık`. Kanonu `docs/otonomi-merdiveni.md` §4.1 (İŞARETÇİ — kopyalanmaz); kod-içi hâli `yedek-yuklemi.ts`, yüzeyi `aide otomasyon durum` yedek ekseni (BİLGİ — kök hükme sızmaz). Sınıf: yüklem/motor · 0 token. |
+| **ilanlı bekleme** | "yedek GEREKLİ ∧ daemon kapalı" hâlinin ALARM DEĞİL KAYIT olarak basılması (K-OO1 sıra kararının görünür izi) — `onar:` satırı TAŞIMAZ: çare metronomu açmak değil, kararın kendisidir. Kalıcı kırmızı yerine ilan: alarm körelmesinin panzehiri. |
 
 ## Sınıf 6 — plan katmanı  → kanon zincir DIŞINDA
 
