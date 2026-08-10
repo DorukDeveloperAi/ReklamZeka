@@ -280,7 +280,10 @@
   - [ ] Rol yönetimi/audit mutation API'si ve gerçek analysis dry-run endpoint'i.
 - [ ] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
   - [x] Deterministik on-pass agenda, category/topic subset ve context/timeframe-bound finding çekirdeği.
-  - [ ] Persistence, gerçek finding ailesi ve Decision Room application binding'i.
+  - [x] A10.2c agenda hash+payload'ı ilk run claim'inde immutable Decision Room run assetine freeze edilir;
+    runtime aynı context/timeframe/pass'lerden tekrar üretip birebir eşleşme olmadan L2 okuması ya da ledger
+    staging'i başlatmaz. Legacy bağsız asset fail-closed kalır.
+  - [ ] Gerçek finding ailesi.
 - [x] EffectiveGuidancePack scope filter/ranking/context-budget ve source/conflict trace.
 - [ ] DecisionCadenceProfile, no-change/repeat suppression ve ExperimentRecord lifecycle.
   - [x] Settle/observation/learning/cooldown/evidence/repeat saf karar kapısı ve tek değişkenli experiment çekirdeği.

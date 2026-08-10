@@ -20,6 +20,7 @@ import {
 } from "@/application/decision-room-analysis-runtime";
 import type { DecisionRoomDraftPort } from "@/application/decision-room";
 import type { FindingObservationReadPort } from "@/analyses/finding-observation-builder";
+import { buildAnalysisAgenda, type AnalysisAgenda } from "@/analyses/agenda";
 import { buildEffectiveCampaignContext, type EffectiveCampaignContext } from "@/analyses/effective-campaign-context";
 import type { EffectiveGuidancePack } from "@/domain/guidance/registry";
 import { evaluateDecisionCadence, type DecisionCadenceProfile } from "@/domain/decisions/cadence";
@@ -172,6 +173,7 @@ type AssetSelection = Readonly<{
   cadence_profile_id: string; cadence_profile_ref: string; cadence_profile_hash: string; cadence_profile_payload: unknown;
   template_hash: string; timeframe_hash: string; context_hash: string;
   template_payload: unknown; timeframe_payload: unknown; context_payload: unknown;
+  agenda_hash?: string | null; agenda_payload?: unknown;
 }>;
 
 function runtimeAssets(
@@ -230,6 +232,18 @@ function runtimeAssets(
   } catch {
     throw new DecisionRoomAnalysisAssetPersistenceError("corrupt_store");
   }
+  let agenda: AnalysisAgenda;
+  try {
+    agenda = buildAnalysisAgenda({ context, resolvedTimeframe: resolved, requestedPasses: template.requestedPasses });
+    if (selection.agenda_hash !== undefined) {
+      if (selection.agenda_hash !== agenda.agendaHash
+        || analysisAssetDefinitionHash(selection.agenda_payload) !== agenda.agendaHash) {
+        throw new Error("persisted agenda mismatch");
+      }
+    }
+  } catch {
+    throw new DecisionRoomAnalysisAssetPersistenceError("corrupt_store");
+  }
   const assets: DecisionRoomAnalysisRuntimeAssets = Object.freeze({
     version: DECISION_ROOM_ANALYSIS_RUNTIME_VERSION,
     workspaceRef: input.workspaceRef,
@@ -241,6 +255,7 @@ function runtimeAssets(
     context,
     resolvedTimeframe: resolved,
     requestedPasses: template.requestedPasses,
+    agenda,
     hierarchy: template.hierarchy,
     checks: template.checks,
     cadence: { ...template.cadence, profile: cadenceProfile },
@@ -511,7 +526,7 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
           template.definition_hash as template_hash, timeframe.definition_hash as timeframe_hash,
           context.context_hash, template.definition_payload as template_payload,
           timeframe.definition_payload as timeframe_payload, context.context_payload,
-          asset.asset_hash, asset.occurred_at, asset.resolved_timeframe
+          asset.agenda_hash, asset.agenda_payload, asset.asset_hash, asset.occurred_at, asset.resolved_timeframe
         from decision_room_run_analysis_assets asset
         join analysis_template_definitions template on template.workspace_id = asset.workspace_id and template.id = asset.template_definition_id
         join analysis_timeframe_definitions timeframe on timeframe.workspace_id = asset.workspace_id and timeframe.id = asset.timeframe_definition_id
@@ -525,9 +540,12 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
         const expectedHash = analysisAssetDefinitionHash({
           runRef: input.runRef, templateHash: existing.template_hash,
           timeframeHash: existing.timeframe_hash, contextHash: existing.context_hash,
-          cadenceProfileHash: existing.cadence_profile_hash, occurredAt: frozenAt, resolvedTimeframe: existing.resolved_timeframe,
+          cadenceProfileHash: existing.cadence_profile_hash, agendaHash: existing.agenda_hash,
+          occurredAt: frozenAt, resolvedTimeframe: existing.resolved_timeframe,
         });
-        if (existing.asset_hash !== expectedHash) throw new DecisionRoomAnalysisAssetPersistenceError("corrupt_store");
+        if (!existing.agenda_hash || !existing.agenda_payload || existing.asset_hash !== expectedHash) {
+          throw new DecisionRoomAnalysisAssetPersistenceError("corrupt_store");
+        }
         const assets = runtimeAssets(input, frozenAt, existing, existing.resolved_timeframe);
         await bindGuidanceRun(transaction, this.workspaceId, run.id, frozenAt, assets.context.guidance);
         return assets;
@@ -609,16 +627,19 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
       const assetHash = analysisAssetDefinitionHash({
         runRef: input.runRef, templateHash: candidates[0]!.template_hash,
         timeframeHash: candidates[0]!.timeframe_hash, contextHash: candidates[0]!.context_hash,
-        cadenceProfileHash: candidates[0]!.cadence_profile_hash, occurredAt, resolvedTimeframe: assets.resolvedTimeframe,
+        cadenceProfileHash: candidates[0]!.cadence_profile_hash, agendaHash: assets.agenda.agendaHash,
+        occurredAt, resolvedTimeframe: assets.resolvedTimeframe,
       });
       await transaction.execute(sql`
         insert into decision_room_run_analysis_assets (
           workspace_id, run_id, template_definition_id, timeframe_definition_id,
-          context_id, cadence_profile_revision_id, cadence_profile_hash, asset_hash, occurred_at, resolved_timeframe
+          context_id, cadence_profile_revision_id, cadence_profile_hash, agenda_hash, agenda_payload,
+          asset_hash, occurred_at, resolved_timeframe
         ) values (
           ${this.workspaceId}::uuid, ${run.id}::uuid, ${candidates[0]!.template_id}::uuid,
           ${candidates[0]!.timeframe_id}::uuid, ${candidates[0]!.context_id}::uuid,
           ${candidates[0]!.cadence_profile_id}::uuid, ${candidates[0]!.cadence_profile_hash},
+          ${assets.agenda.agendaHash}, ${JSON.stringify(assets.agenda)}::jsonb,
           ${assetHash}, ${occurredAt}::timestamptz, ${JSON.stringify(assets.resolvedTimeframe)}::jsonb
         )
       `);

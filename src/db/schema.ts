@@ -2724,6 +2724,9 @@ export const decisionRoomRunAnalysisAssets = pgTable("decision_room_run_analysis
   /** Null only for legacy assets created before A10.2; new assets must bind both fields. */
   cadenceProfileRevisionId: uuid("cadence_profile_revision_id"),
   cadenceProfileHash: text("cadence_profile_hash"),
+  /** Null only for legacy assets; newly claimed runs freeze their exact agenda contract. */
+  agendaHash: text("agenda_hash"),
+  agendaPayload: jsonb("agenda_payload").$type<Record<string, unknown>>(),
   assetHash: text("asset_hash").notNull(),
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
   resolvedTimeframe: jsonb("resolved_timeframe").$type<Record<string, unknown>>().notNull(),
@@ -2766,6 +2769,11 @@ export const decisionRoomRunAnalysisAssets = pgTable("decision_room_run_analysis
     and ${table.resolvedTimeframe} #>> '{resolverVersion}' = 'analysis-timeframe-resolver/1.0.0'
     and ((${table.cadenceProfileRevisionId} is null and ${table.cadenceProfileHash} is null)
       or (${table.cadenceProfileRevisionId} is not null and ${table.cadenceProfileHash} ~ '^[a-f0-9]{64}$'))
+    and ((${table.agendaHash} is null and ${table.agendaPayload} is null)
+      or (${table.agendaHash} ~ '^[a-f0-9]{64}$'
+        and jsonb_typeof(${table.agendaPayload}) = 'object'
+        and ${table.agendaPayload} #>> '{contractVersion}' = 'analysis-agenda/1.0.0'
+        and ${table.agendaPayload} #>> '{agendaHash}' = ${table.agendaHash}))
   ) is true`),
 ]);
 

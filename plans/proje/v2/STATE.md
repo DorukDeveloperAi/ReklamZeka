@@ -103,6 +103,19 @@
 - ExperimentRecord append-only lifecycle'i A10.2b ile tamamlandı; hiçbir action/approval/Meta-write
   capability'si oluşturmaz.
 
+## 2026-08-10 — A10.2c frozen AnalysisAgenda run binding
+
+- Her yeni Decision Room run asset'i exact deterministic `AnalysisAgenda` hash+payload'ını aynı immutable
+  satırda saklar; asset hash'i agenda hash'ini de kapsar. Loader yalnız context, resolved timeframe ve template
+  pass'lerinden aynı agenda yeniden üretilebiliyorsa historical asset'i açar; legacy veya tahrif edilmiş bağ
+  fail-closed reddedilir.
+- Runtime, ilk L2 okumasından önce frozen agenda ile yeniden oluşturulan agenda'nın birebir eşitliğini denetler
+  ve Decision Room sonucunun aynı `agendaRef`'i taşımasını zorunlu kılar. Bu bağ advisory-only'dir; action,
+  approval, Meta-write ve model capability'leri açmaz.
+- Additive migration canlı PostgreSQL'e uygulandı. Transactional asset verifier owner/member denetimli cadence
+  fixture'ı üzerinden agenda payload/hash freeze'ini, RLS/revoke ve immutable asset guard'larını doğruladı;
+  kalıcı fixture bırakmadı.
+
 ## 2026-08-10 — A10.2b ExperimentRecord append-only lifecycle
 
 - Experiment plan artık explicit `guardrail_breach` stop condition'ı taşımadan geçerli değildir. Plan ve

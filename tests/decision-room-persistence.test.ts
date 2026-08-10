@@ -10,6 +10,7 @@ import { WORKSPACE_TOMBSTONE_PURGE_TABLES } from "@/connectors/meta/workspace-to
 const migrationPath = "drizzle/20260807143420_true_storm.sql";
 const readMigrationPath = "drizzle/20260807150835_fancy_may_parker.sql";
 const cadenceBindingMigrationPath = "drizzle/20260810124513_violet_nebula.sql";
+const agendaBindingMigrationPath = "drizzle/20260810125621_loose_thor_girl.sql";
 
 describe("Decision Room PostgreSQL persistence contract", () => {
   it("is additive, tenant-linked, private, and orders composite targets before foreign keys", () => {
@@ -59,6 +60,18 @@ describe("Decision Room PostgreSQL persistence contract", () => {
     expect(source).toContain("decision_cadence_profile_revisions cadence");
     expect(source).toContain("cadence_profile_revision_id, cadence_profile_hash");
     expect(source).toContain("cadenceProfileHash");
+  });
+
+  it("freezes the exact deterministic AnalysisAgenda payload and hash on every new run asset", () => {
+    const migration = readFileSync(agendaBindingMigrationPath, "utf8");
+    expect(migration).toContain('ADD COLUMN "agenda_hash" text');
+    expect(migration).toContain('ADD COLUMN "agenda_payload" jsonb');
+    expect(migration).toContain('"agenda_payload" #>> \'{agendaHash}\'');
+    expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|TRUNCATE|DELETE FROM/);
+    const source = readFileSync("src/connectors/analyses/decision-room-analysis-registry-drizzle.ts", "utf8");
+    expect(source).toContain("buildAnalysisAgenda");
+    expect(source).toContain("agendaHash: assets.agenda.agendaHash");
+    expect(source).toContain("agenda_hash, agenda_payload");
   });
 
   it("fails closed before I/O on token/raw/prompt-shaped extra fields and external channels", async () => {
