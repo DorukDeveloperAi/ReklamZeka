@@ -109,7 +109,7 @@ export class DrizzleInstructionPolicyImpactRepository implements InstructionPoli
     }
     const dependency = rows<CountRow>(await this.database.execute(sql`
       with policy_contexts as (
-        select distinct context.id, context.context_hash, context.context_payload,
+        select distinct context.id, context.context_hash, context.ad_account_id, context.context_payload,
           component.component_version = ${registryHash} as current_registry,
           exists (select 1 from jsonb_array_elements(case when jsonb_typeof(context.context_payload->'policies') = 'array'
             then context.context_payload->'policies' else '[]'::jsonb end) item
@@ -222,7 +222,7 @@ export class DrizzleInstructionPolicyImpactRepository implements InstructionPoli
                 join effective_campaign_policy_composition_items item on item.workspace_id = composition.workspace_id
                   and item.composition_id = composition.id
                 where item.policy_revision_id = binding.policy_revision_id and composition.authority_snapshot_ref = snapshot.snapshot_ref
-                  and composition.authority_snapshot_hash = snapshot.snapshot_hash and composition.authority_catalog_hash = catalog.revision_hash))))
+                  and composition.authority_snapshot_hash = snapshot.snapshot_hash and composition.authority_catalog_hash = catalog.revision_hash)))
           + (select count(*)::int from affected_contexts context
               join effective_campaign_policy_compositions composition on composition.workspace_id = ${workspaceId}::uuid
                 and composition.context_id = context.id
@@ -277,7 +277,7 @@ export class DrizzleInstructionPolicyImpactRepository implements InstructionPoli
                       || '","lockRef":"' || lock.lock_ref || '","policyHash":"' || item.policy_hash
                       || '","policyRef":"' || item.policy_ref || '","policyVersion":' || item.policy_version::text
                       || ',"schemaVersion":"policy-manual-lock/1.0.0","state":"locked","workspaceRef":"'
-                      || (context.context_payload->>'workspaceRef') || '"}', 'sha256'), 'hex')))) as corrupt_manual_lock_rows,
+                      || (context.context_payload->>'workspaceRef') || '"}', 'sha256'), 'hex'))))) as corrupt_manual_lock_rows,
         (select count(*)::int from policy_authority_bindings binding join strict_instruction_policy_revisions policy
           on policy.workspace_id = binding.workspace_id and policy.id = binding.policy_revision_id
           left join account_groups account_group on account_group.workspace_id = binding.workspace_id and account_group.group_ref = binding.binding_ref

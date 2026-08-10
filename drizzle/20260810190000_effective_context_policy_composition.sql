@@ -14,6 +14,7 @@ CREATE TABLE "effective_campaign_policy_compositions" (
   CONSTRAINT "effective_campaign_policy_compositions_hashes" CHECK ("instruction_policy_registry_hash" ~ '^[a-f0-9]{64}$' and "authority_component_version" ~ '^[a-f0-9]{64}$' and "authority_snapshot_hash" ~ '^[a-f0-9]{64}$' and "authority_catalog_hash" ~ '^[a-f0-9]{64}$' and "authority_scope_hash" ~ '^[a-f0-9]{64}$' and "composition_hash" ~ '^[a-f0-9]{64}$')
 );--> statement-breakpoint
 CREATE UNIQUE INDEX "effective_campaign_policy_compositions_context_unique" ON "effective_campaign_policy_compositions" USING btree ("context_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "effective_campaign_policy_compositions_workspace_id_unique" ON "effective_campaign_policy_compositions" USING btree ("workspace_id","id");--> statement-breakpoint
 CREATE INDEX "effective_campaign_policy_compositions_workspace_lookup_idx" ON "effective_campaign_policy_compositions" USING btree ("workspace_id","instruction_policy_registry_hash","authority_component_version");--> statement-breakpoint
 CREATE TABLE "effective_campaign_policy_composition_items" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

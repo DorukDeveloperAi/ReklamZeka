@@ -244,6 +244,7 @@ describe("effective campaign context persistence contract", () => {
       expect(migration).toContain(`ALTER TABLE "${table}" FORCE ROW LEVEL SECURITY`);
     }
     expect(migration).toContain("effective_campaign_policy_compositions_context_scope_fk");
+    expect(migration).toContain("effective_campaign_policy_compositions_workspace_id_unique");
     expect(migration).toContain("effective_campaign_policy_composition_items_revision_scope_fk");
     expect(migration).toContain("effective_campaign_policy_composition_immutable");
     expect(migration).toContain("lifecycle_state = 'tombstoning'");

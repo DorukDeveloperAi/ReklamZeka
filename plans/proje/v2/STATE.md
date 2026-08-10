@@ -114,6 +114,21 @@
   Coverage ve `mutationAllowed`, bütün beş ailenin exact olması ile bütünlük/kesin engellerin temiz
   olmasına bağlıdır. G4 capability'leri yapısal olarak false kalır.
 
+## 2026-08-10 — A09.3d live authority-impact fail-closed acceptance
+
+- `verify:instruction-policy-authority-impact-db`, tek outer rollback içinde gerçek draft → empty
+  authority bootstrap → impact-OCC publish zincirini PostgreSQL'de çalıştırır. Published policy için
+  authority bridge yoksa preview `trusted_authority_catalog` ailesini partial bırakır ve mutation'ı
+  kapatır; cross-tenant görünürlük, RLS/revoke, append-only triggers, sıfır network/action ve rollback
+  sonrası sıfır geçici satır da doğrulanır.
+- Canlı çalışma, impact SQL'indeki iki parantez hatasını ve `policy_contexts` CTE'sindeki eksik
+  `ad_account_id` seçimini; pending sidecar migration'daki composite parent unique anahtar eksikliğini
+  ortaya çıkardı. Düzeltilmiş migration, yerel Drizzle migrator ile başarıyla uygulandı.
+- Bu **complete-positive acceptance değildir**: account-group, topic ve policy-semantic revisions için
+  server-private materialization writer yoktur. Verifier bu veriyi sentetik SQL ile üretmez;
+  `completeExactFixture:false` ve açık writer bağımlılığını raporlar. Browser/session kabulü de açık
+  çevresel kabul noktası olarak kalır.
+
 ## 2026-08-10 — A10.1 kalıcı DecisionCadenceProfile
 
 - `decision_cadence_profile_revisions` additive PostgreSQL tablosu tenant/account/campaign composite

@@ -148,7 +148,9 @@
   - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
     context ailelerinin complete exact-impact coverage'ı için canlı PostgreSQL kabulü ve gerçek oturumlu
     browser kabulü. Repository preview aileleri immutable policy-composition sidecar ve relational zincir
-    üzerinden ayrı ayrı değerlendirir; bu kanıtlar olmadan legacy/missing/corrupt rows partial kalır.
+    üzerinden ayrı ayrı değerlendirir; gerçek live bootstrap/publish/OCC yolu authority bridge eksikliğini
+    fail-closed kanıtlar. Complete-positive fixture, account-group/topic/semantic revisionları için private
+    writer eksik olduğu sürece açık kalır; bu kanıtlar olmadan legacy/missing/corrupt rows partial kalır.
 - [ ] Başlangıç objective/internal kategori playbook seti.
   - [x] Altı canonical objective playbook'una version/hash ile bağlı, review-required ve
     authority-free starter category/profile proposal kataloğu.

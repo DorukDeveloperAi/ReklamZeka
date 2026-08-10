@@ -444,17 +444,17 @@
       "breakpoints": true
     },
     {
-      "idx": 64,
-      "version": "7",
-      "when": 1786381200000,
-      "tag": "20260810190000_effective_context_policy_composition",
-      "breakpoints": true
-    },
-    {
       "idx": 63,
       "version": "7",
       "when": 1786377900000,
       "tag": "20260810184500_guidance_selection_tombstone_purge",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1786381200000,
+      "tag": "20260810190000_effective_context_policy_composition",
       "breakpoints": true
     }
   ]

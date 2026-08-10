@@ -2157,6 +2157,7 @@ export const effectiveCampaignPolicyCompositions = pgTable("effective_campaign_p
 }, (table) => [
   foreignKey({ columns: [table.workspaceId, table.contextId], foreignColumns: [effectiveCampaignContexts.workspaceId, effectiveCampaignContexts.id], name: "effective_campaign_policy_compositions_context_scope_fk" }).onDelete("cascade"),
   uniqueIndex("effective_campaign_policy_compositions_context_unique").on(table.contextId),
+  uniqueIndex("effective_campaign_policy_compositions_workspace_id_unique").on(table.workspaceId, table.id),
   index("effective_campaign_policy_compositions_workspace_lookup_idx").on(table.workspaceId, table.instructionPolicyRegistryHash, table.authorityComponentVersion),
   check("effective_campaign_policy_compositions_hashes", sql`${table.instructionPolicyRegistryHash} ~ '^[a-f0-9]{64}$' and ${table.authorityComponentVersion} ~ '^[a-f0-9]{64}$' and ${table.authoritySnapshotHash} ~ '^[a-f0-9]{64}$' and ${table.authorityCatalogHash} ~ '^[a-f0-9]{64}$' and ${table.authorityScopeHash} ~ '^[a-f0-9]{64}$' and ${table.compositionHash} ~ '^[a-f0-9]{64}$'`),
 ]);
