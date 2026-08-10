@@ -256,7 +256,7 @@
       "pkg": "skill:eszamanli"
     },
     ".claude/skills/eszamanli/proof/proof.mjs": {
-      "hash": "cd5669824ff5ff13",
+      "hash": "ee1dc480aaef3956",
       "pkg": "skill:eszamanli"
     },
     ".claude/skills/workflow/SKILL.md": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-10T17:11:32.649Z",
+  "updatedAt": "2026-08-10T17:49:21.965Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",
