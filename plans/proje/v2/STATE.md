@@ -2488,6 +2488,18 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   listesiyle freeze eder. Window hash ve ref tüm canonical bileşenlerden türetilir.
 - L2 feature pencerenin dışına taşarsa, scope karışırsa veya settled/ready değilse artifact oluşmaz. Raw,
   action ve write authority yapısal olarak yoktur.
-- Bu saf contract henüz database'e yazılmaz ya da Decision Room'a bağlanmaz; sonraki checkpoint immutable
-  L3 header+feature binding persistence ve L2 invalidation tüketimidir.
+- Saf contract'ın immutable relational persistence'ı ve L2 invalidation tüketimi aşağıdaki checkpoint'te
+  eklendi; Decision Room'a bağlama hâlâ ayrıdır.
 - Kanıt: `tests/deterministic-window-snapshot.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 private L3 window materializer substrate
+
+- `deterministic_window_snapshots` ve `deterministic_window_snapshot_features`, L3 window hash/payload
+  ile exact L2 feature id/ref/hash soy zincirini tenant composite FK/index altında immutable saklar.
+  Migration ENABLE+FORCE RLS, revoke, append-only/tombstone guard ve purge child→header sırasını taşır.
+- `DrizzleDeterministicWindowSnapshotRepository.save()`, saf artifact'i yeniden kurar; active workspace
+  altında tüm feature hashlerini invalidation-free readback ile doğrular. Eksik/stale kaynakta header veya
+  binding insert etmeden `source_changed` verir; action/approval/Meta-write yetkisi yoktur.
+- L3 current reader ve Decision Room/context bağlantısı henüz açık kalır.
+- Kanıt: `tests/deterministic-window-snapshot-drizzle-repository.test.ts`,
+  `tests/meta-workspace-tombstone-purge-drizzle-adapter.test.ts`, `npm run typecheck`, `npm run db:check`.

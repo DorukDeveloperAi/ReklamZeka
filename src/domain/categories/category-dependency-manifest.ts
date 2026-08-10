@@ -154,6 +154,8 @@ const columns = [
   "deterministic_feature_snapshots.quality_reason_codes",
   "deterministic_feature_snapshots.metric_result",
   "deterministic_feature_snapshots.feature_payload",
+  // L3 window payload is an immutable feature-hash envelope, not a category/policy dependency.
+  "deterministic_window_snapshots.window_payload",
   "audit_events.metadata",
   "insights.evidence",
   "operational_events.tags",

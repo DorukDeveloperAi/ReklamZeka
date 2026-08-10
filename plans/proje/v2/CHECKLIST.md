@@ -437,6 +437,9 @@
   - [x] Saf L3 window artifact: yalnız same-scope, settled ve `ready` L2 feature'ları doğrulanmış
     resolved timeframe içine freeze eder; exact feature/source-manifest hash listesi ve all-false
     capability seti taşır. Relational persistence/invalidation tüketimi sonraki checkpoint'tir.
+  - [x] Private L3 materializer substrate: immutable tenant-scoped window header+exact L2 bindingleri
+    forward migration ile saklanır; save transaction'ı aktif workspace ve invalidation-free L2 setini
+    tekrar doğrular, eksik/stale seti `source_changed` ile insert öncesi reddeder.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.

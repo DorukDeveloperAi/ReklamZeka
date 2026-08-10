@@ -3445,6 +3445,41 @@ export const deterministicFeatureSnapshotInvalidations = pgTable("deterministic_
   check("deterministic_feature_snapshot_invalidations_shape", sql`${table.eventHash} ~ '^[a-f0-9]{64}$' and ${table.reasonCode} = 'l1_source_changed' and ${table.previousSourcePayloadHash} <> ${table.currentSourcePayloadHash}`),
 ]);
 
+/** Immutable L3 window evidence, bound to the exact ready L2 feature set. */
+export const deterministicWindowSnapshots = pgTable("deterministic_window_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  metaConnectionId: uuid("meta_connection_id").notNull(), adAccountId: uuid("ad_account_id").notNull(),
+  entityLevel: metaInsightEntityLevel("entity_level").notNull(), externalEntityId: text("external_entity_id").notNull(),
+  windowRef: text("window_ref").notNull(), windowHash: text("window_hash").notNull(),
+  startDate: date("start_date", { mode: "string" }).notNull(), endDate: date("end_date", { mode: "string" }).notNull(),
+  windowPayload: jsonb("window_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.metaConnectionId], foreignColumns: [metaConnections.workspaceId, metaConnections.id], name: "deterministic_window_snapshots_connection_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.adAccountId], foreignColumns: [adAccounts.workspaceId, adAccounts.id], name: "deterministic_window_snapshots_account_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("deterministic_window_snapshots_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("deterministic_window_snapshots_workspace_ref_unique").on(table.workspaceId, table.windowRef),
+  uniqueIndex("deterministic_window_snapshots_workspace_hash_unique").on(table.workspaceId, table.windowHash),
+  index("deterministic_window_snapshots_scope_idx").on(table.workspaceId, table.adAccountId, table.entityLevel, table.externalEntityId, table.startDate, table.endDate),
+  check("deterministic_window_snapshots_shape", sql`${table.windowRef} ~ '^window_[a-f0-9]{24}$' and ${table.windowHash} ~ '^[a-f0-9]{64}$' and ${table.startDate} <= ${table.endDate} and ${table.windowPayload} #>> '{windowRef}' = ${table.windowRef} and ${table.windowPayload} #>> '{windowHash}' = ${table.windowHash}`),
+  check("deterministic_window_snapshots_no_authority", sql`${table.windowPayload} #> '{capabilities,containsRawL0}' = 'false'::jsonb and ${table.windowPayload} #> '{capabilities,canAuthorizeAction}' = 'false'::jsonb and ${table.windowPayload} #> '{capabilities,canExecuteWrite}' = 'false'::jsonb`),
+]);
+
+/** Exact L2 lineage for an immutable L3 window; stale L2 rows are rejected by the private reader. */
+export const deterministicWindowSnapshotFeatures = pgTable("deterministic_window_snapshot_features", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  windowSnapshotId: uuid("window_snapshot_id").notNull(), featureSnapshotId: uuid("feature_snapshot_id").notNull(),
+  featureRef: text("feature_ref").notNull(), featureHash: text("feature_hash").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.windowSnapshotId], foreignColumns: [deterministicWindowSnapshots.workspaceId, deterministicWindowSnapshots.id], name: "deterministic_window_snapshot_features_window_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.featureSnapshotId], foreignColumns: [deterministicFeatureSnapshots.workspaceId, deterministicFeatureSnapshots.id], name: "deterministic_window_snapshot_features_feature_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("deterministic_window_snapshot_features_exact_unique").on(table.windowSnapshotId, table.featureSnapshotId),
+  uniqueIndex("deterministic_window_snapshot_features_ref_unique").on(table.windowSnapshotId, table.featureRef),
+  index("deterministic_window_snapshot_features_feature_idx").on(table.workspaceId, table.featureSnapshotId),
+  check("deterministic_window_snapshot_features_shape", sql`${table.featureRef} ~ '^feature_[a-f0-9]{24}$' and ${table.featureHash} ~ '^[a-f0-9]{64}$'`),
+]);
+
 /** Extensible metric rows keep action/action-value families without column churn. */
 export const metaDailyInsightMetrics = pgTable("meta_daily_insight_metrics", {
   id: uuid("id").primaryKey().defaultRandom(),
