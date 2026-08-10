@@ -6,7 +6,7 @@ rol: ajan
 
 # Eşzamanlı session protokolü
 
-<!-- kanit-damga kaynak: packages/kit/templates/hooks/claims-lib.mjs, packages/kit/templates/hooks/claim-guard.mjs, packages/kit/templates/skills/eszamanli/scripts/claim.mjs sha: 57ea7cb202227e96 -->
+<!-- kanit-damga kaynak: packages/kit/templates/hooks/claims-lib.mjs, packages/kit/templates/hooks/claim-guard.mjs, packages/kit/templates/skills/eszamanli/scripts/claim.mjs sha: 553bb79553535bef -->
 
 İki Claude session'ı aynı repoda çalışırken birbirinin yazdığını ezer. Bu protokol
 çakışmayı **imkânsız** kılar (sert kapı) ve bloke olan session'ı **durdurmaz** (izole et,
@@ -61,139 +61,6 @@ koruma diye bir şey olmazdı).
 
 `release` iki iş görür: sahipsen **bırakır**, sıradaysan **vazgeçersin**. Vazgeçme yolu
 şarttır — kuyrukta unutulmuş bir istek sırayı yalanlar.
-
-## BIRAKAN HABER VERİR — sözleşmenin ikinci yarısı ⭐
-
-**Eşzamanlılık sırasına girmiş bir işi bitiriyorsan, seni bekleyene HABER BIRAKMADAN
-bitmiş sayılmaz.** Kural kullanıcı kararıdır (2026-08-09) ve gerekçesi ölçülmüştür: sıra
-doğru kuruluyordu ama "sıra sana geldi" haberi hiç kimseye ulaşmıyordu — bırakan sonucu
-KENDİ ekranına basıyor, bekleyen başka bir pencerede sessizce oturuyordu (defter,
-2026-08-07/08: 25 bloke olayına karşılık 15 kapanış).
-
-Haberi **motor gönderir, sen unutamazsın** — tek koşul kilidi BIRAKMANDIR:
-
-```sh
-node $S release --res <kaynak>     # ← bildiri tam burada doğar
-```
-
-Kim haber alır, kim almaz (`claims-lib: bildirSiradakine` — hüküm tek yerde):
-
-| bekleyenin cinsi | uyanma yolu | ne olur |
-|---|---|---|
-| **AKTİF** (canlı `wait` süreci) | kendi süreci kilidi onun adına alır | bildiri **yazılmaz** — gereksiz, üstelik okunduğunda bayat olurdu |
-| **SESSİZ** (pid'siz "istedim" işareti) | **yok** | bildiri yazılır; bekleyen ilk turunda okur |
-
-Okuma ucu `claim-guard ctx`tir (SessionStart + UserPromptSubmit, zaten kayıtlı): haber
-**bir kez** basılır ve tüketilir. Araya başka bir sahip girdiyse satır bunu söyler ve
-"şimdi al" yerine "yeniden sıraya gir" der — bayat haber yalanlamaz.
-
-### ZİNCİRİN İKİ YÖNÜ
-
-Zincir **eşzamanlılık kuyruğunun kendisidir** — ayrı bir bağımlılık modeli yok. Haber iki yöne
-birden akar:
-
-| yön | ne zaman | kime | ne der |
-|---|---|---|---|
-| **ileri** | işini bitirip kilidi bıraktın | uyanma yolu olmayan sıradakiler | 🔓 beklediğin kaynak boşaldı · şimdi al |
-| **geri** | kilit aşamasında bloke oldun | kilidi **TUTAN** oturum | ⏳ seni bekleyen var · işin bittiyse bırak |
-
-Geri yön 2026-08-09'da eklendi: "bitir de sıra bana gelsin" bilgisinin asıl muhatabı kilidi
-tutandır ve o, bugüne dek ancak `status`a bakarsa görüyordu. Kural her iki yolda da aynı:
-**yalnız YENİ bekleyen bildirilir**, yankı bildirilmez (ölçüt kuyruğun kendisi).
-
-### ROLLER — kalıcı oturumların adı (hex kimlik değil)
-
-Hex kimlik her oturumda değişir; **rol kararlıdır**. Kapalı küme (tanımsız rol reddedilir):
-
-| rol | tekil? | ne yapar |
-|---|---|---|
-| `orkestrator` | ✅ | repo içi koordinasyon — saha olaylarının TAMAMI buraya akar |
-| `altyapi` | ✅ | kit · boot · sync · kurulum · filing · vendor · seviye 0 |
-| `pm` | ✅ | projeler-arası üst hedef ve dağıtım |
-| `vizyon` · `plan` | ✅ | epizodik; sürekli açık olmaları beklenmez |
-| `worker` | ❌ **ÇOĞUL** | işi yapan oturum(lar) — slot tutmaz, **adreslenmez** |
-
-```sh
-node $S rol kayit --rol altyapi --kapsam "kit·boot·sync"   # tekil rol: dolusa --devral ister
-node $S rol durum                                          # kadro tablosu
-node $S bildir --rol altyapi --mesaj "kit sapması var"     # role seslen
-node $S kutu                                               # gelen kutum (TÜKETMEZ)
-```
-
-**ÇOĞUL role bildiri YASAK.** `--rol worker` reddedilir ve canlı adayları listeler: hangi
-worker olduğu ölçülemezken bir muhatap seçmek, haberin sessizce yanlış oturuma gitmesi
-demektir — ve gönderen "ilettim" sanır. Belirsiz adres, adressizlikten beterdir.
-
-**Her rol sahibi ilerleme görür, orkestratör hepsini.** Beslemenin süzgeci roldedir:
-orkestratör `alindi`·`deny`·`claimsiz` dahil her şeyi (tavan 12), öteki roller yalnız
-üst-düzeyi görür — `birakildi`·`kapandi`·`devir`·`cevrim` (tavan 5). **İmleçler ayrıdır:**
-biri ötekinin beslemesini tüketmez. Rolsüz worker besleme almaz; bilmesi gereken zaten kendi
-kutusundadır.
-
-### ORKESTRATÖR — sahadaki koordinatör de haber alır
-
-Planı yürüten, aşamaları sırayla ateşleyen bir oturum varsa **kayıt olur** ve saha olayları
-ona kendiliğinden düşer; kimse ona rapor yazmaz:
-
-```sh
-node $S orkestrator kayit --kapsam "plan: bildiri v1"   # sahadaki koordinatör SENSİN
-node $S orkestrator durum | birak                        # gör · erken bırak
-```
-
-**Besleme = olay defterinin projeksiyonu, elle bağlanan bir liste DEĞİL.** `olay.jsonl`
-eşzamanlılığın tek yazım noktasıdır; orkestratör onu bir **imleçle** okur
-(`orkestrator/imlec.json`, bayt ofseti — kayıt anında defterin SONUNA konur, her çizimden
-sonra ilerler). Sonuç: **her olay yapısal olarak akar**, yeni bir tip eklendiğinde kod
-değişmez, "biri bağlamayı unuttu" diye sessizce eksilmez.
-
-| olay | ne zaman | satırda |
-|---|---|---|
-| 🔒 `alindi` | kilit alındı | kim · hangi kaynak · niyet |
-| ✅ `birakildi` | kilit bırakıldı (iş bitti) | kim · niyet · kaç bekleyeni vardı |
-| ⛔ `deny`·`mesgul` | bir oturum kapıda/CLI'da durdu | kim → hangi kaynak · sahibi kim |
-| ⏳ `bekleyis` | aktif bekleyiş başladı | kim · hangi kaynak |
-| ⏱ `kapanis` | bekleyiş bitti | sonuç (`aldi`·`devraldi`·`vazgecti`·`oldu`) · süre |
-| 🔚 `kapandi` | oturum kapandı | kaç kilit bırakıldı · kaç bekleyiş yarım kaldı |
-| 🔁 `devir` | iş devredildi | görev · devir id |
-| 💀 `cevrim` | deadlock görüldü | bekleme zinciri |
-| ✍ `claimsiz` | claim'siz yazım | **tek satıra katlanır** (sayı · oturum · yol) |
-
-**Gürültü bütçesi sözleşmedir** (ölçüldü: 163 olayın 123'ü `claimsiz`): aynı
-(tip·kaynak·oturum) üçlüsü tek satır + `×N` · tavan **12 satır**, aşan `… +N GÖSTERİLMEDİ`
-ile ilan edilir · okunmamış **500'ü aşarsa** yalnız sayaç özeti basılır (imleç yine ilerler).
-
-**Ölçülen bağlam maliyeti:** tavanı dolduran 54 olaylık bir turda blok **1.543 bayt ≈ 480
-token / 17 satır** (katlama + kırpma sonrası). Sakin turda **tek bayt basılmaz** ve blok
-yalnız orkestratöre gider — sahadaki oturumlar bu bedeli hiç ödemez.
-
-### ORKESTRATÖRÜN ELİ — "şu oturum devam etsin"
-
-```sh
-node $S bildir --hedef <sessionId> --mesaj "kaynak boşaldı, a07'yi sürdür" [--res <kaynak>]
-```
-
-Hedefin posta kutusuna düşer, hedef **ilk turunda** okur (tek sefer, tüketimli). Saha
-bloğunun sonunda bu komut **kopyalanabilir hâlde, gerçek bir kimlikle** basılır. Hedef canlı
-değilse komut uyarır ama **yazar** — oturum dönerse okur; haberi düşürmek sessiz kayıptır.
-Ayrıcalık değildir: orkestratör olmayan da kullanabilir.
-
-**Orkestratör ≠ PM.** PM projeler-arası, agentic ve karar verir; orkestratör **repo içinde**,
-0 token ve yalnız **haber alır** — sahada elini işe sokmuş olan odur. **TEK SLOT:** canlı bir
-kayıt varken ikincisi sessizce kapamaz, `--devral` ister. Canlılık kilitlerdeki ölçütün
-aynısıdır (pid) — çökmüş orkestratör kimseyi bekletmez, oturum kapanınca kayıt kendiliğinden
-düşer. **Görünmez gözlemci yoktur:** sahadaki her oturum, turunun başında bu repoda bir
-orkestratör olduğunu ve olaylarının ona bildirildiğini okur.
-
-**KAPSAM REPO'DUR (ilanlı):** bu katman `~/.claude/claims/<repo>/` defterinde yaşar. Başka
-repoda da koordine edecekse orada AYRICA kayıt olur — projeler-arası eksen `/pm`'in işidir,
-burada ikinci bir küresel router yapılmaz.
-
-**İLANLI SINIR:** bildiri bir **posta kutusudur, ZİL DEĞİL** — durmuş bir oturumu
-UYANDIRMAZ (uyandırmanın tek yolu enjeksiyondur = Maestro, ve o ayrı bir katmandır).
-Seviye 0 taşıyıcısı bu yüzden iki şeyi birden söyler: *bırakırken haber ver* (bu bölüm) ve
-*bekleyeceksen kendi uyanma yolunu kur* (`wait`, aşağıdaki PARÇALA bölümü). Biri ötekinin
-yerine geçmez. Kapanan oturum da haber verir: SessionEnd (`release_all`) aynı motoru koşar.
-Okunmamış haberini görmek için: `node $S status`.
 
 ## BLOKE OLUNCA: PARÇALA — A şimdi, B kaynak devralınınca
 
@@ -252,9 +119,7 @@ Kapı bir yazımı `ÇAKIŞMA KİLİDİ` ile reddettiğinde ya da `claim` `MEŞG
    `renameSync` ile atomiktir (POSIX: tek kazanan) ve **kaybeden işi KOŞMAZ** (exit 1 →
    "Bu işi KOŞMA"). Dedup bir niyet beyanı değil, bir mekanizmadır.
 4. **Kilidi bırak.** `release --res <kaynak>` — unutma. `status`unda bekleyen ya da
-   devir işareti görünüyorsa elverişli ilk anda bırak (küçük iş önceliklidir). Bırakma aynı
-   anda **haber vermedir**: sıradaki sessiz bekleyenlere bildiri tam burada düşer
-   (yukarıdaki *BIRAKAN HABER VERİR*). Bırakmayı atlarsan haber de doğmaz.
+   devir işareti görünüyorsa elverişli ilk anda bırak (küçük iş önceliklidir).
 
 ### Sıra GERÇEKTİR (ama yalnız gerçekten bekleyene)
 
