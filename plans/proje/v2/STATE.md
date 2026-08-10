@@ -93,6 +93,15 @@
   input sırasından bağımsız, snapshot-ref bağlı ve deterministiktir; DB, model, route veya action
   capability eklenmedi.
 
+## 2026-08-10 — A10 creative fatigue ve config diagnostic
+
+- Creative diagnostic, aynı creative için settled günlük snapshot evidence'ını iki eşit pencerede
+  inceler; frequency artışı ile CTR düşüşü threshold'u birlikte geçmedikçe fatigue finding'i üretmez.
+  Az gün, az impression veya unsettled gözlem açık reason-coded `insufficient_data` kalır.
+- Objective, optimization event, billing event ve destination config drift'i fatigue'den ayrı olarak
+  raporlanır. Sonuç snapshot-bound, input-sırası deterministik ve bütün action/Meta-write capability'leri
+  false'tur; persistence, route ve otomatik creative müdahalesi eklenmedi.
+
 ## 2026-08-10 — A09 atomic starter, authoritative facet preview ve progressive persistence
 
 - Starter adoption artık zero-write blocker değildir. Owner/admin confirmation, aktif workspace
