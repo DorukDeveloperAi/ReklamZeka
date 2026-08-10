@@ -136,6 +136,10 @@
     catalog/snapshot/binding, audit ve `policy_authority` invalidation tek transaction'dadır.
     Current kullanım deterministic head, tarihsel replay explicit immutable snapshot ref/hash kullanır;
     HTTP/MCP/UI ve bütün write capability'leri kapalıdır.
+  - [x] A09.3a invalidation fidelity: catalog materializer ve manual-lock writer, türetilmiş
+    catalog/policy hash'i değil aynı workspace'te frozen context'e gerçekten yazılmış her
+    `policy_authority_workspace` ref/version çiftini geçersizleştirir. Bu yalnız stale-context
+    önlemidir; exact-impact coverage hâlâ incomplete ve `mutationAllowed=false` kalır.
   - [x] Migration journal ile canlı PostgreSQL schema/RLS/OCC/rollback kabulü: 52/52 migration,
     authority catalog, frozen context, progressive formalization ve Supabase security verifier'ları geçti.
   - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy

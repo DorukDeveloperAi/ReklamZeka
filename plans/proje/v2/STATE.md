@@ -82,6 +82,17 @@
   mevcuttur; verifier bütün publish/approve/execute/Meta-write capability'lerini `false` doğrular.
   Gerçek oturum/browser kabulü ile impact coverage'ın daha geniş mutation kapsamı hâlâ açık kalır.
 
+## 2026-08-10 — A09.3a policy-authority invalidation fidelity
+
+- Catalog materializer ve private manual-lock writer artık tahmini catalog/snapshot veya policy hash'i
+  invalidation hedefi olarak yazmaz. Aynı kısa transaction içinde workspace'in mevcut frozen context
+  component kayıtlarından yalnız gerçek `policy_authority_workspace` ref/version çiftlerini okur ve
+  her birini append-only invalidation fact'iyle kapatır; böylece eski authority closure taşıyan context
+  yeniden seçilemez.
+- Bu checkpoint authority/impact kapsamını genişletmez: complete exact-impact coverage sağlanmadı,
+  `mutationAllowed=false` ve bütün publish/approve/execute/Meta-write capability'leri false kalır.
+  HTTP/MCP/UI veya action adapter eklenmedi.
+
 ## 2026-08-10 — A10.1 kalıcı DecisionCadenceProfile
 
 - `decision_cadence_profile_revisions` additive PostgreSQL tablosu tenant/account/campaign composite

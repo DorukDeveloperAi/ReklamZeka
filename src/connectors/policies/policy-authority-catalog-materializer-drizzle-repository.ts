@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { createPolicyScopeSnapshot, createTrustedPolicyCatalog, type FrozenPolicyManualLock, type PolicyScopeSnapshot, type TrustedPolicyCatalog } from "@/application/trusted-policy-composition";
 import * as schema from "@/db/schema";
+import { invalidatePersistedPolicyAuthorityContexts } from "@/connectors/policies/policy-authority-context-invalidation";
 
 type Database = Pick<NodePgDatabase<typeof schema>, "execute" | "transaction">;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -37,7 +38,9 @@ export class DrizzlePolicyAuthorityCatalogMaterializerRepository {
       || (input.expectedCatalogHeadHash !== "GENESIS" && !HASH.test(input.expectedCatalogHeadHash))
       || (input.expectedSnapshotHeadHash !== "GENESIS" && !HASH.test(input.expectedSnapshotHeadHash)) || !HASH.test(input.expectedPolicyRegistryHash)
       || Date.parse(iso(input.expiresAt)) <= Date.parse(iso(input.occurredAt))) fail("invalid_input");
-    const catalog = createTrustedPolicyCatalog(input.catalog);
+    const { schemaVersion: _catalogSchemaVersion, authority: _catalogAuthority, catalogHash: suppliedCatalogHash, ...catalogInput } = input.catalog;
+    const catalog = createTrustedPolicyCatalog(catalogInput);
+    if (catalog.catalogHash !== suppliedCatalogHash) fail("invalid_input");
     const scope = createPolicyScopeSnapshot({ workspaceRef: input.scope.workspaceRef, evaluatedAt: input.scope.evaluatedAt,
       accountGroupRefs: input.scope.accountGroupRefs, objectiveRefs: input.scope.objectiveRefs, topicRefs: input.scope.topicRefs,
       canonicalObjective: input.scope.objectiveEvidence.canonicalObjective });
@@ -109,8 +112,8 @@ export class DrizzlePolicyAuthorityCatalogMaterializerRepository {
       }
       if (snapshotHead.length === 0) await tx.execute(sql`insert into tenant_authority_snapshot_heads (workspace_id, current_snapshot_id, current_snapshot_hash, updated_at) values (${input.workspaceId}::uuid, ${snapshotId}::uuid, ${snapshotHash}, ${input.occurredAt}::timestamptz)`);
       else await tx.execute(sql`update tenant_authority_snapshot_heads set current_snapshot_id = ${snapshotId}::uuid, current_snapshot_hash = ${snapshotHash}, updated_at = ${input.occurredAt}::timestamptz where workspace_id = ${input.workspaceId}::uuid and current_snapshot_hash = ${oldSnapshotHash}`);
-      await tx.execute(sql`insert into effective_campaign_context_invalidations (workspace_id, event_hash, component_type, component_ref, component_version, scope_kind, entity_type, entity_ref, reason_code, observed_at)
-        values (${input.workspaceId}::uuid, ${digest({ workspaceId: input.workspaceId, snapshotHash, catalogHash: catalog.catalogHash, occurredAt: input.occurredAt })}, 'policy_authority', 'policy_authority_catalog', ${snapshotHash}, 'workspace_component', null, null, 'source_changed', ${input.occurredAt}::timestamptz) on conflict (workspace_id, event_hash) do nothing`);
+      await invalidatePersistedPolicyAuthorityContexts({ executor: tx, workspaceId: input.workspaceId,
+        observedAt: input.occurredAt, changeRef: snapshotHash });
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`audit:${input.workspaceId}`}, 0))`);
       const previousAuditHash = String(rows<{ event_hash: unknown }>(await tx.execute(sql`select event_hash from audit_events where workspace_id = ${input.workspaceId}::uuid order by occurred_at desc, created_at desc, id desc limit 1`))[0]?.event_hash ?? "GENESIS");
       const audit = Object.freeze({ id: randomUUID(), workspaceId: input.workspaceId, actorId: input.actorId, action: "policy_authority_catalog.materialized",

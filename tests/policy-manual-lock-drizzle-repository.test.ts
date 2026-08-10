@@ -21,7 +21,7 @@ describe("DrizzlePolicyManualLockRepository", () => {
     const harness = repository([
       [{ id: workspaceId }], [{ role: "owner" }],
       [{ id: policyId, workspace_ref: "workspace_primary", policy_version: 1, canonical_hash: "a".repeat(64), status: "published" }],
-      [], [], [], [], [], [],
+      [], [], [{ component_version: "b".repeat(64) }], [], [], [], [], [],
     ]);
     await expect(harness.repository.append({ workspaceId, workspaceRef: "workspace_primary", actorId, actorRef: "actor_owner",
       role: "owner", occurredAt: "2026-08-10T10:00:00.000Z", command })).resolves.toMatchObject({ operation: "lock", sequence: 1,
@@ -30,9 +30,13 @@ describe("DrizzlePolicyManualLockRepository", () => {
       new PgDialect().sqlToQuery(query as never).sql).join("\n");
     expect(rendered).toContain("for update");
     expect(rendered).toContain("insert into policy_manual_lock_revisions");
+    expect(rendered).toContain("from effective_campaign_context_components");
     expect(rendered).toContain("effective_campaign_context_invalidations");
     expect(rendered).toContain("insert into audit_events");
     expect(rendered).not.toMatch(/approval_grant|execute|meta_write/i);
+    const invalidation = (harness.execute.mock.calls as unknown[][]).map(([query]) =>
+      new PgDialect().sqlToQuery(query as never)).find((query) => query.sql.includes("effective_campaign_context_invalidations"));
+    expect(invalidation?.params).toContain("b".repeat(64));
   });
 
   it("fails before mutation for a stale head, non-owner membership, or illegal unlock", async () => {
