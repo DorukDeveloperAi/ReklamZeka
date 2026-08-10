@@ -2586,6 +2586,17 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   akışı hâlâ sonraki bağımlılıktır. Kanıt: `tests/decision-room-analysis-runtime.test.ts`,
   `npm run typecheck`, `git diff --check`.
 
+## 2026-08-10 — A13 typed Meta write-spec boundary
+
+- `meta-write-spec/1.0.0`, yalnız immutable `approval_required` action plan'dan typed
+  status pause/activate ile campaign/ad-set daily/lifetime budget değişikliği adayını üretir.
+  Raw Graph path/field, external ID, token veya transport taşımaz; K0/K1/K4 ve bütün forged/invalid
+  planlar reddedilir.
+- Üretilen spec execute/Meta-write authority vermez: ayrı bir single-use human execution grant,
+  persisted freshness recheck, opaque-ref resolution ve read-after-write executor'ı hâlâ zorunludur.
+  Bu checkpoint ağ çağrısı yapmaz ve gerçek Meta write açmaz.
+- Kanıt: `tests/meta-write-spec.test.ts`, `tests/autonomy-valve.test.ts`, `npm run typecheck`.
+
 ## 2026-08-10 — A10 private timeframe-bound L3 context composer
 
 - `TimeframeBoundAnalysisContextComposer`, input olarak yalnız workspace/entity/timeframe alır. Son geçerli,

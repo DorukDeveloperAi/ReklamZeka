@@ -563,6 +563,9 @@
 ## A13 — Eylem valfi, scheduler ve rutin
 
 - [ ] Typed Meta writer allowlist; raw Graph write yok.
+  - [x] Transport-bağımsız `meta-write-spec/1.0.0`, immutable approval-required planı yalnız
+    typed status/budget adaylarına çevirir; raw Graph path/field, K0/K1/K4 ve write authority
+    taşımaz. Gerçek executor/read-after-write/rollback hâlâ açık kalır.
 - [ ] Campaign/adset/ad pause/activate eligibility ve parent/effective-status matrisi.
 - [ ] Campaign/adset budget owner write; ad-level budget negatif testi.
 - [ ] K0–K4 valve, account allowlist, caps, kill switch ve çift anahtar.
