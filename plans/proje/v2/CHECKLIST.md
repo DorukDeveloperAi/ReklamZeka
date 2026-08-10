@@ -407,6 +407,10 @@
       experiment plan→outcome, stale outcome conflict, immutable revision guard ve audit chain aynı outer
       rollback'te doğrulanır; action/Meta write ve kalıcı fixture sıfırdır.
 - [ ] L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.
+  - [x] Meta Graph insights sayfasından canonical L1 daily-insight parser: v23 capability catalog
+    provenance, hash-only source trace, exact action-type extraction, currency minor-unit dönüşümü ve
+    foreign/malformed/duplicate sayfa reddi. Transactional DB writer ve sync-runtime binding sonraki
+    checkpoint'tir.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.

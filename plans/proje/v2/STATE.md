@@ -2380,3 +2380,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   `truncated`, `moreAvailable` ve neden kodlarıyla görünürdür. Time-series ve drill-down bu saf pakette
   sıfırdır; bunların typed transportu ile L2/L3 Postgres materialization hâlâ açık kalır.
 - Kanıt: `tests/compact-agent-context.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 L1 canonical Meta insight page parser
+
+- `parseMetaInsightPage`, Graph v23 insights response'undaki dar catalog alanlarını canonical daily
+  insight sözleşmesine çevirir. Currency minor-unit dönüşümü, exact action/action-value type extraction,
+  capability catalog provenance ve hash-only source trace aynı deterministik page hash'ine bağlanır.
+- Foreign account, geçersiz tarih/para, malformed response ve duplicate canonical identity persistence'a
+  ulaşmadan fail-closed kalır. Parser L0 raw sayfayı outputta tutmaz ve hiçbir network/action/write authority
+  açmaz.
+- Bu yalnız L1 parse sınırıdır: canonical `meta_daily_insights` transaction writer'ı ile normal sync runtime
+  binding'i henüz eklenmemiştir; dolayısıyla L2 incremental materialization iddiası yoktur.
+- Kanıt: `tests/insights-materialization.test.ts`, `npm run typecheck`, `git diff --check`.
