@@ -119,6 +119,8 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "meta_sync_runs",
   "meta_sync_slices",
   "meta_sync_record_ledger",
+  "deterministic_feature_snapshot_sources",
+  "deterministic_feature_snapshots",
   "meta_daily_insights",
   "meta_daily_insight_metrics",
   "daily_ad_metrics",
@@ -407,6 +409,12 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'meta_daily_insights', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from meta_daily_insights where workspace_id = ${workspaceId}::uuid
+      union all select 'deterministic_feature_snapshots', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from deterministic_feature_snapshots where workspace_id = ${workspaceId}::uuid
+      union all select 'deterministic_feature_snapshot_sources', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from deterministic_feature_snapshot_sources where workspace_id = ${workspaceId}::uuid
       union all select 'meta_daily_insight_metrics', count(*)::int,
         coalesce(md5(string_agg(metric.id::text || ':' || metric.xmin::text || ':' || metric.ctid::text, ',' order by metric.id)), md5(''))
       from meta_daily_insight_metrics metric
@@ -495,6 +503,8 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from promotion_template_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from promotion_template_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from audience_preset_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from deterministic_feature_snapshot_sources where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from deterministic_feature_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (
       delete from meta_daily_insight_metrics where daily_insight_id in (
         select id from meta_daily_insights where workspace_id = ${input.workspaceId}::uuid

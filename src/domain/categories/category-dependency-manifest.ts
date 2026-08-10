@@ -150,6 +150,10 @@ const columns = [
   "meta_daily_insight_metrics.value_json",
   "meta_daily_insight_metrics.provenance",
   "meta_daily_insight_metrics.availability",
+  // L2 feature payloads carry only canonical metrics/source hashes; no mutable category or policy edge.
+  "deterministic_feature_snapshots.quality_reason_codes",
+  "deterministic_feature_snapshots.metric_result",
+  "deterministic_feature_snapshots.feature_payload",
   "audit_events.metadata",
   "insights.evidence",
   "operational_events.tags",

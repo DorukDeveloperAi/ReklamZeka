@@ -420,6 +420,10 @@
   - [x] L2 yazıcı hazırlığı: public observation/finding sözleşmesine iç UUID eklemeden, yalnız
     server-private adapter ile opaque snapshotRef ↔ canonical daily-insight id/contentHash manifest
     bağını taşır. Relational feature header/item persistence ve invalidation hâlâ açık kalır.
+  - [x] L2 relational storage substrate: immutable tenant-scoped feature header ve exact L1
+    source-manifest item tabloları, composite tenant FK/index, FORCE RLS/revoke ve tombstone-only
+    append-only guard ile forward migration olarak eklendi. Server-private materialization writer ve
+    L1-change invalidation tüketicisi hâlâ açık kalır.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.

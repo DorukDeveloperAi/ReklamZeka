@@ -2427,3 +2427,16 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   bağlamı bozmeden relational source-manifest FK'sini yazıcı tarafında yeniden doğrulayabilir.
 - Bu yalnız kanıt taşıma checkpoint'idir: feature header/item tablosu, selective invalidation ve L3
   rollup henüz eklenmedi; herhangi bir yetki veya Meta write açılmaz.
+
+## 2026-08-10 — A10 L2 relational storage substrate
+
+- `deterministic_feature_snapshots` immutable L2 header'ı ile
+  `deterministic_feature_snapshot_sources` exact L1 source-manifest item'ı eklendi. Kaynak item,
+  workspace-scope FK ile hem frozen feature'a hem canonical `meta_daily_insights` satırına bağlıdır;
+  header’da hashli feature/source manifest ve all-false capability payloadı tutulur.
+- Yeni forward migration, iki public tabloda ENABLE+FORCE RLS, API rollerinden revoke, tenant composite
+  FK/index ve yalnız workspace tombstoning anında DELETE kabul eden append-only trigger taşır. Tombstone
+  purger child source item → feature header → L1 insight sırasını açıkça uygular.
+- Drizzle meta snapshot zinciri önceki forward migrations için eksik snapshot ürettiği için generator
+  fazladan tarihsel delta çıkardı; migration güvenle yalnız L2 delta'ya daraltıldı. `db:check` bu
+  reconciled journal'ı doğrular. Henüz materialization writer veya L1-change invalidation yazıcısı yoktur.

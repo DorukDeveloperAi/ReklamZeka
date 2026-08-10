@@ -470,6 +470,13 @@
       "when": 1786384200000,
       "tag": "20260810195000_meta_snapshot_l2_ref_format",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1786385755087,
+      "tag": "20260810181555_lean_wendell_rand",
+      "breakpoints": true
     }
   ]
 }

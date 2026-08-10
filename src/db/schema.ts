@@ -3364,8 +3364,63 @@ export const metaDailyInsights = pgTable("meta_daily_insights", {
     table.workspaceId, table.adAccountId, table.entityLevel, table.externalEntityId,
     table.dateStart, table.dateStop, table.attributionLabel,
   ),
+  uniqueIndex("meta_daily_insights_workspace_id_unique").on(table.workspaceId, table.id),
   index("meta_daily_insights_workspace_account_date_idx").on(table.workspaceId, table.adAccountId, table.dateStart),
   index("meta_daily_insights_run_idx").on(table.syncRunId),
+]);
+
+/** Immutable, canonical-only L2 metric features. They never grant action authority. */
+export const deterministicFeatureSnapshots = pgTable("deterministic_feature_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  metaConnectionId: uuid("meta_connection_id").notNull(),
+  adAccountId: uuid("ad_account_id").notNull(),
+  entityLevel: metaInsightEntityLevel("entity_level").notNull(),
+  externalEntityId: text("external_entity_id").notNull(),
+  featureRef: text("feature_ref").notNull(),
+  featureHash: text("feature_hash").notNull(),
+  observationRef: text("observation_ref").notNull(),
+  role: text("role").notNull(),
+  startDate: date("start_date", { mode: "string" }).notNull(),
+  endDate: date("end_date", { mode: "string" }).notNull(),
+  timezone: text("timezone").notNull(),
+  sampleSize: integer("sample_size").notNull(),
+  settled: boolean("settled").notNull(),
+  qualityStatus: text("quality_status").notNull(),
+  qualityReasonCodes: jsonb("quality_reason_codes").$type<readonly string[]>().notNull(),
+  sourceManifestHash: text("source_manifest_hash").notNull(),
+  formulaCatalogVersion: text("formula_catalog_version").notNull(),
+  metricResult: jsonb("metric_result").$type<Record<string, unknown>>().notNull(),
+  featurePayload: jsonb("feature_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.metaConnectionId], foreignColumns: [metaConnections.workspaceId, metaConnections.id], name: "deterministic_feature_snapshots_connection_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.adAccountId], foreignColumns: [adAccounts.workspaceId, adAccounts.id], name: "deterministic_feature_snapshots_account_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("deterministic_feature_snapshots_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("deterministic_feature_snapshots_workspace_ref_unique").on(table.workspaceId, table.featureRef),
+  uniqueIndex("deterministic_feature_snapshots_workspace_hash_unique").on(table.workspaceId, table.featureHash),
+  index("deterministic_feature_snapshots_scope_window_idx").on(table.workspaceId, table.adAccountId, table.entityLevel, table.externalEntityId, table.startDate, table.endDate),
+  check("deterministic_feature_snapshots_shape", sql`${table.featureRef} ~ '^feature_[a-f0-9]{24}$' and ${table.featureHash} ~ '^[a-f0-9]{64}$' and ${table.sourceManifestHash} ~ '^[a-f0-9]{64}$' and ${table.sampleSize} >= 0 and ${table.role} in ('primary', 'comparison', 'series', 'pre', 'post') and ${table.qualityStatus} in ('ready', 'degraded') and ${table.featurePayload} #>> '{featureRef}' = ${table.featureRef} and ${table.featurePayload} #>> '{featureHash}' = ${table.featureHash}`),
+  check("deterministic_feature_snapshots_payload_object", sql`jsonb_typeof(${table.featurePayload}) = 'object' and jsonb_typeof(${table.metricResult}) = 'object' and jsonb_typeof(${table.qualityReasonCodes}) = 'array'`),
+  check("deterministic_feature_snapshots_no_authority", sql`${table.featurePayload} #> '{capabilities,containsRawL0}' = 'false'::jsonb and ${table.featurePayload} #> '{capabilities,canAuthorizeAction}' = 'false'::jsonb and ${table.featurePayload} #> '{capabilities,canExecuteWrite}' = 'false'::jsonb`),
+]);
+
+/** Exact relational L1 manifest retained for every immutable L2 feature. */
+export const deterministicFeatureSnapshotSources = pgTable("deterministic_feature_snapshot_sources", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  featureSnapshotId: uuid("feature_snapshot_id").notNull(),
+  dailyInsightId: uuid("daily_insight_id").notNull(),
+  snapshotRef: text("snapshot_ref").notNull(),
+  contentHash: text("content_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.featureSnapshotId], foreignColumns: [deterministicFeatureSnapshots.workspaceId, deterministicFeatureSnapshots.id], name: "deterministic_feature_snapshot_sources_feature_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.dailyInsightId], foreignColumns: [metaDailyInsights.workspaceId, metaDailyInsights.id], name: "deterministic_feature_snapshot_sources_insight_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("deterministic_feature_snapshot_sources_exact_unique").on(table.featureSnapshotId, table.dailyInsightId),
+  uniqueIndex("deterministic_feature_snapshot_sources_snapshot_unique").on(table.featureSnapshotId, table.snapshotRef),
+  index("deterministic_feature_snapshot_sources_insight_idx").on(table.workspaceId, table.dailyInsightId),
+  check("deterministic_feature_snapshot_sources_shape", sql`${table.snapshotRef} ~ '^snapshot_[a-f0-9]{32}$' and ${table.contentHash} ~ '^[a-f0-9]{64}$'`),
 ]);
 
 /** Extensible metric rows keep action/action-value families without column churn. */

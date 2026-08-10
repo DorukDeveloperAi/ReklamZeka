@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   metaDailyInsightMetrics,
   metaDailyInsights,
+  deterministicFeatureSnapshotSources,
+  deterministicFeatureSnapshots,
   metaPortfolioSyncRuns,
   metaSyncRecordLedger,
   metaSyncRuns,
@@ -25,8 +27,10 @@ describe("Meta sync persistence schema", () => {
   it("keeps parent run, independent stream, slice and canonical daily insight identities explicit", () => {
     expect([
       metaPortfolioSyncRuns, metaSyncStreams, metaSyncRuns, metaSyncSlices, metaSyncRecordLedger, metaDailyInsights, metaDailyInsightMetrics,
+      deterministicFeatureSnapshots, deterministicFeatureSnapshotSources,
     ].map(getTableName)).toEqual([
       "meta_portfolio_sync_runs", "meta_sync_streams", "meta_sync_runs", "meta_sync_slices", "meta_sync_record_ledger", "meta_daily_insights", "meta_daily_insight_metrics",
+      "deterministic_feature_snapshots", "deterministic_feature_snapshot_sources",
     ]);
     expect(getTableColumns(metaSyncStreams)).toMatchObject({
       workspaceId: expect.anything(), metaConnectionId: expect.anything(), adAccountId: expect.anything(),
@@ -45,6 +49,12 @@ describe("Meta sync persistence schema", () => {
     expect(getTableColumns(metaDailyInsights)).toMatchObject({
       entityLevel: expect.anything(), dateStart: expect.anything(), dateStop: expect.anything(), attributionLabel: expect.anything(),
       currency: expect.anything(), timezone: expect.anything(), fieldAvailability: expect.anything(), metricProvenance: expect.anything(),
+    });
+    expect(getTableColumns(deterministicFeatureSnapshots)).toMatchObject({
+      featureRef: expect.anything(), featureHash: expect.anything(), sourceManifestHash: expect.anything(), featurePayload: expect.anything(),
+    });
+    expect(getTableColumns(deterministicFeatureSnapshotSources)).toMatchObject({
+      featureSnapshotId: expect.anything(), dailyInsightId: expect.anything(), snapshotRef: expect.anything(), contentHash: expect.anything(),
     });
     expect(getTableColumns(metaDailyInsightMetrics)).toMatchObject({ aggregation: expect.anything(), actionType: expect.anything(), provenance: expect.anything() });
   });
