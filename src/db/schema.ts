@@ -3423,6 +3423,28 @@ export const deterministicFeatureSnapshotSources = pgTable("deterministic_featur
   check("deterministic_feature_snapshot_sources_shape", sql`${table.snapshotRef} ~ '^snapshot_[a-f0-9]{32}$' and ${table.contentHash} ~ '^[a-f0-9]{64}$'`),
 ]);
 
+/** Immutable evidence that a canonical L1 input changed after an L2 feature captured it. */
+export const deterministicFeatureSnapshotInvalidations = pgTable("deterministic_feature_snapshot_invalidations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  eventHash: text("event_hash").notNull(),
+  featureSnapshotId: uuid("feature_snapshot_id").notNull(),
+  dailyInsightId: uuid("daily_insight_id").notNull(),
+  previousSourcePayloadHash: text("previous_source_payload_hash").notNull(),
+  currentSourcePayloadHash: text("current_source_payload_hash").notNull(),
+  reasonCode: text("reason_code").notNull(),
+  observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.featureSnapshotId], foreignColumns: [deterministicFeatureSnapshots.workspaceId, deterministicFeatureSnapshots.id], name: "deterministic_feature_snapshot_invalidations_feature_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.dailyInsightId], foreignColumns: [metaDailyInsights.workspaceId, metaDailyInsights.id], name: "deterministic_feature_snapshot_invalidations_insight_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("deterministic_feature_snapshot_invalidations_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("deterministic_feature_snapshot_invalidations_workspace_event_unique").on(table.workspaceId, table.eventHash),
+  index("deterministic_feature_snapshot_invalidations_feature_idx").on(table.workspaceId, table.featureSnapshotId),
+  index("deterministic_feature_snapshot_invalidations_insight_idx").on(table.workspaceId, table.dailyInsightId),
+  check("deterministic_feature_snapshot_invalidations_shape", sql`${table.eventHash} ~ '^[a-f0-9]{64}$' and ${table.reasonCode} = 'l1_source_changed' and ${table.previousSourcePayloadHash} <> ${table.currentSourcePayloadHash}`),
+]);
+
 /** Extensible metric rows keep action/action-value families without column churn. */
 export const metaDailyInsightMetrics = pgTable("meta_daily_insight_metrics", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -1,9 +1,17 @@
+import { createHash } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "@/db/schema";
 import { parseMetaInsightPage, type CanonicalMetaInsightPage, type MetaInsightPagePersistencePort, type MetaInsightSourcePage, type MetaInsightSourcePagePersistencePort } from "./insights-materialization";
 
 type Database = NodePgDatabase<typeof schema>;
+
+function invalidationEventHash(input: Readonly<{ featureSnapshotId: string; dailyInsightId: string; previousSourcePayloadHash: string; currentSourcePayloadHash: string }>): string {
+  return createHash("sha256").update(JSON.stringify([
+    "deterministic_feature_snapshot_invalidation_v1", input.featureSnapshotId, input.dailyInsightId,
+    input.previousSourcePayloadHash, input.currentSourcePayloadHash,
+  ])).digest("hex");
+}
 
 /** Server-private L1 writer. It accepts only canonical parser output and never calls Meta. */
 export class DrizzleMetaInsightPagePersistence implements MetaInsightPagePersistencePort, MetaInsightSourcePagePersistencePort {
@@ -79,6 +87,30 @@ export class DrizzleMetaInsightPagePersistence implements MetaInsightPagePersist
       const byKey = new Map(resolved.map((record) => [key(record), record.id]));
       const ids = changed.map((record) => byKey.get(key(record))).filter((id): id is string => Boolean(id));
       if (ids.length !== changed.length) throw new Error("Canonical insight satırı yeniden çözülemedi");
+      const changedHashByInsightId = new Map(changed.flatMap((record) => {
+        const previous = current.get(key(record));
+        const dailyInsightId = byKey.get(key(record));
+        return previous && dailyInsightId ? [[dailyInsightId, { previous: previous.sourcePayloadHash, current: record.sourcePayloadHash }] as const] : [];
+      }));
+      if (changedHashByInsightId.size > 0) {
+        const affected = await database.select({
+          featureSnapshotId: schema.deterministicFeatureSnapshotSources.featureSnapshotId,
+          dailyInsightId: schema.deterministicFeatureSnapshotSources.dailyInsightId,
+        }).from(schema.deterministicFeatureSnapshotSources).where(and(
+          eq(schema.deterministicFeatureSnapshotSources.workspaceId, page.workspaceId),
+          inArray(schema.deterministicFeatureSnapshotSources.dailyInsightId, [...changedHashByInsightId.keys()]),
+        ));
+        if (affected.length > 0) await database.insert(schema.deterministicFeatureSnapshotInvalidations).values(affected.map((row) => {
+          const hashes = changedHashByInsightId.get(row.dailyInsightId)!;
+          return {
+            workspaceId: page.workspaceId,
+            eventHash: invalidationEventHash({ featureSnapshotId: row.featureSnapshotId, dailyInsightId: row.dailyInsightId, previousSourcePayloadHash: hashes.previous, currentSourcePayloadHash: hashes.current }),
+            featureSnapshotId: row.featureSnapshotId, dailyInsightId: row.dailyInsightId,
+            previousSourcePayloadHash: hashes.previous, currentSourcePayloadHash: hashes.current,
+            reasonCode: "l1_source_changed", observedAt: new Date(page.observedAt),
+          };
+        })).onConflictDoNothing();
+      }
       await database.delete(schema.metaDailyInsightMetrics).where(inArray(schema.metaDailyInsightMetrics.dailyInsightId, ids));
       await database.insert(schema.metaDailyInsightMetrics).values(changed.flatMap((record) => record.metrics.map((metric) => ({
         dailyInsightId: byKey.get(key(record))!, metricKey: metric.metricKey, actionType: metric.actionType ?? "",

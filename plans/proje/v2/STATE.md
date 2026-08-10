@@ -2450,3 +2450,20 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   `source_changed` verir; aynı feature hash exact payloadla yalnız unchanged replay olur.
 - Bu katman action/approval/Meta-write authority taşımaz. L1 change sonrası L2/L3 consumer invalidation
   henüz ayrı bir sonraki checkpoint'tir.
+
+## 2026-08-10 — A10 L1→L2 immutable invalidation evidence
+
+- `deterministic_feature_snapshot_invalidations`, bir L2 feature'ın captured L1 source satırı sonradan
+  değiştiğinde önceki/yeni `source_payload_hash`, exact feature ve daily-insight tenant-scope FKs ile
+  yazılan append-only olay günlüğüdür. Event hash'i aynı değişimi idempotent kılar; frozen feature'ın
+  hash'i veya payload'ı asla güncellenmez.
+- Canonical L1 writer bunu kendi kısa transaction'ında, günlük insight satırı upsert edildikten ve aynı
+  scoped `deterministic_feature_snapshot_sources` bağları çözüldükten sonra yazar. İlk kez görülen bir
+  kaynak için olay yoktur; yalnız mevcut kaynak hash'i değiştiğinde olay üretilir.
+- Forward-only migration ENABLE+FORCE RLS, tüm public/API rollerinden revoke, composite tenant FK/index
+  ve yalnız workspace tombstoning sırasında DELETE'e izin veren append-only trigger ekler. Tombstone
+  purge sırası invalidation → source item → feature header → L1 insight olarak genişletildi.
+- Bu yalnız stale kanıtıdır: L2/L3 reader'ın bu olayları read-time selective rejection veya rematerialize
+  planına dönüştürmesi sonraki checkpoint'tir. Action/approval/Meta-write yetkisi açılmaz.
+- Kanıt: `tests/meta-sync-persistence.test.ts`, `tests/deterministic-feature-snapshot-migration.test.ts`,
+  `tests/meta-workspace-tombstone-purge-drizzle-adapter.test.ts`, `npm run typecheck`, `npm run db:check`.

@@ -18,4 +18,16 @@ describe("deterministic feature snapshot migration", () => {
     expect(migration).toContain("lifecycle_state = 'tombstoning'");
     expect(migration).toContain("REVOKE ALL PRIVILEGES ON TABLE \"deterministic_feature_snapshots\"");
   });
+
+  it("adds an append-only, tenant-scoped L1 change journal without rewriting historical features", () => {
+    const invalidationMigration = readFileSync("drizzle/20260810182741_clumsy_tombstone.sql", "utf8");
+    expect(invalidationMigration).toContain('CREATE TABLE "deterministic_feature_snapshot_invalidations"');
+    expect(invalidationMigration).toContain("deterministic_feature_snapshot_invalidations_feature_scope_fk");
+    expect(invalidationMigration).toContain("deterministic_feature_snapshot_invalidations_insight_scope_fk");
+    expect(invalidationMigration).toContain('ALTER TABLE "deterministic_feature_snapshot_invalidations" ENABLE ROW LEVEL SECURITY');
+    expect(invalidationMigration).toContain('ALTER TABLE "deterministic_feature_snapshot_invalidations" FORCE ROW LEVEL SECURITY');
+    expect(invalidationMigration).toContain("deterministic_feature_snapshot_invalidation_guard");
+    expect(invalidationMigration).toContain("lifecycle_state = 'tombstoning'");
+    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toContain("deterministic_feature_snapshot_invalidations");
+  });
 });

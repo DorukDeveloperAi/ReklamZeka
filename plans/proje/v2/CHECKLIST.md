@@ -427,6 +427,10 @@
   - [x] Server-private L2 materializer: yalnız runtime-attested canonical source manifest'i kabul eder;
     active tenant/account/connection scope ve her L1 row'un current source payload hash'i aynı transactionda
     yeniden doğrulanır. Immutable header+source item insert idempotenttir; stale source fail-closed olur.
+  - [x] L1→L2 invalidation evidence journal: canonical insight writer, yalnız önceden var olan bir L1
+    source payload hash'i değiştiğinde exact relational feature-source bağlarını çözer ve immutable,
+    idempotent invalidation olayı yazar. Olay historic feature'ı değiştirmez; L2/L3 reader'ın selective
+    stale-rejection tüketicisi hâlâ açık kalır.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.
