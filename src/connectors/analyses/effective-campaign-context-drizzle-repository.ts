@@ -736,6 +736,31 @@ export class DrizzleEffectiveCampaignContextRepository {
     return null;
   }
 
+  /**
+   * Resolves the stable UI-safe campaign alias inside the tenant query. The
+   * caller never submits or receives the underlying Meta campaign reference.
+   */
+  async loadLatestValidCampaignPublic(input: Readonly<{
+    workspaceId: string;
+    campaignRef: string;
+  }>): Promise<StoredEffectiveCampaignContext | null> {
+    required(input.workspaceId);
+    if (!/^ref_[a-f0-9]{12}$/.test(input.campaignRef)) {
+      throw new EffectiveCampaignContextRepositoryError("invalid_input");
+    }
+    await assertWorkspace(this.database, input.workspaceId, false);
+    const candidates = await this.database.select().from(schema.effectiveCampaignContexts).where(and(
+      eq(schema.effectiveCampaignContexts.workspaceId, input.workspaceId),
+      eq(schema.effectiveCampaignContexts.entityType, "campaign"),
+      sql`concat('ref_', substring(encode(digest(${schema.effectiveCampaignContexts.campaignRef}, 'sha256'), 'hex') from 1 for 12)) = ${input.campaignRef}`,
+    )).orderBy(desc(schema.effectiveCampaignContexts.capturedAt), desc(schema.effectiveCampaignContexts.createdAt));
+    for (const candidate of candidates) {
+      const record = await loadRecord(this.database, candidate);
+      if (!record.invalidated) return record;
+    }
+    return null;
+  }
+
   async invalidate(input: ContextInvalidationInput): Promise<Readonly<{
     outcome: "inserted" | "unchanged";
     affectedContextCount: number;

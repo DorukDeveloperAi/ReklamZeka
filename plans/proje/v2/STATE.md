@@ -50,6 +50,16 @@
   `Brief'i tamamlayın` durumuna geçirir; bağlamı geri yükleyince yalnız insan inceleme önerisi döner.
   Brief panelinde create/publish/execute kontrolü yoktur.
 
+## 2026-08-10 — A14 persisted campaign-context read boundary
+
+- Frozen `EffectiveCampaignContext`, opaque public `campaignRef` ile tenant SQL içinde çözülür; yalnız
+  en güncel, invalidation almamış campaign context ve public-redacted projection döner. Private Meta
+  kimliği ve ham context browser'a taşınmaz.
+- `/api/campaign-context` local-session `decision_room:read` sınırına bağlı, tek-parametreli ve
+  `read-only`/`Action-Authority: none` yanıt verir. UI henüz demo kimlikleriyle bu route'u çağırmaz;
+  gerçek persisted ref geldiğinde brief/timeline birleşiminin kaynağı budur. Bağlı PostgreSQL/session
+  bu ortamda yoktur; canlı kabul açık kalır.
+
 ## 2026-08-10 — A14 entity/campaign-scoped Approval Queue read boundary
 
 - Approval Queue read modeli `entityRef` veya onunla aynı istekte kullanılamayan `campaignRef` ile

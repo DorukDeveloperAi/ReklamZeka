@@ -663,6 +663,9 @@
     - [x] Aynı brief'ten deterministik salt-okunur öneri: sınıflandırma/kesinti/eksik bilgi için önce
       insanın çözmesi gereken adımı, kapalı bağlamda kampanya şeridi incelemesini gösterir. ActionUnit,
       approval veya Meta write üretmez.
+    - [x] Opaque public campaign ref → latest-valid frozen context için session-bound read boundary;
+      public redaction, invalidation fail-closed ve zero-write HTTP contract'i. Dashboard'ın gerçek
+      persisted campaign ref ile brief/timeline bağlaması açık.
   - [ ] Brief, öneri, approval ve execution-safety durumunu aynı salt-okunur zaman çizelgesinde gösterme.
     - [x] Exact, tenant-bound keyset ActionUnit filtresi: opaque `entityRef` veya onunla aynı istekte
       kullanılamayan `campaignRef` database içinde yeniden çözülür. Campaign filtresi direct campaign ile
