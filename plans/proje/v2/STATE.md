@@ -103,6 +103,17 @@
   sidecar-sız historical replay olarak korunur; bu alan action/promotion yetkisi açmaz ve complete
   exact-impact coverage sınırı değişmez.
 
+## 2026-08-10 — A09.3c family-by-family authority impact evaluation
+
+- Policy impact preview, yalnız A09.3b immutable composition sidecar'ı mevcut, context payload ile
+  header/itemları birebir tutarlı ve relational authority zinciri temiz olduğunda ilgili aileyi
+  `exactRelational` olarak bildirir. Legacy, eksik, bozuk veya belirsiz sidecar taşıyan context bütün
+  authority ailelerini `partialOrUnknown` bırakır; tek ailedeki bozukluk diğer ailelerin kanıtını silmez.
+- Active manual lock kesin engeldir. Frozen action bridge hash'i unit/context kimliğinden yeniden
+  hesaplanır; invalidated non-terminal unit engel, invalidated terminal unit ise yalnız tarihsel etkidir.
+  Coverage ve `mutationAllowed`, bütün beş ailenin exact olması ile bütünlük/kesin engellerin temiz
+  olmasına bağlıdır. G4 capability'leri yapısal olarak false kalır.
+
 ## 2026-08-10 — A10.1 kalıcı DecisionCadenceProfile
 
 - `decision_cadence_profile_revisions` additive PostgreSQL tablosu tenant/account/campaign composite

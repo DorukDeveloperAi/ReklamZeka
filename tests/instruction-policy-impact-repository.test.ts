@@ -26,9 +26,11 @@ const emptyCounts = { registry_components: 2, contexts_needing_invalidation: 2, 
   direct_applied_contexts: 3, direct_suppressed_contexts: 1, direct_parked_contexts: 0, budget_proposals: 2,
   current_analysis_templates: 1, superseded_analysis_templates: 1, enabled_schedules: 1, run_assets: 2,
   decision_ledger_records: 2, nonterminal_action_units: 1, terminal_action_units: 2,
+  invalidated_terminal_action_units: 1, active_manual_locks: 0,
   malformed_context_policies: 0, unresolved_context_policy_refs: 0, inconsistent_context_components: 0,
   corrupt_action_lifecycle_rows: 0, corrupt_trusted_authority_rows: 0, corrupt_manual_lock_rows: 0,
-  corrupt_account_group_rows: 0, corrupt_topic_rows: 0, corrupt_opaque_action_context_rows: 0, missing_authority_bridge_rows: 0, affected_contexts: 4 };
+  corrupt_account_group_rows: 0, corrupt_topic_rows: 0, corrupt_opaque_action_context_rows: 0, missing_authority_bridge_rows: 0,
+  missing_policy_composition_rows: 0, corrupt_policy_composition_rows: 0, affected_contexts: 4 };
 function database(overrides: Partial<typeof emptyCounts> = {}) {
   const target = policy({ policyRef: "policy_health" });
   const inbound = policy({ policyRef: "policy_exception", kind: "exception", refs: ["policy_health"] });
@@ -43,12 +45,12 @@ describe("DrizzleInstructionPolicyImpactRepository", () => {
     const db = database(); const result = await new DrizzleInstructionPolicyImpactRepository(db as never)
       .preview(workspaceId, "policy_health", "publish");
     expect(result).toMatchObject({ operation: "publish", exactBlockers: { currentInboundExceptions: 1,
-      enabledSchedules: 1, nonTerminalActionUnits: 1 }, historicalImpact: { directAppliedContexts: 3,
+      enabledSchedules: 1, nonTerminalActionUnits: 1, activeManualLocks: 0 }, historicalImpact: { directAppliedContexts: 3,
       budgetProposals: 2, currentAnalysisTemplates: 1, runAssets: 2, decisionLedgerRecords: 2,
-      terminalActionUnits: 2 }, invalidationPlan: { registryComponents: 2, contextsNeedingInvalidation: 2 },
+      terminalActionUnits: 2, invalidatedTerminalActionUnits: 1 }, invalidationPlan: { registryComponents: 2, contextsNeedingInvalidation: 2 },
       coverage: { complete: false, exactRelational: expect.arrayContaining(["trusted_authority_catalog", "manual_policy_locks",
         "account_group_scope", "topic_scope", "opaque_action_policy_context"]), partialOrUnknown: expect.not.arrayContaining(["trusted_authority_catalog"]),
-        nonAuthoritativeNotes: ["action_context_hash_index_explain_not_verified"], integrity: {
+        nonAuthoritativeNotes: [], integrity: {
         unclassifiedJsonbColumns: 0, missingManifestJsonbColumns: 0 } }, disposition: "blocked",
       mutationAllowed: false, authority: { canPublish: false, canExecute: false, canWriteMeta: false } });
     expect(result?.impactHash).toMatch(/^[a-f0-9]{64}$/);
@@ -57,9 +59,14 @@ describe("DrizzleInstructionPolicyImpactRepository", () => {
       "decision_room_run_analysis_assets", "decision_ledger_records", "action_proposal_units", "tenant_authority_snapshots",
       "policy_authority_catalog_revisions", "policy_authority_bindings", "policy_manual_lock_revisions",
       "account_groups", "account_group_revisions", "authority_topics", "authority_topic_revisions",
-      "policy_semantic_binding_revisions", "action_proposal_unit_frozen_contexts"]) {
+      "policy_semantic_binding_revisions", "action_proposal_unit_frozen_contexts",
+      "effective_campaign_policy_compositions", "effective_campaign_policy_composition_items",
+      "account_group_account_bindings", "tenant_authority_snapshots"]) {
       expect(rendered).toContain(family);
     }
+    expect(rendered).toContain("policyAuthorityEvidence");
+    expect(rendered).toContain("manualLockBindingHashes");
+    expect(rendered).toContain("action-proposal-unit-frozen-context/1.0.0");
   });
 
   it("hashes deterministically and includes integrity/counter changes", async () => {
@@ -79,12 +86,43 @@ describe("DrizzleInstructionPolicyImpactRepository", () => {
       disposition: "blocked", mutationAllowed: false });
   });
 
-  it("retains all five authority families as partial when any provenance/head/bridge scan is corrupt", async () => {
+  it("keeps only the corrupted authority family partial when sidecar evidence is otherwise exact", async () => {
     const result = await new DrizzleInstructionPolicyImpactRepository(database({ corrupt_manual_lock_rows: 1 }) as never)
       .preview(workspaceId, "policy_health", "archive");
     expect(result?.coverage).toMatchObject({ exactRelational: expect.not.arrayContaining(["manual_policy_locks"]),
-      partialOrUnknown: expect.arrayContaining(["trusted_authority_catalog", "manual_policy_locks", "account_group_scope", "topic_scope", "opaque_action_policy_context"]),
+      partialOrUnknown: ["manual_policy_locks"],
       integrity: { corruptActionLifecycleRows: 1 } });
+  });
+
+  it.each([
+    ["authority snapshot/catalog mismatch", { corrupt_trusted_authority_rows: 1 }, "trusted_authority_catalog"],
+    ["manual-lock sidecar/evidence mismatch", { corrupt_manual_lock_rows: 1 }, "manual_policy_locks"],
+    ["account-group revision or account-membership mismatch", { corrupt_account_group_rows: 1 }, "account_group_scope"],
+    ["topic binding mismatch", { corrupt_topic_rows: 1 }, "topic_scope"],
+    ["recomputed action bridge mismatch", { corrupt_opaque_action_context_rows: 1 }, "opaque_action_policy_context"],
+  ] as const)("marks %s partial without claiming complete mutation coverage", async (_label, overrides, family) => {
+    const result = await new DrizzleInstructionPolicyImpactRepository(database(overrides) as never)
+      .preview(workspaceId, "policy_health", "archive");
+    expect(result).toMatchObject({ coverage: { complete: false, partialOrUnknown: [family] },
+      disposition: "blocked", mutationAllowed: false });
+  });
+
+  it("keeps every authority family partial for legacy or malformed policy-composition sidecars", async () => {
+    const missing = await new DrizzleInstructionPolicyImpactRepository(database({ missing_policy_composition_rows: 1 }) as never)
+      .preview(workspaceId, "policy_health", "archive");
+    const corrupt = await new DrizzleInstructionPolicyImpactRepository(database({ corrupt_policy_composition_rows: 1 }) as never)
+      .preview(workspaceId, "policy_health", "archive");
+    for (const result of [missing, corrupt]) {
+      expect(result?.coverage).toMatchObject({ complete: false, partialOrUnknown: ["trusted_authority_catalog",
+        "manual_policy_locks", "account_group_scope", "topic_scope", "opaque_action_policy_context"] });
+    }
+  });
+
+  it("treats active locks and invalidated nonterminal units as blockers while retaining invalidated terminal units as history", async () => {
+    const result = await new DrizzleInstructionPolicyImpactRepository(database({ active_manual_locks: 1,
+      invalidated_terminal_action_units: 2 }) as never).preview(workspaceId, "policy_health", "archive");
+    expect(result).toMatchObject({ exactBlockers: { activeManualLocks: 1 }, historicalImpact: {
+      invalidatedTerminalActionUnits: 2 }, disposition: "blocked", mutationAllowed: false });
   });
 
   it("denies inactive/cross-tenant workspace before reading policy dependencies", async () => {

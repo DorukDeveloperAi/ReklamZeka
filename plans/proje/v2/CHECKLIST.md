@@ -146,7 +146,9 @@
   - [x] Migration journal ile canlı PostgreSQL schema/RLS/OCC/rollback kabulü: 52/52 migration,
     authority catalog, frozen context, progressive formalization ve Supabase security verifier'ları geçti.
   - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
-    context ailelerinin complete exact-impact coverage'ı ve gerçek oturumlu browser kabulü.
+    context ailelerinin complete exact-impact coverage'ı için canlı PostgreSQL kabulü ve gerçek oturumlu
+    browser kabulü. Repository preview aileleri immutable policy-composition sidecar ve relational zincir
+    üzerinden ayrı ayrı değerlendirir; bu kanıtlar olmadan legacy/missing/corrupt rows partial kalır.
 - [ ] Başlangıç objective/internal kategori playbook seti.
   - [x] Altı canonical objective playbook'una version/hash ile bağlı, review-required ve
     authority-free starter category/profile proposal kataloğu.

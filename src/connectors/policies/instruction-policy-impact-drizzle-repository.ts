@@ -18,10 +18,12 @@ type CountRow = Readonly<Record<"registry_components" | "contexts_needing_invali
   "already_invalidated_contexts" | "direct_applied_contexts" | "direct_suppressed_contexts" |
   "direct_parked_contexts" | "budget_proposals" | "current_analysis_templates" |
   "superseded_analysis_templates" | "enabled_schedules" | "run_assets" | "decision_ledger_records" |
-  "nonterminal_action_units" | "terminal_action_units" | "malformed_context_policies" |
+  "nonterminal_action_units" | "terminal_action_units" | "invalidated_terminal_action_units" | "active_manual_locks" |
+  "malformed_context_policies" |
   "unresolved_context_policy_refs" | "inconsistent_context_components" | "corrupt_action_lifecycle_rows" |
   "corrupt_trusted_authority_rows" | "corrupt_manual_lock_rows" | "corrupt_account_group_rows" |
-  "corrupt_topic_rows" | "corrupt_opaque_action_context_rows" | "missing_authority_bridge_rows" | "affected_contexts", unknown>>;
+  "corrupt_topic_rows" | "corrupt_opaque_action_context_rows" | "missing_authority_bridge_rows" |
+  "missing_policy_composition_rows" | "corrupt_policy_composition_rows" | "affected_contexts", unknown>>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const POLICY_REF = /^policy_[a-z0-9][a-z0-9_.:-]{0,126}$/;
@@ -132,15 +134,16 @@ export class DrizzleInstructionPolicyImpactRepository implements InstructionPoli
         cross join lateral jsonb_array_elements(case when jsonb_typeof(context.context_payload->'policies') = 'array'
           then context.context_payload->'policies' else '[]'::jsonb end) policy(value)
       ), action_states as (
-        select unit.id, unit.context_hash, coalesce(current_event.event_type, 'awaiting_approval') as event_type
+        select unit.id, unit.unit_ref, unit.unit_hash, unit.context_hash, context.id as context_id, context.invalidated,
+          coalesce(current_event.event_type, 'awaiting_approval') as event_type
         from action_proposal_units unit left join lateral (
           select event.value->>'eventType' as event_type from action_approval_decision_events decision
           cross join lateral jsonb_array_elements(case when jsonb_typeof(decision.event_payloads) = 'array'
             then decision.event_payloads else '[]'::jsonb end) event(value)
           where decision.workspace_id = unit.workspace_id and decision.bundle_id = unit.bundle_id
             and event.value->>'unitRef' = unit.unit_ref order by decision.ordinal desc limit 1
-        ) current_event on true where unit.workspace_id = ${workspaceId}::uuid
-          and unit.context_hash in (select context_hash from affected_contexts)
+        ) current_event on true join affected_contexts context on context.context_hash = unit.context_hash
+          where unit.workspace_id = ${workspaceId}::uuid
       ) select
         (select count(*)::int from effective_campaign_context_components component
           where component.workspace_id = ${workspaceId}::uuid and component.component_type = 'instruction_policy'
@@ -173,6 +176,16 @@ export class DrizzleInstructionPolicyImpactRepository implements InstructionPoli
         (select count(*)::int from action_states where event_type in ('awaiting_approval', 'unit_approved')) as nonterminal_action_units,
         (select count(*)::int from action_states where event_type in ('unit_rejected', 'unit_changes_requested',
           'unit_expired', 'unit_stale', 'unit_superseded', 'unit_dependency_failed')) as terminal_action_units,
+        (select count(*)::int from action_states where invalidated and event_type in ('unit_rejected', 'unit_changes_requested',
+          'unit_expired', 'unit_stale', 'unit_superseded', 'unit_dependency_failed')) as invalidated_terminal_action_units,
+        (select count(distinct lock.lock_ref)::int from policy_manual_lock_revisions lock
+          join strict_instruction_policy_revisions policy on policy.workspace_id = lock.workspace_id
+            and policy.id = lock.policy_revision_id
+          where lock.workspace_id = ${workspaceId}::uuid and policy.policy_ref = ${policyRef}
+            and lock.sequence = (select max(current.sequence) from policy_manual_lock_revisions current
+              where current.workspace_id = lock.workspace_id and current.policy_revision_id = lock.policy_revision_id
+                and current.lock_ref = lock.lock_ref)
+            and lock.operation = 'lock') as active_manual_locks,
         (select count(*)::int from policy_contexts where jsonb_typeof(context_payload->'policies') is distinct from 'array'
           or exists (select 1 from jsonb_array_elements(case when jsonb_typeof(context_payload->'policies') = 'array'
             then context_payload->'policies' else '[]'::jsonb end) item where jsonb_typeof(item) <> 'object'
@@ -202,7 +215,28 @@ export class DrizzleInstructionPolicyImpactRepository implements InstructionPoli
               or (binding.binding_kind = 'semantic' and not exists (select 1 from policy_semantic_binding_revisions semantic
                 where semantic.workspace_id = binding.workspace_id and semantic.policy_revision_id = binding.policy_revision_id
                   and semantic.semantic_ref = binding.binding_ref and semantic.revision::text = binding.binding_version
-                  and semantic.revision_hash = binding.binding_hash)))) as corrupt_trusted_authority_rows,
+                  and semantic.revision_hash = binding.binding_hash))
+              or not exists (select 1 from affected_contexts context
+                join effective_campaign_policy_compositions composition on composition.workspace_id = ${workspaceId}::uuid
+                  and composition.context_id = context.id
+                join effective_campaign_policy_composition_items item on item.workspace_id = composition.workspace_id
+                  and item.composition_id = composition.id
+                where item.policy_revision_id = binding.policy_revision_id and composition.authority_snapshot_ref = snapshot.snapshot_ref
+                  and composition.authority_snapshot_hash = snapshot.snapshot_hash and composition.authority_catalog_hash = catalog.revision_hash))))
+          + (select count(*)::int from affected_contexts context
+              join effective_campaign_policy_compositions composition on composition.workspace_id = ${workspaceId}::uuid
+                and composition.context_id = context.id
+              join effective_campaign_policy_composition_items item on item.workspace_id = composition.workspace_id
+                and item.composition_id = composition.id
+              where item.policy_ref = ${policyRef} and not exists (select 1 from policy_authority_bindings binding
+                join tenant_authority_snapshots snapshot on snapshot.workspace_id = binding.workspace_id
+                  and snapshot.id = binding.authority_snapshot_id
+                join policy_authority_catalog_revisions catalog on catalog.workspace_id = binding.workspace_id
+                  and catalog.id = binding.authority_catalog_revision_id
+                where binding.workspace_id = ${workspaceId}::uuid and binding.policy_revision_id = item.policy_revision_id
+                  and snapshot.snapshot_ref = composition.authority_snapshot_ref
+                  and snapshot.snapshot_hash = composition.authority_snapshot_hash
+                  and catalog.revision_hash = composition.authority_catalog_hash)) as corrupt_trusted_authority_rows,
         (select count(*)::int from strict_instruction_policy_revisions policy
           where policy.workspace_id = ${workspaceId}::uuid and policy.policy_ref = ${policyRef}
             and policy.policy_version = (select max(current.policy_version) from strict_instruction_policy_revisions current
@@ -219,14 +253,48 @@ export class DrizzleInstructionPolicyImpactRepository implements InstructionPoli
               or (lock.sequence > 1 and not exists (select 1 from policy_manual_lock_revisions prior
                 where prior.workspace_id = lock.workspace_id and prior.policy_revision_id = lock.policy_revision_id
                   and prior.lock_ref = lock.lock_ref and prior.sequence = lock.sequence - 1
-                  and prior.revision_hash = lock.previous_revision_hash and prior.recorded_at <= lock.recorded_at)))) as corrupt_manual_lock_rows,
+                  and prior.revision_hash = lock.previous_revision_hash and prior.recorded_at <= lock.recorded_at))
+              or exists (select 1 from affected_contexts context
+                join effective_campaign_policy_compositions composition on composition.workspace_id = ${workspaceId}::uuid
+                  and composition.context_id = context.id
+                join effective_campaign_policy_composition_items item on item.workspace_id = composition.workspace_id
+                  and item.composition_id = composition.id and item.policy_revision_id = lock.policy_revision_id
+                left join tenant_authority_snapshots snapshot on snapshot.workspace_id = composition.workspace_id
+                  and snapshot.snapshot_ref = composition.authority_snapshot_ref and snapshot.snapshot_hash = composition.authority_snapshot_hash
+                left join policy_authority_catalog_revisions catalog on catalog.workspace_id = composition.workspace_id
+                  and catalog.revision_hash = composition.authority_catalog_hash
+                where snapshot.id is null or catalog.id is null
+                  or not exists (select 1 from jsonb_array_elements(case when jsonb_typeof(catalog.payload->'bindings') = 'array'
+                    then catalog.payload->'bindings' else '[]'::jsonb end) catalog_binding(value)
+                    where catalog_binding.value->>'policyRef' = item.policy_ref
+                      and (catalog_binding.value->>'policyVersion')::int = item.policy_version
+                      and catalog_binding.value->>'policyHash' = item.policy_hash
+                      and catalog_binding.value->>'manualLockRef' = lock.lock_ref)
+                  or not exists (select 1 from jsonb_array_elements_text(case when jsonb_typeof(
+                    context.context_payload #> '{policyAuthorityEvidence,manualLockBindingHashes}') = 'array'
+                    then context.context_payload #> '{policyAuthorityEvidence,manualLockBindingHashes}' else '[]'::jsonb end) evidence(lock_hash)
+                    where evidence.lock_hash = encode(digest('{"evaluatedAt":"' || (context.context_payload->>'capturedAt')
+                      || '","lockRef":"' || lock.lock_ref || '","policyHash":"' || item.policy_hash
+                      || '","policyRef":"' || item.policy_ref || '","policyVersion":' || item.policy_version::text
+                      || ',"schemaVersion":"policy-manual-lock/1.0.0","state":"locked","workspaceRef":"'
+                      || (context.context_payload->>'workspaceRef') || '"}', 'sha256'), 'hex')))) as corrupt_manual_lock_rows,
         (select count(*)::int from policy_authority_bindings binding join strict_instruction_policy_revisions policy
           on policy.workspace_id = binding.workspace_id and policy.id = binding.policy_revision_id
           left join account_groups account_group on account_group.workspace_id = binding.workspace_id and account_group.group_ref = binding.binding_ref
           left join account_group_revisions group_revision on group_revision.workspace_id = binding.workspace_id and group_revision.account_group_id = account_group.id
             and group_revision.revision = account_group.current_revision and group_revision.revision_hash = account_group.current_revision_hash
           where binding.workspace_id = ${workspaceId}::uuid and policy.policy_ref = ${policyRef} and binding.binding_kind = 'account_group'
-            and (group_revision.id is null or group_revision.status <> 'active' or (group_revision.revision > 1 and not exists (select 1 from account_group_revisions prior
+            and (group_revision.id is null or group_revision.status <> 'active'
+              or binding.binding_version <> group_revision.revision::text or binding.binding_hash <> group_revision.revision_hash
+              or not exists (select 1 from affected_contexts context
+                join effective_campaign_policy_compositions composition on composition.workspace_id = ${workspaceId}::uuid
+                  and composition.context_id = context.id
+                join effective_campaign_policy_composition_items item on item.workspace_id = composition.workspace_id
+                  and item.composition_id = composition.id
+                join account_group_account_bindings membership on membership.workspace_id = group_revision.workspace_id
+                  and membership.account_group_revision_id = group_revision.id and membership.ad_account_id = context.ad_account_id
+                where item.policy_revision_id = binding.policy_revision_id)
+              or (group_revision.revision > 1 and not exists (select 1 from account_group_revisions prior
               where prior.workspace_id = group_revision.workspace_id and prior.account_group_id = group_revision.account_group_id
                 and prior.revision = group_revision.revision - 1 and prior.revision_hash = group_revision.previous_revision_hash)))) as corrupt_account_group_rows,
         (select count(*)::int from policy_authority_bindings binding join strict_instruction_policy_revisions policy
@@ -240,24 +308,65 @@ export class DrizzleInstructionPolicyImpactRepository implements InstructionPoli
               or topic_revision.revision_hash <> binding.binding_hash or (topic_revision.revision > 1 and not exists (select 1 from authority_topic_revisions prior
                 where prior.workspace_id = topic_revision.workspace_id and prior.topic_id = topic_revision.topic_id
                   and prior.revision = topic_revision.revision - 1 and prior.revision_hash = topic_revision.previous_revision_hash)))) as corrupt_topic_rows,
-        (select count(*)::int from action_proposal_units unit
-          where unit.workspace_id = ${workspaceId}::uuid and unit.context_hash in (select context_hash from affected_contexts)
-            and (not exists (select 1 from action_proposal_unit_frozen_contexts bridge join effective_campaign_contexts context
-                on context.workspace_id = bridge.workspace_id and context.id = bridge.context_id
-              where bridge.workspace_id = unit.workspace_id and bridge.action_proposal_unit_id = unit.id
-                and bridge.context_hash = unit.context_hash and context.context_hash = unit.context_hash)
-              or exists (select 1 from affected_contexts affected where affected.context_hash = unit.context_hash and affected.invalidated))) as corrupt_opaque_action_context_rows,
+        (select count(*)::int from action_states action
+          where not exists (select 1 from action_proposal_unit_frozen_contexts bridge
+              where bridge.workspace_id = ${workspaceId}::uuid and bridge.action_proposal_unit_id = action.id
+                and bridge.context_id = action.context_id and bridge.context_hash = action.context_hash
+                and bridge.binding_hash = encode(digest(
+                  '{"contextHash":"' || action.context_hash || '","contextId":"' || action.context_id::text
+                  || '","schemaVersion":"action-proposal-unit-frozen-context/1.0.0","unitHash":"' || action.unit_hash
+                  || '","unitRef":"' || action.unit_ref || '","workspaceId":"' || ${workspaceId}
+                  || '"}', 'sha256'), 'hex'))
+            or (action.invalidated and action.event_type in ('awaiting_approval', 'unit_approved'))) as corrupt_opaque_action_context_rows,
+        (select count(*)::int from affected_contexts context where not exists (
+          select 1 from effective_campaign_policy_compositions composition
+          where composition.workspace_id = ${workspaceId}::uuid and composition.context_id = context.id
+        )) as missing_policy_composition_rows,
+        (select count(*)::int from affected_contexts context
+          join effective_campaign_policy_compositions composition on composition.workspace_id = ${workspaceId}::uuid
+            and composition.context_id = context.id
+          where composition.instruction_policy_registry_hash is distinct from context.context_payload #>> '{versions,instructionPolicyRegistry}'
+            or composition.authority_component_version is distinct from context.context_payload #>> '{versions,policyAuthority}'
+            or composition.authority_snapshot_ref is distinct from context.context_payload #>> '{policyAuthorityEvidence,snapshotRef}'
+            or composition.authority_snapshot_hash is distinct from context.context_payload #>> '{policyAuthorityEvidence,snapshotHash}'
+            or composition.authority_catalog_hash is distinct from context.context_payload #>> '{policyAuthorityEvidence,catalogHash}'
+            or composition.authority_scope_hash is distinct from context.context_payload #>> '{policyAuthorityEvidence,scopeHash}'
+            or not exists (select 1 from tenant_authority_snapshots snapshot
+              join policy_authority_catalog_revisions catalog on catalog.workspace_id = snapshot.workspace_id
+                and catalog.revision_hash = composition.authority_catalog_hash
+              where snapshot.workspace_id = ${workspaceId}::uuid and snapshot.snapshot_ref = composition.authority_snapshot_ref
+                and snapshot.snapshot_hash = composition.authority_snapshot_hash
+                and snapshot.snapshot_payload #>> '{policyAuthority,catalogHash}' = composition.authority_catalog_hash
+                and snapshot.snapshot_payload #>> '{policyAuthority,scope,scopeHash}' = composition.authority_scope_hash)
+            or composition.authority_snapshot_hash !~ '^[a-f0-9]{64}$' or composition.authority_catalog_hash !~ '^[a-f0-9]{64}$'
+            or composition.authority_scope_hash !~ '^[a-f0-9]{64}$' or composition.composition_hash !~ '^[a-f0-9]{64}$'
+            or (select count(*) from effective_campaign_policy_composition_items item
+                where item.workspace_id = ${workspaceId}::uuid and item.composition_id = composition.id)
+              <> jsonb_array_length(case when jsonb_typeof(context.context_payload->'policies') = 'array'
+                then context.context_payload->'policies' else '[]'::jsonb end)
+            or exists (select 1 from jsonb_array_elements(case when jsonb_typeof(context.context_payload->'policies') = 'array'
+                then context.context_payload->'policies' else '[]'::jsonb end) policy(value)
+              where not exists (select 1 from effective_campaign_policy_composition_items item
+                join strict_instruction_policy_revisions revision on revision.workspace_id = item.workspace_id
+                  and revision.id = item.policy_revision_id
+                where item.workspace_id = ${workspaceId}::uuid and item.composition_id = composition.id
+                  and item.policy_ref = policy.value->>'policyRef' and item.state = policy.value->>'state'
+                  and item.reason = policy.value->>'reason' and revision.policy_ref = item.policy_ref
+                  and revision.policy_version = item.policy_version and revision.canonical_hash = item.policy_hash))
+        ) as corrupt_policy_composition_rows,
         (select count(*)::int from affected_contexts) as affected_contexts
     `));
     if (dependency.length !== 1) fail("corrupt_store"); const row = dependency[0]!;
     const exactBlockers = Object.freeze({ currentInboundExceptions,
-      enabledSchedules: count(row.enabled_schedules), nonTerminalActionUnits: count(row.nonterminal_action_units) });
+      enabledSchedules: count(row.enabled_schedules), nonTerminalActionUnits: count(row.nonterminal_action_units),
+      activeManualLocks: count(row.active_manual_locks) });
     const historicalImpact = Object.freeze({ historicalInboundExceptions: totalInboundExceptions - currentInboundExceptions,
       directAppliedContexts: count(row.direct_applied_contexts), directSuppressedContexts: count(row.direct_suppressed_contexts),
       directParkedContexts: count(row.direct_parked_contexts), alreadyInvalidatedContexts: count(row.already_invalidated_contexts),
       budgetProposals: count(row.budget_proposals), currentAnalysisTemplates: count(row.current_analysis_templates),
       supersededAnalysisTemplates: count(row.superseded_analysis_templates), runAssets: count(row.run_assets),
-      decisionLedgerRecords: count(row.decision_ledger_records), terminalActionUnits: count(row.terminal_action_units) });
+      decisionLedgerRecords: count(row.decision_ledger_records), terminalActionUnits: count(row.terminal_action_units),
+      invalidatedTerminalActionUnits: count(row.invalidated_terminal_action_units) });
     const invalidationPlan = Object.freeze({ registryComponents: count(row.registry_components),
       contextsNeedingInvalidation: count(row.contexts_needing_invalidation) });
     const affectedContexts = count(row.affected_contexts);
@@ -268,27 +377,38 @@ export class DrizzleInstructionPolicyImpactRepository implements InstructionPoli
         + count(row.unresolved_context_policy_refs), inconsistentContextComponents: count(row.inconsistent_context_components),
       corruptActionLifecycleRows: count(row.corrupt_action_lifecycle_rows) + count(row.corrupt_trusted_authority_rows)
         + count(row.corrupt_manual_lock_rows) + count(row.corrupt_account_group_rows) + count(row.corrupt_topic_rows)
-        + count(row.corrupt_opaque_action_context_rows) + count(row.missing_authority_bridge_rows),
+        + count(row.corrupt_opaque_action_context_rows) + count(row.missing_authority_bridge_rows)
+        + count(row.missing_policy_composition_rows) + count(row.corrupt_policy_composition_rows),
       rowCapExceeded: affectedContexts > ROW_CAP || Object.values(cappedCounts).some((value) => value > ROW_CAP) ? 1 : 0 });
-    const authorityFamiliesExact = count(row.corrupt_trusted_authority_rows) === 0 && count(row.corrupt_manual_lock_rows) === 0
-      && count(row.corrupt_account_group_rows) === 0 && count(row.corrupt_topic_rows) === 0
-      && count(row.corrupt_opaque_action_context_rows) === 0 && count(row.missing_authority_bridge_rows) === 0;
+    const sidecarExact = count(row.missing_policy_composition_rows) === 0 && count(row.corrupt_policy_composition_rows) === 0;
+    const exactFamilies = Object.freeze([
+      ...(sidecarExact && count(row.corrupt_trusted_authority_rows) === 0 && count(row.missing_authority_bridge_rows) === 0
+        ? ["trusted_authority_catalog"] : []),
+      ...(sidecarExact && count(row.corrupt_manual_lock_rows) === 0 ? ["manual_policy_locks"] : []),
+      ...(sidecarExact && count(row.corrupt_account_group_rows) === 0 ? ["account_group_scope"] : []),
+      ...(sidecarExact && count(row.corrupt_topic_rows) === 0 ? ["topic_scope"] : []),
+      ...(sidecarExact && count(row.corrupt_opaque_action_context_rows) === 0 ? ["opaque_action_policy_context"] : []),
+    ]);
     const authorityFamilies = ["trusted_authority_catalog", "manual_policy_locks", "account_group_scope", "topic_scope", "opaque_action_policy_context"];
-    const coverage = Object.freeze({ complete: false as const,
+    const requiredExact = authorityFamilies.every((family) => exactFamilies.includes(family));
+    const integrityClean = Object.values(integrity).every((value) => value === 0);
+    const blockersClear = Object.values(exactBlockers).every((value) => value === 0);
+    const coverage = Object.freeze({ complete: requiredExact && integrityClean && blockersClear,
       manifestVersion: INSTRUCTION_POLICY_DEPENDENCY_MANIFEST_VERSION,
       exactRelational: Object.freeze(["effective_context_components", "budget_proposals", "analysis_templates",
         "decision_room_schedules", "run_analysis_assets", "decision_ledger", "action_proposal_units",
-        ...(authorityFamiliesExact ? authorityFamilies : [])]),
+        ...exactFamilies]),
       exactContractRef: Object.freeze(["strict_policy_exception_refs", "effective_context_policy_trace"]),
-      partialOrUnknown: Object.freeze([...(authorityFamiliesExact ? [] : authorityFamilies), ...(catalog.unclassifiedColumns > 0 || catalog.missingManifestColumns > 0
+      partialOrUnknown: Object.freeze([...authorityFamilies.filter((family) => !exactFamilies.includes(family)), ...(catalog.unclassifiedColumns > 0 || catalog.missingManifestColumns > 0
           ? ["unclassified_jsonb_dependency_columns"] : [])]),
-      nonAuthoritativeNotes: Object.freeze(["action_context_hash_index_explain_not_verified"]), integrity });
+      nonAuthoritativeNotes: Object.freeze([]), integrity });
     const targetSummary = Object.freeze({ policyRef: target.policy.policyRef, policyVersion: target.policy.policyVersion,
       policyHash: target.policy.canonicalHash, status: target.policy.status });
     const core = Object.freeze({ operation, registryHash, target: targetSummary, exactBlockers,
       historicalImpact, invalidationPlan, coverage });
-    return Object.freeze({ ...core, impactHash: digest(core), disposition: "blocked" as const,
-      mutationAllowed: false as const, authority: Object.freeze({ canPublish: false as const, canPause: false as const,
+    const mutationAllowed = coverage.complete && coverage.partialOrUnknown.length === 0 && integrityClean && blockersClear;
+    return Object.freeze({ ...core, impactHash: digest(core), disposition: mutationAllowed ? "review_required" as const : "blocked" as const,
+      mutationAllowed, authority: Object.freeze({ canPublish: false as const, canPause: false as const,
         canArchive: false as const, canApprove: false as const, canExecute: false as const,
         canSchedule: false as const, canCallTool: false as const, canWriteMeta: false as const }) });
   }

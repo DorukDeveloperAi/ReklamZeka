@@ -29,11 +29,13 @@ type ImpactOperation = "publish" | "pause" | "archive";
 export type InstructionPolicyImpact = Readonly<{ contractVersion: "instruction-policy-impact/1.0.0";
   impactHash: string; operation: ImpactOperation; registryHash: string;
   target: Readonly<{ policyRef: string; policyVersion: number; policyHash: string; status: PolicyStatus }>;
-  exactBlockers: Readonly<{ currentInboundExceptions: number; enabledSchedules: number; nonTerminalActionUnits: number }>;
+  exactBlockers: Readonly<{ currentInboundExceptions: number; enabledSchedules: number; nonTerminalActionUnits: number;
+    activeManualLocks: number }>;
   historicalImpact: Readonly<{ historicalInboundExceptions: number; directAppliedContexts: number;
     directSuppressedContexts: number; directParkedContexts: number; alreadyInvalidatedContexts: number;
     budgetProposals: number; currentAnalysisTemplates: number; supersededAnalysisTemplates: number;
-    runAssets: number; decisionLedgerRecords: number; terminalActionUnits: number }>;
+    runAssets: number; decisionLedgerRecords: number; terminalActionUnits: number;
+    invalidatedTerminalActionUnits: number }>;
   invalidationPlan: Readonly<{ registryComponents: number; contextsNeedingInvalidation: number }>;
   coverage: Readonly<{ complete: boolean; manifestVersion: string; exactRelational: readonly string[];
     exactContractRef: readonly string[]; partialOrUnknown: readonly string[]; nonAuthoritativeNotes: readonly string[];
@@ -57,10 +59,11 @@ const POLICY_AUTHORITY_KEYS = ["canExecute", "canWriteMeta", "canApprove", "canS
   "canAccessNetwork", "canQuerySql"] as const;
 const IMPACT_AUTHORITY_KEYS = ["canPublish", "canPause", "canArchive", "canApprove", "canExecute", "canSchedule",
   "canCallTool", "canWriteMeta"] as const;
-const BLOCKER_KEYS = ["currentInboundExceptions", "enabledSchedules", "nonTerminalActionUnits"] as const;
+const BLOCKER_KEYS = ["currentInboundExceptions", "enabledSchedules", "nonTerminalActionUnits", "activeManualLocks"] as const;
 const HISTORY_KEYS = ["historicalInboundExceptions", "directAppliedContexts", "directSuppressedContexts",
   "directParkedContexts", "alreadyInvalidatedContexts", "budgetProposals", "currentAnalysisTemplates",
-  "supersededAnalysisTemplates", "runAssets", "decisionLedgerRecords", "terminalActionUnits"] as const;
+  "supersededAnalysisTemplates", "runAssets", "decisionLedgerRecords", "terminalActionUnits",
+  "invalidatedTerminalActionUnits"] as const;
 const INTEGRITY_KEYS = ["unclassifiedJsonbColumns", "missingManifestJsonbColumns", "brokenPolicyRevisionChains",
   "unresolvedExceptionRefs", "malformedContextPolicies", "inconsistentContextComponents",
   "corruptActionLifecycleRows", "rowCapExceeded"] as const;
