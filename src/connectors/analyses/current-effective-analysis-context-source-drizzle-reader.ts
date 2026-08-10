@@ -4,6 +4,9 @@ import type { EffectiveAnalysisContextNotReadySource, EffectiveAnalysisContextRe
   EffectiveAnalysisContextSource } from "@/application/effective-analysis-context-composer";
 import { DrizzleCurrentCategoryCompositionReader, resolveCurrentCategoryCompositionInSnapshot,
   type CurrentCategoryComposition } from "@/application/current-category-composition-resolver";
+import { categoryDefinitionPublicRef } from "@/domain/categories/public-reference";
+import { buildEffectiveGuidancePack, type EffectiveGuidancePack } from "@/domain/guidance/registry";
+import { projectMetaAnalysisConfig } from "@/domain/meta/analysis-config-projection";
 import type { CategoryHierarchyTarget } from "@/domain/categories/service";
 import { CurrentDecisionCadenceReader, type CurrentDecisionCadence } from "@/connectors/decisions/current-decision-cadence-reader";
 import { CurrentReviewedGuidanceReader, type CurrentReviewedGuidanceManifest } from "@/connectors/guidance/current-reviewed-guidance-reader";
@@ -58,6 +61,63 @@ function categoryTarget(input: EffectiveAnalysisContextRequest, hierarchy: Curre
     return Object.freeze({ level: "creative", id: input.entityRef, viaAdId });
   }
   return Object.freeze({ level: input.entityType, id: input.entityRef });
+}
+
+/**
+ * Builds only from evidence already obtained in the caller-owned source
+ * snapshot. It never accepts a caller-supplied selection or fallback scope.
+ * The surrounding source remains `not_ready` until every other component is
+ * transaction-local too.
+ */
+export function buildSelectedEffectiveGuidancePackInSnapshot(input: Readonly<{
+  request: EffectiveAnalysisContextRequest;
+  capturedAt: string;
+  hierarchy: CurrentMetaHierarchyConfig;
+  categories: CurrentCategoryComposition;
+  guidance: CurrentReviewedGuidanceManifest;
+  selection: GuidanceCampaignSelection;
+}>): EffectiveGuidancePack {
+  const { request, capturedAt, hierarchy, categories, guidance, selection } = input;
+  if (guidance.capturedAt !== capturedAt || guidance.registry.workspaceId !== request.workspaceId
+    || guidance.registry.registryHash !== guidance.registryHash || categories.workspaceId !== request.workspaceId) {
+    throw new Error("corrupt_store");
+  }
+  const selected = guidance.reviewedSets.filter((set) => set.setRef === selection.selectedSetRef
+    && set.setVersion === selection.selectedSetVersion && set.setHash === selection.selectedSetHash);
+  if (selected.length !== 1 || !guidance.registry.sets.some((set) => set.id === selection.selectedSetRef
+    && set.version === selection.selectedSetVersion && set.reviewStatus === "reviewed")) {
+    throw new Error("guidance_selection_unavailable");
+  }
+  let meta;
+  try { meta = projectMetaAnalysisConfig(hierarchy.metaAnalysisConfigSnapshot, hierarchy.identity.campaignRef); }
+  catch { throw new Error("meta_scope_unavailable"); }
+  if (meta.externalCampaignId !== hierarchy.identity.campaignRef
+    || hierarchy.identity.accountRef !== request.accountRef || hierarchy.identity.hierarchyRefs.at(-1) !== request.entityRef) {
+    throw new Error("meta_scope_unavailable");
+  }
+  const internalCategoryIds = categories.dimensions.flatMap((dimension) => dimension.values.map((definition) =>
+    categoryDefinitionPublicRef(dimension.frozenContext.dimension.key, definition.key))).sort();
+  if (internalCategoryIds.length === 0 || new Set(internalCategoryIds).size !== internalCategoryIds.length) {
+    throw new Error("category_scope_unavailable");
+  }
+  try {
+    const pack = buildEffectiveGuidancePack(guidance.registry, {
+      workspaceId: request.workspaceId, accountId: request.accountRef,
+      objective: meta.objective.state === "known" ? meta.objective.value : null,
+      optimization: meta.optimizationEvent.state === "known" ? meta.optimizationEvent.value : null,
+      internalCategoryIds, entity: { type: request.entityType, id: request.entityRef },
+      topics: selection.topics, requiredTopics: selection.requiredTopics,
+      guidanceSetIds: [selection.selectedSetRef], evaluatedAt: capturedAt, budget: selection.budget,
+    });
+    if (pack.registryHash !== guidance.registryHash || pack.selectedSets.length !== 1
+      || pack.selectedSets[0]!.setId !== selection.selectedSetRef
+      || pack.selectedSets[0]!.setVersion !== selection.selectedSetVersion
+      || pack.selectedSets[0]!.setHash !== selection.selectedSetHash) throw new Error("guidance_pack_unavailable");
+    return pack;
+  } catch (error) {
+    if (error instanceof Error && error.message === "guidance_pack_unavailable") throw error;
+    throw new Error("guidance_pack_unavailable");
+  }
 }
 
 /**
@@ -126,8 +186,6 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
       if (cadence.decision.evaluatedAt !== capturedAt || cadence.decision.actionAuthority !== "none") {
         throw new Error("corrupt_store");
       }
-      // Validation only. This reader does not choose topics, bindings, budgets,
-      // or a reviewed set; those selection inputs remain unavailable here.
       const guidance: CurrentReviewedGuidanceManifest = await this.guidanceReader.readCurrentInTransaction(
         tx, input.workspaceId, capturedAt,
       );
@@ -136,6 +194,11 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
         workspaceId: input.workspaceId, accountRef: input.accountRef, campaignRef: hierarchy.identity.campaignRef,
       }, capturedAt);
       if (selection.effectiveAt > capturedAt) throw new Error("corrupt_store");
+      // The selected advisory pack is now proven inside this exact snapshot.
+      // It is intentionally not surfaced until data/history/lifecycle/authority
+      // closure is equally source-bound.
+      const pack = buildSelectedEffectiveGuidancePackInSnapshot({ request: input, capturedAt, hierarchy, categories, guidance, selection });
+      if (pack.evaluatedAt !== capturedAt) throw new Error("guidance_pack_unavailable");
       const unavailable: EffectiveAnalysisContextNotReadySource = Object.freeze({
         status: "not_ready", capturedAt, reason: "current_source_bundle_unavailable", capabilities: NO_SOURCE_CAPABILITIES,
       });

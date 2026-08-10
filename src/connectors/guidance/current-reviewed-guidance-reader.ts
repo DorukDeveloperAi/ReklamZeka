@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   createGuidanceRegistry,
+  type GuidanceRegistry,
   type GuidanceBinding,
   type GuidanceCard,
   type GuidanceSet,
@@ -159,6 +160,12 @@ function set(row: Row, workspaceId: string, capturedAt: string): CurrentSet {
 export type CurrentReviewedGuidanceManifest = Readonly<{
   capturedAt: string;
   registryHash: string;
+  /**
+   * The complete registry reconstructed from hash-validated current rows.
+   * This stays server-private: callers must still make their own explicit
+   * set/topic/scope choice rather than treating a registry as a selection.
+   */
+  registry: GuidanceRegistry;
   reviewedSets: readonly Readonly<{
     setRef: string;
     setVersion: number;
@@ -248,6 +255,6 @@ export class CurrentReviewedGuidanceReader {
       return Object.freeze({ setRef: value.id, setVersion: value.version, setHash: value.recordHash, cards: Object.freeze(manifestCards) });
     });
     const registry = createGuidanceRegistry({ workspaceId, sources, cards, bindings, sets });
-    return Object.freeze({ capturedAt, registryHash: registry.registryHash, reviewedSets: Object.freeze(reviewedSets) });
+    return Object.freeze({ capturedAt, registryHash: registry.registryHash, registry, reviewedSets: Object.freeze(reviewedSets) });
   }
 }

@@ -2148,3 +2148,16 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   `tests/current-guidance-campaign-selection-reader.test.ts`,
   `tests/current-effective-analysis-context-source-drizzle-reader.test.ts`, `npx tsc --noEmit`,
   `npm run db:check`, `git diff --check`.
+
+## 2026-08-10 — A10.4c-9 selected guidance pack in the source snapshot
+
+- `CurrentReviewedGuidanceReader` artık record-hash doğrulamasından geçmiş immutable registry'yi manifestin
+  server-private parçası olarak taşır. Current-source seam, aynı snapshotta persist edilmiş campaign selection
+  ref/version/hash'iyle tek reviewed seti eşleştirir; Meta config projection, active category refs, topicler,
+  required topicler ve budget dışında input veya default kullanmadan `EffectiveGuidancePack` üretir.
+- Registry/set hash, tenant/account/campaign scope, Meta projection ve category evidence uyuşmazlığı ile pack
+  construction hataları fail-closed olur. Data/history/lifecycle/authority closure hâlâ eksik olduğundan pack
+  dışarıya yayınlanmaz; source sonucu `not_ready`, tüm capability'ler false kalır. HTTP/UI/action/schema yoktur.
+- Kanıt: `tests/current-reviewed-guidance-reader.test.ts`,
+  `tests/current-guidance-campaign-selection-reader.test.ts`,
+  `tests/current-effective-analysis-context-source-drizzle-reader.test.ts`, `npx tsc --noEmit`.

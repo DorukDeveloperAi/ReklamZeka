@@ -28,7 +28,7 @@ function row(overrides: Record<string, unknown> = {}) {
 }
 function reader(candidate = row()) {
   const execute = vi.fn(async () => ({ rows: [candidate] }));
-  const guidanceReader = { readCurrentInTransaction: vi.fn(async () => ({ capturedAt, registryHash: "b".repeat(64),
+  const guidanceReader = { readCurrentInTransaction: vi.fn(async () => ({ capturedAt, registryHash: "b".repeat(64), registry: {} as never,
     reviewedSets: [{ setRef: core.selectedSetRef, setVersion: 1, setHash: core.selectedSetHash, cards: [] }] })) };
   return { execute, reader: new CurrentGuidanceCampaignSelectionReader(guidanceReader) };
 }
