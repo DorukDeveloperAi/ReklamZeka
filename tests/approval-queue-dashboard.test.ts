@@ -88,6 +88,11 @@ describe("Approval Queue dashboard", () => {
     expect(html).toContain("Tekil insan kararı");
     expect(html).toContain("Execute kapalı");
     expect(html).toContain("Meta write kapalı");
+    expect(html).toContain("Uygulama zinciri henüz kapalı");
+    expect(html).toContain("Mirror yeniden kontrolü");
+    expect(html).toContain("Ayrı execution seremonisi");
+    expect(html).toContain("Read-after-write sözleşmesi hazır");
+    expect(html).toContain("NO TRANSPORT");
     expect(html).not.toContain(">Onayla<");
     expect(html).not.toContain(">Reddet<");
     expect(html).not.toContain(">Değişiklik iste<");

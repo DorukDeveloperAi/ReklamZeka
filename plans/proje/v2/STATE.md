@@ -3,6 +3,30 @@
 > Kümülatif ilerleme defteri. v1'in ayrıntılı tur geçmişi
 > [v1 STATE](../v1/STATE.md)'te değişmeden korunur.
 
+## 2026-08-10 — Merkezi ürün akışı ve kademeli teslim ilkesi
+
+- Bundan sonraki ana hat, teknik alt-katmanları tek başına tamamlamak değil; kullanıcının kampanyayı
+  nasıl sınıflandırdığını ve hangi sırayla karar verdiğini görünür, denetlenebilir bir akışa çevirmektir:
+  **kampanya bağlamı → dinamik brief/şablon → salt-okunur öneri → satır-bazlı insan onayı → ayrı,
+  açıkça izinli uygulama**. Her checkpoint bu zincirde gözle görünür bir ilerleme üretmelidir.
+- Öncelik sırası: (1) çalışma kitabından türetilen kategori ve brief şablonlarını Dashboard'da
+  etkileşimli/read-only karar yüzeyine bağlamak, (2) öneri ve approval inbox'ını aynı context/timeline
+  içinde birleştirmek, (3) yalnız bu ürün döngüsü hazır olduğunda A13'ün gerçek transport ve
+  read-after-write kabulünü ayrı kullanıcı izniyle ele almak. Meta write, publish veya otomatik execute
+  bu sıralama ile açılmaz.
+- A09/A10'un mevcut fail-closed kanıtları korunur; ancak yeni ayrıntı yalnız güvenlik ihlali, veri
+  bütünlüğü riski veya bu üç ürün adımını açan somut bir blocker olduğunda yapılır. Kapsam dışı
+  "mükemmelleştirme" işleri checklist'e yeni teslimat gibi eklenmez.
+
+## 2026-08-10 — A14 approval inbox execution-safety görünümü
+
+- Approval Queue, onay kaydı, mirror yeniden kontrolü, ayrı human-presence seremonisi, kapalı Meta
+  transportu ve verify/rollback sözleşmesini beş aşamalı salt-okunur bir durum panelinde gösterir.
+  Panelde execute, rollback veya Meta çağrısı başlatan bir kontrol yoktur.
+- Gerçek dashboard tarayıcısında masaüstü görünüm ve 390px responsive görünüm doğrulandı: panel tek
+  sütuna iner, yatay taşma üretmez ve etkileşimli button içermez. Mevcut API'lerin local ortamda
+  unavailable dönmesi panelin güvenlik durumunu değiştirmez.
+
 ## 2026-08-10 — A13 execution-time Meta mirror revalidation
 
 - Disabled admission ledger, approval/grant zincirini yeniden bağladıktan sonra current persisted Meta

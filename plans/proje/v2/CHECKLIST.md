@@ -649,6 +649,16 @@
 
 ## A14 — Kontrol merkezi ve rollout
 
+- [ ] Merkezi operatör akışı: kampanya bağlamı → dinamik brief/şablon → öneri → insan onayı → ayrı
+  uygulama durumu. Alt-katman işleri yalnız bu akışın güvenlik veya veri bütünlüğü blocker'ı olduğunda
+  öncelik alır.
+  - [x] Çalışma kitabındaki lead/üst-huni, kesinti, randevu/operasyon kapasitesi ve WhatsApp/form ayrımını
+    taşıyan `interactive-campaign-template/1.0.0` karar sözleşmesi; campaign create/publish/approve/
+    execute/Meta-write yetkileri kapalı.
+  - [ ] Şablonları mevcut kampanya bağlamı ve kullanıcı girdisiyle Dashboard'da etkileşimli brief/
+    öneri yüzeyine bağlama; eksik bağlam `needs_input`, kesinti `blocked` kalır.
+  - [ ] Brief, öneri, approval ve execution-safety durumunu aynı salt-okunur zaman çizelgesinde gösterme.
+
 - [ ] Bugün/portfolio hiyerarşi ve internal/Meta filtreler.
 - [ ] Account-group switcher, multi-account connection health ve Page/Instagram asset graph.
 - [ ] Kategori/talimat stüdyosu ve raw/normalized/version/conflict görünümü.
@@ -669,6 +679,9 @@
     fixture'sız dashboard list/detail inbox bağlantısı.
   - [x] İnsan-varlığı kanıtlı, tek-ActionUnit approve/reject/request-changes mutation katmanı;
     macOS sistem diyaloğu, kısa ömürlü tek-kullanımlık proof ve atomik append-only karar kaydı.
+  - [x] Approval Queue'da salt-okunur execution-safety zinciri: onay kaydı, mirror recheck, ayrı
+    seremoninin zorunluluğu, kapalı transport ve verify/rollback contract'i; execute/rollback/Meta
+    çağrısı başlatan kontrol yok. Masaüstü ve 390px tarayıcı görünümü doğrulandı.
 - [ ] Mevcut creative library + context/performance karşılaştırması.
 - [ ] Yayındaki reklam metni/dynamic variant/CTA/destination/post kaynağı explorer'ı.
 - [ ] Instagram/Page post seçici, PromotionTemplate/AudiencePreset ve existing-post guided flow.

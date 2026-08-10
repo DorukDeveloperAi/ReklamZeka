@@ -147,6 +147,17 @@ export function ApprovalQueueReadSurface(props: Readonly<{
       <span>Tekil insan kararı</span><span>Execute kapalı</span><span>Meta write kapalı</span><strong>approval_only</strong>
     </section>
 
+    <section className={`${styles.panel} ${styles.executionSafetyPanel}`} aria-label="Eylem güvenlik durumu">
+      <header><div><span className={styles.kicker}>EXECUTION SAFETY · READ ONLY</span><h2>Uygulama zinciri henüz kapalı</h2><p>Bu görünüm durum bilgisidir; Meta çağrısı, execute veya rollback başlatmaz.</p></div><span className={styles.readOnlyBadge}>NO TRANSPORT</span></header>
+      <ol>
+        <li><span>1</span><div><strong>Onay kaydı</strong><small>ActionUnit için ayrı insan kararı tutulur.</small></div><em data-tone="good">hazır</em></li>
+        <li><span>2</span><div><strong>Mirror yeniden kontrolü</strong><small>Hesap, hedef, parent ve son snapshot tekrar eşleşmelidir.</small></div><em data-tone="good">zorunlu</em></li>
+        <li><span>3</span><div><strong>Ayrı execution seremonisi</strong><small>Tek-kullanımlık kanıt olmadan admission oluşmaz.</small></div><em data-tone="good">zorunlu</em></li>
+        <li><span>4</span><div><strong>Meta transport</strong><small>Typed executor ve dispatch bu ortamda etkin değildir.</small></div><em data-tone="danger">kapalı</em></li>
+        <li><span>5</span><div><strong>Doğrulama / rollback</strong><small>Read-after-write sözleşmesi hazır; rollback yeni insan onayı ister.</small></div><em data-tone="warning">bekliyor</em></li>
+      </ol>
+    </section>
+
     {props.state.status === "loading" ? <section className={`${styles.panel} ${styles.approvalQueueState}`} role="status"><span className={styles.liveDot} /><h2>Onay kuyruğu okunuyor</h2><p>Tenant kapsamı, public-safe projection ve ActionUnit bütünlüğü sunucuda doğrulanıyor.</p></section> : null}
     {props.state.status === "unavailable" ? <section className={`${styles.panel} ${styles.approvalQueueState}`} role="alert"><strong>Kaynak henüz bağlı değil</strong><h2>{props.state.message}</h2><p>Fixture kayıtlar canlı kuyruk gibi gösterilmez. Güvenli yerel oturum ve gerçek read repository bağlandığında bu görünüm açılır.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></section> : null}
     {props.state.status === "error" ? <section className={`${styles.panel} ${styles.approvalQueueState}`} role="alert"><strong>Onay kuyruğu okunamadı</strong><h2>{props.state.message}</h2><p>Kapsam dışı veya güvenli projection sınırını aşan kayıtlar kısmen gösterilmez.</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
