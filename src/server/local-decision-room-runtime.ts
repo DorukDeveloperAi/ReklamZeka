@@ -189,7 +189,7 @@ export function assertTrustedLocalDecisionRoomRequest(
     "guidance-set-review", "guidance-set-archive",
     "category-authoring-mutate", "category-profile-mutate", "starter-category-adoption-confirm",
     "instruction-policy-mutate", "practice-lab-standardize", "promotion-template-lifecycle-publish",
-    "progressive-formalization-mutate",
+    "progressive-formalization-mutate", "decision-cadence-publish",
   ].includes(request.headers.get("x-reklamzeka-intent") ?? "")) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if ((operation === "mark_read" || operation === "draft" || operation === "decide" || operation === "publish") && credential === "cookie"
     && (origin !== config.origin || fetchSite !== "same-origin")) {
@@ -355,6 +355,24 @@ export async function resolveTrustedLocalDecisionRoomDryRunPrincipal(input: Read
     now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
     requiredScope: "decision_room:dry_run", expected: input.config });
   assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
+/** Cookie-only cadence publication; the authenticated DB membership determines the role. */
+export async function resolveTrustedLocalDecisionCadencePublishPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null
+    || input.request.headers.get("x-reklamzeka-intent") !== "decision-cadence-publish") {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: "decision_cadence:publish", expected: input.config });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "publish", "cookie");
   return bindPrincipal(input.database, input.config);
 }
 

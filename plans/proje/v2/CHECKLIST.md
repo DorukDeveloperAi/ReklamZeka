@@ -280,7 +280,10 @@
   - [x] Cookie-only, server-bound deterministic analysis dry-run endpoint'i: workspace/actor/clock ve
     settlement policy istemciden alınmaz; explicit operator policy ref+cutoff yoksa fail-closed 503,
     varsa yalnız advisory run/ledger/inbox sonucu ve `actionAuthority:none` üretir.
-  - [ ] Rol yönetimi/audit mutation API'si ve policy-configured canlı PostgreSQL dry-run acceptance.
+  - [x] Cookie-only server-bound `DecisionCadenceProfile` yayınlama API'si: actor/rol/clock istemciden
+    alınmaz; owner/admin membership, current-hash OCC ve append-only audit repository transaction'ında tekrar
+    doğrulanır. Action/approval/Meta-write authority yapısal olarak `false` kalır.
+  - [ ] Policy-configured canlı PostgreSQL dry-run acceptance.
 - [x] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
   - [x] Deterministik on-pass agenda, category/topic subset ve context/timeframe-bound finding çekirdeği.
   - [x] A10.2c agenda hash+payload'ı ilk run claim'inde immutable Decision Room run assetine freeze edilir;
@@ -292,7 +295,7 @@
 - [ ] DecisionCadenceProfile, no-change/repeat suppression ve ExperimentRecord lifecycle.
   - [x] Settle/observation/learning/cooldown/evidence/repeat saf karar kapısı ve tek değişkenli experiment çekirdeği.
   - [x] Manual/scheduled ortak executor, idempotency/overlap/retry/lease ve in-app inbox çekirdeği.
-  - [ ] Cadence/experiment PostgreSQL persistence, rol/audit API'si ve Decision Room adapter binding'i.
+  - [ ] Cadence/experiment PostgreSQL persistence ve Decision Room adapter binding'i.
     - [x] A10.1 tenant-scoped immutable `DecisionCadenceProfile` revision persistence:
       owner/admin membership recheck, current-hash OCC, audit kaydı, RLS/FORCE RLS ve tombstone
       purge sözleşmesi; tüm action/approval/Meta-write capability'leri false.
@@ -301,6 +304,8 @@
     - [x] A10.2b ExperimentRecord append-only plan→outcome lifecycle'i: explicit stop conditions,
       frozen cadence revision, tenant scope, actor-role recheck, hash chain, audit, RLS ve tombstone guard;
       outcome yalnız `winner|loser|inconclusive|guardrail_stopped` advisory evidence'dır.
+    - [x] A10.2d Cadence profile publish endpoint'i ayrı local-session scope/intent altında yalnız owner/admin'e
+      açılır; profile command dışında caller identity/authority kabul etmez ve persisted audit zincirini kullanır.
 - [ ] L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.

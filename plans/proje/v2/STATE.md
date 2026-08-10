@@ -1865,3 +1865,14 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Canlı kabul: STDIO initialize/list/call, session register, dashboard active-session discovery, 60 saniyelik
   handoff create, CLI consume ve replay reject geçti; Decision Room, policy bundle ve promotion preflight gerçek
   localhost→PostgreSQL hattına ulaştı. Geçici MCP kabul session'ları hedefli biçimde temizlendi.
+## 2026-08-10 — A10 cadence profile server-bound publication
+
+- `/api/decision-cadence` yalnız cookie-only same-origin `decision-cadence-publish` intent'i ve ayrı
+  `decision_cadence:publish` session scope'u ile `DecisionCadenceProfile` yayınlar. İstemci yalnız profile
+  command alanlarını verir; workspace, actor, membership role ve UTC clock server'da çözülür.
+- Application service owner/admin rolünü tekrar denetler; Drizzle publisher aktif workspace/membership, account-
+  campaign tenant scope, expected-current-hash OCC, immutable revision ve hash-chain audit'i tek transaction'da
+  uygular. Response action/approval/Meta-write yetkisi üretmez.
+- Bu yalnız cadence configuration mutation yüzeyidir. Experiment plan/outcome HTTP yüzeyi, run adapter'ı ve
+  policy-configured canlı PostgreSQL dry-run acceptance ayrı açık işlerdir. Yerel çevrede settlement policy ve
+  bağlanabilir PostgreSQL/session binding olmadığı için live dry-run doğrulanmadı.
