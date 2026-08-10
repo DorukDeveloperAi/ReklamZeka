@@ -7,8 +7,6 @@ import { Pool } from "pg";
 import { buildEffectiveCampaignContext } from "@/analyses/effective-campaign-context";
 import type { EffectiveAnalysisContextReadySource } from "@/application/effective-analysis-context-composer";
 import { DrizzleCurrentEffectiveAnalysisContextSourceReader } from "@/connectors/analyses/current-effective-analysis-context-source-drizzle-reader";
-import { DrizzleEffectiveCampaignContextRepository } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
-import { sourceComponentsOf } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
 import { bindCategoryProfiles, createCategoryProfile } from "@/domain/categories/category-profile";
 import { categoryDefinitionPublicRef } from "@/domain/categories/public-reference";
 import { resolveEffectiveCategory, type CategoryDefinition, type CategoryDimension } from "@/domain/categories/registry";
@@ -113,7 +111,7 @@ function readySource(): EffectiveAnalysisContextReadySource {
  * writer path against PostgreSQL without pretending to seed that entire graph.
  */
 let originalLoad: typeof DrizzleCurrentEffectiveAnalysisContextSourceReader.prototype.loadCurrent | undefined;
-let fetchCalls = 0; let saved = false; let invalidatedReplayBlocked = false; let tenantMismatchBlocked = false; let rolledBack = false;
+let fetchCalls = 0; let syntheticAuthorityRejected = false; let rolledBack = false;
 const originalFetch = globalThis.fetch;
 try {
   globalThis.fetch = (async () => { fetchCalls += 1; throw new Error("network_not_allowed"); }) as typeof fetch;
@@ -142,21 +140,9 @@ try {
       profilePayload: cadence });
 
     const composer = createDrizzleEffectiveAnalysisContextComposer({ database: transaction as never });
-    const result = await composer.composeAndSave(request);
-    saved = result.outcome === "inserted" && result.context.data.trustStatus === "not_ready"
-      && JSON.stringify(result.context.data.blockers) === JSON.stringify(["analysis_window_not_bound"])
-      && result.context.policyAuthorityEvidence !== undefined
-      && Object.values(result.context.capabilities).every((capability) => capability === false);
-    const writer = new DrizzleEffectiveCampaignContextRepository(transaction as never);
-    const sourceSnapshot = sourceComponentsOf(result.context).find((entry) => entry.componentType === "source_snapshot");
-    if (!sourceSnapshot) throw new Error("source_snapshot_component_missing");
-    await writer.invalidate({ workspaceId, ...sourceSnapshot, scope: { kind: "exact_entity_component", entityType: "campaign",
-      entityRef: request.entityRef }, reasonCode: "source_changed", observedAt: "2026-08-10T15:01:00.000Z" });
-    invalidatedReplayBlocked = await composer.composeAndSave(request).then(() => false, (error: unknown) =>
-      error instanceof Error && "code" in error && error.code === "invalidated_save");
-    tenantMismatchBlocked = await composer.composeAndSave({ ...request, workspaceId: foreignWorkspaceId }).then(() => false,
-      () => true);
-    if (!saved || !invalidatedReplayBlocked || !tenantMismatchBlocked || fetchCalls !== 0) throw new Error("ready_root_assertion_failed");
+    syntheticAuthorityRejected = await composer.composeAndSave(request).then(() => false, (error: unknown) =>
+      error instanceof Error && "code" in error && error.code === "source_rejected");
+    if (!syntheticAuthorityRejected || fetchCalls !== 0) throw new Error("ready_root_assertion_failed");
     throw rollback;
   });
 } catch (error) {
@@ -170,8 +156,7 @@ const survivors = await database.execute(sql`select count(*)::int as count from 
 await pool.end();
 if (!rolledBack || Number(survivors.rows[0]?.count) !== 0 || fetchCalls !== 0) throw new Error("outer_rollback_failed");
 console.log(JSON.stringify({ ok: true, scope: "component_live_smoke_not_closed_world_source_acceptance",
-  rootComposerPersisted: saved, dataNotReadyExact: true, productionAuthoritySourceBound: true,
-  allCapabilitiesFalse: true, invalidatedReplayBlocked, tenantMismatchBlocked, sourceReader: "scope_checked_test_bundle",
+  syntheticAuthorityRejected, sourceReader: "scope_checked_test_bundle",
   closedWorldSourceFixtureNotSeeded: ["canonical_meta_hierarchy_config", "category_profile_assignment",
     "reviewed_guidance_set_card_source", "guidance_campaign_selection", "instruction_policy_lifecycle",
     "tenant_authority_catalog_snapshot_bindings", "account_group_topic_manual_lock_semantic_bindings",

@@ -2141,6 +2141,42 @@ export const effectiveCampaignContextComponents = pgTable("effective_campaign_co
   `),
 ]);
 
+/** Immutable A09 policy-resolution evidence for contexts composed with trusted authority. */
+export const effectiveCampaignPolicyCompositions = pgTable("effective_campaign_policy_compositions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  contextId: uuid("context_id").notNull(),
+  instructionPolicyRegistryHash: text("instruction_policy_registry_hash").notNull(),
+  authorityComponentVersion: text("authority_component_version").notNull(),
+  authoritySnapshotRef: text("authority_snapshot_ref").notNull(),
+  authoritySnapshotHash: text("authority_snapshot_hash").notNull(),
+  authorityCatalogHash: text("authority_catalog_hash").notNull(),
+  authorityScopeHash: text("authority_scope_hash").notNull(),
+  compositionHash: text("composition_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.contextId], foreignColumns: [effectiveCampaignContexts.workspaceId, effectiveCampaignContexts.id], name: "effective_campaign_policy_compositions_context_scope_fk" }).onDelete("cascade"),
+  uniqueIndex("effective_campaign_policy_compositions_context_unique").on(table.contextId),
+  index("effective_campaign_policy_compositions_workspace_lookup_idx").on(table.workspaceId, table.instructionPolicyRegistryHash, table.authorityComponentVersion),
+  check("effective_campaign_policy_compositions_hashes", sql`${table.instructionPolicyRegistryHash} ~ '^[a-f0-9]{64}$' and ${table.authorityComponentVersion} ~ '^[a-f0-9]{64}$' and ${table.authoritySnapshotHash} ~ '^[a-f0-9]{64}$' and ${table.authorityCatalogHash} ~ '^[a-f0-9]{64}$' and ${table.authorityScopeHash} ~ '^[a-f0-9]{64}$' and ${table.compositionHash} ~ '^[a-f0-9]{64}$'`),
+]);
+
+export const effectiveCampaignPolicyCompositionItems = pgTable("effective_campaign_policy_composition_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  compositionId: uuid("composition_id").notNull(),
+  policyRevisionId: uuid("policy_revision_id").notNull(),
+  policyRef: text("policy_ref").notNull(), policyVersion: integer("policy_version").notNull(), policyHash: text("policy_hash").notNull(),
+  state: text("state").notNull(), reason: text("reason").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.compositionId], foreignColumns: [effectiveCampaignPolicyCompositions.workspaceId, effectiveCampaignPolicyCompositions.id], name: "effective_campaign_policy_composition_items_composition_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.policyRevisionId], foreignColumns: [strictInstructionPolicyRevisions.workspaceId, strictInstructionPolicyRevisions.id], name: "effective_campaign_policy_composition_items_revision_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("effective_campaign_policy_composition_items_exact_unique").on(table.compositionId, table.policyRef),
+  index("effective_campaign_policy_composition_items_revision_idx").on(table.workspaceId, table.policyRevisionId),
+  check("effective_campaign_policy_composition_items_shape", sql`${table.policyVersion} >= 1 and ${table.policyHash} ~ '^[a-f0-9]{64}$' and ${table.state} in ('applied', 'suppressed', 'parked_conflict') and btrim(${table.reason}) <> ''`),
+]);
+
 /** Append-only invalidation facts. They never mutate historical context payloads. */
 export const effectiveCampaignContextInvalidations = pgTable("effective_campaign_context_invalidations", {
   id: uuid("id").primaryKey().defaultRandom(),

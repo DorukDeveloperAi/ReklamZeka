@@ -235,4 +235,27 @@ describe("effective campaign context persistence contract", () => {
     expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|TRUNCATE|DELETE FROM/);
     expect(migration).not.toContain("DROP CONSTRAINT");
   });
+
+  it("makes A09 policy composition source-bound, append-only and legacy-optional", () => {
+    const migration = readFileSync("drizzle/20260810190000_effective_context_policy_composition.sql", "utf8");
+    const repository = readFileSync("src/connectors/analyses/effective-campaign-context-drizzle-repository.ts", "utf8");
+    for (const table of ["effective_campaign_policy_compositions", "effective_campaign_policy_composition_items"]) {
+      expect(migration).toContain(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`);
+      expect(migration).toContain(`ALTER TABLE "${table}" FORCE ROW LEVEL SECURITY`);
+    }
+    expect(migration).toContain("effective_campaign_policy_compositions_context_scope_fk");
+    expect(migration).toContain("effective_campaign_policy_composition_items_revision_scope_fk");
+    expect(migration).toContain("effective_campaign_policy_composition_immutable");
+    expect(migration).toContain("lifecycle_state = 'tombstoning'");
+    expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|TRUNCATE/);
+    expect(repository).toContain("policy_authority_bindings binding");
+    expect(repository).toContain("snapshot.snapshot_ref = ${evidence.snapshotRef}");
+    expect(repository).toContain("snapshot.snapshot_payload #>> '{policyAuthority,scope,scopeHash}' = ${evidence.scopeHash}");
+    expect(repository).toContain("catalog.revision_hash = ${evidence.catalogHash}");
+    expect(repository).toContain("catalog.payload #>> '{instructionPolicyRegistryHash}' = ${context.versions.instructionPolicyRegistry}");
+    expect(repository).not.toContain("tenant_authority_snapshot_heads head");
+    expect(repository).toContain("if (current.has(row.policy_ref)) throw new EffectiveCampaignContextRepositoryError");
+    expect(repository).toContain("if (evidence === undefined) return null");
+    expect(repository).not.toContain("order by policy_ref, policy_version desc");
+  });
 });

@@ -34,7 +34,7 @@ describe("explicit workspace tombstone purge adapter", () => {
 
     expect(evidence.candidateCount).toBe(1);
     expect(evidence.revision).toMatch(/^[a-f0-9]{64}$/);
-    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(102);
+    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(104);
     const allSchemaTables = Object.values(schema)
       .flatMap((value) => isTable(value) ? [getTableName(value)] : [])
       .sort();
@@ -80,7 +80,7 @@ describe("explicit workspace tombstone purge adapter", () => {
     expect(result).toEqual({ purgedRowCount: 0, membershipCount: 0 });
     expect(inspectCalls).toBe(3);
     const deletes = statements.filter((statement) => statement.includes("delete from"));
-    expect(deletes).toHaveLength(102);
+    expect(deletes).toHaveLength(104);
     expect(deletes.findIndex((statement) => statement.includes("delete from guidance_analysis_run_bindings")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from decision_room_runs")));
     expect(deletes.findIndex((statement) => statement.includes("delete from strict_instruction_policy_revisions")))
@@ -134,6 +134,10 @@ describe("explicit workspace tombstone purge adapter", () => {
     expect(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_context_invalidations")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_contexts")));
     expect(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_context_components")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_contexts")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_policy_composition_items")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_policy_compositions")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_policy_compositions")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_contexts")));
     expect(deletes.findIndex((statement) => statement.includes("delete from decision_ledger_records")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_contexts")));

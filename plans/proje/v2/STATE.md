@@ -93,6 +93,16 @@
   `mutationAllowed=false` ve bütün publish/approve/execute/Meta-write capability'leri false kalır.
   HTTP/MCP/UI veya action adapter eklenmedi.
 
+## 2026-08-10 — A09.3b effective policy-composition sidecar
+
+- Trusted-authority ile compose edilen yeni effective context, registry hash'i, authority component,
+  snapshot/catalog/scope hash'i ve çözüm hash'ini; her policy için exact immutable strict revision,
+  applied/suppressed/parked state ve reason ile aynı save transaction'ında append-only yazar. Authority
+  snapshot, catalog/binding zinciri veya bağlanan immutable strict revision eksik/mismatched ise save
+  fail-closed kalır. Legacy context
+  sidecar-sız historical replay olarak korunur; bu alan action/promotion yetkisi açmaz ve complete
+  exact-impact coverage sınırı değişmez.
+
 ## 2026-08-10 — A10.1 kalıcı DecisionCadenceProfile
 
 - `decision_cadence_profile_revisions` additive PostgreSQL tablosu tenant/account/campaign composite
@@ -2220,13 +2230,13 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: `tests/effective-analysis-context-composer-runtime.test.ts`,
   `tests/effective-analysis-context-composer.test.ts`, `npx tsc --noEmit`, `git diff --check`.
 
-## 2026-08-10 — A10.4c-13 narrow PostgreSQL root-persistence smoke
+## 2026-08-10 — A10.4c-13 narrow PostgreSQL root fail-closed smoke
 
 - `verify:ready-effective-analysis-context-root-db`, outer rollback altında concrete private composition
-  root'un evidence-bound context yazımını, `productionAuthoritySourceBound:true` kanıtını, tüm capability
-  bayraklarının false kalışını, exact data blocker'ını, source-component invalidation sonrası replay
-  reddini ve tenant mismatch reddini test eder. Network/action çağrısı sıfır, geçici satırlar rollback
-  sonrasında yoktur.
+  root'un scope-checked sentetik bundle'daki uydurma authority kanıtını relational authority
+  catalog/snapshot/binding zinciri olmadığı için `source_rejected` olarak fail-closed reddettiğini
+  (`syntheticAuthorityRejected:true`) test eder. Network/action çağrısı sıfır, geçici satırlar rollback
+  sonrasında yoktur; persistence başarısı iddia edilmez.
 - Bu **closed-world current-source acceptance değildir**: test, root/persistence sınırını izole etmek için
   source reader'ı scope-checked ready bundle ile değiştirir. Canonical Meta hierarchy/config, category
   profile/assignment, reviewed guidance/selection, policy lifecycle, relational authority catalog/snapshot/

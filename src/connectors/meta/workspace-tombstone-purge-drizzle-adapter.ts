@@ -76,6 +76,8 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "advised_practice_events",
   "effective_campaign_contexts",
   "effective_campaign_context_components",
+  "effective_campaign_policy_compositions",
+  "effective_campaign_policy_composition_items",
   "effective_campaign_context_invalidations",
   "budget_proposal_versions",
   "budget_proposal_alternatives",
@@ -275,6 +277,12 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'effective_campaign_context_components', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from effective_campaign_context_components where workspace_id = ${workspaceId}::uuid
+      union all select 'effective_campaign_policy_compositions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from effective_campaign_policy_compositions where workspace_id = ${workspaceId}::uuid
+      union all select 'effective_campaign_policy_composition_items', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from effective_campaign_policy_composition_items where workspace_id = ${workspaceId}::uuid
       union all select 'effective_campaign_context_invalidations', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from effective_campaign_context_invalidations where workspace_id = ${workspaceId}::uuid
@@ -550,6 +558,8 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from account_group_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from account_groups where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_context_invalidations where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from effective_campaign_policy_composition_items where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from effective_campaign_policy_compositions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_context_components where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_contexts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_assignments where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

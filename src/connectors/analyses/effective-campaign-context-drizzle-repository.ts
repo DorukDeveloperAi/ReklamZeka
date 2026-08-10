@@ -254,6 +254,58 @@ async function assertCadenceEvidence(
   if (matches.length !== 1) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
 }
 
+type PolicyCompositionEvidence = Readonly<{
+  instructionPolicyRegistryHash: string; authorityComponentVersion: string; authoritySnapshotRef: string;
+  authoritySnapshotHash: string; authorityCatalogHash: string; authorityScopeHash: string; compositionHash: string;
+  items: ReadonlyArray<Readonly<{ policyRevisionId: string; policyRef: string; policyVersion: number; policyHash: string; state: "applied" | "suppressed" | "parked_conflict"; reason: string; }> >;
+}>;
+
+/** Re-reads every authority proof and strict revision under the caller's save transaction. */
+async function policyCompositionEvidence(database: ContextDatabase, context: EffectiveCampaignContext): Promise<PolicyCompositionEvidence | null> {
+  const evidence = context.policyAuthorityEvidence;
+  if (evidence === undefined) return null; // legacy payloads deliberately remain sidecar-less.
+  if (context.versions.instructionPolicyRegistry === undefined || context.versions.policyAuthority === undefined) {
+    throw new EffectiveCampaignContextRepositoryError("invalid_input");
+  }
+  const authority = resultRows<{ snapshot_ref: string }>(await database.execute(sql`
+    select snapshot.snapshot_ref from tenant_authority_snapshots snapshot
+    where snapshot.workspace_id = ${context.workspaceId}::uuid
+      and snapshot.snapshot_ref = ${evidence.snapshotRef} and snapshot.snapshot_hash = ${evidence.snapshotHash}
+      and snapshot.snapshot_payload #>> '{policyAuthority,catalogHash}' = ${evidence.catalogHash}
+      and snapshot.snapshot_payload #>> '{policyAuthority,scope,scopeHash}' = ${evidence.scopeHash}
+      and snapshot.snapshot_payload #>> '{policyAuthority,catalog,instructionPolicyRegistryHash}' = ${context.versions.instructionPolicyRegistry}
+    limit 2 for share
+  `));
+  if (authority.length !== 1) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+  const rows = resultRows<{ id: string; policy_ref: string; policy_version: number; canonical_hash: string }>(await database.execute(sql`
+    select distinct policy.id::text as id, policy.policy_ref, policy.policy_version, policy.canonical_hash
+    from policy_authority_bindings binding
+    join strict_instruction_policy_revisions policy on policy.workspace_id = binding.workspace_id and policy.id = binding.policy_revision_id
+    join tenant_authority_snapshots snapshot on snapshot.workspace_id = binding.workspace_id and snapshot.id = binding.authority_snapshot_id
+    join policy_authority_catalog_revisions catalog on catalog.workspace_id = binding.workspace_id and catalog.id = binding.authority_catalog_revision_id
+    where binding.workspace_id = ${context.workspaceId}::uuid and policy.policy_ref = any(${context.policies.map((policy) => policy.policyRef)}::text[])
+      and snapshot.snapshot_ref = ${evidence.snapshotRef} and snapshot.snapshot_hash = ${evidence.snapshotHash}
+      and catalog.revision_hash = ${evidence.catalogHash}
+      and catalog.payload #>> '{instructionPolicyRegistryHash}' = ${context.versions.instructionPolicyRegistry}
+  `));
+  const current = new Map<string, typeof rows[number]>();
+  for (const row of rows) {
+    if (current.has(row.policy_ref)) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+    current.set(row.policy_ref, row);
+  }
+  if (current.size !== context.policies.length) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+  const items = context.policies.map((policy) => {
+    const row = current.get(policy.policyRef); if (!row) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+    return Object.freeze({ policyRevisionId: row.id, policyRef: row.policy_ref, policyVersion: row.policy_version,
+      policyHash: row.canonical_hash, state: policy.state, reason: policy.reason });
+  });
+  const core = { instructionPolicyRegistryHash: context.versions.instructionPolicyRegistry,
+    authorityComponentVersion: context.versions.policyAuthority, authoritySnapshotRef: evidence.snapshotRef,
+    authoritySnapshotHash: evidence.snapshotHash, authorityCatalogHash: evidence.catalogHash, authorityScopeHash: evidence.scopeHash,
+    items: items.map(({ policyRevisionId: _id, ...item }) => item) };
+  return Object.freeze({ ...core, compositionHash: digest(core), items: Object.freeze(items) });
+}
+
 async function assertWorkspace(database: ContextDatabase, workspaceId: string, lock: boolean): Promise<void> {
   const suffix = lock ? sql` for update` : sql``;
   const result = await database.execute(sql`
@@ -452,6 +504,7 @@ export class DrizzleEffectiveCampaignContextRepository {
       const mirror = await assertMirrorScope(transaction, context);
       await assertBusinessOutcomeEvidence(transaction, context);
       await assertCadenceEvidence(transaction, context, mirror);
+      const policyComposition = await policyCompositionEvidence(transaction, context);
       const sameHash = await transaction.select().from(schema.effectiveCampaignContexts).where(and(
         eq(schema.effectiveCampaignContexts.workspaceId, context.workspaceId),
         eq(schema.effectiveCampaignContexts.contextHash, context.contextHash),
@@ -500,6 +553,20 @@ export class DrizzleEffectiveCampaignContextRepository {
         contextId: inserted[0]!.id,
         ...component,
       })));
+      if (policyComposition !== null) {
+        const composition = await transaction.insert(schema.effectiveCampaignPolicyCompositions).values({
+          workspaceId: context.workspaceId, contextId: inserted[0]!.id,
+          instructionPolicyRegistryHash: policyComposition.instructionPolicyRegistryHash,
+          authorityComponentVersion: policyComposition.authorityComponentVersion,
+          authoritySnapshotRef: policyComposition.authoritySnapshotRef, authoritySnapshotHash: policyComposition.authoritySnapshotHash,
+          authorityCatalogHash: policyComposition.authorityCatalogHash, authorityScopeHash: policyComposition.authorityScopeHash,
+          compositionHash: policyComposition.compositionHash,
+        }).returning({ id: schema.effectiveCampaignPolicyCompositions.id });
+        if (!composition[0]) throw new EffectiveCampaignContextRepositoryError("corrupt_store");
+        if (policyComposition.items.length) await transaction.insert(schema.effectiveCampaignPolicyCompositionItems).values(policyComposition.items.map((item) => ({
+          workspaceId: context.workspaceId, compositionId: composition[0]!.id, ...item,
+        })));
+      }
       return Object.freeze({
         outcome: "inserted" as const,
         record: await loadRecord(transaction, inserted[0]),

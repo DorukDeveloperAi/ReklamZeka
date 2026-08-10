@@ -140,6 +140,9 @@
     catalog/policy hash'i değil aynı workspace'te frozen context'e gerçekten yazılmış her
     `policy_authority_workspace` ref/version çiftini geçersizleştirir. Bu yalnız stale-context
     önlemidir; exact-impact coverage hâlâ incomplete ve `mutationAllowed=false` kalır.
+  - [x] A09.3b immutable effective-context policy-composition sidecar: source-bound authority
+    snapshot/catalog/scope ve exact strict revisionler save transaction'ında doğrulanıp append-only
+    kaydedilir; legacy context sidecar-less kalır ve promotion authority vermez.
   - [x] Migration journal ile canlı PostgreSQL schema/RLS/OCC/rollback kabulü: 52/52 migration,
     authority catalog, frozen context, progressive formalization ve Supabase security verifier'ları geçti.
   - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
@@ -315,10 +318,10 @@
     dört scope anahtarıyla (`workspaceId/accountRef/entityType/entityRef`) sınırlıdır; caller facts/
     context enjeksiyonu, HTTP, MCP, Decision Room veya action/write adapter'ı eklenmez. Rejected source
     ve invalidated persistence sonucu fail-closed kalır.
-  - [x] A10.4c-13 dar PostgreSQL root-persistence smoke: outer rollback içinde private root'un
-    evidence-bound context yazımı, policy-authority bindingi, invalidation sonrası replay reddi,
-    tenant mismatch reddi ve sıfır network/action çağrısı doğrulanır. Bu kabul, kaynak okuyucuyu
-    scope-checked test bundle ile izole eder; closed-world current-source kabulü değildir.
+  - [x] A10.4c-13 dar PostgreSQL root fail-closed smoke: outer rollback içinde scope-checked sentetik
+    ready bundle'ın relational authority catalog/snapshot/binding zinciri olmadan `source_rejected`
+    kaldığı (`syntheticAuthorityRejected:true`) ve sıfır network/action çağrısı doğrulanır. Bu kabul,
+    closed-world current-source veya persistence başarısı iddia etmez.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.
