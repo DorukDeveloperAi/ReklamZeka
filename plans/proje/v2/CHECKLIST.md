@@ -584,6 +584,10 @@
     action-unit bağlı proof'unu tüketir. Server-owned source lifecycle/freshness/plan/eligibility
     yükler; browser bu kanıtları veya execution evidence'i enjekte edemez. Sonuç yalnız disabled
     admission ledger çağrısıdır; HTTP/Meta executor hâlâ yoktur.
+  - [x] Server-private Drizzle admission source, immutable queue/approval lifecycle'inden plan ve
+    freshness'i, active tenant Meta mirror'dan da same-account hierarchy/status/budget-owner/latest
+    snapshot kanıtını yükler. Private runtime bu source'u disabled sink'e bağlar; source veya mirror
+    eksik/tamper edilmişse fail-closed'dur. HTTP/cron/Meta transport yüzeyi eklenmemiştir.
 - [ ] Campaign/adset/ad pause/activate eligibility ve parent/effective-status matrisi.
   - [x] `meta-write-eligibility/1.0.0`, frozen source snapshot üstünde campaign/adset/ad target
     eşleşmesini, pause için effective ACTIVE'i ve activate için bütün parent effective ACTIVE

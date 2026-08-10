@@ -18,9 +18,19 @@
   proof'unu tek kez tüketir. Plan/freshness/eligibility browser'dan kabul edilmez; yalnız server-owned
   source portundan yüklenir ve admission ledger'a disabled sonuç yazdırır. Owner/admin dışı roller ve
   proof replay'i fail-closed'dur.
-- Bu checkpoint bir execute veya transport API'si açmaz. Sıradaki somut bağ, aynı source portunun
-  persisted queue/lifecycle/mirror okuyucusuyla private runtime'da kurulması; ardından read-after-write
-  ve rollback tasarımıdır.
+- Bu checkpoint bir execute veya transport API'si açmaz. Persisted source/runtime bağı aşağıdaki
+  checkpoint'te tamamlanmıştır; sıradaki açık kapı read-after-write ve rollback tasarımıdır.
+
+## 2026-08-10 — A13 persisted admission-source runtime
+
+- `DrizzleActionExecutionAdmissionSourceRepository`, immutable ActionUnit/approval lifecycle ile active
+  connection'ın current Meta mirror hiyerarşisini ve latest authentic snapshot'ını read-only bağlar.
+  Action plan, account/entity scope veya snapshot tutarsızlığı source'u reddeder. Sink, admission
+  yazmadan önce aynı mirror kanıtını kendi kısa transaction'ında tekrar doğrular.
+- `createLocalActionExecutionAdmissionService` yalnız bu source, single-use ceremony store ve disabled
+  admission sink'ini birleştiren private composition root'tur. HTTP handler, scheduler, Meta transport
+  veya action execution eklenmemiştir; gerçek session/DB acceptance ve read-after-write/rollback sonraki
+  açık kapılardır.
 
 ## 2026-08-10 — A10 cadence/experiment adapter canlı kabulü
 
