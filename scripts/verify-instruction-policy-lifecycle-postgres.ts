@@ -102,8 +102,8 @@ if (!connectionString) {
         dependencyCoverageIncomplete: impact.coverage.complete === false,
         dependencyBlocked, membershipDowngradeRejected, staleRejected,
         exactDependencyFamiliesRead: impact.coverage.exactRelational.length >= 7,
-        partialUnknownRetained: impact.coverage.partialOrUnknown.includes("opaque_action_policy_context")
-          && impact.coverage.partialOrUnknown.length >= 5,
+        authorityFamilyCoverageExact: ["trusted_authority_catalog", "manual_policy_locks", "account_group_scope",
+          "topic_scope", "opaque_action_policy_context"].every((family) => impact.coverage.exactRelational.includes(family)),
         explainGapIsNonAuthoritative: impact.coverage.nonAuthoritativeNotes
           .includes("action_context_hash_index_explain_not_verified"),
         rawVisibleToWorkspace: serialized.includes(revisedRaw),
@@ -115,7 +115,7 @@ if (!connectionString) {
         invalidationCount: Number(counts.invalidation_count), auditCount: Number(counts.audit_count) };
       if (!Object.entries(evidence).every(([key, value]) => typeof value === "number"
         ? key === "invalidationCount" ? value === 0 : value >= 2 : value === true)) {
-        throw new Error("verifier_assertion_failed");
+        throw new Error(`verifier_assertion_failed:${JSON.stringify(evidence)}`);
       }
       throw rollback;
     });

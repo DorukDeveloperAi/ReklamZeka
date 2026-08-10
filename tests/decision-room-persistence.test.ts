@@ -72,6 +72,7 @@ describe("Decision Room PostgreSQL persistence contract", () => {
     expect(source).toContain("buildAnalysisAgenda");
     expect(source).toContain("agendaHash: assets.agenda.agendaHash");
     expect(source).toContain("agenda_hash, agenda_payload");
+    expect(source).toContain("analysisAssetDefinitionHash(selection.agenda_payload) !== analysisAssetDefinitionHash(agenda)");
   });
 
   it("fails closed before I/O on token/raw/prompt-shaped extra fields and external channels", async () => {

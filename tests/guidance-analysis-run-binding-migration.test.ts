@@ -12,6 +12,10 @@ const hardeningMigration = readFileSync(
   new URL("../drizzle/20260809212851_soft_mesmero.sql", import.meta.url),
   "utf8",
 );
+const forwardHardeningMigration = readFileSync(
+  new URL("../drizzle/20260810170134_guidance_guard_and_asset_revoke.sql", import.meta.url),
+  "utf8",
+);
 const connector = readFileSync(
   new URL("../src/connectors/analyses/decision-room-analysis-registry-drizzle.ts", import.meta.url),
   "utf8",
@@ -60,6 +64,10 @@ describe("guidance analysis-run binding persistence", () => {
     expect(migration).toContain("lifecycle_state = 'tombstoning'");
     expect(migration).toContain("REVOKE ALL PRIVILEGES ON FUNCTION guidance_analysis_run_binding_immutable() FROM PUBLIC, anon, authenticated, service_role");
     expect(hardeningMigration).toMatch(/REVOKE ALL PRIVILEGES ON FUNCTION guidance_official_source_url_allowed\(text\)\s+FROM PUBLIC, anon, authenticated, service_role/);
+    expect(forwardHardeningMigration).toContain("official_path := coalesce(parts[2], '/')");
+    expect(forwardHardeningMigration).toContain("position(chr(92) in value) > 0");
+    expect(forwardHardeningMigration).toContain("REVOKE ALL PRIVILEGES ON TABLE analysis_timeframe_definitions, analysis_template_definitions,");
+    expect(forwardHardeningMigration).toContain("guidance_analysis_run_bindings FROM PUBLIC, anon, authenticated, service_role");
     expect(migration).toContain("'account_group', 'account', 'objective', 'funnel', 'optimization'");
     expect(migration).toContain("'internal_category', 'lifecycle', 'entity', 'promotion_template', 'topic'");
     for (const table of ["guidance_sources", "guidance_cards", "guidance_bindings", "guidance_sets"]) {

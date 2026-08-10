@@ -237,7 +237,7 @@ function runtimeAssets(
     agenda = buildAnalysisAgenda({ context, resolvedTimeframe: resolved, requestedPasses: template.requestedPasses });
     if (selection.agenda_hash !== undefined) {
       if (selection.agenda_hash !== agenda.agendaHash
-        || analysisAssetDefinitionHash(selection.agenda_payload) !== agenda.agendaHash) {
+        || analysisAssetDefinitionHash(selection.agenda_payload) !== analysisAssetDefinitionHash(agenda)) {
         throw new Error("persisted agenda mismatch");
       }
     }

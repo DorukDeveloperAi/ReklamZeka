@@ -4,6 +4,105 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "57dfc870b",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): expose frozen outcome evidence to findings",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "aa8935439",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): compose persisted outcome evidence into context",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e84ca60ed",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): persist outcome evidence snapshots",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7cafd712a",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): add compact business outcome evidence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ec1e91b6e",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): add bounded business outcome reads",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "95b840c88",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): add server-bound business outcome intake",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "9fc14ef87",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): persist normalized business outcomes",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7c5cb9999",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): expose experiment evidence lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c2269a8f3",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): add server-bound cadence publication",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c37cae7e5",
+      "tarih": "2026-08-10",
+      "konu": "fix(a10): preserve decision room reads with dry run config",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "b9504c59d",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): add server-bound decision room dry run",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "ac5d4c18b",
       "tarih": "2026-08-10",
       "konu": "docs(a10): reconcile completed finding capabilities",
@@ -38,122 +137,23 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "c3a5f7793",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): persist cadence profile revisions",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "8b999b063",
-      "tarih": "2026-08-10",
-      "konu": "fix(db): recover migrations and verify authority flows",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "92876f6ab",
-      "tarih": "2026-08-10",
-      "konu": "fix(a10): bind cohorts to metric catalog",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "904a45278",
-      "tarih": "2026-08-10",
-      "konu": "feat(a09): harden policy and promotion authoring",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "a5855809f",
-      "tarih": "2026-08-10",
-      "konu": "feat(guidance): harden run binding rollout",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "68fe5b8ee",
-      "tarih": "2026-08-09",
-      "konu": "feat(guidance): complete human-gated authoring flows",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "bfaf4bcd5",
-      "tarih": "2026-08-09",
-      "konu": "docs(state): record external checkpoint takeover",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "0237143f3",
-      "tarih": "2026-08-09",
-      "konu": "feat(platform): harden category and Meta read contracts",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "44c670e0b",
-      "tarih": "2026-08-09",
-      "konu": "feat(categories): add selector mapping preview",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "cd675c679",
-      "tarih": "2026-08-09",
-      "konu": "chore(architecture): quarantine legacy control plane",
-      "tur": "is",
-      "kapsam": [
-        "chore"
-      ]
-    },
-    {
-      "hash": "6d0591f31",
-      "tarih": "2026-08-09",
-      "konu": "feat(categories): guard lifecycle mutations",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 33
+      "adet": 36
     },
     {
       "kapsam": "docs",
-      "adet": 20
-    },
-    {
-      "kapsam": "chore",
-      "adet": 3
+      "adet": 16
     },
     {
       "kapsam": "fix",
+      "adet": 4
+    },
+    {
+      "kapsam": "chore",
       "adet": 3
     },
     {
@@ -161,7 +161,7 @@
       "adet": 1
     }
   ],
-  "isSayisi": 145,
+  "isSayisi": 156,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-10",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "85aec0c2cf94"
+  "damga": "29b423337ab0"
 }

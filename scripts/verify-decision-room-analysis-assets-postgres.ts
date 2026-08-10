@@ -72,6 +72,18 @@ function resultRows(result: unknown): readonly Record<string, unknown>[] {
     ? result.rows as readonly Record<string, unknown>[] : [];
 }
 
+/** Drizzle wraps PostgreSQL constraint/trigger errors; inspect the causal chain, not wrapper wording. */
+function causedByConstraint(error: unknown, constraint: string): boolean {
+  const visited = new Set<unknown>(); let current: unknown = error;
+  while (current && typeof current === "object" && !visited.has(current)) {
+    visited.add(current);
+    const candidate = current as Record<string, unknown>;
+    if (candidate.constraint === constraint || (typeof candidate.message === "string" && candidate.message.includes(constraint))) return true;
+    current = candidate.cause;
+  }
+  return false;
+}
+
 function timeframe(revision: number, days: number): AnalysisTimeframeDefinition {
   return {
     version: ANALYSIS_TIMEFRAME_DEFINITION_VERSION,
@@ -304,8 +316,7 @@ try {
           where workspace_id = ${workspaceId}::uuid`);
       });
     } catch (reason) {
-      guidanceBindingImmutable = reason instanceof Error
-        && reason.message.includes("guidance_analysis_run_binding_immutable");
+      guidanceBindingImmutable = causedByConstraint(reason, "guidance_analysis_run_binding_immutable");
     }
     const manualRun = resultRows(await transaction.execute(sql`select id::text from decision_room_runs
       where workspace_id = ${workspaceId}::uuid and run_ref = ${manual.runRef} limit 1`))[0];
@@ -323,8 +334,7 @@ try {
         `);
       });
     } catch (reason) {
-      exactGuidanceRefGuard = Boolean(reason && typeof reason === "object" && "constraint" in reason
-        && reason.constraint === "guidance_analysis_run_bindings_exact_refs");
+      exactGuidanceRefGuard = causedByConstraint(reason, "guidance_analysis_run_bindings_exact_refs");
     }
     const exactRef = { cardRef: "guidance_duplicate", version: 1, recordHash: "a".repeat(64) };
     const duplicateCardRefs = JSON.stringify([exactRef, exactRef]);
@@ -399,8 +409,7 @@ try {
         });
         return false;
       } catch (reason) {
-        return Boolean(reason && typeof reason === "object" && "constraint" in reason
-          && reason.constraint === "guidance_analysis_run_bindings_arrays");
+        return causedByConstraint(reason, "guidance_analysis_run_bindings_arrays");
       }
     };
     guidanceRefCapsEnforced = (await rejectsCap(51, 0, 0))
