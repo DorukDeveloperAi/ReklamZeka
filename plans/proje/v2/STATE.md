@@ -2500,6 +2500,8 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - `DrizzleDeterministicWindowSnapshotRepository.save()`, saf artifact'i yeniden kurar; active workspace
   altında tüm feature hashlerini invalidation-free readback ile doğrular. Eksik/stale kaynakta header veya
   binding insert etmeden `source_changed` verir; action/approval/Meta-write yetkisi yoktur.
-- L3 current reader ve Decision Room/context bağlantısı henüz açık kalır.
+- Private L3 current reader exact persisted payload/bindingleri yeniden canonicalize eder; bağlı L2
+  invalidation varsa yeni bir pencere seçmeden `stale` döner. Decision Room/context bağlantısı hâlâ açık
+  kalır.
 - Kanıt: `tests/deterministic-window-snapshot-drizzle-repository.test.ts`,
   `tests/meta-workspace-tombstone-purge-drizzle-adapter.test.ts`, `npm run typecheck`, `npm run db:check`.

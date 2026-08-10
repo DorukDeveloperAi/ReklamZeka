@@ -440,6 +440,9 @@
   - [x] Private L3 materializer substrate: immutable tenant-scoped window header+exact L2 bindingleri
     forward migration ile saklanır; save transaction'ı aktif workspace ve invalidation-free L2 setini
     tekrar doğrular, eksik/stale seti `source_changed` ile insert öncesi reddeder.
+  - [x] Private L3 current reader: saklanan window payload'ı ve exact L2 bindingleri yeniden canonicalize
+    edilir; bağlı L2 invalidation varsa replacement/fallback üretmeden `stale` döner. Decision Room,
+    context veya action yüzeyine henüz bağlı değildir.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.

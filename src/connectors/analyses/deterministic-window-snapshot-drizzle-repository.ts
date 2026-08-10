@@ -12,6 +12,23 @@ const rows = <T extends Row = Row>(value: unknown): readonly T[] => { if (!value
 /** Server-private L3 materializer. Current L2 invalidation is a hard rejection, never a fallback. */
 export class DrizzleDeterministicWindowSnapshotRepository {
   constructor(private readonly database: Database) {}
+  async loadCurrent(input: Readonly<{ workspaceId: string; windowRef: string }>): Promise<Readonly<{ state: "ready" | "stale"; window: DeterministicWindowSnapshot }>> {
+    const found = rows<{ window_payload: unknown; features: unknown; invalidations: unknown }>(await this.database.execute(sql`
+      select window.window_payload,
+        coalesce(jsonb_agg(feature.feature_payload order by feature.feature_ref), '[]'::jsonb) as features,
+        count(invalidation.id)::int as invalidations
+      from deterministic_window_snapshots window
+      join deterministic_window_snapshot_features binding on binding.workspace_id = window.workspace_id and binding.window_snapshot_id = window.id
+      join deterministic_feature_snapshots feature on feature.workspace_id = binding.workspace_id and feature.id = binding.feature_snapshot_id
+      left join deterministic_feature_snapshot_invalidations invalidation on invalidation.workspace_id = feature.workspace_id and invalidation.feature_snapshot_id = feature.id
+      where window.workspace_id = ${input.workspaceId}::uuid and window.window_ref = ${input.windowRef}
+      group by window.id limit 2
+    `));
+    if (found.length === 0) fail("not_found"); if (found.length !== 1 || !Array.isArray(found[0]!.features) || !Number.isInteger(found[0]!.invalidations)) fail("corrupt_store");
+    const window = (() => { try { (found[0]!.features as unknown[]).forEach(assertDeterministicFeatureSnapshot); const payload = found[0]!.window_payload as DeterministicWindowSnapshot; return buildDeterministicWindowSnapshot({ timeframe: payload.resolvedTimeframe, features: found[0]!.features as DeterministicFeatureSnapshot[] }); } catch { return fail("corrupt_store"); } })();
+    if (window.windowRef !== input.windowRef || window.scope.workspaceId !== input.workspaceId) fail("corrupt_store");
+    return Object.freeze({ state: found[0]!.invalidations === 0 ? "ready" : "stale", window });
+  }
   async save(input: Readonly<{ window: DeterministicWindowSnapshot; features: readonly DeterministicFeatureSnapshot[] }>): Promise<Readonly<{ window: DeterministicWindowSnapshot; outcome: "inserted" | "unchanged" }>> {
     const expected = (() => {
       try { input.features.forEach(assertDeterministicFeatureSnapshot); return buildDeterministicWindowSnapshot({ timeframe: input.window.resolvedTimeframe, features: input.features }); }
