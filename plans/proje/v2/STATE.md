@@ -83,6 +83,16 @@
   RLS/OCC rollback kabulü tamamlanmış sayılmaz. Gerçek oturum/browser kanıtı da açık; impact coverage
   yalnız doğrulayabildiği kapsamda mutation'ı kapalı tutar.
 
+## 2026-08-10 — A10 robust cohort calculator
+
+- Saf cohort calculator yalnız aynı objective, funnel, optimization event, metric, category-profile
+  hash'i ve policy-set hash'ini taşıyan entity'leri karşılaştırır. Karışık profile kabul edilmez;
+  böylece farklı objective/KPI'lar tek başarı skorunda birleştirilmez.
+- Median absolute deviation (MAD) ile robust z-score hesaplanır. Minimum üyelik/sample eksikliği
+  veya zero-MAD, yanlış outlier/finding yerine reason-coded `insufficient_data` döndürür. Sonuçlar
+  input sırasından bağımsız, snapshot-ref bağlı ve deterministiktir; DB, model, route veya action
+  capability eklenmedi.
+
 ## 2026-08-10 — A09 atomic starter, authoritative facet preview ve progressive persistence
 
 - Starter adoption artık zero-write blocker değildir. Owner/admin confirmation, aktif workspace

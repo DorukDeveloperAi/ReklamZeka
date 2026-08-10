@@ -256,7 +256,9 @@
     finding→ledger bağlamı, exact frozen snapshot ve server-private entity identity sınırı.
   - [x] Persisted, versioned template/timeframe registry; schedule-revision hash binding,
     frozen run asset ve manual/scheduled ortak production loader/executor.
-  - [ ] Cohort calculator.
+  - [x] Uyumlu objective/funnel/optimization-event/metric/category-policy profile'ı zorunlu,
+    MAD tabanlı deterministic cohort calculator; mixed profile, düşük sample ve zero-MAD
+    `finding` üretmeden fail-closed `insufficient_data` kalır.
 - [ ] Hierarchical driver ve creative fatigue/config diagnostics.
 - [ ] Analysis run ledger, dry-run API ve deterministic replay.
   - [x] Append-only authentic hash-chain decision ledger saf çekirdeği ve malformed/tamper matrisi.
