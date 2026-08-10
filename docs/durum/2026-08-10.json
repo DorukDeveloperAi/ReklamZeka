@@ -1,0 +1,186 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "92876f6ab",
+      "tarih": "2026-08-10",
+      "konu": "fix(a10): bind cohorts to metric catalog",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "904a45278",
+      "tarih": "2026-08-10",
+      "konu": "feat(a09): harden policy and promotion authoring",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "a5855809f",
+      "tarih": "2026-08-10",
+      "konu": "feat(guidance): harden run binding rollout",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "68fe5b8ee",
+      "tarih": "2026-08-09",
+      "konu": "feat(guidance): complete human-gated authoring flows",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "bfaf4bcd5",
+      "tarih": "2026-08-09",
+      "konu": "docs(state): record external checkpoint takeover",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "0237143f3",
+      "tarih": "2026-08-09",
+      "konu": "feat(platform): harden category and Meta read contracts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "44c670e0b",
+      "tarih": "2026-08-09",
+      "konu": "feat(categories): add selector mapping preview",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "cd675c679",
+      "tarih": "2026-08-09",
+      "konu": "chore(architecture): quarantine legacy control plane",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
+      "hash": "6d0591f31",
+      "tarih": "2026-08-09",
+      "konu": "feat(categories): guard lifecycle mutations",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "07fc6819b",
+      "tarih": "2026-08-08",
+      "konu": "chore(turev): merge sonrası türevleri üreticiden yeniden üret",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
+      "hash": "8916ab22f",
+      "tarih": "2026-08-08",
+      "konu": "chore(vscode,oturum): tema ayarları ve oturum kasası kaydı",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
+      "hash": "c90883c4c",
+      "tarih": "2026-08-08",
+      "konu": "feat(categories): scan effective portfolio health",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "86284c17a",
+      "tarih": "2026-08-08",
+      "konu": "feat(categories): preview archive impact safely",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e65579e21",
+      "tarih": "2026-08-08",
+      "konu": "feat(categories): surface evidence confidence health",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c0c3f2f70",
+      "tarih": "2026-08-08",
+      "konu": "feat(categories): add read-only inventory dashboard",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "feat",
+      "adet": 31
+    },
+    {
+      "kapsam": "docs",
+      "adet": 21
+    },
+    {
+      "kapsam": "chore",
+      "adet": 3
+    },
+    {
+      "kapsam": "fix",
+      "adet": 3
+    },
+    {
+      "kapsam": "test",
+      "adet": 2
+    }
+  ],
+  "isSayisi": 139,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-10",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "82c254eff5ea"
+}
