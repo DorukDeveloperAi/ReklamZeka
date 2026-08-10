@@ -11,6 +11,7 @@ import { AutonomyStudioPanel } from "./autonomy-studio-panel";
 import { GuidanceStudioPanel } from "./guidance-studio-panel";
 import { CategoryInventoryPanel } from "./category-inventory-panel";
 import { InstructionPolicyStudioPanel } from "./instruction-policy-studio-panel";
+import { CampaignPlanningBriefPanel } from "./campaign-planning-brief-panel";
 import styles from "./operating-dashboard.module.css";
 
 export type OperatingDashboardModel = Readonly<{
@@ -323,6 +324,7 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
           <div className={styles.copyPreview}><span className={styles.kicker}>YAYINDAKİ REKLAM METNİ</span><h3>Saç ekimi hakkında merak ettiklerinizi uzman ekibimize sorun.</h3><p>Primary text · CTA: WhatsApp'tan mesaj gönder · Instagram post bağlı</p><footer><StatusPill tone="info">Mevcut creative</StatusPill><button>Performansını incele</button></footer></div>
         </section>
       </div>
+      <CampaignPlanningBriefPanel />
     </>;
   }
 

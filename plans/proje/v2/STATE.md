@@ -2628,6 +2628,21 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   `tests/action-execution-admission.test.ts`, `tests/meta-workspace-tombstone-purge-drizzle-adapter.test.ts`,
   `npm run typecheck`, `npm run db:check`.
 
+## 2026-08-10 — A10 interactive proposal-only campaign brief surface
+
+- Kampanyalar görünümündeki `CampaignPlanningBriefPanel`, çalışma kitabında görünen sıralamayı
+  (pazar → dil → hizmet → iş amacı → dönüşüm yolu → kapasite/kreatif) kullanıcı tarafından
+  değiştirilebilir bir taslakta uygular. Her değişimde mevcut pure brief yeniden hesaplanır ve
+  yalnız tek sonraki eksik karar, planlanan şerit, insan-incelemeli sıra ile kıyas sınırı gösterilir.
+- Lead form/WhatsApp, üst huni, öğrenme, kesinti ve sınıflandırma durumları mevcut domain
+  sözleşmesinden gelir; panel yeni bir iş kuralı veya kalıcı source of truth oluşturmaz. State
+  browser oturumunda geçicidir; API, database write, campaign create/publish/approval/execute ve
+  Meta write eklenmedi.
+- Kanıt: `tests/campaign-planning-brief-panel.test.ts`,
+  `tests/interactive-campaign-template.test.ts`, `npm run build`; gerçek browser kabulünde route
+  `lead_form → whatsapp` değişimi doğru outcome'a döndü, write control sayısı `0` kaldı ve
+  390/768/1440 viewport'larında yatay taşma `0` doğrulandı.
+
 ## 2026-08-10 — A10 private timeframe-bound L3 context composer
 
 - `TimeframeBoundAnalysisContextComposer`, input olarak yalnız workspace/entity/timeframe alır. Son geçerli,

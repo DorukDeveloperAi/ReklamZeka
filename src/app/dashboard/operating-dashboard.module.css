@@ -177,6 +177,20 @@
 .contextGrid > div:last-child { border-right: 0; }
 .contextGrid span, .contextGrid small { color: var(--rz-muted); font-size: .57rem; }
 .contextGrid strong { font-size: .7rem; }
+.campaignPlanningBrief { margin-top: 10px; }
+.campaignPlanningBrief > p { margin: 0; padding: 14px 18px; color: var(--rz-muted); font-size: .68rem; line-height: 1.6; border-bottom: 1px solid var(--rz-line); }
+.briefControls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--rz-line); }
+.briefControls label { display: grid; gap: 5px; min-width: 0; color: var(--rz-muted); font-size: .56rem; }
+.briefControls select, .briefControls input { width: 100%; min-height: 34px; border: 1px solid var(--rz-line); border-radius: 7px; background: rgba(7,11,10,.66); color: var(--rz-text); padding: 0 8px; font: inherit; }
+.briefControls .briefToggle { grid-auto-flow: column; justify-content: start; align-items: center; gap: 7px; padding-top: 20px; color: var(--rz-text); }
+.briefToggle input { width: 14px; min-height: 14px; }
+.briefNextDecision { display: grid; gap: 4px; margin: 0 18px 14px; padding: 11px 12px; border: 1px solid rgba(222,167,78,.34); border-radius: 8px; background: rgba(222,167,78,.07); }
+.briefNextDecision > span, .briefPlan > div > span { color: var(--rz-dim); font: 700 .52rem ui-monospace, monospace; letter-spacing: .08em; }
+.briefNextDecision strong { font-size: .7rem; }.briefNextDecision small, .briefPlan small { color: var(--rz-muted); font-size: .58rem; line-height: 1.45; }
+.briefPlan { display: grid; grid-template-columns: 1.2fr 1.2fr .8fr; border-top: 1px solid var(--rz-line); }
+.briefPlan > div { display: grid; align-content: start; gap: 9px; min-height: 112px; padding: 14px 18px; border-right: 1px solid var(--rz-line); }.briefPlan > div:last-child { border-right: 0; }
+.briefPlan article, .briefPlan li { display: grid; gap: 3px; }.briefPlan strong { font-size: .65rem; }.briefPlan ol { display: grid; gap: 7px; margin: 0; padding-left: 18px; }.briefPlan li::marker { color: var(--rz-green); }
+.campaignPlanningBrief > footer { padding: 10px 18px; color: var(--rz-dim); border-top: 1px solid var(--rz-line); font: .56rem ui-monospace, monospace; }
 .hierarchy { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 18px; }
 .hierarchy > div { position: relative; display: grid; gap: 7px; min-height: 70px; padding: 12px; border: 1px solid var(--rz-line); border-radius: 9px; background: rgba(255,255,255,.018); }
 .hierarchy > div:not(:last-child)::after { content: "→"; position: absolute; right: -11px; top: 25px; color: var(--rz-dim); z-index: 2; }
@@ -850,6 +864,9 @@
   .contextGrid { grid-template-columns: repeat(2, 1fr); }
   .contextGrid > div:nth-child(2) { border-right: 0; }
   .contextGrid > div:nth-child(-n+2) { border-bottom: 1px solid var(--rz-line); }
+  .briefControls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .briefPlan { grid-template-columns: 1fr 1fr; }
+  .briefPlan > div:last-child { grid-column: 1 / -1; border-top: 1px solid var(--rz-line); border-right: 0; }
   .analysisBuilder { grid-template-columns: repeat(2, 1fr); }
   .analysisBuilder button { min-height: 46px; grid-column: 1 / -1; }
   .approvalList { grid-template-columns: 1fr; }
@@ -978,6 +995,9 @@
   .signalStrip > div { border-right: 0; }
   .contextGrid, .hierarchy { grid-template-columns: 1fr; }
   .contextGrid > div { border-right: 0; border-bottom: 1px solid var(--rz-line); }
+  .briefControls, .briefPlan { grid-template-columns: 1fr; }
+  .briefPlan > div, .briefPlan > div:last-child { min-height: 0; border-right: 0; border-bottom: 1px solid var(--rz-line); }
+  .briefPlan > div:last-child { border-top: 0; border-bottom: 0; }
   .budgetHero > div:first-child { grid-template-columns: 1fr; }
   .bigProgress { grid-column: auto; }
   .beforeAfter { grid-template-columns: 1fr; }
