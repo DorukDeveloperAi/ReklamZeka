@@ -252,7 +252,7 @@
       "pkg": "skill:eszamanli"
     },
     ".claude/skills/eszamanli/scripts/claim.mjs": {
-      "hash": "57263e35f99abdf7",
+      "hash": "6b9bbe1230891316",
       "pkg": "skill:eszamanli"
     },
     ".claude/skills/eszamanli/proof/proof.mjs": {
@@ -312,11 +312,11 @@
       "pkg": "skill:devam"
     },
     ".claude/hooks/claims-lib.mjs": {
-      "hash": "19fc6665026efa8a",
+      "hash": "85b68d114bdf39da",
       "pkg": "hook:eszamanli-guard"
     },
     ".claude/hooks/claim-guard.mjs": {
-      "hash": "ce2c021aaedc218e",
+      "hash": "61535a417f224450",
       "pkg": "hook:eszamanli-guard"
     },
     ".claude/hooks/hook-nabiz.mjs": {
@@ -364,7 +364,7 @@
       "pkg": "hook:session-status"
     },
     ".claude/aide/docs/terimler.md": {
-      "hash": "464cbb0ee32a9b24",
+      "hash": "d17326592300465e",
       "pkg": "doc:terimler"
     },
     ".claude/aide/docs/claude-md-sozlesmesi.md": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-10T13:03:21.677Z",
+  "updatedAt": "2026-08-10T14:04:00.459Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",
