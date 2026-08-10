@@ -245,6 +245,10 @@
 - [x] Kampanya objective/funnel/event/classification temel sözleşmesi.
 - [x] Altı objective için primary/diagnostic/guardrail/min-sample karar playbook temeli.
 - [ ] Meta config + çoklu internal category + policy composition.
+  - [x] A10.4a immutable/replay-safe `meta-analysis-config-snapshot/2.0.0`: reviewed
+    campaign objective ve ad-set optimization-goal mapping sürümleri hash'e freeze edilir;
+    missing/unmapped/mixed/ambiguous ve legacy-v1 eksiklikleri explicit reason-coded unknown
+    kalır, action/Meta-write authority taşımaz.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.

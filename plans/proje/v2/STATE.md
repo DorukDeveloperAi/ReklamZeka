@@ -1983,3 +1983,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   `verify:decision-room-analysis-assets-db` canlı kabulü agenda freeze/replay, binding immutability/ref caps,
   URL negatifleri, RLS/revoke, cross-tenant negatifleri ve outer rollback'i geçti. Hiçbir action/Meta-write yüzeyi
   eklenmedi.
+
+## 2026-08-10 — A10.4a Meta config snapshot v2
+
+- `meta-analysis-config-snapshot/2.0.0`, campaign objective ve ad-set optimization goal için
+  canonical mapping sürümlerini snapshot hash'ine freeze eden saf, immutable config fact'idir.
+  Replay yeni mapping'i tekrar çalıştırmaz; hash doğrulaması geçmeyen snapshot hiç projekte edilmez.
+- Objective/optimization kaynak alanı eksik, invalid veya reviewed katalog dışında olduğunda; campaign'in
+  ad-set hedefleri birbirinden farklı olduğunda veya bilinmeyen+known evidence karıştığında sonuç yalnız
+  explicit reason-coded `unknown` olur. Bu katman config'e anlam uydurmaz, ağ/DB çağrısı veya action/Meta-write
+  authority taşımaz.
+- Eski `meta-change` v1 snapshot'ları okunabilir kalır; önceden saklanmamış objective/optimization bilgisi
+  `legacy_snapshot_missing_*` olarak görünür. Odak testleri (7 test) ve `npm run typecheck` geçti.
