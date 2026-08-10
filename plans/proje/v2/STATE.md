@@ -2406,3 +2406,13 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: `tests/meta-sync-integration.test.ts`, `tests/meta-read-sync-runtime.test.ts`,
   `tests/insights-materialization.test.ts`, `npm run verify:meta-sync-db`, `npm run typecheck`,
   `git diff --check`.
+
+## 2026-08-10 — A10 immutable L2 feature snapshot contract
+
+- `deterministic-feature-snapshot/1.0.0`, yalnız authentic L1 observation metric sonucu ve aynı
+  observation'ın canonical source-ref manifestini kabul eder. Result/source manifest hash'i, formula
+  catalog sürümü, entity scope ve all-false capability seti immutable feature hash'ine girer.
+- Raw/secret alan veya forged metric result hash'i fail-closed reddedilir. Bu saf contract DB tablosu veya
+  L1-change invalidation yazmaz; bunlar sonraki L2 persistence checkpoint'inde relational source manifest ile
+  bağlanacaktır.
+- Kanıt: `tests/deterministic-feature-snapshot.test.ts`, `npm run typecheck`, `git diff --check`.
