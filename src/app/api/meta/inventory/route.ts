@@ -11,9 +11,12 @@ function publicError(code: MetaInventoryApiError["error"]["code"], message: stri
 }
 
 export async function GET() {
+  const securityBlocked = process.env.META_TOKEN_SECURITY_STATUS === "temporary_exposed";
   return publicError(
     "not_configured",
-    "Meta portföyü güvenli oturum bağlantısı kurulana kadar kullanılamıyor",
+    securityBlocked
+      ? "Meta read mirror geçici olarak kapalı: mevcut token güvenlik incelemesinde. Tokenı döndürün; ardından normal salt-okunur sync çalıştırın."
+      : "Meta portföyü güvenli oturum bağlantısı kurulana kadar kullanılamıyor",
     503,
   );
 }

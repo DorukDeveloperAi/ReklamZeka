@@ -122,6 +122,16 @@
   uydurmaz. Yerel browser oturumunda inventory `503` olduğundan UI dürüstçe unavailable durumu gösterdi;
   gerçek çoklu-hesap seçimi browser kabulü, canlı inventory ile hâlâ açık kalır.
 
+## 2026-08-11 — Meta mirror güvenlik durumunun görünürlüğü
+
+- Public inventory route canlı Meta connector çağırmaya devam etmez. Ortam `META_TOKEN_SECURITY_STATUS`
+  ile `temporary_exposed` ise yalnız güvenli, secret-free rotasyon + normal salt-okunur sync yönlendirmesi
+  döndürür; token, hesap kimliği veya scope dışarı çıkmaz.
+- Browser Meta bağlantısı ekranı bu yönlendirmeyi ve `0` Meta write sınırını gösterdi. Session workspace
+  için read-only PostgreSQL sayımı da active connection/account/campaign/asset değerlerini `0` buldu;
+  bu nedenle gerçek inventory varmış gibi bir fallback eklenmedi. Token rotasyonu ve normal sync sonrası
+  gerçek multi-account browser acceptance açık kalır.
+
 ## 2026-08-11 — A14 demo portföy hiyerarşisi ve filtreler
 
 - Kampanyalar yüzeyindeki salt-okunur portföy katmanı artık Meta objective ve iç kategori ile
