@@ -127,6 +127,13 @@ const columns = [
   "advised_practice_events.payload",
   "effective_campaign_contexts.snapshot_refs",
   "effective_campaign_contexts.context_payload",
+  // Frozen diagnostic evidence carries immutable hashes/manifests for replay;
+  // it has no mutable category-reference edge beyond the context it commits to.
+  "frozen_diagnostic_evidence.hierarchy_refs",
+  "frozen_diagnostic_evidence.feature_manifest",
+  "frozen_diagnostic_evidence.window_manifest",
+  "frozen_diagnostic_evidence.canonical_config_evidence",
+  "frozen_diagnostic_evidence.source_refs",
   "budget_proposal_versions.proposal_payload",
   "budget_proposal_alternatives.alternative_payload",
   "analysis_timeframe_definitions.definition_payload",

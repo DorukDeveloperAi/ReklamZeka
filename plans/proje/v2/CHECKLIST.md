@@ -504,6 +504,11 @@
     spend contribution hesaplanır; peer veya metric kanıtı yoksa açık `insufficient_data`/`unknown` döner.
     Creative/config alanları frozen L2 payloadında yoksa fatigue/config uydurmak yerine `not_supported`
     kalır; ledger/action/Meta-write yetkisi etkilenmez.
+  - [x] A10.5a frozen diagnostic evidence substrate: exact frozen context, L2/L3 manifestleri,
+    hierarchy, objective/funnel/optimization, category-policy/config/source commitmentsi immutable
+    tenant sidecar'da saklanır. Writer yalnız gerçek ready persisted facts ile çalışır; RLS/FORCE/revoke,
+    append-only/tombstone guard ve outer-rollback live verifier hash/capability/tamper/tenant/cleanup
+    negatiflerini doğrular. Cohort/fatigue hesapları bu substrate'in sonraki ayrı checkpointleridir.
   - [x] Private timeframe-bound context composer: son geçerli repository context'inin private mirror scope'u
     ve server clock'u ile L2→L3 materializer çağrılır; yeni evidence-bound context yalnız exact window'un
     feature/window ref'lerini taşır. Caller context, feature, scope UUID veya capture time veremez.

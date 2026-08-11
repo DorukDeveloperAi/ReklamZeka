@@ -204,6 +204,19 @@
   feature ve complete billing/destination config L2 payloadında olmadığı için fatigue/config finding
   üretmek yerine açık `not_supported` taşır; hiçbir ledger kararı, action veya Meta write yetkisi açılmaz.
 
+## 2026-08-11 — A10.5a frozen diagnostic evidence substrate
+
+- Immutable `frozen_diagnostic_evidence` sidecar'ı exact frozen context hash/ref, L2/L3 ref+hash
+  manifestleri, subject hierarchy, objective/funnel/optimization, category/policy/config/source
+  commitmentsini taşır. Yedi capability flag'i yapısal olarak false'tur; writer yalnız ready L2/L3,
+  config ve category facts transaction içinde doğrulanabiliyorsa insert eder, aksi halde
+  `insufficient_evidence` ile row oluşturmadan reddeder.
+- Forward-only PostgreSQL migration FORCE RLS, public/API role revoke, append-only/tombstoning-only
+  guard ve tombstone FK sırasını ekler. Outer-rollback live verifier authentic fixture/composer ile
+  exact hash/capability zarfını, missing/cross-tenant/tamper negatiflerini, RLS/revoke, tombstone
+  aggregate, zero network ve zero residue'yu doğrular. Bu yalnız substrate'tir; cohort veya creative
+  fatigue/config sonucu henüz üretilmez.
+
 ## 2026-08-10 — Local MCP/session canlı kabulü
 
 - Yerel geliştirme sunucusu ve yönetilen `.env.local` session yapılandırmasıyla `npm run verify:mcp-live`
