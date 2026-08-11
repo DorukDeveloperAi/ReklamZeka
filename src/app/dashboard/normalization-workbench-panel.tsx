@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./instruction-policy-studio.module.css";
 
 type Strength = "must" | "should" | "consider" | "avoid" | "question";
+type CampaignIntentTemplateRef = "" | "new_campaign_plan" | "budget_protection" | "lead_quality" | "delivery_recovery";
 type ClosedAuthority = Readonly<{ canPublish: false; canPromotePolicy: false; canApprove: false; canExecute: false; canWriteMeta: false }>;
 type Selection = Readonly<{ sourceRef: string; cardRef: string; setRef: string }>;
 type Preview = Readonly<{ contractVersion: "normalization-workbench/1.0.0"; disposition: "ready" | "needs_input";
@@ -15,12 +16,28 @@ type GuidanceChoices = Readonly<{ cards: readonly GuidanceChoice[]; sets: readon
 type Snapshot = Readonly<{ contractVersion: "normalization-workbench-service/1.0.0";
   revisions: readonly Readonly<{ normalizationRef: string; revision: number; revisionHash: string; selectionHash: string; capabilities: ClosedAuthority }>[];
   authority: Readonly<{ canRead: true; canDraft: boolean; canPublish: false; canPromotePolicy: false; canApprove: false; canExecute: false; canWriteMeta: false }> }>;
+type CampaignIntentTemplate = Readonly<{ title: string; body: string; topic: string; strength: Strength;
+  assumptions: string; questions: string }>;
 
 export class NormalizationWorkbenchClientError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = "NormalizationWorkbenchClientError"; }
 }
 
 const HASH = /^[a-f0-9]{64}$/;
+const CAMPAIGN_INTENT_TEMPLATES: Readonly<Record<Exclude<CampaignIntentTemplateRef, "">, CampaignIntentTemplate>> = Object.freeze({
+  new_campaign_plan: Object.freeze({ title: "Yeni kampanya planını netleştir", topic: "campaign_launch", strength: "question",
+    body: "Kampanya yalnız hedef, pazar, hedef kitle, teklif ve ölçüm planı açıkça doğrulandıktan sonra taslak olarak hazırlanmalıdır.",
+    assumptions: "Yeni kampanya henüz yayınlanmadı", questions: "Birincil iş hedefi nedir?\nHangi pazar ve dil hedefleniyor?\nTeklif ve günlük bütçe sınırı nedir?\nBaşarı hangi metrikle ölçülecek?" }),
+  budget_protection: Object.freeze({ title: "Bütçeyi koru", topic: "budget_guardrail", strength: "must",
+    body: "Onaylanmış bütçe sınırı ve harcama ritmi doğrulanmadan bütçe artışı veya kampanyalar arası aktarım önerilmemelidir.",
+    assumptions: "Para birimi ve bütçe dönemi doğrulanmalıdır", questions: "Onaylı toplam bütçe nedir?\nGünlük harcama üst sınırı nedir?\nAktarım için kim onay verir?" }),
+  lead_quality: Object.freeze({ title: "Lead kalitesini öncele", topic: "lead_quality", strength: "should",
+    body: "Hacim artışı önerisi, hedef pazar, form veya mesajlaşma rotası ve lead kalite sinyali birlikte incelenmeden kesinleştirilmemelidir.",
+    assumptions: "Kalite sinyali CRM veya satış geri bildirimi ile doğrulanmalıdır", questions: "Nitelikli lead tanımı nedir?\nHangi kanal veya form kullanılıyor?\nKalite geri bildirimi hangi sıklıkta geliyor?" }),
+  delivery_recovery: Object.freeze({ title: "Kesinti sonrası toparlama planı", topic: "delivery_recovery", strength: "question",
+    body: "Kesintinin nedeni ve mevcut teslimat durumu doğrulanmadan yeni kampanya, bütçe değişikliği veya genişletme taslağı önerilmemelidir.",
+    assumptions: "Teslimat kesintisinin nedeni henüz doğrulanmamış olabilir", questions: "Kesinti ne zaman başladı?\nTeslimat veya ödeme durumu nedir?\nHangi kampanyalar etkileniyor?\nÖnce doğrulanacak en küçük geri dönüş adımı nedir?" }),
+});
 const AUTHORITY_KEYS = ["canPublish", "canPromotePolicy", "canApprove", "canExecute", "canWriteMeta"] as const;
 function object(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
 function exact(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
@@ -97,6 +114,10 @@ export function buildNormalizationAnswers(input: Readonly<{ title: string; body:
     questions: Object.freeze(lines(input.questions).map((prompt, index) => Object.freeze({ questionRef: `question_${index + 1}`, prompt, required: true }))), });
 }
 
+export function campaignIntentTemplate(ref: CampaignIntentTemplateRef): CampaignIntentTemplate | null {
+  return ref ? CAMPAIGN_INTENT_TEMPLATES[ref] : null;
+}
+
 async function requestWorkbench(command: unknown, request: typeof fetch = fetch): Promise<unknown> {
   const response = await request("/api/normalization-workbench", { method: "POST", credentials: "same-origin",
     headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "normalization-workbench-draft" }, body: JSON.stringify({ command }) });
@@ -131,6 +152,7 @@ export function NormalizationWorkbenchPanel() {
   const [choices, setChoices] = useState<GuidanceChoices | null>(null);
   const [message, setMessage] = useState<string | null>(null); const [preview, setPreview] = useState<Preview | null>(null);
   const [selection, setSelection] = useState<Selection>({ sourceRef: "", cardRef: "", setRef: "" });
+  const [intentTemplate, setIntentTemplate] = useState<CampaignIntentTemplateRef>("");
   const [title, setTitle] = useState(""); const [body, setBody] = useState(""); const [topic, setTopic] = useState("");
   const [strength, setStrength] = useState<Strength>("should"); const [assumptions, setAssumptions] = useState("");
   const [questions, setQuestions] = useState(""); const [saving, setSaving] = useState(false);
@@ -144,6 +166,11 @@ export function NormalizationWorkbenchPanel() {
   const selectedCard = choices?.cards.find((item) => item.cardRef === selection.cardRef) ?? null;
   const matchingSets = selectedCard ? choices?.sets.filter((item) => item.cardRefs.includes(selectedCard.cardRef)) ?? [] : [];
   const answerable = Boolean(title.trim() && body.trim() && topic.trim());
+  function applyIntentTemplate(ref: CampaignIntentTemplateRef) {
+    setIntentTemplate(ref); const template = campaignIntentTemplate(ref); if (!template) return;
+    setTitle(template.title); setBody(template.body); setTopic(template.topic); setStrength(template.strength);
+    setAssumptions(template.assumptions); setQuestions(template.questions); setPreview(null);
+  }
   async function previewSelection() { setSaving(true); setMessage(null); try {
     setPreview(parseNormalizationWorkbenchPreview(await requestWorkbench({ operation: "preview", selection })));
   } catch (reason) { setPreview(null); setMessage(reason instanceof Error ? reason.message : "Kaynak önizlemesi kullanılamıyor."); } finally { setSaving(false); } }
@@ -169,6 +196,11 @@ export function NormalizationWorkbenchPanel() {
       <div className={styles.actions}><button type="button" disabled={saving || !selection.sourceRef || !selection.cardRef || !selection.setRef}
         onClick={() => void previewSelection()}>Kaynak zincirini doğrula</button>{preview ? <small>{preview.disposition === "ready"
           ? "Kaynak/kart/set aynı tenant ve güncel immutable sürümlere bağlandı." : `Eksik: ${preview.missing.join(", ") || "zincir çözülemedi"}`}</small> : null}</div>
+      <label>Kampanya niyeti şablonu<select aria-label="Kampanya niyeti şablonu" value={intentTemplate} disabled={saving}
+        onChange={(event) => applyIntentTemplate(event.target.value as CampaignIntentTemplateRef)}><option value="">Boş taslak ile devam edin</option>
+        <option value="new_campaign_plan">Yeni kampanya planı</option><option value="budget_protection">Bütçe koruma</option>
+        <option value="lead_quality">Lead kalite kontrolü</option><option value="delivery_recovery">Kesinti sonrası toparlama</option></select>
+        <small className={styles.meta}>Şablon yalnızca taslak alanlarını doldurur; yayınlama, onay ve Meta write yetkisi vermez.</small></label>
       <div className={styles.split}><label>Normalize başlık<input aria-label="Normalize başlık" value={title} maxLength={240} disabled={saving}
         onChange={(event) => setTitle(event.target.value)} /></label><label>Topic<input aria-label="Topic" value={topic} maxLength={160} disabled={saving}
           onChange={(event) => setTopic(event.target.value)} /></label><label>Güç<select aria-label="Güç" value={strength} disabled={saving}

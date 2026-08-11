@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildNormalizationAnswers, parseNormalizationWorkbenchPreview, parseNormalizationWorkbenchSnapshot, resolveNormalizationSelection } from
+import { buildNormalizationAnswers, campaignIntentTemplate, parseNormalizationWorkbenchPreview, parseNormalizationWorkbenchSnapshot, resolveNormalizationSelection } from
   "@/app/dashboard/normalization-workbench-panel";
 
 const hash = "a".repeat(64);
@@ -34,5 +34,11 @@ describe("normalization workbench panel contract", () => {
     expect(resolveNormalizationSelection(choices, "guidance_budget")).toEqual({ sourceRef: "", cardRef: "guidance_budget",
       setRef: "guidance_set_budget" });
     expect(resolveNormalizationSelection(choices, "guidance_unknown")).toBeNull();
+  });
+
+  it("offers campaign-intent templates as editable draft inputs without authority", () => {
+    expect(campaignIntentTemplate("budget_protection")).toMatchObject({ title: "Bütçeyi koru", topic: "budget_guardrail", strength: "must" });
+    expect(campaignIntentTemplate("delivery_recovery")?.questions).toContain("Kesinti ne zaman başladı?");
+    expect(campaignIntentTemplate("")).toBeNull();
   });
 });
