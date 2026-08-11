@@ -19,7 +19,8 @@
  * (kapı, ürünü asla kilitlemez — session-status'un "never disrupt" deseni).
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import * as L from "./claims-lib.mjs";
 
 // KOŞUM DAMGASI (otonomi-merdiveni:02.3) — `aide otomasyon durum`un akıbet ekseni bunu okur.
@@ -681,6 +682,32 @@ function main() {
     if (!L.sessionHalted(sid)) return pass(); // askıda değil → hiçbir şey yapma
     try {
       L.limitDevri(L.repoRootOf(p.cwd || process.cwd()), L.identityOf(sid));
+    } catch {
+      /* yut — kapı ürünü asla kilitlemez */
+    }
+    return pass();
+  }
+
+  /* ── YÖNETİM TABLOSU (Stop) — AIDE S ortak temeli (yonetim-katmani/v2:03) ───────
+     Tablo, durumun MODDAN bağımsız yaşadığı yerdir (T-İLKE): `aide l` ve `aide x` aynı
+     dosyayı okur-yazar. Bu dal onu her tur sonunda TAZELER ki uzaktan bakan (aide kurulu
+     olmayan) bir okur güncel resmi görsün.
+
+     ÜÇ SERT KURAL:
+     - DEBOUNCE: `yaz()` girdi damgasını diskten okur; damga eşse HİÇBİR ŞEY yazmaz (0 maliyet).
+     - HATA YUTULUR: tablo yazımı hedef işi ASLA bozmaz — tur her hâlükârda geçer.
+     - ÇIKTISIZ: Stop'u konuşturmak turu etkiler; sonuç dosyada görünür, ekranda değil. */
+  if (mode === "tablo") {
+    try {
+      const repo = L.repoRootOf(p.cwd || process.cwd());
+      // TAŞIYICI SEÇİMİ (ölçülmüş): motoru `node` ile import ETMEK ÇALIŞMAZ — Node'un TS
+      // desteği yalnız type-stripping'dir ve çekirdek zincirdeki `yazar-kilidi.ts`
+      // constructor parameter property kullanır (ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX).
+      // Yazımı `aide` CLI'sı yapar (bun ile koşar). Motor ya da aide yoksa (legacy proje)
+      // SESSİZCE geçilir — T5 adaptörü o durumu ayrıca ele alır.
+      if (existsSync(`${repo}/packages/core/src/yonetim-tablo.ts`)) {
+        spawnSync("aide", ["yonetim", "yaz", "--proje", repo], { timeout: 15000, stdio: "ignore" });
+      }
     } catch {
       /* yut — kapı ürünü asla kilitlemez */
     }
