@@ -48,6 +48,14 @@
   frozen context, tenant asset graph, account-group, approval veya Meta write iddia etmez. Bunlar gerçek
   kaynak/session ile ayrı kabul gerektiren açık kapsamlardır.
 
+## 2026-08-11 — A14 Today envanter doğruluğu
+
+- Today hero ve sistem özeti, kampanya/hesap sayısını yalnız structurally doğrulanmış read-only Meta
+  inventory snapshot'ı geldiğinde gösterir; capture zamanı da aynı kaynaktan yazılır.
+- Kaynak yüklenirken, eksikken veya bozuksa ekran `demo/unavailable` olarak açık kalır ve önceden sabit
+  yazılmış canlı pipeline/32 kampanya/4 hesap iddiasını yapmaz. Otonomi valfi ve bütün write sınırları
+  değişmeden kapalıdır.
+
 ## 2026-08-11 — A14 demo portföy hiyerarşisi ve filtreler
 
 - Kampanyalar yüzeyindeki salt-okunur portföy katmanı artık Meta objective ve iç kategori ile

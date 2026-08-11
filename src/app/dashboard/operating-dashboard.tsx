@@ -140,6 +140,34 @@ export type PortfolioFilters = Readonly<{
   category: string;
 }>;
 
+/**
+ * The Today surface may only call inventory totals "verified" after the
+ * read-only inventory endpoint has supplied a structurally usable snapshot.
+ * Dashboard demo campaigns and planning fixtures are deliberately excluded:
+ * they are navigation specimens, not a live account count.
+ */
+export type TodayInventorySummary = Readonly<{
+  state: "verified" | "unavailable";
+  adAccounts: number | null;
+  campaigns: number | null;
+  refreshedAt: string | null;
+}>;
+
+export function todayInventorySummary(metaInventory: MetaInventorySnapshot | null): TodayInventorySummary {
+  if (!metaInventory
+    || !Number.isSafeInteger(metaInventory.summary.adAccounts) || metaInventory.summary.adAccounts < 0
+    || !Number.isSafeInteger(metaInventory.summary.campaigns) || metaInventory.summary.campaigns < 0
+    || !Number.isFinite(Date.parse(metaInventory.refreshedAt))) {
+    return Object.freeze({ state: "unavailable", adAccounts: null, campaigns: null, refreshedAt: null });
+  }
+  return Object.freeze({
+    state: "verified",
+    adAccounts: metaInventory.summary.adAccounts,
+    campaigns: metaInventory.summary.campaigns,
+    refreshedAt: metaInventory.refreshedAt,
+  });
+}
+
 export function filterCampaignPortfolio<T extends Readonly<{ objective: string; category: string }>>(
   items: readonly T[],
   filters: PortfolioFilters,
@@ -385,15 +413,17 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   }
 
   function renderToday() {
+    const inventorySummary = todayInventorySummary(metaInventory);
+    const hasVerifiedInventory = inventorySummary.state === "verified";
     return <>
       <section className={styles.pageHero}>
-        <div><span className={styles.kicker}>7 AĞUSTOS CUMA · OPERATING REVIEW</span><h1>Günaydın. Sistem sakin, üç karar sizi bekliyor.</h1><p>Veriler işlendi, kategori ve talimatlar uygulandı. Hiçbir Meta değişikliği onayınız olmadan yürütülmez.</p></div>
+        <div><span className={styles.kicker}>7 AĞUSTOS CUMA · OPERATING REVIEW</span><h1>{hasVerifiedInventory ? "Günaydın. Doğrulanmış Meta inventory hazır." : "Günaydın. Meta inventory henüz doğrulanmadı."}</h1><p>{hasVerifiedInventory ? `${inventorySummary.campaigns} kampanya · ${inventorySummary.adAccounts} hesap · ${formatMetaTime(inventorySummary.refreshedAt)}. Hiçbir Meta değişikliği onayınız olmadan yürütülmez.` : "Bu görünümdeki operasyon metrikleri deterministik demo özetidir; doğrulanmış Meta kampanya veya hesap sayısı gösterilmez."}</p></div>
         <button className={styles.primaryButton} onClick={() => navigate("agent")}><span>✦</span> Orchestrator ile çalış</button>
       </section>
 
       <section className={styles.signalStrip} aria-label="Sistem durumu">
-        <div><span className={styles.liveDot} /> <strong>Pipeline güncel</strong><small>{Math.round(model.freshnessHours)} saat önce · L0→L4 tamam</small></div>
-        <div><strong>32 aktif kampanya</strong><small>4 hesap · 11 iç kategori</small></div>
+        <div><span className={hasVerifiedInventory ? styles.liveDot : undefined} /> <strong>{hasVerifiedInventory ? "Meta inventory doğrulandı" : metaLoading ? "Meta inventory yükleniyor · demo" : "Meta inventory kullanılamıyor · demo"}</strong><small>{hasVerifiedInventory ? `${formatMetaTime(inventorySummary.refreshedAt)} · read-only mirror` : metaError ? "Doğrulanmış inventory kaynağı yanıt vermedi; demo sayıları canlı veri değildir." : "Doğrulanmış inventory gelene kadar demo sayıları canlı veri değildir."}</small></div>
+        <div><strong>{hasVerifiedInventory ? `${inventorySummary.campaigns} doğrulanmış kampanya` : "Kampanya sayısı doğrulanmadı"}</strong><small>{hasVerifiedInventory ? `${inventorySummary.adAccounts} hesap · ${formatMetaTime(inventorySummary.refreshedAt)}` : "Hesap sayısı ve freshness unavailable; demo portföy ayrı kalır."}</small></div>
         <div><strong>Otonomi: approval_only</strong><small>K1–K4 onaya sunulur</small></div>
         <button onClick={() => navigate("timeline")}>Tüm timeline <span>→</span></button>
       </section>
