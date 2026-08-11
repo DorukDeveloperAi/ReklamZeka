@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "@/db/schema";
 import type { MetaSyncStoreSnapshot } from "./runtime";
@@ -83,18 +83,30 @@ export class DrizzleMetaSyncTransactionManager implements MetaSyncTransactionMan
     }));
   }
 
-  private async accountId(database: ReklamZekaDatabase, key: MetaSyncDurableKey, externalAccountId: string): Promise<string> {
-    const rows = await database.select({ id: schema.adAccounts.id })
+  private async accountIds(
+    database: ReklamZekaDatabase,
+    key: MetaSyncDurableKey,
+    externalAccountIds: readonly string[],
+  ): Promise<ReadonlyMap<string, string>> {
+    const expected = [...new Set(externalAccountIds)].sort();
+    if (expected.length === 0) return new Map();
+    const rows = await database.select({
+      id: schema.adAccounts.id,
+      externalAccountId: schema.adAccounts.externalAccountId,
+    })
       .from(schema.adAccounts)
       .innerJoin(schema.dataSources, eq(schema.adAccounts.dataSourceId, schema.dataSources.id))
       .where(and(
         eq(schema.adAccounts.workspaceId, key.workspaceId),
         eq(schema.dataSources.metaConnectionId, key.connectionId),
-        eq(schema.adAccounts.externalAccountId, externalAccountId),
-      )).limit(1);
-    const id = rows[0]?.id;
-    if (!id) throw new Error(`Meta sync account mapping bulunamadı: ${externalAccountId}`);
-    return id;
+        inArray(schema.adAccounts.externalAccountId, expected),
+      ));
+    const mapping = new Map(rows.map((row) => [row.externalAccountId, row.id]));
+    const missing = expected.find((externalAccountId) => !mapping.has(externalAccountId));
+    if (missing || mapping.size !== expected.length) {
+      throw new Error(`Meta sync account mapping bulunamadı: ${missing ?? "ambiguous"}`);
+    }
+    return mapping;
   }
 
   private async save(database: ReklamZekaDatabase, key: MetaSyncDurableKey, snapshot: MetaSyncStoreSnapshot): Promise<void> {
@@ -102,6 +114,15 @@ export class DrizzleMetaSyncTransactionManager implements MetaSyncTransactionMan
     if (!parent || parent.workspaceId !== key.workspaceId || parent.connectionId !== key.connectionId) {
       throw new Error("Meta sync durable snapshot scope uyuşmuyor");
     }
+    const accountIds = await this.accountIds(database, key, [
+      ...snapshot.streams.map((stream) => stream.accountId),
+      ...snapshot.records.map((record) => record.accountId),
+    ]);
+    const accountId = (externalAccountId: string): string => {
+      const resolved = accountIds.get(externalAccountId);
+      if (!resolved) throw new Error(`Meta sync account mapping bulunamadı: ${externalAccountId}`);
+      return resolved;
+    };
     const portfolioId = stableUuid(`portfolio:${key.workspaceId}:${key.connectionId}:${key.parentRunId}`);
     await database.insert(schema.metaPortfolioSyncRuns).values({
       id: portfolioId,
@@ -118,7 +139,7 @@ export class DrizzleMetaSyncTransactionManager implements MetaSyncTransactionMan
     });
 
     for (const stream of snapshot.streams.filter((candidate) => candidate.parentRunId === key.parentRunId)) {
-      const adAccountId = await this.accountId(database, key, stream.accountId);
+      const adAccountId = accountId(stream.accountId);
       const streamType = persistedMetaSyncStream(stream.stream);
       const streamId = stableUuid(`stream:${key.workspaceId}:${key.connectionId}:${adAccountId}:${streamType}`);
       const latestCursor = Object.values(stream.cursorBySlice).sort((a, b) => a.updatedAt.localeCompare(b.updatedAt)).at(-1)?.cursor ?? null;
@@ -165,17 +186,16 @@ export class DrizzleMetaSyncTransactionManager implements MetaSyncTransactionMan
       }
     }
 
-    for (const record of snapshot.records) {
-      const adAccountId = await this.accountId(database, key, record.accountId);
-      await database.insert(schema.metaSyncRecordLedger).values({
+    if (snapshot.records.length > 0) {
+      await database.insert(schema.metaSyncRecordLedger).values(snapshot.records.map((record) => ({
         id: stableUuid(`record:${key.workspaceId}:${key.connectionId}:${record.identity}`),
-        workspaceId: key.workspaceId, metaConnectionId: key.connectionId, adAccountId,
+        workspaceId: key.workspaceId, metaConnectionId: key.connectionId, adAccountId: accountId(record.accountId),
         streamType: persistedMetaSyncStream(record.stream), entityLevel: record.entityLevel === "account" ? null : record.entityLevel,
         recordIdentity: record.identity, snapshotHash: record.snapshotHash,
         firstSeenAt: new Date(record.firstSeenAt), lastSeenAt: new Date(record.lastSeenAt),
-      }).onConflictDoUpdate({
+      }))).onConflictDoUpdate({
         target: [schema.metaSyncRecordLedger.workspaceId, schema.metaSyncRecordLedger.metaConnectionId, schema.metaSyncRecordLedger.recordIdentity],
-        set: { snapshotHash: record.snapshotHash, lastSeenAt: new Date(record.lastSeenAt) },
+        set: { snapshotHash: sql`excluded.snapshot_hash`, lastSeenAt: sql`excluded.last_seen_at` },
       });
     }
   }

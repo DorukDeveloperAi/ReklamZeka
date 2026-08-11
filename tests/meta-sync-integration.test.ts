@@ -193,4 +193,25 @@ describe("Meta S1.3 runtime persistence integration", () => {
     expect(writer.writeSourcePage).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: "workspace-a", externalAccountId: "account-a", entityLevel: "campaign" }));
     expect(transactions.snapshot(key)?.records[0]?.payload).toEqual({});
   });
+
+  it("coalesces a terminal slice, stream and parent into one final durable checkpoint", async () => {
+    const transactions = new TransactionFixture();
+    const persistence = new TransactionBackedMetaSyncPersistenceAdapter(transactions);
+    const transport = new Transport(async () => ({
+      records: [{ id: "campaign-a" }], nextCursor: null, usageHeadroom: 1,
+    }));
+
+    const result = await new MetaPartialReadSyncRuntime({ transport, persistence }).run({
+      ...key,
+      plan: [slice],
+    });
+
+    expect(result.parentRun.status).toBe("completed");
+    // restore + initial scope + page cursor/record + terminal parent snapshot
+    expect(transactions.commits).toBe(4);
+    expect(transactions.snapshot(key)?.streams[0]).toMatchObject({
+      status: "completed",
+      completedSliceIds: [slice.id],
+    });
+  });
 });

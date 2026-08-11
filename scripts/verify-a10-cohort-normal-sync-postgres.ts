@@ -37,7 +37,8 @@ try {
   workspaceId = fixture.root.workspaceId;
   actorId = fixture.actorId;
   phase = "normal_read_sync";
-  const result = await materializeA10CohortSyncFixture(database, {
+  const result = await materializeA10CohortSyncFixture({
+    connectionString,
     root: fixture.root,
     parentRunId: `a10_cohort_live_${fixture.root.workspaceId.replaceAll("-", "")}`,
     observedAt: new Date("2026-08-10T12:00:00.000Z"),

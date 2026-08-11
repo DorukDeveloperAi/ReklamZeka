@@ -243,6 +243,19 @@
   henüz explicit funnel commitment üretmediği için positive cohort live acceptance **açık** kalır;
   null funnel’da runtime sonuç uydurmaz.
 
+## 2026-08-11 — A10.5b normal sync fixture acceptance
+
+- İzole test kökü dışında doğrudan kaynak/evidence satırı yazmadan normal GET-only Meta sync zinciri
+  canlı doğrulandı: beş campaign, beş ad set ve beş campaign L1 insight, ardından iki canonical
+  change snapshot/timeline normal runtime ve repository yazıcılarıyla oluştu. Doğrulayıcı sonunda
+  yalnız standart locked tombstone lifecycle'ı ile çalışma alanını temizler; Meta write/network call
+  sıfırdır.
+- Remote pooler round-trip çoğalmasını azaltmak için durable sync store aynı account mappingini bir
+  kez çözer, record ledger'ını toplu upsert eder ve terminal checkpoint'i parent snapshotıyla birlikte
+  yazar. Restart durability regression ile korunur.
+- Bu kanıt henüz uygun funnel/category, guidance/cadence/authority, L2/L3 ve dört üyeli MAD asset
+  dikeyini kurmaz; robust cohort positive acceptance bu nedenle **açık** kalır.
+
 ## 2026-08-11 — A10.5c creative fatigue V2 hesap sözleşmesi
 
 - `creative-fatigue-config-diagnostics/2.0.0`, günlük frequency veya CTR ortalaması

@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 
 import { and, count, eq, inArray } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 
 import {
   DrizzleMetaChangeSnapshotStore,
@@ -30,6 +32,8 @@ export type A10CohortFixtureRootScope = Readonly<{
 }>;
 
 export type A10CohortSyncFixtureInput = Readonly<{
+  /** Transaction-pooler URL; each normal sync slice gets its own short-lived boundary. */
+  connectionString: string;
   root: A10CohortFixtureRootScope;
   /** Caller-owned idempotency identity; must be unique for each isolated fixture. */
   parentRunId: string;
@@ -121,10 +125,6 @@ function fixturePlan(externalAccountId: string): readonly MetaSyncSlice[] {
   ]);
 }
 
-function inventoryFixturePlan(externalAccountId: string): readonly MetaSyncSlice[] {
-  return fixturePlan(externalAccountId).filter((slice) => slice.stream === "inventory");
-}
-
 class A10CohortFixtureTransport implements MetaReadTransport {
   readonly requests: MetaReadRequest[] = [];
 
@@ -156,33 +156,38 @@ class A10CohortFixtureTransport implements MetaReadTransport {
  * helper never inserts workspace/account/campaign/ad-set/insight rows itself.
  */
 export async function materializeA10CohortSyncFixture(
-  database: Database,
   input: A10CohortSyncFixtureInput,
 ): Promise<A10CohortSyncFixtureResult> {
   assertFixtureRunRef(input.parentRunId);
+  if (!input.connectionString.trim()) throw new Error("A10 cohort fixture connectionString zorunludur");
   const records = a10CohortSyncFixtureRecords(input);
   const observedAt = input.observedAt ?? new Date("2026-08-10T12:00:00.000Z");
-  const transport = new A10CohortFixtureTransport(records);
-  const runtime = new MetaPartialReadSyncRuntime({
-    transport,
-    now: () => observedAt,
-    persistence: new TransactionBackedMetaSyncPersistenceAdapter(new DrizzleMetaSyncTransactionManager(database)),
-    inventoryPagePersistence: new DrizzleMetaInventoryPagePersistence(database),
-    insightPagePersistence: new DrizzleMetaInsightPagePersistence(database),
-    maxAttempts: 1,
+  const withBoundary = async <T>(work: (database: Database) => Promise<T>): Promise<T> => {
+    const pool = new Pool({ connectionString: input.connectionString, max: 2, connectionTimeoutMillis: 10_000, statement_timeout: 30_000 });
+    try { return await work(drizzle(pool, { schema })); } finally { await pool.end(); }
+  };
+  const runSlice = async (parentRunId: string, slice: MetaSyncSlice, now: Date) => withBoundary(async (database) => {
+    const transport = new A10CohortFixtureTransport(records);
+    const run = await new MetaPartialReadSyncRuntime({
+      transport, now: () => now,
+      persistence: new TransactionBackedMetaSyncPersistenceAdapter(new DrizzleMetaSyncTransactionManager(database)),
+      inventoryPagePersistence: new DrizzleMetaInventoryPagePersistence(database),
+      insightPagePersistence: new DrizzleMetaInsightPagePersistence(database), maxAttempts: 1,
+    }).run({ parentRunId, workspaceId: input.root.workspaceId, connectionId: input.root.connectionId, plan: [slice] });
+    if (run.parentRun.status !== "completed" || transport.requests.some((request) => request.method !== "GET")) {
+      throw new Error("A10 cohort fixture normal read-sync işlemi tamamlanamadı");
+    }
+    return transport.requests.length;
   });
-  const run = await runtime.run({
-    parentRunId: input.parentRunId,
-    workspaceId: input.root.workspaceId,
-    connectionId: input.root.connectionId,
-    plan: fixturePlan(input.root.externalAccountId),
-  });
-  if (run.parentRun.status !== "completed" || transport.requests.some((request) => request.method !== "GET")) {
-    throw new Error("A10 cohort fixture normal read-sync işlemi tamamlanamadı");
-  }
+  const [campaignSlice, adSetSlice, insightSlice] = fixturePlan(input.root.externalAccountId);
+  if (!campaignSlice || !adSetSlice || !insightSlice) throw new Error("A10 cohort fixture dilimleri bulunamadı");
+  const requests = await runSlice(`${input.parentRunId}.campaign`, campaignSlice, observedAt)
+    + await runSlice(`${input.parentRunId}.adset`, adSetSlice, observedAt)
+    + await runSlice(`${input.parentRunId}.insights`, insightSlice, observedAt);
 
-  const [campaignRows, adSetRows, insightRows] = await Promise.all([
-    database.select({ value: count() }).from(schema.adCampaigns).where(and(
+  const persisted = await withBoundary(async (database) => {
+    const [campaignRows, adSetRows, insightRows] = await Promise.all([
+      database.select({ value: count() }).from(schema.adCampaigns).where(and(
       eq(schema.adCampaigns.workspaceId, input.root.workspaceId),
       eq(schema.adCampaigns.adAccountId, input.root.adAccountId),
       inArray(schema.adCampaigns.externalCampaignId, records.campaigns.map((record) => record.id)),
@@ -200,12 +205,13 @@ export async function materializeA10CohortSyncFixture(
       eq(schema.metaDailyInsights.dateStart, FIXTURE_DATE),
       eq(schema.metaDailyInsights.dateStop, FIXTURE_DATE),
     )),
-  ]);
-  const persisted = {
+    ]);
+    return {
     campaigns: campaignRows[0]?.value ?? 0,
     adSets: adSetRows[0]?.value ?? 0,
     campaignInsights: insightRows[0]?.value ?? 0,
-  };
+    };
+  });
   if (persisted.campaigns !== 5 || persisted.adSets !== 5 || persisted.campaignInsights !== 5) {
     throw new Error("A10 cohort fixture normal writer kanıtı 5+5+5 değil");
   }
@@ -216,43 +222,32 @@ export async function materializeA10CohortSyncFixture(
     externalAccountId: input.root.externalAccountId,
     capturedAt: observedAt.toISOString(),
   } as const;
-  const adapter = new MetaChangeSnapshotDrizzleAdapter(new DrizzleMetaChangeSnapshotStore(database));
-  const previous = normalizeMetaChangeSnapshot(await adapter.buildInput(initialSnapshotScope));
+  const previous = await withBoundary(async (database) => normalizeMetaChangeSnapshot(await new MetaChangeSnapshotDrizzleAdapter(
+    new DrizzleMetaChangeSnapshotStore(database),
+  ).buildInput(initialSnapshotScope)));
   const changedAt = new Date(observedAt.valueOf() + 60_000);
-  const changedTransport = new A10CohortFixtureTransport(records);
-  const changedRun = await new MetaPartialReadSyncRuntime({
-    transport: changedTransport,
-    now: () => changedAt,
-    persistence: new TransactionBackedMetaSyncPersistenceAdapter(new DrizzleMetaSyncTransactionManager(database)),
-    inventoryPagePersistence: new DrizzleMetaInventoryPagePersistence(database),
-    insightPagePersistence: new DrizzleMetaInsightPagePersistence(database),
-    maxAttempts: 1,
-  }).run({
-    parentRunId: `${input.parentRunId}.change`,
-    workspaceId: input.root.workspaceId,
-    connectionId: input.root.connectionId,
-    plan: inventoryFixturePlan(input.root.externalAccountId),
-  });
-  if (changedRun.parentRun.status !== "completed" || changedTransport.requests.some((request) => request.method !== "GET")) {
-    throw new Error("A10 cohort fixture canonical snapshot read-sync işlemi tamamlanamadı");
-  }
+  const changedRequests = await runSlice(`${input.parentRunId}.snapshot_campaign`, campaignSlice, changedAt)
+    + await runSlice(`${input.parentRunId}.snapshot_adset`, adSetSlice, changedAt);
   const snapshotScope = {
     workspaceId: input.root.workspaceId,
     connectionId: input.root.connectionId,
     externalAccountId: input.root.externalAccountId,
     capturedAt: changedAt.toISOString(),
   } as const;
-  const snapshot = normalizeMetaChangeSnapshot(await adapter.buildInput(snapshotScope));
+  const snapshot = await withBoundary(async (database) => normalizeMetaChangeSnapshot(await new MetaChangeSnapshotDrizzleAdapter(
+    new DrizzleMetaChangeSnapshotStore(database),
+  ).buildInput(snapshotScope)));
   const timeline = diffMetaChangeSnapshots({ previous, current: snapshot });
-  const persistedTimeline = await new MetaChangeTimelinePersistenceService(
+  const persistedTimeline = await withBoundary(async (database) => new MetaChangeTimelinePersistenceService(
     new DrizzleMetaChangeTimelinePersistenceStore(database),
   ).persist({
     scope: { workspaceId: input.root.workspaceId, connectionId: input.root.connectionId, adAccountId: input.root.adAccountId },
     previous,
     current: snapshot,
     timeline,
-    detectedAt: observedAt.toISOString(),
-  });
+    // A timeline cannot be detected before its newest persisted snapshot.
+    detectedAt: changedAt.toISOString(),
+  }));
   if (persistedTimeline.insertedSnapshots !== 2 || persistedTimeline.currentSnapshotRef === persistedTimeline.previousSnapshotRef) {
     throw new Error("A10 cohort fixture canonical snapshot kanıtı tamamlanamadı");
   }
@@ -263,6 +258,6 @@ export async function materializeA10CohortSyncFixture(
     runtimeStatus: "completed",
     persisted: Object.freeze(persisted),
     snapshot: Object.freeze({ snapshotRef: persistedTimeline.currentSnapshotRef, snapshotHash: snapshot.snapshotHash, insertedSnapshots: persistedTimeline.insertedSnapshots }),
-    transport: Object.freeze({ requestCount: transport.requests.length + changedTransport.requests.length, writeNetworkCalls: 0 }),
+    transport: Object.freeze({ requestCount: requests + changedRequests, writeNetworkCalls: 0 }),
   });
 }

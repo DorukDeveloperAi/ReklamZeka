@@ -130,7 +130,13 @@ export class MetaPartialReadSyncRuntime {
       }
       if (stream.completedSliceIds.length === slices.length) { stream.status = "completed"; stream.error = null; }
       this.store.saveStream(stream);
-      await this.persist(durableKey);
+      // A completed final stream is persisted atomically with the parent below.
+      // Persist intermediate/partial streams before the next external page so
+      // restart durability is preserved without writing an identical snapshot
+      // twice at the terminal boundary.
+      if (stream.status !== "completed" || this.hasPendingWork(parent, input.plan)) {
+        await this.persist(durableKey);
+      }
     }
     const streams = this.store.streamsFor(parent.id);
     parent.status = streams.every((stream) => stream.status === "completed")
@@ -230,8 +236,17 @@ export class MetaPartialReadSyncRuntime {
     } while (cursor !== null);
     stream.completedSliceIds.push(slice.id);
     this.store.saveStream(stream);
-    await this.persist(durableKey);
     return { completed: true, inserted, updated, unchanged, error: null };
+  }
+
+  private hasPendingWork(parent: MutableParentRun, plan: readonly MetaSyncSlice[]): boolean {
+    return parent.streamRunIds.some((streamId) => {
+      const stream = this.store.stream(streamId);
+      if (!stream || stream.status === "completed") return false;
+      return plan.some((slice) => slice.stream === stream.stream
+        && slice.accountId === stream.accountId
+        && !stream.completedSliceIds.includes(slice.id));
+    });
   }
 
   private async persist(key: MetaSyncDurableKey): Promise<void> {
