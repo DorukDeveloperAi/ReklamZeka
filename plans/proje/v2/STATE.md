@@ -47,6 +47,16 @@
   gerçek Approval Queue'ya geçiş ayrı kaldı. Browser'da Today ve Kampanyalar akışı, demo sınırı,
   brief görünürlüğü ve sıfır console uyarısıyla doğrulandı. Meta write/approval/execute eklenmedi.
 
+## 2026-08-11 — A14 offline çalışma kitabı portföy snapshotı
+
+- Kullanıcının verdiği bütçe/harcama takip çalışma kitabından türetilen tarihli, salt-okunur portföy
+  özeti Kampanyalar yüzeyine eklendi. Kaynak/dönem/capture zamanı açıkça görünür; 27 kampanya,
+  yerli-yabancı ayrımı ve AR WhatsApp FTR / RU form FTR şeritleri yalnız kategorileme ve brief
+  başlangıç bağlamı olarak kullanılır.
+- Snapshot Meta mirror, live KPI, Approval Queue veya kalıcı kaynak değildir. Kesinti kuralı görünür
+  biçimde "önce teslimatı doğrula"dır; form ve WhatsApp sonuçları birleştirilmez. Browser kabulünde
+  offline etiketi, iki rota şeridi, kesinti sınırı ve sıfır console uyarısı doğrulandı.
+
 ## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
 
 - Strict Policy Studio içindeki normalizasyon çalışma alanı, owner talimatının mevcut Guidance Studio

@@ -306,6 +306,9 @@
   - [x] Read-only inventory performans/CRM/budget evidence'i taşımadığında Today KPI'ları `Kaynak
     bekleniyor` olur; demo karar ve portföy örnekleri gerçek approval/performans kaydı gibi
     etiketlenmez.
+  - [x] Kullanıcıdan gelen tarihli çalışma kitabı, canlı Meta mirror'dan ayrı açık bir offline portföy
+    snapshotı olarak görünür; pazar/dil/rota ayrımı ve kesinti sınırı brief başlangıç bağlamına
+    taşınır, KPI/approval/Meta-write iddiasına dönüşmez.
 - [ ] Meta config + çoklu internal category + policy composition.
   - [x] A10.4a immutable/replay-safe `meta-analysis-config-snapshot/2.0.0`: reviewed
     campaign objective ve ad-set optimization-goal mapping sürümleri hash'e freeze edilir;

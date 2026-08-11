@@ -13,6 +13,7 @@ import { CategoryInventoryPanel } from "./category-inventory-panel";
 import { InstructionPolicyStudioPanel } from "./instruction-policy-studio-panel";
 import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel";
 import { CampaignPlanningBriefPanel, type CampaignPlanningBriefContext } from "./campaign-planning-brief-panel";
+import { offlineWorkbookPortfolioSnapshot } from "@/domain/campaigns/offline-workbook-portfolio-snapshot";
 import styles from "./operating-dashboard.module.css";
 
 export type OperatingDashboardModel = Readonly<{
@@ -496,6 +497,13 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   function renderCampaigns() {
     return <>
       <section className={styles.pageHero}><div><span className={styles.kicker}>META PORTFÖYÜ</span><h1>Kampanyayı metrikten önce bağlamıyla okuyun.</h1><p>Meta objective, reklam seti yapısı, mevcut kreatifler ve iç kategoriler aynı karar yüzeyinde.</p></div><button className={styles.primaryButton} onClick={() => navigate("analysis")}>Yeni analiz</button></section>
+      <section className={styles.panel} aria-label="Offline çalışma kitabı portföy özeti">
+        <header className={styles.panelHeader}><div><span className={styles.kicker}>OFFLINE ÇALIŞMA KİTABI SNAPSHOT · SALT-OKUNUR</span><h2>{offlineWorkbookPortfolioSnapshot.period}</h2></div><StatusPill tone="neutral">Canlı Meta mirror değil</StatusPill></header>
+        <p>Kaynak: {offlineWorkbookPortfolioSnapshot.source} · {formatMetaTime(offlineWorkbookPortfolioSnapshot.capturedAt)}. Bu özet yalnız sınıflandırma ve brief senaryolarına yön verir; güncel KPI, approval veya Meta yetkisi değildir.</p>
+        <div className={styles.contextGrid}><div><span>Kampanya</span><strong>{offlineWorkbookPortfolioSnapshot.totals.campaigns}</strong><small>tarihli workbook kapsamı</small></div><div><span>Harcama</span><strong>{new Intl.NumberFormat("tr-TR", { style: "currency", currency: offlineWorkbookPortfolioSnapshot.currency, maximumFractionDigits: 0 }).format(offlineWorkbookPortfolioSnapshot.totals.spend)}</strong><small>yalnız bu tarihli dönem</small></div><div><span>Toplam lead</span><strong>{new Intl.NumberFormat("tr-TR").format(offlineWorkbookPortfolioSnapshot.totals.leads)}</strong><small>form ve WhatsApp ayrı tutulur</small></div><div><span>Kesinti kuralı</span><strong>Önce teslimatı doğrula</strong><small>Kesinti penceresinde performans hükmü yok</small></div></div>
+        <div className={styles.campaignTable} role="table" aria-label="Çalışma kitabı pazar ve dönüşüm şeritleri"><div className={styles.tableHead} role="row"><span>Pazar</span><span>Kampanya</span><span>Lead</span><span>Form</span><span>WhatsApp</span><span>Sınır</span></div>{offlineWorkbookPortfolioSnapshot.markets.map((market) => <div className={styles.tableRow} role="row" key={market.market}><span><strong>{market.market}</strong></span><span>{market.campaigns}</span><span>{market.leads}</span><span>{market.formLeads}</span><span>{market.whatsappLeads}</span><span>Diğer pazar veya rota ile varsayılan kıyas yok</span></div>)}</div>
+        <p>{offlineWorkbookPortfolioSnapshot.lanes.map((lane) => `${lane.label} (${lane.leads} lead)`).join(" · ")}. Bu şeritler brief içindeki pazar/dil/hizmet/rota seçimleriyle ayrı kalır.</p>
+      </section>
       <section className={styles.portfolioOverview} aria-labelledby="portfolio-overview-title">
         <header><div><span className={styles.kicker}>BUGÜN / PORTFÖY HİYERARŞİSİ</span><h2 id="portfolio-overview-title">Demo Marka <i>→</i> Meta portföyü <i>→</i> {filteredCampaigns.length} görünür kampanya</h2><p>Filtreler yalnız bu demo/read-only snapshot'ı daraltır; account, category veya Meta yetkisi değiştirmez.</p></div><StatusPill tone="neutral">unbound demo context</StatusPill></header>
         <div className={styles.portfolioFilters} aria-label="Portföy filtreleri">

@@ -23,6 +23,11 @@ describe("portfolio dashboard", () => {
 
   it("renders the read-only hierarchy and explicit demo-source boundary in the campaign surface", () => {
     const html = renderToStaticMarkup(createElement(OperatingDashboard, { model, initialView: "campaigns" }));
+    expect(html).toContain("OFFLINE ÇALIŞMA KİTABI SNAPSHOT · SALT-OKUNUR");
+    expect(html).toContain("Canlı Meta mirror değil");
+    expect(html).toContain("AR · WhatsApp · FTR");
+    expect(html).toContain("RU · Form · FTR");
+    expect(html).toContain("Kesinti penceresinde performans hükmü yok");
     expect(html).toContain("BUGÜN / PORTFÖY HİYERARŞİSİ");
     expect(html).toContain("Meta objective");
     expect(html).toContain("İç kategori");
