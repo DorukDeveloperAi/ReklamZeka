@@ -24,14 +24,14 @@ function stable(value: unknown): unknown {
 }
 function digest(value: unknown): string { return createHash("sha256").update(JSON.stringify(stable(value))).digest("hex"); }
 
-function categoryComposition() {
+function categoryComposition(targetId: string = input.entityRef) {
   const dimension: CategoryDimension = { id: "dimension_primary", workspaceId: input.workspaceId, key: "service", version: 1,
     cardinality: "single", allowedEntityLevels: ["campaign"], archivedAt: null };
   const definition: CategoryDefinition = { id: "definition_primary", workspaceId: input.workspaceId, dimensionId: dimension.id,
     key: "lead", label: "Lead", version: 1, archivedAt: null };
   const frozen = resolveEffectiveCategory({ dimension, definitions: [definition], path: { workspaceId: input.workspaceId,
-    nodes: [{ level: "campaign", id: input.entityRef }] }, assignments: [{ id: "assignment_primary", workspaceId: input.workspaceId,
-      dimensionId: dimension.id, definitionId: definition.id, entity: { level: "campaign", id: input.entityRef }, operation: "add",
+    nodes: [{ level: "campaign", id: targetId }] }, assignments: [{ id: "assignment_primary", workspaceId: input.workspaceId,
+      dimensionId: dimension.id, definitionId: definition.id, entity: { level: "campaign", id: targetId }, operation: "add",
       source: "manual", manualLock: false, evidence: [{ kind: "owner", ref: "owner_evidence" }], confidence: 1, version: 1, archivedAt: null }] }).frozenContext;
   return { workspaceId: input.workspaceId, dimensions: [{ values: [definition], frozenContext: bindCategoryProfiles(frozen,
     [createCategoryProfile({ workspaceRef: "workspace_primary", profileRef: "category_profile_lead",
@@ -97,7 +97,7 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
       selectedSetRef: "set_primary", selectedSetVersion: 1, selectedSetHash: setHash, topics: ["quality"],
       requiredTopics: [], budget: { maxCards: 10, maxSources: 20, maxCharacters: 1000 }, sourceSelectionHash: "b".repeat(64),
       effectiveAt: "2026-08-10T15:00:00.000Z", previousSelectionHash: "GENESIS", selectionHash: "c".repeat(64) } as GuidanceCampaignSelection));
-    const resolveInTransaction = vi.fn(async () => categoryComposition());
+    const resolveInTransaction = vi.fn(async () => categoryComposition(campaignId));
     const inspectInTransaction = vi.fn(async () => ({ registryHash: "a".repeat(64), current: [], history: [], diffs: [] }));
     const loadInTransaction = vi.fn(async () => ({ scope: { evaluatedAt: "2026-08-10T14:00:00.000Z" }, catalog: { instructionPolicyRegistryHash: "a".repeat(64) }, authoritySnapshot: {
       workspaceId: input.workspaceId, verifiedAt: "2026-08-10T14:00:00.000Z", expiresAt: "2026-08-10T16:00:00.000Z",
@@ -163,7 +163,7 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
           maxCharacters: 1000 }, sourceSelectionHash: "b".repeat(64), effectiveAt: hierarchy.capturedAt, previousSelectionHash: "GENESIS",
         selectionHash: "c".repeat(64) })) },
       { resolveInTransaction: vi.fn(async () => ({ workspaceId: input.workspaceId, dimensions: [{ values: [{ key: "lead" }],
-        frozenContext: { dimension: { key: "service" }, path: [{ id: input.entityRef }] } }] })) } as never,
+        frozenContext: { dimension: { key: "service" }, path: [{ id: campaignId }] } }] })) } as never,
       { inspectInTransaction: vi.fn(async () => ({ registryHash: "a".repeat(64), current: [], history: [], diffs: [] })) } as never,
       { loadInTransaction: vi.fn(async () => ({ scope: { evaluatedAt: "2026-08-10T16:00:00.000Z" }, catalog: { instructionPolicyRegistryHash: "a".repeat(64) }, authoritySnapshot: {
         workspaceId: input.workspaceId, verifiedAt: "2026-08-10T14:00:00.000Z", expiresAt: "2026-08-10T17:00:00.000Z" } })) } as never).loadCurrent(input))
