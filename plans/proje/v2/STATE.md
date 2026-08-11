@@ -55,6 +55,9 @@
 - Kaynak yüklenirken, eksikken veya bozuksa ekran `demo/unavailable` olarak açık kalır ve önceden sabit
   yazılmış canlı pipeline/32 kampanya/4 hesap iddiasını yapmaz. Otonomi valfi ve bütün write sınırları
   değişmeden kapalıdır.
+- Browser kabulünde local inventory unavailable iken bu açık durum, sıfır execute/Meta-write kontrolü ve
+  console uyarısı olmadan doğrulandı. Turbopack'ın yalnız izlenmeyen dev cache'inde bulunan eksik SST
+  referansı güvenli cache yenilemesiyle giderildi; ürün kodu veya kaynak veri değişmedi.
 
 ## 2026-08-11 — A14 demo portföy hiyerarşisi ve filtreler
 
