@@ -98,6 +98,15 @@
   console uyarısı olmadan doğrulandı. Turbopack'ın yalnız izlenmeyen dev cache'inde bulunan eksik SST
   referansı güvenli cache yenilemesiyle giderildi; ürün kodu veya kaynak veri değişmedi.
 
+## 2026-08-11 — A14 çoklu hesap odağı
+
+- Meta read mirror, güncel inventory snapshotındaki erişilebilir reklam hesapları arasında salt-okunur
+  odak seçimi sunar. Yenilenmiş snapshotta bulunmayan eski seçim ilk güncel hesaba düşer; bu tercih
+  hiçbir API isteği, account-group, sayfa/Instagram eşleşmesi veya Meta değişikliği üretmez.
+- Sayfa ve Instagram listesi kaynak account ilişkisi taşımadığı için kaynak-genel kalır; UI ilişki
+  uydurmaz. Yerel browser oturumunda inventory `503` olduğundan UI dürüstçe unavailable durumu gösterdi;
+  gerçek çoklu-hesap seçimi browser kabulü, canlı inventory ile hâlâ açık kalır.
+
 ## 2026-08-11 — A14 demo portföy hiyerarşisi ve filtreler
 
 - Kampanyalar yüzeyindeki salt-okunur portföy katmanı artık Meta objective ve iç kategori ile

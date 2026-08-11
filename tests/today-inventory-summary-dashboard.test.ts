@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   OperatingDashboard,
+  resolveMetaAccountFocus,
   todayInventorySummary,
 } from "@/app/dashboard/operating-dashboard";
 import type { MetaInventorySnapshot } from "@/connectors/meta/types";
@@ -35,6 +36,16 @@ describe("Today inventory summary", () => {
     expect(todayInventorySummary({ ...inventory(), summary: { ...inventory().summary, campaigns: -1 } })).toEqual({
       state: "unavailable", adAccounts: null, campaigns: null, refreshedAt: null,
     });
+  });
+
+  it("keeps account focus within the current read-only inventory snapshot", () => {
+    const accounts = [
+      { id: "act_a", name: "A", currency: "TRY", timezone: "Europe/Istanbul", status: "ACTIVE", campaignCount: 1, adSetCount: 1, adCount: 1, campaignExamples: [], adCopyExamples: [], insightAccess: { verified: true, timeframe: "7d", dateStart: null, dateStop: null }, businessName: null },
+      { id: "act_b", name: "B", currency: "USD", timezone: "UTC", status: "ACTIVE", campaignCount: 2, adSetCount: 2, adCount: 2, campaignExamples: [], adCopyExamples: [], insightAccess: { verified: false, timeframe: "7d", dateStart: null, dateStop: null }, businessName: null },
+    ] as const;
+    expect(resolveMetaAccountFocus(accounts, "act_b")).toBe("act_b");
+    expect(resolveMetaAccountFocus(accounts, "act_missing")).toBe("act_a");
+    expect(resolveMetaAccountFocus([], "act_a")).toBe("");
   });
 
   it("labels the initial Today surface as demo/unavailable and does not claim hardcoded account or campaign totals", () => {

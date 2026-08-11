@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { MetaInventoryApiError, MetaInventorySnapshot } from "@/connectors/meta/types";
+import type { MetaInventoryAccount, MetaInventoryApiError, MetaInventorySnapshot } from "@/connectors/meta/types";
 import { DecisionRoomPanel } from "./decision-room-panel";
 import { BudgetLabPanel } from "./budget-lab-panel";
 import { PracticeLabPanel } from "./practice-lab-panel";
@@ -169,6 +169,21 @@ export function todayInventorySummary(metaInventory: MetaInventorySnapshot | nul
   });
 }
 
+/**
+ * Account focus is a local, read-only UI preference. It deliberately falls
+ * back to the first current inventory account rather than preserving an ID
+ * from an older snapshot, which could otherwise make a removed account look
+ * selectable.
+ */
+export function resolveMetaAccountFocus(
+  accounts: readonly MetaInventoryAccount[],
+  currentAccountId: string,
+): string {
+  return accounts.some((account) => account.id === currentAccountId)
+    ? currentAccountId
+    : accounts[0]?.id ?? "";
+}
+
 export function filterCampaignPortfolio<T extends Readonly<{ objective: string; category: string }>>(
   items: readonly T[],
   filters: PortfolioFilters,
@@ -265,6 +280,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   const [metaInventory, setMetaInventory] = useState<MetaInventorySnapshot | null>(null);
   const [metaLoading, setMetaLoading] = useState(true);
   const [metaError, setMetaError] = useState<string | null>(null);
+  const [selectedMetaAccountId, setSelectedMetaAccountId] = useState("");
   const [agentSessions, setAgentSessions] = useState<AgentSessionSummary[]>([]);
   const [agentSessionsLoading, setAgentSessionsLoading] = useState(true);
   const [agentSessionError, setAgentSessionError] = useState<string | null>(null);
@@ -295,6 +311,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       }
       const snapshot = await response.json() as MetaInventorySnapshot;
       setMetaInventory(snapshot);
+      setSelectedMetaAccountId((current) => resolveMetaAccountFocus(snapshot.accounts, current));
       if (announce) setToast(`Meta envanteri yenilendi: ${snapshot.summary.adAccounts} hesap · ${snapshot.summary.pages} sayfa · ${snapshot.audit.writeOperations} write.`);
     } catch (error) {
       setMetaError(error instanceof Error ? error.message : "Meta envanteri yenilenemedi");
@@ -559,6 +576,9 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
     }
 
     const inventory = metaInventory;
+    const focusedMetaAccount = inventory.accounts.find((account) => account.id === selectedMetaAccountId)
+      ?? inventory.accounts[0]
+      ?? null;
     return <>
       <section className={styles.pageHero}>
         <div><span className={styles.kicker}>META READ MIRROR · {inventory.connection.graphApiVersion}</span><h1>Hangi varlığa erişebildiğimiz açık ve doğrulanmış.</h1><p>İzin kapsamı, canlı erişim ve ReklamZeka’da etkin yetenek birbirinden ayrıdır. Tam Meta ID’leri bu yüzeye çıkmaz.</p></div>
@@ -592,6 +612,11 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       <div className={styles.metaInventoryColumns}>
         <section className={styles.panel}>
           <header className={styles.panelHeader}><div><span className={styles.kicker}>AD ACCOUNTS</span><h2>Erişilebilir reklam hesapları</h2></div><span>{inventory.accounts.length} hesap</span></header>
+          {focusedMetaAccount ? <section className={styles.metaAccountFocus} aria-label="Seçili Meta reklam hesabı">
+            <div><span className={styles.kicker}>HESAP ODAĞI · SALT-OKUNUR</span><strong>{focusedMetaAccount.name}</strong><small>{focusedMetaAccount.currency ?? "Para birimi bilinmiyor"} · {focusedMetaAccount.timezone ?? "Saat dilimi bilinmiyor"} · Insights {focusedMetaAccount.insightAccess.verified ? "doğrulandı" : "doğrulanmadı"}</small></div>
+            <label htmlFor="meta-account-focus"><span>Görüntülenen hesap</span><select id="meta-account-focus" value={focusedMetaAccount.id} onChange={(event) => setSelectedMetaAccountId(resolveMetaAccountFocus(inventory.accounts, event.target.value))}>{inventory.accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
+            <p>Bu seçim yalnız ekrandaki odağı değiştirir. Hesap grubu, sayfa eşleşmesi veya Meta değişikliği çıkarımı yapmaz.</p>
+          </section> : <p className={styles.metaAccountEmpty}>Bu envanterde erişilebilir reklam hesabı yok.</p>}
           <div className={styles.metaAccountList}>{inventory.accounts.map((account) => <details key={account.id}><summary><div><strong>{account.name}</strong><small>{account.id} · {account.currency ?? "—"} · {account.timezone ?? "—"}</small></div><StatusPill tone={account.status === "ACTIVE" ? "good" : "warning"}>{account.status}</StatusPill><div><strong>{compactNumber(account.campaignCount)}</strong><small>kampanya</small></div></summary><div className={styles.metaAccountDetail}><dl><div><dt>Campaign</dt><dd>{compactNumber(account.campaignCount)}</dd></div><div><dt>Ad set</dt><dd>{compactNumber(account.adSetCount)}</dd></div><div><dt>Ad</dt><dd>{compactNumber(account.adCount)}</dd></div><div><dt>Insights</dt><dd>{account.insightAccess.verified ? `${account.insightAccess.dateStart ?? "7g"} → ${account.insightAccess.dateStop ?? "bugün"}` : "Doğrulanamadı"}</dd></div></dl>{account.campaignExamples.length ? <div><span className={styles.kicker}>KAMPANYA ÖRNEKLERİ</span>{account.campaignExamples.map((campaign) => <p key={campaign.id}><strong>{campaign.name}</strong><small>{campaign.status} · {campaign.objective ?? "objective yok"} · {campaign.id}</small></p>)}</div> : <p>Bu hesapta kampanya bulunamadı.</p>}{account.adCopyExamples.some((ad) => ad.body || ad.title || ad.instagramPermalink) ? <div><span className={styles.kicker}>OKUNABİLEN REKLAM METİNLERİ</span>{account.adCopyExamples.filter((ad) => ad.body || ad.title || ad.instagramPermalink).slice(0, 2).map((ad) => <blockquote key={ad.id}><strong>{ad.title ?? ad.name}</strong><p>{ad.body ?? "Metin yok; mevcut gönderi bağlantısı okunabiliyor."}</p>{ad.instagramPermalink ? <a href={ad.instagramPermalink} target="_blank" rel="noreferrer">Instagram gönderisini aç ↗</a> : null}</blockquote>)}</div> : null}</div></details>)}</div>
         </section>
 

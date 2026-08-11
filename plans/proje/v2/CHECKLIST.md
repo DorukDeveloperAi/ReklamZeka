@@ -750,6 +750,9 @@
     → creative/post drill-down. Bu yalnız navigasyon örneğidir; frozen context, gerçek Meta asset graph
     veya approval/write yetkisi yerine geçmez.
 - [ ] Account-group switcher, multi-account connection health ve Page/Instagram asset graph.
+  - [x] Güncel read-only Meta inventory içindeki hesaplar için yerel, salt-okunur account focus seçimi;
+    silinmiş/eski seçim güncel snapshotta ilk hesaba fail-closed düşer. Account-group veya Page/Instagram
+    ilişki verisi kaynakta olmadığından bu seçim onları taklit etmez.
 - [ ] Kategori/talimat stüdyosu ve raw/normalized/version/conflict görünümü.
   - [x] Guidance Studio eksik/expired dashboard capability'yi DB arızasından ayırır; 401
     `local_session_required` ile Decision Room tek-kullanımlık bootstrap yüzeyine yönlendirir.

@@ -614,6 +614,13 @@
 .capabilityRow > small { color: var(--rz-muted); font-size: .57rem; line-height: 1.4; }
 .metaInventoryColumns { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(360px, .8fr); gap: 10px; margin-top: 10px; }
 .metaAccountList { display: grid; }
+.metaAccountFocus { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, .7fr); gap: 12px 18px; padding: 14px 17px; border-bottom: 1px solid var(--rz-line); background: rgba(123,198,255,.035); }
+.metaAccountFocus > div, .metaAccountFocus label { display: grid; align-content: start; gap: 5px; }
+.metaAccountFocus strong { font-size: .74rem; }
+.metaAccountFocus small, .metaAccountFocus label span, .metaAccountFocus p, .metaAccountEmpty { color: var(--rz-muted); font-size: .56rem; line-height: 1.5; }
+.metaAccountFocus select { width: 100%; padding: 8px 9px; border: 1px solid var(--rz-line); border-radius: 7px; background: var(--rz-surface); color: var(--rz-text); font: inherit; font-size: .62rem; }
+.metaAccountFocus p { grid-column: 1 / -1; margin: 0; }
+.metaAccountEmpty { margin: 0; padding: 15px 17px; border-bottom: 1px solid var(--rz-line); }
 .metaAccountList details { border-bottom: 1px solid var(--rz-line); }
 .metaAccountList details:last-child { border-bottom: 0; }
 .metaAccountList summary { display: grid; grid-template-columns: minmax(0, 1fr) auto 72px; align-items: center; gap: 13px; min-height: 76px; padding: 12px 17px; cursor: pointer; list-style: none; }
@@ -1075,6 +1082,8 @@
   .categoryCoverage article { border-right: 0; border-bottom: 1px solid var(--rz-line); }
   .categoryCoverage article:last-child { border-bottom: 0; }
   .metaAccountList summary { grid-template-columns: minmax(0, 1fr) auto; }
+  .metaAccountFocus { grid-template-columns: 1fr; }
+  .metaAccountFocus p { grid-column: auto; }
   .metaAccountList summary > div:last-child { grid-column: 1 / -1; grid-row: 2; text-align: left; }
   .metaPageList article { grid-template-columns: minmax(0, 1fr) auto; }
   .metaPageList article > .instagramIdentity, .metaPageList article > .statusPill { grid-column: 1 / -1; }
