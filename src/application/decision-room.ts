@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { buildAnalysisAgenda, type AnalysisPassKey } from "@/analyses/agenda";
 import type { DeterministicAnalysisRun } from "@/analyses/deterministic-analysis";
 import type { EffectiveCampaignContext } from "@/analyses/effective-campaign-context";
+import { buildCompactAgentContext, type CompactAgentContext } from "@/analyses/compact-agent-context";
 import {
   buildDeterministicFindings,
   type DeterministicFindingRun,
@@ -75,6 +76,8 @@ export type DecisionRoomResult = Readonly<{
   status: DecisionRoomStatus;
   agendaRef: string;
   findingRunRef: string;
+  /** Replay-safe, public-safe L5 projection bound to this immutable analysis record. */
+  compactContext: CompactAgentContext;
   cadence: Readonly<{
     resultRef: string;
     outcome: DecisionRoomStatus;
@@ -266,6 +269,7 @@ export async function runDecisionRoom(
 
   let agenda;
   let findings;
+  let compactContext;
   let cadence;
   let experiment: ExperimentOutcome | null;
   try {
@@ -283,6 +287,7 @@ export async function runDecisionRoom(
       metricBundles: input.findingInput.metricBundles,
       ...(input.findingInput.passAssignments ? { passAssignments: input.findingInput.passAssignments } : {}),
     });
+    compactContext = buildCompactAgentContext({ context: input.context, agenda, findingRun: findings });
     const evidenceRefs = findings.findings.map((finding) => finding.findingId).sort(compareText);
     cadence = evaluateDecisionCadence({
       profile: input.cadence.profile,
@@ -347,6 +352,8 @@ export async function runDecisionRoom(
         agendaRef: agenda.agendaId,
         analysisRef: input.analysis.runId,
         findingRunRef: findings.findingRunId,
+        compactContextRef: compactContext.compactContextRef,
+        compactContextHash: compactContext.compactContextHash,
         selectionRefs: agenda.selectionRefs,
         status,
       },
@@ -406,6 +413,7 @@ export async function runDecisionRoom(
     status,
     agendaRef: agenda.agendaId,
     findingRunRef: findings.findingRunId,
+    compactContext,
     cadence: Object.freeze({
       resultRef: cadence.resultRef,
       outcome: status,

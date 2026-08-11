@@ -16,6 +16,7 @@ import {
   DecisionRoomAnalysisRuntimeError,
   validateDecisionRoomAnalysisRuntimeAssets,
   type DecisionRoomAnalysisRuntimeAssetPort,
+  type DecisionRoomFrozenEvidencePort,
   type DecisionRoomAnalysisRuntimeAssets,
 } from "@/application/decision-room-analysis-runtime";
 import type { DecisionRoomDraftPort } from "@/application/decision-room";
@@ -28,6 +29,8 @@ import { resolveAnalysisTimeframe, validateResolvedAnalysisTimeframe, type Resol
 import * as schema from "@/db/schema";
 import { DrizzleDecisionRoomInbox, DrizzleDecisionRoomRunStore } from "@/connectors/decisions/decision-room-drizzle-adapters";
 import { DecisionRoomExecutor } from "@/domain/decisions/executor";
+import { DrizzleDeterministicFeatureSnapshotRepository } from "@/connectors/analyses/deterministic-feature-snapshot-drizzle-repository";
+import { DrizzleDeterministicWindowSnapshotRepository } from "@/connectors/analyses/deterministic-window-snapshot-drizzle-repository";
 
 type Database = NodePgDatabase<typeof schema>;
 type PersistenceDatabase = Pick<Database, "execute" | "transaction">;
@@ -649,6 +652,20 @@ export class DrizzleDecisionRoomAnalysisRuntimeAssetLoader implements DecisionRo
   }
 }
 
+/** Exact frozen L2/L3 reader; it never falls back to a newer source or L1 query. */
+class DrizzleDecisionRoomFrozenEvidenceReader implements DecisionRoomFrozenEvidencePort {
+  private readonly features: DrizzleDeterministicFeatureSnapshotRepository;
+  private readonly windows: DrizzleDeterministicWindowSnapshotRepository;
+
+  constructor(database: Database) {
+    this.features = new DrizzleDeterministicFeatureSnapshotRepository(database);
+    this.windows = new DrizzleDeterministicWindowSnapshotRepository(database);
+  }
+
+  loadFeature(input: Readonly<{ workspaceId: string; featureRef: string }>) { return this.features.loadCurrent(input); }
+  loadWindow(input: Readonly<{ workspaceId: string; windowRef: string }>) { return this.windows.loadCurrent(input); }
+}
+
 /**
  * Shared production composition for both manual requests and schedule-worker
  * requests. The executor remains advisory-only (`actionAuthority: none`) and
@@ -666,7 +683,7 @@ export function createDrizzleDecisionRoomAnalysisExecutor(input: Readonly<{
     new DrizzleDecisionRoomRunStore(input.database, workspaceId),
     new DecisionRoomDeterministicAnalysisRuntime(
       new DrizzleDecisionRoomAnalysisRuntimeAssetLoader(input.database, workspaceId),
-      input.observations,
+      new DrizzleDecisionRoomFrozenEvidenceReader(input.database as Database),
       input.drafts,
     ),
     new DrizzleDecisionRoomInbox(input.database, workspaceId),

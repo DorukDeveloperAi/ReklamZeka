@@ -9,12 +9,13 @@ import {
 } from "@/analyses/finding-calculators";
 import {
   buildFindingObservationPlan,
-  materializeFindingObservations,
-  type FindingObservationReadPort,
 } from "@/analyses/finding-observation-builder";
+import type { FindingObservation } from "@/analyses/finding-calculators";
 import type { FindingHierarchyNode, FindingMetricBundle } from "@/analyses/finding-engine";
 import type { ResolvedAnalysisTimeframe } from "@/analyses/timeframe-resolver";
 import { validateResolvedAnalysisTimeframe } from "@/analyses/timeframe-resolver";
+import type { DeterministicFeatureSnapshot } from "@/analyses/deterministic-feature-snapshot";
+import type { DeterministicWindowSnapshot } from "@/analyses/deterministic-window-snapshot";
 import { runDecisionRoom, type DecisionRoomDraftPort } from "@/application/decision-room";
 import type { DecisionRoomAnalysisPort } from "@/domain/decisions/executor";
 import {
@@ -93,6 +94,20 @@ export type DecisionRoomAnalysisRuntimeAssetPort = Readonly<{
     templateRef: string;
     triggerKind: "manual" | "scheduled";
   }>): Promise<DecisionRoomAnalysisRuntimeAssets>;
+}>;
+
+/**
+ * Private evidence reader used before a run can consume its frozen context.
+ * It deliberately reads the exact L2/L3 refs already frozen in that context;
+ * it has no L1/Meta transport and never selects a replacement snapshot.
+ */
+export type DecisionRoomFrozenEvidencePort = Readonly<{
+  loadFeature(input: Readonly<{ workspaceId: string; featureRef: string }>): Promise<Readonly<{
+    state: "ready" | "stale"; feature: DeterministicFeatureSnapshot;
+  }>>;
+  loadWindow(input: Readonly<{ workspaceId: string; windowRef: string }>): Promise<Readonly<{
+    state: "ready" | "stale"; window: DeterministicWindowSnapshot;
+  }>>;
 }>;
 
 export class DecisionRoomAnalysisRuntimeError extends Error {
@@ -292,6 +307,39 @@ function mergeMetricBundles(
   }));
 }
 
+async function revalidateFrozenEvidence(
+  context: EffectiveCampaignContext,
+  evidence: DecisionRoomFrozenEvidencePort,
+): Promise<readonly DeterministicFeatureSnapshot[]> {
+  const features = await Promise.all(context.data.featureRefs.map((featureRef) => evidence.loadFeature({ workspaceId: context.workspaceId, featureRef })));
+  const windows = await Promise.all(context.data.windowRefs.map((windowRef) => evidence.loadWindow({ workspaceId: context.workspaceId, windowRef })));
+  if (features.some((entry) => entry.state !== "ready" || entry.feature.scope.workspaceId !== context.workspaceId)
+    || windows.some((entry) => entry.state !== "ready" || entry.window.scope.workspaceId !== context.workspaceId)) {
+    throw new DecisionRoomAnalysisRuntimeError("evidence_not_frozen");
+  }
+  const frozenFeatures = new Set(context.data.featureRefs);
+  const covered = new Set<string>();
+  for (const entry of windows) {
+    if (entry.window.featureRefs.some((featureRef) => !frozenFeatures.has(featureRef))) {
+      throw new DecisionRoomAnalysisRuntimeError("evidence_not_frozen");
+    }
+    entry.window.featureRefs.forEach((featureRef) => covered.add(featureRef));
+  }
+  if (covered.size !== frozenFeatures.size || [...frozenFeatures].some((featureRef) => !covered.has(featureRef))) {
+    throw new DecisionRoomAnalysisRuntimeError("evidence_not_frozen");
+  }
+  return Object.freeze(features.map((entry) => entry.feature));
+}
+
+function observationFromFrozenFeature(feature: DeterministicFeatureSnapshot): FindingObservation {
+  return Object.freeze({
+    observationRef: feature.observationRef, role: feature.role, startDate: feature.startDate, endDate: feature.endDate,
+    timezone: feature.timezone, sampleSize: feature.sampleSize, settled: feature.settled,
+    qualityStatus: feature.qualityStatus, qualityReasonCodes: feature.qualityReasonCodes,
+    metricResult: feature.metricResult, snapshotRefs: feature.sourceSnapshotRefs,
+  });
+}
+
 /**
  * Deterministic AnalysisPort used by both manual executor calls and schedule ticks.
  * It performs no model, Meta network/write, authority or external notification call.
@@ -299,7 +347,7 @@ function mergeMetricBundles(
 export class DecisionRoomDeterministicAnalysisRuntime implements DecisionRoomAnalysisPort {
   constructor(
     private readonly assets: DecisionRoomAnalysisRuntimeAssetPort,
-    private readonly observations: FindingObservationReadPort,
+    private readonly frozenEvidence: DecisionRoomFrozenEvidencePort,
     private readonly drafts: DecisionRoomDraftPort,
   ) {}
 
@@ -326,6 +374,13 @@ export class DecisionRoomDeterministicAnalysisRuntime implements DecisionRoomAna
       throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
     }
     validateDecisionRoomAnalysisRuntimeAssets(input, prepared);
+    let frozenFeatures: readonly DeterministicFeatureSnapshot[];
+    try {
+      frozenFeatures = await revalidateFrozenEvidence(prepared.context, this.frozenEvidence);
+    } catch (error) {
+      if (error instanceof DecisionRoomAnalysisRuntimeError) throw error;
+      throw new DecisionRoomAnalysisRuntimeError("evidence_not_frozen");
+    }
 
     const evaluated = [] as Array<Readonly<{
       check: DecisionRoomAnalysisRuntimeCheck;
@@ -333,18 +388,12 @@ export class DecisionRoomDeterministicAnalysisRuntime implements DecisionRoomAna
       metricResults: readonly MetaMetricAggregationResult[];
     }>>;
     for (const check of prepared.checks) {
-      const observations = await materializeFindingObservations({
-        workspaceId: prepared.context.workspaceId,
-        metaConnectionId: check.metaConnectionId,
-        adAccountId: check.adAccountId,
-        entityLevel: check.entityType,
-        externalEntityId: check.externalEntityId,
-        attributionLabel: check.attributionLabel,
-        expectedCurrency: check.expectedCurrency,
-        timeframe: prepared.resolvedTimeframe,
-        spec: check.spec,
-        maxRowsPerQuery: check.maxRowsPerQuery,
-      }, this.observations);
+      const observations = frozenFeatures
+        .filter((feature) => feature.scope.externalEntityId === check.externalEntityId
+          && feature.scope.entityLevel === check.entityType
+          && feature.sourceSnapshotRefs.some((snapshotRef) => check.expectedSnapshotRefs.includes(snapshotRef)))
+        .map(observationFromFrozenFeature);
+      if (observations.length === 0) throw new DecisionRoomAnalysisRuntimeError("evidence_not_frozen");
       evaluated.push(Object.freeze({
         check,
         finding: calculateDeterministicFinding({

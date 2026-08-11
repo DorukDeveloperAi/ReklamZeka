@@ -492,6 +492,11 @@
   - [x] Decision Room L3 admission gate: yeni run asset'i yalnız ready, blockersız ve hash-biçimli frozen
     L2 feature + L3 window referanslarını taşıyan context ile çalışır; L1 observation ref'i L2 ref'iyle
     karıştırılmaz. Tarihsel frozen run replay davranışı değişmez.
+  - [x] Frozen L2/L3 Decision Room runtime bridge: admission sonrası runtime yeni L1 observation seçmez;
+    contextteki exact ready L2 feature ve complete L3 window bindinglerini private reader'larla yeniden
+    doğrular, yalnız bunlardan calculator observation üretir ve deterministic L5 compact context ref/hash'ini
+    immutable analysis ledger'a freeze eder. Missing/stale/foreign/tamper evidence ledger staging öncesi
+    fail-closed'dur; gerçek PostgreSQL dry-run acceptance pooler blockerı nedeniyle ayrı açık kalır.
   - [x] Private timeframe-bound context composer: son geçerli repository context'inin private mirror scope'u
     ve server clock'u ile L2→L3 materializer çağrılır; yeni evidence-bound context yalnız exact window'un
     feature/window ref'lerini taşır. Caller context, feature, scope UUID veya capture time veremez.

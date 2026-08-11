@@ -169,6 +169,18 @@
   `idle in transaction` davranışı gösterdiği için complete run/ledger kanıtı alınamadı. Sentetik context
   ile bypass edilmedi; fixture recovery yalnız WorkspaceTombstoneService ile yapılır.
 
+## 2026-08-11 — A10 frozen L2/L3 → Decision Room → L5 runtime bridge
+
+- Decision Room runtime admissiondan sonra observation kaynağını yeniden L1'den seçmez. Frozen contextteki
+  exact L2 feature refleri ve L3 window bindingleri tenant/scope/hash/state/coverage bakımından private
+  readers ile yeniden doğrulanır; calculator girişi yalnız bu immutable L2 payloadlardan türetilir.
+- Eksik, stale, foreign, tahrif edilmiş veya L3→L2 coverage'ı eksik evidence `evidence_not_frozen` ile
+  ledger staging öncesi reddedilir. Successful run deterministik L5 compact-agent-context ref/hash/payload
+  commitmentini immutable analysis ledger frozen context'ine bağlar; public executor/action sözleşmesi
+  genişlemez ve Meta/network/write yetkisi üretmez.
+- Runtime birim kanıtı yeşildir. Bu DB read path'i için end-to-end canlı kanıt, authentic dry-run verifier'ın
+  mevcut pooler `idle in transaction` çevresel blockerı çözülene kadar açık kalır.
+
 ## 2026-08-10 — Local MCP/session canlı kabulü
 
 - Yerel geliştirme sunucusu ve yönetilen `.env.local` session yapılandırmasıyla `npm run verify:mcp-live`

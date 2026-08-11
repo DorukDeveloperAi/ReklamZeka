@@ -18,6 +18,7 @@ import {
   InMemoryDecisionRoomRunStore,
 } from "@/domain/decisions/executor";
 import { normalizeMetaDailyInsight } from "@/domain/meta/insights/contract";
+import { aggregateMetaMetrics } from "@/domain/meta/insights/metric-engine";
 import { buildEffectiveGuidancePack, createGuidanceRegistry } from "@/domain/guidance/registry";
 
 const now = "2026-08-07T12:00:00.000Z";
@@ -108,6 +109,29 @@ function input() {
   };
 }
 
+function frozenEvidence(options: Readonly<{ stale?: boolean; omitFeature?: boolean; foreign?: boolean; sourceMismatch?: boolean }> = {}) {
+  const metricResult = aggregateMetaMetrics({ rows: [canonicalRow()], metrics: ["spendMinor"] });
+  const effectiveWorkspaceId = options.foreign ? "20000000-0000-4000-8000-000000000001" : workspaceId;
+  const feature = {
+    featureRef, featureHash: "a".repeat(64),
+    scope: { workspaceId: effectiveWorkspaceId, metaConnectionId: "20000000-0000-4000-8000-000000000002", adAccountId: "30000000-0000-4000-8000-000000000003", entityLevel: "ad" as const, externalEntityId: "238000000000001" },
+    observationRef: "observation_safe", role: "primary" as const, startDate: timeframe.startDate, endDate: timeframe.endDate,
+    timezone: "Europe/Istanbul", sampleSize: 1, settled: true, qualityStatus: "ready" as const, qualityReasonCodes: [],
+    sourceManifestHash: "b".repeat(64), sourceSnapshotRefs: [options.sourceMismatch ? "snapshot_not_frozen" : snapshotRef], formulaCatalogVersion: "meta-metric-formulas/1.0.0" as const,
+    metricResult, capabilities: { containsRawL0: false as const, canAuthorizeAction: false as const, canExecuteWrite: false as const },
+  };
+  return {
+    loadFeature: vi.fn(async () => ({
+      state: options.stale ? "stale" as const : "ready" as const,
+      feature,
+    })),
+    loadWindow: vi.fn(async () => ({
+      state: "ready" as const,
+      window: { scope: { workspaceId: options.foreign ? "20000000-0000-4000-8000-000000000001" : workspaceId }, featureRefs: options.omitFeature ? [] : [featureRef] },
+    })),
+  };
+}
+
 function drafts() {
   let ledger: DecisionLedger = [];
   const port: DecisionRoomDraftPort = {
@@ -139,7 +163,8 @@ describe("DecisionRoomDeterministicAnalysisRuntime", () => {
       settledThroughDate: query.endDate, complete: true as const, qualityStatus: "ready" as const,
       qualityReasonCodes: [],
     }));
-    const runtime = new DecisionRoomDeterministicAnalysisRuntime({ loadExact }, { read } as never, storage.port);
+    const evidence = frozenEvidence();
+    const runtime = new DecisionRoomDeterministicAnalysisRuntime({ loadExact }, evidence as never, storage.port);
 
     const result = await runtime.execute(input());
 
@@ -153,26 +178,31 @@ describe("DecisionRoomDeterministicAnalysisRuntime", () => {
       campaignRef: "campaign_safe", timeframeRef: "timeframe_daily", templateRef: "template_daily",
       triggerKind: "scheduled",
     });
-    expect(read).toHaveBeenCalledTimes(1);
+    expect(read).not.toHaveBeenCalled();
+    expect(evidence.loadFeature).toHaveBeenCalledWith({ workspaceId, featureRef });
+    expect(evidence.loadWindow).toHaveBeenCalledWith({ workspaceId, windowRef });
     expect(storage.ledger()).toHaveLength(1);
+    expect(storage.ledger()[0]).toMatchObject({
+      recordType: "analysis",
+      frozenContext: {
+        compactContextRef: expect.stringMatching(/^compact_context_[a-f0-9]{24}$/),
+        compactContextHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      },
+    });
     expect(JSON.stringify(result)).not.toContain(workspaceId);
     expect(JSON.stringify(result)).not.toContain("238000000000001");
   });
 
-  it("turns degraded or empty L2 material into a safe no-change record", async () => {
+  it("derives the deterministic decision only from frozen L2 material", async () => {
     const storage = drafts();
     const runtime = new DecisionRoomDeterministicAnalysisRuntime(
       { loadExact: async () => assets() },
-      { read: async (query) => ({
-        queryRef: query.queryRef, rows: [], snapshotRefs: [snapshotRef],
-        settledThroughDate: "2026-08-05", complete: true, qualityStatus: "degraded",
-        qualityReasonCodes: ["no_data"],
-      }) },
+      frozenEvidence() as never,
       storage.port,
     );
 
-    await expect(runtime.execute(input())).resolves.toMatchObject({ summaryCode: "deterministic_no_change" });
-    expect(storage.ledger()).toHaveLength(2);
+    await expect(runtime.execute(input())).resolves.toMatchObject({ summaryCode: "deterministic_advisory" });
+    expect(storage.ledger()).toHaveLength(1);
   });
 
   it("fails closed on unbound assets and non-frozen L2 evidence before ledger staging", async () => {
@@ -183,7 +213,7 @@ describe("DecisionRoomDeterministicAnalysisRuntime", () => {
       qualityReasonCodes: [],
     }));
     const mismatch = new DecisionRoomDeterministicAnalysisRuntime(
-      { loadExact: async () => ({ ...assets(), templateRef: "template_foreign" }) }, { read } as never, storage.port,
+      { loadExact: async () => ({ ...assets(), templateRef: "template_foreign" }) }, frozenEvidence() as never, storage.port,
     );
     await expect(mismatch.execute(input())).rejects.toEqual(
       expect.objectContaining<Partial<DecisionRoomAnalysisRuntimeError>>({ code: "asset_not_bound" }),
@@ -191,7 +221,7 @@ describe("DecisionRoomDeterministicAnalysisRuntime", () => {
     expect(read).not.toHaveBeenCalled();
 
     const unfrozen = new DecisionRoomDeterministicAnalysisRuntime(
-      { loadExact: async () => assets() }, { read } as never, storage.port,
+      { loadExact: async () => assets() }, frozenEvidence({ sourceMismatch: true }) as never, storage.port,
     );
     await expect(unfrozen.execute(input())).rejects.toEqual(
       expect.objectContaining<Partial<DecisionRoomAnalysisRuntimeError>>({ code: "evidence_not_frozen" }),
@@ -208,7 +238,8 @@ describe("DecisionRoomDeterministicAnalysisRuntime", () => {
     const runtime = new DecisionRoomDeterministicAnalysisRuntime(
       { loadExact: async () => ({ ...withoutWindow, context: contextWithoutWindow,
         agenda: buildAnalysisAgenda({ context: contextWithoutWindow, resolvedTimeframe: timeframe, requestedPasses: ["ad"] }) }) },
-      { read: vi.fn() }, drafts().port,
+      frozenEvidence() as never,
+      drafts().port,
     );
     await expect(runtime.execute(input())).rejects.toMatchObject({ code: "asset_not_bound" });
   });
@@ -222,7 +253,7 @@ describe("DecisionRoomDeterministicAnalysisRuntime", () => {
         ...prepared,
         agenda: { ...prepared.agenda, agendaHash: "f".repeat(64) },
       }) },
-      { read } as never,
+      frozenEvidence() as never,
       storage.port,
     );
 
@@ -244,7 +275,7 @@ describe("DecisionRoomDeterministicAnalysisRuntime", () => {
       ],
     } as unknown as DecisionRoomAnalysisRuntimeAssets;
     const runtime = new DecisionRoomDeterministicAnalysisRuntime(
-      { loadExact: async () => malformed }, { read } as never, drafts().port,
+      { loadExact: async () => malformed }, frozenEvidence() as never, drafts().port,
     );
 
     await expect(runtime.execute(input())).rejects.toEqual(
@@ -253,15 +284,33 @@ describe("DecisionRoomDeterministicAnalysisRuntime", () => {
     expect(read).not.toHaveBeenCalled();
   });
 
+  it("re-reads the exact frozen L2/L3 references and rejects stale or incomplete evidence before an L1 read", async () => {
+    const read = vi.fn();
+    const stale = new DecisionRoomDeterministicAnalysisRuntime(
+      { loadExact: async () => assets() }, frozenEvidence({ stale: true }) as never, drafts().port,
+    );
+    await expect(stale.execute(input())).rejects.toMatchObject({ code: "evidence_not_frozen" });
+    expect(read).not.toHaveBeenCalled();
+
+    const incomplete = new DecisionRoomDeterministicAnalysisRuntime(
+      { loadExact: async () => assets() }, frozenEvidence({ omitFeature: true }) as never, drafts().port,
+    );
+    await expect(incomplete.execute(input())).rejects.toMatchObject({ code: "evidence_not_frozen" });
+    expect(read).not.toHaveBeenCalled();
+
+    const foreign = new DecisionRoomDeterministicAnalysisRuntime(
+      { loadExact: async () => assets() }, frozenEvidence({ foreign: true }) as never, drafts().port,
+    );
+    await expect(foreign.execute(input())).rejects.toMatchObject({ code: "evidence_not_frozen" });
+    expect(read).not.toHaveBeenCalled();
+  });
+
   it("binds both manual and scheduled executor runs to the same deterministic runtime", async () => {
     const storage = drafts();
     const triggerKinds: string[] = [];
     const runtime = new DecisionRoomDeterministicAnalysisRuntime(
       { loadExact: async (request) => { triggerKinds.push(request.triggerKind); return assets(); } },
-      { read: async (query) => ({
-        queryRef: query.queryRef, rows: [canonicalRow()], snapshotRefs: [snapshotRef],
-        settledThroughDate: query.endDate, complete: true, qualityStatus: "ready", qualityReasonCodes: [],
-      }) },
+      frozenEvidence() as never,
       storage.port,
     );
     const inbox = new InMemoryDecisionRoomInbox();
