@@ -318,7 +318,16 @@
 - `creative-diagnostic-settlement-policy/1.0.0`, explicit `settlementLagDays`, revision,
   previous-hash ve published state'i tek canonical policy hashine bağlar. Cutoff yalnız supplied
   IANA timezone ve canonical evaluation timestamp ile hesaplanır; timezone veya lag default'u yoktur.
-- Bu saf contract henüz tenant-scoped immutable policy revision writer/reader değildir. Dolayısıyla
+- İlk saf sözleşme artık tenant-scoped append-only policy ledger'a taşındı:
+  `creative_diagnostic_settlement_policies` guarded current-head'i ve immutable revision zinciri,
+  exact ref/hash/revision/state/lag payload'ını saklar. Private owner/admin writer aktif workspace ve
+  membership'i aynı transaction'da kilitler, contiguous previous-hash/OCC uygular ve audit chain'e
+  yazar; reader yalnız current published revision'ı kabul eder. Forward-only migration RLS+FORCE,
+  public-role revoke, tombstone-only delete ve workspace purge sırasını kapsar; local PostgreSQL
+  migration ile Supabase security verifier'ı geçti.
+- Bu hâlâ creative window source materializer veya diagnostic finding değildir. Pencere writer'ı
+  policy ref/hash'ini replay evidence olarak bağlamadan, settled window ya da fatigue sonucu üretemez;
+  ad-level outer-rollback lifecycle kabulü bu nedenle açık kalır.
   window snapshot materializer hâlâ policy ref/hashını persisted olarak doğrulayamadığından kapalıdır;
   settled source evidence veya fatigue finding iddiası yapılmaz.
 

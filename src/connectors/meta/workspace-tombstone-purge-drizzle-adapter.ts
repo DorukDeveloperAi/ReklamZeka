@@ -83,6 +83,8 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "meta_creative_window_insight_snapshots",
   "meta_creative_config_snapshots",
   "creative_diagnostic_definition_revisions",
+  "creative_diagnostic_settlement_policies",
+  "creative_diagnostic_settlement_policy_revisions",
   "robust_cohort_diagnostic_assets",
   "frozen_diagnostic_evidence",
   "effective_campaign_policy_compositions",
@@ -314,6 +316,12 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'creative_diagnostic_definition_revisions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from creative_diagnostic_definition_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'creative_diagnostic_settlement_policies', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from creative_diagnostic_settlement_policies where workspace_id = ${workspaceId}::uuid
+      union all select 'creative_diagnostic_settlement_policy_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from creative_diagnostic_settlement_policy_revisions where workspace_id = ${workspaceId}::uuid
       union all select 'robust_cohort_diagnostic_assets', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from robust_cohort_diagnostic_assets where workspace_id = ${workspaceId}::uuid
@@ -636,6 +644,8 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from meta_creative_window_insight_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_creative_config_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from creative_diagnostic_definition_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from creative_diagnostic_settlement_policy_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from creative_diagnostic_settlement_policies where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from robust_cohort_diagnostic_assets where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from frozen_diagnostic_evidence where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_policy_composition_items where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
