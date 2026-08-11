@@ -2518,3 +2518,198 @@ export function bildirOrkestratore(repoRoot, olay = {}) {
     return null;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════
+   AKIBET DEFTERLERİ — AIDE S ortak temeli (yonetim-katmani/v2:04)
+
+   ÜÇ TÜR AKAR ve üçü de KAYBOLMAMALI:
+     talimat  = "şunu yap"      → hedef oturuma (koşum)      · K-YON2: EMİR, fren zinciri aynen
+     request  = "şu gerekli"    → karargâha (planlama)       · K-2D2: emir DEĞİL, kabule karargâh karar verir
+     learning = "şu öğrenildi"  → karargâha (aynı kanal)     · K-2D3: request'in ikinci sütunu
+     soru     = "cevap bekliyor"→ ÇİFT YÖN (kullanıcı ↔ sistem) · K-UZK2
+
+   TEK DİSİPLİN: append-only JSONL · imza dedupe · durum tid'in SON akıbet satırından TÜRER
+   (yerinde güncelleme YOK — eşzamanlı yazımda append çakışmasızdır).
+
+   TESLİM İKİNCİ KANAL AÇMAZ (K-YON1/Ö6): defter yalnız AKIBET tutar; teslimi mevcut POSTA
+   (`bildir`) yapar. İki teslim yolu = iki bayatlama yüzeyi.
+
+   jobs/ (Maestro kuyruğu) BİT-EŞİT kalır — bu blok oraya dokunmaz.
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
+
+export const DEFTER_SURUM = 1;
+/** Kayıt türleri (girdi) — kapalı küme. */
+export const DEFTER_TURLERI = ["talimat", "request", "learning", "soru"];
+/** Akıbet satırı türleri — kapalı küme. `talimat` girdisi, gerisi akıbettir. */
+export const AKIBET_TURLERI = ["alindi", "islendi", "reddedildi", "onay-bekliyor", "onay", "cevap"];
+/** Sınıf: yeşil doğrudan işlenir; kırmızı VALFTE durur (yalnız insan açar). */
+export const DEFTER_SINIFLARI = ["yesil", "kirmizi"];
+/** Akıbetsizlik eşikleri (ms) — `--gate` bunları ölçer. */
+export const AKIBET_TTL = { bekliyor: 24 * 3600_000, alindi: 8 * 3600_000 };
+
+export const defterDirOf = (repoRoot) => join(ledgerDirOf(repoRoot), "defter");
+export const defterPath = (repoRoot) => join(defterDirOf(repoRoot), "defter.jsonl");
+
+/** İmza = hedef ⊕ tür ⊕ metin ⊕ kaynak (bildiriImza emsali). Açık aynı kayıt ikinci kez yazılmaz. */
+export function defterImza(kayit) {
+  return sha1(
+    [kayit?.tur, hedefKutuAdi(kayit?.hedef), mesajNormalize(kayit?.metin), kayit?.kaynak]
+      .map((x) => String(x ?? ""))
+      .join(""),
+  );
+}
+
+/** Hedef kapalı kümesi: {tip:"rol"|"sid"|"plan"|"karargah", ad} → kutu adı. */
+export function hedefKutuAdi(h) {
+  if (!h) return "karargah";
+  if (typeof h === "string") return h;
+  if (h.tip === "rol") return `rol:${h.ad}`;
+  if (h.tip === "sid") return `sid:${h.ad}`;
+  if (h.tip === "plan") return `plan:${h.ad}`;
+  return "karargah";
+}
+
+function defterSatirlari(repoRoot) {
+  try {
+    return readFileSync(defterPath(repoRoot), "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => {
+        try {
+          return JSON.parse(l);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function defterYaz(repoRoot, satir) {
+  mkdirSync(defterDirOf(repoRoot), { recursive: true, mode: 0o700 });
+  appendFileSync(defterPath(repoRoot), JSON.stringify(satir) + "\n", { mode: 0o600 });
+  return satir;
+}
+
+/**
+ * Kayıt ekle (talimat · request · learning · soru).
+ *
+ * TESLİM: yeşil sınıf ve adreslenebilir hedef varsa POSTA çağrılır (`bildir`) — defter
+ * ikinci kanal AÇMAZ. Kırmızı sınıf teslim EDİLMEZ: `onay-bekliyor` durur, yalnız insan açar.
+ * `plan:` hedefi çözümü: canlı sahip → yoksa `rol:orkestrator` → o da yoksa defterde bekler
+ * (kaybolmaz; tabloda `acik` görünür).
+ */
+export function defterEkle(repoRoot, kayit = {}) {
+  const tur = String(kayit.tur ?? "");
+  if (!DEFTER_TURLERI.includes(tur)) {
+    throw new Error(`tanınmayan tür: ${JSON.stringify(tur)} (kapalı küme: ${DEFTER_TURLERI.join(", ")})`);
+  }
+  const metin = String(kayit.metin ?? "").trim();
+  if (!metin) throw new Error("boş metin — kayıt anlamsız");
+  const etiket = String(kayit.etiket ?? "").trim();
+  if (!etiket) throw new Error("kimden.etiket zorunlu — kim yazdı izi olmadan kayıt kabul edilmez");
+  const sinif = kayit.sinif ?? "yesil";
+  if (!DEFTER_SINIFLARI.includes(sinif)) throw new Error(`tanınmayan sınıf: ${sinif}`);
+
+  const imza = defterImza({ tur, hedef: kayit.hedef, metin, kaynak: kayit.kaynak });
+  const acikAyni = defterOzet(repoRoot).kayitlar.find((k) => k.imza === imza && k.acik);
+  if (acikAyni) return { dedupe: true, tid: acikAyni.tid, imza };
+
+  const tid = `t-${imza.slice(0, 6)}`;
+  const satir = {
+    v: DEFTER_SURUM,
+    tur,
+    tid,
+    imza,
+    ts: new Date().toISOString(),
+    kimden: { sid: kayit.sid ?? null, etiket },
+    hedef: kayit.hedef ?? null,
+    sinif,
+    metin,
+    ...(kayit.kaynak ? { kaynak: kayit.kaynak } : {}),
+  };
+  defterYaz(repoRoot, satir);
+
+  // TESLİM — tek kanal: posta. Kırmızı teslim edilmez (valf), önce insan onayı gerekir.
+  let teslim = null;
+  if (sinif === "yesil") {
+    const h = kayit.hedef;
+    try {
+      if (h?.tip === "sid") teslim = bildir(repoRoot, { hedef: h.ad, tip: tur, key: tid, kimden: etiket, mesaj: metin });
+      else if (h?.tip === "rol") teslim = bildir(repoRoot, { hedefRol: h.ad, tip: tur, key: tid, kimden: etiket, mesaj: metin });
+      else if (h?.tip === "plan") {
+        // plan → canlı sahip yoksa orkestratöre; o da yoksa defterde bekler (ilan tabloda).
+        teslim = bildirOrkestratore(repoRoot, { tip: tur, key: tid, kimden: etiket, mesaj: metin });
+      }
+    } catch {
+      /* teslim düşse bile KAYIT durur — akıbetsizlik kapısı onu görünür kılar */
+    }
+  } else {
+    defterYaz(repoRoot, { v: DEFTER_SURUM, tur: "onay-bekliyor", tid, ts: new Date().toISOString(), kim: "sistem" });
+  }
+  return { ...satir, teslim: teslim ? "posta" : null };
+}
+
+/** Akıbet satırı ekle — durum YERİNDE GÜNCELLENMEZ, zincire eklenir. */
+export function defterAkibet(repoRoot, tid, tur, ek = {}) {
+  if (!AKIBET_TURLERI.includes(tur)) {
+    throw new Error(`tanınmayan akıbet: ${JSON.stringify(tur)} (kapalı küme: ${AKIBET_TURLERI.join(", ")})`);
+  }
+  if (!tid) throw new Error("tid zorunlu");
+  return defterYaz(repoRoot, { v: DEFTER_SURUM, tur, tid, ts: new Date().toISOString(), ...ek });
+}
+
+/**
+ * Defterin özeti: her tid için son akıbet → durum. Tablo bloğu ve `--gate` bunu okur.
+ * `acik` = henüz kapanmamış (islendi/reddedildi/cevap değil).
+ */
+export function defterOzet(repoRoot, { now = Date.now() } = {}) {
+  const satirlar = defterSatirlari(repoRoot);
+  const kayitMap = new Map();
+  for (const s of satirlar) {
+    if (DEFTER_TURLERI.includes(s.tur)) {
+      kayitMap.set(s.tid, { ...s, akibetler: [], durum: "bekliyor" });
+    }
+  }
+  for (const s of satirlar) {
+    if (!AKIBET_TURLERI.includes(s.tur)) continue;
+    const k = kayitMap.get(s.tid);
+    if (!k) continue;
+    k.akibetler.push(s);
+    k.durum = s.tur;
+  }
+  const kapali = new Set(["islendi", "reddedildi", "cevap"]);
+  const kayitlar = [...kayitMap.values()].map((k) => {
+    const yasSn = Math.max(0, Math.round((now - Date.parse(k.ts)) / 1000));
+    return { ...k, acik: !kapali.has(k.durum), yasSn };
+  });
+  const akibetsiz = kayitlar.filter((k) => {
+    if (!k.acik) return false;
+    const esik = k.durum === "alindi" ? AKIBET_TTL.alindi : AKIBET_TTL.bekliyor;
+    return k.yasSn * 1000 > esik;
+  });
+  const bol = (t) => kayitlar.filter((k) => k.tur === t);
+  return {
+    kayitlar,
+    talimat: bol("talimat"),
+    request: bol("request"),
+    learning: bol("learning"),
+    soru: bol("soru"),
+    akibetsiz,
+  };
+}
+
+/**
+ * Hedefi bu oturum/rol olan AÇIK kayıtlar — ctx dalının ingest girdisi.
+ * Kırmızı sınıf İLAN edilir ama EMİR olarak basılmaz (valf).
+ */
+export function defterBana(repoRoot, { sid, roller = [] } = {}) {
+  const kutular = new Set([...(sid ? [`sid:${sid}`] : []), ...roller.map((r) => `rol:${r}`)]);
+  return defterOzet(repoRoot).kayitlar.filter((k) => {
+    if (!k.acik) return false;
+    if (k.durum === "alindi") return false; // çift işleme koruması
+    return kutular.has(hedefKutuAdi(k.hedef));
+  });
+}
