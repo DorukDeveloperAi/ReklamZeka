@@ -236,8 +236,13 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
   const [approvalState, setApprovalState] = useState<ApprovalTimelineState>("idle");
   const [approvalTimeline, setApprovalTimeline] = useState<Readonly<{ itemCount: number; latestStatus: string | null }> | null>(null);
   const brief = useMemo(() => createInteractiveCampaignBrief(draft), [draft]);
-  const change = <Key extends keyof BriefDraft>(key: Key, value: BriefDraft[Key]) =>
+  const change = <Key extends keyof BriefDraft>(key: Key, value: BriefDraft[Key]) => {
+    // A scenario is only a starting point. Once an operator changes a field,
+    // keeping its label would imply that the original workbook lane still
+    // describes the brief.
+    setScenarioRef("");
     setDraft((current) => Object.freeze({ ...current, [key]: value }));
+  };
   const applyScenario = (value: CampaignBriefScenarioRef) => {
     setScenarioRef(value); const scenario = campaignBriefScenario(value); if (scenario) setDraft(scenario.input);
   };
