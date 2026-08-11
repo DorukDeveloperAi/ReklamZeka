@@ -26,6 +26,10 @@ export type MetaReadRequest = Readonly<{
   dateStop: string | null;
   cursor: string | null;
   limit: number;
+  /** Private override for a reviewed source reader; ordinary sync remains daily. */
+  insightTimeIncrement?: "all_days" | number;
+  /** Exact external entity edge for a source-owned insight read, never public input. */
+  insightSubjectId?: string;
   correlation: Readonly<{ parentRunId: string; streamRunId: string; accountId: string; sliceId: string; cursorId: string }>;
 }>;
 

@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { settledThroughDate, type CreativeDiagnosticSettlementPolicy } from "@/analyses/creative-diagnostic-settlement-policy";
 import { DrizzleCreativeDiagnosticSettlementPolicyRepository } from "@/connectors/analyses/creative-diagnostic-settlement-policy-drizzle-repository";
+import { CreativeWindowAllDaysSourceError, type CreativeWindowAllDaysSource } from "@/connectors/meta/creative-window-all-days-source";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -37,6 +38,11 @@ function day(value: unknown): string {
   if (typeof value !== "string" || !DATE.test(value) || new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) !== value) fail("invalid_input");
   return value;
 }
+function calendarDays(startDate: string, endDate: string): readonly string[] {
+  const values: string[] = []; const cursor = new Date(`${startDate}T00:00:00.000Z`); const end = new Date(`${endDate}T00:00:00.000Z`);
+  for (; cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) values.push(cursor.toISOString().slice(0, 10));
+  return Object.freeze(values);
+}
 function decimal(value: unknown): number {
   if (typeof value !== "string" || !/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) fail("corrupt_store");
   const parsed = Number(value); if (!Number.isFinite(parsed) || parsed < 0) fail("corrupt_store"); return parsed;
@@ -53,7 +59,8 @@ type SettlementPolicyReader = Pick<DrizzleCreativeDiagnosticSettlementPolicyRepo
  */
 export class DrizzleCreativeDiagnosticWindowInsightSnapshotRepository {
   constructor(private readonly database: Database,
-    private readonly policies: SettlementPolicyReader = new DrizzleCreativeDiagnosticSettlementPolicyRepository(database)) {}
+    private readonly policies: SettlementPolicyReader = new DrizzleCreativeDiagnosticSettlementPolicyRepository(database),
+    private readonly allDaysSource?: CreativeWindowAllDaysSource) {}
 
   async materializeDaily(input: Readonly<{
     workspaceId: string; configSnapshotId: string; windowKind: "baseline" | "recent";
@@ -139,6 +146,88 @@ export class DrizzleCreativeDiagnosticWindowInsightSnapshotRepository {
       if (existing.length !== 1 || typeof existing[0]!.id !== "string" || !UUID.test(existing[0]!.id)
         || existing[0]!.settlement_policy_ref !== policy.policyRef || existing[0]!.settlement_policy_hash !== policy.policyHash || existing[0]!.source_hash !== sourceHash) fail("corrupt_store");
       return Object.freeze({ id: existing[0]!.id, snapshotHash, sourceRef, settlementPolicy: policy, inserted: false });
+    });
+  }
+
+  /**
+   * Captures a direct `time_increment=all_days` frequency value plus complete
+   * canonical daily coverage. It never derives the period frequency from rows.
+   */
+  async materializeAllDays(input: Readonly<{
+    workspaceId: string; configSnapshotId: string; windowKind: "baseline" | "recent";
+    startDate: string; endDate: string; settlementPolicyRef: string; observedAt: string;
+  }>): Promise<Readonly<{
+    id: string; snapshotHash: string; sourceRef: string; settlementPolicy: CreativeDiagnosticSettlementPolicy; inserted: boolean;
+  }>> {
+    if (!UUID.test(input.workspaceId) || !UUID.test(input.configSnapshotId) || !["baseline", "recent"].includes(input.windowKind)
+      || !/^creative_settlement_[a-f0-9]{24}$/.test(input.settlementPolicyRef)) fail("invalid_input");
+    const startDate = day(input.startDate); const endDate = day(input.endDate); if (startDate > endDate) fail("invalid_input");
+    const observedAt = iso(input.observedAt); if (!this.allDaysSource) fail("insufficient_evidence");
+    const scope = rows<{ account_ref: unknown; ad_ref: unknown }>(await this.database.execute(sql`
+      select account.external_account_id as account_ref, ad.external_ad_id as ad_ref
+      from meta_creative_config_snapshots config
+      join meta_ads ad on ad.workspace_id = config.workspace_id and ad.id = config.ad_id and ad.disappeared_at is null
+      join ad_accounts account on account.workspace_id = config.workspace_id and account.id = ad.ad_account_id and account.disappeared_at is null
+      join workspaces workspace on workspace.id = config.workspace_id and workspace.lifecycle_state = 'active'
+      where config.workspace_id = ${input.workspaceId}::uuid and config.id = ${input.configSnapshotId}::uuid
+      limit 2
+    `));
+    if (scope.length === 0) fail("not_found");
+    if (scope.length !== 1 || typeof scope[0]!.account_ref !== "string" || typeof scope[0]!.ad_ref !== "string") fail("corrupt_store");
+    let direct: Awaited<ReturnType<CreativeWindowAllDaysSource["read"]>>;
+    try { direct = await this.allDaysSource.read({ accountRef: scope[0]!.account_ref, adRef: scope[0]!.ad_ref, startDate, endDate }); }
+    catch (error) {
+      if (error instanceof CreativeWindowAllDaysSourceError && ["not_found", "ambiguous", "malformed"].includes(error.code)) fail("insufficient_evidence");
+      fail("corrupt_store");
+    }
+    if (direct.startDate !== startDate || direct.endDate !== endDate || !/^creative_window_[a-f0-9]{24}$/.test(direct.sourceRef) || !HASH.test(direct.sourceHash)) fail("corrupt_store");
+    return this.database.transaction(async (transaction) => {
+      const tx = transaction as unknown as Database;
+      let policy: CreativeDiagnosticSettlementPolicy;
+      try { policy = await this.policies.loadCurrentPublishedInTransaction(tx, { workspaceId: input.workspaceId, policyRef: input.settlementPolicyRef }); }
+      catch { fail("insufficient_evidence"); }
+      const daily = rows<{ insight_id: unknown; insight_date: unknown; source_payload_hash: unknown; timezone: unknown }>(await tx.execute(sql`
+        select insight.id::text as insight_id, insight.date_start::text as insight_date, insight.source_payload_hash, insight.timezone
+        from meta_creative_config_snapshots config
+        join meta_ads ad on ad.workspace_id = config.workspace_id and ad.id = config.ad_id and ad.disappeared_at is null
+        join meta_daily_insights insight on insight.workspace_id = config.workspace_id and insight.ad_account_id = ad.ad_account_id
+          and insight.entity_level = 'ad' and insight.external_entity_id = ad.external_ad_id
+          and insight.date_start = insight.date_stop and insight.date_start >= ${startDate}::date and insight.date_stop <= ${endDate}::date
+          and insight.attribution_label = 'account_default'
+        join workspaces workspace on workspace.id = config.workspace_id and workspace.lifecycle_state = 'active'
+        where config.workspace_id = ${input.workspaceId}::uuid and config.id = ${input.configSnapshotId}::uuid
+        order by insight.date_start asc, insight.id asc limit 92 for share
+      `));
+      const expected = calendarDays(startDate, endDate);
+      if (daily.length !== expected.length || new Set(daily.map((entry) => entry.insight_date)).size !== expected.length
+        || daily.some((entry, index) => entry.insight_date !== expected[index] || typeof entry.insight_id !== "string" || !UUID.test(entry.insight_id)
+          || typeof entry.source_payload_hash !== "string" || !HASH.test(entry.source_payload_hash) || typeof entry.timezone !== "string" || !entry.timezone.trim())) fail("insufficient_evidence");
+      const timezone = daily[0]!.timezone as string; if (daily.some((entry) => entry.timezone !== timezone)) fail("insufficient_evidence");
+      let settled: string; try { settled = settledThroughDate(policy, observedAt, timezone); } catch { fail("corrupt_store"); }
+      if (endDate > settled) fail("insufficient_evidence");
+      const frequency = decimal(direct.frequency); const clicks = integer(direct.clicks); const impressions = integer(direct.impressions);
+      const dailyCoverage = Object.freeze(daily.map((entry) => Object.freeze({ date: entry.insight_date as string, settled: true,
+        sourceSnapshotRef: `snapshot_${digest(`${entry.insight_id}:${entry.source_payload_hash}`).slice(0, 32)}` })));
+      const snapshotHash = digest(Object.freeze({ contractVersion: "creative-diagnostic-window-snapshot/1.0.0", configSnapshotId: input.configSnapshotId,
+        windowKind: input.windowKind, startDate, endDate, frequency, clicks, impressions, attributionLabel: "account_default", timezone,
+        sourceRef: direct.sourceRef, sourceHash: direct.sourceHash, dailyCoverage, settlementPolicyRef: policy.policyRef, settlementPolicyHash: policy.policyHash }));
+      const inserted = rows<{ id: unknown }>(await tx.execute(sql`
+        insert into meta_creative_window_insight_snapshots (id, workspace_id, config_snapshot_id, window_kind, start_date, end_date,
+          frequency, clicks, impressions, attribution_label, timezone, daily_coverage, source_ref, source_hash, settlement_policy_ref, settlement_policy_hash, snapshot_hash, observed_at)
+        values (${randomUUID()}::uuid, ${input.workspaceId}::uuid, ${input.configSnapshotId}::uuid, ${input.windowKind}, ${startDate}::date, ${endDate}::date,
+          ${String(frequency)}::numeric, ${clicks}, ${impressions}, 'account_default', ${timezone}, ${JSON.stringify(dailyCoverage)}::jsonb,
+          ${direct.sourceRef}, ${direct.sourceHash}, ${policy.policyRef}, ${policy.policyHash}, ${snapshotHash}, ${observedAt}::timestamptz)
+        on conflict (workspace_id, snapshot_hash) do nothing returning id::text
+      `));
+      if (inserted.length === 1 && typeof inserted[0]!.id === "string" && UUID.test(inserted[0]!.id)) return Object.freeze({ id: inserted[0]!.id, snapshotHash, sourceRef: direct.sourceRef, settlementPolicy: policy, inserted: true });
+      if (inserted.length !== 0) fail("corrupt_store");
+      const existing = rows<{ id: unknown; settlement_policy_ref: unknown; settlement_policy_hash: unknown; source_hash: unknown }>(await tx.execute(sql`
+        select id::text, settlement_policy_ref, settlement_policy_hash, source_hash from meta_creative_window_insight_snapshots
+        where workspace_id = ${input.workspaceId}::uuid and snapshot_hash = ${snapshotHash} limit 2 for share
+      `));
+      if (existing.length !== 1 || typeof existing[0]!.id !== "string" || !UUID.test(existing[0]!.id)
+        || existing[0]!.settlement_policy_ref !== policy.policyRef || existing[0]!.settlement_policy_hash !== policy.policyHash || existing[0]!.source_hash !== direct.sourceHash) fail("corrupt_store");
+      return Object.freeze({ id: existing[0]!.id, snapshotHash, sourceRef: direct.sourceRef, settlementPolicy: policy, inserted: false });
     });
   }
 }

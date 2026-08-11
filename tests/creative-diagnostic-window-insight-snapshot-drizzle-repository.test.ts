@@ -49,4 +49,25 @@ describe("DrizzleCreativeDiagnosticWindowInsightSnapshotRepository", () => {
     const subject = harness([[source()], [], [{ id: windowId, settlement_policy_ref: policy.policyRef, settlement_policy_hash: policy.policyHash, source_hash: expectedSourceHash() }]]);
     await expect(subject.repository.materializeDaily(input())).resolves.toMatchObject({ id: windowId, inserted: false });
   });
+
+  it("uses a direct all-days source for period frequency and only daily rows for complete coverage", async () => {
+    const execute = vi.fn(async () => ({ rows: [] as unknown[] }));
+    const database = { execute, transaction: async (work: (tx: unknown) => Promise<unknown>) => work({ execute }) };
+    const policies = { loadCurrentPublishedInTransaction: vi.fn(async () => policy) };
+    const sourceRef = `creative_window_${"a".repeat(24)}`;
+    const sourceReader = { read: vi.fn(async () => ({ startDate: "2026-08-08", endDate: "2026-08-10", frequency: "2.8", clicks: "40", impressions: "400", sourceRef, sourceHash: "e".repeat(64) })) };
+    let index = 0;
+    const responses = [
+      [{ account_ref: "act_123", ad_ref: "123456" }],
+      [{ insight_id: insightId, insight_date: "2026-08-08", source_payload_hash: "1".repeat(64), timezone: "Europe/Istanbul" }, { insight_id: "55555555-5555-4555-8555-555555555555", insight_date: "2026-08-09", source_payload_hash: "2".repeat(64), timezone: "Europe/Istanbul" }, { insight_id: "66666666-6666-4666-8666-666666666666", insight_date: "2026-08-10", source_payload_hash: "3".repeat(64), timezone: "Europe/Istanbul" }],
+      [{ id: windowId }],
+    ];
+    execute.mockImplementation(async () => ({ rows: responses[index++] ?? [] }));
+    const repository = new DrizzleCreativeDiagnosticWindowInsightSnapshotRepository(database as never, policies as never, sourceReader as never);
+    await expect(repository.materializeAllDays({ ...input(), startDate: "2026-08-08", endDate: "2026-08-10" })).resolves.toMatchObject({ id: windowId, sourceRef, inserted: true });
+    expect(sourceReader.read).toHaveBeenCalledWith({ accountRef: "act_123", adRef: "123456", startDate: "2026-08-08", endDate: "2026-08-10" });
+    const sql = rendered(execute);
+    expect(sql).toContain("insight.date_start = insight.date_stop");
+    expect(sql).not.toMatch(/avg\(|sum\(.*frequency/i);
+  });
 });

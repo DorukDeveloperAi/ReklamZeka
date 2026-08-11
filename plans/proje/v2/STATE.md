@@ -351,6 +351,18 @@
 - Unsettled coverage yine finding değil `insufficient_data` olur. Asset sadece advisory capability
   envelope taşır; Decision Room action/finding bağlama, live ad-level source fixture ve multi-day
   direct-frequency window contractı açık kalır.
+
+## 2026-08-11 — A10.5c direct all-days creative frequency source
+
+- GET-only private Meta source reader, exact ad `/insights` edge'inde reviewed planner ile
+  `time_increment=all_days` kullanır. Period frequency doğrudan bu tek source-grain yanıttan gelir;
+  canonical günlük rows yalnız tam calendar coverage kanıtıdır. Source pagination, duplicate/missing
+  ad result, malformed metric ya da coverage/timezone/settlement uyumsuzluğu fail-closed kalır.
+- Immutable window writer bu direct source hash'ini exact key'e ekler; aynı tarih/policy ama değişmiş
+  source artık eski snapshot'ı ezmez. Forward-only index migration local PostgreSQL'e uygulandı ve
+  Supabase security verifier geçti. Normal sync materializer da daily observed `frequency` metricini
+  canonical mirror'a taşır. Gerçek credential-backed ad-level outer-rollback read acceptance ve
+  Decision Room'a finding bağlama henüz açık; bu source yalnız read-only/advisory zincirdedir.
   window snapshot materializer hâlâ policy ref/hashını persisted olarak doğrulayamadığından kapalıdır;
   settled source evidence veya fatigue finding iddiası yapılmaz.
 
