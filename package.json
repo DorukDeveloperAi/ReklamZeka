@@ -22,6 +22,7 @@
     "check:analysis-platform": "node scripts/check-analysis-platform.mjs && vitest run tests/analysis-definition.test.ts tests/objective-playbooks.test.ts tests/prompt-envelope.test.ts",
     "pilot:field-preflight": "tsx scripts/preflight-field-pilot.ts",
     "pilot:field-report": "tsx scripts/generate-field-pilot-report.ts",
+    "census:field-pilot-source-db": "tsx scripts/census-field-pilot-source-coverage-postgres.ts",
     "local-session:mint": "tsx --env-file=.env.local scripts/mint-local-session.ts",
     "local-session:configure": "tsx scripts/configure-local-session.ts",
     "mcp:stdio": "node --import tsx scripts/reklamzeka-mcp.ts",

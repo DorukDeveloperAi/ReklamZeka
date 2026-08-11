@@ -2244,9 +2244,37 @@ export const frozenDiagnosticEvidence = pgTable("frozen_diagnostic_evidence", {
   uniqueIndex("frozen_diagnostic_evidence_workspace_id_unique").on(table.workspaceId, table.id),
   uniqueIndex("frozen_diagnostic_evidence_workspace_hash_unique").on(table.workspaceId, table.evidenceHash),
   index("frozen_diagnostic_evidence_lookup_idx").on(table.workspaceId, table.entityType, table.entityRef, table.capturedAt),
+  index("frozen_diagnostic_evidence_cohort_compatibility_idx").on(table.workspaceId, table.entityType, table.objective, table.funnel, table.optimizationEvent, table.categoryCompositionHash, table.policySetHash, table.capturedAt),
   check("frozen_diagnostic_evidence_hashes", sql`${table.contextHash} ~ '^[a-f0-9]{64}$' and ${table.evidenceHash} ~ '^[a-f0-9]{64}$' and ${table.categoryCompositionHash} ~ '^[a-f0-9]{64}$' and ${table.policySetHash} ~ '^[a-f0-9]{64}$' and (${table.creativeBindingHash} is null or ${table.creativeBindingHash} ~ '^[a-f0-9]{64}$')`),
   check("frozen_diagnostic_evidence_exact_context", sql`btrim(${table.contextRef}) <> '' and btrim(${table.entityRef}) <> '' and ${table.entityType} in ('campaign', 'ad_set', 'ad', 'creative') and jsonb_typeof(${table.hierarchyRefs}) = 'array' and jsonb_array_length(${table.hierarchyRefs}) >= 1 and jsonb_typeof(${table.featureManifest}) = 'array' and jsonb_array_length(${table.featureManifest}) >= 1 and jsonb_typeof(${table.windowManifest}) = 'array' and jsonb_array_length(${table.windowManifest}) >= 1 and jsonb_typeof(${table.canonicalConfigEvidence}) = 'object' and jsonb_typeof(${table.sourceRefs}) = 'array' and jsonb_array_length(${table.sourceRefs}) >= 1`),
   check("frozen_diagnostic_evidence_no_authority", sql`${table.capabilities} = '{"canAuthorizeAction":false,"canExecuteWrite":false,"canWriteMeta":false,"canPublish":false,"canApprove":false,"canExecute":false,"canAccessNetwork":false}'::jsonb`),
+]);
+
+/**
+ * Immutable A10.5b cohort replay artifact. Member selection is never caller
+ * supplied: the repository records only the exact frozen-evidence members it
+ * selected from one workspace/account and compatibility profile.
+ */
+export const robustCohortDiagnosticAssets = pgTable("robust_cohort_diagnostic_assets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  targetEvidenceId: uuid("target_evidence_id").notNull(),
+  cohortRef: text("cohort_ref").notNull(),
+  cohortHash: text("cohort_hash").notNull(),
+  profile: jsonb("profile").$type<Record<string, unknown>>().notNull(),
+  memberEvidenceRefs: jsonb("member_evidence_refs").$type<readonly Readonly<{ evidenceRef: string; evidenceHash: string; featureRef: string; featureHash: string }>[]>().notNull(),
+  resultPayload: jsonb("result_payload").$type<Record<string, unknown>>().notNull(),
+  capabilities: jsonb("capabilities").$type<Record<string, false>>().notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.targetEvidenceId], foreignColumns: [frozenDiagnosticEvidence.workspaceId, frozenDiagnosticEvidence.id], name: "robust_cohort_diagnostic_assets_target_scope_fk" }).onDelete("cascade"),
+  uniqueIndex("robust_cohort_diagnostic_assets_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("robust_cohort_diagnostic_assets_hash_unique").on(table.workspaceId, table.cohortHash),
+  index("robust_cohort_diagnostic_assets_target_idx").on(table.workspaceId, table.targetEvidenceId, table.occurredAt),
+  check("robust_cohort_diagnostic_assets_hashes", sql`${table.cohortHash} ~ '^[a-f0-9]{64}$'`),
+  check("robust_cohort_diagnostic_assets_shape", sql`jsonb_typeof(${table.profile}) = 'object' and jsonb_typeof(${table.memberEvidenceRefs}) = 'array' and jsonb_array_length(${table.memberEvidenceRefs}) >= 1 and jsonb_array_length(${table.memberEvidenceRefs}) <= 100 and jsonb_typeof(${table.resultPayload}) = 'object'`),
+  check("robust_cohort_diagnostic_assets_advisory_only", sql`${table.capabilities} = '{"canAuthorizeAction":false,"canExecuteWrite":false,"canWriteMeta":false,"canPublish":false,"canApprove":false,"canExecute":false,"canAccessNetwork":false}'::jsonb`),
 ]);
 
 /** Append-only invalidation facts. They never mutate historical context payloads. */

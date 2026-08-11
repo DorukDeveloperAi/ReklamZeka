@@ -217,6 +217,24 @@
   aggregate, zero network ve zero residue'yu doğrular. Bu yalnız substrate'tir; cohort veya creative
   fatigue/config sonucu henüz üretilmez.
 
+## 2026-08-11 — A10.5b repository-selected robust cohort substrate
+
+- `robust_cohort_diagnostic_assets`, yalnız target frozen diagnostic evidence ve metric/funnel/direction
+  girişiyle çalışır; caller cohort üye listesi veremez. Repository aynı workspace/ad-account ve exact
+  objective/funnel/optimization/category-composition/policy-set profile'ından ready, uninvalidated,
+  primary L2 evidence seçer; mixed/stale/non-primary/missing target veya sample<4 fail-closed olur.
+- MAD sonucu ve exact member ref/hash manifesti immutable advisory assette freeze edilir. Yeni forward-only
+  migrationlar RLS/FORCE/revoke, append-only/tombstone guard ve purge sırasını taşır. Authentic fixture
+  henüz explicit funnel commitment üretmediği için positive cohort live acceptance **açık** kalır;
+  null funnel’da runtime sonuç uydurmaz.
+
+## 2026-08-11 — A07 field-pilot source coverage census
+
+- Yeni read-only `census:field-pilot-source-db` REPEATABLE READ altında yalnız aggregate workspace/account
+  sayıları ve evidence-family missing reason'larını verir; raw ID, secret veya yazı üretmez. Canlı
+  `.env.local` sonucu 0 eligible workspace / 0 account ve tüm ailelerde unavailable döndü, exit 2 ile
+  field-pilot closure'ı doğru biçimde engelledi. `docs/qa/field-pilot.json` veya A07 PASS iddiası eklenmedi.
+
 ## 2026-08-10 — Local MCP/session canlı kabulü
 
 - Yerel geliştirme sunucusu ve yönetilen `.env.local` session yapılandırmasıyla `npm run verify:mcp-live`

@@ -61,6 +61,12 @@ const opaqueCategoryContext = new Set([
   // replay; archive handling must retain it as opaque historical context.
   "action_execution_attempts.admission_payload",
   "action_execution_events.event_payload",
+  // A cohort diagnostic is an immutable replay artifact. Its compatibility
+  // profile/member hashes are historical commitments, not mutable archive edges.
+  "robust_cohort_diagnostic_assets.profile",
+  "robust_cohort_diagnostic_assets.member_evidence_refs",
+  "robust_cohort_diagnostic_assets.result_payload",
+  "robust_cohort_diagnostic_assets.capabilities",
 ]);
 
 const columns = [
@@ -134,6 +140,10 @@ const columns = [
   "frozen_diagnostic_evidence.window_manifest",
   "frozen_diagnostic_evidence.canonical_config_evidence",
   "frozen_diagnostic_evidence.source_refs",
+  "robust_cohort_diagnostic_assets.profile",
+  "robust_cohort_diagnostic_assets.member_evidence_refs",
+  "robust_cohort_diagnostic_assets.result_payload",
+  "robust_cohort_diagnostic_assets.capabilities",
   "budget_proposal_versions.proposal_payload",
   "budget_proposal_alternatives.alternative_payload",
   "analysis_timeframe_definitions.definition_payload",

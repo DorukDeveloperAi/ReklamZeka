@@ -30,6 +30,10 @@ const opaquePolicyContext = new Set([
   "action_proposal_units.summary_payload",
   "action_execution_attempts.admission_payload",
   "action_execution_events.event_payload",
+  "robust_cohort_diagnostic_assets.profile",
+  "robust_cohort_diagnostic_assets.member_evidence_refs",
+  "robust_cohort_diagnostic_assets.result_payload",
+  "robust_cohort_diagnostic_assets.capabilities",
 ]);
 
 const policyAuthorityJsonbColumns = Object.freeze([...policyContract]
