@@ -36,6 +36,9 @@
   kesinti `delivery_recovery`, lead hedefi `lead_quality`, diğer durumlar `new_campaign_plan`.
   Şablon kaynak, campaign, kapsam veya policy ref'i değildir; normalizasyon alanı bunun açık işaretini
   gösterir ve kullanıcı alanları değiştirebilir.
+- Brief ayrıca teklif/değer önerisi, hedef kitle sınırı, nitelikli lead tanımı ve kapasite/geri dönüş
+  notu için dört browser-yerel çalışma alanı taşır. Bu alanlar kaydedilmez veya normalizasyon/policy
+  yüzeyine aktarılmaz; yalnız insanın ilk planlama konuşmasını somutlaştırır.
 
 ## 2026-08-11 — A14 canlı performans kaynağı olmadan demo dürüstlüğü
 

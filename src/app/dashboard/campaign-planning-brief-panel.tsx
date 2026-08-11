@@ -29,6 +29,12 @@ type BriefDraft = Readonly<{
   capacity: CapacityState;
   creativeReady: boolean;
 }>;
+type BriefWorkingNotes = Readonly<{
+  offer: string;
+  audienceBoundary: string;
+  qualifiedLeadDefinition: string;
+  capacityNote: string;
+}>;
 export type CampaignBriefScenarioRef = "" | "domestic_form_lead" | "domestic_whatsapp_lead" | "international_ar_whatsapp"
   | "international_ru_form" | "domestic_upper_funnel" | "delivery_recovery";
 export type CampaignBriefScenario = Readonly<{ label: string; input: BriefDraft }>;
@@ -170,6 +176,7 @@ const INITIAL_DRAFT: BriefDraft = Object.freeze({
   capacity: "confirmed",
   creativeReady: true,
 });
+const EMPTY_WORKING_NOTES: BriefWorkingNotes = Object.freeze({ offer: "", audienceBoundary: "", qualifiedLeadDefinition: "", capacityNote: "" });
 
 export type CampaignPlanningBriefContext = Readonly<{
   campaignRef: string;
@@ -243,6 +250,7 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
 }>) {
   const [draft, setDraft] = useState<BriefDraft>(() => Object.freeze({ ...(campaignBriefScenario(initialScenarioRef)?.input ?? context.input) }));
   const [scenarioRef, setScenarioRef] = useState<CampaignBriefScenarioRef>(initialScenarioRef);
+  const [workingNotes, setWorkingNotes] = useState<BriefWorkingNotes>(EMPTY_WORKING_NOTES);
   const [sourceState, setSourceState] = useState<"unbound" | "loading" | "empty" | "ready" | "unavailable">("unbound");
   const [persistedHint, setPersistedHint] = useState<PersistedCampaignPlanningHint | null>(null);
   const [approvalQueueCampaignRef, setApprovalQueueCampaignRef] = useState<string | null>(null);
@@ -257,7 +265,7 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
     setDraft((current) => Object.freeze({ ...current, [key]: value }));
   };
   const applyScenario = (value: CampaignBriefScenarioRef) => {
-    setScenarioRef(value); const scenario = campaignBriefScenario(value); if (scenario) setDraft(scenario.input);
+    setScenarioRef(value); setWorkingNotes(EMPTY_WORKING_NOTES); const scenario = campaignBriefScenario(value); if (scenario) setDraft(scenario.input);
   };
 
   useEffect(() => {
@@ -345,6 +353,16 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
       </select></label>
       <label className={styles.briefToggle} htmlFor="brief-creative-ready"><input id="brief-creative-ready" type="checkbox" checked={draft.creativeReady} onChange={(event) => change("creativeReady", event.target.checked)} /> <span>Kreatif incelemeye hazır</span></label>
     </div>
+    <div className={styles.briefControls} aria-label="Operatör çalışma notları">
+      <label htmlFor="brief-offer"><span>Teklif / değer önerisi</span><input id="brief-offer" value={workingNotes.offer} maxLength={240} onChange={(event) => setWorkingNotes((current) => Object.freeze({ ...current, offer: event.target.value }))} placeholder="Örn. ücretsiz ön değerlendirme" /></label>
+      <label htmlFor="brief-audience-boundary"><span>Hedef kitle sınırı</span><input id="brief-audience-boundary" value={workingNotes.audienceBoundary} maxLength={240} onChange={(event) => setWorkingNotes((current) => Object.freeze({ ...current, audienceBoundary: event.target.value }))} placeholder="Kimler dahil / hariç?" /></label>
+      <label htmlFor="brief-qualified-lead"><span>Nitelikli lead tanımı</span><input id="brief-qualified-lead" value={workingNotes.qualifiedLeadDefinition} maxLength={240} onChange={(event) => setWorkingNotes((current) => Object.freeze({ ...current, qualifiedLeadDefinition: event.target.value }))} placeholder="Hangi koşulda nitelikli?" /></label>
+      <label htmlFor="brief-capacity-note"><span>Kapasite / geri dönüş notu</span><input id="brief-capacity-note" value={workingNotes.capacityNote} maxLength={240} onChange={(event) => setWorkingNotes((current) => Object.freeze({ ...current, capacityNote: event.target.value }))} placeholder="Günlük kapasite ve geri dönüş süresi" /></label>
+    </div>
+    <div className={styles.briefNextDecision} data-source-state="working_notes">
+      <span>OPERATÖR ÇALIŞMA NOTLARI</span><strong>Bu dört alan yalnız bu tarayıcıdaki geçici brief çalışması içindir.</strong>
+      <small>Kaydedilmez, Guidance/Strict Policy alanına aktarılmaz; hiçbir uygulama yetkisi vermez.</small>
+    </div>
     {brief.nextDecision ? <div className={styles.briefNextDecision}><span>SONRAKİ KARAR</span><strong>{brief.nextDecision.question}</strong><small>{brief.nextDecision.reason}</small></div> : null}
     <div className={styles.briefNextDecision} data-readiness={brief.recommendation.status}>
       <span>SALT-OKUNUR ÖNERİ</span><strong>{brief.recommendation.headline}</strong><small>{brief.recommendation.rationale}</small><p>{brief.recommendation.nextStep}</p>
@@ -375,7 +393,7 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
     </div>
     <footer><span>Salt taslak/öneri · campaign create / publish / approval / execute / Meta write: kapalı</span><div>
       {onOpenDraftOnlyPolicy ? <button type="button" onClick={() => onOpenDraftOnlyPolicy(draftOnlyPolicyTemplateForBrief(draft))}>Taslak talimat alanını aç</button> : null}
-      <button type="button" onClick={() => { setScenarioRef(""); setDraft(Object.freeze({ ...context.input })); }}>Bağlamı geri yükle</button>
+      <button type="button" onClick={() => { setScenarioRef(""); setWorkingNotes(EMPTY_WORKING_NOTES); setDraft(Object.freeze({ ...context.input })); }}>Bağlamı geri yükle</button>
     </div></footer>
   </section>;
 }

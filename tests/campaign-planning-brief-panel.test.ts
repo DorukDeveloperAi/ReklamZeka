@@ -29,6 +29,10 @@ describe("campaign planning brief panel", () => {
     expect(html).toContain("Kampanya yapısını insan incelemesine alın");
     expect(html).toContain("Şablon ve kıyas sınırı");
     expect(html).toContain("domestic_form_lead");
+    expect(html).toContain("OPERATÖR ÇALIŞMA NOTLARI");
+    expect(html).toContain("Teklif / değer önerisi");
+    expect(html).toContain("Nitelikli lead tanımı");
+    expect(html).toContain("Kaydedilmez, Guidance/Strict Policy alanına aktarılmaz; hiçbir uygulama yetkisi vermez");
     expect(html).toContain("campaign create / publish / approval / execute / Meta write: kapalı");
     expect(html).not.toMatch(/Meta.{0,30}(yaz|write).{0,30}(başlat|çalıştır|onayla)/i);
     expect(html).not.toContain("İş amacını bu sinyalle eşle");
