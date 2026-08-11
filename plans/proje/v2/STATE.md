@@ -293,6 +293,15 @@
   fallback yapmaz. Definition invalidation ve V2 asset materializer henüz açık kaldığından lifecycle
   production-ready sayılmaz ve asset/finding materialization kapalıdır.
 
+## 2026-08-11 — A10.5c daily frequency source-grain request
+
+- GET-only Meta insights transport, bir günlük `time_increment=1` sorgusuna canonical `frequency`
+  source alanını da ekler. Capability catalog bunu non-additive olarak taşımaya devam eder; source
+  persistence veya V2 diagnostic günlük/çoklu-gün frequency toplamı ya da ortalaması çıkaramaz.
+- Bu yalnız source-read kapsamını tamamlar. Immutable creative config/window snapshot materializer ve
+  advisory asset writer henüz açık olduğundan hiçbir fatigue finding, Decision Room veya action
+  yetkisi oluşmaz.
+
 ## 2026-08-11 — A07 field-pilot source coverage census
 
 - Yeni read-only `census:field-pilot-source-db` REPEATABLE READ altında yalnız aggregate workspace/account

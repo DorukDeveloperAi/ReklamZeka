@@ -76,7 +76,10 @@ export class MetaGraphSyncTransport implements MetaReadTransport {
     const plan = planMetaInsightQuery({
       graphApiVersion: this.client.graphApiVersion,
       level: request.entityLevel,
-      metrics: ["spendMinor", "impressions", "reach", "clicks", "conversions", "revenueMinor"],
+      // Frequency is non-additive, but the planner is explicitly querying one
+      // source-grain day at a time. It is persisted as a source observation;
+      // no downstream aggregate is permitted to sum or average it.
+      metrics: ["spendMinor", "impressions", "reach", "frequency", "clicks", "conversions", "revenueMinor"],
       attribution: { mode: "account_default" },
       timeIncrement: 1,
       // Connection doctor owns permission verification. This fixed value tells the pure

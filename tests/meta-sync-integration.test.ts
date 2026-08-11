@@ -79,6 +79,8 @@ describe("Meta S1.3 runtime persistence integration", () => {
     expect(calls[0]?.method).toBe("GET");
     expect(calls[0]?.url.pathname).toBe("/v23.0/act_fixture/insights");
     expect(calls[0]?.url.searchParams.get("level")).toBe("campaign");
+    expect(calls[0]?.url.searchParams.get("time_increment")).toBe("1");
+    expect(calls[0]?.url.searchParams.get("fields")?.split(",")).toContain("frequency");
     expect(calls[0]?.url.searchParams.get("action_breakdowns")).toBe("action_type");
     expect(calls[0]?.url.searchParams.get("use_account_attribution_setting")).toBe("true");
     expect(page).toMatchObject({
