@@ -18,5 +18,8 @@ describe("offline workbook portfolio snapshot", () => {
       expect.objectContaining({ language: "AR", route: "whatsapp", briefScenarioRef: "international_ar_whatsapp" }),
       expect.objectContaining({ language: "RU", route: "lead_form", briefScenarioRef: "international_ru_form" }),
     ]));
+    expect(offlineWorkbookPortfolioSnapshot.planningOrder.map((item) => item.title)).toEqual([
+      "Teslimat kesintisini ayır", "Lead şeritlerini rota bazında incele", "Üst huniyi lead kararından ayır",
+    ]);
   });
 });

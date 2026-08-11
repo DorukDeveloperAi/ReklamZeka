@@ -28,6 +28,8 @@ describe("portfolio dashboard", () => {
     expect(html).toContain("AR · WhatsApp · FTR");
     expect(html).toContain("RU · Form · FTR");
     expect(html).toContain("Kesinti penceresinde performans hükmü yok");
+    expect(html).toContain("SIRALI PLANLAMA ÇERÇEVESİ");
+    expect(html).toContain("Üst huniyi lead kararından ayır");
     expect(html).toContain("BUGÜN / PORTFÖY HİYERARŞİSİ");
     expect(html).toContain("Meta objective");
     expect(html).toContain("İç kategori");

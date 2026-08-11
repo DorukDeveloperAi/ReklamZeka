@@ -60,6 +60,10 @@
   AR WhatsApp FTR seçimi kısa ömürlü briefte uluslararası/Arapça/FTR/WhatsApp alanlarını açar;
   persisted campaign bağlamı, proposal, approval veya Meta write oluşturmaz. Browser bu geçişi ve
   kapalı yetki sınırını doğruladı.
+- Aynı snapshot artık portföy seviyesinde kısa bir sıra önerir: önce kesintiyi ayır, sonra lead
+  şeritlerini rota sınırıyla incele, son olarak üst huniyi lead kararından ayrı değerlendir. Bu
+  sıralama çalışma kitabındaki gözlemi görünür kılar; güncel performans hükmü veya otomatik launch
+  planı değildir.
 
 ## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
 

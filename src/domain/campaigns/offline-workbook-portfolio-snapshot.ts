@@ -23,4 +23,9 @@ export const offlineWorkbookPortfolioSnapshot = Object.freeze({
     Object.freeze({ label: "TR · Form · Doğum", market: "Yerli", language: "TR", route: "lead_form", service: "Doğum kampanyası", leads: 613, briefScenarioRef: "domestic_form_lead" as const }),
   ]),
   interruptionRule: "Ani harcama çöküşü önce teslimat kesintisi olarak doğrulanır; o pencerede performans hükmü verilmez.",
+  planningOrder: Object.freeze([
+    Object.freeze({ step: 1, title: "Teslimat kesintisini ayır", rationale: "Önce ani harcama çöküşünün hesap/ödeme/teslimat etkisini doğrula; toparlanma penceresi bitmeden ölçekleme veya yeni şerit değerlendirme." }),
+    Object.freeze({ step: 2, title: "Lead şeritlerini rota bazında incele", rationale: "AR WhatsApp FTR, RU form FTR ve yerli form şeritlerini pazar/dil/hizmet/rota sınırıyla ayrı brieflerde değerlendir." }),
+    Object.freeze({ step: 3, title: "Üst huniyi lead kararından ayır", rationale: "Bilinirlik/izlenme/trafik çalışmaları erişim ve etkileşim penceresiyle değerlendirilir; lead CPL veya rota sonucu ile birleştirilmez." }),
+  ]),
 });
