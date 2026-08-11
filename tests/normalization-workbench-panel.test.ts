@@ -1,6 +1,8 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { buildNormalizationAnswers, buildStructuredAssessmentInput, campaignIntentTemplate, parseNormalizationWorkbenchPreview, parseNormalizationWorkbenchSnapshot, resolveNormalizationSelection } from
+import { buildNormalizationAnswers, buildStructuredAssessmentInput, campaignIntentTemplate, NormalizationWorkbenchPanel, parseNormalizationWorkbenchPreview, parseNormalizationWorkbenchSnapshot, resolveNormalizationSelection } from
   "@/app/dashboard/normalization-workbench-panel";
 
 const hash = "a".repeat(64);
@@ -9,6 +11,12 @@ const authority = { canRead: true, canDraft: true, canPublish: false, canPromote
 const capabilities = { canPublish: false, canPromotePolicy: false, canApprove: false, canExecute: false, canWriteMeta: false };
 
 describe("normalization workbench panel contract", () => {
+  it("accepts a campaign handoff only as a draft template preference", () => {
+    const html = renderToStaticMarkup(createElement(NormalizationWorkbenchPanel, { initialCampaignIntentTemplate: "lead_quality" }));
+    expect(html).toContain("Lead kalitesini öncele");
+    expect(html).toContain("authority kapalı");
+  });
+
   it("accepts only draft-only server responses", () => {
     expect(parseNormalizationWorkbenchSnapshot({ contractVersion: "normalization-workbench-service/1.0.0", revisions: [
       { normalizationRef: "normalization_budget", revision: 1, revisionHash: hash, selectionHash: hash, capabilities },

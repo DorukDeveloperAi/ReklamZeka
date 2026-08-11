@@ -11,6 +11,7 @@ import { AutonomyStudioPanel } from "./autonomy-studio-panel";
 import { GuidanceStudioPanel } from "./guidance-studio-panel";
 import { CategoryInventoryPanel } from "./category-inventory-panel";
 import { InstructionPolicyStudioPanel } from "./instruction-policy-studio-panel";
+import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel";
 import { CampaignPlanningBriefPanel, type CampaignPlanningBriefContext } from "./campaign-planning-brief-panel";
 import styles from "./operating-dashboard.module.css";
 
@@ -272,6 +273,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   const [agentHandoffLoading, setAgentHandoffLoading] = useState(false);
   const [agentEntityRef, setAgentEntityRef] = useState("portfolio_current");
   const [agentEntityLabel, setAgentEntityLabel] = useState("Tüm Meta portföyü");
+  const [draftPolicyTemplate, setDraftPolicyTemplate] = useState<CampaignIntentTemplateRef>("");
 
   const filteredCampaigns = useMemo(() => filterCampaignPortfolio(campaigns, portfolioFilters), [portfolioFilters]);
   const currentCampaign = filteredCampaigns.find((campaign) => campaign.id === selectedCampaign) ?? filteredCampaigns[0] ?? campaigns[0];
@@ -516,7 +518,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       <CampaignPlanningBriefPanel
         context={planningContext}
         onApprovalQueueCampaignRef={setApprovalQueueCampaignRef}
-        onOpenDraftOnlyPolicy={() => navigate("strict-policies")}
+        onOpenDraftOnlyPolicy={(template) => { setDraftPolicyTemplate(template); navigate("strict-policies"); }}
       />
     </>;
   }
@@ -609,7 +611,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
     return <><section className={styles.pageHero}><div><span className={styles.kicker}>APPEND-ONLY TIMELINE</span><h1>Veri, karar ve hareket aynı kronolojide.</h1><p>Sync'ten outcome'a kadar bizim ve Meta üzerindeki harici değişikliklerin tamamı tek izde.</p></div><button className={styles.secondaryButton}>Filtrele</button></section><section className={styles.panel}><div className={styles.timeline}>{timeline.map((event) => <article key={`${event.time}-${event.title}`}><time>{event.time}</time><span className={styles.timelineDot} data-type={event.type} /><div><StatusPill tone="neutral">{event.type}</StatusPill><h2>{event.title}</h2><p>{event.detail}</p><small>{event.actor}</small></div><button aria-label={`${event.title} detayını aç`}>→</button></article>)}</div></section></>;
   }
 
-  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel /> : activeView === "rules" ? <GuidanceStudioPanel onOpenSession={() => navigate("decision-room")} /> : activeView === "strict-policies" ? <InstructionPolicyStudioPanel /> : activeView === "categories" ? <CategoryInventoryPanel onOpenSession={() => navigate("decision-room")} /> : activeView === "autonomy" ? <AutonomyStudioPanel /> : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? <ApprovalQueuePanel campaignRef={approvalQueueCampaignRef} /> : activeView === "promotions" ? <PromotionPreflightPanel /> : renderTimeline();
+  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel /> : activeView === "rules" ? <GuidanceStudioPanel onOpenSession={() => navigate("decision-room")} /> : activeView === "strict-policies" ? <InstructionPolicyStudioPanel initialCampaignIntentTemplate={draftPolicyTemplate} /> : activeView === "categories" ? <CategoryInventoryPanel onOpenSession={() => navigate("decision-room")} /> : activeView === "autonomy" ? <AutonomyStudioPanel /> : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? <ApprovalQueuePanel campaignRef={approvalQueueCampaignRef} /> : activeView === "promotions" ? <PromotionPreflightPanel /> : renderTimeline();
 
   return <main className={styles.appShell}>
     <aside className={styles.sidebar}>

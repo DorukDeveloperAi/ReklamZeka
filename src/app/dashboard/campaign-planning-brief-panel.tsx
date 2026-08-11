@@ -14,6 +14,7 @@ import {
   type PersistedCampaignPlanningHint,
   planningHintFromPersistedCampaignContext,
 } from "@/domain/campaigns/interactive-campaign-template";
+import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel";
 import styles from "./operating-dashboard.module.css";
 
 type BriefDraft = Readonly<{
@@ -46,6 +47,16 @@ const APPROVAL_STATUS = new Set([
   "proposed", "awaiting_approval", "approved", "rejected", "changes_requested", "expired", "stale", "suppressed", "parked",
   "executing", "verified", "failed", "dependency_failed", "rollback_proposed", "rolled_back", "superseded",
 ]);
+
+/**
+ * This picks only a draft-only starting template. It deliberately carries no
+ * campaign, source, scope or policy reference into the policy workspace.
+ */
+export function draftOnlyPolicyTemplateForBrief(input: Pick<BriefDraft, "businessGoal" | "deliveryHealth">): Exclude<CampaignIntentTemplateRef, ""> {
+  if (input.deliveryHealth === "interrupted") return "delivery_recovery";
+  if (input.businessGoal === "lead_acquisition") return "lead_quality";
+  return "new_campaign_plan";
+}
 
 function exactObject(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value)
@@ -227,7 +238,7 @@ export function campaignBriefScenario(ref: CampaignBriefScenarioRef): CampaignBr
 function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef, onOpenDraftOnlyPolicy }: Readonly<{
   context: CampaignPlanningBriefContext;
   onApprovalQueueCampaignRef?: (campaignRef: string | null) => void;
-  onOpenDraftOnlyPolicy?: () => void;
+  onOpenDraftOnlyPolicy?: (template: Exclude<CampaignIntentTemplateRef, "">) => void;
 }>) {
   const [draft, setDraft] = useState<BriefDraft>(() => Object.freeze({ ...context.input }));
   const [scenarioRef, setScenarioRef] = useState<CampaignBriefScenarioRef>("");
@@ -362,7 +373,7 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
       <div><span>Ölçüm sınırı</span><strong>{brief.measurement.primaryOutcome}</strong><small>{brief.measurement.doNotCompareWith.join(" · ")} ile varsayılan olarak kıyaslama.</small></div>
     </div>
     <footer><span>Salt taslak/öneri · campaign create / publish / approval / execute / Meta write: kapalı</span><div>
-      {onOpenDraftOnlyPolicy ? <button type="button" onClick={onOpenDraftOnlyPolicy}>Taslak talimat alanını aç</button> : null}
+      {onOpenDraftOnlyPolicy ? <button type="button" onClick={() => onOpenDraftOnlyPolicy(draftOnlyPolicyTemplateForBrief(draft))}>Taslak talimat alanını aç</button> : null}
       <button type="button" onClick={() => { setScenarioRef(""); setDraft(Object.freeze({ ...context.input })); }}>Bağlamı geri yükle</button>
     </div></footer>
   </section>;
@@ -371,7 +382,7 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
 export function CampaignPlanningBriefPanel({ context = DEFAULT_CONTEXT, onApprovalQueueCampaignRef, onOpenDraftOnlyPolicy }: Readonly<{
   context?: CampaignPlanningBriefContext;
   onApprovalQueueCampaignRef?: (campaignRef: string | null) => void;
-  onOpenDraftOnlyPolicy?: () => void;
+  onOpenDraftOnlyPolicy?: (template: Exclude<CampaignIntentTemplateRef, "">) => void;
 }>) {
   return <CampaignPlanningBriefPanelContent key={context.campaignRef} context={context} onApprovalQueueCampaignRef={onApprovalQueueCampaignRef} onOpenDraftOnlyPolicy={onOpenDraftOnlyPolicy} />;
 }

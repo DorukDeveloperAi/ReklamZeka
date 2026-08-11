@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./instruction-policy-studio.module.css";
 
 type Strength = "must" | "should" | "consider" | "avoid" | "question";
-type CampaignIntentTemplateRef = "" | "new_campaign_plan" | "budget_protection" | "lead_quality" | "delivery_recovery";
+export type CampaignIntentTemplateRef = "" | "new_campaign_plan" | "budget_protection" | "lead_quality" | "delivery_recovery";
 type PolicyIntent = "" | "prohibit_operation" | "require_approval" | "protect_budget" | "prefer_option";
 type PolicyScope = "global" | "specific";
 type PolicyOperation = "" | "status_pause" | "status_activate" | "budget_decrease" | "budget_increase" | "budget_transfer" | "existing_post_promotion";
@@ -183,19 +183,22 @@ export function resolveNormalizationSelection(choices: GuidanceChoices, cardRef:
   return Object.freeze({ sourceRef: card.sourceRefs.length === 1 ? card.sourceRefs[0]! : "", cardRef: card.cardRef, setRef: set.setRef });
 }
 
-export function NormalizationWorkbenchPanel() {
+export function NormalizationWorkbenchPanel({ initialCampaignIntentTemplate = "" }: Readonly<{
+  initialCampaignIntentTemplate?: CampaignIntentTemplateRef;
+}>) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null); const [loading, setLoading] = useState(true);
   const [choices, setChoices] = useState<GuidanceChoices | null>(null);
   const [message, setMessage] = useState<string | null>(null); const [preview, setPreview] = useState<Preview | null>(null);
   const [selection, setSelection] = useState<Selection>({ sourceRef: "", cardRef: "", setRef: "" });
-  const [intentTemplate, setIntentTemplate] = useState<CampaignIntentTemplateRef>("");
+  const initialTemplate = campaignIntentTemplate(initialCampaignIntentTemplate);
+  const [intentTemplate, setIntentTemplate] = useState<CampaignIntentTemplateRef>(initialCampaignIntentTemplate);
   const [policyIntent, setPolicyIntent] = useState<PolicyIntent>(""); const [policyScope, setPolicyScope] = useState<PolicyScope>("global");
   const [policyScopeRef, setPolicyScopeRef] = useState(""); const [policyOperation, setPolicyOperation] = useState<PolicyOperation>("");
   const [budgetPoolRef, setBudgetPoolRef] = useState(""); const [preferenceSubjectRef, setPreferenceSubjectRef] = useState("");
   const [preferredRefs, setPreferredRefs] = useState(""); const [assessment, setAssessment] = useState<StructuredAssessment | null>(null);
-  const [title, setTitle] = useState(""); const [body, setBody] = useState(""); const [topic, setTopic] = useState("");
-  const [strength, setStrength] = useState<Strength>("should"); const [assumptions, setAssumptions] = useState("");
-  const [questions, setQuestions] = useState(""); const [saving, setSaving] = useState(false);
+  const [title, setTitle] = useState(() => initialTemplate?.title ?? ""); const [body, setBody] = useState(() => initialTemplate?.body ?? ""); const [topic, setTopic] = useState(() => initialTemplate?.topic ?? "");
+  const [strength, setStrength] = useState<Strength>(() => initialTemplate?.strength ?? "should"); const [assumptions, setAssumptions] = useState(() => initialTemplate?.assumptions ?? "");
+  const [questions, setQuestions] = useState(() => initialTemplate?.questions ?? ""); const [saving, setSaving] = useState(false);
   const reload = useCallback(async () => { setLoading(true); try {
     const [nextSnapshot, nextChoices] = await Promise.all([loadWorkbench(), loadGuidanceChoices()]);
     setSnapshot(nextSnapshot); setChoices(nextChoices); setMessage(null);
@@ -226,6 +229,7 @@ export function NormalizationWorkbenchPanel() {
     <header className={styles.row}><div><span className={styles.kicker}>DRAFT-ONLY NORMALIZATION</span>
       <h2>Owner talimatını yapılandırılmış taslak olarak değerlendir</h2><p>Ham kaynak Guidance Studio’da korunur. Bu akış publish, G3, approval, action ve Meta write üretmez.</p></div>
       <span className={styles.badge}>authority kapalı</span></header>
+    {initialTemplate ? <p className={styles.meta}><strong>Brief başlangıcı: {initialTemplate.title}</strong> · Bu yalnız düzenlenebilir taslak alanlarını başlatır; campaign, kaynak veya policy referansı aktarılmaz.</p> : null}
     {loading ? <p>Normalizasyon kayıtları yükleniyor…</p> : message && !snapshot ? <p role="alert">{message}</p> : <>
       <div className={styles.split}><label>Guidance kartı<select aria-label="Guidance kartı" value={selection.cardRef} disabled={saving || !choices}
         onChange={(event) => { const resolved = choices ? resolveNormalizationSelection(choices, event.target.value) : null;

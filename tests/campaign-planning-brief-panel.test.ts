@@ -8,6 +8,7 @@ import {
   campaignContextTimelineSourceState,
   campaignDecisionTimeline,
   decisionTimelineFromApprovalQueueResponse,
+  draftOnlyPolicyTemplateForBrief,
   type CampaignPlanningBriefContext,
 } from "@/app/dashboard/campaign-planning-brief-panel";
 
@@ -64,6 +65,12 @@ describe("campaign planning brief panel", () => {
     }));
     expect(html).toContain("Taslak talimat alanını aç");
     expect(html).toContain("campaign create / publish / approval / execute / Meta write: kapalı");
+  });
+
+  it("maps only the brief condition to a draft-only template preference", () => {
+    expect(draftOnlyPolicyTemplateForBrief(gccContext.input)).toBe("lead_quality");
+    expect(draftOnlyPolicyTemplateForBrief({ ...gccContext.input, deliveryHealth: "interrupted" })).toBe("delivery_recovery");
+    expect(draftOnlyPolicyTemplateForBrief({ ...gccContext.input, businessGoal: "upper_funnel_education" })).toBe("new_campaign_plan");
   });
 
   it("only projects a campaign-matching, read-only approval list into the decision timeline", () => {

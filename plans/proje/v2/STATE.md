@@ -32,6 +32,10 @@
   source ref'i veya policy verisi aktarılmaz; kullanıcı Guidance zincirini ve yapılandırılmış niyeti
   ayrı ayrı doğrular. Böylece görünür devam adımı vardır, fakat otomatik policy/publish/approval/action
   veya Meta write anlamı yüklenmez.
+- Bu geçiş, yalnız briefin koşulundan türetilmiş düzenlenebilir bir başlangıç şablonunu gösterir:
+  kesinti `delivery_recovery`, lead hedefi `lead_quality`, diğer durumlar `new_campaign_plan`.
+  Şablon kaynak, campaign, kapsam veya policy ref'i değildir; normalizasyon alanı bunun açık işaretini
+  gösterir ve kullanıcı alanları değiştirebilir.
 
 ## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
 
