@@ -283,9 +283,14 @@
 
 - Saf lifecycle gate, aynı definition ref için yalnız contiguous revision ve exact previous hash ile
   ilerlemeye izin verir; published→draft gerilemesi ile retired sonrası tüm transition'lar reddedilir.
-  Bu, sonraki private repository insert'inin OCC/append-only ön koşuludur.
-- Henüz DB writer, actor/membership/audit veya published loader değildir; bu nedenle definition
-  lifecycle'ı production-ready sayılmaz ve asset materialization kapalıdır.
+  Bu, private repository insert'inin OCC/append-only ön koşuludur.
+- Server-private `DrizzleCreativeDiagnosticDefinitionRepository`, active workspace ve owner/admin
+  membership'ini aynı transaction içinde kilitler; definition-ref advisory lock altında son iki immutable
+  revision zincirini ve payload hashini doğrular. Yalnız exact latest replay yazısız döner; yeni revision
+  append-only insert ve audit hash-chain ile birlikte commit olur. Public route, publish/approve/execute,
+  Meta write ve network capability eklenmemiştir.
+- Current published-definition loader, definition invalidation ve V2 asset materializer henüz açık
+  kaldığından lifecycle production-ready sayılmaz ve asset/finding materialization kapalıdır.
 
 ## 2026-08-11 — A07 field-pilot source coverage census
 
