@@ -419,6 +419,9 @@
     parallel cleanup serializable conflict ürettiği için bilinçli olarak kullanılmaz.
 - [x] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
   - [x] Deterministik on-pass agenda, category/topic subset ve context/timeframe-bound finding çekirdeği.
+  - [x] Agenda v2 frozen asset contract: exact sıralı `general → group_account → objective →
+    internal_category → entity → topic → history` pass'leri hashli persistent run assetine freeze edilir;
+    v1 frozen payload yeniden yorumlanmaz ve L2 okumasından önce fail-closed reddedilir.
   - [x] A10.2c agenda hash+payload'ı ilk run claim'inde immutable Decision Room run assetine freeze edilir;
     runtime aynı context/timeframe/pass'lerden tekrar üretip birebir eşleşme olmadan L2 okuması ya da ledger
     staging'i başlatmaz. Legacy bağsız asset fail-closed kalır.
@@ -496,7 +499,11 @@
     contextteki exact ready L2 feature ve complete L3 window bindinglerini private reader'larla yeniden
     doğrular, yalnız bunlardan calculator observation üretir ve deterministic L5 compact context ref/hash'ini
     immutable analysis ledger'a freeze eder. Missing/stale/foreign/tamper evidence ledger staging öncesi
-    fail-closed'dur; gerçek PostgreSQL dry-run acceptance pooler blockerı nedeniyle ayrı açık kalır.
+    fail-closed'dur; authentic PostgreSQL dry-run acceptance sequential tombstone cleanup ile kanıtlıdır.
+  - [x] Frozen-L2 advisory contribution diagnostic: authenticated primary feature setinden deterministic
+    spend contribution hesaplanır; peer veya metric kanıtı yoksa açık `insufficient_data`/`unknown` döner.
+    Creative/config alanları frozen L2 payloadında yoksa fatigue/config uydurmak yerine `not_supported`
+    kalır; ledger/action/Meta-write yetkisi etkilenmez.
   - [x] Private timeframe-bound context composer: son geçerli repository context'inin private mirror scope'u
     ve server clock'u ile L2→L3 materializer çağrılır; yeni evidence-bound context yalnız exact window'un
     feature/window ref'lerini taşır. Caller context, feature, scope UUID veya capture time veremez.

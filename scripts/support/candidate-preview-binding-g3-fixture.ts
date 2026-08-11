@@ -93,8 +93,8 @@ export async function materializeCandidatePreviewBindingG3Fixture(database: Data
   });
   const template: AnalysisTemplateDefinition = { version: ANALYSIS_TEMPLATE_DEFINITION_VERSION, templateRef, revision: 1,
     timeframeRef, timeframeDefinitionHash: persistedTimeframe.definitionHash, contextHash: windowBound.context.contextHash,
-    requestedPasses: ["campaign"], hierarchy: [{ entityRef: source.campaignRef, entityType: "campaign", parentEntityRef: null }],
-    checks: [{ checkKey: `check_${suffix}`, passKey: "campaign", entityRef: source.campaignRef, entityType: "campaign",
+    requestedPasses: ["entity"], hierarchy: [{ entityRef: source.campaignRef, entityType: "campaign", parentEntityRef: null }],
+    checks: [{ checkKey: `check_${suffix}`, passKey: "entity", entityRef: source.campaignRef, entityType: "campaign",
       parentEntityRef: null, hierarchyPathRefs: [source.campaignRef], driverEvidenceRefs: [], externalEntityId: source.campaignRef,
       metaConnectionId: mirror.connection_id, adAccountId: mirror.account_id, attributionLabel: "7d_click_1d_view", expectedCurrency: "TRY",
       spec: { kind: "threshold", metric: "spendMinor", operator: "gt", thresholdDecimal: "1", minimumSample: 1 },

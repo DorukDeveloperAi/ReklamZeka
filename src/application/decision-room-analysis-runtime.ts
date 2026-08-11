@@ -16,6 +16,10 @@ import type { ResolvedAnalysisTimeframe } from "@/analyses/timeframe-resolver";
 import { validateResolvedAnalysisTimeframe } from "@/analyses/timeframe-resolver";
 import type { DeterministicFeatureSnapshot } from "@/analyses/deterministic-feature-snapshot";
 import type { DeterministicWindowSnapshot } from "@/analyses/deterministic-window-snapshot";
+import {
+  calculateFrozenL2Contribution,
+  type FrozenContributionDiagnostic,
+} from "@/analyses/frozen-l2-advisory-diagnostics";
 import { runDecisionRoom, type DecisionRoomDraftPort } from "@/application/decision-room";
 import type { DecisionRoomAnalysisPort } from "@/domain/decisions/executor";
 import {
@@ -110,6 +114,25 @@ export type DecisionRoomFrozenEvidencePort = Readonly<{
   }>>;
 }>;
 
+/**
+ * Bounded advisory-only diagnostics derived from the exact L2 set already
+ * authenticated for this run. They are deliberately not ledger/action input:
+ * the existing ledger contract does not yet persist a diagnostic artifact.
+ */
+export type FrozenL2RuntimeAdvisoryDiagnostics = Readonly<{
+  contribution: FrozenContributionDiagnostic;
+  creativeFatigue: Readonly<{
+    state: "not_supported";
+    reason: "creative_level_not_persisted";
+    capabilities: Readonly<{ canAuthorizeAction: false; canExecuteWrite: false; canWriteMeta: false }>;
+  }>;
+  configuration: Readonly<{
+    state: "not_supported";
+    reason: "complete_config_not_bound" | "config_evidence_not_bound";
+    capabilities: Readonly<{ canAuthorizeAction: false; canExecuteWrite: false; canWriteMeta: false }>;
+  }>;
+}>;
+
 export class DecisionRoomAnalysisRuntimeError extends Error {
   constructor(readonly code:
     | "invalid_input"
@@ -125,8 +148,7 @@ export class DecisionRoomAnalysisRuntimeError extends Error {
 const MAX_CHECKS = 100;
 const REF = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/;
 const PASSES: readonly AnalysisPassKey[] = [
-  "data_health", "account_objective", "category", "campaign", "ad_set", "ad", "creative",
-  "budget_pacing", "history", "decision",
+  "general", "group_account", "objective", "internal_category", "entity", "topic", "history",
 ];
 
 function compare(left: string, right: string): number {
@@ -341,6 +363,27 @@ function observationFromFrozenFeature(feature: DeterministicFeatureSnapshot): Fi
 }
 
 /**
+ * Does not substitute entity peers or current config during replay. L2 currently
+ * persists campaign/ad-set/ad only, and the frozen config projection has no
+ * billing/destination pair required by creative/config diagnostics.
+ */
+export function deriveFrozenL2RuntimeAdvisoryDiagnostics(
+  context: EffectiveCampaignContext,
+  features: readonly DeterministicFeatureSnapshot[],
+): FrozenL2RuntimeAdvisoryDiagnostics {
+  const capability = Object.freeze({ canAuthorizeAction: false, canExecuteWrite: false, canWriteMeta: false });
+  return Object.freeze({
+    contribution: calculateFrozenL2Contribution({ metric: "spendMinor", features }),
+    creativeFatigue: Object.freeze({ state: "not_supported", reason: "creative_level_not_persisted", capabilities: capability }),
+    configuration: Object.freeze({
+      state: "not_supported",
+      reason: context.metaAnalysisConfigEvidence === undefined ? "config_evidence_not_bound" : "complete_config_not_bound",
+      capabilities: capability,
+    }),
+  });
+}
+
+/**
  * Deterministic AnalysisPort used by both manual executor calls and schedule ticks.
  * It performs no model, Meta network/write, authority or external notification call.
  */
@@ -381,6 +424,10 @@ export class DecisionRoomDeterministicAnalysisRuntime implements DecisionRoomAna
       if (error instanceof DecisionRoomAnalysisRuntimeError) throw error;
       throw new DecisionRoomAnalysisRuntimeError("evidence_not_frozen");
     }
+    // Evaluate bounded diagnostics only against the just re-authenticated set.
+    // Their current contract is advisory and intentionally cannot alter room status,
+    // cadence, finding eligibility, ledger content, or executor return shape.
+    deriveFrozenL2RuntimeAdvisoryDiagnostics(prepared.context, frozenFeatures);
 
     const evaluated = [] as Array<Readonly<{
       check: DecisionRoomAnalysisRuntimeCheck;

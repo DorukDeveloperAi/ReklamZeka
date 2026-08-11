@@ -3047,7 +3047,7 @@ export const decisionRoomRunAnalysisAssets = pgTable("decision_room_run_analysis
     and ((${table.agendaHash} is null and ${table.agendaPayload} is null)
       or (${table.agendaHash} ~ '^[a-f0-9]{64}$'
         and jsonb_typeof(${table.agendaPayload}) = 'object'
-        and ${table.agendaPayload} #>> '{contractVersion}' = 'analysis-agenda/1.0.0'
+        and ${table.agendaPayload} #>> '{contractVersion}' = 'analysis-agenda/2.0.0'
         and ${table.agendaPayload} #>> '{agendaHash}' = ${table.agendaHash}))
   ) is true`),
 ]);

@@ -20,6 +20,7 @@ import {
 import { normalizeMetaDailyInsight } from "@/domain/meta/insights/contract";
 import { aggregateMetaMetrics } from "@/domain/meta/insights/metric-engine";
 import { buildEffectiveGuidancePack, createGuidanceRegistry } from "@/domain/guidance/registry";
+import { buildDeterministicFeatureSnapshot } from "@/analyses/deterministic-feature-snapshot";
 
 const now = "2026-08-07T12:00:00.000Z";
 const workspaceId = "10000000-0000-4000-8000-000000000001";
@@ -70,15 +71,15 @@ function assets(): DecisionRoomAnalysisRuntimeAssets {
     version: DECISION_ROOM_ANALYSIS_RUNTIME_VERSION,
     workspaceRef: "workspace_safe", accountRef: "account_safe", campaignRef: "campaign_safe",
     timeframeRef: "timeframe_daily", templateRef: "template_daily", occurredAt: now,
-    context: context(), resolvedTimeframe: timeframe, requestedPasses: ["ad"],
-    agenda: buildAnalysisAgenda({ context: context(), resolvedTimeframe: timeframe, requestedPasses: ["ad"] }),
+    context: context(), resolvedTimeframe: timeframe, requestedPasses: ["entity"],
+    agenda: buildAnalysisAgenda({ context: context(), resolvedTimeframe: timeframe, requestedPasses: ["entity"] }),
     hierarchy: [
       { entityRef: "campaign_safe", entityType: "campaign", parentEntityRef: null },
       { entityRef: "adset_safe", entityType: "ad_set", parentEntityRef: "campaign_safe" },
       { entityRef: "ad_safe", entityType: "ad", parentEntityRef: "adset_safe" },
     ],
     checks: [{
-      checkKey: "spend_guard", passKey: "ad", entityRef: "ad_safe", entityType: "ad",
+      checkKey: "spend_guard", passKey: "entity", entityRef: "ad_safe", entityType: "ad",
       parentEntityRef: "adset_safe", hierarchyPathRefs: ["campaign_safe", "adset_safe", "ad_safe"],
       driverEvidenceRefs: [], externalEntityId: "238000000000001",
       metaConnectionId: "20000000-0000-4000-8000-000000000002",
@@ -112,14 +113,12 @@ function input() {
 function frozenEvidence(options: Readonly<{ stale?: boolean; omitFeature?: boolean; foreign?: boolean; sourceMismatch?: boolean }> = {}) {
   const metricResult = aggregateMetaMetrics({ rows: [canonicalRow()], metrics: ["spendMinor"] });
   const effectiveWorkspaceId = options.foreign ? "20000000-0000-4000-8000-000000000001" : workspaceId;
-  const feature = {
-    featureRef, featureHash: "a".repeat(64),
+  const feature = buildDeterministicFeatureSnapshot({
     scope: { workspaceId: effectiveWorkspaceId, metaConnectionId: "20000000-0000-4000-8000-000000000002", adAccountId: "30000000-0000-4000-8000-000000000003", entityLevel: "ad" as const, externalEntityId: "238000000000001" },
-    observationRef: "observation_safe", role: "primary" as const, startDate: timeframe.startDate, endDate: timeframe.endDate,
-    timezone: "Europe/Istanbul", sampleSize: 1, settled: true, qualityStatus: "ready" as const, qualityReasonCodes: [],
-    sourceManifestHash: "b".repeat(64), sourceSnapshotRefs: [options.sourceMismatch ? "snapshot_not_frozen" : snapshotRef], formulaCatalogVersion: "meta-metric-formulas/1.0.0" as const,
-    metricResult, capabilities: { containsRawL0: false as const, canAuthorizeAction: false as const, canExecuteWrite: false as const },
-  };
+    observation: { observationRef: "observation_safe", role: "primary" as const, startDate: timeframe.startDate, endDate: timeframe.endDate,
+      timezone: "Europe/Istanbul", sampleSize: 1, settled: true, qualityStatus: "ready" as const, qualityReasonCodes: [],
+      metricResult, snapshotRefs: [options.sourceMismatch ? "snapshot_not_frozen" : snapshotRef] },
+  });
   return {
     loadFeature: vi.fn(async () => ({
       state: options.stale ? "stale" as const : "ready" as const,
@@ -237,7 +236,7 @@ describe("DecisionRoomDeterministicAnalysisRuntime", () => {
     } });
     const runtime = new DecisionRoomDeterministicAnalysisRuntime(
       { loadExact: async () => ({ ...withoutWindow, context: contextWithoutWindow,
-        agenda: buildAnalysisAgenda({ context: contextWithoutWindow, resolvedTimeframe: timeframe, requestedPasses: ["ad"] }) }) },
+        agenda: buildAnalysisAgenda({ context: contextWithoutWindow, resolvedTimeframe: timeframe, requestedPasses: ["entity"] }) }) },
       frozenEvidence() as never,
       drafts().port,
     );
@@ -262,6 +261,22 @@ describe("DecisionRoomDeterministicAnalysisRuntime", () => {
     );
     expect(read).not.toHaveBeenCalled();
     expect(storage.ledger()).toHaveLength(0);
+  });
+
+  it("fails closed rather than replaying a retired v1 agenda contract", async () => {
+    const prepared = assets();
+    const runtime = new DecisionRoomDeterministicAnalysisRuntime(
+      { loadExact: async () => ({
+        ...prepared,
+        agenda: { ...prepared.agenda, contractVersion: "analysis-agenda/1.0.0" } as never,
+      }) },
+      frozenEvidence() as never,
+      drafts().port,
+    );
+
+    await expect(runtime.execute(input())).rejects.toEqual(
+      expect.objectContaining<Partial<DecisionRoomAnalysisRuntimeError>>({ code: "asset_not_bound" }),
+    );
   });
 
   it("validates every nested check before the first L2 read", async () => {

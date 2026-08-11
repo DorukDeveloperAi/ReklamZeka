@@ -119,13 +119,13 @@ function input(options: Readonly<{ protectedBudget?: boolean; clear?: boolean; s
   });
   return {
     workspaceRef, occurredAt: now, context: effectiveContext, resolvedTimeframe: timeframe,
-    agenda: { requestedPasses: ["ad_set", "budget_pacing", "decision"] },
+    agenda: { requestedPasses: ["entity", "topic"] },
     analysis,
     findingInput: {
       hierarchy, metricBundles: hierarchy.map((node) => metricBundle(node.entityRef)),
       passAssignments: [{
         recordId: analysis.records.find((record) => record.entityRef === "campaign-1")!.recordId,
-        passKey: "budget_pacing",
+        passKey: "entity",
       }],
     },
     cadence: {

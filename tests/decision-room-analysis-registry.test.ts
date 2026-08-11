@@ -27,10 +27,10 @@ function template(): AnalysisTemplateDefinition {
     timeframeRef: timeframe.timeframeRef,
     timeframeDefinitionHash: analysisAssetDefinitionHash(timeframe),
     contextHash: "a".repeat(64),
-    requestedPasses: ["campaign"],
+    requestedPasses: ["entity"],
     hierarchy: [{ entityRef: "campaign_safe", entityType: "campaign", parentEntityRef: null }],
     checks: [{
-      checkKey: "spend_guard", passKey: "campaign", entityRef: "campaign_safe", entityType: "campaign",
+      checkKey: "spend_guard", passKey: "entity", entityRef: "campaign_safe", entityType: "campaign",
       parentEntityRef: null, hierarchyPathRefs: ["campaign_safe"], driverEvidenceRefs: [],
       externalEntityId: "238000000000001", metaConnectionId: "20000000-0000-4000-8000-000000000002",
       adAccountId: "30000000-0000-4000-8000-000000000003", attributionLabel: "7d_click_1d_view",

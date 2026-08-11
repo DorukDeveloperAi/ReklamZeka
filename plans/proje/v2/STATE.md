@@ -193,6 +193,17 @@
   doğrulanır. Primary ve foreign fixture workspace'leri sequential WorkspaceTombstoneService ile temizlenir;
   residue guard buna göre kontrol edilir.
 
+## 2026-08-11 — A10 Agenda v2 ve frozen-L2 advisory diagnostics
+
+- Analysis agenda `2.0.0`, deterministic exact pass sırasını `general → group_account → objective →
+  internal_category → entity → topic → history` olarak freeze eder. Persistent Decision Room asset
+  CHECK'i yalnız v2'yi kabul eder; v1 historical payload semantik olarak dönüştürülmez, authentication
+  öncesi fail-closed kalır. Forward-only migration yerel PostgreSQL'e uygulanmıştır.
+- Frozen primary L2 evidence üzerinden replay-stable spend contribution advisory hesaplanır. Peer
+  veya metric kapsamı eksikse sonuç sırasıyla `insufficient_data`/`unknown` olur. Creative-level
+  feature ve complete billing/destination config L2 payloadında olmadığı için fatigue/config finding
+  üretmek yerine açık `not_supported` taşır; hiçbir ledger kararı, action veya Meta write yetkisi açılmaz.
+
 ## 2026-08-10 — Local MCP/session canlı kabulü
 
 - Yerel geliştirme sunucusu ve yönetilen `.env.local` session yapılandırmasıyla `npm run verify:mcp-live`

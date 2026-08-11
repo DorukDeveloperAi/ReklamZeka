@@ -66,8 +66,8 @@ function definition(input: Readonly<{ timeframeRef: string; templateRef: string;
   campaignRef: string; connectionId: string; accountId: string; snapshotRefs: readonly string[]; cadence: AnalysisTemplateDefinition["cadence"] }>): AnalysisTemplateDefinition {
   return { version: ANALYSIS_TEMPLATE_DEFINITION_VERSION, templateRef: input.templateRef, revision: 1,
     timeframeRef: input.timeframeRef, timeframeDefinitionHash: input.timeframeHash, contextHash: input.contextHash,
-    requestedPasses: ["campaign"], hierarchy: [{ entityRef: input.campaignRef, entityType: "campaign", parentEntityRef: null }],
-    checks: [{ checkKey: "spend_guard", passKey: "campaign", entityRef: input.campaignRef, entityType: "campaign",
+    requestedPasses: ["entity"], hierarchy: [{ entityRef: input.campaignRef, entityType: "campaign", parentEntityRef: null }],
+    checks: [{ checkKey: "spend_guard", passKey: "entity", entityRef: input.campaignRef, entityType: "campaign",
       parentEntityRef: null, hierarchyPathRefs: [input.campaignRef], driverEvidenceRefs: [], externalEntityId: input.campaignRef,
       metaConnectionId: input.connectionId, adAccountId: input.accountId, attributionLabel: "7d_click_1d_view", expectedCurrency: "TRY",
       spec: { kind: "threshold", metric: "spendMinor", operator: "gt", thresholdDecimal: "1", minimumSample: 1 },
