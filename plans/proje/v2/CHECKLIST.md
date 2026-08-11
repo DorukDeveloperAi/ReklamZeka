@@ -711,6 +711,9 @@
       persisted campaign ref ile brief/timeline bağlaması açık.
     - [x] Brief paneli yalnız doğrulanmış persisted public ref olduğunda context read yolunu kullanır;
       demo bağlamı explicit unbound kalır ve gerçek kampanya verisi taklit etmez.
+    - [x] Session-bound `GET /api/campaign-contexts`, en güncel geçerli frozen campaign contextleri
+      yalnız opaque alias, güvenli objective/capturedAt özeti ve `frozen_valid` durumuyla listeler.
+      Dashboard seçimi demo seçiminden ayrıdır; source yoksa açıkça unavailable/empty kalır.
     - [x] Context public ref'i ile Approval Queue'nun tenant-bound `entity_…` campaign alias'ı
       bilinçli olarak ayrıdır: server private campaign UUID'den queue alias'ını üretir; brief yalnız
       doğrulanmış alias'ı inbox'a aktarır ve campaign değişiminde eski scope'u temizler. Hedefli testler

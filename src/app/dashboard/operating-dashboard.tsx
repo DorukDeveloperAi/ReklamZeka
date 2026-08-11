@@ -47,6 +47,25 @@ type AgentHandoffSummary = Readonly<{
 }>;
 type PersistedCampaignContextSummary = Readonly<{ campaignRef: string; label: string; objective: string | null; capturedAt: string; sourceState: "frozen_valid" }>;
 
+/**
+ * A list item authenticates only its opaque alias, capture time and Meta
+ * objective. The rest of the planning taxonomy remains human-confirmed until
+ * the exact single-context read has completed, so a demo campaign can never
+ * silently prefill a persisted campaign brief.
+ */
+const PERSISTED_UNCONFIRMED_BRIEF_INPUT = Object.freeze({
+  businessGoal: "classification_triage" as const,
+  market: "unknown" as const,
+  language: null,
+  serviceRef: null,
+  countryOrRegion: null,
+  conversionRoute: "unknown" as const,
+  deliveryHealth: "unknown" as const,
+  classification: "unclassified" as const,
+  capacity: "unknown" as const,
+  creativeReady: false,
+});
+
 export function persistedCampaignContextsFromResponse(value: unknown): readonly PersistedCampaignContextSummary[] | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
@@ -202,7 +221,9 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   const filteredCampaigns = useMemo(() => filterCampaignPortfolio(campaigns, portfolioFilters), [portfolioFilters]);
   const currentCampaign = filteredCampaigns.find((campaign) => campaign.id === selectedCampaign) ?? filteredCampaigns[0] ?? campaigns[0];
   const selectedPersistedContext = persistedContexts.find((context) => context.campaignRef === selectedPersistedCampaignRef) ?? null;
-  const planningContext: CampaignPlanningBriefContext = selectedPersistedContext ? { campaignRef: `persisted_${selectedPersistedContext.campaignRef}`, campaignLabel: selectedPersistedContext.label, persistedCampaignRef: selectedPersistedContext.campaignRef, input: currentCampaign.planningContext.input } : currentCampaign.planningContext;
+  const planningContext: CampaignPlanningBriefContext = selectedPersistedContext
+    ? { campaignRef: `persisted_${selectedPersistedContext.campaignRef}`, campaignLabel: selectedPersistedContext.label, persistedCampaignRef: selectedPersistedContext.campaignRef, input: PERSISTED_UNCONFIRMED_BRIEF_INPUT }
+    : currentCampaign.planningContext;
   const activeTitle = useMemo(() => navGroups.flatMap((group) => group.items).find((item) => item.id === activeView)?.label ?? "Bugün", [activeView]);
 
   const refreshMetaInventory = useCallback(async (announce = false) => {

@@ -18,6 +18,18 @@
   bütünlüğü riski veya bu üç ürün adımını açan somut bir blocker olduğunda yapılır. Kapsam dışı
   "mükemmelleştirme" işleri checklist'e yeni teslimat gibi eklenmez.
 
+## 2026-08-11 — A14 persisted frozen-context seçimi
+
+- Session-bound, query'siz `GET /api/campaign-contexts` yalnız latest-valid campaign contextler için
+  opaque public alias, güvenli Meta objective, capture zamanı ve `frozen_valid` durumunu döndürür.
+  Context hash'i, private entity kimliği, kategori/policy kanıtı ve herhangi bir write yetkisi taşınmaz.
+- Dashboard bu listeyi demo portföyünden ayrı gösterir. Persisted seçimde brief bilerek
+  `classification_triage`/bilinmiyor başlangıcına döner; demo kampanyanın pazar, hizmet veya rota
+  varsayımları gerçek frozen context'e aktarılmaz. Exact tek-context read tamamlanınca mevcut
+  redacted objective sinyali görünür; veri yoksa unavailable/empty durumuna dürüstçe düşer.
+- Approval, execute ve Meta write kapıları değişmedi. Sonraki ürün adımı, mevcut read-only context,
+  brief ve approval görünümünü gerçek oturumlu browser'da birlikte kabul etmektir.
+
 ## 2026-08-11 — A14 demo portföy hiyerarşisi ve filtreler
 
 - Kampanyalar yüzeyindeki salt-okunur portföy katmanı artık Meta objective ve iç kategori ile
