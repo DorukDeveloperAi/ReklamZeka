@@ -269,6 +269,16 @@
   invalidation, V2 result materializer ve PostgreSQL acceptance henüz tamamlanmadığı için
   asset/finding üretilmez; G4 ve tüm write/action/network capability'leri kapalıdır.
 
+## 2026-08-11 — A10.5c immutable diagnostic definition contract
+
+- `creative-diagnostic-definition/1.0.0`, minimum impressions, frequency artışı,
+  CTR düşüşü ve coverage-gap eşiklerini exact shape/revision/previous-hash ile canonicalize
+  eder. Calculator veya persistence caller eşiği kabul etmeyecek şekilde definition hash'ini
+  tek kaynak yapar.
+- Bu saf contract henüz owner/admin lifecycle writer veya current published-definition loader
+  değildir; schema substrate üzerinde definition revision materialization ve asset writer açık
+  kalır. Capability yüzeyi değişmez.
+
 ## 2026-08-11 — A07 field-pilot source coverage census
 
 - Yeni read-only `census:field-pilot-source-db` REPEATABLE READ altında yalnız aggregate workspace/account
