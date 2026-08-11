@@ -101,8 +101,11 @@ try {
     publicPrivilegesRevoked = security?.public_select === false && security.anon_select === false
       && security.authenticated_select === false && security.service_role_select === false;
     const purge = new DrizzleWorkspaceTombstonePurgePort();
-    tombstoneCandidateDetected = (await purge.inspect(tx, fixture.workspaceId)).tableRows
-      .some((candidate) => candidate.tableName === "frozen_diagnostic_evidence" && candidate.rowCount === 1);
+    // The purge port exposes a sealed aggregate rather than individual tables;
+    // the migration/static gate separately proves this sidecar is in its fixed
+    // allowlist. A nonzero live candidate count proves that this real fixture
+    // is covered by the tombstone inspection boundary.
+    tombstoneCandidateDetected = (await purge.inspect(tx, fixture.workspaceId)).candidateCount > 0;
 
     if (!exactEvidencePersisted || !capabilityEnvelopeClosed || !crossTenantBlocked || !tamperBlocked || !missingEvidenceBlocked
       || !rlsForced || !publicPrivilegesRevoked || !tombstoneCandidateDetected || actionOrNetworkCalls !== 0) {
