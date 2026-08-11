@@ -120,7 +120,7 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
         {Object.entries(goalLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select></label>
       <label htmlFor="brief-market"><span>Pazar</span><select id="brief-market" value={draft.market} onChange={(event) => change("market", event.target.value as CampaignMarket)}>
-        <option value="domestic">Yurtiçi</option><option value="international">Uluslararası</option>
+        <option value="unknown">Henüz sınıflanmadı</option><option value="domestic">Yurtiçi</option><option value="international">Uluslararası</option>
       </select></label>
       <label htmlFor="brief-language"><span>Dil</span><select id="brief-language" value={draft.language ?? ""} onChange={(event) => change("language", event.target.value || null)}>
         <option value="">Seçilmedi</option><option value="tr">Türkçe</option><option value="en">İngilizce</option><option value="ar">Arapça</option>
@@ -149,7 +149,8 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
       <small>{sourceState === "ready" ? "Brief/timeline birleşimi yalnız bu doğrulanmış kaynakla açılır." : "Bu durum proposal, approval veya Meta write yetkisi vermez."}</small>
     </div>
     <div className={styles.briefPlan}>
-      <div><span>Önerilen şerit</span>{brief.campaignLanes.length ? brief.campaignLanes.map((lane) => <article key={lane.laneRef}><strong>{lane.sequence}. {lane.purpose}</strong><small>{lane.measurementBoundary}</small></article>) : <small>Önce sınıflandırma veya teslimat engeli çözülmeli.</small>}</div>
+      <div><span>Şablon ve kıyas sınırı</span><strong>{brief.variantRef ?? "Bağlam tamamlanınca seçilecek"}</strong><small>{brief.comparisonBoundary.summary}</small></div>
+      <div><span>Önerilen şerit</span>{brief.campaignLanes.length ? brief.campaignLanes.map((lane) => <article key={lane.laneRef}><strong>{lane.sequence}. {lane.purpose}</strong><small>{lane.measurementBoundary}</small></article>) : <small>Önce pazar/sınıflandırma veya teslimat engeli çözülmeli.</small>}</div>
       <div><span>İzlenecek sıra</span><ol>{brief.launchSequence.map((item) => <li key={item.step}><strong>{item.step}</strong><small>{item.reason}</small></li>)}</ol></div>
       <div><span>Ölçüm sınırı</span><strong>{brief.measurement.primaryOutcome}</strong><small>{brief.measurement.doNotCompareWith.join(" · ")} ile varsayılan olarak kıyaslama.</small></div>
     </div>

@@ -3,7 +3,7 @@
  * campaign writer. It turns a human-confirmed commercial intent into the
  * questions and review sequence needed before a campaign may be proposed.
  */
-export const INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION = "interactive-campaign-template/1.2.0" as const;
+export const INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION = "interactive-campaign-template/1.3.0" as const;
 
 export type CampaignBusinessGoal =
   | "lead_acquisition"
@@ -11,13 +11,22 @@ export type CampaignBusinessGoal =
   | "market_service_learning"
   | "continuity_recovery"
   | "classification_triage";
-export type CampaignMarket = "domestic" | "international";
+export type CampaignMarket = "domestic" | "international" | "unknown";
 export type ConversionRoute = "lead_form" | "whatsapp" | "landing_page" | "not_applicable" | "unknown";
 export type DeliveryHealth = "healthy" | "interrupted" | "unknown";
 export type ClassificationState = "classified" | "unclassified";
 export type CapacityState = "confirmed" | "constrained" | "unknown";
 export type CampaignTemplateRef =
   | "lead_acquisition"
+  | "upper_funnel_education"
+  | "market_service_learning"
+  | "continuity_recovery"
+  | "classification_triage";
+export type CampaignTemplateVariantRef =
+  | "domestic_form_lead"
+  | "domestic_whatsapp_lead"
+  | "international_form_lead"
+  | "international_whatsapp_lead"
   | "upper_funnel_education"
   | "market_service_learning"
   | "continuity_recovery"
@@ -39,6 +48,8 @@ export type InteractiveCampaignTemplateRequest = Readonly<{
 export type InteractiveCampaignBrief = Readonly<{
   version: typeof INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION;
   templateRef: CampaignTemplateRef;
+  /** Concrete reviewed operating variant; null until the minimum taxonomy is known. */
+  variantRef: CampaignTemplateVariantRef | null;
   readiness: "blocked" | "needs_input" | "ready_for_human_review";
   humanReviewRequired: true;
   classification: Readonly<{
@@ -51,7 +62,7 @@ export type InteractiveCampaignBrief = Readonly<{
   questions: readonly string[];
   /** The one deterministic prompt a chat or UI should ask next. */
   nextDecision: Readonly<{
-    field: "classification" | "deliveryHealth" | "language" | "serviceRef" | "countryOrRegion" | "conversionRoute" | "capacity" | "creativeReady";
+    field: "classification" | "deliveryHealth" | "market" | "language" | "serviceRef" | "countryOrRegion" | "conversionRoute" | "capacity" | "creativeReady";
     question: string;
     reason: string;
   }> | null;
@@ -82,6 +93,15 @@ export type InteractiveCampaignBrief = Readonly<{
   }>[];
   launchSequence: readonly Readonly<{ step: string; reason: string }> [];
   measurement: Readonly<{ primaryOutcome: string; doNotCompareWith: readonly string[] }>;
+  /**
+   * Explicitly prevents the Excel taxonomy's independent performance lanes
+   * (market/language/service/route) from being silently pooled.
+   */
+  comparisonBoundary: Readonly<{
+    cohortKey: string | null;
+    requiredDimensions: readonly ("market" | "language" | "service" | "countryOrRegion" | "businessGoal" | "conversionRoute")[];
+    summary: string;
+  }>;
   authority: Readonly<{
     canCreateCampaign: false;
     canPublish: false;
@@ -112,6 +132,10 @@ function nextDecision(input: InteractiveCampaignTemplateRequest, templateRef: Ca
   if (input.deliveryHealth === "interrupted") return Object.freeze({ field: "deliveryHealth",
     question: "Teslimat kesintisi bitti mi ve hesap tekrar sağlıklı mı?",
     reason: "Kesinti dönemiyle ölçekleme veya yeni kampanya kararı karıştırılmaz." });
+  if (input.deliveryHealth === "unknown") return Object.freeze({ field: "deliveryHealth",
+    question: "Teslimat sağlıklı mı, kesintili mi?", reason: "Teslimat durumu bilinmeden performans veya yeni şerit önerilmez." });
+  if (input.market === "unknown") return Object.freeze({ field: "market",
+    question: "Bu çalışma yurtiçi mi, uluslararası mı?", reason: "Yerli/yabancı pazarlar ve dilleri aynı kıyas veya varsayılan şeritte birleştirilmez." });
   if (!validText(input.language)) return Object.freeze({ field: "language", question: "Hangi dilde ilerleyeceğiz?",
     reason: "Pazar ve dil ayrı bir campaign lane tanımıdır." });
   if (input.serviceRef === null) return Object.freeze({ field: "serviceRef", question: "Hangi hizmet/ana grup için çalışıyoruz?",
@@ -125,6 +149,31 @@ function nextDecision(input: InteractiveCampaignTemplateRequest, templateRef: Ca
   if (!input.creativeReady) return Object.freeze({ field: "creativeReady", question: "İncelenebilir kreatif ve mesaj hazır mı?",
     reason: "Kampanya yapısı, kreatif varlık ve mesajdan bağımsız yayın planına dönüşmez." });
   return null;
+}
+
+function variantRef(input: InteractiveCampaignTemplateRequest, templateRef: CampaignTemplateRef): CampaignTemplateVariantRef | null {
+  if (templateRef === "classification_triage" || templateRef === "continuity_recovery") return templateRef;
+  if (input.market === "unknown" || input.deliveryHealth !== "healthy") return null;
+  if (templateRef === "upper_funnel_education") return "upper_funnel_education";
+  if (templateRef === "market_service_learning") return "market_service_learning";
+  if (input.conversionRoute === "lead_form") return input.market === "domestic" ? "domestic_form_lead" : "international_form_lead";
+  if (input.conversionRoute === "whatsapp") return input.market === "domestic" ? "domestic_whatsapp_lead" : "international_whatsapp_lead";
+  return null;
+}
+
+function comparisonBoundary(input: InteractiveCampaignTemplateRequest, templateRef: CampaignTemplateRef): InteractiveCampaignBrief["comparisonBoundary"] {
+  const requiredDimensions = Object.freeze(["market", "language", "service", "countryOrRegion", "businessGoal", "conversionRoute"] as const);
+  const language = input.language;
+  if (input.market === "unknown" || language === null || !validText(language) || input.serviceRef === null
+    || (input.market === "international" && !validText(input.countryOrRegion))
+    || (templateRef === "lead_acquisition" && !["lead_form", "whatsapp"].includes(input.conversionRoute))) {
+    return Object.freeze({ cohortKey: null, requiredDimensions,
+      summary: "Pazar, dil, hizmet ve dönüşüm yolu netleşmeden kıyas havuzu kurulmaz." });
+  }
+  const key = [input.market, language.trim().toLowerCase(), input.countryOrRegion?.trim().toLowerCase() ?? "domestic",
+    input.serviceRef, input.businessGoal, input.conversionRoute].join(":");
+  return Object.freeze({ cohortKey: key, requiredDimensions,
+    summary: "Yalnız aynı pazar, dil, hizmet, iş amacı ve dönüşüm yolundaki sonuçlarla kıyaslayın." });
 }
 
 function campaignLanes(input: InteractiveCampaignTemplateRequest, templateRef: CampaignTemplateRef): InteractiveCampaignBrief["campaignLanes"] {
@@ -177,7 +226,7 @@ function recommendation(
 function assertRequest(input: InteractiveCampaignTemplateRequest): void {
   if (!input || typeof input !== "object"
     || !["lead_acquisition", "upper_funnel_education", "market_service_learning", "continuity_recovery", "classification_triage"].includes(input.businessGoal)
-    || !["domestic", "international"].includes(input.market)
+    || !["domestic", "international", "unknown"].includes(input.market)
     || !["lead_form", "whatsapp", "landing_page", "not_applicable", "unknown"].includes(input.conversionRoute)
     || !["healthy", "interrupted", "unknown"].includes(input.deliveryHealth)
     || !["classified", "unclassified"].includes(input.classification)
@@ -204,22 +253,37 @@ export function createInteractiveCampaignBrief(input: InteractiveCampaignTemplat
   if (templateRef === "classification_triage") {
     question("Kampanyayı pazar, dil, hizmet, iş amacı ve dönüşüm yoluna bağlayın.", questions);
     const lanes = campaignLanes(input, templateRef);
-    return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef, readiness: "blocked",
+    return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef, variantRef: variantRef(input, templateRef), readiness: "blocked",
       humanReviewRequired: true, classification: Object.freeze({ market: input.market, language: input.language,
         serviceRef: input.serviceRef, countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }),
       questions: Object.freeze(questions), nextDecision: nextDecision(input, templateRef), campaignLanes: lanes, recommendation: recommendation(input, templateRef, "blocked", lanes), launchSequence: Object.freeze([{ step: "Sınıflandırmayı doğrula", reason: "Sınıflandırılmamış kampanya ölçekleme veya kıyas için güvenilir değildir." }]),
-      measurement: Object.freeze({ primaryOutcome: "Sınıflandırma tamamlanması", doNotCompareWith: Object.freeze(["lead CPL", "üst huni erişimi"]) }), authority: AUTHORITY });
+      measurement: Object.freeze({ primaryOutcome: "Sınıflandırma tamamlanması", doNotCompareWith: Object.freeze(["lead CPL", "üst huni erişimi"]) }), comparisonBoundary: comparisonBoundary(input, templateRef), authority: AUTHORITY });
   }
   if (templateRef === "continuity_recovery") {
     question("Teslimat kesintisinin bitişini ve hesap sağlığını doğrulayın.", questions);
     question("Toparlanma penceresi bitmeden performans hükmü vermeyin.", questions);
     const lanes = campaignLanes(input, templateRef);
-    return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef, readiness: "blocked",
+    return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef, variantRef: variantRef(input, templateRef), readiness: "blocked",
       humanReviewRequired: true, classification: Object.freeze({ market: input.market, language: input.language,
         serviceRef: input.serviceRef, countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }),
       questions: Object.freeze(questions), nextDecision: nextDecision(input, templateRef), campaignLanes: lanes, recommendation: recommendation(input, templateRef, "blocked", lanes), launchSequence: Object.freeze([{ step: "Teslimatı geri doğrula", reason: "Kesinti günleri performans sinyalini yanıltabilir." },
         { step: "Yeni öğrenme penceresi aç", reason: "Toparlanma sonrası ölçüm, kesinti öncesi ve sırası sonuçlarından ayrılmalıdır." }]),
-      measurement: Object.freeze({ primaryOutcome: "Sağlıklı teslimat sürekliliği", doNotCompareWith: Object.freeze(["kesinti günü CPL", "kesinti günü erişim"]) }), authority: AUTHORITY });
+      measurement: Object.freeze({ primaryOutcome: "Sağlıklı teslimat sürekliliği", doNotCompareWith: Object.freeze(["kesinti günü CPL", "kesinti günü erişim"]) }), comparisonBoundary: comparisonBoundary(input, templateRef), authority: AUTHORITY });
+  }
+
+  if (input.deliveryHealth === "unknown" || input.market === "unknown") {
+    const reason = input.deliveryHealth === "unknown"
+      ? "Teslimat sağlığı belirsiz; kesinti ile performans sinyali ayrıştırılmadan şerit önerilmez."
+      : "Pazar belirsiz; yerli/yabancı, dil ve route kıyas sınırı kurulmadan şerit önerilmez.";
+    question(input.deliveryHealth === "unknown" ? "Teslimat sağlığını doğrulayın." : "Pazarı yurtiçi veya uluslararası olarak doğrulayın.", questions);
+    const lanes = Object.freeze([]) as InteractiveCampaignBrief["campaignLanes"];
+    return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef, variantRef: null, readiness: "needs_input",
+      humanReviewRequired: true, classification: Object.freeze({ market: input.market, language: input.language, serviceRef: input.serviceRef,
+        countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }), questions: Object.freeze(questions), nextDecision: nextDecision(input, templateRef), campaignLanes: lanes,
+      recommendation: Object.freeze({ status: "needs_input", kind: "complete_brief", headline: "Önce pazar ve teslimat bağlamını doğrulayın", rationale: reason,
+        nextStep: "Bir sonraki kararı tamamlayın; sistem şerit, bütçe veya yayın önerisi üretmez.", laneRefs: Object.freeze([]) }),
+      launchSequence: Object.freeze([{ step: "Bağlamı doğrula", reason }]), measurement: Object.freeze({ primaryOutcome: "Bağlam doğrulaması", doNotCompareWith: Object.freeze(["lead CPL", "üst huni erişimi"]) }),
+      comparisonBoundary: comparisonBoundary(input, templateRef), authority: AUTHORITY });
   }
 
   if (missingCore) question("Dil ve hizmet sınıflandırmasını doğrulayın.", questions);
@@ -247,11 +311,12 @@ export function createInteractiveCampaignBrief(input: InteractiveCampaignTemplat
       : [{ step: "Hipotezi yaz", reason: "Yeni pazar/hizmet deneyi tek bir öğrenme sorusuna bağlanır." },
         { step: "İnsan incelemeli küçük test taslağı oluştur", reason: "Bütçe veya yayın önerisi otomatik üretilmez." }];
   const lanes = campaignLanes(input, templateRef);
-  return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef,
+  return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef, variantRef: variantRef(input, templateRef),
     readiness: ready ? "ready_for_human_review" : "needs_input", humanReviewRequired: true,
     classification: Object.freeze({ market: input.market, language: input.language, serviceRef: input.serviceRef,
       countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }), questions: Object.freeze(questions),
     nextDecision: nextDecision(input, templateRef), campaignLanes: lanes, recommendation: recommendation(input, templateRef, ready ? "ready_for_human_review" : "needs_input", lanes),
     launchSequence: Object.freeze(sequence), measurement: Object.freeze({ primaryOutcome,
-      doNotCompareWith: Object.freeze(templateRef === "lead_acquisition" ? ["üst huni erişimi", "farklı dönüşüm yolu"] : ["lead CPL"]) }), authority: AUTHORITY });
+      doNotCompareWith: Object.freeze(templateRef === "lead_acquisition" ? ["üst huni erişimi", "farklı dönüşüm yolu"] : ["lead CPL"]) }),
+    comparisonBoundary: comparisonBoundary(input, templateRef), authority: AUTHORITY });
 }

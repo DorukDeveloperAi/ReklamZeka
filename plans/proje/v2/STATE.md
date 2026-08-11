@@ -376,6 +376,23 @@
   false'tur. Bu root için unit/build/architecture/security-boundary kanıtı vardır; credential-backed
   ad-level outer-rollback source acceptance ile Decision Room finding bağlama hâlâ açık kalır.
 
+## 2026-08-11 — Campaign planning taxonomy v1.3
+
+- `outputs/campaign_budget_tracker_20260810/kampanya_butce_harcama_takip_kesinti_analizli.xlsx`
+  incelendi: karar eksenleri pazar → dil → iş amacı → ana grup/hizmet → dönüşüm yolu; yerli/yabancı
+  ve form/WhatsApp lead'leri ayrı toplam ve CPL havuzlarında tutuluyor. Ödeme/teslimat kesintisi
+  adayları ayrıca performans ölçekleme kararından ayrıştırılıyor.
+- Interactive brief artık bu eksenleri machine-readable `variantRef` ve `comparisonBoundary` ile
+  taşır. Domestic/international × form/WhatsApp lead varyantları ayrı cohort key üretir; pazar veya
+  teslimat sağlığı `unknown` ise lane üretmez, kıyas anahtarı `null` kalır ve yalnız sonraki insan
+  kararını ister. Recovery/triage blokları önceliklidir; create/publish/approve/execute/Meta-write
+  yetkileri false kalır.
+- Bu yalnız client-side proposal-only planlama yardımıdır: Excel'den otomatik kampanya, bütçe veya
+  performans hükmü üretilmez; persisted context'ten semantic market/delivery inference da yapılmaz.
+- Local dashboard browser acceptance: domestic WhatsApp varyantı görünür; `market=unknown` veya
+  `deliveryHealth=unknown` seçimi next-decision'a döner, lane ve variant üretmez ve tüm write
+  kapasitelerini kapalı tutar.
+
 ## 2026-08-11 — A07 field-pilot source coverage census
 
 - Yeni read-only `census:field-pilot-source-db` REPEATABLE READ altında yalnız aggregate workspace/account

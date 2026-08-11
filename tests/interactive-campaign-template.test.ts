@@ -11,6 +11,8 @@ describe("interactive campaign template", () => {
     expect(brief).toMatchObject({ templateRef: "lead_acquisition", readiness: "ready_for_human_review", humanReviewRequired: true,
       measurement: { primaryOutcome: "Nitelikli form talebi" }, authority: { canCreateCampaign: false, canWriteMeta: false } });
     expect(brief.measurement.doNotCompareWith).toContain("farklı dönüşüm yolu");
+    expect(brief.variantRef).toBe("domestic_form_lead");
+    expect(brief.comparisonBoundary.cohortKey).toBe("domestic:tr:domestic:service_medical_aesthetics:lead_acquisition:lead_form");
     expect(brief.nextDecision).toBeNull();
     expect(brief.campaignLanes).toEqual([expect.objectContaining({ laneRef: "conversion_lane", sequence: 1, route: "lead_form" })]);
     expect(brief.recommendation).toMatchObject({ status: "ready_for_human_review", kind: "review_campaign_structure", laneRefs: ["conversion_lane"] });
@@ -44,5 +46,23 @@ describe("interactive campaign template", () => {
     expect(brief).toMatchObject({ readiness: "needs_input", nextDecision: { field: "capacity" } });
     expect(brief.campaignLanes).toEqual([expect.objectContaining({ laneRef: "learning_lane", sequence: 1 })]);
     expect(brief.authority).toMatchObject({ canCreateCampaign: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false });
+  });
+
+  it("does not invent a market or delivery lane, and gives those answers priority after classification", () => {
+    const marketUnknown = createInteractiveCampaignBrief({ ...base, market: "unknown" });
+    expect(marketUnknown).toMatchObject({ readiness: "needs_input", variantRef: null, nextDecision: { field: "market" } });
+    expect(marketUnknown.campaignLanes).toEqual([]);
+    expect(marketUnknown.comparisonBoundary.cohortKey).toBeNull();
+
+    const deliveryUnknown = createInteractiveCampaignBrief({ ...base, deliveryHealth: "unknown" });
+    expect(deliveryUnknown).toMatchObject({ readiness: "needs_input", variantRef: null, nextDecision: { field: "deliveryHealth" } });
+    expect(deliveryUnknown.campaignLanes).toEqual([]);
+  });
+
+  it("keeps domestic/international and form/WhatsApp variants in distinct comparison boundaries", () => {
+    const internationalWhatsApp = createInteractiveCampaignBrief({ ...base, market: "international", language: "ar", countryOrRegion: "GCC", conversionRoute: "whatsapp" });
+    expect(internationalWhatsApp.variantRef).toBe("international_whatsapp_lead");
+    expect(internationalWhatsApp.comparisonBoundary.cohortKey).toBe("international:ar:gcc:service_medical_aesthetics:lead_acquisition:whatsapp");
+    expect(internationalWhatsApp.comparisonBoundary.summary).toContain("Yalnız aynı pazar");
   });
 });
