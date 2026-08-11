@@ -12,8 +12,8 @@ import { GuidanceStudioPanel } from "./guidance-studio-panel";
 import { CategoryInventoryPanel } from "./category-inventory-panel";
 import { InstructionPolicyStudioPanel } from "./instruction-policy-studio-panel";
 import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel";
-import { CampaignPlanningBriefPanel, type CampaignPlanningBriefContext } from "./campaign-planning-brief-panel";
-import { offlineWorkbookPortfolioSnapshot } from "@/domain/campaigns/offline-workbook-portfolio-snapshot";
+import { CampaignPlanningBriefPanel, type CampaignBriefScenarioRef, type CampaignPlanningBriefContext } from "./campaign-planning-brief-panel";
+import { offlineWorkbookPortfolioSnapshot, type OfflineWorkbookBriefScenarioRef } from "@/domain/campaigns/offline-workbook-portfolio-snapshot";
 import styles from "./operating-dashboard.module.css";
 
 export type OperatingDashboardModel = Readonly<{
@@ -273,6 +273,7 @@ export function approvalQueueScopeAfterCampaignSelection(
 export function OperatingDashboard({ model, initialView = "today" }: { model: OperatingDashboardModel; initialView?: DashboardViewId }) {
   const [activeView, setActiveView] = useState<ViewId>(initialView);
   const [selectedCampaign, setSelectedCampaign] = useState<string>(campaigns[0].id);
+  const [workbookBriefScenario, setWorkbookBriefScenario] = useState<CampaignBriefScenarioRef>("");
   const [portfolioFilters, setPortfolioFilters] = useState<PortfolioFilters>({ objective: "all", category: "all" });
   const [approvalQueueCampaignRef, setApprovalQueueCampaignRef] = useState<string | null>(null);
   const [persistedContexts, setPersistedContexts] = useState<readonly PersistedCampaignContextSummary[]>([]);
@@ -418,6 +419,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
     setApprovalQueueCampaignRef((current) => approvalQueueScopeAfterCampaignSelection(selectedCampaign, campaignId, current));
     setSelectedCampaign(campaignId);
     setSelectedPersistedCampaignRef(null);
+    setWorkbookBriefScenario("");
   }
 
   function changePortfolioFilter(key: keyof PortfolioFilters, value: string) {
@@ -502,7 +504,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
         <p>Kaynak: {offlineWorkbookPortfolioSnapshot.source} · {formatMetaTime(offlineWorkbookPortfolioSnapshot.capturedAt)}. Bu özet yalnız sınıflandırma ve brief senaryolarına yön verir; güncel KPI, approval veya Meta yetkisi değildir.</p>
         <div className={styles.contextGrid}><div><span>Kampanya</span><strong>{offlineWorkbookPortfolioSnapshot.totals.campaigns}</strong><small>tarihli workbook kapsamı</small></div><div><span>Harcama</span><strong>{new Intl.NumberFormat("tr-TR", { style: "currency", currency: offlineWorkbookPortfolioSnapshot.currency, maximumFractionDigits: 0 }).format(offlineWorkbookPortfolioSnapshot.totals.spend)}</strong><small>yalnız bu tarihli dönem</small></div><div><span>Toplam lead</span><strong>{new Intl.NumberFormat("tr-TR").format(offlineWorkbookPortfolioSnapshot.totals.leads)}</strong><small>form ve WhatsApp ayrı tutulur</small></div><div><span>Kesinti kuralı</span><strong>Önce teslimatı doğrula</strong><small>Kesinti penceresinde performans hükmü yok</small></div></div>
         <div className={styles.campaignTable} role="table" aria-label="Çalışma kitabı pazar ve dönüşüm şeritleri"><div className={styles.tableHead} role="row"><span>Pazar</span><span>Kampanya</span><span>Lead</span><span>Form</span><span>WhatsApp</span><span>Sınır</span></div>{offlineWorkbookPortfolioSnapshot.markets.map((market) => <div className={styles.tableRow} role="row" key={market.market}><span><strong>{market.market}</strong></span><span>{market.campaigns}</span><span>{market.leads}</span><span>{market.formLeads}</span><span>{market.whatsappLeads}</span><span>Diğer pazar veya rota ile varsayılan kıyas yok</span></div>)}</div>
-        <p>{offlineWorkbookPortfolioSnapshot.lanes.map((lane) => `${lane.label} (${lane.leads} lead)`).join(" · ")}. Bu şeritler brief içindeki pazar/dil/hizmet/rota seçimleriyle ayrı kalır.</p>
+        <div className={styles.decisionList}>{offlineWorkbookPortfolioSnapshot.lanes.map((lane) => <article className={styles.decisionRow} key={lane.label}><div className={styles.decisionBody}><div><StatusPill tone="neutral">Offline şerit</StatusPill><span>{lane.market} · {lane.language} · {lane.route}</span></div><h3>{lane.label}</h3><p>{lane.service} · {lane.leads} tarihli lead. Bu yalnız başlangıç sınıflandırmasıdır.</p></div><div className={styles.decisionAction}><button type="button" onClick={() => setWorkbookBriefScenario(lane.briefScenarioRef as OfflineWorkbookBriefScenarioRef)}>Brief'te aç</button></div></article>)}</div>
       </section>
       <section className={styles.portfolioOverview} aria-labelledby="portfolio-overview-title">
         <header><div><span className={styles.kicker}>BUGÜN / PORTFÖY HİYERARŞİSİ</span><h2 id="portfolio-overview-title">Demo Marka <i>→</i> Meta portföyü <i>→</i> {filteredCampaigns.length} görünür kampanya</h2><p>Filtreler yalnız bu demo/read-only snapshot'ı daraltır; account, category veya Meta yetkisi değiştirmez.</p></div><StatusPill tone="neutral">unbound demo context</StatusPill></header>
@@ -548,6 +550,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       </div>
       <CampaignPlanningBriefPanel
         context={planningContext}
+        initialScenarioRef={workbookBriefScenario}
         onApprovalQueueCampaignRef={setApprovalQueueCampaignRef}
         onOpenDraftOnlyPolicy={(template) => { setDraftPolicyTemplate(template); navigate("strict-policies"); }}
       />

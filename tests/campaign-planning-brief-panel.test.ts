@@ -46,6 +46,16 @@ describe("campaign planning brief panel", () => {
     expect(html).not.toContain("Meta transport");
   });
 
+  it("can begin from an offline workbook scenario without creating a persisted campaign instruction", () => {
+    const html = renderToStaticMarkup(createElement(CampaignPlanningBriefPanel, {
+      context: gccContext,
+      initialScenarioRef: "international_ru_form",
+    }));
+    expect(html).toContain("Uluslararası · RU form · FTR");
+    expect(html).toContain("Nitelikli form talebi");
+    expect(html).toContain("campaign create / publish / approval / execute / Meta write: kapalı");
+  });
+
   it("offers workbook-derived scenarios without joining their comparison lanes", () => {
     expect(campaignBriefScenario("international_ar_whatsapp")).toMatchObject({ label: "Uluslararası · AR WhatsApp · FTR",
       input: { market: "international", language: "ar", conversionRoute: "whatsapp", serviceRef: "service_physical_therapy_rehab" } });

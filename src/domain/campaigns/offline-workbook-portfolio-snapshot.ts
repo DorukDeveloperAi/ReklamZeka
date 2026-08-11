@@ -4,6 +4,7 @@
  * the dashboard must show its capture boundary alongside every use.
  */
 export const OFFLINE_WORKBOOK_PORTFOLIO_SNAPSHOT_VERSION = "offline-workbook-portfolio/1.0.0" as const;
+export type OfflineWorkbookBriefScenarioRef = "international_ar_whatsapp" | "international_ru_form" | "domestic_form_lead";
 
 export const offlineWorkbookPortfolioSnapshot = Object.freeze({
   version: OFFLINE_WORKBOOK_PORTFOLIO_SNAPSHOT_VERSION,
@@ -17,9 +18,9 @@ export const offlineWorkbookPortfolioSnapshot = Object.freeze({
     Object.freeze({ market: "Yabancı", campaigns: 5, spend: 1_308_832.81, leads: 1_282, formLeads: 501, whatsappLeads: 781 }),
   ]),
   lanes: Object.freeze([
-    Object.freeze({ label: "AR · WhatsApp · FTR", market: "Yabancı", language: "AR", route: "whatsapp", service: "Fizik tedavi / rehabilitasyon", leads: 717 }),
-    Object.freeze({ label: "RU · Form · FTR", market: "Yabancı", language: "RU", route: "lead_form", service: "Fizik tedavi / rehabilitasyon", leads: 392 }),
-    Object.freeze({ label: "TR · Form · Doğum", market: "Yerli", language: "TR", route: "lead_form", service: "Doğum kampanyası", leads: 613 }),
+    Object.freeze({ label: "AR · WhatsApp · FTR", market: "Yabancı", language: "AR", route: "whatsapp", service: "Fizik tedavi / rehabilitasyon", leads: 717, briefScenarioRef: "international_ar_whatsapp" as const }),
+    Object.freeze({ label: "RU · Form · FTR", market: "Yabancı", language: "RU", route: "lead_form", service: "Fizik tedavi / rehabilitasyon", leads: 392, briefScenarioRef: "international_ru_form" as const }),
+    Object.freeze({ label: "TR · Form · Doğum", market: "Yerli", language: "TR", route: "lead_form", service: "Doğum kampanyası", leads: 613, briefScenarioRef: "domestic_form_lead" as const }),
   ]),
   interruptionRule: "Ani harcama çöküşü önce teslimat kesintisi olarak doğrulanır; o pencerede performans hükmü verilmez.",
 });

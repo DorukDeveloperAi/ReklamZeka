@@ -235,13 +235,14 @@ export function campaignBriefScenario(ref: CampaignBriefScenarioRef): CampaignBr
  * can explore an operating pattern without creating a campaign, proposal or
  * approval record.
  */
-function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef, onOpenDraftOnlyPolicy }: Readonly<{
+function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onApprovalQueueCampaignRef, onOpenDraftOnlyPolicy }: Readonly<{
   context: CampaignPlanningBriefContext;
+  initialScenarioRef: CampaignBriefScenarioRef;
   onApprovalQueueCampaignRef?: (campaignRef: string | null) => void;
   onOpenDraftOnlyPolicy?: (template: Exclude<CampaignIntentTemplateRef, "">) => void;
 }>) {
-  const [draft, setDraft] = useState<BriefDraft>(() => Object.freeze({ ...context.input }));
-  const [scenarioRef, setScenarioRef] = useState<CampaignBriefScenarioRef>("");
+  const [draft, setDraft] = useState<BriefDraft>(() => Object.freeze({ ...(campaignBriefScenario(initialScenarioRef)?.input ?? context.input) }));
+  const [scenarioRef, setScenarioRef] = useState<CampaignBriefScenarioRef>(initialScenarioRef);
   const [sourceState, setSourceState] = useState<"unbound" | "loading" | "empty" | "ready" | "unavailable">("unbound");
   const [persistedHint, setPersistedHint] = useState<PersistedCampaignPlanningHint | null>(null);
   const [approvalQueueCampaignRef, setApprovalQueueCampaignRef] = useState<string | null>(null);
@@ -379,10 +380,12 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
   </section>;
 }
 
-export function CampaignPlanningBriefPanel({ context = DEFAULT_CONTEXT, onApprovalQueueCampaignRef, onOpenDraftOnlyPolicy }: Readonly<{
+export function CampaignPlanningBriefPanel({ context = DEFAULT_CONTEXT, initialScenarioRef = "", onApprovalQueueCampaignRef, onOpenDraftOnlyPolicy }: Readonly<{
   context?: CampaignPlanningBriefContext;
+  /** An offline workbook lane can choose only a temporary planning start. */
+  initialScenarioRef?: CampaignBriefScenarioRef;
   onApprovalQueueCampaignRef?: (campaignRef: string | null) => void;
   onOpenDraftOnlyPolicy?: (template: Exclude<CampaignIntentTemplateRef, "">) => void;
 }>) {
-  return <CampaignPlanningBriefPanelContent key={context.campaignRef} context={context} onApprovalQueueCampaignRef={onApprovalQueueCampaignRef} onOpenDraftOnlyPolicy={onOpenDraftOnlyPolicy} />;
+  return <CampaignPlanningBriefPanelContent key={`${context.campaignRef}:${initialScenarioRef}`} context={context} initialScenarioRef={initialScenarioRef} onApprovalQueueCampaignRef={onApprovalQueueCampaignRef} onOpenDraftOnlyPolicy={onOpenDraftOnlyPolicy} />;
 }

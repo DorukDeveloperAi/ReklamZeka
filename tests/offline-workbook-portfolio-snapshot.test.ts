@@ -15,8 +15,8 @@ describe("offline workbook portfolio snapshot", () => {
       expect.objectContaining({ market: "Yabancı", formLeads: 501, whatsappLeads: 781 }),
     ]);
     expect(offlineWorkbookPortfolioSnapshot.lanes).toEqual(expect.arrayContaining([
-      expect.objectContaining({ language: "AR", route: "whatsapp" }),
-      expect.objectContaining({ language: "RU", route: "lead_form" }),
+      expect.objectContaining({ language: "AR", route: "whatsapp", briefScenarioRef: "international_ar_whatsapp" }),
+      expect.objectContaining({ language: "RU", route: "lead_form", briefScenarioRef: "international_ru_form" }),
     ]));
   });
 });

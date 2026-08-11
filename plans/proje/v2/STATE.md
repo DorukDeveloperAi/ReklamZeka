@@ -56,6 +56,10 @@
 - Snapshot Meta mirror, live KPI, Approval Queue veya kalıcı kaynak değildir. Kesinti kuralı görünür
   biçimde "önce teslimatı doğrula"dır; form ve WhatsApp sonuçları birleştirilmez. Browser kabulünde
   offline etiketi, iki rota şeridi, kesinti sınırı ve sıfır console uyarısı doğrulandı.
+- Her offline şerit `Brief'te aç` ile yalnız ilgili geçici başlangıç senaryosuna bağlanır. Örneğin
+  AR WhatsApp FTR seçimi kısa ömürlü briefte uluslararası/Arapça/FTR/WhatsApp alanlarını açar;
+  persisted campaign bağlamı, proposal, approval veya Meta write oluşturmaz. Browser bu geçişi ve
+  kapalı yetki sınırını doğruladı.
 
 ## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
 

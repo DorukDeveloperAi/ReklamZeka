@@ -309,6 +309,9 @@
   - [x] Kullanıcıdan gelen tarihli çalışma kitabı, canlı Meta mirror'dan ayrı açık bir offline portföy
     snapshotı olarak görünür; pazar/dil/rota ayrımı ve kesinti sınırı brief başlangıç bağlamına
     taşınır, KPI/approval/Meta-write iddiasına dönüşmez.
+  - [x] Offline portföy şeridi, yalnız eşleştirilmiş geçici brief senaryosunu açar; kullanıcı
+    değişikliği veya context seçimiyle senaryo etiketi sıfırlanır ve hiçbir kalıcı kampanya/policy
+    state'i taşınmaz.
 - [ ] Meta config + çoklu internal category + policy composition.
   - [x] A10.4a immutable/replay-safe `meta-analysis-config-snapshot/2.0.0`: reviewed
     campaign objective ve ad-set optimization-goal mapping sürümleri hash'e freeze edilir;
