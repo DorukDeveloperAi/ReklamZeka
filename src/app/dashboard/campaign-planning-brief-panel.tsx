@@ -224,9 +224,10 @@ export function campaignBriefScenario(ref: CampaignBriefScenarioRef): CampaignBr
  * can explore an operating pattern without creating a campaign, proposal or
  * approval record.
  */
-function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef }: Readonly<{
+function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef, onOpenDraftOnlyPolicy }: Readonly<{
   context: CampaignPlanningBriefContext;
   onApprovalQueueCampaignRef?: (campaignRef: string | null) => void;
+  onOpenDraftOnlyPolicy?: () => void;
 }>) {
   const [draft, setDraft] = useState<BriefDraft>(() => Object.freeze({ ...context.input }));
   const [scenarioRef, setScenarioRef] = useState<CampaignBriefScenarioRef>("");
@@ -360,13 +361,17 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
       <div><span>İzlenecek sıra</span><ol>{brief.launchSequence.map((item) => <li key={item.step}><strong>{item.step}</strong><small>{item.reason}</small></li>)}</ol></div>
       <div><span>Ölçüm sınırı</span><strong>{brief.measurement.primaryOutcome}</strong><small>{brief.measurement.doNotCompareWith.join(" · ")} ile varsayılan olarak kıyaslama.</small></div>
     </div>
-    <footer><span>Salt taslak/öneri · campaign create / publish / approval / execute / Meta write: kapalı</span><button type="button" onClick={() => { setScenarioRef(""); setDraft(Object.freeze({ ...context.input })); }}>Bağlamı geri yükle</button></footer>
+    <footer><span>Salt taslak/öneri · campaign create / publish / approval / execute / Meta write: kapalı</span><div>
+      {onOpenDraftOnlyPolicy ? <button type="button" onClick={onOpenDraftOnlyPolicy}>Taslak talimat alanını aç</button> : null}
+      <button type="button" onClick={() => { setScenarioRef(""); setDraft(Object.freeze({ ...context.input })); }}>Bağlamı geri yükle</button>
+    </div></footer>
   </section>;
 }
 
-export function CampaignPlanningBriefPanel({ context = DEFAULT_CONTEXT, onApprovalQueueCampaignRef }: Readonly<{
+export function CampaignPlanningBriefPanel({ context = DEFAULT_CONTEXT, onApprovalQueueCampaignRef, onOpenDraftOnlyPolicy }: Readonly<{
   context?: CampaignPlanningBriefContext;
   onApprovalQueueCampaignRef?: (campaignRef: string | null) => void;
+  onOpenDraftOnlyPolicy?: () => void;
 }>) {
-  return <CampaignPlanningBriefPanelContent key={context.campaignRef} context={context} onApprovalQueueCampaignRef={onApprovalQueueCampaignRef} />;
+  return <CampaignPlanningBriefPanelContent key={context.campaignRef} context={context} onApprovalQueueCampaignRef={onApprovalQueueCampaignRef} onOpenDraftOnlyPolicy={onOpenDraftOnlyPolicy} />;
 }

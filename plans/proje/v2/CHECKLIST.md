@@ -726,6 +726,9 @@
       doğrulanmış alias'ı inbox'a aktarır ve campaign değişiminde eski scope'u temizler. Hedefli testler
       ve tam kalite kapıları geçti; gerçek persisted context bulunmadığından canlı semantic birleşim kabulü
       bu işaretle tamamlanmış sayılmaz.
+    - [x] Brief'ten draft-only normalizasyon alanına açık kullanıcı geçişi: yalnız dashboard
+      navigasyonu yapar; campaign/brief state'i ya da policy/source ref'i aktarmadan Guidance
+      zinciri ve structured niyetin ayrı insan doğrulamasını korur.
   - [ ] Brief, öneri, approval ve execution-safety durumunu aynı salt-okunur zaman çizelgesinde gösterme.
     - [x] Exact, tenant-bound keyset ActionUnit filtresi: opaque `entityRef` veya onunla aynı istekte
       kullanılamayan `campaignRef` database içinde yeniden çözülür. Campaign filtresi direct campaign ile

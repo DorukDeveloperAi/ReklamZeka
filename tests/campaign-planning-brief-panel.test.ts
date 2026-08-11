@@ -57,6 +57,15 @@ describe("campaign planning brief panel", () => {
     expect(html).toContain("Uluslararası · RU form · FTR");
   });
 
+  it("offers an explicit draft-only handoff without transferring campaign state", () => {
+    const html = renderToStaticMarkup(createElement(CampaignPlanningBriefPanel, {
+      context: gccContext,
+      onOpenDraftOnlyPolicy: () => undefined,
+    }));
+    expect(html).toContain("Taslak talimat alanını aç");
+    expect(html).toContain("campaign create / publish / approval / execute / Meta write: kapalı");
+  });
+
   it("only projects a campaign-matching, read-only approval list into the decision timeline", () => {
     const campaignRef = "entity_abcdef0123456789";
     const response = {

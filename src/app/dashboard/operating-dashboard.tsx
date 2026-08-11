@@ -513,7 +513,11 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
           <div className={styles.copyPreview}><span className={styles.kicker}>YAYINDAKİ REKLAM METNİ</span><h3>Saç ekimi hakkında merak ettiklerinizi uzman ekibimize sorun.</h3><p>Primary text · CTA: WhatsApp'tan mesaj gönder · Instagram post bağlı</p><footer><StatusPill tone="info">Mevcut creative</StatusPill><button>Performansını incele</button></footer></div>
         </section>
       </div>
-      <CampaignPlanningBriefPanel context={planningContext} onApprovalQueueCampaignRef={setApprovalQueueCampaignRef} />
+      <CampaignPlanningBriefPanel
+        context={planningContext}
+        onApprovalQueueCampaignRef={setApprovalQueueCampaignRef}
+        onOpenDraftOnlyPolicy={() => navigate("strict-policies")}
+      />
     </>;
   }
 

@@ -27,6 +27,11 @@
   AR WhatsApp ve RU form FTR, yerli üst huni içerik/gönderi ve kesinti sonrası toparlama. Seçim yalnız
   geçici brief girdisini değiştirir; form/WhatsApp veya yerli/yabancı havuzlarını birleştirmez ve
   campaign create/publish/approval/execute/Meta write başlatmaz.
+- Brief'ten **Taslak talimat alanını aç** geçişi, kampanya planı ile normalizasyon çalışma alanını
+  tek operatör akışında bağlar. Geçiş yalnız dashboard görünümünü değiştirir: campaign/brief state'i,
+  source ref'i veya policy verisi aktarılmaz; kullanıcı Guidance zincirini ve yapılandırılmış niyeti
+  ayrı ayrı doğrular. Böylece görünür devam adımı vardır, fakat otomatik policy/publish/approval/action
+  veya Meta write anlamı yüklenmez.
 
 ## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
 
