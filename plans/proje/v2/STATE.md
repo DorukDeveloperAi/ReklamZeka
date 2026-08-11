@@ -249,6 +249,16 @@
   snapshot/definition/window repository ve PostgreSQL acceptance açık kalır. Böylece
   config drift veya fatigue finding'i bu contract tek başına üretmez.
 
+## 2026-08-11 — A10.5c current mirror creative config reader
+
+- Server-private `DrizzleCreativeDiagnosticSourceRepository`, active tenant/account/ad hierarchy,
+  exact current ad→creative binding ve source hashes üzerinden direct config snapshot üretir. Binding
+  ambiguity fail-closed; billing/destination gibi absent mirror alanları explicit unknown kalır;
+  destination opaque digest/ref dışında taşınmaz.
+- Okuyucu current read-only projection'dır. Immutable config/window snapshot tabloları, definition
+  lifecycle, invalidation ve PostgreSQL verifier henüz açık olduğundan hiçbir diagnostic asset veya
+  Decision Room finding'i yazmaz.
+
 ## 2026-08-11 — A07 field-pilot source coverage census
 
 - Yeni read-only `census:field-pilot-source-db` REPEATABLE READ altında yalnız aggregate workspace/account
