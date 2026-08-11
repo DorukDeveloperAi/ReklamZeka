@@ -568,6 +568,13 @@
   Impact reader, sidecar zorunluluğunu mevcut frozen contextlere uygular; context yoksa doğrulanmış
   relational binding'i sahte bozukluk saymaz. Cross-tenant görünürlük, RLS/revoke, append-only guard,
   network/action sıfır ve rollback sonrası sıfır kalıntı yine kanıtlandı.
+- 2026-08-11 tekrar kabulünde canlı katalog, `frozen_diagnostic_evidence.capabilities` ve
+  `creative_fatigue_config_diagnostic_assets.capabilities` alanlarının policy dependency manifestinde
+  eksik olduğunu ortaya çıkardı. İki alan immutable/opaque historical evidence olarak sınıflandırıldı;
+  manifest testleri artık schema satırındaki **tüm** JSONB alanlarını tarıyor. Bunun ardından gerçek
+  PostgreSQL verifier yeniden `completeExactFixture:true` döndü: ilk publish impact-OCC ile geçiyor,
+  authority bağlanmadan sonraki mutation `trusted_authority_catalog` partial/blocked kalıyor, bağlar
+  materialize edilince beş aile tekrar exact oluyor. Network/action 0 ve outer rollback kalıntısızdır.
 - Browser/session kabulü ayrı açık çevresel kapıdır. G4/A13, HTTP/MCP/UI write yüzeyi veya Meta write
   eklenmedi.
 
@@ -732,10 +739,9 @@
 - Canlı çalışma, impact SQL'indeki iki parantez hatasını ve `policy_contexts` CTE'sindeki eksik
   `ad_account_id` seçimini; pending sidecar migration'daki composite parent unique anahtar eksikliğini
   ortaya çıkardı. Düzeltilmiş migration, yerel Drizzle migrator ile başarıyla uygulandı.
-- Bu **complete-positive acceptance değildir**: account-group, topic ve policy-semantic revisions için
-  server-private materialization writer yoktur. Verifier bu veriyi sentetik SQL ile üretmez;
-  `completeExactFixture:false` ve açık writer bağımlılığını raporlar. Browser/session kabulü de açık
-  çevresel kabul noktası olarak kalır.
+- Bu artık **complete-positive acceptance**tır: account-group, topic ve policy-semantic revisions
+  server-private lifecycle yazarlarıyla üretildi; verifier sentetik authority satırı kullanmadan
+  `completeExactFixture:true` raporladı. Browser/session kabulü ayrı açık çevresel kabul noktası olarak kalır.
 
 ## 2026-08-11 — A09.4a transaction-local authoritative G3 evidence bridge
 

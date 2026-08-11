@@ -39,6 +39,8 @@ const opaquePolicyContext = new Set([
   "meta_creative_config_snapshots.config_payload",
   "meta_creative_window_insight_snapshots.daily_coverage",
   "creative_fatigue_config_diagnostic_assets.result_payload",
+  "creative_fatigue_config_diagnostic_assets.capabilities",
+  "frozen_diagnostic_evidence.capabilities",
 ]);
 
 const policyAuthorityJsonbColumns = Object.freeze([...policyContract]

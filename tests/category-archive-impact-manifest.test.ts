@@ -11,8 +11,9 @@ describe("category dependency JSONB manifest", () => {
     for (const line of source.split("\n")) {
       const tableMatch = line.match(/pgTable\("([^"]+)"/);
       if (tableMatch) table = tableMatch[1]!;
-      const columnMatch = line.match(/jsonb\("([^"]+)"/);
-      if (columnMatch) actual.push({ table, column: columnMatch[1]! });
+      for (const columnMatch of line.matchAll(/jsonb\("([^"]+)"/g)) {
+        actual.push({ table, column: columnMatch[1]! });
+      }
     }
     expect(assessCategoryJsonbCatalog(actual)).toEqual({ unclassifiedColumns: 0, missingManifestColumns: 0 });
     expect(new Set(CATEGORY_JSONB_MANIFEST.map((entry) => `${entry.table}.${entry.column}`)).size)
