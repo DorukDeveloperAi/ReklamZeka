@@ -141,6 +141,10 @@ export function parseMetaInsightPage(input: Readonly<{
       : Object.freeze({ metricKey: "spend", aggregation: "additive", valueMinor: minor(spend, input.minorUnitScale)!, currency: input.currency, provenance });
     const metrics = [spendMetric,
       scalar("impressions", raw.impressions, "additive", provenance), scalar("reach", raw.reach, "non_additive", provenance),
+      // Graph transport requests one source-grain daily frequency value. It
+      // remains non-additive observed evidence; no downstream window may sum
+      // or average daily frequency values.
+      scalar("frequency", raw.frequency, "non_additive", provenance),
       scalar("clicks", raw.clicks, "additive", provenance),
       ...extractMetaActionMetrics({ contracts: META_ACTION_CAPABILITY_CATALOG, actions: raw.actions, actionValues: raw.action_values,
         currency: input.currency, minorUnitScale: input.minorUnitScale }),
