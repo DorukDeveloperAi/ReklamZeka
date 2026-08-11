@@ -92,6 +92,14 @@
 .signalStrip > button { height: 100%; padding: 0 17px; border: 0; background: transparent; color: var(--rz-muted); font-size: .67rem; cursor: pointer; }
 .signalStrip > button:hover { color: var(--rz-green); }
 
+.persistedContextPicker { display: grid; grid-template-columns: minmax(220px, .9fr) minmax(0, 1.6fr) auto; align-items: center; gap: 14px; margin: 10px 0; padding: 14px 17px; border: 1px solid var(--rz-line); border-radius: 12px; background: rgba(18,23,22,.6); }
+.persistedContextPicker > div:first-child { display: grid; gap: 5px; }
+.persistedContextPicker strong { font-size: .74rem; }
+.persistedContextPicker small { color: var(--rz-muted); font-size: .6rem; line-height: 1.45; }
+.persistedContextOptions { display: flex; flex-wrap: wrap; gap: 7px; }
+.persistedContextOptions button { display: grid; gap: 3px; min-width: 150px; padding: 8px 10px; border: 1px solid var(--rz-line); border-radius: 8px; background: var(--rz-surface); color: var(--rz-text); text-align: left; cursor: pointer; }
+.persistedContextOptions button[data-active="true"] { border-color: rgba(184,242,84,.45); box-shadow: inset 0 0 0 1px rgba(184,242,84,.16); }
+
 .metricGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .metricCard, .panel { min-height: 0; padding: 0; border: 1px solid var(--rz-line); border-radius: 13px; background: rgba(18,23,22,.76); backdrop-filter: blur(12px); }
 .metricCard { padding: 17px 18px 14px; }

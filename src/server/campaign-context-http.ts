@@ -20,3 +20,17 @@ export function createCampaignContextHttpHandler(input: Readonly<{ service: Camp
     }
   };
 }
+
+export function createCampaignContextListHttpHandler(input: Readonly<{ service: CampaignContextReadService; workspaceId(request: Request): Promise<string | null> }>) {
+  return async (request: Request) => {
+    try {
+      if (new URL(request.url).search) throw new CampaignContextReadError("invalid_input");
+      const workspaceId = await input.workspaceId(request);
+      if (!workspaceId) return response(403, "forbidden", "Kampanya bağlamı listesi için doğrulanmış yerel oturum gerekir.");
+      return NextResponse.json(await input.service.list({ workspaceId }), { headers: HEADERS });
+    } catch (error) {
+      const code = error instanceof CampaignContextReadError ? error.code : "source_unavailable";
+      return response(code === "invalid_input" ? 400 : code === "unsafe_source" ? 422 : 503, code, "Kampanya bağlamı listesi güvenli biçimde okunamadı.");
+    }
+  };
+}

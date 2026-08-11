@@ -853,6 +853,26 @@ export class DrizzleEffectiveCampaignContextRepository {
     return null;
   }
 
+  /** Server-private discovery query; the application layer projects aliases only. */
+  async listLatestValidCampaignPublic(input: Readonly<{ workspaceId: string }>): Promise<readonly StoredEffectiveCampaignContext[]> {
+    required(input.workspaceId);
+    await assertWorkspace(this.database, input.workspaceId, false);
+    const candidates = await this.database.select().from(schema.effectiveCampaignContexts).where(and(
+      eq(schema.effectiveCampaignContexts.workspaceId, input.workspaceId),
+      eq(schema.effectiveCampaignContexts.entityType, "campaign"),
+    )).orderBy(desc(schema.effectiveCampaignContexts.capturedAt), desc(schema.effectiveCampaignContexts.createdAt));
+    const campaignIds = new Set<string>();
+    const records: StoredEffectiveCampaignContext[] = [];
+    for (const candidate of candidates) {
+      if (campaignIds.has(candidate.campaignId)) continue;
+      const record = await loadRecord(this.database, candidate);
+      if (record.invalidated) continue;
+      campaignIds.add(candidate.campaignId);
+      records.push(record);
+    }
+    return Object.freeze(records);
+  }
+
   async invalidate(input: ContextInvalidationInput): Promise<Readonly<{
     outcome: "inserted" | "unchanged";
     affectedContextCount: number;

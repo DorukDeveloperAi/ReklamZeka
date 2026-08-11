@@ -3,6 +3,7 @@ import { projectEffectiveCampaignContext } from "@/analyses/effective-campaign-c
 import type { StoredEffectiveCampaignContext } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
 
 export const CAMPAIGN_CONTEXT_READ_MODEL_VERSION = "campaign-context-read-model/1.1.0" as const;
+export const CAMPAIGN_CONTEXT_LIST_READ_MODEL_VERSION = "campaign-context-list-read-model/1.0.0" as const;
 
 function approvalQueueCampaignRef(workspaceId: string, campaignId: string): string {
   if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(campaignId)) {
@@ -20,6 +21,7 @@ export class CampaignContextReadError extends Error {
 
 export type CampaignContextReadRepository = Readonly<{
   loadLatestValidCampaignPublic(input: Readonly<{ workspaceId: string; campaignRef: string }>): Promise<StoredEffectiveCampaignContext | null>;
+  listLatestValidCampaignPublic(input: Readonly<{ workspaceId: string }>): Promise<readonly StoredEffectiveCampaignContext[]>;
 }>;
 
 export class CampaignContextReadService {
@@ -49,5 +51,43 @@ export class CampaignContextReadService {
       approvalQueueCampaignRef: queueCampaignRef,
       context,
     });
+  }
+
+  /**
+   * A deliberately small discovery model. It does not expose entity IDs,
+   * context hashes, category evidence, or approval capability; selecting an
+   * item still requires the exact single-context read above.
+   */
+  async list(input: Readonly<{ workspaceId: string }>) {
+    if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(input.workspaceId)) {
+      throw new CampaignContextReadError("invalid_input");
+    }
+    let records: readonly StoredEffectiveCampaignContext[];
+    try { records = await this.repository.listLatestValidCampaignPublic(input); }
+    catch { throw new CampaignContextReadError("source_unavailable"); }
+    const campaignRefs = new Set<string>();
+    const items: Array<Readonly<{ campaignRef: string; label: string; objective: string | null; capturedAt: string; sourceState: "frozen_valid" }>> = [];
+    for (const record of records) {
+      if (record.invalidated) continue;
+      let context;
+      try { context = projectEffectiveCampaignContext(record.context); }
+      catch { throw new CampaignContextReadError("unsafe_source"); }
+      const campaignRef = context.identity.campaignRef;
+      if (!/^ref_[a-f0-9]{12}$/.test(campaignRef) || campaignRefs.has(campaignRef) || context.writeOperations !== 0) {
+        throw new CampaignContextReadError("unsafe_source");
+      }
+      campaignRefs.add(campaignRef);
+      items.push(Object.freeze({
+        campaignRef,
+        label: `Persisted campaign · ${campaignRef.slice(4, 10)}`,
+        objective: context.meta.objective.state === "known" && typeof context.meta.objective.value === "string"
+          ? context.meta.objective.value
+          : null,
+        capturedAt: context.capturedAt,
+        sourceState: "frozen_valid" as const,
+      }));
+      if (items.length === 25) break;
+    }
+    return Object.freeze({ contractVersion: CAMPAIGN_CONTEXT_LIST_READ_MODEL_VERSION, view: "list" as const, items: Object.freeze(items), writeOperations: 0 as const });
   }
 }

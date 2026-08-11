@@ -45,6 +45,21 @@ type AgentHandoffSummary = Readonly<{
   createdAt: string;
   expiresAt: string;
 }>;
+type PersistedCampaignContextSummary = Readonly<{ campaignRef: string; label: string; objective: string | null; capturedAt: string; sourceState: "frozen_valid" }>;
+
+export function persistedCampaignContextsFromResponse(value: unknown): readonly PersistedCampaignContextSummary[] | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (Object.keys(record).length !== 4 || record.contractVersion !== "campaign-context-list-read-model/1.0.0" || record.view !== "list" || record.writeOperations !== 0 || !Array.isArray(record.items) || record.items.length > 25) return null;
+  const items: PersistedCampaignContextSummary[] = [];
+  for (const item of record.items) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+    const candidate = item as Record<string, unknown>;
+    if (Object.keys(candidate).length !== 5 || typeof candidate.campaignRef !== "string" || !/^ref_[a-f0-9]{12}$/.test(candidate.campaignRef) || typeof candidate.label !== "string" || candidate.label.length < 1 || candidate.label.length > 128 || !(candidate.objective === null || typeof candidate.objective === "string" && candidate.objective.length <= 128) || typeof candidate.capturedAt !== "string" || !Number.isFinite(Date.parse(candidate.capturedAt)) || candidate.sourceState !== "frozen_valid") return null;
+    items.push(Object.freeze(candidate as PersistedCampaignContextSummary));
+  }
+  return Object.freeze(items);
+}
 
 const navGroups: ReadonlyArray<Readonly<{ label: string; items: ReadonlyArray<Readonly<{ id: ViewId; label: string; icon: string; badge?: string }>> }>> = [
   { label: "Çalışma", items: [
@@ -164,6 +179,9 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   const [selectedCampaign, setSelectedCampaign] = useState<string>(campaigns[0].id);
   const [portfolioFilters, setPortfolioFilters] = useState<PortfolioFilters>({ objective: "all", category: "all" });
   const [approvalQueueCampaignRef, setApprovalQueueCampaignRef] = useState<string | null>(null);
+  const [persistedContexts, setPersistedContexts] = useState<readonly PersistedCampaignContextSummary[]>([]);
+  const [persistedContextsState, setPersistedContextsState] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [selectedPersistedCampaignRef, setSelectedPersistedCampaignRef] = useState<string | null>(null);
   const [autonomy, setAutonomy] = useState<Record<string, string>>({ analysis: "Otomatik", recommendation: "Otomatik", decrease: "Onaya sun", increase: "Onaya sun", pause: "Onaya sun", create: "Her zaman manuel" });
   const agentMessages: Array<{ from: "agent" | "user"; text: string }> = [
     { from: "agent", text: "Bu dashboard model çalıştırmaz. Aktif Codex veya Claude session'ını doğrulayın, bağlam için kısa ömürlü handoff üretin ve konuşmayı seçtiğiniz CLI içinde sürdürün." },
@@ -183,6 +201,8 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
 
   const filteredCampaigns = useMemo(() => filterCampaignPortfolio(campaigns, portfolioFilters), [portfolioFilters]);
   const currentCampaign = filteredCampaigns.find((campaign) => campaign.id === selectedCampaign) ?? filteredCampaigns[0] ?? campaigns[0];
+  const selectedPersistedContext = persistedContexts.find((context) => context.campaignRef === selectedPersistedCampaignRef) ?? null;
+  const planningContext: CampaignPlanningBriefContext = selectedPersistedContext ? { campaignRef: `persisted_${selectedPersistedContext.campaignRef}`, campaignLabel: selectedPersistedContext.label, persistedCampaignRef: selectedPersistedContext.campaignRef, input: currentCampaign.planningContext.input } : currentCampaign.planningContext;
   const activeTitle = useMemo(() => navGroups.flatMap((group) => group.items).find((item) => item.id === activeView)?.label ?? "Bugün", [activeView]);
 
   const refreshMetaInventory = useCallback(async (announce = false) => {
@@ -236,6 +256,20 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
 
   useEffect(() => { void refreshAgentSessions(); }, [refreshAgentSessions]);
 
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/campaign-contexts", { cache: "no-store", credentials: "same-origin" })
+      .then(async (response) => ({ response, payload: await response.json() as unknown }))
+      .then(({ response, payload }) => {
+        if (!active) return;
+        const items = response.ok ? persistedCampaignContextsFromResponse(payload) : null;
+        setPersistedContexts(items ?? []);
+        setPersistedContextsState(items ? "ready" : "unavailable");
+      })
+      .catch(() => { if (active) { setPersistedContexts([]); setPersistedContextsState("unavailable"); } });
+    return () => { active = false; };
+  }, []);
+
   const createAgentHandoff = useCallback(async (entityRef: string) => {
     if (!selectedAgentSessionRef || !agentSessions.some((session) => session.sessionRef === selectedAgentSessionRef)) {
       setAgentSessionError(agentSessions.length > 1 ? "Devam edilecek session'ı açıkça seçin." : "Aktif bir CLI session bulunamadı.");
@@ -281,6 +315,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   function selectCampaign(campaignId: string) {
     setApprovalQueueCampaignRef((current) => approvalQueueScopeAfterCampaignSelection(selectedCampaign, campaignId, current));
     setSelectedCampaign(campaignId);
+    setSelectedPersistedCampaignRef(null);
   }
 
   function changePortfolioFilter(key: keyof PortfolioFilters, value: string) {
@@ -366,6 +401,11 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
           <small>Kaynak: deterministik demo snapshot · persisted account-group/asset graph taklit edilmez.</small>
         </div>
       </section>
+      <section className={styles.persistedContextPicker} aria-label="Persisted frozen kampanya bağlamı seçimi">
+        <div><span className={styles.kicker}>PERSISTED FROZEN CONTEXT · SALT-OKUNUR</span><strong>Doğrulanmış bağlam seçimi</strong><small>{persistedContextsState === "loading" ? "Kullanılabilir frozen contextler okunuyor." : persistedContextsState === "unavailable" ? "Yerel oturum veya doğrulanmış context listesi kullanılamıyor; demo bağlamı ayrı kalır." : persistedContexts.length ? "Liste yalnız en güncel geçerli frozen context alias’larını içerir." : "Bu oturumda seçilebilir frozen campaign context yok."}</small></div>
+        {persistedContexts.length ? <div className={styles.persistedContextOptions}>{persistedContexts.map((context) => <button key={context.campaignRef} type="button" data-active={context.campaignRef === selectedPersistedCampaignRef} onClick={() => { setApprovalQueueCampaignRef(null); setSelectedPersistedCampaignRef(context.campaignRef); }}><strong>{context.label}</strong><small>{context.objective ?? "Meta amacı bilinmiyor"} · {formatMetaTime(context.capturedAt)}</small></button>)}</div> : null}
+        {selectedPersistedContext ? <button className={styles.secondaryButton} type="button" onClick={() => { setApprovalQueueCampaignRef(null); setSelectedPersistedCampaignRef(null); }}>Demo seçimine dön</button> : null}
+      </section>
       <div className={styles.splitWorkspace}>
         <section className={styles.panel}><header className={styles.panelHeader}><div><span className={styles.kicker}>{filteredCampaigns.length} / {campaigns.length} GÖRÜNÜR</span><h2>Kampanyalar</h2></div><StatusPill tone="good">%98,7 coverage</StatusPill></header><div className={styles.selectorList}>{filteredCampaigns.map((campaign) => <button key={campaign.id} data-active={currentCampaign.id === campaign.id} onClick={() => selectCampaign(campaign.id)}><span><strong>{campaign.name}</strong><small>{campaign.objective}</small></span><StatusPill tone={campaign.tone}>{campaign.health}</StatusPill></button>)}</div></section>
         <section className={styles.panel}><header className={styles.detailHeader}><div><span className={styles.kicker}>EFFECTIVE CAMPAIGN CONTEXT</span><h2>{currentCampaign.name}</h2><p>{currentCampaign.objective} · Campaign budget · 7d click / 1d view</p></div><button onClick={() => openAgentContext(`campaign_${currentCampaign.id.replace("cmp-", "")}`, currentCampaign.name)}>Agent ile aç ✦</button></header>
@@ -374,7 +414,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
           <div className={styles.copyPreview}><span className={styles.kicker}>YAYINDAKİ REKLAM METNİ</span><h3>Saç ekimi hakkında merak ettiklerinizi uzman ekibimize sorun.</h3><p>Primary text · CTA: WhatsApp'tan mesaj gönder · Instagram post bağlı</p><footer><StatusPill tone="info">Mevcut creative</StatusPill><button>Performansını incele</button></footer></div>
         </section>
       </div>
-      <CampaignPlanningBriefPanel context={currentCampaign.planningContext} onApprovalQueueCampaignRef={setApprovalQueueCampaignRef} />
+      <CampaignPlanningBriefPanel context={planningContext} onApprovalQueueCampaignRef={setApprovalQueueCampaignRef} />
     </>;
   }
 

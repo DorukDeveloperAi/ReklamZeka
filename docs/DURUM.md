@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 82907ee34c1c -->
+<!-- durum-damga: 96d33fd9c890 -->
 
 ## Künye
 
@@ -14,13 +14,15 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 262 |
+| iş commit'i (tüm geçmiş) | 264 |
 | ilk / son iş | 2026-08-06 / 2026-08-11 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-11 | `feat` | add portfolio filters | `05a79d16d` |
+| 2026-08-11 | `test` | verify normal sync cohort source | `52ad890b7` |
 | 2026-08-11 | `test` | add normal-sync cohort fixture | `f3d1e21cc` |
 | 2026-08-11 | `feat` | add read-only decision timeline | `d27a834c0` |
 | 2026-08-11 | `feat` | bind frozen objective to planning brief | `6451c7843` |
@@ -34,13 +36,11 @@
 | 2026-08-11 | `feat` | materialize creative config evidence | `5727cab8d` |
 | 2026-08-11 | `feat` | request daily frequency evidence | `44c56bfda` |
 | 2026-08-11 | `feat` | load published creative definitions | `20fec4e4b` |
-| 2026-08-11 | `feat` | add creative definition lifecycle writer | `585f73e8c` |
-| 2026-08-11 | `feat` | gate creative diagnostic definition revisions | `5a5793bce` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 50
-- `test        ` ██ 5
+- `feat        ` ████████████████████████ 49
+- `test        ` ███ 6
 - `fix         ` █ 3
 - `docs        ` █ 2
 
