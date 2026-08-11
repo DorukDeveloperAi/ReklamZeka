@@ -80,6 +80,22 @@ export type PrivateCreativeDiagnosticDefinitionCommand = Readonly<{
 export class DrizzleCreativeDiagnosticDefinitionRepository {
   constructor(private readonly database: Database) {}
 
+  /** Reads one exact latest published revision; it never falls back to an older threshold set. */
+  async loadCurrentPublished(input: Readonly<{ workspaceId: string; definitionRef: string }>): Promise<CreativeDiagnosticDefinition> {
+    if (!UUID.test(input.workspaceId)) fail("invalid_input");
+    let definitionRef: string;
+    try { definitionRef = opaqueRef(input.definitionRef); } catch { fail("invalid_input"); }
+    const found = rows<{ revision: unknown; definition_hash: unknown; previous_hash: unknown; state: unknown; definition_payload: unknown }>(await this.database.execute(sql`
+      select revision, definition_hash, previous_hash, state, definition_payload
+      from creative_diagnostic_definition_revisions
+      where workspace_id = ${input.workspaceId}::uuid and definition_ref = ${definitionRef}
+      order by revision desc limit 1`));
+    if (found.length === 0) fail("not_found");
+    const definition = reconstruct(found[0]!);
+    if (definition.state !== "published") fail("not_found");
+    return definition;
+  }
+
   async append(input: Readonly<{
     workspaceId: string;
     actorId: string;

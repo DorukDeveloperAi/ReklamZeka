@@ -16,7 +16,7 @@ const command = Object.freeze({ definition: Object.freeze({ definitionRef: "crea
 function harness(responses: readonly (readonly unknown[])[]) {
   let index = 0;
   const execute = vi.fn(async () => ({ rows: responses[index++] ?? [] }));
-  const database = { transaction: async (work: (transaction: unknown) => Promise<unknown>) => work({ execute }) };
+  const database = { execute, transaction: async (work: (transaction: unknown) => Promise<unknown>) => work({ execute }) };
   return { execute, repository: new DrizzleCreativeDiagnosticDefinitionRepository(database as never) };
 }
 function input(overrides: Record<string, unknown> = {}) {
@@ -27,6 +27,18 @@ function rendered(execute: ReturnType<typeof vi.fn>): string {
 }
 
 describe("DrizzleCreativeDiagnosticDefinitionRepository", () => {
+  it("reads only the exact latest published revision and never falls back", async () => {
+    const published = createCreativeDiagnosticDefinition({ ...command.definition, state: "published" });
+    const loaded = harness([[{ revision: published.revision, definition_hash: published.definitionHash,
+      previous_hash: published.previousHash, state: published.state, definition_payload: published }]]);
+    await expect(loaded.repository.loadCurrentPublished({ workspaceId, definitionRef: published.definitionRef })).resolves.toEqual(published);
+    const draft = createCreativeDiagnosticDefinition(command.definition);
+    const rejected = harness([[{ revision: draft.revision, definition_hash: draft.definitionHash,
+      previous_hash: draft.previousHash, state: draft.state, definition_payload: draft }]]);
+    await expect(rejected.repository.loadCurrentPublished({ workspaceId, definitionRef: draft.definitionRef })).rejects.toMatchObject({ code: "not_found" });
+    expect(rendered(rejected.execute)).toContain("order by revision desc limit 1");
+  });
+
   it("appends an owner-authorized genesis definition and its immutable audit event", async () => {
     const subject = harness([[{ id: workspaceId }], [{ role: "owner" }], [], [], [], [], []]);
     await expect(subject.repository.append(input())).resolves.toMatchObject({ replayed: false,

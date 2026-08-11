@@ -289,8 +289,9 @@
   revision zincirini ve payload hashini doğrular. Yalnız exact latest replay yazısız döner; yeni revision
   append-only insert ve audit hash-chain ile birlikte commit olur. Public route, publish/approve/execute,
   Meta write ve network capability eklenmemiştir.
-- Current published-definition loader, definition invalidation ve V2 asset materializer henüz açık
-  kaldığından lifecycle production-ready sayılmaz ve asset/finding materialization kapalıdır.
+- Aynı private repository, yalnız exact en son `published` revision'ı yükler; eski published revision'a
+  fallback yapmaz. Definition invalidation ve V2 asset materializer henüz açık kaldığından lifecycle
+  production-ready sayılmaz ve asset/finding materialization kapalıdır.
 
 ## 2026-08-11 — A07 field-pilot source coverage census
 
