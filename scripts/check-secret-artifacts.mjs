@@ -44,9 +44,10 @@ export function checkSecretArtifacts(rootInput = DEFAULT_ROOT) {
     .split("\0").filter(Boolean).map((file) => join(root, file));
   const buildRoot = join(root, ".next");
   const cacheRoot = join(buildRoot, "cache");
+  const developmentCacheRoot = join(buildRoot, "dev", "cache");
   const groups = {
     tracked: trackedFiles,
-    build: filesBelow(buildRoot).filter((file) => !file.startsWith(cacheRoot)),
+    build: filesBelow(buildRoot).filter((file) => !file.startsWith(cacheRoot) && !file.startsWith(developmentCacheRoot)),
     cache: [...filesBelow(cacheRoot), ...filesBelow(join(root, ".turbo"))],
   };
   const matches = Object.freeze(Object.fromEntries(Object.entries(groups).map(([name, files]) => [

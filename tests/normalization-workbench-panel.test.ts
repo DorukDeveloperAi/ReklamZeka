@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildNormalizationAnswers, parseNormalizationWorkbenchPreview, parseNormalizationWorkbenchSnapshot } from
+import { buildNormalizationAnswers, parseNormalizationWorkbenchPreview, parseNormalizationWorkbenchSnapshot, resolveNormalizationSelection } from
   "@/app/dashboard/normalization-workbench-panel";
 
 const hash = "a".repeat(64);
@@ -26,5 +26,13 @@ describe("normalization workbench panel contract", () => {
       assumptions: [{ assumptionRef: "assumption_1", text: "Aylık havuz" }, { assumptionRef: "assumption_2", text: "Tüm kampanya" }],
       questions: [{ questionRef: "question_1", prompt: "Para birimi?", required: true }],
     });
+  });
+
+  it("derives only compatible source/card/reviewed-set choices without guessing a multi-source card", () => {
+    const choices = { cards: [{ cardRef: "guidance_budget", title: "Bütçe", sourceRefs: ["source_owner", "source_strategy"] }],
+      sets: [{ setRef: "guidance_set_budget", name: "Bütçe seti", cardRefs: ["guidance_budget"] }] } as const;
+    expect(resolveNormalizationSelection(choices, "guidance_budget")).toEqual({ sourceRef: "", cardRef: "guidance_budget",
+      setRef: "guidance_set_budget" });
+    expect(resolveNormalizationSelection(choices, "guidance_unknown")).toBeNull();
   });
 });
