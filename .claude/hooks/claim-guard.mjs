@@ -78,6 +78,64 @@ const kis = (s, n) => {
  * İNSANA (`systemMessage`). Kutu tüketici okunduğu için ikinci bir okuyucu haberi yerdi —
  * bu yüzden alma ucu burada, gönderme ucu `mesaj-nabzi.mjs`te. Dönüş: `{ satirlar, ozet }`.
  */
+/* ── DEFTER BLOĞU (AIDE S · yonetim-katmani/v2:04) ─────────────────────────────
+   Üç akıbet zincirinin ctx ucu. Hedefi bu oturum/rolü olan AÇIK kayıtlar burada görünür.
+
+   İKİ SERT KURAL:
+   - YEŞİL = EMİR bloğu: "işle ya da GEREKÇELİ reddet" — sessiz düşürme yasak. `alindi`
+     damgasını hook MOTOR olarak yazar (LLM'e bırakılmaz; damga kesin olmalı).
+   - KIRMIZI = EMİR BASILMAZ: yalnız "🔴 onay bekliyor" İLANI. Valf insanındır
+     (`defter.mjs onayla <tid>`); jobs/'a tek bayt yazılmaz.
+
+   Teslim POSTA ile yapılır (defter ikinci kanal açmaz); bu blok yalnız GÖRÜNÜRLÜK. */
+function defterBloku(root, me) {
+  const bos = { satirlar: [], ozet: [] };
+  try {
+    if (!L.defterBana) return bos;
+    let roller = [];
+    try {
+      roller = (L.rolListe?.(root) || []).filter((r) => r.sahip?.sessionId === me).map((r) => r.ad);
+    } catch {
+      /* rol okunamadı — yalnız sid kutusuna bak */
+    }
+    const kayitlar = L.defterBana(root, { sid: me, roller });
+    if (!kayitlar.length) return bos;
+    const satirlar = [];
+    const ozet = [];
+    const yesil = kayitlar.filter((k) => k.sinif !== "kirmizi");
+    const kirmizi = kayitlar.filter((k) => k.sinif === "kirmizi");
+    if (yesil.length) {
+      satirlar.push(
+        `[EMİR] ${yesil.length} açık kayıt sana adresli — İŞLE ya da GEREKÇELİ REDDET (sessiz düşürme yasak):`,
+      );
+      for (const k of yesil.slice(0, 6)) {
+        satirlar.push(`  • ${k.tid} · ${k.tur} · "${String(k.metin).slice(0, 120)}" — kimden: ${k.kimden?.etiket ?? "?"}`);
+        try {
+          L.defterAkibet(root, k.tid, "alindi", { kim: me, yol: "ctx" });
+        } catch {
+          /* damga yazılamadı — kayıt açık kalır, akıbet kapısı görür */
+        }
+      }
+      satirlar.push(
+        `  kapat: node ~/.claude/skills/aide-s/scripts/defter.mjs kapat <tid> --sonuc "…"  ·  ` +
+          `reddet: … reddet <tid> --neden "…"`,
+      );
+      ozet.push(`✉ ${yesil.length} EMİR (defter)`);
+    }
+    if (kirmizi.length) {
+      satirlar.push(
+        `[🔴 ONAY BEKLİYOR] ${kirmizi.length} kayıt VALFTE — emir olarak işlenmez, yalnız İNSAN açar:`,
+      );
+      for (const k of kirmizi.slice(0, 4)) satirlar.push(`  • ${k.tid} · "${String(k.metin).slice(0, 100)}"`);
+      satirlar.push(`  onay: node ~/.claude/skills/aide-s/scripts/defter.mjs onayla <tid>`);
+      ozet.push(`🔴 ${kirmizi.length} onay bekliyor`);
+    }
+    return { satirlar, ozet };
+  } catch {
+    return bos;
+  }
+}
+
 function bildiriBloku(root, me) {
   const bos = { satirlar: [], ozet: [] };
   if (!me || !L.ledgerExists() || typeof L.bildiriOku !== "function") return bos;
@@ -795,6 +853,7 @@ function main() {
     /* Saha beslemesi AYRI hesaplanır: posta kutusu bu oturuma ÖZEL haberleri, besleme ise
        koordinatörün gözünü taşır. Kişisel olan önce basılır — "sıra sana geldi" bilgisinin
        muhatabı sensin; saha bloğu ondan sonra gelir. */
+    const defter = defterBloku(root, me);
     const saha = sahaBloku(root, me);
     /* Commit kanalı — sahanın İKİNCİ kaynağı (git geçmişi); yalnız orkestratöre basılır.
        İki blok ayrı imleçlidir, tavanları bağımsızdır (MASTER Karar bekleyenler #6). */
@@ -824,13 +883,16 @@ function main() {
     /* Sarkık devir işareti TEK BAŞINA da haber değeridir (iş kaybolmasın); başka canlı
        session yoksa blok yalnız o satırı taşır. Üçü de yoksa TEK BAYT basılmaz. */
     if (!others.length) {
-      if (!devirSatir && !bildiri.satirlar.length && !saha.length && !commitler.length && !orkSatir) return pass();
+      if (!devirSatir && !bildiri.satirlar.length && !defter.satirlar.length && !saha.length && !commitler.length && !orkSatir) return pass();
       return out({
-        ...(bildiri.ozet.length ? { systemMessage: bildiri.ozet.join("\n") } : {}),
+        ...(bildiri.ozet.length || defter.ozet.length
+          ? { systemMessage: [...bildiri.ozet, ...defter.ozet].join("\n") }
+          : {}),
         hookSpecificOutput: {
           hookEventName: olay,
           additionalContext: [
             ...bildiri.satirlar,
+            ...defter.satirlar,
             ...saha,
             ...commitler,
             ...(orkSatir ? [`[eşzamanlılık] ${orkSatir}`] : []),
