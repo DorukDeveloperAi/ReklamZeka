@@ -124,6 +124,7 @@ const columns = [
   "policy_manual_lock_revisions.payload",
   "authority_topic_revisions.payload",
   "policy_semantic_binding_revisions.payload",
+  "normalization_workbench_revisions.revision_payload",
   // Candidate-preview authority evidence pins a policy/guidance/snapshot basis;
   // it carries no category reference, so archive impact has no category edge.
   "candidate_preview_binding_revisions.decision",

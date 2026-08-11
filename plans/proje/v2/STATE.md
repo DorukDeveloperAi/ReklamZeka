@@ -18,6 +18,21 @@
   bütünlüğü riski veya bu üç ürün adımını açan somut bir blocker olduğunda yapılır. Kapsam dışı
   "mükemmelleştirme" işleri checklist'e yeni teslimat gibi eklenmez.
 
+## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
+
+- Strict Policy Studio içindeki normalizasyon çalışma alanı, owner talimatının mevcut Guidance Studio
+  `source → card → reviewed set` zincirini yalnız opaque ref ile seçer. Sunucu aynı tenant içindeki
+  güncel immutable ID/version/hash kayıtlarını transaction içinde yeniden çözer ve append-only taslak
+  revision'a pinler; ham source metni yeni revision'a kopyalanmaz.
+- Kullanıcı normalize başlık/açıklama/topic/güç, varsayımlar ve açık soruları yapılandırılmış olarak
+  girer. Eksik veya drift etmiş source/card/set `needs_input`/conflict olarak fail-closed kalır;
+  strict DSL JSON, strict-policy lifecycle, publish, G3/G4, approval, action ve Meta write bu yüzeyde
+  yoktur. Bütün capability alanları false'tur.
+- Private kayıt RLS FORCE, public-role revoke, immutable/tombstone guard, tenant-composite FK ve
+  tombstone silme sırasıyla korunur. Focused testler, tam unit paketi (360 dosya/1840 test), production
+  build, DB/security/architecture/model-boundary/secret kapıları doğrulandı. Authoritative strict-policy
+  impact/semantic-diff bağlama ayrı açık checkpoint'tir.
+
 ## 2026-08-11 — A14 persisted frozen-context seçimi
 
 - Session-bound, query'siz `GET /api/campaign-contexts` yalnız latest-valid campaign contextler için

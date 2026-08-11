@@ -65,6 +65,7 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "candidate_preview_binding_heads",
   "candidate_preview_binding_revisions",
   "progressive_formalization_revisions",
+  "normalization_workbench_revisions",
   "guidance_sources",
   "guidance_cards",
   "guidance_bindings",
@@ -243,6 +244,9 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'progressive_formalization_revisions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from progressive_formalization_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'normalization_workbench_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from normalization_workbench_revisions where workspace_id = ${workspaceId}::uuid
       union all select 'tenant_authority_snapshots', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from tenant_authority_snapshots where workspace_id = ${workspaceId}::uuid
       union all select 'tenant_authority_snapshot_heads', count(*)::int, coalesce(md5(string_agg(workspace_id::text || ':' || xmin::text || ':' || ctid::text, ',' order by workspace_id)), md5('')) from tenant_authority_snapshot_heads where workspace_id = ${workspaceId}::uuid
       union all select 'account_groups', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from account_groups where workspace_id = ${workspaceId}::uuid
@@ -551,6 +555,7 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from candidate_preview_binding_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from candidate_preview_binding_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from progressive_formalization_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from normalization_workbench_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from strict_instruction_policy_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from instruction_policy_raw_provenance where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from autonomy_rule_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

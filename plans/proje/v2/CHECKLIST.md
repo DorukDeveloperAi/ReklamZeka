@@ -105,6 +105,10 @@
     card + tek scope binding üreten gerçek taslak authoring akışı.
   - [x] G0→G4 saf sözleşmede normalized draft, varsayım/soru, semantic diff, replay ve
     affected-scope/conflict/impact preview doğrulaması; ambiguity/partial sonuç fail-closed.
+  - [x] Draft-only normalizasyon çalışma alanı: Guidance source/card/reviewed-set immutable zincirini
+    server-side hash/version ile yeniden çözen, yapılandırılmış normalize guidance + varsayım/açık soru
+    taslağını append-only kaydeden cookie-only yüzey. Strict policy, publish, G3/G4, approval/action ve
+    Meta write bu checkpoint'te kapalıdır.
   - [ ] Gerçek normalization/application servisi; diff ve impact'in authoritative resolver/
     ledger/dependency reader'dan hesaplanması, persistence/API/UI ve insan onaylı kabul.
 - [ ] Precedence/inheritance/suppression/PARKED_CONFLICT resolver.

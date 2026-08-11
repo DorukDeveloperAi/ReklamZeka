@@ -1648,6 +1648,7 @@ export const guidanceSources = pgTable("guidance_sources", {
   recordHash: text("record_hash").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  uniqueIndex("guidance_sources_workspace_row_unique").on(table.workspaceId, table.id),
   uniqueIndex("guidance_sources_workspace_key_version_unique").on(table.workspaceId, table.sourceKey, table.version),
   index("guidance_sources_workspace_status_idx").on(table.workspaceId, table.status, table.sourceKey),
   check("guidance_sources_version_positive", sql`${table.version} >= 1`),
@@ -1701,6 +1702,7 @@ export const guidanceCards = pgTable("guidance_cards", {
   recordHash: text("record_hash").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  uniqueIndex("guidance_cards_workspace_row_unique").on(table.workspaceId, table.id),
   uniqueIndex("guidance_cards_workspace_key_version_unique").on(table.workspaceId, table.cardKey, table.version),
   index("guidance_cards_workspace_status_topic_idx").on(table.workspaceId, table.status, table.topic),
   check("guidance_cards_version_positive", sql`${table.version} >= 1`),
@@ -1791,6 +1793,102 @@ export const guidanceSets = pgTable("guidance_sets", {
     or (${table.reviewStatus} = 'archived' and ${table.archivedAt} is not null)
   `),
   check("guidance_sets_record_hash_format", sql`${table.recordHash} ~ '^[a-f0-9]{64}$'`),
+]);
+
+/**
+ * Server-private, append-only normalization workbench revisions. A row only
+ * records a user-reviewed guidance draft pinned to exact G0/G1/G2 evidence;
+ * it cannot publish, promote a strict policy, approve, execute, or write Meta.
+ */
+export const normalizationWorkbenchRevisions = pgTable("normalization_workbench_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  sourceId: uuid("source_id").notNull(),
+  cardId: uuid("card_id").notNull(),
+  setId: uuid("set_id").notNull(),
+  workspaceRef: text("workspace_ref").notNull(),
+  normalizationRef: text("normalization_ref").notNull(),
+  revision: integer("revision").notNull(),
+  previousRevisionHash: text("previous_revision_hash").notNull(),
+  sourceKey: text("source_key").notNull(),
+  sourceVersion: integer("source_version").notNull(),
+  sourceHash: text("source_hash").notNull(),
+  cardKey: text("card_key").notNull(),
+  cardVersion: integer("card_version").notNull(),
+  cardHash: text("card_hash").notNull(),
+  setKey: text("set_key").notNull(),
+  setVersion: integer("set_version").notNull(),
+  setHash: text("set_hash").notNull(),
+  actorRef: text("actor_ref").notNull(),
+  actorRole: text("actor_role").notNull(),
+  revisionHash: text("revision_hash").notNull(),
+  revisionPayload: jsonb("revision_payload").$type<Record<string, unknown>>().notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.sourceId], foreignColumns: [guidanceSources.workspaceId, guidanceSources.id],
+    name: "normalization_workbench_revisions_source_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.cardId], foreignColumns: [guidanceCards.workspaceId, guidanceCards.id],
+    name: "normalization_workbench_revisions_card_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.setId], foreignColumns: [guidanceSets.workspaceId, guidanceSets.id],
+    name: "normalization_workbench_revisions_set_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("normalization_workbench_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("normalization_workbench_revisions_workspace_ref_revision_unique")
+    .on(table.workspaceId, table.normalizationRef, table.revision),
+  uniqueIndex("normalization_workbench_revisions_workspace_hash_unique").on(table.workspaceId, table.revisionHash),
+  index("normalization_workbench_revisions_workspace_head_idx")
+    .on(table.workspaceId, table.normalizationRef, table.revision),
+  index("normalization_workbench_revisions_source_snapshot_idx")
+    .on(table.workspaceId, table.sourceKey, table.sourceVersion, table.cardKey, table.setKey),
+  check("normalization_workbench_revisions_identity", sql`
+    ${table.workspaceRef} ~ '^workspace_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.normalizationRef} ~ '^normalization_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.revision} between 1 and 1000000
+    and ((${table.revision} = 1 and ${table.previousRevisionHash} = 'GENESIS')
+      or (${table.revision} > 1 and ${table.previousRevisionHash} ~ '^[a-f0-9]{64}$'))
+    and ${table.sourceVersion} >= 1 and ${table.cardVersion} >= 1 and ${table.setVersion} >= 1
+    and ${table.sourceHash} ~ '^[a-f0-9]{64}$' and ${table.cardHash} ~ '^[a-f0-9]{64}$'
+    and ${table.setHash} ~ '^[a-f0-9]{64}$' and ${table.revisionHash} ~ '^[a-f0-9]{64}$'
+    and ${table.actorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.actorRole} in ('owner', 'admin', 'analyst')
+  `),
+  check("normalization_workbench_revisions_payload_exact", sql`(
+    jsonb_typeof(${table.revisionPayload}) = 'object'
+    and ${table.revisionPayload} #>> '{schemaVersion}' = 'normalization-workbench/1.0.0'
+    and ${table.revisionPayload} #>> '{workspaceRef}' = ${table.workspaceRef}
+    and ${table.revisionPayload} #>> '{normalizationRef}' = ${table.normalizationRef}
+    and (${table.revisionPayload} #>> '{revision}')::integer = ${table.revision}
+    and ${table.revisionPayload} #>> '{previousRevisionHash}' = ${table.previousRevisionHash}
+    and ${table.revisionPayload} #>> '{source,ref}' = ${table.sourceKey}
+    and (${table.revisionPayload} #>> '{source,version}')::integer = ${table.sourceVersion}
+    and ${table.revisionPayload} #>> '{source,recordHash}' = ${table.sourceHash}
+    and ${table.revisionPayload} #>> '{card,ref}' = ${table.cardKey}
+    and (${table.revisionPayload} #>> '{card,version}')::integer = ${table.cardVersion}
+    and ${table.revisionPayload} #>> '{card,recordHash}' = ${table.cardHash}
+    and ${table.revisionPayload} #>> '{set,ref}' = ${table.setKey}
+    and (${table.revisionPayload} #>> '{set,version}')::integer = ${table.setVersion}
+    and ${table.revisionPayload} #>> '{set,recordHash}' = ${table.setHash}
+    and ${table.revisionPayload} #>> '{actor,ref}' = ${table.actorRef}
+    and ${table.revisionPayload} #>> '{actor,role}' = ${table.actorRole}
+    and ${table.revisionPayload} #>> '{revisionHash}' = ${table.revisionHash}
+    and (${table.revisionPayload} #>> '{occurredAt}')::timestamptz = ${table.occurredAt}
+    and jsonb_typeof(${table.revisionPayload} #> '{normalizedGuidance}') = 'object'
+    and jsonb_typeof(${table.revisionPayload} #> '{assumptions}') = 'array'
+    and jsonb_typeof(${table.revisionPayload} #> '{questions}') = 'array'
+    and ${table.revisionPayload} #>> '{impactSummary,status}' = 'not_applicable'
+    and ${table.revisionPayload} #> '{impactSummary,affectedScopeRefs}' = '[]'::jsonb
+    and ${table.revisionPayload} #> '{impactSummary,unresolvedDependencyRefs}' = '[]'::jsonb
+    and ${table.revisionPayload} #> '{authority,canPublish}' = 'false'::jsonb
+    and ${table.revisionPayload} #> '{authority,canPromotePolicy}' = 'false'::jsonb
+    and ${table.revisionPayload} #> '{authority,canApprove}' = 'false'::jsonb
+    and ${table.revisionPayload} #> '{authority,canExecute}' = 'false'::jsonb
+    and ${table.revisionPayload} #> '{authority,canWriteMeta}' = 'false'::jsonb
+  ) is true`),
+  check("normalization_workbench_revisions_no_forbidden_material", sql`
+    ${table.revisionPayload}::text !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json|text)|authorization|approvalgranted)"[[:space:]]*:'
+    and ${table.revisionPayload}::text !~* '"(canPublish|canPromotePolicy|canApprove|canExecute|canWriteMeta)"[[:space:]]*:[[:space:]]*true'
+    and not (${table.revisionPayload} ? 'strictPolicy')
+  `),
 ]);
 
 /**
