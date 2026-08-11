@@ -27,7 +27,8 @@ type Database = NodePgDatabase<typeof schema>;
  */
 export async function materializeCurrentEffectiveAnalysisContextSourceFixture(database: Database, now = new Date()): Promise<Readonly<{
   workspaceId: string; foreignWorkspaceId: string; actorId: string; workspaceRef: string; actorRef: string;
-  accountRef: string; campaignRef: string; request: Readonly<{ workspaceId: string; accountRef: string; entityType: "campaign"; entityRef: string }>;
+  adAccountId: string; campaignId: string; accountRef: string; campaignRef: string;
+  request: Readonly<{ workspaceId: string; accountRef: string; entityType: "campaign"; entityRef: string }>;
   occurredAt: string; snapshotRef: string;
   /** The immutable Meta change snapshot (L2), distinct from policy authority. */
   metaChangeSnapshotRef: string;
@@ -89,7 +90,7 @@ export async function materializeCurrentEffectiveAnalysisContextSourceFixture(da
   const authorityScope = createPolicyScopeSnapshot({ workspaceRef, evaluatedAt: occurredAt, accountGroupRefs: [], objectiveRefs: [], topicRefs: [], canonicalObjective: "lead_generation" });
   const authorityCatalog = createTrustedPolicyCatalog({ workspaceRef, catalogRef: `authority_catalog_${suffix}`, catalogVersion: 1, instructionPolicyRegistryHash: emptyRegistryHash, bindings: [] });
   const authority = await new DrizzlePolicyAuthorityCatalogMaterializerRepository(database as never).materialize({ workspaceId, workspaceRef, actorId, actorRef, role: "owner", occurredAt, expiresAt, repositoryRef: `repository_${suffix}`, repositoryRevision: "current-source-fixture", expectedCatalogHeadHash: "GENESIS", expectedSnapshotHeadHash: "GENESIS", expectedPolicyRegistryHash: emptyRegistryHash, catalog: authorityCatalog, scope: authorityScope, manualLocks: [] });
-  return Object.freeze({ workspaceId, foreignWorkspaceId, actorId, workspaceRef, actorRef, accountRef, campaignRef, request: Object.freeze({ workspaceId, accountRef, entityType: "campaign" as const, entityRef: campaignRef }), occurredAt, snapshotRef, metaChangeSnapshotRef: snapshotRef,
+  return Object.freeze({ workspaceId, foreignWorkspaceId, actorId, workspaceRef, actorRef, adAccountId: accountId, campaignId, accountRef, campaignRef, request: Object.freeze({ workspaceId, accountRef, entityType: "campaign" as const, entityRef: campaignRef }), occurredAt, snapshotRef, metaChangeSnapshotRef: snapshotRef,
     reviewedGuidanceSet: Object.freeze({ setRef: selected.setRef, setVersion: selected.setVersion, setHash: selected.setHash }),
     authoritySnapshot: Object.freeze({ snapshotRef: authority.snapshotRef, snapshotHash: authority.snapshotHash, catalogHash: authority.catalogHash }) });
 }

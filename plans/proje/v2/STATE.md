@@ -164,10 +164,12 @@
   context kullanıyordu. Verifier artık normal L1 observation → persisted L2 feature snapshot → L3
   timeframe window → evidence-bound frozen context zincirini kurmadan Decision Room dry-run'a geçmez;
   replay, stale L1, tenant/tamper, network/Meta-write ve cleanup negatifleri bu gerçek ref'lere bağlıdır.
-- Hedefli statik verifier/runtime testleri ve typecheck yeşildir. Canlı PostgreSQL kabulü henüz açık:
-  `.env.local`daki 6543 ve 5432 endpointleri normal source fixture authority/guidance okumalarından sonra
-  `idle in transaction` davranışı gösterdiği için complete run/ledger kanıtı alınamadı. Sentetik context
-  ile bypass edilmedi; fixture recovery yalnız WorkspaceTombstoneService ile yapılır.
+- Hedefli statik verifier/runtime testleri ve typecheck yeşildir. Sequential canlı PostgreSQL verifier da
+  geçer: `.env.local`daki 6543 transaction ve 5432 session pooler endpointleri `ClientRead/idle in
+  transaction` gösterebilir, ancak blocking PID yoktur; durum 114 FK-sıralı tombstone delete round-trip'i
+  boyunca ilerler ve complete run/ledger/cleanup kanıtı alınır. Paralel workspace cleanup denemesi SQLSTATE
+  `40001` serializable conflict verdiğinden geri alındı; fixture recovery yalnız sequential
+  WorkspaceTombstoneService ile yapılır.
 
 ## 2026-08-11 — A10 frozen L2/L3 → Decision Room → L5 runtime bridge
 
@@ -178,8 +180,18 @@
   ledger staging öncesi reddedilir. Successful run deterministik L5 compact-agent-context ref/hash/payload
   commitmentini immutable analysis ledger frozen context'ine bağlar; public executor/action sözleşmesi
   genişlemez ve Meta/network/write yetkisi üretmez.
-- Runtime birim kanıtı yeşildir. Bu DB read path'i için end-to-end canlı kanıt, authentic dry-run verifier'ın
-  mevcut pooler `idle in transaction` çevresel blockerı çözülene kadar açık kalır.
+- Runtime birim kanıtı ve authentic dry-run canlı PostgreSQL kabulü yeşildir. Pooler görünümü progress
+  halindeki sequential tombstone cleanup'tır; runtime veya evidence sözleşmesi için blocker değildir.
+
+## 2026-08-11 — A11 authentic budget-proposal PostgreSQL acceptance refresh
+
+- Budget proposal verifier'ındaki eski sentetik frozen-context save kaldırıldı. Verifier artık shared
+  current-source fixture ve closed-world composer ile source-bound context üretir; proposal scope hash'i
+  bu gerçek context hash'ine exact bağlanır.
+- PostgreSQL outer rollback altında keep/conservative ve mapping-suppression davranışı, idempotency,
+  revision/audit, public-safe projection, cross-tenant/immutable/RLS negatifleri ve sıfır network/action
+  doğrulanır. Primary ve foreign fixture workspace'leri sequential WorkspaceTombstoneService ile temizlenir;
+  residue guard buna göre kontrol edilir.
 
 ## 2026-08-10 — Local MCP/session canlı kabulü
 
