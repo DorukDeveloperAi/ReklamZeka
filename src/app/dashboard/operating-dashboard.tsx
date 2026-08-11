@@ -237,11 +237,6 @@ function Icon({ name }: { name: string }) {
   return <span aria-hidden="true" className={styles.navIcon}>{name}</span>;
 }
 
-function MiniTrend({ tone = "green" }: { tone?: "green" | "blue" | "amber" }) {
-  const points = tone === "blue" ? "0,28 18,24 36,27 54,15 72,18 90,7 108,11" : tone === "amber" ? "0,12 18,8 36,16 54,11 72,23 90,19 108,25" : "0,24 18,20 36,22 54,12 72,15 90,8 108,4";
-  return <svg className={styles.miniTrend} viewBox="0 0 108 32" role="img" aria-label="Son dönem eğilimi"><polyline points={points} data-tone={tone} /></svg>;
-}
-
 function StatusPill({ children, tone = "neutral" }: { children: React.ReactNode; tone?: string }) {
   return <span className={styles.statusPill} data-tone={tone}>{children}</span>;
 }
@@ -457,21 +452,21 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
         <button onClick={() => navigate("timeline")}>Tüm timeline <span>→</span></button>
       </section>
 
-      <section className={styles.metricGrid} aria-label="Temel metrikler">
-        <article className={styles.metricCard}><div><span>{model.periodDays} günlük harcama</span><StatusPill tone="good">Plan içinde</StatusPill></div><strong>{model.spend}</strong><footer><span>Önceki döneme göre +%6,4</span><MiniTrend /></footer></article>
-        <article className={styles.metricCard}><div><span>Sonuç</span><StatusPill tone="info">Meta proxy</StatusPill></div><strong>{model.conversions}</strong><footer><span>CPA {model.cpa}</span><MiniTrend tone="blue" /></footer></article>
-        <article className={styles.metricCard}><div><span>Nitelikli lead</span><StatusPill tone="good">Manual signal</StatusPill></div><strong>82</strong><footer><span>%65,6 qualification</span><MiniTrend /></footer></article>
-        <article className={styles.metricCard}><div><span>Planlanan aylık bütçe</span><StatusPill tone="neutral">Ağu</StatusPill></div><strong>₺128.000</strong><footer><span>%34,1 gerçekleşti</span><div className={styles.tinyProgress}><i style={{ width: "34%" }} /></div></footer></article>
+      <section className={styles.metricGrid} aria-label="Canlı performans durumu">
+        <article className={styles.metricCard}><div><span>{model.periodDays} günlük harcama</span><StatusPill tone="neutral">Kaynak bekleniyor</StatusPill></div><strong>—</strong><footer><span>Doğrulanmış insight/timeframe henüz bağlı değil.</span></footer></article>
+        <article className={styles.metricCard}><div><span>Sonuç</span><StatusPill tone="neutral">Kaynak bekleniyor</StatusPill></div><strong>—</strong><footer><span>Canlı outcome metriği olmadan CPA gösterilmez.</span></footer></article>
+        <article className={styles.metricCard}><div><span>Nitelikli lead</span><StatusPill tone="neutral">Kaynak bekleniyor</StatusPill></div><strong>—</strong><footer><span>CRM/kalite kanıtı bağlanmadan oran çıkarılmaz.</span></footer></article>
+        <article className={styles.metricCard}><div><span>Bütçe gerçekleşmesi</span><StatusPill tone="neutral">Kaynak bekleniyor</StatusPill></div><strong>—</strong><footer><span>Budget owner ve gerçekleşen harcama ayrı doğrulanır.</span></footer></article>
       </section>
 
       <div className={styles.dashboardColumns}>
         <section className={styles.panel} aria-labelledby="decision-title">
-          <header className={styles.panelHeader}><div><span className={styles.kicker}>KARAR MASASI</span><h2 id="decision-title">Öncelikli kararlar</h2></div><button onClick={() => navigate("approvals")}>Tümünü gör <span>→</span></button></header>
+          <header className={styles.panelHeader}><div><span className={styles.kicker}>KARAR MASASI · DEMO</span><h2 id="decision-title">Örnek karar biçimleri</h2></div><button onClick={() => navigate("approvals")}>Gerçek kuyruğu aç <span>→</span></button></header>
           <div className={styles.decisionList}>
             {approvalItems.map((item, index) => <article key={item.id} className={styles.decisionRow}>
               <div className={styles.decisionIndex}>0{index + 1}</div>
               <div className={styles.decisionBody}><div><StatusPill tone={item.risk === "K1" ? "info" : "warning"}>{item.risk}</StatusPill><span>{item.entity}</span></div><h3>{item.title}</h3><p>{item.evidence}</p><small>{item.policy}</small></div>
-              <div className={styles.decisionAction}><StatusPill tone="neutral">Salt okunur</StatusPill><button className={styles.iconButton} onClick={() => navigate("approvals")} aria-label={`${item.title} için gerçek onay kuyruğunu aç`}>→</button></div>
+              <div className={styles.decisionAction}><StatusPill tone="neutral">Demo örneği</StatusPill><button className={styles.iconButton} onClick={() => navigate("approvals")} aria-label={`${item.title} için gerçek onay kuyruğunu aç`}>→</button></div>
             </article>)}
           </div>
         </section>
@@ -487,7 +482,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       </div>
 
       <section className={styles.panel} aria-labelledby="portfolio-title">
-        <header className={styles.panelHeader}><div><span className={styles.kicker}>PORTFÖY</span><h2 id="portfolio-title">Kampanya sağlığı</h2></div><button onClick={() => navigate("campaigns")}>32 kampanyayı aç <span>→</span></button></header>
+        <header className={styles.panelHeader}><div><span className={styles.kicker}>PORTFÖY · DEMO</span><h2 id="portfolio-title">Planlama senaryoları</h2></div><button onClick={() => navigate("campaigns")}>3 senaryoyu aç <span>→</span></button></header>
         <div className={styles.campaignTable} role="table" aria-label="Kampanya sağlığı">
           <div className={styles.tableHead} role="row"><span>Kampanya ve bağlam</span><span>7g harcama</span><span>Sonuç</span><span>CPA</span><span>Aylık bütçe</span><span>Durum</span></div>
           {campaigns.map((campaign) => <button key={campaign.id} className={styles.tableRow} role="row" onClick={() => { selectCampaign(campaign.id); navigate("campaigns"); }}>

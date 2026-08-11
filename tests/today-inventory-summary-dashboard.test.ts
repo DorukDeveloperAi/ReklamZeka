@@ -53,6 +53,10 @@ describe("Today inventory summary", () => {
     expect(html).toContain("Meta inventory yükleniyor · demo");
     expect(html).toContain("Kampanya sayısı doğrulanmadı");
     expect(html).toContain("demo sayıları canlı veri değildir");
+    expect(html).toContain("Canlı outcome metriği olmadan CPA gösterilmez.");
+    expect(html).toContain("Örnek karar biçimleri");
+    expect(html).toContain("3 senaryoyu aç");
+    expect(html).not.toContain("₺128.000");
     expect(html).not.toContain("32 aktif kampanya");
   });
 });

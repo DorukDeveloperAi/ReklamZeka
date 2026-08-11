@@ -37,6 +37,16 @@
   Şablon kaynak, campaign, kapsam veya policy ref'i değildir; normalizasyon alanı bunun açık işaretini
   gösterir ve kullanıcı alanları değiştirebilir.
 
+## 2026-08-11 — A14 canlı performans kaynağı olmadan demo dürüstlüğü
+
+- Today yüzeyindeki sabit harcama, sonuç, CPA, lead kalitesi ve bütçe gerçekleşmesi değerleri kaldırıldı.
+  Read-only inventory yalnız varlık sayısını doğruladığı için performans/CRM/bütçe sonucunu doğrulamaz;
+  bu kartlar artık açık `Kaynak bekleniyor` durumunda kalır. Böylece inventory gelse dahi, ayrı
+  insight/timeframe/outcome/budget-owner kanıtı olmadan KPI iddiası yapılmaz.
+- Karar masası ve portföy kartları da `DEMO`/`Örnek karar biçimleri`/`3 senaryo` olarak etiketlendi;
+  gerçek Approval Queue'ya geçiş ayrı kaldı. Browser'da Today ve Kampanyalar akışı, demo sınırı,
+  brief görünürlüğü ve sıfır console uyarısıyla doğrulandı. Meta write/approval/execute eklenmedi.
+
 ## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
 
 - Strict Policy Studio içindeki normalizasyon çalışma alanı, owner talimatının mevcut Guidance Studio

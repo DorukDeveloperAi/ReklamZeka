@@ -303,6 +303,9 @@
   - [x] Kampanyalar ekranında geçici `proposal-only` brief paneli: kullanıcı iş amacı, pazar/dil,
     hizmet, rota, kapasite, teslimat ve kreatifi değiştirdikçe tek sonraki karar, kampanya şeridi,
     sıra ve kıyas sınırı yeniden hesaplanır. Panel hiçbir kalıcı mutation yapmaz.
+  - [x] Read-only inventory performans/CRM/budget evidence'i taşımadığında Today KPI'ları `Kaynak
+    bekleniyor` olur; demo karar ve portföy örnekleri gerçek approval/performans kaydı gibi
+    etiketlenmez.
 - [ ] Meta config + çoklu internal category + policy composition.
   - [x] A10.4a immutable/replay-safe `meta-analysis-config-snapshot/2.0.0`: reviewed
     campaign objective ve ad-set optimization-goal mapping sürümleri hash'e freeze edilir;
