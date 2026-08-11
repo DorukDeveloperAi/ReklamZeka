@@ -302,6 +302,17 @@
   advisory asset writer henüz açık olduğundan hiçbir fatigue finding, Decision Room veya action
   yetkisi oluşmaz.
 
+## 2026-08-11 — A10.5c ad-bound creative config snapshot materializer
+
+- `DrizzleCreativeDiagnosticConfigSnapshotRepository`, yalnız immutable frozen diagnostic evidence'ın
+  exact `ad` contextini ve tenant/account/ad scope'unu doğruladıktan sonra current mirror'dan direct
+  creative config snapshot alır. Persisted hash target evidence + frozen context + exact binding/content
+  hashlerini bağlar; conflict sonrası yalnız payload/hash-eş mevcut satırı replay sayar.
+- Missing/ambiguous binding veya campaign/ad-set level target `insufficient_evidence`/fail-closed olur.
+  Bu config snapshot tek başına fatigue/config finding'i veya herhangi bir write/action yetkisi üretmez.
+  Gerçek ad-level lifecycle fixture ve PostgreSQL outer-rollback acceptance henüz açıktır; doğrudan SQL
+  fixture ile bu kabul uydurulmamıştır.
+
 ## 2026-08-11 — A07 field-pilot source coverage census
 
 - Yeni read-only `census:field-pilot-source-db` REPEATABLE READ altında yalnız aggregate workspace/account
