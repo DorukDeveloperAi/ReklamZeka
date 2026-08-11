@@ -38,4 +38,15 @@ describe("normalization workbench service", () => {
       selection: { sourceRef: "source_owner", cardRef: "guidance_budget", setRef: "guidance_set_budget", authority: true }, answers } as never))
       .rejects.toBeInstanceOf(NormalizationWorkbenchServiceError);
   });
+
+  it("returns an authority-closed structured assessment without touching persistence", async () => {
+    let calls = 0;
+    const repository = { inspect: async () => { calls += 1; return []; }, preview: async () => { calls += 1; return null; }, create: async () => { calls += 1; return null; } };
+    const service = new NormalizationWorkbenchService(repository as unknown as NormalizationWorkbenchRepository, [membership] as never);
+    const result = await service.assess(principal as never, { intent: "require_approval", scope: "global", scopeRef: null,
+      operation: "budget_transfer", budgetPoolRef: null, preferenceSubjectRef: null, preferredRefs: [] });
+    expect(result).toMatchObject({ status: "ready_for_draft", clauses: [{ kind: "approval" }],
+      authority: { canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false } });
+    expect(calls).toBe(0);
+  });
 });

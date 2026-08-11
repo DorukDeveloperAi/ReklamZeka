@@ -34,6 +34,11 @@
   girer. Eksik veya drift etmiş source/card/set `needs_input`/conflict olarak fail-closed kalır;
   strict DSL JSON, strict-policy lifecycle, publish, G3/G4, approval, action ve Meta write bu yüzeyde
   yoktur. Bütün capability alanları false'tur.
+- Aynı workbench artık server-side `instruction-policy-normalization/1.0.0` değerlendirmesini de
+  cookie-only read yetkisiyle çağırır: yasaklama, insan onayı, bütçe koruma veya tercih niyeti için
+  gerekli kapsam/operasyon/ref alanlarını açık soru veya `ready_for_draft` sonucu olarak döndürür.
+  Bu sonuç bir StrictInstructionPolicy değildir; persistence, lifecycle, semantic diff/impact,
+  publish ve bütün write capability'leri bu çağrıdan erişilemez kalır.
 - Private kayıt RLS FORCE, public-role revoke, immutable/tombstone guard, tenant-composite FK ve
   tombstone silme sırasıyla korunur. Focused testler, tam unit paketi (360 dosya/1840 test), production
   build, DB/security/architecture/model-boundary/secret kapıları doğrulandı. Authoritative strict-policy

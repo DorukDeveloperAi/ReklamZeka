@@ -6,6 +6,9 @@ import styles from "./instruction-policy-studio.module.css";
 
 type Strength = "must" | "should" | "consider" | "avoid" | "question";
 type CampaignIntentTemplateRef = "" | "new_campaign_plan" | "budget_protection" | "lead_quality" | "delivery_recovery";
+type PolicyIntent = "" | "prohibit_operation" | "require_approval" | "protect_budget" | "prefer_option";
+type PolicyScope = "global" | "specific";
+type PolicyOperation = "" | "status_pause" | "status_activate" | "budget_decrease" | "budget_increase" | "budget_transfer" | "existing_post_promotion";
 type ClosedAuthority = Readonly<{ canPublish: false; canPromotePolicy: false; canApprove: false; canExecute: false; canWriteMeta: false }>;
 type Selection = Readonly<{ sourceRef: string; cardRef: string; setRef: string }>;
 type Preview = Readonly<{ contractVersion: "normalization-workbench/1.0.0"; disposition: "ready" | "needs_input";
@@ -18,6 +21,11 @@ type Snapshot = Readonly<{ contractVersion: "normalization-workbench-service/1.0
   authority: Readonly<{ canRead: true; canDraft: boolean; canPublish: false; canPromotePolicy: false; canApprove: false; canExecute: false; canWriteMeta: false }> }>;
 type CampaignIntentTemplate = Readonly<{ title: string; body: string; topic: string; strength: Strength;
   assumptions: string; questions: string }>;
+type StructuredAssessment = Readonly<{ contractVersion: "instruction-policy-normalization/1.0.0"; status: "needs_input" | "ready_for_draft";
+  questions: readonly Readonly<{ questionRef: string; prompt: string; field: string }>[];
+  clauses: readonly Readonly<{ clauseRef: string; kind: string; summary: string }>[];
+  authority: Readonly<{ canPublish: false; canApprove: false; canExecute: false; canWriteMeta: false; canSchedule: false; canCallTool: false; canAccessNetwork: false }>;
+  normalizationHash: string }>;
 
 export class NormalizationWorkbenchClientError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = "NormalizationWorkbenchClientError"; }
@@ -39,11 +47,15 @@ const CAMPAIGN_INTENT_TEMPLATES: Readonly<Record<Exclude<CampaignIntentTemplateR
     assumptions: "Teslimat kesintisinin nedeni henüz doğrulanmamış olabilir", questions: "Kesinti ne zaman başladı?\nTeslimat veya ödeme durumu nedir?\nHangi kampanyalar etkileniyor?\nÖnce doğrulanacak en küçük geri dönüş adımı nedir?" }),
 });
 const AUTHORITY_KEYS = ["canPublish", "canPromotePolicy", "canApprove", "canExecute", "canWriteMeta"] as const;
+const ASSESSMENT_AUTHORITY_KEYS = ["canPublish", "canApprove", "canExecute", "canWriteMeta", "canSchedule", "canCallTool", "canAccessNetwork"] as const;
 function object(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
 function exact(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
   return object(value) && Object.keys(value).length === keys.length && Object.keys(value).every((key) => keys.includes(key));
 }
 function closed(value: unknown): value is ClosedAuthority { return exact(value, AUTHORITY_KEYS) && AUTHORITY_KEYS.every((key) => value[key] === false); }
+function assessmentClosed(value: unknown): value is StructuredAssessment["authority"] {
+  return exact(value, ASSESSMENT_AUTHORITY_KEYS) && ASSESSMENT_AUTHORITY_KEYS.every((key) => value[key] === false);
+}
 function workbenchAuthority(value: unknown): boolean {
   const keys = ["canRead", "canDraft", ...AUTHORITY_KEYS];
   return exact(value, keys) && value.canRead === true && typeof value.canDraft === "boolean"
@@ -118,9 +130,33 @@ export function campaignIntentTemplate(ref: CampaignIntentTemplateRef): Campaign
   return ref ? CAMPAIGN_INTENT_TEMPLATES[ref] : null;
 }
 
+export function buildStructuredAssessmentInput(input: Readonly<{ intent: PolicyIntent; scope: PolicyScope; scopeRef: string;
+  operation: PolicyOperation; budgetPoolRef: string; preferenceSubjectRef: string; preferredRefs: string }>) {
+  const lines = input.preferredRefs.split("\n").map((item) => item.trim()).filter(Boolean);
+  return Object.freeze({ intent: input.intent || null, scope: input.scope, scopeRef: input.scope === "specific" ? input.scopeRef.trim() || null : null,
+    operation: input.operation || null, budgetPoolRef: input.budgetPoolRef.trim() || null,
+    preferenceSubjectRef: input.preferenceSubjectRef.trim() || null, preferredRefs: Object.freeze(lines) });
+}
+
+function parseStructuredAssessment(value: unknown): StructuredAssessment {
+  if (!exact(value, ["contractVersion", "status", "answers", "questions", "clauses", "authority", "normalizationHash"])
+    || value.contractVersion !== "instruction-policy-normalization/1.0.0" || !["needs_input", "ready_for_draft"].includes(String(value.status))
+    || !Array.isArray(value.questions) || !value.questions.every((item) => exact(item, ["questionRef", "prompt", "field"])
+      && typeof item.questionRef === "string" && typeof item.prompt === "string" && typeof item.field === "string")
+    || !Array.isArray(value.clauses) || !value.clauses.every((item) => exact(item, ["clauseRef", "kind", "summary"])
+      && typeof item.clauseRef === "string" && typeof item.kind === "string" && typeof item.summary === "string")
+    || !assessmentClosed(value.authority)
+    || typeof value.normalizationHash !== "string" || !HASH.test(value.normalizationHash)) {
+    throw new NormalizationWorkbenchClientError("unsafe_response", "Yapılandırılmış taslak değerlendirmesi güvenli sözleşme döndürmedi.");
+  }
+  return value as unknown as StructuredAssessment;
+}
+
 async function requestWorkbench(command: unknown, request: typeof fetch = fetch): Promise<unknown> {
+  const operation = object(command) && typeof command.operation === "string" ? command.operation : null;
+  const intent = operation === "create" ? "normalization-workbench-draft" : "normalization-workbench-read";
   const response = await request("/api/normalization-workbench", { method: "POST", credentials: "same-origin",
-    headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "normalization-workbench-draft" }, body: JSON.stringify({ command }) });
+    headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": intent }, body: JSON.stringify({ command }) });
   let payload: unknown = null; try { payload = await response.json(); } catch { /* error below */ }
   if (!response.ok) throw new NormalizationWorkbenchClientError(String(response.status), readError(payload, "Normalizasyon isteği tamamlanamadı."));
   return payload;
@@ -153,6 +189,10 @@ export function NormalizationWorkbenchPanel() {
   const [message, setMessage] = useState<string | null>(null); const [preview, setPreview] = useState<Preview | null>(null);
   const [selection, setSelection] = useState<Selection>({ sourceRef: "", cardRef: "", setRef: "" });
   const [intentTemplate, setIntentTemplate] = useState<CampaignIntentTemplateRef>("");
+  const [policyIntent, setPolicyIntent] = useState<PolicyIntent>(""); const [policyScope, setPolicyScope] = useState<PolicyScope>("global");
+  const [policyScopeRef, setPolicyScopeRef] = useState(""); const [policyOperation, setPolicyOperation] = useState<PolicyOperation>("");
+  const [budgetPoolRef, setBudgetPoolRef] = useState(""); const [preferenceSubjectRef, setPreferenceSubjectRef] = useState("");
+  const [preferredRefs, setPreferredRefs] = useState(""); const [assessment, setAssessment] = useState<StructuredAssessment | null>(null);
   const [title, setTitle] = useState(""); const [body, setBody] = useState(""); const [topic, setTopic] = useState("");
   const [strength, setStrength] = useState<Strength>("should"); const [assumptions, setAssumptions] = useState("");
   const [questions, setQuestions] = useState(""); const [saving, setSaving] = useState(false);
@@ -171,6 +211,10 @@ export function NormalizationWorkbenchPanel() {
     setTitle(template.title); setBody(template.body); setTopic(template.topic); setStrength(template.strength);
     setAssumptions(template.assumptions); setQuestions(template.questions); setPreview(null);
   }
+  async function assessStructuredDraft() { setSaving(true); setMessage(null); try {
+    setAssessment(parseStructuredAssessment(await requestWorkbench({ operation: "assess", answers: buildStructuredAssessmentInput({
+      intent: policyIntent, scope: policyScope, scopeRef: policyScopeRef, operation: policyOperation, budgetPoolRef, preferenceSubjectRef, preferredRefs }) })));
+  } catch (reason) { setAssessment(null); setMessage(reason instanceof Error ? reason.message : "Yapılandırılmış taslak değerlendirilemedi."); } finally { setSaving(false); } }
   async function previewSelection() { setSaving(true); setMessage(null); try {
     setPreview(parseNormalizationWorkbenchPreview(await requestWorkbench({ operation: "preview", selection })));
   } catch (reason) { setPreview(null); setMessage(reason instanceof Error ? reason.message : "Kaynak önizlemesi kullanılamıyor."); } finally { setSaving(false); } }
@@ -208,6 +252,18 @@ export function NormalizationWorkbenchPanel() {
       <label>Normalize açıklama<textarea aria-label="Normalize açıklama" value={body} maxLength={16_000} disabled={saving} onChange={(event) => setBody(event.target.value)} /></label>
       <div className={styles.split}><label>Varsayımlar (her satır bir tane)<textarea aria-label="Varsayımlar" value={assumptions} disabled={saving} onChange={(event) => setAssumptions(event.target.value)} /></label>
         <label>Açık sorular (her satır bir tane)<textarea aria-label="Açık sorular" value={questions} disabled={saving} onChange={(event) => setQuestions(event.target.value)} /></label></div>
+      <section className={styles.briefNextDecision} aria-label="Yapılandırılmış policy taslak kontrolü"><span>YAPILANDIRILMIŞ TASLAK KONTROLÜ · DRAFT-ONLY</span>
+        <strong>Bağlayıcı politika taslağı için eksik kararları görün</strong><small>Bu önizleme yalnız eksik alanları ve insan incelemeli clause özetini üretir; strict policy oluşturmaz veya yayınlamaz.</small>
+        <div className={styles.split}><label>Niyet<select aria-label="Policy niyeti" value={policyIntent} disabled={saving} onChange={(event) => { setPolicyIntent(event.target.value as PolicyIntent); setAssessment(null); }}>
+          <option value="">Henüz karar verilmedi</option><option value="prohibit_operation">Operasyonu yasakla</option><option value="require_approval">İnsan onayı iste</option><option value="protect_budget">Bütçe havuzunu koru</option><option value="prefer_option">Seçeneği tercih et</option></select></label>
+          <label>Kapsam<select aria-label="Policy kapsamı" value={policyScope} disabled={saving} onChange={(event) => { setPolicyScope(event.target.value as PolicyScope); setAssessment(null); }}><option value="global">Çalışma alanı geneli</option><option value="specific">Belirli kapsam</option></select></label>
+          {policyScope === "specific" ? <label>Kapsam ref<input aria-label="Kapsam ref" value={policyScopeRef} placeholder="campaign_…" disabled={saving} onChange={(event) => { setPolicyScopeRef(event.target.value); setAssessment(null); }} /></label> : null}</div>
+        {policyIntent === "prohibit_operation" || policyIntent === "require_approval" ? <label>Operasyon<select aria-label="Policy operasyonu" value={policyOperation} disabled={saving} onChange={(event) => { setPolicyOperation(event.target.value as PolicyOperation); setAssessment(null); }}><option value="">Seçilmedi</option><option value="status_pause">Duraklatma</option><option value="status_activate">Etkinleştirme</option><option value="budget_decrease">Bütçe azaltma</option><option value="budget_increase">Bütçe artırma</option><option value="budget_transfer">Bütçe aktarımı</option><option value="existing_post_promotion">Mevcut gönderi öne çıkarma</option></select></label> : null}
+        {policyIntent === "protect_budget" ? <label>Bütçe havuzu ref<input aria-label="Bütçe havuzu ref" value={budgetPoolRef} placeholder="budget_pool_…" disabled={saving} onChange={(event) => { setBudgetPoolRef(event.target.value); setAssessment(null); }} /></label> : null}
+        {policyIntent === "prefer_option" ? <div className={styles.split}><label>Tercih konusu ref<input aria-label="Tercih konusu ref" value={preferenceSubjectRef} placeholder="subject_…" disabled={saving} onChange={(event) => { setPreferenceSubjectRef(event.target.value); setAssessment(null); }} /></label><label>Tercih edilen refler (her satır bir tane)<textarea aria-label="Tercih edilen refler" value={preferredRefs} disabled={saving} onChange={(event) => { setPreferredRefs(event.target.value); setAssessment(null); }} /></label></div> : null}
+        <div className={styles.actions}><button type="button" disabled={saving} onClick={() => void assessStructuredDraft()}>Eksik kararları kontrol et</button>
+          {assessment ? <small>{assessment.status === "ready_for_draft" ? assessment.clauses.map((clause) => clause.summary).join(" ") : assessment.questions.map((item) => item.prompt).join(" ")}</small> : null}</div>
+      </section>
       {message ? <p role="status">{message}</p> : null}<div className={styles.actions}><span className={styles.meta}>Taslak zinciri: source/card/set hash + OCC selection hash</span>
         <button className={styles.primary} type="button" disabled={saving || !snapshot?.authority.canDraft || !preview?.selectionHash || !answerable}
           onClick={() => void saveDraft()}>Taslağı kaydet</button></div>

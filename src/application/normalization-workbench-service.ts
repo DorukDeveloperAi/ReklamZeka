@@ -7,6 +7,7 @@ import type {
   NormalizationWorkbenchRevision,
   NormalizationWorkbenchSelection,
 } from "@/connectors/guidance/normalization-workbench-drizzle-repository";
+import { createInstructionPolicyNormalization, type NormalizedOwnerInstruction } from "@/domain/policies/instruction-policy-normalization";
 import { authorizeWorkspace, type WorkspaceMembership } from "@/security/authorization";
 
 export const NORMALIZATION_WORKBENCH_SERVICE_VERSION = "normalization-workbench-service/1.0.0" as const;
@@ -88,6 +89,17 @@ export class NormalizationWorkbenchService {
     }
     return Object.freeze({ ...await this.repository.preview({ workspaceId: principal.workspaceId, selection: candidate }),
       authority: authority(membership.role) });
+  }
+
+  /**
+   * A server-authorized, draft-only interpretation of a structured owner
+   * instruction. The result is intentionally not a StrictInstructionPolicy:
+   * no lifecycle, publish, G3/G4, approval, or action capability is reached
+   * from this read operation.
+   */
+  async assess(principal: TrustedDecisionRoomPrincipal, candidate: unknown): Promise<NormalizedOwnerInstruction> {
+    authorizeWorkspace(principal.actor, principal.workspaceId, "instruction_policy:read", this.memberships);
+    return createInstructionPolicyNormalization(candidate);
   }
 
   async create(principal: TrustedDecisionRoomPrincipal, input: Readonly<{

@@ -29,7 +29,7 @@ export function createLocalNormalizationWorkbenchHandlers(input: Readonly<{
     POST: async (request: Request) => {
       let operation: "read" | "draft" = "draft";
       try { const body = await request.clone().json() as { command?: { operation?: string } };
-        operation = body.command?.operation === "preview" ? "read" : "draft";
+        operation = body.command?.operation === "preview" || body.command?.operation === "assess" ? "read" : "draft";
       } catch { /* exact parser sends the public error */ }
       return execute(request, operation);
     } });

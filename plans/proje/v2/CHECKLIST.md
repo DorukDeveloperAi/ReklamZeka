@@ -109,6 +109,9 @@
     server-side hash/version ile yeniden çözen, yapılandırılmış normalize guidance + varsayım/açık soru
     taslağını append-only kaydeden cookie-only yüzey. Strict policy, publish, G3/G4, approval/action ve
     Meta write bu checkpoint'te kapalıdır.
+  - [x] Cookie-only server-side structured normalization assessment: bağlayıcı niyet/kapsam/operasyon
+    eksiklerini `needs_input` olarak, tamamını yalnız `ready_for_draft` olarak döndürür; policy
+    lifecycle veya persistence çağırmaz.
   - [ ] Gerçek normalization/application servisi; diff ve impact'in authoritative resolver/
     ledger/dependency reader'dan hesaplanması, persistence/API/UI ve insan onaylı kabul.
 - [ ] Precedence/inheritance/suppression/PARKED_CONFLICT resolver.

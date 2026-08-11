@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildNormalizationAnswers, campaignIntentTemplate, parseNormalizationWorkbenchPreview, parseNormalizationWorkbenchSnapshot, resolveNormalizationSelection } from
+import { buildNormalizationAnswers, buildStructuredAssessmentInput, campaignIntentTemplate, parseNormalizationWorkbenchPreview, parseNormalizationWorkbenchSnapshot, resolveNormalizationSelection } from
   "@/app/dashboard/normalization-workbench-panel";
 
 const hash = "a".repeat(64);
@@ -40,5 +40,13 @@ describe("normalization workbench panel contract", () => {
     expect(campaignIntentTemplate("budget_protection")).toMatchObject({ title: "Bütçeyi koru", topic: "budget_guardrail", strength: "must" });
     expect(campaignIntentTemplate("delivery_recovery")?.questions).toContain("Kesinti ne zaman başladı?");
     expect(campaignIntentTemplate("")).toBeNull();
+  });
+
+  it("serializes only the exact structured policy assessment contract", () => {
+    expect(buildStructuredAssessmentInput({ intent: "require_approval", scope: "global", scopeRef: "ignored_scope",
+      operation: "budget_transfer", budgetPoolRef: "", preferenceSubjectRef: "", preferredRefs: "" })).toEqual({
+      intent: "require_approval", scope: "global", scopeRef: null, operation: "budget_transfer", budgetPoolRef: null,
+      preferenceSubjectRef: null, preferredRefs: [],
+    });
   });
 });

@@ -18,16 +18,18 @@ function exact(value: unknown, keys: readonly string[]): asserts value is Record
   if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length !== keys.length
     || Object.keys(value).some((key) => !keys.includes(key))) throw new NormalizationWorkbenchServiceError("invalid_input");
 }
-function shape(request: Request, method: "GET" | "POST", intent: string): void {
+function shape(request: Request, method: "GET" | "POST", intent: string | readonly string[]): void {
   const url = new URL(request.url); const origin = request.headers.get("origin");
+  const intents = typeof intent === "string" ? [intent] : intent;
   let sameOrigin = method === "GET";
   if (origin && method === "POST") { try { sameOrigin = new URL(origin).origin === url.origin; } catch { sameOrigin = false; } }
   if (request.method !== method || method === "GET" && url.search || request.headers.has("authorization") || !request.headers.get("cookie")
     || request.headers.has("x-workspace-id") || request.headers.has("x-workspace-ref") || request.headers.get("sec-fetch-site") !== "same-origin"
-    || request.headers.get("x-reklamzeka-intent") !== intent || method === "POST" && (!sameOrigin
+    || !intents.includes(request.headers.get("x-reklamzeka-intent") ?? "") || method === "POST" && (!sameOrigin
       || request.headers.get("content-type")?.toLowerCase() !== "application/json")) throw new NormalizationWorkbenchServiceError("invalid_input");
 }
 type ParsedCommand = Readonly<{ operation: "preview"; selection: Partial<NormalizationWorkbenchSelection> }>
+  | Readonly<{ operation: "assess"; answers: unknown }>
   | Readonly<{ operation: "create"; expectedSelectionHash: string; selection: unknown; answers: NormalizationWorkbenchAnswers }>;
 async function command(request: Request): Promise<ParsedCommand> {
   const raw = await request.text();
@@ -40,6 +42,10 @@ async function command(request: Request): Promise<ParsedCommand> {
   if (candidate.operation === "preview") {
     exact(candidate, ["operation", "selection"]);
     return Object.freeze({ operation: "preview", selection: candidate.selection as Partial<NormalizationWorkbenchSelection> });
+  }
+  if (candidate.operation === "assess") {
+    exact(candidate, ["operation", "answers"]);
+    return Object.freeze({ operation: "assess", answers: candidate.answers });
   }
   if (candidate.operation === "create") {
     exact(candidate, ["operation", "expectedSelectionHash", "selection", "answers"]);
@@ -71,7 +77,7 @@ export function normalizationWorkbenchSessionRequiredResponse() {
 }
 
 export function createNormalizationWorkbenchHttpHandlers(input: Readonly<{
-  service: Pick<NormalizationWorkbenchService, "inspect" | "preview" | "create">;
+  service: Pick<NormalizationWorkbenchService, "inspect" | "preview" | "assess" | "create">;
   resolvePrincipal(request: Request, operation: "read" | "draft"): Promise<TrustedDecisionRoomPrincipal | null>;
 }>) {
   return Object.freeze({
@@ -81,11 +87,14 @@ export function createNormalizationWorkbenchHttpHandlers(input: Readonly<{
       return NextResponse.json(await input.service.inspect(principal), { headers: HEADERS });
     } catch (reason) { return failure(reason); } },
     POST: async (request: Request) => { try {
-      shape(request, "POST", "normalization-workbench-draft"); const parsed = await command(request);
+      shape(request, "POST", ["normalization-workbench-read", "normalization-workbench-draft"]); const parsed = await command(request);
+      const requiredIntent = parsed.operation === "create" ? "normalization-workbench-draft" : "normalization-workbench-read";
+      if (request.headers.get("x-reklamzeka-intent") !== requiredIntent) throw new NormalizationWorkbenchServiceError("invalid_input");
       const principal = await input.resolvePrincipal(request, parsed.operation === "create" ? "draft" : "read");
       if (!principal) throw new AuthorizationError();
       const result = parsed.operation === "preview" ? await input.service.preview(principal, parsed.selection)
-        : await input.service.create(principal, parsed);
+        : parsed.operation === "assess" ? await input.service.assess(principal, parsed.answers)
+          : await input.service.create(principal, parsed);
       return NextResponse.json(result, { headers: HEADERS });
     } catch (reason) { return failure(reason); } },
   });
