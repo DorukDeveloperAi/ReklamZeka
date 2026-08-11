@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 7bc9688b7980 -->
+<!-- durum-damga: ec5f69d5de07 -->
 
 ## Künye
 
@@ -14,13 +14,17 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 230 |
+| iş commit'i (tüm geçmiş) | 234 |
 | ilk / son iş | 2026-08-06 / 2026-08-11 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-11 | `test` | verify candidate preview binding lifecycle | `e5b49c134` |
+| 2026-08-11 | `test` | compose candidate preview lifecycle fixture | `643973024` |
+| 2026-08-11 | `fix` | harden candidate authority evidence | `a2713940e` |
+| 2026-08-11 | `fix` | validate candidate binding migration and share fixture | `8aa09a476` |
 | 2026-08-11 | `feat` | bind G3 replay to verified evidence | `23f2fa992` |
 | 2026-08-11 | `fix` | verify closed-world source persistence | `8092d47d5` |
 | 2026-08-11 | `feat` | bridge campaign context approval scope | `15f8aab25` |
@@ -32,17 +36,13 @@
 | 2026-08-10 | `feat` | scope approval queue reads by entity | `eca77a011` |
 | 2026-08-10 | `feat` | expose execution safety status | `cf83522f6` |
 | 2026-08-10 | `feat` | define verify and rollback contract | `158da5ad7` |
-| 2026-08-10 | `feat` | bind admission ceremony to persisted source | `7f5858125` |
-| 2026-08-10 | `feat` | add separate execution admission ceremony | `83b8600fe` |
-| 2026-08-10 | `feat` | revalidate admission against Meta mirror | `ce1807263` |
-| 2026-08-10 | `feat` | bind eligibility into execution admission | `1d59e1932` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 48
-- `fix         ` ███ 5
-- `test        ` ███ 5
-- `docs        ` █ 2
+- `feat        ` ████████████████████████ 46
+- `fix         ` ████ 7
+- `test        ` ███ 6
+- `docs        ` █ 1
 
 ## Planlar
 

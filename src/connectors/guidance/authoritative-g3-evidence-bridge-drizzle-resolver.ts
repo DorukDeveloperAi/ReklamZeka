@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { hasExactAuthoritativeImpact } from "@/domain/guidance/authoritative-g3-replay-preview";
+import type { InstructionPolicyImpact } from "@/application/instruction-policy-impact-service";
 import type { StrictInstructionPolicy } from "@/domain/policies/instruction-policy-dsl";
 import { buildEffectiveCampaignContext, EFFECTIVE_CAMPAIGN_CONTEXT_VERSION,
   type EffectiveCampaignContextInput } from "@/analyses/effective-campaign-context";
@@ -18,7 +19,13 @@ const MAX_HISTORY = 100;
 export type AuthoritativeG3EvidenceBridgeResult = Readonly<{
   sourceBound: boolean;
   candidateTierDecisionBound: boolean;
+  /** A private candidate proof plus a separately verified published catalog projection. */
+  candidateReviewEvidenceBound: boolean;
+  /** Existing published policies with the candidate's decision key; never an authority grant. */
+  candidateConflictRefs: readonly string[];
   exactImpact: boolean;
+  /** Exact, server-private impact facts used to build the redacted G3 projection. */
+  impact: InstructionPolicyImpact | null;
   historicalRunsEvaluated: number;
   evaluatedRevisionRefs: readonly string[];
   historicalContextHashes: readonly string[];
@@ -50,18 +57,20 @@ function iso(value: unknown): string | null {
   if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) return null;
   const normalized = new Date(value).toISOString(); return normalized === value ? normalized : null;
 }
-function empty(exactImpact = false): AuthoritativeG3EvidenceBridgeResult {
-  return Object.freeze({ sourceBound: false, candidateTierDecisionBound: false, exactImpact,
+function empty(impact: InstructionPolicyImpact | null = null): AuthoritativeG3EvidenceBridgeResult {
+  return Object.freeze({ sourceBound: false, candidateTierDecisionBound: false, candidateReviewEvidenceBound: false,
+    candidateConflictRefs: Object.freeze([]), exactImpact: impact !== null && hasExactAuthoritativeImpact(impact), impact,
     historicalRunsEvaluated: 0, evaluatedRevisionRefs: Object.freeze([]), historicalContextHashes: Object.freeze([]),
     outcomeEvidenceRefs: Object.freeze([]) });
 }
-function unavailable(exactImpact: boolean, parsed: readonly Readonly<{
+function unavailable(impact: InstructionPolicyImpact | null, parsed: readonly Readonly<{
   bindingHash: string; contextHash: string; outcomeEvidence: readonly Readonly<{ evidenceRef: string; evidenceHash: string }>[];
 }>[]): AuthoritativeG3EvidenceBridgeResult {
   const evaluatedRevisionRefs = [...new Set(parsed.map((entry) => `analysis_revision_${entry.bindingHash.slice(0, 24)}`))].sort();
   const historicalContextHashes = [...new Set(parsed.map((entry) => entry.contextHash))].sort();
   const outcomeEvidenceRefs = [...new Set(parsed.flatMap((entry) => entry.outcomeEvidence.map((evidence) => evidence.evidenceRef)))].sort();
-  return Object.freeze({ sourceBound: false, candidateTierDecisionBound: false, exactImpact,
+  return Object.freeze({ sourceBound: false, candidateTierDecisionBound: false, candidateReviewEvidenceBound: false,
+    candidateConflictRefs: Object.freeze([]), exactImpact: impact !== null && hasExactAuthoritativeImpact(impact), impact,
     historicalRunsEvaluated: parsed.length, evaluatedRevisionRefs: Object.freeze(evaluatedRevisionRefs),
     historicalContextHashes: Object.freeze(historicalContextHashes), outcomeEvidenceRefs: Object.freeze(outcomeEvidenceRefs) });
 }
@@ -140,12 +149,12 @@ export function createDrizzleAuthoritativeG3EvidenceBridge(input: Readonly<{
         return { bindingHash, contextHash, accountRef, capturedAt, authoritySnapshot,
           outcomeEvidence: outcomeEvidence as { evidenceRef: string; evidenceHash: string }[] };
       });
-      if (parsed.some((entry) => entry === null)) return empty(exactImpact);
+      if (parsed.some((entry) => entry === null)) return empty(impact);
       const authenticated = parsed as readonly NonNullable<typeof parsed[number]>[];
-      if (authenticated.length === 0) return empty(exactImpact);
+      if (authenticated.length === 0) return empty(impact);
       // One snapshot is not proof for a mixed-account replay.  Do not choose an
       // arbitrary account or silently widen authority across the selected rows.
-      if (new Set(authenticated.map((entry) => entry.accountRef)).size !== 1) return unavailable(exactImpact, authenticated);
+      if (new Set(authenticated.map((entry) => entry.accountRef)).size !== 1) return unavailable(impact, authenticated);
       const authority = input.authority ?? new DrizzleTrustedPolicyAuthorityRepository(database);
       // Every frozen capture names its own immutable snapshot.  Validate each
       // one through the same relational proof used by source composition;
@@ -155,13 +164,13 @@ export function createDrizzleAuthoritativeG3EvidenceBridge(input: Readonly<{
           workspaceId: request.workspaceId, accountRef: entry.accountRef, evaluatedAt: entry.capturedAt,
           snapshotRef: entry.authoritySnapshot.snapshotRef, snapshotHash: entry.authoritySnapshot.snapshotHash,
         });
-      } catch { return unavailable(exactImpact, authenticated); }
+      } catch { return unavailable(impact, authenticated); }
       const expectedOutcomeEvidence = [...new Map(authenticated.flatMap((entry) => entry.outcomeEvidence)
         .map((evidence) => [`${evidence.evidenceRef}:${evidence.evidenceHash}`, evidence] as const)).values()]
         .sort((left, right) => left.evidenceRef.localeCompare(right.evidenceRef) || left.evidenceHash.localeCompare(right.evidenceHash));
       // Historical runs without outcome snapshots stay replay-incomplete.  A
       // JSON envelope alone is never accepted as authoritative backing.
-      if (expectedOutcomeEvidence.length === 0) return unavailable(exactImpact, authenticated);
+      if (expectedOutcomeEvidence.length === 0) return unavailable(impact, authenticated);
       const backed = rows(await database.execute(sql`
         select evidence.evidence_ref, evidence.evidence_hash from business_outcome_evidence_snapshots evidence
         join jsonb_to_recordset(${JSON.stringify(expectedOutcomeEvidence)}::jsonb)
@@ -175,7 +184,7 @@ export function createDrizzleAuthoritativeG3EvidenceBridge(input: Readonly<{
         ? `${row.evidence_ref}:${row.evidence_hash}` : null);
       const expectedKeys = expectedOutcomeEvidence.map((evidence) => `${evidence.evidenceRef}:${evidence.evidenceHash}`);
       if (backedKeys.some((value) => value === null) || backedKeys.length !== expectedKeys.length
-        || JSON.stringify(backedKeys) !== JSON.stringify(expectedKeys)) return unavailable(exactImpact, authenticated);
+        || JSON.stringify(backedKeys) !== JSON.stringify(expectedKeys)) return unavailable(impact, authenticated);
       // A draft's tier/decision is deliberately proven only by the private
       // candidate ledger.  Production catalogs and frozen source contexts
       // never elevate a draft to productionAuthoritySourceBound.
@@ -238,22 +247,43 @@ export function createDrizzleAuthoritativeG3EvidenceBridge(input: Readonly<{
       // proves current relational backing, scope and expiry; the SQL join above
       // is deliberately insufficient on its own.
       let candidateTierDecisionBound = false;
+      let candidateReviewEvidenceBound = false;
+      let candidateConflictRefs: readonly string[] = Object.freeze([]);
       if (candidateStructurallyBound && typeof candidate!.authority_snapshot_ref === "string"
         && REF.test(candidate!.authority_snapshot_ref) && typeof candidate!.authority_snapshot_hash === "string"
         && HASH.test(candidate!.authority_snapshot_hash)) {
         try {
-          await authority.loadInTransaction(database, {
+          const verifiedCatalog = await authority.loadInTransaction(database, {
             workspaceId: request.workspaceId, accountRef: authenticated[0]!.accountRef,
             evaluatedAt: new Date().toISOString(), snapshotRef: candidate!.authority_snapshot_ref,
             snapshotHash: candidate!.authority_snapshot_hash,
           });
           candidateTierDecisionBound = true;
+          // The candidate remains outside the published catalog.  Its G3 review
+          // instead projects the exact decision-key collision set from that
+          // separately verified catalog.  This is evidence only: sourceBound
+          // and all execution authority remain false for draft policy work.
+          const candidateDecision = candidate!.decision as Record<string, unknown>;
+          const decisionKey = candidateDecision.decisionKey as string;
+          const positionKey = candidateDecision.positionKey as string;
+          const matching = verifiedCatalog.catalog.bindings.filter((binding) => binding.decision?.decisionKey === decisionKey);
+          candidateConflictRefs = Object.freeze(matching.map((binding) =>
+            `${binding.policyRef}:${binding.policyVersion}:${binding.policyHash}:${binding.authorityTier}:${binding.decision!.positionKey}`
+          ).sort());
+          // A verified catalog (including an intentionally empty one) plus a
+          // structurally exact candidate binding is the separate review proof.
+          // A same-decision collision is retained in the preview; it does not
+          // silently become production authority or an action permission.
+          candidateReviewEvidenceBound = verifiedCatalog.catalog.workspaceRef === request.policy.workspaceRef
+            && candidateConflictRefs.every((entry) => entry.includes(":"))
+            && typeof positionKey === "string" && positionKey.length > 0;
         } catch { /* fail closed: stale or unbacked candidate authority is not preview-ready. */ }
       }
       const evaluatedRevisionRefs = [...new Set(authenticated.map((entry) => `analysis_revision_${entry.bindingHash.slice(0, 24)}`))].sort();
       const historicalContextHashes = [...new Set(authenticated.map((entry) => entry.contextHash))].sort();
       const outcomeEvidenceRefs = [...new Set(authenticated.flatMap((entry) => entry.outcomeEvidence.map((evidence) => evidence.evidenceRef)))].sort();
-      return Object.freeze({ sourceBound: false, candidateTierDecisionBound, exactImpact,
+      return Object.freeze({ sourceBound: false, candidateTierDecisionBound, candidateReviewEvidenceBound,
+        candidateConflictRefs, exactImpact, impact,
         historicalRunsEvaluated: authenticated.length, evaluatedRevisionRefs: Object.freeze(evaluatedRevisionRefs),
         historicalContextHashes: Object.freeze(historicalContextHashes),
         outcomeEvidenceRefs: Object.freeze(outcomeEvidenceRefs) });

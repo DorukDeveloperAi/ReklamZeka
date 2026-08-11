@@ -66,11 +66,12 @@ describe("authoritative G3 evidence bridge", () => {
         decision: { decisionKey: "decision_primary", positionKey: "position_primary" },
         authority_snapshot_ref: "authority_snapshot_primary", authority_snapshot_hash: "1".repeat(64) }] };
     });
-    const authority = { loadInTransaction: vi.fn(async () => ({})) };
+    const authority = { loadInTransaction: vi.fn(async () => ({ catalog: { workspaceRef: "workspace_primary", bindings: [] } })) };
     const bridge = createDrizzleAuthoritativeG3EvidenceBridge({ authority: authority as never, impacts: { preview: vi.fn(async () => null) } as never });
     const result = await bridge.resolve({ execute } as never, { workspaceId, formalizationRef: "formalization_primary",
       g2RevisionHash: "e".repeat(64), policy, guidanceSetRef: "guidance_set_primary", guidanceSetVersion: 1, guidanceSetHash: hash });
-    expect(result).toMatchObject({ sourceBound: false, candidateTierDecisionBound: true, historicalRunsEvaluated: 1 });
+    expect(result).toMatchObject({ sourceBound: false, candidateTierDecisionBound: true,
+      candidateReviewEvidenceBound: true, candidateConflictRefs: [], historicalRunsEvaluated: 1 });
     expect(execute).toHaveBeenCalledTimes(3);
     expect(authority.loadInTransaction).toHaveBeenCalledTimes(2);
   });

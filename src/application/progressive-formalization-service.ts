@@ -34,6 +34,7 @@ export type FormalizationBlocker =
   | "historical_replay_incomplete"
   | "conflict_preview_unknown"
   | "impact_preview_incomplete"
+  | "candidate_review_evidence_unavailable"
   | "production_policy_authority_catalog_unavailable"
   | "candidate_authority_tier_decision_binding_unavailable"
   | "g4_risk_evidence_unavailable"

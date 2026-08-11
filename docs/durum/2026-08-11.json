@@ -4,6 +4,42 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "e5b49c134",
+      "tarih": "2026-08-11",
+      "konu": "test(guidance): verify candidate preview binding lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "643973024",
+      "tarih": "2026-08-11",
+      "konu": "test(guidance): compose candidate preview lifecycle fixture",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "a2713940e",
+      "tarih": "2026-08-11",
+      "konu": "fix(guidance): harden candidate authority evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "8aa09a476",
+      "tarih": "2026-08-11",
+      "konu": "fix(authority): validate candidate binding migration and share fixture",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
       "hash": "23f2fa992",
       "tarih": "2026-08-11",
       "konu": "feat(guidance): bind G3 replay to verified evidence",
@@ -101,63 +137,27 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "7f5858125",
-      "tarih": "2026-08-10",
-      "konu": "feat(a13): bind admission ceremony to persisted source",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "83b8600fe",
-      "tarih": "2026-08-10",
-      "konu": "feat(a13): add separate execution admission ceremony",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "ce1807263",
-      "tarih": "2026-08-10",
-      "konu": "feat(a13): revalidate admission against Meta mirror",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "1d59e1932",
-      "tarih": "2026-08-10",
-      "konu": "feat(a13): bind eligibility into execution admission",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 48
+      "adet": 46
     },
     {
       "kapsam": "fix",
-      "adet": 5
+      "adet": 7
     },
     {
       "kapsam": "test",
-      "adet": 5
+      "adet": 6
     },
     {
       "kapsam": "docs",
-      "adet": 2
+      "adet": 1
     }
   ],
-  "isSayisi": 230,
+  "isSayisi": 234,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-11",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "7bc9688b7980"
+  "damga": "ec5f69d5de07"
 }

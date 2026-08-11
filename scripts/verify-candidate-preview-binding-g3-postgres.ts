@@ -35,6 +35,9 @@ let candidateTierDecisionBound = false;
 let productionAuthoritySourceBound = true;
 let sourceBound = true;
 let historicalOutcomeBound = false;
+let candidateReviewEvidenceBound = false;
+let g3Ready = false;
+let g3Promoted = false;
 let crossTenantBlocked = false;
 let tamperedBlocked = false;
 let staleG2Blocked = false;
@@ -77,21 +80,34 @@ try {
       formalizationRef: fixture.formalizationRef, g2RevisionHash: fixture.g2HeadHash, policy,
       guidanceSetRef: fixture.guidanceSetRef, guidanceSetVersion: fixture.guidanceSetVersion, guidanceSetHash: fixture.guidanceSetHash });
     candidateTierDecisionBound = proof.candidateTierDecisionBound;
+    candidateReviewEvidenceBound = proof.candidateReviewEvidenceBound;
     productionAuthoritySourceBound = proof.sourceBound;
     sourceBound = proof.sourceBound;
     historicalOutcomeBound = proof.historicalRunsEvaluated > 0 && proof.outcomeEvidenceRefs.length > 0;
-    // G4 receives no execution authority from a draft candidate binding.  The
-    // separate progressive preview remains blocked and its actor caps remain
-    // read/formalization-only.
     const progressive = new ProgressiveFormalizationService(
       new DrizzleProgressiveFormalizationRepository(tx, createPersistedProgressiveFormalizationPreviewResolver(bridge)), memberships,
     );
-    // G4 cannot even be previewed before a G3 promotion. The rejection is the
-    // desired gate, while the same service's exposed actor capabilities prove
-    // no approval, execution, Meta write, scheduling, or tool authority.
-    g4Blocked = await rejects(() => progressive.preview(principal, {
+    const g3Preview = await progressive.preview(principal, {
+      formalizationRef: fixture!.formalizationRef, target: "G3", policyRef: fixture!.policyRef,
+    });
+    g3Ready = g3Preview.disposition === "ready" && g3Preview.blockers.length === 0
+      && g3Preview.evidence.productionAuthoritySourceBound === false;
+    if (g3Ready) {
+      const state = await progressive.inspect(principal);
+      const head = state.flows.find((flow) => flow.formalizationRef === fixture!.formalizationRef)?.headHash;
+      if (!head) throw new Error("candidate_preview_g3_head_missing");
+      const promoted = await progressive.mutate(principal, { operation: "promote_g3", expectedRegistryHash: state.registryHash,
+        formalizationRef: fixture!.formalizationRef, expectedHeadHash: head, policyRef: fixture!.policyRef,
+        expectedPreviewHash: g3Preview.previewHash,
+        ownerConfirmation: { confirmed: true, confirmationRef: `confirmation_g3_${fixture!.workspaceId.replaceAll("-", "").slice(0, 12)}` } });
+      g3Promoted = promoted.state.flows.find((flow) => flow.formalizationRef === fixture!.formalizationRef)?.level === "G3";
+    }
+    // A successful G3 review remains a formalization-only state. G4 is still
+    // unavailable and every action-bearing capability stays false.
+    const g4Preview = await progressive.preview(principal, {
       formalizationRef: fixture!.formalizationRef, target: "G4", policyRef: null,
-    }));
+    });
+    g4Blocked = g4Preview.disposition === "blocked" && g4Preview.g4Payload === null;
     const formalizationState = await progressive.inspect(principal);
     g4ActionCapsFalse = formalizationState.authority.canApprove === false && formalizationState.authority.canExecute === false
       && formalizationState.authority.canWriteMeta === false && formalizationState.authority.canSchedule === false
@@ -111,7 +127,8 @@ try {
       workspaceId: fixture!.workspaceId, workspaceRef: fixture!.workspaceRef, actorId: fixture!.actorId,
       actorRef: fixture!.actorRef, role: "owner", occurredAt, command: { ...command, expectedG2HeadHash: "e".repeat(64) },
     })));
-    if (!candidateTierDecisionBound || productionAuthoritySourceBound || sourceBound || !historicalOutcomeBound || !g4Blocked || !g4ActionCapsFalse
+    if (!candidateTierDecisionBound || !candidateReviewEvidenceBound || !g3Ready || !g3Promoted
+      || productionAuthoritySourceBound || sourceBound || !historicalOutcomeBound || !g4Blocked || !g4ActionCapsFalse
       || !crossTenantBlocked || !tamperedBlocked || !staleG2Blocked || actionOrNetworkCalls !== 0) {
       throw new Error("candidate_preview_binding_g3_acceptance_failed");
     }
@@ -135,11 +152,12 @@ try {
   }
 } finally { await pool.end(); }
 
-if (!outerRollbackObserved || residueCount !== 0 || !candidateTierDecisionBound || productionAuthoritySourceBound || sourceBound
+if (!outerRollbackObserved || residueCount !== 0 || !candidateTierDecisionBound || !candidateReviewEvidenceBound || !g3Ready || !g3Promoted
+  || productionAuthoritySourceBound || sourceBound
   || !g4Blocked || !g4ActionCapsFalse
   || !historicalOutcomeBound || !crossTenantBlocked || !tamperedBlocked || !staleG2Blocked || actionOrNetworkCalls !== 0) {
   throw new Error("candidate_preview_binding_g3_postgres_acceptance_failed");
 }
 console.log(JSON.stringify({ ok: true, scope: "candidate_preview_g3_private_evidence_only", candidateTierDecisionBound,
-  productionAuthoritySourceBound, sourceBound, historicalOutcomeBound, crossTenantBlocked, tamperedBlocked, staleG2Blocked,
+  candidateReviewEvidenceBound, g3Ready, g3Promoted, productionAuthoritySourceBound, sourceBound, historicalOutcomeBound, crossTenantBlocked, tamperedBlocked, staleG2Blocked,
   g4Blocked, g4ActionCapsFalse, actionOrNetworkCalls, outerRollbackObserved, residueCount }));

@@ -182,7 +182,7 @@ async function persistedPreview(database: Executor, input: Readonly<{ workspaceI
       ...strictPolicy.scope.internalCategoryRefs, ...strictPolicy.scope.entities.map((entity) => entity.ref),
       ...strictPolicy.scope.topicRefs,
     ].sort();
-    const unresolved = ["dependency_production_policy_authority_catalog"];
+    const unresolved = ["dependency_candidate_review_evidence"];
     const bridge = evidenceBridge === undefined || !setMatchesReview ? null : await evidenceBridge.resolve(database as never, {
       workspaceId: input.workspaceId, formalizationRef: input.formalizationRef, g2RevisionHash: flow.revisions[2]!.revisionHash,
       policy: strictPolicy, guidanceSetRef,
@@ -194,10 +194,19 @@ async function persistedPreview(database: Executor, input: Readonly<{ workspaceI
       : bridge.historicalRunsEvaluated === 0 ? "no_history" as const
         : replayOutcomes.length > 0 ? "complete" as const : "incomplete" as const;
     const bridgeUnresolved = bridge === null ? unresolved : [
-      ...(bridge.sourceBound ? [] : ["dependency_production_policy_authority_catalog"]),
+      ...(bridge.candidateReviewEvidenceBound ? [] : ["dependency_candidate_review_evidence"]),
       ...(bridge.exactImpact ? [] : ["dependency_exact_instruction_policy_impact"]),
       ...(bridge.candidateTierDecisionBound ? [] : ["dependency_candidate_authority_tier_decision"]),
     ].sort();
+    const impact = bridge?.impact;
+    const affectedEntityCount = impact === null || impact === undefined ? 0
+      : impact.historicalImpact.directAppliedContexts + impact.historicalImpact.directSuppressedContexts
+        + impact.historicalImpact.directParkedContexts + impact.historicalImpact.currentAnalysisTemplates
+        + impact.historicalImpact.runAssets;
+    const affectedBudgetCount = impact?.historicalImpact.budgetProposals ?? 0;
+    const affectedAutomationCount = impact === null || impact === undefined ? 0
+      : impact.exactBlockers.enabledSchedules + impact.exactBlockers.nonTerminalActionUnits
+        + impact.historicalImpact.terminalActionUnits;
     const normalizedDraft = createNormalizedPolicyDraft({ schemaVersion: NORMALIZED_POLICY_DRAFT_VERSION,
       workspaceRef: input.workspaceRef, formalizationRef: input.formalizationRef, guidanceSetRef, strictPolicy,
       assumptions: [], questions: [], semanticDiff: { status: exactMatch ? "resolved" : "ambiguous",
@@ -207,17 +216,19 @@ async function persistedPreview(database: Executor, input: Readonly<{ workspaceI
         replayHash: digest({ guidanceSetRef, evaluatedRevisionRefs: replayEvaluated, changedOutcomeRefs: replayOutcomes,
           historicalContextHashes: bridge?.historicalContextHashes ?? [],
           unknownOutcomeRefs: bridgeReplayStatus === "complete" ? [] : unknownOutcomeRefs }) },
-      conflictPreview: { status: bridge?.sourceBound === true && bridge.candidateTierDecisionBound ? "clear" : "unknown", conflictRefs: [],
-        previewHash: digest({ policyRef: strictPolicy.policyRef, productionAuthoritySourceBound: bridge?.sourceBound === true,
-          candidateTierDecisionBound: bridge?.candidateTierDecisionBound === true }) },
-      impactPreview: { status: bridge?.exactImpact === true ? "complete" : "partial", affectedScopeRefs, affectedEntityCount: 0,
-        affectedPolicyCount: policyCount, affectedBudgetCount: 0, affectedAutomationCount: 0,
-        unresolvedDependencyRefs: bridgeUnresolved, previewHash: digest({ affectedScopeRefs, policyCount, unresolved: bridgeUnresolved }) } });
+      conflictPreview: { status: bridge?.candidateReviewEvidenceBound === true ? "clear" : "unknown",
+        conflictRefs: bridge?.candidateConflictRefs ?? [],
+        previewHash: digest({ policyRef: strictPolicy.policyRef, candidateReviewEvidenceBound: bridge?.candidateReviewEvidenceBound === true,
+          candidateTierDecisionBound: bridge?.candidateTierDecisionBound === true, candidateConflictRefs: bridge?.candidateConflictRefs ?? [] }) },
+      impactPreview: { status: bridge?.exactImpact === true ? "complete" : "partial", affectedScopeRefs, affectedEntityCount,
+        affectedPolicyCount: policyCount, affectedBudgetCount, affectedAutomationCount,
+        unresolvedDependencyRefs: bridgeUnresolved, previewHash: digest({ affectedScopeRefs, policyCount, affectedEntityCount,
+          affectedBudgetCount, affectedAutomationCount, impactHash: impact?.impactHash ?? null, unresolved: bridgeUnresolved }) } });
     const blockers: FormalizationBlocker[] = [
-      ...(bridge?.sourceBound === true ? [] : ["production_policy_authority_catalog_unavailable" as const]),
+      ...(bridge?.candidateReviewEvidenceBound === true ? [] : ["candidate_review_evidence_unavailable" as const]),
       ...(bridge === null || bridge.candidateTierDecisionBound === true ? [] : ["candidate_authority_tier_decision_binding_unavailable" as const]),
       ...(bridge?.exactImpact === true ? [] : ["impact_preview_incomplete" as const]),
-      ...(bridge?.sourceBound === true && bridge.candidateTierDecisionBound ? [] : ["conflict_preview_unknown" as const]),
+      ...(bridge?.candidateReviewEvidenceBound === true && bridge.candidateTierDecisionBound ? [] : ["conflict_preview_unknown" as const]),
     ];
     if (!setMatchesReview) blockers.push("reviewed_guidance_set_not_found");
     if (!currentCardsPublished) blockers.push("guidance_card_not_published");

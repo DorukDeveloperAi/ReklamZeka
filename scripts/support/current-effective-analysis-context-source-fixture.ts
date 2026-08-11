@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { sql } from "drizzle-orm";
+
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { DrizzleCategoryAuthoringRepository } from "@/connectors/categories/category-authoring-drizzle-repository";
@@ -18,11 +19,6 @@ import { normalizeMetaChangeSnapshot } from "@/domain/meta/snapshot-diff";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
-
-function rows(value: unknown): readonly Record<string, unknown>[] {
-  return value && typeof value === "object" && "rows" in value && Array.isArray(value.rows)
-    ? value.rows as readonly Record<string, unknown>[] : [];
-}
 
 /**
  * Test-only fixture. It intentionally uses the same lifecycle writers as the
@@ -76,10 +72,15 @@ export async function materializeCurrentEffectiveAnalysisContextSourceFixture(da
   await profiles.mutate({ workspaceId, workspaceRef, actorId, actorRef, role: "owner", occurredAt, command: { operation: "publish", profileRef: draft.profile.profileRef, expectedVersion: draft.profile.version, expectedProfileHash: draft.profile.profileHash, expectedRegistryHash: profileState.registryHash, reasonCode: "fixture_publish" } });
 
   const guidanceRegistry = createGuidanceRegistry({ workspaceId, sources: [{ id: "source_current", workspaceId, sourceType: "owner_statement", title: "Current source", sourceRef: "owner:current", sourceUrl: null, content: "Protect quality", author: "owner", capturedAt: snapshotAt, reviewedAt: snapshotAt, reviewBy: null, status: "published", version: 1 }], cards: [{ id: "card_current", workspaceId, sourceType: "owner_statement", sourceIds: ["source_current"], title: "Quality", body: "Protect lead quality", rationale: null, strength: "must", topic: "quality", decisionKey: null, positionKey: null, authority: "guidance_only", status: "published", effectiveFrom: snapshotAt, effectiveTo: null, ownerRef: actorRef, version: 1 }], bindings: [{ id: "binding_current", workspaceId, cardId: "card_current", facet: "entity", value: campaignRef, entityType: "campaign", mode: "default", priority: 1, version: 1 }], sets: [{ id: "guidance_set_current", workspaceId, name: "Current set", orderedCardIds: ["card_current"], reviewStatus: "reviewed", version: 1 }] });
-  const guidanceWrite = await new DrizzleGuidanceRegistryRepository(database as never).save(guidanceRegistry, { expectedRegistryHash: null });
+  const fixtureClock = await database.execute(sql`select to_char(transaction_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as captured_at`);
+  const observedAt = (fixtureClock as unknown as { rows: readonly { captured_at: string }[] }).rows[0]?.captured_at;
+  if (!observedAt) throw new Error("reviewed_guidance_fixture_clock_missing");
+  const guidanceWrite = await new DrizzleGuidanceRegistryRepository(database as never).save(guidanceRegistry, { expectedRegistryHash: null, observedAt });
   const manifest = await database.transaction(async (transaction) => {
-    const clock = rows(await transaction.execute(sql`select to_char(transaction_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as captured_at`));
-    return new CurrentReviewedGuidanceReader().readCurrentInTransaction(transaction as never, workspaceId, String(clock[0]?.captured_at));
+    const clock = await transaction.execute(sql`select to_char(transaction_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as captured_at`);
+    const capturedAt = (clock as unknown as { rows: readonly { captured_at: string }[] }).rows[0]?.captured_at;
+    if (!capturedAt) throw new Error("reviewed_guidance_fixture_clock_missing");
+    return new CurrentReviewedGuidanceReader().readCurrentInTransaction(transaction as never, workspaceId, capturedAt);
   });
   const selected = manifest.reviewedSets[0]; if (!selected || guidanceWrite.outcome !== "inserted") throw new Error("reviewed_guidance_fixture_not_found");
   await new DrizzleGuidanceCampaignSelectionRepository(database as never).publish({ workspaceId, workspaceRef, actorId, actorRef, role: "owner", accountRef, campaignRef, selectionRef: `guidance_selection_${suffix}`, revision: 1, expectedCurrentHash: "GENESIS", selectedSetRef: selected.setRef, selectedSetVersion: selected.setVersion, selectedSetHash: selected.setHash, topics: ["quality"], requiredTopics: ["quality"], budget: { maxCards: 10, maxSources: 10, maxCharacters: 10_000 }, effectiveAt: occurredAt, occurredAt });
