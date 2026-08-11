@@ -82,10 +82,15 @@ export class DrizzleCreativeDiagnosticDefinitionRepository {
 
   /** Reads one exact latest published revision; it never falls back to an older threshold set. */
   async loadCurrentPublished(input: Readonly<{ workspaceId: string; definitionRef: string }>): Promise<CreativeDiagnosticDefinition> {
+    return this.loadCurrentPublishedInTransaction(this.database, input);
+  }
+
+  /** Caller-owned transaction variant for immutable diagnostic asset materialization. */
+  async loadCurrentPublishedInTransaction(executor: Pick<Database, "execute">, input: Readonly<{ workspaceId: string; definitionRef: string }>): Promise<CreativeDiagnosticDefinition> {
     if (!UUID.test(input.workspaceId)) fail("invalid_input");
     let definitionRef: string;
     try { definitionRef = opaqueRef(input.definitionRef); } catch { fail("invalid_input"); }
-    const found = rows<{ revision: unknown; definition_hash: unknown; previous_hash: unknown; state: unknown; definition_payload: unknown }>(await this.database.execute(sql`
+    const found = rows<{ revision: unknown; definition_hash: unknown; previous_hash: unknown; state: unknown; definition_payload: unknown }>(await executor.execute(sql`
       select revision, definition_hash, previous_hash, state, definition_payload
       from creative_diagnostic_definition_revisions
       where workspace_id = ${input.workspaceId}::uuid and definition_ref = ${definitionRef}

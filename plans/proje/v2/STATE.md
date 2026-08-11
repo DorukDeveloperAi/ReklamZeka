@@ -341,6 +341,16 @@
   metric/source hash manifest'i ve settled daily coverage'ı taşır; action, approval, Meta write ve
   network capability'si açılmaz. Gerçek ad-level outer-rollback source fixture/verifier ve sonraki
   all-days direct-window source contractı hâlâ açıktır.
+
+## 2026-08-11 — A10.5c immutable daily creative fatigue/config advisory asset
+
+- Private asset writer, only-current-published definition'ı aynı transaction içinde çözer; exact
+  target evidence, same-creative baseline/recent config snapshots ve policy-bound windows dışındaki
+  her kombinasyonu reddeder. V2 fatigue sonucu, config snapshot hash farkı ve iki settlement commitment
+  immutable `creative_fatigue_config_diagnostic_assets` payload'ında tek diagnostic hash'e bağlanır.
+- Unsettled coverage yine finding değil `insufficient_data` olur. Asset sadece advisory capability
+  envelope taşır; Decision Room action/finding bağlama, live ad-level source fixture ve multi-day
+  direct-frequency window contractı açık kalır.
   window snapshot materializer hâlâ policy ref/hashını persisted olarak doğrulayamadığından kapalıdır;
   settled source evidence veya fatigue finding iddiası yapılmaz.
 
