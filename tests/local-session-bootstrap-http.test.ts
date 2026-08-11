@@ -39,6 +39,21 @@ function request(token: string, overrides: Record<string, string> = {}) {
   });
 }
 
+function zeroLengthStreamRequest(token: string, contentLength: string | null = "0") {
+  return new Request("http://localhost:3000/api/local-session", {
+    method: "POST",
+    headers: {
+      Host: "localhost:3000",
+      Origin: "http://localhost:3000",
+      "Sec-Fetch-Site": "same-origin",
+      "X-ReklamZeka-Intent": "bootstrap-local-session",
+      Authorization: `Bearer ${token}`,
+      ...(contentLength === null ? {} : { "Content-Length": contentLength }),
+    },
+    body: "",
+  });
+}
+
 describe("local session bootstrap HTTP boundary", () => {
   it("consumes a short-lived proof and mints a hardened, scoped HttpOnly cookie", async () => {
     const consume = vi.fn(async () => undefined);
@@ -78,5 +93,19 @@ describe("local session bootstrap HTTP boundary", () => {
       readerRef: "reader_local_owner", osUid: process.getuid!(), issuedAt: now, expiresAt: now + 300,
     }, key).token;
     expect((await handler(request(session))).status).toBe(403);
+  });
+
+  it("accepts an explicitly zero-length body stream from a real route adapter", async () => {
+    const consume = vi.fn(async () => undefined);
+    const response = await createLocalSessionBootstrapHandler({ config, clock: () => now + 1, consume })(zeroLengthStreamRequest(bootstrapToken()));
+    expect(response.status).toBe(204);
+    expect(consume).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps an unknown-length stream out of the bootstrap boundary", async () => {
+    const consume = vi.fn(async () => undefined);
+    const response = await createLocalSessionBootstrapHandler({ config, clock: () => now + 1, consume })(zeroLengthStreamRequest(bootstrapToken(), null));
+    expect(response.status).toBe(403);
+    expect(consume).not.toHaveBeenCalled();
   });
 });

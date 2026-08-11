@@ -69,6 +69,17 @@
 - Approval, execute ve Meta write kapıları değişmedi. Sonraki ürün adımı, mevcut read-only context,
   brief ve approval görünümünü gerçek oturumlu browser'da birlikte kabul etmektir.
 
+## 2026-08-11 — A14 yerel session bootstrap canlı onarımı
+
+- `.env.local` içindeki local session config geçerliydi; canlı dashboard bootstrap'i yine de `403` dönüyordu.
+  Sebep Next Route Handler'ın gerçek sıfır-gövdeli POST isteğini non-null `ReadableStream` olarak
+  sunmasıydı. Bootstrap artık yalnız açık `Content-Length: 0` ve gerçekten boş stream'i kabul eder;
+  chunked/bilinmeyen uzunluklu veya dolu gövde, cross-site, replay ve yanlış scope reddi korunur.
+- Browser'da tek-kullanımlık capability ile HttpOnly local session cookie başarıyla kuruldu. Decision Room
+  bağlı workspace'te dürüst `kayıt yok` read modelini, Campaigns ise `seçilebilir frozen campaign context
+  yok` durumunu gösterdi. Bu gerçek session acceptance'tır; persisted context/approval happy-path'i için
+  doğrulanmış bir campaign context henüz mevcut olmadığından o birleşim kabulü açık kalır.
+
 ## 2026-08-11 — A14 portföy/browser doğrulama sınırı
 
 - Yerel Dashboard'da kampanya görünümüne geçiş ile objective filtresi (`OUTCOME_AWARENESS`) gerçek UI
