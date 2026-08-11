@@ -150,24 +150,24 @@ export class DrizzleTrustedPolicyAuthorityRepository {
                 and semantic.semantic_ref = binding.binding_ref and semantic.revision::text = binding.binding_version
                 and semantic.revision_hash = binding.binding_hash))), '[]'::jsonb) as binding_rows,
         coalesce((select jsonb_agg(group_revision.group_ref order by group_revision.group_ref)
-          from account_groups group join account_group_revisions group_revision
-            on group.workspace_id = group_revision.workspace_id and group.id = group_revision.account_group_id
-              and group.current_revision = group_revision.revision and group.current_revision_hash = group_revision.revision_hash
+          from account_groups group_head join account_group_revisions group_revision
+            on group_head.workspace_id = group_revision.workspace_id and group_head.id = group_revision.account_group_id
+              and group_head.current_revision = group_revision.revision and group_head.current_revision_hash = group_revision.revision_hash
           join account_group_account_bindings membership
             on membership.workspace_id = group_revision.workspace_id and membership.account_group_revision_id = group_revision.id
           join ad_accounts account on account.workspace_id = membership.workspace_id and account.id = membership.ad_account_id
           where group_revision.workspace_id = snapshot.workspace_id and group_revision.status = 'active'
             and account.external_account_id = ${input.accountRef}), '[]'::jsonb) as account_group_refs,
-        coalesce((select jsonb_agg(jsonb_build_object('lockRef', lock.lock_ref, 'policyRef', policy.policy_ref,
-          'policyVersion', policy.policy_version, 'policyHash', policy.canonical_hash, 'operation', lock.operation,
-          'revisionHash', lock.revision_hash, 'recordedAt', lock.recorded_at::text) order by lock.lock_ref, lock.sequence)
-          from (select distinct on (lock.workspace_id, lock.policy_revision_id, lock.lock_ref) lock.*
-            from policy_manual_lock_revisions lock
-            where lock.recorded_at <= (snapshot.snapshot_payload #>> '{policyAuthority,scope,evaluatedAt}')::timestamptz
-            order by lock.workspace_id, lock.policy_revision_id, lock.lock_ref, lock.sequence desc) lock
+        coalesce((select jsonb_agg(jsonb_build_object('lockRef', latest_lock.lock_ref, 'policyRef', policy.policy_ref,
+          'policyVersion', policy.policy_version, 'policyHash', policy.canonical_hash, 'operation', latest_lock.operation,
+          'revisionHash', latest_lock.revision_hash, 'recordedAt', latest_lock.recorded_at::text) order by latest_lock.lock_ref, latest_lock.sequence)
+          from (select distinct on (revision.workspace_id, revision.policy_revision_id, revision.lock_ref) revision.*
+            from policy_manual_lock_revisions revision
+            where revision.recorded_at <= (snapshot.snapshot_payload #>> '{policyAuthority,scope,evaluatedAt}')::timestamptz
+            order by revision.workspace_id, revision.policy_revision_id, revision.lock_ref, revision.sequence desc) latest_lock
           join strict_instruction_policy_revisions policy
-            on policy.workspace_id = lock.workspace_id and policy.id = lock.policy_revision_id
-          where lock.workspace_id = snapshot.workspace_id), '[]'::jsonb) as manual_lock_rows
+            on policy.workspace_id = latest_lock.workspace_id and policy.id = latest_lock.policy_revision_id
+          where latest_lock.workspace_id = snapshot.workspace_id), '[]'::jsonb) as manual_lock_rows
       from selected_snapshot snapshot join linked_catalog catalog on catalog.workspace_id = snapshot.workspace_id
     `));
     if (result.length === 0) fail("not_found");

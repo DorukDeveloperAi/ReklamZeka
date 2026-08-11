@@ -5,6 +5,7 @@ import {
   CurrentReviewedGuidanceReader,
   CurrentReviewedGuidanceReaderError,
 } from "@/connectors/guidance/current-reviewed-guidance-reader";
+import { buildEffectiveGuidancePack } from "@/domain/guidance/registry";
 
 const workspaceId = "61b10d7d-132c-4c6d-b49f-cddc9b10d025";
 const capturedAt = "2026-08-10T12:00:00.000Z";
@@ -76,6 +77,11 @@ describe("CurrentReviewedGuidanceReader", () => {
     expect(result).toMatchObject({ capturedAt, reviewedSets: [{ setRef: "set_primary", setVersion: 1,
       cards: [{ cardRef: "card_primary", cardVersion: 1, sources: [{ sourceKey: "source_primary", sourceRef: "source-ref-primary", sourceVersion: 1 }] }] }] });
     expect(result.reviewedSets[0]!.setHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.registry.sets[0]).not.toHaveProperty("recordHash");
+    expect(buildEffectiveGuidancePack(result.registry, { workspaceId, accountId: "account_primary", objective: null,
+      optimization: null, internalCategoryIds: ["category_primary"], entity: { type: "campaign", id: "campaign_primary" },
+      topics: ["quality"], requiredTopics: [], guidanceSetIds: ["set_primary"], evaluatedAt: capturedAt,
+      budget: { maxCards: 10, maxSources: 10, maxCharacters: 1_000 } }).selectedSets[0]!.setHash).toBe(result.reviewedSets[0]!.setHash);
     expect(result.reviewedSets[0]!.cards[0]!.cardHash).toMatch(/^[a-f0-9]{64}$/);
     expect(result.reviewedSets[0]!.cards[0]!.sources[0]!.sourceHash).toMatch(/^[a-f0-9]{64}$/);
     expect((harness.execute.mock.calls as unknown[][]).map(([query]) => new PgDialect().sqlToQuery(query as never).sql).join("\n"))

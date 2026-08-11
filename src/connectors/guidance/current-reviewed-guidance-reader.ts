@@ -230,7 +230,14 @@ export class CurrentReviewedGuidanceReader {
       cards = rows(cardRows).map((row) => card(row, workspaceId, capturedAt));
       bindings = rows(bindingRows).map((row) => binding(row, workspaceId, capturedAt));
       sets = rows(setRows).map((row) => set(row, workspaceId, capturedAt));
-      createGuidanceRegistry({ workspaceId, sources, cards, bindings, sets });
+      // Lifecycle/provenance fields are validated above, but they are not part
+      // of the immutable GuidanceRegistry domain records or their hashes.
+      createGuidanceRegistry({ workspaceId,
+        sources: sources.map(({ recordHash: _recordHash, createdAt: _createdAt, publishedAt: _publishedAt, archivedAt: _archivedAt, ...value }) => value),
+        cards: cards.map(({ recordHash: _recordHash, createdAt: _createdAt, publishedAt: _publishedAt, archivedAt: _archivedAt, ...value }) => value),
+        bindings: bindings.map(({ recordHash: _recordHash, createdAt: _createdAt, ...value }) => value),
+        sets: sets.map(({ recordHash: _recordHash, createdAt: _createdAt, reviewedAt: _reviewedAt, archivedAt: _archivedAt, ...value }) => value),
+      });
     } catch (error) {
       if (error instanceof CurrentReviewedGuidanceReaderError) throw error;
       fail("corrupt_store");
@@ -254,7 +261,12 @@ export class CurrentReviewedGuidanceReader {
       });
       return Object.freeze({ setRef: value.id, setVersion: value.version, setHash: value.recordHash, cards: Object.freeze(manifestCards) });
     });
-    const registry = createGuidanceRegistry({ workspaceId, sources, cards, bindings, sets });
+    const registry = createGuidanceRegistry({ workspaceId,
+      sources: sources.map(({ recordHash: _recordHash, createdAt: _createdAt, publishedAt: _publishedAt, archivedAt: _archivedAt, ...value }) => value),
+      cards: cards.map(({ recordHash: _recordHash, createdAt: _createdAt, publishedAt: _publishedAt, archivedAt: _archivedAt, ...value }) => value),
+      bindings: bindings.map(({ recordHash: _recordHash, createdAt: _createdAt, ...value }) => value),
+      sets: sets.map(({ recordHash: _recordHash, createdAt: _createdAt, reviewedAt: _reviewedAt, archivedAt: _archivedAt, ...value }) => value),
+    });
     return Object.freeze({ capturedAt, registryHash: registry.registryHash, registry, reviewedSets: Object.freeze(reviewedSets) });
   }
 }

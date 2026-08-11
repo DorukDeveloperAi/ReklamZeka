@@ -33,6 +33,16 @@ if (!connectionString) {
 
 const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 20_000 });
 const database = drizzle(pool, { schema });
+const fixtureResidue = rows(await database.execute(sql`
+  select count(*)::int as count from workspaces
+  where lifecycle_state = 'active' and name in ('Current source verifier', 'Current source foreign')
+`))[0]?.count;
+if (Number(fixtureResidue ?? -1) !== 0) {
+  await pool.end();
+  process.stderr.write(`${JSON.stringify({ ok: false, blocker: "ephemeral_current_source_fixture_residue_detected",
+    activeFixtureCount: Number(fixtureResidue ?? -1), continuation: "ALLOW_EPHEMERAL_CURRENT_SOURCE_FIXTURE_RECOVERY=1 npm run recover:current-effective-analysis-context-source-fixtures-db" })}\n`);
+  process.exit(2);
+}
 const cleanupPrerequisite = rows(await database.execute(sql`
   select to_regclass('public.action_execution_attempts')::text as action_execution_attempts
 `))[0]?.action_execution_attempts;
@@ -57,6 +67,14 @@ const cadence: DecisionCadenceProfile = Object.freeze({ version: DECISION_CADENC
   frequencyWindowHours: 24, maxDecisionsPerWindow: 3, maxActionsPerWindow: 1, maximumHistoryEntries: 20,
   minimumEvidenceCount: 1, minimumEvidenceScore: 0.5 });
 
+let verificationPhase = "bootstrap";
+function phase(value: string): void {
+  verificationPhase = value;
+  if (process.env.VERIFIER_PHASE_OUTPUT === "1") {
+    process.stderr.write(`${JSON.stringify({ verifier: "current_effective_analysis_context_source", phase: value })}\n`);
+  }
+}
+
 function rows(value: unknown): readonly Record<string, unknown>[] {
   return value && typeof value === "object" && "rows" in value && Array.isArray(value.rows)
     ? value.rows as readonly Record<string, unknown>[] : [];
@@ -65,9 +83,12 @@ function rows(value: unknown): readonly Record<string, unknown>[] {
 let fetchCalls = 0; let ready = false; let saved = false; let reloaded = false;
 let crossTenantBlocked = false; let malformedBlocked = false; let fixtureCommitted = false;
 let cleanupSucceeded = false; let activeSurvivorCount = -1; let purgeCandidateCount = -1;
+let foreignActiveSurvivorCount = -1; let foreignPurgeCandidateCount = -1;
+let cleanupError: string | null = null;
 const originalFetch = globalThis.fetch;
 
 try {
+  phase("fixture_materialization");
   globalThis.fetch = (async () => { fetchCalls += 1; throw new Error("network_not_allowed"); }) as typeof fetch;
   {
     // These are platform identities and an immutable source snapshot, not authority facts.
@@ -163,6 +184,7 @@ try {
       expectedSnapshotHeadHash: "GENESIS", expectedPolicyRegistryHash: emptyRegistryHash, catalog: authorityCatalog, scope: authorityScope, manualLocks: [] });
 
     const reader = new DrizzleCurrentEffectiveAnalysisContextSourceReader(database as never);
+    phase("closed_world_read_compose_reload");
     const source = await reader.loadCurrent(request);
     ready = source.status === "ready";
     if (!ready) throw new Error("closed_world_source_not_ready");
@@ -178,21 +200,35 @@ try {
 } finally {
   globalThis.fetch = originalFetch;
   if (fixtureCommitted) {
-    const purge = new DrizzleWorkspaceTombstonePurgePort();
-    const service = new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge),
-      { authorize: async (input) => input.approvalRef === "ephemeral-fixture-approved" }, actorId, 60_000);
-    const now = new Date().toISOString();
-    const plan = await service.dryRun(workspaceId, now);
-    await service.execute({ planRef: plan.planRef, approvalRef: "ephemeral-fixture-approved", now: new Date().toISOString() });
-    purgeCandidateCount = (await purge.inspect(database as never, workspaceId)).candidateCount;
-    const activeRows = rows(await database.execute(sql`select count(*)::int as count from workspaces
-      where id = ${workspaceId}::uuid and lifecycle_state = 'active'`));
-    activeSurvivorCount = Number(activeRows[0]?.count ?? -1);
-    cleanupSucceeded = purgeCandidateCount === 0 && activeSurvivorCount === 0;
+    try {
+      phase("tombstone_cleanup");
+      const purge = new DrizzleWorkspaceTombstonePurgePort();
+      const service = new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge),
+        { authorize: async (input) => input.approvalRef === "ephemeral-fixture-approved" }, actorId, 60_000);
+      for (const fixtureWorkspaceId of [workspaceId, foreignWorkspaceId]) {
+        phase(fixtureWorkspaceId === workspaceId ? "tombstone_primary" : "tombstone_foreign");
+        const plan = await service.dryRun(fixtureWorkspaceId, new Date().toISOString());
+        await service.execute({ planRef: plan.planRef, approvalRef: "ephemeral-fixture-approved", now: new Date().toISOString() });
+      }
+      purgeCandidateCount = (await purge.inspect(database as never, workspaceId)).candidateCount;
+      foreignPurgeCandidateCount = (await purge.inspect(database as never, foreignWorkspaceId)).candidateCount;
+      const activeRows = rows(await database.execute(sql`select count(*) filter (where id = ${workspaceId}::uuid and lifecycle_state = 'active')::int as primary_count,
+        count(*) filter (where id = ${foreignWorkspaceId}::uuid and lifecycle_state = 'active')::int as foreign_count from workspaces
+        where id in (${workspaceId}::uuid, ${foreignWorkspaceId}::uuid)`));
+      activeSurvivorCount = Number(activeRows[0]?.primary_count ?? -1);
+      foreignActiveSurvivorCount = Number(activeRows[0]?.foreign_count ?? -1);
+      cleanupSucceeded = purgeCandidateCount === 0 && foreignPurgeCandidateCount === 0 && activeSurvivorCount === 0 && foreignActiveSurvivorCount === 0;
+    } catch (error) {
+      cleanupError = error instanceof Error ? error.message : "unknown_cleanup_error";
+      process.stderr.write(`${JSON.stringify({ ok: false, phase: verificationPhase, cleanupError })}\n`);
+    }
   }
 }
 await pool.end();
+if (cleanupError) throw new Error(`ephemeral_fixture_cleanup_failed:${cleanupError}`);
 if (!cleanupSucceeded || fetchCalls !== 0) throw new Error("ephemeral_fixture_cleanup_failed");
+phase("complete");
 console.log(JSON.stringify({ ok: ready && saved && reloaded && crossTenantBlocked && malformedBlocked,
   scope: "closed_world_current_source_ready_compose_save_reload", ready, saved, reloaded, crossTenantBlocked, malformedBlocked,
-  actionOrNetworkCalls: fetchCalls, fixtureCommitted, cleanup: "locked_workspace_tombstone", purgeCandidateCount, activeSurvivorCount }));
+  actionOrNetworkCalls: fetchCalls, fixtureCommitted, cleanup: "locked_workspace_tombstone", purgeCandidateCount, activeSurvivorCount,
+  foreignPurgeCandidateCount, foreignActiveSurvivorCount, verificationPhase }));

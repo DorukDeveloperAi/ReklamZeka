@@ -47,7 +47,11 @@ function referencedCompositeKeys(statement: OrderedStatement) {
   ));
 
   return [...matches]
-    .map((match) => ({ table: normalizeIdentifier(match[2]), columns: normalizeColumns(match[3]) }))
+    .flatMap((match) => {
+      const table = match[2];
+      const columns = match[3];
+      return table && columns ? [{ table: normalizeIdentifier(table), columns: normalizeColumns(columns) }] : [];
+    })
     .filter((reference) => reference.columns.length > 1);
 }
 
@@ -59,7 +63,7 @@ function targetKeysCreatedBy(statement: OrderedStatement) {
 
   if (table) {
     for (const match of statement.sql.matchAll(/(?:PRIMARY\s+KEY|\bUNIQUE)\s*\(([^)]+)\)/gi)) {
-      const columns = normalizeColumns(match[1]);
+      const columns = match[1] ? normalizeColumns(match[1]) : [];
       if (columns.length > 1) keys.push(keyFor(table, columns));
     }
   }
@@ -68,8 +72,9 @@ function targetKeysCreatedBy(statement: OrderedStatement) {
     `CREATE\\s+UNIQUE\\s+INDEX\\s+${identifier}\\s+ON\\s+(?:${identifier}\\s*\\.\\s*)?(${identifier})(?:\\s+USING\\s+\\w+)?\\s*\\(([^)]+)\\)`,
     "gi",
   ))) {
-    const columns = normalizeColumns(match[2]);
-    if (columns.length > 1) keys.push(keyFor(match[1], columns));
+    const table = match[1];
+    const columns = match[2] ? normalizeColumns(match[2]) : [];
+    if (table && columns.length > 1) keys.push(keyFor(table, columns));
   }
 
   return keys;

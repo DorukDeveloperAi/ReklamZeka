@@ -36,7 +36,7 @@ describe("deterministic feature snapshot migration", () => {
     for (const [target, foreignKey] of [
       ["meta_connections_workspace_id_unique", "deterministic_feature_snapshots_connection_scope_fk"],
       ["ad_accounts_workspace_id_unique", "deterministic_feature_snapshots_account_scope_fk"],
-    ]) {
+    ] as [string, string][]) {
       expect(scopeTargetMigration.indexOf(target)).toBeGreaterThanOrEqual(0);
       expect(migration.indexOf(foreignKey)).toBeGreaterThanOrEqual(0);
     }
@@ -44,7 +44,7 @@ describe("deterministic feature snapshot migration", () => {
     for (const [target, foreignKey] of [
       ["meta_daily_insights_workspace_id_unique", "deterministic_feature_snapshot_sources_insight_scope_fk"],
       ["deterministic_feature_snapshots_workspace_id_unique", "deterministic_feature_snapshot_sources_feature_scope_fk"],
-    ]) {
+    ] as [string, string][]) {
       expect(migration.indexOf(target)).toBeGreaterThanOrEqual(0);
       expect(migration.indexOf(foreignKey)).toBeGreaterThan(migration.indexOf(target));
     }
