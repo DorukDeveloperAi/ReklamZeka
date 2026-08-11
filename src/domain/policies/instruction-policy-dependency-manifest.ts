@@ -17,6 +17,8 @@ const policyContract = new Set([
   "policy_manual_lock_revisions.payload",
   "authority_topic_revisions.payload",
   "policy_semantic_binding_revisions.payload",
+  "candidate_preview_binding_revisions.decision",
+  "candidate_preview_binding_revisions.payload",
   "decision_cadence_profile_revisions.profile_payload",
   "progressive_formalization_revisions.revision_payload",
 ]);

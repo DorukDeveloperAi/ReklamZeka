@@ -93,6 +93,13 @@ function composer(options: Readonly<{ invalidated?: boolean; authority?: Reposit
 }
 
 describe("EffectiveAnalysisContextComposer", () => {
+  it("can compose a source-bound base for a derived evidence writer without persisting the base identity", async () => {
+    const { instance, save } = composer();
+    const result = await instance.compose(request);
+    expect(result.context.policyAuthorityEvidence?.snapshotRef).toBe("authority_snapshot_primary");
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it("accepts only scope input, derives config/category/authority evidence, and persists evidence-bound", async () => {
     const { instance, save } = composer();
     const result = await instance.composeAndSave(request);

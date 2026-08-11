@@ -9,6 +9,7 @@ describe("candidate preview G3 fixture harness", () => {
       "materializeCurrentEffectiveAnalysisContextSourceFixture", "DrizzleBusinessOutcomeSignalRepository",
       "DrizzleBusinessOutcomeEvidenceRepository", "BusinessOutcomeContextComposer",
       "DrizzleDecisionRoomAnalysisAssetRegistry", "DrizzleDecisionRoomAnalysisRuntimeAssetLoader",
+      "createDrizzleTimeframeBoundAnalysisContextComposer",
       "InstructionPolicyLifecycleService", "ProgressiveFormalizationService",
     ]) expect(source).toContain(writer);
     for (const forbidden of [

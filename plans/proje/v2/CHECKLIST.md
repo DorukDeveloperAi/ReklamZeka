@@ -259,6 +259,13 @@
     context'in own historical authority snapshot'ı same-executor'da doğrulanır. Mixed-account/tamper/
     missing evidence fail-closed; draft candidate için ayrı trusted tier/decision preview binding yoksa
     G3 promotion zero-write blocked kalır. Bu G3 positive acceptance veya G4 yetkisi iddia etmez.
+  - [x] A09.4b server-private candidate preview-binding ledger: G2 head, reviewed guidance
+    manifesti, draft policy sürümü, hedef account ve geçerli repository-verified authority basis
+    snapshot'ı immutable/OCC/auditli bağlanır. Candidate tier/decision yalnız bu ledger'dan okunur;
+    draft için `productionAuthoritySourceBound=false`, bütün G4/action/Meta yetkileri false kalır.
+    PostgreSQL outer-rollback verifier'ı normal lifecycle fixture ile positive candidate binding,
+    cross-tenant/tamper/stale retleri ve sıfır action/network çağrısını kanıtlar; candidate
+    ilişkileri tombstone purge sırasına dahildir.
   - [ ] G3 authoritative conflict/impact/historical-outcome resolver ile G4 A13 evidence binding'i ve
     bağlı PostgreSQL/gerçek session acceptance.
 - [ ] AdvisedPractice candidate→trial→outcome→standardization lifecycle.

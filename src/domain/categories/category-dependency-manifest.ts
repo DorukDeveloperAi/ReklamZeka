@@ -111,6 +111,10 @@ const columns = [
   "policy_manual_lock_revisions.payload",
   "authority_topic_revisions.payload",
   "policy_semantic_binding_revisions.payload",
+  // Candidate-preview authority evidence pins a policy/guidance/snapshot basis;
+  // it carries no category reference, so archive impact has no category edge.
+  "candidate_preview_binding_revisions.decision",
+  "candidate_preview_binding_revisions.payload",
   "guidance_cards.source_ids",
   "guidance_sets.ordered_card_ids",
   // Campaign guidance selection stores guidance topic labels and pack limits,

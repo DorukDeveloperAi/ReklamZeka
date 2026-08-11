@@ -6,6 +6,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { createBusinessOutcomeSignalBatch } from "@/analyses/business-outcome-signal";
 import { BusinessOutcomeContextComposer } from "@/application/business-outcome-context-composer";
 import { ANALYSIS_TEMPLATE_DEFINITION_VERSION, ANALYSIS_TIMEFRAME_DEFINITION_VERSION, type AnalysisTemplateDefinition, type AnalysisTimeframeDefinition } from "@/application/decision-room-analysis-registry";
+import { resolveAnalysisTimeframe } from "@/analyses/timeframe-resolver";
 import { InstructionPolicyLifecycleService } from "@/application/instruction-policy-lifecycle-service";
 import { ProgressiveFormalizationService } from "@/application/progressive-formalization-service";
 import { DrizzleBusinessOutcomeEvidenceRepository } from "@/connectors/analyses/business-outcome-evidence-drizzle-repository";
@@ -54,7 +55,9 @@ export async function materializeCandidatePreviewBindingG3Fixture(database: Data
 
   // Compose source-bound context first, then append only materialized L4 evidence.
   const { createDrizzleEffectiveAnalysisContextComposer } = await import("@/server/effective-analysis-context-composer-runtime");
-  const base = await createDrizzleEffectiveAnalysisContextComposer({ database }).composeAndSave(source.request);
+  // The L4 composer owns the single immutable context write.  Persisting the
+  // unbound base first would deliberately collide on the immutable identity.
+  const base = await createDrizzleEffectiveAnalysisContextComposer({ database }).compose(source.request);
   const contextRepository = new DrizzleEffectiveCampaignContextRepository(database);
   const outcomeContext = await new BusinessOutcomeContextComposer(new DrizzleBusinessOutcomeEvidenceRepository(database), {
     save: (context) => contextRepository.save(context, { mode: "evidence_bound" }),
@@ -78,8 +81,18 @@ export async function materializeCandidatePreviewBindingG3Fixture(database: Data
     timeframe: { kind: "rolling", days: 1, timezone: "Europe/Istanbul" }, comparison: "none", anchors: {} };
   const registry = new DrizzleDecisionRoomAnalysisAssetRegistry(database, source.workspaceId);
   const persistedTimeframe = await registry.publishTimeframe(timeframe, new Date().toISOString());
+  // Decision Room accepts only a normal L3 window-bound context (real feature
+  // and window references). Derive it through the server-private runtime,
+  // rather than fabricating analysis evidence in this fixture.
+  const asOf = new Date(Date.now() + 1_000).toISOString();
+  const resolvedTimeframe = resolveAnalysisTimeframe({ timeframe: timeframe.timeframe, comparison: timeframe.comparison,
+    asOf, anchors: timeframe.anchors });
+  const { createDrizzleTimeframeBoundAnalysisContextComposer } = await import("@/server/timeframe-bound-analysis-context-composer-runtime");
+  const windowBound = await createDrizzleTimeframeBoundAnalysisContextComposer({ database, now: () => new Date(asOf) }).composeAndSave({
+    workspaceId: source.workspaceId, entityType: "campaign", entityRef: source.campaignRef, timeframe: resolvedTimeframe,
+  });
   const template: AnalysisTemplateDefinition = { version: ANALYSIS_TEMPLATE_DEFINITION_VERSION, templateRef, revision: 1,
-    timeframeRef, timeframeDefinitionHash: persistedTimeframe.definitionHash, contextHash: outcomeContext.context.contextHash,
+    timeframeRef, timeframeDefinitionHash: persistedTimeframe.definitionHash, contextHash: windowBound.context.contextHash,
     requestedPasses: ["campaign"], hierarchy: [{ entityRef: source.campaignRef, entityType: "campaign", parentEntityRef: null }],
     checks: [{ checkKey: `check_${suffix}`, passKey: "campaign", entityRef: source.campaignRef, entityType: "campaign",
       parentEntityRef: null, hierarchyPathRefs: [source.campaignRef], driverEvidenceRefs: [], externalEntityId: source.campaignRef,

@@ -384,6 +384,23 @@
   acceptance henüz iddia edilmez; ayrı owner-confirmed candidate preview-binding lifecycle'i sonraki
   forward-only checkpoint'tir.
 
+## 2026-08-11 — A09.4b private candidate preview-binding evidence
+
+- Draft policy, production authority catalog'ına sokulmadan ayrı append-only candidate ledger'da
+  exact G2 head, reviewed guidance manifesti, draft policy revision/hash, active target account,
+  canonical authority tier/structured decision ve repository-verified basis snapshot ile bağlanır.
+  Read-time kontrol snapshot geçerliliğini, tenant/account scope'u, catalog/binding bütünlüğünü ve
+  current draft/G2/guidance head'lerini yeniden doğrular; herhangi bir drift fail-closed'dur.
+- `candidate_preview_binding_*` tablolarda FORCE RLS, public/API rol revoke, tombstoning-only
+  delete ve OCC head korumaları vardır. Tombstone purge invalidation → head → revision sırasıyla
+  bağımlılıkları kaldırır. Decision JSON CHECK'i NULL-true üç değerli mantığına karşı `IS TRUE`
+  ile kapalıdır; tier sözlüğü canonical `PolicyAuthorityTier` ile aynıdır.
+- Gerçek PostgreSQL outer-rollback kanıtı normal source/outcome/timeframe/Decision Room/G0→G2
+  lifecycle'ından candidate binding üretir; positive binding, cross-tenant/tamper/stale retleri,
+  G4/action/Meta/network kapılarının false/zero kalması ve residue=0 doğrulanır. Bu yalnız private
+  G3 preview evidence'ıdır: draft `productionAuthoritySourceBound=false` kalır; G3 promote
+  readiness ve G4 yetkisi açılmaz.
+
 ## 2026-08-10 — A10.1 kalıcı DecisionCadenceProfile
 
 - `decision_cadence_profile_revisions` additive PostgreSQL tablosu tenant/account/campaign composite

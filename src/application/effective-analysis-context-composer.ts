@@ -168,10 +168,8 @@ export class EffectiveAnalysisContextComposer {
   constructor(private readonly sourceReader: EffectiveAnalysisContextSourceReader,
     private readonly writer: EvidenceBoundEffectiveContextWriter) {}
 
-  async composeAndSave(candidate: EffectiveAnalysisContextRequest): Promise<Readonly<{
-    context: EffectiveCampaignContext;
-    outcome: "inserted" | "unchanged";
-  }>> {
+  /** Server-private composition seam for a derived immutable evidence context. */
+  async compose(candidate: EffectiveAnalysisContextRequest): Promise<Readonly<{ context: EffectiveCampaignContext }>> {
     const input = request(candidate);
     let source: EffectiveAnalysisContextSource;
     try { source = await this.sourceReader.loadCurrent(input); }
@@ -218,6 +216,14 @@ export class EffectiveAnalysisContextComposer {
       || !allFalse(composed.context.capabilities) || !allFalse(composed.authority, POLICY_AUTHORITY_CAPABILITIES)) {
       throw new EffectiveAnalysisContextComposerError("authority_rejected");
     }
+    return Object.freeze({ context: composed.context });
+  }
+
+  async composeAndSave(candidate: EffectiveAnalysisContextRequest): Promise<Readonly<{
+    context: EffectiveCampaignContext;
+    outcome: "inserted" | "unchanged";
+  }>> {
+    const composed = await this.compose(candidate);
     let persisted: Awaited<ReturnType<EvidenceBoundEffectiveContextWriter["save"]>>;
     try { persisted = await this.writer.save(composed.context, { mode: "evidence_bound" }); }
     catch (error) { throw new EffectiveAnalysisContextComposerError("source_rejected", diagnosticCodeOf(error)); }
