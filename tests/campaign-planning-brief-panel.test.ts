@@ -12,8 +12,8 @@ import {
 
 const gccContext: CampaignPlanningBriefContext = Object.freeze({
   campaignRef: "cmp_gcc",
-  campaignLabel: "GCC · Doktor Tanıtım · Leads",
-  input: Object.freeze({ businessGoal: "lead_acquisition", market: "international", language: "ar", serviceRef: "service_doctor_introduction", countryOrRegion: "GCC", conversionRoute: "lead_form", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }),
+  campaignLabel: "Arap Bölgesi · FTR · WhatsApp",
+  input: Object.freeze({ businessGoal: "lead_acquisition", market: "international", language: "ar", serviceRef: "service_physical_therapy_rehab", countryOrRegion: "Arap Bölgesi", conversionRoute: "whatsapp", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }),
 });
 
 describe("campaign planning brief panel", () => {
@@ -35,12 +35,12 @@ describe("campaign planning brief panel", () => {
 
   it("starts from the selected campaign context and keeps context reset proposal-only", () => {
     const html = renderToStaticMarkup(createElement(CampaignPlanningBriefPanel, { context: gccContext }));
-    expect(html).toContain("Seçili bağlam: GCC · Doktor Tanıtım · Leads");
+    expect(html).toContain("Seçili bağlam: Arap Bölgesi · FTR · WhatsApp");
     expect(html).toContain("CONTEXT BOUND");
-    expect(html).toContain("Nitelikli form talebi");
+    expect(html).toContain("Nitelikli WhatsApp talebi");
     expect(html).toContain("ayrı proposal/onay akışına geçin");
     expect(html).toContain("Bağlamı geri yükle");
-    expect(html).toContain("international_form_lead");
+    expect(html).toContain("international_whatsapp_lead");
     expect(html).not.toContain("Meta transport");
   });
 

@@ -17,6 +17,12 @@
 - A09/A10'un mevcut fail-closed kanıtları korunur; ancak yeni ayrıntı yalnız güvenlik ihlali, veri
   bütünlüğü riski veya bu üç ürün adımını açan somut bir blocker olduğunda yapılır. Kapsam dışı
   "mükemmelleştirme" işleri checklist'e yeni teslimat gibi eklenmez.
+- `outputs/campaign_budget_tracker_20260810/kampanya_butce_harcama_takip_kesinti_analizli.xlsx`
+  salt-okunur ürün girdisi olarak incelendi: karar eksenleri **pazar → dil → iş amacı → ana grup →
+  dönüşüm yolu**dur; `Lead` ve `Bilinirlik / İzlenme / Trafik` aynı sonuç havuzu değildir; AR WhatsApp
+  ve RU form lead şeritleri ayrı tutulur. Ödeme/teslimat kesintisi sayfası, ani harcama çöküşünün önce
+  sağlıklı teslimat olarak yeniden doğrulanması gerektiğini gösterir. Dashboard briefi bu sınıfları
+  seçilebilir kılar, fakat Excel'i canlı Meta kaynağı veya yazma yetkisi gibi sunmaz.
 
 ## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
 

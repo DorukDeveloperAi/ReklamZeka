@@ -269,7 +269,12 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
         <option value="">Seçilmedi</option><option value="tr">Türkçe</option><option value="en">İngilizce</option><option value="ar">Arapça</option>
       </select></label>
       <label htmlFor="brief-service"><span>Hizmet / ana grup</span><select id="brief-service" value={draft.serviceRef ?? ""} onChange={(event) => change("serviceRef", event.target.value || null)}>
-        <option value="">Seçilmedi</option><option value="service_medical_aesthetics">Medikal estetik</option><option value="service_hair_transplant">Saç ekimi</option><option value="service_doctor_introduction">Doktor tanıtım</option>
+        <option value="">Seçilmedi</option><option value="service_medical_aesthetics">Medikal estetik / plastik cerrahi</option>
+        <option value="service_hair_transplant">Saç ekimi</option><option value="service_physical_therapy_rehab">Fizik tedavi / rehabilitasyon</option>
+        <option value="service_checkup">Check-up</option><option value="service_birth">Doğum kampanyası</option>
+        <option value="service_doctor_introduction">Doktor tanıtım</option><option value="service_human_resources">İnsan kaynakları</option>
+        <option value="service_content_post">İçerik / gönderi</option><option value="service_brand_corporate">Marka / kurumsal</option>
+        <option value="service_unclassified">Diğer / sınıflandırılacak</option>
       </select></label>
       {draft.market === "international" ? <label htmlFor="brief-region"><span>Ülke / bölge</span><input id="brief-region" value={draft.countryOrRegion ?? ""} maxLength={120} onChange={(event) => change("countryOrRegion", event.target.value.trim() || null)} placeholder="Örn. GCC" /></label> : null}
       <label htmlFor="brief-route"><span>Dönüşüm yolu</span><select id="brief-route" value={draft.conversionRoute} onChange={(event) => change("conversionRoute", event.target.value as ConversionRoute)}>
