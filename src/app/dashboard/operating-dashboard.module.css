@@ -188,6 +188,14 @@
 .briefNextDecision > span, .briefPlan > div > span { color: var(--rz-dim); font: 700 .52rem ui-monospace, monospace; letter-spacing: .08em; }
 .briefNextDecision strong { font-size: .7rem; }.briefNextDecision small, .briefPlan small { color: var(--rz-muted); font-size: .58rem; line-height: 1.45; }
 .briefNextDecision button { justify-self: start; min-height: 30px; padding: 0 9px; border: 1px solid rgba(189,245,94,.42); border-radius: 6px; background: rgba(189,245,94,.1); color: var(--rz-green); font: 700 .56rem ui-monospace, monospace; cursor: pointer; }
+.campaignDecisionTimeline { margin: 0 18px 14px; overflow: hidden; border: 1px solid var(--rz-line); border-radius: 8px; background: rgba(255,255,255,.012); }
+.campaignDecisionTimeline > header { display: grid; gap: 4px; padding: 11px 12px; border-bottom: 1px solid var(--rz-line); }
+.campaignDecisionTimeline > header > span { color: var(--rz-blue); font: 700 .52rem ui-monospace, monospace; letter-spacing: .08em; }
+.campaignDecisionTimeline > header small { color: var(--rz-muted); font-size: .57rem; line-height: 1.4; }
+.campaignDecisionTimeline ol { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
+.campaignDecisionTimeline li { display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: start; gap: 8px; min-height: 89px; padding: 12px; border-right: 1px solid var(--rz-line); }
+.campaignDecisionTimeline li:last-child { border-right: 0; }.campaignDecisionTimeline li > span { display: grid; place-items: center; width: 18px; height: 18px; border: 1px solid var(--rz-line-strong); border-radius: 99px; color: var(--rz-muted); font: 700 .55rem ui-monospace, monospace; }.campaignDecisionTimeline li[data-state="ready"] > span { color: #111; border-color: var(--rz-green); background: var(--rz-green); }.campaignDecisionTimeline li[data-state="closed"] > span { color: var(--rz-amber); border-color: rgba(255,194,104,.42); }.campaignDecisionTimeline li[data-state="unavailable"] > span { color: var(--rz-red); border-color: rgba(255,132,123,.42); }
+.campaignDecisionTimeline li > div { display: grid; gap: 4px; min-width: 0; }.campaignDecisionTimeline li strong { font-size: .61rem; line-height: 1.35; }.campaignDecisionTimeline li small { color: var(--rz-muted); font-size: .55rem; line-height: 1.45; }
 .briefPlan { display: grid; grid-template-columns: 1.2fr 1.2fr .8fr; border-top: 1px solid var(--rz-line); }
 .briefPlan > div { display: grid; align-content: start; gap: 9px; min-height: 112px; padding: 14px 18px; border-right: 1px solid var(--rz-line); }.briefPlan > div:last-child { border-right: 0; }
 .briefPlan article, .briefPlan li { display: grid; gap: 3px; }.briefPlan strong { font-size: .65rem; }.briefPlan ol { display: grid; gap: 7px; margin: 0; padding-left: 18px; }.briefPlan li::marker { color: var(--rz-green); }
@@ -881,6 +889,9 @@
   .contextGrid > div:nth-child(-n+2) { border-bottom: 1px solid var(--rz-line); }
   .briefControls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .briefPlan { grid-template-columns: 1fr 1fr; }
+  .campaignDecisionTimeline ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .campaignDecisionTimeline li:nth-child(2) { border-right: 0; }
+  .campaignDecisionTimeline li:nth-child(-n+2) { border-bottom: 1px solid var(--rz-line); }
   .briefPlan > div:last-child { grid-column: 1 / -1; border-top: 1px solid var(--rz-line); border-right: 0; }
   .analysisBuilder { grid-template-columns: repeat(2, 1fr); }
   .analysisBuilder button { min-height: 46px; grid-column: 1 / -1; }
@@ -1018,6 +1029,9 @@
   .contextGrid, .hierarchy { grid-template-columns: 1fr; }
   .contextGrid > div { border-right: 0; border-bottom: 1px solid var(--rz-line); }
   .briefControls, .briefPlan { grid-template-columns: 1fr; }
+  .campaignDecisionTimeline ol { grid-template-columns: 1fr; }
+  .campaignDecisionTimeline li, .campaignDecisionTimeline li:nth-child(2) { min-height: 0; border-right: 0; border-bottom: 1px solid var(--rz-line); }
+  .campaignDecisionTimeline li:last-child { border-bottom: 0; }
   .briefPlan > div, .briefPlan > div:last-child { min-height: 0; border-right: 0; border-bottom: 1px solid var(--rz-line); }
   .briefPlan > div:last-child { border-top: 0; border-bottom: 0; }
   .budgetHero > div:first-child { grid-template-columns: 1fr; }

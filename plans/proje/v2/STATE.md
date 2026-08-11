@@ -18,6 +18,21 @@
   bütünlüğü riski veya bu üç ürün adımını açan somut bir blocker olduğunda yapılır. Kapsam dışı
   "mükemmelleştirme" işleri checklist'e yeni teslimat gibi eklenmez.
 
+## 2026-08-11 — A14 context-bound read-only karar zaman çizelgesi
+
+- Brief paneli yalnız gerçek frozen context'ten doğrulanmış `entity_…` Approval Queue alias'ı geldiğinde
+  dört sabit aşamalı bir zaman çizelgesi açar: persisted context, geçici/deterministik brief ve öneri,
+  persisted approval listesi ve kapalı uygulama güvenliği. Demo veya unbound context bu yüzeyi hiç
+  render etmez; dolayısıyla fixture/draft durumu kalıcı karar tarihi gibi gösterilmez.
+- Approval listesi yalnız `GET /api/approval-queue?view=list&campaignRef=…` ile okunur. Client projection
+  contract sürümünü, exact response anahtarlarını, campaign alias eşleşmesini ve bütün authority bitlerini
+  (`canExecute`/`canWriteMeta` dahil) doğrular. Her sapma approval aşamasını `unavailable` yapar; mutation
+  kontrolü, approval kararı veya Meta write capability'si eklenmez.
+- Hedefli SSR/pure-contract testleri, unbound görünümün timeline üretmediğini; campaign-matching read-only
+  yanıtın dört aşamayı ürettiğini; cross-campaign, malformed veya write-capable yanıtın fail-closed
+  kaldığını doğrular. Gerçek local-session browser semantic acceptance, DB'de persisted context +
+  ActionUnit bulunmadığı için hâlâ açıktır.
+
 ## 2026-08-10 — A14 approval inbox execution-safety görünümü
 
 - Approval Queue, onay kaydı, mirror yeniden kontrolü, ayrı human-presence seremonisi, kapalı Meta

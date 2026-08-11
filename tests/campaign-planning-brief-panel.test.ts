@@ -2,7 +2,13 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { CampaignPlanningBriefPanel, type CampaignPlanningBriefContext } from "@/app/dashboard/campaign-planning-brief-panel";
+import {
+  CampaignPlanningBriefPanel,
+  campaignContextTimelineSourceState,
+  campaignDecisionTimeline,
+  decisionTimelineFromApprovalQueueResponse,
+  type CampaignPlanningBriefContext,
+} from "@/app/dashboard/campaign-planning-brief-panel";
 
 const gccContext: CampaignPlanningBriefContext = Object.freeze({
   campaignRef: "cmp_gcc",
@@ -24,6 +30,7 @@ describe("campaign planning brief panel", () => {
     expect(html).toContain("campaign create / publish / approval / execute / Meta write: kapalı");
     expect(html).not.toMatch(/Meta.{0,30}(yaz|write).{0,30}(başlat|çalıştır|onayla)/i);
     expect(html).not.toContain("İş amacını bu sinyalle eşle");
+    expect(html).not.toContain("KARAR ZAMAN ÇİZELGESİ");
   });
 
   it("starts from the selected campaign context and keeps context reset proposal-only", () => {
@@ -35,5 +42,58 @@ describe("campaign planning brief panel", () => {
     expect(html).toContain("Bağlamı geri yükle");
     expect(html).toContain("international_form_lead");
     expect(html).not.toContain("Meta transport");
+  });
+
+  it("only projects a campaign-matching, read-only approval list into the decision timeline", () => {
+    const campaignRef = "entity_abcdef0123456789";
+    const response = {
+      contractVersion: "approval-queue-read-model/1.2.0",
+      view: "list",
+      entityRef: null,
+      campaignRef,
+      items: [{
+        unitRef: "action_unit_abcdef0123456789abcd",
+        bundleRef: null,
+        status: "awaiting_approval",
+        risk: "K2",
+        actionType: "budget_decrease",
+        accountRef: "account_abcdef0123456789",
+        campaignRef,
+        entity: { type: "campaign", ref: campaignRef, label: "Campaign" },
+        beforeAfter: { field: "configured_status", before: "ACTIVE", after: "PAUSED" },
+        autonomy: { profileRef: "autonomy_abcdef0123456789", decision: "approval_required", trace: [{ scope: "risk", decision: "approval_required", reasonCode: "policy_limit" }] },
+        expiresAt: "2026-08-12T10:00:00.000Z",
+        createdAt: "2026-08-11T10:00:00.000Z",
+        dependencies: [],
+        summaryCode: "safe_summary",
+      }],
+      nextCursor: null,
+      authority: { readOnly: true, canApprove: false, canReject: false, canRequestChanges: false, canGrant: false, canExecute: false, canWriteMeta: false },
+    };
+    const approval = decisionTimelineFromApprovalQueueResponse(response, campaignRef);
+    expect(approval).toEqual({ itemCount: 1, latestStatus: "awaiting_approval" });
+    expect(campaignDecisionTimeline({ sourceState: "ready", approvalState: "ready", approval }).map((stage) => stage.title)).toEqual([
+      "Frozen kampanya bağlamı", "Deterministik brief ve öneri", "Persisted insan onayı", "Uygulama güvenliği",
+    ]);
+    expect(campaignDecisionTimeline({ sourceState: "ready", approvalState: "ready", approval })[3]?.detail).toContain("Kapalı");
+  });
+
+  it("fails closed for a malformed, cross-campaign, or write-capable approval response", () => {
+    const campaignRef = "entity_abcdef0123456789";
+    const base = {
+      contractVersion: "approval-queue-read-model/1.2.0", view: "list", entityRef: null, campaignRef, items: [], nextCursor: null,
+      authority: { readOnly: true, canApprove: false, canReject: false, canRequestChanges: false, canGrant: false, canExecute: false, canWriteMeta: false },
+    };
+    expect(decisionTimelineFromApprovalQueueResponse({ ...base, authority: { ...base.authority, canExecute: true } }, campaignRef)).toBeNull();
+    expect(decisionTimelineFromApprovalQueueResponse({ ...base, campaignRef: "entity_0000000000000000" }, campaignRef)).toBeNull();
+    expect(decisionTimelineFromApprovalQueueResponse({ ...base, unexpected: true }, campaignRef)).toBeNull();
+  });
+
+  it("distinguishes an authentic empty context from a malformed successful response", () => {
+    const campaignRef = "ref_abcdef012345";
+    const empty = { contractVersion: "campaign-context-read-model/1.1.0", view: "empty", campaignRef, writeOperations: 0 };
+    expect(campaignContextTimelineSourceState(true, empty, campaignRef)).toBe("empty");
+    expect(campaignContextTimelineSourceState(true, { ...empty, writeOperations: 1 }, campaignRef)).toBe("unavailable");
+    expect(campaignContextTimelineSourceState(true, { ...empty, unexpected: true }, campaignRef)).toBe("unavailable");
   });
 });

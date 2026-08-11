@@ -721,6 +721,10 @@
       kullanılamayan `campaignRef` database içinde yeniden çözülür. Campaign filtresi direct campaign ile
       ad-set/ad üst-campaign hiyerarşisini kapsar; public source sonucu filtreyle eşleşmezse fail-closed
       kalır. Dashboard timeline bağlama açık.
+    - [x] Doğrulanmış frozen-context alias'ı açıldığında dört sıralı read-only karar zaman çizelgesi:
+      persisted context → ephemeral brief/öneri → exact persisted approval listesi → execute/Meta-write
+      kapalı. Alias, response şeması veya read-only authority bitlerinden biri değişirse approval aşaması
+      fail-closed `unavailable` kalır; demo/unbound bağlamda timeline render edilmez.
 
 - [ ] Bugün/portfolio hiyerarşi ve internal/Meta filtreler.
 - [ ] Account-group switcher, multi-account connection health ve Page/Instagram asset graph.
