@@ -279,6 +279,14 @@
   değildir; schema substrate üzerinde definition revision materialization ve asset writer açık
   kalır. Capability yüzeyi değişmez.
 
+## 2026-08-11 — A10.5c diagnostic definition transition gate
+
+- Saf lifecycle gate, aynı definition ref için yalnız contiguous revision ve exact previous hash ile
+  ilerlemeye izin verir; published→draft gerilemesi ile retired sonrası tüm transition'lar reddedilir.
+  Bu, sonraki private repository insert'inin OCC/append-only ön koşuludur.
+- Henüz DB writer, actor/membership/audit veya published loader değildir; bu nedenle definition
+  lifecycle'ı production-ready sayılmaz ve asset materialization kapalıdır.
+
 ## 2026-08-11 — A07 field-pilot source coverage census
 
 - Yeni read-only `census:field-pilot-source-db` REPEATABLE READ altında yalnız aggregate workspace/account
