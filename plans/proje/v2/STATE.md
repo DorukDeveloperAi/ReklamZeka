@@ -228,6 +228,17 @@
   henüz explicit funnel commitment üretmediği için positive cohort live acceptance **açık** kalır;
   null funnel’da runtime sonuç uydurmaz.
 
+## 2026-08-11 — A10.5c creative fatigue V2 hesap sözleşmesi
+
+- `creative-fatigue-config-diagnostics/2.0.0`, günlük frequency veya CTR ortalaması
+  kullanmaz: eşit/bitişik baseline-recent pencereler için frequency doğrudan source-grain
+  değer, CTR ise `clicks / impressions` ratio-of-sums olarak hesaplanır. Daily kayıtlar
+  yalnız tamlık/settlement kanıtıdır; frequency türetilmez ya da çoklu ad/creative arasında
+  birleştirilmez.
+- Bu yalnız saf, advisory hesap sözleşmesidir. Source-owned all-days Meta pencereleri,
+  binding/config snapshotları, immutable repository ve canlı PostgreSQL kabulü henüz
+  açık kaldığından Decision Room'a finding bağlanmamış, tüm yetkiler kapalıdır.
+
 ## 2026-08-11 — A07 field-pilot source coverage census
 
 - Yeni read-only `census:field-pilot-source-db` REPEATABLE READ altında yalnız aggregate workspace/account
