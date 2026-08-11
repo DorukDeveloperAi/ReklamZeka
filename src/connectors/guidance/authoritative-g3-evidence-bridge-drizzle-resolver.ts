@@ -7,8 +7,6 @@ import { buildEffectiveCampaignContext, EFFECTIVE_CAMPAIGN_CONTEXT_VERSION,
   type EffectiveCampaignContextInput } from "@/analyses/effective-campaign-context";
 import * as schema from "@/db/schema";
 import { DrizzleInstructionPolicyImpactRepository } from "@/connectors/policies/instruction-policy-impact-drizzle-repository";
-import { DrizzleTrustedPolicyAuthorityRepository, type LoadedTrustedPolicyAuthority } from
-  "@/connectors/policies/trusted-policy-authority-drizzle-repository";
 
 type Database = Pick<NodePgDatabase<typeof schema>, "execute">;
 type Row = Readonly<Record<string, unknown>>;
@@ -34,6 +32,8 @@ export type AuthoritativeG3EvidenceBridgeResult = Readonly<{
 export type AuthoritativeG3EvidenceBridge = Readonly<{
   resolve(database: Database, input: Readonly<{
     workspaceId: string;
+    formalizationRef?: string;
+    g2RevisionHash?: string;
     policy: StrictInstructionPolicy;
     guidanceSetRef: string;
     guidanceSetVersion: number;
@@ -88,7 +88,8 @@ function frozenAuthoritySnapshot(value: unknown): Readonly<{ snapshotRef: string
 }
 
 export function createDrizzleAuthoritativeG3EvidenceBridge(input: Readonly<{
-  authority?: Pick<DrizzleTrustedPolicyAuthorityRepository, "loadInTransaction">;
+  /** Deprecated test seam; production candidate proof never reads this value. */
+  authority?: unknown;
   impacts?: Pick<DrizzleInstructionPolicyImpactRepository, "preview">;
 }> = {}): AuthoritativeG3EvidenceBridge {
   return Object.freeze({
@@ -164,30 +165,66 @@ export function createDrizzleAuthoritativeG3EvidenceBridge(input: Readonly<{
       const expectedKeys = expectedOutcomeEvidence.map((evidence) => `${evidence.evidenceRef}:${evidence.evidenceHash}`);
       if (backedKeys.some((value) => value === null) || backedKeys.length !== expectedKeys.length
         || JSON.stringify(backedKeys) !== JSON.stringify(expectedKeys)) return unavailable(exactImpact, authenticated);
-      const authority = input.authority ?? new DrizzleTrustedPolicyAuthorityRepository(database as NodePgDatabase<typeof schema>);
-      // Every frozen context names the immutable authority snapshot that was
-      // embedded when it was composed. A current head, or another context's
-      // historical snapshot, cannot prove a row captured at a different time.
-      // This is deliberately per-context rather than a representative load.
-      const loaded: LoadedTrustedPolicyAuthority[] = [];
-      try {
-        for (const entry of authenticated) {
-          loaded.push(await authority.loadInTransaction(database as NodePgDatabase<typeof schema>, {
-            workspaceId: request.workspaceId, accountRef: entry.accountRef, evaluatedAt: entry.capturedAt,
-            snapshotRef: entry.authoritySnapshot.snapshotRef, snapshotHash: entry.authoritySnapshot.snapshotHash,
-          }));
-        }
-      } catch { return unavailable(exactImpact, authenticated); }
-      const candidateTierDecisionBound = loaded.every((loadedAuthority) => loadedAuthority.catalog.bindings.some((binding) =>
-        binding.policyRef === request.policy.policyRef && binding.policyVersion === request.policy.policyVersion
-        && binding.policyHash === request.policy.canonicalHash
-        // `authorityTier` is a closed trusted enum; a non-null structured decision
-        // is the missing explicit preview binding we must not invent from policy text.
-        && typeof binding.authorityTier === "string" && binding.decision !== null));
+      // A draft's tier/decision is deliberately proven only by the private
+      // candidate ledger.  Production catalogs and frozen source contexts
+      // never elevate a draft to productionAuthoritySourceBound.
+      const candidateRows = !request.formalizationRef || !request.g2RevisionHash || !HASH.test(request.g2RevisionHash) || !REF.test(request.formalizationRef)
+        ? [] : rows(await database.execute(sql`
+        select revision.revision_hash, revision.authority_tier, revision.decision
+          from candidate_preview_binding_heads head
+          join candidate_preview_binding_revisions revision
+            on revision.workspace_id = head.workspace_id and revision.id = head.current_revision_id
+              and revision.revision = head.current_revision and revision.revision_hash = head.current_revision_hash
+          join progressive_formalization_revisions g2
+            on g2.workspace_id = revision.workspace_id and g2.formalization_ref = revision.formalization_ref
+              and g2.sequence = 3 and g2.to_level = 'G2' and g2.revision_hash = revision.g2_revision_hash
+              and not exists (select 1 from progressive_formalization_revisions later
+                where later.workspace_id = g2.workspace_id and later.formalization_ref = g2.formalization_ref and later.sequence > 3)
+          join guidance_sets guidance
+            on guidance.workspace_id = revision.workspace_id and guidance.id = revision.guidance_set_id
+              and guidance.set_key = revision.guidance_set_ref and guidance.version = revision.guidance_set_version
+              and guidance.record_hash = revision.guidance_set_hash and guidance.review_status = 'reviewed'
+              and not exists (select 1 from guidance_sets later
+                where later.workspace_id = guidance.workspace_id and later.set_key = guidance.set_key and later.version > guidance.version)
+          join strict_instruction_policy_revisions policy
+            on policy.workspace_id = revision.workspace_id and policy.id = revision.policy_revision_id
+              and policy.policy_ref = revision.policy_ref and policy.policy_version = revision.policy_version
+              and policy.canonical_hash = revision.policy_hash and policy.status = 'draft'
+              and not exists (select 1 from strict_instruction_policy_revisions later
+                where later.workspace_id = policy.workspace_id and later.policy_ref = policy.policy_ref and later.policy_version > policy.policy_version)
+          join ad_accounts account
+            on account.workspace_id = revision.workspace_id and account.id = revision.target_account_id
+              and account.external_account_id = revision.target_account_ref and account.disappeared_at is null
+          join tenant_authority_snapshots snapshot
+            on snapshot.workspace_id = revision.workspace_id and snapshot.id = revision.authority_snapshot_id
+              and snapshot.snapshot_ref = revision.authority_snapshot_ref and snapshot.snapshot_hash = revision.authority_snapshot_hash
+              and snapshot.snapshot_payload #> '{repository,verified}' = 'true'::jsonb
+          join tenant_authority_snapshot_heads snapshot_head
+            on snapshot_head.workspace_id = snapshot.workspace_id and snapshot_head.current_snapshot_id = snapshot.id
+              and snapshot_head.current_snapshot_hash = snapshot.snapshot_hash
+          left join candidate_preview_binding_invalidations invalidation
+            on invalidation.workspace_id = revision.workspace_id and invalidation.binding_revision_id = revision.id
+         where head.workspace_id = ${request.workspaceId}::uuid and head.formalization_ref = ${request.formalizationRef}
+           and revision.g2_revision_hash = ${request.g2RevisionHash}
+           and revision.guidance_set_ref = ${request.guidanceSetRef} and revision.guidance_set_version = ${request.guidanceSetVersion}
+           and revision.guidance_set_hash = ${request.guidanceSetHash}
+           and revision.policy_ref = ${request.policy.policyRef} and revision.policy_version = ${request.policy.policyVersion}
+           and revision.policy_hash = ${request.policy.canonicalHash}
+           and revision.target_account_ref = ${authenticated[0]!.accountRef}
+           and invalidation.id is null
+         limit 2
+      `));
+      const candidate = candidateRows[0];
+      const decision = candidate?.decision;
+      const candidateTierDecisionBound = candidate !== undefined && candidateRows.length === 1 && HASH.test(String(candidate.revision_hash))
+        && typeof candidate.authority_tier === "string" && candidate.authority_tier.length > 0
+        && !!decision && typeof decision === "object" && !Array.isArray(decision)
+        && typeof (decision as Record<string, unknown>).decisionKey === "string"
+        && typeof (decision as Record<string, unknown>).positionKey === "string";
       const evaluatedRevisionRefs = [...new Set(authenticated.map((entry) => `analysis_revision_${entry.bindingHash.slice(0, 24)}`))].sort();
       const historicalContextHashes = [...new Set(authenticated.map((entry) => entry.contextHash))].sort();
       const outcomeEvidenceRefs = [...new Set(authenticated.flatMap((entry) => entry.outcomeEvidence.map((evidence) => evidence.evidenceRef)))].sort();
-      return Object.freeze({ sourceBound: true, candidateTierDecisionBound, exactImpact,
+      return Object.freeze({ sourceBound: false, candidateTierDecisionBound, exactImpact,
         historicalRunsEvaluated: authenticated.length, evaluatedRevisionRefs: Object.freeze(evaluatedRevisionRefs),
         historicalContextHashes: Object.freeze(historicalContextHashes),
         outcomeEvidenceRefs: Object.freeze(outcomeEvidenceRefs) });

@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 6ecf82b402cd -->
+<!-- durum-damga: 7bc9688b7980 -->
 
 ## Künye
 
@@ -14,13 +14,15 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 228 |
+| iş commit'i (tüm geçmiş) | 230 |
 | ilk / son iş | 2026-08-06 / 2026-08-11 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-11 | `feat` | bind G3 replay to verified evidence | `23f2fa992` |
+| 2026-08-11 | `fix` | verify closed-world source persistence | `8092d47d5` |
 | 2026-08-11 | `feat` | bridge campaign context approval scope | `15f8aab25` |
 | 2026-08-10 | `feat` | scope approval inbox by campaign context | `6a2ec7a98` |
 | 2026-08-10 | `feat` | bind briefs to persisted context state | `b2180c942` |
@@ -34,14 +36,12 @@
 | 2026-08-10 | `feat` | add separate execution admission ceremony | `83b8600fe` |
 | 2026-08-10 | `feat` | revalidate admission against Meta mirror | `ce1807263` |
 | 2026-08-10 | `feat` | bind eligibility into execution admission | `1d59e1932` |
-| 2026-08-10 | `feat` | add Meta write eligibility matrix | `cd904ed39` |
-| 2026-08-10 | `feat` | add interactive campaign brief panel | `638674a54` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 49
-- `test        ` ██ 5
-- `fix         ` ██ 4
+- `feat        ` ████████████████████████ 48
+- `fix         ` ███ 5
+- `test        ` ███ 5
 - `docs        ` █ 2
 
 ## Planlar

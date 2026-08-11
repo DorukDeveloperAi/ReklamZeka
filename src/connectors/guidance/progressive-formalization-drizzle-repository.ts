@@ -184,7 +184,8 @@ async function persistedPreview(database: Executor, input: Readonly<{ workspaceI
     ].sort();
     const unresolved = ["dependency_production_policy_authority_catalog"];
     const bridge = evidenceBridge === undefined || !setMatchesReview ? null : await evidenceBridge.resolve(database as never, {
-      workspaceId: input.workspaceId, policy: strictPolicy, guidanceSetRef,
+      workspaceId: input.workspaceId, formalizationRef: input.formalizationRef, g2RevisionHash: flow.revisions[2]!.revisionHash,
+      policy: strictPolicy, guidanceSetRef,
       guidanceSetVersion: Number(currentSet?.version), guidanceSetHash: String(currentSet?.record_hash),
     });
     const replayEvaluated = bridge?.evaluatedRevisionRefs ?? evaluatedRevisionRefs;

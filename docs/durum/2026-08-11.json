@@ -1,0 +1,182 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "23f2fa992",
+      "tarih": "2026-08-11",
+      "konu": "feat(guidance): bind G3 replay to verified evidence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "8092d47d5",
+      "tarih": "2026-08-11",
+      "konu": "fix(context): verify closed-world source persistence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "15f8aab25",
+      "tarih": "2026-08-11",
+      "konu": "feat(a14): bridge campaign context approval scope",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "6a2ec7a98",
+      "tarih": "2026-08-10",
+      "konu": "feat(a14): scope approval inbox by campaign context",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "b2180c942",
+      "tarih": "2026-08-10",
+      "konu": "feat(a14): bind briefs to persisted context state",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "6df768290",
+      "tarih": "2026-08-10",
+      "konu": "feat(a14): expose read-only campaign context",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "025aab9fe",
+      "tarih": "2026-08-10",
+      "konu": "feat(a14): derive read-only campaign recommendations",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "76b74e4a3",
+      "tarih": "2026-08-10",
+      "konu": "feat(a14): scope approval reads by campaign hierarchy",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "eca77a011",
+      "tarih": "2026-08-10",
+      "konu": "feat(a14): scope approval queue reads by entity",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "cf83522f6",
+      "tarih": "2026-08-10",
+      "konu": "feat(a14): expose execution safety status",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "158da5ad7",
+      "tarih": "2026-08-10",
+      "konu": "feat(a13): define verify and rollback contract",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7f5858125",
+      "tarih": "2026-08-10",
+      "konu": "feat(a13): bind admission ceremony to persisted source",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "83b8600fe",
+      "tarih": "2026-08-10",
+      "konu": "feat(a13): add separate execution admission ceremony",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ce1807263",
+      "tarih": "2026-08-10",
+      "konu": "feat(a13): revalidate admission against Meta mirror",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "1d59e1932",
+      "tarih": "2026-08-10",
+      "konu": "feat(a13): bind eligibility into execution admission",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "feat",
+      "adet": 48
+    },
+    {
+      "kapsam": "fix",
+      "adet": 5
+    },
+    {
+      "kapsam": "test",
+      "adet": 5
+    },
+    {
+      "kapsam": "docs",
+      "adet": 2
+    }
+  ],
+  "isSayisi": 230,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-11",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "7bc9688b7980"
+}

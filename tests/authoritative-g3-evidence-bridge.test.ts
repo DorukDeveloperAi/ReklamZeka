@@ -55,6 +55,23 @@ function frozenPayload(accountRef = "account_primary", capturedAt = "2026-08-10T
 }
 
 describe("authoritative G3 evidence bridge", () => {
+  it("sets the candidate flag only from the private candidate-binding head", async () => {
+    const frozen = frozenPayload(); const evidence = frozen.history.outcomeEvidence![0]!;
+    const execute = vi.fn(async () => {
+      const call = execute.mock.calls.length;
+      if (call === 1) return { rows: [{ binding_hash: "b".repeat(64), context_hash: frozen.contextHash,
+        context_payload: frozen, account_ref: "account_primary", captured_at: frozen.capturedAt }] };
+      if (call === 2) return { rows: [{ evidence_ref: evidence.evidenceRef, evidence_hash: evidence.evidenceHash }] };
+      return { rows: [{ revision_hash: "d".repeat(64), authority_tier: "platform_policy",
+        decision: { decisionKey: "decision_primary", positionKey: "position_primary" } }] };
+    });
+    const bridge = createDrizzleAuthoritativeG3EvidenceBridge({ impacts: { preview: vi.fn(async () => null) } as never });
+    const result = await bridge.resolve({ execute } as never, { workspaceId, formalizationRef: "formalization_primary",
+      g2RevisionHash: "e".repeat(64), policy, guidanceSetRef: "guidance_set_primary", guidanceSetVersion: 1, guidanceSetHash: hash });
+    expect(result).toMatchObject({ sourceBound: false, candidateTierDecisionBound: true, historicalRunsEvaluated: 1 });
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+
   it("uses one caller-owned read-only executor and preserves an explicit missing tier/decision blocker fact", async () => {
     const frozen = frozenPayload(); const evidence = frozen.history.outcomeEvidence![0]!;
     const execute = vi.fn(async () => execute.mock.calls.length === 1 ? { rows: [{ binding_hash: "b".repeat(64), context_hash: frozen.contextHash,
@@ -69,10 +86,8 @@ describe("authoritative G3 evidence bridge", () => {
     const bridge = createDrizzleAuthoritativeG3EvidenceBridge({ authority: authority as never, impacts: impacts as never });
     const result = await bridge.resolve({ execute } as never, { workspaceId, policy, guidanceSetRef: "guidance_set_primary",
       guidanceSetVersion: 1, guidanceSetHash: hash });
-    expect(authority.loadInTransaction).toHaveBeenCalledWith({ execute }, expect.objectContaining({ workspaceId,
-      accountRef: "account_primary", evaluatedAt: "2026-08-10T10:00:00.000Z",
-      snapshotRef: "authority_snapshot_primary", snapshotHash: "1".repeat(64) }));
-    expect(result).toEqual(expect.objectContaining({ sourceBound: true, exactImpact: true,
+    expect(authority.loadInTransaction).not.toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({ sourceBound: false, exactImpact: true,
       candidateTierDecisionBound: false, historicalRunsEvaluated: 1,
       evaluatedRevisionRefs: ["analysis_revision_" + "b".repeat(24)],
       historicalContextHashes: [frozen.contextHash], outcomeEvidenceRefs: [evidence.evidenceRef] }));
@@ -95,12 +110,8 @@ describe("authoritative G3 evidence bridge", () => {
       impacts: { preview: vi.fn(async () => null) } as never });
     const result = await bridge.resolve({ execute } as never, { workspaceId, policy, guidanceSetRef: "guidance_set_primary",
       guidanceSetVersion: 1, guidanceSetHash: hash });
-    expect(result).toMatchObject({ sourceBound: true, candidateTierDecisionBound: true, historicalRunsEvaluated: 2 });
-    expect(authority.loadInTransaction).toHaveBeenCalledTimes(2);
-    expect(authority.loadInTransaction).toHaveBeenNthCalledWith(1, { execute }, expect.objectContaining({
-      accountRef: "account_primary", evaluatedAt: first.capturedAt, snapshotRef: "authority_snapshot_primary", snapshotHash: "1".repeat(64) }));
-    expect(authority.loadInTransaction).toHaveBeenNthCalledWith(2, { execute }, expect.objectContaining({
-      accountRef: "account_primary", evaluatedAt: second.capturedAt, snapshotRef: "authority_snapshot_later", snapshotHash: "4".repeat(64) }));
+    expect(result).toMatchObject({ sourceBound: false, candidateTierDecisionBound: false, historicalRunsEvaluated: 2 });
+    expect(authority.loadInTransaction).not.toHaveBeenCalled();
   });
 
   it("fails closed before authority loading for mixed-account historical contexts", async () => {
