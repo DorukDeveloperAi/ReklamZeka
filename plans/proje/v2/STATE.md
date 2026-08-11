@@ -64,6 +64,10 @@
   şeritlerini rota sınırıyla incele, son olarak üst huniyi lead kararından ayrı değerlendir. Bu
   sıralama çalışma kitabındaki gözlemi görünür kılar; güncel performans hükmü veya otomatik launch
   planı değildir.
+- Kampanyalar yüzeyindeki görünür şablon kütüphanesi, altı mevcut brief başlangıcını (yerli form/
+  WhatsApp, AR/RU FTR, üst huni ve kesinti toparlama) aynı geçici akışta açar. Tarayıcı kabulünde
+  toparlanma seçimi briefi `Önce engeli çöz` durumuna alır; yeni campaign, policy, approval veya
+  Meta write oluşturmaz.
 
 ## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
 

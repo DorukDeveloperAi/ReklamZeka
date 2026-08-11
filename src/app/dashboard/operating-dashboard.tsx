@@ -12,7 +12,7 @@ import { GuidanceStudioPanel } from "./guidance-studio-panel";
 import { CategoryInventoryPanel } from "./category-inventory-panel";
 import { InstructionPolicyStudioPanel } from "./instruction-policy-studio-panel";
 import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel";
-import { CampaignPlanningBriefPanel, type CampaignBriefScenarioRef, type CampaignPlanningBriefContext } from "./campaign-planning-brief-panel";
+import { CAMPAIGN_BRIEF_SCENARIOS, CampaignPlanningBriefPanel, type CampaignBriefScenarioRef, type CampaignPlanningBriefContext } from "./campaign-planning-brief-panel";
 import { offlineWorkbookPortfolioSnapshot, type OfflineWorkbookBriefScenarioRef } from "@/domain/campaigns/offline-workbook-portfolio-snapshot";
 import styles from "./operating-dashboard.module.css";
 
@@ -506,6 +506,14 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
         <div className={styles.campaignTable} role="table" aria-label="Çalışma kitabı pazar ve dönüşüm şeritleri"><div className={styles.tableHead} role="row"><span>Pazar</span><span>Kampanya</span><span>Lead</span><span>Form</span><span>WhatsApp</span><span>Sınır</span></div>{offlineWorkbookPortfolioSnapshot.markets.map((market) => <div className={styles.tableRow} role="row" key={market.market}><span><strong>{market.market}</strong></span><span>{market.campaigns}</span><span>{market.leads}</span><span>{market.formLeads}</span><span>{market.whatsappLeads}</span><span>Diğer pazar veya rota ile varsayılan kıyas yok</span></div>)}</div>
         <div className={styles.briefPlan}><div><span>SIRALI PLANLAMA ÇERÇEVESİ</span><ol>{offlineWorkbookPortfolioSnapshot.planningOrder.map((item) => <li key={item.step}><strong>{item.step}. {item.title}</strong><small>{item.rationale}</small></li>)}</ol></div></div>
         <div className={styles.decisionList}>{offlineWorkbookPortfolioSnapshot.lanes.map((lane) => <article className={styles.decisionRow} key={lane.label}><div className={styles.decisionBody}><div><StatusPill tone="neutral">Offline şerit</StatusPill><span>{lane.market} · {lane.language} · {lane.route}</span></div><h3>{lane.label}</h3><p>{lane.service} · {lane.leads} tarihli lead. Bu yalnız başlangıç sınıflandırmasıdır.</p></div><div className={styles.decisionAction}><button type="button" onClick={() => setWorkbookBriefScenario(lane.briefScenarioRef as OfflineWorkbookBriefScenarioRef)}>Brief'te aç</button></div></article>)}</div>
+        <section className={styles.panel} aria-labelledby="campaign-template-library-title">
+          <header className={styles.panelHeader}><div><span className={styles.kicker}>İNSAN İNCELEMELİ ŞABLON KÜTÜPHANESİ</span><h3 id="campaign-template-library-title">Amaç ve ihtiyaca göre brief başlangıcı seçin</h3></div><StatusPill tone="neutral">geçici planlama</StatusPill></header>
+          <p>Şablonlar çalışma kitabındaki sınıflandırmayı görünür ve düzenlenebilir bir brief başlangıcına çevirir. Kaynak, campaign, policy veya Meta yetkisi taşımaz.</p>
+          <div className={styles.decisionList}>{Object.entries(CAMPAIGN_BRIEF_SCENARIOS).map(([scenarioRef, scenario]) => <article className={styles.decisionRow} key={scenarioRef}>
+            <div className={styles.decisionBody}><div><StatusPill tone="neutral">Taslak örnek</StatusPill><span>{scenario.input.businessGoal} · {scenario.input.conversionRoute}</span></div><h3>{scenario.label}</h3><p>{scenario.input.deliveryHealth === "interrupted" ? "Önce teslimat ve hesap sağlığını doğrulayan toparlanma briefi." : "Pazar, dil, hizmet, rota, kapasite ve kreatifi insan incelemesine taşıyan brief başlangıcı."}</p></div>
+            <div className={styles.decisionAction}><button type="button" onClick={() => setWorkbookBriefScenario(scenarioRef as CampaignBriefScenarioRef)}>Brief'te aç</button></div>
+          </article>)}</div>
+        </section>
       </section>
       <section className={styles.portfolioOverview} aria-labelledby="portfolio-overview-title">
         <header><div><span className={styles.kicker}>BUGÜN / PORTFÖY HİYERARŞİSİ</span><h2 id="portfolio-overview-title">Demo Marka <i>→</i> Meta portföyü <i>→</i> {filteredCampaigns.length} görünür kampanya</h2><p>Filtreler yalnız bu demo/read-only snapshot'ı daraltır; account, category veya Meta yetkisi değiştirmez.</p></div><StatusPill tone="neutral">unbound demo context</StatusPill></header>

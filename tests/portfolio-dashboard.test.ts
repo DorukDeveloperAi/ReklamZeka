@@ -30,6 +30,10 @@ describe("portfolio dashboard", () => {
     expect(html).toContain("Kesinti penceresinde performans hükmü yok");
     expect(html).toContain("SIRALI PLANLAMA ÇERÇEVESİ");
     expect(html).toContain("Üst huniyi lead kararından ayır");
+    expect(html).toContain("İNSAN İNCELEMELİ ŞABLON KÜTÜPHANESİ");
+    expect(html).toContain("Amaç ve ihtiyaca göre brief başlangıcı seçin");
+    expect(html).toContain("Teslimat kesintisi sonrası toparlama");
+    expect(html).toContain("Kaynak, campaign, policy veya Meta yetkisi taşımaz");
     expect(html).toContain("BUGÜN / PORTFÖY HİYERARŞİSİ");
     expect(html).toContain("Meta objective");
     expect(html).toContain("İç kategori");
