@@ -4,135 +4,135 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "a1d3b0fe3",
+      "hash": "7c76a5ff1",
       "tarih": "2026-08-11",
-      "konu": "feat(analysis): freeze agenda v2 and L2 advisory evidence",
+      "konu": "feat(analysis): materialize creative fatigue evidence",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "1c2ce1f76",
+      "hash": "f73f1b734",
       "tarih": "2026-08-11",
-      "konu": "test(budget): verify source-bound proposal lifecycle",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "6024270a2",
-      "tarih": "2026-08-11",
-      "konu": "feat(analysis): bind decision room to frozen evidence",
+      "konu": "feat(analysis): bind creative windows to settlement policy",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "f0c348506",
+      "hash": "a1413a5b7",
       "tarih": "2026-08-11",
-      "konu": "test(analysis): require authentic dry-run evidence",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "2a405c570",
-      "tarih": "2026-08-11",
-      "konu": "docs(plan): record candidate-aware G3 acceptance",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "e5b49c134",
-      "tarih": "2026-08-11",
-      "konu": "test(guidance): verify candidate preview binding lifecycle",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "643973024",
-      "tarih": "2026-08-11",
-      "konu": "test(guidance): compose candidate preview lifecycle fixture",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "a2713940e",
-      "tarih": "2026-08-11",
-      "konu": "fix(guidance): harden candidate authority evidence",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "8aa09a476",
-      "tarih": "2026-08-11",
-      "konu": "fix(authority): validate candidate binding migration and share fixture",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "23f2fa992",
-      "tarih": "2026-08-11",
-      "konu": "feat(guidance): bind G3 replay to verified evidence",
+      "konu": "feat(analysis): persist creative settlement policies",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "8092d47d5",
+      "hash": "0e7685c3e",
       "tarih": "2026-08-11",
-      "konu": "fix(context): verify closed-world source persistence",
+      "konu": "feat(analysis): define creative settlement policy",
       "tur": "is",
       "kapsam": [
-        "fix"
+        "feat"
       ]
     },
     {
-      "hash": "15f8aab25",
+      "hash": "5727cab8d",
       "tarih": "2026-08-11",
-      "konu": "feat(a14): bridge campaign context approval scope",
+      "konu": "feat(analysis): materialize creative config evidence",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "6a2ec7a98",
-      "tarih": "2026-08-10",
-      "konu": "feat(a14): scope approval inbox by campaign context",
+      "hash": "44c56bfda",
+      "tarih": "2026-08-11",
+      "konu": "feat(meta): request daily frequency evidence",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "b2180c942",
-      "tarih": "2026-08-10",
-      "konu": "feat(a14): bind briefs to persisted context state",
+      "hash": "20fec4e4b",
+      "tarih": "2026-08-11",
+      "konu": "feat(analysis): load published creative definitions",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "6df768290",
-      "tarih": "2026-08-10",
-      "konu": "feat(a14): expose read-only campaign context",
+      "hash": "585f73e8c",
+      "tarih": "2026-08-11",
+      "konu": "feat(analysis): add creative definition lifecycle writer",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "5a5793bce",
+      "tarih": "2026-08-11",
+      "konu": "feat(analysis): gate creative diagnostic definition revisions",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "920bffb63",
+      "tarih": "2026-08-11",
+      "konu": "feat(analysis): define immutable creative diagnostic thresholds",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "8ffcb6af1",
+      "tarih": "2026-08-11",
+      "konu": "feat(analysis): add immutable creative diagnostic substrate",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c41f65956",
+      "tarih": "2026-08-11",
+      "konu": "feat(meta): read direct creative diagnostic source evidence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "08769f210",
+      "tarih": "2026-08-11",
+      "konu": "feat(meta): define direct creative config evidence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "fbb80c599",
+      "tarih": "2026-08-11",
+      "konu": "feat(analysis): add source-grain creative fatigue contract",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "2face434e",
+      "tarih": "2026-08-11",
+      "konu": "feat(analysis): bind cohort compatibility to frozen categories",
       "tur": "is",
       "kapsam": [
         "feat"
@@ -142,22 +142,22 @@
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 47
+      "adet": 51
     },
     {
       "kapsam": "test",
-      "adet": 7
+      "adet": 4
     },
     {
       "kapsam": "fix",
-      "adet": 4
+      "adet": 3
     },
     {
       "kapsam": "docs",
       "adet": 2
     }
   ],
-  "isSayisi": 239,
+  "isSayisi": 256,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-11",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "8d7e8dbee2e1"
+  "damga": "e2522fb9f272"
 }

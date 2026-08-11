@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 8d7e8dbee2e1 -->
+<!-- durum-damga: e2522fb9f272 -->
 
 ## Künye
 
@@ -14,34 +14,34 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 239 |
+| iş commit'i (tüm geçmiş) | 256 |
 | ilk / son iş | 2026-08-06 / 2026-08-11 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
-| 2026-08-11 | `feat` | freeze agenda v2 and L2 advisory evidence | `a1d3b0fe3` |
-| 2026-08-11 | `test` | verify source-bound proposal lifecycle | `1c2ce1f76` |
-| 2026-08-11 | `feat` | bind decision room to frozen evidence | `6024270a2` |
-| 2026-08-11 | `test` | require authentic dry-run evidence | `f0c348506` |
-| 2026-08-11 | `docs` | record candidate-aware G3 acceptance | `2a405c570` |
-| 2026-08-11 | `test` | verify candidate preview binding lifecycle | `e5b49c134` |
-| 2026-08-11 | `test` | compose candidate preview lifecycle fixture | `643973024` |
-| 2026-08-11 | `fix` | harden candidate authority evidence | `a2713940e` |
-| 2026-08-11 | `fix` | validate candidate binding migration and share fixture | `8aa09a476` |
-| 2026-08-11 | `feat` | bind G3 replay to verified evidence | `23f2fa992` |
-| 2026-08-11 | `fix` | verify closed-world source persistence | `8092d47d5` |
-| 2026-08-11 | `feat` | bridge campaign context approval scope | `15f8aab25` |
-| 2026-08-10 | `feat` | scope approval inbox by campaign context | `6a2ec7a98` |
-| 2026-08-10 | `feat` | bind briefs to persisted context state | `b2180c942` |
-| 2026-08-10 | `feat` | expose read-only campaign context | `6df768290` |
+| 2026-08-11 | `feat` | materialize creative fatigue evidence | `7c76a5ff1` |
+| 2026-08-11 | `feat` | bind creative windows to settlement policy | `f73f1b734` |
+| 2026-08-11 | `feat` | persist creative settlement policies | `a1413a5b7` |
+| 2026-08-11 | `feat` | define creative settlement policy | `0e7685c3e` |
+| 2026-08-11 | `feat` | materialize creative config evidence | `5727cab8d` |
+| 2026-08-11 | `feat` | request daily frequency evidence | `44c56bfda` |
+| 2026-08-11 | `feat` | load published creative definitions | `20fec4e4b` |
+| 2026-08-11 | `feat` | add creative definition lifecycle writer | `585f73e8c` |
+| 2026-08-11 | `feat` | gate creative diagnostic definition revisions | `5a5793bce` |
+| 2026-08-11 | `feat` | define immutable creative diagnostic thresholds | `920bffb63` |
+| 2026-08-11 | `feat` | add immutable creative diagnostic substrate | `8ffcb6af1` |
+| 2026-08-11 | `feat` | read direct creative diagnostic source evidence | `c41f65956` |
+| 2026-08-11 | `feat` | define direct creative config evidence | `08769f210` |
+| 2026-08-11 | `feat` | add source-grain creative fatigue contract | `fbb80c599` |
+| 2026-08-11 | `feat` | bind cohort compatibility to frozen categories | `2face434e` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 47
-- `test        ` ████ 7
-- `fix         ` ██ 4
+- `feat        ` ████████████████████████ 51
+- `test        ` ██ 4
+- `fix         ` █ 3
 - `docs        ` █ 2
 
 ## Planlar
