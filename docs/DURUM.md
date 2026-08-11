@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: f469223fb30b -->
+<!-- durum-damga: 25a0cdf6b822 -->
 
 ## Künye
 
@@ -14,34 +14,34 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 279 |
+| iş commit'i (tüm geçmiş) | 289 |
 | ilk / son iş | 2026-08-06 / 2026-08-11 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-11 | `feat` | add ephemeral operator notes | `389bb7e5f` |
+| 2026-08-11 | `feat` | expose planning template library | `ac69c8e4f` |
+| 2026-08-11 | `feat` | add planning sequence | `0b976f766` |
+| 2026-08-11 | `feat` | open workbook lanes as drafts | `69d8af2cb` |
+| 2026-08-11 | `feat` | add offline workbook portfolio snapshot | `7357644f1` |
+| 2026-08-11 | `fix` | separate demo from live performance | `bb4ab0d88` |
+| 2026-08-11 | `fix` | expose safe rotation guidance | `9f89d358f` |
+| 2026-08-11 | `fix` | guide dashboard session bootstrap | `f99902c39` |
+| 2026-08-11 | `fix` | accept zero-length route body | `28107999f` |
+| 2026-08-11 | `feat` | add read-only Meta account focus | `a1039cfe1` |
 | 2026-08-11 | `fix` | classify diagnostic JSONB dependencies | `677f3f351` |
 | 2026-08-11 | `feat` | carry brief intent into draft template | `e13ad1236` |
 | 2026-08-11 | `feat` | link brief to draft policy workspace | `91b430eaf` |
 | 2026-08-11 | `fix` | clear scenario after manual brief edit | `355909eb2` |
 | 2026-08-11 | `feat` | add workbook campaign scenarios | `18fd1037f` |
-| 2026-08-11 | `feat` | assess structured normalization drafts | `0b2b9558f` |
-| 2026-08-11 | `feat` | align brief with campaign taxonomy | `7e36cc967` |
-| 2026-08-11 | `feat` | add campaign intent templates | `803678f0a` |
-| 2026-08-11 | `feat` | select guidance in normalization | `27b0e1403` |
-| 2026-08-11 | `feat` | add draft normalization workbench | `ee9773758` |
-| 2026-08-11 | `docs` | record today browser boundary | `534f9490c` |
-| 2026-08-11 | `feat` | show verified inventory on today | `69a0e4206` |
-| 2026-08-11 | `feat` | add campaign hierarchy drilldown | `ce5aa492d` |
-| 2026-08-11 | `docs` | record portfolio browser boundary | `6adb094e0` |
-| 2026-08-11 | `feat` | select persisted campaign contexts | `d855f1c51` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 45
+- `feat        ` ████████████████████████ 42
+- `fix         ` █████ 8
 - `test        ` ███ 6
-- `fix         ` ███ 5
 - `docs        ` ██ 4
 
 ## Planlar

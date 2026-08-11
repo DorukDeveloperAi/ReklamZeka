@@ -4,6 +4,96 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "389bb7e5f",
+      "tarih": "2026-08-11",
+      "konu": "feat(brief): add ephemeral operator notes",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ac69c8e4f",
+      "tarih": "2026-08-11",
+      "konu": "feat(brief): expose planning template library",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "0b976f766",
+      "tarih": "2026-08-11",
+      "konu": "feat(portfolio): add planning sequence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "69d8af2cb",
+      "tarih": "2026-08-11",
+      "konu": "feat(brief): open workbook lanes as drafts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7357644f1",
+      "tarih": "2026-08-11",
+      "konu": "feat(dashboard): add offline workbook portfolio snapshot",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "bb4ab0d88",
+      "tarih": "2026-08-11",
+      "konu": "fix(dashboard): separate demo from live performance",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "9f89d358f",
+      "tarih": "2026-08-11",
+      "konu": "fix(meta): expose safe rotation guidance",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "f99902c39",
+      "tarih": "2026-08-11",
+      "konu": "fix(context): guide dashboard session bootstrap",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "28107999f",
+      "tarih": "2026-08-11",
+      "konu": "fix(session): accept zero-length route body",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "a1039cfe1",
+      "tarih": "2026-08-11",
+      "konu": "feat(dashboard): add read-only Meta account focus",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "677f3f351",
       "tarih": "2026-08-11",
       "konu": "fix(policies): classify diagnostic JSONB dependencies",
@@ -47,117 +137,27 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "0b2b9558f",
-      "tarih": "2026-08-11",
-      "konu": "feat(policies): assess structured normalization drafts",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "7e36cc967",
-      "tarih": "2026-08-11",
-      "konu": "feat(dashboard): align brief with campaign taxonomy",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "803678f0a",
-      "tarih": "2026-08-11",
-      "konu": "feat(policies): add campaign intent templates",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "27b0e1403",
-      "tarih": "2026-08-11",
-      "konu": "feat(policies): select guidance in normalization",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "ee9773758",
-      "tarih": "2026-08-11",
-      "konu": "feat(policies): add draft normalization workbench",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "534f9490c",
-      "tarih": "2026-08-11",
-      "konu": "docs(a14): record today browser boundary",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "69a0e4206",
-      "tarih": "2026-08-11",
-      "konu": "feat(dashboard): show verified inventory on today",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "ce5aa492d",
-      "tarih": "2026-08-11",
-      "konu": "feat(dashboard): add campaign hierarchy drilldown",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "6adb094e0",
-      "tarih": "2026-08-11",
-      "konu": "docs(a14): record portfolio browser boundary",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "d855f1c51",
-      "tarih": "2026-08-11",
-      "konu": "feat(dashboard): select persisted campaign contexts",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 45
+      "adet": 42
+    },
+    {
+      "kapsam": "fix",
+      "adet": 8
     },
     {
       "kapsam": "test",
       "adet": 6
     },
     {
-      "kapsam": "fix",
-      "adet": 5
-    },
-    {
       "kapsam": "docs",
       "adet": 4
     }
   ],
-  "isSayisi": 279,
+  "isSayisi": 289,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-11",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "f469223fb30b"
+  "damga": "25a0cdf6b822"
 }
