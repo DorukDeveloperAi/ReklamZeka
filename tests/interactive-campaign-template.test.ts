@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createInteractiveCampaignBrief } from "@/domain/campaigns/interactive-campaign-template";
+import { createInteractiveCampaignBrief, planningHintFromPersistedCampaignContext } from "@/domain/campaigns/interactive-campaign-template";
 
 const base = { businessGoal: "lead_acquisition" as const, market: "domestic" as const, language: "tr",
   serviceRef: "service_medical_aesthetics", countryOrRegion: null, conversionRoute: "lead_form" as const,
@@ -64,5 +64,17 @@ describe("interactive campaign template", () => {
     expect(internationalWhatsApp.variantRef).toBe("international_whatsapp_lead");
     expect(internationalWhatsApp.comparisonBoundary.cohortKey).toBe("international:ar:gcc:service_medical_aesthetics:lead_acquisition:whatsapp");
     expect(internationalWhatsApp.comparisonBoundary.summary).toContain("Yalnız aynı pazar");
+  });
+
+  it("uses only a verified frozen Meta objective as an optional business-goal hint", () => {
+    expect(planningHintFromPersistedCampaignContext({ meta: { objective: { state: "known", value: "lead_generation" } } }))
+      .toMatchObject({ source: "frozen_campaign_context", suggestedBusinessGoal: "lead_acquisition", deliveryHealth: "unknown", requiresHumanClassification: true });
+    expect(planningHintFromPersistedCampaignContext({ meta: { objective: { state: "known", value: "awareness" } } }))
+      .toMatchObject({ suggestedBusinessGoal: "upper_funnel_education" });
+    expect(planningHintFromPersistedCampaignContext({ meta: { objective: { state: "known", value: "sales" } } }))
+      .toMatchObject({ suggestedBusinessGoal: null });
+    expect(planningHintFromPersistedCampaignContext({ meta: { objective: { state: "unknown", reason: "objective_unmapped" } } }))
+      .toMatchObject({ suggestedBusinessGoal: null });
+    expect(planningHintFromPersistedCampaignContext({ meta: { objective: { state: "known", value: 42 } } })).toBeNull();
   });
 });

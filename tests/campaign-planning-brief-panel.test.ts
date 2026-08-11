@@ -23,6 +23,7 @@ describe("campaign planning brief panel", () => {
     expect(html).toContain("domestic_form_lead");
     expect(html).toContain("campaign create / publish / approval / execute / Meta write: kapalı");
     expect(html).not.toMatch(/Meta.{0,30}(yaz|write).{0,30}(başlat|çalıştır|onayla)/i);
+    expect(html).not.toContain("İş amacını bu sinyalle eşle");
   });
 
   it("starts from the selected campaign context and keeps context reset proposal-only", () => {

@@ -45,6 +45,23 @@ export type InteractiveCampaignTemplateRequest = Readonly<{
   creativeReady: boolean;
 }>;
 
+/** Minimal public, frozen-context shape consumed by the client-side brief. */
+export type PublicCampaignPlanningObjective = Readonly<{
+  state: "known" | "unknown";
+  value?: string;
+  reason?: string;
+}>;
+
+export type PersistedCampaignPlanningHint = Readonly<{
+  source: "frozen_campaign_context";
+  objective: PublicCampaignPlanningObjective;
+  suggestedBusinessGoal: CampaignBusinessGoal | null;
+  /** Public configured/effective status is not a delivery-health signal. */
+  deliveryHealth: "unknown";
+  /** Market, language, service and route remain human-confirmed. */
+  requiresHumanClassification: true;
+}>;
+
 export type InteractiveCampaignBrief = Readonly<{
   version: typeof INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION;
   templateRef: CampaignTemplateRef;
@@ -124,6 +141,33 @@ const AUTHORITY = Object.freeze({ canCreateCampaign: false as const, canPublish:
 
 function question(value: string, questions: string[]): void { if (!questions.includes(value)) questions.push(value); }
 function validText(value: string | null): boolean { return value !== null && value.trim().length > 0 && value.length <= 120; }
+
+/**
+ * Reads only the canonical objective that is already public in an authentic
+ * frozen context. This does not infer market, language, service, route, or
+ * delivery health from a campaign name or configured status.
+ */
+export function planningHintFromPersistedCampaignContext(value: unknown): PersistedCampaignPlanningHint | null {
+  if (!value || typeof value !== "object" || !("meta" in value)) return null;
+  const meta = (value as { meta?: unknown }).meta;
+  if (!meta || typeof meta !== "object" || !("objective" in meta)) return null;
+  const objective = (meta as { objective?: unknown }).objective;
+  if (!objective || typeof objective !== "object" || !("state" in objective)) return null;
+  const state = (objective as { state?: unknown }).state;
+  if (state === "unknown") {
+    const reason = (objective as { reason?: unknown }).reason;
+    if (typeof reason !== "string" || !reason.trim()) return null;
+    return Object.freeze({ source: "frozen_campaign_context", objective: Object.freeze({ state, reason }),
+      suggestedBusinessGoal: null, deliveryHealth: "unknown", requiresHumanClassification: true });
+  }
+  if (state !== "known") return null;
+  const raw = (objective as { value?: unknown }).value;
+  if (typeof raw !== "string") return null;
+  const suggestedBusinessGoal: CampaignBusinessGoal | null = raw === "lead_generation" ? "lead_acquisition"
+    : ["awareness", "traffic", "engagement"].includes(raw) ? "upper_funnel_education" : null;
+  return Object.freeze({ source: "frozen_campaign_context", objective: Object.freeze({ state, value: raw }),
+    suggestedBusinessGoal, deliveryHealth: "unknown", requiresHumanClassification: true });
+}
 
 function nextDecision(input: InteractiveCampaignTemplateRequest, templateRef: CampaignTemplateRef): InteractiveCampaignBrief["nextDecision"] {
   if (input.classification === "unclassified") return Object.freeze({ field: "classification",

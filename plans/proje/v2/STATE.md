@@ -393,6 +393,17 @@
   `deliveryHealth=unknown` seçimi next-decision'a döner, lane ve variant üretmez ve tüm write
   kapasitelerini kapalı tutar.
 
+## 2026-08-11 — Persisted context → brief objective hint
+
+- Brief paneli, session-bound `/api/campaign-context` yolundan gelen authentic public frozen context'in
+  yalnız canonical Meta objective alanını parse eder. `lead_generation` → lead acquisition ve
+  awareness/traffic/engagement → upper-funnel eşlemesi açık bir kullanıcı butonu ile uygulanabilir;
+  sales/app-growth için hedef uydurulmaz. Malformed veya unknown objective hiç hint üretmez.
+- Bu köprü market, language, service, conversion route veya delivery health'i isim/status'ten çıkarmaz;
+  bunlar human classification olarak kalır. Persisted context yoksa hint görünmez, demo seed'e veya
+  approval/Meta write yetkisine dönüşmez. Gerçek persisted-context browser happy path, environment'ta
+  aktif source bulunmadığından ayrı açık kabul noktasıdır.
+
 ## 2026-08-11 — A07 field-pilot source coverage census
 
 - Yeni read-only `census:field-pilot-source-db` REPEATABLE READ altında yalnız aggregate workspace/account

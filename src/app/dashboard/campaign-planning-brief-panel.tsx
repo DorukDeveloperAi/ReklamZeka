@@ -11,6 +11,8 @@ import {
   type ConversionRoute,
   type DeliveryHealth,
   type InteractiveCampaignTemplateRequest,
+  type PersistedCampaignPlanningHint,
+  planningHintFromPersistedCampaignContext,
 } from "@/domain/campaigns/interactive-campaign-template";
 import styles from "./operating-dashboard.module.css";
 
@@ -81,6 +83,7 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
 }>) {
   const [draft, setDraft] = useState<BriefDraft>(() => Object.freeze({ ...context.input }));
   const [sourceState, setSourceState] = useState<"unbound" | "loading" | "empty" | "ready" | "unavailable">("unbound");
+  const [persistedHint, setPersistedHint] = useState<PersistedCampaignPlanningHint | null>(null);
   const brief = useMemo(() => createInteractiveCampaignBrief(draft), [draft]);
   const change = <Key extends keyof BriefDraft>(key: Key, value: BriefDraft[Key]) =>
     setDraft((current) => Object.freeze({ ...current, [key]: value }));
@@ -88,12 +91,13 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
   useEffect(() => {
     if (!context.persistedCampaignRef || !/^ref_[a-f0-9]{12}$/.test(context.persistedCampaignRef)) {
       onApprovalQueueCampaignRef?.(null);
+      setPersistedHint(null);
       setSourceState("unbound");
       return;
     }
     let active = true; setSourceState("loading");
     void fetch(`/api/campaign-context?campaignRef=${encodeURIComponent(context.persistedCampaignRef)}`, { cache: "no-store", credentials: "same-origin" })
-      .then(async (response) => ({ response, payload: await response.json() as { view?: string; approvalQueueCampaignRef?: string } }))
+      .then(async (response) => ({ response, payload: await response.json() as { view?: string; approvalQueueCampaignRef?: string; context?: unknown } }))
       .then(({ response, payload }) => {
         if (!active) return;
         const queueCampaignRef = payload.view === "context" && typeof payload.approvalQueueCampaignRef === "string"
@@ -101,9 +105,10 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
           ? payload.approvalQueueCampaignRef
           : null;
         onApprovalQueueCampaignRef?.(queueCampaignRef);
+        setPersistedHint(payload.view === "context" ? planningHintFromPersistedCampaignContext(payload.context) : null);
         setSourceState(!response.ok ? "unavailable" : payload.view === "context" ? "ready" : "empty");
       })
-      .catch(() => { if (active) { onApprovalQueueCampaignRef?.(null); setSourceState("unavailable"); } });
+      .catch(() => { if (active) { onApprovalQueueCampaignRef?.(null); setPersistedHint(null); setSourceState("unavailable"); } });
     return () => { active = false; };
   }, [context.persistedCampaignRef, onApprovalQueueCampaignRef]);
 
@@ -148,6 +153,14 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
       <span>PERSISTED KAMPANYA BAĞLAMI</span><strong>{sourceState === "ready" ? "Frozen campaign context doğrulandı" : sourceState === "empty" ? "Henüz frozen context yok" : sourceState === "loading" ? "Frozen context okunuyor" : sourceState === "unavailable" ? "Context kaynağı kullanılamıyor" : "Demo bağlamı persisted kaynağa bağlı değil"}</strong>
       <small>{sourceState === "ready" ? "Brief/timeline birleşimi yalnız bu doğrulanmış kaynakla açılır." : "Bu durum proposal, approval veya Meta write yetkisi vermez."}</small>
     </div>
+    {sourceState === "ready" && persistedHint ? <div className={styles.briefNextDecision} data-source-state="hint">
+      <span>FROZEN CONTEXT SİNYALİ</span><strong>{persistedHint.objective.state === "known" ? `Doğrulanmış Meta amacı: ${persistedHint.objective.value}` : "Meta amacı henüz doğrulanmış değil"}</strong>
+      <small>Pazar, dil, hizmet, dönüşüm yolu ve teslimat sağlığı bu kaynaktan tahmin edilmez; kullanıcı doğrular.</small>
+      {persistedHint.suggestedBusinessGoal ? <button type="button" onClick={() => {
+        const suggested = persistedHint.suggestedBusinessGoal;
+        if (suggested) change("businessGoal", suggested);
+      }}>İş amacını bu sinyalle eşle</button> : null}
+    </div> : null}
     <div className={styles.briefPlan}>
       <div><span>Şablon ve kıyas sınırı</span><strong>{brief.variantRef ?? "Bağlam tamamlanınca seçilecek"}</strong><small>{brief.comparisonBoundary.summary}</small></div>
       <div><span>Önerilen şerit</span>{brief.campaignLanes.length ? brief.campaignLanes.map((lane) => <article key={lane.laneRef}><strong>{lane.sequence}. {lane.purpose}</strong><small>{lane.measurementBoundary}</small></article>) : <small>Önce pazar/sınıflandırma veya teslimat engeli çözülmeli.</small>}</div>

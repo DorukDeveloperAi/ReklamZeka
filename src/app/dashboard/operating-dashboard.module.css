@@ -187,6 +187,7 @@
 .briefNextDecision { display: grid; gap: 4px; margin: 0 18px 14px; padding: 11px 12px; border: 1px solid rgba(222,167,78,.34); border-radius: 8px; background: rgba(222,167,78,.07); }
 .briefNextDecision > span, .briefPlan > div > span { color: var(--rz-dim); font: 700 .52rem ui-monospace, monospace; letter-spacing: .08em; }
 .briefNextDecision strong { font-size: .7rem; }.briefNextDecision small, .briefPlan small { color: var(--rz-muted); font-size: .58rem; line-height: 1.45; }
+.briefNextDecision button { justify-self: start; min-height: 30px; padding: 0 9px; border: 1px solid rgba(189,245,94,.42); border-radius: 6px; background: rgba(189,245,94,.1); color: var(--rz-green); font: 700 .56rem ui-monospace, monospace; cursor: pointer; }
 .briefPlan { display: grid; grid-template-columns: 1.2fr 1.2fr .8fr; border-top: 1px solid var(--rz-line); }
 .briefPlan > div { display: grid; align-content: start; gap: 9px; min-height: 112px; padding: 14px 18px; border-right: 1px solid var(--rz-line); }.briefPlan > div:last-child { border-right: 0; }
 .briefPlan article, .briefPlan li { display: grid; gap: 3px; }.briefPlan strong { font-size: .65rem; }.briefPlan ol { display: grid; gap: 7px; margin: 0; padding-left: 18px; }.briefPlan li::marker { color: var(--rz-green); }
