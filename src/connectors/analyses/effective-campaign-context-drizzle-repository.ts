@@ -12,6 +12,7 @@ import {
 } from "@/analyses/effective-campaign-context";
 import { assertDeterministicFeatureSnapshot, type DeterministicFeatureSnapshot } from "@/analyses/deterministic-feature-snapshot";
 import { buildDeterministicWindowSnapshot, type DeterministicWindowSnapshot } from "@/analyses/deterministic-window-snapshot";
+import { DrizzleFrozenDiagnosticEvidenceRepository, FrozenDiagnosticEvidenceRepositoryError } from "@/connectors/analyses/frozen-diagnostic-evidence-drizzle-repository";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -94,7 +95,7 @@ export class EffectiveCampaignContextRepositoryError extends Error {
  */
 type PersistenceWriteStage = "workspace_lock" | "mirror_scope" | "analysis_evidence" | "outcome_evidence"
   | "cadence_evidence" | "authority_snapshot_evidence" | "authority_binding_evidence" | "idempotency_lookup" | "identity_lookup"
-  | "context_insert" | "components_insert" | "policy_sidecar_insert" | "policy_items_insert" | "persistence_reload";
+  | "context_insert" | "components_insert" | "policy_sidecar_insert" | "policy_items_insert" | "diagnostic_evidence_insert" | "persistence_reload";
 
 function persistenceDiagnosticCode(error: unknown, stage: PersistenceWriteStage): EffectiveCampaignContextRepositoryError["diagnosticCode"] {
   let candidate: unknown = error;
@@ -765,6 +766,17 @@ export class DrizzleEffectiveCampaignContextRepository {
           workspaceId: context.workspaceId, compositionId: composition[0]!.id, ...item,
           })));
         }
+      }
+      // A10 substrate is optional only when the frozen context itself is not
+      // analytically ready. Once all persisted facts exist, a missing or bad
+      // diagnostic envelope rejects this transaction rather than inventing a
+      // cohort/config/creative interpretation.
+      if (context.data.trustStatus === "ready" && context.data.blockers.length === 0
+        && context.data.featureRefs.length > 0 && context.data.windowRefs.length > 0
+        && context.metaAnalysisConfigEvidence !== undefined && context.categories.length > 0) {
+        persistenceStage = "diagnostic_evidence_insert";
+        try { await new DrizzleFrozenDiagnosticEvidenceRepository().saveInTransaction(transaction, { contextId: inserted[0]!.id, context }); }
+        catch (error) { if (error instanceof FrozenDiagnosticEvidenceRepositoryError) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch"); throw error; }
       }
       persistenceStage = "persistence_reload";
       return Object.freeze({

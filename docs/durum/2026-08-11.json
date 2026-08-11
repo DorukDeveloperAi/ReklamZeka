@@ -4,6 +4,51 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "a1d3b0fe3",
+      "tarih": "2026-08-11",
+      "konu": "feat(analysis): freeze agenda v2 and L2 advisory evidence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "1c2ce1f76",
+      "tarih": "2026-08-11",
+      "konu": "test(budget): verify source-bound proposal lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "6024270a2",
+      "tarih": "2026-08-11",
+      "konu": "feat(analysis): bind decision room to frozen evidence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "f0c348506",
+      "tarih": "2026-08-11",
+      "konu": "test(analysis): require authentic dry-run evidence",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "2a405c570",
+      "tarih": "2026-08-11",
+      "konu": "docs(plan): record candidate-aware G3 acceptance",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
       "hash": "e5b49c134",
       "tarih": "2026-08-11",
       "konu": "test(guidance): verify candidate preview binding lifecycle",
@@ -92,72 +137,27 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "025aab9fe",
-      "tarih": "2026-08-10",
-      "konu": "feat(a14): derive read-only campaign recommendations",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "76b74e4a3",
-      "tarih": "2026-08-10",
-      "konu": "feat(a14): scope approval reads by campaign hierarchy",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "eca77a011",
-      "tarih": "2026-08-10",
-      "konu": "feat(a14): scope approval queue reads by entity",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "cf83522f6",
-      "tarih": "2026-08-10",
-      "konu": "feat(a14): expose execution safety status",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "158da5ad7",
-      "tarih": "2026-08-10",
-      "konu": "feat(a13): define verify and rollback contract",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 46
-    },
-    {
-      "kapsam": "fix",
-      "adet": 7
+      "adet": 47
     },
     {
       "kapsam": "test",
-      "adet": 6
+      "adet": 7
+    },
+    {
+      "kapsam": "fix",
+      "adet": 4
     },
     {
       "kapsam": "docs",
-      "adet": 1
+      "adet": 2
     }
   ],
-  "isSayisi": 234,
+  "isSayisi": 239,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-11",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "ec5f69d5de07"
+  "damga": "8d7e8dbee2e1"
 }

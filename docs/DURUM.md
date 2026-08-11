@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: ec5f69d5de07 -->
+<!-- durum-damga: 8d7e8dbee2e1 -->
 
 ## Künye
 
@@ -14,13 +14,18 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 234 |
+| iş commit'i (tüm geçmiş) | 239 |
 | ilk / son iş | 2026-08-06 / 2026-08-11 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-11 | `feat` | freeze agenda v2 and L2 advisory evidence | `a1d3b0fe3` |
+| 2026-08-11 | `test` | verify source-bound proposal lifecycle | `1c2ce1f76` |
+| 2026-08-11 | `feat` | bind decision room to frozen evidence | `6024270a2` |
+| 2026-08-11 | `test` | require authentic dry-run evidence | `f0c348506` |
+| 2026-08-11 | `docs` | record candidate-aware G3 acceptance | `2a405c570` |
 | 2026-08-11 | `test` | verify candidate preview binding lifecycle | `e5b49c134` |
 | 2026-08-11 | `test` | compose candidate preview lifecycle fixture | `643973024` |
 | 2026-08-11 | `fix` | harden candidate authority evidence | `a2713940e` |
@@ -31,18 +36,13 @@
 | 2026-08-10 | `feat` | scope approval inbox by campaign context | `6a2ec7a98` |
 | 2026-08-10 | `feat` | bind briefs to persisted context state | `b2180c942` |
 | 2026-08-10 | `feat` | expose read-only campaign context | `6df768290` |
-| 2026-08-10 | `feat` | derive read-only campaign recommendations | `025aab9fe` |
-| 2026-08-10 | `feat` | scope approval reads by campaign hierarchy | `76b74e4a3` |
-| 2026-08-10 | `feat` | scope approval queue reads by entity | `eca77a011` |
-| 2026-08-10 | `feat` | expose execution safety status | `cf83522f6` |
-| 2026-08-10 | `feat` | define verify and rollback contract | `158da5ad7` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 46
-- `fix         ` ████ 7
-- `test        ` ███ 6
-- `docs        ` █ 1
+- `feat        ` ████████████████████████ 47
+- `test        ` ████ 7
+- `fix         ` ██ 4
+- `docs        ` █ 2
 
 ## Planlar
 

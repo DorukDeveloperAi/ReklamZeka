@@ -2219,6 +2219,36 @@ export const effectiveCampaignPolicyCompositionItems = pgTable("effective_campai
   check("effective_campaign_policy_composition_items_shape", sql`${table.policyVersion} >= 1 and ${table.policyHash} ~ '^[a-f0-9]{64}$' and ${table.state} in ('applied', 'suppressed', 'parked_conflict') and btrim(${table.reason}) <> ''`),
 ]);
 
+/**
+ * Immutable A10 diagnostic input envelope. This is deliberately evidence, not
+ * a finding: it preserves the exact frozen context/config/window inputs from
+ * which a future cohort, fatigue, or configuration calculation may be made.
+ */
+export const frozenDiagnosticEvidence = pgTable("frozen_diagnostic_evidence", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  contextId: uuid("context_id").notNull(),
+  contextRef: text("context_ref").notNull(), contextHash: text("context_hash").notNull(),
+  evidenceHash: text("evidence_hash").notNull(), capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+  entityType: text("entity_type").notNull(), entityRef: text("entity_ref").notNull(), hierarchyRefs: jsonb("hierarchy_refs").$type<readonly string[]>().notNull(),
+  featureManifest: jsonb("feature_manifest").$type<readonly Readonly<{ ref: string; hash: string }>[]>().notNull(),
+  windowManifest: jsonb("window_manifest").$type<readonly Readonly<{ ref: string; hash: string }>[]>().notNull(),
+  objective: text("objective"), funnel: text("funnel"), optimizationEvent: text("optimization_event"),
+  categoryCompositionHash: text("category_composition_hash").notNull(), policySetHash: text("policy_set_hash").notNull(),
+  creativeBindingHash: text("creative_binding_hash"), canonicalConfigEvidence: jsonb("canonical_config_evidence").$type<Record<string, unknown>>().notNull(),
+  sourceRefs: jsonb("source_refs").$type<readonly string[]>().notNull(), capabilities: jsonb("capabilities").$type<Record<string, false>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.contextId], foreignColumns: [effectiveCampaignContexts.workspaceId, effectiveCampaignContexts.id], name: "frozen_diagnostic_evidence_context_scope_fk" }).onDelete("cascade"),
+  uniqueIndex("frozen_diagnostic_evidence_context_unique").on(table.contextId),
+  uniqueIndex("frozen_diagnostic_evidence_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("frozen_diagnostic_evidence_workspace_hash_unique").on(table.workspaceId, table.evidenceHash),
+  index("frozen_diagnostic_evidence_lookup_idx").on(table.workspaceId, table.entityType, table.entityRef, table.capturedAt),
+  check("frozen_diagnostic_evidence_hashes", sql`${table.contextHash} ~ '^[a-f0-9]{64}$' and ${table.evidenceHash} ~ '^[a-f0-9]{64}$' and ${table.categoryCompositionHash} ~ '^[a-f0-9]{64}$' and ${table.policySetHash} ~ '^[a-f0-9]{64}$' and (${table.creativeBindingHash} is null or ${table.creativeBindingHash} ~ '^[a-f0-9]{64}$')`),
+  check("frozen_diagnostic_evidence_exact_context", sql`btrim(${table.contextRef}) <> '' and btrim(${table.entityRef}) <> '' and ${table.entityType} in ('campaign', 'ad_set', 'ad', 'creative') and jsonb_typeof(${table.hierarchyRefs}) = 'array' and jsonb_array_length(${table.hierarchyRefs}) >= 1 and jsonb_typeof(${table.featureManifest}) = 'array' and jsonb_array_length(${table.featureManifest}) >= 1 and jsonb_typeof(${table.windowManifest}) = 'array' and jsonb_array_length(${table.windowManifest}) >= 1 and jsonb_typeof(${table.canonicalConfigEvidence}) = 'object' and jsonb_typeof(${table.sourceRefs}) = 'array' and jsonb_array_length(${table.sourceRefs}) >= 1`),
+  check("frozen_diagnostic_evidence_no_authority", sql`${table.capabilities} = '{"canAuthorizeAction":false,"canExecuteWrite":false,"canWriteMeta":false,"canPublish":false,"canApprove":false,"canExecute":false,"canAccessNetwork":false}'::jsonb`),
+]);
+
 /** Append-only invalidation facts. They never mutate historical context payloads. */
 export const effectiveCampaignContextInvalidations = pgTable("effective_campaign_context_invalidations", {
   id: uuid("id").primaryKey().defaultRandom(),

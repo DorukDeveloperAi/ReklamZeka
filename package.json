@@ -64,6 +64,7 @@
     "verify:campaign-context-approval-queue-live": "tsx scripts/verify-campaign-context-approval-queue-live.ts",
     "verify:ready-effective-analysis-context-root-db": "tsx scripts/verify-ready-effective-analysis-context-root-postgres.ts",
     "verify:current-effective-analysis-context-source-db": "tsx scripts/verify-current-effective-analysis-context-source-postgres.ts",
+    "verify:frozen-diagnostic-evidence-db": "tsx scripts/verify-frozen-diagnostic-evidence-postgres.ts",
     "verify:candidate-preview-binding-g3-db": "tsx scripts/verify-candidate-preview-binding-g3-postgres.ts",
     "verify:candidate-preview-binding-tombstone-db": "tsx scripts/verify-candidate-preview-binding-tombstone-postgres.ts",
     "recover:current-effective-analysis-context-source-fixtures-db": "tsx scripts/recover-current-effective-analysis-context-source-fixtures-postgres.ts",
