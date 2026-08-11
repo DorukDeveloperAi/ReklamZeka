@@ -17138,6 +17138,27 @@
         }
       },
       "indexes": {
+        "guidance_sets_workspace_row_unique": {
+          "name": "guidance_sets_workspace_row_unique",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "guidance_sets_workspace_key_version_unique": {
           "name": "guidance_sets_workspace_key_version_unique",
           "columns": [

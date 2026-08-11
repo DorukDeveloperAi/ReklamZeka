@@ -6,7 +6,7 @@ type JournalEntry = { idx: number; tag: string };
 type OrderedStatement = { migration: string; position: number; sql: string };
 
 const root = process.cwd();
-const identifier = /(?:"[^"]+"|[a-z_][a-z0-9_$]*)/i;
+const identifier = '(?:"[^"]+"|[a-z_][a-z0-9_$]*)';
 
 function normalizeIdentifier(value: string) {
   return value.trim().replace(/^"|"$/g, "").toLowerCase();

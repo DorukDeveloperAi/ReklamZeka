@@ -1776,6 +1776,7 @@ export const guidanceSets = pgTable("guidance_sets", {
   recordHash: text("record_hash").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  uniqueIndex("guidance_sets_workspace_row_unique").on(table.workspaceId, table.id),
   uniqueIndex("guidance_sets_workspace_key_version_unique").on(table.workspaceId, table.setKey, table.version),
   index("guidance_sets_workspace_status_idx").on(table.workspaceId, table.reviewStatus, table.setKey),
   check("guidance_sets_version_positive", sql`${table.version} >= 1`),
