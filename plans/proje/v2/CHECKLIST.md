@@ -349,6 +349,13 @@
     ready bundle'ın relational authority catalog/snapshot/binding zinciri olmadan `source_rejected`
     kaldığı (`syntheticAuthorityRejected:true`) ve sıfır network/action çağrısı doğrulanır. Bu kabul,
     closed-world current-source veya persistence başarısı iddia etmez.
+  - [x] A10.4c-14 closed-world current-source persistence acceptance: gerçek private lifecycle fixture'ı
+    canonical hierarchy/config, category, cadence, reviewed guidance selection, policy lifecycle,
+    authority snapshot/catalog ve promotion registry zincirini aynı kaynak sözleşmesiyle kurar; source
+    reader → evidence-bound writer → reload canlı PostgreSQL'de doğrulanır. Cross-tenant/malformed public
+    alias fail-closed, network/action/Meta write sıfır ve iki tenantın locked tombstone cleanup'ı sıfır
+    survivor verir. Data window bağlanmadığından `analysis_window_not_bound` ve bütün G4/action
+    capability'leri kapalı kalır.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.

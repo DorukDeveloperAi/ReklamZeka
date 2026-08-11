@@ -2813,3 +2813,22 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Tek server-private Drizzle root bu reader/materializer/writer'ı aynı database sınırında kurar; HTTP, MCP,
   action veya Meta write yüzeyi eklenmedi. Kanıt: `tests/timeframe-bound-analysis-context-composer.test.ts`,
   `tests/timeframe-bound-analysis-context-composer-runtime.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-11 — A10.4c-14 closed-world current-source persistence acceptance
+
+- Gerçek PostgreSQL verifier, tek bir geçici tenantta canonical Meta hierarchy/config snapshot'ı, category
+  profile/composition, cadence, reviewed guidance selection/pack, policy lifecycle, repository-verified
+  authority snapshot/catalog ve promotion registry zincirini normal private lifecycle'ler üzerinden kurar.
+  `DrizzleCurrentEffectiveAnalysisContextSourceReader` aynı read-only snapshotta bu kaynakları çözer;
+  server-private composer context'i `evidence_bound` olarak yazar ve tekrar yükler.
+- Empty published policy registry artık ayrı bir policy iddia etmediğinde boş `ANY(...)` binding sorgusu
+  çalıştırmaz; snapshot/catalog/registry hash'i doğrulandıktan sonra zero-item immutable composition sidecar
+  yazılır. Nonempty policy bağlamları exact relational binding doğrulamasını korur.
+- Verifier public campaign read sınırında iç UUID/hash kullanmaz, API'nin SHA-256 türetilmiş `ref_…` aliasını
+  kullanır. Cross-tenant scope ve malformed alias reddedilir. Ağ, action ve Meta write çağrıları sıfırdır.
+  Primary ve foreign fixture workspace'leri yalnız locked tombstone servisiyle temizlenir; survivor sayıları
+  sıfırdır. Bu acceptance data window bağlamaz: `data.not_ready` / `analysis_window_not_bound` korunur;
+  Decision Room, HTTP/MCP, approval veya G4 capability'si açılmaz.
+- Kanıt: `npm run verify:current-effective-analysis-context-source-db`; `npm test` (316 dosya/1.719 test),
+  `npm run build`, `npm run db:check`, `npm run check:security`, `npm run check:security-boundaries`,
+  `npm run check:secret-artifacts` ve `git diff --check`.

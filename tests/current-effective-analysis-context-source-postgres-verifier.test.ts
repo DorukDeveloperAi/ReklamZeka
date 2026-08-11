@@ -18,6 +18,8 @@ describe("current effective analysis context PostgreSQL verifier", () => {
     expect(source).toContain('"tombstone_foreign"');
     expect(source).toContain("workspace_tombstone_purge_schema_not_migrated");
     expect(source).toContain("closed_world_current_source_ready_compose_save_reload");
+    expect(source).toContain('campaignRef: `ref_${createHash("sha256").update(campaignRef).digest("hex").slice(0, 12)}`');
+    expect(source).not.toContain("campaignRef: `ref_${composed.context.contextHash.slice(0, 12)}`");
     expect(source).not.toContain("prototype.loadCurrent");
     expect(source).not.toContain("insert into tenant_authority_snapshots");
     expect(source).not.toContain("insert into policy_authority_catalog");

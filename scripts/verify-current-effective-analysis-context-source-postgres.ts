@@ -212,7 +212,7 @@ try {
       throw error;
     }); saved = composed.outcome === "inserted";
     const stored = await new DrizzleEffectiveCampaignContextRepository(database as never).loadLatestValidCampaignPublic({ workspaceId,
-      campaignRef: `ref_${composed.context.contextHash.slice(0, 12)}` });
+      campaignRef: `ref_${createHash("sha256").update(campaignRef).digest("hex").slice(0, 12)}` });
     reloaded = stored !== null && stored.context.contextHash === composed.context.contextHash;
     crossTenantBlocked = await reader.loadCurrent({ ...request, workspaceId: foreignWorkspaceId }).then(() => false, () => true);
     malformedBlocked = await reader.loadCurrent({ ...request, entityRef: "bad ref" }).then(() => false, () => true);
