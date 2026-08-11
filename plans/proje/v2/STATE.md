@@ -363,8 +363,18 @@
   Supabase security verifier geçti. Normal sync materializer da daily observed `frequency` metricini
   canonical mirror'a taşır. Gerçek credential-backed ad-level outer-rollback read acceptance ve
   Decision Room'a finding bağlama henüz açık; bu source yalnız read-only/advisory zincirdedir.
-  window snapshot materializer hâlâ policy ref/hashını persisted olarak doğrulayamadığından kapalıdır;
-  settled source evidence veya fatigue finding iddiası yapılmaz.
+  Settled window source evidence veya fatigue finding iddiası bununla açılmaz.
+
+## 2026-08-11 — A10.5c private direct-window runtime composition
+
+- `ProductionCreativeDiagnosticWindowService`, çağıranın connection, access token veya Meta account
+  vermesine izin vermez: server-derived config scope'tan active tenant ad/account/data-source
+  zinciriyle connection'ı çözer, active read-only connection'ın environment secret'ını server-side
+  alır ve yalnız GET-only `MetaGraphCreativeWindowAllDaysSource` ile policy-bound window writer'ı
+  kurar. Redacted sonuç yalnız immutable snapshot hash/ref ve `inserted` bilgisini döndürür.
+- Scope/connection/secret/source eksikliği fail-closed, tüm action/approval/Meta-write capability'leri
+  false'tur. Bu root için unit/build/architecture/security-boundary kanıtı vardır; credential-backed
+  ad-level outer-rollback source acceptance ile Decision Room finding bağlama hâlâ açık kalır.
 
 ## 2026-08-11 — A07 field-pilot source coverage census
 
