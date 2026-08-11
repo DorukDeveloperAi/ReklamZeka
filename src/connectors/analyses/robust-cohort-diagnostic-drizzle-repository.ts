@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { calculateRobustCohort, type CohortDirection, type CohortCompatibilityProfile, type RobustCohortResult } from "@/analyses/cohort-calculator";
-import { ANALYSIS_METRICS, FUNNEL_STAGES, type AnalysisMetric, type FunnelStage } from "@/analyses/schema";
+import { ANALYSIS_METRICS, CAMPAIGN_OBJECTIVES, FUNNEL_STAGES, OPTIMIZATION_EVENTS,
+  type AnalysisMetric, type FunnelStage } from "@/analyses/schema";
 import { assertDeterministicFeatureSnapshot, type DeterministicFeatureSnapshot } from "@/analyses/deterministic-feature-snapshot";
 import * as schema from "@/db/schema";
 
@@ -54,12 +55,12 @@ export class DrizzleRobustCohortDiagnosticRepository {
       const selected = rows<CandidateRow>(await tx.execute(sql`
         with target as (
           select evidence.workspace_id, evidence.id, context.ad_account_id, evidence.objective, evidence.funnel,
-            evidence.optimization_event, evidence.category_composition_hash, evidence.policy_set_hash
+            evidence.optimization_event, evidence.category_cohort_profile_hash, evidence.policy_set_hash
           from frozen_diagnostic_evidence evidence
           join effective_campaign_contexts context on context.workspace_id = evidence.workspace_id and context.id = evidence.context_id
           where evidence.workspace_id = ${input.workspaceId}::uuid and evidence.id = ${input.targetEvidenceId}::uuid
             and evidence.entity_type = 'campaign' and evidence.objective is not null and evidence.funnel = ${input.funnel}
-            and evidence.optimization_event is not null
+            and evidence.optimization_event is not null and evidence.category_cohort_profile_hash is not null
             and not exists (select 1 from effective_campaign_context_invalidations invalidation where invalidation.workspace_id = evidence.workspace_id and invalidation.context_id = evidence.context_id)
           for share
         ), ranked as (
@@ -68,7 +69,7 @@ export class DrizzleRobustCohortDiagnosticRepository {
           join effective_campaign_contexts context on context.workspace_id = evidence.workspace_id and context.id = evidence.context_id
           join target on target.workspace_id = evidence.workspace_id and target.ad_account_id = context.ad_account_id
             and target.objective = evidence.objective and target.funnel = evidence.funnel and target.optimization_event = evidence.optimization_event
-            and target.category_composition_hash = evidence.category_composition_hash and target.policy_set_hash = evidence.policy_set_hash
+            and target.category_cohort_profile_hash = evidence.category_cohort_profile_hash and target.policy_set_hash = evidence.policy_set_hash
           where evidence.workspace_id = ${input.workspaceId}::uuid and evidence.entity_type = 'campaign'
             and not exists (select 1 from effective_campaign_context_invalidations invalidation where invalidation.workspace_id = evidence.workspace_id and invalidation.context_id = evidence.context_id)
           order by evidence.entity_ref, evidence.captured_at desc, evidence.id desc
@@ -87,13 +88,17 @@ export class DrizzleRobustCohortDiagnosticRepository {
       for (const row of selected) grouped.set(row.evidence_id, [...(grouped.get(row.evidence_id) ?? []), row]);
       const targetRows = grouped.get(input.targetEvidenceId);
       if (!targetRows || targetRows.length !== 1 || [...grouped.values()].some((entries) => entries.length !== 1)) fail("insufficient_evidence");
-      const profileRow = rows<Readonly<{ objective: unknown; funnel: unknown; optimization_event: unknown; category_composition_hash: unknown; policy_set_hash: unknown }>>(await tx.execute(sql`
-        select objective, funnel, optimization_event, category_composition_hash, policy_set_hash
+      const profileRow = rows<Readonly<{ objective: unknown; funnel: unknown; optimization_event: unknown; category_cohort_profile_hash: unknown; policy_set_hash: unknown }>>(await tx.execute(sql`
+        select objective, funnel, optimization_event, category_cohort_profile_hash, policy_set_hash
         from frozen_diagnostic_evidence where workspace_id = ${input.workspaceId}::uuid and id = ${input.targetEvidenceId}::uuid limit 2 for share
       `))[0];
-      if (!profileRow || typeof profileRow.objective !== "string" || profileRow.funnel !== input.funnel || typeof profileRow.optimization_event !== "string"
-        || typeof profileRow.category_composition_hash !== "string" || typeof profileRow.policy_set_hash !== "string" || !HASH.test(profileRow.category_composition_hash) || !HASH.test(profileRow.policy_set_hash)) fail("corrupt_store");
-      const profile: CohortCompatibilityProfile = Object.freeze({ objective: profileRow.objective as CohortCompatibilityProfile["objective"], funnel: input.funnel, optimizationEvent: profileRow.optimization_event as CohortCompatibilityProfile["optimizationEvent"], metricKey: input.metricKey, categoryProfileHash: profileRow.category_composition_hash, policySetHash: profileRow.policy_set_hash });
+      if (!profileRow || typeof profileRow.objective !== "string"
+        || !(CAMPAIGN_OBJECTIVES as readonly string[]).includes(profileRow.objective)
+        || profileRow.funnel !== input.funnel || typeof profileRow.optimization_event !== "string"
+        || !(OPTIMIZATION_EVENTS as readonly string[]).includes(profileRow.optimization_event)
+        || typeof profileRow.category_cohort_profile_hash !== "string" || typeof profileRow.policy_set_hash !== "string"
+        || !HASH.test(profileRow.category_cohort_profile_hash) || !HASH.test(profileRow.policy_set_hash)) fail("corrupt_store");
+      const profile: CohortCompatibilityProfile = Object.freeze({ objective: profileRow.objective as CohortCompatibilityProfile["objective"], funnel: input.funnel, optimizationEvent: profileRow.optimization_event as CohortCompatibilityProfile["optimizationEvent"], metricKey: input.metricKey, categoryProfileHash: profileRow.category_cohort_profile_hash, policySetHash: profileRow.policy_set_hash });
       const members = [...grouped.values()].map((entries) => {
         const row = entries[0]!; let feature: DeterministicFeatureSnapshot;
         try { assertDeterministicFeatureSnapshot(row.feature_payload); feature = row.feature_payload as DeterministicFeatureSnapshot; } catch { return fail("corrupt_store"); }

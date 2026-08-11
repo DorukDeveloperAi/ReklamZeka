@@ -554,6 +554,13 @@
       "when": 1786465400166,
       "tag": "20260811162320_strong_fat_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1786465884899,
+      "tag": "20260811163124_simple_northstar",
+      "breakpoints": true
     }
   ]
 }

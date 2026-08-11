@@ -1,10 +1,24 @@
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 import type { EffectiveCampaignContext } from "@/analyses/effective-campaign-context";
-import { DrizzleFrozenDiagnosticEvidenceRepository, FrozenDiagnosticEvidenceRepositoryError } from "@/connectors/analyses/frozen-diagnostic-evidence-drizzle-repository";
+import { DrizzleFrozenDiagnosticEvidenceRepository, FrozenDiagnosticEvidenceRepositoryError,
+  deriveDiagnosticCategoryCohortProfileHash, deriveFrozenDiagnosticFunnel } from "@/connectors/analyses/frozen-diagnostic-evidence-drizzle-repository";
+import { categoryDefinitionPublicRef } from "@/domain/categories/public-reference";
 
 const workspaceId = "00000000-0000-4000-8000-000000000101";
 const contextId = "00000000-0000-4000-8000-000000000102";
+
+function category(entityRef = "campaign_test", assignmentId = "assignment_test", funnel = "conversion") {
+  return { schemaVersion: 1 as const, workspaceId, path: [{ level: "campaign" as const, id: entityRef }],
+    dimension: { id: "dimension_funnel", key: "funnel_intent", version: 2, cardinality: "single" as const },
+    definitionVersions: [{ id: "definition_funnel", key: funnel, version: 3 }],
+    effectiveDefinitions: [{ id: "definition_funnel", key: funnel, version: 3 }],
+    evaluatedAssignments: [{ id: assignmentId, version: 1, operation: "override" as const,
+      entityLevel: "campaign" as const, manualLock: true }],
+    profileBindings: [{ categoryRef: categoryDefinitionPublicRef("funnel_intent", funnel),
+      profileRef: "category_profile_funnel", profileVersion: 4, profileHash: "e".repeat(64) }],
+    resolutionHash: "b".repeat(64) };
+}
 
 function context(overrides: Partial<EffectiveCampaignContext> = {}): EffectiveCampaignContext {
   return {
@@ -12,7 +26,7 @@ function context(overrides: Partial<EffectiveCampaignContext> = {}): EffectiveCa
     contextHash: "a".repeat(64), identity: { connectionRef: "connection_test", accountRef: "account_test", campaignRef: "campaign_test", entityType: "campaign", entityRef: "campaign_test", hierarchyRefs: ["campaign_test"] },
     meta: { objective: { state: "known", value: "sales" }, optimizationEvent: { state: "known", value: "purchase" } },
     metaAnalysisConfigEvidence: { snapshot: { version: "meta-analysis-config/2.0.0", workspaceId, externalAccountId: "account_test", capturedAt: "2026-08-11T11:00:00.000Z", campaigns: [], adSets: [] } },
-    categories: [{ dimension: { id: "dimension_test" }, resolutionHash: "b".repeat(64), profileBindings: [] }], policies: [],
+    categories: [category()], policies: [],
     data: { trustStatus: "ready", blockers: [], featureRefs: ["feature_aaaaaaaaaaaaaaaaaaaaaaaa"], windowRefs: ["window_bbbbbbbbbbbbbbbbbbbbbbbb"], snapshotRefs: ["snapshot_test"] },
     ...overrides,
   } as unknown as EffectiveCampaignContext;
@@ -29,6 +43,7 @@ describe("DrizzleFrozenDiagnosticEvidenceRepository", () => {
     expect(result).toBe("inserted");
     expect(calls).toHaveLength(2);
     expect(calls[1]).toContain("insert into frozen_diagnostic_evidence");
+    expect(calls[1]).toContain("category_cohort_profile_hash");
     expect(calls[1]).toContain("canAccessNetwork");
     expect(calls[1]).toContain("on conflict (context_id) do nothing");
   });
@@ -42,5 +57,21 @@ describe("DrizzleFrozenDiagnosticEvidenceRepository", () => {
     await expect(new DrizzleFrozenDiagnosticEvidenceRepository().saveInTransaction(database as never, { contextId, context: candidate }))
       .rejects.toMatchObject({ code: "insufficient_evidence" } satisfies Partial<FrozenDiagnosticEvidenceRepositoryError>);
     expect(database.execute).not.toHaveBeenCalled();
+  });
+
+  it("derives only an exact canonical funnel and keeps cohort compatibility independent of entity identity", () => {
+    const first = category("campaign_alpha", "assignment_alpha");
+    const second = category("campaign_beta", "assignment_beta");
+    expect(deriveFrozenDiagnosticFunnel([first])).toBe("conversion");
+    expect(deriveDiagnosticCategoryCohortProfileHash([first]))
+      .toBe(deriveDiagnosticCategoryCohortProfileHash([second]));
+    expect(deriveDiagnosticCategoryCohortProfileHash([category("campaign_beta", "assignment_beta", "consideration")]))
+      .not.toBe(deriveDiagnosticCategoryCohortProfileHash([first]));
+  });
+
+  it("does not infer funnel from noncanonical or multi-valued owner categories", () => {
+    expect(deriveFrozenDiagnosticFunnel([category("campaign_test", "assignment_test", "sales")])).toBeNull();
+    expect(deriveFrozenDiagnosticFunnel([{ ...category(), dimension: { ...category().dimension, cardinality: "multi" as const } }])).toBeNull();
+    expect(deriveFrozenDiagnosticFunnel([{ ...category(), dimension: { ...category().dimension, key: "service" } }])).toBeNull();
   });
 });

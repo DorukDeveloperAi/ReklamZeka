@@ -26,7 +26,7 @@ describe("DrizzleRobustCohortDiagnosticRepository", () => {
       calls.push(dialect.sqlToQuery(query).sql);
       if (calls.length === 1) return { rows: [{ id: workspaceId }] };
       if (calls.length === 2) return { rows: selected };
-      if (calls.length === 3) return { rows: [{ objective: "sales", funnel: "conversion", optimization_event: "purchase", category_composition_hash: "a".repeat(64), policy_set_hash: "b".repeat(64) }] };
+      if (calls.length === 3) return { rows: [{ objective: "sales", funnel: "conversion", optimization_event: "purchase", category_cohort_profile_hash: "a".repeat(64), policy_set_hash: "b".repeat(64) }] };
       return { rows: [{ id: "00000000-0000-4000-8000-000000000105" }] };
     }) };
     const result = await new DrizzleRobustCohortDiagnosticRepository(database as never).materialize(input);
@@ -34,7 +34,7 @@ describe("DrizzleRobustCohortDiagnosticRepository", () => {
     expect(result.result.assessments.find((assessment) => assessment.entityRef === "campaign_delta")).toMatchObject({ status: "finding", reason: "outlier_against_cohort" });
     expect(calls[1]).toContain("join target");
     expect(calls[1]).toContain("target.ad_account_id = context.ad_account_id");
-    expect(calls[1]).toContain("category_composition_hash");
+    expect(calls[1]).toContain("category_cohort_profile_hash");
     expect(calls[1]).toContain("policy_set_hash");
     expect(calls[3]).toContain("insert into robust_cohort_diagnostic_assets");
     expect(calls[3]).toContain("on conflict (workspace_id, cohort_hash) do nothing");
