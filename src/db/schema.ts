@@ -908,6 +908,7 @@ export const metaCreatives = pgTable("meta_creatives", {
 }, (table) => [
   uniqueIndex("meta_creatives_account_external_unique").on(table.adAccountId, table.externalCreativeId),
   uniqueIndex("meta_creatives_id_workspace_unique").on(table.id, table.workspaceId),
+  uniqueIndex("meta_creatives_workspace_id_unique").on(table.workspaceId, table.id),
   index("meta_creatives_workspace_post_idx").on(table.workspaceId, table.postId),
   index("meta_creatives_post_idx").on(table.postId),
   index("meta_creatives_actor_asset_idx").on(table.actorAssetId),
@@ -941,6 +942,7 @@ export const metaAds = pgTable("meta_ads", {
 }, (table) => [
   uniqueIndex("meta_ads_account_external_unique").on(table.adAccountId, table.externalAdId),
   uniqueIndex("meta_ads_id_workspace_unique").on(table.id, table.workspaceId),
+  uniqueIndex("meta_ads_workspace_id_unique").on(table.workspaceId, table.id),
   index("meta_ads_workspace_ad_set_idx").on(table.workspaceId, table.adSetId),
   index("meta_ads_creative_idx").on(table.creativeId),
 ]);
@@ -2279,6 +2281,44 @@ export const robustCohortDiagnosticAssets = pgTable("robust_cohort_diagnostic_as
   check("robust_cohort_diagnostic_assets_hashes", sql`${table.cohortHash} ~ '^[a-f0-9]{64}$'`),
   check("robust_cohort_diagnostic_assets_shape", sql`jsonb_typeof(${table.profile}) = 'object' and jsonb_typeof(${table.memberEvidenceRefs}) = 'array' and jsonb_array_length(${table.memberEvidenceRefs}) >= 1 and jsonb_array_length(${table.memberEvidenceRefs}) <= 100 and jsonb_typeof(${table.resultPayload}) = 'object'`),
   check("robust_cohort_diagnostic_assets_advisory_only", sql`${table.capabilities} = '{"canAuthorizeAction":false,"canExecuteWrite":false,"canWriteMeta":false,"canPublish":false,"canApprove":false,"canExecute":false,"canAccessNetwork":false}'::jsonb`),
+]);
+
+/** Immutable source-owned contract for creative fatigue/config materialization. */
+export const creativeDiagnosticDefinitionRevisions = pgTable("creative_diagnostic_definition_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  definitionRef: text("definition_ref").notNull(), revision: integer("revision").notNull(), definitionHash: text("definition_hash").notNull(), previousHash: text("previous_hash"),
+  state: text("state").notNull(), definitionPayload: jsonb("definition_payload").$type<Record<string, unknown>>().notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("creative_diagnostic_definition_revisions_exact_unique").on(table.workspaceId, table.definitionRef, table.revision), uniqueIndex("creative_diagnostic_definition_revisions_workspace_id_unique").on(table.workspaceId, table.id),
+  index("creative_diagnostic_definition_revisions_lookup_idx").on(table.workspaceId, table.definitionRef, table.state, table.revision),
+  check("creative_diagnostic_definition_revisions_shape", sql`${table.definitionRef} ~ '^creative_definition_[a-f0-9]{24}$' and ${table.revision} >= 1 and ${table.definitionHash} ~ '^[a-f0-9]{64}$' and (${table.previousHash} is null or ${table.previousHash} ~ '^[a-f0-9]{64}$') and ${table.state} in ('draft', 'published', 'retired') and jsonb_typeof(${table.definitionPayload}) = 'object'`),
+]);
+
+export const metaCreativeConfigSnapshots = pgTable("meta_creative_config_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), targetEvidenceId: uuid("target_evidence_id").notNull(), adId: uuid("ad_id").notNull(), creativeId: uuid("creative_id").notNull(),
+  bindingHash: text("binding_hash").notNull(), creativeContentHash: text("creative_content_hash").notNull(), configPayload: jsonb("config_payload").$type<Record<string, unknown>>().notNull(), snapshotHash: text("snapshot_hash").notNull(), observedAt: timestamp("observed_at", { withTimezone: true }).notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.targetEvidenceId], foreignColumns: [frozenDiagnosticEvidence.workspaceId, frozenDiagnosticEvidence.id], name: "meta_creative_config_snapshots_evidence_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.adId], foreignColumns: [metaAds.workspaceId, metaAds.id], name: "meta_creative_config_snapshots_ad_scope_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.creativeId], foreignColumns: [metaCreatives.workspaceId, metaCreatives.id], name: "meta_creative_config_snapshots_creative_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("meta_creative_config_snapshots_hash_unique").on(table.workspaceId, table.snapshotHash), uniqueIndex("meta_creative_config_snapshots_workspace_id_unique").on(table.workspaceId, table.id), index("meta_creative_config_snapshots_evidence_idx").on(table.workspaceId, table.targetEvidenceId, table.observedAt),
+  check("meta_creative_config_snapshots_shape", sql`${table.bindingHash} ~ '^[a-f0-9]{64}$' and ${table.creativeContentHash} ~ '^[a-f0-9]{64}$' and ${table.snapshotHash} ~ '^[a-f0-9]{64}$' and jsonb_typeof(${table.configPayload}) = 'object'`),
+]);
+
+export const metaCreativeWindowInsightSnapshots = pgTable("meta_creative_window_insight_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), configSnapshotId: uuid("config_snapshot_id").notNull(), windowKind: text("window_kind").notNull(), startDate: date("start_date", { mode: "string" }).notNull(), endDate: date("end_date", { mode: "string" }).notNull(),
+  frequency: numeric("frequency", { precision: 30, scale: 12 }).notNull(), clicks: bigint("clicks", { mode: "number" }).notNull(), impressions: bigint("impressions", { mode: "number" }).notNull(), attributionLabel: text("attribution_label").notNull(), timezone: text("timezone").notNull(), dailyCoverage: jsonb("daily_coverage").$type<readonly Record<string, unknown>[]>().notNull(), sourceRef: text("source_ref").notNull(), sourceHash: text("source_hash").notNull(), snapshotHash: text("snapshot_hash").notNull(), observedAt: timestamp("observed_at", { withTimezone: true }).notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.configSnapshotId], foreignColumns: [metaCreativeConfigSnapshots.workspaceId, metaCreativeConfigSnapshots.id], name: "meta_creative_window_insight_snapshots_config_scope_fk" }).onDelete("cascade"),
+  uniqueIndex("meta_creative_window_insight_snapshots_hash_unique").on(table.workspaceId, table.snapshotHash), uniqueIndex("meta_creative_window_insight_snapshots_workspace_id_unique").on(table.workspaceId, table.id), uniqueIndex("meta_creative_window_insight_snapshots_exact_unique").on(table.configSnapshotId, table.windowKind, table.startDate, table.endDate, table.attributionLabel), index("meta_creative_window_insight_snapshots_config_idx").on(table.workspaceId, table.configSnapshotId, table.observedAt),
+  check("meta_creative_window_insight_snapshots_shape", sql`${table.windowKind} in ('baseline', 'recent') and ${table.startDate} <= ${table.endDate} and ${table.frequency} >= 0 and ${table.clicks} >= 0 and ${table.impressions} >= 0 and btrim(${table.attributionLabel}) <> '' and btrim(${table.timezone}) <> '' and ${table.sourceRef} ~ '^creative_window_[a-f0-9]{24}$' and ${table.sourceHash} ~ '^[a-f0-9]{64}$' and ${table.snapshotHash} ~ '^[a-f0-9]{64}$' and jsonb_typeof(${table.dailyCoverage}) = 'array'`),
+]);
+
+export const creativeFatigueConfigDiagnosticAssets = pgTable("creative_fatigue_config_diagnostic_assets", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), targetEvidenceId: uuid("target_evidence_id").notNull(), definitionRevisionId: uuid("definition_revision_id").notNull(), baselineConfigSnapshotId: uuid("baseline_config_snapshot_id").notNull(), recentConfigSnapshotId: uuid("recent_config_snapshot_id").notNull(), baselineWindowId: uuid("baseline_window_id").notNull(), recentWindowId: uuid("recent_window_id").notNull(), diagnosticHash: text("diagnostic_hash").notNull(), resultPayload: jsonb("result_payload").$type<Record<string, unknown>>().notNull(), capabilities: jsonb("capabilities").$type<Record<string, false>>().notNull(), occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.targetEvidenceId], foreignColumns: [frozenDiagnosticEvidence.workspaceId, frozenDiagnosticEvidence.id], name: "creative_fatigue_config_diagnostic_assets_evidence_scope_fk" }).onDelete("cascade"), foreignKey({ columns: [table.workspaceId, table.definitionRevisionId], foreignColumns: [creativeDiagnosticDefinitionRevisions.workspaceId, creativeDiagnosticDefinitionRevisions.id], name: "creative_fatigue_config_diagnostic_assets_definition_scope_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.baselineConfigSnapshotId], foreignColumns: [metaCreativeConfigSnapshots.workspaceId, metaCreativeConfigSnapshots.id], name: "creative_fatigue_config_diagnostic_assets_baseline_config_scope_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.recentConfigSnapshotId], foreignColumns: [metaCreativeConfigSnapshots.workspaceId, metaCreativeConfigSnapshots.id], name: "creative_fatigue_config_diagnostic_assets_recent_config_scope_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.baselineWindowId], foreignColumns: [metaCreativeWindowInsightSnapshots.workspaceId, metaCreativeWindowInsightSnapshots.id], name: "creative_fatigue_config_diagnostic_assets_baseline_window_scope_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.recentWindowId], foreignColumns: [metaCreativeWindowInsightSnapshots.workspaceId, metaCreativeWindowInsightSnapshots.id], name: "creative_fatigue_config_diagnostic_assets_recent_window_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("creative_fatigue_config_diagnostic_assets_hash_unique").on(table.workspaceId, table.diagnosticHash), uniqueIndex("creative_fatigue_config_diagnostic_assets_workspace_id_unique").on(table.workspaceId, table.id), index("creative_fatigue_config_diagnostic_assets_target_idx").on(table.workspaceId, table.targetEvidenceId, table.occurredAt),
+  check("creative_fatigue_config_diagnostic_assets_shape", sql`${table.diagnosticHash} ~ '^[a-f0-9]{64}$' and jsonb_typeof(${table.resultPayload}) = 'object' and ${table.capabilities} = '{"canAuthorizeAction":false,"canExecuteWrite":false,"canWriteMeta":false,"canPublish":false,"canApprove":false,"canExecute":false,"canAccessNetwork":false}'::jsonb`),
 ]);
 
 /** Append-only invalidation facts. They never mutate historical context payloads. */

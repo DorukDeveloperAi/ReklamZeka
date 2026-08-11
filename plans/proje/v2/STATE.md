@@ -259,6 +259,16 @@
   lifecycle, invalidation ve PostgreSQL verifier henüz açık olduğundan hiçbir diagnostic asset veya
   Decision Room finding'i yazmaz.
 
+## 2026-08-11 — A10.5c immutable creative diagnostic substrate
+
+- Forward-only creative diagnostic migration; definition revisions, exact ad→creative config
+  snapshots, baseline/recent all-days window snapshots ve immutable advisory asset tablolarını
+  tenant-composite FK, FORCE RLS, public-role revoke, append-only/tombstoning delete guard ile
+  ekledi. Workspace purge allowlist/inspection/delete sırası bu dört tabloyu kapsar.
+- Bu yalnız persistence substrate'tir: source writer, definition lifecycle, current-vs-historical
+  invalidation, V2 result materializer ve PostgreSQL acceptance henüz tamamlanmadığı için
+  asset/finding üretilmez; G4 ve tüm write/action/network capability'leri kapalıdır.
+
 ## 2026-08-11 — A07 field-pilot source coverage census
 
 - Yeni read-only `census:field-pilot-source-db` REPEATABLE READ altında yalnız aggregate workspace/account

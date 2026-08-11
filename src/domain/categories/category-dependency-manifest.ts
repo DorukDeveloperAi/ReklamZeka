@@ -67,6 +67,12 @@ const opaqueCategoryContext = new Set([
   "robust_cohort_diagnostic_assets.member_evidence_refs",
   "robust_cohort_diagnostic_assets.result_payload",
   "robust_cohort_diagnostic_assets.capabilities",
+  // Creative diagnostic persistence commits historical config/window/result
+  // hashes. None exposes a mutable category-reference edge.
+  "creative_diagnostic_definition_revisions.definition_payload",
+  "meta_creative_config_snapshots.config_payload",
+  "meta_creative_window_insight_snapshots.daily_coverage",
+  "creative_fatigue_config_diagnostic_assets.result_payload",
 ]);
 
 const columns = [
@@ -144,6 +150,10 @@ const columns = [
   "robust_cohort_diagnostic_assets.member_evidence_refs",
   "robust_cohort_diagnostic_assets.result_payload",
   "robust_cohort_diagnostic_assets.capabilities",
+  "creative_diagnostic_definition_revisions.definition_payload",
+  "meta_creative_config_snapshots.config_payload",
+  "meta_creative_window_insight_snapshots.daily_coverage",
+  "creative_fatigue_config_diagnostic_assets.result_payload",
   "budget_proposal_versions.proposal_payload",
   "budget_proposal_alternatives.alternative_payload",
   "analysis_timeframe_definitions.definition_payload",
