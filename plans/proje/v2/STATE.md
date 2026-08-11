@@ -328,6 +328,19 @@
 - Bu hâlâ creative window source materializer veya diagnostic finding değildir. Pencere writer'ı
   policy ref/hash'ini replay evidence olarak bağlamadan, settled window ya da fatigue sonucu üretemez;
   ad-level outer-rollback lifecycle kabulü bu nedenle açık kalır.
+
+## 2026-08-11 — A10.5c policy-bound daily creative window evidence
+
+- `DrizzleCreativeDiagnosticWindowInsightSnapshotRepository`, yalnız current published settlement
+  policy'yi caller-owned transaction içinde çözer; active tenant/ad/config snapshot üzerinden aynı
+  güne ait tek canonical Meta `ad` insight'ını ve exactly-one `frequency`/`clicks`/`impressions`
+  metriclerini doğrular. Policy cutoff'u geçmemiş gün, eksik/tekrarlı metric, ambiguous insight ya da
+  aggregate period `insufficient_evidence` olur.
+- Frequency non-additive olduğu için writer çok günlük değeri toplamaz ya da ortalamaz: şimdilik
+  yalnız source-grain tek günlük baseline/recent snapshot yazar. Kaydedilen snapshot policy ref/hash,
+  metric/source hash manifest'i ve settled daily coverage'ı taşır; action, approval, Meta write ve
+  network capability'si açılmaz. Gerçek ad-level outer-rollback source fixture/verifier ve sonraki
+  all-days direct-window source contractı hâlâ açıktır.
   window snapshot materializer hâlâ policy ref/hashını persisted olarak doğrulayamadığından kapalıdır;
   settled source evidence veya fatigue finding iddiası yapılmaz.
 

@@ -58,8 +58,13 @@ export class DrizzleCreativeDiagnosticSettlementPolicyRepository {
   constructor(private readonly database: Database) {}
 
   async loadCurrentPublished(input: Readonly<{ workspaceId: string; policyRef: string }>): Promise<CreativeDiagnosticSettlementPolicy> {
+    return this.loadCurrentPublishedInTransaction(this.database, input);
+  }
+
+  /** Caller-owned transaction variant for evidence writers that must bind one consistent policy head. */
+  async loadCurrentPublishedInTransaction(executor: Pick<Database, "execute">, input: Readonly<{ workspaceId: string; policyRef: string }>): Promise<CreativeDiagnosticSettlementPolicy> {
     if (!UUID.test(input.workspaceId) || !REF.test(input.policyRef)) fail("invalid_input");
-    const found = rows<{ revision: unknown; policy_hash: unknown; previous_hash: unknown; state: unknown; settlement_lag_days: unknown; payload: unknown }>(await this.database.execute(sql`
+    const found = rows<{ revision: unknown; policy_hash: unknown; previous_hash: unknown; state: unknown; settlement_lag_days: unknown; payload: unknown }>(await executor.execute(sql`
       select revision.revision, revision.policy_hash, revision.previous_hash, revision.state, revision.settlement_lag_days, revision.payload
       from creative_diagnostic_settlement_policies head
       join creative_diagnostic_settlement_policy_revisions revision on revision.workspace_id = head.workspace_id
