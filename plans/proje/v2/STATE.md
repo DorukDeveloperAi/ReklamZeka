@@ -158,6 +158,17 @@
 - Bu kabul Meta write, campaign create/publish, approval veya action execution açmaz. Browser
   acceptance ayrı açık çevresel kabul noktasıdır.
 
+## 2026-08-11 — A10 authentic L1→L3 dry-run verifier correction
+
+- Önceki dry-run verifier'ı güncel relational evidence sözleşmesine uymayan elle kurulmuş ready
+  context kullanıyordu. Verifier artık normal L1 observation → persisted L2 feature snapshot → L3
+  timeframe window → evidence-bound frozen context zincirini kurmadan Decision Room dry-run'a geçmez;
+  replay, stale L1, tenant/tamper, network/Meta-write ve cleanup negatifleri bu gerçek ref'lere bağlıdır.
+- Hedefli statik verifier/runtime testleri ve typecheck yeşildir. Canlı PostgreSQL kabulü henüz açık:
+  `.env.local`daki 6543 ve 5432 endpointleri normal source fixture authority/guidance okumalarından sonra
+  `idle in transaction` davranışı gösterdiği için complete run/ledger kanıtı alınamadı. Sentetik context
+  ile bypass edilmedi; fixture recovery yalnız WorkspaceTombstoneService ile yapılır.
+
 ## 2026-08-10 — Local MCP/session canlı kabulü
 
 - Yerel geliştirme sunucusu ve yönetilen `.env.local` session yapılandırmasıyla `npm run verify:mcp-live`
