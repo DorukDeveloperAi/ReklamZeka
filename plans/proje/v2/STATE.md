@@ -398,8 +398,22 @@
 - Gerçek PostgreSQL outer-rollback kanıtı normal source/outcome/timeframe/Decision Room/G0→G2
   lifecycle'ından candidate binding üretir; positive binding, cross-tenant/tamper/stale retleri,
   G4/action/Meta/network kapılarının false/zero kalması ve residue=0 doğrulanır. Bu yalnız private
-  G3 preview evidence'ıdır: draft `productionAuthoritySourceBound=false` kalır; G3 promote
-  readiness ve G4 yetkisi açılmaz.
+  G3 preview evidence'ıdır: draft `productionAuthoritySourceBound=false` kalır; G4 yetkisi açılmaz.
+
+## 2026-08-11 — A09.4c candidate-aware G3 review/promotion
+
+- Candidate ledger'dan gelen tier/structured decision, historical outcome zinciri ve repository
+  doğrulamalı exact impact ayrı `candidateReviewEvidenceBound` altında birleşir. Bu kanıt, draftın
+  production policy catalog'unda bulunmamasını source-bound eksikliği saymaz; buna karşılık
+  `productionAuthoritySourceBound` ve `sourceBound` draft için false kalır.
+- Progressive G3 preview artık candidate-review evidence + complete historical evidence + exact
+  impact ister. Hazır durumdaki owner-confirmed `promote_g3`, gerçek impact sayılarıyla immutable
+  formalization revision/audit üretir; malformed/stale/cross-tenant candidate evidence preview'i
+  fail-closed bırakır ve yazı yapmaz.
+- Outer-rollback PostgreSQL verifier normal source → outcome → timeframe → Decision Room → G0–G2
+  lifecycle'ıyla positive preview/G3 promotionı, negative retleri, residue=0 ve network/action/Meta
+  çağrılarının sıfırını doğrular. G4 için A13 risk/cap/approval/rollout/action-valve kanıtı hâlâ
+  yoktur; G4 ve bütün ilgili yetkiler kapalıdır.
 
 ## 2026-08-10 — A10.1 kalıcı DecisionCadenceProfile
 

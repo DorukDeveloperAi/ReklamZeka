@@ -266,6 +266,12 @@
     PostgreSQL outer-rollback verifier'ı normal lifecycle fixture ile positive candidate binding,
     cross-tenant/tamper/stale retleri ve sıfır action/network çağrısını kanıtlar; candidate
     ilişkileri tombstone purge sırasına dahildir.
+  - [x] A09.4c candidate-aware authoritative G3 review projection: draft için production
+    source-bound kanıtı aranmadan, ayrı repository-verified candidate review evidence, authenticated
+    historical outcome ve authoritative exact-impact preview'iyle owner-confirmed G3 promotion yapılır.
+    Impact sayıları gerçek preview'den gelir; cross-tenant/tamper/stale negative'ler zero-write'tır.
+    Bu yalnız G3 formalization state'idir: `productionAuthoritySourceBound=false` ve G4/action/Meta
+    yetkileri kapalı kalır.
   - [ ] G3 authoritative conflict/impact/historical-outcome resolver ile G4 A13 evidence binding'i ve
     bağlı PostgreSQL/gerçek session acceptance.
 - [ ] AdvisedPractice candidate→trial→outcome→standardization lifecycle.
