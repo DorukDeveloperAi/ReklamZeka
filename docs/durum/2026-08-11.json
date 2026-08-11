@@ -4,135 +4,135 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "05a79d16d",
+      "hash": "677f3f351",
       "tarih": "2026-08-11",
-      "konu": "feat(dashboard): add portfolio filters",
+      "konu": "fix(policies): classify diagnostic JSONB dependencies",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "e13ad1236",
+      "tarih": "2026-08-11",
+      "konu": "feat(dashboard): carry brief intent into draft template",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "52ad890b7",
+      "hash": "91b430eaf",
       "tarih": "2026-08-11",
-      "konu": "test(meta): verify normal sync cohort source",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "f3d1e21cc",
-      "tarih": "2026-08-11",
-      "konu": "test(analysis): add normal-sync cohort fixture",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "d27a834c0",
-      "tarih": "2026-08-11",
-      "konu": "feat(campaigns): add read-only decision timeline",
+      "konu": "feat(dashboard): link brief to draft policy workspace",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "6451c7843",
+      "hash": "355909eb2",
       "tarih": "2026-08-11",
-      "konu": "feat(campaigns): bind frozen objective to planning brief",
+      "konu": "fix(dashboard): clear scenario after manual brief edit",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "18fd1037f",
+      "tarih": "2026-08-11",
+      "konu": "feat(dashboard): add workbook campaign scenarios",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "1e68a0db2",
+      "hash": "0b2b9558f",
       "tarih": "2026-08-11",
-      "konu": "feat(campaigns): add taxonomy-bound planning variants",
+      "konu": "feat(policies): assess structured normalization drafts",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "ca172561a",
+      "hash": "7e36cc967",
       "tarih": "2026-08-11",
-      "konu": "feat(meta): compose private creative window reader",
+      "konu": "feat(dashboard): align brief with campaign taxonomy",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "a056bfdbc",
+      "hash": "803678f0a",
       "tarih": "2026-08-11",
-      "konu": "feat(meta): capture direct all-days creative frequency",
+      "konu": "feat(policies): add campaign intent templates",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "7c76a5ff1",
+      "hash": "27b0e1403",
       "tarih": "2026-08-11",
-      "konu": "feat(analysis): materialize creative fatigue evidence",
+      "konu": "feat(policies): select guidance in normalization",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "f73f1b734",
+      "hash": "ee9773758",
       "tarih": "2026-08-11",
-      "konu": "feat(analysis): bind creative windows to settlement policy",
+      "konu": "feat(policies): add draft normalization workbench",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "a1413a5b7",
+      "hash": "534f9490c",
       "tarih": "2026-08-11",
-      "konu": "feat(analysis): persist creative settlement policies",
+      "konu": "docs(a14): record today browser boundary",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "69a0e4206",
+      "tarih": "2026-08-11",
+      "konu": "feat(dashboard): show verified inventory on today",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "0e7685c3e",
+      "hash": "ce5aa492d",
       "tarih": "2026-08-11",
-      "konu": "feat(analysis): define creative settlement policy",
+      "konu": "feat(dashboard): add campaign hierarchy drilldown",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "5727cab8d",
+      "hash": "6adb094e0",
       "tarih": "2026-08-11",
-      "konu": "feat(analysis): materialize creative config evidence",
+      "konu": "docs(a14): record portfolio browser boundary",
       "tur": "is",
       "kapsam": [
-        "feat"
+        "docs"
       ]
     },
     {
-      "hash": "44c56bfda",
+      "hash": "d855f1c51",
       "tarih": "2026-08-11",
-      "konu": "feat(meta): request daily frequency evidence",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "20fec4e4b",
-      "tarih": "2026-08-11",
-      "konu": "feat(analysis): load published creative definitions",
+      "konu": "feat(dashboard): select persisted campaign contexts",
       "tur": "is",
       "kapsam": [
         "feat"
@@ -142,7 +142,7 @@
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 49
+      "adet": 45
     },
     {
       "kapsam": "test",
@@ -150,14 +150,14 @@
     },
     {
       "kapsam": "fix",
-      "adet": 3
+      "adet": 5
     },
     {
       "kapsam": "docs",
-      "adet": 2
+      "adet": 4
     }
   ],
-  "isSayisi": 264,
+  "isSayisi": 279,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-11",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "96d33fd9c890"
+  "damga": "f469223fb30b"
 }

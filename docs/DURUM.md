@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 96d33fd9c890 -->
+<!-- durum-damga: f469223fb30b -->
 
 ## Künye
 
@@ -14,35 +14,35 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 264 |
+| iş commit'i (tüm geçmiş) | 279 |
 | ilk / son iş | 2026-08-06 / 2026-08-11 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
-| 2026-08-11 | `feat` | add portfolio filters | `05a79d16d` |
-| 2026-08-11 | `test` | verify normal sync cohort source | `52ad890b7` |
-| 2026-08-11 | `test` | add normal-sync cohort fixture | `f3d1e21cc` |
-| 2026-08-11 | `feat` | add read-only decision timeline | `d27a834c0` |
-| 2026-08-11 | `feat` | bind frozen objective to planning brief | `6451c7843` |
-| 2026-08-11 | `feat` | add taxonomy-bound planning variants | `1e68a0db2` |
-| 2026-08-11 | `feat` | compose private creative window reader | `ca172561a` |
-| 2026-08-11 | `feat` | capture direct all-days creative frequency | `a056bfdbc` |
-| 2026-08-11 | `feat` | materialize creative fatigue evidence | `7c76a5ff1` |
-| 2026-08-11 | `feat` | bind creative windows to settlement policy | `f73f1b734` |
-| 2026-08-11 | `feat` | persist creative settlement policies | `a1413a5b7` |
-| 2026-08-11 | `feat` | define creative settlement policy | `0e7685c3e` |
-| 2026-08-11 | `feat` | materialize creative config evidence | `5727cab8d` |
-| 2026-08-11 | `feat` | request daily frequency evidence | `44c56bfda` |
-| 2026-08-11 | `feat` | load published creative definitions | `20fec4e4b` |
+| 2026-08-11 | `fix` | classify diagnostic JSONB dependencies | `677f3f351` |
+| 2026-08-11 | `feat` | carry brief intent into draft template | `e13ad1236` |
+| 2026-08-11 | `feat` | link brief to draft policy workspace | `91b430eaf` |
+| 2026-08-11 | `fix` | clear scenario after manual brief edit | `355909eb2` |
+| 2026-08-11 | `feat` | add workbook campaign scenarios | `18fd1037f` |
+| 2026-08-11 | `feat` | assess structured normalization drafts | `0b2b9558f` |
+| 2026-08-11 | `feat` | align brief with campaign taxonomy | `7e36cc967` |
+| 2026-08-11 | `feat` | add campaign intent templates | `803678f0a` |
+| 2026-08-11 | `feat` | select guidance in normalization | `27b0e1403` |
+| 2026-08-11 | `feat` | add draft normalization workbench | `ee9773758` |
+| 2026-08-11 | `docs` | record today browser boundary | `534f9490c` |
+| 2026-08-11 | `feat` | show verified inventory on today | `69a0e4206` |
+| 2026-08-11 | `feat` | add campaign hierarchy drilldown | `ce5aa492d` |
+| 2026-08-11 | `docs` | record portfolio browser boundary | `6adb094e0` |
+| 2026-08-11 | `feat` | select persisted campaign contexts | `d855f1c51` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 49
+- `feat        ` ████████████████████████ 45
 - `test        ` ███ 6
-- `fix         ` █ 3
-- `docs        ` █ 2
+- `fix         ` ███ 5
+- `docs        ` ██ 4
 
 ## Planlar
 
