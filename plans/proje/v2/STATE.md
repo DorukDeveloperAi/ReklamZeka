@@ -30,6 +30,15 @@
 - Approval, execute ve Meta write kapıları değişmedi. Sonraki ürün adımı, mevcut read-only context,
   brief ve approval görünümünü gerçek oturumlu browser'da birlikte kabul etmektir.
 
+## 2026-08-11 — A14 portföy/browser doğrulama sınırı
+
+- Yerel Dashboard'da kampanya görünümüne geçiş ile objective filtresi (`OUTCOME_AWARENESS`) gerçek UI
+  etkileşimiyle doğrulandı: görünür liste 3'ten 1'e indi ve brief aynı awareness campaign'e geçti.
+  Demo bağlamın `unbound` işareti ve tüm action/Meta-write kapıları korundu.
+- `GET /api/campaign-contexts` normal yerel istekte `503 source_not_configured` ve read-only/authority-none
+  güvenlik başlıkları döndürüyor. Bu yüzden persisted context → brief → approval semantic happy path henüz
+  kabul edilmiş değildir; gerçek yerel session ve geçerli frozen context ile tekrar çalıştırılacaktır.
+
 ## 2026-08-11 — A14 demo portföy hiyerarşisi ve filtreler
 
 - Kampanyalar yüzeyindeki salt-okunur portföy katmanı artık Meta objective ve iç kategori ile
