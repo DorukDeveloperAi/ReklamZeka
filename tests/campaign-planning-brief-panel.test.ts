@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CampaignPlanningBriefPanel,
+  campaignBriefScenario,
   campaignContextTimelineSourceState,
   campaignDecisionTimeline,
   decisionTimelineFromApprovalQueueResponse,
@@ -42,6 +43,18 @@ describe("campaign planning brief panel", () => {
     expect(html).toContain("Bağlamı geri yükle");
     expect(html).toContain("international_whatsapp_lead");
     expect(html).not.toContain("Meta transport");
+  });
+
+  it("offers workbook-derived scenarios without joining their comparison lanes", () => {
+    expect(campaignBriefScenario("international_ar_whatsapp")).toMatchObject({ label: "Uluslararası · AR WhatsApp · FTR",
+      input: { market: "international", language: "ar", conversionRoute: "whatsapp", serviceRef: "service_physical_therapy_rehab" } });
+    expect(campaignBriefScenario("international_ru_form")).toMatchObject({ input: { language: "ru", conversionRoute: "lead_form" } });
+    expect(campaignBriefScenario("delivery_recovery")?.input.deliveryHealth).toBe("interrupted");
+    expect(campaignBriefScenario("")).toBeNull();
+    const html = renderToStaticMarkup(createElement(CampaignPlanningBriefPanel));
+    expect(html).toContain("Çalışma kitabı senaryosu");
+    expect(html).toContain("Uluslararası · AR WhatsApp · FTR");
+    expect(html).toContain("Uluslararası · RU form · FTR");
   });
 
   it("only projects a campaign-matching, read-only approval list into the decision timeline", () => {

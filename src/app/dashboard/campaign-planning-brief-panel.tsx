@@ -28,6 +28,9 @@ type BriefDraft = Readonly<{
   capacity: CapacityState;
   creativeReady: boolean;
 }>;
+export type CampaignBriefScenarioRef = "" | "domestic_form_lead" | "domestic_whatsapp_lead" | "international_ar_whatsapp"
+  | "international_ru_form" | "domestic_upper_funnel" | "delivery_recovery";
+export type CampaignBriefScenario = Readonly<{ label: string; input: BriefDraft }>;
 
 type ApprovalTimelineState = "idle" | "loading" | "ready" | "unavailable";
 
@@ -188,6 +191,35 @@ const routeLabels: Readonly<Record<ConversionRoute, string>> = Object.freeze({
 });
 
 /**
+ * Read-only planning starting points from the 2026-08-10 operating workbook.
+ * They are intentionally examples, not persisted Meta campaign instructions.
+ */
+export const CAMPAIGN_BRIEF_SCENARIOS: Readonly<Record<Exclude<CampaignBriefScenarioRef, "">, CampaignBriefScenario>> = Object.freeze({
+  domestic_form_lead: Object.freeze({ label: "Yerli · form lead · medikal estetik", input: Object.freeze({
+    businessGoal: "lead_acquisition", market: "domestic", language: "tr", serviceRef: "service_medical_aesthetics", countryOrRegion: null,
+    conversionRoute: "lead_form", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }) }),
+  domestic_whatsapp_lead: Object.freeze({ label: "Yerli · WhatsApp lead · saç ekimi", input: Object.freeze({
+    businessGoal: "lead_acquisition", market: "domestic", language: "tr", serviceRef: "service_hair_transplant", countryOrRegion: null,
+    conversionRoute: "whatsapp", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }) }),
+  international_ar_whatsapp: Object.freeze({ label: "Uluslararası · AR WhatsApp · FTR", input: Object.freeze({
+    businessGoal: "lead_acquisition", market: "international", language: "ar", serviceRef: "service_physical_therapy_rehab", countryOrRegion: "Arap Bölgesi",
+    conversionRoute: "whatsapp", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }) }),
+  international_ru_form: Object.freeze({ label: "Uluslararası · RU form · FTR", input: Object.freeze({
+    businessGoal: "lead_acquisition", market: "international", language: "ru", serviceRef: "service_physical_therapy_rehab", countryOrRegion: "Türki Cumhuriyetler",
+    conversionRoute: "lead_form", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }) }),
+  domestic_upper_funnel: Object.freeze({ label: "Yerli · üst huni · içerik/gönderi", input: Object.freeze({
+    businessGoal: "upper_funnel_education", market: "domestic", language: "tr", serviceRef: "service_content_post", countryOrRegion: null,
+    conversionRoute: "not_applicable", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }) }),
+  delivery_recovery: Object.freeze({ label: "Teslimat kesintisi sonrası toparlama", input: Object.freeze({
+    businessGoal: "lead_acquisition", market: "unknown", language: null, serviceRef: null, countryOrRegion: null,
+    conversionRoute: "unknown", deliveryHealth: "interrupted", classification: "unclassified", capacity: "unknown", creativeReady: false }) }),
+});
+
+export function campaignBriefScenario(ref: CampaignBriefScenarioRef): CampaignBriefScenario | null {
+  return ref ? CAMPAIGN_BRIEF_SCENARIOS[ref] : null;
+}
+
+/**
  * Client-side planning aid only. Its state is deliberately ephemeral: users
  * can explore an operating pattern without creating a campaign, proposal or
  * approval record.
@@ -197,6 +229,7 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
   onApprovalQueueCampaignRef?: (campaignRef: string | null) => void;
 }>) {
   const [draft, setDraft] = useState<BriefDraft>(() => Object.freeze({ ...context.input }));
+  const [scenarioRef, setScenarioRef] = useState<CampaignBriefScenarioRef>("");
   const [sourceState, setSourceState] = useState<"unbound" | "loading" | "empty" | "ready" | "unavailable">("unbound");
   const [persistedHint, setPersistedHint] = useState<PersistedCampaignPlanningHint | null>(null);
   const [approvalQueueCampaignRef, setApprovalQueueCampaignRef] = useState<string | null>(null);
@@ -205,6 +238,9 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
   const brief = useMemo(() => createInteractiveCampaignBrief(draft), [draft]);
   const change = <Key extends keyof BriefDraft>(key: Key, value: BriefDraft[Key]) =>
     setDraft((current) => Object.freeze({ ...current, [key]: value }));
+  const applyScenario = (value: CampaignBriefScenarioRef) => {
+    setScenarioRef(value); const scenario = campaignBriefScenario(value); if (scenario) setDraft(scenario.input);
+  };
 
   useEffect(() => {
     if (!context.persistedCampaignRef || !/^ref_[a-f0-9]{12}$/.test(context.persistedCampaignRef)) {
@@ -258,6 +294,9 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
       </span>
     </header>
     <p><strong>Seçili bağlam: {context.campaignLabel}</strong> · Excel’deki çalışma mantığını sıraya koyar: pazar → dil → hizmet → iş amacı → dönüşüm yolu → kapasite/kreatif. Bu yüzey kayıt veya Meta işlemi yapmaz.</p>
+    <label htmlFor="brief-scenario"><span>Çalışma kitabı senaryosu</span><select id="brief-scenario" value={scenarioRef} onChange={(event) => applyScenario(event.target.value as CampaignBriefScenarioRef)}>
+      <option value="">Seçili bağlamla devam edin</option>{Object.entries(CAMPAIGN_BRIEF_SCENARIOS).map(([ref, scenario]) => <option key={ref} value={ref}>{scenario.label}</option>)}</select>
+      <small>Bu yalnız planlama başlangıcıdır; canlı Meta verisi, teklif, bütçe veya yayın komutu değildir.</small></label>
     <div className={styles.briefControls}>
       <label htmlFor="brief-business-goal"><span>İş amacı</span><select id="brief-business-goal" value={draft.businessGoal} onChange={(event) => change("businessGoal", event.target.value as CampaignBusinessGoal)}>
         {Object.entries(goalLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -266,7 +305,7 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
         <option value="unknown">Henüz sınıflanmadı</option><option value="domestic">Yurtiçi</option><option value="international">Uluslararası</option>
       </select></label>
       <label htmlFor="brief-language"><span>Dil</span><select id="brief-language" value={draft.language ?? ""} onChange={(event) => change("language", event.target.value || null)}>
-        <option value="">Seçilmedi</option><option value="tr">Türkçe</option><option value="en">İngilizce</option><option value="ar">Arapça</option>
+        <option value="">Seçilmedi</option><option value="tr">Türkçe</option><option value="en">İngilizce</option><option value="ar">Arapça</option><option value="ru">Rusça</option>
       </select></label>
       <label htmlFor="brief-service"><span>Hizmet / ana grup</span><select id="brief-service" value={draft.serviceRef ?? ""} onChange={(event) => change("serviceRef", event.target.value || null)}>
         <option value="">Seçilmedi</option><option value="service_medical_aesthetics">Medikal estetik / plastik cerrahi</option>
@@ -316,7 +355,7 @@ function CampaignPlanningBriefPanelContent({ context, onApprovalQueueCampaignRef
       <div><span>İzlenecek sıra</span><ol>{brief.launchSequence.map((item) => <li key={item.step}><strong>{item.step}</strong><small>{item.reason}</small></li>)}</ol></div>
       <div><span>Ölçüm sınırı</span><strong>{brief.measurement.primaryOutcome}</strong><small>{brief.measurement.doNotCompareWith.join(" · ")} ile varsayılan olarak kıyaslama.</small></div>
     </div>
-    <footer><span>Salt taslak/öneri · campaign create / publish / approval / execute / Meta write: kapalı</span><button type="button" onClick={() => setDraft(Object.freeze({ ...context.input }))}>Bağlamı geri yükle</button></footer>
+    <footer><span>Salt taslak/öneri · campaign create / publish / approval / execute / Meta write: kapalı</span><button type="button" onClick={() => { setScenarioRef(""); setDraft(Object.freeze({ ...context.input })); }}>Bağlamı geri yükle</button></footer>
   </section>;
 }
 

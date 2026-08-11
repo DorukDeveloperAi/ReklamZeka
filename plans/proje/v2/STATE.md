@@ -23,6 +23,10 @@
   ve RU form lead şeritleri ayrı tutulur. Ödeme/teslimat kesintisi sayfası, ani harcama çöküşünün önce
   sağlıklı teslimat olarak yeniden doğrulanması gerektiğini gösterir. Dashboard briefi bu sınıfları
   seçilebilir kılar, fakat Excel'i canlı Meta kaynağı veya yazma yetkisi gibi sunmaz.
+- Brief'e bu matrisin altı insan-incelemeli başlangıç senaryosu eklendi: yerli form/WhatsApp lead,
+  AR WhatsApp ve RU form FTR, yerli üst huni içerik/gönderi ve kesinti sonrası toparlama. Seçim yalnız
+  geçici brief girdisini değiştirir; form/WhatsApp veya yerli/yabancı havuzlarını birleştirmez ve
+  campaign create/publish/approval/execute/Meta write başlatmaz.
 
 ## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
 
