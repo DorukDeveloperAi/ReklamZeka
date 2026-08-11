@@ -2,7 +2,7 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { createPolicyScopeSnapshot, createTrustedPolicyCatalog } from "@/application/trusted-policy-composition";
+import { createFrozenPolicyManualLock, createPolicyScopeSnapshot, createTrustedPolicyCatalog } from "@/application/trusted-policy-composition";
 import { DrizzleTrustedPolicyAuthorityRepository } from
   "@/connectors/policies/trusted-policy-authority-drizzle-repository";
 
@@ -10,6 +10,20 @@ const workspaceId = "11111111-1111-4111-8111-111111111111";
 function stable(value: unknown): unknown { return Array.isArray(value) ? value.map(stable) : value && typeof value === "object"
   ? Object.fromEntries(Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, stable(v)])) : value; }
 function digest(value: unknown) { return createHash("sha256").update(JSON.stringify(stable(value))).digest("hex"); }
+function authorityRow(catalog: ReturnType<typeof createTrustedPolicyCatalog>, scope: ReturnType<typeof createPolicyScopeSnapshot>,
+  manualLocks: readonly ReturnType<typeof createFrozenPolicyManualLock>[] = [], overrides: Record<string, unknown> = {}) {
+  const core = { schemaVersion: "tenant-authority-snapshot/1.0.0" as const, snapshotRef: "authority_snapshot_empty",
+    repository: { ref: "repository_policy_authority", revision: "42", verified: true },
+    authority: { productionAuthoritySourceBound: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false },
+    validity: { notBefore: "2026-08-09T00:00:00.000Z", expiresAt: "2026-08-10T00:00:00.000Z" },
+    policyAuthority: { catalogHash: catalog.catalogHash, scope, manualLocks } };
+  const snapshotHash = digest(core);
+  return { snapshot_id: "22222222-2222-4222-8222-222222222222", snapshot_ref: core.snapshotRef, snapshot_hash: snapshotHash,
+    repository_ref: core.repository.ref, repository_revision: core.repository.revision, verified_at: core.validity.notBefore,
+    expires_at: core.validity.expiresAt, snapshot_payload: { ...core, snapshotHash },
+    catalog_id: "33333333-3333-4333-8333-333333333333", catalog_revision_hash: catalog.catalogHash, catalog_payload: catalog,
+    binding_rows: [], account_group_refs: [], manual_lock_rows: [], current_snapshot_count: 1, ...overrides };
+}
 
 describe("DrizzleTrustedPolicyAuthorityRepository", () => {
   it("uses protected current heads and requires an exact immutable ref/hash pair for replay", async () => {
@@ -87,12 +101,55 @@ describe("DrizzleTrustedPolicyAuthorityRepository", () => {
       "policy_authority_catalogs"]) expect(rendered).toContain(family);
   });
 
+  it("renders persisted authority timestamps as canonical UTC ISO values", async () => {
+    const execute = vi.fn(async () => execute.mock.calls.length === 1 ? { rows: [{ id: workspaceId }] } : { rows: [] });
+    await expect(new DrizzleTrustedPolicyAuthorityRepository({ execute } as never).load({ workspaceId,
+      accountRef: "account_primary", evaluatedAt: "2026-08-09T12:00:00.000Z" }))
+      .rejects.toMatchObject({ code: "not_found" });
+    const rendered = new PgDialect().sqlToQuery((execute.mock.calls as unknown[][])[1]![0] as never).sql;
+    expect(rendered).toContain("to_char(snapshot.verified_at at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')");
+    expect(rendered).toContain("to_char(snapshot.expires_at at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')");
+    expect(rendered).toContain("to_char(latest_lock.recorded_at at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')");
+    expect(rendered).not.toContain("snapshot.verified_at::text");
+    expect(rendered).not.toContain("snapshot.expires_at::text");
+    expect(rendered).not.toContain("latest_lock.recorded_at::text");
+  });
+
   it("rejects malformed scope before reading tenant records", async () => {
     const execute = vi.fn();
     await expect(new DrizzleTrustedPolicyAuthorityRepository({ execute } as never).load({ workspaceId: "bad",
       accountRef: "account_primary", evaluatedAt: "2026-08-09T12:00:00.000Z" }))
       .rejects.toMatchObject({ code: "invalid_input" });
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("accepts only a completely empty relational backing for a no-policy authority", async () => {
+    const emptyCatalog = createTrustedPolicyCatalog({ workspaceRef: "workspace_primary", catalogRef: "authority_catalog_empty",
+      catalogVersion: 1, instructionPolicyRegistryHash: "a".repeat(64), bindings: [] });
+    const emptyScope = createPolicyScopeSnapshot({ workspaceRef: "workspace_primary", evaluatedAt: "2026-08-09T12:00:00.000Z",
+      accountGroupRefs: [], objectiveRefs: [], topicRefs: [], canonicalObjective: null });
+    const load = async (row: Record<string, unknown>) => {
+      const execute = vi.fn(async () => execute.mock.calls.length === 1 ? { rows: [{ id: workspaceId }] } : { rows: [row] });
+      return new DrizzleTrustedPolicyAuthorityRepository({ execute } as never).load({ workspaceId,
+        accountRef: "account_primary", evaluatedAt: "2026-08-09T13:00:00.000Z" });
+    };
+    await expect(load(authorityRow(emptyCatalog, emptyScope))).resolves.toMatchObject({ catalog: { bindings: [] },
+      scope: { accountGroupRefs: [], topicRefs: [] }, manualLocks: [] });
+
+    const nonemptyCatalog = createTrustedPolicyCatalog({ workspaceRef: "workspace_primary", catalogRef: "authority_catalog_bound",
+      catalogVersion: 1, instructionPolicyRegistryHash: "a".repeat(64), bindings: [{ policyRef: "policy_primary", policyVersion: 1,
+        policyHash: "b".repeat(64), authorityTier: "metric_rule", decision: { decisionKey: "budget", positionKey: "hold" },
+        categoryProfileRef: null, categoryProfileVersion: null, categoryProfileHash: null, manualLockRef: null }] });
+    await expect(load(authorityRow(nonemptyCatalog, emptyScope))).rejects.toMatchObject({ code: "corrupt_store" });
+
+    const groupedScope = createPolicyScopeSnapshot({ workspaceRef: "workspace_primary", evaluatedAt: "2026-08-09T12:00:00.000Z",
+      accountGroupRefs: ["account_group_primary"], objectiveRefs: [], topicRefs: [], canonicalObjective: null });
+    await expect(load(authorityRow(emptyCatalog, groupedScope, [], { account_group_refs: ["account_group_primary"] })))
+      .rejects.toMatchObject({ code: "corrupt_store" });
+
+    const lock = createFrozenPolicyManualLock({ workspaceRef: "workspace_primary", lockRef: "lock_primary", policyRef: "policy_primary",
+      policyVersion: 1, policyHash: "b".repeat(64), evaluatedAt: emptyScope.evaluatedAt });
+    await expect(load(authorityRow(emptyCatalog, emptyScope, [lock]))).rejects.toMatchObject({ code: "corrupt_store" });
   });
 
   it("binds the repository composition closure to the loaded account", async () => {

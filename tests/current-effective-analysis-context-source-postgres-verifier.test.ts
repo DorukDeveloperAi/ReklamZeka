@@ -7,6 +7,7 @@ describe("current effective analysis context PostgreSQL verifier", () => {
     expect(source).toContain("new DrizzleCurrentEffectiveAnalysisContextSourceReader(database as never)");
     expect(source).toContain("createDrizzleEffectiveAnalysisContextComposer({ database: database as never })");
     expect(source).toContain("new DrizzlePolicyAuthorityCatalogMaterializerRepository(database as never).materialize");
+    expect(source).toContain('canonicalObjective: "lead_generation"');
     expect(source).toContain("new DrizzleCategoryAuthoringRepository(database as never)");
     expect(source).toContain("new DrizzleGuidanceCampaignSelectionRepository(database as never).publish");
     expect(source).toContain("new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge)");

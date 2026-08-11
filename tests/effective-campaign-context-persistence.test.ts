@@ -201,6 +201,14 @@ describe("effective campaign context persistence contract", () => {
     expect(database.transaction).not.toHaveBeenCalled();
   });
 
+  it("collapses an untyped database failure to a stable fail-closed persistence code", async () => {
+    const database = { transaction: vi.fn(async () => { throw new Error("driver detail"); }) };
+    const repository = new DrizzleEffectiveCampaignContextRepository(database as never);
+
+    await expect(repository.save(context()))
+      .rejects.toMatchObject({ code: "persistence_rejected" } satisfies Partial<EffectiveCampaignContextRepositoryError>);
+  });
+
   it("rejects evidence-bound contexts whose claimed L2/L3 evidence is absent or stale", async () => {
     const existing = context({ evidenceBound: true });
     const { schemaVersion: _schemaVersion, contextHash: _contextHash, capabilities: _capabilities, ...input } = existing;

@@ -36,7 +36,8 @@ export type EffectiveAnalysisContextFacts = Readonly<{
 }>;
 
 export type RepositoryVerifiedAuthority = Readonly<{
-  compose(baseContext: EffectiveCampaignContextInput, lifecycle: InstructionPolicyLifecycleState): Readonly<{
+  compose(baseContext: EffectiveCampaignContextInput, lifecycle: InstructionPolicyLifecycleState,
+    categoryTarget?: CategoryHierarchyTarget): Readonly<{
     context: EffectiveCampaignContext;
     validationBoundary: Readonly<{ contractIntegrity: "self_hash_validated"; productionAuthoritySourceBound: true }>;
     authority: Readonly<Record<string, false>>;
@@ -47,7 +48,14 @@ export type EffectiveAnalysisContextReadySource = Readonly<{
   status: "ready";
   capturedAt: string;
   facts: EffectiveAnalysisContextFacts;
-  categories: Readonly<{ workspaceId: string; dimensions: readonly { frozenContext: EffectiveCampaignContextInput["categories"][number] }[] }>;
+  /**
+   * Category paths use repository-internal hierarchy UUIDs.  The source reader
+   * resolves this target from the requested external Meta ref inside its same
+   * repeatable-read snapshot, so the composer can validate the frozen category
+   * evidence without conflating the two identifier namespaces.
+   */
+  categories: Readonly<{ workspaceId: string; target: CategoryHierarchyTarget;
+    dimensions: readonly { frozenContext: EffectiveCampaignContextInput["categories"][number] }[] }>;
   lifecycle: InstructionPolicyLifecycleState;
   authority: RepositoryVerifiedAuthority;
 }>;
@@ -90,7 +98,9 @@ export type EvidenceBoundEffectiveContextWriter = Readonly<{
 }>;
 
 export class EffectiveAnalysisContextComposerError extends Error {
-  constructor(readonly code: "invalid_input" | "source_rejected" | "authority_rejected" | "invalidated_save") {
+  constructor(readonly code: "invalid_input" | "source_rejected" | "authority_rejected" | "invalidated_save",
+    /** Server-side diagnostic only; it never grants authority or replaces the stable public rejection code. */
+    readonly diagnosticCode?: string) {
     super(`Effective analysis context rejected: ${code}`);
     this.name = "EffectiveAnalysisContextComposerError";
   }
@@ -140,6 +150,17 @@ function allFalse(value: Record<string, unknown>, expected?: readonly string[]):
 }
 
 /**
+ * Keep the public result fail-closed while retaining the repository's stable
+ * classification for server-side verification.  Never expose arbitrary driver
+ * messages: they may contain SQL or tenant details and are not a contract.
+ */
+function diagnosticCodeOf(error: unknown): string | undefined {
+  if (!error || typeof error !== "object" || !("code" in error) || typeof error.code !== "string") return undefined;
+  const detail = "diagnosticCode" in error && typeof error.diagnosticCode === "string" ? `:${error.diagnosticCode}` : "";
+  return `${error.code}${detail}`;
+}
+
+/**
  * Small, server-private orchestration seam. The source reader owns snapshot
  * consistency; this composer never stitches independently read components.
  */
@@ -160,12 +181,18 @@ export class EffectiveAnalysisContextComposer {
       throw new EffectiveAnalysisContextComposerError("source_rejected");
     }
     const facts = source.facts;
-    const target = categoryTarget(input, facts.identity);
+    // Validate the caller's external hierarchy against repository-owned Meta
+    // identity.  Category evidence itself is keyed by the separately verified
+    // internal target supplied by the same source snapshot.
+    categoryTarget(input, facts.identity);
     const categoryComposition = source.categories;
     const lifecycle = source.lifecycle;
     const authority = source.authority;
+    const resolvedCategoryTarget = categoryComposition.target;
     if (categoryComposition.workspaceId !== input.workspaceId || categoryComposition.dimensions.length === 0
-      || categoryComposition.dimensions.some((entry) => entry.frozenContext.path.at(-1)?.id !== target.id)) {
+      || resolvedCategoryTarget.level !== input.entityType || !resolvedCategoryTarget.id.trim()
+      || (resolvedCategoryTarget.level === "creative" && !resolvedCategoryTarget.viaAdId.trim())
+      || categoryComposition.dimensions.some((entry) => entry.frozenContext.path.at(-1)?.id !== resolvedCategoryTarget.id)) {
       throw new EffectiveAnalysisContextComposerError("source_rejected");
     }
     let base: EffectiveCampaignContextInput;
@@ -184,8 +211,8 @@ export class EffectiveAnalysisContextComposer {
       buildEffectiveCampaignContext(base);
     } catch { throw new EffectiveAnalysisContextComposerError("source_rejected"); }
     let composed: ReturnType<RepositoryVerifiedAuthority["compose"]>;
-    try { composed = authority.compose(base, lifecycle); }
-    catch { throw new EffectiveAnalysisContextComposerError("authority_rejected"); }
+    try { composed = authority.compose(base, lifecycle, resolvedCategoryTarget); }
+    catch (error) { throw new EffectiveAnalysisContextComposerError("authority_rejected", diagnosticCodeOf(error)); }
     if (composed.validationBoundary.productionAuthoritySourceBound !== true
       || composed.context.policyAuthorityEvidence === undefined || composed.context.versions.policyAuthority === undefined
       || !allFalse(composed.context.capabilities) || !allFalse(composed.authority, POLICY_AUTHORITY_CAPABILITIES)) {
@@ -193,7 +220,7 @@ export class EffectiveAnalysisContextComposer {
     }
     let persisted: Awaited<ReturnType<EvidenceBoundEffectiveContextWriter["save"]>>;
     try { persisted = await this.writer.save(composed.context, { mode: "evidence_bound" }); }
-    catch { throw new EffectiveAnalysisContextComposerError("source_rejected"); }
+    catch (error) { throw new EffectiveAnalysisContextComposerError("source_rejected", diagnosticCodeOf(error)); }
     if (persisted.record.invalidated || persisted.record.context.contextHash !== composed.context.contextHash) {
       throw new EffectiveAnalysisContextComposerError("invalidated_save");
     }

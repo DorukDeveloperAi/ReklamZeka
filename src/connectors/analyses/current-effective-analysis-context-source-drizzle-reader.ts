@@ -85,6 +85,7 @@ export function buildReadyEffectiveAnalysisContextSourceInSnapshot(input: Readon
   request: EffectiveAnalysisContextRequest;
   capturedAt: string;
   hierarchy: CurrentMetaHierarchyConfig;
+  categoryTarget: CategoryHierarchyTarget;
   categories: CurrentCategoryComposition;
   guidance: EffectiveGuidancePack;
   cadence: CurrentDecisionCadence;
@@ -92,10 +93,11 @@ export function buildReadyEffectiveAnalysisContextSourceInSnapshot(input: Readon
   authority: LoadedTrustedPolicyAuthority;
   promotion: PromotionTemplateLifecycleState;
 }>): EffectiveAnalysisContextReadySource {
-  const { request, capturedAt, hierarchy, categories, guidance, cadence, lifecycle, authority, promotion } = input;
+  const { request, capturedAt, hierarchy, categoryTarget, categories, guidance, cadence, lifecycle, authority, promotion } = input;
   if (hierarchy.capturedAt !== capturedAt || hierarchy.identity.accountRef !== request.accountRef
     || hierarchy.identity.hierarchyRefs.at(-1) !== request.entityRef || categories.workspaceId !== request.workspaceId
-    || categories.dimensions.length === 0 || guidance.workspaceId !== request.workspaceId || guidance.evaluatedAt !== capturedAt
+    || categories.dimensions.length === 0 || categories.dimensions.some((dimension) => dimension.frozenContext.path.at(-1)?.id !== categoryTarget.id)
+    || guidance.workspaceId !== request.workspaceId || guidance.evaluatedAt !== capturedAt
     || cadence.decision.evaluatedAt !== capturedAt || !/^[a-f0-9]{64}$/.test(lifecycle.registryHash)
     || !/^[a-f0-9]{64}$/.test(promotion.registryHash)
     || authority.authoritySnapshot.workspaceId !== request.workspaceId
@@ -122,7 +124,7 @@ export function buildReadyEffectiveAnalysisContextSourceInSnapshot(input: Readon
       promotionRegistry: promotion.registryHash }),
   });
   const source: EffectiveAnalysisContextReadySource = Object.freeze({ status: "ready", capturedAt, facts,
-    categories: Object.freeze({ workspaceId: categories.workspaceId, dimensions: categories.dimensions.map((dimension) =>
+    categories: Object.freeze({ workspaceId: categories.workspaceId, target: categoryTarget, dimensions: categories.dimensions.map((dimension) =>
       Object.freeze({ frozenContext: dimension.frozenContext })) }), lifecycle,
     authority: authority as RepositoryVerifiedAuthority });
   // Prove all pre-authority evidence is already a valid persistence payload.
@@ -359,7 +361,7 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
         throw new Error("policy_authority_unavailable");
       }
       const promotion = await this.promotionReader.inspectInTransaction(tx, input.workspaceId);
-      return buildReadyEffectiveAnalysisContextSourceInSnapshot({ request: input, capturedAt, hierarchy, categories,
+      return buildReadyEffectiveAnalysisContextSourceInSnapshot({ request: input, capturedAt, hierarchy, categoryTarget: resolvedTarget, categories,
         guidance: pack, cadence, lifecycle, authority, promotion });
     });
   }

@@ -21,7 +21,13 @@ try {
   const fixtures = rows(await database.execute(sql`select workspace.id::text as workspace_id, workspace.name, owner.user_id::text as actor_id
     from workspaces workspace left join lateral (select membership.user_id from memberships membership where membership.workspace_id = workspace.id order by membership.id limit 1) owner on true
     where workspace.lifecycle_state = 'active' and workspace.name in ('Current source verifier', 'Current source foreign') order by workspace.created_at`));
-  const fallbackActor = fixtures.find((row) => row.name === "Current source verifier" && row.actor_id)?.actor_id;
+  const fixtureActor = rows(await database.execute(sql`select id::text as actor_id from users
+    where email like 'current-source-%@example.invalid' order by created_at desc limit 1`))[0]?.actor_id;
+  // An interrupted verifier can leave only the foreign workspace, which never
+  // has a membership. Reuse an already-materialized verifier test actor for
+  // the append-only cleanup audit; do not create a new actor or bypass the
+  // tombstone service merely to remove the damaged fixture.
+  const fallbackActor = fixtures.find((row) => row.name === "Current source verifier" && row.actor_id)?.actor_id ?? fixtureActor;
   if (fixtures.some((row) => typeof (row.actor_id ?? fallbackActor) !== "string")) throw new Error("fixture_recovery_actor_unavailable");
   const purge = new DrizzleWorkspaceTombstonePurgePort();
   const service = new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge), { authorize: async (input) => input.approvalRef === "ephemeral-fixture-recovery-approved" }, String(fallbackActor), 60_000);

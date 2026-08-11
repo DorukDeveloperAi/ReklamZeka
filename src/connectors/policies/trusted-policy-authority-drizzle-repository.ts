@@ -11,6 +11,7 @@ import {
   type TrustedPolicyCatalog,
 } from "@/application/trusted-policy-composition";
 import type { EffectiveCampaignContextInput } from "@/analyses/effective-campaign-context";
+import type { CategoryHierarchyTarget } from "@/domain/categories/service";
 import { buildEffectiveCampaignContext } from "@/analyses/effective-campaign-context";
 import type { InstructionPolicyLifecycleState } from "@/application/instruction-policy-lifecycle-service";
 import type { RepositoryVerifiedPolicyAuthoritySnapshot } from "@/domain/policies/trusted-policy-authority";
@@ -58,7 +59,8 @@ export type LoadedTrustedPolicyAuthority = Readonly<{
   manualLocks: readonly FrozenPolicyManualLock[];
   authoritySnapshot: RepositoryVerifiedPolicyAuthoritySnapshot;
   /** This closure is created only after the repository has verified the tenant rows. */
-  compose(baseContext: EffectiveCampaignContextInput, lifecycle: InstructionPolicyLifecycleState): RepositoryTrustedPolicyComposition;
+  compose(baseContext: EffectiveCampaignContextInput, lifecycle: InstructionPolicyLifecycleState,
+    categoryTarget?: CategoryHierarchyTarget): RepositoryTrustedPolicyComposition;
 }>;
 type RepositoryTrustedPolicyComposition = Omit<ReturnType<typeof composeTrustedPolicyContext>, "validationBoundary"> & Readonly<{
   validationBoundary: Readonly<{ contractIntegrity: "self_hash_validated"; productionAuthoritySourceBound: true }>;
@@ -121,7 +123,9 @@ export class DrizzleTrustedPolicyAuthorityRepository {
             and catalog_head.current_revision = catalog.revision and catalog_head.current_revision_hash = catalog.revision_hash)
       )
       select snapshot.id::text as snapshot_id, snapshot.snapshot_ref, snapshot.snapshot_hash,
-        snapshot.repository_ref, snapshot.repository_revision, snapshot.verified_at::text, snapshot.expires_at::text,
+        snapshot.repository_ref, snapshot.repository_revision,
+        to_char(snapshot.verified_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as verified_at,
+        to_char(snapshot.expires_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as expires_at,
         snapshot.snapshot_payload, catalog.id::text as catalog_id, catalog.revision_hash as catalog_revision_hash,
         catalog.payload as catalog_payload, (select count(*)::int from selected_snapshot) as current_snapshot_count,
         coalesce((select jsonb_agg(jsonb_build_object('policyRef', policy.policy_ref, 'policyVersion', policy.policy_version,
@@ -160,7 +164,8 @@ export class DrizzleTrustedPolicyAuthorityRepository {
             and account.external_account_id = ${input.accountRef}), '[]'::jsonb) as account_group_refs,
         coalesce((select jsonb_agg(jsonb_build_object('lockRef', latest_lock.lock_ref, 'policyRef', policy.policy_ref,
           'policyVersion', policy.policy_version, 'policyHash', policy.canonical_hash, 'operation', latest_lock.operation,
-          'revisionHash', latest_lock.revision_hash, 'recordedAt', latest_lock.recorded_at::text) order by latest_lock.lock_ref, latest_lock.sequence)
+          'revisionHash', latest_lock.revision_hash,
+          'recordedAt', to_char(latest_lock.recorded_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')) order by latest_lock.lock_ref, latest_lock.sequence)
           from (select distinct on (revision.workspace_id, revision.policy_revision_id, revision.lock_ref) revision.*
             from policy_manual_lock_revisions revision
             where revision.recorded_at <= (snapshot.snapshot_payload #>> '{policyAuthority,scope,evaluatedAt}')::timestamptz
@@ -231,12 +236,14 @@ export class DrizzleTrustedPolicyAuthorityRepository {
       workspaceId: input.workspaceId, workspaceRef: catalog.workspaceRef, snapshotRef: row.snapshot_ref as string,
       snapshotHash: row.snapshot_hash as string, repositoryRef: row.repository_ref as string, repositoryRevision: row.repository_revision as string,
       catalogHash: catalog.catalogHash, scopeHash: scope.scopeHash, verifiedAt, expiresAt });
-    const composition = (baseContext: EffectiveCampaignContextInput, lifecycle: InstructionPolicyLifecycleState) => {
+    const composition = (baseContext: EffectiveCampaignContextInput, lifecycle: InstructionPolicyLifecycleState,
+      categoryTarget?: CategoryHierarchyTarget) => {
       if (baseContext.workspaceId !== input.workspaceId || baseContext.identity.accountRef !== input.accountRef
         || new Date(baseContext.capturedAt).toISOString() !== input.evaluatedAt) {
         throw new TrustedPolicyAuthorityRepositoryError("workspace_scope_mismatch");
       }
-      const selfValidated = composeTrustedPolicyContext({ baseContext, workspaceRef: catalog.workspaceRef, lifecycle, catalog, scope, manualLocks });
+      const selfValidated = composeTrustedPolicyContext({ baseContext, workspaceRef: catalog.workspaceRef, lifecycle, catalog, scope, manualLocks,
+        ...(categoryTarget === undefined ? {} : { categoryTarget }) });
       const authorityVersion = createHash("sha256").update(JSON.stringify({ snapshotRef: authoritySnapshot.snapshotRef,
         snapshotHash: authoritySnapshot.snapshotHash, catalogHash: authoritySnapshot.catalogHash, scopeHash: authoritySnapshot.scopeHash,
         accountGroups: scope.accountGroupRefs, topics: scope.topicRefs, manualLocks: manualLocks.map((lock) => lock.lockHash) })).digest("hex");
@@ -258,7 +265,17 @@ export class DrizzleTrustedPolicyAuthorityRepository {
   private assertRelationalBacking(row: AuthorityRow, catalog: TrustedPolicyCatalog, scope: PolicyScopeSnapshot,
     manualLocks: readonly FrozenPolicyManualLock[]): void {
     const bindings = list(row.binding_rows).map((value) => exact(value, ["policyRef", "policyVersion", "policyHash", "bindingKind", "bindingRef", "bindingVersion", "bindingHash", "authorityTierRef", "decisionRef"]));
-    if (bindings.length === 0 || bindings.some((binding) => typeof binding.policyRef !== "string" || typeof binding.policyVersion !== "number"
+    const groups = sorted(list(row.account_group_refs).map((value) => { if (typeof value !== "string" || !REF.test(value)) fail("corrupt_store"); return value; }));
+    const lockRows = list(row.manual_lock_rows).map((value) => exact(value, ["lockRef", "policyRef", "policyVersion", "policyHash", "operation", "revisionHash", "recordedAt"]));
+    // An empty policy registry is a valid authority state, but only when its
+    // complete relational backing is empty. This must not turn a missing
+    // binding row for a non-empty catalog, scope, or lock history into trust.
+    if (bindings.length === 0) {
+      if (catalog.bindings.length === 0 && scope.accountGroupRefs.length === 0 && scope.topicRefs.length === 0
+        && groups.length === 0 && manualLocks.length === 0 && lockRows.length === 0) return;
+      fail("corrupt_store");
+    }
+    if (bindings.some((binding) => typeof binding.policyRef !== "string" || typeof binding.policyVersion !== "number"
       || typeof binding.policyHash !== "string" || !HASH.test(binding.policyHash) || !["account_group", "topic", "semantic"].includes(binding.bindingKind as string)
       || typeof binding.bindingRef !== "string" || !REF.test(binding.bindingRef) || typeof binding.bindingVersion !== "string" || !(binding.bindingVersion as string).trim()
       || typeof binding.bindingHash !== "string" || !HASH.test(binding.bindingHash) || typeof binding.authorityTierRef !== "string" || !REF.test(binding.authorityTierRef)
@@ -268,11 +285,9 @@ export class DrizzleTrustedPolicyAuthorityRepository {
       || new Set(bindings.map((binding) => `${binding.policyRef}:${binding.bindingKind}:${binding.bindingRef}:${binding.bindingVersion}`)).size !== bindings.length
       || !catalog.bindings.every((binding) => bindings.some((rowBinding) => rowBinding.policyRef === binding.policyRef
         && rowBinding.policyVersion === binding.policyVersion && rowBinding.policyHash === binding.policyHash && rowBinding.bindingKind === "semantic"))) fail("corrupt_store");
-    const groups = sorted(list(row.account_group_refs).map((value) => { if (typeof value !== "string" || !REF.test(value)) fail("corrupt_store"); return value; }));
     if (JSON.stringify(groups) !== JSON.stringify(scope.accountGroupRefs)) fail("corrupt_store");
     const topics = sorted(bindings.filter((binding) => binding.bindingKind === "topic").map((binding) => binding.bindingRef as string));
     if (JSON.stringify(topics) !== JSON.stringify(scope.topicRefs)) fail("corrupt_store");
-    const lockRows = list(row.manual_lock_rows).map((value) => exact(value, ["lockRef", "policyRef", "policyVersion", "policyHash", "operation", "revisionHash", "recordedAt"]));
     const latest = new Map<string, Record<string, unknown>>();
     for (const lock of lockRows) {
       if (typeof lock.lockRef !== "string" || typeof lock.policyRef !== "string" || typeof lock.policyVersion !== "number" || typeof lock.policyHash !== "string"

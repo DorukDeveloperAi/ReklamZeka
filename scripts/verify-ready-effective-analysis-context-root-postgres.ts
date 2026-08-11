@@ -95,7 +95,8 @@ function readySource(): EffectiveAnalysisContextReadySource {
       authority: { canExecute: false as const, canWriteMeta: false as const, canApprove: false as const, canSchedule: false as const,
         canCallTool: false as const, canAccessNetwork: false as const, canQuerySql: false as const } };
   } };
-  return Object.freeze({ status: "ready", capturedAt, facts, categories: { workspaceId, dimensions: [{ frozenContext: frozen }] },
+  return Object.freeze({ status: "ready", capturedAt, facts, categories: { workspaceId,
+    target: { level: "campaign" as const, id: request.entityRef }, dimensions: [{ frozenContext: frozen }] },
     lifecycle: { registryHash: "c".repeat(64), current: [], history: [], diffs: [] }, authority });
 }
 

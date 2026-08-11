@@ -16,6 +16,8 @@ import { DrizzleEffectiveCampaignContextRepository } from "@/connectors/analyses
 import { DrizzleWorkspaceTombstonePurgePort } from "@/connectors/meta/workspace-tombstone-purge-drizzle-adapter";
 import { DrizzleWorkspaceTombstoneStore, WorkspaceTombstoneService } from "@/connectors/meta/workspace-tombstone-drizzle-service";
 import { createDrizzleEffectiveAnalysisContextComposer } from "@/server/effective-analysis-context-composer-runtime";
+import { EffectiveAnalysisContextComposerError } from "@/application/effective-analysis-context-composer";
+import { projectMetaAnalysisConfig } from "@/domain/meta/analysis-config-projection";
 import { createTrustedPolicyCatalog, createPolicyScopeSnapshot } from "@/application/trusted-policy-composition";
 import { categoryDefinitionPublicRef, categoryDimensionPublicRef, categoryEntityPublicRef } from "@/domain/categories/public-reference";
 import { createGuidanceRegistry } from "@/domain/guidance/registry";
@@ -176,7 +178,10 @@ try {
 
     // Empty policy registry is an explicit, valid no-policy authority state. The catalog/snapshot/bindings are materialized only here.
     const emptyRegistryHash = createHash("sha256").update(JSON.stringify([])).digest("hex");
-    const authorityScope = createPolicyScopeSnapshot({ workspaceRef, evaluatedAt: occurredAt, accountGroupRefs: [], objectiveRefs: [], topicRefs: [], canonicalObjective: null });
+    // The repository authority scope must attest the same canonical Meta
+    // objective as the immutable snapshot above; composition rejects a scope
+    // that is current but describes a different campaign objective.
+    const authorityScope = createPolicyScopeSnapshot({ workspaceRef, evaluatedAt: occurredAt, accountGroupRefs: [], objectiveRefs: [], topicRefs: [], canonicalObjective: "lead_generation" });
     const authorityCatalog = createTrustedPolicyCatalog({ workspaceRef, catalogRef: `authority_catalog_${suffix}`, catalogVersion: 1,
       instructionPolicyRegistryHash: emptyRegistryHash, bindings: [] });
     await new DrizzlePolicyAuthorityCatalogMaterializerRepository(database as never).materialize({ workspaceId, workspaceRef, actorId, actorRef, role: "owner",
@@ -186,10 +191,26 @@ try {
     const reader = new DrizzleCurrentEffectiveAnalysisContextSourceReader(database as never);
     phase("closed_world_read_compose_reload");
     const source = await reader.loadCurrent(request);
-    ready = source.status === "ready";
-    if (!ready) throw new Error("closed_world_source_not_ready");
+    if (source.status !== "ready") throw new Error("closed_world_source_not_ready");
+    const readySource = source;
+    ready = true;
+    if (process.env.VERIFIER_PHASE_OUTPUT === "1") {
+      const authority = readySource.authority as unknown as { catalog?: { workspaceRef?: unknown }; scope?: {
+        workspaceRef?: unknown; evaluatedAt?: unknown; objectiveEvidence?: { canonicalObjective?: unknown } } };
+      const projectedObjective = projectMetaAnalysisConfig(readySource.facts.metaAnalysisConfigSnapshot, readySource.facts.identity.campaignRef).objective;
+      process.stderr.write(`${JSON.stringify({ verifier: "current_effective_analysis_context_source", phase: verificationPhase,
+        authorityScopeWorkspaceMatchesCatalog: authority.scope?.workspaceRef === authority.catalog?.workspaceRef,
+        authorityScopeAtOrBeforeCapture: typeof authority.scope?.evaluatedAt === "string" && authority.scope.evaluatedAt <= readySource.capturedAt,
+        authorityScopeObjectiveMatchesMeta: authority.scope?.objectiveEvidence?.canonicalObjective === (projectedObjective.state === "known" ? projectedObjective.value : null) })}\n`);
+    }
     const composer = createDrizzleEffectiveAnalysisContextComposer({ database: database as never });
-    const composed = await composer.composeAndSave(request); saved = composed.outcome === "inserted";
+    const composed = await composer.composeAndSave(request).catch((error: unknown) => {
+      if (error instanceof EffectiveAnalysisContextComposerError) {
+        process.stderr.write(`${JSON.stringify({ verifier: "current_effective_analysis_context_source", phase: verificationPhase,
+          composeRejection: error.code, diagnosticCode: error.diagnosticCode ?? null })}\n`);
+      }
+      throw error;
+    }); saved = composed.outcome === "inserted";
     const stored = await new DrizzleEffectiveCampaignContextRepository(database as never).loadLatestValidCampaignPublic({ workspaceId,
       campaignRef: `ref_${composed.context.contextHash.slice(0, 12)}` });
     reloaded = stored !== null && stored.context.contextHash === composed.context.contextHash;

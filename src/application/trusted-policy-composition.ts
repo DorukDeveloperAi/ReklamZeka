@@ -7,6 +7,7 @@ import {
 } from "@/analyses/effective-campaign-context";
 import type { InstructionPolicyLifecycleState, InstructionPolicyPublicRevision } from "@/application/instruction-policy-lifecycle-service";
 import type { FrozenCategoryProfileBinding } from "@/domain/categories/category-profile";
+import type { CategoryHierarchyTarget } from "@/domain/categories/service";
 import { categoryDefinitionPublicRef } from "@/domain/categories/public-reference";
 import type { FrozenCategoryContext } from "@/domain/categories/registry";
 import {
@@ -131,7 +132,9 @@ export class TrustedPolicyCompositionError extends Error {
     | "scope_mismatch"
     | "stale_binding"
     | "ambiguous_binding"
-    | "missing_manual_lock") {
+    | "missing_manual_lock",
+    /** Stable server-side discriminator for a fail-closed branch; never authority data. */
+    readonly diagnosticCode?: string) {
     super(`Trusted policy composition rejected: ${code}`);
     this.name = "TrustedPolicyCompositionError";
   }
@@ -143,7 +146,9 @@ const SEMANTIC_KEY = /^[a-z][a-z0-9_.:-]{1,127}$/;
 const AUTHORITY = Object.freeze({ canExecute: false as const, canWriteMeta: false as const, canApprove: false as const,
   canSchedule: false as const, canCallTool: false as const, canAccessNetwork: false as const, canQuerySql: false as const });
 
-function fail(code: TrustedPolicyCompositionError["code"]): never { throw new TrustedPolicyCompositionError(code); }
+function fail(code: TrustedPolicyCompositionError["code"], diagnosticCode?: string): never {
+  throw new TrustedPolicyCompositionError(code, diagnosticCode);
+}
 function compareText(left: string, right: string): number { return left < right ? -1 : left > right ? 1 : 0; }
 function stable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stable);
@@ -381,15 +386,26 @@ function assertManualLock(lock: FrozenPolicyManualLock): FrozenPolicyManualLock 
   return freeze({ ...core, lockHash: lock.lockHash });
 }
 
-function categoryEvidence(categories: readonly FrozenCategoryContext[], context: EffectiveCampaignContextInput): Readonly<{
+function categoryEvidence(categories: readonly FrozenCategoryContext[], context: EffectiveCampaignContextInput,
+  target?: CategoryHierarchyTarget): Readonly<{
   refs: readonly string[]; profiles: ReadonlyMap<string, FrozenCategoryProfileBinding>; resolutionHashes: readonly string[] } > {
   const expectedPath = context.identity.hierarchyRefs.map((id, index) => ({
     level: (["campaign", "ad_set", "ad", "creative"] as const)[index]!, id,
   }));
+  if (target !== undefined && (!target || typeof target !== "object" || !["campaign", "ad_set", "ad", "creative"].includes(target.level)
+    || typeof target.id !== "string" || !target.id.trim() || (target.level === "creative"
+      && (typeof target.viaAdId !== "string" || !target.viaAdId.trim())))) fail("scope_mismatch");
   const categoryRefs: string[] = []; const profiles = new Map<string, FrozenCategoryProfileBinding>(); const resolutionHashes: string[] = [];
   for (const category of categories) {
     const { resolutionHash, ...categoryCore } = category;
-    if (category.workspaceId !== context.workspaceId || digest(category.path) !== digest(expectedPath)) fail("scope_mismatch");
+    const final = category.path.at(-1);
+    // The current reader resolves external Meta refs to a tenant-owned internal
+    // target in its snapshot. Direct/historical callers retain exact external
+    // path equality when no internal target accompanies the composition.
+    const targetMatches = target === undefined ? digest(category.path) === digest(expectedPath)
+      : final?.level === target.level && final.id === target.id
+        && (target.level !== "creative" || (category.path.at(-2)?.level === "ad" && category.path.at(-2)?.id === target.viaAdId));
+    if (category.workspaceId !== context.workspaceId || !targetMatches) fail("scope_mismatch");
     if (hash(resolutionHash, "scope_mismatch") !== digest(categoryCore)) fail("scope_mismatch");
     resolutionHashes.push(resolutionHash);
     for (const definition of category.effectiveDefinitions) {
@@ -424,8 +440,11 @@ export function composeTrustedPolicyContext(input: Readonly<{
   catalog: TrustedPolicyCatalog;
   scope: PolicyScopeSnapshot;
   manualLocks: readonly FrozenPolicyManualLock[];
+  categoryTarget?: CategoryHierarchyTarget;
 }>): TrustedPolicyComposition {
-  exact(input, ["baseContext", "workspaceRef", "lifecycle", "catalog", "scope", "manualLocks"], "invalid_input");
+  exact(input, "categoryTarget" in input
+    ? ["baseContext", "workspaceRef", "lifecycle", "catalog", "scope", "manualLocks", "categoryTarget"]
+    : ["baseContext", "workspaceRef", "lifecycle", "catalog", "scope", "manualLocks"], "invalid_input");
   const workspaceRef = reference(input.workspaceRef, "invalid_input");
   if (input.baseContext.policies.length !== 0 || input.baseContext.versions.instructionPolicyRegistry !== undefined
     || !Array.isArray(input.manualLocks) || input.manualLocks.length > 1_000) fail("invalid_input");
@@ -436,13 +455,14 @@ export function composeTrustedPolicyContext(input: Readonly<{
   // materialized before this read snapshot.  It is never allowed to describe
   // a future scope, but the repository separately proves that its immutable
   // validity interval still covers `capturedAt`.
-  if (catalog.workspaceRef !== workspaceRef || scope.workspaceRef !== workspaceRef
-    || Date.parse(scope.evaluatedAt) > Date.parse(capturedAt)) fail("scope_mismatch");
+  if (catalog.workspaceRef !== workspaceRef) fail("scope_mismatch", "catalog_workspace_ref");
+  if (scope.workspaceRef !== workspaceRef) fail("scope_mismatch", "scope_workspace_ref");
+  if (Date.parse(scope.evaluatedAt) > Date.parse(capturedAt)) fail("scope_mismatch", "scope_evaluated_after_capture");
   const baseObjective = input.baseContext.meta.objective;
   if (baseObjective.state === "known") {
-    if (scope.objectiveEvidence.canonicalObjective !== baseObjective.value) fail("scope_mismatch");
+    if (scope.objectiveEvidence.canonicalObjective !== baseObjective.value) fail("scope_mismatch", "canonical_objective");
   } else if (scope.objectiveEvidence.canonicalObjective !== null || scope.objectiveRefs.length > 0) {
-    fail("scope_mismatch");
+    fail("scope_mismatch", "unknown_objective_scope");
   }
   if (catalog.instructionPolicyRegistryHash !== input.lifecycle.registryHash) fail("stale_binding");
   const published = current.filter((revision) => revision.policy.status === "published");
@@ -454,7 +474,7 @@ export function composeTrustedPolicyContext(input: Readonly<{
     if (lockByRef.has(lock.lockRef)) fail("ambiguous_binding");
     lockByRef.set(lock.lockRef, lock);
   }
-  const categories = categoryEvidence(input.baseContext.categories, input.baseContext);
+  const categories = categoryEvidence(input.baseContext.categories, input.baseContext, input.categoryTarget);
   const manualLockedPolicyRefs: string[] = [];
   const candidates = published.map((revision) => {
     const policy = revision.policy; const binding = bindingByPolicy.get(policy.policyRef);

@@ -75,7 +75,9 @@ export class EffectiveCampaignContextRepositoryError extends Error {
     | "workspace_scope_mismatch"
     | "identity_conflict"
     | "not_found"
-    | "corrupt_store") {
+    | "corrupt_store"
+    /** A driver-level write failure deliberately carries no raw database detail across the boundary. */
+    | "persistence_rejected") {
     super(`Effective campaign context persistence reddedildi: ${code}`);
     this.name = "EffectiveCampaignContextRepositoryError";
   }
@@ -629,7 +631,8 @@ export class DrizzleEffectiveCampaignContextRepository {
     }
     const expectedIdentityHash = identityHash(context);
     const components = sourceComponentsOf(context);
-    return this.database.transaction(async (transaction) => {
+    try {
+      return await this.database.transaction(async (transaction) => {
       await assertWorkspace(transaction, context.workspaceId, true);
       const mirror = await assertMirrorScope(transaction, context);
       await assertDeterministicAnalysisData(transaction, context, mirror);
@@ -702,7 +705,14 @@ export class DrizzleEffectiveCampaignContextRepository {
         outcome: "inserted" as const,
         record: await loadRecord(transaction, inserted[0]),
       });
-    });
+      });
+    } catch (error) {
+      // Preserve our semantic classification. A database/driver exception is
+      // intentionally collapsed to one stable repository code: callers must
+      // remain fail-closed and never receive SQL, constraint, or tenant data.
+      if (error instanceof EffectiveCampaignContextRepositoryError) throw error;
+      throw new EffectiveCampaignContextRepositoryError("persistence_rejected");
+    }
   }
 
   async loadHistorical(workspaceId: string, contextHash: string): Promise<StoredEffectiveCampaignContext> {
