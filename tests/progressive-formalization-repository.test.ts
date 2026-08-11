@@ -40,6 +40,38 @@ function database(input: Readonly<{ revisions?: readonly unknown[]; sourceRows?:
 }
 
 describe("progressive formalization Drizzle repository", () => {
+  it("keeps promote_g3 zero-write when its transaction-local authoritative resolver reports the missing tier/decision binding", async () => {
+    const g0 = advanceProgressiveFormalization(null, { schemaVersion: PROGRESSIVE_FORMALIZATION_VERSION,
+      transition: "capture_g0", workspaceRef: "workspace_test", formalizationRef: "formalization_authority",
+      occurredAt: "2026-08-10T00:00:00.000Z", actor: { actorRef: "actor_owner", role: "owner" },
+      payload: { rawProvenanceRef: "source_owner_note", rawTextHash: h("raw") } });
+    const g1 = advanceProgressiveFormalization(g0, { schemaVersion: PROGRESSIVE_FORMALIZATION_VERSION,
+      transition: "scope_g1", workspaceRef: "workspace_test", formalizationRef: "formalization_authority",
+      occurredAt: "2026-08-10T01:00:00.000Z", actor: { actorRef: "actor_owner", role: "owner" },
+      payload: { guidanceCardRefs: ["guidance_owner_note"], scope: { global: true, accountGroupRefs: [], accountRefs: [],
+        objectiveRefs: [], internalCategoryRefs: [], entityRefs: [], promotionTemplateRefs: [], topicRefs: [] } } });
+    const g2 = advanceProgressiveFormalization(g1, { schemaVersion: PROGRESSIVE_FORMALIZATION_VERSION,
+      transition: "review_g2", workspaceRef: "workspace_test", formalizationRef: "formalization_authority",
+      occurredAt: "2026-08-10T02:00:00.000Z", actor: { actorRef: "actor_owner", role: "owner" },
+      payload: { guidanceSetRef: "guidance_set_test", reviewedGuidanceHash: h("review"), confirmation: { confirmed: true,
+        confirmationRef: "confirmation_owner_g2", confirmedAt: "2026-08-10T02:00:00.000Z" } } });
+    const fake = database({ role: "owner", revisions: [g0, g1, g2] });
+    const resolve = vi.fn(async () => ({ contractVersion: "progressive-formalization-studio/1.0.0" as const, target: "G3" as const,
+      formalizationRef: "formalization_authority", headHash: g2.revisionHash, previewHash: "a".repeat(64), disposition: "blocked" as const,
+      blockers: ["candidate_authority_tier_decision_binding_unavailable" as const], normalizedDraft: null, g4Payload: null,
+      evidence: { persistedGuidance: true, persistedPolicy: true, productionAuthoritySourceBound: true, historicalRunsEvaluated: 1 },
+      authority: { canApprove: false as const, canExecute: false as const, canWriteMeta: false as const,
+        canSchedule: false as const, canCallTool: false as const } }));
+    const repository = new DrizzleProgressiveFormalizationRepository(fake.db as never, resolve as never);
+    await expect(repository.mutate({ workspaceId, workspaceRef: "workspace_test", actorId, actorRef: "actor_owner", role: "owner",
+      occurredAt: "2026-08-10T03:00:00.000Z", command: { operation: "promote_g3", expectedRegistryHash: (await repository.inspect(workspaceId)).registryHash,
+        formalizationRef: "formalization_authority", expectedHeadHash: g2.revisionHash, policyRef: "policy_test", expectedPreviewHash: "a".repeat(64),
+        ownerConfirmation: { confirmed: true, confirmationRef: "confirmation_owner_g3" } } })).rejects.toMatchObject({ code: "preview_blocked" });
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect(fake.statements.some((statement) => statement.includes("insert into progressive_formalization_revisions"))).toBe(false);
+    expect(fake.statements.some((statement) => statement.includes("insert into audit_events"))).toBe(false);
+  });
+
   it("captures G0 from the current source_key stream and derives its persisted source_ref and hash", async () => {
     const newest = "En yeni owner statement"; const fake = database({ role: "analyst", sourceRows: [
       { source_key: "source_owner_note", source_ref: "source_persisted_owner_note", version: 2, status: "draft", content: newest, record_hash: "a".repeat(64) },

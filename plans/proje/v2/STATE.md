@@ -367,6 +367,23 @@
   `completeExactFixture:false` ve açık writer bağımlılığını raporlar. Browser/session kabulü de açık
   çevresel kabul noktası olarak kalır.
 
+## 2026-08-11 — A09.4a transaction-local authoritative G3 evidence bridge
+
+- Progressive G3 preview, yalnız aynı caller-owned transaction içinde exact G2 guidance-set manifestine
+  bağlı en fazla 100 run → analysis asset → frozen context zincirini okur. Her frozen context yeniden
+  canonicalize/hash-authenticate edilir; history içindeki outcome envelope'ları da workspace/ref/hash
+  eşleşmeli immutable `business_outcome_evidence_snapshots` satırlarıyla ilişkisel olarak doğrulanır.
+- Her historical context kendi capture zamanında kendi frozen authority snapshot ref/hash'iyle yeniden
+  yüklenir. Mixed-account, missing/tampered context, missing/forged outcome snapshot veya authority
+  replay başarısızlığında bridge source-bound iddiasını bırakır ve G3 preview incomplete/blocked kalır.
+- Draft G3 adayı için mevcut production authority catalog'ı kasıtlı olarak kullanılmaz: catalog yalnız
+  published policy taşır. Bu yüzden `candidate_authority_tier_decision_binding_unavailable` blocker'ı
+  G3 promote'u revision/audit yazmadan reddeder. G4, HTTP/UI, action/network/Meta write veya
+  `productionAuthoritySourceBound` semantiği değişmedi.
+- Kanıt: 7 focused suite/23 test, `npm run typecheck`, `git diff --check`. Gerçek positive G3 canlı
+  acceptance henüz iddia edilmez; ayrı owner-confirmed candidate preview-binding lifecycle'i sonraki
+  forward-only checkpoint'tir.
+
 ## 2026-08-10 — A10.1 kalıcı DecisionCadenceProfile
 
 - `decision_cadence_profile_revisions` additive PostgreSQL tablosu tenant/account/campaign composite

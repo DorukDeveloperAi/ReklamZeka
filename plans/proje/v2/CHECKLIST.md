@@ -254,6 +254,11 @@
     append-only PostgreSQL persistence, workspace lock/membership/OCC/audit, cookie-only API ve responsive UI.
   - [x] G3/G4 storage contract, exact JSONB/hash-chain/RLS/revoke/immutability ve injected-ready replay;
     production preview eksik authority/risk/cap/approval/rollout/valve kanıtında fail-closed kalır.
+  - [x] A09.4a transaction-local authoritative G3 evidence bridge: G2 exact set manifesti üzerinden
+    bounded run→asset→hash-authenticated frozen context→relational outcome snapshot zinciri ve her
+    context'in own historical authority snapshot'ı same-executor'da doğrulanır. Mixed-account/tamper/
+    missing evidence fail-closed; draft candidate için ayrı trusted tier/decision preview binding yoksa
+    G3 promotion zero-write blocked kalır. Bu G3 positive acceptance veya G4 yetkisi iddia etmez.
   - [ ] G3 authoritative conflict/impact/historical-outcome resolver ile G4 A13 evidence binding'i ve
     bağlı PostgreSQL/gerçek session acceptance.
 - [ ] AdvisedPractice candidate→trial→outcome→standardization lifecycle.
