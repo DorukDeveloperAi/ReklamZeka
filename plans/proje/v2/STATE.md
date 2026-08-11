@@ -313,6 +313,15 @@
   Gerçek ad-level lifecycle fixture ve PostgreSQL outer-rollback acceptance henüz açıktır; doğrudan SQL
   fixture ile bu kabul uydurulmamıştır.
 
+## 2026-08-11 — A10.5c creative settlement policy contract
+
+- `creative-diagnostic-settlement-policy/1.0.0`, explicit `settlementLagDays`, revision,
+  previous-hash ve published state'i tek canonical policy hashine bağlar. Cutoff yalnız supplied
+  IANA timezone ve canonical evaluation timestamp ile hesaplanır; timezone veya lag default'u yoktur.
+- Bu saf contract henüz tenant-scoped immutable policy revision writer/reader değildir. Dolayısıyla
+  window snapshot materializer hâlâ policy ref/hashını persisted olarak doğrulayamadığından kapalıdır;
+  settled source evidence veya fatigue finding iddiası yapılmaz.
+
 ## 2026-08-11 — A07 field-pilot source coverage census
 
 - Yeni read-only `census:field-pilot-source-db` REPEATABLE READ altında yalnız aggregate workspace/account
