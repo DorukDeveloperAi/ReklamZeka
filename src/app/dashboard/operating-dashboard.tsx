@@ -27,7 +27,8 @@ export type OperatingDashboardModel = Readonly<{
   attribution: string;
 }>;
 
-type ViewId = "today" | "campaigns" | "analysis" | "decision-room" | "practice-lab" | "budgets" | "rules" | "strict-policies" | "categories" | "autonomy" | "agent" | "approvals" | "promotions" | "timeline" | "meta";
+export type DashboardViewId = "today" | "campaigns" | "analysis" | "decision-room" | "practice-lab" | "budgets" | "rules" | "strict-policies" | "categories" | "autonomy" | "agent" | "approvals" | "promotions" | "timeline" | "meta";
+type ViewId = DashboardViewId;
 
 type AgentSessionSummary = Readonly<{
   clientRef: string;
@@ -72,6 +73,21 @@ const campaigns = [
   { id: "cmp-gcc", name: "GCC · Doktor Tanıtım · Leads", objective: "OUTCOME_LEADS", category: "Uluslararası hasta", tags: ["GCC", "AR", "Evergreen"], spend: "₺241", conversions: 42, cpa: "₺5,74", budget: "₺51.000", health: "Stabil", tone: "stable", progress: 63, planningContext: { campaignRef: "cmp_gcc", persistedCampaignRef: null, campaignLabel: "GCC · Doktor Tanıtım · Leads", input: { businessGoal: "lead_acquisition", market: "international", language: "ar", serviceRef: "service_doctor_introduction", countryOrRegion: "GCC", conversionRoute: "lead_form", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true } } },
   { id: "cmp-awareness", name: "TR · Marka · Evergreen Awareness", objective: "OUTCOME_AWARENESS", category: "Marka koruma", tags: ["Türkiye", "TR", "No-pause"], spend: "₺136", conversions: 29, cpa: "₺4,69", budget: "₺35.000", health: "Korunan", tone: "protected", progress: 48, planningContext: { campaignRef: "cmp_awareness", persistedCampaignRef: null, campaignLabel: "TR · Marka · Evergreen Awareness", input: { businessGoal: "upper_funnel_education", market: "domestic", language: "tr", serviceRef: "service_medical_aesthetics", countryOrRegion: null, conversionRoute: "not_applicable", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true } } },
 ] as const satisfies readonly Readonly<{ id: string; name: string; objective: string; category: string; tags: readonly string[]; spend: string; conversions: number; cpa: string; budget: string; health: string; tone: "watch" | "stable" | "protected"; progress: number; planningContext: CampaignPlanningBriefContext; }>[];
+
+export type PortfolioFilters = Readonly<{
+  objective: string;
+  category: string;
+}>;
+
+export function filterCampaignPortfolio<T extends Readonly<{ objective: string; category: string }>>(
+  items: readonly T[],
+  filters: PortfolioFilters,
+): readonly T[] {
+  return items.filter((campaign) =>
+    (filters.objective === "all" || campaign.objective === filters.objective)
+    && (filters.category === "all" || campaign.category === filters.category),
+  );
+}
 
 const analysisRuns = [
   { title: "Günlük portföy kontrolü", schedule: "Her gün · 09:00", scope: "Tüm Meta hesapları", status: "Tamamlandı", result: "2 izle · 1 onay bekliyor", next: "Yarın 09:00" },
@@ -143,9 +159,10 @@ export function approvalQueueScopeAfterCampaignSelection(
   return currentCampaignId === nextCampaignId ? currentApprovalQueueCampaignRef : null;
 }
 
-export function OperatingDashboard({ model }: { model: OperatingDashboardModel }) {
-  const [activeView, setActiveView] = useState<ViewId>("today");
+export function OperatingDashboard({ model, initialView = "today" }: { model: OperatingDashboardModel; initialView?: DashboardViewId }) {
+  const [activeView, setActiveView] = useState<ViewId>(initialView);
   const [selectedCampaign, setSelectedCampaign] = useState<string>(campaigns[0].id);
+  const [portfolioFilters, setPortfolioFilters] = useState<PortfolioFilters>({ objective: "all", category: "all" });
   const [approvalQueueCampaignRef, setApprovalQueueCampaignRef] = useState<string | null>(null);
   const [autonomy, setAutonomy] = useState<Record<string, string>>({ analysis: "Otomatik", recommendation: "Otomatik", decrease: "Onaya sun", increase: "Onaya sun", pause: "Onaya sun", create: "Her zaman manuel" });
   const agentMessages: Array<{ from: "agent" | "user"; text: string }> = [
@@ -164,7 +181,8 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
   const [agentEntityRef, setAgentEntityRef] = useState("portfolio_current");
   const [agentEntityLabel, setAgentEntityLabel] = useState("Tüm Meta portföyü");
 
-  const currentCampaign = campaigns.find((campaign) => campaign.id === selectedCampaign) ?? campaigns[0];
+  const filteredCampaigns = useMemo(() => filterCampaignPortfolio(campaigns, portfolioFilters), [portfolioFilters]);
+  const currentCampaign = filteredCampaigns.find((campaign) => campaign.id === selectedCampaign) ?? filteredCampaigns[0] ?? campaigns[0];
   const activeTitle = useMemo(() => navGroups.flatMap((group) => group.items).find((item) => item.id === activeView)?.label ?? "Bugün", [activeView]);
 
   const refreshMetaInventory = useCallback(async (announce = false) => {
@@ -265,6 +283,16 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
     setSelectedCampaign(campaignId);
   }
 
+  function changePortfolioFilter(key: keyof PortfolioFilters, value: string) {
+    const next = { ...portfolioFilters, [key]: value };
+    const nextCampaigns = filterCampaignPortfolio(campaigns, next);
+    setPortfolioFilters(next);
+    if (!nextCampaigns.some((campaign) => campaign.id === selectedCampaign) && nextCampaigns[0]) {
+      setApprovalQueueCampaignRef(null);
+      setSelectedCampaign(nextCampaigns[0].id);
+    }
+  }
+
   function openAgentContext(entityRef: string, label: string) {
     setAgentEntityRef(entityRef);
     setAgentEntityLabel(label);
@@ -330,8 +358,16 @@ export function OperatingDashboard({ model }: { model: OperatingDashboardModel }
   function renderCampaigns() {
     return <>
       <section className={styles.pageHero}><div><span className={styles.kicker}>META PORTFÖYÜ</span><h1>Kampanyayı metrikten önce bağlamıyla okuyun.</h1><p>Meta objective, reklam seti yapısı, mevcut kreatifler ve iç kategoriler aynı karar yüzeyinde.</p></div><button className={styles.primaryButton} onClick={() => navigate("analysis")}>Yeni analiz</button></section>
+      <section className={styles.portfolioOverview} aria-labelledby="portfolio-overview-title">
+        <header><div><span className={styles.kicker}>BUGÜN / PORTFÖY HİYERARŞİSİ</span><h2 id="portfolio-overview-title">Demo Marka <i>→</i> Meta portföyü <i>→</i> {filteredCampaigns.length} görünür kampanya</h2><p>Filtreler yalnız bu demo/read-only snapshot'ı daraltır; account, category veya Meta yetkisi değiştirmez.</p></div><StatusPill tone="neutral">unbound demo context</StatusPill></header>
+        <div className={styles.portfolioFilters} aria-label="Portföy filtreleri">
+          <label htmlFor="portfolio-meta-filter"><span>Meta objective</span><select id="portfolio-meta-filter" value={portfolioFilters.objective} onChange={(event) => changePortfolioFilter("objective", event.target.value)}><option value="all">Tümü</option>{[...new Set(campaigns.map((campaign) => campaign.objective))].map((objective) => <option key={objective} value={objective}>{objective}</option>)}</select></label>
+          <label htmlFor="portfolio-category-filter"><span>İç kategori</span><select id="portfolio-category-filter" value={portfolioFilters.category} onChange={(event) => changePortfolioFilter("category", event.target.value)}><option value="all">Tümü</option>{[...new Set(campaigns.map((campaign) => campaign.category))].map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+          <small>Kaynak: deterministik demo snapshot · persisted account-group/asset graph taklit edilmez.</small>
+        </div>
+      </section>
       <div className={styles.splitWorkspace}>
-        <section className={styles.panel}><header className={styles.panelHeader}><div><span className={styles.kicker}>32 AKTİF</span><h2>Kampanyalar</h2></div><StatusPill tone="good">%98,7 coverage</StatusPill></header><div className={styles.selectorList}>{campaigns.map((campaign) => <button key={campaign.id} data-active={selectedCampaign === campaign.id} onClick={() => selectCampaign(campaign.id)}><span><strong>{campaign.name}</strong><small>{campaign.objective}</small></span><StatusPill tone={campaign.tone}>{campaign.health}</StatusPill></button>)}</div></section>
+        <section className={styles.panel}><header className={styles.panelHeader}><div><span className={styles.kicker}>{filteredCampaigns.length} / {campaigns.length} GÖRÜNÜR</span><h2>Kampanyalar</h2></div><StatusPill tone="good">%98,7 coverage</StatusPill></header><div className={styles.selectorList}>{filteredCampaigns.map((campaign) => <button key={campaign.id} data-active={currentCampaign.id === campaign.id} onClick={() => selectCampaign(campaign.id)}><span><strong>{campaign.name}</strong><small>{campaign.objective}</small></span><StatusPill tone={campaign.tone}>{campaign.health}</StatusPill></button>)}</div></section>
         <section className={styles.panel}><header className={styles.detailHeader}><div><span className={styles.kicker}>EFFECTIVE CAMPAIGN CONTEXT</span><h2>{currentCampaign.name}</h2><p>{currentCampaign.objective} · Campaign budget · 7d click / 1d view</p></div><button onClick={() => openAgentContext(`campaign_${currentCampaign.id.replace("cmp-", "")}`, currentCampaign.name)}>Agent ile aç ✦</button></header>
           <div className={styles.contextGrid}><div><span>İç kategori</span><strong>{currentCampaign.category}</strong><small>{currentCampaign.tags.join(" · ")}</small></div><div><span>Bütçe sahibi</span><strong>Campaign / CBO</strong><small>{currentCampaign.budget} aylık plan</small></div><div><span>Karar temposu</span><strong>72 saat observation</strong><small>Son hamle: 31 saat önce</small></div><div><span>Aktif koruma</span><strong>{currentCampaign.id === "cmp-istanbul" ? "no-transfer · floor" : "max-change %10"}</strong><small>Policy v4 · yayınlandı</small></div></div>
           <div className={styles.hierarchy}><div><span>Campaign</span><strong>{currentCampaign.name}</strong></div><div><span>Ad set · 3</span><strong>Broad · Remarketing · LAL</strong></div><div><span>Ad · 8</span><strong>6 active · 1 learning · 1 paused</strong></div><div><span>Creative/post</span><strong>5 mevcut asset · yeni üretim yok</strong></div></div>

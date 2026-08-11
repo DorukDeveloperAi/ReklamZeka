@@ -18,6 +18,15 @@
   bütünlüğü riski veya bu üç ürün adımını açan somut bir blocker olduğunda yapılır. Kapsam dışı
   "mükemmelleştirme" işleri checklist'e yeni teslimat gibi eklenmez.
 
+## 2026-08-11 — A14 demo portföy hiyerarşisi ve filtreler
+
+- Kampanyalar yüzeyindeki salt-okunur portföy katmanı artık Meta objective ve iç kategori ile
+  daraltılabilir; görünür kampanya sayısı ve seçili campaign/brief aynı filtre sonucundan gelir.
+- Bu yüzey yalnız deterministik demo snapshot'ını sunar. `unbound demo context` işareti korunur;
+  persisted account-group, asset graph, approval mutation, action veya Meta write taklit edilmez.
+- Böylece sonraki ürün checkpoint'i filtreli seçimden gerçek frozen campaign context'e geçiştir;
+  bu bağ kurulana kadar demo verisi canlı karar kaynağı sayılmaz.
+
 ## 2026-08-11 — A14 context-bound read-only karar zaman çizelgesi
 
 - Brief paneli yalnız gerçek frozen context'ten doğrulanmış `entity_…` Approval Queue alias'ı geldiğinde

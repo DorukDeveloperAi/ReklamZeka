@@ -727,6 +727,9 @@
       fail-closed `unavailable` kalır; demo/unbound bağlamda timeline render edilmez.
 
 - [ ] Bugün/portfolio hiyerarşi ve internal/Meta filtreler.
+  - [x] Dashboard'da Meta objective ve iç kategori ile daraltılan salt-okunur demo portföy görünümü;
+    seçili kampanya/brief filtre sonucu ile tutarlı kalır. Kaynak açıkça unbound deterministik demo
+    snapshot'tır; persisted account-group/asset graph, action ve Meta write iddiası yoktur.
 - [ ] Account-group switcher, multi-account connection health ve Page/Instagram asset graph.
 - [ ] Kategori/talimat stüdyosu ve raw/normalized/version/conflict görünümü.
   - [x] Guidance Studio eksik/expired dashboard capability'yi DB arızasından ayırır; 401
