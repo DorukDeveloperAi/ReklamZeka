@@ -81,6 +81,16 @@ export function persistedCampaignContextsFromResponse(value: unknown): readonly 
   return Object.freeze(items);
 }
 
+export function isLocalSessionRequiredResponse(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const response = value as Record<string, unknown>;
+  if (Object.keys(response).length !== 1 || !response.error || typeof response.error !== "object" || Array.isArray(response.error)) return false;
+  const error = response.error as Record<string, unknown>;
+  return Object.keys(error).length === 2
+    && error.code === "local_session_required"
+    && typeof error.message === "string" && error.message.length > 0 && error.message.length <= 240;
+}
+
 const navGroups: ReadonlyArray<Readonly<{ label: string; items: ReadonlyArray<Readonly<{ id: ViewId; label: string; icon: string; badge?: string }>> }>> = [
   { label: "Çalışma", items: [
     { id: "today", label: "Bugün", icon: "⌂", badge: "3" },
@@ -270,7 +280,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   const [portfolioFilters, setPortfolioFilters] = useState<PortfolioFilters>({ objective: "all", category: "all" });
   const [approvalQueueCampaignRef, setApprovalQueueCampaignRef] = useState<string | null>(null);
   const [persistedContexts, setPersistedContexts] = useState<readonly PersistedCampaignContextSummary[]>([]);
-  const [persistedContextsState, setPersistedContextsState] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [persistedContextsState, setPersistedContextsState] = useState<"loading" | "ready" | "session_required" | "unavailable">("loading");
   const [selectedPersistedCampaignRef, setSelectedPersistedCampaignRef] = useState<string | null>(null);
   const [autonomy, setAutonomy] = useState<Record<string, string>>({ analysis: "Otomatik", recommendation: "Otomatik", decrease: "Onaya sun", increase: "Onaya sun", pause: "Onaya sun", create: "Her zaman manuel" });
   const agentMessages: Array<{ from: "agent" | "user"; text: string }> = [
@@ -360,7 +370,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
         if (!active) return;
         const items = response.ok ? persistedCampaignContextsFromResponse(payload) : null;
         setPersistedContexts(items ?? []);
-        setPersistedContextsState(items ? "ready" : "unavailable");
+        setPersistedContextsState(items ? "ready" : !response.ok && isLocalSessionRequiredResponse(payload) ? "session_required" : "unavailable");
       })
       .catch(() => { if (active) { setPersistedContexts([]); setPersistedContextsState("unavailable"); } });
     return () => { active = false; };
@@ -500,8 +510,9 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
         </div>
       </section>
       <section className={styles.persistedContextPicker} aria-label="Persisted frozen kampanya bağlamı seçimi">
-        <div><span className={styles.kicker}>PERSISTED FROZEN CONTEXT · SALT-OKUNUR</span><strong>Doğrulanmış bağlam seçimi</strong><small>{persistedContextsState === "loading" ? "Kullanılabilir frozen contextler okunuyor." : persistedContextsState === "unavailable" ? "Yerel oturum veya doğrulanmış context listesi kullanılamıyor; demo bağlamı ayrı kalır." : persistedContexts.length ? "Liste yalnız en güncel geçerli frozen context alias’larını içerir." : "Bu oturumda seçilebilir frozen campaign context yok."}</small></div>
+        <div><span className={styles.kicker}>PERSISTED FROZEN CONTEXT · SALT-OKUNUR</span><strong>Doğrulanmış bağlam seçimi</strong><small>{persistedContextsState === "loading" ? "Kullanılabilir frozen contextler okunuyor." : persistedContextsState === "session_required" ? "Önce Decision Room'da güvenli yerel oturumu bağlayın; demo bağlamı ayrı kalır." : persistedContextsState === "unavailable" ? "Doğrulanmış context listesi kullanılamıyor; demo bağlamı ayrı kalır." : persistedContexts.length ? "Liste yalnız en güncel geçerli frozen context alias’larını içerir." : "Bu oturumda seçilebilir frozen campaign context yok."}</small></div>
         {persistedContexts.length ? <div className={styles.persistedContextOptions}>{persistedContexts.map((context) => <button key={context.campaignRef} type="button" data-active={context.campaignRef === selectedPersistedCampaignRef} onClick={() => { setApprovalQueueCampaignRef(null); setSelectedPersistedCampaignRef(context.campaignRef); }}><strong>{context.label}</strong><small>{context.objective ?? "Meta amacı bilinmiyor"} · {formatMetaTime(context.capturedAt)}</small></button>)}</div> : null}
+        {persistedContextsState === "session_required" ? <button className={styles.secondaryButton} type="button" onClick={() => navigate("decision-room")}>Yerel oturumu bağla</button> : null}
         {selectedPersistedContext ? <button className={styles.secondaryButton} type="button" onClick={() => { setApprovalQueueCampaignRef(null); setSelectedPersistedCampaignRef(null); }}>Demo seçimine dön</button> : null}
       </section>
       <div className={styles.splitWorkspace}>

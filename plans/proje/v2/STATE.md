@@ -79,6 +79,10 @@
   bağlı workspace'te dürüst `kayıt yok` read modelini, Campaigns ise `seçilebilir frozen campaign context
   yok` durumunu gösterdi. Bu gerçek session acceptance'tır; persisted context/approval happy-path'i için
   doğrulanmış bir campaign context henüz mevcut olmadığından o birleşim kabulü açık kalır.
+- Campaign-context route'u artık eksik/geçersiz local credential'ı `401 local_session_required` olarak
+  ayırır ve database sorgusu yapmaz. Dashboard bu güvenli zarfı tanıyıp kullanıcıyı Decision Room session
+  bootstrap yüzeyine yönlendirir; oturumlu fakat boş listede ayrı `seçilebilir frozen context yok` mesajı
+  kalır. Bu ayırım UI'da ve gerçek loopback route'ta doğrulandı; hiç write/Meta çağrısı yapılmadı.
 
 ## 2026-08-11 — A14 portföy/browser doğrulama sınırı
 
