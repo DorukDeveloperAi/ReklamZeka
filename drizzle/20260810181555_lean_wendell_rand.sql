@@ -59,6 +59,8 @@ CREATE TABLE "deterministic_feature_snapshot_sources" (
   )
 );--> statement-breakpoint
 
+CREATE UNIQUE INDEX "deterministic_feature_snapshots_workspace_id_unique" ON "deterministic_feature_snapshots" USING btree ("workspace_id", "id");--> statement-breakpoint
+
 ALTER TABLE "deterministic_feature_snapshots" ADD CONSTRAINT "deterministic_feature_snapshots_workspace_id_workspaces_id_fk"
   FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade;--> statement-breakpoint
 ALTER TABLE "deterministic_feature_snapshots" ADD CONSTRAINT "deterministic_feature_snapshots_connection_scope_fk"
@@ -72,7 +74,6 @@ ALTER TABLE "deterministic_feature_snapshot_sources" ADD CONSTRAINT "determinist
 ALTER TABLE "deterministic_feature_snapshot_sources" ADD CONSTRAINT "deterministic_feature_snapshot_sources_insight_scope_fk"
   FOREIGN KEY ("workspace_id", "daily_insight_id") REFERENCES "public"."meta_daily_insights"("workspace_id", "id") ON DELETE restrict;--> statement-breakpoint
 
-CREATE UNIQUE INDEX "deterministic_feature_snapshots_workspace_id_unique" ON "deterministic_feature_snapshots" USING btree ("workspace_id", "id");--> statement-breakpoint
 CREATE UNIQUE INDEX "deterministic_feature_snapshots_workspace_ref_unique" ON "deterministic_feature_snapshots" USING btree ("workspace_id", "feature_ref");--> statement-breakpoint
 CREATE UNIQUE INDEX "deterministic_feature_snapshots_workspace_hash_unique" ON "deterministic_feature_snapshots" USING btree ("workspace_id", "feature_hash");--> statement-breakpoint
 CREATE INDEX "deterministic_feature_snapshots_scope_window_idx" ON "deterministic_feature_snapshots" USING btree ("workspace_id", "ad_account_id", "entity_level", "external_entity_id", "start_date", "end_date");--> statement-breakpoint

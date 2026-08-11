@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { DrizzleCurrentEffectiveAnalysisContextSourceReader } from "@/connectors/analyses/current-effective-analysis-context-source-drizzle-reader";
+import { DrizzleCurrentEffectiveAnalysisContextSourceReader, resolvedCategoryTarget } from "@/connectors/analyses/current-effective-analysis-context-source-drizzle-reader";
 import type { CurrentDecisionCadence } from "@/connectors/decisions/current-decision-cadence-reader";
 import type { CurrentReviewedGuidanceManifest } from "@/connectors/guidance/current-reviewed-guidance-reader";
 import type { GuidanceCampaignSelection } from "@/connectors/guidance/guidance-campaign-selection-drizzle-repository";
@@ -14,6 +14,7 @@ import { resolveEffectiveCategory, type CategoryDefinition, type CategoryDimensi
 
 const input = Object.freeze({ workspaceId: "61b10d7d-132c-4c6d-b49f-cddc9b10d025", accountRef: "account_primary",
   entityType: "campaign" as const, entityRef: "campaign_primary" });
+const campaignId = "11111111-1111-4111-8111-111111111111";
 
 function stable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stable);
@@ -40,10 +41,32 @@ function categoryComposition() {
 }
 
 describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
+  it.each([
+    ["campaign", ["campaign_primary"], { level: "campaign", id: campaignId }],
+    ["ad_set", ["campaign_primary", "ad_set_primary"], { level: "ad_set", id: campaignId }],
+    ["ad", ["campaign_primary", "ad_set_primary", "ad_primary"], { level: "ad", id: campaignId }],
+    ["creative", ["campaign_primary", "ad_set_primary", "ad_primary", "creative_primary"], { level: "creative", id: campaignId, viaAdId: "22222222-2222-4222-8222-222222222222" }],
+  ] as const)("resolves an exact tenant-bound internal category target for %s", async (entityType, hierarchyRefs, expected) => {
+    const execute = vi.fn(async () => ({ rows: [entityType === "creative"
+      ? { entity_id: campaignId, ad_id: "22222222-2222-4222-8222-222222222222" } : { entity_id: campaignId }] }));
+    const hierarchy = { identity: { accountRef: input.accountRef, campaignRef: "campaign_primary", hierarchyRefs } } as unknown as CurrentMetaHierarchyConfig;
+    await expect(resolvedCategoryTarget({ execute } as never, input.workspaceId,
+      { ...input, entityType, entityRef: hierarchyRefs.at(-1)! }, hierarchy)).resolves.toEqual(expected);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([[[]], [[{ entity_id: campaignId }, { entity_id: campaignId }]]])("rejects missing or ambiguous category hierarchy candidates", async (candidates) => {
+    const execute = vi.fn(async () => ({ rows: candidates }));
+    const hierarchy = { identity: { accountRef: input.accountRef, campaignRef: input.entityRef, hierarchyRefs: [input.entityRef] } } as unknown as CurrentMetaHierarchyConfig;
+    await expect(resolvedCategoryTarget({ execute } as never, input.workspaceId, input, hierarchy))
+      .rejects.toThrow("category_hierarchy_unavailable");
+  });
+
   it("uses one repeatable read-only scope snapshot and returns an evidence-bound ready bundle", async () => {
     const execute = vi.fn(async (_query: unknown) => ({ rows: execute.mock.calls.length === 2
       ? [{ captured_at: "2026-08-10T15:00:00.000Z" }]
       : execute.mock.calls.length === 3 ? [{ workspace_ref: "workspace_primary" }]
+        : execute.mock.calls.length === 4 ? [{ entity_id: campaignId }]
         : [] }));
     const database = { execute, transaction: vi.fn(async (work: (tx: { execute: typeof execute }) => Promise<unknown>) => work({ execute })) };
     const metaAnalysisConfigSnapshot = normalizeMetaAnalysisConfigSnapshotV2({ version: META_ANALYSIS_CONFIG_SNAPSHOT_VERSION,
@@ -93,7 +116,7 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
       expect(result.facts.cadenceEvidence).toEqual({ profileRevision: 1, profileVersion: "decision-cadence/1.0.0", profileHash: "d".repeat(64) });
       expect(result.facts.versions.promotionRegistry).toMatch(/^[a-f0-9]{64}$/);
     }
-    expect(execute).toHaveBeenCalledTimes(5);
+    expect(execute).toHaveBeenCalledTimes(6);
     expect(readCurrent).toHaveBeenCalledWith(expect.anything(), input);
     expect(readCurrentInTransaction).toHaveBeenCalledWith(expect.anything(), {
       workspaceId: input.workspaceId, accountRef: input.accountRef, campaignRef: input.entityRef,
@@ -103,7 +126,7 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
       workspaceId: input.workspaceId, accountRef: input.accountRef, campaignRef: input.entityRef,
     }, "2026-08-10T15:00:00.000Z");
     expect(resolveInTransaction).toHaveBeenCalledWith(expect.anything(), "workspace_primary", input.workspaceId,
-      { level: "campaign", id: input.entityRef });
+      { level: "campaign", id: campaignId });
     expect(inspectInTransaction).toHaveBeenCalledWith(expect.anything(), input.workspaceId, "2026-08-10T15:00:00.000Z");
     expect(loadInTransaction).toHaveBeenCalledWith(expect.anything(), {
       workspaceId: input.workspaceId, accountRef: input.accountRef, evaluatedAt: "2026-08-10T15:00:00.000Z",
@@ -113,7 +136,8 @@ describe("DrizzleCurrentEffectiveAnalysisContextSourceReader", () => {
   it("rejects future or expired authority evidence before a source can advance", async () => {
     const execute = vi.fn(async () => ({ rows: execute.mock.calls.length === 2
       ? [{ captured_at: "2026-08-10T15:00:00.000Z" }]
-      : execute.mock.calls.length === 3 ? [{ workspace_ref: "workspace_primary" }] : [] }));
+      : execute.mock.calls.length === 3 ? [{ workspace_ref: "workspace_primary" }]
+        : execute.mock.calls.length === 4 ? [{ entity_id: campaignId }] : [] }));
     const database = { execute, transaction: async (work: (tx: { execute: typeof execute }) => Promise<unknown>) => work({ execute }) };
     const hierarchy: CurrentMetaHierarchyConfig = { capturedAt: "2026-08-10T15:00:00.000Z", identity: {
       connectionRef: "connection_primary", accountRef: input.accountRef, campaignRef: input.entityRef, hierarchyRefs: [input.entityRef] },

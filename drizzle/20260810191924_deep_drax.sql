@@ -67,6 +67,7 @@ CREATE TABLE "action_execution_events" (
   )
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX "action_execution_attempts_workspace_row_unique" ON "action_execution_attempts" USING btree ("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "action_execution_attempts" ADD CONSTRAINT "action_execution_attempts_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "action_execution_attempts" ADD CONSTRAINT "action_execution_attempts_bundle_scope_fk" FOREIGN KEY ("workspace_id","bundle_id") REFERENCES "public"."action_proposal_bundles"("workspace_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "action_execution_attempts" ADD CONSTRAINT "action_execution_attempts_unit_scope_fk" FOREIGN KEY ("workspace_id","bundle_id","unit_id","unit_ref") REFERENCES "public"."action_proposal_units"("workspace_id","bundle_id","id","unit_ref") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -74,7 +75,6 @@ ALTER TABLE "action_execution_attempts" ADD CONSTRAINT "action_execution_attempt
 ALTER TABLE "action_execution_attempts" ADD CONSTRAINT "action_execution_attempts_grant_scope_fk" FOREIGN KEY ("workspace_id","approval_grant_id") REFERENCES "public"."action_approval_evidence_grants"("workspace_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "action_execution_events" ADD CONSTRAINT "action_execution_events_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "action_execution_events" ADD CONSTRAINT "action_execution_events_attempt_scope_fk" FOREIGN KEY ("workspace_id","execution_attempt_id") REFERENCES "public"."action_execution_attempts"("workspace_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "action_execution_attempts_workspace_row_unique" ON "action_execution_attempts" USING btree ("workspace_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "action_execution_attempts_workspace_ref_unique" ON "action_execution_attempts" USING btree ("workspace_id","execution_ref");--> statement-breakpoint
 CREATE UNIQUE INDEX "action_execution_attempts_workspace_idempotency_unique" ON "action_execution_attempts" USING btree ("workspace_id","idempotency_key");--> statement-breakpoint
 CREATE UNIQUE INDEX "action_execution_attempts_decision_unique" ON "action_execution_attempts" USING btree ("workspace_id","decision_event_id");--> statement-breakpoint

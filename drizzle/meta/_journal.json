@@ -505,6 +505,13 @@
       "when": 1786389564942,
       "tag": "20260810191924_deep_drax",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1786435375231,
+      "tag": "20260810195500_authority_trigger_tombstone_guards",
+      "breakpoints": true
     }
   ]
 }

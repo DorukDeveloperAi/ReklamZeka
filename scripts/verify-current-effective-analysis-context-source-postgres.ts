@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -132,9 +132,16 @@ try {
       entityType: "campaign", mode: "default", priority: 1, version: 1 }],
     sets: [{ id: "guidance_set_current", workspaceId, name: "Current set", orderedCardIds: ["card_current"], reviewStatus: "reviewed", version: 1 }] });
     const guidanceWrite = await new DrizzleGuidanceRegistryRepository(database as never).save(guidanceRegistry, { expectedRegistryHash: null });
-    const manifestClock = rows(await database.execute(sql`select to_char(transaction_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as captured_at`));
-    const manifest = await new CurrentReviewedGuidanceReader().readCurrentInTransaction(database as never, workspaceId,
-      String(manifestClock[0]?.captured_at));
+    // The reader binds capturedAt to PostgreSQL's transaction clock. Keep the
+    // clock query and read in the same caller-owned transaction; using two
+    // implicit statement transactions is deliberately rejected as ambiguous.
+    const manifest = await database.transaction(async (transaction) => {
+      const manifestClock = rows(await transaction.execute(sql`
+        select to_char(transaction_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as captured_at
+      `));
+      return new CurrentReviewedGuidanceReader().readCurrentInTransaction(transaction as never, workspaceId,
+        String(manifestClock[0]?.captured_at));
+    });
     const selected = manifest.reviewedSets[0];
     if (!selected) throw new Error("reviewed_guidance_fixture_not_found");
     await new DrizzleGuidanceCampaignSelectionRepository(database as never).publish({ workspaceId, workspaceRef, actorId, actorRef, role: "owner",
@@ -147,7 +154,7 @@ try {
       accountRef, campaignRef, profileRef: `cadence_${suffix}`, revision: 1, expectedCurrentHash: "GENESIS", profile: cadence, occurredAt });
 
     // Empty policy registry is an explicit, valid no-policy authority state. The catalog/snapshot/bindings are materialized only here.
-    const emptyRegistryHash = "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12d5e11e0f9cce2e26e8d8e5ad83c0";
+    const emptyRegistryHash = createHash("sha256").update(JSON.stringify([])).digest("hex");
     const authorityScope = createPolicyScopeSnapshot({ workspaceRef, evaluatedAt: occurredAt, accountGroupRefs: [], objectiveRefs: [], topicRefs: [], canonicalObjective: null });
     const authorityCatalog = createTrustedPolicyCatalog({ workspaceRef, catalogRef: `authority_catalog_${suffix}`, catalogVersion: 1,
       instructionPolicyRegistryHash: emptyRegistryHash, bindings: [] });

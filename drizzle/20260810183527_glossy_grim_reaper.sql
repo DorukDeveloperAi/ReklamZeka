@@ -26,6 +26,7 @@ CREATE TABLE "deterministic_window_snapshots" (
 	CONSTRAINT "deterministic_window_snapshots_no_authority" CHECK ("deterministic_window_snapshots"."window_payload" #> '{capabilities,containsRawL0}' = 'false'::jsonb and "deterministic_window_snapshots"."window_payload" #> '{capabilities,canAuthorizeAction}' = 'false'::jsonb and "deterministic_window_snapshots"."window_payload" #> '{capabilities,canExecuteWrite}' = 'false'::jsonb)
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX "deterministic_window_snapshots_workspace_id_unique" ON "deterministic_window_snapshots" USING btree ("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "deterministic_window_snapshot_features" ADD CONSTRAINT "deterministic_window_snapshot_features_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "deterministic_window_snapshot_features" ADD CONSTRAINT "deterministic_window_snapshot_features_window_scope_fk" FOREIGN KEY ("workspace_id","window_snapshot_id") REFERENCES "public"."deterministic_window_snapshots"("workspace_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "deterministic_window_snapshot_features" ADD CONSTRAINT "deterministic_window_snapshot_features_feature_scope_fk" FOREIGN KEY ("workspace_id","feature_snapshot_id") REFERENCES "public"."deterministic_feature_snapshots"("workspace_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
@@ -35,7 +36,6 @@ ALTER TABLE "deterministic_window_snapshots" ADD CONSTRAINT "deterministic_windo
 CREATE UNIQUE INDEX "deterministic_window_snapshot_features_exact_unique" ON "deterministic_window_snapshot_features" USING btree ("window_snapshot_id","feature_snapshot_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "deterministic_window_snapshot_features_ref_unique" ON "deterministic_window_snapshot_features" USING btree ("window_snapshot_id","feature_ref");--> statement-breakpoint
 CREATE INDEX "deterministic_window_snapshot_features_feature_idx" ON "deterministic_window_snapshot_features" USING btree ("workspace_id","feature_snapshot_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "deterministic_window_snapshots_workspace_id_unique" ON "deterministic_window_snapshots" USING btree ("workspace_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "deterministic_window_snapshots_workspace_ref_unique" ON "deterministic_window_snapshots" USING btree ("workspace_id","window_ref");--> statement-breakpoint
 CREATE UNIQUE INDEX "deterministic_window_snapshots_workspace_hash_unique" ON "deterministic_window_snapshots" USING btree ("workspace_id","window_hash");--> statement-breakpoint
 CREATE INDEX "deterministic_window_snapshots_scope_idx" ON "deterministic_window_snapshots" USING btree ("workspace_id","ad_account_id","entity_level","external_entity_id","start_date","end_date");--> statement-breakpoint

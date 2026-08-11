@@ -152,6 +152,57 @@ function categoryTarget(input: EffectiveAnalysisContextRequest, hierarchy: Curre
 }
 
 /**
+ * Category assignments are persisted against internal Meta hierarchy UUIDs,
+ * while the immutable hierarchy reader intentionally exposes only external
+ * refs. Resolve the complete path in this same RR/RO snapshot and accept
+ * exactly one tenant-bound path—never an arbitrary external-ref match.
+ */
+export async function resolvedCategoryTarget(transaction: Pick<Database, "execute">, workspaceId: string,
+  input: EffectiveAnalysisContextRequest, hierarchy: CurrentMetaHierarchyConfig): Promise<CategoryHierarchyTarget> {
+  const external = categoryTarget(input, hierarchy);
+  const result = input.entityType === "campaign" ? await transaction.execute(sql`
+    select campaign.id::text as entity_id from ad_campaigns campaign
+    join ad_accounts account on account.workspace_id = campaign.workspace_id and account.id = campaign.ad_account_id
+    where campaign.workspace_id = ${workspaceId}::uuid and account.external_account_id = ${input.accountRef}
+      and campaign.external_campaign_id = ${external.id} and campaign.disappeared_at is null limit 2
+  `) : input.entityType === "ad_set" ? await transaction.execute(sql`
+    select ad_set.id::text as entity_id from meta_ad_sets ad_set
+    join ad_campaigns campaign on campaign.workspace_id = ad_set.workspace_id and campaign.id = ad_set.campaign_id
+    join ad_accounts account on account.workspace_id = campaign.workspace_id and account.id = campaign.ad_account_id
+    where ad_set.workspace_id = ${workspaceId}::uuid and account.external_account_id = ${input.accountRef}
+      and campaign.external_campaign_id = ${hierarchy.identity.campaignRef} and ad_set.external_ad_set_id = ${external.id}
+      and campaign.disappeared_at is null and ad_set.disappeared_at is null limit 2
+  `) : input.entityType === "ad" ? await transaction.execute(sql`
+    select ad.id::text as entity_id from meta_ads ad
+    join meta_ad_sets ad_set on ad_set.workspace_id = ad.workspace_id and ad_set.id = ad.ad_set_id
+    join ad_campaigns campaign on campaign.workspace_id = ad_set.workspace_id and campaign.id = ad_set.campaign_id
+    join ad_accounts account on account.workspace_id = campaign.workspace_id and account.id = campaign.ad_account_id
+    where ad.workspace_id = ${workspaceId}::uuid and account.external_account_id = ${input.accountRef}
+      and campaign.external_campaign_id = ${hierarchy.identity.campaignRef} and ad_set.external_ad_set_id = ${hierarchy.identity.hierarchyRefs[1]}
+      and ad.external_ad_id = ${external.id} and campaign.disappeared_at is null and ad_set.disappeared_at is null and ad.disappeared_at is null limit 2
+  `) : await transaction.execute(sql`
+    select creative.id::text as entity_id, ad.id::text as ad_id from meta_creatives creative
+    join meta_ads ad on ad.workspace_id = creative.workspace_id and ad.creative_id = creative.id
+    join meta_ad_sets ad_set on ad_set.workspace_id = ad.workspace_id and ad_set.id = ad.ad_set_id
+    join ad_campaigns campaign on campaign.workspace_id = ad_set.workspace_id and campaign.id = ad_set.campaign_id
+    join ad_accounts account on account.workspace_id = campaign.workspace_id and account.id = campaign.ad_account_id
+    where creative.workspace_id = ${workspaceId}::uuid and account.external_account_id = ${input.accountRef}
+      and campaign.external_campaign_id = ${hierarchy.identity.campaignRef} and ad_set.external_ad_set_id = ${hierarchy.identity.hierarchyRefs[1]}
+      and ad.external_ad_id = ${hierarchy.identity.hierarchyRefs[2]} and creative.external_creative_id = ${external.id}
+      and campaign.disappeared_at is null and ad_set.disappeared_at is null and ad.disappeared_at is null and creative.disappeared_at is null limit 2
+  `);
+  const candidates = rows(result);
+  if (candidates.length !== 1 || typeof candidates[0]!.entity_id !== "string" || !UUID.test(candidates[0]!.entity_id)) {
+    throw new Error("category_hierarchy_unavailable");
+  }
+  if (input.entityType === "creative") {
+    if (typeof candidates[0]!.ad_id !== "string" || !UUID.test(candidates[0]!.ad_id)) throw new Error("category_hierarchy_unavailable");
+    return Object.freeze({ level: "creative", id: candidates[0]!.entity_id, viaAdId: candidates[0]!.ad_id });
+  }
+  return Object.freeze({ level: input.entityType, id: candidates[0]!.entity_id });
+}
+
+/**
  * Builds only from evidence already obtained in the caller-owned source
  * snapshot. It never accepts a caller-supplied selection or fallback scope.
  * The surrounding source remains `not_ready` until every other component is
@@ -265,10 +316,11 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
       `));
       if (workspaceRefs.length !== 1 || typeof workspaceRefs[0]!.workspace_ref !== "string"
         || !WORKSPACE_REF.test(workspaceRefs[0]!.workspace_ref)) throw new Error("category_scope_unavailable");
+      const resolvedTarget = await resolvedCategoryTarget(tx, input.workspaceId, input, hierarchy);
       const categories = await this.categoryResolver.resolveInTransaction(tx, workspaceRefs[0]!.workspace_ref,
-        input.workspaceId, categoryTarget(input, hierarchy));
+        input.workspaceId, resolvedTarget);
       if (categories.workspaceId !== input.workspaceId || categories.dimensions.length === 0
-        || categories.dimensions.some((dimension) => dimension.frozenContext.path.at(-1)?.id !== input.entityRef)) {
+        || categories.dimensions.some((dimension) => dimension.frozenContext.path.at(-1)?.id !== resolvedTarget.id)) {
         throw new Error("corrupt_store");
       }
       const cadence: CurrentDecisionCadence = await this.cadenceReader.readCurrentInTransaction(tx, {
