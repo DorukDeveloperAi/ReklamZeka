@@ -239,6 +239,16 @@
   binding/config snapshotları, immutable repository ve canlı PostgreSQL kabulü henüz
   açık kaldığından Decision Room'a finding bağlanmamış, tüm yetkiler kapalıdır.
 
+## 2026-08-11 — A10.5c direct creative config evidence contract
+
+- `creative-diagnostic-config-snapshot/1.0.0`, objective, optimization, billing ve
+  destination alanlarını ya ref/source-ref/source-hash ile doğrudan observed ya da
+  `not_observed|unsupported|ambiguous` olarak explicit unknown saklar. `promoted_object`,
+  implicit billing veya destination fallback'i sözleşme dışında tutulur.
+- Bu saf sınır henüz mirror reader veya immutable persistence değildir; source-owned
+  snapshot/definition/window repository ve PostgreSQL acceptance açık kalır. Böylece
+  config drift veya fatigue finding'i bu contract tek başına üretmez.
+
 ## 2026-08-11 — A07 field-pilot source coverage census
 
 - Yeni read-only `census:field-pilot-source-db` REPEATABLE READ altında yalnız aggregate workspace/account
