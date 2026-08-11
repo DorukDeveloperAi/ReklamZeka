@@ -7,6 +7,7 @@ import { buildEffectiveCampaignContext, EFFECTIVE_CAMPAIGN_CONTEXT_VERSION,
   type EffectiveCampaignContextInput } from "@/analyses/effective-campaign-context";
 import * as schema from "@/db/schema";
 import { DrizzleInstructionPolicyImpactRepository } from "@/connectors/policies/instruction-policy-impact-drizzle-repository";
+import { DrizzleTrustedPolicyAuthorityRepository } from "@/connectors/policies/trusted-policy-authority-drizzle-repository";
 
 type Database = Pick<NodePgDatabase<typeof schema>, "execute">;
 type Row = Readonly<Record<string, unknown>>;
@@ -88,8 +89,8 @@ function frozenAuthoritySnapshot(value: unknown): Readonly<{ snapshotRef: string
 }
 
 export function createDrizzleAuthoritativeG3EvidenceBridge(input: Readonly<{
-  /** Deprecated test seam; production candidate proof never reads this value. */
-  authority?: unknown;
+  /** Test seam; production always uses the relational trusted-authority loader. */
+  authority?: Pick<DrizzleTrustedPolicyAuthorityRepository, "loadInTransaction">;
   impacts?: Pick<DrizzleInstructionPolicyImpactRepository, "preview">;
 }> = {}): AuthoritativeG3EvidenceBridge {
   return Object.freeze({
@@ -145,6 +146,16 @@ export function createDrizzleAuthoritativeG3EvidenceBridge(input: Readonly<{
       // One snapshot is not proof for a mixed-account replay.  Do not choose an
       // arbitrary account or silently widen authority across the selected rows.
       if (new Set(authenticated.map((entry) => entry.accountRef)).size !== 1) return unavailable(exactImpact, authenticated);
+      const authority = input.authority ?? new DrizzleTrustedPolicyAuthorityRepository(database);
+      // Every frozen capture names its own immutable snapshot.  Validate each
+      // one through the same relational proof used by source composition;
+      // accepting only the JSON envelope would make a historical replay forgeable.
+      try {
+        for (const entry of authenticated) await authority.loadInTransaction(database, {
+          workspaceId: request.workspaceId, accountRef: entry.accountRef, evaluatedAt: entry.capturedAt,
+          snapshotRef: entry.authoritySnapshot.snapshotRef, snapshotHash: entry.authoritySnapshot.snapshotHash,
+        });
+      } catch { return unavailable(exactImpact, authenticated); }
       const expectedOutcomeEvidence = [...new Map(authenticated.flatMap((entry) => entry.outcomeEvidence)
         .map((evidence) => [`${evidence.evidenceRef}:${evidence.evidenceHash}`, evidence] as const)).values()]
         .sort((left, right) => left.evidenceRef.localeCompare(right.evidenceRef) || left.evidenceHash.localeCompare(right.evidenceHash));
@@ -170,7 +181,8 @@ export function createDrizzleAuthoritativeG3EvidenceBridge(input: Readonly<{
       // never elevate a draft to productionAuthoritySourceBound.
       const candidateRows = !request.formalizationRef || !request.g2RevisionHash || !HASH.test(request.g2RevisionHash) || !REF.test(request.formalizationRef)
         ? [] : rows(await database.execute(sql`
-        select revision.revision_hash, revision.authority_tier, revision.decision
+        select revision.revision_hash, revision.authority_tier, revision.decision,
+          revision.authority_snapshot_ref, revision.authority_snapshot_hash
           from candidate_preview_binding_heads head
           join candidate_preview_binding_revisions revision
             on revision.workspace_id = head.workspace_id and revision.id = head.current_revision_id
@@ -216,11 +228,28 @@ export function createDrizzleAuthoritativeG3EvidenceBridge(input: Readonly<{
       `));
       const candidate = candidateRows[0];
       const decision = candidate?.decision;
-      const candidateTierDecisionBound = candidate !== undefined && candidateRows.length === 1 && HASH.test(String(candidate.revision_hash))
+      const candidateStructurallyBound = candidate !== undefined && candidateRows.length === 1 && HASH.test(String(candidate.revision_hash))
         && typeof candidate.authority_tier === "string" && candidate.authority_tier.length > 0
         && !!decision && typeof decision === "object" && !Array.isArray(decision)
         && typeof (decision as Record<string, unknown>).decisionKey === "string"
         && typeof (decision as Record<string, unknown>).positionKey === "string";
+      // Candidate bindings remain preview-only, but their snapshot must still
+      // be valid for the account at this read instant.  The trusted loader
+      // proves current relational backing, scope and expiry; the SQL join above
+      // is deliberately insufficient on its own.
+      let candidateTierDecisionBound = false;
+      if (candidateStructurallyBound && typeof candidate!.authority_snapshot_ref === "string"
+        && REF.test(candidate!.authority_snapshot_ref) && typeof candidate!.authority_snapshot_hash === "string"
+        && HASH.test(candidate!.authority_snapshot_hash)) {
+        try {
+          await authority.loadInTransaction(database, {
+            workspaceId: request.workspaceId, accountRef: authenticated[0]!.accountRef,
+            evaluatedAt: new Date().toISOString(), snapshotRef: candidate!.authority_snapshot_ref,
+            snapshotHash: candidate!.authority_snapshot_hash,
+          });
+          candidateTierDecisionBound = true;
+        } catch { /* fail closed: stale or unbacked candidate authority is not preview-ready. */ }
+      }
       const evaluatedRevisionRefs = [...new Set(authenticated.map((entry) => `analysis_revision_${entry.bindingHash.slice(0, 24)}`))].sort();
       const historicalContextHashes = [...new Set(authenticated.map((entry) => entry.contextHash))].sort();
       const outcomeEvidenceRefs = [...new Set(authenticated.flatMap((entry) => entry.outcomeEvidence.map((evidence) => evidence.evidenceRef)))].sort();

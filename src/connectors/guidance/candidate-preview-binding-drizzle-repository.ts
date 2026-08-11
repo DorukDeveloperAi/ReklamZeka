@@ -5,13 +5,14 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import * as schema from "@/db/schema";
 import { DrizzleTrustedPolicyAuthorityRepository } from "@/connectors/policies/trusted-policy-authority-drizzle-repository";
+import { POLICY_AUTHORITY_ORDER, type PolicyAuthorityTier } from "@/domain/policies/policy-precedence-resolver";
 
 type Database = NodePgDatabase<typeof schema>;
 type Row = Readonly<Record<string, unknown>>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
-const TIER = new Set(["legal_compliance", "platform_policy", "brand_safety", "user_locked_instruction", "internal_category_playbook", "operator_preference"]);
+const TIER = new Set<string>(POLICY_AUTHORITY_ORDER);
 
 export class CandidatePreviewBindingRepositoryError extends Error {
   constructor(readonly code: "invalid_input" | "not_found" | "forbidden" | "conflict" | "corrupt_store" | "incomplete_authority") {
@@ -42,7 +43,7 @@ export type PrivateCandidatePreviewBindingCommand = Readonly<{
   formalizationRef: string; expectedHeadHash: "GENESIS" | string; expectedG2HeadHash: string;
   guidanceSetRef: string; guidanceSetVersion: number; guidanceSetHash: string;
   policyRef: string; policyVersion: number; policyHash: string; targetAccountRef: string;
-  authoritySnapshotRef: string; authoritySnapshotHash: string; authorityTier: string;
+  authoritySnapshotRef: string; authoritySnapshotHash: string; authorityTier: PolicyAuthorityTier;
   decision: Readonly<{ decisionKey: string; positionKey: string }>;
 }>;
 

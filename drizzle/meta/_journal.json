@@ -519,6 +519,13 @@
       "when": 1786457067251,
       "tag": "20260811140427_volatile_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1786459026812,
+      "tag": "20260811143706_candidate_preview_binding_authority_tier_contract",
+      "breakpoints": true
     }
   ]
 }

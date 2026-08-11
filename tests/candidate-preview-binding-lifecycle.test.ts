@@ -12,7 +12,7 @@ const input = {
     formalizationRef: "formalization_primary", expectedHeadHash: "GENESIS" as const, expectedG2HeadHash: "a".repeat(64),
     guidanceSetRef: "guidance_set_primary", guidanceSetVersion: 1, guidanceSetHash: "b".repeat(64),
     policyRef: "policy_primary", policyVersion: 1, policyHash: "c".repeat(64), targetAccountRef: "account_primary",
-    authoritySnapshotRef: "authority_snapshot_primary", authoritySnapshotHash: "d".repeat(64), authorityTier: "platform_policy",
+    authoritySnapshotRef: "authority_snapshot_primary", authoritySnapshotHash: "d".repeat(64), authorityTier: "platform_legal_tenant_safety" as const,
     decision: { decisionKey: "decision_primary", positionKey: "position_primary" },
   },
 };
@@ -51,5 +51,16 @@ describe("candidate preview binding lifecycle", () => {
       "snapshot?.ref === c.authoritySnapshotRef", "decision?.decisionKey === c.decision.decisionKey"]) expect(writer).toContain(field);
     for (const source of ["progressive_formalization_revisions g2", "guidance_sets guidance",
       "strict_instruction_policy_revisions policy", "tenant_authority_snapshot_heads snapshot_head"]) expect(bridge).toContain(source);
+    expect(bridge).toContain("evaluatedAt: new Date().toISOString()");
+    expect(bridge).toContain("new DrizzleTrustedPolicyAuthorityRepository(database)");
+  });
+
+  it("moves the applied candidate constraint forward to the canonical authority-tier vocabulary", () => {
+    const migration = readFileSync("drizzle/20260811143706_candidate_preview_binding_authority_tier_contract.sql", "utf8");
+    expect(migration).toContain('DROP CONSTRAINT "candidate_preview_binding_revisions_identity"');
+    expect(migration).toContain("platform_legal_tenant_safety");
+    expect(migration).toContain("metric_rule");
+    expect(migration).toContain('DROP CONSTRAINT "candidate_preview_binding_revisions_decision_exact"');
+    expect(migration).toContain("IS TRUE");
   });
 });

@@ -63,13 +63,16 @@ describe("authoritative G3 evidence bridge", () => {
         context_payload: frozen, account_ref: "account_primary", captured_at: frozen.capturedAt }] };
       if (call === 2) return { rows: [{ evidence_ref: evidence.evidenceRef, evidence_hash: evidence.evidenceHash }] };
       return { rows: [{ revision_hash: "d".repeat(64), authority_tier: "platform_policy",
-        decision: { decisionKey: "decision_primary", positionKey: "position_primary" } }] };
+        decision: { decisionKey: "decision_primary", positionKey: "position_primary" },
+        authority_snapshot_ref: "authority_snapshot_primary", authority_snapshot_hash: "1".repeat(64) }] };
     });
-    const bridge = createDrizzleAuthoritativeG3EvidenceBridge({ impacts: { preview: vi.fn(async () => null) } as never });
+    const authority = { loadInTransaction: vi.fn(async () => ({})) };
+    const bridge = createDrizzleAuthoritativeG3EvidenceBridge({ authority: authority as never, impacts: { preview: vi.fn(async () => null) } as never });
     const result = await bridge.resolve({ execute } as never, { workspaceId, formalizationRef: "formalization_primary",
       g2RevisionHash: "e".repeat(64), policy, guidanceSetRef: "guidance_set_primary", guidanceSetVersion: 1, guidanceSetHash: hash });
     expect(result).toMatchObject({ sourceBound: false, candidateTierDecisionBound: true, historicalRunsEvaluated: 1 });
     expect(execute).toHaveBeenCalledTimes(3);
+    expect(authority.loadInTransaction).toHaveBeenCalledTimes(2);
   });
 
   it("uses one caller-owned read-only executor and preserves an explicit missing tier/decision blocker fact", async () => {
@@ -86,7 +89,10 @@ describe("authoritative G3 evidence bridge", () => {
     const bridge = createDrizzleAuthoritativeG3EvidenceBridge({ authority: authority as never, impacts: impacts as never });
     const result = await bridge.resolve({ execute } as never, { workspaceId, policy, guidanceSetRef: "guidance_set_primary",
       guidanceSetVersion: 1, guidanceSetHash: hash });
-    expect(authority.loadInTransaction).not.toHaveBeenCalled();
+    expect(authority.loadInTransaction).toHaveBeenCalledTimes(1);
+    expect(authority.loadInTransaction).toHaveBeenLastCalledWith({ execute }, expect.objectContaining({
+      accountRef: "account_primary", evaluatedAt: frozen.capturedAt, snapshotRef: "authority_snapshot_primary", snapshotHash: "1".repeat(64),
+    }));
     expect(result).toEqual(expect.objectContaining({ sourceBound: false, exactImpact: true,
       candidateTierDecisionBound: false, historicalRunsEvaluated: 1,
       evaluatedRevisionRefs: ["analysis_revision_" + "b".repeat(24)],
@@ -111,7 +117,13 @@ describe("authoritative G3 evidence bridge", () => {
     const result = await bridge.resolve({ execute } as never, { workspaceId, policy, guidanceSetRef: "guidance_set_primary",
       guidanceSetVersion: 1, guidanceSetHash: hash });
     expect(result).toMatchObject({ sourceBound: false, candidateTierDecisionBound: false, historicalRunsEvaluated: 2 });
-    expect(authority.loadInTransaction).not.toHaveBeenCalled();
+    expect(authority.loadInTransaction).toHaveBeenCalledTimes(2);
+    expect(authority.loadInTransaction).toHaveBeenNthCalledWith(1, { execute }, expect.objectContaining({
+      evaluatedAt: first.capturedAt, snapshotRef: "authority_snapshot_primary", snapshotHash: "1".repeat(64),
+    }));
+    expect(authority.loadInTransaction).toHaveBeenNthCalledWith(2, { execute }, expect.objectContaining({
+      evaluatedAt: second.capturedAt, snapshotRef: "authority_snapshot_later", snapshotHash: "4".repeat(64),
+    }));
   });
 
   it("fails closed before authority loading for mixed-account historical contexts", async () => {
@@ -145,7 +157,7 @@ describe("authoritative G3 evidence bridge", () => {
       guidanceSetVersion: 1, guidanceSetHash: hash });
     expect(result).toMatchObject({ sourceBound: false, historicalRunsEvaluated: 1,
       outcomeEvidenceRefs: [evidence.evidenceRef] });
-    expect(authority.loadInTransaction).not.toHaveBeenCalled();
+    expect(authority.loadInTransaction).toHaveBeenCalledTimes(1);
   });
 
   it("does not trust an outcome envelope without a relational snapshot row", async () => {
@@ -158,7 +170,7 @@ describe("authoritative G3 evidence bridge", () => {
     const result = await bridge.resolve({ execute } as never, { workspaceId, policy, guidanceSetRef: "guidance_set_primary",
       guidanceSetVersion: 1, guidanceSetHash: hash });
     expect(result.sourceBound).toBe(false);
-    expect(authority.loadInTransaction).not.toHaveBeenCalled();
+    expect(authority.loadInTransaction).toHaveBeenCalledTimes(1);
   });
 
   it("fails closed when a frozen context payload was tampered after its stored hash", async () => {
