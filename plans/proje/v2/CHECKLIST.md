@@ -733,6 +733,9 @@
   - [x] Dashboard'da Meta objective ve iç kategori ile daraltılan salt-okunur demo portföy görünümü;
     seçili kampanya/brief filtre sonucu ile tutarlı kalır. Kaynak açıkça unbound deterministik demo
     snapshot'tır; persisted account-group/asset graph, action ve Meta write iddiası yoktur.
+  - [x] Filtre sonrası seçili demo kampanyası için progressive portföy → hesap → campaign → ad set → ad
+    → creative/post drill-down. Bu yalnız navigasyon örneğidir; frozen context, gerçek Meta asset graph
+    veya approval/write yetkisi yerine geçmez.
 - [ ] Account-group switcher, multi-account connection health ve Page/Instagram asset graph.
 - [ ] Kategori/talimat stüdyosu ve raw/normalized/version/conflict görünümü.
   - [x] Guidance Studio eksik/expired dashboard capability'yi DB arızasından ayırır; 401

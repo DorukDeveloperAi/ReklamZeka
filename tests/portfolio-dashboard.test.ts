@@ -30,4 +30,18 @@ describe("portfolio dashboard", () => {
     expect(html).toContain("persisted account-group/asset graph taklit edilmez");
     expect(html).not.toContain("Meta write yetkisi açık");
   });
+
+  it("progressively exposes only the selected demo campaign's account-to-creative hierarchy", () => {
+    const html = renderToStaticMarkup(createElement(OperatingDashboard, { model, initialView: "campaigns" }));
+
+    expect(html).toContain("PORTFÖY DRILL-DOWN · SALT-OKUNUR");
+    expect(html).toContain("Demo Marka · Türkiye");
+    expect(html).toContain("Meta Ads · TR Acquisition");
+    expect(html).toContain("Broad · İstanbul");
+    expect(html).toContain("Uzman ekip · video");
+    expect(html).toContain("IG post · uzman görüşü");
+    expect(html).toContain("Frozen context, asset graph veya Meta kaynağı temsil etmez");
+    expect(html).toContain("<details");
+    expect(html).not.toContain("GCC Leads");
+  });
 });

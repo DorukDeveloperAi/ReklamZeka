@@ -39,6 +39,15 @@
   güvenlik başlıkları döndürüyor. Bu yüzden persisted context → brief → approval semantic happy path henüz
   kabul edilmiş değildir; gerçek yerel session ve geçerli frozen context ile tekrar çalıştırılacaktır.
 
+## 2026-08-11 — A14 demo portföy drill-down
+
+- Filtreli seçili campaign için portföy → hesap → campaign → ad set → ad → creative/post katmanlarını
+  native progressive disclosure ile gösteren salt-okunur hiyerarşi eklendi. Hiyerarşi seçili campaign'e
+  bağlıdır; örneğin awareness filtresi İstanbul/GCC demo dallarını göstermez.
+- Bu R-14.1'in yalnız ürün navigasyonu kısmıdır: yüzey deterministic demo olarak etiketlenir ve gerçek
+  frozen context, tenant asset graph, account-group, approval veya Meta write iddia etmez. Bunlar gerçek
+  kaynak/session ile ayrı kabul gerektiren açık kapsamlardır.
+
 ## 2026-08-11 — A14 demo portföy hiyerarşisi ve filtreler
 
 - Kampanyalar yüzeyindeki salt-okunur portföy katmanı artık Meta objective ve iç kategori ile

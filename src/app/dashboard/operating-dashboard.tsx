@@ -108,6 +108,33 @@ const campaigns = [
   { id: "cmp-awareness", name: "TR · Marka · Evergreen Awareness", objective: "OUTCOME_AWARENESS", category: "Marka koruma", tags: ["Türkiye", "TR", "No-pause"], spend: "₺136", conversions: 29, cpa: "₺4,69", budget: "₺35.000", health: "Korunan", tone: "protected", progress: 48, planningContext: { campaignRef: "cmp_awareness", persistedCampaignRef: null, campaignLabel: "TR · Marka · Evergreen Awareness", input: { businessGoal: "upper_funnel_education", market: "domestic", language: "tr", serviceRef: "service_medical_aesthetics", countryOrRegion: null, conversionRoute: "not_applicable", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true } } },
 ] as const satisfies readonly Readonly<{ id: string; name: string; objective: string; category: string; tags: readonly string[]; spend: string; conversions: number; cpa: string; budget: string; health: string; tone: "watch" | "stable" | "protected"; progress: number; planningContext: CampaignPlanningBriefContext; }>[];
 
+/**
+ * This is intentionally a tiny, deterministic navigation specimen rather than
+ * an asset graph read model.  In particular, it is never combined with a
+ * selected persisted frozen context: the labels exist solely to make the demo
+ * campaign hierarchy inspectable before a tenant-bound hierarchy reader lands.
+ */
+type DemoHierarchy = Readonly<{
+  portfolioLabel: string;
+  accountLabel: string;
+  adSets: readonly Readonly<{
+    name: string;
+    delivery: string;
+    ads: readonly Readonly<{
+      name: string;
+      status: string;
+      creative: string;
+      creativeType: string;
+    }>[];
+  }>[];
+}>;
+
+const demoHierarchyByCampaignId: Readonly<Record<(typeof campaigns)[number]["id"], DemoHierarchy>> = {
+  "cmp-istanbul": { portfolioLabel: "Demo Marka · Türkiye", accountLabel: "Meta Ads · TR Acquisition", adSets: [{ name: "Broad · İstanbul", delivery: "Aktif · WhatsApp", ads: [{ name: "Uzman ekip · video", status: "ACTIVE", creative: "IG post · uzman görüşü", creativeType: "Mevcut video/post" }] }, { name: "Remarketing · 30g", delivery: "Aktif · WhatsApp", ads: [{ name: "Soru-cevap · carousel", status: "ACTIVE", creative: "Carousel · SSS", creativeType: "Mevcut asset" }] }] },
+  "cmp-gcc": { portfolioLabel: "Demo Marka · International", accountLabel: "Meta Ads · GCC Leads", adSets: [{ name: "Broad · GCC", delivery: "Aktif · Lead form", ads: [{ name: "Doctor introduction · AR", status: "ACTIVE", creative: "Lead form video · AR", creativeType: "Mevcut video" }] }, { name: "LAL · qualified leads", delivery: "Learning · Lead form", ads: [{ name: "Patient story · AR", status: "LEARNING", creative: "IG post · testimonial", creativeType: "Mevcut post" }] }] },
+  "cmp-awareness": { portfolioLabel: "Demo Marka · Türkiye", accountLabel: "Meta Ads · Brand", adSets: [{ name: "Broad · Türkiye", delivery: "Aktif · Awareness", ads: [{ name: "Marka filmi · 15s", status: "ACTIVE", creative: "Brand video · 15s", creativeType: "Mevcut video" }] }, { name: "Engagers · 90g", delivery: "Aktif · Awareness", ads: [{ name: "Clinic carousel", status: "ACTIVE", creative: "Carousel · klinik", creativeType: "Mevcut asset" }] }] },
+};
+
 export type PortfolioFilters = Readonly<{
   objective: string;
   category: string;
@@ -220,6 +247,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
 
   const filteredCampaigns = useMemo(() => filterCampaignPortfolio(campaigns, portfolioFilters), [portfolioFilters]);
   const currentCampaign = filteredCampaigns.find((campaign) => campaign.id === selectedCampaign) ?? filteredCampaigns[0] ?? campaigns[0];
+  const currentDemoHierarchy = demoHierarchyByCampaignId[currentCampaign.id];
   const selectedPersistedContext = persistedContexts.find((context) => context.campaignRef === selectedPersistedCampaignRef) ?? null;
   const planningContext: CampaignPlanningBriefContext = selectedPersistedContext
     ? { campaignRef: `persisted_${selectedPersistedContext.campaignRef}`, campaignLabel: selectedPersistedContext.label, persistedCampaignRef: selectedPersistedContext.campaignRef, input: PERSISTED_UNCONFIRMED_BRIEF_INPUT }
@@ -432,6 +460,26 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
         <section className={styles.panel}><header className={styles.detailHeader}><div><span className={styles.kicker}>EFFECTIVE CAMPAIGN CONTEXT</span><h2>{currentCampaign.name}</h2><p>{currentCampaign.objective} · Campaign budget · 7d click / 1d view</p></div><button onClick={() => openAgentContext(`campaign_${currentCampaign.id.replace("cmp-", "")}`, currentCampaign.name)}>Agent ile aç ✦</button></header>
           <div className={styles.contextGrid}><div><span>İç kategori</span><strong>{currentCampaign.category}</strong><small>{currentCampaign.tags.join(" · ")}</small></div><div><span>Bütçe sahibi</span><strong>Campaign / CBO</strong><small>{currentCampaign.budget} aylık plan</small></div><div><span>Karar temposu</span><strong>72 saat observation</strong><small>Son hamle: 31 saat önce</small></div><div><span>Aktif koruma</span><strong>{currentCampaign.id === "cmp-istanbul" ? "no-transfer · floor" : "max-change %10"}</strong><small>Policy v4 · yayınlandı</small></div></div>
           <div className={styles.hierarchy}><div><span>Campaign</span><strong>{currentCampaign.name}</strong></div><div><span>Ad set · 3</span><strong>Broad · Remarketing · LAL</strong></div><div><span>Ad · 8</span><strong>6 active · 1 learning · 1 paused</strong></div><div><span>Creative/post</span><strong>5 mevcut asset · yeni üretim yok</strong></div></div>
+          <section className={styles.demoHierarchyDrilldown} aria-labelledby="demo-hierarchy-title">
+            <header><div><span className={styles.kicker}>PORTFÖY DRILL-DOWN · SALT-OKUNUR</span><h3 id="demo-hierarchy-title">{currentCampaign.name} içindeki mevcut demo katmanları</h3></div><StatusPill tone="neutral">deterministik demo</StatusPill></header>
+            <p>Bu açılır görünüm yalnız filtrelerden sonra seçili demo kampanyasını gösterir. Frozen context, asset graph veya Meta kaynağı temsil etmez; hiçbir katman yazma ya da onay yetkisi vermez.</p>
+            <details open>
+              <summary><span>Portföy</span><strong>{currentDemoHierarchy.portfolioLabel}</strong><small>1 demo hesap</small></summary>
+              <details>
+                <summary><span>Hesap</span><strong>{currentDemoHierarchy.accountLabel}</strong><small>yalnız örnek hiyerarşi</small></summary>
+                <details>
+                  <summary><span>Kampanya</span><strong>{currentCampaign.name}</strong><small>{currentCampaign.objective} · {currentCampaign.category}</small></summary>
+                  <div className={styles.demoAdSetList}>{currentDemoHierarchy.adSets.map((adSet) => <details key={adSet.name}>
+                    <summary><span>Ad set</span><strong>{adSet.name}</strong><small>{adSet.delivery} · {adSet.ads.length} demo reklam</small></summary>
+                    <div className={styles.demoAdList}>{adSet.ads.map((ad) => <details key={ad.name}>
+                      <summary><span>Ad</span><strong>{ad.name}</strong><small>{ad.status}</small></summary>
+                      <div className={styles.demoCreativeLeaf}><span>Creative/post</span><strong>{ad.creative}</strong><small>{ad.creativeType} · salt-okunur demo tanımı</small></div>
+                    </details>)}</div>
+                  </details>)}</div>
+                </details>
+              </details>
+            </details>
+          </section>
           <div className={styles.copyPreview}><span className={styles.kicker}>YAYINDAKİ REKLAM METNİ</span><h3>Saç ekimi hakkında merak ettiklerinizi uzman ekibimize sorun.</h3><p>Primary text · CTA: WhatsApp'tan mesaj gönder · Instagram post bağlı</p><footer><StatusPill tone="info">Mevcut creative</StatusPill><button>Performansını incele</button></footer></div>
         </section>
       </div>
