@@ -40,6 +40,10 @@
   seçer; pazar her zaman zorunludur. Eksik künye ya da slice uyuşmazlığı bir kampanyayı tahminle
   gruba katmak yerine dışarıda bırakır. Bu yalnız salt-okunur öneri kapsamıdır; otomasyon veya Meta
   değişimi açılmaz.
+- Mevcut portföyün kural kataloğu, önce tüm pazarı ayıran sınırı; ardından yalnız uygun yabancı
+  `FTR · Intensive FTR` slice'ında değerlendirme kümesi, sonuç-ölçüm sınırı ve korunmuş ülke/platform
+  dağılımı taslaklarını döndürür. Yerli bir FTR/WhatsApp çalışması benzer route taşısa bile yabancı
+  FTR kurallarını devralmaz. Katalog öncelik sırası deterministiktir ve tüm kayıtların yetkileri kapalıdır.
 
 ## 2026-08-10 — Merkezi ürün akışı ve kademeli teslim ilkesi
 
