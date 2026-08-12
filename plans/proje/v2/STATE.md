@@ -142,6 +142,11 @@
   `account_group` seviyesini de görünür kılar. Grup ref'i yalnız kural değerlendirme kapsamıdır;
   draft yüzeyinin publish/approve/execute/Meta-write yetkileri yine false kalır.
 
+- Account-group scoped otonomi taslağı artık aynı transaction içinde tenant'a ait güncel ve
+  `active` group revision head'ini `FOR SHARE` ile doğrular. Serbest biçimli, yabancı tenant'a
+  ait veya arşivlenmiş group ref'i `scope_unavailable` ile kaydedilmeden reddedilir; mevcut
+  immutable draft/publish yetki sınırları değişmez.
+
 ## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
 
 - Strict Policy Studio içindeki normalizasyon çalışma alanı, owner talimatının mevcut Guidance Studio

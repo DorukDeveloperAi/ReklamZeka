@@ -116,6 +116,30 @@ describe("Drizzle Autonomy Rule Registry", () => {
     }
   });
 
+  it("requires an exact current active account-group head for account-group scoped drafts", async () => {
+    const artifact = draft({ scope: { level: "account_group", ref: "account_group_international_ftr" } });
+    const missing = database([
+      { rows: [{ id: workspaceId, lifecycle_state: "active" }] },
+      { rows: [] },
+    ]);
+    await expect(new DrizzleAutonomyRuleRegistryRepository(missing as never, workspaceId, workspaceRef).append(artifact))
+      .rejects.toEqual(expect.objectContaining({ code: "scope_unavailable" }));
+
+    const groupId = "33333333-3333-4333-a333-333333333333";
+    const accepted = database([
+      { rows: [{ id: workspaceId, lifecycle_state: "active" }] },
+      { rows: [{ id: groupId }] },
+      { rows: [] }, { rows: [] },
+      { rows: [{ canonical_hash: artifact.canonicalHash }] },
+    ]);
+    await expect(new DrizzleAutonomyRuleRegistryRepository(accepted as never, workspaceId, workspaceRef).append(artifact))
+      .resolves.toMatchObject({ outcome: "inserted" });
+    const groupScopeQuery = new PgDialect().sqlToQuery(accepted.execute.mock.calls[1]![0]).sql;
+    expect(groupScopeQuery).toMatch(/account_groups group_head/i);
+    expect(groupScopeQuery).toMatch(/revision\.status = 'active'/i);
+    expect(groupScopeQuery).toContain("for share");
+  });
+
   it("resolves only public action-valve rules and strips publication/guidance metadata", async () => {
     const artifact = published(draft({ sourceGuidanceRefs: ["guidance_safety"] }));
     const db = database([

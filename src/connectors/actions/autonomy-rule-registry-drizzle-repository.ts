@@ -16,6 +16,7 @@ export class AutonomyRuleRegistryRepositoryError extends Error {
   constructor(readonly code:
     | "invalid_input"
     | "workspace_scope_mismatch"
+    | "scope_unavailable"
     | "inactive_workspace"
     | "revision_conflict"
     | "transition_conflict"
@@ -97,6 +98,33 @@ function validateExisting(row: ExistingRow): ExistingRow {
   return row;
 }
 
+/**
+ * A group-scoped draft must bind to the tenant's current active group head.
+ * The persisted ref stays opaque, but it can no longer be an arbitrary string
+ * that happens to satisfy the public-reference grammar.
+ */
+async function assertCurrentAccountGroupScope(
+  database: Pick<Database, "execute">,
+  workspaceId: string,
+  scope: AutonomyRuleArtifact["scope"],
+): Promise<void> {
+  if (scope.level !== "account_group") return;
+  const result = rows<{ id: string }>(await database.execute(sql`
+    select group_head.id
+    from account_groups group_head
+    join account_group_revisions revision
+      on revision.workspace_id = group_head.workspace_id
+      and revision.account_group_id = group_head.id
+      and revision.revision = group_head.current_revision
+      and revision.revision_hash = group_head.current_revision_hash
+      and revision.status = 'active'
+    where group_head.workspace_id = ${workspaceId}::uuid
+      and group_head.group_ref = ${scope.ref}
+    limit 2 for share
+  `));
+  if (result.length !== 1 || typeof result[0]!.id !== "string" || !UUID.test(result[0]!.id)) fail("scope_unavailable");
+}
+
 /** Server-only append and resolve port. It has no guidance promotion, approval, execution, or Meta methods. */
 export class DrizzleAutonomyRuleRegistryRepository {
   private readonly workspaceId: string;
@@ -120,6 +148,7 @@ export class DrizzleAutonomyRuleRegistryRepository {
     return this.database.transaction(async (transaction) => {
       // Serializes every revision allocation for this low-volume tenant registry.
       await lockActiveWorkspace(transaction, this.workspaceId, "update");
+      await assertCurrentAccountGroupScope(transaction, this.workspaceId, artifact.scope);
       const exactRows = rows<ExistingRow>(await transaction.execute(sql`
         select revision, state, canonical_hash, artifact_payload
         from autonomy_rule_revisions
