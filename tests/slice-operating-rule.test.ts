@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SliceOperatingRuleError, createSliceOperatingRuleDraft } from "@/domain/campaigns/slice-operating-rule";
+import { SliceOperatingRuleError, createSliceOperatingRuleDraft, resolveCampaignEvaluationCohort } from "@/domain/campaigns/slice-operating-rule";
 import { INTERNATIONAL_PHYSICAL_THERAPY_WORKBOOK_RULE } from "@/domain/campaigns/international-physical-therapy-workbook-rule";
 import { INTERNATIONAL_PHYSICAL_THERAPY_MEASUREMENT_RULE } from "@/domain/campaigns/international-physical-therapy-measurement-rule";
 import { MEVCUT_PORTFOY_PAZAR_SINIRI_RULE } from "@/domain/campaigns/mevcut-portfoy-pazar-siniri-rule";
@@ -150,5 +150,43 @@ describe("slice operating rule draft", () => {
       automationMode: "observe_only", priority: 1,
       verification: { metric: "delivery_health", reviewCadence: "weekly", rollbackWhen: "test" },
     })).toThrow(SliceOperatingRuleError);
+  });
+
+  it("evaluates a rule through its chosen group dimensions while retaining the market boundary", () => {
+    const draft = createSliceOperatingRuleDraft({
+      slice: { market: "international", serviceRef: "service_physical_therapy_rehab" },
+      rule: {
+        kind: "degerlendirme_kumesi",
+        grup_boyutlari: ["pazar", "ana_kampanya_hedefi", "kampanya_ailesi", "ulke_bolge", "hedef_kitle_stratejisi", "platform"],
+        eksik_kunye: "degerlendirme_disi_tut",
+      },
+      automationMode: "recommendation_only", priority: 10,
+      verification: { metric: "qualified_leads", reviewCadence: "weekly", rollbackWhen: "Künye veya sonuç yolu değişirse." },
+    });
+    const included = resolveCampaignEvaluationCohort(draft, {
+      market: "international", serviceRef: "service_physical_therapy_rehab", businessGoal: "lead_acquisition",
+      campaignFamilyRef: "campaign_family_intensive_ftr", countryOrRegion: "gcc", audienceStrategy: "custom_audience", platform: "instagram",
+    });
+    expect(included).toEqual({
+      status: "included",
+      cohortKey: "campaign-evaluation-cohort/1:ana_kampanya_hedefi=lead_acquisition|hedef_kitle_stratejisi=custom_audience|kampanya_ailesi=campaign_family_intensive_ftr|pazar=yabanci|platform=instagram|ulke_bolge=gcc",
+      missingDimensions: [],
+    });
+    expect(resolveCampaignEvaluationCohort(draft, {
+      market: "domestic", serviceRef: "service_physical_therapy_rehab", businessGoal: "lead_acquisition",
+      campaignFamilyRef: "campaign_family_intensive_ftr", countryOrRegion: "gcc", audienceStrategy: "custom_audience", platform: "instagram",
+    }).status).toBe("excluded_scope_mismatch");
+  });
+
+  it("leaves incomplete labels out instead of guessing a campaign into an evaluation group", () => {
+    const draft = createSliceOperatingRuleDraft({
+      slice: { market: "international" },
+      rule: { kind: "degerlendirme_kumesi", grup_boyutlari: ["pazar", "kampanya_ailesi", "platform"], eksik_kunye: "degerlendirme_disi_tut" },
+      automationMode: "observe_only", priority: 1,
+      verification: { metric: "delivery_health", reviewCadence: "weekly", rollbackWhen: "Künye eksik." },
+    });
+    expect(resolveCampaignEvaluationCohort(draft, { market: "international", campaignFamilyRef: "campaign_family_intensive_ftr" })).toEqual({
+      status: "excluded_incomplete_metadata", cohortKey: null, missingDimensions: ["platform"],
+    });
   });
 });

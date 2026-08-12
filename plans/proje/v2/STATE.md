@@ -35,6 +35,11 @@
   olarak taşır. `Intensive FTR` seçildiğinde değerlendirme cohort anahtarı aileyi içerir; aile
   atanmamışsa mevcut brief kümeleri korunur. Bu geçici UI alanı kalıcı künye, proposal veya Meta
   değişimi yaratmaz.
+- `degerlendirme_kumesi` taslağı artık bir kampanya künyesini deterministik olarak değerlendirme
+  cohort'una çözer. Strateji gerekli boyutları (ör. ana hedef+aile veya ülke+hedefleme+platform)
+  seçer; pazar her zaman zorunludur. Eksik künye ya da slice uyuşmazlığı bir kampanyayı tahminle
+  gruba katmak yerine dışarıda bırakır. Bu yalnız salt-okunur öneri kapsamıdır; otomasyon veya Meta
+  değişimi açılmaz.
 
 ## 2026-08-10 — Merkezi ürün akışı ve kademeli teslim ilkesi
 

@@ -120,6 +120,22 @@ export type SliceOperatingRuleDraft = Readonly<{
   draftHash: string;
 }>;
 
+/**
+ * A read-only campaign label used only to decide whether two campaigns may be
+ * evaluated in the same cohort. It intentionally contains no budget, metric,
+ * action, or Meta-write field.
+ */
+export type CampaignEvaluationCandidate = Readonly<CampaignSlice & {
+  audienceStrategy?: string;
+  platform?: "facebook" | "instagram" | "mixed";
+}>;
+
+export type CampaignEvaluationCohort = Readonly<{
+  status: "included" | "excluded_scope_mismatch" | "excluded_incomplete_metadata" | "not_applicable";
+  cohortKey: string | null;
+  missingDimensions: readonly string[];
+}>;
+
 export class SliceOperatingRuleError extends Error {
   constructor(readonly code: "invalid_input" | "invalid_slice" | "invalid_rule") {
     super(`Slice operating rule rejected: ${code}`);
@@ -327,4 +343,45 @@ export function createSliceOperatingRuleDraft(input: Readonly<{
     zamansalDegerlendirme: zamansalDegerlendirme(normalizedVerification.reviewCadence),
     requiresHumanReview: true as const, promotionRequired: true as const, authority: AUTHORITY });
   return Object.freeze({ ...core, draftHash: digest(core) });
+}
+
+/**
+ * Resolves the comparison group of a labelled campaign under a review-only
+ * `degerlendirme_kumesi` rule. A campaign is never guessed into a group: a
+ * missing scope or group field is excluded, and the domestic/international
+ * boundary remains mandatory because the rule constructor requires `pazar`.
+ */
+export function resolveCampaignEvaluationCohort(
+  draft: SliceOperatingRuleDraft,
+  candidate: CampaignEvaluationCandidate,
+): CampaignEvaluationCohort {
+  if (draft.rule.kind !== "degerlendirme_kumesi") {
+    return Object.freeze({ status: "not_applicable", cohortKey: null, missingDimensions: Object.freeze([]) });
+  }
+
+  const scopeEntries = Object.entries(draft.slice) as readonly [keyof CampaignSlice, CampaignSlice[keyof CampaignSlice]][];
+  const missingScope = scopeEntries.filter(([key]) => candidate[key] === undefined).map(([key]) => key);
+  if (missingScope.length) {
+    return Object.freeze({ status: "excluded_incomplete_metadata", cohortKey: null, missingDimensions: Object.freeze(missingScope.sort()) });
+  }
+  if (scopeEntries.some(([key, value]) => candidate[key] !== value)) {
+    return Object.freeze({ status: "excluded_scope_mismatch", cohortKey: null, missingDimensions: Object.freeze([]) });
+  }
+
+  const values = {
+    pazar: candidate.market === "domestic" ? "yerli" : candidate.market === "international" ? "yabanci" : undefined,
+    ana_kampanya_hedefi: candidate.businessGoal,
+    kampanya_ailesi: candidate.campaignFamilyRef,
+    donusum_rotasi: candidate.conversionRoute,
+    ulke_bolge: candidate.countryOrRegion,
+    hedef_kitle_stratejisi: candidate.audienceStrategy,
+    platform: candidate.platform,
+  } as const;
+  const missingDimensions = draft.rule.grup_boyutlari.filter((dimension) => values[dimension] === undefined);
+  if (missingDimensions.length) {
+    return Object.freeze({ status: "excluded_incomplete_metadata", cohortKey: null, missingDimensions: Object.freeze([...missingDimensions].sort()) });
+  }
+  const cohortKey = `campaign-evaluation-cohort/1:${draft.rule.grup_boyutlari
+    .map((dimension) => `${dimension}=${encodeURIComponent(values[dimension] as string)}`).join("|")}`;
+  return Object.freeze({ status: "included", cohortKey, missingDimensions: Object.freeze([]) });
 }
