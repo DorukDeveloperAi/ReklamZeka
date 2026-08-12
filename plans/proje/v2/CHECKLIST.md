@@ -39,6 +39,10 @@
     account-read evidence materialization: aynı asset persistence transaction'ında connection'ın tüm
     bilinen hesapları source listesine karşı yeniden değerlendirir. Listede yok/empty/permission-missing/
     unavailable hesap eski grant'i korumaz; `ads_read` ve `canReadAccount=false` ile fail-closed güncellenir.
+  - [x] Cookie-only, query'siz `GET /api/meta/portfolio-capability` aynı tenant-bound salt-okur
+    snapshotı public-safe capability modeli olarak sunar. Dashboard gerçek kaynak yoksa demo grup
+    uydurmaz; yerel oturum gereksinimini, hesap-grubunun yalnız kapsam etiketi olduğunu ve tüm
+    publish/approve/execute/Meta-write alanlarının kapalı kaldığını açıkça gösterir.
 - [x] Facebook Page, Instagram, pixel/dataset, app/WhatsApp destination asset graph.
   - [x] Asset ve edge canonical şeması, capability/provenance/orphan alanları.
   - [x] Parçalı canlı sync, ownership/capability çözümlemesi ve iki hesap kanıtı.

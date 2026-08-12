@@ -123,6 +123,21 @@
   toparlanma seçimi briefi `Önce engeli çöz` durumuna alır; yeni campaign, policy, approval veya
   Meta write oluşturmaz.
 
+## 2026-08-12 — A08 oturum bağlı portföy kapsamı
+
+- `GET /api/meta/portfolio-capability` yalnız aynı-origin, cookie-only `decision_room:read`
+  principal'ı için tenant-bound portföy capability snapshotını döndürür. Sorgu parametresi,
+  bearer/cross-origin istek ve oturumsuz erişim fail-closed kalır; yanıt cache edilmez ve action
+  authority `none`dır.
+- Meta bağlantısı ekranı gerçek bağlantı envanteri olmasa bile hesap grubu durumunu dürüstçe
+  `oturum gerekli`/`kaynak yok` olarak gösterir; demo hesap grubu veya erişim uydurmaz. Kaynak
+  geldiğinde hesap başına read readiness ve grup sayısı görünür, fakat grup üyeliği hiçbir hesabın
+  plan/publish/approve/execute/Meta-write yetkisini genişletmez.
+- Focused runtime/domain/dashboard testleri, tam unit paketi (367 dosya/1889 test), production
+  build, DB/security/architecture/model-provider/secret kapıları geçti. Gerçek browser kabulünde
+  oturumsuz dashboard `Oturum gerekli` ve kapalı yazma sınırını gösterdi; Meta veya action çağrısı
+  yapılmadı.
+
 ## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
 
 - Strict Policy Studio içindeki normalizasyon çalışma alanı, owner talimatının mevcut Guidance Studio
