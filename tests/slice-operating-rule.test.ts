@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { SliceOperatingRuleError, createSliceOperatingRuleDraft } from "@/domain/campaigns/slice-operating-rule";
 import { INTERNATIONAL_PHYSICAL_THERAPY_WORKBOOK_RULE } from "@/domain/campaigns/international-physical-therapy-workbook-rule";
+import { INTERNATIONAL_PHYSICAL_THERAPY_MEASUREMENT_RULE } from "@/domain/campaigns/international-physical-therapy-measurement-rule";
 import { MEVCUT_PORTFOY_PAZAR_SINIRI_RULE } from "@/domain/campaigns/mevcut-portfoy-pazar-siniri-rule";
 
 const slice = Object.freeze({ market: "international" as const, language: "ar", serviceRef: "service_physical_therapy",
@@ -76,6 +77,30 @@ describe("slice operating rule draft", () => {
       },
       automationMode: "observe_only", priority: 1,
       verification: { metric: "delivery_health", reviewCadence: "weekly", rollbackWhen: "test" },
+    })).toThrow(SliceOperatingRuleError);
+  });
+
+  it("keeps international physical-therapy routes, territories, and audience strategies in separate result lanes", () => {
+    expect(INTERNATIONAL_PHYSICAL_THERAPY_MEASUREMENT_RULE.rule).toEqual({
+      kind: "sonuc_olcum_siniri",
+      ayri_degerlendir: ["donusum_rotasi", "hedef_kitle_stratejisi", "ulke_bolge"],
+      birlikte_karsilastirilamaz: true,
+    });
+    expect(INTERNATIONAL_PHYSICAL_THERAPY_MEASUREMENT_RULE.automationMode).toBe("recommendation_only");
+    expect(INTERNATIONAL_PHYSICAL_THERAPY_MEASUREMENT_RULE.verification).toMatchObject({
+      metric: "qualified_leads", reviewCadence: "weekly",
+    });
+  });
+
+  it("rejects a result boundary that would permit unlike routes to be compared together", () => {
+    expect(() => createSliceOperatingRuleDraft({
+      slice,
+      rule: {
+        kind: "sonuc_olcum_siniri", ayri_degerlendir: ["donusum_rotasi"],
+        birlikte_karsilastirilamaz: false as never,
+      },
+      automationMode: "recommendation_only", priority: 1,
+      verification: { metric: "qualified_leads", reviewCadence: "weekly", rollbackWhen: "test" },
     })).toThrow(SliceOperatingRuleError);
   });
 });

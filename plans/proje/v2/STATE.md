@@ -12,6 +12,10 @@
 - Bu karar, `pazar_siniri` review-only taslak kuralına işlendi. Kural bütün write yetkilerini kapalı
   tutar; Meta/CRM adı, bütçe, kampanya durumu veya hedefleme değiştirmez. Sonraki kurallar bu sınır
   altında, `pazar → ana kampanya hedefi → kampanya işlevi → kampanya ailesi` sırasıyla eklenecektir.
+- Canlı 30 günlük yalnız-okunur Meta kontrolü, yabancı `Intensive FTR` altında Arapça WhatsApp ve
+  Rusça form-lead rotalarının eşdeğer olmayan platform sonuçları ürettiğini doğruladı. Bu nedenle
+  `sonuc_olcum_siniri` taslağı rota, ülke/bölge ve hedef kitle stratejisini ayrı değerlendirme
+  şeritlerinde tutar; haftalık nitelikli-lead incelemesi dışında otomatik bütçe/Meta değişimi açmaz.
 
 ## 2026-08-10 — Merkezi ürün akışı ve kademeli teslim ilkesi
 

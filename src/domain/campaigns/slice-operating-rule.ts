@@ -57,6 +57,12 @@ export type SliceRule =
     ayrik_tutulacak_kararlar: readonly ("butce" | "sonuc_degerlendirmesi" | "otomasyon")[];
   }>
   | Readonly<{
+    /** Prevents unlike acquisition routes from being ranked as one result pool. */
+    kind: "sonuc_olcum_siniri";
+    ayri_degerlendir: readonly ("donusum_rotasi" | "ulke_bolge" | "hedef_kitle_stratejisi")[];
+    birlikte_karsilastirilamaz: true;
+  }>
+  | Readonly<{
     /** Preserves a human-reviewed current distribution before any optimization. */
     kind: "targeting_budget_preservation";
     currency: string;
@@ -214,6 +220,16 @@ function normalizeRule(value: unknown): SliceRule {
       || !rule.ayrik_tutulacak_kararlar.every((decision) => decision === "butce" || decision === "sonuc_degerlendirmesi" || decision === "otomasyon")) fail("invalid_rule");
     return Object.freeze({ kind, pazarlar: Object.freeze([...rule.pazarlar].sort()) as readonly ("yerli" | "yabanci")[], birlikte_yonetilemez: true as const,
       ayrik_tutulacak_kararlar: Object.freeze([...rule.ayrik_tutulacak_kararlar].sort()) as readonly ("butce" | "sonuc_degerlendirmesi" | "otomasyon")[] });
+  }
+  if (kind === "sonuc_olcum_siniri") {
+    const rule = exact(value, ["kind", "ayri_degerlendir", "birlikte_karsilastirilamaz"], "invalid_rule");
+    const dimensions = ["donusum_rotasi", "ulke_bolge", "hedef_kitle_stratejisi"] as const;
+    if (!Array.isArray(rule.ayri_degerlendir) || rule.ayri_degerlendir.length < 1 || rule.ayri_degerlendir.length > dimensions.length
+      || new Set(rule.ayri_degerlendir).size !== rule.ayri_degerlendir.length
+      || !rule.ayri_degerlendir.every((dimension) => dimensions.includes(dimension as typeof dimensions[number]))
+      || rule.birlikte_karsilastirilamaz !== true) fail("invalid_rule");
+    return Object.freeze({ kind, ayri_degerlendir: Object.freeze([...rule.ayri_degerlendir].sort()) as readonly (typeof dimensions[number])[],
+      birlikte_karsilastirilamaz: true as const });
   }
   if (kind === "targeting_budget_preservation") {
     const rule = exact(value, ["kind", "currency", "totalDailyBudgetDecimal", "allocations"], "invalid_rule");
