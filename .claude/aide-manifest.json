@@ -76,7 +76,7 @@
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/plan-organizatoru/scripts/agac.mjs": {
-      "hash": "81f99ab167f60483",
+      "hash": "3c038ad19a458b9f",
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/plan-organizatoru/scripts/harita.mjs": {
@@ -312,7 +312,7 @@
       "pkg": "skill:devam"
     },
     ".claude/hooks/claims-lib.mjs": {
-      "hash": "0560bda32d9577bd",
+      "hash": "0ca325856d138b31",
       "pkg": "hook:eszamanli-guard"
     },
     ".claude/hooks/claim-guard.mjs": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-12T11:16:43.641Z",
+  "updatedAt": "2026-08-12T12:17:12.086Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",

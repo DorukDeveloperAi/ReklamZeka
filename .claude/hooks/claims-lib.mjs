@@ -2541,7 +2541,9 @@ export const DEFTER_SURUM = 1;
 /** Kayıt türleri (girdi) — kapalı küme. */
 export const DEFTER_TURLERI = ["talimat", "request", "learning", "soru"];
 /** Akıbet satırı türleri — kapalı küme. `talimat` girdisi, gerisi akıbettir. */
-export const AKIBET_TURLERI = ["alindi", "islendi", "reddedildi", "onay-bekliyor", "onay", "cevap"];
+// `bekletildi` AYRI bir akıbettir ve kayıt AÇIK kalır (aide-l:02 D2): anayasayla çelişen ekleme
+// REDDEDİLMEZ, BEKLETİLİR — vizyon değişince çelişki kalkabilir, ret ise bilgi kaybıdır (K-2C7).
+export const AKIBET_TURLERI = ["alindi", "islendi", "reddedildi", "onay-bekliyor", "onay", "cevap", "bekletildi"];
 /** Sınıf: yeşil doğrudan işlenir; kırmızı VALFTE durur (yalnız insan açar). */
 export const DEFTER_SINIFLARI = ["yesil", "kirmizi"];
 /** Akıbetsizlik eşikleri (ms) — `--gate` bunları ölçer. */
@@ -2629,6 +2631,10 @@ export function defterEkle(repoRoot, kayit = {}) {
     sinif,
     metin,
     ...(kayit.kaynak ? { kaynak: kayit.kaynak } : {}),
+    // INPUT STACK sırası (aide-l:02 D3) — İKİSİ DE OPSİYONEL, uydurulmaz: künyesiz kayıt
+    // sıralamada en sona düşer (`stackSirala`), sahte öncelik ÜRETİLMEZ.
+    ...(Number.isInteger(kayit.oncelik) ? { oncelik: kayit.oncelik } : {}),
+    ...(kayit.elevate ? { elevate: true } : {}),
   };
   defterYaz(repoRoot, satir);
 

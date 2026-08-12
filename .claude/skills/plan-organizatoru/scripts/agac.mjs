@@ -132,6 +132,9 @@ const TODO_ELLE = path.join(PLANS, 'TODO-ELLE.md');
 // Her birinin kendi görünürlük kanalı VAR: alerts→PM brifingi · parked→Rotacı teşhis · doctor→exit≠0.
 const TODO_MUAF = ['alerts.jsonl', 'parked işler', 'doctor fix:', 'teslim onar:', "kaptan task'ları"];
 const TD_RE = /^td:(chk|elle|hukum|kunye|oturum)\/[a-z0-9][a-z0-9./-]*$/;
+// `uy:<hedef>/<yetenek>` — utopya çıpası (adres uzayının `uy:` tipi). `Capability:` alanının
+// ŞEMASI budur; şema dışı parça gate FAIL eder (GEÇERSİZ KAPATIR emsali), beyansızlık ADVISORY.
+const UY_RE = /^uy:[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9./-]*$/;
 const KATEGORILER = ['proje', 'özellik', 'altyapı', 'süreç', 'araştırma'];
 const DURUMLAR = ['AÇIK', 'SÜRÜYOR', 'KAPALI', 'BLOKE'];
 // Plan künyesi ekseneri — sıra ANLAMLIDIR (indeks = puan; yüksek = önce)
@@ -258,6 +261,18 @@ function parseKunye(md) {
   // ÇİFT DİKİŞİN ELLE UCU: plan hangi oturumdan doğduğunu KENDİ söyler; ters yön (oturum → plan
   // listesi + hüküm) TÜREVDİR (oturum-lib). Eksik beyan ADVISORY (künye emsali), YANLIŞ beyan
   // gate FAIL (tüketici — kılavuz sırası, "bu oturumu bitirdim mi" hükmü — ona göre karar verir).
+  // `End-goal:` + `Capability:` (aide-l:02 D7) — planın NE DAVRANIŞ bırakacağı ve hangi
+  // utopya çıpalarını karşıladığı. Sözleşme künye emsalinin AYNISI: beyansızlık ADVISORY
+  // (legacy plan kırılmaz), BİÇİMSİZ beyan gate FAIL (yanlış beyan beyansızlıktan beterdir).
+  // Ölçen ikinci uç `aide mutabakat` ②: Capability'siz açık plan "vizyonsuz plan" olarak GÖRÜNÜR.
+  const endGoalHam = kunyeAlan(blok, 'End-goal', { satirSonu: true });
+  const endGoal = endGoalHam && !/^<.*>$/.test(endGoalHam) ? endGoalHam : null;
+  const capHam = kunyeAlan(blok, 'Capability', { satirSonu: true });
+  const capability = []; const capabilityGecersiz = [];
+  for (const parca of String(capHam || '').split(/[,·]/).map((x) => x.trim()).filter(Boolean)) {
+    if (/^<.*>$/.test(parca)) continue;                 // şablon placeholder'ı — beyan sayılmaz
+    if (UY_RE.test(parca)) capability.push(parca); else capabilityGecersiz.push(parca);
+  }
   const oturumHam = kunyeAlan(blok, 'Oturum');
   const oturum = oturumHam && OT_RE.test(oturumHam) ? oturumHam : null;
   const oturumGecersiz = oturumHam && !oturum ? oturumHam : null;
@@ -265,8 +280,9 @@ function parseKunye(md) {
     kategori, ust: ust === '—' ? null : ust, hedef,
     kritiklik: kritiklik.deger, aciliyet: aciliyet.deger, hacim: hacim.deger,
     oncelik, puan, gecersiz, kapatir, kapatirGecersiz, oturum, oturumGecersiz,
-    eksik: ['Kritiklik', 'Aciliyet', 'Hacim', 'Hedef'].filter((a, i) =>
-      [kritiklik.deger, aciliyet.deger, hacim.deger, hedef][i] == null),
+    endGoal, capability, capabilityGecersiz,
+    eksik: ['Kritiklik', 'Aciliyet', 'Hacim', 'Hedef', 'End-goal', 'Capability'].filter((a, i) =>
+      [kritiklik.deger, aciliyet.deger, hacim.deger, hedef, endGoal, capability.length || null][i] == null),
   };
 }
 
@@ -1014,6 +1030,10 @@ function governance(model) {
     // GEÇERSİZ OTURUM — GATE KIRAR (aynı emsal): biçimsiz `Oturum:` ref'i sessizce BAĞSIZ kalırdı;
     // plan "şu oturumdan doğdum" der, hiçbir oturum onu görmez ve "bu oturumu bitirdim mi?" sorusu
     // YANLIŞ cevaplanır. Beyansız plan bu bulguyu üretmez (ADVISORY'dir — bkz. oturumsuz[]).
+    // GEÇERSİZ CAPABILITY — GATE KIRAR (GEÇERSİZ KAPATIR emsali): `Capability:` YAZAN plan
+    // şemayı da tutturmalıdır; şema dışı çıpa mutabakat ölçümünde sessizce karşılıksız kalırdı.
+    for (const g of p.kunye?.capabilityGecersiz || [])
+      bulgular.push(`GEÇERSİZ CAPABILITY: plans/${p.slug} — "${g}" (şema: uy:<hedef>/<yetenek>)`);
     if (p.kunye?.oturumGecersiz)
       bulgular.push(`GEÇERSİZ OTURUM: plans/${p.slug} — "${p.kunye.oturumGecersiz}" (şema: ot:<YYYY-MM-DD>/<slug>)`);
   }
@@ -1062,6 +1082,8 @@ function kunyeBulgular(model) {
       slug: p.slug, v: p.v, eksik,
       onar: `plans/${p.slug}/v${p.v}/MASTER.md üst bloğuna ekle: ${eksik.map((a) =>
         a === 'Hedef' ? 'Hedef: <tek cümle>'
+          : a === 'End-goal' ? 'End-goal: <plan bitince sistemde ne DAVRANIŞ olacak>'
+          : a === 'Capability' ? 'Capability: uy:<hedef>/<yetenek> (virgülle çoklu)'
           : `${a}: <${(a === 'Kritiklik' ? KRITIKLIK : a === 'Aciliyet' ? ACILIYET : HACIM).join('|')}>`).join(' · ')}`,
     });
   }
