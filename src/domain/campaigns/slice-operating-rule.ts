@@ -48,6 +48,20 @@ export type SliceRule =
     kind: "delivery_guardrail";
     condition: "delivery_interrupted" | "capacity_constrained" | "payment_or_account_review";
     response: "hold_recommendations" | "pause_candidate" | "needs_human_review";
+  }>
+  | Readonly<{
+    /** Preserves a human-reviewed current distribution before any optimization. */
+    kind: "targeting_budget_preservation";
+    currency: string;
+    totalDailyBudgetDecimal: string;
+    allocations: readonly Readonly<{
+      allocationRef: string;
+      dailyBudgetDecimal: string;
+      territory: string;
+      platform: "ios" | "android" | "all_platforms" | "unknown";
+      audienceStrategy: string;
+      targetingEvidence: "adset_name_inference" | "live_targeting_verified";
+    }>[];
   }>;
 
 export type SliceOperatingRuleDraft = Readonly<{
@@ -179,6 +193,28 @@ function normalizeRule(value: unknown): SliceRule {
       || !["hold_recommendations", "pause_candidate", "needs_human_review"].includes(String(rule.response))) fail("invalid_rule");
     return Object.freeze({ kind, condition: rule.condition as "delivery_interrupted" | "capacity_constrained" | "payment_or_account_review",
       response: rule.response as "hold_recommendations" | "pause_candidate" | "needs_human_review" });
+  }
+  if (kind === "targeting_budget_preservation") {
+    const rule = exact(value, ["kind", "currency", "totalDailyBudgetDecimal", "allocations"], "invalid_rule");
+    if (typeof rule.currency !== "string" || !CURRENCY.test(rule.currency) || typeof rule.totalDailyBudgetDecimal !== "string"
+      || !DECIMAL.test(rule.totalDailyBudgetDecimal) || rule.totalDailyBudgetDecimal === "0" || !Array.isArray(rule.allocations)
+      || rule.allocations.length < 1 || rule.allocations.length > 100) fail("invalid_rule");
+    const allocations = rule.allocations.map((item) => {
+      const allocation = exact(item, ["allocationRef", "dailyBudgetDecimal", "territory", "platform", "audienceStrategy", "targetingEvidence"], "invalid_rule");
+      const allocationRef = text(allocation.allocationRef);
+      if (!REF.test(allocationRef) || typeof allocation.dailyBudgetDecimal !== "string" || !DECIMAL.test(allocation.dailyBudgetDecimal)
+        || allocation.dailyBudgetDecimal === "0" || !["ios", "android", "all_platforms", "unknown"].includes(String(allocation.platform))
+        || !["adset_name_inference", "live_targeting_verified"].includes(String(allocation.targetingEvidence))) fail("invalid_rule");
+      return Object.freeze({ allocationRef, dailyBudgetDecimal: allocation.dailyBudgetDecimal, territory: text(allocation.territory),
+        platform: allocation.platform as "ios" | "android" | "all_platforms" | "unknown", audienceStrategy: text(allocation.audienceStrategy),
+        targetingEvidence: allocation.targetingEvidence as "adset_name_inference" | "live_targeting_verified" });
+    }).sort((left, right) => left.allocationRef.localeCompare(right.allocationRef));
+    if (new Set(allocations.map((item) => item.allocationRef)).size !== allocations.length) fail("invalid_rule");
+    const units = (value: string) => {
+      const [whole, fraction = ""] = value.split("."); return BigInt(`${whole}${fraction.padEnd(12, "0")}`);
+    };
+    if (allocations.reduce((sum, item) => sum + units(item.dailyBudgetDecimal), 0n) !== units(rule.totalDailyBudgetDecimal)) fail("invalid_rule");
+    return Object.freeze({ kind, currency: rule.currency, totalDailyBudgetDecimal: rule.totalDailyBudgetDecimal, allocations: Object.freeze(allocations) });
   }
   fail("invalid_rule");
 }

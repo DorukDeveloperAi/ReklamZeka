@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { SliceOperatingRuleError, createSliceOperatingRuleDraft } from "@/domain/campaigns/slice-operating-rule";
+import { INTERNATIONAL_PHYSICAL_THERAPY_WORKBOOK_RULE } from "@/domain/campaigns/international-physical-therapy-workbook-rule";
 
 const slice = Object.freeze({ market: "international" as const, language: "ar", serviceRef: "service_physical_therapy",
   countryOrRegion: "sa", businessGoal: "lead_acquisition" as const, conversionRoute: "whatsapp" as const });
@@ -37,5 +38,17 @@ describe("slice operating rule draft", () => {
     verification: { metric: "engagement_rate", reviewCadence: "weekly", rollbackWhen: "Etki sinyali yeterli değilse keşif payı korunur." } });
     expect(draft.rule.kind).toBe("winner_continuation_rotation");
     expect(draft.authority.canExecute).toBe(false);
+  });
+
+  it("preserves the workbook's international physical-therapy country and platform segmentation as recommendation-only", () => {
+    const rule = INTERNATIONAL_PHYSICAL_THERAPY_WORKBOOK_RULE.rule;
+    expect(rule).toMatchObject({ kind: "targeting_budget_preservation", currency: "TRY", totalDailyBudgetDecimal: "48000" });
+    if (rule.kind !== "targeting_budget_preservation") throw new Error("unexpected rule");
+    expect(rule.allocations).toHaveLength(11);
+    expect(rule.allocations.reduce((sum, item) => sum + Number(item.dailyBudgetDecimal), 0)).toBe(48_000);
+    expect(rule.allocations.filter((item) => item.platform === "ios")).toHaveLength(7);
+    expect(rule.allocations.every((item) => item.targetingEvidence === "adset_name_inference")).toBe(true);
+    expect(INTERNATIONAL_PHYSICAL_THERAPY_WORKBOOK_RULE.automationMode).toBe("recommendation_only");
+    expect(INTERNATIONAL_PHYSICAL_THERAPY_WORKBOOK_RULE.authority.canWriteMeta).toBe(false);
   });
 });
