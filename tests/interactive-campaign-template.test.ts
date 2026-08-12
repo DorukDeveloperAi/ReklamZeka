@@ -74,6 +74,12 @@ describe("interactive campaign template", () => {
     expect(brief.comparisonBoundary.cohortKey).toBe("international:ar:gcc:service_physical_therapy_rehab:campaign_family_intensive_ftr:lead_acquisition:whatsapp");
   });
 
+  it("keeps human-confirmed audience and publisher labels separate from campaign naming", () => {
+    const brief = createInteractiveCampaignBrief({ ...base, audienceStrategy: "custom", publisherPlatform: "instagram" });
+    expect(brief.classification).toMatchObject({ audienceStrategy: "custom", publisherPlatform: "instagram" });
+    expect(createInteractiveCampaignBrief(base).classification).toMatchObject({ audienceStrategy: null, publisherPlatform: null });
+  });
+
   it("uses only a verified frozen Meta objective as an optional business-goal hint", () => {
     expect(planningHintFromPersistedCampaignContext({ meta: { objective: { state: "known", value: "lead_generation" } } }))
       .toMatchObject({ source: "frozen_campaign_context", suggestedBusinessGoal: "lead_acquisition", deliveryHealth: "unknown", requiresHumanClassification: true });

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   createInteractiveCampaignBrief,
+  type AudienceStrategy,
   type CampaignBusinessGoal,
   type CampaignMarket,
   type CapacityState,
@@ -12,6 +13,7 @@ import {
   type DeliveryHealth,
   type InteractiveCampaignTemplateRequest,
   type PersistedCampaignPlanningHint,
+  type PublisherPlatform,
   planningHintFromPersistedCampaignContext,
 } from "@/domain/campaigns/interactive-campaign-template";
 import { currentPortfolioRulesFor } from "@/domain/campaigns/current-portfolio-rule-catalog";
@@ -25,6 +27,8 @@ type BriefDraft = Readonly<{
   language: string | null;
   serviceRef: string | null;
   campaignFamilyRef?: string | null;
+  audienceStrategy?: AudienceStrategy | null;
+  publisherPlatform?: PublisherPlatform | null;
   countryOrRegion: string | null;
   conversionRoute: ConversionRoute;
   deliveryHealth: DeliveryHealth;
@@ -173,6 +177,8 @@ const INITIAL_DRAFT: BriefDraft = Object.freeze({
   language: "tr",
   serviceRef: "service_medical_aesthetics",
   campaignFamilyRef: null,
+  audienceStrategy: null,
+  publisherPlatform: null,
   countryOrRegion: null,
   conversionRoute: "lead_form",
   deliveryHealth: "healthy",
@@ -220,11 +226,15 @@ function evaluationCandidateFromBrief(draft: BriefDraft): CampaignEvaluationCand
     countryOrRegion?: string;
     conversionRoute?: "lead_form" | "whatsapp" | "landing_page";
     businessGoal?: "lead_acquisition" | "upper_funnel_education" | "market_service_learning";
+    audienceStrategy?: string;
+    platform?: "facebook" | "instagram" | "mixed";
   } = {};
   if (draft.market !== "unknown") candidate.market = draft.market;
   if (draft.serviceRef) candidate.serviceRef = draft.serviceRef;
   if (draft.campaignFamilyRef) candidate.campaignFamilyRef = draft.campaignFamilyRef;
   if (draft.countryOrRegion) candidate.countryOrRegion = draft.countryOrRegion;
+  if (draft.audienceStrategy && draft.audienceStrategy !== "unknown") candidate.audienceStrategy = draft.audienceStrategy;
+  if (draft.publisherPlatform && draft.publisherPlatform !== "unknown") candidate.platform = draft.publisherPlatform;
   if (draft.conversionRoute === "lead_form" || draft.conversionRoute === "whatsapp" || draft.conversionRoute === "landing_page") {
     candidate.conversionRoute = draft.conversionRoute;
   }
@@ -381,6 +391,13 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
       <label htmlFor="brief-campaign-family"><span>Kampanya ailesi</span><select id="brief-campaign-family" value={draft.campaignFamilyRef ?? ""} onChange={(event) => change("campaignFamilyRef", event.target.value || null)}>
         <option value="">Henüz insan incelemesiyle atanmadı</option><option value="campaign_family_intensive_ftr">Intensive FTR</option>
       </select><small>Rota değildir; hizmet altındaki stratejik kampanya ailesidir.</small></label>
+      <label htmlFor="brief-audience-strategy"><span>Hedefleme yaklaşımı</span><select id="brief-audience-strategy" value={draft.audienceStrategy ?? "unknown"} onChange={(event) => change("audienceStrategy", event.target.value === "unknown" ? null : event.target.value as AudienceStrategy)}>
+        <option value="unknown">Henüz insan incelemesiyle doğrulanmadı</option><option value="preserve_current">Mevcut hedeflemeyi koru</option>
+        <option value="broad">Geniş hedefleme</option><option value="custom">Özel / seçilmiş hedefleme</option><option value="remarketing">Yeniden pazarlama</option><option value="lookalike">Benzer kitle</option>
+      </select><small>İsimden türetilmez; mevcut reklam seti veya insan incelemesiyle doğrulanır.</small></label>
+      <label htmlFor="brief-publisher-platform"><span>Yayın platformu</span><select id="brief-publisher-platform" value={draft.publisherPlatform ?? "unknown"} onChange={(event) => change("publisherPlatform", event.target.value === "unknown" ? null : event.target.value as PublisherPlatform)}>
+        <option value="unknown">Henüz insan incelemesiyle doğrulanmadı</option><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="mixed">Karma platform</option>
+      </select><small>Device/placement ayrıntısı değildir; kural kümesinin platform kapsamıdır.</small></label>
       {draft.market === "international" ? <label htmlFor="brief-region"><span>Ülke / bölge</span><input id="brief-region" value={draft.countryOrRegion ?? ""} maxLength={120} onChange={(event) => change("countryOrRegion", event.target.value.trim() || null)} placeholder="Örn. GCC" /></label> : null}
       <label htmlFor="brief-route"><span>Dönüşüm yolu</span><select id="brief-route" value={draft.conversionRoute} onChange={(event) => change("conversionRoute", event.target.value as ConversionRoute)}>
         {Object.entries(routeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}

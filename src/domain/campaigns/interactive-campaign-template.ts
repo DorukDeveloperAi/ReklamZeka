@@ -13,6 +13,10 @@ export type CampaignBusinessGoal =
   | "classification_triage";
 export type CampaignMarket = "domestic" | "international" | "unknown";
 export type ConversionRoute = "lead_form" | "whatsapp" | "landing_page" | "not_applicable" | "unknown";
+/** Human-confirmed audience posture; never inferred from a campaign name. */
+export type AudienceStrategy = "broad" | "custom" | "remarketing" | "lookalike" | "preserve_current" | "unknown";
+/** Human-confirmed publisher placement scope; device is a separate concern. */
+export type PublisherPlatform = "facebook" | "instagram" | "mixed" | "unknown";
 export type DeliveryHealth = "healthy" | "interrupted" | "unknown";
 export type ClassificationState = "classified" | "unclassified";
 export type CapacityState = "confirmed" | "constrained" | "unknown";
@@ -39,6 +43,8 @@ export type InteractiveCampaignTemplateRequest = Readonly<{
   serviceRef: string | null;
   /** Human-confirmed campaign family; it is never derived from the route. */
   campaignFamilyRef?: string | null;
+  audienceStrategy?: AudienceStrategy | null;
+  publisherPlatform?: PublisherPlatform | null;
   countryOrRegion: string | null;
   conversionRoute: ConversionRoute;
   deliveryHealth: DeliveryHealth;
@@ -76,6 +82,8 @@ export type InteractiveCampaignBrief = Readonly<{
     language: string | null;
     serviceRef: string | null;
     campaignFamilyRef: string | null;
+    audienceStrategy: AudienceStrategy | null;
+    publisherPlatform: PublisherPlatform | null;
     countryOrRegion: string | null;
     conversionRoute: ConversionRoute;
   }>;
@@ -282,7 +290,9 @@ function assertRequest(input: InteractiveCampaignTemplateRequest): void {
     || input.language !== null && !validText(input.language)
     || input.countryOrRegion !== null && !validText(input.countryOrRegion)
     || input.serviceRef !== null && !REF.test(input.serviceRef)
-    || input.campaignFamilyRef !== undefined && input.campaignFamilyRef !== null && !REF.test(input.campaignFamilyRef)) throw new InteractiveCampaignTemplateError("invalid_input");
+    || input.campaignFamilyRef !== undefined && input.campaignFamilyRef !== null && !REF.test(input.campaignFamilyRef)
+    || input.audienceStrategy !== undefined && input.audienceStrategy !== null && !["broad", "custom", "remarketing", "lookalike", "preserve_current", "unknown"].includes(input.audienceStrategy)
+    || input.publisherPlatform !== undefined && input.publisherPlatform !== null && !["facebook", "instagram", "mixed", "unknown"].includes(input.publisherPlatform)) throw new InteractiveCampaignTemplateError("invalid_input");
 }
 
 /**
@@ -303,7 +313,7 @@ export function createInteractiveCampaignBrief(input: InteractiveCampaignTemplat
     const lanes = campaignLanes(input, templateRef);
     return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef, variantRef: variantRef(input, templateRef), readiness: "blocked",
       humanReviewRequired: true, classification: Object.freeze({ market: input.market, language: input.language,
-        serviceRef: input.serviceRef, campaignFamilyRef: input.campaignFamilyRef ?? null, countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }),
+        serviceRef: input.serviceRef, campaignFamilyRef: input.campaignFamilyRef ?? null, audienceStrategy: input.audienceStrategy ?? null, publisherPlatform: input.publisherPlatform ?? null, countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }),
       questions: Object.freeze(questions), nextDecision: nextDecision(input, templateRef), campaignLanes: lanes, recommendation: recommendation(input, templateRef, "blocked", lanes), launchSequence: Object.freeze([{ step: "Sınıflandırmayı doğrula", reason: "Sınıflandırılmamış kampanya ölçekleme veya kıyas için güvenilir değildir." }]),
       measurement: Object.freeze({ primaryOutcome: "Sınıflandırma tamamlanması", doNotCompareWith: Object.freeze(["lead CPL", "üst huni erişimi"]) }), comparisonBoundary: comparisonBoundary(input, templateRef), authority: AUTHORITY });
   }
@@ -313,7 +323,7 @@ export function createInteractiveCampaignBrief(input: InteractiveCampaignTemplat
     const lanes = campaignLanes(input, templateRef);
     return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef, variantRef: variantRef(input, templateRef), readiness: "blocked",
       humanReviewRequired: true, classification: Object.freeze({ market: input.market, language: input.language,
-        serviceRef: input.serviceRef, campaignFamilyRef: input.campaignFamilyRef ?? null, countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }),
+        serviceRef: input.serviceRef, campaignFamilyRef: input.campaignFamilyRef ?? null, audienceStrategy: input.audienceStrategy ?? null, publisherPlatform: input.publisherPlatform ?? null, countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }),
       questions: Object.freeze(questions), nextDecision: nextDecision(input, templateRef), campaignLanes: lanes, recommendation: recommendation(input, templateRef, "blocked", lanes), launchSequence: Object.freeze([{ step: "Teslimatı geri doğrula", reason: "Kesinti günleri performans sinyalini yanıltabilir." },
         { step: "Yeni öğrenme penceresi aç", reason: "Toparlanma sonrası ölçüm, kesinti öncesi ve sırası sonuçlarından ayrılmalıdır." }]),
       measurement: Object.freeze({ primaryOutcome: "Sağlıklı teslimat sürekliliği", doNotCompareWith: Object.freeze(["kesinti günü CPL", "kesinti günü erişim"]) }), comparisonBoundary: comparisonBoundary(input, templateRef), authority: AUTHORITY });
@@ -327,7 +337,7 @@ export function createInteractiveCampaignBrief(input: InteractiveCampaignTemplat
     const lanes = Object.freeze([]) as InteractiveCampaignBrief["campaignLanes"];
     return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef, variantRef: null, readiness: "needs_input",
       humanReviewRequired: true, classification: Object.freeze({ market: input.market, language: input.language, serviceRef: input.serviceRef,
-        campaignFamilyRef: input.campaignFamilyRef ?? null, countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }), questions: Object.freeze(questions), nextDecision: nextDecision(input, templateRef), campaignLanes: lanes,
+        campaignFamilyRef: input.campaignFamilyRef ?? null, audienceStrategy: input.audienceStrategy ?? null, publisherPlatform: input.publisherPlatform ?? null, countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }), questions: Object.freeze(questions), nextDecision: nextDecision(input, templateRef), campaignLanes: lanes,
       recommendation: Object.freeze({ status: "needs_input", kind: "complete_brief", headline: "Önce pazar ve teslimat bağlamını doğrulayın", rationale: reason,
         nextStep: "Bir sonraki kararı tamamlayın; sistem şerit, bütçe veya yayın önerisi üretmez.", laneRefs: Object.freeze([]) }),
       launchSequence: Object.freeze([{ step: "Bağlamı doğrula", reason }]), measurement: Object.freeze({ primaryOutcome: "Bağlam doğrulaması", doNotCompareWith: Object.freeze(["lead CPL", "üst huni erişimi"]) }),
@@ -362,7 +372,7 @@ export function createInteractiveCampaignBrief(input: InteractiveCampaignTemplat
   return Object.freeze({ version: INTERACTIVE_CAMPAIGN_TEMPLATE_VERSION, templateRef, variantRef: variantRef(input, templateRef),
     readiness: ready ? "ready_for_human_review" : "needs_input", humanReviewRequired: true,
     classification: Object.freeze({ market: input.market, language: input.language, serviceRef: input.serviceRef,
-      campaignFamilyRef: input.campaignFamilyRef ?? null, countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }), questions: Object.freeze(questions),
+      campaignFamilyRef: input.campaignFamilyRef ?? null, audienceStrategy: input.audienceStrategy ?? null, publisherPlatform: input.publisherPlatform ?? null, countryOrRegion: input.countryOrRegion, conversionRoute: input.conversionRoute }), questions: Object.freeze(questions),
     nextDecision: nextDecision(input, templateRef), campaignLanes: lanes, recommendation: recommendation(input, templateRef, ready ? "ready_for_human_review" : "needs_input", lanes),
     launchSequence: Object.freeze(sequence), measurement: Object.freeze({ primaryOutcome,
       doNotCompareWith: Object.freeze(templateRef === "lead_acquisition" ? ["üst huni erişimi", "farklı dönüşüm yolu"] : ["lead CPL"]) }),

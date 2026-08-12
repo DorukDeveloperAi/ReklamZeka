@@ -48,6 +48,11 @@
   senaryosunda pazar sınırı, değerlendirme kümesi, sonuç-ölçüm ayrımı ve mevcut hedefleme/bütçe korunumu
   birlikte görünür; değerlendirme kümesi için hedefleme/platform künyesi eksikse kampanya açıkça dışarıda
   kalır. Browser kabulünde bu durum, kapalı Meta-write yüzeyi ve sıfır console hata/uyarısı doğrulandı.
+- Brief'e insan-doğrulanmış `hedefleme yaklaşımı` ve `yayın platformu` alanları eklendi. Bu alanlar
+  kampanya adından/rotadan türetilmez; seçilmediklerinde özel FTR kıyas kümesi dışarıda kalır. AR/FTR
+  senaryosunda `özel/seçilmiş hedefleme + Instagram` seçildiğinde cohort'a dahil olma yalnız salt-okunur
+  olarak görünür; proposal, approval, execute ve Meta write kapalı kalır. Browser'da bu geçiş ve sıfır
+  console hata/uyarısı doğrulandı.
 
 ## 2026-08-10 — Merkezi ürün akışı ve kademeli teslim ilkesi
 

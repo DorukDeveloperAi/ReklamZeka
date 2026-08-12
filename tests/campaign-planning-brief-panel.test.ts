@@ -33,6 +33,9 @@ describe("campaign planning brief panel", () => {
     expect(html).toContain("UYGULANAN KURAL TASLAKLARI");
     expect(html).toContain("Yerli/yabancı pazar sınırı");
     expect(html).toContain("Teklif / değer önerisi");
+    expect(html).toContain("Hedefleme yaklaşımı");
+    expect(html).toContain("Yayın platformu");
+    expect(html).toContain("İsimden türetilmez");
     expect(html).toContain("Nitelikli lead tanımı");
     expect(html).toContain("Kaydedilmez, Guidance/Strict Policy alanına aktarılmaz; hiçbir uygulama yetkisi vermez");
     expect(html).toContain("campaign create / publish / approval / execute / Meta write: kapalı");
