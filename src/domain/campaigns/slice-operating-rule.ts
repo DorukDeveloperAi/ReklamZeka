@@ -50,6 +50,13 @@ export type SliceRule =
     response: "hold_recommendations" | "pause_candidate" | "needs_human_review";
   }>
   | Readonly<{
+    /** Keeps the primary domestic/foreign portfolio split intact. */
+    kind: "pazar_siniri";
+    pazarlar: readonly ("yerli" | "yabanci")[];
+    birlikte_yonetilemez: true;
+    ayrik_tutulacak_kararlar: readonly ("butce" | "sonuc_degerlendirmesi" | "otomasyon")[];
+  }>
+  | Readonly<{
     /** Preserves a human-reviewed current distribution before any optimization. */
     kind: "targeting_budget_preservation";
     currency: string;
@@ -195,6 +202,18 @@ function normalizeRule(value: unknown): SliceRule {
       || !["hold_recommendations", "pause_candidate", "needs_human_review"].includes(String(rule.response))) fail("invalid_rule");
     return Object.freeze({ kind, condition: rule.condition as "delivery_interrupted" | "capacity_constrained" | "payment_or_account_review",
       response: rule.response as "hold_recommendations" | "pause_candidate" | "needs_human_review" });
+  }
+  if (kind === "pazar_siniri") {
+    const rule = exact(value, ["kind", "pazarlar", "birlikte_yonetilemez", "ayrik_tutulacak_kararlar"], "invalid_rule");
+    if (!Array.isArray(rule.pazarlar) || rule.pazarlar.length !== 2
+      || new Set(rule.pazarlar).size !== 2 || !rule.pazarlar.every((market) => market === "yerli" || market === "yabanci")
+      || rule.birlikte_yonetilemez !== true
+      || !Array.isArray(rule.ayrik_tutulacak_kararlar) || rule.ayrik_tutulacak_kararlar.length < 1
+      || rule.ayrik_tutulacak_kararlar.length > 3
+      || new Set(rule.ayrik_tutulacak_kararlar).size !== rule.ayrik_tutulacak_kararlar.length
+      || !rule.ayrik_tutulacak_kararlar.every((decision) => decision === "butce" || decision === "sonuc_degerlendirmesi" || decision === "otomasyon")) fail("invalid_rule");
+    return Object.freeze({ kind, pazarlar: Object.freeze([...rule.pazarlar].sort()) as readonly ("yerli" | "yabanci")[], birlikte_yonetilemez: true as const,
+      ayrik_tutulacak_kararlar: Object.freeze([...rule.ayrik_tutulacak_kararlar].sort()) as readonly ("butce" | "sonuc_degerlendirmesi" | "otomasyon")[] });
   }
   if (kind === "targeting_budget_preservation") {
     const rule = exact(value, ["kind", "currency", "totalDailyBudgetDecimal", "allocations"], "invalid_rule");

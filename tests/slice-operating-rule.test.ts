@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { SliceOperatingRuleError, createSliceOperatingRuleDraft } from "@/domain/campaigns/slice-operating-rule";
 import { INTERNATIONAL_PHYSICAL_THERAPY_WORKBOOK_RULE } from "@/domain/campaigns/international-physical-therapy-workbook-rule";
+import { MEVCUT_PORTFOY_PAZAR_SINIRI_RULE } from "@/domain/campaigns/mevcut-portfoy-pazar-siniri-rule";
 
 const slice = Object.freeze({ market: "international" as const, language: "ar", serviceRef: "service_physical_therapy",
   countryOrRegion: "sa", businessGoal: "lead_acquisition" as const, conversionRoute: "whatsapp" as const });
@@ -51,5 +52,30 @@ describe("slice operating rule draft", () => {
     expect(rule.allocations.find((item) => item.allocationRef === "allocation_ar_bahrain_kuwait_qatar_android")?.countryCodes).toEqual(["BH", "KW", "QA"]);
     expect(INTERNATIONAL_PHYSICAL_THERAPY_WORKBOOK_RULE.automationMode).toBe("recommendation_only");
     expect(INTERNATIONAL_PHYSICAL_THERAPY_WORKBOOK_RULE.authority.canWriteMeta).toBe(false);
+  });
+
+  it("keeps domestic and foreign portfolio decisions apart as an observe-only rule", () => {
+    expect(MEVCUT_PORTFOY_PAZAR_SINIRI_RULE.rule).toEqual({
+      kind: "pazar_siniri", pazarlar: ["yabanci", "yerli"],
+      birlikte_yonetilemez: true,
+      ayrik_tutulacak_kararlar: ["butce", "otomasyon", "sonuc_degerlendirmesi"],
+    });
+    expect(MEVCUT_PORTFOY_PAZAR_SINIRI_RULE.automationMode).toBe("observe_only");
+    expect(MEVCUT_PORTFOY_PAZAR_SINIRI_RULE.authority).toEqual({
+      canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false, canEnableAutomation: false,
+    });
+  });
+
+  it("rejects a market boundary that permits domestic and foreign to be managed together", () => {
+    expect(() => createSliceOperatingRuleDraft({
+      slice,
+      rule: {
+        kind: "pazar_siniri", pazarlar: ["yerli", "yabanci"],
+        birlikte_yonetilemez: false as never,
+        ayrik_tutulacak_kararlar: ["butce"],
+      },
+      automationMode: "observe_only", priority: 1,
+      verification: { metric: "delivery_health", reviewCadence: "weekly", rollbackWhen: "test" },
+    })).toThrow(SliceOperatingRuleError);
   });
 });

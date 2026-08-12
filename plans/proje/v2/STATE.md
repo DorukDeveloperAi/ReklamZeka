@@ -3,6 +3,16 @@
 > Kümülatif ilerleme defteri. v1'in ayrıntılı tur geçmişi
 > [v1 STATE](../v1/STATE.md)'te değişmeden korunur.
 
+## 2026-08-12 — Portföy pazar sınırı
+
+- Kullanıcıyla yürütülen mevcut portföy istişaresinde **pazar**, tüm künye ve slice'ların ilk
+  işletim ayrımı olarak sabitlendi: yalnız `yerli` veya `yabancı` vardır; karma/çoklu pazar
+  işletim kategorisi yoktur. Aynı slice, bütçe havuzu, sonuç değerlendirmesi veya otomasyon kararı
+  iki pazarı birleştiremez.
+- Bu karar, `pazar_siniri` review-only taslak kuralına işlendi. Kural bütün write yetkilerini kapalı
+  tutar; Meta/CRM adı, bütçe, kampanya durumu veya hedefleme değiştirmez. Sonraki kurallar bu sınır
+  altında, `pazar → ana kampanya hedefi → kampanya işlevi → kampanya ailesi` sırasıyla eklenecektir.
+
 ## 2026-08-10 — Merkezi ürün akışı ve kademeli teslim ilkesi
 
 - Bundan sonraki ana hat, teknik alt-katmanları tek başına tamamlamak değil; kullanıcının kampanyayı
