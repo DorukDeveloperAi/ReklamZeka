@@ -58,7 +58,9 @@ export type SliceRule =
       allocationRef: string;
       dailyBudgetDecimal: string;
       territory: string;
+      countryCodes: readonly string[];
       platform: "ios" | "android" | "all_platforms" | "unknown";
+      publisherPlatforms: readonly ("facebook" | "instagram")[] | null;
       audienceStrategy: string;
       targetingEvidence: "adset_name_inference" | "live_targeting_verified";
     }>[];
@@ -200,13 +202,20 @@ function normalizeRule(value: unknown): SliceRule {
       || !DECIMAL.test(rule.totalDailyBudgetDecimal) || rule.totalDailyBudgetDecimal === "0" || !Array.isArray(rule.allocations)
       || rule.allocations.length < 1 || rule.allocations.length > 100) fail("invalid_rule");
     const allocations = rule.allocations.map((item) => {
-      const allocation = exact(item, ["allocationRef", "dailyBudgetDecimal", "territory", "platform", "audienceStrategy", "targetingEvidence"], "invalid_rule");
+      const allocation = exact(item, ["allocationRef", "dailyBudgetDecimal", "territory", "countryCodes", "platform", "publisherPlatforms", "audienceStrategy", "targetingEvidence"], "invalid_rule");
       const allocationRef = text(allocation.allocationRef);
       if (!REF.test(allocationRef) || typeof allocation.dailyBudgetDecimal !== "string" || !DECIMAL.test(allocation.dailyBudgetDecimal)
         || allocation.dailyBudgetDecimal === "0" || !["ios", "android", "all_platforms", "unknown"].includes(String(allocation.platform))
         || !["adset_name_inference", "live_targeting_verified"].includes(String(allocation.targetingEvidence))) fail("invalid_rule");
+      if (!Array.isArray(allocation.countryCodes) || allocation.countryCodes.length < 1 || allocation.countryCodes.length > 250
+        || allocation.countryCodes.some((code) => typeof code !== "string" || !/^[A-Z]{2}$/.test(code))
+        || new Set(allocation.countryCodes).size !== allocation.countryCodes.length
+        || allocation.publisherPlatforms !== null && (!Array.isArray(allocation.publisherPlatforms)
+          || allocation.publisherPlatforms.length < 1 || allocation.publisherPlatforms.some((platform) => platform !== "facebook" && platform !== "instagram")
+          || new Set(allocation.publisherPlatforms).size !== allocation.publisherPlatforms.length)) fail("invalid_rule");
       return Object.freeze({ allocationRef, dailyBudgetDecimal: allocation.dailyBudgetDecimal, territory: text(allocation.territory),
-        platform: allocation.platform as "ios" | "android" | "all_platforms" | "unknown", audienceStrategy: text(allocation.audienceStrategy),
+        countryCodes: Object.freeze([...allocation.countryCodes].sort()), platform: allocation.platform as "ios" | "android" | "all_platforms" | "unknown",
+        publisherPlatforms: allocation.publisherPlatforms === null ? null : Object.freeze([...allocation.publisherPlatforms].sort()) as readonly ("facebook" | "instagram")[], audienceStrategy: text(allocation.audienceStrategy),
         targetingEvidence: allocation.targetingEvidence as "adset_name_inference" | "live_targeting_verified" });
     }).sort((left, right) => left.allocationRef.localeCompare(right.allocationRef));
     if (new Set(allocations.map((item) => item.allocationRef)).size !== allocations.length) fail("invalid_rule");
