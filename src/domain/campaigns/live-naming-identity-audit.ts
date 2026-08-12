@@ -121,14 +121,31 @@ function countryLabel(code: string): string {
   return COUNTRIES.find(([candidate]) => candidate === code)?.[1] ?? code;
 }
 
-function expectedRouteFinding(name: string, route: CampaignNamingIdentityInput["expected"]["route"]): NamingAuditFinding | null {
+type NamedRoute = "whatsapp" | "lead_form";
+
+function routeClaim(name: string): Readonly<{ route: NamedRoute; beginsName: boolean }> | null {
+  const value = normalized(name);
+  const whatsapp = "(?:whatsapp|whats[ -]?app|wapp)";
+  const leadForm = "(?:lead|form)";
+  if (new RegExp(`(^|[^a-z0-9])${whatsapp}(?=$|[^a-z0-9])`, "u").test(value)) {
+    return Object.freeze({ route: "whatsapp", beginsName: new RegExp(`^${whatsapp}(?=$|[^a-z0-9])`, "u").test(value) });
+  }
+  if (new RegExp(`(^|[^a-z0-9])${leadForm}(?=$|[^a-z0-9])`, "u").test(value)) {
+    return Object.freeze({ route: "lead_form", beginsName: new RegExp(`^${leadForm}(?=$|[^a-z0-9])`, "u").test(value) });
+  }
+  return null;
+}
+
+function expectedRouteFinding(name: string, route: CampaignNamingIdentityInput["expected"]["route"], campaignPrimaryIdentity: boolean): NamingAuditFinding | null {
   if (!route) return null;
-  const routeToken = route === "whatsapp" ? "whatsapp" : "lead";
-  const claimsRoute = hasToken(name, routeToken);
-  const startsWithRoute = new RegExp(`^\\s*${routeToken}\\b`, "iu").test(name);
-  if (startsWithRoute) return finding("route", "mismatch", "correction_required",
+  const claim = routeClaim(name);
+  if (campaignPrimaryIdentity && claim?.beginsName) return finding("route", "mismatch", "correction_required",
     "Dönüşüm rotası kampanya adının ana kimliği olamaz; rota canlı kurulum ve ölçüm alanında tutulmalıdır.");
-  if (claimsRoute) return finding("route", "verified", "information", "İsim rota bilgisini ikincil tanım olarak taşıyor; ana kimlik hizmet ve kampanya ailesidir.");
+  if (claim && claim.route !== route) return finding("route", "mismatch", "correction_required",
+    "İsimdeki dönüşüm rotası canlı/insan-doğrulanmış rota ile uyuşmuyor.");
+  if (claim) return finding("route", "verified", "information", campaignPrimaryIdentity
+    ? "İsim rota bilgisini ikincil tanım olarak taşıyor; ana kimlik hizmet ve kampanya ailesidir."
+    : "İsim rota bilgisini canlı/insan-doğrulanmış rota ile uyumlu biçimde taşıyor.");
   return finding("route", "unknown", "information", "Kampanya adı rota bilgisini taşımıyor; rota yalnız canlı kurulumdan doğrulanmalıdır.");
 }
 
@@ -143,7 +160,7 @@ export function auditCampaignNamingIdentity(input: CampaignNamingIdentityInput):
     findings.push(finding("campaign_family", familyMatches ? "verified" : "mismatch", familyMatches ? "information" : "correction_required",
       familyMatches ? "İsim Intensive FTR kampanya ailesini taşıyor." : "İsim beklenen Intensive FTR kampanya ailesini taşımıyor."));
   }
-  const route = expectedRouteFinding(input.name, input.expected.route);
+  const route = expectedRouteFinding(input.name, input.expected.route, true);
   if (route) findings.push(route);
   if (input.expected.language) {
     const languageMatches = hasToken(input.name, input.expected.language.toUpperCase());
@@ -158,7 +175,7 @@ export function auditCampaignNamingIdentity(input: CampaignNamingIdentityInput):
   } else {
     findings.push(finding("objective", "unknown", "review_required", "İsim objective iddiası taşımıyor; canlı objective isimden türetilemez."));
   }
-  const routePrimary = input.expected.route && new RegExp(`^\\s*${input.expected.route === "whatsapp" ? "whatsapp" : "lead"}\\b`, "iu").test(input.name);
+  const routePrimary = input.expected.route && routeClaim(input.name)?.beginsName;
   const suggestedName = routePrimary && input.expected.service === "physical_therapy_rehab" && input.expected.campaignFamily === "intensive_ftr"
     ? "Fizik Tedavi · Intensive FTR"
     : auditStatus(findings) === "mismatch" ? input.name : null;
@@ -186,7 +203,7 @@ export function auditAdSetNamingIdentity(input: AdSetNamingIdentityInput): Namin
   findings.push(finding("operating_system", operatingSystemMatches ? "verified" : "mismatch", operatingSystemMatches ? "information" : "correction_required",
     operatingSystemMatches ? "İsimdeki işletim sistemi canlı hedefleme ile eşleşiyor." : `İsim işletim sistemi ${namedOperatingSystem}; canlı hedefleme ${configuredOperatingSystem}.`));
 
-  const route = expectedRouteFinding(input.name, input.expected.route);
+  const route = expectedRouteFinding(input.name, input.expected.route, false);
   if (route) findings.push(route);
   if (input.expected.audienceStrategy) {
     const matches = hasToken(input.name, input.expected.audienceStrategy);

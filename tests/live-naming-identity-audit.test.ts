@@ -40,6 +40,17 @@ describe("live naming identity audit", () => {
     expect(audit.findings.find((item) => item.facet === "route")).toMatchObject({ status: "unknown", severity: "information" });
   });
 
+  it("recognizes a WApp naming variant without allowing it to become the campaign identity", () => {
+    const audit = auditCampaignNamingIdentity({
+      name: "WApp - Fizik Tedavi - Intensive FTR - AR",
+      configuredObjective: "OUTCOME_LEADS",
+      expected: { service: "physical_therapy_rehab", campaignFamily: "intensive_ftr", route: "whatsapp", language: "ar" },
+    });
+
+    expect(audit.findings.find((item) => item.facet === "route")).toMatchObject({ status: "mismatch", severity: "correction_required" });
+    expect(audit.suggestedName).toBe("Fizik Tedavi · Intensive FTR");
+  });
+
   it("flags an Arabic Android ad set whose name omits a live targeted country and proposes only a reviewable label", () => {
     const audit = auditAdSetNamingIdentity({
       name: "Kuveyt,Katar Whatsapp android luks",
