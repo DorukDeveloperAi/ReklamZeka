@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 25a0cdf6b822 -->
+<!-- durum-damga: affece4b60c6 -->
 
 ## Künye
 
@@ -14,13 +14,17 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 289 |
-| ilk / son iş | 2026-08-06 / 2026-08-11 |
+| iş commit'i (tüm geçmiş) | 293 |
+| ilk / son iş | 2026-08-06 / 2026-08-12 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-12 | `feat` | audit live campaign naming identity | `572f068ac` |
+| 2026-08-12 | `fix` | bind physical therapy targeting to live read | `670ae7965` |
+| 2026-08-12 | `feat` | preserve international physical therapy allocation | `f24175682` |
+| 2026-08-12 | `feat` | add slice operating rule drafts | `5deb20f02` |
 | 2026-08-11 | `feat` | add ephemeral operator notes | `389bb7e5f` |
 | 2026-08-11 | `feat` | expose planning template library | `ac69c8e4f` |
 | 2026-08-11 | `feat` | add planning sequence | `0b976f766` |
@@ -32,16 +36,12 @@
 | 2026-08-11 | `fix` | accept zero-length route body | `28107999f` |
 | 2026-08-11 | `feat` | add read-only Meta account focus | `a1039cfe1` |
 | 2026-08-11 | `fix` | classify diagnostic JSONB dependencies | `677f3f351` |
-| 2026-08-11 | `feat` | carry brief intent into draft template | `e13ad1236` |
-| 2026-08-11 | `feat` | link brief to draft policy workspace | `91b430eaf` |
-| 2026-08-11 | `fix` | clear scenario after manual brief edit | `355909eb2` |
-| 2026-08-11 | `feat` | add workbook campaign scenarios | `18fd1037f` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 42
-- `fix         ` █████ 8
-- `test        ` ███ 6
+- `feat        ` ████████████████████████ 44
+- `fix         ` ████ 7
+- `test        ` ███ 5
 - `docs        ` ██ 4
 
 ## Planlar
