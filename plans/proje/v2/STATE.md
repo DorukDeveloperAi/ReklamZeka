@@ -24,6 +24,10 @@
   `Fizik Tedavi · Intensive FTR` hizmet/aile kimliğidir; WhatsApp canlı route/ölçüm özelliğidir ve
   kampanya adının başına geçemez. İsimde rota hiç yazmıyorsa yalnız bilgi `unknown` kalır; isimden
   rota uydurulmaz. Her öneri insan incelemeli ve yeniden adlandırma/Meta write yetkisizdir.
+- Her slice taslağı artık türetilmiş `zamansalDegerlendirme` taşır: doğrulanmış mevcut kurulum
+  bir sonraki günlük/haftalık/aylık ölçüm penceresine kadar korunur; teslimat kesintisi,
+  kapsam/hedefleme değişimi veya yeni sonuç kanıtı yeniden insan incelemesi tetikler. Bu bilgi
+  scheduler ya da otomasyon değildir; karar modu her zaman `insan_incelemeli_oneri` olarak kapalıdır.
 
 ## 2026-08-10 — Merkezi ürün akışı ve kademeli teslim ilkesi
 

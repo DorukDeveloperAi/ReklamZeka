@@ -90,6 +90,11 @@ describe("slice operating rule draft", () => {
     expect(INTERNATIONAL_PHYSICAL_THERAPY_MEASUREMENT_RULE.verification).toMatchObject({
       metric: "qualified_leads", reviewCadence: "weekly",
     });
+    expect(INTERNATIONAL_PHYSICAL_THERAPY_MEASUREMENT_RULE.zamansalDegerlendirme).toEqual({
+      mevcutDurum: "incelemeye_kadar_koru", olcumPenceresiGun: 7,
+      yenidenIncelemeTetikleyicileri: ["kapsam_veya_hedefleme_degisimi", "teslimat_kesintisi", "yeni_sonuc_kaniti"],
+      kararModu: "insan_incelemeli_oneri",
+    });
   });
 
   it("rejects a result boundary that would permit unlike routes to be compared together", () => {

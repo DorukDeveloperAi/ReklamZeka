@@ -96,6 +96,17 @@ export type SliceOperatingRuleDraft = Readonly<{
     reviewCadence: "daily" | "weekly" | "monthly";
     rollbackWhen: string;
   }>;
+  /**
+   * Derived, read-only temporal interpretation of the reviewed rule. This
+   * keeps a confirmed current setup in place until its next evidence window;
+   * it does not schedule or authorize any automation.
+   */
+  zamansalDegerlendirme: Readonly<{
+    mevcutDurum: "incelemeye_kadar_koru";
+    olcumPenceresiGun: 1 | 7 | 30;
+    yenidenIncelemeTetikleyicileri: readonly ("teslimat_kesintisi" | "kapsam_veya_hedefleme_degisimi" | "yeni_sonuc_kaniti")[];
+    kararModu: "insan_incelemeli_oneri";
+  }>;
   requiresHumanReview: true;
   promotionRequired: true;
   authority: Readonly<{
@@ -280,6 +291,16 @@ function normalizeRule(value: unknown): SliceRule {
   fail("invalid_rule");
 }
 
+function zamansalDegerlendirme(reviewCadence: SliceOperatingRuleDraft["verification"]["reviewCadence"]): SliceOperatingRuleDraft["zamansalDegerlendirme"] {
+  const olcumPenceresiGun = reviewCadence === "daily" ? 1 : reviewCadence === "weekly" ? 7 : 30;
+  return Object.freeze({
+    mevcutDurum: "incelemeye_kadar_koru" as const,
+    olcumPenceresiGun,
+    yenidenIncelemeTetikleyicileri: Object.freeze(["kapsam_veya_hedefleme_degisimi", "teslimat_kesintisi", "yeni_sonuc_kaniti"] as const),
+    kararModu: "insan_incelemeli_oneri" as const,
+  });
+}
+
 /** Creates only a deterministic human-review draft; no action path is exposed. */
 export function createSliceOperatingRuleDraft(input: Readonly<{
   slice: CampaignSlice;
@@ -297,9 +318,12 @@ export function createSliceOperatingRuleDraft(input: Readonly<{
   const verification = exact(source.verification, ["metric", "reviewCadence", "rollbackWhen"], "invalid_input");
   if (!["qualified_leads", "cost_per_qualified_lead", "engagement_rate", "delivery_health"].includes(String(verification.metric))
     || !["daily", "weekly", "monthly"].includes(String(verification.reviewCadence))) fail("invalid_input");
+  const normalizedVerification = Object.freeze({ metric: verification.metric as SliceOperatingRuleDraft["verification"]["metric"],
+    reviewCadence: verification.reviewCadence as SliceOperatingRuleDraft["verification"]["reviewCadence"], rollbackWhen: text(verification.rollbackWhen, 500) });
   const core = Object.freeze({ version: SLICE_OPERATING_RULE_VERSION, slice, rule, automationMode: source.automationMode as SliceAutomationMode,
     priority, verification: Object.freeze({ metric: verification.metric as SliceOperatingRuleDraft["verification"]["metric"],
       reviewCadence: verification.reviewCadence as SliceOperatingRuleDraft["verification"]["reviewCadence"], rollbackWhen: text(verification.rollbackWhen, 500) }),
+    zamansalDegerlendirme: zamansalDegerlendirme(normalizedVerification.reviewCadence),
     requiresHumanReview: true as const, promotionRequired: true as const, authority: AUTHORITY });
   return Object.freeze({ ...core, draftHash: digest(core) });
 }
