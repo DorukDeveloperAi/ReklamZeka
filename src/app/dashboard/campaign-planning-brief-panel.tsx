@@ -14,6 +14,8 @@ import {
   type PersistedCampaignPlanningHint,
   planningHintFromPersistedCampaignContext,
 } from "@/domain/campaigns/interactive-campaign-template";
+import { currentPortfolioRulesFor } from "@/domain/campaigns/current-portfolio-rule-catalog";
+import { resolveCampaignEvaluationCohort, type CampaignEvaluationCandidate } from "@/domain/campaigns/slice-operating-rule";
 import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel";
 import styles from "./operating-dashboard.module.css";
 
@@ -210,6 +212,36 @@ const routeLabels: Readonly<Record<ConversionRoute, string>> = Object.freeze({
   unknown: "Henüz seçilmedi",
 });
 
+function evaluationCandidateFromBrief(draft: BriefDraft): CampaignEvaluationCandidate {
+  const candidate: {
+    market?: "domestic" | "international";
+    serviceRef?: string;
+    campaignFamilyRef?: string;
+    countryOrRegion?: string;
+    conversionRoute?: "lead_form" | "whatsapp" | "landing_page";
+    businessGoal?: "lead_acquisition" | "upper_funnel_education" | "market_service_learning";
+  } = {};
+  if (draft.market !== "unknown") candidate.market = draft.market;
+  if (draft.serviceRef) candidate.serviceRef = draft.serviceRef;
+  if (draft.campaignFamilyRef) candidate.campaignFamilyRef = draft.campaignFamilyRef;
+  if (draft.countryOrRegion) candidate.countryOrRegion = draft.countryOrRegion;
+  if (draft.conversionRoute === "lead_form" || draft.conversionRoute === "whatsapp" || draft.conversionRoute === "landing_page") {
+    candidate.conversionRoute = draft.conversionRoute;
+  }
+  if (draft.businessGoal === "lead_acquisition" || draft.businessGoal === "upper_funnel_education" || draft.businessGoal === "market_service_learning") {
+    candidate.businessGoal = draft.businessGoal;
+  }
+  return Object.freeze(candidate);
+}
+
+function ruleDraftLabel(kind: string): string {
+  return kind === "pazar_siniri" ? "Yerli/yabancı pazar sınırı"
+    : kind === "degerlendirme_kumesi" ? "Kıyas/değerlendirme kümesi"
+      : kind === "sonuc_olcum_siniri" ? "Sonuç ölçüm ayrımı"
+        : kind === "targeting_budget_preservation" ? "Mevcut hedefleme ve bütçe korunumu"
+          : "İnceleme kuralı";
+}
+
 /**
  * Read-only planning starting points from the 2026-08-10 operating workbook.
  * They are intentionally examples, not persisted Meta campaign instructions.
@@ -259,6 +291,9 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
   const [approvalState, setApprovalState] = useState<ApprovalTimelineState>("idle");
   const [approvalTimeline, setApprovalTimeline] = useState<Readonly<{ itemCount: number; latestStatus: string | null }> | null>(null);
   const brief = useMemo(() => createInteractiveCampaignBrief(draft), [draft]);
+  const applicableRules = useMemo(() => currentPortfolioRulesFor(evaluationCandidateFromBrief(draft)), [draft]);
+  const evaluationRule = applicableRules.find((rule) => rule.rule.kind === "degerlendirme_kumesi") ?? null;
+  const evaluationCohort = useMemo(() => evaluationRule ? resolveCampaignEvaluationCohort(evaluationRule, evaluationCandidateFromBrief(draft)) : null, [draft, evaluationRule]);
   const change = <Key extends keyof BriefDraft>(key: Key, value: BriefDraft[Key]) => {
     // A scenario is only a starting point. Once an operator changes a field,
     // keeping its label would imply that the original workbook lane still
@@ -371,6 +406,14 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
     {brief.nextDecision ? <div className={styles.briefNextDecision}><span>SONRAKİ KARAR</span><strong>{brief.nextDecision.question}</strong><small>{brief.nextDecision.reason}</small></div> : null}
     <div className={styles.briefNextDecision} data-readiness={brief.recommendation.status}>
       <span>SALT-OKUNUR ÖNERİ</span><strong>{brief.recommendation.headline}</strong><small>{brief.recommendation.rationale}</small><p>{brief.recommendation.nextStep}</p>
+    </div>
+    <div className={styles.briefNextDecision} data-rule-state={evaluationCohort?.status ?? "portfolio_only"}>
+      <span>UYGULANAN KURAL TASLAKLARI</span>
+      <strong>{applicableRules.length ? applicableRules.map((rule) => ruleDraftLabel(rule.rule.kind)).join(" · ") : "Önce pazar ve kapsamı doğrulayın"}</strong>
+      <small>{evaluationCohort?.status === "included" ? "Bu kampanya, seçilmiş kuralın değerlendirme kümesine girebilir; sonuç değerlendirmesi yine insan incelemesindedir."
+        : evaluationCohort?.status === "excluded_incomplete_metadata" ? `Kıyas kümesi için eksik künye: ${evaluationCohort.missingDimensions.join(", ")}. Sistem kampanyayı tahminle bu gruba katmaz.`
+          : evaluationCohort?.status === "excluded_scope_mismatch" ? "Bu kampanya, seçilmiş değerlendirme kuralının kapsamına girmiyor."
+            : "Pazar sınırı uygulanır; daha özel bir kural için insan doğrulamalı kapsam gerekir."}</small>
     </div>
     <div className={styles.briefNextDecision} data-source-state={sourceState}>
       <span>PERSISTED KAMPANYA BAĞLAMI</span><strong>{sourceState === "ready" ? "Frozen campaign context doğrulandı" : sourceState === "empty" ? "Henüz frozen context yok" : sourceState === "loading" ? "Frozen context okunuyor" : sourceState === "unavailable" ? "Context kaynağı kullanılamıyor" : "Demo bağlamı persisted kaynağa bağlı değil"}</strong>

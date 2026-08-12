@@ -44,6 +44,10 @@
   `FTR · Intensive FTR` slice'ında değerlendirme kümesi, sonuç-ölçüm sınırı ve korunmuş ülke/platform
   dağılımı taslaklarını döndürür. Yerli bir FTR/WhatsApp çalışması benzer route taşısa bile yabancı
   FTR kurallarını devralmaz. Katalog öncelik sırası deterministiktir ve tüm kayıtların yetkileri kapalıdır.
+- Dashboard brief'i artık seçili geçici künyeye uyan kural taslaklarını görünür kılar. Yabancı AR/FTR
+  senaryosunda pazar sınırı, değerlendirme kümesi, sonuç-ölçüm ayrımı ve mevcut hedefleme/bütçe korunumu
+  birlikte görünür; değerlendirme kümesi için hedefleme/platform künyesi eksikse kampanya açıkça dışarıda
+  kalır. Browser kabulünde bu durum, kapalı Meta-write yüzeyi ve sıfır console hata/uyarısı doğrulandı.
 
 ## 2026-08-10 — Merkezi ürün akışı ve kademeli teslim ilkesi
 

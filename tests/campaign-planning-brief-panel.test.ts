@@ -30,6 +30,8 @@ describe("campaign planning brief panel", () => {
     expect(html).toContain("Şablon ve kıyas sınırı");
     expect(html).toContain("domestic_form_lead");
     expect(html).toContain("OPERATÖR ÇALIŞMA NOTLARI");
+    expect(html).toContain("UYGULANAN KURAL TASLAKLARI");
+    expect(html).toContain("Yerli/yabancı pazar sınırı");
     expect(html).toContain("Teklif / değer önerisi");
     expect(html).toContain("Nitelikli lead tanımı");
     expect(html).toContain("Kaydedilmez, Guidance/Strict Policy alanına aktarılmaz; hiçbir uygulama yetkisi vermez");
@@ -47,6 +49,8 @@ describe("campaign planning brief panel", () => {
     expect(html).toContain("ayrı proposal/onay akışına geçin");
     expect(html).toContain("Bağlamı geri yükle");
     expect(html).toContain("international_whatsapp_lead");
+    expect(html).toContain("Kıyas/değerlendirme kümesi");
+    expect(html).toContain("Sistem kampanyayı tahminle bu gruba katmaz");
     expect(html).not.toContain("Meta transport");
   });
 
