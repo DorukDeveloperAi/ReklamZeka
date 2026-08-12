@@ -48,6 +48,10 @@ type AgentHandoffSummary = Readonly<{
   expiresAt: string;
 }>;
 type PersistedCampaignContextSummary = Readonly<{ campaignRef: string; label: string; objective: string | null; capturedAt: string; sourceState: "frozen_valid" }>;
+type PortfolioCapabilitySummary = Readonly<{
+  connections: readonly Readonly<{ connectionRef: string; displayName: string; status: "active" | "disconnected" | "revoked" | "invalid"; readReady: boolean; accountCount: number; }>[],
+  accounts: readonly Readonly<{ accountRef: string; connectionRef: string; name: string; currency: string; timezone: string; spendCapMinor: number | null; groupRefs: readonly string[]; readReadiness: "ready" | "partial" | "unavailable"; reasonCodes: readonly string[]; capabilities: Readonly<{ canRead: boolean; canPlan: boolean; canPublish: false; canApprove: false; canExecute: false; canWriteMeta: false; }> }>[],
+}>;
 
 /**
  * A list item authenticates only its opaque alias, capture time and Meta
@@ -90,6 +94,40 @@ export function isLocalSessionRequiredResponse(value: unknown): boolean {
   return Object.keys(error).length === 2
     && error.code === "local_session_required"
     && typeof error.message === "string" && error.message.length > 0 && error.message.length <= 240;
+}
+
+/** Accept only the deliberately redacted, read-only portfolio contract. */
+export function portfolioCapabilityFromResponse(value: unknown): PortfolioCapabilitySummary | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const response = value as Record<string, unknown>;
+  if (Object.keys(response).length !== 3 || response.version !== "meta-portfolio-capability/1.0.0"
+    || !Array.isArray(response.connections) || !Array.isArray(response.accounts)) return null;
+  const opaque = (candidate: unknown, prefix: string) => typeof candidate === "string" && new RegExp(`^${prefix}_[a-f0-9]{24}$`).test(candidate);
+  const connections = response.connections.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+    const item = entry as Record<string, unknown>;
+    if (Object.keys(item).length !== 5 || !opaque(item.connectionRef, "meta_connection") || typeof item.displayName !== "string" || item.displayName.length < 1 || item.displayName.length > 256
+      || !["active", "disconnected", "revoked", "invalid"].includes(item.status as string) || typeof item.readReady !== "boolean" || !Number.isSafeInteger(item.accountCount) || (item.accountCount as number) < 0) return null;
+    return Object.freeze(item as PortfolioCapabilitySummary["connections"][number]);
+  });
+  const accounts = response.accounts.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+    const item = entry as Record<string, unknown>;
+    const capability = item.capabilities;
+    if (Object.keys(item).length !== 10 || !opaque(item.accountRef, "ad_account") || !opaque(item.connectionRef, "meta_connection")
+      || typeof item.name !== "string" || item.name.length < 1 || item.name.length > 256 || typeof item.currency !== "string" || !/^[A-Z]{3}$/.test(item.currency)
+      || typeof item.timezone !== "string" || item.timezone.length < 1 || item.timezone.length > 128 || !(item.spendCapMinor === null || Number.isSafeInteger(item.spendCapMinor) && (item.spendCapMinor as number) >= 0)
+      || !Array.isArray(item.groupRefs) || item.groupRefs.some((ref) => typeof ref !== "string" || !/^account_group_[a-z0-9][a-z0-9_.:-]{0,126}$/.test(ref))
+      || !["ready", "partial", "unavailable"].includes(item.readReadiness as string) || !Array.isArray(item.reasonCodes) || item.reasonCodes.some((code) => typeof code !== "string" || !/^[a-z0-9_]{1,96}$/.test(code))
+      || !capability || typeof capability !== "object" || Array.isArray(capability) || Object.keys(capability as object).length !== 6
+      || typeof (capability as Record<string, unknown>).canRead !== "boolean" || typeof (capability as Record<string, unknown>).canPlan !== "boolean"
+      || (capability as Record<string, unknown>).canPublish !== false || (capability as Record<string, unknown>).canApprove !== false || (capability as Record<string, unknown>).canExecute !== false || (capability as Record<string, unknown>).canWriteMeta !== false) return null;
+    return Object.freeze(item as PortfolioCapabilitySummary["accounts"][number]);
+  });
+  const validConnections = connections.filter((entry): entry is PortfolioCapabilitySummary["connections"][number] => entry !== null);
+  const validAccounts = accounts.filter((entry): entry is PortfolioCapabilitySummary["accounts"][number] => entry !== null);
+  if (validConnections.length !== connections.length || validAccounts.length !== accounts.length) return null;
+  return Object.freeze({ connections: Object.freeze(validConnections), accounts: Object.freeze(validAccounts) });
 }
 
 const navGroups: ReadonlyArray<Readonly<{ label: string; items: ReadonlyArray<Readonly<{ id: ViewId; label: string; icon: string; badge?: string }>> }>> = [
@@ -288,6 +326,8 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   const [metaLoading, setMetaLoading] = useState(true);
   const [metaError, setMetaError] = useState<string | null>(null);
   const [selectedMetaAccountId, setSelectedMetaAccountId] = useState("");
+  const [portfolioCapability, setPortfolioCapability] = useState<PortfolioCapabilitySummary | null>(null);
+  const [portfolioCapabilityState, setPortfolioCapabilityState] = useState<"loading" | "ready" | "session_required" | "unavailable">("loading");
   const [agentSessions, setAgentSessions] = useState<AgentSessionSummary[]>([]);
   const [agentSessionsLoading, setAgentSessionsLoading] = useState(true);
   const [agentSessionError, setAgentSessionError] = useState<string | null>(null);
@@ -358,6 +398,20 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   }, [refreshMetaInventory]);
 
   useEffect(() => { void refreshAgentSessions(); }, [refreshAgentSessions]);
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/meta/portfolio-capability", { cache: "no-store", credentials: "same-origin" })
+      .then(async (response) => ({ response, payload: await response.json() as unknown }))
+      .then(({ response, payload }) => {
+        if (!active) return;
+        const capability = response.ok ? portfolioCapabilityFromResponse(payload) : null;
+        setPortfolioCapability(capability);
+        setPortfolioCapabilityState(capability ? "ready" : !response.ok && isLocalSessionRequiredResponse(payload) ? "session_required" : "unavailable");
+      })
+      .catch(() => { if (active) { setPortfolioCapability(null); setPortfolioCapabilityState("unavailable"); } });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -598,6 +652,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       return <>
         <section className={styles.pageHero}><div><span className={styles.kicker}>META READ MIRROR</span><h1>Meta erişim envanteri hazırlanıyor.</h1><p>Token yalnız sunucu tarafında okunur; dashboard ve agent bağlamına hiçbir zaman eklenmez.</p></div><button className={styles.primaryButton} disabled={metaLoading} onClick={() => void refreshMetaInventory(true)}>{metaLoading ? "Kontrol ediliyor…" : "Yeniden dene"}</button></section>
         <section className={`${styles.panel} ${styles.metaEmpty}`}><StatusPill tone={metaError ? "danger" : "neutral"}>{metaError ? "Bağlantı hatası" : "Salt okunur keşif"}</StatusPill><h2>{metaError ?? "Meta Graph yanıtı bekleniyor"}</h2><p>Hiçbir kampanya, bütçe, reklam seti veya reklam değiştirilmiyor.</p></section>
+        <section className={styles.panel} aria-label="Portföy kapsamı"><header className={styles.panelHeader}><div><span className={styles.kicker}>PORTFÖY KAPSAMI</span><h2>Hesap grupları ve salt-okur erişim</h2></div><StatusPill tone={portfolioCapabilityState === "session_required" ? "warning" : "neutral"}>{portfolioCapabilityState === "session_required" ? "Oturum gerekli" : "Kaynak yok"}</StatusPill></header><p className={styles.metaAccountEmpty}>{portfolioCapabilityState === "session_required" ? "Gerçek hesap gruplarını görmek için önce yerel dashboard oturumunu bağlayın." : "Portföy kapsamı kaynağı henüz güvenli biçimde bağlanmadı; demo gruplar gösterilmiyor."}</p><p className={styles.safetyNote}>Bu görünümden bütçe, yayın, onay veya Meta yazma yapılamaz.</p></section>
       </>;
     }
 
@@ -633,6 +688,16 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
           <div className={styles.capabilityHead} role="row"><span>Yetenek</span><span>Token izni</span><span>Canlı doğrulama</span><span>ReklamZeka’da etkin</span><span>Açıklama</span></div>
           {inventory.capabilities.map((capability) => <div className={styles.capabilityRow} role="row" key={capability.id}><strong>{capability.label}</strong><StatusPill tone={capability.granted ? "good" : "neutral"}>{capability.granted ? "Var" : "Yok"}</StatusPill><StatusPill tone={capability.verified ? "info" : "neutral"}>{capability.verified ? "Doğrulandı" : "Çalıştırılmadı"}</StatusPill><StatusPill tone={capability.enabled ? "good" : "danger"}>{capability.enabled ? "Açık" : "Kapalı"}</StatusPill><small>{capability.note}</small></div>)}
         </div>
+      </section>
+
+      <section className={styles.panel} aria-label="Portföy kapsamı">
+        <header className={styles.panelHeader}><div><span className={styles.kicker}>PORTFÖY KAPSAMI</span><h2>Hesap grupları ve salt-okur erişim</h2></div><StatusPill tone={portfolioCapabilityState === "ready" ? "good" : portfolioCapabilityState === "session_required" ? "warning" : "neutral"}>{portfolioCapabilityState === "ready" ? "Doğrulandı" : portfolioCapabilityState === "session_required" ? "Oturum gerekli" : "Kaynak yok"}</StatusPill></header>
+        {portfolioCapabilityState === "ready" && portfolioCapability ? <div className={styles.metaAccountList}>{portfolioCapability.accounts.length ? portfolioCapability.accounts.map((account) => <article key={account.accountRef} className={styles.metaAccountDetail}>
+          <div><span className={styles.kicker}>HESAP · SALT-OKUR</span><strong>{account.name}</strong><small>{account.currency} · {account.timezone} · {account.groupRefs.length ? `${account.groupRefs.length} tanımlı hesap grubu` : "Hesap grubu tanımlı değil"}</small></div>
+          <dl><div><dt>Okuma</dt><dd>{account.capabilities.canRead ? "Hazır" : account.readReadiness}</dd></div><div><dt>Plan</dt><dd>{account.capabilities.canPlan ? "Sadece öneri" : "Kapalı"}</dd></div><div><dt>Onay / uygulama</dt><dd>Kapalı</dd></div><div><dt>Meta yazma</dt><dd>Kapalı</dd></div></dl>
+          {account.reasonCodes.length ? <p>Eksik kanıt: {account.reasonCodes.join(" · ")}</p> : null}
+        </article>) : <p className={styles.metaAccountEmpty}>Bağlı portföyde seçilebilir reklam hesabı yok.</p>}</div> : <p className={styles.metaAccountEmpty}>{portfolioCapabilityState === "session_required" ? "Gerçek hesap gruplarını görmek için önce yerel dashboard oturumunu bağlayın." : "Portföy kapsamı kaynağı henüz güvenli biçimde bağlanmadı; demo gruplar gösterilmiyor."}</p>}
+        <p className={styles.safetyNote}>Hesap grubu yalnız kapsam etiketidir; hesap yetkisini genişletmez. Bütçe, yayın, onay ve Meta yazma bu görünümden yapılamaz.</p>
       </section>
 
       <div className={styles.metaInventoryColumns}>

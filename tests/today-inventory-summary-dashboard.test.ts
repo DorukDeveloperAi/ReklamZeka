@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   OperatingDashboard,
+  portfolioCapabilityFromResponse,
   resolveMetaAccountFocus,
   todayInventorySummary,
 } from "@/app/dashboard/operating-dashboard";
@@ -58,5 +59,17 @@ describe("Today inventory summary", () => {
     expect(html).toContain("3 senaryoyu aç");
     expect(html).not.toContain("₺128.000");
     expect(html).not.toContain("32 aktif kampanya");
+  });
+
+  it("keeps the account-group portfolio surface unavailable until its authenticated source is verified", () => {
+    const html = renderToStaticMarkup(createElement(OperatingDashboard, { model, initialView: "meta" }));
+    expect(html).toContain("PORTFÖY KAPSAMI");
+    expect(html).toContain("Portföy kapsamı kaynağı henüz güvenli biçimde bağlanmadı; demo gruplar gösterilmiyor.");
+    expect(html).toContain("Bu görünümden bütçe, yayın, onay veya Meta yazma yapılamaz.");
+  });
+
+  it("accepts only the public-safe portfolio capability contract", () => {
+    expect(portfolioCapabilityFromResponse({ version: "meta-portfolio-capability/1.0.0", connections: [], accounts: [] })).toEqual({ connections: [], accounts: [] });
+    expect(portfolioCapabilityFromResponse({ version: "meta-portfolio-capability/1.0.0", connections: [], accounts: [{ accountRef: "ad_account_aaaaaaaaaaaaaaaaaaaaaaaa", connectionRef: "meta_connection_bbbbbbbbbbbbbbbbbbbbbbbb", name: "X", currency: "TRY", timezone: "Europe/Istanbul", spendCapMinor: null, groupRefs: [], readReadiness: "ready", reasonCodes: [], capabilities: { canRead: true, canPlan: true, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: true } }] })).toBeNull();
   });
 });
