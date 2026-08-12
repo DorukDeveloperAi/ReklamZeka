@@ -160,7 +160,7 @@
       "pkg": "skill:kaptan"
     },
     ".claude/skills/kaptan/scripts/distill.mjs": {
-      "hash": "efd16ec8f929424b",
+      "hash": "143024cf70e6e373",
       "pkg": "skill:kaptan"
     },
     ".claude/skills/kaptan/scripts/backfill.mjs": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-12T09:16:13.128Z",
+  "updatedAt": "2026-08-12T11:16:43.602Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",
