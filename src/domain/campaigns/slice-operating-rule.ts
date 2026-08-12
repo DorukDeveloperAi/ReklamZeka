@@ -63,6 +63,12 @@ export type SliceRule =
     birlikte_karsilastirilamaz: true;
   }>
   | Readonly<{
+    /** Declares the exact dimensions that define a comparable operating cohort. */
+    kind: "degerlendirme_kumesi";
+    grup_boyutlari: readonly ("pazar" | "ana_kampanya_hedefi" | "kampanya_ailesi" | "donusum_rotasi" | "ulke_bolge" | "hedef_kitle_stratejisi" | "platform")[];
+    eksik_kunye: "degerlendirme_disi_tut";
+  }>
+  | Readonly<{
     /** Preserves a human-reviewed current distribution before any optimization. */
     kind: "targeting_budget_preservation";
     currency: string;
@@ -230,6 +236,17 @@ function normalizeRule(value: unknown): SliceRule {
       || rule.birlikte_karsilastirilamaz !== true) fail("invalid_rule");
     return Object.freeze({ kind, ayri_degerlendir: Object.freeze([...rule.ayri_degerlendir].sort()) as readonly (typeof dimensions[number])[],
       birlikte_karsilastirilamaz: true as const });
+  }
+  if (kind === "degerlendirme_kumesi") {
+    const rule = exact(value, ["kind", "grup_boyutlari", "eksik_kunye"], "invalid_rule");
+    const dimensions = ["pazar", "ana_kampanya_hedefi", "kampanya_ailesi", "donusum_rotasi", "ulke_bolge", "hedef_kitle_stratejisi", "platform"] as const;
+    if (!Array.isArray(rule.grup_boyutlari) || rule.grup_boyutlari.length < 1 || rule.grup_boyutlari.length > dimensions.length
+      || new Set(rule.grup_boyutlari).size !== rule.grup_boyutlari.length
+      || !rule.grup_boyutlari.includes("pazar")
+      || !rule.grup_boyutlari.every((dimension) => dimensions.includes(dimension as typeof dimensions[number]))
+      || rule.eksik_kunye !== "degerlendirme_disi_tut") fail("invalid_rule");
+    return Object.freeze({ kind, grup_boyutlari: Object.freeze([...rule.grup_boyutlari].sort()) as readonly (typeof dimensions[number])[],
+      eksik_kunye: "degerlendirme_disi_tut" as const });
   }
   if (kind === "targeting_budget_preservation") {
     const rule = exact(value, ["kind", "currency", "totalDailyBudgetDecimal", "allocations"], "invalid_rule");

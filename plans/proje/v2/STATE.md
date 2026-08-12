@@ -16,6 +16,10 @@
   Rusça form-lead rotalarının eşdeğer olmayan platform sonuçları ürettiğini doğruladı. Bu nedenle
   `sonuc_olcum_siniri` taslağı rota, ülke/bölge ve hedef kitle stratejisini ayrı değerlendirme
   şeritlerinde tutar; haftalık nitelikli-lead incelemesi dışında otomatik bütçe/Meta değişimi açmaz.
+- Değerlendirme havuzu tek bir sabit hiyerarşiye bağlanmadı: `degerlendirme_kumesi` kuralı pazar
+  sınırını zorunlu tutarken, her strateji için ana kampanya hedefi, aile, rota, ülke/bölge, hedef
+  kitle stratejisi ve platformdan gerekli olanları seçebilir. Eksik künye otomatik olarak o
+  karşılaştırmadan dışarıda kalır; tahminle gruplama yapılmaz.
 
 ## 2026-08-10 — Merkezi ürün akışı ve kademeli teslim ilkesi
 

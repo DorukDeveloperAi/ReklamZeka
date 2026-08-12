@@ -103,4 +103,34 @@ describe("slice operating rule draft", () => {
       verification: { metric: "qualified_leads", reviewCadence: "weekly", rollbackWhen: "test" },
     })).toThrow(SliceOperatingRuleError);
   });
+
+  it("lets a rule choose its own comparable cohort while always retaining the market boundary", () => {
+    const rule = createSliceOperatingRuleDraft({
+      slice: { market: "international", campaignCategoryRef: "category_ftr" },
+      rule: {
+        kind: "degerlendirme_kumesi",
+        grup_boyutlari: ["pazar", "ana_kampanya_hedefi", "ulke_bolge", "hedef_kitle_stratejisi"],
+        eksik_kunye: "degerlendirme_disi_tut",
+      },
+      automationMode: "recommendation_only", priority: 10,
+      verification: { metric: "qualified_leads", reviewCadence: "weekly", rollbackWhen: "Eksik künye" },
+    });
+    expect(rule.rule).toEqual({
+      kind: "degerlendirme_kumesi",
+      grup_boyutlari: ["ana_kampanya_hedefi", "hedef_kitle_stratejisi", "pazar", "ulke_bolge"],
+      eksik_kunye: "degerlendirme_disi_tut",
+    });
+  });
+
+  it("rejects a comparable cohort that drops the mandatory market boundary", () => {
+    expect(() => createSliceOperatingRuleDraft({
+      slice,
+      rule: {
+        kind: "degerlendirme_kumesi", grup_boyutlari: ["ana_kampanya_hedefi"],
+        eksik_kunye: "degerlendirme_disi_tut",
+      },
+      automationMode: "observe_only", priority: 1,
+      verification: { metric: "delivery_health", reviewCadence: "weekly", rollbackWhen: "test" },
+    })).toThrow(SliceOperatingRuleError);
+  });
 });
