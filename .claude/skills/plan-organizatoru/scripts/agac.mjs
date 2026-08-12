@@ -601,10 +601,17 @@ function resolveGraph(model) {
     // beyan hazir[]'a GİRMEZ (o governance bulgusudur, gate FAIL eder). Beyan yoksa anahtar HİÇ
     // eklenmez (spread ile) → 104 frontmatter'sız aşamada hazir[] baytları bugünküyle AYNI kalır.
     const hazirKosum = (no) => { const k = p.kosumMap?.[no]; return k && k.tur ? { kosum: k } : {}; };
+    // `dokunur` PROJEKSİYONU (AIDE S temel:05 · orkestrator-dagitim:01 ile aynı sözleşme):
+    // aşamanın DOKUNACAĞI kaynaklar hazır-küme girdisine taşınır — çakışma eleği ve harita
+    // hat ataması bunu okur. `kosum` emsaliyle birebir: YALNIZ dolu beyan taşınır, beyansız
+    // aşamada anahtar HİÇ eklenmez (spread) → beyansız aşamalarda hazir[] baytları AYNI kalır.
+    // `dugum` TAŞINMAZ (aşamanın ÜRETECEĞİ dosyadır; eleğe girerse aşama kendi çıktısıyla
+    // çakışır sanılır) — İLANLI sınır.
+    const hazirDokunur = (no) => { const d = p.getirirMap?.[no]?.dokunur; return d?.length ? { dokunur: d } : {}; };
     if (p.depli) {
       p.baslangiclar = p.asamalar.filter((a) => !(a.bagimli || []).length).map((a) => a.no);
       p.hazir = p.asamalar.filter((a) => a.durum === 'AÇIK' && tatmin(a))
-        .map((a) => ({ no: a.no, ad: a.ad, goal: goalCmd(p.slug, p.v, a.no), ...hazirKosum(a.no) }));
+        .map((a) => ({ no: a.no, ad: a.ad, goal: goalCmd(p.slug, p.v, a.no), ...hazirKosum(a.no), ...hazirDokunur(a.no) }));
       p.bekleyen = p.asamalar.filter((a) => a.durum === 'AÇIK' && !tatmin(a))
         .map((a) => ({
           no: a.no, ad: a.ad,
@@ -616,7 +623,7 @@ function resolveGraph(model) {
       // paralel tüketim ancak bağımlılık İLAN edilmiş planda meşrudur.
       const ilkAcik = p.asamalar.find((a) => a.durum === 'AÇIK');
       p.baslangiclar = p.asamalar.length ? [p.asamalar[0].no] : [];
-      p.hazir = ilkAcik ? [{ no: ilkAcik.no, ad: ilkAcik.ad, goal: goalCmd(p.slug, p.v, ilkAcik.no), ...hazirKosum(ilkAcik.no) }] : [];
+      p.hazir = ilkAcik ? [{ no: ilkAcik.no, ad: ilkAcik.ad, goal: goalCmd(p.slug, p.v, ilkAcik.no), ...hazirKosum(ilkAcik.no), ...hazirDokunur(ilkAcik.no) }] : [];
       p.bekleyen = [];
     }
     const suren = p.asamalar.find((a) => a.durum === 'SÜRÜYOR');
