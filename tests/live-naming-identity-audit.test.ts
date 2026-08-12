@@ -7,12 +7,37 @@ describe("live naming identity audit", () => {
     const audit = auditCampaignNamingIdentity({
       name: "Fizik Tedavi - Intensive FTR - Türki Cumhuriyetler - Tümü - RU - Lechenie v Turtsii - lead",
       configuredObjective: "OUTCOME_LEADS",
-      expected: { service: "physical_therapy_rehab", route: "lead_form", language: "ru" },
+      expected: { service: "physical_therapy_rehab", campaignFamily: "intensive_ftr", route: "lead_form", language: "ru" },
     });
 
     expect(audit.status).toBe("verified");
     expect(audit.suggestedName).toBeNull();
     expect(audit.authority).toEqual({ canRename: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false });
+  });
+
+  it("rejects WhatsApp as the primary campaign identity while retaining it as a live route", () => {
+    const audit = auditCampaignNamingIdentity({
+      name: "Whatsapp - Fizik Tedavi - Intensive FTR - Arap Bölgesi - AR",
+      configuredObjective: "OUTCOME_LEADS",
+      expected: { service: "physical_therapy_rehab", campaignFamily: "intensive_ftr", route: "whatsapp", language: "ar" },
+    });
+
+    expect(audit.status).toBe("mismatch");
+    expect(audit.findings.find((item) => item.facet === "campaign_family")).toMatchObject({ status: "verified" });
+    expect(audit.findings.find((item) => item.facet === "route")).toMatchObject({ status: "mismatch", severity: "correction_required" });
+    expect(audit.suggestedName).toBe("Fizik Tedavi · Intensive FTR");
+    expect(audit.authority.canRename).toBe(false);
+  });
+
+  it("does not require a conversion route token in a campaign name", () => {
+    const audit = auditCampaignNamingIdentity({
+      name: "Fizik Tedavi - Intensive FTR - Arap Bölgesi - AR",
+      configuredObjective: "OUTCOME_LEADS",
+      expected: { service: "physical_therapy_rehab", campaignFamily: "intensive_ftr", route: "whatsapp", language: "ar" },
+    });
+
+    expect(audit.status).toBe("unknown");
+    expect(audit.findings.find((item) => item.facet === "route")).toMatchObject({ status: "unknown", severity: "information" });
   });
 
   it("flags an Arabic Android ad set whose name omits a live targeted country and proposes only a reviewable label", () => {

@@ -20,6 +20,10 @@
   sınırını zorunlu tutarken, her strateji için ana kampanya hedefi, aile, rota, ülke/bölge, hedef
   kitle stratejisi ve platformdan gerekli olanları seçebilir. Eksik künye otomatik olarak o
   karşılaştırmadan dışarıda kalır; tahminle gruplama yapılmaz.
+- İsim denetimi kampanya ana kimliği ile dönüşüm rotasını ayıracak biçimde düzeltildi: örneğin
+  `Fizik Tedavi · Intensive FTR` hizmet/aile kimliğidir; WhatsApp canlı route/ölçüm özelliğidir ve
+  kampanya adının başına geçemez. İsimde rota hiç yazmıyorsa yalnız bilgi `unknown` kalır; isimden
+  rota uydurulmaz. Her öneri insan incelemeli ve yeniden adlandırma/Meta write yetkisizdir.
 
 ## 2026-08-10 — Merkezi ürün akışı ve kademeli teslim ilkesi
 

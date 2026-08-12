@@ -11,7 +11,7 @@ export type NamingAuditStatus = "verified" | "mismatch" | "unknown";
 export type NamingAuditSeverity = "correction_required" | "review_required" | "information";
 
 export type NamingAuditFinding = Readonly<{
-  facet: "service" | "route" | "language" | "objective" | "country_targeting" | "operating_system" | "publisher_platform" | "delivery_country";
+  facet: "service" | "campaign_family" | "route" | "language" | "objective" | "country_targeting" | "operating_system" | "publisher_platform" | "delivery_country";
   status: NamingAuditStatus;
   severity: NamingAuditSeverity;
   detail: string;
@@ -22,6 +22,7 @@ export type CampaignNamingIdentityInput = Readonly<{
   configuredObjective: "OUTCOME_LEADS" | "OUTCOME_ENGAGEMENT" | "OUTCOME_AWARENESS" | "unknown";
   expected: Readonly<{
     service?: "physical_therapy_rehab";
+    campaignFamily?: "intensive_ftr";
     route?: "whatsapp" | "lead_form";
     language?: "ar" | "ru" | "tr" | "en";
   }>;
@@ -81,7 +82,11 @@ const COUNTRIES = Object.freeze([
 ] as const);
 
 function normalized(value: string): string {
-  return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLocaleLowerCase("tr-TR");
+  // Campaign labels mix Turkish and English tokens. Locale-sensitive Turkish
+  // lowercasing would turn `Intensive` into `ıntensive`, while a supplied
+  // canonical `intensive_ftr` remains dotted; normalize identity tokens in a
+  // locale-neutral form before comparing them.
+  return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 }
 
 function hasToken(name: string, token: string): boolean {
@@ -118,9 +123,13 @@ function countryLabel(code: string): string {
 
 function expectedRouteFinding(name: string, route: CampaignNamingIdentityInput["expected"]["route"]): NamingAuditFinding | null {
   if (!route) return null;
-  const matches = route === "whatsapp" ? hasToken(name, "whatsapp") : hasToken(name, "lead");
-  return finding("route", matches ? "verified" : "mismatch", matches ? "information" : "correction_required",
-    matches ? `İsim ${route === "whatsapp" ? "WhatsApp" : "lead"} rota iddiasını taşıyor.` : `İsim beklenen ${route} rota iddiasını taşımıyor.`);
+  const routeToken = route === "whatsapp" ? "whatsapp" : "lead";
+  const claimsRoute = hasToken(name, routeToken);
+  const startsWithRoute = new RegExp(`^\\s*${routeToken}\\b`, "iu").test(name);
+  if (startsWithRoute) return finding("route", "mismatch", "correction_required",
+    "Dönüşüm rotası kampanya adının ana kimliği olamaz; rota canlı kurulum ve ölçüm alanında tutulmalıdır.");
+  if (claimsRoute) return finding("route", "verified", "information", "İsim rota bilgisini ikincil tanım olarak taşıyor; ana kimlik hizmet ve kampanya ailesidir.");
+  return finding("route", "unknown", "information", "Kampanya adı rota bilgisini taşımıyor; rota yalnız canlı kurulumdan doğrulanmalıdır.");
 }
 
 /** Audits only explicit campaign-name claims against configured objective and reviewed expected identity. */
@@ -129,6 +138,11 @@ export function auditCampaignNamingIdentity(input: CampaignNamingIdentityInput):
   const serviceMatches = input.expected.service !== "physical_therapy_rehab" || hasToken(input.name, "ftr") || hasToken(input.name, "fizik tedavi");
   if (input.expected.service) findings.push(finding("service", serviceMatches ? "verified" : "mismatch", serviceMatches ? "information" : "correction_required",
     serviceMatches ? "İsim fizik tedavi / rehabilitasyon hizmet iddiasını taşıyor." : "İsim beklenen fizik tedavi / rehabilitasyon hizmet iddiasını taşımıyor."));
+  if (input.expected.campaignFamily) {
+    const familyMatches = input.expected.campaignFamily !== "intensive_ftr" || hasToken(input.name, "intensive ftr");
+    findings.push(finding("campaign_family", familyMatches ? "verified" : "mismatch", familyMatches ? "information" : "correction_required",
+      familyMatches ? "İsim Intensive FTR kampanya ailesini taşıyor." : "İsim beklenen Intensive FTR kampanya ailesini taşımıyor."));
+  }
   const route = expectedRouteFinding(input.name, input.expected.route);
   if (route) findings.push(route);
   if (input.expected.language) {
@@ -144,7 +158,11 @@ export function auditCampaignNamingIdentity(input: CampaignNamingIdentityInput):
   } else {
     findings.push(finding("objective", "unknown", "review_required", "İsim objective iddiası taşımıyor; canlı objective isimden türetilemez."));
   }
-  return finalize("campaign", input.name, findings, auditStatus(findings) === "mismatch" ? input.name : null);
+  const routePrimary = input.expected.route && new RegExp(`^\\s*${input.expected.route === "whatsapp" ? "whatsapp" : "lead"}\\b`, "iu").test(input.name);
+  const suggestedName = routePrimary && input.expected.service === "physical_therapy_rehab" && input.expected.campaignFamily === "intensive_ftr"
+    ? "Fizik Tedavi · Intensive FTR"
+    : auditStatus(findings) === "mismatch" ? input.name : null;
+  return finalize("campaign", input.name, findings, suggestedName);
 }
 
 /**
