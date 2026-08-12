@@ -37,7 +37,21 @@ const EPICS_DIR = join(CLAUDE, "kaptan", "epics");
 const KUNYE_DIR = join(CLAUDE, "kaptan", "kunye");
 const STATE_FILE = join(CLAUDE, "kaptan", "distill-state.json");
 
-const DEFAULT_MODEL = "claude-sonnet-5";
+/** Damıtma modeli — MODEL POLİTİKASINDAN okunur (`~/.claude/model-policy.json` → `tiers.hizli`).
+ *  persona.mjs ile AYNI desen; ikinci bir model kaynağı yazılmaz.
+ *
+ *  BURASI BİR ZAMANLAR HARDCODE'DU (`claude-sonnet-5`) ve politikanın bilinen TEK canlı
+ *  baypasıydı: "tek kaynak config.json→models" kanonunun dışında bir model, hiçbir tier'da
+ *  tanımlı olmadan koşuyordu (persona'da aynı hata düzeltilmiş, burada kalmıştı).
+ *  Policy okunamazsa haiku'ya düşer — sessiz sonnet'e DEĞİL. */
+function hizliModel() {
+  try {
+    const p = JSON.parse(readFileSync(join(homedir(), ".claude", "model-policy.json"), "utf8"));
+    return p?.tiers?.hizli?.model || "claude-haiku-4-5";
+  } catch {
+    return "claude-haiku-4-5";
+  }
+}
 const MAX_TODOS = 14;   // Stage A: session başına prompt'a giren todo sayısı
 const MAX_LEN = 130;    // içerik kırpma
 const TITLE_MAX = 60;
@@ -454,7 +468,7 @@ if (isMain) {
   const skipB = args.includes("--skip-b");
   const forceA = args.includes("--force-a"); // kapsam tam olsa da epic'leri yeniden grupla
   const force = args.includes("--force");    // nabız değişmemiş olsa da projeye bak
-  const model = val("--model") || DEFAULT_MODEL;
+  const model = val("--model") || hizliModel();
 
   let targets;
   try { targets = resolveTargets(val("--project")); }
