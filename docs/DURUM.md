@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: d057d80784a9 -->
+<!-- durum-damga: 8dae37cccdeb -->
 
 ## Künye
 
@@ -14,13 +14,17 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 305 |
+| iş commit'i (tüm geçmiş) | 309 |
 | ilk / son iş | 2026-08-06 / 2026-08-12 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-12 | `fix` | exclude inactive group scopes on resolve | `fc382f8f2` |
+| 2026-08-12 | `fix` | verify account group scope on draft | `842102ea8` |
+| 2026-08-12 | `feat` | expose account group draft scope | `bcf63ded5` |
+| 2026-08-12 | `docs` | record portfolio capability read boundary | `ce8605f59` |
 | 2026-08-12 | `feat` | classify audience and platform scope | `914aa6406` |
 | 2026-08-12 | `feat` | show applicable portfolio rules | `bf6720d23` |
 | 2026-08-12 | `feat` | catalog current portfolio scopes | `8b86fa5f8` |
@@ -32,16 +36,12 @@
 | 2026-08-12 | `fix` | separate campaign identity from conversion route | `60e04fb25` |
 | 2026-08-12 | `feat` | support scoped evaluation cohorts | `85f777d15` |
 | 2026-08-12 | `feat` | separate international acquisition measurement lanes | `e00015c6b` |
-| 2026-08-12 | `feat` | enforce domestic foreign portfolio boundary | `3cead9cef` |
-| 2026-08-12 | `feat` | audit live campaign naming identity | `572f068ac` |
-| 2026-08-12 | `fix` | bind physical therapy targeting to live read | `670ae7965` |
-| 2026-08-12 | `feat` | preserve international physical therapy allocation | `f24175682` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 48
-- `fix         ` ████ 8
-- `docs        ` █ 2
+- `feat        ` ████████████████████████ 45
+- `fix         ` █████ 10
+- `docs        ` ██ 3
 - `test        ` █ 2
 
 ## Planlar

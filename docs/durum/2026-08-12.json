@@ -4,6 +4,42 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "fc382f8f2",
+      "tarih": "2026-08-12",
+      "konu": "fix(rules): exclude inactive group scopes on resolve",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "842102ea8",
+      "tarih": "2026-08-12",
+      "konu": "fix(rules): verify account group scope on draft",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "bcf63ded5",
+      "tarih": "2026-08-12",
+      "konu": "feat(rules): expose account group draft scope",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ce8605f59",
+      "tarih": "2026-08-12",
+      "konu": "docs(a08): record portfolio capability read boundary",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
       "hash": "914aa6406",
       "tarih": "2026-08-12",
       "konu": "feat(brief): classify audience and platform scope",
@@ -101,63 +137,27 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "3cead9cef",
-      "tarih": "2026-08-12",
-      "konu": "feat(rules): enforce domestic foreign portfolio boundary",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "572f068ac",
-      "tarih": "2026-08-12",
-      "konu": "feat(meta): audit live campaign naming identity",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "670ae7965",
-      "tarih": "2026-08-12",
-      "konu": "fix(rules): bind physical therapy targeting to live read",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "f24175682",
-      "tarih": "2026-08-12",
-      "konu": "feat(rules): preserve international physical therapy allocation",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 48
+      "adet": 45
     },
     {
       "kapsam": "fix",
-      "adet": 8
+      "adet": 10
     },
     {
       "kapsam": "docs",
-      "adet": 2
+      "adet": 3
     },
     {
       "kapsam": "test",
       "adet": 2
     }
   ],
-  "isSayisi": 305,
+  "isSayisi": 309,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-12",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "d057d80784a9"
+  "damga": "8dae37cccdeb"
 }
