@@ -138,6 +138,10 @@
   oturumsuz dashboard `Oturum gerekli` ve kapalı yazma sınırını gösterdi; Meta veya action çağrısı
   yapılmadı.
 
+- Autonomy Studio'nun draft kapsam seçicisi, mevcut append-only sözleşmenin desteklediği
+  `account_group` seviyesini de görünür kılar. Grup ref'i yalnız kural değerlendirme kapsamıdır;
+  draft yüzeyinin publish/approve/execute/Meta-write yetkileri yine false kalır.
+
 ## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
 
 - Strict Policy Studio içindeki normalizasyon çalışma alanı, owner talimatının mevcut Guidance Studio
