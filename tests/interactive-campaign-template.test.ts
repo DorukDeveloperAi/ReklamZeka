@@ -66,6 +66,14 @@ describe("interactive campaign template", () => {
     expect(internationalWhatsApp.comparisonBoundary.summary).toContain("Yalnız aynı pazar");
   });
 
+  it("adds a human-confirmed campaign family to a cohort without confusing it with the route", () => {
+    const brief = createInteractiveCampaignBrief({ ...base, market: "international", language: "ar", countryOrRegion: "GCC",
+      serviceRef: "service_physical_therapy_rehab", campaignFamilyRef: "campaign_family_intensive_ftr", conversionRoute: "whatsapp" });
+    expect(brief.classification.campaignFamilyRef).toBe("campaign_family_intensive_ftr");
+    expect(brief.comparisonBoundary.requiredDimensions).toContain("campaignFamily");
+    expect(brief.comparisonBoundary.cohortKey).toBe("international:ar:gcc:service_physical_therapy_rehab:campaign_family_intensive_ftr:lead_acquisition:whatsapp");
+  });
+
   it("uses only a verified frozen Meta objective as an optional business-goal hint", () => {
     expect(planningHintFromPersistedCampaignContext({ meta: { objective: { state: "known", value: "lead_generation" } } }))
       .toMatchObject({ source: "frozen_campaign_context", suggestedBusinessGoal: "lead_acquisition", deliveryHealth: "unknown", requiresHumanClassification: true });

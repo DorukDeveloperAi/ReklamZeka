@@ -15,7 +15,7 @@ import {
 const gccContext: CampaignPlanningBriefContext = Object.freeze({
   campaignRef: "cmp_gcc",
   campaignLabel: "Arap Bölgesi · FTR · WhatsApp",
-  input: Object.freeze({ businessGoal: "lead_acquisition", market: "international", language: "ar", serviceRef: "service_physical_therapy_rehab", countryOrRegion: "Arap Bölgesi", conversionRoute: "whatsapp", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }),
+  input: Object.freeze({ businessGoal: "lead_acquisition", market: "international", language: "ar", serviceRef: "service_physical_therapy_rehab", campaignFamilyRef: "campaign_family_intensive_ftr", countryOrRegion: "Arap Bölgesi", conversionRoute: "whatsapp", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }),
 });
 
 describe("campaign planning brief panel", () => {
@@ -62,7 +62,7 @@ describe("campaign planning brief panel", () => {
 
   it("offers workbook-derived scenarios without joining their comparison lanes", () => {
     expect(campaignBriefScenario("international_ar_whatsapp")).toMatchObject({ label: "Uluslararası · AR WhatsApp · FTR",
-      input: { market: "international", language: "ar", conversionRoute: "whatsapp", serviceRef: "service_physical_therapy_rehab" } });
+      input: { market: "international", language: "ar", conversionRoute: "whatsapp", serviceRef: "service_physical_therapy_rehab", campaignFamilyRef: "campaign_family_intensive_ftr" } });
     expect(campaignBriefScenario("international_ru_form")).toMatchObject({ input: { language: "ru", conversionRoute: "lead_form" } });
     expect(campaignBriefScenario("delivery_recovery")?.input.deliveryHealth).toBe("interrupted");
     expect(campaignBriefScenario("")).toBeNull();

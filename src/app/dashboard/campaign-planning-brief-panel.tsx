@@ -22,6 +22,7 @@ type BriefDraft = Readonly<{
   market: CampaignMarket;
   language: string | null;
   serviceRef: string | null;
+  campaignFamilyRef?: string | null;
   countryOrRegion: string | null;
   conversionRoute: ConversionRoute;
   deliveryHealth: DeliveryHealth;
@@ -169,6 +170,7 @@ const INITIAL_DRAFT: BriefDraft = Object.freeze({
   market: "domestic",
   language: "tr",
   serviceRef: "service_medical_aesthetics",
+  campaignFamilyRef: null,
   countryOrRegion: null,
   conversionRoute: "lead_form",
   deliveryHealth: "healthy",
@@ -221,10 +223,10 @@ export const CAMPAIGN_BRIEF_SCENARIOS: Readonly<Record<Exclude<CampaignBriefScen
     conversionRoute: "whatsapp", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }) }),
   international_ar_whatsapp: Object.freeze({ label: "Uluslararası · AR WhatsApp · FTR", input: Object.freeze({
     businessGoal: "lead_acquisition", market: "international", language: "ar", serviceRef: "service_physical_therapy_rehab", countryOrRegion: "Arap Bölgesi",
-    conversionRoute: "whatsapp", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }) }),
+    campaignFamilyRef: "campaign_family_intensive_ftr", conversionRoute: "whatsapp", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }) }),
   international_ru_form: Object.freeze({ label: "Uluslararası · RU form · FTR", input: Object.freeze({
     businessGoal: "lead_acquisition", market: "international", language: "ru", serviceRef: "service_physical_therapy_rehab", countryOrRegion: "Türki Cumhuriyetler",
-    conversionRoute: "lead_form", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }) }),
+    campaignFamilyRef: "campaign_family_intensive_ftr", conversionRoute: "lead_form", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }) }),
   domestic_upper_funnel: Object.freeze({ label: "Yerli · üst huni · içerik/gönderi", input: Object.freeze({
     businessGoal: "upper_funnel_education", market: "domestic", language: "tr", serviceRef: "service_content_post", countryOrRegion: null,
     conversionRoute: "not_applicable", deliveryHealth: "healthy", classification: "classified", capacity: "confirmed", creativeReady: true }) }),
@@ -341,6 +343,9 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
         <option value="service_content_post">İçerik / gönderi</option><option value="service_brand_corporate">Marka / kurumsal</option>
         <option value="service_unclassified">Diğer / sınıflandırılacak</option>
       </select></label>
+      <label htmlFor="brief-campaign-family"><span>Kampanya ailesi</span><select id="brief-campaign-family" value={draft.campaignFamilyRef ?? ""} onChange={(event) => change("campaignFamilyRef", event.target.value || null)}>
+        <option value="">Henüz insan incelemesiyle atanmadı</option><option value="campaign_family_intensive_ftr">Intensive FTR</option>
+      </select><small>Rota değildir; hizmet altındaki stratejik kampanya ailesidir.</small></label>
       {draft.market === "international" ? <label htmlFor="brief-region"><span>Ülke / bölge</span><input id="brief-region" value={draft.countryOrRegion ?? ""} maxLength={120} onChange={(event) => change("countryOrRegion", event.target.value.trim() || null)} placeholder="Örn. GCC" /></label> : null}
       <label htmlFor="brief-route"><span>Dönüşüm yolu</span><select id="brief-route" value={draft.conversionRoute} onChange={(event) => change("conversionRoute", event.target.value as ConversionRoute)}>
         {Object.entries(routeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}

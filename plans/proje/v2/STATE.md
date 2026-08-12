@@ -31,6 +31,10 @@
 - Slice kapsamı artık `campaignFamilyRef` taşıyabilir. Böylece `Intensive FTR` gibi bir kampanya
   ailesinin kuralı, aynı hizmet hattındaki farklı aile/rota çalışmalarından ayrıdır; rota aile
   kimliği yerine kullanılmaz.
+- Taslak brief de kampanya ailesini rota dışında, isteğe bağlı ve insan-doğrulanmış bir kapsam alanı
+  olarak taşır. `Intensive FTR` seçildiğinde değerlendirme cohort anahtarı aileyi içerir; aile
+  atanmamışsa mevcut brief kümeleri korunur. Bu geçici UI alanı kalıcı künye, proposal veya Meta
+  değişimi yaratmaz.
 
 ## 2026-08-10 — Merkezi ürün akışı ve kademeli teslim ilkesi
 
