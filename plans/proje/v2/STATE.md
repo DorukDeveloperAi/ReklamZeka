@@ -28,6 +28,9 @@
   bir sonraki günlük/haftalık/aylık ölçüm penceresine kadar korunur; teslimat kesintisi,
   kapsam/hedefleme değişimi veya yeni sonuç kanıtı yeniden insan incelemesi tetikler. Bu bilgi
   scheduler ya da otomasyon değildir; karar modu her zaman `insan_incelemeli_oneri` olarak kapalıdır.
+- Slice kapsamı artık `campaignFamilyRef` taşıyabilir. Böylece `Intensive FTR` gibi bir kampanya
+  ailesinin kuralı, aynı hizmet hattındaki farklı aile/rota çalışmalarından ayrıdır; rota aile
+  kimliği yerine kullanılmaz.
 
 ## 2026-08-10 — Merkezi ürün akışı ve kademeli teslim ilkesi
 

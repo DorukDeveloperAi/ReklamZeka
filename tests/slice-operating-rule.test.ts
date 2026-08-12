@@ -81,6 +81,9 @@ describe("slice operating rule draft", () => {
   });
 
   it("keeps international physical-therapy routes, territories, and audience strategies in separate result lanes", () => {
+    expect(INTERNATIONAL_PHYSICAL_THERAPY_MEASUREMENT_RULE.slice).toMatchObject({
+      market: "international", serviceRef: "service_physical_therapy_rehab", campaignFamilyRef: "campaign_family_intensive_ftr",
+    });
     expect(INTERNATIONAL_PHYSICAL_THERAPY_MEASUREMENT_RULE.rule).toEqual({
       kind: "sonuc_olcum_siniri",
       ayri_degerlendir: ["donusum_rotasi", "hedef_kitle_stratejisi", "ulke_bolge"],
@@ -95,6 +98,16 @@ describe("slice operating rule draft", () => {
       yenidenIncelemeTetikleyicileri: ["kapsam_veya_hedefleme_degisimi", "teslimat_kesintisi", "yeni_sonuc_kaniti"],
       kararModu: "insan_incelemeli_oneri",
     });
+  });
+
+  it("allows a rule to bind a scope to a campaign family without relying on the route", () => {
+    const rule = createSliceOperatingRuleDraft({
+      slice: { market: "international", campaignFamilyRef: "campaign_family_intensive_ftr" },
+      rule: { kind: "delivery_guardrail", condition: "delivery_interrupted", response: "hold_recommendations" },
+      automationMode: "observe_only", priority: 1,
+      verification: { metric: "delivery_health", reviewCadence: "daily", rollbackWhen: "Teslimat yok" },
+    });
+    expect(rule.slice).toEqual({ market: "international", campaignFamilyRef: "campaign_family_intensive_ftr" });
   });
 
   it("rejects a result boundary that would permit unlike routes to be compared together", () => {

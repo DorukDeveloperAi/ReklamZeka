@@ -23,6 +23,7 @@ export type CampaignSlice = Readonly<{
   businessGoal?: "lead_acquisition" | "upper_funnel_education" | "market_service_learning";
   conversionRoute?: "lead_form" | "whatsapp" | "landing_page";
   campaignCategoryRef?: string;
+  campaignFamilyRef?: string;
 }>;
 
 export type SliceRule =
@@ -158,7 +159,7 @@ function digest(value: unknown): string { return createHash("sha256").update(JSO
 function normalizeSlice(value: unknown): CampaignSlice {
   if (!value || typeof value !== "object" || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) fail("invalid_slice");
   const input = value as Record<string, unknown>;
-  const allowed = ["market", "language", "serviceRef", "countryOrRegion", "businessGoal", "conversionRoute", "campaignCategoryRef"];
+  const allowed = ["market", "language", "serviceRef", "countryOrRegion", "businessGoal", "conversionRoute", "campaignCategoryRef", "campaignFamilyRef"];
   if (Object.keys(input).some((key) => !allowed.includes(key))) fail("invalid_slice");
   const slice: Record<string, string> = {};
   if (input.market !== undefined) {
@@ -166,7 +167,7 @@ function normalizeSlice(value: unknown): CampaignSlice {
     slice.market = input.market;
   }
   for (const key of ["language", "countryOrRegion"] as const) if (input[key] !== undefined) slice[key] = text(input[key], 120);
-  for (const key of ["serviceRef", "campaignCategoryRef"] as const) {
+  for (const key of ["serviceRef", "campaignCategoryRef", "campaignFamilyRef"] as const) {
     if (input[key] !== undefined) {
       const value = text(input[key]);
       if (!REF.test(value)) fail("invalid_slice");

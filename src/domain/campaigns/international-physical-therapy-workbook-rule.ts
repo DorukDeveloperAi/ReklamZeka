@@ -8,7 +8,7 @@ import { createSliceOperatingRuleDraft, type SliceOperatingRuleDraft } from "./s
  */
 export const INTERNATIONAL_PHYSICAL_THERAPY_WORKBOOK_RULE: SliceOperatingRuleDraft = createSliceOperatingRuleDraft({
   slice: {
-    market: "international", serviceRef: "service_physical_therapy_rehab", businessGoal: "lead_acquisition",
+    market: "international", serviceRef: "service_physical_therapy_rehab", campaignFamilyRef: "campaign_family_intensive_ftr", businessGoal: "lead_acquisition",
   },
   rule: {
     kind: "targeting_budget_preservation", currency: "TRY", totalDailyBudgetDecimal: "48000",
