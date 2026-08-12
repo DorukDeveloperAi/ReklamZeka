@@ -155,6 +155,28 @@ describe("Drizzle Autonomy Rule Registry", () => {
     expect(new PgDialect().sqlToQuery(db.execute.mock.calls[0]![0]).sql).toContain("for share");
   });
 
+  it("excludes a group-scoped published rule when its current active group head is absent", async () => {
+    const artifact = published(draft({ scope: { level: "account_group", ref: "account_group_international_ftr" } }));
+    const activeGroup = database([
+      { rows: [{ id: workspaceId, lifecycle_state: "active" }] },
+      { rows: [{ artifact_payload: artifact }] },
+      { rows: [{ group_ref: "account_group_international_ftr" }] },
+    ]);
+    await expect(new DrizzleAutonomyRuleRegistryRepository(activeGroup as never, workspaceId, workspaceRef).resolve())
+      .resolves.toHaveLength(1);
+    const activeScopeQuery = new PgDialect().sqlToQuery(activeGroup.execute.mock.calls[2]![0]).sql;
+    expect(activeScopeQuery).toMatch(/group_ref = any/i);
+    expect(activeScopeQuery).toMatch(/revision\.status = 'active'/i);
+
+    const archived = database([
+      { rows: [{ id: workspaceId, lifecycle_state: "active" }] },
+      { rows: [{ artifact_payload: artifact }] },
+      { rows: [] },
+    ]);
+    await expect(new DrizzleAutonomyRuleRegistryRepository(archived as never, workspaceId, workspaceRef).resolve())
+      .resolves.toEqual([]);
+  });
+
   it("reads the latest artifact with limit one even when a rule has multiple revisions", async () => {
     const artifact = published();
     const db = database([{ rows: [{ id: workspaceId, lifecycle_state: "active" }] }, { rows: [{ artifact_payload: artifact }] }]);

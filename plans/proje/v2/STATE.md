@@ -147,6 +147,11 @@
   ait veya arşivlenmiş group ref'i `scope_unavailable` ile kaydedilmeden reddedilir; mevcut
   immutable draft/publish yetki sınırları değişmez.
 
+- Otonomi valfine çözümlenen kural listesi de her `account_group` scope'unu güncel `active`
+  revision head'iyle toplu olarak yeniden doğrular. Sonradan arşivlenmiş ya da kaybolmuş grup,
+  geçmişte publish edilmiş olsa bile action-valve girdisinden çıkarılır; diğer tenant/genel
+  kurallar etkilenmez.
+
 ## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
 
 - Strict Policy Studio içindeki normalizasyon çalışma alanı, owner talimatının mevcut Guidance Studio

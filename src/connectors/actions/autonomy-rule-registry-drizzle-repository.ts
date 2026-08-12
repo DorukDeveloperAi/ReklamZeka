@@ -125,6 +125,32 @@ async function assertCurrentAccountGroupScope(
   if (result.length !== 1 || typeof result[0]!.id !== "string" || !UUID.test(result[0]!.id)) fail("scope_unavailable");
 }
 
+/** Resolves only exact active heads; archived/missing historical groups are not action scopes. */
+async function currentAccountGroupRefs(
+  database: Pick<Database, "execute">,
+  workspaceId: string,
+  refs: readonly string[],
+): Promise<ReadonlySet<string>> {
+  if (!refs.length) return new Set();
+  const result = rows<{ group_ref: string }>(await database.execute(sql`
+    select group_head.group_ref
+    from account_groups group_head
+    join account_group_revisions revision
+      on revision.workspace_id = group_head.workspace_id
+      and revision.account_group_id = group_head.id
+      and revision.revision = group_head.current_revision
+      and revision.revision_hash = group_head.current_revision_hash
+      and revision.status = 'active'
+    where group_head.workspace_id = ${workspaceId}::uuid
+      and group_head.group_ref = any(${refs}::text[])
+    limit 10001 for share
+  `));
+  if (result.length > refs.length || result.some((row) => typeof row.group_ref !== "string" || !refs.includes(row.group_ref))) {
+    fail("corrupt_store");
+  }
+  return new Set(result.map((row) => row.group_ref));
+}
+
 /** Server-only append and resolve port. It has no guidance promotion, approval, execution, or Meta methods. */
 export class DrizzleAutonomyRuleRegistryRepository {
   private readonly workspaceId: string;
@@ -223,7 +249,10 @@ export class DrizzleAutonomyRuleRegistryRepository {
       } catch {
         fail("corrupt_store");
       }
-      return resolveAutonomyRules({ workspaceRef: this.workspaceRef, artifacts });
+      const groupRefs = [...new Set(artifacts.flatMap((artifact) => artifact.scope.level === "account_group" ? [artifact.scope.ref] : []))];
+      const activeGroupRefs = await currentAccountGroupRefs(transaction, this.workspaceId, groupRefs);
+      const applicable = artifacts.filter((artifact) => artifact.scope.level !== "account_group" || activeGroupRefs.has(artifact.scope.ref));
+      return resolveAutonomyRules({ workspaceRef: this.workspaceRef, artifacts: applicable });
     });
   }
 
