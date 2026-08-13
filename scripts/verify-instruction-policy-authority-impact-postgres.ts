@@ -45,9 +45,10 @@ if (missingSidecarTables.length) {
     missingTables: missingSidecarTables, continuation: "apply the repository's pending forward migrations, then rerun npm run verify:instruction-policy-authority-impact-db" })}\n`);
   process.exit(2);
 }
-const workspaceId = randomUUID(); const foreignWorkspaceId = randomUUID(); const userId = randomUUID();
+const workspaceId = randomUUID(); const foreignWorkspaceId = randomUUID(); const userId = randomUUID(); const approverUserId = randomUUID();
 const workspaceRef = `workspace_impact_${workspaceId.replaceAll("-", "").slice(0, 12)}`;
 const actorRef = `actor_impact_${userId.replaceAll("-", "").slice(0, 12)}`;
+const approverRef = `actor_impact_approver_${approverUserId.replaceAll("-", "").slice(0, 12)}`;
 const policyRef = `policy_impact_${workspaceId.replaceAll("-", "").slice(0, 12)}`;
 const accountRef = `account_impact_${workspaceId.replaceAll("-", "").slice(0, 12)}`;
 const groupRef = `account_group_impact_${workspaceId.replaceAll("-", "").slice(0, 12)}`;
@@ -55,6 +56,7 @@ const topicRef = `topic_impact_${workspaceId.replaceAll("-", "").slice(0, 12)}`;
 const semanticRef = `semantic_impact_${workspaceId.replaceAll("-", "").slice(0, 12)}`;
 const rawText = "Kaliteyi koru; bütçe kararını insan onayına bırak.";
 const principal = { actor: { userId }, workspaceId, workspaceRef, readerRef: actorRef } as const;
+const approverPrincipal = { actor: { userId: approverUserId }, workspaceId, workspaceRef, readerRef: approverRef } as const;
 const rollback = new Error("INSTRUCTION_POLICY_AUTHORITY_IMPACT_OUTER_ROLLBACK");
 let fetchCalls = 0; let evidence: Record<string, unknown> | undefined;
 const originalFetch = globalThis.fetch;
@@ -62,11 +64,14 @@ const originalFetch = globalThis.fetch;
 try {
   globalThis.fetch = (async () => { fetchCalls += 1; throw new Error("network_not_allowed"); }) as typeof fetch;
   await database.transaction(async (outer) => {
-    await outer.execute(sql`insert into users (id, email) values (${userId}::uuid, ${`impact-${userId}@invalid.local`})`);
+    await outer.execute(sql`insert into users (id, email) values
+      (${userId}::uuid, ${`impact-${userId}@invalid.local`}),
+      (${approverUserId}::uuid, ${`impact-approver-${approverUserId}@invalid.local`})`);
     await outer.execute(sql`insert into workspaces (id, name) values (${workspaceId}::uuid, 'authority impact verifier'),
       (${foreignWorkspaceId}::uuid, 'authority impact foreign verifier')`);
     await outer.execute(sql`insert into memberships (workspace_id, user_id, role)
-      values (${workspaceId}::uuid, ${userId}::uuid, 'owner')`);
+      values (${workspaceId}::uuid, ${userId}::uuid, 'owner'),
+        (${workspaceId}::uuid, ${approverUserId}::uuid, 'owner')`);
     const connectionId = randomUUID(); const sourceId = randomUUID(); const accountId = randomUUID();
     await outer.execute(sql`insert into meta_connections (id, workspace_id, external_connection_key, display_name,
       graph_api_version, field_catalog_version, access_mode, status, granted_scopes, enabled_capabilities, capability_snapshot)
@@ -77,7 +82,8 @@ try {
     await outer.execute(sql`insert into ad_accounts (id, workspace_id, data_source_id, external_account_id, name, currency, timezone)
       values (${accountId}::uuid, ${workspaceId}::uuid, ${sourceId}::uuid, ${accountRef}, 'authority impact account', 'TRY', 'Europe/Istanbul')`);
 
-    const memberships = [{ workspaceId, userId, role: "owner" as const }];
+    const memberships = [{ workspaceId, userId, role: "owner" as const },
+      { workspaceId, userId: approverUserId, role: "owner" as const }];
     const lifecycle = new InstructionPolicyLifecycleService(
       new DrizzleInstructionPolicyLifecycleRepository(outer as never), memberships);
     const initial = await lifecycle.inspect(principal);
@@ -105,7 +111,7 @@ try {
       catalog: emptyCatalog, scope, manualLocks: [] });
     const beforePublish = await new DrizzleInstructionPolicyImpactRepository(outer as never).preview(workspaceId, policyRef, "publish");
     if (!beforePublish) throw new Error("draft_impact_not_found");
-    const published = await lifecycle.mutate(principal, { operation: "publish", expectedRegistryHash: drafted.state.registryHash,
+    const published = await lifecycle.mutate(approverPrincipal, { operation: "publish", expectedRegistryHash: drafted.state.registryHash,
       policyRef, expectedVersion: draft.policyVersion, expectedPolicyHash: draft.canonicalHash,
       expectedImpactHash: beforePublish.impactHash, reasonCode: "impact_verified" });
     const afterPublishBeforeAuthority = await new DrizzleInstructionPolicyImpactRepository(outer as never).preview(workspaceId, policyRef, "pause");
