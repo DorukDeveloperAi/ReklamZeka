@@ -145,6 +145,20 @@
   public-safe kaynak kanıt etiketlerini ve append-only insan karar geçmişini zaman sırasıyla gösterir.
   Bu yalnız karar izidir; yeni approval semantiği, execution veya Meta write yüzeyi oluşturmaz.
 
+## 2026-08-13 — Zamansal öneri ve güvenli budget-action temeli
+
+- `temporal-recommendation/1.0.0`, exact frozen context, doğrulanmış Slice Rule taslağı ve settled
+  deterministic window'u mevcut append-only decision ledger'a bağlar. Açık aynı-account delivery
+  alarmı varsa yeni bir immutable `no_change`/hold kaydı; yoksa advisory recommendation kaydı üretir.
+  Alert head'i idempotency kimliğinin parçasıdır; geçmiş karar yeniden yazılmaz. Session-bound API
+  yalnız context/rule/window seçimini alır; alert, metrik veya sonuç kabul etmez. Timeline sonuçları
+  gösterir; publish/approve/execute/automation/Meta write tümü kapalıdır.
+- Gelecek human-approved budget action için `slice_rule_allocation_entity_bindings` immutable
+  persistence katmanı eklendi. Binding, serbest allocation ref'ini doğrudan Meta kimliği saymaz;
+  ileride yalnız canonical campaign/ad-set hiyerarşisi, budget owner/kind/currency/current snapshot
+  ve evidence hash'i doğrulandıktan sonra hazırlanabilir. Bu checkpoint ActionUnit, queue, grant,
+  execution veya Meta write üretmez.
+
 ## 2026-08-12 — Portföy pazar sınırı
 
 - Kullanıcıyla yürütülen mevcut portföy istişaresinde **pazar**, tüm künye ve slice'ların ilk
