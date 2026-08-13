@@ -19,10 +19,11 @@
 
 - **Salt-okunur Meta bootstrap'i gerçek tenantta çalıştırıldı.** Güvenlik işareti `rotated` sonrası
   read-only connection doctor kabulü geçti; beş erişilebilir hesap için canonical data-source/account
-  kökleri oluşturuldu. Dayanıklı, yalnız GET mirror checkpoint'leri şu ana kadar 370 kampanya, 987
-  reklam seti ve 240 reklam yazdı. Bu yalnız GET çağrılarıyla gerçekleşti; Meta write sıfırdır.
-  Bir inventory stream'i upstream sayfa hatasıyla `partial` kaldığı için creative ve insight streamleri
-  henüz tamamlanmış sayılmaz; recovery komutu bu state'i idempotent checkpoint'ten sürdürür.
+  kökleri oluşturuldu. Dayanıklı, yalnız GET mirror checkpoint'leri şu ana kadar 422 kampanya, 1086
+  reklam seti ve 1336 reklam yazdı. Bu yalnız GET çağrılarıyla gerçekleşti; Meta write sıfırdır.
+  Inventory recovery yaratıcı streamini başlatacak kadar ilerledi, ancak bir inventory sayfası upstream
+  hatasıyla `partial` kaldığı ve creative/insight streamleri tamamlanmadığı için canlı kabul henüz
+  tamamlanmış sayılmaz; recovery komutu bu state'i idempotent checkpoint'ten sürdürür.
 - `/api/meta/read-mirror` Dashboard'un kullandığı canonical DB read-model'idir; eski
   `/api/meta/inventory` route'u bilinçli biçimde `503` kalır. Hiyerarşinin campaign kısmı mevcut
   tenantta gerçek veriye bağlıdır. Ad-set/ad/creative/insight tamamlaması ve ayrıntılı immutable
