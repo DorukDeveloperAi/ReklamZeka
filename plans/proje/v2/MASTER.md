@@ -25,6 +25,13 @@ ağırlıklı üretim hedefi `%55`. Bu oran kabul değildir; aşağıdaki fazlar
 kapıları tamamlanmadan ilerleme iddiası yapılamaz. Faz 5, Faz 1–4 ile paralel yürüyebilir;
 gerçek kural/bütçe kayıtlarına bağlanması Faz 3–4'e bağlıdır.
 
+Faz 0'un mevcut gerçeği: canonical Meta DB aynası ve enabled scheduler şu an boştur;
+Dashboard da gerçek hierarchy/content read-model'ine bağlı değildir. İlk Faz 1 teslimi bu
+nedenle canlı yazma değil, güvenli bağlantı bootstrap'i → tek hesaplık 7 günlük canonical
+salt-okunur sync → DB-backed Dashboard hierarchy/content/freshness görünümüdür. Token security
+durumu `temporary_exposed` iken bootstrap/runner aktivasyonu yapılmaz; önce rotation/doctor
+kanıtı gerekir.
+
 Değişmez sınırlar: yerli/yabancı karışmaz; eksik künye tahmin edilmez; isim değişikliği
 yalnız önerilir; taslak policy değildir; taslağın sahibi kendi policy'sini yayımlayamaz;
 agent publish/approve/execute/Meta write yetkisi taşımaz; canlı Meta write ayrıca açık

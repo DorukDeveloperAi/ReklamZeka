@@ -15,6 +15,32 @@
 - `yerli/yabancı` sınırı, tahminle künye yasağı, draft≠policy, iki kişi policy yayını ve agentın
   publish/approve/execute/Meta-write yetkisinin kapalı kalması bütün fazlarda değişmezdir.
 
+## 2026-08-13 — Faz 0 kanıt/durum uzlaştırması
+
+- **Gerçek Meta işletimi henüz aktif değildir.** Canlı salt-okunur DB sayımında aktif connection,
+  account, campaign, ad set, ad, creative, daily insight, enabled schedule ve schedule run sayıları
+  sıfırdır. STATE'teki önceki canlı sayımlar historical verifier kanıtıdır; mevcut tenantın işletim
+  durumu olarak yorumlanamaz.
+- Dashboard'un çağırdığı `/api/meta/inventory` route'u doğrudan Graph veya canonical DB read-model'i
+  değildir ve tasarım gereği `503` döner. Mevcut portföy capability endpoint'i yalnız
+  connection/account/group read-readiness verir. Bu yüzden gerçek Meta hierarchy/content/performance
+  görünümü henüz Dashboard'a bağlı değildir.
+- Meta sync scheduler substrate'i (registry, lease, worker ve private factory) testli olsa da güvenilir
+  runner/principal, enabled schedule ve canonical creative/Page/Instagram persistence bağlantısı
+  eksiktir. `verify:meta-read-sync-schedule-db` yalnız substrate'i kanıtlar; cron, ağ çağrısı veya
+  güncel veri kanıtlamaz.
+- `.env.local` güvenlik durumu `META_TOKEN_SECURITY_STATUS=temporary_exposed` olarak işaretlidir.
+  Token değeri okunmadı veya değiştirilmiyor; güvenli rotation/doctor onayı olmadan bootstrap veya
+  runner aktivasyonu yapılmayacak.
+- Slice/budget/policy altyapısı mevcut olsa da, browser-yerel brief, statik rule katalogları ve
+  persistent policy/budget ledger henüz tek kullanıcı akışında birleşmez. İlk ürün dilimi
+  `Slice Rule Workspace` olacaktır: yabancı FTR gibi kanıtlı bir scope için recommendation-only
+  budget-cap taslağı → impact preview → Budget Lab dry-run → append-only timeline; publish/approve/
+  execute/Meta write kapalı.
+- Orchestrator'da gerçek session/handoff çekirdeği vardır; dashboard sohbeti ise bugün sabit mesaj ve
+  kapalı composer'dır. İlk kalıcı sohbet dilimi, DB ledger + güvenli `codex exec --json` /
+  `resume --json` adapter'ı ile hazırlanacak; experimental app-server protokolü ilk transport olmayacak.
+
 ## 2026-08-12 — Portföy pazar sınırı
 
 - Kullanıcıyla yürütülen mevcut portföy istişaresinde **pazar**, tüm künye ve slice'ların ilk
