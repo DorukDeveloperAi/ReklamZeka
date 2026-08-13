@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=motor
 // ayar.mjs — PM kadranının TEK YAZARI (~/.claude/pm/ayar.json).
 //
 //   ayar.mjs get [--json]

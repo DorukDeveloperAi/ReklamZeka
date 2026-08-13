@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=defter
 // gelen.mjs — PM gelen kutusu notunun (~/.claude/pm/gelen/*.md) TEK KOD-YOLU.
 //
 //   gelen.mjs add --text "<metin>" [--tip hedef|vizyon|direktif|soru]

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=motor
 // Model politikası bekçisi — politikayı KÂĞITTAN çıkarıp uygulanabilir kılan yer.
 //
 // Politika (tek kaynak: ~/.claude/model-policy.json ← ~/.config/agent-ide/config.json):
