@@ -4,6 +4,33 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "a2d6c0291",
+      "tarih": "2026-08-13",
+      "konu": "fix(approval): harden decision trace projection",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "be6f4b1d6",
+      "tarih": "2026-08-13",
+      "konu": "test(meta): bind asset verifier to account discovery",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "58eb3c3d2",
+      "tarih": "2026-08-13",
+      "konu": "fix(analysis): restore budget evidence-bound verifier",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
       "hash": "e370ad054",
       "tarih": "2026-08-13",
       "konu": "fix(analysis): classify current-source failures safely",
@@ -110,47 +137,24 @@
       "kapsam": [
         "docs"
       ]
-    },
-    {
-      "hash": "209276eb1",
-      "tarih": "2026-08-13",
-      "konu": "feat(policy): support exact K2 K3 approval drafts",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "09a2b9eed",
-      "tarih": "2026-08-13",
-      "konu": "docs(state): record creative evidence and budget queue",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "90a068440",
-      "tarih": "2026-08-13",
-      "konu": "fix(meta): recover creative actor bindings from Graph evidence",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 22
+      "adet": 21
     },
     {
       "kapsam": "docs",
-      "adet": 19
+      "adet": 18
     },
     {
       "kapsam": "fix",
-      "adet": 16
+      "adet": 17
+    },
+    {
+      "kapsam": "test",
+      "adet": 2
     },
     {
       "kapsam": "?",
@@ -159,13 +163,9 @@
     {
       "kapsam": "chore",
       "adet": 1
-    },
-    {
-      "kapsam": "test",
-      "adet": 1
     }
   ],
-  "isSayisi": 406,
+  "isSayisi": 409,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-13",
   "planlar": [
@@ -186,5 +186,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "dd12efa80655"
+  "damga": "ef9199e97578"
 }

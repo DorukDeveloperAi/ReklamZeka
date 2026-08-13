@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: dd12efa80655 -->
+<!-- durum-damga: ef9199e97578 -->
 
 ## Künye
 
@@ -14,13 +14,16 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 406 |
+| iş commit'i (tüm geçmiş) | 409 |
 | ilk / son iş | 2026-08-06 / 2026-08-13 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-13 | `fix` | harden decision trace projection | `a2d6c0291` |
+| 2026-08-13 | `test` | bind asset verifier to account discovery | `be6f4b1d6` |
+| 2026-08-13 | `fix` | restore budget evidence-bound verifier | `58eb3c3d2` |
 | 2026-08-13 | `fix` | classify current-source failures safely | `e370ad054` |
 | 2026-08-13 | `docs` | record gated Meta schedule runner | `d040960cc` |
 | 2026-08-13 | `feat` | add gated read-only schedule runner | `0bbc7c308` |
@@ -33,18 +36,15 @@
 | 2026-08-13 | `feat` | expose normalization workbench in dashboard | `62d736691` |
 | 2026-08-13 | `feat` | surface verified empty insight delivery | `4c066e399` |
 | 2026-08-13 | `docs` | record K2 K3 budget policy studio | `7a522638f` |
-| 2026-08-13 | `feat` | support exact K2 K3 approval drafts | `209276eb1` |
-| 2026-08-13 | `docs` | record creative evidence and budget queue | `09a2b9eed` |
-| 2026-08-13 | `fix` | recover creative actor bindings from Graph evidence | `90a068440` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 22
-- `docs        ` █████████████████████ 19
-- `fix         ` █████████████████ 16
+- `feat        ` ████████████████████████ 21
+- `docs        ` █████████████████████ 18
+- `fix         ` ███████████████████ 17
+- `test        ` ██ 2
 - `?           ` █ 1
 - `chore       ` █ 1
-- `test        ` █ 1
 
 ## Planlar
 
