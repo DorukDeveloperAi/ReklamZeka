@@ -131,6 +131,11 @@ const columns = [
   // Slice-rule drafts retain their own immutable scope vocabulary. Category
   // archive must not infer an internal category link from opaque refs here.
   "slice_rule_workspace_drafts.draft_payload",
+  // Advisory budget-pool trees and bindings constrain market/caps only. They
+  // carry no internal category or strict-policy reference that archive impact
+  // may interpret as a mutable dependency.
+  "budget_pool_hierarchy_revisions.hierarchy_payload",
+  "slice_rule_budget_pool_bindings.binding_payload",
   // Delivery/payment alert records are historical evidence and checklist
   // state, never category or policy selection inputs.
   "delivery_health_alert_ledger_records.checklist_payload",
