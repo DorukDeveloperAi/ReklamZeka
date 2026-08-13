@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: e97571bd2128 -->
+<!-- durum-damga: 8027afe592c1 -->
 
 ## Künye
 
@@ -14,13 +14,19 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 428 |
+| iş commit'i (tüm geçmiş) | 434 |
 | ilk / son iş | 2026-08-06 / 2026-08-14 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-14 | `fix` | preserve category composition diagnostics | `dadf63549` |
+| 2026-08-14 | `fix` | publish approval chain category profiles | `26983ac27` |
+| 2026-08-14 | `fix` | retry tombstone transport failures | `dadb6dc62` |
+| 2026-08-14 | `fix` | align fixture insight date to analysis window | `029a34eeb` |
+| 2026-08-14 | `test` | read authentic queue projection | `6a70c7c1a` |
+| 2026-08-14 | `test` | verify authentic rule budget queue chain | `d71df2d9b` |
 | 2026-08-14 | `refactor` | share ready budget context fixture | `36061fcee` |
 | 2026-08-14 | `docs` | record frozen action context binding | `5a5aacb50` |
 | 2026-08-14 | `fix` | bind materialized units to frozen context | `6d7796951` |
@@ -30,20 +36,13 @@
 | 2026-08-14 | `feat` | hand off review rows to manual assignment | `ebf137c8d` |
 | 2026-08-14 | `docs` | record canonical campaign portfolio | `664b14f98` |
 | 2026-08-14 | `feat` | show canonical campaign portfolio | `6d3298f67` |
-| 2026-08-14 | `feat` | add safe slice scope candidates | `21d4826fd` |
-| 2026-08-13 | `feat` | add canonical campaign classification review queue | `d0f805355` |
-| 2026-08-13 | `feat` | add canonical performance read model | `17df9c00d` |
-| 2026-08-13 | `docs` | record completed Meta insight bootstrap | `36693dd77` |
-| 2026-08-13 | `fix` | accept canonical insight account identity | `5603ad262` |
-| 2026-08-13 | `feat` | add capability-gated insight bootstrap | `281273f93` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 22
-- `docs        ` ████████████████████ 18
-- `fix         ` ███████████████ 14
-- `test        ` ███ 3
-- `?           ` █ 1
+- `feat        ` ████████████████████████ 20
+- `fix         ` ████████████████████ 17
+- `docs        ` ███████████████████ 16
+- `test        ` ██████ 5
 - `chore       ` █ 1
 - `refactor    ` █ 1
 

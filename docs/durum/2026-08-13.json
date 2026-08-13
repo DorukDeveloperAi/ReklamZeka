@@ -4,6 +4,60 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "dadf63549",
+      "tarih": "2026-08-14",
+      "konu": "fix(analysis): preserve category composition diagnostics",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "26983ac27",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): publish approval chain category profiles",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "dadb6dc62",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): retry tombstone transport failures",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "029a34eeb",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): align fixture insight date to analysis window",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "6a70c7c1a",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): read authentic queue projection",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "d71df2d9b",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): verify authentic rule budget queue chain",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
       "hash": "36061fcee",
       "tarih": "2026-08-14",
       "konu": "refactor(verification): share ready budget context fixture",
@@ -83,82 +137,24 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "21d4826fd",
-      "tarih": "2026-08-14",
-      "konu": "feat(rules): add safe slice scope candidates",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "d0f805355",
-      "tarih": "2026-08-13",
-      "konu": "feat(categories): add canonical campaign classification review queue",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "17df9c00d",
-      "tarih": "2026-08-13",
-      "konu": "feat(meta): add canonical performance read model",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "36693dd77",
-      "tarih": "2026-08-13",
-      "konu": "docs(state): record completed Meta insight bootstrap",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "5603ad262",
-      "tarih": "2026-08-13",
-      "konu": "fix(meta): accept canonical insight account identity",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "281273f93",
-      "tarih": "2026-08-13",
-      "konu": "feat(meta): add capability-gated insight bootstrap",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 22
-    },
-    {
-      "kapsam": "docs",
-      "adet": 18
+      "adet": 20
     },
     {
       "kapsam": "fix",
-      "adet": 14
+      "adet": 17
+    },
+    {
+      "kapsam": "docs",
+      "adet": 16
     },
     {
       "kapsam": "test",
-      "adet": 3
-    },
-    {
-      "kapsam": "?",
-      "adet": 1
+      "adet": 5
     },
     {
       "kapsam": "chore",
@@ -169,7 +165,7 @@
       "adet": 1
     }
   ],
-  "isSayisi": 428,
+  "isSayisi": 434,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-14",
   "planlar": [
@@ -190,5 +186,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "e97571bd2128"
+  "damga": "8027afe592c1"
 }
