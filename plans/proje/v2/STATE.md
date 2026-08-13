@@ -3662,3 +3662,14 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: `tests/policy-bundle-studio.test.ts`, `tests/policy-bundle-dashboard.test.ts`,
   `tests/approval-policy-registry.test.ts`, `tests/slice-rule-budget-action-unit-http.test.ts`,
   `npm run typecheck`, `npm run check:security-boundaries`, `npm run db:check`.
+
+## 2026-08-13 — Normalizasyon görünürlüğü ve doğrulanmış boş insight teslimatı
+
+- Rules yüzeyi artık sıralı olarak Guidance → Normalization → Slice Rule akışını gösterir. Normalization
+  ham insan dilini yalnız structured taslak, varsayım ve açık sorulara çevirir; policy değildir ve publish,
+  approval, action veya Meta write yetkisi taşımaz. Strict Policy yüzeyinden çıkarılarak iki farklı policy
+  yolu izlenimi engellendi.
+- Canlı Meta insight durumu aggregate-only kanıtla ayrıştırıldı: bir account stream'i completed olmasına
+  rağmen canonical daily insight sayısı sıfırdır; dashboard bunu `insight_delivery_empty_verified` olarak
+  gösterir. Incomplete ve hiç gözlenmemiş stream'ler ayrı reason code alır. Bu bilgi yalnız read modeldir,
+  Meta write ya da veri uydurma yapmaz.
