@@ -3,6 +3,18 @@
 > Kümülatif ilerleme defteri. v1'in ayrıntılı tur geçmişi
 > [v1 STATE](../v1/STATE.md)'te değişmeden korunur.
 
+## 2026-08-13 — Master tamamlanma sırası
+
+- Kullanıcı-görünür üretim hedefi, teknik alt maddelerin tek başına kapanmasından ayrıştırıldı ve
+  `MASTER.md` altında sekiz fazda sabitlendi: gerçek salt-okunur Meta aynası; kanıtlı künye/slice;
+  kural ve bütçe çalışma alanı; zamansal öneri/alarm; kalıcı ReklamZeka Orchestrator sohbeti; birleşik
+  insan karar akışı; ayrıca izinli typed Meta write pilotu; üretim kapanışı.
+- Mevcut ağırlıklı ilerleme yaklaşık `%55` olarak kaydedildi: teknik/güvenlik altyapısı `%65`, gerçek
+  kullanıcı işletim döngüsü `%40`. Bu oran kabul kanıtı değildir; her fazın master kabul kapısı ve
+  ayrıntılı CHECKLIST maddeleri korunur.
+- `yerli/yabancı` sınırı, tahminle künye yasağı, draft≠policy, iki kişi policy yayını ve agentın
+  publish/approve/execute/Meta-write yetkisinin kapalı kalması bütün fazlarda değişmezdir.
+
 ## 2026-08-12 — Portföy pazar sınırı
 
 - Kullanıcıyla yürütülen mevcut portföy istişaresinde **pazar**, tüm künye ve slice'ların ilk

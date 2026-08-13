@@ -1,6 +1,8 @@
 # ReklamZeka Meta Reklam İşletim Sistemi — CHECKLIST (v2)
 
 > Ana plan kümülatiftir. `[x]` yalnız kanıtlı teslimi, `[ ]` kalan işi gösterir.
+> Kullanıcı-görünür tamamlanma sırası için [MASTER](./MASTER.md) belgesini kullanın;
+> bu dosya ayrıntılı kanıt ve kalan iş kaynağıdır.
 
 - [x] Bütün ürün görüşmelerini vizyon, davranış sözleşmesi, yetki paylaşımı, kullanıcı
   yolculukları ve S0–S6 teslim kapılarıyla birleştiren kanonik ürün distilasyonu.
