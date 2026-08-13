@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
@@ -43,9 +44,13 @@ export async function materializeReadyBudgetContext(database: Database, source: 
     const scope = rows(await transaction.execute(sql`select connection.id::text as connection_id, account.id::text as account_id from meta_connections connection join data_sources source on source.workspace_id=connection.workspace_id and source.meta_connection_id=connection.id join ad_accounts account on account.workspace_id=source.workspace_id and account.data_source_id=source.id where connection.workspace_id=${source.workspaceId}::uuid and account.external_account_id=${source.accountRef} limit 2`))[0];
     if (!scope || typeof scope.connection_id !== "string" || typeof scope.account_id !== "string") throw new Error("ready_budget_context_l1_scope_missing");
     connectionId = scope.connection_id; accountId = scope.account_id;
-    const stream = crypto.randomUUID(), syncRun = crypto.randomUUID(), slice = crypto.randomUUID(), insight = crypto.randomUUID();
-    await transaction.insert(schema.metaSyncStreams).values({ id: stream, workspaceId: source.workspaceId, metaConnectionId: connectionId, adAccountId: accountId, streamType: "insights", status: "completed" });
-    await transaction.insert(schema.metaSyncRuns).values({ id: syncRun, workspaceId: source.workspaceId, metaConnectionId: connectionId, adAccountId: accountId, streamId: stream, streamType: "insights", idempotencyKey: `ready_budget_context_${source.workspaceId}`, status: "completed", startedAt: new Date(now.getTime() - 90_000), finishedAt: new Date(now.getTime() - 60_000) });
+    const existingStream = rows(await transaction.execute(sql`select id::text as id from meta_sync_streams where workspace_id=${source.workspaceId}::uuid and meta_connection_id=${connectionId}::uuid and ad_account_id=${accountId}::uuid and stream_type='insights' limit 2`));
+    if (existingStream.length > 1 || existingStream[0] && typeof existingStream[0].id !== "string") throw new Error("ready_budget_context_l1_stream_corrupt");
+    const stream = typeof existingStream[0]?.id === "string" ? existingStream[0].id : crypto.randomUUID();
+    const syncRun = crypto.randomUUID(), slice = crypto.randomUUID(), insight = crypto.randomUUID();
+    if (!existingStream[0]) await transaction.insert(schema.metaSyncStreams).values({ id: stream, workspaceId: source.workspaceId, metaConnectionId: connectionId, adAccountId: accountId, streamType: "insights", status: "completed" });
+    const runKey = `ready_budget_context_${createHash("sha256").update(`${source.workspaceId}\0${entityLevel}\0${source.request.entityRef}`).digest("hex").slice(0, 40)}`;
+    await transaction.insert(schema.metaSyncRuns).values({ id: syncRun, workspaceId: source.workspaceId, metaConnectionId: connectionId, adAccountId: accountId, streamId: stream, streamType: "insights", idempotencyKey: runKey, status: "completed", startedAt: new Date(now.getTime() - 90_000), finishedAt: new Date(now.getTime() - 60_000) });
     await transaction.insert(schema.metaSyncSlices).values({ id: slice, workspaceId: source.workspaceId, metaConnectionId: connectionId, adAccountId: accountId, runId: syncRun, streamType: "insights", entityLevel, dateStart: day, dateStop: day, sliceKey: `ready_budget_context_${entityLevel}_${day}`, status: "completed", completedAt: new Date(now.getTime() - 60_000) });
     await transaction.insert(schema.metaDailyInsights).values({ id: insight, workspaceId: source.workspaceId, metaConnectionId: connectionId, adAccountId: accountId, syncRunId: syncRun, syncSliceId: slice, entityLevel, externalEntityId: source.request.entityRef, dateStart: day, dateStop: day, attributionLabel: "7d_click_1d_view", attributionWindow: { click: 7, view: 1 }, currency: "TRY", timezone: "Europe/Istanbul", sourceRevision: "ready-budget-context-v1", sourcePayloadHash: "b".repeat(64), sourceUpdatedAt: new Date(now.getTime() - 60_000), metricProvenance: { source: "acceptance_fixture" } });
     await transaction.insert(schema.metaDailyInsightMetrics).values({ dailyInsightId: insight, metricKey: "spend", aggregation: "additive", valueMinor: 100, currency: "TRY", provenance: { field: "spend" }, sourceRevision: "ready-budget-context-v1", sourcePayloadHash: "b".repeat(64) });
