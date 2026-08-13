@@ -16,6 +16,9 @@ if (!workspaceId || !recoveryAccountId || !["inventory_ad_set_v1", "creative_ad_
 // The runtime is intentionally sequential. A single session connection keeps
 // each immutable page checkpoint on one deterministic PostgreSQL channel.
 const pool = new Pool({ connectionString: process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL, max: 1 });
+// Nested creative payloads are materially wider than inventory rows. Keep the
+// recovery page bounded without letting a caller choose the size.
+const initialPageSize = recoveryLane === "creative_ad_v1" ? 20 : 100;
 
 try {
   const database = drizzle(pool, { schema });
@@ -38,7 +41,7 @@ try {
     dateStart: start.toISOString().slice(0, 10),
     dateStop: today.toISOString().slice(0, 10),
     dateSliceDays: 7,
-    initialPageSize: 100,
+    initialPageSize,
     requestTimeoutMs: 20_000,
     maxAttempts: 3,
     maxRunDurationMs: 90_000,

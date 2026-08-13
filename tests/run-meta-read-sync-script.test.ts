@@ -17,7 +17,8 @@ describe("local Meta read-sync recovery command", () => {
     // recovery reliability, not a write-capability change.
     expect(source).toContain("requestTimeoutMs: 20_000");
     expect(source).toContain("maxAttempts: 3");
-    expect(source).toContain("initialPageSize: 100");
+    expect(source).toContain('recoveryLane === "creative_ad_v1" ? 20 : 100');
+    expect(source).toContain("initialPageSize,");
     expect(source).toContain("maxRunDurationMs: 90_000");
     expect(source).toContain('status: "failed"');
     expect(source).not.toContain("accessToken");
