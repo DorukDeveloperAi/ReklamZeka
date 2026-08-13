@@ -775,6 +775,10 @@
   - [x] Filtre sonrası seçili demo kampanyası için progressive portföy → hesap → campaign → ad set → ad
     → creative/post drill-down. Bu yalnız navigasyon örneğidir; frozen context, gerçek Meta asset graph
     veya approval/write yetkisi yerine geçmez.
+  - [x] Güvenli yerel oturum ve doğrulanmış `meta/read-mirror` hazır olduğunda Kampanyalar yüzeyi,
+    demo yerine canonical account → campaign → ad set → ad → creative/post hiyerarşisini salt-okunur
+    gösterir. Kaynak/oturum yoksa demo açık fallback kalır; bu yüzey KPI, policy, action veya Meta
+    write yetkisi üretmez.
 - [ ] Account-group switcher, multi-account connection health ve Page/Instagram asset graph.
   - [x] Güncel read-only Meta inventory içindeki hesaplar için yerel, salt-okunur account focus seçimi;
     silinmiş/eski seçim güncel snapshotta ilk hesaba fail-closed düşer. Account-group veya Page/Instagram

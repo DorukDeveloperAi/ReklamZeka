@@ -3707,3 +3707,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   olarak göstermeyi sürdürmeli; boş gün sıfır performans ya da tam 30-gün coverage diye yorumlanmaz.
 - Bootstrap yalnız Graph GET çağrıları yaptı; Meta write 0'dır. Scheduler/cron etkinleştirilmedi;
   runner kapalıdır ve normal otomatik işletim kanıtı değildir.
+
+## 2026-08-14 — Kanonik Meta kampanya portföyü Dashboard'a bağlandı
+
+- Kampanyalar yüzeyi, güvenli yerel oturum ve doğrulanmış `meta/read-mirror` kaynağı hazır olduğunda
+  artık demo hiyerarşisi yerine canonical account → campaign → ad set → ad → creative/post aynasını
+  gösterir. Objective, durum, bütçe sahibi, hedefleme özeti ve aynalanmış metin yalnız mevcut read
+  modelden gelir; kampanya referansları opaque kalır.
+- Oturum ya da kaynak yoksa eski demo görünümü yalnız açık `fallback` olarak kalır; gerçek portföy,
+  KPI, kategori veya policy sonucu taklit edilmez. Bu yüzey Meta write, policy yayını, approval veya
+  action yetkisi vermez.
+- Kanıt: `6d3298f`, `tests/canonical-campaign-portfolio-panel.test.ts`,
+  `tests/portfolio-dashboard.test.ts`, `npm run typecheck` ve `git diff --check`.
