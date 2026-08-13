@@ -55,6 +55,18 @@ describe("Slice Rule Workspace panel", () => {
     expect(buildSliceRuleDraftCommand({ ...form, serviceRef: "" })).toBeNull();
   });
 
+  it("turns only explicit, complete budget shares into a draft rule", () => {
+    const command = buildSliceRuleDraftCommand({ ...EMPTY_SLICE_RULE_FORM,
+      seriesRef: "slice_rule.ftr.ar.distribution", serviceRef: "service_physical_therapy",
+      campaignFamilyRef: "campaign_family_intensive_ftr", ruleKind: "budget_distribution",
+      distributionDimension: "countryOrRegion", distributionAllocations: "Arap Bölgesi: 60\nAvrupa: 40" });
+    expect(command).toMatchObject({ rule: { kind: "budget_distribution", dimension: "countryOrRegion",
+      allocations: [{ key: "Arap Bölgesi", basisPoints: 6000 }, { key: "Avrupa", basisPoints: 4000 }] } });
+    expect(buildSliceRuleDraftCommand({ ...EMPTY_SLICE_RULE_FORM, seriesRef: "slice_rule.ftr.ar.distribution",
+      serviceRef: "service_physical_therapy", campaignFamilyRef: "campaign_family_intensive_ftr",
+      ruleKind: "budget_distribution", distributionAllocations: "Arap Bölgesi: 60\nAvrupa: 30" })).toBeNull();
+  });
+
   it("rejects opened authority anywhere in the response", () => {
     expect(() => parseSliceRuleWorkspaceSnapshot({ ...snapshot, items: [{ ...item,
       operatingRule: { ...item.operatingRule, authority: { ...closed, canExecute: true } } }] })).toThrow("güvenli sözleşmeyi");

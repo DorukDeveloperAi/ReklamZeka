@@ -73,10 +73,12 @@ type Form = Readonly<{
   countryOrRegion: string;
   audienceStrategy: string;
   platform: "" | Platform;
-  ruleKind: "period_budget_cap" | "winner_continuation_rotation" | "delivery_guardrail";
+  ruleKind: "period_budget_cap" | "budget_distribution" | "winner_continuation_rotation" | "delivery_guardrail";
   period: "daily" | "weekly" | "monthly";
   currency: string;
   maximumDecimal: string;
+  distributionDimension: "countryOrRegion" | "campaignCategory" | "conversionRoute";
+  distributionAllocations: string;
   continuationPercent: string;
   evaluationWindowDays: string;
   condition: "delivery_interrupted" | "capacity_constrained" | "payment_or_account_review";
@@ -90,7 +92,8 @@ const CLOSED: ClosedAuthority = Object.freeze({ canPublish: false, canApprove: f
   canWriteMeta: false, canEnableAutomation: false });
 const EMPTY_FORM: Form = Object.freeze({ seriesRef: "", market: "international", serviceRef: "",
   campaignFamilyRef: "", countryOrRegion: "", audienceStrategy: "", platform: "", ruleKind: "period_budget_cap",
-  period: "monthly", currency: "TRY", maximumDecimal: "", continuationPercent: "80", evaluationWindowDays: "7",
+  period: "monthly", currency: "TRY", maximumDecimal: "", distributionDimension: "countryOrRegion",
+  distributionAllocations: "", continuationPercent: "80", evaluationWindowDays: "7",
   condition: "delivery_interrupted", priority: "50", metric: "cost_per_qualified_lead", reviewCadence: "weekly",
   rollbackWhen: "Yeni sonuç kanıtı, teslimat kesintisi veya kapsam değişimi insan incelemesini gerektirirse." });
 const EMPTY_BUDGET_COMMAND = `{
@@ -214,6 +217,26 @@ export function classifySliceRuleBudgetImpactFailure(code: string | undefined, s
   return { status: "error", message: "Etki önizleme isteği reddedildi; hiçbir sonuç veya yetki varsayılmadı." };
 }
 
+/** Parses only explicit `slice key: percent` lines; no audience or geography is inferred. */
+function parseDistributionAllocations(value: string): readonly Readonly<{ key: string; basisPoints: number }>[] | null {
+  const lines = value.split("\n").map((line) => line.trim()).filter(Boolean);
+  if (lines.length < 2 || lines.length > 50) return null;
+  const allocations = lines.map((line) => {
+    const parts = line.split(":");
+    if (parts.length !== 2) return null;
+    const key = parts[0]?.trim() ?? "";
+    const percent = parts[1]?.trim() ?? "";
+    if (!key || key.length > 200 || !/^(?:0|[1-9]\d?|100)(?:\.\d{1,2})?$/.test(percent)) return null;
+    const [whole, fractional = ""] = percent.split(".");
+    return Object.freeze({ key, basisPoints: Number(whole) * 100 + Number(fractional.padEnd(2, "0")) });
+  });
+  if (allocations.some((allocation) => allocation === null)) return null;
+  const exact = allocations as readonly Readonly<{ key: string; basisPoints: number }>[];
+  if (new Set(exact.map((allocation) => allocation.key)).size !== exact.length
+    || exact.reduce((sum, allocation) => sum + allocation.basisPoints, 0) !== 10_000) return null;
+  return Object.freeze([...exact].sort((left, right) => left.key.localeCompare(right.key)));
+}
+
 export function buildSliceRuleDraftCommand(form: Form, head?: SliceRuleWorkspaceItem) {
   const continuation = Number(form.continuationPercent);
   const priority = Number(form.priority);
@@ -228,6 +251,10 @@ export function buildSliceRuleDraftCommand(form: Form, head?: SliceRuleWorkspace
     if (!/^[A-Z]{3}$/.test(form.currency) || !/^(0|[1-9]\d*)(?:\.\d{1,12})?$/.test(form.maximumDecimal)
       || Number(form.maximumDecimal) <= 0) return null;
     rule = { kind: form.ruleKind, period: form.period, currency: form.currency, maximumDecimal: form.maximumDecimal };
+  } else if (form.ruleKind === "budget_distribution") {
+    const allocations = parseDistributionAllocations(form.distributionAllocations);
+    if (!allocations) return null;
+    rule = { kind: form.ruleKind, dimension: form.distributionDimension, allocations };
   } else if (form.ruleKind === "winner_continuation_rotation") {
     if (!Number.isInteger(continuation) || continuation < 0 || continuation > 100 || !Number.isInteger(window)
       || window < 1 || window > 90 || form.metric === "delivery_health") return null;
@@ -249,6 +276,7 @@ export function buildSliceRuleDraftCommand(form: Form, head?: SliceRuleWorkspace
 
 function ruleLabel(rule: SliceRule): string {
   if (rule.kind === "period_budget_cap") return `${rule.period} tavan · ${rule.maximumDecimal} ${rule.currency}`;
+  if (rule.kind === "budget_distribution") return `${rule.dimension} dağılımı · ${rule.allocations.length} dilim`;
   if (rule.kind === "winner_continuation_rotation") return `Kazanan %${rule.continuationBasisPoints / 100} · keşif %${rule.explorationBasisPoints / 100}`;
   if (rule.kind === "delivery_guardrail") return `Teslimat koruması · ${rule.condition}`;
   return rule.kind;
@@ -331,8 +359,9 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
           <label>Hizmet referansı<input value={form.serviceRef} disabled={Boolean(head)} onChange={(event) => update("serviceRef", event.target.value)} placeholder="service_physical_therapy" /></label>
           <label>Kampanya ailesi referansı<input value={form.campaignFamilyRef} disabled={Boolean(head)} onChange={(event) => update("campaignFamilyRef", event.target.value)} placeholder="campaign_family_intensive_ftr" /></label>
           <div className={styles.row}><label>Ülke / bölge (opsiyonel)<input value={form.countryOrRegion} disabled={Boolean(head)} onChange={(event) => update("countryOrRegion", event.target.value)} /></label><label>Hedefleme stratejisi (opsiyonel)<input value={form.audienceStrategy} disabled={Boolean(head)} onChange={(event) => update("audienceStrategy", event.target.value)} /></label></div>
-          <label>Kural türü<select value={form.ruleKind} onChange={(event) => update("ruleKind", event.target.value as Form["ruleKind"])}><option value="period_budget_cap">Dönemsel bütçe tavanı</option><option value="winner_continuation_rotation">Kazananı sürdür / keşif rotasyonu</option><option value="delivery_guardrail">Teslimat koruması</option></select></label>
+          <label>Kural türü<select value={form.ruleKind} onChange={(event) => update("ruleKind", event.target.value as Form["ruleKind"])}><option value="period_budget_cap">Dönemsel bütçe tavanı</option><option value="budget_distribution">Bütçe dağılımı</option><option value="winner_continuation_rotation">Kazananı sürdür / keşif rotasyonu</option><option value="delivery_guardrail">Teslimat koruması</option></select></label>
           {form.ruleKind === "period_budget_cap" ? <div className={styles.row}><label>Dönem<select value={form.period} onChange={(event) => update("period", event.target.value as Form["period"])}><option value="daily">Günlük</option><option value="weekly">Haftalık</option><option value="monthly">Aylık</option></select></label><label>Tavan<input value={form.maximumDecimal} onChange={(event) => update("maximumDecimal", event.target.value)} inputMode="decimal" placeholder="250000" /></label><label>Para birimi<input value={form.currency} onChange={(event) => update("currency", event.target.value.toUpperCase())} maxLength={3} /></label></div> : null}
+          {form.ruleKind === "budget_distribution" ? <><label>Dağıtım boyutu<select value={form.distributionDimension} onChange={(event) => update("distributionDimension", event.target.value as Form["distributionDimension"])}><option value="countryOrRegion">Ülke / bölge</option><option value="campaignCategory">Kampanya kategorisi</option><option value="conversionRoute">Sonuç rotası</option></select></label><label>Dilim ve paylar<textarea value={form.distributionAllocations} onChange={(event) => update("distributionAllocations", event.target.value)} rows={4} placeholder={"Arap Bölgesi: 60\nAvrupa: 40"} /><small>Her satır <strong>dilim: yüzde</strong> biçiminde olmalı; toplam tam %100 olmalı. Bu yalnız insan incelemeli bir dağılım önerisidir.</small></label></> : null}
           {form.ruleKind === "winner_continuation_rotation" ? <div className={styles.row}><label>Kazanan payı %<input value={form.continuationPercent} onChange={(event) => update("continuationPercent", event.target.value)} inputMode="numeric" /></label><label>Ölçüm penceresi (gün)<input value={form.evaluationWindowDays} onChange={(event) => update("evaluationWindowDays", event.target.value)} inputMode="numeric" /></label></div> : null}
           {form.ruleKind === "delivery_guardrail" ? <label>Koşul<select value={form.condition} onChange={(event) => update("condition", event.target.value as Form["condition"])}><option value="delivery_interrupted">Teslimat kesintisi</option><option value="capacity_constrained">Kapasite kısıtı</option><option value="payment_or_account_review">Ödeme / hesap incelemesi</option></select></label> : null}
           <div className={styles.row}><label>Öncelik (0–100)<input value={form.priority} onChange={(event) => update("priority", event.target.value)} inputMode="numeric" /></label><label>İnceleme sıklığı<select value={form.reviewCadence} onChange={(event) => update("reviewCadence", event.target.value as Form["reviewCadence"])}><option value="daily">Günlük</option><option value="weekly">Haftalık</option><option value="monthly">Aylık</option></select></label></div>
