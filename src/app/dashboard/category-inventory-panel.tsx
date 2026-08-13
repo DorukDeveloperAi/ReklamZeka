@@ -268,6 +268,27 @@ export async function runCategoryAuthoringMutation(command: CategoryMutationComm
 }
 export type CategoryAssignmentDraft = Readonly<{ dimensionRef: string; definitionRef: string; level: "" | Level;
   targetKey: string; operation: "add" | "override" | "deny"; manualLock: boolean; confidencePercent: string }>;
+export type CategoryAssignmentHandoff = Readonly<{ campaignRef: string; facet: "market" | "service" | "family" }>;
+const REVIEW_HANDOFF_DIMENSION: Readonly<Record<CategoryAssignmentHandoff["facet"], string>> = Object.freeze({
+  market: "market", service: "service_line", family: "campaign_family",
+});
+
+/**
+ * A review row may only prefill the existing guarded authoring form. It never
+ * selects a definition or submits a mutation; the API still resolves this
+ * opaque target inside the bound workspace at write time.
+ */
+export function buildCategoryAssignmentHandoffDraft(authoring: CategoryAuthoringState,
+  handoff: CategoryAssignmentHandoff): CategoryAssignmentDraft | null {
+  if (!authoring.authority.canAssign || !ENTITY_REF.test(handoff.campaignRef)) return null;
+  const dimension = authoring.dimensions.filter((item) => item.key === REVIEW_HANDOFF_DIMENSION[handoff.facet]
+    && item.allowedEntityLevels.includes("campaign"));
+  const target = authoring.targets.filter((item) => item.level === "campaign" && item.ref === handoff.campaignRef
+    && item.viaAdRef === null);
+  if (dimension.length !== 1 || target.length !== 1) return null;
+  return Object.freeze({ dimensionRef: dimension[0]!.ref, definitionRef: "", level: "campaign",
+    targetKey: `${target[0]!.ref}:direct`, operation: "add", manualLock: true, confidencePercent: "100" });
+}
 export function buildCategoryAssignmentCommand(authoring: CategoryAuthoringState,
   draft: CategoryAssignmentDraft): CategoryMutationCommand | null {
   if (!authoring.authority.canAssign || !draft.level || !draft.confidencePercent.trim()) return null;
@@ -410,6 +431,21 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
       return false;
     } finally { setMutating(false); }
   }, [refresh]);
+  useEffect(() => {
+    const handoff = (event: Event) => {
+      const detail = (event as CustomEvent<CategoryAssignmentHandoff>).detail;
+      if (!authoring || !detail) return;
+      const next = buildCategoryAssignmentHandoffDraft(authoring, detail);
+      if (!next) {
+        setMutationError("İnceleme satırı bu aktif workspace hedefi veya kategori boyutuyla eşleşmedi; form güvenli biçimde boş bırakıldı.");
+        return;
+      }
+      setAssignmentDraft(next); setMutationError(null); setMutationStatus("İnceleme hedefi hazırlandı. Tanımı siz seçin; atama henüz oluşturulmadı.");
+      window.setTimeout(() => document.getElementById("category-assignment-form")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+    };
+    window.addEventListener("reklamzeka:category-assignment-handoff", handoff);
+    return () => window.removeEventListener("reklamzeka:category-assignment-handoff", handoff);
+  }, [authoring]);
 
   if (loading && !snapshot) return <><section className={`${styles.panel} ${styles.categoryState}`} aria-busy="true"><strong>İÇ KATEGORİLER</strong><h2>Kategori envanteri yükleniyor</h2><p>Aktif tanımlar ve doğrudan atama kapsamı okunuyor.</p></section><StarterCategoryAdoption /></>;
   if (error && !snapshot) return <><section className={`${styles.panel} ${styles.categoryState}`} role="alert"><strong>{sessionRequired ? "YEREL OTURUM GEREKLİ" : "BAĞLANTI KURULAMADI"}</strong><h2>{sessionRequired ? "Dashboard oturumunu bağlayın" : "Kategori kaynağı kullanılamıyor"}</h2><p>{error}</p>{sessionRequired && props.onOpenSession ? <button type="button" onClick={props.onOpenSession}>Decision Room’da oturumu bağla</button> : <button type="button" onClick={() => void refresh()}>Yeniden dene</button>}</section><StarterCategoryAdoption /><CategoryProfileStudio /></>;
@@ -465,7 +501,7 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
     </section> : null}
     {authoring?.authority.canAssign ? <section className={`${styles.panel} ${styles.categoryAuthoring}`} aria-label="Kategori ataması">
       <header className={styles.panelHeader}><div><span className={styles.kicker}>WORKSPACE-BOUND TARGETS</span><h2>İlk kategori atamasını oluştur</h2></div><span>Yalnız aktif mirror hedefleri</span></header>
-      <div className={styles.categoryAssignmentGrid}><form onSubmit={(event) => {
+      <div className={styles.categoryAssignmentGrid}><form id="category-assignment-form" onSubmit={(event) => {
         event.preventDefault();
         if (!assignmentCommand) return;
         void mutate(assignmentCommand)

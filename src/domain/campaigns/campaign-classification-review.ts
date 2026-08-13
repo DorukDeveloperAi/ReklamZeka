@@ -5,13 +5,13 @@ export type ClassificationFacet = "market" | "service" | "family" | "geo" | "aud
 export type ClassificationFacetState = "assigned" | "missing" | "conflict" | "not_configured";
 
 export type CampaignClassificationReviewSource = Readonly<{
-  campaigns: readonly Readonly<{ id: string; name: string; accountName: string; fetchedAt: string }>[],
+  campaigns: readonly Readonly<{ id: string; ref: string; name: string; accountName: string; fetchedAt: string }>[],
   paths: readonly CategoryEntityPath[], dimensions: readonly CategoryDimension[], definitions: readonly CategoryDefinition[],
   assignments: readonly CategoryAssignment[],
 }>;
 
 const FACETS: Readonly<Record<ClassificationFacet, readonly string[]>> = Object.freeze({
-  market: ["geo_market"], service: ["service_line"], family: ["campaign_family"],
+  market: ["market"], service: ["service_line"], family: ["campaign_family"],
   geo: ["geo_market"], audience: ["audience_strategy"], platform: ["platform"],
 });
 const AUTHORITY = Object.freeze({ canAssign: false as const, canPublish: false as const, canAuthorizeAction: false as const, canWriteMeta: false as const });
@@ -39,7 +39,7 @@ export function buildCampaignClassificationReview(source: CampaignClassification
     const paths = source.paths.filter((path) => path.nodes[0]?.level === "campaign" && path.nodes[0]?.id === campaign.id);
     const facets = (Object.keys(FACETS) as ClassificationFacet[]).map((name) => facet(name, source.dimensions, source.definitions, source.assignments, paths));
     const reasons = [...new Set(facets.flatMap((item) => item.reasonCodes))].sort();
-    return Object.freeze({ campaignRef: campaign.id, name: campaign.name, accountName: campaign.accountName, fetchedAt: campaign.fetchedAt,
+    return Object.freeze({ campaignRef: campaign.ref, name: campaign.name, accountName: campaign.accountName, fetchedAt: campaign.fetchedAt,
       facets: Object.freeze(facets), reviewRequired: facets.some((item) => item.state !== "assigned"), reasonCodes: Object.freeze(reasons) });
   }).sort((left, right) => Number(right.reviewRequired) - Number(left.reviewRequired) || left.name.localeCompare(right.name, "tr"));
   return Object.freeze({ version: CAMPAIGN_CLASSIFICATION_REVIEW_VERSION, entries: Object.freeze(entries),

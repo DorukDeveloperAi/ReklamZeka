@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { buildCategoryAssignmentCommand, isArchiveMutationReady, isRevisionMutationReady, loadCategoryAuthoringState,
+import { buildCategoryAssignmentCommand, buildCategoryAssignmentHandoffDraft, isArchiveMutationReady, isRevisionMutationReady, loadCategoryAuthoringState,
   parseCategoryArchiveImpact, parseCategoryAuthoringState,
   runCategoryAuthoringMutation } from "@/app/dashboard/category-inventory-panel";
 
@@ -137,5 +137,15 @@ describe("A09.7 guarded category authoring dashboard contract", () => {
       canRevise: false, canArchive: false, canAssign: false } }, { dimensionRef: refs.dimension,
       definitionRef: refs.definition, level: "campaign", targetKey: `${refs.entity}:direct`, operation: "add",
       manualLock: false, confidencePercent: "100" })).toBeNull();
+  });
+
+  it("only preselects the existing manual assignment form for an exact opaque campaign target", () => {
+    const state = parseCategoryAuthoringState(authoringPayload);
+    expect(buildCategoryAssignmentHandoffDraft(state, { campaignRef: refs.entity, facet: "service" })).toEqual({
+      dimensionRef: refs.dimension, definitionRef: "", level: "campaign", targetKey: `${refs.entity}:direct`,
+      operation: "add", manualLock: true, confidencePercent: "100",
+    });
+    expect(buildCategoryAssignmentHandoffDraft(state, { campaignRef: `category_entity_${"9".repeat(24)}`, facet: "service" })).toBeNull();
+    expect(buildCategoryAssignmentHandoffDraft(state, { campaignRef: "campaign-raw-id", facet: "service" } as any)).toBeNull();
   });
 });

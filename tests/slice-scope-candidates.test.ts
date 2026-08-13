@@ -9,13 +9,13 @@ function assignment(dimensionId: string, definitionId: string) { return { id: `a
 function source(overrides: Record<string, unknown> = {}) {
   const dims = [dimension("market"), dimension("service_line"), dimension("campaign_family"), dimension("geo_market"), dimension("publisher_platform")];
   const defs = [definition("d-market", "yabanci"), definition("d-service_line", "service_physical_therapy"), definition("d-campaign_family", "campaign_family_intensive_ftr"), definition("d-geo_market", "gcc"), definition("d-publisher_platform", "instagram")];
-  return { campaigns: [{ id: "campaign-1", name: "Name is ignored", accountName: "Account", fetchedAt: "2026-08-14T00:00:00.000Z" }], paths: [campaignPath], dimensions: dims, definitions: defs, assignments: defs.map((item) => assignment(item.dimensionId, item.id)), ...overrides } as any;
+  return { campaigns: [{ id: "campaign-1", ref: `category_entity_${"a".repeat(24)}`, name: "Name is ignored", accountName: "Account", fetchedAt: "2026-08-14T00:00:00.000Z" }], paths: [campaignPath], dimensions: dims, definitions: defs, assignments: defs.map((item) => assignment(item.dimensionId, item.id)), ...overrides } as any;
 }
 describe("slice scope candidates", () => {
   it("projects only exact coherent machine-key scope and keeps budget evidence closed", () => {
     const result = buildSliceScopeCandidates(source());
     expect(result).toMatchObject({ version: "slice-scope-candidates/1.0.0", authority: { canSave: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false } });
-    expect(result.candidates).toEqual([{ campaignRef: "campaign-1", scope: { market: "international", serviceRef: "service_physical_therapy", campaignFamilyRef: "campaign_family_intensive_ftr", countryOrRegion: "gcc", platform: "instagram" }, requiresFrozenContext: true, budgetImpactReady: false }]);
+    expect(result.candidates).toEqual([{ campaignRef: `category_entity_${"a".repeat(24)}`, scope: { market: "international", serviceRef: "service_physical_therapy", campaignFamilyRef: "campaign_family_intensive_ftr", countryOrRegion: "gcc", platform: "instagram" }, requiresFrozenContext: true, budgetImpactReady: false }]);
     expect(JSON.stringify(result)).not.toContain("Name is ignored");
     expect(JSON.stringify(result)).not.toContain("label ");
   });

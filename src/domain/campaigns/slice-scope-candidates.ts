@@ -54,7 +54,7 @@ export function buildSliceScopeCandidates(source: CampaignClassificationReviewSo
       return value ? [[facet, value]] : [];
     })) as Partial<Record<OptionalFacet, string>>;
     const scope = Object.freeze({ market, serviceRef, campaignFamilyRef, ...optional }) as Scope;
-    return [Object.freeze({ campaignRef: campaign.id, scope, requiresFrozenContext: true as const, budgetImpactReady: false as const })];
+    return [Object.freeze({ campaignRef: campaign.ref, scope, requiresFrozenContext: true as const, budgetImpactReady: false as const })];
   }).sort((left, right) => left.campaignRef.localeCompare(right.campaignRef));
   return Object.freeze({ version: SLICE_SCOPE_CANDIDATES_VERSION, candidates: Object.freeze(candidates), authority: CLOSED });
 }
