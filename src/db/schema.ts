@@ -2851,6 +2851,74 @@ export const sliceRuleAllocationEntityBindings = pgTable("slice_rule_allocation_
   `),
 ]);
 
+/**
+ * A human's immutable, advisory choice of one exact planned scenario allocation.
+ * It is provenance only and cannot create an action, approval, or Meta write.
+ */
+export const sliceRuleScenarioAllocationSelections = pgTable("slice_rule_scenario_allocation_selections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  draftHash: text("draft_hash").notNull(),
+  proposalHash: text("proposal_hash").notNull(),
+  proposalRef: text("proposal_ref").notNull(),
+  scenarioRef: text("scenario_ref").notNull(),
+  allocationRef: text("allocation_ref").notNull(),
+  beforeAmountMinor: bigint("before_amount_minor", { mode: "number" }).notNull(),
+  afterAmountMinor: bigint("after_amount_minor", { mode: "number" }).notNull(),
+  selectionEvidenceHash: text("selection_evidence_hash").notNull(),
+  selectionEvidence: jsonb("selection_evidence").$type<Record<string, unknown>>().notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  selectedByActorId: uuid("selected_by_actor_id").notNull(),
+  selectionPayload: jsonb("selection_payload").$type<Record<string, unknown>>().notNull(),
+  selectedAt: timestamp("selected_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.draftHash], foreignColumns: [sliceRuleWorkspaceDrafts.workspaceId, sliceRuleWorkspaceDrafts.draftHash], name: "slice_rule_scenario_allocation_selections_draft_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.proposalHash], foreignColumns: [budgetProposalVersions.workspaceId, budgetProposalVersions.proposalHash], name: "slice_rule_scenario_allocation_selections_proposal_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.draftHash, table.allocationRef], foreignColumns: [sliceRuleAllocationEntityBindings.workspaceId, sliceRuleAllocationEntityBindings.draftHash, sliceRuleAllocationEntityBindings.allocationRef], name: "slice_rule_scenario_allocation_selections_allocation_binding_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.selectedByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "slice_rule_scenario_allocation_selections_membership_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("slice_rule_scenario_allocation_selections_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slice_rule_scenario_allocation_selections_exact_unique").on(table.workspaceId, table.draftHash, table.proposalHash, table.scenarioRef, table.allocationRef),
+  uniqueIndex("slice_rule_scenario_allocation_selections_allocation_unique").on(table.workspaceId, table.draftHash, table.allocationRef),
+  uniqueIndex("slice_rule_scenario_allocation_selections_idempotency_unique").on(table.workspaceId, table.idempotencyKey),
+  index("slice_rule_scenario_allocation_selections_lookup_idx").on(table.workspaceId, table.proposalHash, table.selectedAt.desc()),
+  check("slice_rule_scenario_allocation_selections_identity", sql`
+    ${table.draftHash} ~ '^[a-f0-9]{64}$' and ${table.proposalHash} ~ '^[a-f0-9]{64}$'
+    and ${table.proposalRef} ~ '^budget_proposal_[a-f0-9]{20}$'
+    and ${table.scenarioRef} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+    and ${table.allocationRef} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+    and ${table.idempotencyKey} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+    and ${table.beforeAmountMinor} >= 0 and ${table.afterAmountMinor} >= 0
+    and ${table.beforeAmountMinor} <> ${table.afterAmountMinor}
+    and ${table.selectionEvidenceHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("slice_rule_scenario_allocation_selections_evidence_exact", sql`(
+    jsonb_typeof(${table.selectionEvidence}) = 'object'
+    and ${table.selectionEvidence} #>> '{evidenceHash}' = ${table.selectionEvidenceHash}
+    and ${table.selectionEvidence} #>> '{proposalHash}' = ${table.proposalHash}
+    and ${table.selectionEvidence} #>> '{scenarioRef}' = ${table.scenarioRef}
+    and ${table.selectionEvidence} #>> '{allocationRef}' = ${table.allocationRef}
+  ) is true`),
+  check("slice_rule_scenario_allocation_selections_payload_exact", sql`(
+    jsonb_typeof(${table.selectionPayload}) = 'object'
+    and ${table.selectionPayload} #>> '{schemaVersion}' = 'slice-rule-scenario-allocation-selection/1.0.0'
+    and ${table.selectionPayload} #>> '{draftHash}' = ${table.draftHash}
+    and ${table.selectionPayload} #>> '{proposalHash}' = ${table.proposalHash}
+    and ${table.selectionPayload} #>> '{proposalRef}' = ${table.proposalRef}
+    and ${table.selectionPayload} #>> '{scenarioRef}' = ${table.scenarioRef}
+    and ${table.selectionPayload} #>> '{allocationRef}' = ${table.allocationRef}
+    and (${table.selectionPayload} #>> '{beforeAmountMinor}')::bigint = ${table.beforeAmountMinor}
+    and (${table.selectionPayload} #>> '{afterAmountMinor}')::bigint = ${table.afterAmountMinor}
+    and ${table.selectionPayload} #> '{selectionEvidence}' = ${table.selectionEvidence}
+    and (${table.selectionPayload} #>> '{selectedAt}')::timestamptz = ${table.selectedAt}
+    and ${table.selectionPayload} #> '{authority}' = '{"recommendationOnly":true,"canPublish":false,"canApprove":false,"canExecute":false,"canWriteMeta":false,"canEnableAutomation":false}'::jsonb
+  ) is true`),
+  check("slice_rule_scenario_allocation_selections_no_forbidden_authority", sql`
+    ${table.selectionPayload}::text !~* '"(approvalGranted|writeEnabled|policyPublished|actionAuthorized)"[[:space:]]*:[[:space:]]*true'
+    and ${table.selectionPayload}::text !~* '"[^"[:space:]]*(token|secret|authorization|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
+  `),
+]);
+
 /** Append-only, advisory-only budget proposal revisions over one exact frozen campaign context. */
 export const budgetProposalVersions = pgTable("budget_proposal_versions", {
   id: uuid("id").primaryKey().defaultRandom(),
