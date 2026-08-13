@@ -6,6 +6,10 @@ import { ActionProposalStagingService } from "@/application/action-proposal-stag
 import { DrizzleActionProposalQueueRepository } from "@/connectors/actions/action-proposal-queue-drizzle-repository";
 import { buildActionPlan, type ActionValveContext } from "@/domain/actions/autonomy-valve";
 import type { ApprovalPolicy } from "@/domain/actions/approval-lifecycle";
+import {
+  resolvePublishedApprovalPolicy,
+  type ApprovalPolicyDefinitionRevision,
+} from "@/domain/actions/approval-policy-registry";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -24,6 +28,35 @@ export class SliceRuleBudgetActionUnitMaterializerError extends Error {
 export type SliceRuleBudgetActionUnitMaterializeCommand = Readonly<{
   workspaceId: string; selectionId: string; actorId: string; idempotencyKey: string; proposedAt: string; expiresAt: string;
 }>;
+type ApprovalPolicyRow = Readonly<{ workspaceRef: string; artifactPayload: unknown }>;
+type BudgetApprovalApplicability = Readonly<
+  | { actionType: "budget_decrease"; risk: "K2" }
+  | { actionType: "budget_increase"; risk: "K3" }
+>;
+
+/**
+ * Resolves the persisted policy's authoritative workspace reference. A database UUID
+ * is deliberately never converted into a public workspace ref at this boundary.
+ */
+export function resolveSliceRuleBudgetActionApprovalPolicy(input: Readonly<{
+  evaluatedAt: string;
+  applicability: BudgetApprovalApplicability;
+  rows: readonly ApprovalPolicyRow[];
+}>): Readonly<{ policy: ApprovalPolicy; workspaceRef: string }> | null {
+  if (input.rows.length === 0 || input.rows.length > 1_000) return null;
+  const workspaceRefs = [...new Set(input.rows.map((row) => row.workspaceRef))];
+  if (workspaceRefs.length !== 1) return null;
+  try {
+    const resolved = resolvePublishedApprovalPolicy({
+      workspaceRef: workspaceRefs[0]!, evaluatedAt: input.evaluatedAt,
+      applicability: input.applicability,
+      definitions: input.rows.map((row) => row.artifactPayload as ApprovalPolicyDefinitionRevision),
+    });
+    return Object.freeze({ policy: resolved.policy, workspaceRef: resolved.source.workspaceRef });
+  } catch {
+    return null;
+  }
+}
 function stable(v: unknown): unknown { if (Array.isArray(v)) return v.map(stable); if (v && typeof v === "object") return Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, x]) => [k, stable(x)])); return v; }
 function digest(v: unknown) { return createHash("sha256").update(JSON.stringify(stable(v))).digest("hex"); }
 function decimal(minor: number): string { if (!Number.isSafeInteger(minor) || minor < 0) throw new SliceRuleBudgetActionUnitMaterializerError("corrupt_store"); return `${Math.floor(minor / 100)}.${String(minor % 100).padStart(2, "0")}`; }
@@ -60,15 +93,27 @@ export class DrizzleSliceRuleBudgetActionUnitMaterializer {
       if (campaign.length !== 1 || account.length !== 1 || contexts.length !== 1 || campaign[0]!.dailyBudgetMinor !== s.beforeAmountMinor || account[0]!.currency !== target.currency) throw new SliceRuleBudgetActionUnitMaterializerError("stale_source");
       const alertHeads = await tx.execute(sql`select 1 from delivery_health_alert_ledger_records h where h.workspace_id=${input.workspaceId}::uuid and h.account_ref=${contexts[0]!.accountRef} and h.status <> 'resolved' and not exists (select 1 from delivery_health_alert_ledger_records n where n.workspace_id=h.workspace_id and n.alert_ref=h.alert_ref and n.sequence>h.sequence) limit 1`);
       if ((alertHeads.rows as unknown[]).length) throw new SliceRuleBudgetActionUnitMaterializerError("delivery_hold");
-      const policyRows = await tx.select().from(schema.approvalPolicyDefinitionRevisions).where(and(eq(schema.approvalPolicyDefinitionRevisions.workspaceId, input.workspaceId), eq(schema.approvalPolicyDefinitionRevisions.workspaceRef, `workspace_${input.workspaceId}`), eq(schema.approvalPolicyDefinitionRevisions.state, "published"), eq(schema.approvalPolicyDefinitionRevisions.actionType, s.afterAmountMinor > s.beforeAmountMinor ? "budget_increase" : "budget_decrease"))).limit(2);
-      if (policyRows.length !== 1) throw new SliceRuleBudgetActionUnitMaterializerError("policy_unavailable");
-      const policy = (policyRows[0]!.artifactPayload as { policy?: ApprovalPolicy }).policy;
-      if (!policy) throw new SliceRuleBudgetActionUnitMaterializerError("corrupt_store");
+      const applicability = s.afterAmountMinor > s.beforeAmountMinor
+        ? Object.freeze({ actionType: "budget_increase" as const, risk: "K3" as const })
+        : Object.freeze({ actionType: "budget_decrease" as const, risk: "K2" as const });
+      const policyRows = await tx.select({
+        workspaceRef: schema.approvalPolicyDefinitionRevisions.workspaceRef,
+        artifactPayload: schema.approvalPolicyDefinitionRevisions.artifactPayload,
+      }).from(schema.approvalPolicyDefinitionRevisions).where(and(
+        eq(schema.approvalPolicyDefinitionRevisions.workspaceId, input.workspaceId),
+        eq(schema.approvalPolicyDefinitionRevisions.actionType, applicability.actionType),
+        eq(schema.approvalPolicyDefinitionRevisions.risk, applicability.risk),
+      )).limit(1_001);
+      const resolvedPolicy = resolveSliceRuleBudgetActionApprovalPolicy({
+        evaluatedAt: input.proposedAt, applicability, rows: policyRows,
+      });
+      if (!resolvedPolicy) throw new SliceRuleBudgetActionUnitMaterializerError("policy_unavailable");
+      const { policy, workspaceRef } = resolvedPolicy;
       const intent = { kind: "budget_change" as const, entity: { level: "campaign" as const, ref: campaign[0]!.externalCampaignId }, budgetKind: "daily" as const, currency: target.currency, beforeDecimal: decimal(s.beforeAmountMinor), afterDecimal: decimal(s.afterAmountMinor), budgetOwnerRef: campaign[0]!.externalCampaignId };
-      const valve: ActionValveContext = { workspaceRef: `workspace_${input.workspaceId}`, accountGroupRef: null, accountRef: contexts[0]!.accountRef, internalCategoryRefs: [], campaignRef: contexts[0]!.campaignRef, entity: intent.entity, evaluatedAt: input.proposedAt, rules: [], budgetLimits: null, protection: { protectedInternalCategoryRefs: [], affectedGeoRefs: [], protectedGeoRefs: [], changeDisposition: "allowed", policyRefs: [] } };
+      const valve: ActionValveContext = { workspaceRef, accountGroupRef: null, accountRef: contexts[0]!.accountRef, internalCategoryRefs: [], campaignRef: contexts[0]!.campaignRef, entity: intent.entity, evaluatedAt: input.proposedAt, rules: [], budgetLimits: null, protection: { protectedInternalCategoryRefs: [], affectedGeoRefs: [], protectedGeoRefs: [], changeDisposition: "allowed", policyRefs: [] } };
       const actionPlan = buildActionPlan(intent, valve);
       if (actionPlan.disposition !== "approval_required") throw new SliceRuleBudgetActionUnitMaterializerError("queue_rejected");
-      const staged = new ActionProposalStagingService(policy).stage({ plan: { planRef: `slice_rule_${s.draftHash.slice(0, 20)}`, revision: 1, planHash: digest({ draftHash: s.draftHash, proposalHash: s.proposalHash, selectionId: s.id }) }, workspaceRef: `workspace_${input.workspaceId}`, accountRef: contexts[0]!.accountRef, requester: { actorRef: `actor_${input.actorId.replaceAll("-", "")}`, role: "owner" }, proposedAt: input.proposedAt, expiresAt: input.expiresAt, units: [{ unitKey: `budget_${s.id.replaceAll("-", "")}`, plan: { planRef: `slice_rule_${s.draftHash.slice(0, 20)}`, revision: 1, planHash: digest({ draftHash: s.draftHash, proposalHash: s.proposalHash, selectionId: s.id }) }, actionPlan, workspaceRef: `workspace_${input.workspaceId}`, accountRef: contexts[0]!.accountRef, entityRef: campaign[0]!.externalCampaignId, actionType: actionPlan.actionType, risk: actionPlan.risk, actionHash: digest(actionPlan.action), dependencies: [], summary: { safety: "public_safe", before: { label: "Günlük bütçe", value: decimal(s.beforeAmountMinor) }, after: { label: "Günlük bütçe", value: decimal(s.afterAmountMinor) }, evidence: [{ evidenceRef: `selection_${s.id.replaceAll("-", "")}`, label: "Onaylı senaryo seçimi" }] } }] });
+      const staged = new ActionProposalStagingService(policy).stage({ plan: { planRef: `slice_rule_${s.draftHash.slice(0, 20)}`, revision: 1, planHash: digest({ draftHash: s.draftHash, proposalHash: s.proposalHash, selectionId: s.id }) }, workspaceRef, accountRef: contexts[0]!.accountRef, requester: { actorRef: `actor_${input.actorId.replaceAll("-", "")}`, role: "owner" }, proposedAt: input.proposedAt, expiresAt: input.expiresAt, units: [{ unitKey: `budget_${s.id.replaceAll("-", "")}`, plan: { planRef: `slice_rule_${s.draftHash.slice(0, 20)}`, revision: 1, planHash: digest({ draftHash: s.draftHash, proposalHash: s.proposalHash, selectionId: s.id }) }, actionPlan, workspaceRef, accountRef: contexts[0]!.accountRef, entityRef: campaign[0]!.externalCampaignId, actionType: actionPlan.actionType, risk: actionPlan.risk, actionHash: digest(actionPlan.action), dependencies: [], summary: { safety: "public_safe", before: { label: "Günlük bütçe", value: decimal(s.beforeAmountMinor) }, after: { label: "Günlük bütçe", value: decimal(s.afterAmountMinor) }, evidence: [{ evidenceRef: `selection_${s.id.replaceAll("-", "")}`, label: "Onaylı senaryo seçimi" }] } }] });
       try { await new DrizzleActionProposalQueueRepository(tx as Database, input.workspaceId).appendInitial(staged); } catch { throw new SliceRuleBudgetActionUnitMaterializerError("queue_rejected"); }
       const unit = await tx.select().from(schema.actionProposalUnits).where(and(eq(schema.actionProposalUnits.workspaceId, input.workspaceId), eq(schema.actionProposalUnits.unitRef, staged.summaries[0]!.unitRef))).limit(2);
       if (unit.length !== 1) throw new SliceRuleBudgetActionUnitMaterializerError("corrupt_store");
