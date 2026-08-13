@@ -210,6 +210,10 @@ export function createDrizzleProductionMetaReadSyncService(input: Readonly<{
   environment?: Record<string, string | undefined>;
   fetchImpl?: MetaFetch;
   deferAffectedGeoMaterialization?: boolean;
+  /** Server-composed recovery mode; request payloads cannot select it. */
+  inventoryTransactionMode?: "atomic" | "idempotent_page";
+  /** Server-composed recovery mode for durable checkpoint replay. */
+  durableTransactionMode?: "atomic" | "idempotent_checkpoint";
 }>): ProductionMetaReadSyncService {
   return new ProductionMetaReadSyncService({
     scopeResolver: input.scopeResolver,
@@ -217,11 +221,15 @@ export function createDrizzleProductionMetaReadSyncService(input: Readonly<{
     secrets: new DrizzleEnvironmentMetaSecretRepository(input.database, input.environment),
     accounts: new DrizzleMetaSyncAccountScopeResolver(input.database),
     durablePersistence: new TransactionBackedMetaSyncPersistenceAdapter(
-      new DrizzleMetaSyncTransactionManager(input.database),
+      new DrizzleMetaSyncTransactionManager(input.database,
+        input.durableTransactionMode === undefined ? {} : { transactionMode: input.durableTransactionMode }),
     ),
     affectedGeoMaterialization: input.deferAffectedGeoMaterialization ? "deferred" : "completed",
     inventoryPagePersistence: new DrizzleMetaInventoryPagePersistence(input.database, undefined,
-      { materializeAffectedGeo: !input.deferAffectedGeoMaterialization }),
+      {
+        materializeAffectedGeo: !input.deferAffectedGeoMaterialization,
+        ...(input.inventoryTransactionMode === undefined ? {} : { transactionMode: input.inventoryTransactionMode }),
+      }),
     insightPagePersistence: new DrizzleMetaInsightPagePersistence(input.database),
     fetchImpl: input.fetchImpl,
   });

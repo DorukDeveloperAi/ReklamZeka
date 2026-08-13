@@ -8,6 +8,7 @@ import {
   ProductionMetaReadSyncError,
   ProductionMetaReadSyncService,
 } from "@/server/meta-read-sync-runtime";
+import { DrizzleMetaSyncTransactionManager } from "@/connectors/meta/sync/persistence-adapter";
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
 const connectionId = "22222222-2222-4222-8222-222222222222";
@@ -79,6 +80,17 @@ function fixture(overrides: Readonly<{
 }
 
 describe("production Meta read sync composition", () => {
+  it("keeps atomic checkpoints by default and makes pooler recovery explicitly server-selected", async () => {
+    const database = { transaction: vi.fn(async (work: (transaction: unknown) => Promise<string>) => work({})) };
+    const atomic = new DrizzleMetaSyncTransactionManager(database as never);
+    await expect(atomic.transaction(async () => "atomic")).resolves.toBe("atomic");
+    expect(database.transaction).toHaveBeenCalledTimes(1);
+
+    const recovery = new DrizzleMetaSyncTransactionManager(database as never, { transactionMode: "idempotent_checkpoint" });
+    await expect(recovery.transaction(async () => "recovery")).resolves.toBe("recovery");
+    expect(database.transaction).toHaveBeenCalledTimes(1);
+  });
+
   it("derives every private scope server-side and injects canonical inventory persistence", async () => {
     const setup = fixture();
     const response = await setup.service.run({

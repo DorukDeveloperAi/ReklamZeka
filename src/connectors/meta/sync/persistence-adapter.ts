@@ -74,13 +74,23 @@ type ReklamZekaDatabase = NodePgDatabase<typeof schema>;
 
 /** Concrete PostgreSQL implementation for the Drizzle S1.3 tables. */
 export class DrizzleMetaSyncTransactionManager implements MetaSyncTransactionManager {
-  constructor(private readonly database: ReklamZekaDatabase) {}
+  constructor(
+    private readonly database: ReklamZekaDatabase,
+    private readonly options: Readonly<{ transactionMode?: "atomic" | "idempotent_checkpoint" }> = {},
+  ) {}
 
   transaction<T>(work: (transaction: MetaSyncPersistenceTransaction) => Promise<T>): Promise<T> {
-    return this.database.transaction(async (databaseTransaction) => work({
-      load: (key) => this.load(databaseTransaction as ReklamZekaDatabase, key),
-      save: (key, snapshot) => this.save(databaseTransaction as ReklamZekaDatabase, key, snapshot),
-    }));
+    const bind = (database: ReklamZekaDatabase): MetaSyncPersistenceTransaction => ({
+      load: (key) => this.load(database, key),
+      save: (key, snapshot) => this.save(database, key, snapshot),
+    });
+    // This is a server-selected recovery path for a verified pooler callback
+    // defect. Every durable relation uses deterministic identities/upserts, so
+    // an interrupted checkpoint is safely replayed; the normal default remains
+    // a single atomic transaction.
+    return this.options.transactionMode === "idempotent_checkpoint"
+      ? work(bind(this.database))
+      : this.database.transaction(async (databaseTransaction) => work(bind(databaseTransaction as ReklamZekaDatabase)));
   }
 
   private async accountIds(
