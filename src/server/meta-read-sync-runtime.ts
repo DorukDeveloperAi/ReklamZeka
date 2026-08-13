@@ -56,7 +56,7 @@ export type ProductionMetaReadSyncInput = Readonly<{
  */
 export type ProductionMetaReadSyncRecoveryInput = Readonly<Omit<ProductionMetaReadSyncInput, "parentRunId">>;
 
-export type ServerOwnedMetaRecoveryLaneId = "inventory_ad_set_v1" | "creative_ad_v1" | "insights_ad_v1";
+export type ServerOwnedMetaRecoveryLaneId = "inventory_ad_set_v1" | "creative_ad_v1" | "creative_ad_v2" | "insights_ad_v1";
 
 type ServerOwnedMetaRecoveryLane = Readonly<{
   id: ServerOwnedMetaRecoveryLaneId;
@@ -220,7 +220,7 @@ export class ProductionMetaReadSyncService {
       const plan = recoveryLane
         ? fullPlan.filter((slice) => recoveryLane.id === "inventory_ad_set_v1"
           ? slice.stream === "inventory" && slice.entityLevel === "ad_set"
-          : recoveryLane.id === "creative_ad_v1"
+          : recoveryLane.id === "creative_ad_v1" || recoveryLane.id === "creative_ad_v2"
             ? slice.stream === "creative_post" && slice.entityLevel === "ad"
             : slice.stream === "insights" && slice.entityLevel === "ad")
         : fullPlan;
@@ -286,7 +286,7 @@ export function createDrizzleProductionMetaReadSyncService(input: Readonly<{
   const recoveryAccountId = input.recoveryAccountId;
   const recoveryLane = recoveryAccountId === undefined ? undefined : (() => {
     const id = input.recoveryLaneId ?? "inventory_ad_set_v1";
-    if (!(["inventory_ad_set_v1", "creative_ad_v1", "insights_ad_v1"] as const).includes(id)) {
+    if (!(["inventory_ad_set_v1", "creative_ad_v1", "creative_ad_v2", "insights_ad_v1"] as const).includes(id)) {
       throw new ProductionMetaReadSyncError("account_scope_unavailable");
     }
     return Object.freeze({ id, accountId: recoveryAccountId,

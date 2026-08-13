@@ -8,7 +8,7 @@ process.loadEnvFile(".env.local");
 const workspaceId = process.env.REKLAMZEKA_LOCAL_WORKSPACE_ID;
 const recoveryAccountId = process.env.REKLAMZEKA_META_RECOVERY_ACCOUNT_ID;
 const recoveryLane = process.env.REKLAMZEKA_META_RECOVERY_LANE ?? "inventory_ad_set_v1";
-if (!workspaceId || !recoveryAccountId || !["inventory_ad_set_v1", "creative_ad_v1", "insights_ad_v1"].includes(recoveryLane)
+if (!workspaceId || !recoveryAccountId || !["inventory_ad_set_v1", "creative_ad_v1", "creative_ad_v2", "insights_ad_v1"].includes(recoveryLane)
   || process.env.META_TOKEN_SECURITY_STATUS !== "rotated") {
   throw new Error("read-only sync preflight rejected");
 }
@@ -18,9 +18,10 @@ if (!workspaceId || !recoveryAccountId || !["inventory_ad_set_v1", "creative_ad_
 const pool = new Pool({ connectionString: process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL, max: 1 });
 // Nested creative payloads are materially wider than inventory rows. Keep the
 // recovery page bounded without letting a caller choose the size.
-const initialPageSize = recoveryLane === "creative_ad_v1" ? 20 : 100;
-const requestTimeoutMs = recoveryLane === "creative_ad_v1" ? 60_000 : 20_000;
-const maxAttempts = recoveryLane === "creative_ad_v1" ? 1 : 3;
+const creativeLane = recoveryLane === "creative_ad_v1" || recoveryLane === "creative_ad_v2";
+const initialPageSize = creativeLane ? 20 : 100;
+const requestTimeoutMs = creativeLane ? 60_000 : 20_000;
+const maxAttempts = creativeLane ? 1 : 3;
 
 try {
   const database = drizzle(pool, { schema });
@@ -34,7 +35,7 @@ try {
     inventoryTransactionMode: "idempotent_page",
     durableTransactionMode: "idempotent_checkpoint",
     recoveryAccountId,
-    recoveryLaneId: recoveryLane as "inventory_ad_set_v1" | "creative_ad_v1" | "insights_ad_v1",
+    recoveryLaneId: recoveryLane as "inventory_ad_set_v1" | "creative_ad_v1" | "creative_ad_v2" | "insights_ad_v1",
   });
   // This is exactly one server-owned account + inventory/ad-set lane. Its
   // stable parent id restores the previous durable cursor; it does not fan out

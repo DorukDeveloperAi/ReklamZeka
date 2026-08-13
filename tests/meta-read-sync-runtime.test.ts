@@ -52,7 +52,7 @@ function fixture(overrides: Readonly<{
   resolveSecret?: () => Promise<string>;
   accountIds?: readonly string[];
   recoveryAccountId?: string;
-  recoveryLaneId?: "inventory_ad_set_v1" | "creative_ad_v1" | "insights_ad_v1";
+  recoveryLaneId?: "inventory_ad_set_v1" | "creative_ad_v1" | "creative_ad_v2" | "insights_ad_v1";
   creativePagePersistence?: MetaCreativeSourcePagePersistencePort;
 }> = {}) {
   const inventoryPagePersistence: MetaInventoryPagePersistencePort = {
@@ -178,7 +178,7 @@ describe("production Meta read sync composition", () => {
   });
 
   it("limits a configured creative or insight lane to its exact ad stream", async () => {
-    for (const [lane, stream] of [["creative_ad_v1", "creative_post"], ["insights_ad_v1", "insights"]] as const) {
+    for (const [lane, stream] of [["creative_ad_v1", "creative_post"], ["creative_ad_v2", "creative_post"], ["insights_ad_v1", "insights"]] as const) {
       const setup = fixture({ accountIds: ["act_123456"], recoveryAccountId: "act_123456", recoveryLaneId: lane });
       await setup.service.runRecoveryLane({ dateStart: "2026-08-01", dateStop: "2026-08-07" });
       const plan = setup.runtimeRun.mock.calls[0]![0].plan;
