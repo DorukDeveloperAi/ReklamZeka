@@ -21,7 +21,13 @@ const rows = (result: unknown): readonly Record<string, unknown>[] => result && 
  * reader takes a repeatable-read snapshot. Callers own tombstone cleanup.
  */
 export async function materializeReadyBudgetContext(database: Database, source: ReadyBudgetContextSource): Promise<Readonly<{ contextHash: string; ready: boolean }>> {
-  const now = new Date(); const day = now.toISOString().slice(0, 10); let featureRef = ""; let connectionId = ""; let accountId = "";
+  const now = new Date();
+  // The observation window is market-timezone based. UTC date rolls earlier
+  // than Europe/Istanbul around midnight, so fixture insight dates must come
+  // from the resolved query window rather than `toISOString().slice(0, 10)`.
+  const l1AsOf = new Date(now.getTime() + 1_000).toISOString();
+  const l1Timeframe = resolveAnalysisTimeframe({ timeframe: { kind: "rolling", days: 1, timezone: "Europe/Istanbul" }, comparison: "none", asOf: l1AsOf, anchors: {} });
+  const day = l1Timeframe.startDate; let featureRef = ""; let connectionId = ""; let accountId = "";
   await database.transaction(async (transaction) => {
     const scope = rows(await transaction.execute(sql`select connection.id::text as connection_id, account.id::text as account_id from meta_connections connection join data_sources source on source.workspace_id=connection.workspace_id and source.meta_connection_id=connection.id join ad_accounts account on account.workspace_id=source.workspace_id and account.data_source_id=source.id where connection.workspace_id=${source.workspaceId}::uuid and account.external_account_id=${source.accountRef} limit 2`))[0];
     if (!scope || typeof scope.connection_id !== "string" || typeof scope.account_id !== "string") throw new Error("ready_budget_context_l1_scope_missing");
@@ -32,7 +38,7 @@ export async function materializeReadyBudgetContext(database: Database, source: 
     await transaction.insert(schema.metaSyncSlices).values({ id: slice, workspaceId: source.workspaceId, metaConnectionId: connectionId, adAccountId: accountId, runId: syncRun, streamType: "insights", entityLevel: "campaign", dateStart: day, dateStop: day, sliceKey: `ready_budget_context_${day}`, status: "completed", completedAt: new Date(now.getTime() - 60_000) });
     await transaction.insert(schema.metaDailyInsights).values({ id: insight, workspaceId: source.workspaceId, metaConnectionId: connectionId, adAccountId: accountId, syncRunId: syncRun, syncSliceId: slice, entityLevel: "campaign", externalEntityId: source.campaignRef, dateStart: day, dateStop: day, attributionLabel: "7d_click_1d_view", attributionWindow: { click: 7, view: 1 }, currency: "TRY", timezone: "Europe/Istanbul", sourceRevision: "ready-budget-context-v1", sourcePayloadHash: "b".repeat(64), sourceUpdatedAt: new Date(now.getTime() - 60_000), metricProvenance: { source: "acceptance_fixture" } });
     await transaction.insert(schema.metaDailyInsightMetrics).values({ dailyInsightId: insight, metricKey: "spend", aggregation: "additive", valueMinor: 100, currency: "TRY", provenance: { field: "spend" }, sourceRevision: "ready-budget-context-v1", sourcePayloadHash: "b".repeat(64) });
-    const timeframe = resolveAnalysisTimeframe({ timeframe: { kind: "rolling", days: 1, timezone: "Europe/Istanbul" }, comparison: "none", asOf: new Date(now.getTime() + 1_000).toISOString(), anchors: {} });
+    const timeframe = l1Timeframe;
     const plan = buildFindingObservationPlan({ workspaceId: source.workspaceId, metaConnectionId: connectionId, adAccountId: accountId, entityLevel: "campaign", externalEntityId: source.campaignRef, attributionLabel: "7d_click_1d_view", expectedCurrency: "TRY", timeframe, spec: { kind: "threshold", metric: "spendMinor", operator: "gt", thresholdDecimal: "1", minimumSample: 1 }, maxRowsPerQuery: 10 });
     const query = plan.queries[0]; if (!query) throw new Error("ready_budget_context_l1_plan_empty");
     const reads = new DrizzleFindingObservationReadPort(transaction as never, { resolve: async () => ({ policyVersion: FINDING_OBSERVATION_SETTLEMENT_POLICY_VERSION, policyRef: "settlement_ready_budget_context", evaluatedAsOf: now.toISOString(), settledThroughDate: day }) });

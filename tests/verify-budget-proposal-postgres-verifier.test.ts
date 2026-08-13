@@ -13,6 +13,8 @@ describe("budget proposal PostgreSQL verifier", () => {
     expect(helper).toContain("new DrizzleDeterministicFeatureSnapshotRepository(transaction as never).save");
     expect(helper).toContain("createDrizzleEffectiveAnalysisContextComposer({ database: database as never }).composeAndSave(source.request)");
     expect(helper).toContain("createDrizzleTimeframeBoundAnalysisContextComposer({ database: database as never");
+    expect(helper).toContain("const day = l1Timeframe.startDate");
+    expect(helper).not.toContain("now.toISOString().slice(0, 10)");
     expect(source).not.toContain("buildEffectiveCampaignContext");
     expect(source).not.toContain("DrizzleEffectiveCampaignContextRepository");
     expect(source).toContain("new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge)");
