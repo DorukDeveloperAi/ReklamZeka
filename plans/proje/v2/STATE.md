@@ -156,8 +156,10 @@
 - Gelecek human-approved budget action için `slice_rule_allocation_entity_bindings` immutable
   persistence katmanı eklendi. Binding, serbest allocation ref'ini doğrudan Meta kimliği saymaz;
   ileride yalnız canonical campaign/ad-set hiyerarşisi, budget owner/kind/currency/current snapshot
-  ve evidence hash'i doğrulandıktan sonra hazırlanabilir. Bu checkpoint ActionUnit, queue, grant,
-  execution veya Meta write üretmez.
+  ve evidence hash'i doğrulandıktan sonra hazırlanabilir. Server-private writer istemciden Meta ID,
+  tutar, currency veya owner kabul etmez; exact persisted draft→proposal→frozen-context→current
+  mirror zincirini tek transaction'da tekrar doğrular ve missing/stale/ambiguous durumda bağ yazmaz.
+  Bu checkpoint ActionUnit, queue, grant, execution veya Meta write üretmez.
 
 ## 2026-08-12 — Portföy pazar sınırı
 
