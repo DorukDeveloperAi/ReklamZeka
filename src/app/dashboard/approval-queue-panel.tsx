@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { ApprovalQueueReadService, ApprovalQueueRecord } from "@/application/approval-queue-read-service";
+import type { ApprovalQueueDetailRecord, ApprovalQueueReadService, ApprovalQueueRecord } from "@/application/approval-queue-read-service";
 import styles from "./operating-dashboard.module.css";
 
 type ApprovalQueueListResult = Awaited<ReturnType<ApprovalQueueReadService["list"]>>;
@@ -13,7 +13,7 @@ export type ApprovalQueueDashboardState =
   | Readonly<{
     status: "ready";
     result: ApprovalQueueListResult;
-    selected: ApprovalQueueRecord | null;
+    selected: ApprovalQueueRecord | ApprovalQueueDetailRecord | null;
     detailLoading: boolean;
   }>;
 
@@ -181,7 +181,7 @@ export function ApprovalQueueReadSurface(props: Readonly<{
 }
 
 function ApprovalQueueDetail({ item, loading, decision }: Readonly<{
-  item: ApprovalQueueRecord | null;
+  item: ApprovalQueueRecord | ApprovalQueueDetailRecord | null;
   loading: boolean;
   decision?: DecisionControl;
 }>) {
@@ -193,6 +193,10 @@ function ApprovalQueueDetail({ item, loading, decision }: Readonly<{
     <div className={styles.approvalQueueFacts}><div><span>Durum</span><strong data-tone={toneForStatus(item.status)}>{STATUS_LABELS[item.status]}</strong><small>{item.summaryCode.replaceAll("_", " ")}</small></div><div><span>Otonomi kararı</span><strong>{item.autonomy.decision.replaceAll("_", " ")}</strong><small>{item.autonomy.profileRef}</small></div><div><span>Geçerlilik</span><strong>{timestamp(item.expiresAt)}</strong><small>Oluşturuldu: {timestamp(item.createdAt)}</small></div></div>
     <section className={styles.approvalQueueChange} aria-label={`${values.field} önce ve sonra`}><span>{values.field}</span><div><p><small>Önce</small><strong>{values.before}</strong></p><i>→</i><p><small>Sonra</small><strong>{values.after}</strong></p></div></section>
     <div className={styles.approvalQueueTrace}><h3>Otonomi izi</h3>{item.autonomy.trace.map((step, index) => <article key={`${step.scope}-${index}`}><span>{index + 1}</span><p><strong>{step.scope}</strong><small>{step.decision.replaceAll("_", " ")} · {step.reasonCode.replaceAll("_", " ")}</small></p></article>)}</div>
+    {"evidence" in item && "decisionTimeline" in item ? <>
+      <div className={styles.approvalQueueTrace}><h3>Kaynak zinciri</h3>{item.evidence.length === 0 ? <p>Public-safe kaynak özeti bulunmuyor.</p> : item.evidence.map((evidence, index) => <article key={`${evidence.kind}-${index}`}><span>{index + 1}</span><p><strong>{evidence.kind.replaceAll("_", " ")}</strong><small>{evidence.label}</small></p></article>)}</div>
+      <div className={styles.approvalQueueTrace}><h3>İnsan karar izi</h3>{item.decisionTimeline.map((event, index) => <article key={`${event.kind}-${event.occurredAt}`}><span>{index + 1}</span><p><strong>{event.kind.replaceAll("_", " ")}</strong><small>{timestamp(event.occurredAt)}{event.reasonCode ? ` · ${event.reasonCode.replaceAll("_", " ")}` : ""}</small></p></article>)}</div>
+    </> : null}
     <div className={styles.approvalQueueDependencies}><h3>Bağımlılıklar</h3>{item.dependencies.length === 0 ? <p>Bağımlılık yok.</p> : item.dependencies.map((dependency) => <p key={dependency.unitRef}><span>{dependency.unitRef}</span><strong>{STATUS_LABELS[dependency.status]}</strong></p>)}</div>
     {item.status === "awaiting_approval" && decision ? <section className={styles.approvalDecisionBox} aria-label="Tekil insan kararı">
       <h3>Bu ActionUnit için karar ver</h3>

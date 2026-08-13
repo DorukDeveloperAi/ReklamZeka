@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: afa6357e6496 -->
+<!-- durum-damga: ef94b0562edd -->
 
 ## Künye
 
@@ -14,35 +14,34 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 314 |
+| iş commit'i (tüm geçmiş) | 324 |
 | ilk / son iş | 2026-08-06 / 2026-08-13 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-13 | `feat` | guide alert conversations | `e9ddee919` |
+| 2026-08-13 | `fix` | gate bootstrap on token security | `04d2bebbe` |
+| 2026-08-13 | `docs` | record rule impact and alert surfaces | `4de49fd53` |
+| 2026-08-13 | `feat` | preview slice rule impact safely | `1f9c8a091` |
+| 2026-08-13 | `feat` | bind rule previews to frozen scope evidence | `7cae18933` |
+| 2026-08-13 | `feat` | add delivery health alert workspace | `e1147d3f8` |
+| 2026-08-13 | `feat` | add delivery alert ledger and rule impact bridge | `3c2ae2845` |
+| 2026-08-13 | `feat` | show read mirror and slice rule workspace | `a7aca5ffc` |
+| 2026-08-13 | `feat` | add read mirror rule workspace and Codex chat | `a489278e6` |
+| 2026-08-13 | `docs` | reconcile phase zero operating evidence | `7a9f96ff6` |
 | 2026-08-13 | `docs` | add completion execution roadmap | `091dc7d8d` |
 | 2026-08-13 | `feat` | guide manual Codex tasks by page | `b4fc3de71` |
 | 2026-08-13 | `feat` | add manual Codex task handoff | `5c2cc2e75` |
 | 2026-08-13 | `feat` | add delivery health alert contract | `bb9848dfd` |
 | 2026-08-13 | `feat` | require separate publisher | `2809577a9` |
-| 2026-08-12 | `fix` | exclude inactive group scopes on resolve | `fc382f8f2` |
-| 2026-08-12 | `fix` | verify account group scope on draft | `842102ea8` |
-| 2026-08-12 | `feat` | expose account group draft scope | `bcf63ded5` |
-| 2026-08-12 | `docs` | record portfolio capability read boundary | `ce8605f59` |
-| 2026-08-12 | `feat` | classify audience and platform scope | `914aa6406` |
-| 2026-08-12 | `feat` | show applicable portfolio rules | `bf6720d23` |
-| 2026-08-12 | `feat` | catalog current portfolio scopes | `8b86fa5f8` |
-| 2026-08-12 | `feat` | resolve scoped campaign evaluation cohorts | `303223af3` |
-| 2026-08-12 | `feat` | scope comparisons by campaign family | `728f53432` |
-| 2026-08-12 | `feat` | recognize route naming variants safely | `4538eba61` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 44
-- `fix         ` █████ 10
-- `docs        ` ██ 4
-- `test        ` █ 2
+- `feat        ` ████████████████████████ 43
+- `fix         ` ██████ 11
+- `docs        ` ███ 6
 
 ## Planlar
 

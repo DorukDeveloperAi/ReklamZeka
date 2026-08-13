@@ -1,4 +1,4 @@
-export const APPROVAL_QUEUE_READ_MODEL_VERSION = "approval-queue-read-model/1.2.0" as const;
+export const APPROVAL_QUEUE_READ_MODEL_VERSION = "approval-queue-read-model/1.3.0" as const;
 
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i;
 const FULL_HASH = /\b[a-f0-9]{64}\b/i;
@@ -40,9 +40,19 @@ export type ApprovalQueueRecord = Readonly<{
   summaryCode: string;
 }>;
 
+/** Detail-only public projection. Refs and hashes remain server-private. */
+export type ApprovalQueueDetailRecord = ApprovalQueueRecord & Readonly<{
+  evidence: readonly Readonly<{ kind: "budget_proposal" | "slice_rule" | "delivery_alert" | "other"; label: string }>[];
+  decisionTimeline: readonly Readonly<{
+    kind: "proposed" | "approved" | "rejected" | "changes_requested";
+    occurredAt: string;
+    reasonCode: string | null;
+  }>[];
+}>;
+
 export type ApprovalQueueRepository = Readonly<{
   list(input: Readonly<{ workspaceId: string; entityRef: string | null; campaignRef: string | null; before: Readonly<{ createdAt: string; unitRef: string }> | null; limit: number }>): Promise<readonly ApprovalQueueRecord[]>;
-  get(input: Readonly<{ workspaceId: string; unitRef: string }>): Promise<ApprovalQueueRecord | null>;
+  get(input: Readonly<{ workspaceId: string; unitRef: string }>): Promise<ApprovalQueueDetailRecord | null>;
 }>;
 
 export class ApprovalQueueReadError extends Error {
@@ -131,6 +141,32 @@ function validate(record: ApprovalQueueRecord): ApprovalQueueRecord {
   });
 }
 
+function validateDetail(record: ApprovalQueueDetailRecord): ApprovalQueueDetailRecord {
+  exact(record, ["unitRef", "bundleRef", "status", "risk", "actionType", "accountRef", "campaignRef", "entity", "beforeAfter", "autonomy", "expiresAt", "createdAt", "dependencies", "summaryCode", "evidence", "decisionTimeline"]);
+  const { evidence: rawEvidence, decisionTimeline: rawTimeline, ...baseRecord } = record;
+  const base = validate(baseRecord);
+  if (!Array.isArray(rawEvidence) || rawEvidence.length > 50 || !Array.isArray(rawTimeline)
+    || rawTimeline.length < 1 || rawTimeline.length > 50) throw new ApprovalQueueReadError("unsafe_source");
+  const evidence = rawEvidence.map((entry) => {
+    exact(entry, ["kind", "label"]);
+    const candidate = entry as Readonly<{ kind: unknown; label: unknown }>;
+    if (typeof candidate.kind !== "string" || !["budget_proposal", "slice_rule", "delivery_alert", "other"].includes(candidate.kind) || !safeText(candidate.label)) throw new ApprovalQueueReadError("unsafe_source");
+    return Object.freeze({ kind: candidate.kind as ApprovalQueueDetailRecord["evidence"][number]["kind"], label: candidate.label });
+  });
+  const timeline = rawTimeline.map((entry, index) => {
+    exact(entry, ["kind", "occurredAt", "reasonCode"]);
+    const candidate = entry as Readonly<{ kind: unknown; occurredAt: unknown; reasonCode: unknown }>;
+    if (typeof candidate.kind !== "string" || !["proposed", "approved", "rejected", "changes_requested"].includes(candidate.kind)
+      || typeof candidate.occurredAt !== "string" || !Number.isFinite(Date.parse(candidate.occurredAt)) || candidate.reasonCode !== null && (typeof candidate.reasonCode !== "string" || !CODE.test(candidate.reasonCode))
+      || index === 0 && (candidate.kind !== "proposed" || candidate.reasonCode !== null)
+      || index > 0 && candidate.kind === "proposed") throw new ApprovalQueueReadError("unsafe_source");
+    const previous = index > 0 ? rawTimeline[index - 1]! as Readonly<{ occurredAt?: unknown }> : null;
+    if (previous && (typeof previous.occurredAt !== "string" || Date.parse(candidate.occurredAt) < Date.parse(previous.occurredAt))) throw new ApprovalQueueReadError("unsafe_source");
+    return Object.freeze({ kind: candidate.kind as ApprovalQueueDetailRecord["decisionTimeline"][number]["kind"], occurredAt: new Date(candidate.occurredAt).toISOString(), reasonCode: candidate.reasonCode as string | null });
+  });
+  return Object.freeze({ ...base, evidence: Object.freeze(evidence), decisionTimeline: Object.freeze(timeline) });
+}
+
 function cursor(record: ApprovalQueueRecord): string {
   return Buffer.from(JSON.stringify({ v: 1, createdAt: record.createdAt, unitRef: record.unitRef }), "utf8").toString("base64url");
 }
@@ -174,10 +210,10 @@ export class ApprovalQueueReadService {
 
   async get(input: Readonly<{ workspaceId: string; unitRef: string }>) {
     if (typeof input.workspaceId !== "string" || !UUID.test(input.workspaceId) || !UNIT_REF.test(input.unitRef)) throw new ApprovalQueueReadError("invalid_input");
-    let record: ApprovalQueueRecord | null;
+    let record: ApprovalQueueDetailRecord | null;
     try { record = await this.repository.get(input); } catch { throw new ApprovalQueueReadError("source_unavailable"); }
     if (!record) throw new ApprovalQueueReadError("not_found");
-    const safeRecord = validate(record);
+    const safeRecord = validateDetail(record);
     if (safeRecord.unitRef !== input.unitRef) throw new ApprovalQueueReadError("unsafe_source");
     return Object.freeze({ contractVersion: APPROVAL_QUEUE_READ_MODEL_VERSION, view: "detail" as const, item: safeRecord, authority: AUTHORITY });
   }

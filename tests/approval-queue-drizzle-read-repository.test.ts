@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 
@@ -40,6 +41,10 @@ function budgetPlan() {
 }
 
 function sourceRow(patch: Record<string, unknown> = {}) {
+  const summaryPayload = { safety: "public_safe", before: { label: "Günlük bütçe", value: "₺1.000" },
+    after: { label: "Günlük bütçe", value: "₺950,50" }, evidence: [{ evidenceRef: "budget_proposal_alpha", label: "Bütçe önerisi" }] };
+  const summaryHash = createHash("sha256").update(JSON.stringify({ after: summaryPayload.after, before: summaryPayload.before,
+    evidence: summaryPayload.evidence, safety: summaryPayload.safety })).digest("hex");
   return {
     unit_ref: unitRef,
     bundle_ref: "action_bundle_bbbbbbbbbbbbbbbbbbbb",
@@ -57,6 +62,9 @@ function sourceRow(patch: Record<string, unknown> = {}) {
     current_event_type: null,
     action_plan_payload: budgetPlan(),
     dependencies: [{ unit_ref: "action_unit_cccccccccccccccccccc", status: "awaiting_approval" }],
+    summary_payload: summaryPayload,
+    summary_hash: summaryHash,
+    decision_timeline: [],
     ...patch,
   };
 }
@@ -150,7 +158,11 @@ describe("Approval Queue Drizzle read repository", () => {
     const result = await new DrizzleApprovalQueueReadRepository(found.db as never, workspaceId)
       .get({ workspaceId, unitRef });
     expect(result?.unitRef).toBe(unitRef);
+    expect(result?.evidence).toEqual([{ kind: "budget_proposal", label: "Bütçe önerisi" }]);
+    expect(result?.decisionTimeline).toEqual([{ kind: "proposed", occurredAt: "2026-08-07T13:00:00.000Z", reasonCode: null }]);
     expect(found.queries[0]?.sql).toContain("unit.workspace_id = $1::uuid and unit.unit_ref = $2");
+    expect(found.queries[0]?.sql).toContain("unit.summary_payload, unit.summary_hash");
+    expect(found.queries[0]?.sql).toContain("unit_changes_requested");
     expect(found.queries[0]?.params).toEqual([workspaceId, unitRef]);
 
     await expect(new DrizzleApprovalQueueReadRepository(database([]).db as never, workspaceId)
@@ -160,11 +172,13 @@ describe("Approval Queue Drizzle read repository", () => {
   it("projects append-only decision and dependency event state instead of the initial fixture state", async () => {
     const fixture = database([sourceRow({
       current_event_type: "unit_approved",
+      decision_timeline: [{ event_type: "unit_approved", occurred_at: "2026-08-07T13:30:00.000Z", reason_code: "human.confirmed" }],
       dependencies: [{ unit_ref: "action_unit_cccccccccccccccccccc", status: "changes_requested" }],
     })]);
     const result = await new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId)
       .get({ workspaceId, unitRef });
-    expect(result).toMatchObject({ status: "approved", dependencies: [{ status: "changes_requested" }] });
+    expect(result).toMatchObject({ status: "approved", dependencies: [{ status: "changes_requested" }],
+      decisionTimeline: [{ kind: "proposed" }, { kind: "approved", reasonCode: "human.confirmed" }] });
     expect(fixture.queries[0]?.sql).toContain("jsonb_array_elements(decision.event_payloads)");
   });
 

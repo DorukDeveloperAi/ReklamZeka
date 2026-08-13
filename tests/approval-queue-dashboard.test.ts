@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ApprovalQueueReadSurface, recordApprovalDecision } from "@/app/dashboard/approval-queue-panel";
-import type { ApprovalQueueRecord } from "@/application/approval-queue-read-service";
+import type { ApprovalQueueDetailRecord, ApprovalQueueRecord } from "@/application/approval-queue-read-service";
 
 const callbacks = { onRetry: vi.fn(), onSelect: vi.fn() };
 const item = {
@@ -33,7 +33,7 @@ function ready(selected: ApprovalQueueRecord | null = null) {
   return {
     status: "ready" as const,
     result: {
-      contractVersion: "approval-queue-read-model/1.2.0" as const,
+      contractVersion: "approval-queue-read-model/1.3.0" as const,
       view: "list" as const,
       entityRef: null,
       campaignRef: null,
@@ -51,6 +51,22 @@ function ready(selected: ApprovalQueueRecord | null = null) {
 }
 
 describe("Approval Queue dashboard", () => {
+  it("renders the public-safe source chain and immutable human decision history without execution controls", () => {
+    const detail: ApprovalQueueDetailRecord = { ...item, evidence: [
+      { kind: "budget_proposal", label: "Yabancı FTR bütçe tavanı" },
+      { kind: "slice_rule", label: "Yabancı FTR slice kuralı" },
+    ], decisionTimeline: [
+      { kind: "proposed", occurredAt: item.createdAt, reasonCode: null },
+      { kind: "changes_requested", occurredAt: "2026-08-07T10:00:00.000Z", reasonCode: "human.changes_requested" },
+    ] };
+    const html = renderToStaticMarkup(createElement(ApprovalQueueReadSurface, { ...callbacks, state: ready(detail) }));
+    expect(html).toContain("Kaynak zinciri");
+    expect(html).toContain("Yabancı FTR bütçe tavanı");
+    expect(html).toContain("İnsan karar izi");
+    expect(html).toContain("changes requested");
+    expect(html).not.toContain("Meta write etkin");
+  });
+
   it("distinguishes unavailable, error, and true empty without a fixture fallback", () => {
     const unavailable = renderToStaticMarkup(createElement(ApprovalQueueReadSurface, {
       ...callbacks, state: { status: "unavailable", message: "Yerel oturum gerekli." },

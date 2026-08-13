@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApprovalQueueReadError, ApprovalQueueReadService, type ApprovalQueueRecord, type ApprovalQueueRepository } from "@/application/approval-queue-read-service";
+import { ApprovalQueueReadError, ApprovalQueueReadService, type ApprovalQueueDetailRecord, type ApprovalQueueRecord, type ApprovalQueueRepository } from "@/application/approval-queue-read-service";
 
 const workspaceId = "11111111-1111-4111-a111-111111111111";
 
@@ -20,7 +20,15 @@ function record(patch: Partial<ApprovalQueueRecord> = {}): ApprovalQueueRecord {
 }
 
 function repository(records: readonly ApprovalQueueRecord[]): ApprovalQueueRepository {
-  return { list: vi.fn(async () => records), get: vi.fn(async ({ unitRef }) => records.find((item) => item.unitRef === unitRef) ?? null) };
+  return { list: vi.fn(async () => records), get: vi.fn(async ({ unitRef }) => {
+    const item = records.find((candidate) => candidate.unitRef === unitRef);
+    return item ? detail(item) : null;
+  }) };
+}
+
+function detail(item: ApprovalQueueRecord): ApprovalQueueDetailRecord {
+  return { ...item, evidence: [{ kind: "budget_proposal", label: "Bütçe önerisi" }],
+    decisionTimeline: [{ kind: "proposed", occurredAt: item.createdAt, reasonCode: null }] };
 }
 
 describe("Approval Queue public read service", () => {

@@ -4,6 +4,7 @@ import { ApprovalQueueAgentContract } from "@/application/approval-queue-agent-c
 import {
   ApprovalQueueReadError,
   ApprovalQueueReadService,
+  type ApprovalQueueDetailRecord,
   type ApprovalQueueRecord,
   type ApprovalQueueRepository,
 } from "@/application/approval-queue-read-service";
@@ -44,9 +45,15 @@ function record(): ApprovalQueueRecord {
   };
 }
 
+function detail(): ApprovalQueueDetailRecord {
+  const item = record();
+  return { ...item, evidence: [{ kind: "budget_proposal", label: "Bütçe önerisi" }],
+    decisionTimeline: [{ kind: "proposed", occurredAt: item.createdAt, reasonCode: null }] };
+}
+
 function harness(repository: ApprovalQueueRepository = {
   list: vi.fn(async () => [record()]),
-  get: vi.fn(async () => record()),
+  get: vi.fn(async () => detail()),
 }, role: "owner" | "admin" | "analyst" | "viewer" = "viewer") {
   const resolvePrincipal = vi.fn(async (): Promise<typeof principal | null> => principal);
   const contract = new ApprovalQueueAgentContract(
