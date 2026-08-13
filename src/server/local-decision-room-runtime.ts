@@ -175,6 +175,7 @@ export function assertTrustedLocalDecisionRoomRequest(
   ) && !["autonomy-rule-create-draft", "guidance-studio-create", "guidance-studio-revise",
     "guidance-set-create", "guidance-set-revise", "instruction-policy-mutate",
     "practice-lab-propose-standardization", "promotion-template-lifecycle-draft", "slice-rule-workspace-save", "slice-rule-budget-impact-save",
+    "slice-rule-budget-action-unit-materialize",
     "progressive-formalization-mutate", "delivery-health-alert-transition"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
@@ -561,12 +562,14 @@ export async function resolveTrustedLocalSliceRuleBudgetImpactPrincipal(input: R
   const token = cookieToken(input.request);
   const intent = input.request.headers.get("x-reklamzeka-intent");
   if (bearerToken(input.request) !== null || token === null
-    || (intent !== "slice-rule-budget-impact-preview" && intent !== "slice-rule-budget-impact-save")) {
+    || !["slice-rule-budget-impact-preview", "slice-rule-budget-impact-save", "slice-rule-budget-action-unit-read",
+      "slice-rule-budget-action-unit-materialize"].includes(intent ?? "")) {
     throw new LocalDecisionRoomBoundaryError("untrusted_request");
   }
   const verification = { token, key: input.config.signingKey, now: Math.floor(Date.now() / 1000),
     osUid: typeof process.getuid === "function" ? process.getuid() : -1, expected: input.config };
-  const operation = intent === "slice-rule-budget-impact-save" ? "draft" : "read";
+  const operation = intent === "slice-rule-budget-impact-save" || intent === "slice-rule-budget-action-unit-materialize"
+    ? "draft" : "read";
   verifyLocalSessionCapability({ ...verification, requiredScope: operation === "draft" ? "instruction_policy:draft" : "instruction_policy:read" });
   verifyLocalSessionCapability({ ...verification, requiredScope: operation === "draft" ? "budget_lab:draft" : "budget_lab:read" });
   assertTrustedLocalDecisionRoomRequest(input.request, input.config, operation, "cookie");

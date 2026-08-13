@@ -75,6 +75,11 @@ type ImpactState = Readonly<{ status: "idle" | "loading" }>
   | Readonly<{ status: "ready"; result: ImpactResult }>
   | Readonly<{ status: "saved"; result: SavedImpactResult }>
   | Readonly<{ status: "unsupported" | "unavailable" | "stale" | "scope" | "error"; message: string }>;
+type ApprovalQueueSelection = Readonly<{ selectionRef: string; selectedAt: string }>;
+type ApprovalQueueState = Readonly<{ status: "loading" }>
+  | Readonly<{ status: "ready"; selections: readonly ApprovalQueueSelection[] }>
+  | Readonly<{ status: "queued"; selectionRef: string; persistence: "inserted" | "unchanged" }>
+  | Readonly<{ status: "unavailable" | "error"; message: string }>;
 
 type Form = Readonly<{
   seriesRef: string;
@@ -139,6 +144,14 @@ function noOpenedAuthority(value: unknown): boolean {
     if (!noOpenedAuthority(child)) return false;
   }
   return true;
+}
+export function parseSliceRuleBudgetActionSelections(value: unknown): readonly ApprovalQueueSelection[] {
+  if (!object(value) || value.contractVersion !== "slice-rule-budget-action-unit-http/1.0.0" || !Array.isArray(value.selections)
+    || value.selections.length > 100 || !value.selections.every((entry) => object(entry)
+      && typeof entry.selectionRef === "string" && /^selection_[a-f0-9]{64}$/.test(entry.selectionRef)
+      && typeof entry.selectedAt === "string") || !object(value.authority) || value.authority.canApprove !== false
+    || value.authority.canExecute !== false || value.authority.canWriteMeta !== false) throw new Error("Onay kuyruğu seçim sözleşmesi güvenli değil.");
+  return value.selections as ApprovalQueueSelection[];
 }
 function isScope(value: unknown): value is Scope {
   if (!object(value) || !["domestic", "international"].includes(String(value.market))
@@ -363,11 +376,33 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   const [message, setMessage] = useState<string | null>(null);
   const [impactRaw, setImpactRaw] = useState(EMPTY_BUDGET_COMMAND);
   const [impactState, setImpactState] = useState<ImpactState>({ status: "idle" });
+  const [approvalQueue, setApprovalQueue] = useState<ApprovalQueueState>({ status: "loading" });
   const head = snapshot?.items.find((item) => item.seriesRef === headRef) ?? undefined;
   const editableHead = head === undefined || isEditableRule(head.operatingRule.rule);
   const command = useMemo(() => editableHead ? buildSliceRuleDraftCommand(form, head) : null, [editableHead, form, head]);
   const impactCommand = useMemo(() => buildSliceRuleBudgetImpactCommand(head, impactRaw), [head, impactRaw]);
   const update = <K extends keyof Form>(key: K, value: Form[K]) => setForm((current) => ({ ...current, [key]: value }));
+  const loadApprovalSelections = useCallback(async () => {
+    try {
+      const response = await fetch("/api/slice-rule-budget-action-units", { cache: "no-store", credentials: "same-origin",
+        headers: { "X-ReklamZeka-Intent": "slice-rule-budget-action-unit-read" } });
+      const payload = await response.json();
+      if (!response.ok) throw new Error("Seçilmiş senaryolar okunamadı.");
+      setApprovalQueue({ status: "ready", selections: parseSliceRuleBudgetActionSelections(payload) });
+    } catch (reason) { setApprovalQueue({ status: "unavailable", message: reason instanceof Error ? reason.message : "Seçilmiş senaryolar okunamadı." }); }
+  }, []);
+  useEffect(() => { void loadApprovalSelections(); }, [loadApprovalSelections]);
+  const sendToApprovalQueue = async (selection: ApprovalQueueSelection) => {
+    setApprovalQueue({ status: "loading" }); const proposedAt = new Date().toISOString(); const expiresAt = new Date(Date.now() + 86_400_000).toISOString();
+    try {
+      const response = await fetch("/api/slice-rule-budget-action-units", { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-budget-action-unit-materialize" },
+        body: JSON.stringify({ command: { selectionRef: selection.selectionRef, idempotencyKey: `approval_${selection.selectionRef.slice(-20)}`, proposedAt, expiresAt } }) });
+      const payload = await response.json() as { persistence?: "inserted" | "unchanged"; error?: { message?: string } };
+      if (!response.ok || (payload.persistence !== "inserted" && payload.persistence !== "unchanged")) throw new Error(payload.error?.message ?? "İnsan onay kuyruğu isteği reddedildi.");
+      setApprovalQueue({ status: "queued", selectionRef: selection.selectionRef, persistence: payload.persistence });
+    } catch (reason) { setApprovalQueue({ status: "error", message: reason instanceof Error ? reason.message : "İnsan onay kuyruğu isteği reddedildi." }); }
+  };
   const save = async () => {
     if (!command || !snapshot?.authority.canSaveDraft) return;
     setSaving(true); setMessage(null);
@@ -481,6 +516,18 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
             <span>Proposal: {impactState.result.persistence} · provenance: {impactState.result.provenance}</span>
             <span>Onay · action · otomasyon · Meta write: kapalı</span>
           </div> : null}
+          <div className={styles.impactResult} aria-label="İnsan onay kuyruğu">
+            <strong>Seçilmiş senaryoyu insan onay kuyruğuna gönder</strong>
+            <span>Yalnız seçilmiş immutable allocation kullanılır; tutar, kampanya, policy veya Meta kimliği tarayıcıdan gönderilmez.</span>
+            {approvalQueue.status === "loading" ? <span>Seçilmiş senaryolar okunuyor…</span> : null}
+            {approvalQueue.status === "ready" && approvalQueue.selections.length === 0 ? <span>Onaya gönderilecek seçilmiş senaryo yok.</span> : null}
+            {approvalQueue.status === "ready" ? approvalQueue.selections.map((selection) => <div className={styles.row} key={selection.selectionRef}>
+              <span>Seçim: {selection.selectionRef.slice(0, 20)}… · {date(selection.selectedAt)}</span>
+              <button className={styles.save} type="button" onClick={() => void sendToApprovalQueue(selection)}>İnsan onay kuyruğuna gönder</button>
+            </div>) : null}
+            {approvalQueue.status === "queued" ? <span>Seçim onay kuyruğuna eklendi ({approvalQueue.persistence}). Onay, execute ve Meta write hâlâ kapalıdır.</span> : null}
+            {(approvalQueue.status === "unavailable" || approvalQueue.status === "error") ? <span role="alert">{approvalQueue.message}</span> : null}
+          </div>
         </section>
       </section>
     </div> : null}
