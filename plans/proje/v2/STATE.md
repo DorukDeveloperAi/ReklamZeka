@@ -160,6 +160,12 @@
   tutar, currency veya owner kabul etmez; exact persisted draft→proposal→frozen-context→current
   mirror zincirini tek transaction'da tekrar doğrular ve missing/stale/ambiguous durumda bağ yazmaz.
   Bu checkpoint ActionUnit, queue, grant, execution veya Meta write üretmez.
+- ApprovalPolicy applicability artık yalnız üç exact çift kabul eder: mevcut gönderi için
+  `existing_post_promotion/K4`, bütçe azaltma için `budget_decrease/K2` ve bütçe artırma için
+  `budget_increase/K3`. K4 policy'si bütçe işlemine fallback olamaz; policy taslağını normalleştiren
+  kişi kendi taslağını publish edemez. Queue, K2/K3 budget unit'i geldiğinde aynı exact published
+  policy definition'ı tekrar çözüp snapshot'a bağlar; bu sırada ActionUnit üretimi veya Meta write
+  yeni bir public yüzey olarak açılmamıştır.
 
 ## 2026-08-13 — S1.4 canlı asset/post recovery durumu
 
