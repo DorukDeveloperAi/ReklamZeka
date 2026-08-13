@@ -8,7 +8,7 @@ import { CATEGORY_PROFILE_VERSION } from "@/domain/categories/category-profile";
 import type { EffectiveAnalysisContextFacts, EffectiveAnalysisContextRequest,
   EffectiveAnalysisContextSource, EffectiveAnalysisContextReadySource, RepositoryVerifiedAuthority } from "@/application/effective-analysis-context-composer";
 import { DrizzleCurrentCategoryCompositionReader, resolveCurrentCategoryCompositionInSnapshot,
-  type CurrentCategoryComposition } from "@/application/current-category-composition-resolver";
+  CurrentCategoryCompositionError, type CurrentCategoryComposition } from "@/application/current-category-composition-resolver";
 import { categoryDefinitionPublicRef } from "@/domain/categories/public-reference";
 import { buildEffectiveGuidancePack, type EffectiveGuidancePack } from "@/domain/guidance/registry";
 import { projectMetaAnalysisConfig } from "@/domain/meta/analysis-config-projection";
@@ -44,6 +44,7 @@ export class CurrentEffectiveAnalysisContextSourceReaderError extends Error {
 
 function sourceFailureCode(error: unknown): string {
   if (error instanceof CurrentEffectiveAnalysisContextSourceReaderError) return error.code;
+  if (error instanceof CurrentCategoryCompositionError) return `category_composition_${error.code}`;
   if (error instanceof Error && SOURCE_FAILURE_CODES.has(error.message)) return error.message;
   return "source_reader_unavailable";
 }
