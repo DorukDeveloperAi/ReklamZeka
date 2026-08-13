@@ -212,6 +212,10 @@
     her zaman kapalı salt-okur dimension/definition archive-impact önizlemesi.
   - [x] Canlı hierarchy path'leri üzerinden bounded portföy çapında effective single-dimension
     conflict taraması; creative reuse path-bazlı, 20.000 yol/100 boyut hard cap ve fail-closed sonuç.
+  - [x] Canonical kampanya künye inceleme kuyruğundaki eksik `market`/hizmet/aile alanından, yalnız
+    mevcut guarded Category Inventory formuna opaque hedef ve boyut ön-seçimli manuel handoff.
+    Tanım seçimi, rol/registry-hash/aktif-hedef doğrulaması ve mutation aynı canonical authoring
+    sınırında kalır; otomatik atama, policy/action ve Meta write yoktur.
   - [ ] Archive preview dependency coverage'ini tamamlayıp güvenli mutation guard'ına bağlama.
     - [x] Sürümlü JSONB dependency manifest'i, `pg_catalog` drift kontrolü, canonical+legacy
       category ref lineage'ı, promotion/practice/budget geçmişi, conservative non-terminal

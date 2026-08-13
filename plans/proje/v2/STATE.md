@@ -3719,3 +3719,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   action yetkisi vermez.
 - Kanıt: `6d3298f`, `tests/canonical-campaign-portfolio-panel.test.ts`,
   `tests/portfolio-dashboard.test.ts`, `npm run typecheck` ve `git diff --check`.
+
+## 2026-08-14 — Künye incelemesinden denetimli manuel atamaya geçiş
+
+- Canonical kampanya künye inceleme kuyruğundaki eksik pazar, hizmet veya kampanya ailesi satırı,
+  mevcut guarded Category Inventory atama formuna yalnız opaque ve workspace-bound kampanya hedefi ile
+  ön-doldurulur. Tanım seçimi bilerek boş kalır: owner/admin kanıtı inceleyip tanımı ve manuel kilidi
+  kendi seçer; authoring tarafı aktif hedefi, rolü ve registry hash'ini yeniden doğrular.
+- Review ve Slice Scope Candidate read modelleri artık ham dahili kampanya kimliği taşımaz; pazar
+  boyutu da Slice Rule sözleşmesindeki `market` ekseniyle hizalanır. Otomatik künye ataması, yeni bir
+  mutation yolu, policy/action yetkisi ve Meta write yoktur.
+- Kanıt: `ebf137c`, ilgili classification/scope/category authoring odak testleri, `npm run typecheck`
+  ve `git diff --check`.
