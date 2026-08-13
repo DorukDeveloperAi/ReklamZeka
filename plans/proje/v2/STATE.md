@@ -106,6 +106,10 @@
   delemez. RLS FORCE/revoke, append-only+tombstone koruması ve audit kaydı uygulanır. Bu yalnız
   recommendation-only taslaktır: gerçek harcama tahsisi, policy publish, approval, otomasyon veya
   Meta write yetkisi vermez; bir sonraki dilim bunu Rule Workspace editörü ve frozen impact ile bağlar.
+- Rules ekranındaki **Bütçe Havuzları** paneli, bu kayıt defterini aynı local-session sınırından okur
+  ve yeni revizyon taslağı kaydedebilir. Kullanıcı iki pazar kökünü ve alt havuz ağacını açık şemada
+  görür; server tüm hiyerarşi/pazar/tavan/zaman kurallarını yeniden doğrular. Bu yüzey henüz Rule
+  taslağıyla otomatik eşleştirme veya gerçek bütçe önerisi üretmez.
 
 ## 2026-08-13 — İlk gerçek operasyon izi
 
