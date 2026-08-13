@@ -2,14 +2,14 @@
 import { useCallback, useEffect, useState } from "react";
 import styles from "./operating-dashboard.module.css";
 
-type Event = Readonly<{ kind: "slice_rule_draft" | "delivery_alert" | "approval_proposed" | "approval_decision"; occurredAt: string; title: string; detail: string }>;
+type Event = Readonly<{ kind: "slice_rule_draft" | "budget_proposal" | "delivery_alert" | "approval_proposed" | "approval_decision"; occurredAt: string; title: string; detail: string }>;
 type Result = Readonly<{ contractVersion: "operational-timeline/1.0.0"; items: readonly Event[]; authority: Readonly<{ readOnly: true; canPublish: false; canApprove: false; canExecute: false; canWriteMeta: false; canEnableAutomation: false }> }>;
 function parse(value: unknown): Result | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null; const x = value as Record<string, unknown>;
   if (x.contractVersion !== "operational-timeline/1.0.0" || !Array.isArray(x.items) || !x.authority || typeof x.authority !== "object") return null;
   const a = x.authority as Record<string, unknown>;
   if (a.readOnly !== true || a.canPublish !== false || a.canApprove !== false || a.canExecute !== false || a.canWriteMeta !== false || a.canEnableAutomation !== false) return null;
-  if (!x.items.every((event) => event && typeof event === "object" && !Array.isArray(event) && ["slice_rule_draft", "delivery_alert", "approval_proposed", "approval_decision"].includes(String((event as Record<string, unknown>).kind)) && typeof (event as Record<string, unknown>).occurredAt === "string" && typeof (event as Record<string, unknown>).title === "string" && typeof (event as Record<string, unknown>).detail === "string")) return null;
+  if (!x.items.every((event) => event && typeof event === "object" && !Array.isArray(event) && ["slice_rule_draft", "budget_proposal", "delivery_alert", "approval_proposed", "approval_decision"].includes(String((event as Record<string, unknown>).kind)) && typeof (event as Record<string, unknown>).occurredAt === "string" && typeof (event as Record<string, unknown>).title === "string" && typeof (event as Record<string, unknown>).detail === "string")) return null;
   return value as Result;
 }
 function when(value: string) { return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(value)); }

@@ -15,4 +15,11 @@ describe("operational timeline read service", () => {
       occurredAt: "2026-08-13T12:00:00.000Z", title: "Kural", detail: "11111111-1111-4111-8111-111111111111" }] }, memberships);
     await expect(service.list(principal)).rejects.toBeInstanceOf(OperationalTimelineReadError);
   });
+  it("admits a public-safe persisted budget proposal trace but keeps every authority closed", async () => {
+    const service = new OperationalTimelineReadService({ list: async () => [{ kind: "budget_proposal" as const,
+      occurredAt: "2026-08-13T12:00:00.000Z", title: "Bütçe önerisi taslağı kaydedildi",
+      detail: "Revizyon 2 · 3 senaryo · uygulama yetkisi yok" }] }, memberships);
+    await expect(service.list(principal)).resolves.toMatchObject({ items: [expect.objectContaining({ kind: "budget_proposal" })],
+      authority: { canApprove: false, canExecute: false, canWriteMeta: false } });
+  });
 });
