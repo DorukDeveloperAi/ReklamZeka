@@ -19,8 +19,8 @@
 
 - **Salt-okunur Meta bootstrap'i gerçek tenantta çalıştırıldı.** Güvenlik işareti `rotated` sonrası
   read-only connection doctor kabulü geçti; beş erişilebilir hesap için canonical data-source/account
-  kökleri oluşturuldu. İlk canlı mirror koşusu 320 kampanyayı yazdı. Bu yalnız GET çağrılarıyla
-  gerçekleşti; Meta write sıfırdır.
+  kökleri oluşturuldu. Dayanıklı, yalnız GET mirror checkpoint'leri şu ana kadar 330 kampanya ve 768
+  reklam seti yazdı. Bu yalnız GET çağrılarıyla gerçekleşti; Meta write sıfırdır.
 - `/api/meta/read-mirror` Dashboard'un kullandığı canonical DB read-model'idir; eski
   `/api/meta/inventory` route'u bilinçli biçimde `503` kalır. Hiyerarşinin campaign kısmı mevcut
   tenantta gerçek veriye bağlıdır. Ad-set/ad/creative/insight tamamlaması ve ayrıntılı immutable
