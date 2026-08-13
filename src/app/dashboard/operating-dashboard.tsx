@@ -16,6 +16,7 @@ import { BudgetPoolHierarchyPanel } from "./budget-pool-hierarchy-panel";
 import { OperationalTimelinePanel } from "./operational-timeline-panel";
 import { DeliveryHealthAlertPanel } from "./delivery-health-alert-panel";
 import { CategoryInventoryPanel } from "./category-inventory-panel";
+import { CampaignClassificationReviewPanel } from "./campaign-classification-review-panel";
 import { InstructionPolicyStudioPanel } from "./instruction-policy-studio-panel";
 import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel";
 import { NormalizationWorkbenchPanel } from "./normalization-workbench-panel";
@@ -1095,7 +1096,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
     return <OperationalTimelinePanel />;
   }
 
-  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel onOpenSession={() => navigate("decision-room")} /> : activeView === "rules" ? <><BudgetPoolHierarchyPanel /><GuidanceStudioPanel onOpenSession={() => navigate("decision-room")} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /><SliceRuleWorkspacePanel /></> : activeView === "strict-policies" ? <InstructionPolicyStudioPanel /> : activeView === "categories" ? <CategoryInventoryPanel onOpenSession={() => navigate("decision-room")} /> : activeView === "autonomy" ? <AutonomyStudioPanel /> : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? <ApprovalQueuePanel campaignRef={approvalQueueCampaignRef} onOpenSession={() => navigate("decision-room")} /> : activeView === "promotions" ? <PromotionPreflightPanel /> : activeView === "alerts" ? <DeliveryHealthAlertPanel /> : renderTimeline();
+  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel onOpenSession={() => navigate("decision-room")} /> : activeView === "rules" ? <><BudgetPoolHierarchyPanel /><GuidanceStudioPanel onOpenSession={() => navigate("decision-room")} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /><SliceRuleWorkspacePanel /></> : activeView === "strict-policies" ? <InstructionPolicyStudioPanel /> : activeView === "categories" ? <><CampaignClassificationReviewPanel /><CategoryInventoryPanel onOpenSession={() => navigate("decision-room")} /></> : activeView === "autonomy" ? <AutonomyStudioPanel /> : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? <ApprovalQueuePanel campaignRef={approvalQueueCampaignRef} onOpenSession={() => navigate("decision-room")} /> : activeView === "promotions" ? <PromotionPreflightPanel /> : activeView === "alerts" ? <DeliveryHealthAlertPanel /> : renderTimeline();
 
   return <main className={styles.appShell}>
     <aside className={styles.sidebar}>
