@@ -56,10 +56,12 @@
   tenantta gerçek veriye bağlıdır. Ad-set/ad/creative/insight tamamlaması ve ayrıntılı immutable
   affected-geo snapshot backfill'i henüz canlı kabulden geçmediği için bu alanlar `partial`/`unavailable`
   olarak görünmelidir; dashboard bunları demo gibi göstermemelidir.
-- Meta sync scheduler substrate'i (registry, lease, worker ve private factory) testli olsa da güvenilir
-  runner/principal, enabled schedule ve canonical creative/Page/Instagram persistence bağlantısı
-  eksiktir. `verify:meta-read-sync-schedule-db` yalnız substrate'i kanıtlar; cron, ağ çağrısı veya
-  güncel veri kanıtlamaz.
+- Meta sync scheduler substrate'i (registry, lease, worker ve private factory) artık güvenli yerel
+  `run:meta-read-sync-schedule` runner'ıyla çağrılabilir. Runner varsayılan olarak kapalıdır;
+  yalnız açık `REKLAMZEKA_META_SCHEDULE_RUNNER_ENABLED=true` ve `META_TOKEN_SECURITY_STATUS=rotated`
+  ile due schedule'ları çalıştırır, scope/account/token kabul etmez ve yalnız GET-only tick sonucunun
+  aggregate özetini yazar. Enabled schedule/cron işletimi ve üç ardışık canlı fire kabulü henüz açık
+  kalır. `verify:meta-read-sync-schedule-db` yalnız substrate'i kanıtlar; güncel veri kanıtlamaz.
 - Token değeri hiçbir log/projection'a taşınmadı. Bootstrap yalnız `META_TOKEN_SECURITY_STATUS=rotated`
   önkoşulunda ve server-private secret resolver ile çalışır; scheduler/Meta write yine aktif değildir.
 - Slice/budget/policy altyapısı, persistent Slice Rule Workspace, Budget Lab dry-run impact preview
