@@ -7,8 +7,9 @@ describe("local Meta read-sync recovery command", () => {
     const source = readFileSync(resolve(process.cwd(), "scripts/run-meta-read-sync.ts"), "utf8");
     expect(source).toContain('inventoryTransactionMode: "idempotent_page"');
     expect(source).toContain('durableTransactionMode: "idempotent_checkpoint"');
-    expect(source).toContain("recoveryInventoryAdSetAccountId");
+    expect(source).toContain("recoveryAccountId");
     expect(source).toContain("REKLAMZEKA_META_RECOVERY_ACCOUNT_ID");
+    expect(source).toContain("REKLAMZEKA_META_RECOVERY_LANE");
     expect(source).toContain("service.runRecoveryLane({");
     expect(source).not.toContain("service.run({");
     expect(source).toContain("deferAffectedGeoMaterialization: true");

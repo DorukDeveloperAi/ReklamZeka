@@ -53,8 +53,10 @@ export type ProductionMetaReadSyncInput = Readonly<{
  */
 export type ProductionMetaReadSyncRecoveryInput = Readonly<Omit<ProductionMetaReadSyncInput, "parentRunId">>;
 
+export type ServerOwnedMetaRecoveryLaneId = "inventory_ad_set_v1" | "creative_ad_v1" | "insights_ad_v1";
+
 type ServerOwnedMetaRecoveryLane = Readonly<{
-  id: "inventory_ad_set_v1";
+  id: ServerOwnedMetaRecoveryLaneId;
   accountId: string;
   /** Stable across invocations so the durable cursor is restored exactly. */
   parentRunId: string;
@@ -207,10 +209,14 @@ export class ProductionMetaReadSyncService {
         ...(input.dateSliceDays === undefined ? {} : { dateSliceDays: input.dateSliceDays }),
         ...(input.initialPageSize === undefined ? {} : { initialPageSize: input.initialPageSize }),
       });
-      // Keep recovery intentionally smaller than a normal inventory plan. It
-      // cannot silently grow to campaigns, ads, creative, or insights.
+      // Each recovery lane is intentionally one fixed stream/entity-level; it
+      // cannot silently fan out to another account or Meta stream.
       const plan = recoveryLane
-        ? fullPlan.filter((slice) => slice.stream === "inventory" && slice.entityLevel === "ad_set")
+        ? fullPlan.filter((slice) => recoveryLane.id === "inventory_ad_set_v1"
+          ? slice.stream === "inventory" && slice.entityLevel === "ad_set"
+          : recoveryLane.id === "creative_ad_v1"
+            ? slice.stream === "creative_post" && slice.entityLevel === "ad"
+            : slice.stream === "insights" && slice.entityLevel === "ad")
         : fullPlan;
       if (!plan.length) throw new ProductionMetaReadSyncError("account_scope_unavailable");
       const result = await runtime.run({
@@ -267,14 +273,19 @@ export function createDrizzleProductionMetaReadSyncService(input: Readonly<{
    * Server deployment configuration for one resumable recovery lane. It is
    * deliberately absent from request inputs and does not grant write access.
    */
-  recoveryInventoryAdSetAccountId?: string;
+  recoveryAccountId?: string;
+  /** One of the fixed server-owned lanes; absent means inventory/ad-set. */
+  recoveryLaneId?: ServerOwnedMetaRecoveryLaneId;
 }>): ProductionMetaReadSyncService {
-  const recoveryInventoryAdSetAccountId = input.recoveryInventoryAdSetAccountId;
-  const recoveryLane = recoveryInventoryAdSetAccountId === undefined ? undefined : Object.freeze({
-    id: "inventory_ad_set_v1" as const,
-    accountId: recoveryInventoryAdSetAccountId,
-    parentRunId: "meta.read.recovery.inventory_ad_set.v1",
-  });
+  const recoveryAccountId = input.recoveryAccountId;
+  const recoveryLane = recoveryAccountId === undefined ? undefined : (() => {
+    const id = input.recoveryLaneId ?? "inventory_ad_set_v1";
+    if (!(["inventory_ad_set_v1", "creative_ad_v1", "insights_ad_v1"] as const).includes(id)) {
+      throw new ProductionMetaReadSyncError("account_scope_unavailable");
+    }
+    return Object.freeze({ id, accountId: recoveryAccountId,
+      parentRunId: `meta.read.recovery.${id.replace(/_v1$/, "").replaceAll("_", ".")}.v1` });
+  })();
   return new ProductionMetaReadSyncService({
     scopeResolver: input.scopeResolver,
     connections: new DrizzleMetaConnectionRepository(input.database),

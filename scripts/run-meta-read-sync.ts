@@ -6,8 +6,10 @@ import { createDrizzleProductionMetaReadSyncService } from "../src/server/meta-r
 
 process.loadEnvFile(".env.local");
 const workspaceId = process.env.REKLAMZEKA_LOCAL_WORKSPACE_ID;
-const recoveryInventoryAdSetAccountId = process.env.REKLAMZEKA_META_RECOVERY_ACCOUNT_ID;
-if (!workspaceId || !recoveryInventoryAdSetAccountId || process.env.META_TOKEN_SECURITY_STATUS !== "rotated") {
+const recoveryAccountId = process.env.REKLAMZEKA_META_RECOVERY_ACCOUNT_ID;
+const recoveryLane = process.env.REKLAMZEKA_META_RECOVERY_LANE ?? "inventory_ad_set_v1";
+if (!workspaceId || !recoveryAccountId || !["inventory_ad_set_v1", "creative_ad_v1", "insights_ad_v1"].includes(recoveryLane)
+  || process.env.META_TOKEN_SECURITY_STATUS !== "rotated") {
   throw new Error("read-only sync preflight rejected");
 }
 
@@ -26,7 +28,8 @@ try {
     deferAffectedGeoMaterialization: true,
     inventoryTransactionMode: "idempotent_page",
     durableTransactionMode: "idempotent_checkpoint",
-    recoveryInventoryAdSetAccountId,
+    recoveryAccountId,
+    recoveryLaneId: recoveryLane as "inventory_ad_set_v1" | "creative_ad_v1" | "insights_ad_v1",
   });
   // This is exactly one server-owned account + inventory/ad-set lane. Its
   // stable parent id restores the previous durable cursor; it does not fan out
