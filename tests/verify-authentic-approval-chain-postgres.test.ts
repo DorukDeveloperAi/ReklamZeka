@@ -15,6 +15,10 @@ describe("authentic approval-chain PostgreSQL verifier", () => {
     expect(source).toContain("new DrizzleSliceRuleScenarioAllocationSelectionRepository");
     expect(source).toContain("new DrizzleSliceRuleBudgetActionUnitMaterializer");
     expect(source).toContain("new ApprovalQueueReadService(new DrizzleApprovalQueueReadRepository");
+    expect(source).toContain("normalizeMetaChangeSnapshot");
+    expect(source).toContain("hierarchySnapshot");
+    expect(source).toContain("new Date(now.getTime() - 86_400_000)");
+    expect(source).toContain("new Date(now.getTime() + 86_400_000)");
     expect(source).toContain("new DrizzleApprovalPolicyRegistryRepository");
     expect(source).toContain("new WorkspaceTombstoneService");
     expect(source).not.toContain("effectiveCampaignContexts).values");
