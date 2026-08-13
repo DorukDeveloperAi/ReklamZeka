@@ -40,11 +40,15 @@ function budgetPlan() {
   return buildActionPlan(action, context(action.entity));
 }
 
+function summaryHashOf(summary: Record<string, unknown>) {
+  return createHash("sha256").update(JSON.stringify({ after: summary.after, before: summary.before,
+    evidence: summary.evidence, safety: summary.safety })).digest("hex");
+}
+
 function sourceRow(patch: Record<string, unknown> = {}) {
   const summaryPayload = { safety: "public_safe", before: { label: "Günlük bütçe", value: "₺1.000" },
     after: { label: "Günlük bütçe", value: "₺950,50" }, evidence: [{ evidenceRef: "budget_proposal_alpha", label: "Bütçe önerisi" }] };
-  const summaryHash = createHash("sha256").update(JSON.stringify({ after: summaryPayload.after, before: summaryPayload.before,
-    evidence: summaryPayload.evidence, safety: summaryPayload.safety })).digest("hex");
+  const summaryHash = summaryHashOf(summaryPayload);
   return {
     unit_ref: unitRef,
     bundle_ref: "action_bundle_bbbbbbbbbbbbbbbbbbbb",
@@ -180,6 +184,28 @@ describe("Approval Queue Drizzle read repository", () => {
     expect(result).toMatchObject({ status: "approved", dependencies: [{ status: "changes_requested" }],
       decisionHistory: [{ decision: "proposed" }, { decision: "approved", reasonCode: "human.confirmed" }] });
     expect(fixture.queries[0]?.sql).toContain("jsonb_array_elements(decision.event_payloads)");
+  });
+
+  it.each([
+    ["a summary whose stored hash no longer matches", () => sourceRow({ summary_hash: "f".repeat(64) })],
+    ["an unsafe source-evidence label despite a matching summary hash", () => {
+      const row = sourceRow();
+      const summary = { ...(row.summary_payload as Record<string, unknown>), evidence: [{ evidenceRef: "budget_proposal_alpha", label: "act_123456789012" }] };
+      return { ...row, summary_payload: summary, summary_hash: summaryHashOf(summary) };
+    }],
+    ["a malformed before/after summary pair despite a matching hash", () => {
+      const row = sourceRow();
+      const summary = { ...(row.summary_payload as Record<string, unknown>), before: { label: "Günlük bütçe", value: "₺1.000", extra: true } };
+      return { ...row, summary_payload: summary, summary_hash: summaryHashOf(summary) };
+    }],
+    ["a decision event ordered before the proposal", () => sourceRow({ decision_timeline: [
+      { event_type: "unit_approved", occurred_at: "2026-08-07T12:59:59.000Z", reason_code: "human.confirmed" },
+    ] })],
+  ])("fails closed on invalid detail projection: %s", async (_label, make) => {
+    const fixture = database([make()]);
+    await expect(new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId)
+      .get({ workspaceId, unitRef }))
+      .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "corrupt_store" }));
   });
 
   it("rejects cross-tenant access and malformed inputs before database I/O", async () => {

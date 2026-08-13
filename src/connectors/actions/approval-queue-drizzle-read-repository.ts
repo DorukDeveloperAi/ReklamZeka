@@ -31,6 +31,10 @@ const CODE = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const PRIVATE_REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const PUBLIC_ENTITY_REF = /^entity_[a-f0-9]{16}$/;
 const ACTION_TYPES: readonly ApprovalActionType[] = ["status_pause", "status_activate", "budget_decrease", "budget_increase"];
+const UUID_TEXT = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i;
+const FULL_HASH_TEXT = /\b[a-f0-9]{64}\b/i;
+const META_ID_TEXT = /\b(?:act_|campaign_|adset_|ad_)\d{5,}\b/i;
+const CREDENTIAL_TEXT = /\b(?:rzs1\.|EA[A-Za-z0-9]{30,}|Bearer\s+)[A-Za-z0-9._-]*/i;
 
 type SourceRow = Readonly<{
   unit_ref: unknown;
@@ -92,6 +96,18 @@ function instant(value: unknown): string {
   const candidate = value instanceof Date ? value.toISOString() : value;
   if (typeof candidate !== "string" || !Number.isFinite(Date.parse(candidate))) fail("corrupt_store");
   return new Date(candidate).toISOString();
+}
+
+/**
+ * The stored summary is hash-bound, but its labels still cross a public read
+ * boundary. Validate them here too so a direct repository consumer cannot
+ * accidentally bypass the service-level presentation guard.
+ */
+function publicSummaryText(value: unknown): string {
+  if (typeof value !== "string" || !value.trim() || value !== value.trim() || value.length > 240
+    || /[\u0000-\u001f\u007f]/.test(value) || UUID_TEXT.test(value) || FULL_HASH_TEXT.test(value)
+    || META_ID_TEXT.test(value) || CREDENTIAL_TEXT.test(value) || /^\d{8,}$/.test(value)) fail("corrupt_store");
+  return value;
 }
 
 function publicRef(kind: "account" | "entity" | "autonomy", workspaceId: string, internalId: unknown): string {
@@ -293,13 +309,19 @@ function detailRow(row: SourceRow, workspaceId: string): ApprovalQueueDetailReco
   if (row.summary_hash === null || typeof row.summary_hash !== "string" || !HASH.test(row.summary_hash)
     || digest(summary) !== row.summary_hash || summary.safety !== "public_safe" || !Array.isArray(summary.evidence)
     || summary.evidence.length > 50) fail("corrupt_store");
+  exact(summary.before, ["label", "value"]);
+  exact(summary.after, ["label", "value"]);
+  publicSummaryText(summary.before.label);
+  publicSummaryText(summary.before.value);
+  publicSummaryText(summary.after.label);
+  publicSummaryText(summary.after.value);
   const sourceEvidence = summary.evidence.map((candidate) => {
     exact(candidate, ["evidenceRef", "label"]);
-    if (typeof candidate.label !== "string" || candidate.label.length < 1 || candidate.label.length > 240) fail("corrupt_store");
-    return Object.freeze({ kind: evidenceKind(candidate.evidenceRef), label: candidate.label, integrity: "hash_verified" as const });
+    return Object.freeze({ kind: evidenceKind(candidate.evidenceRef), label: publicSummaryText(candidate.label), integrity: "hash_verified" as const });
   });
   if (new Set(summary.evidence.map((candidate) => (candidate as Record<string, unknown>).evidenceRef)).size !== sourceEvidence.length) fail("corrupt_store");
   if (!Array.isArray(row.decision_timeline) || row.decision_timeline.length > 49) fail("corrupt_store");
+  let previousAt = Date.parse(base.createdAt);
   const decisions = row.decision_timeline.map((candidate) => {
     exact(candidate, ["event_type", "occurred_at", "reason_code"]);
     const kind: Record<string, "approved" | "rejected" | "changes_requested"> = {
@@ -307,7 +329,10 @@ function detailRow(row: SourceRow, workspaceId: string): ApprovalQueueDetailReco
     };
     if (typeof candidate.event_type !== "string" || !Object.hasOwn(kind, candidate.event_type)
       || candidate.reason_code !== null && (typeof candidate.reason_code !== "string" || !CODE.test(candidate.reason_code))) fail("corrupt_store");
-    return Object.freeze({ decision: kind[candidate.event_type]!, occurredAt: instant(candidate.occurred_at), reasonCode: candidate.reason_code as string | null });
+    const occurredAt = instant(candidate.occurred_at);
+    if (Date.parse(occurredAt) < previousAt) fail("corrupt_store");
+    previousAt = Date.parse(occurredAt);
+    return Object.freeze({ decision: kind[candidate.event_type]!, occurredAt, reasonCode: candidate.reason_code as string | null });
   });
   return Object.freeze({ ...base, sourceEvidence: Object.freeze(sourceEvidence), decisionHistory: Object.freeze([
     Object.freeze({ decision: "proposed" as const, occurredAt: base.createdAt, reasonCode: null }), ...decisions,
