@@ -5,6 +5,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 import { BudgetLabDraftService, type BudgetLabDraftCommand } from "@/application/budget-lab-draft-service";
+import { ApprovalQueueReadService } from "@/application/approval-queue-read-service";
+import { DrizzleApprovalQueueReadRepository } from "@/connectors/actions/approval-queue-drizzle-read-repository";
 import { SliceRuleWorkspaceService } from "@/application/slice-rule-workspace-service";
 import { DrizzleApprovalPolicyRegistryRepository } from "@/connectors/actions/approval-policy-registry-drizzle-repository";
 import { DrizzleBudgetProposalRepository } from "@/connectors/budget/budget-proposal-drizzle-repository";
@@ -75,7 +77,9 @@ try {
     const replay = await materializer.materialize({ workspaceId: source.workspaceId, selectionId: selection.id, actorId: source.actorId, idempotencyKey: "unit.approval_chain.r1", proposedAt, expiresAt });
     evidence.materialized = first.outcome === "inserted"; evidence.exactReplay = replay.outcome === "unchanged" && replay.actionUnitId === first.actionUnitId;
     const queued = rows(await tx.execute(sql`select unit_payload from action_proposal_units where workspace_id=${source.workspaceId}::uuid and id=${first.actionUnitId}::uuid`))[0]?.unit_payload as { actionAuthority?: unknown; capabilities?: { canExecute?: unknown }; contextHash?: string } | undefined;
-    evidence.queueRead = queued?.contextHash === prepared.contextHash; evidence.canExecuteFalse = queued?.actionAuthority === "none" && queued?.capabilities?.canExecute === false;
+    const queue = await new ApprovalQueueReadService(new DrizzleApprovalQueueReadRepository(tx as never, source.workspaceId)).list({ workspaceId: source.workspaceId, limit: 10 });
+    evidence.queueRead = queued?.contextHash === prepared.contextHash && queue.items.length === 1 && (queue.items[0]?.unitRef.length ?? 0) > 0;
+    evidence.canExecuteFalse = queued?.actionAuthority === "none" && queued?.capabilities?.canExecute === false && queue.authority.canExecute === false;
     throw rollback;
   });
 } catch (error) { if (error !== rollback) throw error; }

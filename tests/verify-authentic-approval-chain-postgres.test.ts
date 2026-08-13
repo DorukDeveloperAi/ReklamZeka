@@ -11,6 +11,7 @@ describe("authentic approval-chain PostgreSQL verifier", () => {
     expect(source).toContain("new DrizzleSliceRuleAllocationEntityBindingRepository");
     expect(source).toContain("new DrizzleSliceRuleScenarioAllocationSelectionRepository");
     expect(source).toContain("new DrizzleSliceRuleBudgetActionUnitMaterializer");
+    expect(source).toContain("new ApprovalQueueReadService(new DrizzleApprovalQueueReadRepository");
     expect(source).toContain("new DrizzleApprovalPolicyRegistryRepository");
     expect(source).toContain("new WorkspaceTombstoneService");
     expect(source).not.toContain("effectiveCampaignContexts).values");
