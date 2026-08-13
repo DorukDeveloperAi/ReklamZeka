@@ -118,6 +118,8 @@ export type ActionValveContext = Readonly<{
   rules: readonly AutonomyRule[];
   budgetLimits: BudgetDeltaLimits | null;
   protection: ProtectionContext;
+  /** Server-derived immutable evidence binding. It is unavailable to public action inputs. */
+  frozenContextHash?: string;
 }>;
 
 export type AutonomyTraceItem = Readonly<{
@@ -526,10 +528,11 @@ function normalizeContext(value: ActionValveContext, action: ClassifiedAction): 
   budgetLimits: BudgetDeltaLimits | null;
   protection: ProtectionContext;
 }> {
-  exactKeys(value, [
-    "workspaceRef", "accountGroupRef", "accountRef", "internalCategoryRefs", "campaignRef",
-    "entity", "evaluatedAt", "rules", "budgetLimits", "protection",
-  ]);
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype
+    || ![10, 11].includes(Object.keys(value).length) || Object.keys(value).some((key) => ![
+      "workspaceRef", "accountGroupRef", "accountRef", "internalCategoryRefs", "campaignRef",
+      "entity", "evaluatedAt", "rules", "budgetLimits", "protection", "frozenContextHash",
+    ].includes(key))) fail("invalid_contract");
   const workspaceRef = reference(value.workspaceRef);
   const entity = validateEntity(value.entity);
   if (entity.level !== action.action.entity.level || entity.ref !== action.action.entity.ref) fail("invalid_contract");
@@ -556,6 +559,10 @@ function normalizeContext(value: ActionValveContext, action: ClassifiedAction): 
     rules: Object.freeze(rules),
     budgetLimits,
     protection,
+    ...(value.frozenContextHash === undefined ? {} : {
+      frozenContextHash: typeof value.frozenContextHash === "string" && HASH.test(value.frozenContextHash)
+        ? value.frozenContextHash : fail("invalid_contract"),
+    }),
   });
   return { context, rules, budgetLimits, protection };
 }
@@ -719,7 +726,10 @@ export function buildActionPlan(intent: TypedActionIntent, rawContext: ActionVal
       canGrantApproval: false as const,
       canAccessRawGraph: false as const,
     }),
-    contextHash: hash(context),
+    // Most non-queue plans use a deterministic valve-context digest. A server
+    // materializer may bind one already-persisted frozen evidence context;
+    // then the queue can resolve precisely that immutable record.
+    contextHash: context.frozenContextHash ?? hash(context),
   });
   return Object.freeze({ ...base, planHash: hash(base) });
 }

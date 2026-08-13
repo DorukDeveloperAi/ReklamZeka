@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import {
   createApprovalPolicyDraft,
@@ -42,6 +43,13 @@ function published(workspaceRef = "workspace_alpha") {
 }
 
 describe("slice-rule budget ActionUnit policy resolution", () => {
+  it("binds the queued action plan only to the persisted frozen context resolved server-side", () => {
+    const source = readFileSync("src/connectors/campaigns/slice-rule-budget-action-unit-materializer.ts", "utf8");
+    expect(source).toContain("frozenContextHash: contexts[0]!.contextHash");
+    expect(source).toContain("const contexts = await tx.select()");
+    expect(source).not.toContain("frozenContextHash: input.");
+  });
+
   it("uses the persisted public workspace reference, never a fabricated UUID-derived ref", () => {
     const artifacts = published();
     const resolved = resolveSliceRuleBudgetActionApprovalPolicy({

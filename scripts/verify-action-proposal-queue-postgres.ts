@@ -54,11 +54,15 @@ const autonomyRule: AutonomyRule = {
 };
 const action = { kind: "status_change" as const, entity: { level: "campaign" as const, ref: "campaign_12345" },
   fromStatus: "ACTIVE" as const, toStatus: "PAUSED" as const };
+const persistedFrozenContextHash = "d".repeat(64);
 const actionPlan = buildActionPlan(action, {
   workspaceRef: "workspace_verifier", accountGroupRef: null, accountRef: "act_12345",
   internalCategoryRefs: [], campaignRef: "campaign_12345", entity: action.entity,
   evaluatedAt: "2026-08-07T17:00:00.000Z", rules: [autonomyRule], budgetLimits: null,
   protection: { protectedInternalCategoryRefs: [], affectedGeoRefs: [], protectedGeoRefs: [], changeDisposition: "allowed", policyRefs: [] },
+  // A queue candidate may only name the exact persisted context that this
+  // verifier seeds below; it must not reuse a valve-context digest.
+  frozenContextHash: persistedFrozenContextHash,
 });
 const proposal = new ActionProposalStagingService({
   version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_verifier", revision: 1, autonomyMode: "approval_only",
@@ -141,7 +145,8 @@ try {
     // therefore exercised only the rejection path.  Seed the smallest canonical context
     // fixture here; it is rolled back with the rest of this acceptance transaction.
     const capturedAt = "2026-08-07T17:00:00.000Z";
-    const contextHash = proposal.bundle.units[0]!.contextHash;
+    const contextHash = persistedFrozenContextHash;
+    if (proposal.bundle.units[0]!.contextHash !== contextHash) throw new Error("frozen_context_binding_missing");
     const snapshotRefs = ["snapshot_aaaaaaaaaaaaaaaaaaaa"];
     await transaction.insert(schema.effectiveCampaignContexts).values({
       id: contextId, workspaceId, identityHash: "b".repeat(64), contextHash,
