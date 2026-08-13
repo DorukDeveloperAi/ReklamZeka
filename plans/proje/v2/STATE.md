@@ -3695,3 +3695,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   rağmen canonical daily insight sayısı sıfırdır; dashboard bunu `insight_delivery_empty_verified` olarak
   gösterir. Incomplete ve hiç gözlenmemiş stream'ler ayrı reason code alır. Bu bilgi yalnız read modeldir,
   Meta write ya da veri uydurma yapmaz.
+
+## 2026-08-13 — 30 günlük canonical Meta insight bootstrap tamamlandı
+
+- Server-private, GET-only insight bootstrap iki canonical hesap için 10/10 campaign-insight tarih
+  dilimini durable cursor üzerinden tamamladı. Bootstrap kaynağında 759 canonical
+  `meta_daily_insights` satırı, 48 campaign ve 2026-07-14–2026-08-12 kapsaması vardır; cursor ve
+  error classification kalmamıştır. Tüm canonical tabloda 761 satır, 4 account ve 50 campaign görülür.
+- Bu, günlük yoğunluğun eksiksiz olduğu anlamına gelmez: ikinci hesapta Meta bazı günler satır
+  döndürmedi. Trust/readiness ve Dashboard, account/gün coverage eksikliğini `partial`/`not_ready`
+  olarak göstermeyi sürdürmeli; boş gün sıfır performans ya da tam 30-gün coverage diye yorumlanmaz.
+- Bootstrap yalnız Graph GET çağrıları yaptı; Meta write 0'dır. Scheduler/cron etkinleştirilmedi;
+  runner kapalıdır ve normal otomatik işletim kanıtı değildir.

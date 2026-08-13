@@ -80,6 +80,10 @@
     raporu maskeli, eksik insights'i `not_ready` bırakan fail-closed kanıt.
   - [x] S1.5 lifecycle/diff sonrası kalıcı trust raporu, restart/replay ve iki hesap
     isolation PostgreSQL E2E; eksik insight coverage sebepli `not_ready` olarak korunuyor.
+  - [x] İki canonical hesapta 30 günlük bounded GET-only campaign insight bootstrap: 10/10
+    tarih dilimi, 759 source satırı/48 campaign ve tamamlanmış durable cursor. İkinci hesapta
+    günlük Meta teslimatı seyrek olduğundan day-level coverage trust/readiness'te `partial`/
+    `not_ready` kalır; scheduler/cron kapalı, Meta write 0.
 
 ## A09 — İç kategori ve talimat
 
