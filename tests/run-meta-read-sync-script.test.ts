@@ -15,8 +15,10 @@ describe("local Meta read-sync recovery command", () => {
     expect(source).toContain("deferAffectedGeoMaterialization: true");
     // Large GET-only Meta pages are allowed a bounded retry window; this is
     // recovery reliability, not a write-capability change.
-    expect(source).toContain("requestTimeoutMs: 20_000");
-    expect(source).toContain("maxAttempts: 3");
+    expect(source).toContain('recoveryLane === "creative_ad_v1" ? 60_000 : 20_000');
+    expect(source).toContain('recoveryLane === "creative_ad_v1" ? 1 : 3');
+    expect(source).toContain("requestTimeoutMs,");
+    expect(source).toContain("maxAttempts,");
     expect(source).toContain('recoveryLane === "creative_ad_v1" ? 20 : 100');
     expect(source).toContain("initialPageSize,");
     expect(source).toContain("maxRunDurationMs: 90_000");

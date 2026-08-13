@@ -19,6 +19,8 @@ const pool = new Pool({ connectionString: process.env.DIRECT_DATABASE_URL ?? pro
 // Nested creative payloads are materially wider than inventory rows. Keep the
 // recovery page bounded without letting a caller choose the size.
 const initialPageSize = recoveryLane === "creative_ad_v1" ? 20 : 100;
+const requestTimeoutMs = recoveryLane === "creative_ad_v1" ? 60_000 : 20_000;
+const maxAttempts = recoveryLane === "creative_ad_v1" ? 1 : 3;
 
 try {
   const database = drizzle(pool, { schema });
@@ -42,8 +44,8 @@ try {
     dateStop: today.toISOString().slice(0, 10),
     dateSliceDays: 7,
     initialPageSize,
-    requestTimeoutMs: 20_000,
-    maxAttempts: 3,
+    requestTimeoutMs,
+    maxAttempts,
     maxRunDurationMs: 90_000,
   });
   console.log(JSON.stringify(result));
