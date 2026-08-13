@@ -143,6 +143,12 @@ const columns = [
   // Rule-to-budget provenance pins immutable hashes only; no category edge is
   // inferred by archive impact from this advisory linkage.
   "slice_rule_budget_proposal_bindings.binding_payload",
+  // A selected scenario allocation and the later ActionUnit provenance edge
+  // pin immutable draft/proposal/action hashes. Category archive must not
+  // reinterpret their historical evidence as a current mutable category link.
+  "slice_rule_scenario_allocation_selections.selection_evidence",
+  "slice_rule_scenario_allocation_selections.selection_payload",
+  "slice_rule_budget_action_unit_bindings.binding_payload",
   // Delivery/payment alert records are historical evidence and checklist
   // state, never category or policy selection inputs.
   "delivery_health_alert_ledger_records.checklist_payload",
