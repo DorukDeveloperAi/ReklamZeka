@@ -20,7 +20,11 @@ type ReklamZekaDatabase = NodePgDatabase<typeof schema>;
 type WriteOutcome = MetaInventoryCanonicalWriteOutcome;
 type Existing = Readonly<{ externalId: string; sourceRevision: string; sourcePriority: number; payloadHash: string }>;
 type AffectedGeoRepositoryFactory = (database: ReklamZekaDatabase, workspaceId: string) => MetaAffectedGeoAppendPort;
-type InventoryPersistenceOptions = Readonly<{ materializeAffectedGeo?: boolean }>;
+type InventoryPersistenceOptions = Readonly<{
+  materializeAffectedGeo?: boolean;
+  /** Only for a connection that cannot complete PostgreSQL transaction callbacks. */
+  transactionMode?: "atomic" | "idempotent_page";
+}>;
 
 const incomingRevision = sql<string>`excluded.provenance ->> 'sourceRevision'`;
 const incomingPriority = sql<number>`case
@@ -80,6 +84,7 @@ function appendIssue(issues: readonly MetaInventoryFieldIssue[], field: string, 
  */
 export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePersistencePort {
   private readonly materializeAffectedGeo: boolean;
+  private readonly transactionMode: "atomic" | "idempotent_page";
   constructor(private readonly database: ReklamZekaDatabase,
     private readonly affectedGeoRepository: AffectedGeoRepositoryFactory = (database, workspaceId) =>
       // writeAdSets already owns the page transaction; nesting one savepoint per
@@ -87,11 +92,11 @@ export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePer
       new DrizzleMetaAffectedGeoSnapshotRepository(database, workspaceId, "caller"),
     options: InventoryPersistenceOptions = {}) {
     this.materializeAffectedGeo = options.materializeAffectedGeo ?? true;
+    this.transactionMode = options.transactionMode ?? "atomic";
   }
 
   async writePage(page: CanonicalMetaInventoryPage, privateSource?: unknown): Promise<MetaInventoryWriteSummary> {
-    return this.database.transaction(async (transaction) => {
-      const database = transaction as ReklamZekaDatabase;
+    const write = async (database: ReklamZekaDatabase) => {
       const accountId = await this.resolveAccount(database, page);
       const outcomes = page.entityLevel === "campaign"
         ? await this.writeCampaigns(database, accountId, page, page.records as readonly CanonicalMetaInventoryCampaign[])
@@ -100,7 +105,13 @@ export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePer
           : await this.writeAds(database, accountId, page, page.records as readonly CanonicalMetaInventoryAd[]);
       const disappeared = page.terminal ? await this.markDisappeared(database, accountId, page) : 0;
       return summary(outcomes, disappeared, page.pageHash);
-    });
+    };
+    // All canonical writes use deterministic identities and revision guards, so
+    // a retry after a connection-level interruption is safe. The default stays
+    // atomic; the opt-in fallback exists solely for broken transaction callbacks.
+    return this.transactionMode === "atomic"
+      ? this.database.transaction(async (transaction) => write(transaction as ReklamZekaDatabase))
+      : write(this.database);
   }
 
   private async resolveAccount(database: ReklamZekaDatabase, page: CanonicalMetaInventoryPage): Promise<string> {
