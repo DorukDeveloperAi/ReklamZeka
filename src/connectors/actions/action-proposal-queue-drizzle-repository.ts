@@ -15,7 +15,8 @@ import {
 } from "@/application/action-proposal-staging-service";
 import { ACTION_PLAN_VERSION, type ActionPlan } from "@/domain/actions/autonomy-valve";
 import {
-  resolvePublishedExistingPostPolicy,
+  resolvePublishedApprovalPolicy,
+  type ApprovalPolicyApplicability,
   type ApprovalPolicyDefinitionRevision,
 } from "@/domain/actions/approval-policy-registry";
 import * as schema from "@/db/schema";
@@ -252,31 +253,51 @@ type TrustedPolicySource = Readonly<{
   canonicalHash: string;
 }>;
 
-function requiresTrustedExistingPostPolicy(lifecycle: ApprovalLifecycle): boolean {
-  return lifecycle.bundle.units.some((unit) => unit.scope.actionType === "existing_post_promotion" && unit.risk === "K4");
+function trustedApplicability(lifecycle: ApprovalLifecycle): ApprovalPolicyApplicability | null {
+  const applicable = lifecycle.bundle.units.flatMap((unit): readonly ApprovalPolicyApplicability[] => {
+    if (unit.scope.actionType === "existing_post_promotion" && unit.risk === "K4") {
+      return [Object.freeze({ actionType: "existing_post_promotion", risk: "K4" })];
+    }
+    if (unit.scope.actionType === "budget_decrease" && unit.risk === "K2") {
+      return [Object.freeze({ actionType: "budget_decrease", risk: "K2" })];
+    }
+    if (unit.scope.actionType === "budget_increase" && unit.risk === "K3") {
+      return [Object.freeze({ actionType: "budget_increase", risk: "K3" })];
+    }
+    return [];
+  });
+  if (applicable.length === 0) return null;
+  const first = applicable[0]!;
+  if (applicable.length !== lifecycle.bundle.units.length
+    || applicable.some((item) => item.actionType !== first.actionType || item.risk !== first.risk)) {
+    throw new ActionProposalQueueRepositoryError("policy_conflict");
+  }
+  return first;
 }
 
-async function resolveTrustedExistingPostPolicy(
+async function resolveTrustedPolicy(
   database: QueueDatabase,
   workspaceId: string,
   workspaceRef: string,
   lifecycle: ApprovalLifecycle,
   evaluatedAt: string,
+  applicability: ApprovalPolicyApplicability,
 ): Promise<TrustedPolicySource> {
   const definitionRows = await database.select({
     id: schema.approvalPolicyDefinitionRevisions.id,
     artifactPayload: schema.approvalPolicyDefinitionRevisions.artifactPayload,
   }).from(schema.approvalPolicyDefinitionRevisions).where(and(
     eq(schema.approvalPolicyDefinitionRevisions.workspaceId, workspaceId),
-    eq(schema.approvalPolicyDefinitionRevisions.actionType, "existing_post_promotion"),
-    eq(schema.approvalPolicyDefinitionRevisions.risk, "K4"),
+    eq(schema.approvalPolicyDefinitionRevisions.actionType, applicability.actionType),
+    eq(schema.approvalPolicyDefinitionRevisions.risk, applicability.risk),
   )).limit(1001);
   if (definitionRows.length > 1000) throw new ActionProposalQueueRepositoryError("corrupt_store");
-  let resolved: ReturnType<typeof resolvePublishedExistingPostPolicy>;
+  let resolved: ReturnType<typeof resolvePublishedApprovalPolicy>;
   try {
-    resolved = resolvePublishedExistingPostPolicy({
+    resolved = resolvePublishedApprovalPolicy({
       workspaceRef,
       evaluatedAt,
+      applicability,
       definitions: definitionRows.map((row) => row.artifactPayload as ApprovalPolicyDefinitionRevision),
     });
   } catch {
@@ -371,9 +392,10 @@ export class DrizzleActionProposalQueueRepository {
         return Object.freeze({ outcome: "unchanged" as const, lifecycleHash });
       }
 
-      const trustedPolicySource = requiresTrustedExistingPostPolicy(lifecycle)
-        ? await resolveTrustedExistingPostPolicy(
-          transaction, this.workspaceId, workspaceRef, lifecycle, initializedAt,
+      const requiredApplicability = trustedApplicability(lifecycle);
+      const trustedPolicySource = requiredApplicability !== null
+        ? await resolveTrustedPolicy(
+          transaction, this.workspaceId, workspaceRef, lifecycle, initializedAt, requiredApplicability,
         )
         : null;
 

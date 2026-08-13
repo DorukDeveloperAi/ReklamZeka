@@ -3,7 +3,8 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import {
   assertValidApprovalPolicyDefinition,
-  resolvePublishedExistingPostPolicy,
+  resolvePublishedApprovalPolicy,
+  type ApprovalPolicyApplicability,
   type ApprovalPolicyDefinitionRevision,
   type ResolvedApprovalPolicyDefinition,
 } from "@/domain/actions/approval-policy-registry";
@@ -167,20 +168,29 @@ export class DrizzleApprovalPolicyRegistryRepository {
   }
 
   async resolveExistingPostPolicy(evaluatedAt: string): Promise<PersistedApprovalPolicyResolution> {
+    return this.resolvePolicy({ actionType: "existing_post_promotion", risk: "K4" }, evaluatedAt);
+  }
+
+  /** Resolves one explicit action/risk pair; callers cannot widen a K4 policy to budget actions. */
+  async resolvePolicy(
+    applicability: ApprovalPolicyApplicability,
+    evaluatedAt: string,
+  ): Promise<PersistedApprovalPolicyResolution> {
+    if (!applicability || typeof applicability !== "object") fail("invalid_input");
     return this.database.transaction(async (transaction) => {
       await lockWorkspace(transaction, this.workspaceId, "share");
       const result = rows<Row>(await transaction.execute(sql`
         select id, workspace_ref, policy_ref, revision, previous_hash, state, policy_hash, canonical_hash, artifact_payload
         from approval_policy_definition_revisions
         where workspace_id = ${this.workspaceId}::uuid
-          and action_type = 'existing_post_promotion' and risk = 'K4'
+          and action_type = ${applicability.actionType} and risk = ${applicability.risk}
         order by policy_ref, revision
         limit 1001
       `));
       if (result.length > 1000) fail("corrupt_store");
       const definitions = result.map(validateRow);
       let resolved: ResolvedApprovalPolicyDefinition;
-      try { resolved = resolvePublishedExistingPostPolicy({ workspaceRef: this.workspaceRef, evaluatedAt, definitions }); }
+      try { resolved = resolvePublishedApprovalPolicy({ workspaceRef: this.workspaceRef, evaluatedAt, applicability, definitions }); }
       catch (reason) {
         if (reason && typeof reason === "object" && "code" in reason && reason.code === "not_found") fail("not_found");
         if (reason && typeof reason === "object" && "code" in reason && reason.code === "ambiguous") fail("ambiguous");
