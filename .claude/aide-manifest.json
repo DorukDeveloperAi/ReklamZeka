@@ -76,7 +76,7 @@
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/plan-organizatoru/scripts/agac.mjs": {
-      "hash": "d913fc9bf562fcf9",
+      "hash": "b01d121d13aa93fa",
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/plan-organizatoru/scripts/harita.mjs": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-13T12:20:30.674Z",
+  "updatedAt": "2026-08-13T13:20:59.791Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",
