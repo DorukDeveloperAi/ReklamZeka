@@ -3603,3 +3603,25 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: `npm run verify:current-effective-analysis-context-source-db`; `npm test` (316 dosya/1.719 test),
   `npm run build`, `npm run db:check`, `npm run check:security`, `npm run check:security-boundaries`,
   `npm run check:secret-artifacts` ve `git diff --check`.
+
+## 2026-08-13 — Meta mirror gerçek okuma durumu ve bütçe önerisi→insan onayı köprüsü
+
+- Tek-hesap, GET-only Meta recovery şeritleri güvenli `rotated` token durumu ile yeniden çalıştırıldı.
+  Insight şeridi teknik olarak tamamlandı fakat seçili kapalı gün için Meta sıfır kayıt döndürdü; bu nedenle
+  canonical `meta_daily_insights` satırı hâlâ yoktur. Creative v2 şeridi iki dayanıklı checkpointte toplam
+  278 yeni creative kaydı yazıp tamamlandı; Meta write çağrısı her koşumda sıfır kaldı.
+- Ayna şu anda creative metinlerini taşısa da creative→post/actor ilişkisi kanıtlı değildir. Bu nedenle
+  içerik/künye çıkarımı kullanılabilir bir inceleme girdisidir; ama S1.4 actor/post kaynak doğrulaması,
+  performans metriği ve otomatik karar için yeterli kabul edilmez. Dashboard bu durumu `partial`/`unavailable`
+  olarak göstermeye devam etmelidir; demo ya da başarı etiketiyle gizlenemez.
+- Seçilmiş, immutable Slice Rule bütçe senaryosu artık yalnız mevcut frozen proposal, campaign budget-owner
+  binding, güncel canonical daily budget, currency, delivery-hold ve exact K2/K3 yayınlanmış onay politikası
+  birlikte doğrulanınca bir `ActionUnit` taslağına dönüştürülebilir. Bu taslak mevcut insan onay kuyruğuna
+  gider; approval, execution, Meta write ve otomasyon yetkileri açılmaz.
+- Köprü workspace UUID'sinden kamu ref'i türetmez: onay politikası ledger'ındaki exact `workspaceRef`,
+  policy revision/hash zinciri üzerinden tekrar çözülür. Eksik, stale, farklı-workspace veya applicability
+  uyuşmayan politika `policy_unavailable` ile fail-closed kalır. Bu noktada kullanıcı arayüzü materializer
+  komutunu henüz açmaz; dolayısıyla canlıda otomatik ya da tek-tık Meta değişikliği yoktur.
+- Kanıt: `tests/slice-rule-budget-action-unit-materializer.test.ts`,
+  `tests/approval-policy-registry.test.ts`, `tests/action-proposal-queue-drizzle-repository.test.ts`,
+  `npm run typecheck`, `git diff --check`; Meta recovery çıktılarında `writeNetworkCalls:0`.
