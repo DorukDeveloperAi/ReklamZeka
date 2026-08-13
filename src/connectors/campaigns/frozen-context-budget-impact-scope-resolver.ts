@@ -68,6 +68,33 @@ function exactDefinition(
   return Object.freeze({ state: "ready" as const, category, key: category.effectiveDefinitions[0]!.key });
 }
 
+/**
+ * Optional slice facets are membership constraints, not a claim that a
+ * campaign has no other geo/platform labels.  The requested key itself still
+ * has to occur exactly once on one exact campaign-level frozen category.
+ */
+function exactOptionalDefinition(
+  context: EffectiveCampaignContext,
+  dimensionKey: string,
+  expectedKey: string,
+): Readonly<{ state: "ready"; category: FrozenCategoryContext; key: string }>
+  | Readonly<{ state: "missing" | "ambiguous" }> {
+  const categories = categoriesFor(context, dimensionKey);
+  if (categories.length === 0) return Object.freeze({ state: "missing" as const });
+  if (categories.length !== 1) return Object.freeze({ state: "ambiguous" as const });
+  const category = categories[0]!;
+  if (category.path.length !== 1 || category.path[0]?.level !== "campaign"
+    || category.path[0].id !== context.identity.campaignRef || category.effectiveDefinitions.length === 0) {
+    return Object.freeze({ state: "ambiguous" as const });
+  }
+  const matches = category.effectiveDefinitions.filter((definition) => definition.key === expectedKey);
+  // A dimension exists but excludes the requested slice: this is an exact
+  // scope conflict, not an invitation to silently omit the facet.
+  if (matches.length === 0) return Object.freeze({ state: "ambiguous" as const });
+  if (matches.length !== 1) return Object.freeze({ state: "ambiguous" as const });
+  return Object.freeze({ state: "ready" as const, category, key: expectedKey });
+}
+
 function market(key: string): "domestic" | "international" | null {
   if (key === "yerli") return "domestic";
   if (key === "yabanci") return "international";
@@ -134,7 +161,7 @@ export class FrozenContextBudgetImpactScopeResolver implements BudgetImpactScope
     for (const [facet, dimensionKey] of Object.entries(OPTIONAL_DIMENSIONS) as readonly [keyof typeof OPTIONAL_DIMENSIONS, string][]) {
       const expected = input.expectedScope[facet];
       if (expected === undefined) continue;
-      const evidence = exactDefinition(frozen.context, dimensionKey);
+      const evidence = exactOptionalDefinition(frozen.context, dimensionKey, expected);
       if (evidence.state !== "ready") {
         return Object.freeze({ state: evidence.state, scope: null, evidenceRefs: Object.freeze([]) });
       }

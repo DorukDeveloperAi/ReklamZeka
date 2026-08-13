@@ -21,9 +21,9 @@ const campaignId = "33333333-3333-4333-8333-333333333333";
 const requiredScope = Object.freeze({ market: "international" as const,
   serviceRef: "service_physical_therapy_rehab", campaignFamilyRef: "campaign_family_intensive_ftr" });
 
-function category(dimensionKey: string, definitionKey: string, suffix: string) {
+function category(dimensionKey: string, definitionKey: string, suffix: string, cardinality: "single" | "multi" = "single") {
   const dimension: CategoryDimension = { id: `dimension-${suffix}`, workspaceId, key: dimensionKey,
-    version: 1, cardinality: "single", allowedEntityLevels: ["campaign"], archivedAt: null };
+    version: 1, cardinality, allowedEntityLevels: ["campaign"], archivedAt: null };
   const definition: CategoryDefinition = { id: `definition-${suffix}`, workspaceId,
     dimensionId: dimension.id, key: definitionKey, label: definitionKey, version: 1, archivedAt: null };
   return resolveEffectiveCategory({ dimension, definitions: [definition],
@@ -107,7 +107,7 @@ describe("frozen context Slice Rule budget impact scope resolver", () => {
       category("market", "yabanci", "market"),
       category("service_line", "service_physical_therapy_rehab", "service"),
       category("campaign_family", "campaign_family_intensive_ftr", "family"),
-      category("geo_market", "Arap Bölgesi", "geo"),
+      category("geo_market", "Arap Bölgesi", "geo", "multi"),
       category("audience_strategy", "Özel hedefleme", "audience"),
       category("publisher_platform", "instagram", "platform"),
     ] });

@@ -97,8 +97,9 @@
   veya sonuç rotası için her dilim kullanıcı tarafından `dilim: yüzde` olarak girilir ve toplam tam
   `%100` değilse kayıt oluşmaz. Bu dağıtım da yalnız recommendation-only taslaktır. Budget impact
   resolver'ı, taslağın istediği ülke/bölge, hedefleme stratejisi veya yayın platformunu ancak aynı
-  frozen context'te tekil, eş değer kategori kanıtı varsa kabul eder; eksik, çoklu veya farklı künye
-  preview üretmez. Kategori kanıtı olmayan genişletilmiş scope için fallback yoktur.
+  frozen context'te exact category membership kanıtı varsa kabul eder; eksik, çelişkili veya farklı
+  künye preview üretmez. Çoklu geo etiketi, istenen etiketi gerçekten içerdiğinde ek kapsamı gizlemez;
+  kategori kanıtı olmayan genişletilmiş scope için fallback yoktur.
 
 ## 2026-08-12 — Portföy pazar sınırı
 
