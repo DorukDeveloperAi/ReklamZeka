@@ -6,6 +6,7 @@ import {
   CampaignPlanningBriefPanel,
   campaignBriefScenario,
   campaignContextTimelineSourceState,
+  campaignOperationalTimelineFromResponse,
   campaignDecisionTimeline,
   decisionTimelineFromApprovalQueueResponse,
   draftOnlyPolicyTemplateForBrief,
@@ -145,5 +146,17 @@ describe("campaign planning brief panel", () => {
     expect(campaignContextTimelineSourceState(true, empty, campaignRef)).toBe("empty");
     expect(campaignContextTimelineSourceState(true, { ...empty, writeOperations: 1 }, campaignRef)).toBe("unavailable");
     expect(campaignContextTimelineSourceState(true, { ...empty, unexpected: true }, campaignRef)).toBe("unavailable");
+  });
+  it("accepts only an ordered, authority-closed campaign operational trace", () => {
+    const response = {
+      contractVersion: "operational-timeline/1.0.0", items: [
+        { kind: "approval_decision", occurredAt: "2026-08-13T12:00:00.000Z", title: "İnsan kararı kaydedildi", detail: "approve · human confirmed" },
+        { kind: "budget_proposal", occurredAt: "2026-08-13T11:00:00.000Z", title: "Bütçe önerisi taslağı kaydedildi", detail: "Revizyon 1 · uygulama yetkisi yok" },
+      ], authority: { readOnly: true, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false, canEnableAutomation: false },
+    };
+    expect(campaignOperationalTimelineFromResponse(response)).toHaveLength(2);
+    expect(campaignOperationalTimelineFromResponse({ ...response, items: [...response.items].reverse() })).toBeNull();
+    expect(campaignOperationalTimelineFromResponse({ ...response, authority: { ...response.authority, canExecute: true } })).toBeNull();
+    expect(campaignOperationalTimelineFromResponse({ ...response, items: [{ ...response.items[0], kind: "delivery_alert" }] })).toBeNull();
   });
 });

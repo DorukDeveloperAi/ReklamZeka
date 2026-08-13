@@ -11,7 +11,11 @@ export type OperationalTimelineEvent = Readonly<{
 }>;
 
 export interface OperationalTimelineRepository {
-  list(input: Readonly<{ workspaceId: string; limit: number }>): Promise<readonly OperationalTimelineEvent[]>;
+  /**
+   * `campaignRef` is a UI-safe alias only. Implementations must resolve it
+   * inside the tenant boundary and must never use it as a private identifier.
+   */
+  list(input: Readonly<{ workspaceId: string; limit: number; campaignRef?: string }>): Promise<readonly OperationalTimelineEvent[]>;
 }
 
 export class OperationalTimelineReadError extends Error {
@@ -40,13 +44,15 @@ function safe(event: OperationalTimelineEvent): OperationalTimelineEvent {
 export class OperationalTimelineReadService {
   constructor(private readonly repository: OperationalTimelineRepository, private readonly memberships: readonly WorkspaceMembership[]) {}
 
-  async list(principal: TrustedDecisionRoomPrincipal, limit = 50) {
-    if (!UUID.test(principal.workspaceId) || !Number.isInteger(limit) || limit < 1 || limit > 100) {
+  async list(principal: TrustedDecisionRoomPrincipal, input: Readonly<{ limit?: number; campaignRef?: string }> = {}) {
+    const limit = input.limit ?? 50;
+    if (!UUID.test(principal.workspaceId) || !Number.isInteger(limit) || limit < 1 || limit > 100
+      || input.campaignRef !== undefined && !/^ref_[a-f0-9]{12}$/.test(input.campaignRef)) {
       throw new OperationalTimelineReadError("invalid_input");
     }
     authorizeWorkspace(principal.actor, principal.workspaceId, "data:read", this.memberships);
     let items: readonly OperationalTimelineEvent[];
-    try { items = await this.repository.list({ workspaceId: principal.workspaceId, limit }); }
+    try { items = await this.repository.list({ workspaceId: principal.workspaceId, limit, campaignRef: input.campaignRef }); }
     catch (reason) { if (reason instanceof OperationalTimelineReadError) throw reason; throw new OperationalTimelineReadError("source_unavailable"); }
     if (!Array.isArray(items) || items.length > limit) throw new OperationalTimelineReadError("unsafe_source");
     const normalized = items.map(safe);

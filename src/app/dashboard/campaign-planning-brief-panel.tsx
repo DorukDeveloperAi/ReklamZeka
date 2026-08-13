@@ -47,6 +47,8 @@ export type CampaignBriefScenarioRef = "" | "domestic_form_lead" | "domestic_wha
 export type CampaignBriefScenario = Readonly<{ label: string; input: BriefDraft }>;
 
 type ApprovalTimelineState = "idle" | "loading" | "ready" | "unavailable";
+type CampaignOperationalTimelineState = "idle" | "loading" | "ready" | "unavailable";
+type CampaignOperationalTimelineItem = Readonly<{ kind: string; occurredAt: string; title: string; detail: string }>;
 
 type DecisionTimelineStage = Readonly<{
   ordinal: 1 | 2 | 3 | 4;
@@ -80,6 +82,31 @@ function safeReadAuthority(value: unknown): boolean {
   return exactObject(value, ["readOnly", "canApprove", "canReject", "canRequestChanges", "canGrant", "canExecute", "canWriteMeta"])
     && value.readOnly === true && value.canApprove === false && value.canReject === false && value.canRequestChanges === false
     && value.canGrant === false && value.canExecute === false && value.canWriteMeta === false;
+}
+
+function safeOperationalTimelineAuthority(value: unknown): boolean {
+  return exactObject(value, ["readOnly", "canPublish", "canApprove", "canExecute", "canWriteMeta", "canEnableAutomation"])
+    && value.readOnly === true && value.canPublish === false && value.canApprove === false
+    && value.canExecute === false && value.canWriteMeta === false && value.canEnableAutomation === false;
+}
+
+/** The campaign trace is rendered only from the closed public read contract. */
+export function campaignOperationalTimelineFromResponse(value: unknown): readonly CampaignOperationalTimelineItem[] | null {
+  if (!exactObject(value, ["contractVersion", "items", "authority"])
+    || value.contractVersion !== "operational-timeline/1.0.0" || !Array.isArray(value.items) || value.items.length > 50
+    || !safeOperationalTimelineAuthority(value.authority)) return null;
+  const allowed = new Set(["budget_proposal", "approval_proposed", "approval_decision", "temporal_evaluation"]);
+  const items: CampaignOperationalTimelineItem[] = [];
+  for (const item of value.items) {
+    if (!exactObject(item, ["kind", "occurredAt", "title", "detail"])
+      || typeof item.kind !== "string" || !allowed.has(item.kind)
+      || typeof item.occurredAt !== "string" || !Number.isFinite(Date.parse(item.occurredAt))
+      || typeof item.title !== "string" || item.title.length < 1 || item.title.length > 180
+      || typeof item.detail !== "string" || item.detail.length < 1 || item.detail.length > 300) return null;
+    items.push(Object.freeze({ kind: item.kind, occurredAt: new Date(item.occurredAt).toISOString(), title: item.title, detail: item.detail }));
+  }
+  if (items.some((item, index) => index > 0 && Date.parse(item.occurredAt) > Date.parse(items[index - 1]!.occurredAt))) return null;
+  return Object.freeze(items);
 }
 
 function safeApprovalItem(value: unknown, campaignRef: string): value is Record<string, unknown> {
@@ -300,6 +327,8 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
   const [approvalQueueCampaignRef, setApprovalQueueCampaignRef] = useState<string | null>(null);
   const [approvalState, setApprovalState] = useState<ApprovalTimelineState>("idle");
   const [approvalTimeline, setApprovalTimeline] = useState<Readonly<{ itemCount: number; latestStatus: string | null }> | null>(null);
+  const [operationalTimelineState, setOperationalTimelineState] = useState<CampaignOperationalTimelineState>("idle");
+  const [operationalTimeline, setOperationalTimeline] = useState<readonly CampaignOperationalTimelineItem[] | null>(null);
   const brief = useMemo(() => createInteractiveCampaignBrief(draft), [draft]);
   const applicableRules = useMemo(() => currentPortfolioRulesFor(evaluationCandidateFromBrief(draft)), [draft]);
   const evaluationRule = applicableRules.find((rule) => rule.rule.kind === "degerlendirme_kumesi") ?? null;
@@ -322,6 +351,8 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
       setApprovalQueueCampaignRef(null);
       setApprovalTimeline(null);
       setApprovalState("idle");
+      setOperationalTimeline(null);
+      setOperationalTimelineState("idle");
       setSourceState("unbound");
       return;
     }
@@ -336,10 +367,12 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
         setApprovalQueueCampaignRef(queueCampaignRef);
         setApprovalTimeline(null);
         setApprovalState(queueCampaignRef ? "loading" : "idle");
+        setOperationalTimeline(null);
+        setOperationalTimelineState(bridge ? "loading" : "idle");
         setPersistedHint(bridge ? planningHintFromPersistedCampaignContext(bridge.context) : null);
         setSourceState(campaignContextTimelineSourceState(response.ok, payload, context.persistedCampaignRef!));
       })
-      .catch(() => { if (active) { onApprovalQueueCampaignRef?.(null); setPersistedHint(null); setApprovalQueueCampaignRef(null); setApprovalTimeline(null); setApprovalState("idle"); setSourceState("unavailable"); } });
+      .catch(() => { if (active) { onApprovalQueueCampaignRef?.(null); setPersistedHint(null); setApprovalQueueCampaignRef(null); setApprovalTimeline(null); setApprovalState("idle"); setOperationalTimeline(null); setOperationalTimelineState("idle"); setSourceState("unavailable"); } });
     return () => { active = false; };
   }, [context.persistedCampaignRef, onApprovalQueueCampaignRef]);
 
@@ -358,6 +391,22 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
       .catch(() => { if (active) { setApprovalTimeline(null); setApprovalState("unavailable"); } });
     return () => { active = false; };
   }, [approvalQueueCampaignRef, sourceState]);
+
+  useEffect(() => {
+    if (sourceState !== "ready" || !context.persistedCampaignRef || !/^ref_[a-f0-9]{12}$/.test(context.persistedCampaignRef)) return;
+    let active = true;
+    setOperationalTimelineState("loading");
+    void fetch(`/api/operational-timeline?campaignRef=${encodeURIComponent(context.persistedCampaignRef)}`, { cache: "no-store", credentials: "same-origin", headers: { "X-ReklamZeka-Intent": "campaign-operational-timeline-read" } })
+      .then(async (response) => ({ response, payload: await response.json() as unknown }))
+      .then(({ response, payload }) => {
+        if (!active) return;
+        const timeline = response.ok ? campaignOperationalTimelineFromResponse(payload) : null;
+        setOperationalTimeline(timeline);
+        setOperationalTimelineState(timeline ? "ready" : "unavailable");
+      })
+      .catch(() => { if (active) { setOperationalTimeline(null); setOperationalTimelineState("unavailable"); } });
+    return () => { active = false; };
+  }, [context.persistedCampaignRef, sourceState]);
 
   return <section className={`${styles.panel} ${styles.campaignPlanningBrief}`} aria-labelledby="campaign-planning-brief-title">
     <header className={styles.panelHeader}>
@@ -449,6 +498,15 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
       <ol>{campaignDecisionTimeline({ sourceState, approvalState: approvalState === "idle" ? "loading" : approvalState, approval: approvalTimeline }).map((stage) => <li key={stage.ordinal} data-state={stage.state}>
         <span>{stage.ordinal}</span><div><strong>{stage.title}</strong><small>{stage.detail}</small></div>
       </li>)}</ol>
+    </section> : null}
+    {sourceState === "ready" ? <section className={styles.campaignDecisionTimeline} aria-label="Kampanya operasyon izi">
+      <header><span>KAMPANYA OPERASYON İZİ · SALT-OKUNUR</span><small>Yalnız bu frozen context alias’ına sunucuda exact bağlanan kayıtlar gösterilir.</small></header>
+      {operationalTimelineState === "loading" ? <p>Kanıtlı kampanya olayları okunuyor.</p>
+        : operationalTimelineState === "unavailable" ? <p>Kanıtlı kampanya operasyon izi şu anda kullanılamıyor; belirsiz veya genel kayıtlar gösterilmez.</p>
+          : operationalTimelineState === "ready" && operationalTimeline?.length === 0 ? <p>Bu kampanyaya exact bağlı gösterilebilir operasyon olayı yok.</p>
+            : operationalTimelineState === "ready" ? <ol>{operationalTimeline?.map((event) => <li key={`${event.kind}:${event.occurredAt}`} data-state="ready">
+              <span>{new Date(event.occurredAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })}</span><div><strong>{event.title}</strong><small>{event.detail} · immutable kayıt</small></div>
+            </li>)}</ol> : null}
     </section> : null}
     <div className={styles.briefPlan}>
       <div><span>Şablon ve kıyas sınırı</span><strong>{brief.variantRef ?? "Bağlam tamamlanınca seçilecek"}</strong><small>{brief.comparisonBoundary.summary}</small></div>

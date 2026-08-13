@@ -14,8 +14,10 @@ export function operationalTimelineNotConfiguredResponse() { return failure(new 
 export function createOperationalTimelineHttpHandler(input: Readonly<{ service: OperationalTimelineReadService; resolvePrincipal(request: Request): Promise<TrustedDecisionRoomPrincipal> }>) {
   return async (request: Request) => { try {
     const url = new URL(request.url);
-    if (request.method !== "GET" || url.search || !request.headers.get("cookie") || request.headers.has("authorization") || request.headers.has("x-workspace-id")
+    const campaignRef = url.searchParams.get("campaignRef");
+    if (request.method !== "GET" || [...url.searchParams.keys()].some((key) => key !== "campaignRef")
+      || campaignRef !== null && !/^ref_[a-f0-9]{12}$/.test(campaignRef) || !request.headers.get("cookie") || request.headers.has("authorization") || request.headers.has("x-workspace-id")
       || request.headers.get("sec-fetch-site") !== "same-origin") throw new OperationalTimelineReadError("invalid_input");
-    return NextResponse.json(await input.service.list(await input.resolvePrincipal(request)), { headers: HEADERS });
+    return NextResponse.json(await input.service.list(await input.resolvePrincipal(request), { campaignRef: campaignRef ?? undefined }), { headers: HEADERS });
   } catch (reason) { return failure(reason); } };
 }

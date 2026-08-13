@@ -37,4 +37,15 @@ describe("operational timeline read service", () => {
     await expect(service.list(principal)).resolves.toMatchObject({ items: [expect.objectContaining({ kind: "temporal_evaluation" })],
       authority: { canApprove: false, canExecute: false, canWriteMeta: false } });
   });
+  it("passes only an opaque campaign alias to the repository for a campaign trace", async () => {
+    let received: unknown = null;
+    const service = new OperationalTimelineReadService({ list: async (input) => { received = input; return []; } }, memberships);
+    await expect(service.list(principal, { campaignRef: "ref_abcdef012345" })).resolves.toMatchObject({ items: [] });
+    expect(received).toEqual({ workspaceId: principal.workspaceId, limit: 50, campaignRef: "ref_abcdef012345" });
+  });
+  it("rejects private, malformed, or cross-contract campaign filter input before reading", async () => {
+    const service = new OperationalTimelineReadService({ list: async () => [] }, memberships);
+    await expect(service.list(principal, { campaignRef: "campaign_123" })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(service.list(principal, { campaignRef: "11111111-1111-4111-8111-111111111111" })).rejects.toMatchObject({ code: "invalid_input" });
+  });
 });

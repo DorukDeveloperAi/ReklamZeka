@@ -21,4 +21,14 @@ describe("operational timeline budget proposal source", () => {
     expect(source).toContain("uygulama yetkisi yok");
     expect(source).not.toContain("insert into");
   });
+  it("uses a tenant-local opaque alias resolution and excludes campaign-ambiguous global sources", () => {
+    const source = readFileSync("src/connectors/decisions/operational-timeline-drizzle-repository.ts", "utf8");
+    expect(source).toContain("with scoped_campaign as");
+    expect(source).toContain("campaign.workspace_id");
+    expect(source).toContain("count(*) from scoped_campaign) = 1");
+    expect(source).toContain("Slice drafts are intentionally workspace-scoped");
+    expect(source).toContain("Account-only alarms must not be attributed to an arbitrary campaign");
+    expect(source).toContain("context.id = proposal.context_id and context.campaign_id = proposal.campaign_id");
+    expect(source).toContain("context.id = analysis.effective_context_id");
+  });
 });
