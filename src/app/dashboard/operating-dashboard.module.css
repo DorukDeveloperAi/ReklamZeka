@@ -69,6 +69,8 @@
 .topActions > button:hover { color: var(--rz-text); border-color: var(--rz-line-strong); }
 .topActions > button > i { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 99px; color: #111; background: var(--rz-green); font-size: .55rem; font-style: normal; font-weight: 900; }
 .topActions .autonomyButton { display: flex; align-items: center; gap: 8px; width: auto; padding: 0 11px; color: var(--rz-text); font: 700 .65rem ui-monospace, SFMono-Regular, Consolas, monospace; }
+.topActions .codexTransferButton { width: auto; padding: 0 11px; color: #111; border-color: rgba(184,242,84,.3); background: var(--rz-green); font-size: .61rem; font-weight: 850; }
+.topActions .codexTransferButton:disabled { opacity: .52; cursor: wait; }
 .autonomyButton i { position: static !important; width: auto !important; height: auto !important; color: var(--rz-muted) !important; background: transparent !important; }
 .topActions .profileButton { color: #111; background: #d8e6cf; font-size: .62rem; font-weight: 900; }
 .mobileBrand, .mobileNav { display: none; }
@@ -446,6 +448,12 @@
 .chatComposer textarea { min-height: 66px; resize: none; padding: 9px; border: 0; background: transparent; color: var(--rz-text); font-size: .7rem; line-height: 1.5; }
 .chatComposer textarea:focus { outline: 0; }
 .chatComposer button { align-self: end; min-height: 34px; padding: 0 12px; border: 0; border-radius: 8px; color: #111; background: var(--rz-green); font-size: .61rem; font-weight: 850; cursor: pointer; }
+.codexManualTask { display: grid; gap: 8px; margin: 0 16px 14px; padding: 12px; border: 1px solid rgba(184,242,84,.28); border-radius: 10px; background: rgba(184,242,84,.045); }
+.codexManualTask > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.codexManualTask strong { font-size: .67rem; }
+.codexManualTask button { border: 0; background: transparent; color: var(--rz-green); font-size: .6rem; cursor: pointer; }
+.codexManualTask textarea { min-height: 160px; resize: vertical; padding: 10px; border: 1px solid var(--rz-line); border-radius: 7px; background: #0b0f0d; color: var(--rz-text); font: .64rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.codexManualTask small { color: var(--rz-muted); font-size: .56rem; }
 .agentChat > footer { padding: 0 20px 15px; color: var(--rz-dim); font-size: .55rem; text-align: center; }
 .agentConfiguration { display: grid; align-content: start; gap: 10px; }
 .agentSessionHub { display: grid; gap: 13px; padding-bottom: 16px; }
@@ -954,7 +962,8 @@
   .mobileBrand { display: flex; align-items: center; gap: 8px; }
   .mobileBrand > span { width: 29px; height: 29px; border-radius: 8px; }
   .mobileBrand strong { font-size: .76rem; }
-  .topActions > button:not(.autonomyButton):not(.profileButton) { display: none; }
+  .topActions > button:not(.autonomyButton):not(.profileButton):not(.codexTransferButton) { display: none; }
+  .topActions .codexTransferButton { padding: 0 8px; font-size: .55rem; }
   .topActions .autonomyButton { max-width: 145px; font-size: .56rem; }
   .policyReadiness > div { grid-template-columns: 1fr 1fr; }
   .policyReadiness article:nth-child(2) { border-right: 0; }

@@ -308,6 +308,32 @@ export function approvalQueueScopeAfterCampaignSelection(
   return currentCampaignId === nextCampaignId ? currentApprovalQueueCampaignRef : null;
 }
 
+/**
+ * This is deliberately a manual bridge, rather than a browser-to-desktop
+ * protocol. It gives the operator a bounded, safe task to paste into Codex
+ * while the actual conversation remains in their selected CLI session.
+ */
+export function buildCodexManualTask(input: Readonly<{
+  pageLabel: string;
+  entityLabel: string;
+  handoffRef: string | null;
+}>): string {
+  const handoff = input.handoffRef
+    ? `Önce MCP üzerinden \`${input.handoffRef}\` handoff'unu tüket; yalnız onun izin verdiği bağlamı kullan.`
+    : "Bu aktarım için doğrulanmış aktif CLI handoff'u yok; eksik kanıtı açıkça belirt ve tahmin etme.";
+  return [
+    "ReklamZeka Orchestrator görevi",
+    "",
+    `Bağlam: ${input.pageLabel} · ${input.entityLabel}`,
+    handoff,
+    "",
+    "Önce mevcut kanıtı, belirsizlikleri ve gerekli soruları çıkar. Ardından yalnız taslak analiz, künye düzeltme önerisi veya kural önerisi sun.",
+    "Kısıt: policy yayınlama/onaylama, action yürütme, bütçe veya durum değiştirme ve Meta write yapma. Her öneri insan onayı beklemeli.",
+    "",
+    "Operatör isteği: [buraya kendi talimatınızı ekleyin]",
+  ].join("\n");
+}
+
 export function OperatingDashboard({ model, initialView = "today" }: { model: OperatingDashboardModel; initialView?: DashboardViewId }) {
   const [activeView, setActiveView] = useState<ViewId>(initialView);
   const [selectedCampaign, setSelectedCampaign] = useState<string>(campaigns[0].id);
@@ -336,6 +362,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   const [agentHandoffLoading, setAgentHandoffLoading] = useState(false);
   const [agentEntityRef, setAgentEntityRef] = useState("portfolio_current");
   const [agentEntityLabel, setAgentEntityLabel] = useState("Tüm Meta portföyü");
+  const [codexManualTask, setCodexManualTask] = useState<string | null>(null);
   const [draftPolicyTemplate, setDraftPolicyTemplate] = useState<CampaignIntentTemplateRef>("");
 
   const filteredCampaigns = useMemo(() => filterCampaignPortfolio(campaigns, portfolioFilters), [portfolioFilters]);
@@ -427,10 +454,10 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
     return () => { active = false; };
   }, []);
 
-  const createAgentHandoff = useCallback(async (entityRef: string) => {
+  const createAgentHandoff = useCallback(async (entityRef: string): Promise<AgentHandoffSummary | null> => {
     if (!selectedAgentSessionRef || !agentSessions.some((session) => session.sessionRef === selectedAgentSessionRef)) {
       setAgentSessionError(agentSessions.length > 1 ? "Devam edilecek session'ı açıkça seçin." : "Aktif bir CLI session bulunamadı.");
-      return;
+      return null;
     }
     setAgentHandoffLoading(true);
     setAgentSessionError(null);
@@ -457,12 +484,33 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       if (!response.ok || !payload.handoff) throw new Error(payload.error?.message ?? "Handoff oluşturulamadı.");
       setAgentHandoff(payload.handoff);
       setToast(`Kısa ömürlü handoff ${payload.handoff.targetSessionRef.slice(0, 16)}… session'ı için hazır.`);
+      return payload.handoff;
     } catch (error) {
       setAgentSessionError(error instanceof Error ? error.message : "Handoff oluşturulamadı.");
+      return null;
     } finally {
       setAgentHandoffLoading(false);
     }
   }, [agentSessions, selectedAgentSessionRef]);
+
+  const transferCurrentContextToCodex = useCallback(async () => {
+    const isCampaign = activeView === "campaigns";
+    const entityRef = isCampaign ? `campaign_${currentCampaign.id.replace("cmp-", "")}` : "portfolio_current";
+    const entityLabel = isCampaign ? currentCampaign.name : activeTitle === "Bugün" ? "Tüm Meta portföyü" : `${activeTitle} görünümü`;
+    setAgentEntityRef(entityRef);
+    setAgentEntityLabel(entityLabel);
+    setAgentHandoff(null);
+    const handoff = await createAgentHandoff(entityRef);
+    const task = buildCodexManualTask({ pageLabel: activeTitle, entityLabel, handoffRef: handoff?.handoffRef ?? null });
+    setCodexManualTask(task);
+    try {
+      await navigator.clipboard.writeText(task);
+      setToast("Codex görevi kopyalandı. Codex Desktop'a geçip yapıştırın.");
+    } catch {
+      setToast("Görev Orchestrator alanında hazır; Codex Desktop'a geçip elle kopyalayın.");
+    }
+    setActiveView("agent");
+  }, [activeTitle, activeView, createAgentHandoff, currentCampaign]);
 
   function navigate(view: ViewId) {
     setActiveView(view);
@@ -632,7 +680,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
     return <>
       <section className={styles.pageHero}><div><span className={styles.kicker}>REKLAMZEKA ORCHESTRATOR</span><h1>Tek agent, farklı vendor; aynı yetki ve karar sözleşmesi.</h1><p>Codex veya Claude session'ı değişebilir. Kampanya bağlamı, kurallar, skill'ler ve otonomi valfi ReklamZeka'da kalır.</p></div><StatusPill tone={agentSessions.length ? "good" : agentSessionError ? "warning" : "neutral"}>{agentSessionsLoading ? "Session kontrolü" : agentSessions.length ? `● ${agentSessions.length} session bağlı` : "Session bağlı değil"}</StatusPill></section>
       <div className={styles.agentWorkspace}>
-        <section className={styles.agentChat}><header><div><span className={styles.agentMark}>✦</span><div><strong>Orchestrator çalışma alanı</strong><small>Bağlam: {agentEntityLabel}</small></div></div><button onClick={() => void refreshAgentSessions(true)}>Session'ları yenile</button></header><div className={styles.chatMessages}>{agentMessages.map((message, index) => <div key={`${message.from}-${index}`} data-from={message.from}><span>{message.from === "agent" ? "RZ" : "Siz"}</span><p>{message.text}</p></div>)}</div><div className={styles.chatComposer}><textarea aria-label="Orchestrator'a mesaj" placeholder="Sohbet Codex/Claude CLI transport'u bağlandıktan sonra burada devam edebilir." value="" disabled /><button disabled>CLI bekleniyor</button></div><footer>Bu sohbet yüzeyi model çalıştırmaz · Agent yalnız read/draft/proposal araçlarına erişir · Meta writer yok</footer></section>
+        <section className={styles.agentChat}><header><div><span className={styles.agentMark}>✦</span><div><strong>Orchestrator çalışma alanı</strong><small>Bağlam: {agentEntityLabel}</small></div></div><button onClick={() => void refreshAgentSessions(true)}>Session'ları yenile</button></header><div className={styles.chatMessages}>{agentMessages.map((message, index) => <div key={`${message.from}-${index}`} data-from={message.from}><span>{message.from === "agent" ? "RZ" : "Siz"}</span><p>{message.text}</p></div>)}</div>{codexManualTask ? <div className={styles.codexManualTask}><header><strong>Codex için hazır görev</strong><button onClick={() => void navigator.clipboard.writeText(codexManualTask).then(() => setToast("Görev yeniden kopyalandı."), () => setToast("Kopyalama kullanılamadı; metni seçip kopyalayın."))}>Tekrar kopyala</button></header><textarea aria-label="Codex görevi" readOnly value={codexManualTask} /><small>Bu manuel aktarım Meta veya policy işlemi başlatmaz.</small></div> : null}<div className={styles.chatComposer}><textarea aria-label="Orchestrator'a mesaj" placeholder="Sohbet Codex/Claude CLI transport'u bağlandıktan sonra burada devam edebilir." value="" disabled /><button disabled>CLI bekleniyor</button></div><footer>Bu sohbet yüzeyi model çalıştırmaz · Agent yalnız read/draft/proposal araçlarına erişir · Meta writer yok</footer></section>
         <aside className={styles.agentConfiguration}>
           <section className={`${styles.panel} ${styles.agentSessionHub}`}><header className={styles.panelHeader}><div><span className={styles.kicker}>LOCAL SESSION HUB</span><h2>Dashboard ↔ CLI handoff</h2></div><StatusPill tone={agentSessions.length ? "good" : "neutral"}>{agentSessionsLoading ? "Kontrol" : `${agentSessions.length} aktif`}</StatusPill></header>
             {agentSessionError ? <p role="alert">{agentSessionError}</p> : null}
@@ -736,7 +784,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       <div className={styles.sidebarFooter}><span className={styles.liveDot} /><div><strong>Meta Mirror</strong><small>{metaInventory ? `${metaInventory.summary.adAccounts} hesap · read-only` : `${model.freshnessLabel} · kontrol ediliyor`}</small></div><button aria-label="Bağlantı ayarları" onClick={() => navigate("meta")}>•••</button></div>
     </aside>
     <section className={styles.workspace}>
-      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button className={styles.workspacePicker} onClick={() => navigate("meta")}><span className={styles.avatar}>DM</span><span><strong>Demo Marka</strong><small>{metaInventory ? `${metaInventory.summary.adAccounts} Meta hesabı` : "Meta kontrol ediliyor"}</small></span><i>⌄</i></button><div className={styles.topActions}><button aria-label="Ara">⌕</button><button aria-label="Bildirimler">♢</button><button className={styles.autonomyButton} onClick={() => navigate("agent")}><span className={styles.liveDot} /> approval_only <i>⌄</i></button><button className={styles.profileButton}>AY</button></div></header>
+      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button className={styles.workspacePicker} onClick={() => navigate("meta")}><span className={styles.avatar}>DM</span><span><strong>Demo Marka</strong><small>{metaInventory ? `${metaInventory.summary.adAccounts} Meta hesabı` : "Meta kontrol ediliyor"}</small></span><i>⌄</i></button><div className={styles.topActions}><button aria-label="Ara">⌕</button><button aria-label="Bildirimler">♢</button><button className={styles.codexTransferButton} disabled={agentHandoffLoading} onClick={() => void transferCurrentContextToCodex()}>{agentHandoffLoading ? "Hazırlanıyor…" : "Codex'e aktar"}</button><button className={styles.autonomyButton} onClick={() => navigate("agent")}><span className={styles.liveDot} /> approval_only <i>⌄</i></button><button className={styles.profileButton}>AY</button></div></header>
       <div className={styles.mobileNav}>{navGroups.flatMap((group) => group.items).map((item) => <button key={item.id} data-active={activeView === item.id} onClick={() => navigate(item.id)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</div>
       <div className={styles.content} aria-label={activeTitle}>{content}</div>
       <footer className={styles.sourceFooter}><span>{activeView === "meta" && metaInventory ? `Canlı Meta Graph · ${formatMetaTime(metaInventory.refreshedAt)} · ${metaInventory.connection.accessMode}` : activeView === "decision-room" ? "Decision Room read model · canlı kaynak bağlanmadan fixture kullanılmaz" : activeView === "practice-lab" ? "Practice Lab read model · append-only lifecycle doğrulaması" : activeView === "budgets" ? "Budget Lab read model · doğrulanmış proposal ledger" : activeView === "rules" ? "Guidance Studio · kalıcı append-only registry ve iç kategori kataloğu" : activeView === "strict-policies" ? "Strict policy registry · raw provenance + normalize DSL + append-only diff" : activeView === "categories" ? "Category Registry · aktif tanımlar ve doğrudan atama kapsamı" : activeView === "approvals" ? "Approval Queue read model · tenant-bound ActionUnit projection" : activeView === "promotions" ? "Existing-post preflight · yalnız server-provided ref kataloğu" : `Demo snapshot · ${model.currency} · ${model.timezone} · ${model.attribution}`}</span><span>{activeView === "meta" ? "Kimlikler maskeli · token server-only · write connector yok" : activeView === "decision-room" ? "Server-bound workspace · bounded cursor · action authority yok" : activeView === "practice-lab" ? "Public-safe projection · draft ephemeral · promotion/automation/action yok" : activeView === "budgets" ? "Public-safe projection · draft/approval/execute/Meta yok" : activeView === "rules" ? "Public-safe refs · guidance_only · publish policy/action/Meta yetkisi üretmez" : activeView === "strict-policies" ? "Cookie-only · OCC guarded · approve/execute/schedule/tool/network/Meta write kapalı" : activeView === "categories" ? "Public-safe refs · inherited context değil · assign/action/Meta kapalı" : activeView === "approvals" ? "Public-safe projection · approve/reject/grant/execute/Meta kapalı" : activeView === "promotions" ? "Ephemeral K4 preview · persist/approve/execute/Meta/creative kapalı" : "Deterministik veriler mevcut fixture/API'dan; operasyon bağlamı ürün vizyonu demosudur."}</span></footer>
