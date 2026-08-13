@@ -124,6 +124,14 @@ describe("production Meta read sync composition", () => {
     expect(JSON.stringify(response)).not.toContain("act_123456");
   });
 
+  it("passes a validated server-owned execution deadline to the runtime", async () => {
+    const setup = fixture();
+    await setup.service.run({ parentRunId: "run_daily", dateStart: "2026-08-01", dateStop: "2026-08-07", maxRunDurationMs: 5_000 });
+    expect(setup.wiredOptions()?.deadlineAtEpochMs).toEqual(expect.any(Number));
+    await expect(setup.service.run({ parentRunId: "run_daily", dateStart: "2026-08-01", dateStop: "2026-08-07", maxRunDurationMs: 4_999 }))
+      .rejects.toEqual(new ProductionMetaReadSyncError("sync_failed"));
+  });
+
   it("fails closed with a redacted error when the private secret cannot be resolved", async () => {
     const setup = fixture({ resolveSecret: async () => { throw new Error(`${token}: private provider path`); } });
     await expect(setup.service.run({ parentRunId: "run_daily", dateStart: "2026-08-01", dateStop: "2026-08-07" }))

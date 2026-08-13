@@ -55,6 +55,8 @@ export type MetaSyncRuntimeOptions = Readonly<{
   persistence?: MetaSyncDurablePersistence;
   inventoryPagePersistence?: MetaInventoryPagePersistencePort;
   insightPagePersistence?: MetaInsightSourcePagePersistencePort;
+  /** Server-owned boundary: stop only between checkpointed pages. */
+  deadlineAtEpochMs?: number;
 }>;
 export type MetaSyncResult = Readonly<{ parentRun: MetaParentSyncRun; streamRuns: readonly MetaStreamRun[]; inserted: number; updated: number; unchanged: number; writeNetworkCalls: 0 }>;
 
@@ -80,6 +82,7 @@ export class MetaPartialReadSyncRuntime {
   private readonly random: () => number;
   private readonly maxAttempts: number;
   private readonly minPageSize: number;
+  private readonly deadlineAtEpochMs: number | null;
 
   constructor(private readonly options: MetaSyncRuntimeOptions) {
     this.store = options.store ?? new InMemoryMetaSyncStore();
@@ -88,7 +91,9 @@ export class MetaPartialReadSyncRuntime {
     this.random = options.random ?? Math.random;
     this.maxAttempts = options.maxAttempts ?? 3;
     this.minPageSize = options.minPageSize ?? 10;
+    this.deadlineAtEpochMs = options.deadlineAtEpochMs ?? null;
     if (!Number.isSafeInteger(this.maxAttempts) || this.maxAttempts < 1) throw new Error("maxAttempts en az 1 olmalıdır");
+    if (this.deadlineAtEpochMs !== null && (!Number.isSafeInteger(this.deadlineAtEpochMs) || this.deadlineAtEpochMs <= 0)) throw new Error("Meta sync süre sınırı geçersiz");
   }
 
   async run(input: Readonly<{ parentRunId: string; workspaceId: string; connectionId: string; plan: readonly MetaSyncSlice[] }>): Promise<MetaSyncResult> {
@@ -154,6 +159,17 @@ export class MetaPartialReadSyncRuntime {
     let pageSize = slice.pageSize;
     let inserted = 0; let updated = 0; let unchanged = 0;
     do {
+      // Return a normal, resumable partial result instead of depending on an
+      // external process kill. An in-flight GET remains bounded by transport.
+      if (this.deadlineAtEpochMs !== null && this.now().valueOf() >= this.deadlineAtEpochMs) {
+        stream.cursorBySlice[slice.id] = { cursor, cursorId: stableHash({ sliceId: slice.id, cursor }), updatedAt: this.now().toISOString() };
+        this.store.saveStream(stream);
+        await this.persist(durableKey);
+        return { completed: false, inserted, updated, unchanged, error: {
+          reason: "timeout", retryable: true,
+          message: "Meta salt-okunur koşum süre penceresine ulaştı; checkpoint sonraki koşumda devam edecek",
+        } };
+      }
       const cursorId = stableHash({ sliceId: slice.id, cursor });
       const request: MetaReadRequest = { method: "GET", stream: slice.stream, accountId: slice.accountId, entityLevel: slice.entityLevel, dateStart: slice.dateStart, dateStop: slice.dateStop, cursor, limit: pageSize, correlation: { parentRunId: parent.id, streamRunId: stream.id, accountId: slice.accountId, sliceId: slice.id, cursorId } };
       const pageResult = await this.fetchBounded(request);

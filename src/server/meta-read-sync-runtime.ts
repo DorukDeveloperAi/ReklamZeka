@@ -42,6 +42,8 @@ export type ProductionMetaReadSyncInput = Readonly<{
   requestTimeoutMs?: number;
   /** Runtime-level retry budget; Graph client retries are disabled when this is supplied. */
   maxAttempts?: number;
+  /** Server-composed duration window; it only yields a durable partial checkpoint. */
+  maxRunDurationMs?: number;
 }>;
 
 export type ProductionMetaReadSyncResult = Readonly<{
@@ -117,6 +119,9 @@ export class ProductionMetaReadSyncService {
     if (input.maxAttempts !== undefined && (!Number.isInteger(input.maxAttempts) || input.maxAttempts < 1 || input.maxAttempts > 3)) {
       throw new ProductionMetaReadSyncError("sync_failed");
     }
+    if (input.maxRunDurationMs !== undefined && (!Number.isInteger(input.maxRunDurationMs) || input.maxRunDurationMs < 5_000 || input.maxRunDurationMs > 900_000)) {
+      throw new ProductionMetaReadSyncError("sync_failed");
+    }
 
     let scope: ServerDerivedMetaSyncScope;
     try {
@@ -157,6 +162,7 @@ export class ProductionMetaReadSyncService {
         inventoryPagePersistence: this.dependencies.inventoryPagePersistence,
         insightPagePersistence: this.dependencies.insightPagePersistence,
         ...(input.maxAttempts === undefined ? {} : { maxAttempts: input.maxAttempts }),
+        ...(input.maxRunDurationMs === undefined ? {} : { deadlineAtEpochMs: Date.now() + input.maxRunDurationMs }),
       });
       const result = await runtime.run({
         parentRunId: input.parentRunId,
