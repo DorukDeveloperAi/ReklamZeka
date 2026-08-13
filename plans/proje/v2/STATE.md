@@ -168,6 +168,9 @@
   Ancak seçilen creative sayfalarında exact actor/post eşleşmesi doğrulanamadığından hiçbir mevcut creative
   post/actor'a tahminle bağlanmadı. Recovery sonucu bu nedenle `partial`dir; Dashboard/post bağlamı
   eksikmiş gibi gösterilir, mevcut creative copy için sahte post provenance iddiası kurulmaz.
+- Insight recovery de tek UTC gününe ve date-isolated parent run'a daraltıldı; canlı GET-only koşum
+  `completed` oldu fakat Meta o gün için insight satırı döndürmedi. Bu yüzden `meta_daily_insights`
+  boş kalır ve performance/budget önerileri bu gerçek hesap verisiyle açılmaz.
 
 ## 2026-08-12 — Portföy pazar sınırı
 
