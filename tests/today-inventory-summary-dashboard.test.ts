@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   OperatingDashboard,
+  metaReadMirrorErrorState,
+  metaReadMirrorFromResponse,
   portfolioCapabilityFromResponse,
   resolveMetaAccountFocus,
   todayInventorySummary,
@@ -26,6 +28,28 @@ function inventory(): MetaInventorySnapshot {
 }
 
 describe("Today inventory summary", () => {
+  it("accepts only a canonical mirror with zero action authority", () => {
+    const projection = {
+      version: "meta-read-mirror-projection/1.0.0", sourceState: "empty",
+      observedAt: "2026-08-13T12:00:00.000Z", latestCanonicalObservationAt: "2026-08-13T11:59:00.000Z",
+      freshnessAgeMinutes: 1, freshnessThresholdMinutes: 1440, reasonCodes: ["canonical_hierarchy_empty"],
+      summary: { connections: 1, accounts: 1, campaigns: 0, adSets: 0, ads: 0, creatives: 0, posts: 0 },
+      authority: { actionAuthority: "none", canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false },
+      connections: [{ connectionRef: "connection_aaaaaaaaaaaaaaaaaaaaaaaa", name: "Meta", status: "active", accessMode: "read_only",
+        accounts: [{ accountRef: "account_bbbbbbbbbbbbbbbbbbbbbbbb", name: "Hesap", currency: "TRY", timezone: "Europe/Istanbul",
+          freshness: { inventoryStatus: "completed", creativeStatus: "completed", latestObservedAt: "2026-08-13T11:59:00.000Z" }, campaigns: [] }] }],
+    };
+    expect(metaReadMirrorFromResponse(projection)).toEqual(projection);
+    expect(metaReadMirrorFromResponse({ ...projection, authority: { ...projection.authority, canWriteMeta: true } })).toBeNull();
+    expect(metaReadMirrorFromResponse({ ...projection, connections: [{ ...projection.connections[0], accessMode: "write" }] })).toBeNull();
+  });
+
+  it("distinguishes an authenticated-session boundary from an unavailable mirror", () => {
+    expect(metaReadMirrorErrorState(401, { error: { code: "local_session_required", message: "Oturum gerekli" } })).toBe("session_required");
+    expect(metaReadMirrorErrorState(403, { error: { code: "forbidden", message: "Oturum gerekli" } })).toBe("session_required");
+    expect(metaReadMirrorErrorState(503, { error: { code: "source_unavailable", message: "Yok" } })).toBe("unavailable");
+  });
+
   it("uses only a structurally valid read-only inventory snapshot for verified counts and freshness", () => {
     expect(todayInventorySummary(inventory())).toEqual({
       state: "verified", adAccounts: 4, campaigns: 32, refreshedAt: "2026-08-11T09:30:00.000Z",
@@ -63,6 +87,9 @@ describe("Today inventory summary", () => {
 
   it("keeps the account-group portfolio surface unavailable until its authenticated source is verified", () => {
     const html = renderToStaticMarkup(createElement(OperatingDashboard, { model, initialView: "meta" }));
+    expect(html).toContain("KANONİK DB AYNASI · SALT-OKUNUR");
+    expect(html).toContain("Campaign → ad set → ad → creative/post");
+    expect(html).toContain("Yetki: none · publish kapalı · approve kapalı · execute kapalı · Meta write kapalı");
     expect(html).toContain("PORTFÖY KAPSAMI");
     expect(html).toContain("Portföy kapsamı kaynağı henüz güvenli biçimde bağlanmadı; demo gruplar gösterilmiyor.");
     expect(html).toContain("Bu görünümden bütçe, yayın, onay veya Meta yazma yapılamaz.");

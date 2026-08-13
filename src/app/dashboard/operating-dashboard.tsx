@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MetaInventoryAccount, MetaInventoryApiError, MetaInventorySnapshot } from "@/connectors/meta/types";
+import type { MetaReadMirrorProjection } from "@/domain/meta/read-mirror-projection";
 import { DecisionRoomPanel } from "./decision-room-panel";
 import { BudgetLabPanel } from "./budget-lab-panel";
 import { PracticeLabPanel } from "./practice-lab-panel";
@@ -9,6 +10,7 @@ import { ApprovalQueuePanel } from "./approval-queue-panel";
 import { PromotionPreflightPanel } from "./promotion-preflight-panel";
 import { AutonomyStudioPanel } from "./autonomy-studio-panel";
 import { GuidanceStudioPanel } from "./guidance-studio-panel";
+import { SliceRuleWorkspacePanel } from "./slice-rule-workspace-panel";
 import { CategoryInventoryPanel } from "./category-inventory-panel";
 import { InstructionPolicyStudioPanel } from "./instruction-policy-studio-panel";
 import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel";
@@ -59,6 +61,79 @@ type PortfolioCapabilitySummary = Readonly<{
   connections: readonly Readonly<{ connectionRef: string; displayName: string; status: "active" | "disconnected" | "revoked" | "invalid"; readReady: boolean; accountCount: number; }>[],
   accounts: readonly Readonly<{ accountRef: string; connectionRef: string; name: string; currency: string; timezone: string; spendCapMinor: number | null; groupRefs: readonly string[]; readReadiness: "ready" | "partial" | "unavailable"; reasonCodes: readonly string[]; capabilities: Readonly<{ canRead: boolean; canPlan: boolean; canPublish: false; canApprove: false; canExecute: false; canWriteMeta: false; }> }>[],
 }>;
+
+type MetaReadMirrorLoadState = "loading" | "ready" | "session_required" | "unavailable";
+
+function plainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+const nullableText = (value: unknown): boolean => value === null || typeof value === "string";
+const isoText = (value: unknown): boolean => typeof value === "string" && Number.isFinite(Date.parse(value));
+function mirrorBudget(value: unknown, owners: readonly string[]): boolean {
+  if (!plainRecord(value) || !owners.includes(value.owner as string)) return false;
+  return [value.dailyMinor, value.lifetimeMinor].every((amount) => amount === null || Number.isSafeInteger(amount) && (amount as number) >= 0);
+}
+
+/** Fail closed before presenting an API response as canonical Meta evidence. */
+export function metaReadMirrorFromResponse(value: unknown): MetaReadMirrorProjection | null {
+  if (!plainRecord(value) || value.version !== "meta-read-mirror-projection/1.0.0"
+    || !["ready", "partial", "stale", "empty", "unavailable"].includes(value.sourceState as string)
+    || typeof value.observedAt !== "string" || !Number.isFinite(Date.parse(value.observedAt))
+    || !(value.latestCanonicalObservationAt === null || typeof value.latestCanonicalObservationAt === "string" && Number.isFinite(Date.parse(value.latestCanonicalObservationAt)))
+    || !(value.freshnessAgeMinutes === null || Number.isSafeInteger(value.freshnessAgeMinutes) && (value.freshnessAgeMinutes as number) >= 0)
+    || !Number.isSafeInteger(value.freshnessThresholdMinutes) || (value.freshnessThresholdMinutes as number) < 1
+    || !Array.isArray(value.reasonCodes) || value.reasonCodes.some((code) => typeof code !== "string")
+    || !plainRecord(value.summary) || !plainRecord(value.authority) || !Array.isArray(value.connections)
+    || value.authority.actionAuthority !== "none" || value.authority.canPublish !== false
+    || value.authority.canApprove !== false || value.authority.canExecute !== false || value.authority.canWriteMeta !== false) return null;
+  const summary = value.summary as Record<string, unknown>;
+  const summaryKeys = ["connections", "accounts", "campaigns", "adSets", "ads", "creatives", "posts"];
+  if (summaryKeys.some((key) => !Number.isSafeInteger(summary[key]) || (summary[key] as number) < 0)) return null;
+  for (const connection of value.connections) {
+    if (!plainRecord(connection) || typeof connection.connectionRef !== "string" || typeof connection.name !== "string"
+      || !["active", "disconnected", "revoked", "invalid"].includes(connection.status as string)
+      || connection.accessMode !== "read_only" || !Array.isArray(connection.accounts)) return null;
+    for (const account of connection.accounts) {
+      if (!plainRecord(account) || typeof account.accountRef !== "string" || typeof account.name !== "string"
+        || typeof account.currency !== "string" || !/^[A-Z]{3}$/.test(account.currency) || typeof account.timezone !== "string" || !plainRecord(account.freshness)
+        || !(account.freshness.latestObservedAt === null || isoText(account.freshness.latestObservedAt))
+        || !Array.isArray(account.campaigns)) return null;
+      for (const campaign of account.campaigns) {
+        if (!plainRecord(campaign) || typeof campaign.campaignRef !== "string" || typeof campaign.name !== "string"
+          || !nullableText(campaign.status) || !nullableText(campaign.objective) || !isoText(campaign.fetchedAt)
+          || !mirrorBudget(campaign.budget, ["campaign", "ad_set", "unknown"]) || !Array.isArray(campaign.adSets)) return null;
+        for (const adSet of campaign.adSets) {
+          if (!plainRecord(adSet) || typeof adSet.adSetRef !== "string" || typeof adSet.name !== "string"
+            || !nullableText(adSet.status) || !nullableText(adSet.optimizationGoal) || !isoText(adSet.fetchedAt)
+            || !(adSet.targetingSummary === null || plainRecord(adSet.targetingSummary))
+            || !mirrorBudget(adSet.budget, ["ad_set", "campaign", "unknown"]) || !Array.isArray(adSet.ads)) return null;
+          for (const ad of adSet.ads) {
+            if (!plainRecord(ad) || typeof ad.adRef !== "string" || typeof ad.name !== "string"
+              || !nullableText(ad.status) || !isoText(ad.fetchedAt) || !(ad.creative === null || plainRecord(ad.creative))) return null;
+            if (plainRecord(ad.creative)) {
+              const creative = ad.creative;
+              if (typeof creative.creativeRef !== "string" || typeof creative.sourceType !== "string" || !isoText(creative.fetchedAt)
+                || [creative.name, creative.primaryText, creative.headline, creative.description, creative.caption,
+                  creative.callToActionType, creative.destinationUrl, creative.format].some((field) => !nullableText(field))
+                || !(creative.post === null || plainRecord(creative.post))) return null;
+              if (plainRecord(creative.post) && (typeof creative.post.postRef !== "string" || !isoText(creative.post.fetchedAt)
+                || [creative.post.mediaType, creative.post.permalink, creative.post.message, creative.post.caption,
+                  creative.post.publishedAt].some((field) => !nullableText(field)))) return null;
+            }
+          }
+        }
+      }
+    }
+  }
+  return value as unknown as MetaReadMirrorProjection;
+}
+
+export function metaReadMirrorErrorState(status: number, value: unknown): Exclude<MetaReadMirrorLoadState, "loading" | "ready"> {
+  if ((status === 401 || status === 403) && plainRecord(value) && plainRecord(value.error)
+    && ["local_session_required", "forbidden"].includes(value.error.code as string)) return "session_required";
+  return "unavailable";
+}
 
 /**
  * A list item authenticates only its opaque alias, capture time and Meta
@@ -292,6 +367,21 @@ function formatMetaTime(value: string | null) {
   return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(value));
 }
 
+function formatMinorBudget(value: number | null, currency: string): string {
+  if (value === null) return "Tanımlı değil";
+  return new Intl.NumberFormat("tr-TR", { style: "currency", currency, maximumFractionDigits: 2 }).format(value / 100);
+}
+
+function targetingLabel(value: Record<string, unknown> | null): string {
+  if (!value) return "Hedefleme özeti yok";
+  const labels = Object.entries(value).slice(0, 4).map(([key, item]) => {
+    const rendered = Array.isArray(item) ? item.slice(0, 3).join(", ")
+      : typeof item === "string" || typeof item === "number" || typeof item === "boolean" ? String(item) : "tanımlı";
+    return `${key}: ${rendered}`;
+  });
+  return labels.length ? labels.join(" · ") : "Hedefleme özeti boş";
+}
+
 function compactNumber(value: number | null) {
   return value === null ? "—" : new Intl.NumberFormat("tr-TR").format(value);
 }
@@ -378,6 +468,10 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   const [metaLoading, setMetaLoading] = useState(true);
   const [metaError, setMetaError] = useState<string | null>(null);
   const [selectedMetaAccountId, setSelectedMetaAccountId] = useState("");
+  const [metaReadMirror, setMetaReadMirror] = useState<MetaReadMirrorProjection | null>(null);
+  const [metaReadMirrorState, setMetaReadMirrorState] = useState<MetaReadMirrorLoadState>("loading");
+  const [metaReadMirrorError, setMetaReadMirrorError] = useState<string | null>(null);
+  const [selectedMirrorAccountRef, setSelectedMirrorAccountRef] = useState("");
   const [portfolioCapability, setPortfolioCapability] = useState<PortfolioCapabilitySummary | null>(null);
   const [portfolioCapabilityState, setPortfolioCapabilityState] = useState<"loading" | "ready" | "session_required" | "unavailable">("loading");
   const [agentSessions, setAgentSessions] = useState<AgentSessionSummary[]>([]);
@@ -426,6 +520,35 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
     }
   }, []);
 
+  const refreshMetaReadMirror = useCallback(async (announce = false) => {
+    setMetaReadMirrorState("loading");
+    setMetaReadMirrorError(null);
+    try {
+      const response = await fetch("/api/meta/read-mirror", { cache: "no-store", credentials: "same-origin" });
+      const payload: unknown = await response.json();
+      if (!response.ok) {
+        setMetaReadMirror(null);
+        setMetaReadMirrorState(metaReadMirrorErrorState(response.status, payload));
+        const message = plainRecord(payload) && plainRecord(payload.error) && typeof payload.error.message === "string"
+          ? payload.error.message : "Kanonik Meta aynası kullanılamıyor.";
+        setMetaReadMirrorError(message);
+        return;
+      }
+      const projection = metaReadMirrorFromResponse(payload);
+      if (!projection) throw new Error("Kanonik Meta aynası beklenen salt-okunur sözleşmeyle eşleşmedi.");
+      setMetaReadMirror(projection);
+      setMetaReadMirrorState("ready");
+      const accounts = projection.connections.flatMap((connection) => connection.accounts);
+      setSelectedMirrorAccountRef((current) => accounts.some((account) => account.accountRef === current)
+        ? current : accounts[0]?.accountRef ?? "");
+      if (announce) setToast(`Kanonik Meta aynası yenilendi: ${projection.summary.campaigns} kampanya · ${projection.summary.ads} reklam · 0 write.`);
+    } catch (error) {
+      setMetaReadMirror(null);
+      setMetaReadMirrorState("unavailable");
+      setMetaReadMirrorError(error instanceof Error ? error.message : "Kanonik Meta aynası kullanılamıyor.");
+    }
+  }, []);
+
   const refreshAgentSessions = useCallback(async (announce = false) => {
     setAgentSessionsLoading(true);
     setAgentSessionError(null);
@@ -455,6 +578,12 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
     const timer = window.setInterval(() => void refreshMetaInventory(), 15 * 60_000);
     return () => window.clearInterval(timer);
   }, [refreshMetaInventory]);
+
+  useEffect(() => {
+    void refreshMetaReadMirror();
+    const timer = window.setInterval(() => void refreshMetaReadMirror(), 15 * 60_000);
+    return () => window.clearInterval(timer);
+  }, [refreshMetaReadMirror]);
 
   useEffect(() => { void refreshAgentSessions(); }, [refreshAgentSessions]);
 
@@ -782,11 +911,77 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
     </>;
   }
 
+  function renderCanonicalMetaMirror() {
+    const projection = metaReadMirror;
+    const mirrorAccounts = projection?.connections.flatMap((connection) => connection.accounts) ?? [];
+    const account = mirrorAccounts.find((item) => item.accountRef === selectedMirrorAccountRef) ?? mirrorAccounts[0] ?? null;
+    const sourceTone = projection?.sourceState === "ready" ? "good"
+      : projection?.sourceState === "partial" || projection?.sourceState === "stale" ? "warning"
+        : projection?.sourceState === "empty" ? "neutral" : "danger";
+    const sourceLabel = projection?.sourceState === "ready" ? "Güncel"
+      : projection?.sourceState === "partial" ? "Kısmi"
+        : projection?.sourceState === "stale" ? "Bayat"
+          : projection?.sourceState === "empty" ? "Kampanya yok" : "Kaynak yok";
+
+    return <section className={`${styles.panel} ${styles.canonicalMirror}`} aria-label="Kanonik Meta salt okunur aynası">
+      <header className={styles.panelHeader}>
+        <div><span className={styles.kicker}>KANONİK DB AYNASI · SALT-OKUNUR</span><h2>Campaign → ad set → ad → creative/post</h2></div>
+        <div className={styles.canonicalMirrorActions}><StatusPill tone={metaReadMirrorState === "session_required" ? "warning" : sourceTone}>{metaReadMirrorState === "loading" ? "Okunuyor" : metaReadMirrorState === "session_required" ? "Oturum gerekli" : projection ? sourceLabel : "Kullanılamıyor"}</StatusPill><button disabled={metaReadMirrorState === "loading"} onClick={() => void refreshMetaReadMirror(true)}>Aynayı yenile</button></div>
+      </header>
+      {metaReadMirrorState !== "ready" || !projection ? <div className={styles.canonicalMirrorNotice} role={metaReadMirrorError ? "alert" : undefined}>
+        <strong>{metaReadMirrorState === "loading" ? "Kanonik kayıtlar okunuyor."
+          : metaReadMirrorState === "session_required" ? "Doğrulanmış yerel dashboard oturumu gerekli."
+            : "Kanonik Meta aynası şu anda kullanılamıyor."}</strong>
+        <p>{metaReadMirrorError ?? "Bu alan demo veya Graph envanterini canlı hiyerarşi gibi göstermez."}</p>
+      </div> : <>
+        <div className={styles.canonicalMirrorSummary}>
+          <div><span>Kaynak durumu</span><strong>{sourceLabel}</strong><small>Gözlem: {formatMetaTime(projection.observedAt)}</small></div>
+          <div><span>Freshness</span><strong>{projection.freshnessAgeMinutes === null ? "Bilinmiyor" : `${projection.freshnessAgeMinutes} dk`}</strong><small>Eşik: {projection.freshnessThresholdMinutes} dk</small></div>
+          <div><span>Hiyerarşi</span><strong>{projection.summary.campaigns} / {projection.summary.adSets} / {projection.summary.ads}</strong><small>kampanya / ad set / reklam</small></div>
+          <div><span>İçerik</span><strong>{projection.summary.creatives} / {projection.summary.posts}</strong><small>creative / post</small></div>
+        </div>
+        {projection.reasonCodes.length ? <div className={styles.canonicalMirrorReasons}><strong>Kaynak notları</strong><p>{projection.reasonCodes.join(" · ")}</p></div> : null}
+        {projection.sourceState === "empty" ? <div className={styles.canonicalMirrorNotice}><strong>Kanonik hesap kaydı var; kampanya hiyerarşisi boş.</strong><p>Boş sonuç canlı kampanya olmadığı anlamına gelir; demo kampanyalar burada gösterilmez.</p></div>
+          : projection.sourceState === "unavailable" ? <div className={styles.canonicalMirrorNotice}><strong>Bağlantı veya hesap kaynağı kullanılamıyor.</strong><p>Eski ya da demo varlıklarla boşluk doldurulmadı.</p></div>
+            : account ? <>
+              <div className={styles.canonicalMirrorFocus}>
+                <div><span>Seçili kanonik hesap</span><strong>{account.name}</strong><small>{account.currency} · {account.timezone} · son kayıt {formatMetaTime(account.freshness.latestObservedAt)}</small></div>
+                <label htmlFor="canonical-meta-account"><span>Hesap</span><select id="canonical-meta-account" value={account.accountRef} onChange={(event) => setSelectedMirrorAccountRef(event.target.value)}>{mirrorAccounts.map((item) => <option key={item.accountRef} value={item.accountRef}>{item.name}</option>)}</select></label>
+              </div>
+              <div className={styles.canonicalHierarchy}>
+                {account.campaigns.slice(0, 10).map((campaign) => <details key={campaign.campaignRef}>
+                  <summary><div><strong>{campaign.name}</strong><small>{campaign.status ?? "Durum bilinmiyor"} · {campaign.objective ?? "Amaç bilinmiyor"} · {formatMetaTime(campaign.fetchedAt)}</small></div><div><strong>{campaign.adSets.length}</strong><small>ad set</small></div></summary>
+                  <div className={styles.canonicalCampaignBody}>
+                    <p><strong>Bütçe sahibi: {campaign.budget.owner}</strong><span>Günlük {formatMinorBudget(campaign.budget.dailyMinor, account.currency)} · ömür boyu {formatMinorBudget(campaign.budget.lifetimeMinor, account.currency)}</span></p>
+                    {campaign.adSets.slice(0, 6).map((adSet) => <details key={adSet.adSetRef}>
+                      <summary><div><strong>{adSet.name}</strong><small>{adSet.status ?? "Durum bilinmiyor"} · {adSet.optimizationGoal ?? "Optimizasyon bilinmiyor"}</small></div><div><strong>{adSet.ads.length}</strong><small>reklam</small></div></summary>
+                      <div className={styles.canonicalAdSetBody}>
+                        <p><strong>{targetingLabel(adSet.targetingSummary)}</strong><span>Bütçe sahibi: {adSet.budget.owner} · günlük {formatMinorBudget(adSet.budget.dailyMinor, account.currency)}</span></p>
+                        {adSet.ads.slice(0, 6).map((ad) => <article key={ad.adRef}>
+                          <header><div><strong>{ad.name}</strong><small>{ad.status ?? "Durum bilinmiyor"} · {formatMetaTime(ad.fetchedAt)}</small></div><StatusPill tone={ad.creative ? "info" : "warning"}>{ad.creative ? "İçerik bağlı" : "İçerik yok"}</StatusPill></header>
+                          {ad.creative ? <div className={styles.canonicalCreative}><span>{ad.creative.sourceType}{ad.creative.format ? ` · ${ad.creative.format}` : ""}</span><strong>{ad.creative.headline ?? ad.creative.name ?? "Başlık yok"}</strong><p>{ad.creative.primaryText ?? ad.creative.description ?? ad.creative.caption ?? "Okunabilir reklam metni yok."}</p><small>CTA: {ad.creative.callToActionType ?? "yok"} · destination: {ad.creative.destinationUrl ?? "yok"}</small>{ad.creative.post ? <small>Post: {ad.creative.post.mediaType ?? "tür yok"} · {ad.creative.post.message ?? ad.creative.post.caption ?? "metin yok"}</small> : null}</div> : null}
+                        </article>)}
+                        {adSet.ads.length > 6 ? <small>İlk 6 / {adSet.ads.length} reklam gösteriliyor.</small> : null}
+                      </div>
+                    </details>)}
+                    {campaign.adSets.length > 6 ? <small>İlk 6 / {campaign.adSets.length} ad set gösteriliyor.</small> : null}
+                  </div>
+                </details>)}
+                {!account.campaigns.length ? <p className={styles.metaAccountEmpty}>Bu kanonik hesapta kampanya yok.</p> : null}
+              </div>
+              {account.campaigns.length > 10 ? <p className={styles.canonicalSliceNote}>İlk 10 / {account.campaigns.length} kampanya gösteriliyor. Bu ilk salt-okunur dilimdir.</p> : null}
+            </> : <div className={styles.canonicalMirrorNotice}><strong>Seçilebilir kanonik reklam hesabı yok.</strong><p>Demo hesap gösterilmedi.</p></div>}
+      </>}
+      <footer className={styles.canonicalAuthority}>Yetki: none · publish kapalı · approve kapalı · execute kapalı · Meta write kapalı</footer>
+    </section>;
+  }
+
   function renderMetaConnection() {
     if (!metaInventory) {
       return <>
         <section className={styles.pageHero}><div><span className={styles.kicker}>META READ MIRROR</span><h1>Meta erişim envanteri hazırlanıyor.</h1><p>Token yalnız sunucu tarafında okunur; dashboard ve agent bağlamına hiçbir zaman eklenmez.</p></div><button className={styles.primaryButton} disabled={metaLoading} onClick={() => void refreshMetaInventory(true)}>{metaLoading ? "Kontrol ediliyor…" : "Yeniden dene"}</button></section>
-        <section className={`${styles.panel} ${styles.metaEmpty}`}><StatusPill tone={metaError ? "danger" : "neutral"}>{metaError ? "Bağlantı hatası" : "Salt okunur keşif"}</StatusPill><h2>{metaError ?? "Meta Graph yanıtı bekleniyor"}</h2><p>Hiçbir kampanya, bütçe, reklam seti veya reklam değiştirilmiyor.</p></section>
+        {renderCanonicalMetaMirror()}
+        <section className={`${styles.panel} ${styles.metaEmpty}`}><StatusPill tone={metaError ? "danger" : "neutral"}>{metaError ? "Bağlantı hatası" : "Salt okunur keşif"}</StatusPill><h2>{metaError ?? "Meta Graph yanıtı bekleniyor"}</h2><p>Bu alan yalnız Graph erişim envanteridir; kanonik DB aynasının yerine geçmez. Hiçbir kampanya, bütçe, reklam seti veya reklam değiştirilmiyor.</p></section>
         <section className={styles.panel} aria-label="Portföy kapsamı"><header className={styles.panelHeader}><div><span className={styles.kicker}>PORTFÖY KAPSAMI</span><h2>Hesap grupları ve salt-okur erişim</h2></div><StatusPill tone={portfolioCapabilityState === "session_required" ? "warning" : "neutral"}>{portfolioCapabilityState === "session_required" ? "Oturum gerekli" : "Kaynak yok"}</StatusPill></header><p className={styles.metaAccountEmpty}>{portfolioCapabilityState === "session_required" ? "Gerçek hesap gruplarını görmek için önce yerel dashboard oturumunu bağlayın." : "Portföy kapsamı kaynağı henüz güvenli biçimde bağlanmadı; demo gruplar gösterilmiyor."}</p><p className={styles.safetyNote}>Bu görünümden bütçe, yayın, onay veya Meta yazma yapılamaz.</p></section>
       </>;
     }
@@ -802,6 +997,8 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       </section>
 
       {inventory.connection.securityStatus === "temporary_exposed" ? <section className={styles.securityBanner}><span>!</span><div><strong>Geçici ve riskli kimlik bilgisi</strong><p>Bu token daha önce terminal çıktısında göründü. Salt okunur kullanım zorlanıyor; ilk bakım adımı token rotasyonu olmalı.</p></div><StatusPill tone="warning">Rotation gerekli</StatusPill></section> : null}
+
+      {renderCanonicalMetaMirror()}
 
       <section className={styles.metaMetricGrid} aria-label="Meta erişim özeti">
         <article><span>Reklam hesabı</span><strong>{inventory.summary.adAccounts}</strong><small>{inventory.summary.accountsWithCampaigns} hesapta kampanya var</small></article>
@@ -862,7 +1059,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
     return <><section className={styles.pageHero}><div><span className={styles.kicker}>APPEND-ONLY TIMELINE</span><h1>Veri, karar ve hareket aynı kronolojide.</h1><p>Sync'ten outcome'a kadar bizim ve Meta üzerindeki harici değişikliklerin tamamı tek izde.</p></div><button className={styles.secondaryButton}>Filtrele</button></section><section className={styles.panel}><div className={styles.timeline}>{timeline.map((event) => <article key={`${event.time}-${event.title}`}><time>{event.time}</time><span className={styles.timelineDot} data-type={event.type} /><div><StatusPill tone="neutral">{event.type}</StatusPill><h2>{event.title}</h2><p>{event.detail}</p><small>{event.actor}</small></div><button aria-label={`${event.title} detayını aç`}>→</button></article>)}</div></section></>;
   }
 
-  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel /> : activeView === "rules" ? <GuidanceStudioPanel onOpenSession={() => navigate("decision-room")} /> : activeView === "strict-policies" ? <InstructionPolicyStudioPanel initialCampaignIntentTemplate={draftPolicyTemplate} /> : activeView === "categories" ? <CategoryInventoryPanel onOpenSession={() => navigate("decision-room")} /> : activeView === "autonomy" ? <AutonomyStudioPanel /> : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? <ApprovalQueuePanel campaignRef={approvalQueueCampaignRef} /> : activeView === "promotions" ? <PromotionPreflightPanel /> : renderTimeline();
+  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel /> : activeView === "rules" ? <><SliceRuleWorkspacePanel /><GuidanceStudioPanel onOpenSession={() => navigate("decision-room")} /></> : activeView === "strict-policies" ? <InstructionPolicyStudioPanel initialCampaignIntentTemplate={draftPolicyTemplate} /> : activeView === "categories" ? <CategoryInventoryPanel onOpenSession={() => navigate("decision-room")} /> : activeView === "autonomy" ? <AutonomyStudioPanel /> : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? <ApprovalQueuePanel campaignRef={approvalQueueCampaignRef} /> : activeView === "promotions" ? <PromotionPreflightPanel /> : renderTimeline();
 
   return <main className={styles.appShell}>
     <aside className={styles.sidebar}>
@@ -874,7 +1071,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button className={styles.workspacePicker} onClick={() => navigate("meta")}><span className={styles.avatar}>DM</span><span><strong>Demo Marka</strong><small>{metaInventory ? `${metaInventory.summary.adAccounts} Meta hesabı` : "Meta kontrol ediliyor"}</small></span><i>⌄</i></button><div className={styles.topActions}><button aria-label="Ara">⌕</button><button aria-label="Bildirimler">♢</button><button className={styles.codexTransferButton} disabled={agentHandoffLoading} onClick={() => void transferCurrentContextToCodex()}>{agentHandoffLoading ? "Hazırlanıyor…" : "Codex'e aktar"}</button><button className={styles.autonomyButton} onClick={() => navigate("agent")}><span className={styles.liveDot} /> approval_only <i>⌄</i></button><button className={styles.profileButton}>AY</button></div></header>
       <div className={styles.mobileNav}>{navGroups.flatMap((group) => group.items).map((item) => <button key={item.id} data-active={activeView === item.id} onClick={() => navigate(item.id)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</div>
       <div className={styles.content} aria-label={activeTitle}>{content}</div>
-      <footer className={styles.sourceFooter}><span>{activeView === "meta" && metaInventory ? `Canlı Meta Graph · ${formatMetaTime(metaInventory.refreshedAt)} · ${metaInventory.connection.accessMode}` : activeView === "decision-room" ? "Decision Room read model · canlı kaynak bağlanmadan fixture kullanılmaz" : activeView === "practice-lab" ? "Practice Lab read model · append-only lifecycle doğrulaması" : activeView === "budgets" ? "Budget Lab read model · doğrulanmış proposal ledger" : activeView === "rules" ? "Guidance Studio · kalıcı append-only registry ve iç kategori kataloğu" : activeView === "strict-policies" ? "Strict policy registry · raw provenance + normalize DSL + append-only diff" : activeView === "categories" ? "Category Registry · aktif tanımlar ve doğrudan atama kapsamı" : activeView === "approvals" ? "Approval Queue read model · tenant-bound ActionUnit projection" : activeView === "promotions" ? "Existing-post preflight · yalnız server-provided ref kataloğu" : `Demo snapshot · ${model.currency} · ${model.timezone} · ${model.attribution}`}</span><span>{activeView === "meta" ? "Kimlikler maskeli · token server-only · write connector yok" : activeView === "decision-room" ? "Server-bound workspace · bounded cursor · action authority yok" : activeView === "practice-lab" ? "Public-safe projection · draft ephemeral · promotion/automation/action yok" : activeView === "budgets" ? "Public-safe projection · draft/approval/execute/Meta yok" : activeView === "rules" ? "Public-safe refs · guidance_only · publish policy/action/Meta yetkisi üretmez" : activeView === "strict-policies" ? "Cookie-only · OCC guarded · approve/execute/schedule/tool/network/Meta write kapalı" : activeView === "categories" ? "Public-safe refs · inherited context değil · assign/action/Meta kapalı" : activeView === "approvals" ? "Public-safe projection · approve/reject/grant/execute/Meta kapalı" : activeView === "promotions" ? "Ephemeral K4 preview · persist/approve/execute/Meta/creative kapalı" : "Deterministik veriler mevcut fixture/API'dan; operasyon bağlamı ürün vizyonu demosudur."}</span></footer>
+      <footer className={styles.sourceFooter}><span>{activeView === "meta" ? metaReadMirror ? `Kanonik DB aynası · ${formatMetaTime(metaReadMirror.observedAt)} · ${metaReadMirror.sourceState}` : `Kanonik DB aynası · ${metaReadMirrorState === "session_required" ? "oturum gerekli" : metaReadMirrorState === "loading" ? "okunuyor" : "kullanılamıyor"}` : activeView === "decision-room" ? "Decision Room read model · canlı kaynak bağlanmadan fixture kullanılmaz" : activeView === "practice-lab" ? "Practice Lab read model · append-only lifecycle doğrulaması" : activeView === "budgets" ? "Budget Lab read model · doğrulanmış proposal ledger" : activeView === "rules" ? "Slice Rule Workspace + Guidance Studio · append-only taslak ve kaynak registry" : activeView === "strict-policies" ? "Strict policy registry · raw provenance + normalize DSL + append-only diff" : activeView === "categories" ? "Category Registry · aktif tanımlar ve doğrudan atama kapsamı" : activeView === "approvals" ? "Approval Queue read model · tenant-bound ActionUnit projection" : activeView === "promotions" ? "Existing-post preflight · yalnız server-provided ref kataloğu" : `Demo snapshot · ${model.currency} · ${model.timezone} · ${model.attribution}`}</span><span>{activeView === "meta" ? "Kanonik hiyerarşi DB kaynaklı · Graph envanteri ayrı · action authority none · Meta write yok" : activeView === "decision-room" ? "Server-bound workspace · bounded cursor · action authority yok" : activeView === "practice-lab" ? "Public-safe projection · draft ephemeral · promotion/automation/action yok" : activeView === "budgets" ? "Public-safe projection · draft/approval/execute/Meta yok" : activeView === "rules" ? "Recommendation-only draft · publish/approval/action/automation/Meta write kapalı" : activeView === "strict-policies" ? "Cookie-only · OCC guarded · approve/execute/schedule/tool/network/Meta write kapalı" : activeView === "categories" ? "Public-safe refs · inherited context değil · assign/action/Meta kapalı" : activeView === "approvals" ? "Public-safe projection · approve/reject/grant/execute/Meta kapalı" : activeView === "promotions" ? "Ephemeral K4 preview · persist/approve/execute/Meta/creative kapalı" : "Deterministik veriler mevcut fixture/API'dan; operasyon bağlamı ürün vizyonu demosudur."}</span></footer>
     </section>
     {toast ? <div className={styles.toast} role="status"><span>✓</span><p>{toast}</p><button onClick={() => setToast(null)} aria-label="Bildirimi kapat">×</button></div> : null}
   </main>;

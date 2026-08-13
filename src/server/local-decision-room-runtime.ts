@@ -174,7 +174,7 @@ export function assertTrustedLocalDecisionRoomRequest(
     request.headers.get("x-reklamzeka-intent") ?? "",
   ) && !["autonomy-rule-create-draft", "guidance-studio-create", "guidance-studio-revise",
     "guidance-set-create", "guidance-set-revise", "instruction-policy-mutate",
-    "practice-lab-propose-standardization", "promotion-template-lifecycle-draft",
+    "practice-lab-propose-standardization", "promotion-template-lifecycle-draft", "slice-rule-workspace-save",
     "progressive-formalization-mutate"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
