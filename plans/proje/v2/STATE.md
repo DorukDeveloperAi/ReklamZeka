@@ -3625,3 +3625,24 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: `tests/slice-rule-budget-action-unit-materializer.test.ts`,
   `tests/approval-policy-registry.test.ts`, `tests/action-proposal-queue-drizzle-repository.test.ts`,
   `npm run typecheck`, `git diff --check`; Meta recovery çıktılarında `writeNetworkCalls:0`.
+
+## 2026-08-13 — Creative kaynak bağı ve seçilmiş bütçe senaryosunun insan kuyruğu
+
+- `creative_ad_v2` GET-only recovery artık Graph'ın `creative.actor_id` kanıtını v24 alan kataloğundan
+  ister. Object-story bilgisinin redakte ya da eksik olması doğrudan bağ sayılmaz: repository aynı
+  connection'ın canonical asset aynasında eşleşmeyi yeniden doğrulamadan creative→actor/post ilişkisi
+  yazmaz. Bounded canlı recovery sonucunda 11 canonical creative post/actor bağı, 25 ad→creative→post
+  bağı ve sıfır aktif ilişki tutarsızlığı oluştu; Meta write çağrısı sıfırdır. Kalan kanıtsız creative'ler
+  hâlâ `unresolved` olarak kalır.
+- Slice Rule panelindeki seçilmiş tek-allocation senaryo, yalnız açık cookie-bound “insan onayına gönder”
+  komutuyla ActionUnit taslağına ilerleyebilir. Tarayıcı yalnız opaque seçim kanıtını, idempotency anahtarını
+  ve zaman penceresini taşır; kampanya, tutar, para birimi, policy ve iç UUID sunucuda immutable
+  provenance'dan yeniden çözülür. Sonuç mevcut Approval Queue'da görünür; onay, execute, otomasyon ve
+  Meta write yetkileri hâlâ kapalıdır.
+- Insight recovery'nin seçili kapalı gün için sıfır satır dönmesi değişmedi. Bu nedenle performans/kohort
+  çıkarımı ve metric-temelli bütçe önerisi, insight kanıtı gelene kadar `unavailable`/`needs review`
+  sınırında kalır; creative metninden otomatik performans sonucu çıkarılmaz.
+- Kanıt: `tests/meta-content-extraction.test.ts`, `tests/meta-sync-integration.test.ts`,
+  `tests/slice-rule-budget-action-unit-http.test.ts`, `npm run typecheck`, `npm run db:check`,
+  `npm run check:security-boundaries`; canlı recovery aggregate-only olarak 11/25/0 bağı ve sıfır
+  Meta write doğruladı.
