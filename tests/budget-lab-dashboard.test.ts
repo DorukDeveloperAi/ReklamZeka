@@ -17,6 +17,15 @@ describe("Budget Lab dashboard", () => {
     expect(empty).toContain("fixture veya demo fallback değildir");
   });
 
+  it("routes a missing local session to the Decision Room bind surface", () => {
+    const html = renderToStaticMarkup(createElement(BudgetLabReadSurface, { ...callbacks,
+      onOpenSession: vi.fn(), state: { status: "session_required", message: "Oturumu bağlayın." },
+    }));
+    expect(html).toContain("YEREL OTURUM GEREKLİ");
+    expect(html).toContain("Decision Room’da oturumu bağla");
+    expect(html).not.toContain("Kaynak henüz bağlı değil");
+  });
+
   it("renders read-only boundaries before any source result", () => {
     const html = renderToStaticMarkup(createElement(BudgetLabReadSurface, { ...callbacks, state: { status: "loading" } }));
     expect(html).toContain("READ ONLY · AUTHORITY NONE");

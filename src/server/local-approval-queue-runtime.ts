@@ -6,12 +6,15 @@ import { DrizzleApprovalQueueReadRepository } from "@/connectors/actions/approva
 import * as schema from "@/db/schema";
 import {
   approvalQueueNotConfiguredResponse,
+  approvalQueueSessionRequiredResponse,
   createApprovalQueueHttpHandler,
 } from "@/server/approval-queue-http";
 import {
+  LocalDecisionRoomBoundaryError,
   resolveTrustedLocalReadPrincipal,
   type LocalDecisionRoomConfig,
 } from "@/server/local-decision-room-runtime";
+import { LocalSessionCapabilityError } from "@/security/local-session-capability";
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -37,8 +40,9 @@ export function createLocalApprovalQueueRouteHandler(input: Readonly<{
         contract,
         resolvePrincipal: async () => bound.principal,
       })(request);
-    } catch {
-      return approvalQueueNotConfiguredResponse();
+    } catch (reason) {
+      return reason instanceof LocalDecisionRoomBoundaryError || reason instanceof LocalSessionCapabilityError
+        ? approvalQueueSessionRequiredResponse() : approvalQueueNotConfiguredResponse();
     }
   };
 }

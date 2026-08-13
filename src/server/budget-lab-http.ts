@@ -29,6 +29,11 @@ export function budgetLabNotConfiguredResponse() {
   return error("source_not_configured", "Budget Lab çalışma alanı ve yerel kimlik bağlama katmanı henüz etkin değil.", 503);
 }
 
+/** The local runtime uses this exact response when a session proof is absent or invalid. */
+export function budgetLabSessionRequiredResponse() {
+  return error("local_session_required", "Budget Lab için yerel dashboard oturumunu bağlayın.", 401);
+}
+
 export function createBudgetLabHttpHandler(input: Readonly<{
   contract: BudgetLabAgentContract;
   resolvePrincipal(request: Request): Promise<TrustedDecisionRoomPrincipal | null>;

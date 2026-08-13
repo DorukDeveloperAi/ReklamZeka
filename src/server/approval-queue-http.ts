@@ -57,6 +57,11 @@ export function approvalQueueNotConfiguredResponse() {
   );
 }
 
+/** The local runtime uses this exact response when a session proof is absent or invalid. */
+export function approvalQueueSessionRequiredResponse() {
+  return error("local_session_required", "Onay Kuyruğu için yerel dashboard oturumunu bağlayın.", 401);
+}
+
 export function createApprovalQueueHttpHandler(input: Readonly<{
   contract: ApprovalQueueAgentContract;
   resolvePrincipal(request: Request): Promise<TrustedDecisionRoomPrincipal | null>;

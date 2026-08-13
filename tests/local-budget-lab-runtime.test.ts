@@ -60,12 +60,14 @@ describe("local Budget Lab route", () => {
     expect(database.select).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects a damaged capability before any DB access", async () => {
+  it("reports a damaged capability as session-required before any DB access", async () => {
     const database = { execute: vi.fn(), select: vi.fn(), transaction: vi.fn() };
     const handler = createLocalBudgetLabRouteHandler({ database: database as never, config: localDecisionRoomConfig(environment())! });
     const valid = token();
     const damaged = `${valid.slice(0, -1)}${valid.endsWith("x") ? "y" : "x"}`;
-    expect((await handler(request(damaged))).status).toBe(503);
+    const response = await handler(request(damaged));
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error: { code: "local_session_required" } });
     expect(database.execute).not.toHaveBeenCalled();
     expect(database.select).not.toHaveBeenCalled();
   });
@@ -84,6 +86,6 @@ describe("local Budget Lab route", () => {
 
     const untrusted = postRequest(minted);
     untrusted.headers.set("Origin", "http://evil.invalid");
-    expect((await POST(untrusted)).status).toBe(503);
+    expect((await POST(untrusted)).status).toBe(401);
   });
 });

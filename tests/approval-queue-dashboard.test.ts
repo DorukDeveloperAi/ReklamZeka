@@ -86,6 +86,15 @@ describe("Approval Queue dashboard", () => {
     expect(empty).toContain("demo fallback değildir");
   });
 
+  it("routes a missing local session to the Decision Room bind surface", () => {
+    const html = renderToStaticMarkup(createElement(ApprovalQueueReadSurface, {
+      ...callbacks, onOpenSession: vi.fn(), state: { status: "session_required", message: "Oturumu bağlayın." },
+    }));
+    expect(html).toContain("YEREL OTURUM GEREKLİ");
+    expect(html).toContain("Decision Room’da oturumu bağla");
+    expect(html).not.toContain("Kaynak henüz bağlı değil");
+  });
+
   it("renders rows and a public-safe detail with before/after, trace, expiry, and dependencies", () => {
     const html = renderToStaticMarkup(createElement(ApprovalQueueReadSurface, {
       ...callbacks, state: ready(item),
