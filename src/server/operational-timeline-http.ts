@@ -13,9 +13,9 @@ function failure(reason: unknown) {
 export function operationalTimelineNotConfiguredResponse() { return failure(new OperationalTimelineReadError("source_unavailable")); }
 export function createOperationalTimelineHttpHandler(input: Readonly<{ service: OperationalTimelineReadService; resolvePrincipal(request: Request): Promise<TrustedDecisionRoomPrincipal> }>) {
   return async (request: Request) => { try {
-    const url = new URL(request.url); const origin = request.headers.get("origin");
+    const url = new URL(request.url);
     if (request.method !== "GET" || url.search || !request.headers.get("cookie") || request.headers.has("authorization") || request.headers.has("x-workspace-id")
-      || origin === null || new URL(origin).origin !== url.origin || request.headers.get("sec-fetch-site") !== "same-origin") throw new OperationalTimelineReadError("invalid_input");
+      || request.headers.get("sec-fetch-site") !== "same-origin") throw new OperationalTimelineReadError("invalid_input");
     return NextResponse.json(await input.service.list(await input.resolvePrincipal(request)), { headers: HEADERS });
   } catch (reason) { return failure(reason); } };
 }
