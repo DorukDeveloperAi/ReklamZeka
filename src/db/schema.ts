@@ -5704,7 +5704,9 @@ export const approvalPolicyDefinitionRevisions = pgTable("approval_policy_defini
     and ${table.policyHash} ~ '^[a-f0-9]{64}$' and ${table.canonicalHash} ~ '^[a-f0-9]{64}$'
   `),
   check("approval_policy_definition_revisions_applicability", sql`
-    ${table.actionType} = 'existing_post_promotion' and ${table.risk} = 'K4'
+    (${table.actionType} = 'existing_post_promotion' and ${table.risk} = 'K4')
+    or (${table.actionType} = 'budget_decrease' and ${table.risk} = 'K2')
+    or (${table.actionType} = 'budget_increase' and ${table.risk} = 'K3')
   `),
   check("approval_policy_definition_revisions_lifecycle", sql`
     ${table.state} in ('draft', 'published', 'disabled')
