@@ -4,145 +4,145 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "a2d6c0291",
-      "tarih": "2026-08-13",
-      "konu": "fix(approval): harden decision trace projection",
+      "hash": "36061fcee",
+      "tarih": "2026-08-14",
+      "konu": "refactor(verification): share ready budget context fixture",
+      "tur": "is",
+      "kapsam": [
+        "refactor"
+      ]
+    },
+    {
+      "hash": "5a5aacb50",
+      "tarih": "2026-08-14",
+      "konu": "docs(state): record frozen action context binding",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "6d7796951",
+      "tarih": "2026-08-14",
+      "konu": "fix(approval): bind materialized units to frozen context",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "be6f4b1d6",
-      "tarih": "2026-08-13",
-      "konu": "test(meta): bind asset verifier to account discovery",
+      "hash": "2a0713f0c",
+      "tarih": "2026-08-14",
+      "konu": "docs(state): record slice readiness projection",
       "tur": "is",
       "kapsam": [
-        "test"
+        "docs"
       ]
     },
     {
-      "hash": "58eb3c3d2",
+      "hash": "c5814def6",
+      "tarih": "2026-08-14",
+      "konu": "feat(rules): show frozen context readiness",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7d95faba7",
+      "tarih": "2026-08-14",
+      "konu": "docs(state): record manual classification handoff",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "ebf137c8d",
+      "tarih": "2026-08-14",
+      "konu": "feat(categories): hand off review rows to manual assignment",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "664b14f98",
+      "tarih": "2026-08-14",
+      "konu": "docs(state): record canonical campaign portfolio",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "6d3298f67",
+      "tarih": "2026-08-14",
+      "konu": "feat(dashboard): show canonical campaign portfolio",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "21d4826fd",
+      "tarih": "2026-08-14",
+      "konu": "feat(rules): add safe slice scope candidates",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "d0f805355",
       "tarih": "2026-08-13",
-      "konu": "fix(analysis): restore budget evidence-bound verifier",
+      "konu": "feat(categories): add canonical campaign classification review queue",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "17df9c00d",
+      "tarih": "2026-08-13",
+      "konu": "feat(meta): add canonical performance read model",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "36693dd77",
+      "tarih": "2026-08-13",
+      "konu": "docs(state): record completed Meta insight bootstrap",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "5603ad262",
+      "tarih": "2026-08-13",
+      "konu": "fix(meta): accept canonical insight account identity",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "e370ad054",
+      "hash": "281273f93",
       "tarih": "2026-08-13",
-      "konu": "fix(analysis): classify current-source failures safely",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "d040960cc",
-      "tarih": "2026-08-13",
-      "konu": "docs(state): record gated Meta schedule runner",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "0bbc7c308",
-      "tarih": "2026-08-13",
-      "konu": "feat(meta): add gated read-only schedule runner",
+      "konu": "feat(meta): add capability-gated insight bootstrap",
       "tur": "is",
       "kapsam": [
         "feat"
-      ]
-    },
-    {
-      "hash": "04af0c44b",
-      "tarih": "2026-08-13",
-      "konu": "test(approval): bind queue verifier to frozen context",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "a82508c45",
-      "tarih": "2026-08-13",
-      "konu": "docs(state): record Meta quality read projection",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "a5af7e894",
-      "tarih": "2026-08-13",
-      "konu": "feat(meta): expose canonical trust readiness report",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "bfd3497c8",
-      "tarih": "2026-08-13",
-      "konu": "fix(manifests): classify budget action provenance",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "7952add5d",
-      "tarih": "2026-08-13",
-      "konu": "docs(state): record dashboard fail-closed acceptance",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "b17a8e222",
-      "tarih": "2026-08-13",
-      "konu": "docs(state): record normalization and insight evidence",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "62d736691",
-      "tarih": "2026-08-13",
-      "konu": "feat(rules): expose normalization workbench in dashboard",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "4c066e399",
-      "tarih": "2026-08-13",
-      "konu": "feat(meta): surface verified empty insight delivery",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "7a522638f",
-      "tarih": "2026-08-13",
-      "konu": "docs(state): record K2 K3 budget policy studio",
-      "tur": "is",
-      "kapsam": [
-        "docs"
       ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 21
+      "adet": 22
     },
     {
       "kapsam": "docs",
@@ -150,11 +150,11 @@
     },
     {
       "kapsam": "fix",
-      "adet": 17
+      "adet": 14
     },
     {
       "kapsam": "test",
-      "adet": 2
+      "adet": 3
     },
     {
       "kapsam": "?",
@@ -163,11 +163,15 @@
     {
       "kapsam": "chore",
       "adet": 1
+    },
+    {
+      "kapsam": "refactor",
+      "adet": 1
     }
   ],
-  "isSayisi": 409,
+  "isSayisi": 428,
   "ilkIsTarihi": "2026-08-06",
-  "sonIsTarihi": "2026-08-13",
+  "sonIsTarihi": "2026-08-14",
   "planlar": [
     {
       "slug": "proje",
@@ -186,5 +190,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "ef9199e97578"
+  "damga": "e97571bd2128"
 }

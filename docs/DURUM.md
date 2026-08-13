@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: ef9199e97578 -->
+<!-- durum-damga: e97571bd2128 -->
 
 ## Künye
 
@@ -14,37 +14,38 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 409 |
-| ilk / son iş | 2026-08-06 / 2026-08-13 |
+| iş commit'i (tüm geçmiş) | 428 |
+| ilk / son iş | 2026-08-06 / 2026-08-14 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
-| 2026-08-13 | `fix` | harden decision trace projection | `a2d6c0291` |
-| 2026-08-13 | `test` | bind asset verifier to account discovery | `be6f4b1d6` |
-| 2026-08-13 | `fix` | restore budget evidence-bound verifier | `58eb3c3d2` |
-| 2026-08-13 | `fix` | classify current-source failures safely | `e370ad054` |
-| 2026-08-13 | `docs` | record gated Meta schedule runner | `d040960cc` |
-| 2026-08-13 | `feat` | add gated read-only schedule runner | `0bbc7c308` |
-| 2026-08-13 | `test` | bind queue verifier to frozen context | `04af0c44b` |
-| 2026-08-13 | `docs` | record Meta quality read projection | `a82508c45` |
-| 2026-08-13 | `feat` | expose canonical trust readiness report | `a5af7e894` |
-| 2026-08-13 | `fix` | classify budget action provenance | `bfd3497c8` |
-| 2026-08-13 | `docs` | record dashboard fail-closed acceptance | `7952add5d` |
-| 2026-08-13 | `docs` | record normalization and insight evidence | `b17a8e222` |
-| 2026-08-13 | `feat` | expose normalization workbench in dashboard | `62d736691` |
-| 2026-08-13 | `feat` | surface verified empty insight delivery | `4c066e399` |
-| 2026-08-13 | `docs` | record K2 K3 budget policy studio | `7a522638f` |
+| 2026-08-14 | `refactor` | share ready budget context fixture | `36061fcee` |
+| 2026-08-14 | `docs` | record frozen action context binding | `5a5aacb50` |
+| 2026-08-14 | `fix` | bind materialized units to frozen context | `6d7796951` |
+| 2026-08-14 | `docs` | record slice readiness projection | `2a0713f0c` |
+| 2026-08-14 | `feat` | show frozen context readiness | `c5814def6` |
+| 2026-08-14 | `docs` | record manual classification handoff | `7d95faba7` |
+| 2026-08-14 | `feat` | hand off review rows to manual assignment | `ebf137c8d` |
+| 2026-08-14 | `docs` | record canonical campaign portfolio | `664b14f98` |
+| 2026-08-14 | `feat` | show canonical campaign portfolio | `6d3298f67` |
+| 2026-08-14 | `feat` | add safe slice scope candidates | `21d4826fd` |
+| 2026-08-13 | `feat` | add canonical campaign classification review queue | `d0f805355` |
+| 2026-08-13 | `feat` | add canonical performance read model | `17df9c00d` |
+| 2026-08-13 | `docs` | record completed Meta insight bootstrap | `36693dd77` |
+| 2026-08-13 | `fix` | accept canonical insight account identity | `5603ad262` |
+| 2026-08-13 | `feat` | add capability-gated insight bootstrap | `281273f93` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 21
-- `docs        ` █████████████████████ 18
-- `fix         ` ███████████████████ 17
-- `test        ` ██ 2
+- `feat        ` ████████████████████████ 22
+- `docs        ` ████████████████████ 18
+- `fix         ` ███████████████ 14
+- `test        ` ███ 3
 - `?           ` █ 1
 - `chore       ` █ 1
+- `refactor    ` █ 1
 
 ## Planlar
 
