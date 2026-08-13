@@ -17,21 +17,21 @@
 
 ## 2026-08-13 — Faz 0 kanıt/durum uzlaştırması
 
-- **Gerçek Meta işletimi henüz aktif değildir.** Canlı salt-okunur DB sayımında aktif connection,
-  account, campaign, ad set, ad, creative, daily insight, enabled schedule ve schedule run sayıları
-  sıfırdır. STATE'teki önceki canlı sayımlar historical verifier kanıtıdır; mevcut tenantın işletim
-  durumu olarak yorumlanamaz.
-- Dashboard'un çağırdığı `/api/meta/inventory` route'u doğrudan Graph veya canonical DB read-model'i
-  değildir ve tasarım gereği `503` döner. Mevcut portföy capability endpoint'i yalnız
-  connection/account/group read-readiness verir. Bu yüzden gerçek Meta hierarchy/content/performance
-  görünümü henüz Dashboard'a bağlı değildir.
+- **Salt-okunur Meta bootstrap'i gerçek tenantta çalıştırıldı.** Güvenlik işareti `rotated` sonrası
+  read-only connection doctor kabulü geçti; beş erişilebilir hesap için canonical data-source/account
+  kökleri oluşturuldu. İlk canlı mirror koşusu 320 kampanyayı yazdı. Bu yalnız GET çağrılarıyla
+  gerçekleşti; Meta write sıfırdır.
+- `/api/meta/read-mirror` Dashboard'un kullandığı canonical DB read-model'idir; eski
+  `/api/meta/inventory` route'u bilinçli biçimde `503` kalır. Hiyerarşinin campaign kısmı mevcut
+  tenantta gerçek veriye bağlıdır. Ad-set/ad/creative/insight tamamlaması ve ayrıntılı immutable
+  affected-geo snapshot backfill'i henüz canlı kabulden geçmediği için bu alanlar `partial`/`unavailable`
+  olarak görünmelidir; dashboard bunları demo gibi göstermemelidir.
 - Meta sync scheduler substrate'i (registry, lease, worker ve private factory) testli olsa da güvenilir
   runner/principal, enabled schedule ve canonical creative/Page/Instagram persistence bağlantısı
   eksiktir. `verify:meta-read-sync-schedule-db` yalnız substrate'i kanıtlar; cron, ağ çağrısı veya
   güncel veri kanıtlamaz.
-- `.env.local` güvenlik durumu `META_TOKEN_SECURITY_STATUS=temporary_exposed` olarak işaretlidir.
-  Token değeri okunmadı veya değiştirilmiyor; güvenli rotation/doctor onayı olmadan bootstrap veya
-  runner aktivasyonu yapılmayacak.
+- Token değeri hiçbir log/projection'a taşınmadı. Bootstrap yalnız `META_TOKEN_SECURITY_STATUS=rotated`
+  önkoşulunda ve server-private secret resolver ile çalışır; scheduler/Meta write yine aktif değildir.
 - Slice/budget/policy altyapısı mevcut olsa da, browser-yerel brief, statik rule katalogları ve
   persistent policy/budget ledger henüz tek kullanıcı akışında birleşmez. İlk ürün dilimi
   `Slice Rule Workspace` olacaktır: yabancı FTR gibi kanıtlı bir scope için recommendation-only
