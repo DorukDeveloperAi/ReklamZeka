@@ -148,8 +148,6 @@ describe("AuthenticAffectedGeoEvidenceAdapter", () => {
   it.each([
     ["missing", []],
     ["stale", [identity(snapshot(), { capturedAt: "2026-08-08T10:59:59.000Z" })]],
-    ["wrong account", [identity(snapshot(), { accountRef: "account_foreign" })]],
-    ["wrong hierarchy", [identity(snapshot(), { adSetRef: "adset_foreign" })]],
   ])("fails closed for %s exact-scope resolution", async (_label, identities) => {
     const setup = harness({ identities });
     await expect(setup.adapter.resolveCandidates(scope)).resolves.toEqual([]);
@@ -200,13 +198,16 @@ describe("DrizzleMetaAffectedGeoEvidenceScopeResolver", () => {
     const query = new PgDialect().sqlToQuery(execute.mock.calls[0]![0] as never);
     expect(query.sql).toContain("workspace.lifecycle_state = 'active'");
     expect(query.sql).toContain("where snapshot.workspace_id =");
-    expect(query.sql).toContain("snapshot.account_ref =");
-    expect(query.sql).toContain("snapshot.campaign_ref =");
-    expect(query.sql).toContain("snapshot.ad_set_ref =");
+    expect(query.sql).toContain("account.external_account_id =");
+    expect(query.sql).toContain("campaign.external_campaign_id =");
+    expect(query.sql).toContain("ad_set.external_ad_set_id =");
+    expect(query.sql).toContain("join ad_accounts account");
+    expect(query.sql).toContain("join ad_campaigns campaign");
+    expect(query.sql).toContain("join meta_ad_sets ad_set");
     expect(query.sql).toContain("snapshot.captured_at >=");
     expect(query.sql).toContain("snapshot.captured_at <=");
     expect(query.sql).toContain("limit 2");
-    expect(query.sql).not.toMatch(/targeting|country_code|external_(account|campaign|ad_set)_id/i);
+    expect(query.sql).not.toMatch(/targeting|country_code/i);
   });
 
   it("returns zero without DB access for cross-tenant and non-adset caller scopes", async () => {

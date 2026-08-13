@@ -53,8 +53,13 @@ function instant(value: unknown): value is string {
 function exactScope(value: unknown, scope: ProtectionEvidenceScope): value is MetaAffectedGeoSnapshotExactScope {
   if (!exact(value, EXACT_KEYS)) return false;
   return value.workspaceId === scope.workspaceId && value.workspaceRef === scope.workspaceRef
-    && value.accountRef === scope.accountRef && value.campaignRef === scope.campaignRef
-    && value.adSetRef === scope.entity.ref && typeof value.adAccountId === "string" && UUID.test(value.adAccountId)
+    // Public snapshot refs are mirror-derived opaque identities. The private
+    // canonical hierarchy join in the resolver binds them to this external
+    // context scope; they must not be compared as interchangeable strings.
+    && typeof value.accountRef === "string" && REF.test(value.accountRef)
+    && typeof value.campaignRef === "string" && REF.test(value.campaignRef)
+    && typeof value.adSetRef === "string" && REF.test(value.adSetRef)
+    && typeof value.adAccountId === "string" && UUID.test(value.adAccountId)
     && typeof value.campaignId === "string" && UUID.test(value.campaignId)
     && typeof value.adSetId === "string" && UUID.test(value.adSetId)
     && instant(value.capturedAt) && value.capturedAt >= scope.notBefore && value.capturedAt <= scope.evaluatedAt
@@ -154,11 +159,19 @@ export class DrizzleMetaAffectedGeoEvidenceScopeResolver implements MetaAffected
       from meta_affected_geo_snapshots snapshot
       join workspaces workspace
         on workspace.id = snapshot.workspace_id and workspace.lifecycle_state = 'active'
+      join ad_accounts account
+        on account.workspace_id = snapshot.workspace_id and account.id = snapshot.ad_account_id
+      join ad_campaigns campaign
+        on campaign.workspace_id = snapshot.workspace_id and campaign.id = snapshot.campaign_id
+          and campaign.ad_account_id = snapshot.ad_account_id
+      join meta_ad_sets ad_set
+        on ad_set.workspace_id = snapshot.workspace_id and ad_set.id = snapshot.ad_set_id
+          and ad_set.campaign_id = snapshot.campaign_id and ad_set.ad_account_id = snapshot.ad_account_id
       where snapshot.workspace_id = ${this.workspaceId}::uuid
         and snapshot.workspace_ref = ${this.workspaceRef}
-        and snapshot.account_ref = ${scope.accountRef}
-        and snapshot.campaign_ref = ${scope.campaignRef}
-        and snapshot.ad_set_ref = ${scope.entity.ref}
+        and account.external_account_id = ${scope.accountRef}
+        and campaign.external_campaign_id = ${scope.campaignRef}
+        and ad_set.external_ad_set_id = ${scope.entity.ref}
         and snapshot.captured_at >= ${scope.notBefore}::timestamptz
         and snapshot.captured_at <= ${scope.evaluatedAt}::timestamptz
         and snapshot.source_graph_version = 'v23.0'
