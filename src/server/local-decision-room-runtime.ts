@@ -548,6 +548,30 @@ export async function resolveTrustedLocalInstructionPolicyPrincipal(input: Reado
 }
 
 /**
+ * Cookie-only, read-only binding for the Slice Rule -> Budget Lab impact
+ * preview. Both source-rule and budget-read capabilities are required; the
+ * preview cannot inherit either draft capability.
+ */
+export async function resolveTrustedLocalSliceRuleBudgetImpactPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  const token = cookieToken(input.request);
+  if (bearerToken(input.request) !== null || token === null
+    || input.request.headers.get("x-reklamzeka-intent") !== "slice-rule-budget-impact-preview") {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  const verification = { token, key: input.config.signingKey, now: Math.floor(Date.now() / 1000),
+    osUid: typeof process.getuid === "function" ? process.getuid() : -1, expected: input.config };
+  verifyLocalSessionCapability({ ...verification, requiredScope: "instruction_policy:read" });
+  verifyLocalSessionCapability({ ...verification, requiredScope: "budget_lab:read" });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "read", "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
+/**
  * Separately scoped K4 Policy Bundle Studio binding. Read access may use the
  * same OS-UID-bound bearer capability as the project MCP server. Draft and
  * publication stay dashboard-cookie only.

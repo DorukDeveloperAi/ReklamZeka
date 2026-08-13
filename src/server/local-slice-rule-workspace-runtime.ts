@@ -1,13 +1,19 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
+import { BudgetLabDraftService } from "@/application/budget-lab-draft-service";
+import { SliceRuleBudgetImpactService } from "@/application/slice-rule-budget-impact-service";
 import { SliceRuleWorkspaceService } from "@/application/slice-rule-workspace-service";
+import { DrizzleBudgetProposalRepository } from "@/connectors/budget/budget-proposal-drizzle-repository";
+import { FrozenContextBudgetImpactScopeResolver } from "@/connectors/campaigns/frozen-context-budget-impact-scope-resolver";
 import { DrizzleSliceRuleWorkspaceRepository } from "@/connectors/campaigns/slice-rule-workspace-drizzle-repository";
 import * as schema from "@/db/schema";
 import {
   LocalDecisionRoomBoundaryError,
   resolveTrustedLocalInstructionPolicyPrincipal,
+  resolveTrustedLocalSliceRuleBudgetImpactPrincipal,
   type LocalDecisionRoomConfig,
 } from "@/server/local-decision-room-runtime";
+import { createSliceRuleBudgetImpactHttpHandler } from "@/server/slice-rule-budget-impact-http";
 import {
   createSliceRuleWorkspaceHttpHandlers,
   sliceRuleWorkspaceNotConfiguredResponse,
@@ -22,8 +28,18 @@ export function createLocalSliceRuleWorkspaceHandlers(input: Readonly<{
   config: LocalDecisionRoomConfig;
   now?: () => string;
 }>) {
-  const execute = async (request: Request, operation: "read" | "draft") => {
+  const execute = async (request: Request, operation: "read" | "draft" | "impact") => {
     try {
+      if (operation === "impact") {
+        const bound = await resolveTrustedLocalSliceRuleBudgetImpactPrincipal({ request,
+          database: input.database, config: input.config });
+        const rules = new DrizzleSliceRuleWorkspaceRepository(input.database as never);
+        const budgets = new DrizzleBudgetProposalRepository(input.database as never);
+        const service = new SliceRuleBudgetImpactService(rules,
+          new FrozenContextBudgetImpactScopeResolver(budgets), new BudgetLabDraftService(budgets, budgets));
+        return createSliceRuleBudgetImpactHttpHandler({ service,
+          resolvePrincipal: async () => bound.principal })(request);
+      }
       const bound = await resolveTrustedLocalInstructionPolicyPrincipal({ request, database: input.database,
         config: input.config, requiredScope: operation === "read" ? "instruction_policy:read" : "instruction_policy:draft" });
       const repository = new DrizzleSliceRuleWorkspaceRepository(input.database as never);
@@ -38,5 +54,6 @@ export function createLocalSliceRuleWorkspaceHandlers(input: Readonly<{
     }
   };
   return Object.freeze({ GET: (request: Request) => execute(request, "read"),
-    POST: (request: Request) => execute(request, "draft") });
+    POST: (request: Request) => execute(request,
+      request.headers.get("x-reklamzeka-intent") === "slice-rule-budget-impact-preview" ? "impact" : "draft") });
 }

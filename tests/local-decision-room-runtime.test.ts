@@ -8,6 +8,7 @@ import {
   resolveTrustedLocalExperimentRecordPrincipal,
   resolveTrustedLocalPromotionLifecyclePrincipal,
   resolveTrustedLocalSessionIdentity,
+  resolveTrustedLocalSliceRuleBudgetImpactPrincipal,
   type LocalDecisionRoomEnvironment,
 } from "@/server/local-decision-room-runtime";
 import {
@@ -146,6 +147,23 @@ describe("local Decision Room principal boundary", () => {
       database: readDatabase() as never, config })).resolves.toMatchObject({
       membership: { workspaceId, userId, role: "viewer" },
     });
+  });
+
+  it("binds Slice Rule budget impact to its exact cookie-only read intent", async () => {
+    const config = localDecisionRoomConfig(environment())!;
+    const token = sessionToken();
+    const impact = (mode: "cookie" | "bearer", intent = "slice-rule-budget-impact-preview") => request(
+      "/api/slice-rule-workspace", { Origin: "http://localhost:3000", "X-ReklamZeka-Intent": intent,
+        ...(mode === "cookie" ? { Cookie: `${LOCAL_SESSION_COOKIE}=${encodeURIComponent(token)}` }
+          : { Authorization: `Bearer ${token}` }) });
+    await expect(resolveTrustedLocalSliceRuleBudgetImpactPrincipal({ request: impact("cookie"),
+      database: readDatabase() as never, config })).resolves.toMatchObject({
+      membership: { workspaceId, userId, role: "viewer" },
+    });
+    await expect(resolveTrustedLocalSliceRuleBudgetImpactPrincipal({ request: impact("bearer"),
+      database: readDatabase() as never, config })).rejects.toBeInstanceOf(LocalDecisionRoomBoundaryError);
+    await expect(resolveTrustedLocalSliceRuleBudgetImpactPrincipal({ request: impact("cookie", "slice-rule-workspace-save"),
+      database: readDatabase() as never, config })).rejects.toBeInstanceOf(LocalDecisionRoomBoundaryError);
   });
 
   it("is disabled unless all server-only bindings are explicitly enabled", () => {
