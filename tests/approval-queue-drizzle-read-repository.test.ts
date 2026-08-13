@@ -158,8 +158,8 @@ describe("Approval Queue Drizzle read repository", () => {
     const result = await new DrizzleApprovalQueueReadRepository(found.db as never, workspaceId)
       .get({ workspaceId, unitRef });
     expect(result?.unitRef).toBe(unitRef);
-    expect(result?.evidence).toEqual([{ kind: "budget_proposal", label: "Bütçe önerisi" }]);
-    expect(result?.decisionTimeline).toEqual([{ kind: "proposed", occurredAt: "2026-08-07T13:00:00.000Z", reasonCode: null }]);
+    expect(result?.sourceEvidence).toEqual([{ kind: "budget_proposal", label: "Bütçe önerisi", integrity: "hash_verified" }]);
+    expect(result?.decisionHistory).toEqual([{ decision: "proposed", occurredAt: "2026-08-07T13:00:00.000Z", reasonCode: null }]);
     expect(found.queries[0]?.sql).toContain("unit.workspace_id = $1::uuid and unit.unit_ref = $2");
     expect(found.queries[0]?.sql).toContain("unit.summary_payload, unit.summary_hash");
     expect(found.queries[0]?.sql).toContain("unit_changes_requested");
@@ -178,7 +178,7 @@ describe("Approval Queue Drizzle read repository", () => {
     const result = await new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId)
       .get({ workspaceId, unitRef });
     expect(result).toMatchObject({ status: "approved", dependencies: [{ status: "changes_requested" }],
-      decisionTimeline: [{ kind: "proposed" }, { kind: "approved", reasonCode: "human.confirmed" }] });
+      decisionHistory: [{ decision: "proposed" }, { decision: "approved", reasonCode: "human.confirmed" }] });
     expect(fixture.queries[0]?.sql).toContain("jsonb_array_elements(decision.event_payloads)");
   });
 

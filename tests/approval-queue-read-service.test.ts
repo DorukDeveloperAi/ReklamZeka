@@ -27,8 +27,8 @@ function repository(records: readonly ApprovalQueueRecord[]): ApprovalQueueRepos
 }
 
 function detail(item: ApprovalQueueRecord): ApprovalQueueDetailRecord {
-  return { ...item, evidence: [{ kind: "budget_proposal", label: "Bütçe önerisi" }],
-    decisionTimeline: [{ kind: "proposed", occurredAt: item.createdAt, reasonCode: null }] };
+  return { ...item, sourceEvidence: [{ kind: "budget_proposal", label: "Bütçe önerisi", integrity: "hash_verified" }],
+    decisionHistory: [{ decision: "proposed", occurredAt: item.createdAt, reasonCode: null }] };
 }
 
 describe("Approval Queue public read service", () => {

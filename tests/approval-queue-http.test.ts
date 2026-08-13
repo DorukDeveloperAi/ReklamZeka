@@ -47,8 +47,8 @@ function record(): ApprovalQueueRecord {
 
 function detail(): ApprovalQueueDetailRecord {
   const item = record();
-  return { ...item, evidence: [{ kind: "budget_proposal", label: "Bütçe önerisi" }],
-    decisionTimeline: [{ kind: "proposed", occurredAt: item.createdAt, reasonCode: null }] };
+  return { ...item, sourceEvidence: [{ kind: "budget_proposal", label: "Bütçe önerisi", integrity: "hash_verified" }],
+    decisionHistory: [{ decision: "proposed", occurredAt: item.createdAt, reasonCode: null }] };
 }
 
 function harness(repository: ApprovalQueueRepository = {

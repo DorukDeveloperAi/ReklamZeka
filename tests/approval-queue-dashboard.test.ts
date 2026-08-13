@@ -33,7 +33,7 @@ function ready(selected: ApprovalQueueRecord | null = null) {
   return {
     status: "ready" as const,
     result: {
-      contractVersion: "approval-queue-read-model/1.3.0" as const,
+      contractVersion: "approval-queue-read-model/1.4.0" as const,
       view: "list" as const,
       entityRef: null,
       campaignRef: null,
@@ -51,18 +51,19 @@ function ready(selected: ApprovalQueueRecord | null = null) {
 }
 
 describe("Approval Queue dashboard", () => {
-  it("renders the public-safe source chain and immutable human decision history without execution controls", () => {
-    const detail: ApprovalQueueDetailRecord = { ...item, evidence: [
-      { kind: "budget_proposal", label: "Yabancı FTR bütçe tavanı" },
-      { kind: "slice_rule", label: "Yabancı FTR slice kuralı" },
-    ], decisionTimeline: [
-      { kind: "proposed", occurredAt: item.createdAt, reasonCode: null },
-      { kind: "changes_requested", occurredAt: "2026-08-07T10:00:00.000Z", reasonCode: "human.changes_requested" },
+  it("renders hash-verified source labels and ordered human decision history without execution controls", () => {
+    const detail: ApprovalQueueDetailRecord = { ...item, sourceEvidence: [
+      { kind: "budget_proposal", label: "Yabancı FTR bütçe tavanı", integrity: "hash_verified" },
+      { kind: "slice_rule", label: "Yabancı FTR slice kuralı", integrity: "hash_verified" },
+    ], decisionHistory: [
+      { decision: "proposed", occurredAt: item.createdAt, reasonCode: null },
+      { decision: "changes_requested", occurredAt: "2026-08-07T10:00:00.000Z", reasonCode: "human.changes_requested" },
     ] };
     const html = renderToStaticMarkup(createElement(ApprovalQueueReadSurface, { ...callbacks, state: ready(detail) }));
-    expect(html).toContain("Kaynak zinciri");
+    expect(html).toContain("Doğrulanmış kaynak kanıtı");
     expect(html).toContain("Yabancı FTR bütçe tavanı");
-    expect(html).toContain("İnsan karar izi");
+    expect(html).toContain("hash doğrulandı");
+    expect(html).toContain("İnsan karar geçmişi");
     expect(html).toContain("changes requested");
     expect(html).not.toContain("Meta write etkin");
   });

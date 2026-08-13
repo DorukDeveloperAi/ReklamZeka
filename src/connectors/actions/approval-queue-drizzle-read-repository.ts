@@ -277,7 +277,7 @@ function mapRow(row: SourceRow, workspaceId: string): ApprovalQueueRecord {
   });
 }
 
-function evidenceKind(ref: unknown): ApprovalQueueDetailRecord["evidence"][number]["kind"] {
+function evidenceKind(ref: unknown): ApprovalQueueDetailRecord["sourceEvidence"][number]["kind"] {
   if (typeof ref !== "string" || !PRIVATE_REF.test(ref)) fail("corrupt_store");
   if (ref.startsWith("budget_proposal_")) return "budget_proposal";
   if (ref.startsWith("slice_rule_draft_")) return "slice_rule";
@@ -293,12 +293,12 @@ function detailRow(row: SourceRow, workspaceId: string): ApprovalQueueDetailReco
   if (row.summary_hash === null || typeof row.summary_hash !== "string" || !HASH.test(row.summary_hash)
     || digest(summary) !== row.summary_hash || summary.safety !== "public_safe" || !Array.isArray(summary.evidence)
     || summary.evidence.length > 50) fail("corrupt_store");
-  const evidence = summary.evidence.map((candidate) => {
+  const sourceEvidence = summary.evidence.map((candidate) => {
     exact(candidate, ["evidenceRef", "label"]);
     if (typeof candidate.label !== "string" || candidate.label.length < 1 || candidate.label.length > 240) fail("corrupt_store");
-    return Object.freeze({ kind: evidenceKind(candidate.evidenceRef), label: candidate.label });
+    return Object.freeze({ kind: evidenceKind(candidate.evidenceRef), label: candidate.label, integrity: "hash_verified" as const });
   });
-  if (new Set(summary.evidence.map((candidate) => (candidate as Record<string, unknown>).evidenceRef)).size !== evidence.length) fail("corrupt_store");
+  if (new Set(summary.evidence.map((candidate) => (candidate as Record<string, unknown>).evidenceRef)).size !== sourceEvidence.length) fail("corrupt_store");
   if (!Array.isArray(row.decision_timeline) || row.decision_timeline.length > 49) fail("corrupt_store");
   const decisions = row.decision_timeline.map((candidate) => {
     exact(candidate, ["event_type", "occurred_at", "reason_code"]);
@@ -307,10 +307,10 @@ function detailRow(row: SourceRow, workspaceId: string): ApprovalQueueDetailReco
     };
     if (typeof candidate.event_type !== "string" || !Object.hasOwn(kind, candidate.event_type)
       || candidate.reason_code !== null && (typeof candidate.reason_code !== "string" || !CODE.test(candidate.reason_code))) fail("corrupt_store");
-    return Object.freeze({ kind: kind[candidate.event_type]!, occurredAt: instant(candidate.occurred_at), reasonCode: candidate.reason_code as string | null });
+    return Object.freeze({ decision: kind[candidate.event_type]!, occurredAt: instant(candidate.occurred_at), reasonCode: candidate.reason_code as string | null });
   });
-  return Object.freeze({ ...base, evidence: Object.freeze(evidence), decisionTimeline: Object.freeze([
-    Object.freeze({ kind: "proposed" as const, occurredAt: base.createdAt, reasonCode: null }), ...decisions,
+  return Object.freeze({ ...base, sourceEvidence: Object.freeze(sourceEvidence), decisionHistory: Object.freeze([
+    Object.freeze({ decision: "proposed" as const, occurredAt: base.createdAt, reasonCode: null }), ...decisions,
   ]) });
 }
 

@@ -1,4 +1,4 @@
-export const APPROVAL_QUEUE_READ_MODEL_VERSION = "approval-queue-read-model/1.3.0" as const;
+export const APPROVAL_QUEUE_READ_MODEL_VERSION = "approval-queue-read-model/1.4.0" as const;
 
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i;
 const FULL_HASH = /\b[a-f0-9]{64}\b/i;
@@ -42,9 +42,15 @@ export type ApprovalQueueRecord = Readonly<{
 
 /** Detail-only public projection. Refs and hashes remain server-private. */
 export type ApprovalQueueDetailRecord = ApprovalQueueRecord & Readonly<{
-  evidence: readonly Readonly<{ kind: "budget_proposal" | "slice_rule" | "delivery_alert" | "other"; label: string }>[];
-  decisionTimeline: readonly Readonly<{
-    kind: "proposed" | "approved" | "rejected" | "changes_requested";
+  /** Labels from the ActionUnit's hash-verified public summary; its hash stays server-private. */
+  sourceEvidence: readonly Readonly<{
+    kind: "budget_proposal" | "slice_rule" | "delivery_alert" | "other";
+    label: string;
+    integrity: "hash_verified";
+  }>[];
+  /** Chronological, append-only human decisions for this exact ActionUnit. */
+  decisionHistory: readonly Readonly<{
+    decision: "proposed" | "approved" | "rejected" | "changes_requested";
     occurredAt: string;
     reasonCode: string | null;
   }>[];
@@ -142,29 +148,30 @@ function validate(record: ApprovalQueueRecord): ApprovalQueueRecord {
 }
 
 function validateDetail(record: ApprovalQueueDetailRecord): ApprovalQueueDetailRecord {
-  exact(record, ["unitRef", "bundleRef", "status", "risk", "actionType", "accountRef", "campaignRef", "entity", "beforeAfter", "autonomy", "expiresAt", "createdAt", "dependencies", "summaryCode", "evidence", "decisionTimeline"]);
-  const { evidence: rawEvidence, decisionTimeline: rawTimeline, ...baseRecord } = record;
+  exact(record, ["unitRef", "bundleRef", "status", "risk", "actionType", "accountRef", "campaignRef", "entity", "beforeAfter", "autonomy", "expiresAt", "createdAt", "dependencies", "summaryCode", "sourceEvidence", "decisionHistory"]);
+  const { sourceEvidence: rawEvidence, decisionHistory: rawHistory, ...baseRecord } = record;
   const base = validate(baseRecord);
-  if (!Array.isArray(rawEvidence) || rawEvidence.length > 50 || !Array.isArray(rawTimeline)
-    || rawTimeline.length < 1 || rawTimeline.length > 50) throw new ApprovalQueueReadError("unsafe_source");
+  if (!Array.isArray(rawEvidence) || rawEvidence.length > 50 || !Array.isArray(rawHistory)
+    || rawHistory.length < 1 || rawHistory.length > 50) throw new ApprovalQueueReadError("unsafe_source");
   const evidence = rawEvidence.map((entry) => {
-    exact(entry, ["kind", "label"]);
-    const candidate = entry as Readonly<{ kind: unknown; label: unknown }>;
-    if (typeof candidate.kind !== "string" || !["budget_proposal", "slice_rule", "delivery_alert", "other"].includes(candidate.kind) || !safeText(candidate.label)) throw new ApprovalQueueReadError("unsafe_source");
-    return Object.freeze({ kind: candidate.kind as ApprovalQueueDetailRecord["evidence"][number]["kind"], label: candidate.label });
+    exact(entry, ["kind", "label", "integrity"]);
+    const candidate = entry as Readonly<{ kind: unknown; label: unknown; integrity: unknown }>;
+    if (typeof candidate.kind !== "string" || !["budget_proposal", "slice_rule", "delivery_alert", "other"].includes(candidate.kind)
+      || !safeText(candidate.label) || candidate.integrity !== "hash_verified") throw new ApprovalQueueReadError("unsafe_source");
+    return Object.freeze({ kind: candidate.kind as ApprovalQueueDetailRecord["sourceEvidence"][number]["kind"], label: candidate.label, integrity: "hash_verified" as const });
   });
-  const timeline = rawTimeline.map((entry, index) => {
-    exact(entry, ["kind", "occurredAt", "reasonCode"]);
-    const candidate = entry as Readonly<{ kind: unknown; occurredAt: unknown; reasonCode: unknown }>;
-    if (typeof candidate.kind !== "string" || !["proposed", "approved", "rejected", "changes_requested"].includes(candidate.kind)
+  const history = rawHistory.map((entry, index) => {
+    exact(entry, ["decision", "occurredAt", "reasonCode"]);
+    const candidate = entry as Readonly<{ decision: unknown; occurredAt: unknown; reasonCode: unknown }>;
+    if (typeof candidate.decision !== "string" || !["proposed", "approved", "rejected", "changes_requested"].includes(candidate.decision)
       || typeof candidate.occurredAt !== "string" || !Number.isFinite(Date.parse(candidate.occurredAt)) || candidate.reasonCode !== null && (typeof candidate.reasonCode !== "string" || !CODE.test(candidate.reasonCode))
-      || index === 0 && (candidate.kind !== "proposed" || candidate.reasonCode !== null)
-      || index > 0 && candidate.kind === "proposed") throw new ApprovalQueueReadError("unsafe_source");
-    const previous = index > 0 ? rawTimeline[index - 1]! as Readonly<{ occurredAt?: unknown }> : null;
+      || index === 0 && (candidate.decision !== "proposed" || candidate.reasonCode !== null)
+      || index > 0 && candidate.decision === "proposed") throw new ApprovalQueueReadError("unsafe_source");
+    const previous = index > 0 ? rawHistory[index - 1]! as Readonly<{ occurredAt?: unknown }> : null;
     if (previous && (typeof previous.occurredAt !== "string" || Date.parse(candidate.occurredAt) < Date.parse(previous.occurredAt))) throw new ApprovalQueueReadError("unsafe_source");
-    return Object.freeze({ kind: candidate.kind as ApprovalQueueDetailRecord["decisionTimeline"][number]["kind"], occurredAt: new Date(candidate.occurredAt).toISOString(), reasonCode: candidate.reasonCode as string | null });
+    return Object.freeze({ decision: candidate.decision as ApprovalQueueDetailRecord["decisionHistory"][number]["decision"], occurredAt: new Date(candidate.occurredAt).toISOString(), reasonCode: candidate.reasonCode as string | null });
   });
-  return Object.freeze({ ...base, evidence: Object.freeze(evidence), decisionTimeline: Object.freeze(timeline) });
+  return Object.freeze({ ...base, sourceEvidence: Object.freeze(evidence), decisionHistory: Object.freeze(history) });
 }
 
 function cursor(record: ApprovalQueueRecord): string {
