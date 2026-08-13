@@ -17,6 +17,7 @@ import {
   MetaAssetContentPersistenceError,
   MetaAssetContentPersistenceRun,
   type MetaAssetContentPage,
+  type MetaAdContentRecord,
   type MetaAssetContentRepository,
   type MetaAssetContentScope,
   type MetaAssetContentWriteSummary,
@@ -251,6 +252,22 @@ function mergePostInventories(
   });
 }
 
+/** A deferred record may replay only after the exact actor/post pair was returned by Graph. */
+function graphVerifiedReplayRecords(
+  page: MetaAssetContentPage,
+  inventory: CanonicalMetaPostMediaInventory,
+): readonly MetaAdContentRecord[] {
+  const verified = new Set(inventory.items.map((item) =>
+    `${item.actor.type}:${item.actor.externalId}:${item.externalContentId}`));
+  return page.content.filter((record) => {
+    const post = record.extraction.post;
+    if (!post) return false;
+    const actorType = post.platform === "facebook" ? "facebook_page" : "instagram_account";
+    const actorExternalId = actorType === "facebook_page" ? post.actorPageExternalId : post.actorInstagramExternalId;
+    return actorExternalId !== null && verified.has(`${actorType}:${actorExternalId}:${post.externalPostId}`);
+  });
+}
+
 /**
  * S1.4 read orchestrator. Raw IDs, tokens and ad text stay inside the connector/persistence
  * boundary; the returned result contains only deterministic references and aggregate evidence.
@@ -422,7 +439,9 @@ export class MetaS14LiveAssetContentService {
       // exist in the mirror yet. Recovery is complete before this replay and
       // no Graph request or inferred relationship is involved here.
       for (const page of deferredContentPages) {
-        addWrite(persistenceEvidence, await persistence.writePage(page));
+        const content = graphVerifiedReplayRecords(page, completeInventory);
+        if (content.length === 0) continue;
+        addWrite(persistenceEvidence, await persistence.writePage({ ...page, content }));
       }
       if (this.options.postInventoryPersistence) {
         await this.options.postInventoryPersistence.persist(completeInventory);
@@ -595,6 +614,15 @@ export class MetaS14LiveAssetContentService {
       } catch (error) {
         if (error instanceof MetaAssetContentPersistenceError && error.code === "wrong_actor") {
           input.deferredContentPages.push(persistencePage);
+          cursor = nextCursor;
+          if (cursor === null) return { ...evidence, status: "completed", failureReason: null };
+          pageSize = page.usageHeadroom < 0.2
+            ? Math.max(this.minPageSize, Math.floor(pageSize / 2))
+            : page.usageHeadroom > 0.7
+              ? Math.min(500, pageSize + Math.max(1, Math.floor(pageSize / 4)))
+              : pageSize;
+          if (page.usageHeadroom <= 0.1) await this.sleep(250);
+          continue;
         }
         return { ...evidence, status: "partial", failureReason: "unknown" };
       }
