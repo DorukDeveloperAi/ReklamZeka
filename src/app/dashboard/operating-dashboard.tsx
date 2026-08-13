@@ -20,6 +20,7 @@ import { InstructionPolicyStudioPanel } from "./instruction-policy-studio-panel"
 import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel";
 import { NormalizationWorkbenchPanel } from "./normalization-workbench-panel";
 import { MetaTrustReadinessPanel } from "./meta-trust-readiness-panel";
+import { CanonicalPerformancePanel } from "./canonical-performance-panel";
 import { CAMPAIGN_BRIEF_SCENARIOS, CampaignPlanningBriefPanel, type CampaignBriefScenarioRef, type CampaignPlanningBriefContext } from "./campaign-planning-brief-panel";
 import { offlineWorkbookPortfolioSnapshot, type OfflineWorkbookBriefScenarioRef } from "@/domain/campaigns/offline-workbook-portfolio-snapshot";
 import styles from "./operating-dashboard.module.css";
@@ -786,12 +787,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
         <button onClick={() => navigate("timeline")}>Tüm timeline <span>→</span></button>
       </section>
 
-      <section className={styles.metricGrid} aria-label="Canlı performans durumu">
-        <article className={styles.metricCard}><div><span>{model.periodDays} günlük harcama</span><StatusPill tone="neutral">Kaynak bekleniyor</StatusPill></div><strong>—</strong><footer><span>Doğrulanmış insight/timeframe henüz bağlı değil.</span></footer></article>
-        <article className={styles.metricCard}><div><span>Sonuç</span><StatusPill tone="neutral">Kaynak bekleniyor</StatusPill></div><strong>—</strong><footer><span>Canlı outcome metriği olmadan CPA gösterilmez.</span></footer></article>
-        <article className={styles.metricCard}><div><span>Nitelikli lead</span><StatusPill tone="neutral">Kaynak bekleniyor</StatusPill></div><strong>—</strong><footer><span>CRM/kalite kanıtı bağlanmadan oran çıkarılmaz.</span></footer></article>
-        <article className={styles.metricCard}><div><span>Bütçe gerçekleşmesi</span><StatusPill tone="neutral">Kaynak bekleniyor</StatusPill></div><strong>—</strong><footer><span>Budget owner ve gerçekleşen harcama ayrı doğrulanır.</span></footer></article>
-      </section>
+      <CanonicalPerformancePanel />
 
       <div className={styles.dashboardColumns}>
         <section className={styles.panel} aria-labelledby="decision-title">
