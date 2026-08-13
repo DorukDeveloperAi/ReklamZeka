@@ -28,7 +28,7 @@ const CLOSED_AUTHORITY = Object.freeze({
   canWriteMeta: false as const,
   canEnableAutomation: false as const,
 });
-const ALLOWED_SCOPE_KEYS = ["market", "serviceRef", "campaignFamilyRef", "countryOrRegion", "audienceStrategy", "platform"] as const;
+const ALLOWED_SCOPE_KEYS = ["market", "serviceRef", "campaignFamilyRef", "countryOrRegion", "audienceStrategy", "platform", "conversionRoute"] as const;
 
 type ActorContext = Readonly<{ principal: TrustedDecisionRoomPrincipal; role: WorkspaceRole }>;
 type SaveCommand = Readonly<{

@@ -15,6 +15,7 @@ export type ExactSliceRuleScope = Readonly<{
   countryOrRegion?: string;
   audienceStrategy?: string;
   platform?: "facebook" | "instagram" | "mixed";
+  conversionRoute?: "lead_form" | "whatsapp" | "landing_page";
 }>;
 
 export type SliceRuleWorkspaceDraft = Readonly<{
@@ -90,19 +91,21 @@ function digest(value: unknown): string {
 
 function exactScope(scope: ExactSliceRuleScope): ExactSliceRuleScope {
   if (!scope || typeof scope !== "object" || Array.isArray(scope) || Object.getPrototypeOf(scope) !== Object.prototype
-    || Object.keys(scope).some((key) => !["market", "serviceRef", "campaignFamilyRef", "countryOrRegion", "audienceStrategy", "platform"].includes(key))
+    || Object.keys(scope).some((key) => !["market", "serviceRef", "campaignFamilyRef", "countryOrRegion", "audienceStrategy", "platform", "conversionRoute"].includes(key))
     || (scope.market !== "domestic" && scope.market !== "international")
     || typeof scope.serviceRef !== "string" || !REF.test(scope.serviceRef)
     || typeof scope.campaignFamilyRef !== "string" || !REF.test(scope.campaignFamilyRef)
     || scope.countryOrRegion !== undefined && (scope.countryOrRegion.trim() !== scope.countryOrRegion || scope.countryOrRegion.length < 1 || scope.countryOrRegion.length > 120)
     || scope.audienceStrategy !== undefined && (scope.audienceStrategy.trim() !== scope.audienceStrategy || scope.audienceStrategy.length < 1 || scope.audienceStrategy.length > 120)
-    || scope.platform !== undefined && !["facebook", "instagram", "mixed"].includes(scope.platform)) {
+    || scope.platform !== undefined && !["facebook", "instagram", "mixed"].includes(scope.platform)
+    || scope.conversionRoute !== undefined && !["lead_form", "whatsapp", "landing_page"].includes(scope.conversionRoute)) {
     throw new SliceRuleWorkspaceError("invalid_scope");
   }
   return Object.freeze({ market: scope.market, serviceRef: scope.serviceRef, campaignFamilyRef: scope.campaignFamilyRef,
     ...(scope.countryOrRegion === undefined ? {} : { countryOrRegion: scope.countryOrRegion }),
     ...(scope.audienceStrategy === undefined ? {} : { audienceStrategy: scope.audienceStrategy }),
-    ...(scope.platform === undefined ? {} : { platform: scope.platform }) });
+    ...(scope.platform === undefined ? {} : { platform: scope.platform }),
+    ...(scope.conversionRoute === undefined ? {} : { conversionRoute: scope.conversionRoute }) });
 }
 
 function iso(value: string): string {

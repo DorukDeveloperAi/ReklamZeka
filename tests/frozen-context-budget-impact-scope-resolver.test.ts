@@ -110,13 +110,16 @@ describe("frozen context Slice Rule budget impact scope resolver", () => {
       category("geo_market", "Arap Bölgesi", "geo", "multi"),
       category("audience_strategy", "Özel hedefleme", "audience"),
       category("publisher_platform", "instagram", "platform"),
+      category("conversion_route", "whatsapp", "route"),
     ] });
     const h = harness(value);
     const expected = { ...requiredScope, countryOrRegion: "Arap Bölgesi", audienceStrategy: "Özel hedefleme",
-      platform: "instagram" as const };
+      platform: "instagram" as const, conversionRoute: "whatsapp" as const };
     await expect(h.resolver.loadExact({ ...h.scope, expectedScope: expected })).resolves.toMatchObject({ state: "ready",
       scope: expected, evidenceRefs: expect.arrayContaining([expect.stringMatching(/^category_resolution_[a-f0-9]{64}$/)]) });
     await expect(h.resolver.loadExact({ ...h.scope, expectedScope: { ...expected, platform: "facebook" } })).resolves.toMatchObject({
+      state: "ambiguous", scope: null });
+    await expect(h.resolver.loadExact({ ...h.scope, expectedScope: { ...expected, conversionRoute: "lead_form" } })).resolves.toMatchObject({
       state: "ambiguous", scope: null });
   });
 

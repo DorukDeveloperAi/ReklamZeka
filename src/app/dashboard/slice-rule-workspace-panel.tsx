@@ -15,6 +15,7 @@ type Scope = Readonly<{
   countryOrRegion?: string;
   audienceStrategy?: string;
   platform?: Platform;
+  conversionRoute?: "lead_form" | "whatsapp" | "landing_page";
 }>;
 type ClosedAuthority = Readonly<{
   canPublish: false;
@@ -83,6 +84,7 @@ type Form = Readonly<{
   countryOrRegion: string;
   audienceStrategy: string;
   platform: "" | Platform;
+  conversionRoute: "" | "lead_form" | "whatsapp" | "landing_page";
   ruleKind: "period_budget_cap" | "budget_distribution" | "winner_continuation_rotation" | "delivery_guardrail";
   period: "daily" | "weekly" | "monthly";
   currency: string;
@@ -101,7 +103,7 @@ type Form = Readonly<{
 const CLOSED: ClosedAuthority = Object.freeze({ canPublish: false, canApprove: false, canExecute: false,
   canWriteMeta: false, canEnableAutomation: false });
 const EMPTY_FORM: Form = Object.freeze({ seriesRef: "", market: "international", serviceRef: "",
-  campaignFamilyRef: "", countryOrRegion: "", audienceStrategy: "", platform: "", ruleKind: "period_budget_cap",
+  campaignFamilyRef: "", countryOrRegion: "", audienceStrategy: "", platform: "", conversionRoute: "", ruleKind: "period_budget_cap",
   period: "monthly", currency: "TRY", maximumDecimal: "", distributionDimension: "countryOrRegion",
   distributionAllocations: "", continuationPercent: "80", evaluationWindowDays: "7",
   condition: "delivery_interrupted", priority: "50", metric: "cost_per_qualified_lead", reviewCadence: "weekly",
@@ -143,8 +145,9 @@ function isScope(value: unknown): value is Scope {
     || typeof value.serviceRef !== "string" || !value.serviceRef || typeof value.campaignFamilyRef !== "string"
     || !value.campaignFamilyRef || value.countryOrRegion !== undefined && typeof value.countryOrRegion !== "string"
     || value.audienceStrategy !== undefined && typeof value.audienceStrategy !== "string"
-    || value.platform !== undefined && !["facebook", "instagram", "mixed"].includes(String(value.platform))) return false;
-  return Object.keys(value).every((key) => ["market", "serviceRef", "campaignFamilyRef", "countryOrRegion", "audienceStrategy", "platform"].includes(key));
+    || value.platform !== undefined && !["facebook", "instagram", "mixed"].includes(String(value.platform))
+    || value.conversionRoute !== undefined && !["lead_form", "whatsapp", "landing_page"].includes(String(value.conversionRoute))) return false;
+  return Object.keys(value).every((key) => ["market", "serviceRef", "campaignFamilyRef", "countryOrRegion", "audienceStrategy", "platform", "conversionRoute"].includes(key));
 }
 function sameScope(left: Scope, right: Scope): boolean {
   const stable = (value: Scope) => Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)));
@@ -299,7 +302,8 @@ export function buildSliceRuleDraftCommand(form: Form, head?: SliceRuleWorkspace
   const scope = { market: form.market, serviceRef: form.serviceRef, campaignFamilyRef: form.campaignFamilyRef,
     ...(form.countryOrRegion.trim() ? { countryOrRegion: form.countryOrRegion.trim() } : {}),
     ...(form.audienceStrategy.trim() ? { audienceStrategy: form.audienceStrategy.trim() } : {}),
-    ...(form.platform ? { platform: form.platform } : {}) };
+    ...(form.platform ? { platform: form.platform } : {}),
+    ...(form.conversionRoute ? { conversionRoute: form.conversionRoute } : {}) };
   const revision = head ? head.revision + 1 : 1;
   return Object.freeze({ operation: "save_draft" as const, seriesRef: form.seriesRef, revision,
     previousDraftHash: head?.draftHash ?? "GENESIS", idempotencyKey: `${form.seriesRef}.r${revision}`,
@@ -330,7 +334,7 @@ function formFromItem(item: SliceRuleWorkspaceItem): Form {
   const shared = { ...EMPTY_FORM, seriesRef: item.seriesRef, market: item.scope.market,
     serviceRef: item.scope.serviceRef, campaignFamilyRef: item.scope.campaignFamilyRef,
     countryOrRegion: item.scope.countryOrRegion ?? "", audienceStrategy: item.scope.audienceStrategy ?? "",
-    platform: item.scope.platform ?? "", ruleKind: isEditableRule(rule) ? rule.kind : "period_budget_cap",
+    platform: item.scope.platform ?? "", conversionRoute: item.scope.conversionRoute ?? "", ruleKind: isEditableRule(rule) ? rule.kind : "period_budget_cap",
     priority: String(item.operatingRule.priority),
     metric: item.operatingRule.verification.metric, reviewCadence: item.operatingRule.verification.reviewCadence,
     rollbackWhen: item.operatingRule.verification.rollbackWhen } as Form;
@@ -432,6 +436,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
         <fieldset disabled={!snapshot.authority.canSaveDraft || saving} className={styles.form}>
           <label>Seri referansı<input value={form.seriesRef} disabled={Boolean(head)} onChange={(event) => update("seriesRef", event.target.value)} placeholder="slice_rule.ftr.ar" /></label>
           <div className={styles.row}><label>Pazar<select value={form.market} disabled={Boolean(head)} onChange={(event) => update("market", event.target.value as Market)}><option value="domestic">Yerli</option><option value="international">Yabancı</option></select></label><label>Platform (opsiyonel)<select value={form.platform} disabled={Boolean(head)} onChange={(event) => update("platform", event.target.value as Form["platform"])}><option value="">Tümü / belirtilmedi</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option><option value="mixed">Karma</option></select></label></div>
+          <label>Sonuç rotası (opsiyonel)<select value={form.conversionRoute} disabled={Boolean(head)} onChange={(event) => update("conversionRoute", event.target.value as Form["conversionRoute"])}><option value="">Belirtilmedi</option><option value="lead_form">Lead formu</option><option value="whatsapp">WhatsApp</option><option value="landing_page">Landing page</option></select></label>
           <label>Hizmet referansı<input value={form.serviceRef} disabled={Boolean(head)} onChange={(event) => update("serviceRef", event.target.value)} placeholder="service_physical_therapy" /></label>
           <label>Kampanya ailesi referansı<input value={form.campaignFamilyRef} disabled={Boolean(head)} onChange={(event) => update("campaignFamilyRef", event.target.value)} placeholder="campaign_family_intensive_ftr" /></label>
           <div className={styles.row}><label>Ülke / bölge (opsiyonel)<input value={form.countryOrRegion} disabled={Boolean(head)} onChange={(event) => update("countryOrRegion", event.target.value)} /></label><label>Hedefleme stratejisi (opsiyonel)<input value={form.audienceStrategy} disabled={Boolean(head)} onChange={(event) => update("audienceStrategy", event.target.value)} /></label></div>

@@ -17,7 +17,7 @@ const closed = { canPublish: false, canApprove: false, canExecute: false, canWri
 const item = { schemaVersion: "public-slice-rule-workspace-draft/1.0.0", seriesRef: "slice_rule.ftr.ar", revision: 1,
   draftRef: `slice_rule_draft_${"a".repeat(20)}`, draftHash: "b".repeat(64), status: "draft", operatingMode: "recommendation_only",
   scope: { market: "international", serviceRef: "service_physical_therapy", campaignFamilyRef: "campaign_family_intensive_ftr",
-    countryOrRegion: "Arap Bölgesi", audienceStrategy: "Özel hedefleme", platform: "instagram" },
+    countryOrRegion: "Arap Bölgesi", audienceStrategy: "Özel hedefleme", platform: "instagram", conversionRoute: "whatsapp" },
   operatingRule: { rule: { kind: "period_budget_cap", period: "monthly", currency: "TRY", maximumDecimal: "250000" },
     priority: 80, verification: { metric: "cost_per_qualified_lead", reviewCadence: "weekly",
       rollbackWhen: "Kapsam değişirse." }, authority: closed }, createdAt: "2026-08-13T10:00:00.000Z", authority: closed } as const;
@@ -29,7 +29,7 @@ describe("Slice Rule Workspace panel", () => {
     const html = renderToStaticMarkup(createElement(SliceRuleWorkspaceSurface, { state: { status: "ready",
       snapshot: parseSliceRuleWorkspaceSnapshot(snapshot) }, onRetry: vi.fn(), onSaved: vi.fn(async () => undefined) }));
     for (const label of ["Pazar", "Hizmet referansı", "Kampanya ailesi referansı", "Ülke / bölge (opsiyonel)",
-      "Hedefleme stratejisi (opsiyonel)", "Platform (opsiyonel)"]) expect(html).toContain(label);
+      "Hedefleme stratejisi (opsiyonel)", "Platform (opsiyonel)", "Sonuç rotası (opsiyonel)"]) expect(html).toContain(label);
     expect(html).toContain("RECOMMENDATION ONLY · AUTHORITY NONE");
     expect(html).toContain("Policy yayınlama: kapalı");
     expect(html).toContain("Action/Meta write: kapalı");

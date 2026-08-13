@@ -22,6 +22,7 @@ const OPTIONAL_DIMENSIONS = Object.freeze({
   countryOrRegion: "geo_market",
   audienceStrategy: "audience_strategy",
   platform: "publisher_platform",
+  conversionRoute: "conversion_route",
 } as const);
 
 function contextInput(context: EffectiveCampaignContext): EffectiveCampaignContextInput {
