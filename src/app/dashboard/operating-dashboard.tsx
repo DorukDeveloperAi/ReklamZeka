@@ -11,6 +11,7 @@ import { PromotionPreflightPanel } from "./promotion-preflight-panel";
 import { AutonomyStudioPanel } from "./autonomy-studio-panel";
 import { GuidanceStudioPanel } from "./guidance-studio-panel";
 import { SliceRuleWorkspacePanel } from "./slice-rule-workspace-panel";
+import { DeliveryHealthAlertPanel } from "./delivery-health-alert-panel";
 import { CategoryInventoryPanel } from "./category-inventory-panel";
 import { InstructionPolicyStudioPanel } from "./instruction-policy-studio-panel";
 import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel";
@@ -31,7 +32,7 @@ export type OperatingDashboardModel = Readonly<{
   attribution: string;
 }>;
 
-export type DashboardViewId = "today" | "campaigns" | "analysis" | "decision-room" | "practice-lab" | "budgets" | "rules" | "strict-policies" | "categories" | "autonomy" | "agent" | "approvals" | "promotions" | "timeline" | "meta";
+export type DashboardViewId = "today" | "campaigns" | "analysis" | "decision-room" | "practice-lab" | "budgets" | "rules" | "strict-policies" | "categories" | "autonomy" | "agent" | "approvals" | "promotions" | "alerts" | "timeline" | "meta";
 type ViewId = DashboardViewId;
 
 type AgentSessionSummary = Readonly<{
@@ -229,6 +230,7 @@ const navGroups: ReadonlyArray<Readonly<{ label: string; items: ReadonlyArray<Re
     { id: "meta", label: "Meta bağlantısı", icon: "◎" },
     { id: "agent", label: "Orchestrator Agent", icon: "✦", badge: "●" },
     { id: "approvals", label: "Onay kuyruğu", icon: "✓" },
+    { id: "alerts", label: "Teslimat alarmları", icon: "!" },
     { id: "promotions", label: "Gönderi öne çıkarma", icon: "↗" },
     { id: "timeline", label: "Timeline", icon: "↺" },
   ] },
@@ -1059,7 +1061,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
     return <><section className={styles.pageHero}><div><span className={styles.kicker}>APPEND-ONLY TIMELINE</span><h1>Veri, karar ve hareket aynı kronolojide.</h1><p>Sync'ten outcome'a kadar bizim ve Meta üzerindeki harici değişikliklerin tamamı tek izde.</p></div><button className={styles.secondaryButton}>Filtrele</button></section><section className={styles.panel}><div className={styles.timeline}>{timeline.map((event) => <article key={`${event.time}-${event.title}`}><time>{event.time}</time><span className={styles.timelineDot} data-type={event.type} /><div><StatusPill tone="neutral">{event.type}</StatusPill><h2>{event.title}</h2><p>{event.detail}</p><small>{event.actor}</small></div><button aria-label={`${event.title} detayını aç`}>→</button></article>)}</div></section></>;
   }
 
-  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel /> : activeView === "rules" ? <><SliceRuleWorkspacePanel /><GuidanceStudioPanel onOpenSession={() => navigate("decision-room")} /></> : activeView === "strict-policies" ? <InstructionPolicyStudioPanel initialCampaignIntentTemplate={draftPolicyTemplate} /> : activeView === "categories" ? <CategoryInventoryPanel onOpenSession={() => navigate("decision-room")} /> : activeView === "autonomy" ? <AutonomyStudioPanel /> : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? <ApprovalQueuePanel campaignRef={approvalQueueCampaignRef} /> : activeView === "promotions" ? <PromotionPreflightPanel /> : renderTimeline();
+  const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel /> : activeView === "rules" ? <><SliceRuleWorkspacePanel /><GuidanceStudioPanel onOpenSession={() => navigate("decision-room")} /></> : activeView === "strict-policies" ? <InstructionPolicyStudioPanel initialCampaignIntentTemplate={draftPolicyTemplate} /> : activeView === "categories" ? <CategoryInventoryPanel onOpenSession={() => navigate("decision-room")} /> : activeView === "autonomy" ? <AutonomyStudioPanel /> : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? <ApprovalQueuePanel campaignRef={approvalQueueCampaignRef} /> : activeView === "promotions" ? <PromotionPreflightPanel /> : activeView === "alerts" ? <DeliveryHealthAlertPanel /> : renderTimeline();
 
   return <main className={styles.appShell}>
     <aside className={styles.sidebar}>
