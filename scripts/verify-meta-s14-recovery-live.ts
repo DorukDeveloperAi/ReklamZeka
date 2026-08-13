@@ -1,39 +1,34 @@
 import { existsSync } from "node:fs";
-import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
-import {
-  recoverMetaPostMediaInventoryFromCreativeEvidence,
-  type MetaCreativePostRecoveryTarget,
-} from "@/connectors/meta/post-media-inventory";
+import { discoverMetaAssetMirror } from "@/connectors/meta/asset-mirror";
 import type { MetaFetch } from "@/connectors/meta/graph-client";
-import * as schema from "@/db/schema";
+import {
+  MetaS14LiveAssetContentService,
+  type MetaAssetContentPageWriter,
+} from "@/connectors/meta/sync/live-asset-content-service";
+import type { MetaAssetContentPage, MetaAssetContentWriteSummary } from "@/connectors/meta/sync/asset-content-persistence";
+import { planMetaReadSync } from "@/connectors/meta/sync/planner";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 
-const databaseUrl = process.env.DATABASE_URL?.trim();
 const token = process.env.META_ACCESS_TOKEN?.trim();
 const workspaceId = process.env.META_S14_RECOVERY_WORKSPACE_ID?.trim();
 const connectionId = process.env.META_S14_RECOVERY_CONNECTION_ID?.trim();
-const maxActors = Number(process.env.META_S14_RECOVERY_MAX_TARGET_ACTORS ?? "5");
+const connectionExternalKey = process.env.META_S14_RECOVERY_CONNECTION_EXTERNAL_KEY?.trim();
+const maxAccounts = Number(process.env.META_S14_RECOVERY_MAX_ACCOUNTS ?? "2");
 
-if (!databaseUrl) throw new Error("DATABASE_URL yapılandırılmadı");
 if (!token) throw new Error("META_ACCESS_TOKEN yapılandırılmadı");
 if (process.env.META_TOKEN_SECURITY_STATUS !== "rotated") {
   throw new Error("META_TOKEN_SECURITY_STATUS=rotated olmadan canlı recovery doğrulaması çalışmaz");
 }
-if (!workspaceId || !connectionId) {
-  throw new Error("META_S14_RECOVERY_WORKSPACE_ID ve META_S14_RECOVERY_CONNECTION_ID yapılandırılmalı");
+if (!workspaceId || !connectionId || !connectionExternalKey) {
+  throw new Error("META_S14_RECOVERY_WORKSPACE_ID, META_S14_RECOVERY_CONNECTION_ID ve META_S14_RECOVERY_CONNECTION_EXTERNAL_KEY yapılandırılmalı");
 }
-if (!Number.isSafeInteger(maxActors) || maxActors < 1 || maxActors > 10) {
-  throw new Error("META_S14_RECOVERY_MAX_TARGET_ACTORS 1-10 aralığında olmalı");
+if (!Number.isSafeInteger(maxAccounts) || maxAccounts < 1 || maxAccounts > 5) {
+  throw new Error("META_S14_RECOVERY_MAX_ACCOUNTS 1-5 aralığında olmalı");
 }
 
-const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 20_000 });
-const database = drizzle(pool, { schema });
 let getNetworkCalls = 0;
 let writeNetworkCalls = 0;
-
 const trackedFetch: MetaFetch = async (input, init) => {
   const method = (init?.method ?? "GET").toUpperCase();
   if (method !== "GET") {
@@ -46,80 +41,106 @@ const trackedFetch: MetaFetch = async (input, init) => {
   return fetch(input, { ...init, signal });
 };
 
-try {
-  // Targets are derived only from canonical persisted post↔actor evidence.
-  // The verifier never writes Meta or the local database.
-  const evidence = await database.select({
-    actorType: schema.metaAssets.assetType,
-    actorExternalId: schema.metaAssets.externalAssetId,
-    externalPostId: schema.metaPosts.externalPostId,
-  }).from(schema.metaCreatives)
-    .innerJoin(schema.metaPosts, eq(schema.metaCreatives.postId, schema.metaPosts.id))
-    .innerJoin(schema.metaAssets, eq(schema.metaPosts.actorAssetId, schema.metaAssets.id))
-    .where(and(
-      eq(schema.metaCreatives.workspaceId, workspaceId),
-      eq(schema.metaPosts.workspaceId, workspaceId),
-      eq(schema.metaPosts.metaConnectionId, connectionId),
-      eq(schema.metaAssets.workspaceId, workspaceId),
-      eq(schema.metaAssets.metaConnectionId, connectionId),
-      isNotNull(schema.metaCreatives.postId),
-      inArray(schema.metaAssets.assetType, ["facebook_page", "instagram_account"]),
-    ))
-    .orderBy(asc(schema.metaPosts.externalPostId))
-    .limit(maxActors * 10);
-  const targetByActor = new Map<string, MetaCreativePostRecoveryTarget[]>();
-  for (const row of evidence) {
-    if (row.actorType !== "facebook_page" && row.actorType !== "instagram_account") continue;
-    const target: MetaCreativePostRecoveryTarget = {
-      actorType: row.actorType,
-      actorExternalId: row.actorExternalId,
-      externalPostId: row.externalPostId,
-    };
-    const key = `${target.actorType}:${target.actorExternalId}`;
-    if (!targetByActor.has(key) && targetByActor.size >= maxActors) continue;
-    targetByActor.set(key, [...(targetByActor.get(key) ?? []), target]);
+/** In-memory canonical boundary: observes only Graph-verified persistence candidates. */
+class CapturingWriter implements MetaAssetContentPageWriter {
+  readonly pages: MetaAssetContentPage[] = [];
+
+  async writePage(page: MetaAssetContentPage): Promise<MetaAssetContentWriteSummary> {
+    this.pages.push(structuredClone(page));
+    const recordCount = (page.assetSnapshot?.assets.length ?? 0)
+      + (page.assetSnapshot?.edges.length ?? 0)
+      + (page.assetSnapshot?.discoveries.length ?? 0)
+      + (page.postMediaInventory?.items.length ?? 0)
+      + (page.postMediaInventory?.discoveries.length ?? 0)
+      + page.content.length;
+    return { inserted: recordCount, updated: 0, unchanged: 0, stale: 0, cursor: page.cursor, recordCount };
   }
-  const targets = [...targetByActor.values()].flat();
-  if (targets.length === 0) {
-    console.log(JSON.stringify({
-      schemaVersion: "meta-s14-recovery-live-v1",
-      status: "partial",
-      reason: "no_persisted_actor_post_evidence",
-      persistedEvidence: { candidateRows: evidence.length, targetActors: 0, targetPosts: 0 },
-      recovery: { recoveredItems: 0, verifiedDiscoveries: 0, partialDiscoveries: 0 },
-      metaNetwork: { getCalls: getNetworkCalls, writeCalls: writeNetworkCalls },
-      localDatabaseWrites: 0,
-    }));
-    process.exitCode = 2;
-  } else {
-    const inventory = await recoverMetaPostMediaInventoryFromCreativeEvidence({
-      token,
-      workspaceId,
-      connectionExternalKey: connectionId,
-      targets,
-      fetchImpl: trackedFetch,
-      maxPagesPerActor: 1,
-    });
-    const verifiedDiscoveries = inventory.discoveries.filter((entry) => entry.status === "verified" || entry.status === "empty").length;
-    const partialDiscoveries = inventory.discoveries.length - verifiedDiscoveries;
-    const status = writeNetworkCalls !== 0
-      ? "unavailable"
-      : inventory.items.length === 0 || partialDiscoveries > 0
-        ? "partial"
-        : "completed";
-    console.log(JSON.stringify({
-      schemaVersion: "meta-s14-recovery-live-v1",
-      status,
-      reason: inventory.items.length === 0
-        ? "no_exact_actor_post_returned"
-        : partialDiscoveries > 0 ? "some_actor_edges_unavailable" : null,
-      persistedEvidence: { candidateRows: evidence.length, targetActors: targetByActor.size, targetPosts: targets.length },
-      recovery: { recoveredItems: inventory.items.length, verifiedDiscoveries, partialDiscoveries },
-      metaNetwork: { getCalls: getNetworkCalls, writeCalls: writeNetworkCalls },
-      localDatabaseWrites: 0,
-    }));
-    if (status !== "completed") process.exitCode = 2;
-  }
-} finally {
-  await pool.end();
+}
+
+// Server-owned account discovery is the only source of selected accounts. No
+// account, actor, post, raw ID or token is accepted from a client or printed.
+const assetSnapshot = await discoverMetaAssetMirror({
+  token,
+  workspaceId,
+  connectionExternalKey,
+  fetchImpl: trackedFetch,
+});
+const selectedAccounts = assetSnapshot.adAccountExternalIds.slice(0, maxAccounts);
+if (selectedAccounts.length === 0) {
+  console.log(JSON.stringify({
+    schemaVersion: "meta-s14-recovery-live-v2",
+    status: "partial",
+    reason: "no_server_discovered_ad_accounts",
+    discovery: { selectedAccounts: 0, assets: assetSnapshot.assets.length, edges: assetSnapshot.edges.length },
+    recovery: { targetActors: 0, recoveredItems: 0 },
+    metaNetwork: { getCalls: getNetworkCalls, writeCalls: writeNetworkCalls },
+    localDatabaseWrites: 0,
+  }));
+  process.exitCode = 2;
+} else {
+  const plan = planMetaReadSync({
+    accountIds: selectedAccounts,
+    dateStart: "2026-01-01",
+    dateStop: "2026-01-01",
+  });
+  const creativeByAdAccountExternalId = Object.fromEntries(plan
+    .filter((slice) => slice.stream === "creative_post")
+    .map((slice) => [slice.accountId, slice.id]));
+  const writer = new CapturingWriter();
+  const service = new MetaS14LiveAssetContentService({
+    secretResolver: { resolve: async () => token },
+    beginPersistenceRun: async () => writer,
+    fetchImpl: trackedFetch,
+    // Reuse the authoritative server-owned `/me/accounts` snapshot collected
+    // above; the service then performs bounded creative + exact recovery reads.
+    discoverAssets: async () => assetSnapshot,
+    maxPagesPerAccount: 1,
+    maxPagesPerActor: 1,
+    accountConcurrency: 1,
+    initialPageSize: 25,
+    minPageSize: 25,
+    maxAttempts: 1,
+  });
+  const result = await service.run({
+    runId: "meta-s14-recovery-live",
+    workspaceId,
+    connectionId,
+    connectionExternalKey,
+    secretReference: "env:META_ACCESS_TOKEN",
+    selectedAdAccountExternalIds: selectedAccounts,
+    sliceKeys: {
+      asset: "meta-s14-recovery:asset",
+      postMedia: "meta-s14-recovery:post-media",
+      creativeByAdAccountExternalId,
+    },
+  });
+  const recoveredInventory = writer.pages.find((page) => page.postMediaInventory)?.postMediaInventory;
+  const recoveredItems = recoveredInventory?.items.length ?? 0;
+  const status = writeNetworkCalls !== 0
+    ? "unavailable"
+    : recoveredItems === 0 || result.postInventoryEvidence.partialDiscoveries > 0
+      ? "partial"
+      : "completed";
+  console.log(JSON.stringify({
+    schemaVersion: "meta-s14-recovery-live-v2",
+    status,
+    reason: recoveredItems === 0 ? "no_exact_actor_post_returned" : status === "partial" ? "some_actor_edges_unavailable" : null,
+    discovery: {
+      selectedAccounts: selectedAccounts.length,
+      assets: assetSnapshot.assets.length,
+      edges: assetSnapshot.edges.length,
+      creativeRecords: result.creativeEvidence.contentRecords,
+      existingPostBindings: result.creativeEvidence.existingPostBindings,
+    },
+    recovery: {
+      targetActors: result.postInventoryEvidence.recoveryTargetActors,
+      recoveredItems,
+      verifiedDiscoveries: result.postInventoryEvidence.verifiedDiscoveries,
+      partialDiscoveries: result.postInventoryEvidence.partialDiscoveries,
+      graphVerifiedOnly: true,
+    },
+    metaNetwork: { getCalls: getNetworkCalls, writeCalls: writeNetworkCalls },
+    localDatabaseWrites: 0,
+  }));
+  if (status !== "completed") process.exitCode = 2;
 }
