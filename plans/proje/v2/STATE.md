@@ -26,7 +26,11 @@
   tamamlanmış sayılmaz; recovery komutu bu state'i idempotent checkpoint'ten sürdürür.
   Sunucu yapılandırmasındaki doğrulanmış tek hesap için ayrık inventory/ad-set recovery lane'i canlıda
   `completed` oldu; lane yalnız GET yapar, requestten account/stream kabul etmez ve aynı durable
-  cursor/parent üzerinden tekrar başlatılır. Creative ve insight için eşdeğer ayrı lane'ler hâlâ açık.
+  cursor/parent üzerinden tekrar başlatılır. Creative için ayrı canonical lane ilk canlı checkpoint'te
+  **145 creative** ve **180 ad–creative bağı** yazdı; post/Page/Instagram aktör kanıtı bu dar ads
+  lane'inde okunmadığından post ilişkisi bilerek `unresolved` bırakılır, uydurulmaz. Insight lane'i
+  teknik olarak `completed` döndü fakat seçili yedi günlük pencerede Meta günlük insight satırı
+  döndürmedi; metrik/performance önerileri bu hesap için hâlâ `unavailable` kalır.
 - `/api/meta/read-mirror` Dashboard'un kullandığı canonical DB read-model'idir; eski
   `/api/meta/inventory` route'u bilinçli biçimde `503` kalır. Hiyerarşinin campaign kısmı mevcut
   tenantta gerçek veriye bağlıdır. Ad-set/ad/creative/insight tamamlaması ve ayrıntılı immutable
