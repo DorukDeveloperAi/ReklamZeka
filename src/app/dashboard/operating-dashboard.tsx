@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MetaInventoryAccount, MetaInventoryApiError, MetaInventorySnapshot } from "@/connectors/meta/types";
 import type { MetaReadMirrorProjection } from "@/domain/meta/read-mirror-projection";
+import type { MetaBootstrapPreflight } from "@/connectors/meta/bootstrap-preflight";
 import { DecisionRoomPanel } from "./decision-room-panel";
 import { BudgetLabPanel } from "./budget-lab-panel";
 import { PracticeLabPanel } from "./practice-lab-panel";
@@ -134,6 +135,19 @@ export function metaReadMirrorErrorState(status: number, value: unknown): Exclud
   if ((status === 401 || status === 403) && plainRecord(value) && plainRecord(value.error)
     && ["local_session_required", "forbidden"].includes(value.error.code as string)) return "session_required";
   return "unavailable";
+}
+
+/** The public preflight is intentionally capability-free and secret-free. */
+export function metaBootstrapPreflightFromResponse(value: unknown): MetaBootstrapPreflight | null {
+  if (!plainRecord(value) || value.schemaVersion !== 1 || value.phase !== "preflight" || value.accessMode !== "read_only"
+    || !["configured", "blocked"].includes(value.readiness as string)
+    || !(value.blocker === null || ["rotation_required", "explicit_security_status_required", "secret_binding_missing"].includes(value.blocker as string))
+    || !["temporary_exposed", "secure", "unknown"].includes(value.securityStatus as string)
+    || typeof value.secretBindingConfigured !== "boolean" || value.doctorExecuted !== false || value.bootstrapExecuted !== false
+    || value.networkCalls !== 0 || value.writeOperations !== 0 || typeof value.message !== "string" || typeof value.nextStep !== "string") return null;
+  if (value.readiness === "configured" ? value.blocker !== null || value.securityStatus !== "secure" || !value.secretBindingConfigured
+    : value.blocker === null) return null;
+  return Object.freeze(value as unknown as MetaBootstrapPreflight);
 }
 
 /**
@@ -474,6 +488,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   const [metaReadMirror, setMetaReadMirror] = useState<MetaReadMirrorProjection | null>(null);
   const [metaReadMirrorState, setMetaReadMirrorState] = useState<MetaReadMirrorLoadState>("loading");
   const [metaReadMirrorError, setMetaReadMirrorError] = useState<string | null>(null);
+  const [metaBootstrapPreflight, setMetaBootstrapPreflight] = useState<MetaBootstrapPreflight | null>(null);
   const [selectedMirrorAccountRef, setSelectedMirrorAccountRef] = useState("");
   const [portfolioCapability, setPortfolioCapability] = useState<PortfolioCapabilitySummary | null>(null);
   const [portfolioCapabilityState, setPortfolioCapabilityState] = useState<"loading" | "ready" | "session_required" | "unavailable">("loading");
@@ -552,6 +567,14 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
     }
   }, []);
 
+  const refreshMetaBootstrapPreflight = useCallback(async () => {
+    try {
+      const response = await fetch("/api/meta/bootstrap-status", { cache: "no-store", credentials: "same-origin" });
+      const candidate: unknown = await response.json();
+      setMetaBootstrapPreflight(response.ok ? metaBootstrapPreflightFromResponse(candidate) : null);
+    } catch { setMetaBootstrapPreflight(null); }
+  }, []);
+
   const refreshAgentSessions = useCallback(async (announce = false) => {
     setAgentSessionsLoading(true);
     setAgentSessionError(null);
@@ -587,6 +610,8 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
     const timer = window.setInterval(() => void refreshMetaReadMirror(), 15 * 60_000);
     return () => window.clearInterval(timer);
   }, [refreshMetaReadMirror]);
+
+  useEffect(() => { void refreshMetaBootstrapPreflight(); }, [refreshMetaBootstrapPreflight]);
 
   useEffect(() => { void refreshAgentSessions(); }, [refreshAgentSessions]);
 
@@ -980,10 +1005,17 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   }
 
   function renderMetaConnection() {
+    const preflight = metaBootstrapPreflight;
+    const preflightNotice = preflight ? <section className={`${styles.panel} ${styles.metaEmpty}`} aria-label="Meta bootstrap güvenlik ön kontrolü">
+      <StatusPill tone={preflight.readiness === "configured" ? "good" : "warning"}>{preflight.readiness === "configured" ? "Salt-okunur doctor hazır" : "Bootstrap kapalı"}</StatusPill>
+      <h2>{preflight.message}</h2><p>{preflight.nextStep}</p>
+      <small>Doctor: çalıştırılmadı · Bootstrap: çalıştırılmadı · Network: 0 · Meta write: 0</small>
+    </section> : null;
     if (!metaInventory) {
       return <>
         <section className={styles.pageHero}><div><span className={styles.kicker}>META READ MIRROR</span><h1>Meta erişim envanteri hazırlanıyor.</h1><p>Token yalnız sunucu tarafında okunur; dashboard ve agent bağlamına hiçbir zaman eklenmez.</p></div><button className={styles.primaryButton} disabled={metaLoading} onClick={() => void refreshMetaInventory(true)}>{metaLoading ? "Kontrol ediliyor…" : "Yeniden dene"}</button></section>
         {renderCanonicalMetaMirror()}
+        {preflightNotice}
         <section className={`${styles.panel} ${styles.metaEmpty}`}><StatusPill tone={metaError ? "danger" : "neutral"}>{metaError ? "Bağlantı hatası" : "Salt okunur keşif"}</StatusPill><h2>{metaError ?? "Meta Graph yanıtı bekleniyor"}</h2><p>Bu alan yalnız Graph erişim envanteridir; kanonik DB aynasının yerine geçmez. Hiçbir kampanya, bütçe, reklam seti veya reklam değiştirilmiyor.</p></section>
         <section className={styles.panel} aria-label="Portföy kapsamı"><header className={styles.panelHeader}><div><span className={styles.kicker}>PORTFÖY KAPSAMI</span><h2>Hesap grupları ve salt-okur erişim</h2></div><StatusPill tone={portfolioCapabilityState === "session_required" ? "warning" : "neutral"}>{portfolioCapabilityState === "session_required" ? "Oturum gerekli" : "Kaynak yok"}</StatusPill></header><p className={styles.metaAccountEmpty}>{portfolioCapabilityState === "session_required" ? "Gerçek hesap gruplarını görmek için önce yerel dashboard oturumunu bağlayın." : "Portföy kapsamı kaynağı henüz güvenli biçimde bağlanmadı; demo gruplar gösterilmiyor."}</p><p className={styles.safetyNote}>Bu görünümden bütçe, yayın, onay veya Meta yazma yapılamaz.</p></section>
       </>;
@@ -1000,6 +1032,8 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       </section>
 
       {inventory.connection.securityStatus === "temporary_exposed" ? <section className={styles.securityBanner}><span>!</span><div><strong>Geçici ve riskli kimlik bilgisi</strong><p>Bu token daha önce terminal çıktısında göründü. Salt okunur kullanım zorlanıyor; ilk bakım adımı token rotasyonu olmalı.</p></div><StatusPill tone="warning">Rotation gerekli</StatusPill></section> : null}
+
+      {preflightNotice}
 
       {renderCanonicalMetaMirror()}
 

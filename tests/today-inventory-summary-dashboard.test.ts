@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   OperatingDashboard,
+  metaBootstrapPreflightFromResponse,
   metaReadMirrorErrorState,
   metaReadMirrorFromResponse,
   portfolioCapabilityFromResponse,
@@ -28,6 +29,16 @@ function inventory(): MetaInventorySnapshot {
 }
 
 describe("Today inventory summary", () => {
+  it("accepts only the secret-free, zero-network Meta bootstrap preflight contract", () => {
+    const preflight = { schemaVersion: 1, phase: "preflight", accessMode: "read_only", readiness: "blocked",
+      blocker: "rotation_required", securityStatus: "temporary_exposed", secretBindingConfigured: true,
+      doctorExecuted: false, bootstrapExecuted: false, networkCalls: 0, writeOperations: 0,
+      message: "Bağlantı kapalı", nextStep: "Tokenı döndürün" } as const;
+    expect(metaBootstrapPreflightFromResponse(preflight)).toEqual(preflight);
+    expect(metaBootstrapPreflightFromResponse({ ...preflight, networkCalls: 1 })).toBeNull();
+    expect(metaBootstrapPreflightFromResponse({ ...preflight, bootstrapExecuted: true })).toBeNull();
+  });
+
   it("accepts only a canonical mirror with zero action authority", () => {
     const projection = {
       version: "meta-read-mirror-projection/1.0.0", sourceState: "empty",
