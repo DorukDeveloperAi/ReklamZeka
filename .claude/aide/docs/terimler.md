@@ -144,6 +144,22 @@ ama yeni adı söyler.)
 | **yedek yüklemi** | daemonun ne zaman devrede olduğunun TEK ölçütü olan kapalı yüklem: `YEDEK_DEVREDE ⟺ saat-güdümlü∧olay-karşılıksız ∨ rol-oturumu-yok ∨ oturum-kırık`. Kanonu `docs/otonomi-merdiveni.md` §4.1 (İŞARETÇİ — kopyalanmaz); kod-içi hâli `yedek-yuklemi.ts`, yüzeyi `aide otomasyon durum` yedek ekseni (BİLGİ — kök hükme sızmaz). Sınıf: yüklem/motor · 0 token. |
 | **ilanlı bekleme** | "yedek GEREKLİ ∧ daemon kapalı" hâlinin ALARM DEĞİL KAYIT olarak basılması (K-OO1 sıra kararının görünür izi) — `onar:` satırı TAŞIMAZ: çare metronomu açmak değil, kararın kendisidir. Kalıcı kırmızı yerine ilan: alarm körelmesinin panzehiri. |
 
+## Sınıf 5b — AIDE S  → kanon zincir DIŞINDA
+
+AIDE S'in (karargâh · harita · koşum · hakem · triaj) TAM sözlüğü **`docs/aide-l.md`**'dedir
+(Mod 1) ve **`docs/aide-l-zamanlama.md`**'de (zamanlama katmanı). Sınıf 6 emsali: **burada liste
+YOK, çünkü ikinci kopya yalanlaşır.**
+
+Zincirde yalnız DAVRANIŞ DEĞİŞTİREN üç kural kalır — gerisi işaretçiye iner:
+
+| terim | tek cümle |
+|---|---|
+| **karargâh** | vizyon+plan masası. Anayasası `KURALLAR.md`⊕`ilkeler.md`⊕`KUZEY.md`; onu DEĞİŞTİREMEZ. Çelişen girdiyi REDDETMEZ, BEKLETİR. |
+| **hüküm zinciri** | H1 plan kalitesi (giriş) · H2/H3 iş (toggle'lı) · H4 tamamlandı (çıkış). **H1 ve H4 kapatılamaz**; H2/H3 kapalıysa teslim `öz-onay:<kademe>` damgası taşır. |
+| **⊤ (beyansız)** | `dokunur:` beyanı olmayan iş. **Yapı değil POLİTİKA**: harita onu kendi kanalına koyar, temkin dağıtımda uygulanır. |
+
+Yeni bir AIDE S terimi ORAYA eklenir (yazım sözleşmesi md.6 oraya da uygulanır).
+
 ## Sınıf 6 — plan katmanı  → kanon zincir DIŞINDA
 
 Plan katmanının TAM sözlüğü **`docs/plan-katmani.md` § 4e**'dedir (taşıma anında 21 terimdi;
