@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: d374dfbddc4b -->
+<!-- durum-damga: afa6357e6496 -->
 
 ## Künye
 
@@ -14,13 +14,14 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 313 |
+| iş commit'i (tüm geçmiş) | 314 |
 | ilk / son iş | 2026-08-06 / 2026-08-13 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-13 | `docs` | add completion execution roadmap | `091dc7d8d` |
 | 2026-08-13 | `feat` | guide manual Codex tasks by page | `b4fc3de71` |
 | 2026-08-13 | `feat` | add manual Codex task handoff | `5c2cc2e75` |
 | 2026-08-13 | `feat` | add delivery health alert contract | `bb9848dfd` |
@@ -35,13 +36,12 @@
 | 2026-08-12 | `feat` | resolve scoped campaign evaluation cohorts | `303223af3` |
 | 2026-08-12 | `feat` | scope comparisons by campaign family | `728f53432` |
 | 2026-08-12 | `feat` | recognize route naming variants safely | `4538eba61` |
-| 2026-08-12 | `feat` | scope rules to campaign families | `930eb9e7c` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 45
+- `feat        ` ████████████████████████ 44
 - `fix         ` █████ 10
-- `docs        ` ██ 3
+- `docs        ` ██ 4
 - `test        ` █ 2
 
 ## Planlar

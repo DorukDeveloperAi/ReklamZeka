@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "091dc7d8d",
+      "tarih": "2026-08-13",
+      "konu": "docs(plan): add completion execution roadmap",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
       "hash": "b4fc3de71",
       "tarih": "2026-08-13",
       "konu": "feat(dashboard): guide manual Codex tasks by page",
@@ -128,21 +137,12 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "930eb9e7c",
-      "tarih": "2026-08-12",
-      "konu": "feat(rules): scope rules to campaign families",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 45
+      "adet": 44
     },
     {
       "kapsam": "fix",
@@ -150,14 +150,14 @@
     },
     {
       "kapsam": "docs",
-      "adet": 3
+      "adet": 4
     },
     {
       "kapsam": "test",
       "adet": 2
     }
   ],
-  "isSayisi": 313,
+  "isSayisi": 314,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-13",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "d374dfbddc4b"
+  "damga": "afa6357e6496"
 }
