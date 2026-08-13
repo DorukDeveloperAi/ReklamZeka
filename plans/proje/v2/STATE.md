@@ -101,6 +101,9 @@
   türü preview üretmez. Preview persistence/proposal/approval/action/Meta write oluşturmaz. Ayrı ve
   açık “öneri taslağını kaydet” isteği, preview'ı tekrar doğrular ve immutable rule→BudgetProposal
   provenance bağını kaydeder; policy yayınlama, approval, action, otomasyon ve Meta write yine kapalıdır.
+- Dönüşüm rotası (`lead_form|whatsapp|landing_page`) artık serbest metin değildir: yalnız frozen
+  `conversion_route` category evidence içinden tekil ve canonical biçimde çözülür; yoksa veya
+  çelişirse impact `needs_review` kalır.
 - Teslimat Alarmları Dashboard yüzeyi, confirmed/suspected ayrımı, atama, checklist, insan workflow
   durumu ve recommendation hold bilgisini gösterir. UI yalnız server-izinli `assign/start/check/resolve/
   reopen` geçişini sunar; approval/execute/automation/Meta write kontrolü yoktur.
@@ -138,6 +141,9 @@
   tek korelasyon grafiğinde birleştirilmesi sonraki dilimdir. Ancak gösterilen kayıtlar artık demo
   değil; boş veya unavailable durum açıkça gösterilir. Yetki bütün response/UI katmanında publish,
   approve, execute, automation ve Meta write için kapalıdır.
+- Approval Queue detail v1.4, mevcut ActionUnit summary hash'ini yeniden doğruladıktan sonra
+  public-safe kaynak kanıt etiketlerini ve append-only insan karar geçmişini zaman sırasıyla gösterir.
+  Bu yalnız karar izidir; yeni approval semantiği, execution veya Meta write yüzeyi oluşturmaz.
 
 ## 2026-08-12 — Portföy pazar sınırı
 
