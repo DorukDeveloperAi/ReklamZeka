@@ -15,6 +15,19 @@
 - `yerli/yabancı` sınırı, tahminle künye yasağı, draft≠policy, iki kişi policy yayını ve agentın
   publish/approve/execute/Meta-write yetkisinin kapalı kalması bütün fazlarda değişmezdir.
 
+## 2026-08-13 — Dashboard güvenlik sınırı tarayıcı kabulü
+
+- Yerel Dashboard, oturumsuz gerçek tarayıcıda kontrol edildi. `Kurallar & akışlar` alanı Bütçe
+  Havuzları, Guidance → Normalization → Slice Rule yüzeylerini görünür kılıyor; kalıcı kayıt
+  gerektiren her panel yerel oturum bağlanana kadar açıkça `kaynak bağlı değil`/`oturum gerekli`
+  durumunda ve yazma denetimleri kapalıdır. Demo havuz veya kural kaydı üretilmedi.
+- Onay Kuyruğu, kaynak olmadan fixture satırı göstermiyor; `approval_only`, execute kapalı ve
+  Meta write kapalı durumunu açıkça gösteriyor. Orchestrator yüzeyi aynı şekilde session yokken
+  composer'ı devre dışı bırakıyor ve yalnız manuel aktarım fall-back'ini bırakıyor.
+- Tarayıcı konsolunda hata/uyarı görülmedi. Bu yalnız **oturumsuz fail-closed** kabulüdür; gerçek
+  workspace principal ile Rule → BudgetProposal → ActionUnit → insan kararı ve gerçek Meta
+  read-mirror hiyerarşisi browser kabulü hâlâ açıktır.
+
 ## 2026-08-13 — Faz 0 kanıt/durum uzlaştırması
 
 - **Salt-okunur Meta bootstrap'i gerçek tenantta çalıştırıldı.** Güvenlik işareti `rotated` sonrası
