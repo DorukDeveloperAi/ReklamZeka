@@ -11,6 +11,7 @@ import { SliceRuleWorkspaceService } from "@/application/slice-rule-workspace-se
 import { DrizzleApprovalPolicyRegistryRepository } from "@/connectors/actions/approval-policy-registry-drizzle-repository";
 import { DrizzleBudgetProposalRepository } from "@/connectors/budget/budget-proposal-drizzle-repository";
 import { DrizzleCategoryAuthoringRepository } from "@/connectors/categories/category-authoring-drizzle-repository";
+import { DrizzleCategoryProfileLifecycleRepository } from "@/connectors/categories/category-profile-lifecycle-drizzle-repository";
 import { DrizzleSliceRuleAllocationEntityBindingRepository } from "@/connectors/campaigns/slice-rule-allocation-entity-binding-drizzle-repository";
 import { DrizzleSliceRuleBudgetActionUnitMaterializer } from "@/connectors/campaigns/slice-rule-budget-action-unit-materializer";
 import { DrizzleSliceRuleScenarioAllocationSelectionRepository } from "@/connectors/campaigns/slice-rule-scenario-allocation-selection-drizzle-repository";
@@ -34,11 +35,16 @@ const now = new Date(); const proposedAt = new Date(now.getTime() + 2_000).toISO
 let fixture: Awaited<ReturnType<typeof materializeCurrentEffectiveAnalysisContextSourceFixture>> | null = null;
 async function assignScopeCategories(source: NonNullable<typeof fixture>) {
   const authoring = new DrizzleCategoryAuthoringRepository(database as never); let state = await authoring.inspect(source.workspaceId);
+  const profiles = new DrizzleCategoryProfileLifecycleRepository(database as never);
   for (const [dimension, definition] of [["market", "yabanci"], ["service_line", "service_physical_therapy"], ["campaign_family", "campaign_family_intensive_ftr"]] as const) {
     state = (await authoring.mutate({ workspaceId: source.workspaceId, actorId: source.actorId, actorRef: source.actorRef, role: "owner", occurredAt: proposedAt, command: { operation: "create_dimension", key: dimension, name: dimension, description: null, cardinality: "single", allowedEntityLevels: ["campaign"], expectedRegistryHash: state.registryHash } })).state;
     const dimensionRef = categoryDimensionPublicRef(dimension);
     state = (await authoring.mutate({ workspaceId: source.workspaceId, actorId: source.actorId, actorRef: source.actorRef, role: "owner", occurredAt: proposedAt, command: { operation: "create_definition", dimensionRef, key: definition, label: definition, description: null, expectedRegistryHash: state.registryHash } })).state;
     state = (await authoring.mutate({ workspaceId: source.workspaceId, actorId: source.actorId, actorRef: source.actorRef, role: "owner", occurredAt: proposedAt, command: { operation: "create_assignment", dimensionRef, definitionRef: categoryDefinitionPublicRef(dimension, definition), entityLevel: "campaign", entityRef: categoryEntityPublicRef(source.workspaceId, "campaign", source.campaignId), viaAdRef: null, assignmentOperation: "override", manualLock: false, confidenceBasisPoints: 10_000, expectedRegistryHash: state.registryHash } })).state;
+    let profileState = await profiles.inspect(source.workspaceId, source.workspaceRef);
+    const created = await profiles.mutate({ workspaceId: source.workspaceId, workspaceRef: source.workspaceRef, actorId: source.actorId, actorRef: source.actorRef, role: "owner", occurredAt: proposedAt, command: { operation: "create_draft", definitionRef: categoryDefinitionPublicRef(dimension, definition), expectedRegistryHash: profileState.registryHash, parentDefinitionRef: null, label: definition, description: "Authentic approval-chain fixture", color: "#A31F34", bindings: { analysisPlaybookRefs: ["analysis_playbook_approval_chain"], ruleInstructionBundleRefs: [], budgetPolicyRefs: [], transferPolicyRefs: [], schedulePolicyRefs: [], actionPolicyRefs: [], creativePolicyRefs: [] } } });
+    profileState = created.state;
+    await profiles.mutate({ workspaceId: source.workspaceId, workspaceRef: source.workspaceRef, actorId: source.actorId, actorRef: source.actorRef, role: "owner", occurredAt: proposedAt, command: { operation: "publish", profileRef: created.profile.profileRef, expectedVersion: created.profile.version, expectedProfileHash: created.profile.profileHash, expectedRegistryHash: profileState.registryHash, reasonCode: "approval_chain_fixture" } });
   }
 }
 const fetch0 = globalThis.fetch;

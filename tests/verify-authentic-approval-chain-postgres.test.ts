@@ -7,6 +7,9 @@ describe("authentic approval-chain PostgreSQL verifier", () => {
     const source = readFileSync("scripts/verify-authentic-approval-chain-postgres.ts", "utf8");
     expect(source).toContain("materializeReadyBudgetContext(database, source)");
     expect(source).toContain("new SliceRuleWorkspaceService");
+    expect(source).toContain("new DrizzleCategoryProfileLifecycleRepository");
+    expect(source).toContain('operation: "create_draft"');
+    expect(source).toContain('operation: "publish"');
     expect(source).toContain("saveRuleLinkedDraft");
     expect(source).toContain("new DrizzleSliceRuleAllocationEntityBindingRepository");
     expect(source).toContain("new DrizzleSliceRuleScenarioAllocationSelectionRepository");

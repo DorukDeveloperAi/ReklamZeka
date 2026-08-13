@@ -31,7 +31,7 @@ const WORKSPACE_REF = /^workspace_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const SOURCE_FAILURE_CODES = new Set([
   "scope_not_found", "category_scope_unavailable", "category_hierarchy_unavailable",
   "guidance_pack_unavailable", "policy_authority_unavailable", "current_source_bundle_unavailable",
-  "cadence_unavailable", "corrupt_store", "invalid_input",
+  "guidance_selection_unavailable", "meta_scope_unavailable", "cadence_unavailable", "corrupt_store", "invalid_input",
 ]);
 
 /** A finite diagnostic for server-side acceptance, never a database/driver message. */
