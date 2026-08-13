@@ -3731,3 +3731,16 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   mutation yolu, policy/action yetkisi ve Meta write yoktur.
 - Kanıt: `ebf137c`, ilgili classification/scope/category authoring odak testleri, `npm run typecheck`
   ve `git diff --check`.
+
+## 2026-08-14 — Slice kapsamından frozen-context hazırlık görünümü
+
+- Rules yüzeyi, server-derived ve queryless hazırlık read modelinde her tutarlı Slice Scope adayının
+  yalnız iki gerçek kapısını gösterir: geçerli frozen campaign context bulunup bulunmadığı ve aynı
+  immutable scope için Budget Impact'in ilişkisel olarak uygunluğu. Bu eşleme, istemcinin kampanya,
+  account veya context ref'i sunmasıyla değil, canonical aday ve en güncel geçerli frozen kayıtların
+  tenant içi yeniden çözümüyle yapılır.
+- L2/L3 window, temporal öneri veya compose sonucu için eksik kanıttan iddia üretilmez. Görünüm salt
+  okunurdur; context compose, rule/policy save, action ve Meta write çağrısı yapmaz.
+- Kanıt: `c5814de`, `tests/slice-operational-readiness-{service,http}.test.ts`,
+  `tests/slice-scope-candidates.test.ts`, `tests/slice-rule-workspace-panel.test.ts`,
+  `npm run typecheck` ve `git diff --check`.
