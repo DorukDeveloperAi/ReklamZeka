@@ -136,8 +136,13 @@ try {
       decisionRef: "decision_guardrail_approval_chain", reasonRef: "reason_guardrail_approval_chain", publishedAt: proposedAt }));
     const selection = rows(await tx.execute(sql`select id::text as id from slice_rule_scenario_allocation_selections where workspace_id=${source.workspaceId}::uuid and idempotency_key='selection.approval_chain.r1'`))[0]; if (!selection || typeof selection.id !== "string") throw new Error("selection_missing");
     const materializer = new DrizzleSliceRuleBudgetActionUnitMaterializer(tx as never);
-    const first = await materializer.materialize({ workspaceId: source.workspaceId, selectionId: selection.id, actorId: source.actorId, idempotencyKey: "unit.approval_chain.r1", proposedAt, expiresAt });
-    const replay = await materializer.materialize({ workspaceId: source.workspaceId, selectionId: selection.id, actorId: source.actorId, idempotencyKey: "unit.approval_chain.r1", proposedAt, expiresAt });
+    // Evidence is composed immediately above. Evaluate the ActionUnit at the
+    // actual command instant so the strict freshness boundary never treats
+    // newly persisted canonical evidence as future-dated.
+    const materializeAt = new Date().toISOString();
+    const materializeExpiresAt = new Date(Date.parse(materializeAt) + 3_600_000).toISOString();
+    const first = await materializer.materialize({ workspaceId: source.workspaceId, selectionId: selection.id, actorId: source.actorId, idempotencyKey: "unit.approval_chain.r1", proposedAt: materializeAt, expiresAt: materializeExpiresAt });
+    const replay = await materializer.materialize({ workspaceId: source.workspaceId, selectionId: selection.id, actorId: source.actorId, idempotencyKey: "unit.approval_chain.r1", proposedAt: materializeAt, expiresAt: materializeExpiresAt });
     evidence.materialized = first.outcome === "inserted"; evidence.exactReplay = replay.outcome === "unchanged" && replay.actionUnitId === first.actionUnitId;
     const queued = rows(await tx.execute(sql`select unit_payload from action_proposal_units where workspace_id=${source.workspaceId}::uuid and id=${first.actionUnitId}::uuid`))[0]?.unit_payload as { actionAuthority?: unknown; capabilities?: { canExecute?: unknown }; contextHash?: string } | undefined;
     const queue = await new ApprovalQueueReadService(new DrizzleApprovalQueueReadRepository(tx as never, source.workspaceId)).list({ workspaceId: source.workspaceId, limit: 10 });
