@@ -6,6 +6,7 @@ import {
 } from "@/domain/meta/insights/capability-catalog";
 import type { MetaReadPage, MetaReadRequest, MetaReadTransport } from "./types";
 import { META_INVENTORY_FIELD_CATALOG_VERSION } from "./inventory-materialization";
+import { META_CREATIVE_CONTENT_FIELD_CATALOG_VERSION } from "./creative-content-runtime-persistence";
 
 type GraphPage = Readonly<{
   data?: readonly Readonly<Record<string, unknown>>[];
@@ -67,7 +68,7 @@ export class MetaGraphSyncTransport implements MetaReadTransport {
       fields: CREATIVE_POST_FIELDS,
       limit: String(request.limit), ...(request.cursor ? { after: request.cursor } : {}),
     });
-    return this.page(response.data, response.usageHeadroom);
+    return this.page(response.data, response.usageHeadroom, META_CREATIVE_CONTENT_FIELD_CATALOG_VERSION);
   }
 
   private async insights(request: MetaReadRequest): Promise<MetaReadPage> {

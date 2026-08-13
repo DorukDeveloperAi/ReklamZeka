@@ -11,6 +11,9 @@ import type { MetaSecretRepository } from "@/connectors/meta/secret-repository";
 import { MetaGraphSyncTransport } from "@/connectors/meta/sync/graph-transport";
 import { DrizzleMetaInventoryPagePersistence } from "@/connectors/meta/sync/inventory-drizzle-repository";
 import { DrizzleMetaInsightPagePersistence } from "@/connectors/meta/sync/insights-drizzle-repository";
+import { DrizzleMetaAssetContentRepository } from "@/connectors/meta/sync/asset-content-drizzle-repository";
+import { repositoryBackedMetaAssetContentRun } from "@/connectors/meta/sync/live-asset-content-service";
+import { MetaCreativeContentRuntimePersistence } from "@/connectors/meta/sync/creative-content-runtime-persistence";
 import { TransactionBackedMetaSyncPersistenceAdapter, DrizzleMetaSyncTransactionManager } from "@/connectors/meta/sync/persistence-adapter";
 import { planMetaReadSync } from "@/connectors/meta/sync/planner";
 import { MetaPartialReadSyncRuntime, type MetaSyncResult, type MetaSyncRuntimeOptions } from "@/connectors/meta/sync/runtime";
@@ -88,6 +91,8 @@ type ProductionMetaReadSyncDependencies = Readonly<{
   accounts: MetaSyncAccountScopeResolver;
   inventoryPagePersistence: MetaSyncRuntimeOptions["inventoryPagePersistence"];
   insightPagePersistence?: MetaSyncRuntimeOptions["insightPagePersistence"];
+  /** Built only after the authoritative workspace/connection scope is resolved. */
+  creativePagePersistenceFactory?: (scope: ServerDerivedMetaSyncScope) => MetaSyncRuntimeOptions["creativePagePersistence"];
   durablePersistence: MetaSyncRuntimeOptions["persistence"];
   affectedGeoMaterialization?: "completed" | "deferred";
   fetchImpl?: MetaFetch;
@@ -199,6 +204,7 @@ export class ProductionMetaReadSyncService {
         persistence: this.dependencies.durablePersistence,
         inventoryPagePersistence: this.dependencies.inventoryPagePersistence,
         insightPagePersistence: this.dependencies.insightPagePersistence,
+        creativePagePersistence: this.dependencies.creativePagePersistenceFactory?.(scope),
         ...(input.maxAttempts === undefined ? {} : { maxAttempts: input.maxAttempts }),
         ...(input.maxRunDurationMs === undefined ? {} : { deadlineAtEpochMs: Date.now() + input.maxRunDurationMs }),
       });
@@ -302,6 +308,13 @@ export function createDrizzleProductionMetaReadSyncService(input: Readonly<{
         ...(input.inventoryTransactionMode === undefined ? {} : { transactionMode: input.inventoryTransactionMode }),
       }),
     insightPagePersistence: new DrizzleMetaInsightPagePersistence(input.database),
+    creativePagePersistenceFactory: (scope) => new MetaCreativeContentRuntimePersistence({
+      workspaceId: scope.workspaceId,
+      connectionId: scope.connectionId,
+      // The canonical connection repository assigns this stable external key
+      // to the connection id; it is not caller-provided.
+      connectionExternalKey: scope.connectionId,
+    }, repositoryBackedMetaAssetContentRun(new DrizzleMetaAssetContentRepository(input.database))),
     fetchImpl: input.fetchImpl,
     recoveryLane,
   });

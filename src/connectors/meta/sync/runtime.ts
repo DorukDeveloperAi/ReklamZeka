@@ -3,6 +3,7 @@ import { META_SYNC_STREAMS, stableHash, type MetaParentSyncRun, type MetaReadReq
 import type { MetaSyncDurableKey, MetaSyncDurablePersistence } from "./persistence-adapter";
 import { MetaInventoryMaterializationError, parseMetaInventoryPage, type MetaInventoryPagePersistencePort } from "./inventory-materialization";
 import type { MetaInsightSourcePagePersistencePort } from "./insights-materialization";
+import type { MetaCreativeSourcePagePersistencePort } from "./creative-content-runtime-persistence";
 
 type MutableStreamRun = { -readonly [Key in keyof MetaStreamRun]: MetaStreamRun[Key] } & { completedSliceIds: string[]; cursorBySlice: Record<string, { cursor: string | null; cursorId: string; updatedAt: string }> };
 type MutableParentRun = { -readonly [Key in keyof MetaParentSyncRun]: MetaParentSyncRun[Key] } & { streamRunIds: string[] };
@@ -55,6 +56,7 @@ export type MetaSyncRuntimeOptions = Readonly<{
   persistence?: MetaSyncDurablePersistence;
   inventoryPagePersistence?: MetaInventoryPagePersistencePort;
   insightPagePersistence?: MetaInsightSourcePagePersistencePort;
+  creativePagePersistence?: MetaCreativeSourcePagePersistencePort;
   /** Server-owned boundary: stop only between checkpointed pages. */
   deadlineAtEpochMs?: number;
 }>;
@@ -226,6 +228,31 @@ export class MetaPartialReadSyncRuntime {
           } };
         }
       }
+      if (this.options.creativePagePersistence && slice.stream === "creative_post" && slice.entityLevel === "ad") {
+        try {
+          if (!page.sourceGraphVersion || !page.fieldCatalogVersion) {
+            throw new Error("Creative provenance metadata is missing");
+          }
+          // The canonical writer's checkpoint is FK-bound to this exact
+          // durable slice. Make the current cursor visible before it writes;
+          // this mirrors the insight path and never advances to nextCursor.
+          stream.cursorBySlice[slice.id] = { cursor, cursorId, updatedAt: this.now().toISOString() };
+          this.store.saveStream(stream);
+          await this.persist(durableKey);
+          await this.options.creativePagePersistence.writeSourcePage({
+            workspaceId: parent.workspaceId, connectionId: parent.connectionId,
+            externalAccountId: slice.accountId, parentRunId: parent.id,
+            sliceId: slice.id, cursorId, nextCursor: page.nextCursor, observedAt,
+            sourceGraphVersion: page.sourceGraphVersion, fieldCatalogVersion: page.fieldCatalogVersion,
+            records: page.records,
+          });
+        } catch {
+          return { completed: false, inserted, updated, unchanged, error: {
+            reason: "malformed_response", retryable: false,
+            message: "Meta creative/Page/Instagram canonical materialization doğrulaması başarısız",
+          } };
+        }
+      }
       for (const payload of page.records) {
         const externalId = typeof payload.id === "string" ? payload.id : stableHash(payload);
         const identity = `${parent.workspaceId}:${parent.connectionId}:${slice.accountId}:${slice.stream}:${slice.entityLevel}:${slice.dateStart ?? "all"}:${slice.dateStop ?? "all"}:${externalId}`;
@@ -238,7 +265,8 @@ export class MetaPartialReadSyncRuntime {
           // Canonical inventory persistence already holds the validated fields;
           // the generic restart ledger needs only identity and hash evidence.
           payload: (this.options.inventoryPagePersistence && slice.stream === "inventory")
-            || (this.options.insightPagePersistence && slice.stream === "insights") ? {} : payload,
+            || (this.options.insightPagePersistence && slice.stream === "insights")
+            || (this.options.creativePagePersistence && slice.stream === "creative_post") ? {} : payload,
           firstSeenAt: this.now().toISOString(),
           lastSeenAt: this.now().toISOString(),
         });

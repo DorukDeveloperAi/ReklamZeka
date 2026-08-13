@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { MetaConnection } from "@/connectors/meta/connection-types";
 import type { MetaInventoryPagePersistencePort } from "@/connectors/meta/sync/inventory-materialization";
 import type { MetaSyncDurablePersistence } from "@/connectors/meta/sync/persistence-adapter";
+import type { MetaCreativeSourcePagePersistencePort } from "@/connectors/meta/sync/creative-content-runtime-persistence";
 import type { MetaPartialReadSyncRuntime, MetaSyncResult, MetaSyncRuntimeOptions } from "@/connectors/meta/sync/runtime";
 import {
   ProductionMetaReadSyncError,
@@ -52,6 +53,7 @@ function fixture(overrides: Readonly<{
   accountIds?: readonly string[];
   recoveryAccountId?: string;
   recoveryLaneId?: "inventory_ad_set_v1" | "creative_ad_v1" | "insights_ad_v1";
+  creativePagePersistence?: MetaCreativeSourcePagePersistencePort;
 }> = {}) {
   const inventoryPagePersistence: MetaInventoryPagePersistencePort = {
     writePage: vi.fn(async (page) => ({ inserted: 0, updated: 0, unchanged: 0, stale: 0, disappeared: 0, pageHash: page.pageHash })),
@@ -72,6 +74,9 @@ function fixture(overrides: Readonly<{
     accounts: { resolve: accountResolve },
     inventoryPagePersistence,
     durablePersistence,
+    ...(overrides.creativePagePersistence === undefined ? {} : {
+      creativePagePersistenceFactory: vi.fn(() => overrides.creativePagePersistence),
+    }),
     ...(overrides.recoveryAccountId === undefined ? {} : {
       recoveryLane: {
         id: overrides.recoveryLaneId ?? "inventory_ad_set_v1",
@@ -131,6 +136,15 @@ describe("production Meta read sync composition", () => {
     expect(JSON.stringify(response)).not.toContain(workspaceId);
     expect(JSON.stringify(response)).not.toContain(connectionId);
     expect(JSON.stringify(response)).not.toContain("act_123456");
+  });
+
+  it("injects the server-bound canonical creative/Page/Instagram persistence port", async () => {
+    const creativePagePersistence: MetaCreativeSourcePagePersistencePort = {
+      writeSourcePage: vi.fn(async () => ({ inserted: 0, updated: 0, unchanged: 0, stale: 0, cursor: null, recordCount: 0 })),
+    };
+    const setup = fixture({ creativePagePersistence });
+    await setup.service.run({ parentRunId: "run_daily", dateStart: "2026-08-01", dateStop: "2026-08-07" });
+    expect(setup.wiredOptions()?.creativePagePersistence).toBe(creativePagePersistence);
   });
 
   it("passes a validated server-owned execution deadline to the runtime", async () => {

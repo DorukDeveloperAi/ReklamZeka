@@ -11,6 +11,7 @@ import type { MetaReadRequest, MetaReadTransport, MetaSyncSlice } from "@/connec
 import { MetaGraphClient } from "@/connectors/meta/graph-client";
 import { MetaGraphSyncTransport } from "@/connectors/meta/sync/graph-transport";
 import type { MetaInsightSourcePagePersistencePort } from "@/connectors/meta/sync/insights-materialization";
+import type { MetaCreativeSourcePagePersistencePort } from "@/connectors/meta/sync/creative-content-runtime-persistence";
 
 class TransactionFixture implements MetaSyncTransactionManager {
   private snapshots = new Map<string, MetaSyncStoreSnapshot>();
@@ -192,6 +193,30 @@ describe("Meta S1.3 runtime persistence integration", () => {
     expect(result.parentRun.status).toBe("completed");
     expect(writer.writeSourcePage).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: "workspace-a", externalAccountId: "account-a", entityLevel: "campaign" }));
     expect(transactions.snapshot(key)?.records[0]?.payload).toEqual({});
+  });
+
+  it("writes each creative/Post page through the canonical content port and never retains raw payload", async () => {
+    const creativeSlice: MetaSyncSlice = {
+      id: "creative_post:account-a:ad:all:all", stream: "creative_post", accountId: "account-a",
+      entityLevel: "ad", dateStart: null, dateStop: null, pageSize: 50,
+    };
+    const writer: MetaCreativeSourcePagePersistencePort = {
+      writeSourcePage: vi.fn(async () => ({ inserted: 1, updated: 0, unchanged: 0, stale: 0, cursor: null, recordCount: 1 })),
+    };
+    const transport = new Transport(async () => ({
+      records: [{ id: "ad-a", creative: { id: "creative-a", body: "private copy" } }],
+      nextCursor: null, usageHeadroom: 1, sourceGraphVersion: "v23.0", fieldCatalogVersion: "meta-creative-post-v23",
+    }));
+    const runtime = new MetaPartialReadSyncRuntime({ transport, creativePagePersistence: writer });
+    const result = await runtime.run({ ...key, plan: [creativeSlice] });
+    expect(result.parentRun.status).toBe("completed");
+    expect(writer.writeSourcePage).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId: "workspace-a", connectionId: "connection-a", externalAccountId: "account-a",
+      sliceId: creativeSlice.id, nextCursor: null,
+    }));
+    expect(result.writeNetworkCalls).toBe(0);
+    expect(result.parentRun.id).toBe("run-a");
+    expect(runtime.store.snapshot().records[0]?.payload).toEqual({});
   });
 
   it("coalesces a terminal slice, stream and parent into one final durable checkpoint", async () => {
