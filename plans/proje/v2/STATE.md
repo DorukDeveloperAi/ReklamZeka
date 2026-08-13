@@ -166,6 +166,11 @@
   kişi kendi taslağını publish edemez. Queue, K2/K3 budget unit'i geldiğinde aynı exact published
   policy definition'ı tekrar çözüp snapshot'a bağlar; bu sırada ActionUnit üretimi veya Meta write
   yeni bir public yüzey olarak açılmamıştır.
+- Birden fazla advisory BudgetProposal alternatifi arasından seçim artık `slice_rule_scenario_allocation_selections`
+  immutable kaydıyla owner/admin tarafından açıkça sabitlenir. Kayıt, exact Slice Rule draft,
+  bound BudgetProposal, campaign/ad-set allocation evidence, `composed/planned` scenario ve tek
+  before/after allocation değerini server-side tekrar doğrular. Bu seçim ActionUnit, approval,
+  execute veya Meta write değildir; campaign-owner action taslağı için yalnız provenance temelidir.
 
 ## 2026-08-13 — S1.4 canlı asset/post recovery durumu
 
