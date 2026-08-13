@@ -13,6 +13,7 @@ import { EffectiveAnalysisContextComposerError } from "@/application/effective-a
 import { projectMetaAnalysisConfig } from "@/domain/meta/analysis-config-projection";
 import * as schema from "@/db/schema";
 import { materializeCurrentEffectiveAnalysisContextSourceFixture } from "./support/current-effective-analysis-context-source-fixture";
+import { retryWorkspaceTombstoneTransport } from "./support/workspace-tombstone-transport-retry";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const connectionString = process.env.DIRECT_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
@@ -22,8 +23,10 @@ if (!connectionString) {
   process.exit(2);
 }
 
-const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 20_000 });
-const database = drizzle(pool, { schema });
+const createPool = () => new Pool({ connectionString, max: 1, connectionTimeoutMillis: 10_000,
+  statement_timeout: 20_000, query_timeout: 45_000, keepAlive: true, keepAliveInitialDelayMillis: 1_000 });
+let pool = createPool();
+let database = drizzle(pool, { schema });
 const fixtureResidue = rows(await database.execute(sql`
   select count(*)::int as count from workspaces
   where lifecycle_state = 'active' and name in ('Current source verifier', 'Current source foreign')
@@ -105,12 +108,26 @@ try {
     try {
       phase("tombstone_cleanup");
       const purge = new DrizzleWorkspaceTombstonePurgePort();
-      const service = new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge),
-        { authorize: async (input) => input.approvalRef === "ephemeral-fixture-approved" }, fixture.actorId, 60_000);
+      const lifecycleActorId = fixture.actorId;
       for (const fixtureWorkspaceId of [fixture.workspaceId, fixture.foreignWorkspaceId]) {
         phase(fixtureWorkspaceId === fixture.workspaceId ? "tombstone_primary" : "tombstone_foreign");
-        const plan = await service.dryRun(fixtureWorkspaceId, new Date().toISOString());
-        await service.execute({ planRef: plan.planRef, approvalRef: "ephemeral-fixture-approved", now: new Date().toISOString() });
+        await retryWorkspaceTombstoneTransport({
+          execute: async () => {
+            const service = new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge),
+              { authorize: async (input) => input.approvalRef === "ephemeral-fixture-approved" }, lifecycleActorId, 60_000);
+            const plan = await service.dryRun(fixtureWorkspaceId, new Date().toISOString());
+            await service.execute({ planRef: plan.planRef, approvalRef: "ephemeral-fixture-approved", now: new Date().toISOString() });
+          },
+          reconnect: async () => {
+            await pool.end();
+            pool = createPool();
+            database = drizzle(pool, { schema });
+          },
+          completedAfterReconnect: async () => {
+            const lifecycle = rows(await database.execute(sql`select lifecycle_state from workspaces where id = ${fixtureWorkspaceId}::uuid`))[0]?.lifecycle_state;
+            return lifecycle === "tombstoned" && (await purge.inspect(database as never, fixtureWorkspaceId)).candidateCount === 0;
+          },
+        });
       }
       purgeCandidateCount = (await purge.inspect(database as never, fixture.workspaceId)).candidateCount;
       foreignPurgeCandidateCount = (await purge.inspect(database as never, fixture.foreignWorkspaceId)).candidateCount;
