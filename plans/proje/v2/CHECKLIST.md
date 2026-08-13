@@ -106,6 +106,9 @@
 - [x] Strict instruction/policy DSL ve negatif parser matrisi.
   - [x] Draft policy'nin publish'i iki kişi ayrılığı ister: taslağın owner actor'u kendi current draft
     hash'ini publish edemez; aynı exact revision için farklı bir owner/admin approval gerekir.
+  - [x] Payment/delivery alarm çekirdeği: resmi Meta state ile harcama kesintisi kanıtını sırasıyla
+    `confirmed` ve `suspected` olarak ayırır; kritik uyarı yalnız insan incelemesi/öneri üretir ve
+    bütün action/Meta-write capability'leri false kalır.
 - [ ] Raw natural-language → normalized draft + assumption/question/impact preview.
   - [x] `owner_statement` ham metni ayrı provenance kaydı olarak koruyan, guidance-only
     card + tek scope binding üreten gerçek taslak authoring akışı.

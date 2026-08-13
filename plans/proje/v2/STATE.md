@@ -181,6 +181,15 @@
 - Bu yalnız policy promotion yönetişimidir: approval/action/Meta write capability'leri kapalı kalır;
   pause/archive için yeni bir ikinci kişi şartı getirilmemiştir.
 
+## 2026-08-13 — Payment/delivery interruption alarm sözleşmesi
+
+- `delivery-health-alert/1.0.0`, resmi Meta account/delivery state ile ölçülmüş harcama kesintisini
+  aynı olaya çevirmeden ayrı kanıt seviyelerinde (`confirmed` / `suspected`) hashler. Her iki olay
+  kritik ve sorumlu actor'a yöneliktir; doğrulanmış durumda öneriler tutulur, şüpheli durumda insan
+  incelemesi istenir.
+- Bu yalnız domain sözleşmesidir; kalıcı alert/revision timeline ve atama ekranı sonraki checkpoint'te
+  eklenecek. Alarmdan action, approval, otonomi veya Meta write yetkisi doğmaz.
+
 ## 2026-08-11 — A14 persisted frozen-context seçimi
 
 - Session-bound, query'siz `GET /api/campaign-contexts` yalnız latest-valid campaign contextler için
