@@ -51,4 +51,11 @@ describe("local agent session dashboard", () => {
     expect(task).toContain("Meta write yapma");
     expect(task).toContain("Operatör isteği");
   });
+
+  it("guides Codex to the delivery alert ledger without granting alert authority", () => {
+    const task = buildCodexManualTask(codexPageGuide("alerts", "Teslimat alarmları"));
+    expect(task).toContain("delivery-health-alert-panel.tsx");
+    expect(task).toContain("Delivery health alert ledger");
+    expect(task).toContain("Meta write yapma");
+  });
 });

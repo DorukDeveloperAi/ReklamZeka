@@ -25,6 +25,7 @@ const PAGE_GUIDES = Object.freeze({
   autonomy: ["Otonomi", "İzin sınırlarını ve action uygunluğunu taslak olarak değerlendirme.", "src/app/dashboard/autonomy-studio-panel.tsx", "autonomy rules / action guardrails"],
   agent: ["Orchestrator Agent", "Sayfalar arasında devam eden salt-okur analiz sohbeti.", "src/app/dashboard/operating-dashboard.tsx", "orchestrator conversation ledger"],
   approvals: ["Onaylar", "Mevcut öneri ve kanıtı açıklama; onay, red veya yetki verme yoktur.", "src/app/dashboard/approval-queue-panel.tsx", "approval queue / decision events"],
+  alerts: ["Teslimat alarmları", "Ödeme veya teslimat kesintisi kanıtını ve insan kontrol listesini inceleme; hiçbir Meta veya action yetkisi yoktur.", "src/app/dashboard/delivery-health-alert-panel.tsx", "delivery health alert ledger"],
   promotions: ["Öne Çıkarmalar", "Mevcut post promotion uygunluğunu salt-okur kanıtla değerlendirme.", "src/app/dashboard/promotion-preflight-panel.tsx", "promotion preflight / templates"],
   timeline: ["Timeline", "Kural, gözlem, öneri, karar ve sonuç zincirini inceleme.", "src/app/dashboard/operating-dashboard.tsx", "decision ledger / operational events"],
   meta: ["Meta Bağlantısı", "GET-only Meta aynası, freshness ve delivery erişimini inceleme.", "src/app/dashboard/operating-dashboard.tsx", "Meta connections / sync ledger"],
