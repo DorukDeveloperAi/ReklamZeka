@@ -172,6 +172,15 @@
   build, DB/security/architecture/model-boundary/secret kapıları doğrulandı. Authoritative strict-policy
   impact/semantic-diff bağlama ayrı açık checkpoint'tir.
 
+## 2026-08-13 — İki kişi ayrılığıyla strict policy promotion
+
+- Strict policy publish işlemi artık draft'ı oluşturan actor ref ile yapılamaz. Aynı immutable draft
+  revision/hash için farklı bir `owner` veya `admin` publish kararını vermelidir. Kontrol workspace
+  kilidi, güncel membership, exact impact/registry doğrulaması, context invalidation ve append-only
+  audit ile aynı transaction içinde çalışır.
+- Bu yalnız policy promotion yönetişimidir: approval/action/Meta write capability'leri kapalı kalır;
+  pause/archive için yeni bir ikinci kişi şartı getirilmemiştir.
+
 ## 2026-08-11 — A14 persisted frozen-context seçimi
 
 - Session-bound, query'siz `GET /api/campaign-contexts` yalnız latest-valid campaign contextler için

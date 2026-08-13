@@ -104,6 +104,8 @@
   - [x] Tüm category/guidance/policy/data refs'lerini birleştiren saf EffectiveCampaignContext.
   - [x] Context persistence, selective invalidation ve public redaction projection'ı.
 - [x] Strict instruction/policy DSL ve negatif parser matrisi.
+  - [x] Draft policy'nin publish'i iki kişi ayrılığı ister: taslağın owner actor'u kendi current draft
+    hash'ini publish edemez; aynı exact revision için farklı bir owner/admin approval gerekir.
 - [ ] Raw natural-language → normalized draft + assumption/question/impact preview.
   - [x] `owner_statement` ham metni ayrı provenance kaydı olarak koruyan, guidance-only
     card + tek scope binding üreten gerçek taslak authoring akışı.

@@ -8,6 +8,7 @@ import { EFFECTIVE_CONTEXT_INSTRUCTION_POLICY_COMPONENT_REF } from "@/analyses/e
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
 const actorId = "22222222-2222-4222-8222-222222222222";
+const approverId = "66666666-6666-4666-8666-666666666666";
 const rawText = "Sağlık kategorisini önceliklendir.";
 const rawHash = createHash("sha256").update(rawText).digest("hex");
 
@@ -90,8 +91,8 @@ describe("DrizzleInstructionPolicyLifecycleRepository", () => {
     const published = parseStrictInstructionPolicy({ ...input, policyVersion: 2,
       previousVersionHash: draft.canonicalHash, status: "published", reasonCode: "owner_publish" });
     const results = [
-      { rows: [{ id: workspaceId }] }, { rows: [{ role: "owner" }] }, { rows: [row(draft)] }, { rows: [] },
-      { rows: [{ id: actorId }] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [row(draft), { ...row(published),
+      { rows: [{ id: workspaceId }] }, { rows: [{ role: "admin" }] }, { rows: [row(draft)] }, { rows: [] },
+      { rows: [{ id: approverId }] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [row(draft), { ...row(published),
         id: "55555555-5555-4555-8555-555555555555" }] },
     ];
     const tx = { execute: vi.fn(async (_query: unknown) => results.shift()) };
@@ -115,7 +116,7 @@ describe("DrizzleInstructionPolicyLifecycleRepository", () => {
         canApprove: false as const, canExecute: false as const, canSchedule: false as const,
         canCallTool: false as const, canWriteMeta: false as const } })) };
     const result = await new DrizzleInstructionPolicyLifecycleRepository(database as never, () => impact).mutate({ workspaceId,
-      workspaceRef: "workspace_test", actorId, actorRef: "actor_owner", role: "owner",
+      workspaceRef: "workspace_test", actorId: approverId, actorRef: "actor_admin", role: "admin",
       occurredAt: "2026-08-09T20:00:00.000Z", command: { operation: "publish",
         expectedRegistryHash: initial.registryHash, policyRef: draft.policyRef, expectedVersion: 1,
         expectedPolicyHash: draft.canonicalHash, expectedImpactHash: impactHash, reasonCode: "owner_publish" } });
@@ -142,6 +143,23 @@ describe("DrizzleInstructionPolicyLifecycleRepository", () => {
       reasonCode: "owner_publish" });
   });
 
+  it("requires an owner/admin other than the draft author to publish", async () => {
+    const draft = artifact();
+    const initial = await new DrizzleInstructionPolicyLifecycleRepository({
+      execute: vi.fn(async () => ({ rows: [row(draft)] })),
+    } as never).inspect(workspaceId);
+    const results = [{ rows: [{ id: workspaceId }] }, { rows: [{ role: "owner" }] }, { rows: [row(draft)] }];
+    const tx = { execute: vi.fn(async () => results.shift()) };
+    const database = { transaction: vi.fn(async (callback: (value: typeof tx) => Promise<unknown>) => callback(tx)) };
+    await expect(new DrizzleInstructionPolicyLifecycleRepository(database as never).mutate({ workspaceId,
+      workspaceRef: "workspace_test", actorId, actorRef: "actor_owner", role: "owner",
+      occurredAt: "2026-08-09T20:00:00.000Z", command: { operation: "publish",
+        expectedRegistryHash: initial.registryHash, policyRef: draft.policyRef, expectedVersion: 1,
+        expectedPolicyHash: draft.canonicalHash, expectedImpactHash: "d".repeat(64), reasonCode: "owner_publish" } }))
+      .rejects.toMatchObject({ code: "approval_required" });
+    expect(tx.execute).toHaveBeenCalledTimes(3);
+  });
+
   it("rechecks current membership after the workspace lock and before persistence", async () => {
     const tx = { execute: vi.fn(async () => ({ rows: tx.execute.mock.calls.length === 1
       ? [{ id: workspaceId }] : [{ role: "analyst" }] })) };
@@ -159,7 +177,7 @@ describe("DrizzleInstructionPolicyLifecycleRepository", () => {
     const draft = artifact(); const initial = await new DrizzleInstructionPolicyLifecycleRepository({
       execute: vi.fn(async () => ({ rows: [row(draft)] })),
     } as never).inspect(workspaceId);
-    const results = [{ rows: [{ id: workspaceId }] }, { rows: [{ role: "owner" }] }, { rows: [row(draft)] }];
+    const results = [{ rows: [{ id: workspaceId }] }, { rows: [{ role: "admin" }] }, { rows: [row(draft)] }];
     const tx = { execute: vi.fn(async () => results.shift()) };
     const database = { transaction: vi.fn(async (callback: (value: typeof tx) => Promise<unknown>) => callback(tx)) };
     const impactHash = "d".repeat(64);
@@ -172,7 +190,7 @@ describe("DrizzleInstructionPolicyLifecycleRepository", () => {
           malformedContextPolicies: 0, inconsistentContextComponents: 0, corruptActionLifecycleRows: 0,
           rowCapExceeded: 0 } }, disposition: "blocked", mutationAllowed: false })) };
     await expect(new DrizzleInstructionPolicyLifecycleRepository(database as never, () => partialImpact as never)
-      .mutate({ workspaceId, workspaceRef: "workspace_test", actorId, actorRef: "actor_owner", role: "owner",
+      .mutate({ workspaceId, workspaceRef: "workspace_test", actorId: approverId, actorRef: "actor_admin", role: "admin",
         occurredAt: "2026-08-09T20:00:00.000Z", command: { operation: "publish",
           expectedRegistryHash: initial.registryHash, policyRef: draft.policyRef, expectedVersion: 1,
           expectedPolicyHash: draft.canonicalHash, expectedImpactHash: impactHash,
@@ -198,12 +216,12 @@ describe("DrizzleInstructionPolicyLifecycleRepository", () => {
       { ...base, target: { ...base.target, status: "paused" } },
     ];
     for (const impact of wrongBindings) {
-      const results = [{ rows: [{ id: workspaceId }] }, { rows: [{ role: "owner" }] }, { rows: [row(draft)] }];
+      const results = [{ rows: [{ id: workspaceId }] }, { rows: [{ role: "admin" }] }, { rows: [row(draft)] }];
       const tx = { execute: vi.fn(async () => results.shift()) };
       const database = { transaction: vi.fn(async (callback: (value: typeof tx) => Promise<unknown>) => callback(tx)) };
       await expect(new DrizzleInstructionPolicyLifecycleRepository(database as never,
         () => ({ preview: vi.fn(async () => impact) }) as never).mutate({ workspaceId,
-        workspaceRef: "workspace_test", actorId, actorRef: "actor_owner", role: "owner",
+        workspaceRef: "workspace_test", actorId: approverId, actorRef: "actor_admin", role: "admin",
         occurredAt: "2026-08-09T20:00:00.000Z", command: { operation: "publish",
           expectedRegistryHash: initial.registryHash, policyRef: draft.policyRef, expectedVersion: 1,
           expectedPolicyHash: draft.canonicalHash, expectedImpactHash: impactHash,
@@ -220,7 +238,7 @@ describe("DrizzleInstructionPolicyLifecycleRepository", () => {
     const tx = { execute: vi.fn(async (query: unknown) => {
       const rendered = new PgDialect().sqlToQuery(query as never).sql;
       if (rendered.includes("from workspaces")) return { rows: [{ id: workspaceId }] };
-      if (rendered.includes("from memberships")) return { rows: [{ role: "owner" }] };
+      if (rendered.includes("from memberships")) return { rows: [{ role: "admin" }] };
       if (rendered.includes("from strict_instruction_policy_revisions")) return { rows: [row(draft)] };
       if (rendered.includes("insert into strict_instruction_policy_revisions")) { staged.push("revision"); return { rows: [] }; }
       if (rendered.includes("insert into effective_campaign_context_invalidations")) {
@@ -244,7 +262,7 @@ describe("DrizzleInstructionPolicyLifecycleRepository", () => {
           unresolvedExceptionRefs: 0, malformedContextPolicies: 0, inconsistentContextComponents: 0,
           corruptActionLifecycleRows: 0, rowCapExceeded: 0 } }, disposition: "review_required", mutationAllowed: true })) };
     await expect(new DrizzleInstructionPolicyLifecycleRepository(database as never, () => completeImpact as never)
-      .mutate({ workspaceId, workspaceRef: "workspace_test", actorId, actorRef: "actor_owner", role: "owner",
+      .mutate({ workspaceId, workspaceRef: "workspace_test", actorId: approverId, actorRef: "actor_admin", role: "admin",
         occurredAt: "2026-08-09T20:00:00.000Z", command: { operation: "publish",
           expectedRegistryHash: initial.registryHash, policyRef: draft.policyRef, expectedVersion: 1,
           expectedPolicyHash: draft.canonicalHash, expectedImpactHash: impactHash,
