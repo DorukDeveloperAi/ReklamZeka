@@ -43,6 +43,7 @@
     "verify:meta-asset-content-db": "tsx scripts/verify-meta-asset-content-postgres.ts",
     "verify:meta-post-media-db": "tsx scripts/verify-meta-post-media-postgres.ts",
     "verify:meta-s14-live-db": "tsx scripts/verify-meta-s14-live-postgres.ts",
+    "verify:meta-s14-recovery-live": "tsx scripts/verify-meta-s14-recovery-live.ts",
     "verify:meta-s14-read": "tsx scripts/verify-meta-s14-read.ts",
     "verify:meta-targeting-shape": "tsx scripts/verify-meta-targeting-shape.ts",
     "verify:meta-insight-capabilities": "tsx scripts/verify-meta-insight-capabilities.ts",
