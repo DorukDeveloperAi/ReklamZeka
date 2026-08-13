@@ -14,6 +14,7 @@ function fact(overrides: Partial<MetaReadMirrorFact> = {}): MetaReadMirrorFact {
     currency: "TRY", timezone: "Europe/Istanbul", accountFetchedAt: "2026-08-13T11:57:00.000Z",
     inventoryStreamStatus: "completed", inventoryStreamUpdatedAt: "2026-08-13T11:58:00.000Z",
     creativeStreamStatus: "completed", creativeStreamUpdatedAt: "2026-08-13T11:59:00.000Z",
+    insightStreamStatus: "completed", insightStreamUpdatedAt: "2026-08-13T11:59:30.000Z", insightCanonicalRowCount: 4,
     campaignId: "44444444-4444-4444-8444-444444444444", campaignName: "Intensive FTR",
     campaignStatus: "ACTIVE", campaignObjective: "OUTCOME_LEADS", campaignDailyBudgetMinor: 100000,
     campaignLifetimeBudgetMinor: null, campaignFetchedAt: "2026-08-13T11:57:00.000Z",
@@ -69,6 +70,19 @@ describe("Meta read mirror projection", () => {
       creativeId: null, creativeSourceType: null, creativeFetchedAt: null, postId: null, postFetchedAt: null })] });
     expect(partial.sourceState).toBe("partial");
     expect(partial.reasonCodes).toEqual(["creative_binding_missing", "sync_stream_incomplete"]);
+  });
+
+  it("reports an empty completed insight delivery separately from a failed or incomplete sync", () => {
+    const emptyDelivery = buildMetaReadMirrorProjection({ workspaceId, observedAt,
+      facts: [fact({ insightCanonicalRowCount: 0 })] });
+    expect(emptyDelivery.sourceState).toBe("partial");
+    expect(emptyDelivery.reasonCodes).toContain("insight_delivery_empty_verified");
+    expect(emptyDelivery.connections[0]!.accounts[0]!.freshness).toMatchObject({ insightStatus: "completed", insightCanonicalRowCount: 0 });
+
+    const incomplete = buildMetaReadMirrorProjection({ workspaceId, observedAt,
+      facts: [fact({ insightStreamStatus: "partial", insightCanonicalRowCount: 0 })] });
+    expect(incomplete.reasonCodes).toContain("insight_sync_incomplete");
+    expect(incomplete.reasonCodes).not.toContain("insight_delivery_empty_verified");
   });
 
   it("never lets a disconnected connection appear ready", () => {

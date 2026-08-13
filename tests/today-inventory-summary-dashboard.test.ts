@@ -48,7 +48,7 @@ describe("Today inventory summary", () => {
       authority: { actionAuthority: "none", canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false },
       connections: [{ connectionRef: "connection_aaaaaaaaaaaaaaaaaaaaaaaa", name: "Meta", status: "active", accessMode: "read_only",
         accounts: [{ accountRef: "account_bbbbbbbbbbbbbbbbbbbbbbbb", name: "Hesap", currency: "TRY", timezone: "Europe/Istanbul",
-          freshness: { inventoryStatus: "completed", creativeStatus: "completed", latestObservedAt: "2026-08-13T11:59:00.000Z" }, campaigns: [] }] }],
+          freshness: { inventoryStatus: "completed", creativeStatus: "completed", insightStatus: "completed", insightObservedAt: "2026-08-13T11:59:00.000Z", insightCanonicalRowCount: 0, latestObservedAt: "2026-08-13T11:59:00.000Z" }, campaigns: [] }] }],
     };
     expect(metaReadMirrorFromResponse(projection)).toEqual(projection);
     expect(metaReadMirrorFromResponse({ ...projection, authority: { ...projection.authority, canWriteMeta: true } })).toBeNull();

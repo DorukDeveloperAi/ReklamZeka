@@ -102,6 +102,9 @@ export function metaReadMirrorFromResponse(value: unknown): MetaReadMirrorProjec
       if (!plainRecord(account) || typeof account.accountRef !== "string" || typeof account.name !== "string"
         || typeof account.currency !== "string" || !/^[A-Z]{3}$/.test(account.currency) || typeof account.timezone !== "string" || !plainRecord(account.freshness)
         || !(account.freshness.latestObservedAt === null || isoText(account.freshness.latestObservedAt))
+        || !(account.freshness.insightObservedAt === null || isoText(account.freshness.insightObservedAt))
+        || !(account.freshness.insightStatus === null || ["pending", "running", "partial", "completed", "failed", "cancelled"].includes(account.freshness.insightStatus as string))
+        || !Number.isSafeInteger(account.freshness.insightCanonicalRowCount) || (account.freshness.insightCanonicalRowCount as number) < 0
         || !Array.isArray(account.campaigns)) return null;
       for (const campaign of account.campaigns) {
         if (!plainRecord(campaign) || typeof campaign.campaignRef !== "string" || typeof campaign.name !== "string"
@@ -962,6 +965,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
           <div><span>Freshness</span><strong>{projection.freshnessAgeMinutes === null ? "Bilinmiyor" : `${projection.freshnessAgeMinutes} dk`}</strong><small>Eşik: {projection.freshnessThresholdMinutes} dk</small></div>
           <div><span>Hiyerarşi</span><strong>{projection.summary.campaigns} / {projection.summary.adSets} / {projection.summary.ads}</strong><small>kampanya / ad set / reklam</small></div>
           <div><span>İçerik</span><strong>{projection.summary.creatives} / {projection.summary.posts}</strong><small>creative / post</small></div>
+          <div><span>Günlük insight</span><strong>{account?.freshness.insightStatus === "completed" ? account.freshness.insightCanonicalRowCount === 0 ? "Doğrulanmış boş" : `${account.freshness.insightCanonicalRowCount} kayıt` : "Hazır değil"}</strong><small>{account?.freshness.insightStatus === "completed" ? "Meta teslimatı / canonical kayıt" : "Performans önerileri beklemede"}</small></div>
         </div>
         {projection.reasonCodes.length ? <div className={styles.canonicalMirrorReasons}><strong>Kaynak notları</strong><p>{projection.reasonCodes.join(" · ")}</p></div> : null}
         {projection.sourceState === "empty" ? <div className={styles.canonicalMirrorNotice}><strong>Kanonik hesap kaydı var; kampanya hiyerarşisi boş.</strong><p>Boş sonuç canlı kampanya olmadığı anlamına gelir; demo kampanyalar burada gösterilmez.</p></div>

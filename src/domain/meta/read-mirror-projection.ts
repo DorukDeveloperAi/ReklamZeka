@@ -16,6 +16,11 @@ export type MetaReadMirrorFact = Readonly<{
   inventoryStreamUpdatedAt: string | null;
   creativeStreamStatus: "pending" | "running" | "partial" | "completed" | "failed" | "cancelled" | null;
   creativeStreamUpdatedAt: string | null;
+  /** Daily insight stream state is separate from hierarchy freshness. */
+  insightStreamStatus: "pending" | "running" | "partial" | "completed" | "failed" | "cancelled" | null;
+  insightStreamUpdatedAt: string | null;
+  /** Aggregate canonical rows only; no raw Graph payload or identifiers leave the repository. */
+  insightCanonicalRowCount: number;
   campaignId: string | null;
   campaignName: string | null;
   campaignStatus: string | null;
@@ -90,6 +95,9 @@ export type MetaReadMirrorAccount = Readonly<{
   freshness: Readonly<{
     inventoryStatus: MetaReadMirrorFact["inventoryStreamStatus"];
     creativeStatus: MetaReadMirrorFact["creativeStreamStatus"];
+    insightStatus: MetaReadMirrorFact["insightStreamStatus"];
+    insightObservedAt: string | null;
+    insightCanonicalRowCount: number;
     latestObservedAt: string | null;
   }>;
   campaigns: readonly MetaReadMirrorCampaign[];
@@ -173,6 +181,10 @@ function minor(value: number | null): number | null {
   if (value !== null && (!Number.isSafeInteger(value) || value < 0)) fail("corrupt_store");
   return value;
 }
+function count(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 0) fail("corrupt_store");
+  return value;
+}
 function maxIso(values: readonly (string | null)[]): string | null {
   const present = values.filter((value): value is string => value !== null).map((value) => iso(value)!);
   return present.length === 0 ? null : present.reduce((latest, value) => value > latest ? value : latest);
@@ -224,6 +236,9 @@ export function buildMetaReadMirrorProjection(input: Readonly<{
     const currency = required(fact.currency);
     const timezone = required(fact.timezone);
     if (!/^[A-Z]{3}$/.test(currency)) fail("corrupt_store");
+    const insightRows = count(fact.insightCanonicalRowCount);
+    // Insight freshness is tracked separately. A newer empty metric recovery
+    // must not make a stale canonical hierarchy appear fresh.
     const latestAccount = maxIso([fact.accountFetchedAt, fact.inventoryStreamUpdatedAt, fact.creativeStreamUpdatedAt]);
     latestCandidates.push(latestAccount);
     const accounts = accountMaps.get(connectionId)!;
@@ -231,14 +246,27 @@ export function buildMetaReadMirrorProjection(input: Readonly<{
     if (!account) {
       account = { accountRef: ref("account", input.workspaceId, accountId), name: accountName, currency, timezone,
         freshness: { inventoryStatus: fact.inventoryStreamStatus, creativeStatus: fact.creativeStreamStatus,
-          latestObservedAt: latestAccount }, campaigns: [] };
+          insightStatus: fact.insightStreamStatus, insightObservedAt: fact.insightStreamUpdatedAt,
+          insightCanonicalRowCount: insightRows, latestObservedAt: latestAccount }, campaigns: [] };
       accounts.set(accountId, account);
       connection.accounts.push(account);
       campaignMaps.set(accountId, new Map());
     } else if (account.name !== accountName || account.currency !== currency || account.timezone !== timezone
-      || account.freshness.inventoryStatus !== fact.inventoryStreamStatus || account.freshness.creativeStatus !== fact.creativeStreamStatus) fail("corrupt_store");
+      || account.freshness.inventoryStatus !== fact.inventoryStreamStatus || account.freshness.creativeStatus !== fact.creativeStreamStatus
+      || account.freshness.insightStatus !== fact.insightStreamStatus || account.freshness.insightObservedAt !== fact.insightStreamUpdatedAt
+      || account.freshness.insightCanonicalRowCount !== insightRows) fail("corrupt_store");
     if (!STREAM_READY.has(fact.inventoryStreamStatus ?? "") || !STREAM_READY.has(fact.creativeStreamStatus ?? "")) {
       reasonCodes.add("sync_stream_incomplete");
+    }
+    if (fact.insightStreamStatus === "completed" && insightRows === 0) {
+      // This is positive evidence of an empty Graph delivery, not a failed
+      // ingestion. Metric-driven recommendations must remain held, while the
+      // user can distinguish it from an outage or an incomplete checkpoint.
+      reasonCodes.add("insight_delivery_empty_verified");
+    } else if (fact.insightStreamStatus === null) {
+      reasonCodes.add("insight_stream_unobserved");
+    } else if (!STREAM_READY.has(fact.insightStreamStatus)) {
+      reasonCodes.add("insight_sync_incomplete");
     }
     if (fact.campaignId === null) continue;
 

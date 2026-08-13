@@ -19,6 +19,7 @@ describe("Drizzle Meta read mirror repository", () => {
         currency: "TRY", timezone: "Europe/Istanbul", account_fetched_at: new Date("2026-08-13T11:59:00.000Z"),
         inventory_stream_status: "completed", inventory_stream_updated_at: new Date("2026-08-13T11:59:00.000Z"),
         creative_stream_status: "completed", creative_stream_updated_at: new Date("2026-08-13T11:59:00.000Z"),
+        insight_stream_status: "completed", insight_stream_updated_at: new Date("2026-08-13T11:59:30.000Z"), insight_canonical_row_count: "0",
         campaign_id: null, campaign_name: null, campaign_status: null, campaign_objective: null,
         campaign_daily_budget_minor: null, campaign_lifetime_budget_minor: null, campaign_fetched_at: null,
         ad_set_id: null, ad_set_name: null, ad_set_status: null, optimization_goal: null, targeting_summary: null,
@@ -38,6 +39,7 @@ describe("Drizzle Meta read mirror repository", () => {
     expect(execute).toHaveBeenCalledTimes(3);
     expect(sqlText(execute.mock.calls[0]![0])).toContain("repeatable read");
     expect(sqlText(execute.mock.calls[1]![0])).toContain("read only");
+    expect(sqlText(execute.mock.calls[2]![0])).toContain("insight_counts");
   });
 
   it("rejects caller-controlled invalid workspace scope before DB access", async () => {

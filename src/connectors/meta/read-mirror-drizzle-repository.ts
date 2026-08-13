@@ -33,6 +33,11 @@ function minor(value: unknown): number | null {
   if (!Number.isSafeInteger(parsed) || parsed < 0) throw new Error("Meta read mirror rejected: corrupt_store");
   return parsed;
 }
+function count(value: unknown): number {
+  const parsed = typeof value === "number" ? value : typeof value === "string" && /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  if (!Number.isSafeInteger(parsed) || parsed < 0) throw new Error("Meta read mirror rejected: corrupt_store");
+  return parsed;
+}
 function object(value: unknown): Record<string, unknown> | null {
   if (value === null || value === undefined) return null;
   if (typeof value !== "object" || Array.isArray(value)) throw new Error("Meta read mirror rejected: corrupt_store");
@@ -53,6 +58,9 @@ function fact(row: Row): MetaReadMirrorFact {
     inventoryStreamUpdatedAt: timestamp(row.inventory_stream_updated_at),
     creativeStreamStatus: text(row.creative_stream_status) as MetaReadMirrorFact["creativeStreamStatus"],
     creativeStreamUpdatedAt: timestamp(row.creative_stream_updated_at),
+    insightStreamStatus: text(row.insight_stream_status) as MetaReadMirrorFact["insightStreamStatus"],
+    insightStreamUpdatedAt: timestamp(row.insight_stream_updated_at),
+    insightCanonicalRowCount: count(row.insight_canonical_row_count),
     campaignId: text(row.campaign_id),
     campaignName: text(row.campaign_name),
     campaignStatus: text(row.campaign_status),
@@ -106,6 +114,12 @@ export class DrizzleMetaReadMirrorRepository {
       await transaction.execute(sql`set local transaction isolation level repeatable read`);
       await transaction.execute(sql`set local transaction read only`);
       return rows(await transaction.execute(sql`
+        with insight_counts as (
+          select insight.workspace_id, insight.ad_account_id, count(*)::text as canonical_row_count
+          from meta_daily_insights insight
+          where insight.workspace_id = ${workspaceId}::uuid
+          group by insight.workspace_id, insight.ad_account_id
+        )
         select
           connection.id::text as connection_id,
           connection.display_name as connection_name,
@@ -120,6 +134,9 @@ export class DrizzleMetaReadMirrorRepository {
           inventory_stream.updated_at as inventory_stream_updated_at,
           creative_stream.status::text as creative_stream_status,
           creative_stream.updated_at as creative_stream_updated_at,
+          insight_stream.status::text as insight_stream_status,
+          insight_stream.updated_at as insight_stream_updated_at,
+          coalesce(insight_counts.canonical_row_count, '0') as insight_canonical_row_count,
           campaign.id::text as campaign_id,
           campaign.name as campaign_name,
           coalesce(campaign.effective_status, campaign.configured_status) as campaign_status,
@@ -176,6 +193,14 @@ export class DrizzleMetaReadMirrorRepository {
           and creative_stream.meta_connection_id = connection.id
           and creative_stream.ad_account_id = account.id
           and creative_stream.stream_type = 'creative'
+        left join meta_sync_streams insight_stream
+          on insight_stream.workspace_id = connection.workspace_id
+          and insight_stream.meta_connection_id = connection.id
+          and insight_stream.ad_account_id = account.id
+          and insight_stream.stream_type = 'insights'
+        left join insight_counts
+          on insight_counts.workspace_id = connection.workspace_id
+          and insight_counts.ad_account_id = account.id
         left join ad_campaigns campaign
           on campaign.workspace_id = connection.workspace_id
           and campaign.ad_account_id = account.id
