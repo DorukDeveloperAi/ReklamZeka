@@ -19,6 +19,7 @@ import { CategoryInventoryPanel } from "./category-inventory-panel";
 import { InstructionPolicyStudioPanel } from "./instruction-policy-studio-panel";
 import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel";
 import { NormalizationWorkbenchPanel } from "./normalization-workbench-panel";
+import { MetaTrustReadinessPanel } from "./meta-trust-readiness-panel";
 import { CAMPAIGN_BRIEF_SCENARIOS, CampaignPlanningBriefPanel, type CampaignBriefScenarioRef, type CampaignPlanningBriefContext } from "./campaign-planning-brief-panel";
 import { offlineWorkbookPortfolioSnapshot, type OfflineWorkbookBriefScenarioRef } from "@/domain/campaigns/offline-workbook-portfolio-snapshot";
 import styles from "./operating-dashboard.module.css";
@@ -1015,6 +1016,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       return <>
         <section className={styles.pageHero}><div><span className={styles.kicker}>META READ MIRROR</span><h1>Meta erişim envanteri hazırlanıyor.</h1><p>Token yalnız sunucu tarafında okunur; dashboard ve agent bağlamına hiçbir zaman eklenmez.</p></div><button className={styles.primaryButton} disabled={metaLoading} onClick={() => void refreshMetaInventory(true)}>{metaLoading ? "Kontrol ediliyor…" : "Yeniden dene"}</button></section>
         {renderCanonicalMetaMirror()}
+        <MetaTrustReadinessPanel />
         {preflightNotice}
         <section className={`${styles.panel} ${styles.metaEmpty}`}><StatusPill tone={metaError ? "danger" : "neutral"}>{metaError ? "Bağlantı hatası" : "Salt okunur keşif"}</StatusPill><h2>{metaError ?? "Meta Graph yanıtı bekleniyor"}</h2><p>Bu alan yalnız Graph erişim envanteridir; kanonik DB aynasının yerine geçmez. Hiçbir kampanya, bütçe, reklam seti veya reklam değiştirilmiyor.</p></section>
         <section className={styles.panel} aria-label="Portföy kapsamı"><header className={styles.panelHeader}><div><span className={styles.kicker}>PORTFÖY KAPSAMI</span><h2>Hesap grupları ve salt-okur erişim</h2></div><StatusPill tone={portfolioCapabilityState === "session_required" ? "warning" : "neutral"}>{portfolioCapabilityState === "session_required" ? "Oturum gerekli" : "Kaynak yok"}</StatusPill></header><p className={styles.metaAccountEmpty}>{portfolioCapabilityState === "session_required" ? "Gerçek hesap gruplarını görmek için önce yerel dashboard oturumunu bağlayın." : "Portföy kapsamı kaynağı henüz güvenli biçimde bağlanmadı; demo gruplar gösterilmiyor."}</p><p className={styles.safetyNote}>Bu görünümden bütçe, yayın, onay veya Meta yazma yapılamaz.</p></section>
@@ -1036,6 +1038,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       {preflightNotice}
 
       {renderCanonicalMetaMirror()}
+      <MetaTrustReadinessPanel />
 
       <section className={styles.metaMetricGrid} aria-label="Meta erişim özeti">
         <article><span>Reklam hesabı</span><strong>{inventory.summary.adAccounts}</strong><small>{inventory.summary.accountsWithCampaigns} hesapta kampanya var</small></article>
