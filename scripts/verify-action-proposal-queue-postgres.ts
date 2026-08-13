@@ -24,6 +24,7 @@ const connectionId = randomUUID();
 const sourceId = randomUUID();
 const accountId = randomUUID();
 const campaignId = randomUUID();
+const contextId = randomUUID();
 const evidence = { tablesApplied: false, inserted: false, exactReplay: false, immutable: false,
   decisionTablesApplied: false, decisionInserted: false, decisionExactReplay: false,
   decisionImmutable: false, rlsAndGrants: false, exactRows: false, rollbackClean: false,
@@ -134,6 +135,33 @@ try {
     });
     await transaction.insert(schema.adCampaigns).values({
       id: campaignId, workspaceId, adAccountId: accountId, externalCampaignId: "campaign_12345", name: "Verifier",
+    });
+    // Queue persistence deliberately resolves an already-frozen, tenant-bound context
+    // before it stages an ActionUnit.  This verifier used to predate that invariant and
+    // therefore exercised only the rejection path.  Seed the smallest canonical context
+    // fixture here; it is rolled back with the rest of this acceptance transaction.
+    const capturedAt = "2026-08-07T17:00:00.000Z";
+    const contextHash = proposal.bundle.units[0]!.contextHash;
+    const snapshotRefs = ["snapshot_aaaaaaaaaaaaaaaaaaaa"];
+    await transaction.insert(schema.effectiveCampaignContexts).values({
+      id: contextId, workspaceId, identityHash: "b".repeat(64), contextHash,
+      schemaVersion: "effective-campaign-context/1.0.0", metaConnectionId: connectionId,
+      adAccountId: accountId, campaignId, connectionRef: "action-queue-verifier", accountRef: "act_12345",
+      campaignRef: "campaign_12345", entityType: "campaign", entityRef: "campaign_12345",
+      capturedAt: new Date(capturedAt), snapshotRefs,
+      contextPayload: {
+        workspaceId, schemaVersion: "effective-campaign-context/1.0.0", contextHash, capturedAt,
+        identity: {
+          connectionRef: "action-queue-verifier", accountRef: "act_12345",
+          campaignRef: "campaign_12345", entityType: "campaign", entityRef: "campaign_12345",
+        },
+        data: { snapshotRefs },
+        capabilities: { containsRawL0: false, canAuthorizeAction: false, canExecuteWrite: false },
+      },
+    });
+    await transaction.insert(schema.effectiveCampaignContextComponents).values({
+      workspaceId, contextId, componentType: "policy_authority",
+      componentRef: "policy_authority_workspace", componentVersion: "a".repeat(64),
     });
     const repository = new DrizzleActionProposalQueueRepository(transaction as never, workspaceId);
     evidence.inserted = (await repository.appendInitial(proposal)).outcome === "inserted";
