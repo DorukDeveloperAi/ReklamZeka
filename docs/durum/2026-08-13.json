@@ -4,6 +4,60 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "3377eee7b",
+      "tarih": "2026-08-14",
+      "konu": "fix(approval): bind geo evidence through hierarchy",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "294e5e398",
+      "tarih": "2026-08-14",
+      "konu": "fix(meta): label trust freshness in hours",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "2834bf3f7",
+      "tarih": "2026-08-14",
+      "konu": "fix(approval): enforce published budget guardrails",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "edb2b8d03",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): make budget approval scenario selectable",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "c1e68ad04",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): bind approval fixture hierarchy evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "82b419413",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): align approval chain source evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
       "hash": "dadf63549",
       "tarih": "2026-08-14",
       "konu": "fix(analysis): preserve category composition diagnostics",
@@ -83,89 +137,31 @@
       "kapsam": [
         "fix"
       ]
-    },
-    {
-      "hash": "2a0713f0c",
-      "tarih": "2026-08-14",
-      "konu": "docs(state): record slice readiness projection",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "c5814def6",
-      "tarih": "2026-08-14",
-      "konu": "feat(rules): show frozen context readiness",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "7d95faba7",
-      "tarih": "2026-08-14",
-      "konu": "docs(state): record manual classification handoff",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "ebf137c8d",
-      "tarih": "2026-08-14",
-      "konu": "feat(categories): hand off review rows to manual assignment",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "664b14f98",
-      "tarih": "2026-08-14",
-      "konu": "docs(state): record canonical campaign portfolio",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "6d3298f67",
-      "tarih": "2026-08-14",
-      "konu": "feat(dashboard): show canonical campaign portfolio",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
-      "kapsam": "feat",
+      "kapsam": "fix",
       "adet": 20
     },
     {
-      "kapsam": "fix",
-      "adet": 17
+      "kapsam": "feat",
+      "adet": 19
     },
     {
       "kapsam": "docs",
-      "adet": 16
+      "adet": 15
     },
     {
       "kapsam": "test",
       "adet": 5
     },
     {
-      "kapsam": "chore",
-      "adet": 1
-    },
-    {
       "kapsam": "refactor",
       "adet": 1
     }
   ],
-  "isSayisi": 434,
+  "isSayisi": 440,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-14",
   "planlar": [
@@ -186,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "8027afe592c1"
+  "damga": "68e43c747f0a"
 }

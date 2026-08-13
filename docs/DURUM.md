@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 8027afe592c1 -->
+<!-- durum-damga: 68e43c747f0a -->
 
 ## Künye
 
@@ -14,13 +14,19 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 434 |
+| iş commit'i (tüm geçmiş) | 440 |
 | ilk / son iş | 2026-08-06 / 2026-08-14 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-14 | `fix` | bind geo evidence through hierarchy | `3377eee7b` |
+| 2026-08-14 | `fix` | label trust freshness in hours | `294e5e398` |
+| 2026-08-14 | `fix` | enforce published budget guardrails | `2834bf3f7` |
+| 2026-08-14 | `fix` | make budget approval scenario selectable | `edb2b8d03` |
+| 2026-08-14 | `fix` | bind approval fixture hierarchy evidence | `c1e68ad04` |
+| 2026-08-14 | `fix` | align approval chain source evidence | `82b419413` |
 | 2026-08-14 | `fix` | preserve category composition diagnostics | `dadf63549` |
 | 2026-08-14 | `fix` | publish approval chain category profiles | `26983ac27` |
 | 2026-08-14 | `fix` | retry tombstone transport failures | `dadb6dc62` |
@@ -30,20 +36,13 @@
 | 2026-08-14 | `refactor` | share ready budget context fixture | `36061fcee` |
 | 2026-08-14 | `docs` | record frozen action context binding | `5a5aacb50` |
 | 2026-08-14 | `fix` | bind materialized units to frozen context | `6d7796951` |
-| 2026-08-14 | `docs` | record slice readiness projection | `2a0713f0c` |
-| 2026-08-14 | `feat` | show frozen context readiness | `c5814def6` |
-| 2026-08-14 | `docs` | record manual classification handoff | `7d95faba7` |
-| 2026-08-14 | `feat` | hand off review rows to manual assignment | `ebf137c8d` |
-| 2026-08-14 | `docs` | record canonical campaign portfolio | `664b14f98` |
-| 2026-08-14 | `feat` | show canonical campaign portfolio | `6d3298f67` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 20
-- `fix         ` ████████████████████ 17
-- `docs        ` ███████████████████ 16
+- `fix         ` ████████████████████████ 20
+- `feat        ` ███████████████████████ 19
+- `docs        ` ██████████████████ 15
 - `test        ` ██████ 5
-- `chore       ` █ 1
 - `refactor    ` █ 1
 
 ## Planlar

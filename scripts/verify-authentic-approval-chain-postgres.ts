@@ -9,6 +9,7 @@ import { ApprovalQueueReadService } from "@/application/approval-queue-read-serv
 import { DrizzleApprovalQueueReadRepository } from "@/connectors/actions/approval-queue-drizzle-read-repository";
 import { SliceRuleWorkspaceService } from "@/application/slice-rule-workspace-service";
 import { DrizzleApprovalPolicyRegistryRepository } from "@/connectors/actions/approval-policy-registry-drizzle-repository";
+import { DrizzleActionGuardrailPolicyRepository } from "@/connectors/actions/action-guardrail-policy-drizzle-repository";
 import { DrizzleBudgetProposalRepository } from "@/connectors/budget/budget-proposal-drizzle-repository";
 import { DrizzleCategoryAuthoringRepository } from "@/connectors/categories/category-authoring-drizzle-repository";
 import { DrizzleCategoryProfileLifecycleRepository } from "@/connectors/categories/category-profile-lifecycle-drizzle-repository";
@@ -19,8 +20,11 @@ import { DrizzleSliceRuleWorkspaceRepository } from "@/connectors/campaigns/slic
 import { DrizzleWorkspaceTombstonePurgePort } from "@/connectors/meta/workspace-tombstone-purge-drizzle-adapter";
 import { DrizzleWorkspaceTombstoneStore, WorkspaceTombstoneService } from "@/connectors/meta/workspace-tombstone-drizzle-service";
 import { createApprovalPolicyDraft, publishApprovalPolicy } from "@/domain/actions/approval-policy-registry";
+import { createActionGuardrailPolicyDraft, publishActionGuardrailPolicy } from "@/domain/actions/action-guardrail-policy";
 import { ACTION_APPROVAL_POLICY_VERSION } from "@/domain/actions/approval-lifecycle";
 import { categoryDefinitionPublicRef, categoryDimensionPublicRef, categoryEntityPublicRef } from "@/domain/categories/public-reference";
+import { hashMetaAffectedGeoSourceSubtree, normalizeMetaAffectedGeoCountries } from "@/domain/meta/affected-geo-country-snapshot";
+import { DrizzleMetaAffectedGeoSnapshotRepository } from "@/connectors/meta/meta-affected-geo-snapshot-drizzle-repository";
 import { normalizeMetaChangeSnapshot } from "@/domain/meta/snapshot-diff";
 import * as schema from "@/db/schema";
 import { materializeCurrentEffectiveAnalysisContextSourceFixture } from "./support/current-effective-analysis-context-source-fixture";
@@ -32,6 +36,11 @@ const pool = new Pool({ connectionString: url, max: 1, connectionTimeoutMillis: 
 const database = drizzle(pool, { schema }); const rollback = Symbol("authentic-approval-chain-rollback");
 const evidence = { readyL3: false, ruleSaved: false, savedProposal: false, allocationBound: false, selected: false, materialized: false, exactReplay: false, queueRead: false, canExecuteFalse: false, rollbackClean: false, cleanup: false, metaCalls: 0, executionCalls: 0 };
 const rows = (v: unknown): readonly Record<string, unknown>[] => v && typeof v === "object" && "rows" in v && Array.isArray(v.rows) ? v.rows as readonly Record<string, unknown>[] : [];
+function serializationFailure(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const value = error as { code?: unknown; cause?: { code?: unknown } };
+  return value.code === "40001" || value.cause?.code === "40001";
+}
 const now = new Date(); const proposedAt = new Date(now.getTime() + 2_000).toISOString(); const expiresAt = new Date(now.getTime() + 3_600_000).toISOString();
 let fixture: Awaited<ReturnType<typeof materializeCurrentEffectiveAnalysisContextSourceFixture>> | null = null;
 async function assignScopeCategories(source: NonNullable<typeof fixture>) {
@@ -60,7 +69,8 @@ try {
   // Canonical mirror fixture only: the target context remains wholly production-materialized below.
   await database.execute(sql`update ad_campaigns set campaign_budget_optimization=true, daily_budget_minor=10000, raw_payload_hash=${"a".repeat(64)}, source_graph_version='v23.0', field_catalog_version='approval-chain-fixture', fetched_at=${now} where workspace_id=${source.workspaceId}::uuid and id=${source.campaignId}::uuid`);
   const adSetRef = `adset_${source.campaignRef}`;
-  await database.insert(schema.metaAdSets).values({ id: randomUUID(), workspaceId: source.workspaceId, adAccountId: source.adAccountId, campaignId: source.campaignId, externalAdSetId: adSetRef, name: "Approval chain fixture", rawPayloadHash: "c".repeat(64), sourceGraphVersion: "v23.0", fieldCatalogVersion: "approval-chain-fixture", provenance: { fixture: true }, fetchedAt: now, firstSeenAt: now, lastSeenAt: now });
+  const adSetId = randomUUID();
+  await database.insert(schema.metaAdSets).values({ id: adSetId, workspaceId: source.workspaceId, adAccountId: source.adAccountId, campaignId: source.campaignId, externalAdSetId: adSetRef, name: "Approval chain fixture", rawPayloadHash: "c".repeat(64), sourceGraphVersion: "v23.0", fieldCatalogVersion: "approval-chain-fixture", provenance: { fixture: true }, fetchedAt: now, firstSeenAt: now, lastSeenAt: now });
   // A hierarchy change is accepted by the source reader only when its immutable
   // change snapshot carries the same complete campaign/ad-set shape.
   const snapshotAt = new Date(now.getTime() - 1_000).toISOString();
@@ -73,7 +83,19 @@ try {
     adAccountId: source.adAccountId, publicRef: `snapshot_${randomUUID().replaceAll("-", "").slice(0, 20)}`,
     snapshotHash: hierarchySnapshot.snapshotHash, schemaVersion: hierarchySnapshot.schemaVersion, fieldCatalogVersion: hierarchySnapshot.fieldCatalogVersion,
     capturedAt: new Date(snapshotAt), canonicalPayload: hierarchySnapshot, safeAggregate: { entityCounts: { campaign: 1, adSet: 1, ad: 0 }, knownFieldCount: 1, unknownFieldCount: 1 } });
+  const geoTargeting = { geo_locations: { countries: ["TR"], location_types: ["home"] } };
+  const geoSnapshot = normalizeMetaAffectedGeoCountries({ sourceKind: "meta_graph_adset_targeting", scope: { workspaceRef: source.workspaceRef,
+    accountRef: source.accountRef, campaignRef: source.campaignRef, adSetRef }, sourceGraphVersion: "v23.0",
+    fieldCatalogVersion: "approval-chain-fixture", fetchedAt: snapshotAt, provenance: { observationRunRef: "observation_approval_chain",
+      sliceRef: "slice_approval_chain", pageRef: "page_approval_chain", rawPayloadHash: "d".repeat(64),
+      sourceGeoSubtreeHash: hashMetaAffectedGeoSourceSubtree(geoTargeting) }, targeting: geoTargeting });
+  if (geoSnapshot.status !== "known") throw new Error("approval_chain_geo_not_known");
+  await new DrizzleMetaAffectedGeoSnapshotRepository(database as never, source.workspaceId).append({ workspaceId: source.workspaceId,
+    adAccountId: source.adAccountId, campaignId: source.campaignId, adSetId, snapshot: geoSnapshot });
   const prepared = await materializeReadyBudgetContext(database, source); if (!prepared.ready) throw new Error("authentic_chain_l3_not_ready"); evidence.readyL3 = true;
+  const preparedAdSet = await materializeReadyBudgetContext(database, { ...source, request: { workspaceId: source.workspaceId,
+    accountRef: source.accountRef, entityType: "ad_set", entityRef: adSetRef } });
+  if (!preparedAdSet.ready) throw new Error("authentic_chain_adset_l3_not_ready");
   await database.transaction(async (tx) => {
     const ruleService = new SliceRuleWorkspaceService(new DrizzleSliceRuleWorkspaceRepository(tx as never));
     const savedRule = await ruleService.saveDraft(source.actorId, { workspaceId: source.workspaceId, seriesRef: "slice_rule.approval_chain", revision: 1, previousDraftHash: "GENESIS", idempotencyKey: "slice_rule.approval_chain.r1", createdAt: proposedAt, scope: { market: "international", serviceRef: "service_physical_therapy", campaignFamilyRef: "campaign_family_intensive_ftr" }, rule: { kind: "targeting_budget_preservation", currency: "TRY", totalDailyBudgetDecimal: "100.00", allocations: [{ allocationRef: "allocation_primary", dailyBudgetDecimal: "100.00", territory: "Türkiye", countryCodes: ["TR"], platform: "all_platforms", publisherPlatforms: ["instagram"], audienceStrategy: "live targeting", targetingEvidence: "live_targeting_verified" }] }, priority: 100, verification: { metric: "cost_per_qualified_lead", reviewCadence: "daily", rollbackWhen: "evidence_changed" } });
@@ -101,6 +123,17 @@ try {
     const policy = { version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "approval_policy_budget_decrease", revision: 1, autonomyMode: "approval_only" as const, requesterRoles: ["owner"] as const, approverRoles: [{ risk: "K2" as const, roles: ["owner"] as const }], grantConsumerRoles: ["owner"] as const, separationOfDutiesRisks: ["K2"] as const, maximumProtectionEvidenceAgeSeconds: 3600, maximumProposalLifetimeSeconds: 86400, maximumGrantLifetimeSeconds: 300 };
     const draft = createApprovalPolicyDraft({ workspaceRef: source.workspaceRef, policy, applicability: { actionType: "budget_decrease", risk: "K2" }, effectiveFrom: new Date(now.getTime() - 60_000).toISOString(), expiresAt: null, normalizedBy: { actorRef: source.actorRef, role: "owner" } });
     await registry.append(draft); await registry.append(publishApprovalPolicy({ draft, actor: { actorRef: secondActorRef, role: "owner" }, decisionRef: "decision_approval_chain", reasonRef: "reason_approval_chain", publishedAt: proposedAt }));
+    const guardrails = new DrizzleActionGuardrailPolicyRepository(tx as never, source.workspaceId, source.workspaceRef);
+    const guardrailDraft = createActionGuardrailPolicyDraft({ workspaceRef: source.workspaceRef, policyRef: "guardrail_budget_decrease",
+      revision: 1, previousHash: null, effectiveFrom: source.occurredAt, expiresAt: null,
+      selector: { actionTypes: ["budget_decrease"], accountRefs: [source.accountRef], campaignRefs: [source.campaignRef],
+        entities: [{ level: "campaign", ref: source.campaignRef }], internalCategoryRefs: [], geoRefs: [] },
+      clauses: [{ clauseRef: "guardrail_budget_decrease_limit", kind: "budget_delta_limit", currency: "TRY",
+        maximumAbsoluteDeltaDecimal: "15", maximumRelativeDeltaBasisPoints: 1_000 }],
+      normalizedBy: { actorRef: source.actorRef, role: "owner" }, sourceGuidanceRefs: [] });
+    await guardrails.append(guardrailDraft);
+    await guardrails.append(publishActionGuardrailPolicy({ draft: guardrailDraft, actor: { actorRef: secondActorRef, role: "owner" },
+      decisionRef: "decision_guardrail_approval_chain", reasonRef: "reason_guardrail_approval_chain", publishedAt: proposedAt }));
     const selection = rows(await tx.execute(sql`select id::text as id from slice_rule_scenario_allocation_selections where workspace_id=${source.workspaceId}::uuid and idempotency_key='selection.approval_chain.r1'`))[0]; if (!selection || typeof selection.id !== "string") throw new Error("selection_missing");
     const materializer = new DrizzleSliceRuleBudgetActionUnitMaterializer(tx as never);
     const first = await materializer.materialize({ workspaceId: source.workspaceId, selectionId: selection.id, actorId: source.actorId, idempotencyKey: "unit.approval_chain.r1", proposedAt, expiresAt });
@@ -113,6 +146,6 @@ try {
     throw rollback;
   });
 } catch (error) { if (error !== rollback) throw error; }
-finally { globalThis.fetch = fetch0; if (fixture) { const residual = rows(await database.execute(sql`select count(*)::int as count from budget_proposal_versions where workspace_id=${fixture.workspaceId}::uuid`))[0]; evidence.rollbackClean = Number(residual?.count) === 0; const purge = new DrizzleWorkspaceTombstonePurgePort(); const tombstones = new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge), { authorize: async (input) => input.approvalRef === "ephemeral-fixture-approved" }, fixture.actorId, 60_000); for (const workspaceId of [fixture.workspaceId, fixture.foreignWorkspaceId]) { const plan = await tombstones.dryRun(workspaceId, new Date().toISOString()); await tombstones.execute({ planRef: plan.planRef, approvalRef: "ephemeral-fixture-approved", now: new Date().toISOString() }); } evidence.cleanup = (await purge.inspect(database as never, fixture.workspaceId)).candidateCount === 0 && (await purge.inspect(database as never, fixture.foreignWorkspaceId)).candidateCount === 0; } await pool.end(); }
+finally { globalThis.fetch = fetch0; if (fixture) { const residual = rows(await database.execute(sql`select count(*)::int as count from budget_proposal_versions where workspace_id=${fixture.workspaceId}::uuid`))[0]; evidence.rollbackClean = Number(residual?.count) === 0; const purge = new DrizzleWorkspaceTombstonePurgePort(); const tombstones = new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge), { authorize: async (input) => input.approvalRef === "ephemeral-fixture-approved" }, fixture.actorId, 60_000); for (const workspaceId of [fixture.workspaceId, fixture.foreignWorkspaceId]) { for (let attempt = 0; ; attempt += 1) { try { const plan = await tombstones.dryRun(workspaceId, new Date().toISOString()); await tombstones.execute({ planRef: plan.planRef, approvalRef: "ephemeral-fixture-approved", now: new Date().toISOString() }); break; } catch (error) { if (!serializationFailure(error) || attempt === 2) throw error; } } } evidence.cleanup = (await purge.inspect(database as never, fixture.workspaceId)).candidateCount === 0 && (await purge.inspect(database as never, fixture.foreignWorkspaceId)).candidateCount === 0; } await pool.end(); }
 if (!(evidence.readyL3 && evidence.ruleSaved && evidence.savedProposal && evidence.allocationBound && evidence.selected && evidence.materialized && evidence.exactReplay && evidence.queueRead && evidence.canExecuteFalse && evidence.rollbackClean && evidence.cleanup) || evidence.metaCalls !== 0 || evidence.executionCalls !== 0) throw new Error(`authentic_approval_chain_failed:${JSON.stringify(evidence)}`);
 console.log(JSON.stringify(evidence));
