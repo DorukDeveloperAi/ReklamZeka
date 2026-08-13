@@ -24,6 +24,9 @@
   Inventory recovery yaratıcı streamini başlatacak kadar ilerledi, ancak bir inventory sayfası upstream
   hatasıyla `partial` kaldığı ve creative/insight streamleri tamamlanmadığı için canlı kabul henüz
   tamamlanmış sayılmaz; recovery komutu bu state'i idempotent checkpoint'ten sürdürür.
+  Sunucu yapılandırmasındaki doğrulanmış tek hesap için ayrık inventory/ad-set recovery lane'i canlıda
+  `completed` oldu; lane yalnız GET yapar, requestten account/stream kabul etmez ve aynı durable
+  cursor/parent üzerinden tekrar başlatılır. Creative ve insight için eşdeğer ayrı lane'ler hâlâ açık.
 - `/api/meta/read-mirror` Dashboard'un kullandığı canonical DB read-model'idir; eski
   `/api/meta/inventory` route'u bilinçli biçimde `503` kalır. Hiyerarşinin campaign kısmı mevcut
   tenantta gerçek veriye bağlıdır. Ad-set/ad/creative/insight tamamlaması ve ayrıntılı immutable
