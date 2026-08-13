@@ -3,22 +3,15 @@ import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-import { buildDeterministicFeatureSnapshot } from "@/analyses/deterministic-feature-snapshot";
-import { buildFindingObservationPlan, buildFindingObservations } from "@/analyses/finding-observation-builder";
-import { resolveAnalysisTimeframe } from "@/analyses/timeframe-resolver";
 import { BudgetLabDraftService } from "@/application/budget-lab-draft-service";
 import { BudgetProposalService, type BudgetProposalInput } from "@/application/budget-proposal-service";
-import { DrizzleDeterministicFeatureSnapshotRepository } from "@/connectors/analyses/deterministic-feature-snapshot-drizzle-repository";
-import { DrizzleDeterministicWindowSnapshotRepository } from "@/connectors/analyses/deterministic-window-snapshot-drizzle-repository";
-import { DrizzleFindingObservationReadPort, FINDING_OBSERVATION_SETTLEMENT_POLICY_VERSION } from "@/connectors/analyses/finding-observation-drizzle-read-port";
 import { DrizzleBudgetProposalRepository } from "@/connectors/budget/budget-proposal-drizzle-repository";
 import { DrizzleWorkspaceTombstonePurgePort } from "@/connectors/meta/workspace-tombstone-purge-drizzle-adapter";
 import { DrizzleWorkspaceTombstoneStore, WorkspaceTombstoneService } from "@/connectors/meta/workspace-tombstone-drizzle-service";
 import * as schema from "@/db/schema";
 import type { BudgetScenarioDefinition } from "@/domain/budget/scenario-composer";
-import { createDrizzleEffectiveAnalysisContextComposer } from "@/server/effective-analysis-context-composer-runtime";
-import { createDrizzleTimeframeBoundAnalysisContextComposer } from "@/server/timeframe-bound-analysis-context-composer-runtime";
 import { materializeCurrentEffectiveAnalysisContextSourceFixture } from "./support/current-effective-analysis-context-source-fixture";
+import { materializeReadyBudgetContext } from "./support/materialize-ready-budget-context";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const databaseUrl = process.env.DATABASE_URL?.trim();
@@ -72,142 +65,6 @@ function scenario(kind: BudgetScenarioDefinition["kind"], requestedBudgetMinor: 
   };
 }
 
-/**
- * The source reader owns a repeatable-read/read-only snapshot.  This verifier
- * therefore commits its L1/L2 evidence before composing the source context,
- * then binds that context to L3 through the normal production materializer.
- * The outer rollback below remains limited to proposal/draft acceptance rows;
- * the committed fixture branch is always removed by the tombstone lifecycle.
- */
-async function materializeReadyBudgetContext(source: NonNullable<typeof fixture>): Promise<Readonly<{
-  contextHash: string;
-  ready: boolean;
-}>> {
-  const now = new Date();
-  const day = now.toISOString().slice(0, 10);
-  let featureRef = "";
-  let analysisConnectionId = "";
-  let analysisAccountId = "";
-  await database.transaction(async (transaction) => {
-    const scope = rows(await transaction.execute(sql`
-      select connection.id::text as connection_id, account.id::text as account_id
-      from meta_connections connection
-      join data_sources source on source.workspace_id = connection.workspace_id and source.meta_connection_id = connection.id
-      join ad_accounts account on account.workspace_id = source.workspace_id and account.data_source_id = source.id
-      where connection.workspace_id = ${source.workspaceId}::uuid and account.external_account_id = ${source.accountRef}
-      limit 2
-    `))[0];
-    if (!scope || typeof scope.connection_id !== "string" || typeof scope.account_id !== "string") {
-      throw new Error("budget_verifier_l1_scope_missing");
-    }
-    analysisConnectionId = scope.connection_id;
-    analysisAccountId = scope.account_id;
-    const stream = crypto.randomUUID(); const syncRun = crypto.randomUUID(); const slice = crypto.randomUUID(); const insight = crypto.randomUUID();
-    await transaction.insert(schema.metaSyncStreams).values({ id: stream, workspaceId: source.workspaceId, metaConnectionId: scope.connection_id,
-      adAccountId: scope.account_id, streamType: "insights", status: "completed" });
-    await transaction.insert(schema.metaSyncRuns).values({ id: syncRun, workspaceId: source.workspaceId, metaConnectionId: scope.connection_id,
-      adAccountId: scope.account_id, streamId: stream, streamType: "insights", idempotencyKey: `budget_verifier_${source.workspaceId}`,
-      status: "completed", startedAt: new Date(now.getTime() - 90_000), finishedAt: new Date(now.getTime() - 60_000) });
-    await transaction.insert(schema.metaSyncSlices).values({ id: slice, workspaceId: source.workspaceId, metaConnectionId: scope.connection_id,
-      adAccountId: scope.account_id, runId: syncRun, streamType: "insights", entityLevel: "campaign", dateStart: day, dateStop: day,
-      sliceKey: `budget_verifier_${day}`, status: "completed", completedAt: new Date(now.getTime() - 60_000) });
-    await transaction.insert(schema.metaDailyInsights).values({ id: insight, workspaceId: source.workspaceId, metaConnectionId: scope.connection_id,
-      adAccountId: scope.account_id, syncRunId: syncRun, syncSliceId: slice, entityLevel: "campaign", externalEntityId: source.campaignRef,
-      dateStart: day, dateStop: day, attributionLabel: "7d_click_1d_view", attributionWindow: { click: 7, view: 1 }, currency: "TRY",
-      timezone: "Europe/Istanbul", sourceRevision: "budget-verifier-v1", sourcePayloadHash: "b".repeat(64),
-      sourceUpdatedAt: new Date(now.getTime() - 60_000), metricProvenance: { source: "acceptance_fixture" } });
-    await transaction.insert(schema.metaDailyInsightMetrics).values({ dailyInsightId: insight, metricKey: "spend", aggregation: "additive", valueMinor: 100,
-      currency: "TRY", provenance: { field: "spend" }, sourceRevision: "budget-verifier-v1", sourcePayloadHash: "b".repeat(64) });
-
-    const asOf = new Date(now.getTime() + 1_000).toISOString();
-    const timeframe = resolveAnalysisTimeframe({ timeframe: { kind: "rolling", days: 1, timezone: "Europe/Istanbul" }, comparison: "none", asOf, anchors: {} });
-    const plan = buildFindingObservationPlan({ workspaceId: source.workspaceId, metaConnectionId: scope.connection_id, adAccountId: scope.account_id,
-      entityLevel: "campaign", externalEntityId: source.campaignRef, attributionLabel: "7d_click_1d_view", expectedCurrency: "TRY", timeframe,
-      spec: { kind: "threshold", metric: "spendMinor", operator: "gt", thresholdDecimal: "1", minimumSample: 1 }, maxRowsPerQuery: 10 });
-    const query = plan.queries[0];
-    if (!query) throw new Error("budget_verifier_l1_plan_empty");
-    const reads = new DrizzleFindingObservationReadPort(transaction as never, { resolve: async () => ({
-      policyVersion: FINDING_OBSERVATION_SETTLEMENT_POLICY_VERSION, policyRef: "settlement_budget_verifier",
-      evaluatedAsOf: now.toISOString(), settledThroughDate: day,
-    }) });
-    const observed = buildFindingObservations({ plan, reads: [(await reads.readForFeatureSnapshot(query)).read] })[0];
-    if (!observed || observed.qualityStatus !== "ready" || !observed.settled) throw new Error("budget_verifier_l1_not_ready");
-    const feature = buildDeterministicFeatureSnapshot({ scope: { workspaceId: source.workspaceId, metaConnectionId: scope.connection_id,
-      adAccountId: scope.account_id, entityLevel: "campaign", externalEntityId: source.campaignRef }, observation: observed });
-    const stored = await new DrizzleDeterministicFeatureSnapshotRepository(transaction as never).save({ feature,
-      source: await reads.readForFeatureSnapshot(query) });
-    if (stored.outcome !== "inserted") throw new Error("budget_verifier_l2_not_persisted");
-    featureRef = feature.featureRef;
-  });
-
-  const base = await createDrizzleEffectiveAnalysisContextComposer({ database: database as never }).composeAndSave(source.request);
-  const l3AsOf = new Date(Math.max(Date.now() + 1_000, Date.parse(base.context.capturedAt) + 1_000)).toISOString();
-  const timeframe = resolveAnalysisTimeframe({ timeframe: { kind: "rolling", days: 1, timezone: "Europe/Istanbul" }, comparison: "none", asOf: l3AsOf, anchors: {} });
-  if (!analysisConnectionId || !analysisAccountId) throw new Error("budget_verifier_l3_scope_missing");
-  // Surface the bounded repository error before the higher-level composer
-  // deliberately collapses it to source_rejected. This remains verifier-only
-  // and writes the same immutable L3 window the composer would materialize.
-  let l3QueryStage = 0;
-  const l3Database = Object.freeze({
-    transaction: async (work: (transaction: unknown) => Promise<unknown>) => database.transaction(async (transaction) => {
-      const observed = Object.create(transaction) as { execute: (query: unknown) => Promise<unknown> };
-      observed.execute = async (query) => {
-        l3QueryStage += 1;
-        try { return await transaction.execute(query as never); }
-        catch (error) {
-          const message = error instanceof Error ? error.message.replace(/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}/gi, "<uuid>") : "unknown";
-          throw new Error(`budget_verifier_l3_query_${l3QueryStage}:${message}`);
-        }
-      };
-      return work(observed);
-    }),
-  });
-  try {
-    await new DrizzleDeterministicWindowSnapshotRepository(l3Database as never).materializeForTimeframe({
-      workspaceId: source.workspaceId,
-      metaConnectionId: analysisConnectionId,
-      adAccountId: analysisAccountId,
-      entityLevel: "campaign",
-      externalEntityId: source.campaignRef,
-      timeframe,
-    });
-  } catch (error) {
-    let code = "unknown";
-    let candidate: unknown = error;
-    for (let depth = 0; depth < 4 && candidate && typeof candidate === "object"; depth += 1) {
-      if ("code" in candidate && typeof candidate.code === "string") { code = candidate.code; break; }
-      candidate = "cause" in candidate ? candidate.cause : undefined;
-    }
-    const kind = error instanceof Error && /^[A-Za-z][A-Za-z0-9]{0,80}$/.test(error.name)
-      ? error.name : "unknown";
-    const messages: string[] = [];
-    candidate = error;
-    for (let depth = 0; depth < 4 && candidate && typeof candidate === "object"; depth += 1) {
-      if (candidate instanceof Error) messages.push(candidate.message.toLowerCase());
-      candidate = "cause" in candidate ? candidate.cause : undefined;
-    }
-    const category = messages.some((message) => message.includes("uuid")) ? "uuid"
-      : messages.some((message) => message.includes("date")) ? "date"
-      : messages.some((message) => message.includes("json")) ? "json"
-      : "other";
-    const stage = messages.find((message) => message.startsWith("budget_verifier_l3_query_")) ?? "budget_verifier_l3_query_unknown";
-    throw new Error(`budget_verifier_l3_window_${code}_${kind}_${category}_${stage}`);
-  }
-  let l3: Awaited<ReturnType<ReturnType<typeof createDrizzleTimeframeBoundAnalysisContextComposer>["composeAndSave"]>>;
-  try {
-    l3 = await createDrizzleTimeframeBoundAnalysisContextComposer({ database: database as never, now: () => new Date(l3AsOf) })
-      .composeAndSave({ workspaceId: source.workspaceId, entityType: "campaign", entityRef: source.campaignRef, timeframe });
-  } catch (error) {
-    const code = error && typeof error === "object" && "diagnosticCode" in error && typeof error.diagnosticCode === "string"
-      ? error.diagnosticCode : "unknown";
-    throw new Error(`budget_verifier_l3_persistence_${code}`);
-  }
-  return Object.freeze({ contextHash: l3.context.contextHash,
-    ready: l3.context.data.trustStatus === "ready" && l3.context.data.blockers.length === 0
-      && l3.context.data.featureRefs.length === 1 && l3.context.data.featureRefs[0] === featureRef
-      && l3.context.data.windowRefs.length === 1 });
-}
-
 const originalFetch = globalThis.fetch;
 let fixture: Awaited<ReturnType<typeof materializeCurrentEffectiveAnalysisContextSourceFixture>> | null = null;
 try {
@@ -215,7 +72,7 @@ try {
   fixture = await materializeCurrentEffectiveAnalysisContextSourceFixture(database as never);
   const sourceFixture = fixture;
   evidence.fixtureCommitted = true;
-  const prepared = await materializeReadyBudgetContext(sourceFixture);
+  const prepared = await materializeReadyBudgetContext(database, sourceFixture);
   evidence.sourceBoundContext = prepared.ready;
   evidence.readyL3Context = prepared.ready;
   await database.transaction(async (transaction) => {

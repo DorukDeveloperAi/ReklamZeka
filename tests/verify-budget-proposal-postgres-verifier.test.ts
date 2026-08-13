@@ -7,11 +7,12 @@ describe("budget proposal PostgreSQL verifier", () => {
     const source = readFileSync("scripts/verify-budget-proposal-postgres.ts", "utf8");
     expect(source).toContain('from "./support/current-effective-analysis-context-source-fixture"');
     expect(source).toContain("await materializeCurrentEffectiveAnalysisContextSourceFixture(database as never)");
-    expect(source).toContain("async function materializeReadyBudgetContext");
-    expect(source).toContain("new DrizzleDeterministicFeatureSnapshotRepository(transaction as never).save");
-    expect(source).toContain("createDrizzleEffectiveAnalysisContextComposer({ database: database as never }).composeAndSave(source.request)");
-    expect(source).toContain("createDrizzleTimeframeBoundAnalysisContextComposer({ database: database as never");
-    expect(source).toContain("const prepared = await materializeReadyBudgetContext(sourceFixture)");
+    expect(source).toContain('from "./support/materialize-ready-budget-context"');
+    expect(source).toContain("const prepared = await materializeReadyBudgetContext(database, sourceFixture)");
+    const helper = readFileSync("scripts/support/materialize-ready-budget-context.ts", "utf8");
+    expect(helper).toContain("new DrizzleDeterministicFeatureSnapshotRepository(transaction as never).save");
+    expect(helper).toContain("createDrizzleEffectiveAnalysisContextComposer({ database: database as never }).composeAndSave(source.request)");
+    expect(helper).toContain("createDrizzleTimeframeBoundAnalysisContextComposer({ database: database as never");
     expect(source).not.toContain("buildEffectiveCampaignContext");
     expect(source).not.toContain("DrizzleEffectiveCampaignContextRepository");
     expect(source).toContain("new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge)");
