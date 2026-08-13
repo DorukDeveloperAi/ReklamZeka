@@ -80,6 +80,7 @@
     "verify:slice-rule-workspace-db": "tsx scripts/verify-slice-rule-workspace-postgres.ts",
     "verify:delivery-health-alert-ledger-db": "tsx scripts/verify-delivery-health-alert-ledger-postgres.ts",
     "verify:action-proposal-queue-db": "tsx scripts/verify-action-proposal-queue-postgres.ts",
+    "verify:authentic-approval-chain-db": "tsx scripts/verify-authentic-approval-chain-postgres.ts",
     "verify:action-guardrail-db": "tsx scripts/verify-action-guardrail-policy-postgres.ts",
     "verify:meta-affected-geo-db": "tsx scripts/verify-meta-affected-geo-postgres.ts",
     "verify:meta-affected-geo-live-db": "tsx scripts/verify-meta-affected-geo-live-postgres.ts",

@@ -192,6 +192,8 @@ async function deleteCount(executor: DrizzleExecutor, statement: ReturnType<type
  * serializable, locked caller transaction. No table name is catalog-derived.
  */
 export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePurgePort {
+  /** Optional bounded observer for verifier diagnostics; it receives no SQL or row data. */
+  constructor(private readonly diagnostics?: Readonly<{ onDeletePhase(phase: number): void }>) {}
   async inspect(executor: DrizzleExecutor, workspaceId: string): Promise<WorkspaceTombstonePurgeEvidence> {
     if (!workspaceId) throw new WorkspaceTombstoneError("invalid_input");
 
@@ -592,7 +594,9 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     }
 
     let purgedRowCount = 0;
+    let phase = 0;
     const remove = async (statement: ReturnType<typeof sql>) => {
+      this.diagnostics?.onDeletePhase(++phase);
       const count = await deleteCount(executor, statement);
       purgedRowCount += count;
       return count;

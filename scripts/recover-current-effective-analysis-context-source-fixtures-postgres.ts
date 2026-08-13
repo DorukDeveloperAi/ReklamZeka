@@ -6,6 +6,7 @@ import { Pool } from "pg";
 import { DrizzleWorkspaceTombstonePurgePort } from "@/connectors/meta/workspace-tombstone-purge-drizzle-adapter";
 import { DrizzleWorkspaceTombstoneStore, WorkspaceTombstoneService } from "@/connectors/meta/workspace-tombstone-drizzle-service";
 import * as schema from "@/db/schema";
+import { retryWorkspaceTombstoneTransport } from "./support/workspace-tombstone-transport-retry";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 if (process.env.ALLOW_EPHEMERAL_CURRENT_SOURCE_FIXTURE_RECOVERY !== "1") {
@@ -14,8 +15,10 @@ if (process.env.ALLOW_EPHEMERAL_CURRENT_SOURCE_FIXTURE_RECOVERY !== "1") {
 }
 const connectionString = process.env.DIRECT_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
 if (!connectionString) throw new Error("postgres_connection_not_configured");
-const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 20_000 });
-const database = drizzle(pool, { schema });
+const createPool = () => new Pool({ connectionString, max: 1, connectionTimeoutMillis: 10_000,
+  statement_timeout: 20_000, query_timeout: 45_000, keepAlive: true, keepAliveInitialDelayMillis: 1_000 });
+let pool = createPool();
+let database = drizzle(pool, { schema });
 const rows = (value: unknown): readonly Record<string, unknown>[] => value && typeof value === "object" && "rows" in value && Array.isArray(value.rows) ? value.rows as readonly Record<string, unknown>[] : [];
 try {
   const fixtures = rows(await database.execute(sql`select workspace.id::text as workspace_id, workspace.name, owner.user_id::text as actor_id
@@ -29,11 +32,28 @@ try {
   // tombstone service merely to remove the damaged fixture.
   const fallbackActor = fixtures.find((row) => row.name === "Current source verifier" && row.actor_id)?.actor_id ?? fixtureActor;
   if (fixtures.some((row) => typeof (row.actor_id ?? fallbackActor) !== "string")) throw new Error("fixture_recovery_actor_unavailable");
-  const purge = new DrizzleWorkspaceTombstonePurgePort();
-  const service = new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge), { authorize: async (input) => input.approvalRef === "ephemeral-fixture-recovery-approved" }, String(fallbackActor), 60_000);
+  const purge = new DrizzleWorkspaceTombstonePurgePort({ onDeletePhase: (phase) => {
+    if (phase % 20 === 0) process.stderr.write(`${JSON.stringify({ recoveryPhase: phase })}\n`);
+  } });
   for (const fixture of fixtures) {
-    const plan = await service.dryRun(String(fixture.workspace_id), new Date().toISOString());
-    await service.execute({ planRef: plan.planRef, approvalRef: "ephemeral-fixture-recovery-approved", now: new Date().toISOString() });
+    const workspaceId = String(fixture.workspace_id);
+    await retryWorkspaceTombstoneTransport({
+      execute: async () => {
+        const service = new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge),
+          { authorize: async (input) => input.approvalRef === "ephemeral-fixture-recovery-approved" }, String(fallbackActor), 60_000);
+        const plan = await service.dryRun(workspaceId, new Date().toISOString());
+        await service.execute({ planRef: plan.planRef, approvalRef: "ephemeral-fixture-recovery-approved", now: new Date().toISOString() });
+      },
+      reconnect: async () => {
+        await pool.end();
+        pool = createPool();
+        database = drizzle(pool, { schema });
+      },
+      completedAfterReconnect: async () => {
+        const lifecycle = rows(await database.execute(sql`select lifecycle_state from workspaces where id = ${workspaceId}::uuid`))[0]?.lifecycle_state;
+        return lifecycle === "tombstoned" && (await purge.inspect(database as never, workspaceId)).candidateCount === 0;
+      },
+    });
   }
   const survivors = rows(await database.execute(sql`select count(*)::int as count from workspaces where lifecycle_state = 'active' and name in ('Current source verifier', 'Current source foreign')`))[0]?.count;
   if (Number(survivors ?? -1) !== 0) throw new Error("fixture_recovery_survivors_detected");
