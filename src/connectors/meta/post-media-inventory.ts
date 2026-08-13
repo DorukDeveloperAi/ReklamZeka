@@ -6,6 +6,7 @@ import {
   contentHashFor,
   normalizeMetaPostMediaInventory,
   type CanonicalMetaPostMediaInventory,
+  type MetaContentActorType,
   type MetaContentLifecycle,
   type MetaContentMediaType,
   type MetaPostMediaDiscovery,
@@ -57,6 +58,21 @@ export type DiscoverMetaPostMediaInventoryOptions = Readonly<{
   fetchImpl?: MetaFetch;
   now?: () => Date;
   maxPagesPerActor?: number;
+}>;
+
+/**
+ * A server-owned recovery target taken from an already-read creative.  It is not
+ * a user-selectable account input: both actor and post identities must have
+ * appeared together in the creative response before an actor edge is queried.
+ */
+export type MetaCreativePostRecoveryTarget = Readonly<{
+  actorType: MetaContentActorType;
+  actorExternalId: string;
+  externalPostId: string;
+}>;
+
+export type RecoverMetaPostMediaInventoryOptions = DiscoverMetaPostMediaInventoryOptions & Readonly<{
+  targets: readonly MetaCreativePostRecoveryTarget[];
 }>;
 
 function stableValue(value: unknown): unknown {
@@ -221,6 +237,108 @@ function discovery(
     reason: null,
     promotionEligibility: "unknown",
   };
+}
+
+function recoveryTargets(input: readonly MetaCreativePostRecoveryTarget[]): readonly MetaCreativePostRecoveryTarget[] {
+  const unique = new Map<string, MetaCreativePostRecoveryTarget>();
+  for (const target of input) {
+    if (!target.actorExternalId.trim() || !target.externalPostId.trim()) continue;
+    unique.set(`${target.actorType}:${target.actorExternalId}:${target.externalPostId}`, target);
+  }
+  return [...unique.values()].sort((left, right) =>
+    `${left.actorType}:${left.actorExternalId}:${left.externalPostId}`
+      .localeCompare(`${right.actorType}:${right.actorExternalId}:${right.externalPostId}`));
+}
+
+/**
+ * Bounded GET-only recovery for a creative-proven actor/post pair missing from
+ * the broad inventory. A row is emitted only when the actor edge itself returns
+ * the exact creative post ID; it never creates an inferred actor/post link.
+ */
+export async function recoverMetaPostMediaInventoryFromCreativeEvidence(
+  options: RecoverMetaPostMediaInventoryOptions,
+): Promise<CanonicalMetaPostMediaInventory> {
+  if (!options.token.trim()) throw new TypeError("Meta access token is required");
+  const maxPages = options.maxPagesPerActor ?? 20;
+  if (!Number.isSafeInteger(maxPages) || maxPages < 1) throw new TypeError("maxPagesPerActor must be a positive integer");
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchedAt = (options.now ?? (() => new Date()))().toISOString();
+  const items: MetaPostMediaItem[] = [];
+  const discoveries: MetaPostMediaDiscovery[] = [];
+
+  const targetsByActor = new Map<string, readonly MetaCreativePostRecoveryTarget[]>();
+  for (const target of recoveryTargets(options.targets)) {
+    const key = `${target.actorType}:${target.actorExternalId}`;
+    targetsByActor.set(key, [...(targetsByActor.get(key) ?? []), target]);
+  }
+  for (const targets of targetsByActor.values()) {
+    const target = targets[0]!;
+    const wantedPostIds = new Set(targets.map((entry) => entry.externalPostId));
+    const isPage = target.actorType === "facebook_page";
+    const sourceEdge = isPage ? `/${target.actorExternalId}/posts` : `/${target.actorExternalId}/media`;
+    const result = await listAll<RawPagePost | RawInstagramMedia>({
+      path: sourceEdge,
+      fields: isPage
+        ? "id,message,created_time,permalink_url,status_type,is_published,attachments{media_type,type}"
+        : "id,caption,media_type,media_product_type,permalink,timestamp,username",
+      token: options.token,
+      fetchImpl,
+      maxPages,
+    });
+    const matched = !isFailure(result)
+      ? result.rows.filter((row): row is (RawPagePost | RawInstagramMedia) & { id: string } =>
+        typeof row.id === "string" && Boolean(row.id.trim()) && wantedPostIds.has(row.id))
+      : [];
+    discoveries.push(discovery(target.actorType, target.actorExternalId, sourceEdge, result));
+    for (const raw of matched) {
+      if (isPage) {
+        const post = raw as RawPagePost & { id: string };
+        const messageOrCaption = cleanText(post.message);
+        const publishedAt = isoOrNull(post.created_time);
+        const mediaType = pageMediaType(post);
+        const lifecycle = pageLifecycle(post);
+        items.push({
+          externalContentId: post.id,
+          contentKind: "page_post",
+          actor: { type: "facebook_page", externalId: target.actorExternalId, displayName: null, username: null },
+          messageOrCaption, mediaType, publishedAt, lifecycle,
+          contentHash: contentHashFor({ externalContentId: post.id, contentKind: "page_post", actorType: "facebook_page", actorExternalId: target.actorExternalId, messageOrCaption, mediaType, publishedAt, lifecycle }),
+          ownership: { kind: "accessible", evidence: "/me/accounts" },
+          readCapability: { status: "verified", evidence: "edge_read_succeeded" },
+          promotionEligibility: { status: "unknown", reason: "not_verified_by_inventory_read" },
+          previewSource: { classification: "server_only_sensitive", permalink: safePermalink(post.permalink_url) },
+          provenance: provenance(sourceEdge, post, fetchedAt),
+        });
+      } else {
+        const media = raw as RawInstagramMedia & { id: string };
+        const messageOrCaption = cleanText(media.caption);
+        const publishedAt = isoOrNull(media.timestamp);
+        const mediaType = instagramMediaType(media);
+        const lifecycle: MetaContentLifecycle = publishedAt ? "published" : "unknown";
+        items.push({
+          externalContentId: media.id,
+          contentKind: "instagram_media",
+          actor: { type: "instagram_account", externalId: target.actorExternalId, displayName: null, username: cleanText(media.username) },
+          messageOrCaption, mediaType, publishedAt, lifecycle,
+          contentHash: contentHashFor({ externalContentId: media.id, contentKind: "instagram_media", actorType: "instagram_account", actorExternalId: target.actorExternalId, messageOrCaption, mediaType, publishedAt, lifecycle }),
+          ownership: { kind: "linked", evidence: "facebook_page.instagram_business_account" },
+          readCapability: { status: "verified", evidence: "edge_read_succeeded" },
+          promotionEligibility: { status: "unknown", reason: "not_verified_by_inventory_read" },
+          previewSource: { classification: "server_only_sensitive", permalink: safePermalink(media.permalink) },
+          provenance: provenance(sourceEdge, media, fetchedAt),
+        });
+      }
+    }
+  }
+  return normalizeMetaPostMediaInventory({
+    schemaVersion: META_POST_MEDIA_INVENTORY_SCHEMA_VERSION,
+    workspaceId: options.workspaceId,
+    connectionExternalKey: options.connectionExternalKey,
+    fetchedAt,
+    items,
+    discoveries,
+    writeOperations: 0,
+  });
 }
 
 /**

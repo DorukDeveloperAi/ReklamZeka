@@ -145,6 +145,12 @@ function makeService(input: Readonly<{
       expect(options.token).toBe(secret);
       return postInventory();
     },
+    // Keep orchestration fixtures hermetic; recovery itself is verified against
+    // a Graph-shaped GET fixture in the post-media inventory test suite.
+    recoverPostInventory: async (options) => {
+      expect(options.token).toBe(secret);
+      return postInventory();
+    },
     postInventoryPersistence: {
       persist: async (inventory) => { input.persistedInventories.push(structuredClone(inventory)); },
     },
@@ -202,7 +208,9 @@ describe("Meta S1.4 live asset/content orchestration", () => {
         contentWithCopy: 2,
         existingPostBindings: 1,
       },
-      postInventoryEvidence: { status: "completed", persistenceInvoked: true },
+      postInventoryEvidence: {
+        status: "completed", persistenceInvoked: true, recoveryTargetActors: 1, recoveredItems: 0,
+      },
       writeNetworkCalls: 0,
     });
     expect(result.creativeEvidence.accounts.map((entry) => entry.status).sort()).toEqual(["completed", "partial"]);

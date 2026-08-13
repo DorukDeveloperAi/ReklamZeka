@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { discoverMetaPostMediaInventory } from "@/connectors/meta/post-media-inventory";
+import {
+  discoverMetaPostMediaInventory,
+  recoverMetaPostMediaInventoryFromCreativeEvidence,
+} from "@/connectors/meta/post-media-inventory";
 import { redactMetaPostMediaInventory } from "@/domain/meta/content/post-media-inventory";
 
 const USER_TOKEN = "user-secret-token-value";
@@ -76,6 +79,38 @@ function fixtureFetch(calls: Array<{ url: URL; method: string; authorization: st
 }
 
 describe("Meta linked post/media inventory", () => {
+  it("recovers only a Graph-verified creative actor/post pair with bounded GET reads", async () => {
+    const calls: Array<{ url: URL; method: string; authorization: string }> = [];
+    const snapshot = await recoverMetaPostMediaInventoryFromCreativeEvidence({
+      token: USER_TOKEN,
+      workspaceId: "workspace-1",
+      connectionExternalKey: "meta-primary",
+      maxPagesPerActor: 1,
+      targets: [
+        { actorType: "facebook_page", actorExternalId: "page_11112222", externalPostId: "page_11112222_77778888" },
+        { actorType: "facebook_page", actorExternalId: "page_11112222", externalPostId: "not-returned-by-actor" },
+      ],
+      fetchImpl: async (input, init) => {
+        const url = new URL(input);
+        calls.push({ url, method: init?.method ?? "GET", authorization: new Headers(init?.headers).get("authorization") ?? "" });
+        return jsonResponse({ data: [{
+          id: "page_11112222_77778888", message: "Doğrulanmış post", created_time: NOW, is_published: true,
+        }] });
+      },
+      now: () => new Date(NOW),
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ method: "GET", authorization: `Bearer ${USER_TOKEN}` });
+    expect(calls[0]?.url.pathname).toMatch(/page_11112222\/posts$/);
+    expect(snapshot.items).toHaveLength(1);
+    expect(snapshot.items[0]).toMatchObject({
+      externalContentId: "page_11112222_77778888",
+      actor: { type: "facebook_page", externalId: "page_11112222" },
+    });
+    expect(snapshot.items.some((item) => item.externalContentId === "not-returned-by-actor")).toBe(false);
+  });
+
   it("paginates Page actors and posts with GET only while isolating actor failures", async () => {
     const calls: Array<{ url: URL; method: string; authorization: string }> = [];
     const snapshot = await discoverMetaPostMediaInventory({
