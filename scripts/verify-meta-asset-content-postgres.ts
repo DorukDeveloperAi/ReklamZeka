@@ -193,6 +193,21 @@ function assetSnapshot() {
       provenance,
     }],
     discoveries: [{
+      // Account capability evidence is intentionally derived only from the
+      // connection-owned /me/adaccounts discovery, never from an unrelated
+      // per-account asset edge. Keep this fixture structurally identical to
+      // the real read-only asset mirror.
+      resource: "ad_accounts",
+      sourceType: "connection",
+      sourceExternalId: null,
+      status: "verified",
+      reason: null,
+      itemCount: 1,
+      provenance: {
+        ...provenance,
+        sourceEdge: "/me/adaccounts",
+      },
+    }, {
       resource: "pages",
       sourceType: "ad_account",
       sourceExternalId: external.account,
@@ -412,10 +427,10 @@ try {
 }
 
 const countsValid = Object.entries(persistedCounts).every(([key, value]) =>
-  value === (key === "bindings" ? 2 : 1));
+  value === (key === "bindings" ? 2 : key === "discoveries" ? 2 : 1));
 if (
-  inserted !== 4
-  || unchanged !== 4
+  inserted !== 5
+  || unchanged !== 5
   || stale !== 1
   || updated !== 1
   || !checkpointAtomic
