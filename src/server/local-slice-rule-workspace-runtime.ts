@@ -55,5 +55,7 @@ export function createLocalSliceRuleWorkspaceHandlers(input: Readonly<{
   };
   return Object.freeze({ GET: (request: Request) => execute(request, "read"),
     POST: (request: Request) => execute(request,
-      request.headers.get("x-reklamzeka-intent") === "slice-rule-budget-impact-preview" ? "impact" : "draft") });
+      ["slice-rule-budget-impact-preview", "slice-rule-budget-impact-save"].includes(
+        request.headers.get("x-reklamzeka-intent") ?? "",
+      ) ? "impact" : "draft") });
 }

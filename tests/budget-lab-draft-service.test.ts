@@ -61,4 +61,13 @@ describe("Budget Lab explicit draft service", () => {
     const replay = await h.service.saveDraft(workspaceId, "44444444-4444-4444-a444-444444444444", "2026-08-07T13:01:00.000Z", command);
     expect(replay).toMatchObject({ persistence: "unchanged", auditAppended: false });
   });
+
+  it("keeps the exact private proposal available only to a server-side provenance binder", async () => {
+    const h = harness();
+    const saved = await h.service.saveDraftWithPrivateProposal(workspaceId,
+      "44444444-4444-4444-a444-444444444444", "2026-08-07T13:00:00.000Z", command);
+    expect(saved.result).toMatchObject({ mode: "saved_draft", persistence: "inserted" });
+    expect(saved.proposal.proposalHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(JSON.stringify(saved.result)).not.toContain(saved.proposal.proposalHash);
+  });
 });

@@ -8,6 +8,7 @@ import {
   classifySliceRuleBudgetImpactFailure,
   EMPTY_SLICE_RULE_FORM,
   parseSliceRuleBudgetImpactResult,
+  parseSliceRuleBudgetImpactSavedResult,
   parseSliceRuleWorkspaceSnapshot,
   SliceRuleWorkspaceSurface,
 } from "@/app/dashboard/slice-rule-workspace-panel";
@@ -106,6 +107,19 @@ describe("Slice Rule Workspace panel", () => {
       binding: { ...result.binding, draftHash: "d".repeat(64) } }, item)).toThrow("güvenli sözleşmeyi");
     expect(() => parseSliceRuleBudgetImpactResult({ ...result,
       authority: { ...result.authority, canExecute: true } }, item)).toThrow("güvenli sözleşmeyi");
+  });
+
+  it("accepts a saved advisory draft only with the exact rule provenance and no action authority", () => {
+    const result = { contractVersion: "slice-rule-budget-impact/1.0.0", mode: "saved_advisory_draft",
+      binding: { seriesRef: item.seriesRef, draftRef: item.draftRef, draftHash: item.draftHash,
+        scope: item.scope, ruleKind: item.operatingRule.rule.kind, evidenceRefs: ["category_resolution_market_ftr_ar"] },
+      budgetProposal: { actionAuthority: "none", writeOperations: 0 }, persistence: "inserted", provenance: "inserted",
+      authority: { recommendationOnly: true, canPublish: false, canApprove: false, canCreateProposal: false,
+        canExecute: false, canWriteMeta: false } };
+    expect(parseSliceRuleBudgetImpactSavedResult(result, item)).toMatchObject({ mode: "saved_advisory_draft",
+      persistence: "inserted", provenance: "inserted" });
+    expect(() => parseSliceRuleBudgetImpactSavedResult({ ...result,
+      budgetProposal: { ...result.budgetProposal, actionAuthority: "approval_required" } }, item)).toThrow("güvenli sözleşmeyi");
   });
 
   it("keeps stale, scope and unavailable failures explicit and fail-closed", () => {

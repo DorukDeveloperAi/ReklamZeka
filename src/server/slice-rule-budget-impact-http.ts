@@ -10,7 +10,7 @@ import type { TrustedDecisionRoomPrincipal } from "@/application/decision-room-a
 const HEADERS = Object.freeze({
   "Cache-Control": "private, no-store, max-age=0",
   "X-Content-Type-Options": "nosniff",
-  "X-ReklamZeka-Access-Mode": "slice-rule-budget-impact-read-only",
+  "X-ReklamZeka-Access-Mode": "slice-rule-budget-impact-advisory",
   "X-ReklamZeka-Action-Authority": "none",
   "X-ReklamZeka-Meta-Write": "disabled",
 });
@@ -37,7 +37,7 @@ function requestShape(request: Request): void {
     || request.headers.has("authorization") || request.headers.has("x-workspace-id")
     || request.headers.has("x-workspace-ref") || request.headers.get("sec-fetch-site") !== "same-origin"
     || request.headers.get("content-type")?.toLowerCase() !== "application/json"
-    || request.headers.get("x-reklamzeka-intent") !== "slice-rule-budget-impact-preview") {
+    || !["slice-rule-budget-impact-preview", "slice-rule-budget-impact-save"].includes(request.headers.get("x-reklamzeka-intent") ?? "")) {
     throw new SliceRuleBudgetImpactError("invalid_input");
   }
 }
@@ -65,15 +65,17 @@ function failure(reason: unknown) {
 }
 
 export function createSliceRuleBudgetImpactHttpHandler(input: Readonly<{
-  service: Pick<SliceRuleBudgetImpactService, "preview">;
+  service: Pick<SliceRuleBudgetImpactService, "preview" | "save">;
   resolvePrincipal(request: Request): Promise<TrustedDecisionRoomPrincipal>;
 }>) {
   return async (request: Request) => {
     try {
       requestShape(request);
       const [command, principal] = await Promise.all([body(request), input.resolvePrincipal(request)]);
-      const result = await input.service.preview({ ...command, workspaceId: principal.workspaceId,
-        actorId: principal.actor.userId });
+      const scoped = { ...command, workspaceId: principal.workspaceId, actorId: principal.actor.userId };
+      const result = request.headers.get("x-reklamzeka-intent") === "slice-rule-budget-impact-save"
+        ? await input.service.save(scoped, new Date().toISOString())
+        : await input.service.preview(scoped);
       return NextResponse.json(result, { headers: HEADERS });
     } catch (reason) { return failure(reason); }
   };

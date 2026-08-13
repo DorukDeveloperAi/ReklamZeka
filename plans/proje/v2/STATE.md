@@ -32,9 +32,10 @@
   güncel veri kanıtlamaz.
 - Token değeri hiçbir log/projection'a taşınmadı. Bootstrap yalnız `META_TOKEN_SECURITY_STATUS=rotated`
   önkoşulunda ve server-private secret resolver ile çalışır; scheduler/Meta write yine aktif değildir.
-- Slice/budget/policy altyapısı, persistent Slice Rule Workspace ve Budget Lab dry-run impact
-  preview ile aynı kullanıcı akışında bağlandı. Kural yalnız kaydedilmiş exact draft ref/hash/scope
-  üzerinden değerlendirilir; publish/approve/execute/Meta write kapalıdır.
+- Slice/budget/policy altyapısı, persistent Slice Rule Workspace, Budget Lab dry-run impact preview
+  ve açık kullanıcı isteğiyle kaydedilen **advisory BudgetProposal draft** zinciriyle aynı kullanıcı
+  akışında bağlandı. Kaydedilen öneri, exact Slice Rule draft ref/hash/scope ile immutable provenance
+  kaydına bağlıdır; publish/approve/execute/Meta write kapalıdır.
 - Orchestrator artık kalıcı conversation/turn/message ledger'i ve güvenli yerel Codex adapter'ıyla
   Dashboard'a bağlıdır: sabit executable/cwd, shell=false, read-only sandbox ve yalnız normalize edilmiş
   JSONL son yanıtı kullanılır. Konuşma bütün sayfalarda aynıdır; her tur yalnız page-guide snapshotı
@@ -87,7 +88,9 @@
   recommendation-only taslak oluşturabilir; yalnız kaydedilmiş exact draft ref/hash/scope üzerinden
   frozen context'ten çözülen pazar/hizmet/aile kanıtıyla Budget Lab dry-run impact preview isteyebilir.
   Kaydedilmemiş form, stale/missing draft, bozuk/çoklu kategori, pazar uyuşmazlığı veya unsupported rule
-  türü preview üretmez. Preview persistence/proposal/approval/action/Meta write oluşturmaz.
+  türü preview üretmez. Preview persistence/proposal/approval/action/Meta write oluşturmaz. Ayrı ve
+  açık “öneri taslağını kaydet” isteği, preview'ı tekrar doğrular ve immutable rule→BudgetProposal
+  provenance bağını kaydeder; policy yayınlama, approval, action, otomasyon ve Meta write yine kapalıdır.
 - Teslimat Alarmları Dashboard yüzeyi, confirmed/suspected ayrımı, atama, checklist, insan workflow
   durumu ve recommendation hold bilgisini gösterir. UI yalnız server-izinli `assign/start/check/resolve/
   reopen` geçişini sunar; approval/execute/automation/Meta write kontrolü yoktur.
@@ -118,7 +121,8 @@
   projection'ı yalnız tenant-bound append-only kayıt defterlerinden Slice Rule taslak revizyonu,
   doğrulanmış immutable BudgetProposal taslağı, delivery/payment alarm olayı, ActionUnit önerisi ve
   insan onay kararını zaman sırasıyla okur. BudgetProposal payload/hash'i projection öncesi yeniden
-  doğrulanır; public timeline ham ref veya hash taşımaz.
+  doğrulanır; bu proposal exact Slice Rule provenance'ına bağlıysa timeline bunu ham ref/hash
+  göstermeden ayrıca belirtir. Public timeline ham ref veya hash taşımaz.
   Ham kimlik, hash, token, Meta ID, kanıt payload'ı ve authority bilgisi public yüzeye taşınmaz.
 - Bu ilk görünüm tam evrensel timeline iddiası değildir: outcome, sync ve policy lifecycle kayıtlarının
   tek korelasyon grafiğinde birleştirilmesi sonraki dilimdir. Ancak gösterilen kayıtlar artık demo

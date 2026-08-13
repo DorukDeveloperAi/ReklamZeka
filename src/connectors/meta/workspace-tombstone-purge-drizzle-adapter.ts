@@ -31,6 +31,7 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "slice_rule_workspace_drafts",
   "budget_pool_hierarchy_revisions",
   "slice_rule_budget_pool_bindings",
+  "slice_rule_budget_proposal_bindings",
   "delivery_health_alert_ledger_records",
   "local_agent_handoffs",
   "local_agent_sessions",
@@ -541,6 +542,9 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'slice_rule_budget_pool_bindings', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from slice_rule_budget_pool_bindings where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_rule_budget_proposal_bindings', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from slice_rule_budget_proposal_bindings where workspace_id = ${workspaceId}::uuid
       union all select 'delivery_health_alert_ledger_records', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from delivery_health_alert_ledger_records where workspace_id = ${workspaceId}::uuid
@@ -658,6 +662,7 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from business_outcome_batches where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from business_outcome_evidence_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from business_outcome_entity_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_rule_budget_proposal_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from budget_proposal_alternatives where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from budget_proposal_versions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from analysis_template_definitions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

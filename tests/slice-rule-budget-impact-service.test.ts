@@ -31,7 +31,10 @@ function harness(evidenceScope: import("@/application/slice-rule-workspace-servi
   const loadExact: BudgetImpactScopeEvidencePort["loadExact"] = vi.fn(async () => ({ state: "ready" as const,
     scope: evidenceScope, evidenceRefs: ["category_resolution_market_ftr_ar"] }));
   const scopeEvidence = { loadExact };
-  const budgetLab = { dryRun: vi.fn(async () => budgetPreview) };
+  const budgetLab = { dryRun: vi.fn(async () => budgetPreview), saveRuleLinkedDraft: vi.fn(async () => ({
+    result: { ...budgetPreview, mode: "saved_draft" as const, persistence: "inserted" as const, auditAppended: true },
+    bindingOutcome: "inserted" as const,
+  })) };
   return { drafts, scopeEvidence, budgetLab,
     service: new SliceRuleBudgetImpactService(drafts, scopeEvidence, budgetLab) };
 }
@@ -81,5 +84,14 @@ describe("Slice Rule to Budget Lab impact bridge", () => {
     const h = harness();
     h.budgetLab.dryRun.mockResolvedValueOnce({ ...budgetPreview, persistence: "inserted" } as never);
     await expect(h.service.preview(request())).rejects.toMatchObject({ code: "unsafe_budget_preview" });
+  });
+
+  it("persists only an explicitly requested exact preview with its immutable rule provenance", async () => {
+    const h = harness();
+    const result = await h.service.save(request(), "2026-08-13T10:02:00.000Z");
+    expect(result).toMatchObject({ mode: "saved_advisory_draft", persistence: "inserted", provenance: "inserted",
+      authority: { canApprove: false, canExecute: false, canWriteMeta: false } });
+    expect(h.budgetLab.saveRuleLinkedDraft).toHaveBeenCalledWith(workspaceId, actorId, "2026-08-13T10:02:00.000Z",
+      budgetCommand, draft, expect.stringMatching(/^rule_budget_[a-f0-9]{32}$/));
   });
 });

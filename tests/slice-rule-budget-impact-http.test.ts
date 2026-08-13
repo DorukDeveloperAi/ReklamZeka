@@ -37,4 +37,13 @@ describe("Slice Rule Budget impact HTTP boundary", () => {
     expect((await handler(request({ command }, "slice-rule-workspace-save"))).status).toBe(400);
     expect(preview).not.toHaveBeenCalled();
   });
+
+  it("routes an explicit advisory save through the server clock while retaining no action authority", async () => {
+    const save = vi.fn(async () => ({ contractVersion: "slice-rule-budget-impact/1.0.0", mode: "saved_advisory_draft" }));
+    const response = await createSliceRuleBudgetImpactHttpHandler({ service: { preview: vi.fn(), save } as never,
+      resolvePrincipal: async () => principal })(request({ command }, "slice-rule-budget-impact-save"));
+    expect(response.status).toBe(200);
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: principal.workspaceId }), expect.any(String));
+    expect(response.headers.get("X-ReklamZeka-Action-Authority")).toBe("none");
+  });
 });

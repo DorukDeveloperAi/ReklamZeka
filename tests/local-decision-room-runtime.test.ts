@@ -149,7 +149,7 @@ describe("local Decision Room principal boundary", () => {
     });
   });
 
-  it("binds Slice Rule budget impact to its exact cookie-only read intent", async () => {
+  it("binds Slice Rule impact preview/save only to their exact cookie intents", async () => {
     const config = localDecisionRoomConfig(environment())!;
     const token = sessionToken();
     const impact = (mode: "cookie" | "bearer", intent = "slice-rule-budget-impact-preview") => request(
@@ -157,6 +157,10 @@ describe("local Decision Room principal boundary", () => {
         ...(mode === "cookie" ? { Cookie: `${LOCAL_SESSION_COOKIE}=${encodeURIComponent(token)}` }
           : { Authorization: `Bearer ${token}` }) });
     await expect(resolveTrustedLocalSliceRuleBudgetImpactPrincipal({ request: impact("cookie"),
+      database: readDatabase() as never, config })).resolves.toMatchObject({
+      membership: { workspaceId, userId, role: "viewer" },
+    });
+    await expect(resolveTrustedLocalSliceRuleBudgetImpactPrincipal({ request: impact("cookie", "slice-rule-budget-impact-save"),
       database: readDatabase() as never, config })).resolves.toMatchObject({
       membership: { workspaceId, userId, role: "viewer" },
     });

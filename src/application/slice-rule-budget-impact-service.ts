@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
   BudgetLabDraftCommand,
   BudgetLabDraftResult,
@@ -72,6 +73,16 @@ export type SliceRuleBudgetImpactResult = Readonly<{
   }>;
 }>;
 
+export type SliceRuleBudgetImpactSavedResult = Readonly<{
+  contractVersion: typeof SLICE_RULE_BUDGET_IMPACT_VERSION;
+  mode: "saved_advisory_draft";
+  binding: SliceRuleBudgetImpactResult["binding"];
+  budgetProposal: BudgetLabDraftResult["proposal"];
+  persistence: "inserted" | "unchanged";
+  provenance: "inserted" | "unchanged";
+  authority: SliceRuleBudgetImpactResult["authority"];
+}>;
+
 export class SliceRuleBudgetImpactError extends Error {
   constructor(readonly code:
     | "invalid_input"
@@ -80,7 +91,8 @@ export class SliceRuleBudgetImpactError extends Error {
     | "scope_evidence_not_ready"
     | "market_boundary"
     | "scope_mismatch"
-    | "unsafe_budget_preview") {
+    | "unsafe_budget_preview"
+    | "provenance_unavailable") {
     super(`Slice Rule bütçe etki önizlemesi reddedildi: ${code}`);
     this.name = "SliceRuleBudgetImpactError";
   }
@@ -130,7 +142,7 @@ export class SliceRuleBudgetImpactService {
   constructor(
     private readonly drafts: CurrentSliceRuleDraftPort,
     private readonly scopeEvidence: BudgetImpactScopeEvidencePort,
-    private readonly budgetLab: Pick<BudgetLabDraftService, "dryRun">,
+    private readonly budgetLab: Pick<BudgetLabDraftService, "dryRun"> & Partial<Pick<BudgetLabDraftService, "saveRuleLinkedDraft">>,
   ) {}
 
   async preview(input: SliceRuleBudgetImpactInput): Promise<SliceRuleBudgetImpactResult> {
@@ -166,5 +178,30 @@ export class SliceRuleBudgetImpactService {
         draftHash: draft.draftHash, scope: draft.scope, ruleKind: draft.operatingRule.rule.kind,
         evidenceRefs: Object.freeze([...evidence.evidenceRefs]) }),
       budgetPreview, persistence: "none" as const, writeOperations: 0 as const, authority: AUTHORITY });
+  }
+
+  async save(input: SliceRuleBudgetImpactInput, occurredAt: string): Promise<SliceRuleBudgetImpactSavedResult> {
+    if (!/^\d{4}-\d{2}-\d{2}T.*Z$/.test(occurredAt) || !Number.isFinite(Date.parse(occurredAt))
+      || new Date(occurredAt).toISOString() !== occurredAt || !this.budgetLab.saveRuleLinkedDraft) {
+      throw new SliceRuleBudgetImpactError("provenance_unavailable");
+    }
+    const preview = await this.preview(input);
+    // Read the exact current revision again immediately before the atomic
+    // proposal+binding write; a concurrent revision cannot be silently linked.
+    const draft = await this.drafts.loadCurrentExact({ workspaceId: input.workspaceId, actorId: input.actorId, seriesRef: input.seriesRef });
+    if (!draft || !verifySliceRuleWorkspaceDraft(draft) || draft.draftHash !== preview.binding.draftHash
+      || draft.draftRef !== preview.binding.draftRef || !sameScope(draft.scope, preview.binding.scope)) {
+      throw new SliceRuleBudgetImpactError("stale_draft");
+    }
+    const bindingIdempotencyKey = `rule_budget_${createHash("sha256").update(`${draft.draftHash}:${input.budgetCommand.idempotencyKey}`).digest("hex").slice(0, 32)}`;
+    const saved = await this.budgetLab.saveRuleLinkedDraft(input.workspaceId, input.actorId, occurredAt,
+      input.budgetCommand, draft, bindingIdempotencyKey);
+    if (saved.result.mode !== "saved_draft" || (saved.result.persistence !== "inserted" && saved.result.persistence !== "unchanged")) {
+      throw new SliceRuleBudgetImpactError("provenance_unavailable");
+    }
+    const persistence: "inserted" | "unchanged" = saved.result.persistence;
+    return Object.freeze({ contractVersion: SLICE_RULE_BUDGET_IMPACT_VERSION, mode: "saved_advisory_draft" as const,
+      binding: preview.binding, budgetProposal: saved.result.proposal, persistence,
+      provenance: saved.bindingOutcome, authority: AUTHORITY });
   }
 }

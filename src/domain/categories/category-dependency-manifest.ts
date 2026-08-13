@@ -136,6 +136,9 @@ const columns = [
   // may interpret as a mutable dependency.
   "budget_pool_hierarchy_revisions.hierarchy_payload",
   "slice_rule_budget_pool_bindings.binding_payload",
+  // Rule-to-budget provenance pins immutable hashes only; no category edge is
+  // inferred by archive impact from this advisory linkage.
+  "slice_rule_budget_proposal_bindings.binding_payload",
   // Delivery/payment alert records are historical evidence and checklist
   // state, never category or policy selection inputs.
   "delivery_health_alert_ledger_records.checklist_payload",

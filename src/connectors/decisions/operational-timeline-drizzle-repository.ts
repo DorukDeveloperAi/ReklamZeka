@@ -7,7 +7,7 @@ import * as schema from "@/db/schema";
 
 type Database = Pick<NodePgDatabase<typeof schema>, "execute">;
 
-type SourceRow = Readonly<{ event_kind: unknown; occurred_at: unknown; one: unknown; two: unknown; three: unknown; four?: unknown }>;
+type SourceRow = Readonly<{ event_kind: unknown; occurred_at: unknown; one: unknown; two: unknown; three: unknown; four?: unknown; five?: unknown }>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function rows(value: unknown): readonly SourceRow[] {
@@ -40,8 +40,10 @@ function event(row: SourceRow): OperationalTimelineEvent {
       || proposal.revision !== revision || typeof row.two !== "string" || proposal.seriesRef !== row.two) {
       throw new Error("corrupt_store");
     }
+    if (row.five !== null && row.five !== undefined && row.five !== "rule_linked") throw new Error("corrupt_store");
     return Object.freeze({ kind, occurredAt, title: "Bütçe önerisi taslağı kaydedildi",
-      detail: `Revizyon ${revision} · ${proposal.alternatives.length} senaryo · uygulama yetkisi yok` });
+      detail: `Revizyon ${revision} · ${proposal.alternatives.length} senaryo${row.five === "rule_linked"
+        ? " · exact kural kaynağı bağlı" : ""} · uygulama yetkisi yok` });
   }
   if (kind === "delivery_alert") {
     const level = text(row.one, 16); const status = text(row.two, 24);
@@ -68,21 +70,26 @@ export class DrizzleOperationalTimelineRepository implements OperationalTimeline
   async list(input: Readonly<{ workspaceId: string; limit: number }>): Promise<readonly OperationalTimelineEvent[]> {
     if (!UUID.test(input.workspaceId) || !Number.isInteger(input.limit) || input.limit < 1 || input.limit > 100) throw new Error("invalid_input");
     const result = await this.database.execute(sql`
-      select event_kind, occurred_at, one, two, three, four from (
+      select event_kind, occurred_at, one, two, three, four, five from (
         select 'slice_rule_draft'::text as event_kind, drafted_at as occurred_at, market as one,
-          lifecycle_state as two, revision::text as three, null::jsonb as four
+          lifecycle_state as two, revision::text as three, null::jsonb as four, null::text as five
         from public.slice_rule_workspace_drafts where workspace_id = ${input.workspaceId}::uuid
         union all
-        select 'budget_proposal'::text, proposed_at, proposal_hash, series_ref, revision::text, proposal_payload
-        from public.budget_proposal_versions where workspace_id = ${input.workspaceId}::uuid
+        select 'budget_proposal'::text, proposal.proposed_at, proposal.proposal_hash, proposal.series_ref,
+          proposal.revision::text, proposal.proposal_payload,
+          case when exists (
+            select 1 from public.slice_rule_budget_proposal_bindings binding
+            where binding.workspace_id = proposal.workspace_id and binding.proposal_hash = proposal.proposal_hash
+          ) then 'rule_linked' else null end
+        from public.budget_proposal_versions proposal where proposal.workspace_id = ${input.workspaceId}::uuid
         union all
-        select 'delivery_alert'::text, occurred_at, evidence_level, status, sequence::text, null::jsonb
+        select 'delivery_alert'::text, occurred_at, evidence_level, status, sequence::text, null::jsonb, null::text
         from public.delivery_health_alert_ledger_records where workspace_id = ${input.workspaceId}::uuid
         union all
-        select 'approval_proposed'::text, proposed_at, action_type, risk, initial_state, null::jsonb
+        select 'approval_proposed'::text, proposed_at, action_type, risk, initial_state, null::jsonb, null::text
         from public.action_proposal_units where workspace_id = ${input.workspaceId}::uuid
         union all
-        select 'approval_decision'::text, decided_at, command_kind, reason_code, actor_role, null::jsonb
+        select 'approval_decision'::text, decided_at, command_kind, reason_code, actor_role, null::jsonb, null::text
         from public.action_approval_decision_events where workspace_id = ${input.workspaceId}::uuid
       ) timeline order by occurred_at desc limit ${input.limit}
     `);

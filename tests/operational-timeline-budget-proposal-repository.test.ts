@@ -8,6 +8,8 @@ describe("operational timeline budget proposal source", () => {
     expect(source).toContain("proposal_payload");
     expect(source).toContain("verifyBudgetProposal(proposal)");
     expect(source).toContain("proposal.proposalHash !== proposalHash");
+    expect(source).toContain("slice_rule_budget_proposal_bindings");
+    expect(source).toContain("exact kural kaynağı bağlı");
     expect(source).not.toContain("insert into");
     expect(source).not.toContain("update public.");
   });

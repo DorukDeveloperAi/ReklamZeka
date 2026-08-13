@@ -2892,6 +2892,48 @@ export const budgetProposalAlternatives = pgTable("budget_proposal_alternatives"
   `),
 ]);
 
+/**
+ * Immutable provenance edge created only after an operator explicitly saves a
+ * reviewed advisory BudgetProposal from an exact Slice Rule preview.
+ */
+export const sliceRuleBudgetProposalBindings = pgTable("slice_rule_budget_proposal_bindings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  draftHash: text("draft_hash").notNull(),
+  proposalHash: text("proposal_hash").notNull(),
+  proposalRef: text("proposal_ref").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  boundByActorId: uuid("bound_by_actor_id").notNull(),
+  bindingPayload: jsonb("binding_payload").$type<Record<string, unknown>>().notNull(),
+  boundAt: timestamp("bound_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.draftHash], foreignColumns: [sliceRuleWorkspaceDrafts.workspaceId, sliceRuleWorkspaceDrafts.draftHash], name: "slice_rule_budget_proposal_bindings_draft_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.proposalHash], foreignColumns: [budgetProposalVersions.workspaceId, budgetProposalVersions.proposalHash], name: "slice_rule_budget_proposal_bindings_proposal_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.boundByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "slice_rule_budget_proposal_bindings_membership_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("slice_rule_budget_proposal_bindings_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slice_rule_budget_proposal_bindings_exact_unique").on(table.workspaceId, table.draftHash, table.proposalHash),
+  uniqueIndex("slice_rule_budget_proposal_bindings_idempotency_unique").on(table.workspaceId, table.idempotencyKey),
+  index("slice_rule_budget_proposal_bindings_proposal_idx").on(table.workspaceId, table.proposalHash, table.boundAt.desc()),
+  check("slice_rule_budget_proposal_bindings_identity", sql`
+    ${table.draftHash} ~ '^[a-f0-9]{64}$'
+    and ${table.proposalHash} ~ '^[a-f0-9]{64}$'
+    and ${table.proposalRef} ~ '^budget_proposal_[a-f0-9]{20}$'
+    and ${table.idempotencyKey} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+  `),
+  check("slice_rule_budget_proposal_bindings_payload_exact", sql`(
+    jsonb_typeof(${table.bindingPayload}) = 'object'
+    and ${table.bindingPayload} #>> '{draftHash}' = ${table.draftHash}
+    and ${table.bindingPayload} #>> '{proposalHash}' = ${table.proposalHash}
+    and ${table.bindingPayload} #>> '{proposalRef}' = ${table.proposalRef}
+    and (${table.bindingPayload} #>> '{boundAt}')::timestamptz = ${table.boundAt}
+    and ${table.bindingPayload} #> '{authority}' = '{
+      "recommendationOnly": true, "canPublish": false, "canApprove": false,
+      "canExecute": false, "canWriteMeta": false, "canEnableAutomation": false
+    }'::jsonb
+  ) is true`),
+]);
+
 /** Append-only, versioned timeframe definitions used by deterministic analysis. */
 export const analysisTimeframeDefinitions = pgTable("analysis_timeframe_definitions", {
   id: uuid("id").primaryKey().defaultRandom(),

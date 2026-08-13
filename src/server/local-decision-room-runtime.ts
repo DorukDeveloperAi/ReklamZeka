@@ -174,7 +174,7 @@ export function assertTrustedLocalDecisionRoomRequest(
     request.headers.get("x-reklamzeka-intent") ?? "",
   ) && !["autonomy-rule-create-draft", "guidance-studio-create", "guidance-studio-revise",
     "guidance-set-create", "guidance-set-revise", "instruction-policy-mutate",
-    "practice-lab-propose-standardization", "promotion-template-lifecycle-draft", "slice-rule-workspace-save",
+    "practice-lab-propose-standardization", "promotion-template-lifecycle-draft", "slice-rule-workspace-save", "slice-rule-budget-impact-save",
     "progressive-formalization-mutate", "delivery-health-alert-transition"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
@@ -549,8 +549,8 @@ export async function resolveTrustedLocalInstructionPolicyPrincipal(input: Reado
 
 /**
  * Cookie-only, read-only binding for the Slice Rule -> Budget Lab impact
- * preview. Both source-rule and budget-read capabilities are required; the
- * preview cannot inherit either draft capability.
+ * preview/save. Preview is read-only; saving remains an explicit cookie-bound
+ * advisory draft and requires both independent draft capabilities.
  */
 export async function resolveTrustedLocalSliceRuleBudgetImpactPrincipal(input: Readonly<{
   request: Request;
@@ -559,15 +559,17 @@ export async function resolveTrustedLocalSliceRuleBudgetImpactPrincipal(input: R
 }>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
   exactKeys(input, ["request", "database", "config"]);
   const token = cookieToken(input.request);
+  const intent = input.request.headers.get("x-reklamzeka-intent");
   if (bearerToken(input.request) !== null || token === null
-    || input.request.headers.get("x-reklamzeka-intent") !== "slice-rule-budget-impact-preview") {
+    || (intent !== "slice-rule-budget-impact-preview" && intent !== "slice-rule-budget-impact-save")) {
     throw new LocalDecisionRoomBoundaryError("untrusted_request");
   }
   const verification = { token, key: input.config.signingKey, now: Math.floor(Date.now() / 1000),
     osUid: typeof process.getuid === "function" ? process.getuid() : -1, expected: input.config };
-  verifyLocalSessionCapability({ ...verification, requiredScope: "instruction_policy:read" });
-  verifyLocalSessionCapability({ ...verification, requiredScope: "budget_lab:read" });
-  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "read", "cookie");
+  const operation = intent === "slice-rule-budget-impact-save" ? "draft" : "read";
+  verifyLocalSessionCapability({ ...verification, requiredScope: operation === "draft" ? "instruction_policy:draft" : "instruction_policy:read" });
+  verifyLocalSessionCapability({ ...verification, requiredScope: operation === "draft" ? "budget_lab:draft" : "budget_lab:read" });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, operation, "cookie");
   return bindPrincipal(input.database, input.config);
 }
 

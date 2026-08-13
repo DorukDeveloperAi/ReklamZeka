@@ -61,8 +61,18 @@ type ImpactResult = Readonly<{
   authority: Readonly<{ recommendationOnly: true; canPublish: false; canApprove: false;
     canCreateProposal: false; canExecute: false; canWriteMeta: false }>;
 }>;
+type SavedImpactResult = Readonly<{
+  contractVersion: "slice-rule-budget-impact/1.0.0";
+  mode: "saved_advisory_draft";
+  binding: ImpactResult["binding"];
+  budgetProposal: BudgetLabDraftResult["proposal"];
+  persistence: "inserted" | "unchanged";
+  provenance: "inserted" | "unchanged";
+  authority: ImpactResult["authority"];
+}>;
 type ImpactState = Readonly<{ status: "idle" | "loading" }>
   | Readonly<{ status: "ready"; result: ImpactResult }>
+  | Readonly<{ status: "saved"; result: SavedImpactResult }>
   | Readonly<{ status: "unsupported" | "unavailable" | "stale" | "scope" | "error"; message: string }>;
 
 type Form = Readonly<{
@@ -203,6 +213,29 @@ export function parseSliceRuleBudgetImpactResult(value: unknown, expected: Slice
     throw new Error("Bütçe etki önizlemesi güvenli sözleşmeyi döndürmedi.");
   }
   return value as unknown as ImpactResult;
+}
+
+/** The only writable outcome in this panel is an advisory BudgetProposal draft.
+ * It is still explicitly not an approval, action, automation, or Meta write. */
+export function parseSliceRuleBudgetImpactSavedResult(value: unknown, expected: SliceRuleWorkspaceItem): SavedImpactResult {
+  if (!object(value) || value.contractVersion !== "slice-rule-budget-impact/1.0.0"
+    || value.mode !== "saved_advisory_draft" || !object(value.binding)
+    || value.binding.seriesRef !== expected.seriesRef || value.binding.draftRef !== expected.draftRef
+    || value.binding.draftHash !== expected.draftHash || value.binding.ruleKind !== expected.operatingRule.rule.kind
+    || !isScope(value.binding.scope) || !sameScope(value.binding.scope, expected.scope)
+    || !Array.isArray(value.binding.evidenceRefs) || value.binding.evidenceRefs.length < 1
+    || !value.binding.evidenceRefs.every((ref) => typeof ref === "string" && ref.length > 0)
+    || !["inserted", "unchanged"].includes(String(value.persistence))
+    || !["inserted", "unchanged"].includes(String(value.provenance))
+    || !object(value.authority) || value.authority.recommendationOnly !== true
+    || value.authority.canPublish !== false || value.authority.canApprove !== false
+    || value.authority.canCreateProposal !== false || value.authority.canExecute !== false
+    || value.authority.canWriteMeta !== false || !object(value.budgetProposal)
+    || value.budgetProposal.actionAuthority !== "none" || value.budgetProposal.writeOperations !== 0
+    || !noOpenedAuthority(value)) {
+    throw new Error("Kaydedilen bütçe önerisi güvenli sözleşmeyi döndürmedi.");
+  }
+  return value as unknown as SavedImpactResult;
 }
 
 export function classifySliceRuleBudgetImpactFailure(code: string | undefined, status: number): Exclude<ImpactState, { status: "idle" | "loading" | "ready" }> {
@@ -370,6 +403,22 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
         ? reason.message : "Etki önizlemesi kullanılamıyor; hiçbir fallback uygulanmadı." });
     }
   };
+  const saveAdvisoryDraft = async () => {
+    if (!head || impactState.status !== "ready" || !impactCommand) return;
+    const requestedHead = head;
+    setImpactState({ status: "loading" });
+    try {
+      const response = await fetch("/api/slice-rule-workspace", { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-budget-impact-save" },
+        body: JSON.stringify({ command: impactCommand }) });
+      const payload = await response.json() as { error?: { code?: string } };
+      if (!response.ok) { setImpactState(classifySliceRuleBudgetImpactFailure(payload.error?.code, response.status)); return; }
+      setImpactState({ status: "saved", result: parseSliceRuleBudgetImpactSavedResult(payload, requestedHead) });
+    } catch (reason) {
+      setImpactState({ status: "unavailable", message: reason instanceof Error
+        ? reason.message : "Öneri taslağı kaydedilemedi; hiçbir action veya Meta write yapılmadı." });
+    }
+  };
   return <div className={styles.workspace}>
     <header className={styles.hero}><div><span>SLICE RULE WORKSPACE</span><h1>Kanıtlı kapsam için işletim kuralı taslağı</h1><p>Pazar, hizmet ve kampanya ailesi açıkça seçilir. Bu alan yalnız öneri taslağı kaydeder.</p></div><strong>RECOMMENDATION ONLY · AUTHORITY NONE</strong></header>
     {props.state.status === "loading" ? <section className={styles.state} role="status">Taslak kayıt defteri doğrulanıyor…</section> : null}
@@ -400,7 +449,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
         {message ? <p className={styles.message} role="status">{message}</p> : null}
         <button className={styles.save} type="button" disabled={!command || !snapshot.authority.canSaveDraft || saving} onClick={() => void save()}>{saving ? "Kaydediliyor…" : head ? "Yeni revizyonu kaydet" : "Taslağı kaydet"}</button>
         <section className={styles.impact} aria-labelledby="slice-rule-impact-heading">
-          <div className={styles.panelTitle}><div><span>BUDGET LAB · SALT OKUNUR</span><h2 id="slice-rule-impact-heading">Kayıtlı taslağın bütçe etkisi</h2></div><small>Persistence none · write 0</small></div>
+          <div className={styles.panelTitle}><div><span>BUDGET LAB · ÖNİZLEME / TASLAK</span><h2 id="slice-rule-impact-heading">Kayıtlı taslağın bütçe etkisi</h2></div><small>Onay · action · Meta write kapalı</small></div>
           {!head ? <p className={styles.impactNotice}>Önizleme için önce kayıt defterindeki güncel bir taslağı seçin. Kaydedilmemiş form kapsamı kullanılmaz.</p> : null}
           {head?.operatingRule.rule.kind === "delivery_guardrail" ? <p className={styles.impactNotice} role="status"><strong>Desteklenmiyor.</strong> Teslimat koruması doğrudan bütçe senaryosu değildir; otomatik bir bütçe etkisi varsayılmaz.</p> : null}
           {head && head.operatingRule.rule.kind !== "delivery_guardrail" ? <>
@@ -418,6 +467,14 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
             <span>{impactState.result.binding.seriesRef} · {impactState.result.binding.ruleKind}</span>
             <span>{impactState.result.binding.evidenceRefs.length} kapsam kanıtı · {impactState.result.budgetPreview.proposal.alternatives.length} senaryo</span>
             <span>Kalıcı kayıt: yok · write operation: 0 · onay/execute/Meta write: kapalı</span>
+            <button className={styles.save} type="button" disabled={!impactCommand}
+              onClick={() => void saveAdvisoryDraft()}>Bu öneri taslağını kaydet</button>
+            <small>Bu işlem yalnız exact kural–bütçe önerisi bağını kayıt altına alır. Policy yayınlamaz, onay oluşturmaz ve Meta’da değişiklik yapmaz.</small>
+          </div> : null}
+          {impactState.status === "saved" ? <div className={styles.impactResult} role="status">
+            <strong>Öneri taslağı ve kural kaynağı birlikte kaydedildi</strong>
+            <span>Proposal: {impactState.result.persistence} · provenance: {impactState.result.provenance}</span>
+            <span>Onay · action · otomasyon · Meta write: kapalı</span>
           </div> : null}
         </section>
       </section>

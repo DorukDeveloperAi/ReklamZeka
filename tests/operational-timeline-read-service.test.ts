@@ -22,4 +22,12 @@ describe("operational timeline read service", () => {
     await expect(service.list(principal)).resolves.toMatchObject({ items: [expect.objectContaining({ kind: "budget_proposal" })],
       authority: { canApprove: false, canExecute: false, canWriteMeta: false } });
   });
+  it("keeps an exact rule-linked proposal as a public-safe timeline description", async () => {
+    const service = new OperationalTimelineReadService({ list: async () => [{ kind: "budget_proposal" as const,
+      occurredAt: "2026-08-13T12:00:00.000Z", title: "Bütçe önerisi taslağı kaydedildi",
+      detail: "Revizyon 2 · 3 senaryo · exact kural kaynağı bağlı · uygulama yetkisi yok" }] }, memberships);
+    await expect(service.list(principal)).resolves.toMatchObject({ items: [expect.objectContaining({
+      detail: expect.stringContaining("kural kaynağı bağlı"),
+    })] });
+  });
 });
