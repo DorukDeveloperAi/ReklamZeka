@@ -30,4 +30,11 @@ describe("operational timeline read service", () => {
       detail: expect.stringContaining("kural kaynağı bağlı"),
     })] });
   });
+  it("admits only a public-safe temporal evaluation projection with no action authority", async () => {
+    const service = new OperationalTimelineReadService({ list: async () => [{ kind: "temporal_evaluation" as const,
+      occurredAt: "2026-08-13T12:00:00.000Z", title: "Zamansal kural değerlendirmesi kaydedildi",
+      detail: "Öneri üretildi · window ready · uygulama yetkisi yok" }] }, memberships);
+    await expect(service.list(principal)).resolves.toMatchObject({ items: [expect.objectContaining({ kind: "temporal_evaluation" })],
+      authority: { canApprove: false, canExecute: false, canWriteMeta: false } });
+  });
 });

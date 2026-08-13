@@ -80,6 +80,10 @@ type ApprovalQueueState = Readonly<{ status: "loading" }>
   | Readonly<{ status: "ready"; selections: readonly ApprovalQueueSelection[] }>
   | Readonly<{ status: "queued"; selectionRef: string; persistence: "inserted" | "unchanged" }>
   | Readonly<{ status: "unavailable" | "error"; message: string }>;
+type TemporalCandidate = Readonly<{ candidateRef: string; ruleSeriesRef: string; reviewCadence: "daily" | "weekly" | "monthly"; windowRef: string; capturedAt: string }>;
+type TemporalState = Readonly<{ status: "loading" }>
+  | Readonly<{ status: "ready"; candidates: readonly TemporalCandidate[]; result: string | null }>
+  | Readonly<{ status: "unavailable" | "error"; message: string }>;
 
 type Form = Readonly<{
   seriesRef: string;
@@ -187,6 +191,22 @@ export function parseSliceRuleWorkspaceSnapshot(value: unknown): SliceRuleWorksp
     throw new Error("Slice Rule Workspace güvenli sözleşmeyi döndürmedi.");
   }
   return value as unknown as SliceRuleWorkspaceSnapshot;
+}
+
+/** The panel accepts only opaque candidate references discovered by the server. */
+export function parseTemporalEvaluationCandidates(value: unknown): readonly TemporalCandidate[] {
+  if (!object(value) || value.contractVersion !== "temporal-recommendation-read/1.0.0" || !Array.isArray(value.candidates)
+    || value.candidates.length > 50 || !value.candidates.every((candidate) => object(candidate)
+      && /^temporal_candidate_[a-f0-9]{24}$/.test(String(candidate.candidateRef))
+      && /^[a-z][a-z0-9_.:-]{0,127}$/.test(String(candidate.ruleSeriesRef))
+      && ["daily", "weekly", "monthly"].includes(String(candidate.reviewCadence))
+      && /^window_[a-f0-9]{24}$/.test(String(candidate.windowRef))
+      && typeof candidate.capturedAt === "string" && Number.isFinite(Date.parse(candidate.capturedAt)))
+    || !object(value.authority) || value.authority.canPublish !== false || value.authority.canApprove !== false
+    || value.authority.canExecute !== false || value.authority.canWriteMeta !== false || !noOpenedAuthority(value)) {
+    throw new Error("Zamansal değerlendirme aday sözleşmesi güvenli değil.");
+  }
+  return value.candidates as TemporalCandidate[];
 }
 
 export function buildSliceRuleBudgetImpactCommand(item: SliceRuleWorkspaceItem | undefined, raw: string) {
@@ -377,6 +397,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   const [impactRaw, setImpactRaw] = useState(EMPTY_BUDGET_COMMAND);
   const [impactState, setImpactState] = useState<ImpactState>({ status: "idle" });
   const [approvalQueue, setApprovalQueue] = useState<ApprovalQueueState>({ status: "loading" });
+  const [temporal, setTemporal] = useState<TemporalState>({ status: "loading" });
   const head = snapshot?.items.find((item) => item.seriesRef === headRef) ?? undefined;
   const editableHead = head === undefined || isEditableRule(head.operatingRule.rule);
   const command = useMemo(() => editableHead ? buildSliceRuleDraftCommand(form, head) : null, [editableHead, form, head]);
@@ -392,6 +413,28 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     } catch (reason) { setApprovalQueue({ status: "unavailable", message: reason instanceof Error ? reason.message : "Seçilmiş senaryolar okunamadı." }); }
   }, []);
   useEffect(() => { void loadApprovalSelections(); }, [loadApprovalSelections]);
+  const loadTemporalCandidates = useCallback(async (result: string | null = null) => {
+    try {
+      const response = await fetch("/api/temporal-recommendations", { cache: "no-store", credentials: "same-origin" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error("Zamansal adaylar okunamadı.");
+      setTemporal({ status: "ready", candidates: parseTemporalEvaluationCandidates(payload), result });
+    } catch (reason) { setTemporal({ status: "unavailable", message: reason instanceof Error ? reason.message : "Zamansal adaylar okunamadı." }); }
+  }, []);
+  useEffect(() => { void loadTemporalCandidates(); }, [loadTemporalCandidates]);
+  const evaluateTemporal = async (candidate: TemporalCandidate) => {
+    setTemporal({ status: "loading" });
+    try {
+      const response = await fetch("/api/temporal-recommendations", { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "temporal-recommendation-evaluate" },
+        body: JSON.stringify({ candidateRef: candidate.candidateRef }) });
+      const payload = await response.json() as { outcome?: string; reason?: string; persistence?: string; authority?: ClosedAuthority; error?: { message?: string } };
+      if (!response.ok || !["recommendation", "no_change"].includes(String(payload.outcome)) || !["inserted", "unchanged"].includes(String(payload.persistence))
+        || !isClosed(payload.authority)) throw new Error(payload.error?.message ?? "Zamansal değerlendirme isteği reddedildi.");
+      const result = `${payload.outcome === "recommendation" ? "Öneri kaydedildi" : "Değişiklik önerilmedi"} · ${String(payload.reason).replaceAll("_", " ")} · ${payload.persistence}`;
+      await loadTemporalCandidates(result);
+    } catch (reason) { setTemporal({ status: "error", message: reason instanceof Error ? reason.message : "Zamansal değerlendirme isteği reddedildi." }); }
+  };
   const sendToApprovalQueue = async (selection: ApprovalQueueSelection) => {
     setApprovalQueue({ status: "loading" }); const proposedAt = new Date().toISOString(); const expiresAt = new Date(Date.now() + 86_400_000).toISOString();
     try {
@@ -527,6 +570,19 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
             </div>) : null}
             {approvalQueue.status === "queued" ? <span>Seçim onay kuyruğuna eklendi ({approvalQueue.persistence}). Onay, execute ve Meta write hâlâ kapalıdır.</span> : null}
             {(approvalQueue.status === "unavailable" || approvalQueue.status === "error") ? <span role="alert">{approvalQueue.message}</span> : null}
+          </div>
+          <div className={styles.impactResult} aria-label="Zamansal değerlendirme">
+            <strong>Zamansal değerlendirme</strong>
+            <span>Yalnız sunucunun güncel kural başı, frozen campaign context’i ve hazır L3 penceresinden türettiği adaylar değerlendirilir.</span>
+            {temporal.status === "loading" ? <span>Uygun pencereler doğrulanıyor…</span> : null}
+            {temporal.status === "ready" && temporal.result ? <span role="status">{temporal.result}</span> : null}
+            {temporal.status === "ready" && temporal.candidates.length === 0 ? <span>Şu anda değerlendirilebilir, hazır bir zaman penceresi yok.</span> : null}
+            {temporal.status === "ready" ? temporal.candidates.map((candidate) => <div className={styles.row} key={candidate.candidateRef}>
+              <span>{candidate.ruleSeriesRef} · {candidate.reviewCadence} · frozen pencere · {date(candidate.capturedAt)}</span>
+              <button className={styles.save} type="button" onClick={() => void evaluateTemporal(candidate)}>Salt-okur değerlendir</button>
+            </div>) : null}
+            {(temporal.status === "unavailable" || temporal.status === "error") ? <span role="alert">{temporal.message}</span> : null}
+            <small>Bu işlem policy yayınlamaz, ActionUnit oluşturmaz, onay/execute yetkisi vermez ve Meta’ya yazmaz. Sonuç ana operasyon timeline’ına immutable olay olarak eklenir.</small>
           </div>
         </section>
       </section>

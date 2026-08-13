@@ -4,7 +4,7 @@ import { authorizeWorkspace, type WorkspaceMembership } from "@/security/authori
 export const OPERATIONAL_TIMELINE_VERSION = "operational-timeline/1.0.0" as const;
 
 export type OperationalTimelineEvent = Readonly<{
-  kind: "slice_rule_draft" | "budget_proposal" | "delivery_alert" | "approval_proposed" | "approval_decision";
+  kind: "slice_rule_draft" | "budget_proposal" | "delivery_alert" | "approval_proposed" | "approval_decision" | "temporal_evaluation";
   occurredAt: string;
   title: string;
   detail: string;
@@ -26,7 +26,7 @@ const AUTHORITY = Object.freeze({ readOnly: true as const, canPublish: false as 
   canExecute: false as const, canWriteMeta: false as const, canEnableAutomation: false as const });
 
 function safe(event: OperationalTimelineEvent): OperationalTimelineEvent {
-  if (!event || typeof event !== "object" || !["slice_rule_draft", "budget_proposal", "delivery_alert", "approval_proposed", "approval_decision"].includes(event.kind)
+  if (!event || typeof event !== "object" || !["slice_rule_draft", "budget_proposal", "delivery_alert", "approval_proposed", "approval_decision", "temporal_evaluation"].includes(event.kind)
     || typeof event.occurredAt !== "string" || !Number.isFinite(Date.parse(event.occurredAt))
     || typeof event.title !== "string" || event.title.length < 1 || event.title.length > 180
     || typeof event.detail !== "string" || event.detail.length < 1 || event.detail.length > 300

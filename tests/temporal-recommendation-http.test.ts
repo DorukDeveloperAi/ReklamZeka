@@ -18,6 +18,20 @@ describe("temporal recommendation HTTP", () => {
     expect((await handlers.POST(request("POST", command))).status).toBe(200); expect(evaluate).toHaveBeenCalledWith(command);
     expect((await handlers.POST(request("POST", { ...command, spend: 1 }))).status).toBe(400);
   });
+  it("accepts an opaque server candidate but rejects mixed or forged candidate commands", async () => {
+    const evaluate = vi.fn().mockResolvedValue({ contractVersion: "temporal-recommendation/1.0.0" });
+    const handlers = createTemporalRecommendationHttpHandler({ service: { list: vi.fn(), evaluate }, resolvePrincipal: vi.fn() });
+    const candidate = { candidateRef: `temporal_candidate_${"b".repeat(24)}` };
+    expect((await handlers.POST(request("POST", candidate))).status).toBe(200);
+    expect(evaluate).toHaveBeenCalledWith(candidate);
+    expect((await handlers.POST(request("POST", { ...candidate, windowRef: "window_demo" }))).status).toBe(400);
+  });
+  it("returns only an authority-closed candidate list when the runtime provides it", async () => {
+    const listCandidates = vi.fn().mockResolvedValue([{ candidateRef: `temporal_candidate_${"c".repeat(24)}`, ruleSeriesRef: "series_demo", reviewCadence: "weekly", windowRef: `window_${"d".repeat(24)}`, capturedAt: "2026-08-13T00:00:00.000Z" }]);
+    const handlers = createTemporalRecommendationHttpHandler({ service: { list: vi.fn().mockResolvedValue([]), listCandidates, evaluate: vi.fn() }, resolvePrincipal: vi.fn() });
+    const body = await (await handlers.GET(request("GET"))).json();
+    expect(body).toMatchObject({ candidates: [expect.objectContaining({ ruleSeriesRef: "series_demo" })], authority: { canExecute: false, canWriteMeta: false } });
+  });
   it("rejects bearer and cross-site commands", async () => {
     const handlers = createTemporalRecommendationHttpHandler({ service: { list: vi.fn(), evaluate: vi.fn() }, resolvePrincipal: vi.fn() });
     expect((await handlers.POST(request("POST", command, { authorization: "Bearer no" }))).status).toBe(400);

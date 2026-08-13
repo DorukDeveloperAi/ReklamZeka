@@ -61,6 +61,12 @@ function event(row: SourceRow): OperationalTimelineEvent {
     if (!["approve", "reject", "request_changes"].includes(decision) || !/^[a-z][a-z0-9_.:-]{0,127}$/.test(reason)) throw new Error("corrupt_store");
     return Object.freeze({ kind, occurredAt, title: "İnsan kararı kaydedildi", detail: `${decision.replaceAll("_", " ")} · ${reason.replaceAll("_", " ")}` });
   }
+  if (kind === "temporal_evaluation") {
+    const outcome = text(row.one, 24); const reason = text(row.two, 48);
+    if (!["recommendation", "no_change"].includes(outcome) || !["window_ready", "window_unsettled", "window_too_short", "open_delivery_alert"].includes(reason)) throw new Error("corrupt_store");
+    return Object.freeze({ kind, occurredAt, title: "Zamansal kural değerlendirmesi kaydedildi",
+      detail: `${outcome === "recommendation" ? "Öneri üretildi" : "Değişiklik önerilmedi"} · ${reason.replaceAll("_", " ")} · uygulama yetkisi yok` });
+  }
   throw new Error("corrupt_store");
 }
 
@@ -91,6 +97,16 @@ export class DrizzleOperationalTimelineRepository implements OperationalTimeline
         union all
         select 'approval_decision'::text, decided_at, command_kind, reason_code, actor_role, null::jsonb, null::text
         from public.action_approval_decision_events where workspace_id = ${input.workspaceId}::uuid
+        union all
+        select 'temporal_evaluation'::text, analysis.occurred_at,
+          case when decision.disposition = 'act' then 'recommendation' else 'no_change' end,
+          substring(decision.cadence_result_ref from '^temporal:(.+)$'), null::text, null::jsonb, null::text
+        from public.decision_ledger_records analysis
+        join public.decision_ledger_records decision on decision.workspace_id = analysis.workspace_id
+          and decision.analysis_record_ref = analysis.record_id
+        where analysis.workspace_id = ${input.workspaceId}::uuid
+          and analysis.record_type = 'analysis' and analysis.analysis_definition_ref = 'temporal-recommendation'
+          and decision.record_type = 'decision' and decision.cadence_result_ref like 'temporal:%'
       ) timeline order by occurred_at desc limit ${input.limit}
     `);
     return Object.freeze(rows(result).map(event));
