@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=motor
 // dispatch.mjs — PM dağıtım sarmalayıcısı: `zamanla add` + dağıtım defteri tek yerde.
 //
 //   dispatch.mjs add [--goal <goalId>] [--epic <epicId>] [--proje <cwd>]

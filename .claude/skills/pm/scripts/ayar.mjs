@@ -1,8 +1,9 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=motor
 // ayar.mjs — PM kadranının TEK YAZARI (~/.claude/pm/ayar.json).
 //
 //   ayar.mjs get [--json]
-//   ayar.mjs set [--frekans 2h] [--paralel 1] [--gunluk 8] [--mod gozlem|yesil|tam]
+//   ayar.mjs set [--frekans 2h] [--paralel 1] [--gunluk 8] [--wip 3|yok] [--mod gozlem|yesil|tam]
 //                [--kaynak cli|tui|pano|session|vscode] [--apply]   (bkz. KAYNAKLAR — BEŞ yüzey)
 //
 // TEK-YAZAR SÖZLEŞMESİ: ayar.json'a YALNIZ bu script yazar. Pano (`POST /api/pm/ayar`),
@@ -54,6 +55,36 @@ export const VARSAYILAN = {
   guncellendi: null,
   kaynak: null,
 };
+// `kadans.wip` VARSAYILAN'da KASTEN YOKTUR (K-TB1) — varsayılan koymak, sistemin kendine tavan
+// koyması olurdu. Alanı yazan tek şey insan iradesidir (`set --wip N`), kaldıran `set --wip yok`.
+
+/** WIP ekseninin EN KISITLAYICI GEÇERLİ değeri. 0 DEĞİL: 0, kullanıcının hiç yazamayacağı
+ *  (`dogrula` reddeder) bir "hiç yeni plan açma" hâli olurdu — sistemin kendi icat ettiği tavan.
+ *  En kısıtlayıcı YORUM, geçerli değer kümesinin (tamsayı ≥ 1) alt sınırıdır. */
+export const WIP_EN_KISITLAYICI = 1;
+
+/**
+ * `kadans.wip` ÇÖZÜCÜSÜ — SAF. İki hâli AYIRIR (K-TB1 / K-TB1′; plan tavan-baglayici/v1:02):
+ *
+ *   alan YOK (undefined|null)   → {ayarli:false}          → eksen PASİF, sınırsız.
+ *   alan VAR ama GEÇERSİZ       → {ayarli:true, bozuk:true, tavan: EN KISITLAYICI}
+ *   alan VAR ve GEÇERLİ         → {ayarli:true, bozuk:false, tavan: N}
+ *
+ * YOK ≠ GEÇERSİZ. `kadans.wip:"abc"` pasife düşerse **fren basılı sanılırken fren yoktur** —
+ * `ayarOku`nun mod/frekans/paralel/gunlukTavan için kapattığını ilan ettiği hatanın aynısı
+ * (`uy:ilke/fren-fail-closed`). Bozukluk SESSİZ DEĞİLDİR: çağıran `bozuk`u `bozukAlanlar[]`e taşır.
+ *
+ * İKİZ UYARISI: Rotacı bu dosyayı import EDEMEZ (ayrı taşıyıcı, ~/.claude kurulu kopyası) →
+ * aynı yüklem `packages/rotaci/lib/reconcile.mjs → wipCoz`ta ikinci kez yaşar. İkisi
+ * `packages/rotaci/test/wip-ekseni.test.mjs` içindeki BAĞ TESTİ ile aynı tabloya bağlanmıştır:
+ * biri sapınca test kırmızı olur.
+ */
+export function wipCoz(ham) {
+  if (ham === undefined || ham === null) return { ayarli: false, tavan: null, bozuk: false };
+  const n = typeof ham === "number" ? ham : Number.NaN;
+  if (!Number.isInteger(n) || n < 1) return { ayarli: true, tavan: WIP_EN_KISITLAYICI, bozuk: true };
+  return { ayarli: true, tavan: n, bozuk: false };
+}
 
 /** Ayarı oku — dosya yoksa/bozuksa VARSAYILANI döndür (YAZMADAN).
  *
@@ -101,6 +132,13 @@ export function ayarOku() {
     bozuk.push(`gunlukTavan=${JSON.stringify(a.kadans.gunlukTavan)} → ${VARSAYILAN.kadans.gunlukTavan}`);
     a.kadans.gunlukTavan = VARSAYILAN.kadans.gunlukTavan;
   }
+  // WIP (tavan-baglayici/v1:02) — DİĞERLERİNDEN FARKLI DALLANIR: alanın YOKLUĞU bir kusur
+  // DEĞİL, ekseni pasif bırakan meşru hâldir (K-TB1) → `wipCoz` yalnız VAR olan alanı yargılar.
+  const w = wipCoz(a.kadans.wip);
+  if (w.bozuk) {
+    bozuk.push(`wip=${JSON.stringify(a.kadans.wip)} → ${w.tavan} (EN KISITLAYICI; pasife DÜŞMEZ)`);
+    a.kadans.wip = w.tavan;
+  }
   if (bozuk.length) a.bozukAlanlar = bozuk;
   return a;
 }
@@ -127,6 +165,11 @@ function dogrula(a) {
     hata(`geçersiz --paralel: ${a.kadans.paralel} (tamsayı ve ≥1 olmalı)`);
   if (!Number.isInteger(a.kadans.gunlukTavan) || a.kadans.gunlukTavan < 1)
     hata(`geçersiz --gunluk: ${a.kadans.gunlukTavan} (tamsayı ve ≥1 olmalı)`);
+  // wip: alan YOKSA doğrulama da yok (pasif meşru hâl). VARSA tamsayı ≥1 — GEÇERSİZ GİRDİ
+  // KABUL EDİLMEZ (02.e): sessizce en kısıtlayıcıya sabitlemek, kullanıcının yazdığını
+  // yazmamış saymaktır. Dosyada zaten duran bozuk değeri `ayarOku` klemper + ilan eder.
+  if (a.kadans.wip !== undefined && (!Number.isInteger(a.kadans.wip) || a.kadans.wip < 1))
+    hata(`geçersiz --wip: ${a.kadans.wip} (tamsayı ve ≥1 olmalı; ekseni kapatmak için: --wip yok)`);
   if (!MODLAR.includes(a.mod)) hata(`geçersiz --mod: ${a.mod} (geçerli: ${MODLAR.join(" | ")})`);
   return a;
 }
@@ -260,7 +303,9 @@ if (isMain) {
       console.log(`frekans      : ${a.kadans.frekans}`);
       console.log(`paralel      : ${a.kadans.paralel}`);
       console.log(`günlük tavan : ${a.kadans.gunlukTavan}`);
+      console.log(`wip (paralel açık plan): ${a.kadans.wip ?? "—  (eksen PASİF: sınırsız · set --wip N ile bağla)"}`);
       console.log(`rutin işi    : ${a.rutinJobId ?? "—  (aide pm ayar --apply ile kur)"}`);
+      if (a.bozukAlanlar?.length) console.log(`⚠ bozuk alan : ${a.bozukAlanlar.join(" · ")}`);
       console.log(`güncellendi  : ${a.guncellendi ?? "—"}${a.kaynak ? ` (${a.kaynak})` : ""}`);
       if (!existsSync(AYAR)) console.log("\n(ayar.json yok — varsayılanlar gösterildi, dosya yazılmadı)");
     }
@@ -271,6 +316,14 @@ if (isMain) {
     if (opt("frekans") !== null) a.kadans.frekans = String(opt("frekans"));
     if (opt("paralel") !== null) a.kadans.paralel = int(opt("paralel"), "paralel");
     if (opt("gunluk") !== null) a.kadans.gunlukTavan = int(opt("gunluk"), "gunluk");
+    // WIP: `yok`/`kapat` ALANI SİLER → eksen pasife döner (K-TB1). Sentinel şart: alanın
+    // varlığı tavanın varlığıdır, bu yüzden "kapatma"nın bir SAYI ile ifadesi yoktur
+    // (0 yazmak `dogrula`da reddedilir — 0, sistemin icat ettiği bir tavan olurdu).
+    if (opt("wip") !== null) {
+      const ham = String(opt("wip"));
+      if (ham === "yok" || ham === "kapat") delete a.kadans.wip;
+      else a.kadans.wip = int(ham, "wip");
+    }
     if (opt("mod") !== null) a.mod = String(opt("mod"));
     const kaynak = opt("kaynak", "cli");
     if (!KAYNAKLAR.includes(kaynak)) hata(`geçersiz --kaynak: ${kaynak} (geçerli: ${KAYNAKLAR.join(" | ")})`);
@@ -308,7 +361,8 @@ if (isMain) {
     ayarYaz(a);
     console.log(JSON.stringify({ ok: true, ayar: a, ...(rutin ? { rutin } : {}) }, null, 2));
   } else {
-    console.error(`komutlar: get [--json] | set [--frekans 2h] [--paralel 1] [--gunluk 8] [--mod gozlem|yesil|tam] [--kaynak ${KAYNAKLAR.join("|")}] [--apply] [--simdi]`);
+    console.error(`komutlar: get [--json] | set [--frekans 2h] [--paralel 1] [--gunluk 8] [--wip 3|yok] [--mod gozlem|yesil|tam] [--kaynak ${KAYNAKLAR.join("|")}] [--apply] [--simdi]`);
+    console.error("  --wip   : eşzamanlı SÜRÜYOR plan tavanı (tamsayı ≥1). Alan yoksa eksen PASİF; 'yok' alanı siler");
     console.error("  --apply : rutin işini yeni kadansla yeniden kurar (frekans değiştiyse ŞART)");
     console.error("  --simdi : kadans değişiminde rutini HEMEN ateşle (varsayılan: yalnız ilk kurulumda)");
     process.exit(1);

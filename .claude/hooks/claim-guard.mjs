@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=kapi
 /**
  * claim-guard — eşzamanlı session çakışma KAPISI (PreToolUse) + farkındalık enjeksiyonu.
  *
