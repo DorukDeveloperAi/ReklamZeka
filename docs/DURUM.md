@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: ef94b0562edd -->
+<!-- durum-damga: 6d320d366795 -->
 
 ## Künye
 
@@ -14,34 +14,35 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 324 |
+| iş commit'i (tüm geçmiş) | 337 |
 | ilk / son iş | 2026-08-06 / 2026-08-13 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-13 | `test` | cover budget pool binding contract | `ea697f1ef` |
+| 2026-08-13 | `feat` | bind drafts to budget pool revisions | `994086ed8` |
+| 2026-08-13 | `feat` | add budget pool hierarchy workspace | `289bf8483` |
+| 2026-08-13 | `feat` | expose recommendation-only pool workspace | `1b0dedba6` |
+| 2026-08-13 | `feat` | persist recommendation-only pool hierarchies | `dcb13c5bd` |
+| 2026-08-13 | `feat` | define market-bound pool hierarchy | `ef8b5e2f0` |
+| 2026-08-13 | `fix` | accept standard same-origin reads | `4bbc765ce` |
+| 2026-08-13 | `feat` | show persisted operational trace | `d860e95a8` |
+| 2026-08-13 | `fix` | require exact optional slice evidence | `841a5c863` |
+| 2026-08-13 | `fix` | require frozen proof for scoped impact | `aa74c011b` |
+| 2026-08-13 | `feat` | add explicit budget distribution drafts | `f3de526e2` |
+| 2026-08-13 | `test` | isolate connection verifier security state | `a625403c0` |
+| 2026-08-13 | `feat` | show Meta bootstrap safety state | `6a8ad4b99` |
 | 2026-08-13 | `feat` | guide alert conversations | `e9ddee919` |
 | 2026-08-13 | `fix` | gate bootstrap on token security | `04d2bebbe` |
-| 2026-08-13 | `docs` | record rule impact and alert surfaces | `4de49fd53` |
-| 2026-08-13 | `feat` | preview slice rule impact safely | `1f9c8a091` |
-| 2026-08-13 | `feat` | bind rule previews to frozen scope evidence | `7cae18933` |
-| 2026-08-13 | `feat` | add delivery health alert workspace | `e1147d3f8` |
-| 2026-08-13 | `feat` | add delivery alert ledger and rule impact bridge | `3c2ae2845` |
-| 2026-08-13 | `feat` | show read mirror and slice rule workspace | `a7aca5ffc` |
-| 2026-08-13 | `feat` | add read mirror rule workspace and Codex chat | `a489278e6` |
-| 2026-08-13 | `docs` | reconcile phase zero operating evidence | `7a9f96ff6` |
-| 2026-08-13 | `docs` | add completion execution roadmap | `091dc7d8d` |
-| 2026-08-13 | `feat` | guide manual Codex tasks by page | `b4fc3de71` |
-| 2026-08-13 | `feat` | add manual Codex task handoff | `5c2cc2e75` |
-| 2026-08-13 | `feat` | add delivery health alert contract | `bb9848dfd` |
-| 2026-08-13 | `feat` | require separate publisher | `2809577a9` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 43
-- `fix         ` ██████ 11
-- `docs        ` ███ 6
+- `feat        ` ████████████████████████ 41
+- `fix         ` ████████ 13
+- `docs        ` ██ 4
+- `test        ` █ 2
 
 ## Planlar
 

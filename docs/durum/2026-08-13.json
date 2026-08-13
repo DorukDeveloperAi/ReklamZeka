@@ -4,6 +4,123 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "ea697f1ef",
+      "tarih": "2026-08-13",
+      "konu": "test(rules): cover budget pool binding contract",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "994086ed8",
+      "tarih": "2026-08-13",
+      "konu": "feat(rules): bind drafts to budget pool revisions",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "289bf8483",
+      "tarih": "2026-08-13",
+      "konu": "feat(rules): add budget pool hierarchy workspace",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "1b0dedba6",
+      "tarih": "2026-08-13",
+      "konu": "feat(budget): expose recommendation-only pool workspace",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "dcb13c5bd",
+      "tarih": "2026-08-13",
+      "konu": "feat(budget): persist recommendation-only pool hierarchies",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ef8b5e2f0",
+      "tarih": "2026-08-13",
+      "konu": "feat(budget): define market-bound pool hierarchy",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4bbc765ce",
+      "tarih": "2026-08-13",
+      "konu": "fix(timeline): accept standard same-origin reads",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "d860e95a8",
+      "tarih": "2026-08-13",
+      "konu": "feat(timeline): show persisted operational trace",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "841a5c863",
+      "tarih": "2026-08-13",
+      "konu": "fix(rules): require exact optional slice evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "aa74c011b",
+      "tarih": "2026-08-13",
+      "konu": "fix(rules): require frozen proof for scoped impact",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "f3de526e2",
+      "tarih": "2026-08-13",
+      "konu": "feat(rules): add explicit budget distribution drafts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "a625403c0",
+      "tarih": "2026-08-13",
+      "konu": "test(meta): isolate connection verifier security state",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "6a8ad4b99",
+      "tarih": "2026-08-13",
+      "konu": "feat(dashboard): show Meta bootstrap safety state",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "e9ddee919",
       "tarih": "2026-08-13",
       "konu": "feat(orchestrator): guide alert conversations",
@@ -20,140 +137,27 @@
       "kapsam": [
         "fix"
       ]
-    },
-    {
-      "hash": "4de49fd53",
-      "tarih": "2026-08-13",
-      "konu": "docs(state): record rule impact and alert surfaces",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "1f9c8a091",
-      "tarih": "2026-08-13",
-      "konu": "feat(budget): preview slice rule impact safely",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "7cae18933",
-      "tarih": "2026-08-13",
-      "konu": "feat(budget): bind rule previews to frozen scope evidence",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "e1147d3f8",
-      "tarih": "2026-08-13",
-      "konu": "feat(dashboard): add delivery health alert workspace",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "3c2ae2845",
-      "tarih": "2026-08-13",
-      "konu": "feat(operations): add delivery alert ledger and rule impact bridge",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "a7aca5ffc",
-      "tarih": "2026-08-13",
-      "konu": "feat(dashboard): show read mirror and slice rule workspace",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "a489278e6",
-      "tarih": "2026-08-13",
-      "konu": "feat(operations): add read mirror rule workspace and Codex chat",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "7a9f96ff6",
-      "tarih": "2026-08-13",
-      "konu": "docs(plan): reconcile phase zero operating evidence",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "091dc7d8d",
-      "tarih": "2026-08-13",
-      "konu": "docs(plan): add completion execution roadmap",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "b4fc3de71",
-      "tarih": "2026-08-13",
-      "konu": "feat(dashboard): guide manual Codex tasks by page",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "5c2cc2e75",
-      "tarih": "2026-08-13",
-      "konu": "feat(dashboard): add manual Codex task handoff",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "bb9848dfd",
-      "tarih": "2026-08-13",
-      "konu": "feat(operations): add delivery health alert contract",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "2809577a9",
-      "tarih": "2026-08-13",
-      "konu": "feat(policy): require separate publisher",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 43
+      "adet": 41
     },
     {
       "kapsam": "fix",
-      "adet": 11
+      "adet": 13
     },
     {
       "kapsam": "docs",
-      "adet": 6
+      "adet": 4
+    },
+    {
+      "kapsam": "test",
+      "adet": 2
     }
   ],
-  "isSayisi": 324,
+  "isSayisi": 337,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-13",
   "planlar": [
@@ -174,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "ef94b0562edd"
+  "damga": "6d320d366795"
 }
