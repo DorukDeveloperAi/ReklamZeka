@@ -3744,3 +3744,19 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
 - Kanıt: `c5814de`, `tests/slice-operational-readiness-{service,http}.test.ts`,
   `tests/slice-scope-candidates.test.ts`, `tests/slice-rule-workspace-panel.test.ts`,
   `npm run typecheck` ve `git diff --check`.
+
+## 2026-08-14 — İnsan onay kuyruğu frozen-context hash bağını doğruluyor
+
+- Slice Rule'dan seçilmiş budget allocation ile materialize edilen ActionPlan'in `contextHash` alanı,
+  artık valve bağlamının türetilmiş digest'i değil, materializer'ın aynı transaction içinde çözdüğü
+  persisted frozen campaign context hash'idir. Bu değer istemci veya materialize komutundan kabul
+  edilmez; Action Proposal Queue böylece ActionUnit'i gerçek immutable context kaydıyla yeniden
+  doğrular.
+- K2/K3 insan onayı, approval-only davranışı ve tüm `canExecute`/Meta write kapıları değişmedi.
+  Queue DB kabulü inserted/exact replay/immutability/decision replay/RLS-grant/outer-rollback ile
+  geçti; `metaCalls=0`, `executionCalls=0`. Bu browser human-presence seremonisini bypass eden bir
+  kanıt değildir.
+- Kanıt: `6d77969`, `tests/autonomy-valve.test.ts`,
+  `tests/slice-rule-budget-action-unit-materializer.test.ts`,
+  `tests/action-proposal-queue-drizzle-repository.test.ts`,
+  `npm run verify:action-proposal-queue-db` ve `npm run typecheck`.

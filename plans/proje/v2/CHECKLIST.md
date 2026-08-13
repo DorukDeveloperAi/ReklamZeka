@@ -809,6 +809,10 @@
     public-safe çıktı ve approval/execute/Meta-write yetkisi `false`.
 - [ ] Approval inbox, automation run, verify/rollback ve tek timeline.
   - [x] Restart-durable awaiting-approval veri modeli ve public-safe read contract.
+  - [x] Slice Rule budget allocation materializer'ından gelen ActionUnit, yalnız aynı transaction'da
+    server'ın çözdüğü persisted frozen context hash'iyle Queue'ya bağlanır. İstemci hash veremez;
+    Queue exact immutable context eşleşmesini yeniden doğrular. Bu approval-only kabulde Meta write
+    ve execution sıfır, human-presence browser seremonisi ayrıdır.
   - [x] Tenant-bound Drizzle read adapter, ayrı `approval_queue:read` kapsamlı GET API ve
     fixture'sız dashboard list/detail inbox bağlantısı.
   - [x] İnsan-varlığı kanıtlı, tek-ActionUnit approve/reject/request-changes mutation katmanı;
