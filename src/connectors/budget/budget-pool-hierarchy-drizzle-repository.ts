@@ -83,4 +83,12 @@ export class DrizzleBudgetPoolHierarchyRepository implements BudgetPoolHierarchy
       return Object.freeze({ outcome: "inserted" as const, auditAppended: true });
     });
   }
+
+  async loadCurrent(input: Readonly<{ workspaceId: string; actorId: string }>) {
+    await access(this.database, input.workspaceId, input.actorId, false);
+    const latest = await this.database.select().from(schema.budgetPoolHierarchyRevisions).where(
+      eq(schema.budgetPoolHierarchyRevisions.workspaceId, input.workspaceId),
+    ).orderBy(sql`${schema.budgetPoolHierarchyRevisions.revision} desc`).limit(1);
+    return latest[0] ? fromRow(latest[0]) : null;
+  }
 }
