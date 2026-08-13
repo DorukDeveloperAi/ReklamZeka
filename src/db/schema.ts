@@ -2746,6 +2746,29 @@ export const budgetPoolHierarchyRevisions = pgTable("budget_pool_hierarchy_revis
   `),
 ]);
 
+/** Immutable binding of one saved operating-rule revision to one exact advisory pool node. */
+export const sliceRuleBudgetPoolBindings = pgTable("slice_rule_budget_pool_bindings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  draftHash: text("draft_hash").notNull(),
+  hierarchyHash: text("hierarchy_hash").notNull(),
+  poolRef: text("pool_ref").notNull(),
+  market: text("market").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  boundByActorId: uuid("bound_by_actor_id").notNull(),
+  bindingPayload: jsonb("binding_payload").$type<Record<string, unknown>>().notNull(),
+  boundAt: timestamp("bound_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.draftHash], foreignColumns: [sliceRuleWorkspaceDrafts.workspaceId, sliceRuleWorkspaceDrafts.draftHash], name: "slice_rule_budget_pool_bindings_draft_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.hierarchyHash], foreignColumns: [budgetPoolHierarchyRevisions.workspaceId, budgetPoolHierarchyRevisions.hierarchyHash], name: "slice_rule_budget_pool_bindings_hierarchy_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.boundByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "slice_rule_budget_pool_bindings_membership_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("slice_rule_budget_pool_bindings_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slice_rule_budget_pool_bindings_draft_unique").on(table.workspaceId, table.draftHash),
+  uniqueIndex("slice_rule_budget_pool_bindings_idempotency_unique").on(table.workspaceId, table.idempotencyKey),
+  check("slice_rule_budget_pool_bindings_identity", sql`${table.draftHash} ~ '^[a-f0-9]{64}$' and ${table.hierarchyHash} ~ '^[a-f0-9]{64}$' and ${table.poolRef} ~ '^budget_pool_[a-z0-9][a-z0-9_.:-]{0,119}$' and ${table.market} in ('domestic', 'international') and ${table.idempotencyKey} ~ '^[a-z][a-z0-9_.:-]{0,127}$'`),
+  check("slice_rule_budget_pool_bindings_payload_exact", sql`(jsonb_typeof(${table.bindingPayload}) = 'object' and ${table.bindingPayload} #>> '{draftHash}' = ${table.draftHash} and ${table.bindingPayload} #>> '{hierarchyHash}' = ${table.hierarchyHash} and ${table.bindingPayload} #>> '{poolRef}' = ${table.poolRef} and ${table.bindingPayload} #>> '{market}' = ${table.market} and (${table.bindingPayload} #>> '{boundAt}')::timestamptz = ${table.boundAt} and ${table.bindingPayload} #> '{authority}' = '{"canPublish":false,"canApprove":false,"canExecute":false,"canWriteMeta":false,"canEnableAutomation":false}'::jsonb) is true`),
+]);
+
 /** Append-only, advisory-only budget proposal revisions over one exact frozen campaign context. */
 export const budgetProposalVersions = pgTable("budget_proposal_versions", {
   id: uuid("id").primaryKey().defaultRandom(),

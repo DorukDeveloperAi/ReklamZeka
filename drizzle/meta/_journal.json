@@ -624,6 +624,13 @@
       "when": 1786628343301,
       "tag": "20260813133903_shocking_rocket_racer",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1786628755350,
+      "tag": "20260813134555_lame_black_tarantula",
+      "breakpoints": true
     }
   ]
 }
