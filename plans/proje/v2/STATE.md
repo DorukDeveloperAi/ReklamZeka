@@ -116,7 +116,9 @@
 
 - Dashboard Timeline'daki statik örnekler kaldırıldı. Yeni salt-okunur `operational-timeline/1.0.0`
   projection'ı yalnız tenant-bound append-only kayıt defterlerinden Slice Rule taslak revizyonu,
-  delivery/payment alarm olayı, ActionUnit önerisi ve insan onay kararını zaman sırasıyla okur.
+  doğrulanmış immutable BudgetProposal taslağı, delivery/payment alarm olayı, ActionUnit önerisi ve
+  insan onay kararını zaman sırasıyla okur. BudgetProposal payload/hash'i projection öncesi yeniden
+  doğrulanır; public timeline ham ref veya hash taşımaz.
   Ham kimlik, hash, token, Meta ID, kanıt payload'ı ve authority bilgisi public yüzeye taşınmaz.
 - Bu ilk görünüm tam evrensel timeline iddiası değildir: outcome, sync ve policy lifecycle kayıtlarının
   tek korelasyon grafiğinde birleştirilmesi sonraki dilimdir. Ancak gösterilen kayıtlar artık demo
