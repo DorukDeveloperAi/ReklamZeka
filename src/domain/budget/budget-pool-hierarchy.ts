@@ -20,7 +20,7 @@ export type BudgetPoolHierarchy = Readonly<{
   authority: Readonly<{ recommendationOnly: true; canPublish: false; canApprove: false; canExecute: false; canWriteMeta: false; canEnableAutomation: false }>;
 }>;
 export class BudgetPoolHierarchyError extends Error {
-  constructor(readonly code: "invalid_input" | "duplicate_pool" | "invalid_root" | "missing_parent" | "market_boundary" | "currency_mismatch" | "cap_exceeded" | "cycle") { super(`Bütçe havuzu hiyerarşisi reddedildi: ${code}`); }
+  constructor(readonly code: "invalid_input" | "duplicate_pool" | "invalid_root" | "missing_parent" | "market_boundary" | "currency_mismatch" | "cap_exceeded" | "time_window" | "cycle") { super(`Bütçe havuzu hiyerarşisi reddedildi: ${code}`); }
 }
 const REF = /^budget_pool_[a-z0-9][a-z0-9_.:-]{0,119}$/;
 const CURRENCY = /^[A-Z]{3}$/;
@@ -59,6 +59,7 @@ export function createBudgetPoolHierarchy(input: Readonly<{ nodes: readonly Budg
     if (parent.market !== node.market) fail("market_boundary");
     if (parent.currency !== node.currency) fail("currency_mismatch");
     if (amount(node.hardCapDecimal) > amount(parent.hardCapDecimal)) fail("cap_exceeded");
+    if (node.effectiveFrom < parent.effectiveFrom || node.effectiveTo > parent.effectiveTo) fail("time_window");
     const visited = new Set<string>([node.poolRef]); let cursor: BudgetPoolNode | undefined = parent;
     while (cursor) { if (visited.has(cursor.poolRef)) fail("cycle"); visited.add(cursor.poolRef); cursor = cursor.parentPoolRef === null ? undefined : index.get(cursor.parentPoolRef); }
   }

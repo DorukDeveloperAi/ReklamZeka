@@ -100,6 +100,12 @@
   frozen context'te exact category membership kanıtı varsa kabul eder; eksik, çelişkili veya farklı
   künye preview üretmez. Çoklu geo etiketi, istenen etiketi gerçekten içerdiğinde ek kapsamı gizlemez;
   kategori kanıtı olmayan genişletilmiş scope için fallback yoktur.
+- Ayrı `budget_pool_hierarchy_revisions` kayıt defteri artık bütün bütçe havuzu ağacını immutable
+  revizyon olarak saklar. Her kayıt tam olarak bir yerli ve bir yabancı pazar kökü, aynı para birimi,
+  child ≤ parent tavanı ve parent zaman penceresi sınırını doğrular; named alt-havuzlar bu iki sınırı
+  delemez. RLS FORCE/revoke, append-only+tombstone koruması ve audit kaydı uygulanır. Bu yalnız
+  recommendation-only taslaktır: gerçek harcama tahsisi, policy publish, approval, otomasyon veya
+  Meta write yetkisi vermez; bir sonraki dilim bunu Rule Workspace editörü ve frozen impact ile bağlar.
 
 ## 2026-08-13 — İlk gerçek operasyon izi
 

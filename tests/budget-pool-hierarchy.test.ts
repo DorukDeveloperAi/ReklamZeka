@@ -16,4 +16,12 @@ describe("budget pool hierarchy", () => {
     expect(() => createBudgetPoolHierarchy({ nodes: [...roots, child] })).toThrow(BudgetPoolHierarchyError);
     expect(() => createBudgetPoolHierarchy({ nodes: [...roots, { ...child, market: "domestic", hardCapDecimal: "600000" }] })).toThrow(BudgetPoolHierarchyError);
   });
+  it("does not let a dated child outlive its market-cap window", () => {
+    const create = () => createBudgetPoolHierarchy({ nodes: [...roots, {
+      poolRef: "budget_pool_domestic_late", parentPoolRef: "budget_pool_domestic", layer: "named", market: "domestic", currency: "TRY", hardCapDecimal: "1",
+      effectiveFrom: at, effectiveTo: "2026-10-13T00:00:00.000Z",
+    }] });
+    expect(create).toThrow(BudgetPoolHierarchyError);
+    try { create(); } catch (error) { expect(error).toMatchObject({ code: "time_window" }); }
+  });
 });

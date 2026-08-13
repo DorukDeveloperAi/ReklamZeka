@@ -2697,6 +2697,55 @@ export const sliceRuleWorkspaceDrafts = pgTable("slice_rule_workspace_drafts", {
   `),
 ]);
 
+/**
+ * Whole-tree immutable budget pool revisions. A hierarchy always has exactly
+ * one domestic and one international root; it is advisory until a separately
+ * reviewed policy/action path binds it.
+ */
+export const budgetPoolHierarchyRevisions = pgTable("budget_pool_hierarchy_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  revision: integer("revision").notNull(),
+  previousHierarchyHash: text("previous_hierarchy_hash").notNull(),
+  hierarchyHash: text("hierarchy_hash").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  lifecycleState: text("lifecycle_state").notNull(),
+  createdByActorId: uuid("created_by_actor_id").notNull(),
+  hierarchyPayload: jsonb("hierarchy_payload").$type<Record<string, unknown>>().notNull(),
+  effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull(),
+  effectiveTo: timestamp("effective_to", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.createdByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "budget_pool_hierarchy_revisions_membership_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("budget_pool_hierarchy_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("budget_pool_hierarchy_revisions_workspace_revision_unique").on(table.workspaceId, table.revision),
+  uniqueIndex("budget_pool_hierarchy_revisions_workspace_hash_unique").on(table.workspaceId, table.hierarchyHash),
+  uniqueIndex("budget_pool_hierarchy_revisions_workspace_idempotency_unique").on(table.workspaceId, table.idempotencyKey),
+  index("budget_pool_hierarchy_revisions_current_idx").on(table.workspaceId, table.revision.desc()),
+  check("budget_pool_hierarchy_revisions_identity", sql`
+    ${table.revision} >= 1
+    and ((${table.revision} = 1 and ${table.previousHierarchyHash} = 'GENESIS')
+      or (${table.revision} > 1 and ${table.previousHierarchyHash} ~ '^[a-f0-9]{64}$'))
+    and ${table.hierarchyHash} ~ '^[a-f0-9]{64}$'
+    and ${table.idempotencyKey} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+    and ${table.lifecycleState} = 'draft'
+    and ${table.effectiveTo} > ${table.effectiveFrom}
+  `),
+  check("budget_pool_hierarchy_revisions_payload_exact", sql`(
+    jsonb_typeof(${table.hierarchyPayload}) = 'object'
+    and ${table.hierarchyPayload} #>> '{schemaVersion}' = 'budget-pool-hierarchy/1.0.0'
+    and ${table.hierarchyPayload} #>> '{hierarchyHash}' = ${table.hierarchyHash}
+    and ${table.hierarchyPayload} #> '{authority}' = '{
+      "recommendationOnly": true, "canPublish": false, "canApprove": false,
+      "canExecute": false, "canWriteMeta": false, "canEnableAutomation": false
+    }'::jsonb
+  ) is true`),
+  check("budget_pool_hierarchy_revisions_no_forbidden_authority", sql`
+    ${table.hierarchyPayload}::text !~* '"(approvalGranted|writeEnabled|policyPublished|actionAuthorized)"[[:space:]]*:[[:space:]]*true'
+    and ${table.hierarchyPayload}::text !~* '"[^"[:space:]]*(token|secret|authorization|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
+  `),
+]);
+
 /** Append-only, advisory-only budget proposal revisions over one exact frozen campaign context. */
 export const budgetProposalVersions = pgTable("budget_proposal_versions", {
   id: uuid("id").primaryKey().defaultRandom(),
