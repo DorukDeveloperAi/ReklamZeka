@@ -10,6 +10,7 @@ import {
   parseSliceRuleBudgetImpactResult,
   parseSliceRuleBudgetImpactSavedResult,
   parseSliceRuleWorkspaceSnapshot,
+  parseSliceScopeCandidates,
   SliceRuleWorkspaceSurface,
 } from "@/app/dashboard/slice-rule-workspace-panel";
 
@@ -35,6 +36,14 @@ describe("Slice Rule Workspace panel", () => {
     expect(html).toContain("Action/Meta write: kapalı");
     expect(html).toContain("Kayıtlı taslağın bütçe etkisi");
     expect(html).toContain("Kaydedilmemiş form kapsamı kullanılmaz");
+    expect(html).toContain("Kanıtlı kapsam adayları");
+    expect(html).toContain("Frozen context, bütçe etkisi, policy ve action yetkisi üretmez");
+  });
+
+  it("accepts candidates only as form-prefill data with frozen budget evidence still required", () => {
+    const candidates = parseSliceScopeCandidates({ version: "slice-scope-candidates/1.0.0", candidates: [{ campaignRef: "campaign-1", scope: { market: "international", serviceRef: "service_physical_therapy", campaignFamilyRef: "campaign_family_intensive_ftr", platform: "instagram" }, requiresFrozenContext: true, budgetImpactReady: false }], authority: { canSave: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false } });
+    expect(candidates[0]).toMatchObject({ requiresFrozenContext: true, budgetImpactReady: false });
+    expect(() => parseSliceScopeCandidates({ version: "slice-scope-candidates/1.0.0", candidates: [{ campaignRef: "campaign-1", scope: { market: "international", serviceRef: "service_physical_therapy", campaignFamilyRef: "campaign_family_intensive_ftr" }, requiresFrozenContext: false, budgetImpactReady: true }], authority: { canSave: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false } })).toThrow("güvenli değil");
   });
 
   it("keeps a viewer read-only", () => {

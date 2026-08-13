@@ -84,6 +84,10 @@ type TemporalCandidate = Readonly<{ candidateRef: string; ruleSeriesRef: string;
 type TemporalState = Readonly<{ status: "loading" }>
   | Readonly<{ status: "ready"; candidates: readonly TemporalCandidate[]; result: string | null }>
   | Readonly<{ status: "unavailable" | "error"; message: string }>;
+type ScopeCandidate = Readonly<{ campaignRef: string; scope: Scope; requiresFrozenContext: true; budgetImpactReady: false }>;
+type ScopeCandidateState = Readonly<{ status: "loading" }>
+  | Readonly<{ status: "ready"; candidates: readonly ScopeCandidate[] }>
+  | Readonly<{ status: "unavailable" }>;
 
 type Form = Readonly<{
   seriesRef: string;
@@ -191,6 +195,18 @@ export function parseSliceRuleWorkspaceSnapshot(value: unknown): SliceRuleWorksp
     throw new Error("Slice Rule Workspace güvenli sözleşmeyi döndürmedi.");
   }
   return value as unknown as SliceRuleWorkspaceSnapshot;
+}
+
+/** Candidate data may only prefill a new local form; it is never budget evidence. */
+export function parseSliceScopeCandidates(value: unknown): readonly ScopeCandidate[] {
+  if (!object(value) || value.version !== "slice-scope-candidates/1.0.0" || !Array.isArray(value.candidates)
+    || value.candidates.length > 1000 || !value.candidates.every((candidate) => object(candidate)
+      && typeof candidate.campaignRef === "string" && candidate.campaignRef.length > 0
+      && isScope(candidate.scope) && candidate.requiresFrozenContext === true && candidate.budgetImpactReady === false)
+    || !object(value.authority) || value.authority.canSave !== false || value.authority.canPublish !== false
+    || value.authority.canApprove !== false || value.authority.canExecute !== false || value.authority.canWriteMeta !== false
+    || !noOpenedAuthority(value)) throw new Error("Slice kapsam aday sözleşmesi güvenli değil.");
+  return value.candidates as ScopeCandidate[];
 }
 
 /** The panel accepts only opaque candidate references discovered by the server. */
@@ -398,6 +414,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   const [impactState, setImpactState] = useState<ImpactState>({ status: "idle" });
   const [approvalQueue, setApprovalQueue] = useState<ApprovalQueueState>({ status: "loading" });
   const [temporal, setTemporal] = useState<TemporalState>({ status: "loading" });
+  const [scopeCandidates, setScopeCandidates] = useState<ScopeCandidateState>({ status: "loading" });
   const head = snapshot?.items.find((item) => item.seriesRef === headRef) ?? undefined;
   const editableHead = head === undefined || isEditableRule(head.operatingRule.rule);
   const command = useMemo(() => editableHead ? buildSliceRuleDraftCommand(form, head) : null, [editableHead, form, head]);
@@ -422,6 +439,22 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     } catch (reason) { setTemporal({ status: "unavailable", message: reason instanceof Error ? reason.message : "Zamansal adaylar okunamadı." }); }
   }, []);
   useEffect(() => { void loadTemporalCandidates(); }, [loadTemporalCandidates]);
+  const loadScopeCandidates = useCallback(async () => {
+    try {
+      const response = await fetch("/api/slice-scope-candidates", { cache: "no-store", credentials: "same-origin",
+        headers: { "X-ReklamZeka-Intent": "slice-scope-candidates-read" } });
+      if (!response.ok) throw new Error("Slice kapsam adayları okunamadı.");
+      setScopeCandidates({ status: "ready", candidates: parseSliceScopeCandidates(await response.json()) });
+    } catch { setScopeCandidates({ status: "unavailable" }); }
+  }, []);
+  useEffect(() => { void loadScopeCandidates(); }, [loadScopeCandidates]);
+  const applyScopeCandidate = (candidate: ScopeCandidate) => {
+    setHeadRef(null); setImpactState({ status: "idle" });
+    setForm((current) => ({ ...current, market: candidate.scope.market, serviceRef: candidate.scope.serviceRef,
+      campaignFamilyRef: candidate.scope.campaignFamilyRef, countryOrRegion: candidate.scope.countryOrRegion ?? "",
+      audienceStrategy: candidate.scope.audienceStrategy ?? "", platform: candidate.scope.platform ?? "",
+      conversionRoute: candidate.scope.conversionRoute ?? "" }));
+  };
   const evaluateTemporal = async (candidate: TemporalCandidate) => {
     setTemporal({ status: "loading" });
     try {
@@ -511,6 +544,12 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
         <button className={styles.newButton} type="button" onClick={() => { setHeadRef(null); setImpactState({ status: "idle" }); setForm(EMPTY_FORM); }}>+ Yeni seri</button>
       </section>
       <section className={styles.panel}><div className={styles.panelTitle}><div><span>{head ? `REVİZYON ${head.revision + 1}` : "YENİ TASLAK"}</span><h2>Kapsam ve kural</h2></div><small>{snapshot.authority.canSaveDraft ? "Owner · Admin · Analyst" : "Viewer · salt okunur"}</small></div>
+        {!head ? <section className={styles.impactResult} aria-label="Kanıtlı slice kapsam adayları"><strong>Kanıtlı kapsam adayları</strong><span>Yalnız tekil ve tutarlı mevcut kategori anahtarları yeni formu doldurur. Frozen context, bütçe etkisi, policy ve action yetkisi üretmez.</span>
+          {scopeCandidates.status === "loading" ? <span>Kapsam adayları okunuyor…</span> : null}
+          {scopeCandidates.status === "ready" && scopeCandidates.candidates.length === 0 ? <span>Tekil zorunlu kapsam kanıtı olan kampanya yok.</span> : null}
+          {scopeCandidates.status === "ready" ? scopeCandidates.candidates.slice(0, 50).map((candidate) => <div className={styles.row} key={candidate.campaignRef}><span>{candidate.campaignRef.slice(0, 18)}… · {candidate.scope.market} · {candidate.scope.serviceRef} · {candidate.scope.campaignFamilyRef}</span><button type="button" className={styles.preview} disabled={!snapshot.authority.canSaveDraft} onClick={() => applyScopeCandidate(candidate)}>Formu doldur</button></div>) : null}
+          {scopeCandidates.status === "unavailable" ? <span>Kapsam adayları şu an kullanılamıyor; formda hiçbir fallback uygulanmadı.</span> : null}
+        </section> : null}
         <fieldset disabled={!snapshot.authority.canSaveDraft || saving} className={styles.form}>
           <label>Seri referansı<input value={form.seriesRef} disabled={Boolean(head)} onChange={(event) => update("seriesRef", event.target.value)} placeholder="slice_rule.ftr.ar" /></label>
           <div className={styles.row}><label>Pazar<select value={form.market} disabled={Boolean(head)} onChange={(event) => update("market", event.target.value as Market)}><option value="domestic">Yerli</option><option value="international">Yabancı</option></select></label><label>Platform (opsiyonel)<select value={form.platform} disabled={Boolean(head)} onChange={(event) => update("platform", event.target.value as Form["platform"])}><option value="">Tümü / belirtilmedi</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option><option value="mixed">Karma</option></select></label></div>
