@@ -115,7 +115,12 @@ export class MetaGraphClient {
         const data = await Promise.race<T>([
           response.json() as Promise<T>,
           new Promise<never>((_, reject) => {
-            bodyTimeoutId = setTimeout(() => reject(new Error("meta_response_body_timeout")), this.requestTimeoutMs);
+            bodyTimeoutId = setTimeout(() => {
+              // `Response.json()` may otherwise keep the underlying stream and
+              // the Node event loop alive after the caller has failed closed.
+              controller.abort();
+              reject(new Error("meta_response_body_timeout"));
+            }, this.requestTimeoutMs);
           }),
         ]);
         return { data, usageHeadroom: usageHeadroom(response.headers) };

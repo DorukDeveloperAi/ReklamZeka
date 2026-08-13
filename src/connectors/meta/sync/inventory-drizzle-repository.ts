@@ -80,7 +80,9 @@ function appendIssue(issues: readonly MetaInventoryFieldIssue[], field: string, 
 export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePersistencePort {
   constructor(private readonly database: ReklamZekaDatabase,
     private readonly affectedGeoRepository: AffectedGeoRepositoryFactory = (database, workspaceId) =>
-      new DrizzleMetaAffectedGeoSnapshotRepository(database, workspaceId)) {}
+      // writeAdSets already owns the page transaction; nesting one savepoint per
+      // ad set turns a normal targeting page into hundreds of remote round trips.
+      new DrizzleMetaAffectedGeoSnapshotRepository(database, workspaceId, "caller")) {}
 
   async writePage(page: CanonicalMetaInventoryPage, privateSource?: unknown): Promise<MetaInventoryWriteSummary> {
     return this.database.transaction(async (transaction) => {

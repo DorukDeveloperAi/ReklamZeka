@@ -7,6 +7,7 @@ import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
 type RepositoryDatabase = Pick<Database, "execute" | "transaction">;
+type TransactionExecutor = Pick<Database, "execute">;
 
 export class MetaAffectedGeoSnapshotRepositoryError extends Error {
   constructor(readonly code:
@@ -194,7 +195,11 @@ const SELECT_COLUMNS = sql.raw(`id, workspace_id, ad_account_id, campaign_id, ad
 /** Private immutable persistence port. It has no Meta transport, policy, approval, or execution capability. */
 export class DrizzleMetaAffectedGeoSnapshotRepository {
   private readonly workspaceId: string;
-  constructor(private readonly database: RepositoryDatabase, workspaceId: string) {
+  constructor(
+    private readonly database: RepositoryDatabase,
+    workspaceId: string,
+    private readonly transactionMode: "own" | "caller" = "own",
+  ) {
     if (!UUID.test(workspaceId)) fail("invalid_input");
     this.workspaceId = workspaceId.toLowerCase();
   }
@@ -209,7 +214,7 @@ export class DrizzleMetaAffectedGeoSnapshotRepository {
       || !validUuid(input.adSetId)) fail("invalid_input");
     if (input.workspaceId.toLowerCase() !== this.workspaceId) fail("workspace_scope_mismatch");
     const snapshot = validateSnapshot(input.snapshot);
-    return this.database.transaction(async (transaction) => {
+    const work = async (transaction: TransactionExecutor) => {
       await lockWorkspace(transaction, this.workspaceId, "update");
       const hierarchy = rows<{ id: string }>(await transaction.execute(sql`
         select ad_set.id from meta_ad_sets ad_set
@@ -274,7 +279,10 @@ export class DrizzleMetaAffectedGeoSnapshotRepository {
       if (Number(itemInsert[0]?.count) !== snapshot.items.length
         || Number(locationInsert[0]?.count) !== snapshot.locationTypes.length) fail("corrupt_store");
       return Object.freeze({ outcome: "inserted" as const, snapshotId, snapshotHash: snapshot.snapshotHash });
-    });
+    };
+    return this.transactionMode === "caller"
+      ? work(this.database)
+      : this.database.transaction(async (transaction) => work(transaction));
   }
 
   async resolveExact(input: MetaAffectedGeoSnapshotExactScope): Promise<CanonicalAffectedGeoCountrySnapshot> {
