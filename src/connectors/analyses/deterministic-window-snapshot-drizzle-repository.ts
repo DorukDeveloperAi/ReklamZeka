@@ -44,9 +44,13 @@ export class DrizzleDeterministicWindowSnapshotRepository {
       if (rows(await tx.execute(sql`select id from workspaces where id = ${scope.workspaceId}::uuid and lifecycle_state = 'active' for update`)).length !== 1) fail("not_found");
       const current = rows<{ id: unknown; feature_payload: unknown }>(await tx.execute(sql`
         select feature.id::text as id, feature.feature_payload from deterministic_feature_snapshots feature
-        left join deterministic_feature_snapshot_invalidations invalidation on invalidation.workspace_id = feature.workspace_id and invalidation.feature_snapshot_id = feature.id
         where feature.workspace_id = ${scope.workspaceId}::uuid and feature.feature_hash = any(${expected.featureHashes}::text[])
-        group by feature.id having count(invalidation.id) = 0 for share
+          and not exists (
+            select 1 from deterministic_feature_snapshot_invalidations invalidation
+            where invalidation.workspace_id = feature.workspace_id
+              and invalidation.feature_snapshot_id = feature.id
+          )
+        for share
       `));
       if (current.length !== featureCount) fail("source_changed");
       for (const row of current) try { assertDeterministicFeatureSnapshot(row.feature_payload); } catch { fail("corrupt_store"); }

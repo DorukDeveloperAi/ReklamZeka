@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "e370ad054",
+      "tarih": "2026-08-13",
+      "konu": "fix(analysis): classify current-source failures safely",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
       "hash": "d040960cc",
       "tarih": "2026-08-13",
       "konu": "docs(state): record gated Meta schedule runner",
@@ -128,15 +137,6 @@
       "kapsam": [
         "fix"
       ]
-    },
-    {
-      "hash": "031a6e58d",
-      "tarih": "2026-08-13",
-      "konu": "feat(approval): queue selected budget allocations",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -146,11 +146,11 @@
     },
     {
       "kapsam": "docs",
-      "adet": 20
+      "adet": 19
     },
     {
       "kapsam": "fix",
-      "adet": 15
+      "adet": 16
     },
     {
       "kapsam": "?",
@@ -165,7 +165,7 @@
       "adet": 1
     }
   ],
-  "isSayisi": 405,
+  "isSayisi": 406,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-13",
   "planlar": [
@@ -186,5 +186,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "94c69534ef09"
+  "damga": "dd12efa80655"
 }
