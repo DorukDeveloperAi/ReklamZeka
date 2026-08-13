@@ -75,6 +75,7 @@
     "verify:advised-practice-db": "tsx scripts/verify-advised-practice-postgres.ts",
     "verify:budget-proposal-db": "tsx scripts/verify-budget-proposal-postgres.ts",
     "verify:slice-rule-workspace-db": "tsx scripts/verify-slice-rule-workspace-postgres.ts",
+    "verify:delivery-health-alert-ledger-db": "tsx scripts/verify-delivery-health-alert-ledger-postgres.ts",
     "verify:action-proposal-queue-db": "tsx scripts/verify-action-proposal-queue-postgres.ts",
     "verify:action-guardrail-db": "tsx scripts/verify-action-guardrail-policy-postgres.ts",
     "verify:meta-affected-geo-db": "tsx scripts/verify-meta-affected-geo-postgres.ts",

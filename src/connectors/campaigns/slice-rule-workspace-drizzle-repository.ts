@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import {
@@ -172,5 +172,19 @@ export class DrizzleSliceRuleWorkspaceRepository implements SliceRuleWorkspaceDr
       return row.draft_payload;
     });
     return Object.freeze(drafts.map(projectSliceRuleWorkspaceDraft));
+  }
+
+  async loadCurrentExact(input: Readonly<{ workspaceId: string; actorId: string; seriesRef: string }>) {
+    if (!UUID.test(input.workspaceId) || !UUID.test(input.actorId)
+      || !/^[a-z][a-z0-9_.:-]{0,127}$/.test(input.seriesRef)) {
+      throw new SliceRuleWorkspaceRepositoryError("invalid_input");
+    }
+    await assertAccess(this.database, input.workspaceId, input.actorId, false);
+    const found = await this.database.select().from(schema.sliceRuleWorkspaceDrafts).where(and(
+      eq(schema.sliceRuleWorkspaceDrafts.workspaceId, input.workspaceId),
+      eq(schema.sliceRuleWorkspaceDrafts.seriesRef, input.seriesRef),
+    )).orderBy(desc(schema.sliceRuleWorkspaceDrafts.revision)).limit(1);
+    if (found.length === 0) return null;
+    return fromRow(found.at(-1)!);
   }
 }

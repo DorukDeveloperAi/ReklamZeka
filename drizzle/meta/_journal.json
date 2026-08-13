@@ -610,6 +610,13 @@
       "when": 1786624506945,
       "tag": "20260813123506_slice_rule_workspace_drafts",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1786625877387,
+      "tag": "20260813125757_delivery_health_alert_ledger",
+      "breakpoints": true
     }
   ]
 }

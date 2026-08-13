@@ -5693,3 +5693,108 @@ export const metaCompatibilityArtifactRevisions = pgTable("meta_compatibility_ar
       !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json)|free[_-]?text)"[[:space:]]*:'
   `),
 ]);
+
+/**
+ * Server-private append-only payment/delivery alert history. Every row is a
+ * complete immutable projection revision; recommendation holds never carry
+ * approval, execution, automation or Meta-write authority.
+ */
+export const deliveryHealthAlertLedgerRecords = pgTable("delivery_health_alert_ledger_records", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  alertRef: text("alert_ref").notNull(),
+  accountRef: text("account_ref").notNull(),
+  sequence: integer("sequence").notNull(),
+  previousRecordHash: text("previous_record_hash").notNull(),
+  recordHash: text("record_hash").notNull(),
+  alertHash: text("alert_hash").notNull(),
+  evidenceHash: text("evidence_hash").notNull(),
+  evidenceLevel: text("evidence_level").notNull(),
+  officialState: text("official_state"),
+  status: text("status").notNull(),
+  recommendationDisposition: text("recommendation_disposition").notNull(),
+  assignedActorRef: text("assigned_actor_ref").notNull(),
+  checklistPayload: jsonb("checklist_payload").$type<Record<string, boolean>>().notNull(),
+  eventType: text("event_type").notNull(),
+  eventActorRef: text("event_actor_ref").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  createdByActorId: uuid("created_by_actor_id").notNull(),
+  recordPayload: jsonb("record_payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.createdByActorId],
+    foreignColumns: [memberships.workspaceId, memberships.userId],
+    name: "delivery_health_alert_ledger_records_membership_scope_fk",
+  }).onDelete("restrict"),
+  uniqueIndex("delivery_health_alert_ledger_records_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("delivery_health_alert_ledger_records_alert_sequence_unique")
+    .on(table.workspaceId, table.alertRef, table.sequence),
+  uniqueIndex("delivery_health_alert_ledger_records_workspace_hash_unique").on(table.workspaceId, table.recordHash),
+  index("delivery_health_alert_ledger_records_current_idx")
+    .on(table.workspaceId, table.status, table.occurredAt, table.alertRef, table.sequence),
+  check("delivery_health_alert_ledger_records_identity", sql`
+    ${table.alertRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.accountRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.sequence} between 1 and 1000000
+    and ((${table.sequence} = 1 and ${table.previousRecordHash} = 'GENESIS')
+      or (${table.sequence} > 1 and ${table.previousRecordHash} ~ '^[a-f0-9]{64}$'))
+    and ${table.recordHash} ~ '^[a-f0-9]{64}$'
+    and ${table.alertHash} ~ '^[a-f0-9]{64}$'
+    and ${table.evidenceHash} ~ '^[a-f0-9]{64}$'
+    and ${table.evidenceLevel} in ('confirmed', 'suspected')
+    and ((${table.evidenceLevel} = 'confirmed' and ${table.officialState} in
+      ('payment_required', 'account_disabled', 'delivery_rejected', 'delivery_limited'))
+      or (${table.evidenceLevel} = 'suspected' and ${table.officialState} is null))
+    and ${table.status} in ('open', 'investigating', 'resolved')
+    and ${table.recommendationDisposition} in ('hold_recommendations', 'needs_human_review', 'released')
+    and (${table.status} = 'resolved') = (${table.recommendationDisposition} = 'released')
+    and (${table.evidenceLevel} <> 'confirmed' or ${table.status} = 'resolved'
+      or ${table.recommendationDisposition} = 'hold_recommendations')
+    and (${table.evidenceLevel} <> 'suspected' or ${table.status} = 'resolved'
+      or ${table.recommendationDisposition} = 'needs_human_review')
+    and ${table.assignedActorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.eventActorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.eventType} in ('detected', 'assign', 'start_investigation', 'set_checklist_item', 'resolve', 'reopen')
+  `),
+  check("delivery_health_alert_ledger_records_checklist_exact", sql`
+    jsonb_typeof(${table.checklistPayload}) = 'object'
+    and ${table.checklistPayload} ?& array['verify_evidence', 'inspect_account_and_delivery',
+      'confirm_recovery_or_false_positive', 'notify_responsible']
+    and ${table.checklistPayload} - array['verify_evidence', 'inspect_account_and_delivery',
+      'confirm_recovery_or_false_positive', 'notify_responsible'] = '{}'::jsonb
+    and jsonb_typeof(${table.checklistPayload} #> '{verify_evidence}') = 'boolean'
+    and jsonb_typeof(${table.checklistPayload} #> '{inspect_account_and_delivery}') = 'boolean'
+    and jsonb_typeof(${table.checklistPayload} #> '{confirm_recovery_or_false_positive}') = 'boolean'
+    and jsonb_typeof(${table.checklistPayload} #> '{notify_responsible}') = 'boolean'
+  `),
+  check("delivery_health_alert_ledger_records_payload_exact", sql`(
+    jsonb_typeof(${table.recordPayload}) = 'object'
+    and ${table.recordPayload} #>> '{version}' = 'delivery-health-alert-ledger/1.0.0'
+    and ${table.recordPayload} #>> '{alert,workspaceRef}' is not null
+    and ${table.recordPayload} #>> '{alert,alertRef}' = ${table.alertRef}
+    and ${table.recordPayload} #>> '{alert,accountRef}' = ${table.accountRef}
+    and ${table.recordPayload} #>> '{alert,alertHash}' = ${table.alertHash}
+    and ${table.recordPayload} #>> '{alert,evidenceHash}' = ${table.evidenceHash}
+    and ${table.recordPayload} #>> '{alert,evidence,level}' = ${table.evidenceLevel}
+    and (${table.recordPayload} #>> '{alert,evidence,officialState}') is not distinct from ${table.officialState}
+    and (${table.recordPayload} #>> '{sequence}')::integer = ${table.sequence}
+    and ${table.recordPayload} #>> '{previousRecordHash}' = ${table.previousRecordHash}
+    and ${table.recordPayload} #>> '{recordHash}' = ${table.recordHash}
+    and ${table.recordPayload} #>> '{current,status}' = ${table.status}
+    and ${table.recordPayload} #>> '{current,recommendationDisposition}' = ${table.recommendationDisposition}
+    and ${table.recordPayload} #>> '{current,assignedActorRef}' = ${table.assignedActorRef}
+    and ${table.recordPayload} #> '{current,checklist}' = ${table.checklistPayload}
+    and ${table.recordPayload} #>> '{event,kind}' = ${table.eventType}
+    and ${table.recordPayload} #>> '{event,actorRef}' = ${table.eventActorRef}
+    and (${table.recordPayload} #>> '{event,occurredAt}')::timestamptz = ${table.occurredAt}
+    and ${table.recordPayload} #> '{authority}' = '{
+      "canApprove": false, "canExecute": false,
+      "canWriteMeta": false, "canEnableAutomation": false
+    }'::jsonb
+  ) is true`),
+  check("delivery_health_alert_ledger_records_no_forbidden_authority", sql`
+    ${table.recordPayload}::text !~* '"(approvalGranted|writeEnabled|policyPublished|actionAuthorized)"[[:space:]]*:[[:space:]]*true'
+    and ${table.recordPayload}::text !~* '"[^"[:space:]]*(token|secret|authorization|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
+  `),
+]);

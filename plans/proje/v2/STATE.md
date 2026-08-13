@@ -68,6 +68,18 @@
   kabulü; 34 odaklı test, typecheck, db:check, production build ve secret scan geçti. Yeni forward
   migrationlar yerel geliştirme DB'sine uygulandı.
 
+## 2026-08-13 — Persistent delivery/payment alarm ledger'i
+
+- `delivery_health_alerts` zinciri, `confirmed` resmi durum kanıtını ve `suspected` harcama/teslimat
+  anomalisini ayrı immutable olaylar olarak kaydeder. Alarmın ataması, dört maddelik kontrol listesi,
+  `open → investigating → resolved/reopen` geçmişi ve evidence hash'i append-only audit zincirindedir.
+- `hold_recommendations` yalnız öneri baskılama işaretidir; approval/action/execute/automation/Meta-write
+  yetkisi vermez. Alarm materialization server-private; HTTP yalnız public-safe okuma ve insan workflow
+  geçişi sunar. RLS FORCE, revoke, tombstone purge ve audit korumaları uygulanır.
+- Canlı DB verifier; iki kanıt seviyesinin ayrılığını, idempotency, checklist zorunluluğunu, viewer write
+  reddini, append-only korumayı, audit zincirini ve sıfır Meta write'ı doğruladı. Bu checkpoint henüz
+  Dashboard alarm panelini veya temporal evaluator'ı bağlamaz.
+
 ## 2026-08-12 — Portföy pazar sınırı
 
 - Kullanıcıyla yürütülen mevcut portföy istişaresinde **pazar**, tüm künye ve slice'ların ilk

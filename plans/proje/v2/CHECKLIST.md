@@ -593,6 +593,8 @@
 - [ ] Natural-language instruction translator ve ambiguity eval seti.
 - [ ] Salt-okur local-session/advisor ledger, import/DB saldırı testi ve redaksiyon.
 - [ ] Karar defteri/context budget ve deterministic fallback.
+  - [x] Confirmed/suspected delivery-health alert ledger: atama, zorunlu checklist, insan workflow
+    durumu ve recommendation hold/release append-only zinciri; action/Meta authority kapalı.
 - [ ] Injection/cross-tenant/secret/action-bypass tam negatif matrisi.
 - [x] LocalAgentClient/session contract ve modelsiz deterministic fixture client; 15 safe read/draft/preflight
   tool'u exact local-session scope'a bağlı, correlation replay/cross-session ve authority/raw/tool injection fail-closed.
