@@ -273,9 +273,19 @@ export class MetaPartialReadSyncRuntime {
   private async fetchBounded(request: MetaReadRequest): Promise<{ page: Awaited<ReturnType<MetaReadTransport["get"]>> } | { error: MetaSyncError }> {
     let lastError: MetaSyncError | null = null;
     for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
+      // A Graph request that already began is bounded by the transport timeout,
+      // but a retry must not extend a server-owned run window indefinitely.
+      if (this.deadlineAtEpochMs !== null && this.now().valueOf() >= this.deadlineAtEpochMs) {
+        return { error: { reason: "timeout", retryable: true,
+          message: "Meta salt-okunur koşum süre penceresine ulaştı; checkpoint sonraki koşumda devam edecek" } };
+      }
       try { return { page: await this.options.transport.get(request) }; }
       catch (error) {
         lastError = classifyMetaSyncError(error);
+        if (this.deadlineAtEpochMs !== null && this.now().valueOf() >= this.deadlineAtEpochMs) {
+          return { error: { reason: "timeout", retryable: true,
+            message: "Meta salt-okunur koşum süre penceresine ulaştı; checkpoint sonraki koşumda devam edecek" } };
+        }
         if (!lastError.retryable || attempt === this.maxAttempts) break;
         const delay = Math.round(100 * 2 ** (attempt - 1) * (0.5 + this.random()));
         await this.sleep(delay);
