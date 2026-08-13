@@ -30,6 +30,13 @@
 
 ## 2026-08-13 — Faz 0 kanıt/durum uzlaştırması
 
+- Canonical Meta mirror için ayrı **trust/readiness** read projection eklendi. Aktif connection ve
+  account kapsamı requestten değil, salt-okunur repeatable-read transaction içinde canonical DB'den
+  çözülür; Dashboard yalnız opaque connection/account ref'leri, stream coverage/freshness ve reason
+  code'ları görür. Eşik sürümü/report hash'i kanıta bağlıdır; Graph/secret çağrısı, publish/approve/
+  execute/Meta write yoktur. Oturum yoksa rapor fail-closed kalır. Gerçek principal ile browser
+  kabulü hâlâ açık olup bu kayıt onu tamamlanmış saymaz.
+
 - **Salt-okunur Meta bootstrap'i gerçek tenantta çalıştırıldı.** Güvenlik işareti `rotated` sonrası
   read-only connection doctor kabulü geçti; beş erişilebilir hesap için canonical data-source/account
   kökleri oluşturuldu. Dayanıklı, yalnız GET mirror checkpoint'leri şu ana kadar 422 kampanya, 1086
