@@ -4,133 +4,135 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "13b515647",
+      "hash": "d040960cc",
       "tarih": "2026-08-13",
-      "konu": "docs(state): record empty bounded insight recovery",
+      "konu": "docs(state): record gated Meta schedule runner",
       "tur": "is",
       "kapsam": [
         "docs"
       ]
     },
     {
-      "hash": "e875877d5",
+      "hash": "0bbc7c308",
       "tarih": "2026-08-13",
-      "konu": "fix: bound Meta insight recovery to one day",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "6027dde23",
-      "tarih": "2026-08-13",
-      "konu": "docs(state): record partial live asset recovery",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "b6179d9a2",
-      "tarih": "2026-08-13",
-      "konu": "fix(meta): replay only verified actor post bindings",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "05afe327a",
-      "tarih": "2026-08-13",
-      "konu": "fix(meta): report bounded materialization failures",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "d514ff535",
-      "tarih": "2026-08-13",
-      "konu": "feat(meta): materialize bounded S1.4 recovery",
+      "konu": "feat(meta): add gated read-only schedule runner",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "44f71e06e",
+      "hash": "04af0c44b",
       "tarih": "2026-08-13",
-      "konu": "fix(meta): bootstrap live recovery from S1.4 reads",
+      "konu": "test(approval): bind queue verifier to frozen context",
       "tur": "is",
       "kapsam": [
-        "fix"
+        "test"
       ]
     },
     {
-      "hash": "984fd836b",
+      "hash": "a82508c45",
       "tarih": "2026-08-13",
-      "konu": "chore(meta): add live recovery verifier",
-      "tur": "is",
-      "kapsam": [
-        "chore"
-      ]
-    },
-    {
-      "hash": "a2a74a601",
-      "tarih": "2026-08-13",
-      "konu": "fix(meta): recover actor posts from creative evidence",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "f9e3cdc77",
-      "tarih": "2026-08-13",
-      "konu": "docs(state): record allocation binding writer",
+      "konu": "docs(state): record Meta quality read projection",
       "tur": "is",
       "kapsam": [
         "docs"
       ]
     },
     {
-      "hash": "506add07b",
+      "hash": "a5af7e894",
       "tarih": "2026-08-13",
-      "konu": "feat(rules): add server-private allocation binding writer",
+      "konu": "feat(meta): expose canonical trust readiness report",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "f10112eb3",
+      "hash": "bfd3497c8",
       "tarih": "2026-08-13",
-      "konu": "docs(state): record temporal and allocation foundations",
+      "konu": "fix(manifests): classify budget action provenance",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "7952add5d",
+      "tarih": "2026-08-13",
+      "konu": "docs(state): record dashboard fail-closed acceptance",
       "tur": "is",
       "kapsam": [
         "docs"
       ]
     },
     {
-      "hash": "acdaa0842",
+      "hash": "b17a8e222",
       "tarih": "2026-08-13",
-      "konu": "Add immutable slice rule allocation bindings",
+      "konu": "docs(state): record normalization and insight evidence",
       "tur": "is",
-      "kapsam": []
+      "kapsam": [
+        "docs"
+      ]
     },
     {
-      "hash": "700bdf3de",
+      "hash": "62d736691",
       "tarih": "2026-08-13",
-      "konu": "feat: expose temporal recommendation ledger safely",
+      "konu": "feat(rules): expose normalization workbench in dashboard",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "07261d2fe",
+      "hash": "4c066e399",
       "tarih": "2026-08-13",
-      "konu": "feat(recommendations): add temporal evaluation ledger",
+      "konu": "feat(meta): surface verified empty insight delivery",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7a522638f",
+      "tarih": "2026-08-13",
+      "konu": "docs(state): record K2 K3 budget policy studio",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "209276eb1",
+      "tarih": "2026-08-13",
+      "konu": "feat(policy): support exact K2 K3 approval drafts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "09a2b9eed",
+      "tarih": "2026-08-13",
+      "konu": "docs(state): record creative evidence and budget queue",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "90a068440",
+      "tarih": "2026-08-13",
+      "konu": "fix(meta): recover creative actor bindings from Graph evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "031a6e58d",
+      "tarih": "2026-08-13",
+      "konu": "feat(approval): queue selected budget allocations",
       "tur": "is",
       "kapsam": [
         "feat"
@@ -140,34 +142,30 @@
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 23
-    },
-    {
-      "kapsam": "fix",
-      "adet": 19
+      "adet": 22
     },
     {
       "kapsam": "docs",
-      "adet": 12
+      "adet": 20
     },
     {
-      "kapsam": "chore",
-      "adet": 2
-    },
-    {
-      "kapsam": "test",
-      "adet": 2
+      "kapsam": "fix",
+      "adet": 15
     },
     {
       "kapsam": "?",
       "adet": 1
     },
     {
-      "kapsam": "perf",
+      "kapsam": "chore",
+      "adet": 1
+    },
+    {
+      "kapsam": "test",
       "adet": 1
     }
   ],
-  "isSayisi": 382,
+  "isSayisi": 405,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-13",
   "planlar": [
@@ -188,5 +186,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "f377c2c6f766"
+  "damga": "94c69534ef09"
 }

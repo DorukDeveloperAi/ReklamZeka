@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: f377c2c6f766 -->
+<!-- durum-damga: 94c69534ef09 -->
 
 ## Künye
 
@@ -14,38 +14,37 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 382 |
+| iş commit'i (tüm geçmiş) | 405 |
 | ilk / son iş | 2026-08-06 / 2026-08-13 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
-| 2026-08-13 | `docs` | record empty bounded insight recovery | `13b515647` |
-| 2026-08-13 | `fix` | bound Meta insight recovery to one day | `e875877d5` |
-| 2026-08-13 | `docs` | record partial live asset recovery | `6027dde23` |
-| 2026-08-13 | `fix` | replay only verified actor post bindings | `b6179d9a2` |
-| 2026-08-13 | `fix` | report bounded materialization failures | `05afe327a` |
-| 2026-08-13 | `feat` | materialize bounded S1.4 recovery | `d514ff535` |
-| 2026-08-13 | `fix` | bootstrap live recovery from S1.4 reads | `44f71e06e` |
-| 2026-08-13 | `chore` | add live recovery verifier | `984fd836b` |
-| 2026-08-13 | `fix` | recover actor posts from creative evidence | `a2a74a601` |
-| 2026-08-13 | `docs` | record allocation binding writer | `f9e3cdc77` |
-| 2026-08-13 | `feat` | add server-private allocation binding writer | `506add07b` |
-| 2026-08-13 | `docs` | record temporal and allocation foundations | `f10112eb3` |
-| 2026-08-13 | `—` | Add immutable slice rule allocation bindings | `acdaa0842` |
-| 2026-08-13 | `feat` | expose temporal recommendation ledger safely | `700bdf3de` |
-| 2026-08-13 | `feat` | add temporal evaluation ledger | `07261d2fe` |
+| 2026-08-13 | `docs` | record gated Meta schedule runner | `d040960cc` |
+| 2026-08-13 | `feat` | add gated read-only schedule runner | `0bbc7c308` |
+| 2026-08-13 | `test` | bind queue verifier to frozen context | `04af0c44b` |
+| 2026-08-13 | `docs` | record Meta quality read projection | `a82508c45` |
+| 2026-08-13 | `feat` | expose canonical trust readiness report | `a5af7e894` |
+| 2026-08-13 | `fix` | classify budget action provenance | `bfd3497c8` |
+| 2026-08-13 | `docs` | record dashboard fail-closed acceptance | `7952add5d` |
+| 2026-08-13 | `docs` | record normalization and insight evidence | `b17a8e222` |
+| 2026-08-13 | `feat` | expose normalization workbench in dashboard | `62d736691` |
+| 2026-08-13 | `feat` | surface verified empty insight delivery | `4c066e399` |
+| 2026-08-13 | `docs` | record K2 K3 budget policy studio | `7a522638f` |
+| 2026-08-13 | `feat` | support exact K2 K3 approval drafts | `209276eb1` |
+| 2026-08-13 | `docs` | record creative evidence and budget queue | `09a2b9eed` |
+| 2026-08-13 | `fix` | recover creative actor bindings from Graph evidence | `90a068440` |
+| 2026-08-13 | `feat` | queue selected budget allocations | `031a6e58d` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 23
-- `fix         ` ████████████████████ 19
-- `docs        ` █████████████ 12
-- `chore       ` ██ 2
-- `test        ` ██ 2
+- `feat        ` ████████████████████████ 22
+- `docs        ` ██████████████████████ 20
+- `fix         ` ████████████████ 15
 - `?           ` █ 1
-- `perf        ` █ 1
+- `chore       ` █ 1
+- `test        ` █ 1
 
 ## Planlar
 
