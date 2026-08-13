@@ -82,6 +82,16 @@ describe("Meta read-only inventory", () => {
     expect(calls).toBe(2);
   });
 
+  it("bounds a response body that never completes", async () => {
+    const fetchImpl: MetaFetch = vi.fn(async () => ({
+      ok: true,
+      headers: new Headers(),
+      json: async () => new Promise<never>(() => undefined),
+    }) as unknown as Response);
+    const client = new MetaGraphClient(token, fetchImpl, { requestTimeoutMs: 1_000 });
+    await expect(client.get("/me")).rejects.toMatchObject({ code: "invalid_data", retryable: false });
+  }, 2_000);
+
   it("fails closed for an invalid token", async () => {
     const fetchImpl: MetaFetch = vi.fn(async () => json({ data: { is_valid: false } }));
     await expect(discoverMetaInventory({ token, fetchImpl })).rejects.toMatchObject({ code: "authentication" });

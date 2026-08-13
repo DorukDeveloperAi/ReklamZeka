@@ -38,6 +38,10 @@ export type ProductionMetaReadSyncInput = Readonly<{
   dateStop: string;
   dateSliceDays?: number;
   initialPageSize?: number;
+  /** Bounded server-run guard; it cannot enable a write capability. */
+  requestTimeoutMs?: number;
+  /** Runtime-level retry budget; Graph client retries are disabled when this is supplied. */
+  maxAttempts?: number;
 }>;
 
 export type ProductionMetaReadSyncResult = Readonly<{
@@ -104,6 +108,12 @@ export class ProductionMetaReadSyncService {
 
   async run(input: ProductionMetaReadSyncInput): Promise<ProductionMetaReadSyncResult> {
     if (!RUN_REF.test(input.parentRunId)) throw new ProductionMetaReadSyncError("sync_failed");
+    if (input.requestTimeoutMs !== undefined && (!Number.isInteger(input.requestTimeoutMs) || input.requestTimeoutMs < 1_000 || input.requestTimeoutMs > 60_000)) {
+      throw new ProductionMetaReadSyncError("sync_failed");
+    }
+    if (input.maxAttempts !== undefined && (!Number.isInteger(input.maxAttempts) || input.maxAttempts < 1 || input.maxAttempts > 3)) {
+      throw new ProductionMetaReadSyncError("sync_failed");
+    }
 
     let scope: ServerDerivedMetaSyncScope;
     try {
@@ -134,6 +144,8 @@ export class ProductionMetaReadSyncService {
 
       const transport = new MetaGraphSyncTransport(new MetaGraphClient(token, this.dependencies.fetchImpl, {
         graphApiVersion: connection.graphApiVersion,
+        ...(input.requestTimeoutMs === undefined ? {} : { requestTimeoutMs: input.requestTimeoutMs }),
+        ...(input.maxAttempts === undefined ? {} : { maxAttempts: 1 }),
       }));
       const createRuntime = this.dependencies.runtimeFactory ?? ((options) => new MetaPartialReadSyncRuntime(options));
       const runtime = createRuntime({
@@ -141,6 +153,7 @@ export class ProductionMetaReadSyncService {
         persistence: this.dependencies.durablePersistence,
         inventoryPagePersistence: this.dependencies.inventoryPagePersistence,
         insightPagePersistence: this.dependencies.insightPagePersistence,
+        ...(input.maxAttempts === undefined ? {} : { maxAttempts: input.maxAttempts }),
       });
       const result = await runtime.run({
         parentRunId: input.parentRunId,

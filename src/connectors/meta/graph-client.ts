@@ -3,6 +3,7 @@ import { withConnectorRetry } from "@/connectors/retry";
 
 export const META_GRAPH_API_VERSION = "v23.0";
 const META_GRAPH_ORIGIN = "https://graph.facebook.com";
+const DEFAULT_REQUEST_TIMEOUT_MS = 20_000;
 
 export type MetaFetch = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
@@ -55,14 +56,24 @@ export class MetaGraphClient {
   constructor(
     private readonly token: string,
     private readonly fetchImpl: MetaFetch = fetch,
-    options: Readonly<{ graphApiVersion?: string }> = {},
+    options: Readonly<{ graphApiVersion?: string; requestTimeoutMs?: number; maxAttempts?: number }> = {},
   ) {
     if (!token.trim()) throw new ConnectorError("authentication", "Meta access token yapılandırılmadı", false);
     this.graphApiVersion = options.graphApiVersion ?? META_GRAPH_API_VERSION;
+    this.requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     if (!/^v\d+\.\d+$/.test(this.graphApiVersion)) {
       throw new ConnectorError("invalid_data", "Meta Graph API sürümü geçersiz", false);
     }
+    if (!Number.isInteger(this.requestTimeoutMs) || this.requestTimeoutMs < 1_000 || this.requestTimeoutMs > 60_000) {
+      throw new ConnectorError("invalid_data", "Meta istek zaman aşımı geçersiz", false);
+    }
+    this.maxAttempts = options.maxAttempts ?? 3;
+    if (!Number.isInteger(this.maxAttempts) || this.maxAttempts < 1 || this.maxAttempts > 3) {
+      throw new ConnectorError("invalid_data", "Meta istek tekrar sınırı geçersiz", false);
+    }
   }
+  private readonly requestTimeoutMs: number;
+  private readonly maxAttempts: number;
 
   async get<T>(path: string, params: Readonly<Record<string, string>> = {}): Promise<T> {
     return (await this.getWithUsage<T>(path, params)).data;
@@ -73,24 +84,47 @@ export class MetaGraphClient {
       const url = new URL(`${META_GRAPH_ORIGIN}/${this.graphApiVersion}/${path.replace(/^\//, "")}`);
       for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
       let response: Response;
+      const controller = new AbortController();
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const deadline = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          controller.abort();
+          reject(new Error("meta_request_timeout"));
+        }, this.requestTimeoutMs);
+      });
       try {
-        response = await this.fetchImpl(url, {
+        response = await Promise.race([this.fetchImpl(url, {
           method: "GET",
           cache: "no-store",
+          signal: controller.signal,
           headers: { Authorization: `Bearer ${this.token}`, Accept: "application/json" },
-        });
+        }), deadline]);
       } catch {
         // Fetch implementations may include the complete request URL or Authorization
         // header in their native errors. Never let that material cross this boundary.
         throw new ConnectorError("transient", "Meta ağına güvenli bağlantı kurulamadı", true);
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
       }
       if (!response.ok) throw connectorErrorFor(response);
+      let bodyTimeoutId: ReturnType<typeof setTimeout> | undefined;
       try {
-        return { data: await response.json() as T, usageHeadroom: usageHeadroom(response.headers) };
+        // A response can have arrived while its body never finishes streaming.
+        // Apply the same bounded, fail-closed deadline to JSON decoding; otherwise
+        // a read-only sync can retain a persistence transaction indefinitely.
+        const data = await Promise.race<T>([
+          response.json() as Promise<T>,
+          new Promise<never>((_, reject) => {
+            bodyTimeoutId = setTimeout(() => reject(new Error("meta_response_body_timeout")), this.requestTimeoutMs);
+          }),
+        ]);
+        return { data, usageHeadroom: usageHeadroom(response.headers) };
       } catch {
         throw new ConnectorError("invalid_data", "Meta geçersiz JSON döndürdü", false);
+      } finally {
+        if (bodyTimeoutId) clearTimeout(bodyTimeoutId);
       }
-    }, { maxAttempts: 3, baseDelayMs: 300 });
+    }, { maxAttempts: this.maxAttempts, baseDelayMs: 300 });
   }
 
   async listAll<T>(
