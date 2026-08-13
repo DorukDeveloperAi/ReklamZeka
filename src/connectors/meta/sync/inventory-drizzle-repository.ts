@@ -20,6 +20,7 @@ type ReklamZekaDatabase = NodePgDatabase<typeof schema>;
 type WriteOutcome = MetaInventoryCanonicalWriteOutcome;
 type Existing = Readonly<{ externalId: string; sourceRevision: string; sourcePriority: number; payloadHash: string }>;
 type AffectedGeoRepositoryFactory = (database: ReklamZekaDatabase, workspaceId: string) => MetaAffectedGeoAppendPort;
+type InventoryPersistenceOptions = Readonly<{ materializeAffectedGeo?: boolean }>;
 
 const incomingRevision = sql<string>`excluded.provenance ->> 'sourceRevision'`;
 const incomingPriority = sql<number>`case
@@ -78,11 +79,15 @@ function appendIssue(issues: readonly MetaInventoryFieldIssue[], field: string, 
  * calls and never persists or logs the source page itself.
  */
 export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePersistencePort {
+  private readonly materializeAffectedGeo: boolean;
   constructor(private readonly database: ReklamZekaDatabase,
     private readonly affectedGeoRepository: AffectedGeoRepositoryFactory = (database, workspaceId) =>
       // writeAdSets already owns the page transaction; nesting one savepoint per
       // ad set turns a normal targeting page into hundreds of remote round trips.
-      new DrizzleMetaAffectedGeoSnapshotRepository(database, workspaceId, "caller")) {}
+      new DrizzleMetaAffectedGeoSnapshotRepository(database, workspaceId, "caller"),
+    options: InventoryPersistenceOptions = {}) {
+    this.materializeAffectedGeo = options.materializeAffectedGeo ?? true;
+  }
 
   async writePage(page: CanonicalMetaInventoryPage, privateSource?: unknown): Promise<MetaInventoryWriteSummary> {
     return this.database.transaction(async (transaction) => {
@@ -231,10 +236,12 @@ export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePer
       const resolved = resolvedRows.find((row) => row.externalAdSetId === entry.externalId);
       return !resolved || resolved.campaignId !== campaigns.get(entry.externalCampaignId);
     })) throw new Error("Meta inventory affected-geo hierarchy kapsamı çözülemedi");
-    await appendKnownAffectedGeoForCanonicalAdSetPage({ page, privateSource, adAccountId: accountId,
-      hierarchy: resolvedRows.map((row) => ({ externalAdSetId: row.externalAdSetId,
-        campaignId: row.campaignId, adSetId: row.id })), outcomes,
-      repository: this.affectedGeoRepository(database, page.workspaceId) });
+    if (this.materializeAffectedGeo) {
+      await appendKnownAffectedGeoForCanonicalAdSetPage({ page, privateSource, adAccountId: accountId,
+        hierarchy: resolvedRows.map((row) => ({ externalAdSetId: row.externalAdSetId,
+          campaignId: row.campaignId, adSetId: row.id })), outcomes,
+        repository: this.affectedGeoRepository(database, page.workspaceId) });
+    }
     await this.markObserved(database, schema.metaAdSets, schema.metaAdSets.externalAdSetId, schema.metaAdSets.adAccountId,
       schema.metaAdSets.workspaceId, schema.metaAdSets.fetchedAt, schema.metaAdSets.provenance, ids, accountId, page);
     return outcomes;

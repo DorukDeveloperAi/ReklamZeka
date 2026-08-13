@@ -51,6 +51,7 @@ export type ProductionMetaReadSyncResult = Readonly<{
   updated: number;
   unchanged: number;
   writeNetworkCalls: 0;
+  affectedGeoMaterialization?: "completed" | "deferred";
 }>;
 
 export class ProductionMetaReadSyncError extends Error {
@@ -70,6 +71,7 @@ type ProductionMetaReadSyncDependencies = Readonly<{
   inventoryPagePersistence: MetaSyncRuntimeOptions["inventoryPagePersistence"];
   insightPagePersistence?: MetaSyncRuntimeOptions["insightPagePersistence"];
   durablePersistence: MetaSyncRuntimeOptions["persistence"];
+  affectedGeoMaterialization?: "completed" | "deferred";
   fetchImpl?: MetaFetch;
   runtimeFactory?: RuntimeFactory;
 }>;
@@ -82,7 +84,7 @@ function validScope(scope: ServerDerivedMetaSyncScope): boolean {
   return UUID.test(scope.workspaceId) && UUID.test(scope.connectionId);
 }
 
-function summarize(result: MetaSyncResult): ProductionMetaReadSyncResult {
+function summarize(result: MetaSyncResult, affectedGeoMaterialization: "completed" | "deferred"): ProductionMetaReadSyncResult {
   return Object.freeze({
     status: result.parentRun.status,
     streamCounts: Object.freeze({
@@ -94,6 +96,7 @@ function summarize(result: MetaSyncResult): ProductionMetaReadSyncResult {
     updated: result.updated,
     unchanged: result.unchanged,
     writeNetworkCalls: 0,
+    affectedGeoMaterialization,
   });
 }
 
@@ -167,7 +170,7 @@ export class ProductionMetaReadSyncService {
           ...(input.initialPageSize === undefined ? {} : { initialPageSize: input.initialPageSize }),
         }),
       });
-      return summarize(result as MetaSyncResult);
+      return summarize(result as MetaSyncResult, this.dependencies.affectedGeoMaterialization ?? "completed");
     } catch (error) {
       if (error instanceof ProductionMetaReadSyncError) throw error;
       if (error instanceof ConnectorError && error.code === "authentication") {
@@ -206,6 +209,7 @@ export function createDrizzleProductionMetaReadSyncService(input: Readonly<{
   scopeResolver: ServerDerivedMetaSyncScopeResolver;
   environment?: Record<string, string | undefined>;
   fetchImpl?: MetaFetch;
+  deferAffectedGeoMaterialization?: boolean;
 }>): ProductionMetaReadSyncService {
   return new ProductionMetaReadSyncService({
     scopeResolver: input.scopeResolver,
@@ -215,7 +219,9 @@ export function createDrizzleProductionMetaReadSyncService(input: Readonly<{
     durablePersistence: new TransactionBackedMetaSyncPersistenceAdapter(
       new DrizzleMetaSyncTransactionManager(input.database),
     ),
-    inventoryPagePersistence: new DrizzleMetaInventoryPagePersistence(input.database),
+    affectedGeoMaterialization: input.deferAffectedGeoMaterialization ? "deferred" : "completed",
+    inventoryPagePersistence: new DrizzleMetaInventoryPagePersistence(input.database, undefined,
+      { materializeAffectedGeo: !input.deferAffectedGeoMaterialization }),
     insightPagePersistence: new DrizzleMetaInsightPagePersistence(input.database),
     fetchImpl: input.fetchImpl,
   });

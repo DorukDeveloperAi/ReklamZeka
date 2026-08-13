@@ -104,6 +104,7 @@ describe("production Meta read sync composition", () => {
       updated: 1,
       unchanged: 3,
       writeNetworkCalls: 0,
+      affectedGeoMaterialization: "completed",
     });
     expect(JSON.stringify(response)).not.toContain(token);
     expect(JSON.stringify(response)).not.toContain(workspaceId);
