@@ -25,7 +25,7 @@ describe("K4 Policy Bundle dashboard", () => {
     expect(html).toContain("Compatibility"); expect(html).toContain("Seçim anında");
     expect(html).toContain("Doruk Hospital"); expect(html).toContain("Saç ekimi");
     expect(html).toContain("Kampanya ref"); expect(html).toContain("readOnly");
-    expect(html).toContain("Henüz K4 politika taslağı yok");
+    expect(html).toContain("Henüz K2/K3/K4 politika taslağı yok");
     expect(html).not.toMatch(/<button[^>]*>\s*(Yayınla|Onayla|Execute|Meta)/i);
     expect(html).not.toMatch(/value="(24|1|900|86400)"/);
   });
@@ -44,6 +44,22 @@ describe("K4 Policy Bundle dashboard", () => {
     expect(() => createGuardrailPolicyDraftBody({ policyRef: "guardrail_k4", accountRef: "account_foreign",
       adSetRef: "adset_doruk", internalCategoryRefs: [], denyAction: false, denyClauseRef: "",
       effectiveFrom: "2026-08-08T12:00", expiresAt: "", sourceGuidanceRefs: "" }, result)).toThrow();
+  });
+
+  it("serializes the selected budget applicability explicitly and renders it in the public-safe feed", () => {
+    expect(createApprovalPolicyDraftBody({ policyRef: "approval_policy_k3", requesterRoles: ["owner"],
+      approverRoles: ["admin"], grantConsumerRoles: ["owner"], separationOfDuties: true,
+      applicability: { actionType: "budget_increase", risk: "K3" }, evidenceHours: "24", proposalHours: "12",
+      grantMinutes: "15", effectiveFrom: "2026-08-08T12:00", expiresAt: "" }))
+      .toMatchObject({ applicability: { actionType: "budget_increase", risk: "K3" } });
+    const html = renderToStaticMarkup(createElement(PolicyBundleStudioSurface, { result: { ...result,
+      approvalPolicies: [{ kind: "approval_policy", policyRef: "approval_policy_k2", revision: 1,
+        applicability: { actionType: "budget_decrease", risk: "K2" }, state: "draft", effectiveFrom: "2026-08-08T12:00:00.000Z",
+        expiresAt: null, requesterRoles: ["owner"], approverRoles: ["admin"], grantConsumerRoles: ["owner"],
+        separationOfDuties: true, maximumProtectionEvidenceAgeSeconds: 3600, maximumProposalLifetimeSeconds: 3600,
+        maximumGrantLifetimeSeconds: 600, normalizedByRole: "owner", publishedByRole: null }] }, onReload: vi.fn() }));
+    expect(html).toContain("K2 · bütçe azaltma");
+    expect(html).toContain("Onay kapsamı");
   });
 
   it("runs the human-presence challenge before publication and preserves closed action authority", async () => {
@@ -83,7 +99,7 @@ describe("K4 Policy Bundle dashboard", () => {
 
   it("shows the ceremony control only for an authorized human and a real draft", () => {
     const approvalDraft = { kind: "approval_policy" as const, policyRef: "approval_policy_k4", revision: 1,
-      state: "draft" as const, effectiveFrom: "2026-08-08T12:00:00.000Z", expiresAt: null,
+      applicability: { actionType: "existing_post_promotion" as const, risk: "K4" as const }, state: "draft" as const, effectiveFrom: "2026-08-08T12:00:00.000Z", expiresAt: null,
       requesterRoles: ["owner" as const], approverRoles: ["owner" as const], grantConsumerRoles: ["owner" as const],
       separationOfDuties: false, maximumProtectionEvidenceAgeSeconds: 3600,
       maximumProposalLifetimeSeconds: 3600, maximumGrantLifetimeSeconds: 600,

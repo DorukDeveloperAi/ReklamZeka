@@ -41,7 +41,7 @@ function harness(role: "owner" | "admin" | "analyst" | "viewer" = "owner") {
   return { service, approvals, guardrails, approvalRepo, guardrailRepo, source };
 }
 
-describe("K4 Policy Bundle Studio read + draft", () => {
+describe("Policy Bundle Studio read + draft", () => {
   it("shows an empty source-backed bundle without demo policies or false readiness", async () => {
     const result = await harness().service.list(principal);
     expect(result).toMatchObject({ approvalPolicies: [], guardrails: [], readiness: {
@@ -65,6 +65,39 @@ describe("K4 Policy Bundle Studio read + draft", () => {
       applicability: { actionType: "existing_post_promotion", risk: "K4" }, policy: { autonomyMode: "approval_only" },
       state: "draft", authority: { canApprove: false, canGrant: false, canExecute: false, canWriteMeta: false } });
     expect(JSON.stringify(result)).not.toMatch(/canonicalHash|policyHash|actor_local_owner/i);
+  });
+
+  it("creates exact K2 and K3 budget approval drafts without falling back to the K4 promotion policy", async () => {
+    const api = harness("analyst");
+    const decrease = await api.service.createDraft(principal, { ...approvalRequest,
+      policyRef: "approval_policy_budget_decrease", applicability: { actionType: "budget_decrease", risk: "K2" } });
+    const increase = await api.service.createDraft(principal, { ...approvalRequest,
+      policyRef: "approval_policy_budget_increase", applicability: { actionType: "budget_increase", risk: "K3" } });
+    expect(decrease.item).toMatchObject({ applicability: { actionType: "budget_decrease", risk: "K2" },
+      approverRoles: ["admin", "owner"], separationOfDuties: true });
+    expect(increase.item).toMatchObject({ applicability: { actionType: "budget_increase", risk: "K3" },
+      approverRoles: ["admin", "owner"], separationOfDuties: true });
+    expect(api.approvals).toEqual(expect.arrayContaining([
+      expect.objectContaining({ applicability: { actionType: "budget_decrease", risk: "K2" },
+        policy: expect.objectContaining({ approverRoles: [{ risk: "K2", roles: ["admin", "owner"] }],
+          separationOfDutiesRisks: ["K2"] }) }),
+      expect.objectContaining({ applicability: { actionType: "budget_increase", risk: "K3" },
+        policy: expect.objectContaining({ approverRoles: [{ risk: "K3", roles: ["admin", "owner"] }],
+          separationOfDutiesRisks: ["K3"] }) }),
+    ]));
+  });
+
+  it("rejects a malformed or applicability-changing revision instead of silently converting it to K4", async () => {
+    const api = harness();
+    await expect(api.service.createDraft(principal, { ...approvalRequest, policyRef: "approval_policy_bad",
+      applicability: { actionType: "budget_increase", risk: "K2" } as never })).rejects.toMatchObject({ code: "invalid_input" });
+    await api.service.createDraft(principal, { ...approvalRequest, policyRef: "approval_policy_budget",
+      applicability: { actionType: "budget_decrease", risk: "K2" } });
+    const draft = api.approvals[0] as ApprovalPolicyDefinitionRevision;
+    api.approvals.push(publishApprovalPolicy({ draft, actor: { actorRef: "actor_owner", role: "owner" },
+      decisionRef: "decision_policy_budget", reasonRef: "reason_policy_budget", publishedAt: "2026-08-08T12:01:00.000Z" }));
+    await expect(api.service.createDraft(principal, { ...approvalRequest, policyRef: "approval_policy_budget",
+      applicability: { actionType: "existing_post_promotion", risk: "K4" } })).rejects.toMatchObject({ code: "invalid_input" });
   });
 
   it("binds a guardrail to one server-catalog account/campaign/adset chain and rejects foreign refs", async () => {

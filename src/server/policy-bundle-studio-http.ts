@@ -27,12 +27,12 @@ function failure(reason: unknown) {
   if (reason instanceof SyntaxError || reason instanceof PolicyBundleStudioError && reason.code === "invalid_input"
     || reason instanceof ApprovalPolicyRegistryError && reason.code === "invalid_input"
     || reason instanceof ActionGuardrailPolicyError && reason.code === "invalid_input") {
-    return response("invalid_input", "K4 policy bundle isteği geçersiz.", 400);
+    return response("invalid_input", "Policy bundle isteği geçersiz.", 400);
   }
-  return response("unavailable", "K4 Policy Bundle Studio şu anda kullanılamıyor.", 503);
+  return response("unavailable", "Policy Bundle Studio şu anda kullanılamıyor.", 503);
 }
 export function policyBundleStudioNotConfiguredResponse() {
-  return response("source_not_configured", "K4 Policy Bundle Studio yerel çalışma alanına henüz bağlanmadı.", 503);
+  return response("source_not_configured", "Policy Bundle Studio yerel çalışma alanına henüz bağlanmadı.", 503);
 }
 function trusted(request: Request, method: "GET" | "POST", intent: string): boolean {
   const url = new URL(request.url);

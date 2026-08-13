@@ -6,7 +6,7 @@ import { createActionGuardrailPolicyDraft, reviseActionGuardrailPolicyDraft,
 import { ACTION_APPROVAL_POLICY_VERSION, type ApprovalPolicy, type ActionActorRole,
   type ActionApprovalRole } from "@/domain/actions/approval-lifecycle";
 import { createApprovalPolicyDraft, reviseApprovalPolicyDraft,
-  type ApprovalPolicyDefinitionRevision } from "@/domain/actions/approval-policy-registry";
+  type ApprovalPolicyApplicability, type ApprovalPolicyDefinitionRevision } from "@/domain/actions/approval-policy-registry";
 import type { AutonomyRule } from "@/domain/actions/autonomy-valve";
 import { authorizeWorkspace, type WorkspaceMembership } from "@/security/authorization";
 
@@ -15,6 +15,8 @@ export const POLICY_BUNDLE_STUDIO_VERSION = "policy-bundle-studio/1.1.0" as cons
 export type ApprovalPolicyDraftRequest = Readonly<{
   kind: "approval_policy";
   policyRef: string;
+  /** Omitted only for the legacy K4 studio flow. Budget policies must declare their exact pair. */
+  applicability?: ApprovalPolicyApplicability;
   requesterRoles: readonly Extract<ActionActorRole, "owner" | "admin" | "analyst">[];
   approverRoles: readonly Extract<ActionApprovalRole, "owner" | "admin">[];
   grantConsumerRoles: readonly Extract<ActionApprovalRole, "owner" | "admin">[];
@@ -44,6 +46,7 @@ export type PublicApprovalPolicyRevision = Readonly<{
   kind: "approval_policy";
   policyRef: string;
   revision: number;
+  applicability: ApprovalPolicyApplicability;
   state: ApprovalPolicyDefinitionRevision["state"];
   effectiveFrom: string;
   expiresAt: string | null;
@@ -114,7 +117,7 @@ type AutonomyPort = Readonly<{ resolve(): Promise<readonly AutonomyRule[]> }>;
 
 export class PolicyBundleStudioError extends Error {
   constructor(readonly code: "invalid_input" | "source_unavailable" | "draft_exists" | "scope_unavailable") {
-    super("K4 policy bundle güvenli biçimde işlenemedi");
+    super("Policy bundle güvenli biçimde işlenemedi");
     this.name = "PolicyBundleStudioError";
   }
 }
@@ -154,13 +157,29 @@ function authorRole(value: WorkspaceMembership["role"]): "owner" | "admin" | "an
   if (value === "owner" || value === "admin" || value === "analyst") return value;
   throw new PolicyBundleStudioError("invalid_input");
 }
+const K4_APPLICABILITY = Object.freeze({ actionType: "existing_post_promotion" as const, risk: "K4" as const });
+function applicability(value: unknown): ApprovalPolicyApplicability {
+  if (value === undefined) return K4_APPLICABILITY;
+  exact(value, ["actionType", "risk"]);
+  if (value.actionType === "existing_post_promotion" && value.risk === "K4") return K4_APPLICABILITY;
+  if (value.actionType === "budget_decrease" && value.risk === "K2") {
+    return Object.freeze({ actionType: "budget_decrease", risk: "K2" });
+  }
+  if (value.actionType === "budget_increase" && value.risk === "K3") {
+    return Object.freeze({ actionType: "budget_increase", risk: "K3" });
+  }
+  throw new PolicyBundleStudioError("invalid_input");
+}
+function sameApplicability(left: ApprovalPolicyApplicability, right: ApprovalPolicyApplicability): boolean {
+  return left.actionType === right.actionType && left.risk === right.risk;
+}
 function approvalProjection(value: ApprovalPolicyDefinitionRevision): PublicApprovalPolicyRevision {
-  const approvers = value.policy.approverRoles.find((item) => item.risk === "K4")?.roles ?? [];
+  const approvers = value.policy.approverRoles.find((item) => item.risk === value.applicability.risk)?.roles ?? [];
   return Object.freeze({ kind: "approval_policy", policyRef: value.policyRef, revision: value.revision, state: value.state,
-    effectiveFrom: value.effectiveFrom, expiresAt: value.expiresAt,
+    applicability: value.applicability, effectiveFrom: value.effectiveFrom, expiresAt: value.expiresAt,
     requesterRoles: Object.freeze([...value.policy.requesterRoles]), approverRoles: Object.freeze([...approvers]),
     grantConsumerRoles: Object.freeze([...value.policy.grantConsumerRoles]),
-    separationOfDuties: value.policy.separationOfDutiesRisks.includes("K4"),
+    separationOfDuties: value.policy.separationOfDutiesRisks.includes(value.applicability.risk),
     maximumProtectionEvidenceAgeSeconds: value.policy.maximumProtectionEvidenceAgeSeconds,
     maximumProposalLifetimeSeconds: value.policy.maximumProposalLifetimeSeconds,
     maximumGrantLifetimeSeconds: value.policy.maximumGrantLifetimeSeconds,
@@ -221,7 +240,8 @@ export class PolicyBundleStudioService {
     const membership = authorizeWorkspace(principal.actor, principal.workspaceId, "policy_bundle:read", this.memberships);
     const source = await this.sources(principal);
     const evaluatedAt = this.clock();
-    const approvalPolicy = latestState(source.approvalPolicies, evaluatedAt);
+    // The existing K4 gate must remain an exact K4 gate: a budget policy is never a fallback for it.
+    const approvalPolicy = latestState(source.approvalPolicies.filter((item) => sameApplicability(item.applicability, K4_APPLICABILITY)), evaluatedAt);
     const guardrail = latestState(source.guardrails, evaluatedAt);
     const workspaceAutonomy = source.autonomyRules.some((rule) => rule.state === "published"
       && rule.scope.level === "workspace" && rule.scope.ref === principal.workspaceRef
@@ -252,9 +272,14 @@ export class PolicyBundleStudioService {
     request: ApprovalPolicyDraftRequest) {
     exact(request, ["kind", "policyRef", "requesterRoles", "approverRoles", "grantConsumerRoles",
       "separationOfDuties", "maximumProtectionEvidenceAgeSeconds", "maximumProposalLifetimeSeconds",
-      "maximumGrantLifetimeSeconds", "effectiveFrom", "expiresAt"]);
+      "maximumGrantLifetimeSeconds", "effectiveFrom", "expiresAt",
+      ...(Object.hasOwn(request, "applicability") ? ["applicability"] : [])]);
     const policyRef = ref(request.policyRef); const latest = await this.approvals.latestArtifact(policyRef);
     if (latest?.state === "draft") throw new PolicyBundleStudioError("draft_exists");
+    const selectedApplicability = applicability(request.applicability);
+    if (latest && !sameApplicability(latest.applicability, selectedApplicability)) {
+      throw new PolicyBundleStudioError("invalid_input");
+    }
     const requesterRoles = enumValues(request.requesterRoles, new Set(["owner", "admin", "analyst"] as const)) as ApprovalPolicy["requesterRoles"];
     const approverRoles = enumValues(request.approverRoles, new Set(["owner", "admin"] as const)) as readonly ActionApprovalRole[];
     const grantConsumerRoles = enumValues(request.grantConsumerRoles, new Set(["owner", "admin"] as const)) as readonly ActionApprovalRole[];
@@ -264,15 +289,15 @@ export class PolicyBundleStudioService {
     const revision = latest ? latest.revision + 1 : 1;
     const policy: ApprovalPolicy = Object.freeze({ version: ACTION_APPROVAL_POLICY_VERSION, policyRef, revision,
       autonomyMode: "approval_only", requesterRoles,
-      approverRoles: Object.freeze([{ risk: "K4" as const, roles: approverRoles }]), grantConsumerRoles,
-      separationOfDutiesRisks: Object.freeze(request.separationOfDuties ? ["K4" as const] : []),
+      approverRoles: Object.freeze([{ risk: selectedApplicability.risk, roles: approverRoles }]), grantConsumerRoles,
+      separationOfDutiesRisks: Object.freeze(request.separationOfDuties ? [selectedApplicability.risk] : []),
       maximumProtectionEvidenceAgeSeconds: request.maximumProtectionEvidenceAgeSeconds,
       maximumProposalLifetimeSeconds: request.maximumProposalLifetimeSeconds,
       maximumGrantLifetimeSeconds: request.maximumGrantLifetimeSeconds });
     const normalizedBy = { actorRef: principal.readerRef, role: authorRole(membership.role) } as const;
     const artifact = latest ? reviseApprovalPolicyDraft({ current: latest, policy,
       effectiveFrom: instant(request.effectiveFrom), expiresAt: request.expiresAt === null ? null : instant(request.expiresAt),
-      normalizedBy }) : createApprovalPolicyDraft({ workspaceRef: principal.workspaceRef, policy,
+      normalizedBy }) : createApprovalPolicyDraft({ workspaceRef: principal.workspaceRef, policy, applicability: selectedApplicability,
       effectiveFrom: instant(request.effectiveFrom), expiresAt: request.expiresAt === null ? null : instant(request.expiresAt),
       normalizedBy });
     await this.approvals.append(artifact);
