@@ -28,6 +28,25 @@ import * as schema from "@/db/schema";
 type Database = NodePgDatabase<typeof schema>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const WORKSPACE_REF = /^workspace_[a-z0-9][a-z0-9_.:-]{0,126}$/;
+const SOURCE_FAILURE_CODES = new Set([
+  "scope_not_found", "category_scope_unavailable", "category_hierarchy_unavailable",
+  "guidance_pack_unavailable", "policy_authority_unavailable", "current_source_bundle_unavailable",
+  "cadence_unavailable", "corrupt_store", "invalid_input",
+]);
+
+/** A finite diagnostic for server-side acceptance, never a database/driver message. */
+export class CurrentEffectiveAnalysisContextSourceReaderError extends Error {
+  constructor(readonly code: string) {
+    super(`Current effective analysis source unavailable: ${code}`);
+    this.name = "CurrentEffectiveAnalysisContextSourceReaderError";
+  }
+}
+
+function sourceFailureCode(error: unknown): string {
+  if (error instanceof CurrentEffectiveAnalysisContextSourceReaderError) return error.code;
+  if (error instanceof Error && SOURCE_FAILURE_CODES.has(error.message)) return error.message;
+  return "source_reader_unavailable";
+}
 
 function rows(value: unknown): readonly Readonly<Record<string, unknown>>[] {
   if (!value || typeof value !== "object" || !("rows" in value) || !Array.isArray(value.rows)) {
@@ -282,7 +301,7 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
   async loadCurrent(input: EffectiveAnalysisContextRequest): Promise<EffectiveAnalysisContextSource> {
     if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).length !== 4
       || !inputIsValid(input)) throw new Error("invalid_input");
-    return this.database.transaction(async (transaction) => {
+    try { return await this.database.transaction(async (transaction) => {
       const tx = transaction as unknown as Database;
       await tx.execute(sql`set transaction isolation level repeatable read, read only`);
       const scope = rows(await tx.execute(sql`
@@ -363,6 +382,8 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
       const promotion = await this.promotionReader.inspectInTransaction(tx, input.workspaceId);
       return buildReadyEffectiveAnalysisContextSourceInSnapshot({ request: input, capturedAt, hierarchy, categoryTarget: resolvedTarget, categories,
         guidance: pack, cadence, lifecycle, authority, promotion });
-    });
+    }); } catch (error) {
+      throw new CurrentEffectiveAnalysisContextSourceReaderError(sourceFailureCode(error));
+    }
   }
 }

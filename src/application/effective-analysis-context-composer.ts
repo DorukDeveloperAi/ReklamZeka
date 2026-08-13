@@ -173,7 +173,7 @@ export class EffectiveAnalysisContextComposer {
     const input = request(candidate);
     let source: EffectiveAnalysisContextSource;
     try { source = await this.sourceReader.loadCurrent(input); }
-    catch { throw new EffectiveAnalysisContextComposerError("source_rejected"); }
+    catch (error) { throw new EffectiveAnalysisContextComposerError("source_rejected", diagnosticCodeOf(error)); }
     if (source.status !== "ready" || !Number.isFinite(Date.parse(source.capturedAt))
       || new Date(source.capturedAt).toISOString() !== source.capturedAt) {
       throw new EffectiveAnalysisContextComposerError("source_rejected");
