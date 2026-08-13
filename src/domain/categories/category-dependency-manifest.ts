@@ -125,6 +125,16 @@ const columns = [
   "authority_topic_revisions.payload",
   "policy_semantic_binding_revisions.payload",
   "normalization_workbench_revisions.revision_payload",
+  // Conversation page guides are UI navigation snapshots only; they do not
+  // carry a mutable category edge.
+  "orchestrator_conversation_turns.page_guide",
+  // Slice-rule drafts retain their own immutable scope vocabulary. Category
+  // archive must not infer an internal category link from opaque refs here.
+  "slice_rule_workspace_drafts.draft_payload",
+  // Delivery/payment alert records are historical evidence and checklist
+  // state, never category or policy selection inputs.
+  "delivery_health_alert_ledger_records.checklist_payload",
+  "delivery_health_alert_ledger_records.record_payload",
   // Candidate-preview authority evidence pins a policy/guidance/snapshot basis;
   // it carries no category reference, so archive impact has no category edge.
   "candidate_preview_binding_revisions.decision",

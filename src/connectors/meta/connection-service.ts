@@ -16,6 +16,7 @@ import {
 import { MetaConnectionNotFoundError, type MetaConnectionRepository } from "./connection-repository";
 import { inspectMetaConnection } from "./doctor";
 import type { MetaSecretRepository } from "./secret-repository";
+import { metaTokenSecurityBlocksDoctor } from "./bootstrap-preflight";
 
 export class MetaConnectionLifecycleError extends Error {
   readonly publicMessage: string;
@@ -34,6 +35,7 @@ export type MetaConnectionServiceOptions = Readonly<{
   audit: AppendOnlyAuditLog;
   fetchImpl?: MetaFetch;
   now?: () => Date;
+  tokenSecurityStatus?: () => string | undefined;
 }>;
 
 export class MetaConnectionService {
@@ -95,6 +97,13 @@ export class MetaConnectionService {
     const membership = authorizeWorkspace(actor, workspaceId, "connection:manage", this.options.memberships);
     const connection = await this.options.connections.find(workspaceId, connectionId);
     this.assertConnected(connection);
+    const tokenSecurityStatus = this.options.tokenSecurityStatus?.() ?? process.env.META_TOKEN_SECURITY_STATUS;
+    if (metaTokenSecurityBlocksDoctor(tokenSecurityStatus)) {
+      throw new MetaConnectionLifecycleError(
+        "Meta doctor rejected before secret resolution: token security status is temporary_exposed",
+        "Meta bağlantısı güvenlik nedeniyle kapalı; token rotasyonu ve güvenli binding doğrulaması gerekiyor",
+      );
+    }
     const token = await this.options.secrets.resolve(connection.secretReference, { workspaceId, connectionId });
     let snapshot: MetaCapabilitySnapshot;
     try {
