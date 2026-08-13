@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./instruction-policy-studio.module.css";
-import { NormalizationWorkbenchPanel, type CampaignIntentTemplateRef } from "./normalization-workbench-panel";
 import { ProgressiveFormalizationPanel } from "./progressive-formalization-panel";
 
 type PolicyStatus = "draft" | "published" | "paused" | "archived";
@@ -458,9 +457,7 @@ export function InstructionPolicyStudioView(props: Readonly<{ snapshot: Instruct
   </div>;
 }
 
-export function InstructionPolicyStudioPanel({ initialCampaignIntentTemplate }: Readonly<{
-  initialCampaignIntentTemplate?: CampaignIntentTemplateRef;
-}>) {
+export function InstructionPolicyStudioPanel() {
   const [snapshot, setSnapshot] = useState<InstructionPolicyStudioSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -471,12 +468,12 @@ export function InstructionPolicyStudioPanel({ initialCampaignIntentTemplate }: 
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void reload(); }, [reload]);
-  if (loading) return <><NormalizationWorkbenchPanel initialCampaignIntentTemplate={initialCampaignIntentTemplate} /><section className={styles.empty} aria-live="polite">Strict policy registry yükleniyor…</section>
+  if (loading) return <><section className={styles.empty} aria-live="polite">Strict policy registry yükleniyor…</section>
     <ProgressiveFormalizationPanel /></>;
-  if (error || !snapshot) return <><NormalizationWorkbenchPanel initialCampaignIntentTemplate={initialCampaignIntentTemplate} /><section className={styles.error} role="alert"><strong>Strict policy Studio kullanılamıyor.</strong>
+  if (error || !snapshot) return <><section className={styles.error} role="alert"><strong>Strict policy Studio kullanılamıyor.</strong>
     <p>{error ?? "Talimat politikası kaynağı güvenli biçimde bağlanamadı."}</p><p>Dependency impact: henüz hesaplanmadı.</p>
     <button className={styles.retry} type="button" onClick={() => void reload()}>Tekrar dene</button></section>
     <ProgressiveFormalizationPanel /></>;
-  return <><NormalizationWorkbenchPanel initialCampaignIntentTemplate={initialCampaignIntentTemplate} /><InstructionPolicyStudioView snapshot={snapshot} onReload={reload} />
+  return <><InstructionPolicyStudioView snapshot={snapshot} onReload={reload} />
     <ProgressiveFormalizationPanel /></>;
 }
