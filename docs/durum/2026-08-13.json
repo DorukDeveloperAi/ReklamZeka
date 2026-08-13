@@ -4,6 +4,24 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "b4fc3de71",
+      "tarih": "2026-08-13",
+      "konu": "feat(dashboard): guide manual Codex tasks by page",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "5c2cc2e75",
+      "tarih": "2026-08-13",
+      "konu": "feat(dashboard): add manual Codex task handoff",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "bb9848dfd",
       "tarih": "2026-08-13",
       "konu": "feat(operations): add delivery health alert contract",
@@ -119,24 +137,6 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "cdb1c2465",
-      "tarih": "2026-08-12",
-      "konu": "feat(rules): add temporal review semantics",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "60e04fb25",
-      "tarih": "2026-08-12",
-      "konu": "fix(meta): separate campaign identity from conversion route",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -157,7 +157,7 @@
       "adet": 2
     }
   ],
-  "isSayisi": 311,
+  "isSayisi": 313,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-13",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "19e39414ba98"
+  "damga": "d374dfbddc4b"
 }

@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 19e39414ba98 -->
+<!-- durum-damga: d374dfbddc4b -->
 
 ## Künye
 
@@ -14,13 +14,15 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 311 |
+| iş commit'i (tüm geçmiş) | 313 |
 | ilk / son iş | 2026-08-06 / 2026-08-13 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-13 | `feat` | guide manual Codex tasks by page | `b4fc3de71` |
+| 2026-08-13 | `feat` | add manual Codex task handoff | `5c2cc2e75` |
 | 2026-08-13 | `feat` | add delivery health alert contract | `bb9848dfd` |
 | 2026-08-13 | `feat` | require separate publisher | `2809577a9` |
 | 2026-08-12 | `fix` | exclude inactive group scopes on resolve | `fc382f8f2` |
@@ -34,8 +36,6 @@
 | 2026-08-12 | `feat` | scope comparisons by campaign family | `728f53432` |
 | 2026-08-12 | `feat` | recognize route naming variants safely | `4538eba61` |
 | 2026-08-12 | `feat` | scope rules to campaign families | `930eb9e7c` |
-| 2026-08-12 | `feat` | add temporal review semantics | `cdb1c2465` |
-| 2026-08-12 | `fix` | separate campaign identity from conversion route | `60e04fb25` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
