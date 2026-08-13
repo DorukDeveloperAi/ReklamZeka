@@ -8,7 +8,10 @@ describe("local Meta read-sync recovery command", () => {
     expect(source).toContain('inventoryTransactionMode:"idempotent_page"');
     expect(source).toContain('durableTransactionMode:"idempotent_checkpoint"');
     expect(source).toContain("deferAffectedGeoMaterialization:true");
-    expect(source).toContain("requestTimeoutMs:5_000");
+    // Large GET-only Meta pages are allowed a bounded retry window; this is
+    // recovery reliability, not a write-capability change.
+    expect(source).toContain("requestTimeoutMs:20_000");
+    expect(source).toContain("maxAttempts:3");
     expect(source).not.toContain("accessToken");
   });
 });
