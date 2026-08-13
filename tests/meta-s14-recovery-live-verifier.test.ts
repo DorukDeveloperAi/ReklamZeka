@@ -13,4 +13,15 @@ describe("Meta S1.4 recovery live verifier boundary", () => {
     expect(source).toContain("graphVerifiedOnly: true");
     expect(source).not.toMatch(/drizzle|new Pool|database\.insert|database\.update|database\.delete/i);
   });
+
+  it("keeps materialization server-scoped, repository-backed and GET-only", () => {
+    const source = readFileSync(resolve(process.cwd(), "scripts/materialize-meta-s14-recovery-live.ts"), "utf8");
+
+    expect(source).toContain("DrizzleMetaAssetContentRepository");
+    expect(source).toContain("repositoryBackedMetaAssetContentRun");
+    expect(source).toContain('eq(schema.metaConnections.status, "active")');
+    expect(source).toContain('eq(schema.metaConnections.accessMode, "read_only")');
+    expect(source).toContain('method !== "GET"');
+    expect(source).toContain("recoveredItems: result.postInventoryEvidence.recoveredItems");
+  });
 });
