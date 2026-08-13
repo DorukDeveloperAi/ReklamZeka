@@ -4,135 +4,135 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "ea697f1ef",
+      "hash": "780e52f7e",
       "tarih": "2026-08-13",
-      "konu": "test(rules): cover budget pool binding contract",
+      "konu": "docs(state): record Meta mirror recovery progress",
       "tur": "is",
       "kapsam": [
-        "test"
+        "docs"
       ]
     },
     {
-      "hash": "994086ed8",
+      "hash": "7be94eb7d",
       "tarih": "2026-08-13",
-      "konu": "feat(rules): bind drafts to budget pool revisions",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "289bf8483",
-      "tarih": "2026-08-13",
-      "konu": "feat(rules): add budget pool hierarchy workspace",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "1b0dedba6",
-      "tarih": "2026-08-13",
-      "konu": "feat(budget): expose recommendation-only pool workspace",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "dcb13c5bd",
-      "tarih": "2026-08-13",
-      "konu": "feat(budget): persist recommendation-only pool hierarchies",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "ef8b5e2f0",
-      "tarih": "2026-08-13",
-      "konu": "feat(budget): define market-bound pool hierarchy",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "4bbc765ce",
-      "tarih": "2026-08-13",
-      "konu": "fix(timeline): accept standard same-origin reads",
+      "konu": "fix(meta): checkpoint bounded read sync runs",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "d860e95a8",
+      "hash": "5f4d941fa",
       "tarih": "2026-08-13",
-      "konu": "feat(timeline): show persisted operational trace",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "841a5c863",
-      "tarih": "2026-08-13",
-      "konu": "fix(rules): require exact optional slice evidence",
+      "konu": "fix(meta): allow bounded retries for read sync recovery",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "aa74c011b",
+      "hash": "73f85b51e",
       "tarih": "2026-08-13",
-      "konu": "fix(rules): require frozen proof for scoped impact",
+      "konu": "feat(rules): bind saved budget drafts to exact slice rules",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "04b1924a1",
+      "tarih": "2026-08-13",
+      "konu": "docs(state): include budget proposal operational trace",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "a11c0dbbb",
+      "tarih": "2026-08-13",
+      "konu": "feat(timeline): include verified budget proposal traces",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ac3db6610",
+      "tarih": "2026-08-13",
+      "konu": "docs(state): record Meta sync checkpoint coverage",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "3724584f2",
+      "tarih": "2026-08-13",
+      "konu": "fix(meta): recover durable sync checkpoints without callback transactions",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "f3de526e2",
+      "hash": "5f282256b",
       "tarih": "2026-08-13",
-      "konu": "feat(rules): add explicit budget distribution drafts",
+      "konu": "docs(state): reconcile delivered operation surfaces",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "f9cde2fc1",
+      "tarih": "2026-08-13",
+      "konu": "chore(meta): serialize local read sync channel",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
+      "hash": "7e29715fc",
+      "tarih": "2026-08-13",
+      "konu": "feat(meta): add idempotent inventory bootstrap fallback",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "a625403c0",
+      "hash": "0164bc3de",
       "tarih": "2026-08-13",
-      "konu": "test(meta): isolate connection verifier security state",
+      "konu": "docs(state): record partial live Meta mirror",
       "tur": "is",
       "kapsam": [
-        "test"
+        "docs"
       ]
     },
     {
-      "hash": "6a8ad4b99",
+      "hash": "b69b83747",
       "tarih": "2026-08-13",
-      "konu": "feat(dashboard): show Meta bootstrap safety state",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "e9ddee919",
-      "tarih": "2026-08-13",
-      "konu": "feat(orchestrator): guide alert conversations",
+      "konu": "feat(meta): support deferred affected geo backfill",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "04d2bebbe",
+      "hash": "82dc46ace",
       "tarih": "2026-08-13",
-      "konu": "fix(meta): gate bootstrap on token security",
+      "konu": "fix(meta): bound initial targeting sync pages",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "b63075483",
+      "tarih": "2026-08-13",
+      "konu": "fix(manifest): classify budget pool JSONB surfaces",
       "tur": "is",
       "kapsam": [
         "fix"
@@ -142,7 +142,7 @@
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 41
+      "adet": 34
     },
     {
       "kapsam": "fix",
@@ -150,14 +150,22 @@
     },
     {
       "kapsam": "docs",
-      "adet": 4
+      "adet": 9
     },
     {
       "kapsam": "test",
       "adet": 2
+    },
+    {
+      "kapsam": "chore",
+      "adet": 1
+    },
+    {
+      "kapsam": "perf",
+      "adet": 1
     }
   ],
-  "isSayisi": 337,
+  "isSayisi": 354,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-13",
   "planlar": [
@@ -178,5 +186,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "6d320d366795"
+  "damga": "bdc59adcf991"
 }
