@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=motor
 // agac.mjs — plan ağacı türetici + tazelik kapısı (plan-organizatoru'nun makine katmanı)
 //
 // INDEX.md ve INDEX.json ELLE YAZILMAZ — tek yazar bu script'tir (Ders 15/17:

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=motor
 // oturum.mjs — OTURUM (session) katmanı: "bu oturumda koyduğum hedefleri ve planları bitirdim mi?"
 //
 // SINIF: motor · deterministik · 0 token. LLM DOĞURMAZ · tmux GEREKTİRMEZ · **aide GEREKTİRMEZ**.

@@ -76,7 +76,7 @@
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/plan-organizatoru/scripts/agac.mjs": {
-      "hash": "3c038ad19a458b9f",
+      "hash": "d913fc9bf562fcf9",
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/plan-organizatoru/scripts/harita.mjs": {
@@ -84,7 +84,7 @@
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/plan-organizatoru/scripts/oturum.mjs": {
-      "hash": "3df328696b89f9f4",
+      "hash": "b00583d5b7bdd734",
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/plan-organizatoru/scripts/oturum-lib.mjs": {
@@ -144,7 +144,7 @@
       "pkg": "skill:kaptan"
     },
     ".claude/skills/kaptan/scripts/model.mjs": {
-      "hash": "0add36cab3a3b4d5",
+      "hash": "1382df71200974bf",
       "pkg": "skill:kaptan"
     },
     ".claude/skills/kaptan/scripts/durum.mjs": {
@@ -184,15 +184,15 @@
       "pkg": "skill:pm"
     },
     ".claude/skills/pm/scripts/ayar.mjs": {
-      "hash": "cf30008b1673a741",
+      "hash": "16a112d3458af1d5",
       "pkg": "skill:pm"
     },
     ".claude/skills/pm/scripts/dispatch.mjs": {
-      "hash": "96b0477055817549",
+      "hash": "62463e3e0164cbb5",
       "pkg": "skill:pm"
     },
     ".claude/skills/pm/scripts/gelen.mjs": {
-      "hash": "39abe6594f2de18f",
+      "hash": "6cf3f4c1bce1adfe",
       "pkg": "skill:pm"
     },
     ".claude/skills/pm/scripts/persona.mjs": {
@@ -200,11 +200,11 @@
       "pkg": "skill:pm"
     },
     ".claude/skills/pm/scripts/yaz.mjs": {
-      "hash": "617413e8607f715d",
+      "hash": "278a4f89a6ec351c",
       "pkg": "skill:pm"
     },
     ".claude/skills/pm/scripts/bildir.mjs": {
-      "hash": "abdecd7780fd5edf",
+      "hash": "967ff03205597864",
       "pkg": "skill:pm"
     },
     ".claude/skills/pm/scripts/kopru.mjs": {
@@ -228,11 +228,11 @@
       "pkg": "skill:pm"
     },
     ".claude/hooks/goal-tracker.mjs": {
-      "hash": "5273b32fa3bd873f",
+      "hash": "6d5873168243420a",
       "pkg": "hook:goal-tracker"
     },
     ".claude/hooks/oturum-kapanis.mjs": {
-      "hash": "f9bdf8ced5cd0080",
+      "hash": "1e38a5a9ea2e1566",
       "pkg": "hook:oturum-kapanis"
     },
     ".claude/docs/model-policy.md": {
@@ -252,7 +252,7 @@
       "pkg": "skill:eszamanli"
     },
     ".claude/skills/eszamanli/scripts/claim.mjs": {
-      "hash": "6b9bbe1230891316",
+      "hash": "65508766c0d3ea06",
       "pkg": "skill:eszamanli"
     },
     ".claude/skills/eszamanli/proof/proof.mjs": {
@@ -292,7 +292,7 @@
       "pkg": "skill:soft-resume"
     },
     ".claude/skills/soft-resume/scripts/kasa.mjs": {
-      "hash": "1055f4c2fb761573",
+      "hash": "7ad8a2b827069c6d",
       "pkg": "skill:soft-resume"
     },
     ".claude/skills/soft-resume/proof/proof.mjs": {
@@ -316,7 +316,7 @@
       "pkg": "hook:eszamanli-guard"
     },
     ".claude/hooks/claim-guard.mjs": {
-      "hash": "397ef09353a880c2",
+      "hash": "70c551aa54e4d07f",
       "pkg": "hook:eszamanli-guard"
     },
     ".claude/hooks/hook-nabiz.mjs": {
@@ -356,11 +356,11 @@
       "pkg": "doc:utopya-iskelet"
     },
     ".claude/hooks/model-policy-guard.mjs": {
-      "hash": "6347bfed0852c709",
+      "hash": "6ceaeaeea110d6eb",
       "pkg": "hook:model-policy-guard"
     },
     ".claude/hooks/session-status.mjs": {
-      "hash": "2deee8e2a8302a99",
+      "hash": "38723213afd60243",
       "pkg": "hook:session-status"
     },
     ".claude/aide/docs/terimler.md": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-13T01:19:05.331Z",
+  "updatedAt": "2026-08-13T12:20:30.693Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",

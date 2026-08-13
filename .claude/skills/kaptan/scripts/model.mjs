@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=motor
 /**
  * kaptan GÖREV VERİ MODELİ — tek kaynak türetme katmanı (schemaVersion 3).
  *

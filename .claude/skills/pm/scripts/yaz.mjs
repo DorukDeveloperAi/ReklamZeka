@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=motor
 /**
  * PM veri yüzeyi YAZICISI — otonom koşumun tek yazma yolu.
  *
