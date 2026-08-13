@@ -83,7 +83,7 @@ try {
   await database.execute(sql`update ad_campaigns set campaign_budget_optimization=true, daily_budget_minor=10000, raw_payload_hash=${"a".repeat(64)}, source_graph_version='v23.0', field_catalog_version='approval-chain-fixture', fetched_at=${now} where workspace_id=${source.workspaceId}::uuid and id=${source.campaignId}::uuid`);
   const adSetRef = `adset_${source.campaignRef}`;
   const adSetId = randomUUID();
-  await database.insert(schema.metaAdSets).values({ id: adSetId, workspaceId: source.workspaceId, adAccountId: source.adAccountId, campaignId: source.campaignId, externalAdSetId: adSetRef, name: "Approval chain fixture", rawPayloadHash: "c".repeat(64), sourceGraphVersion: "v23.0", fieldCatalogVersion: "approval-chain-fixture", provenance: { fixture: true }, fetchedAt: now, firstSeenAt: now, lastSeenAt: now });
+  await database.insert(schema.metaAdSets).values({ id: adSetId, workspaceId: source.workspaceId, adAccountId: source.adAccountId, campaignId: source.campaignId, externalAdSetId: adSetRef, name: "Approval chain fixture", configuredStatus: "ACTIVE", effectiveStatus: "ACTIVE", rawPayloadHash: "c".repeat(64), sourceGraphVersion: "v23.0", fieldCatalogVersion: "approval-chain-fixture", provenance: { fixture: true }, fetchedAt: now, firstSeenAt: now, lastSeenAt: now });
   await assignAdSetGuardrailCategory(source, adSetId);
   // A hierarchy change is accepted by the source reader only when its immutable
   // change snapshot carries the same complete campaign/ad-set shape.
