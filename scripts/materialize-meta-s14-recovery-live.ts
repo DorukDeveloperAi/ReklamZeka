@@ -151,6 +151,16 @@ try {
     metaNetwork: { writeCalls: writeNetworkCalls },
   }));
   if (writeNetworkCalls !== 0 || result.postInventoryEvidence.recoveredItems === 0) process.exitCode = 2;
+} catch {
+  // Driver/Graph failures can contain SQL, URL, IDs or headers. Keep the
+  // operational result honest without moving that material across the CLI boundary.
+  console.log(JSON.stringify({
+    schemaVersion: "meta-s14-recovery-materialization-v1",
+    status: "partial",
+    reason: "materialization_failed_before_completion",
+    metaNetwork: { writeCalls: writeNetworkCalls },
+  }));
+  process.exitCode = 2;
 } finally {
   await pool.end();
 }
