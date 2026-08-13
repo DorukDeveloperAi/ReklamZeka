@@ -102,6 +102,17 @@ function entityId(level: MetaInsightEntityLevel, record: Readonly<Record<string,
 }
 
 /**
+ * Insights may return `account_id` without the Graph path's `act_` prefix,
+ * whereas canonical account scopes retain the prefix. Compare the one exact
+ * numeric identity in either representation; never accept a different ID.
+ */
+function belongsToAccount(value: unknown, externalAccountId: string): boolean {
+  if (typeof value !== "string" || !/^act_\d{1,32}$/.test(externalAccountId)) return false;
+  const canonicalNumber = externalAccountId.slice(4);
+  return value === externalAccountId || value === canonicalNumber;
+}
+
+/**
  * Canonicalizes the narrow Graph insight field set requested by the v23 capability catalog.
  * Any malformed identity, date, money value, or duplicate entity/day is rejected before persistence.
  */
@@ -129,7 +140,7 @@ export function parseMetaInsightPage(input: Readonly<{
     throw new MetaInsightMaterializationError("invalid_scope");
   }
   const records = input.records.map((raw) => {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw) || required(raw.account_id) !== externalAccountId) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw) || !belongsToAccount(raw.account_id, externalAccountId)) {
       throw new MetaInsightMaterializationError("invalid_page");
     }
     const provenance = Object.freeze({ materializationVersion: META_INSIGHT_MATERIALIZATION_VERSION,

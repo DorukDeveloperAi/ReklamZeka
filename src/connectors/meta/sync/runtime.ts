@@ -2,7 +2,7 @@ import { ConnectorError } from "@/connectors/contract";
 import { META_SYNC_STREAMS, stableHash, type MetaParentSyncRun, type MetaReadRequest, type MetaReadTransport, type MetaStreamRun, type MetaSyncError, type MetaSyncErrorReason, type MetaSyncRecord, type MetaSyncSlice } from "./types";
 import type { MetaSyncDurableKey, MetaSyncDurablePersistence } from "./persistence-adapter";
 import { MetaInventoryMaterializationError, parseMetaInventoryPage, type MetaInventoryPagePersistencePort } from "./inventory-materialization";
-import type { MetaInsightSourcePagePersistencePort } from "./insights-materialization";
+import { MetaInsightMaterializationError, type MetaInsightSourcePagePersistencePort } from "./insights-materialization";
 import type { MetaCreativeSourcePagePersistencePort } from "./creative-content-runtime-persistence";
 
 type MutableStreamRun = { -readonly [Key in keyof MetaStreamRun]: MetaStreamRun[Key] } & { completedSliceIds: string[]; cursorBySlice: Record<string, { cursor: string | null; cursorId: string; updatedAt: string }> };
@@ -222,9 +222,13 @@ export class MetaPartialReadSyncRuntime {
             records: page.records,
           });
         } catch (error) {
+          const reason = error instanceof MetaInsightMaterializationError ? error.code : "repository_write";
           return { completed: false, inserted, updated, unchanged, error: {
             reason: "malformed_response", retryable: false,
-            message: "Meta insight canonical materialization doğrulaması başarısız",
+            // The code is a closed parser/repository classification only. It
+            // deliberately excludes Graph payload, account IDs, SQL and error
+            // detail so an operator can repair a stalled GET-only hydration.
+            message: `Meta insight canonical materialization doğrulaması başarısız: ${reason}`,
           } };
         }
       }

@@ -31,4 +31,14 @@ describe("canonical Meta insight page", () => {
     expect(() => parseMetaInsightPage({ ...input(), records: [{ ...input().records[0], account_id: "act_other" }] })).toThrowError(MetaInsightMaterializationError);
     expect(() => parseMetaInsightPage({ ...input(), records: [{ ...input().records[0], spend: "not-a-number" }, input().records[0] as never] })).toThrowError(MetaInsightMaterializationError);
   });
+
+  it("accepts Meta's bare numeric insight account identity only for the exact scoped act_ account", () => {
+    const parsed = parseMetaInsightPage({ ...input(), records: [{
+      ...input().records[0], account_id: "123",
+    }] });
+    expect(parsed.records).toHaveLength(1);
+    expect(() => parseMetaInsightPage({ ...input(), records: [{
+      ...input().records[0], account_id: "124",
+    }] })).toThrowError(MetaInsightMaterializationError);
+  });
 });
