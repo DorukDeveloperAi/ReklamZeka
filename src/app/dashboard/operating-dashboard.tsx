@@ -22,6 +22,7 @@ import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel"
 import { NormalizationWorkbenchPanel } from "./normalization-workbench-panel";
 import { MetaTrustReadinessPanel } from "./meta-trust-readiness-panel";
 import { CanonicalPerformancePanel } from "./canonical-performance-panel";
+import { CanonicalCampaignPortfolioPanel } from "./canonical-campaign-portfolio-panel";
 import { CAMPAIGN_BRIEF_SCENARIOS, CampaignPlanningBriefPanel, type CampaignBriefScenarioRef, type CampaignPlanningBriefContext } from "./campaign-planning-brief-panel";
 import { offlineWorkbookPortfolioSnapshot, type OfflineWorkbookBriefScenarioRef } from "@/domain/campaigns/offline-workbook-portfolio-snapshot";
 import styles from "./operating-dashboard.module.css";
@@ -843,7 +844,9 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
           </article>)}</div>
         </section>
       </section>
-      <section className={styles.portfolioOverview} aria-labelledby="portfolio-overview-title">
+      {metaReadMirrorState === "ready" && metaReadMirror
+        ? <CanonicalCampaignPortfolioPanel projection={metaReadMirror} onOpenAgentContext={openAgentContext} />
+        : <><section className={styles.portfolioOverview} aria-labelledby="portfolio-overview-title">
         <header><div><span className={styles.kicker}>BUGÜN / PORTFÖY HİYERARŞİSİ</span><h2 id="portfolio-overview-title">Demo Marka <i>→</i> Meta portföyü <i>→</i> {filteredCampaigns.length} görünür kampanya</h2><p>Filtreler yalnız bu demo/read-only snapshot'ı daraltır; account, category veya Meta yetkisi değiştirmez.</p></div><StatusPill tone="neutral">unbound demo context</StatusPill></header>
         <div className={styles.portfolioFilters} aria-label="Portföy filtreleri">
           <label htmlFor="portfolio-meta-filter"><span>Meta objective</span><select id="portfolio-meta-filter" value={portfolioFilters.objective} onChange={(event) => changePortfolioFilter("objective", event.target.value)}><option value="all">Tümü</option>{[...new Set(campaigns.map((campaign) => campaign.objective))].map((objective) => <option key={objective} value={objective}>{objective}</option>)}</select></label>
@@ -890,7 +893,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
         initialScenarioRef={workbookBriefScenario}
         onApprovalQueueCampaignRef={setApprovalQueueCampaignRef}
         onOpenDraftOnlyPolicy={(template) => { setDraftPolicyTemplate(template); navigate("rules"); }}
-      />
+      /></>}
     </>;
   }
 
