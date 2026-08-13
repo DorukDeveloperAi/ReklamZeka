@@ -313,19 +313,38 @@ export function approvalQueueScopeAfterCampaignSelection(
  * protocol. It gives the operator a bounded, safe task to paste into Codex
  * while the actual conversation remains in their selected CLI session.
  */
-export function buildCodexManualTask(input: Readonly<{
+export type CodexPageGuide = Readonly<{
   pageLabel: string;
-  entityLabel: string;
-  handoffRef: string | null;
-}>): string {
-  const handoff = input.handoffRef
-    ? `Önce MCP üzerinden \`${input.handoffRef}\` handoff'unu tüket; yalnız onun izin verdiği bağlamı kullan.`
-    : "Bu aktarım için doğrulanmış aktif CLI handoff'u yok; eksik kanıtı açıkça belirt ve tahmin etme.";
+  purpose: string;
+  componentPath: string;
+  recordGuide: string;
+}>;
+
+export function codexPageGuide(view: DashboardViewId, pageLabel: string): CodexPageGuide {
+  const guides: Partial<Record<DashboardViewId, Omit<CodexPageGuide, "pageLabel">>> = {
+    budgets: { purpose: "Bütçe havuzları, limitler ve yalnız öneri niteliğindeki dağıtım kararları.", componentPath: "src/app/dashboard/budget-lab-panel.tsx", recordGuide: "Bütçe önerisi ve approval kayıtlarını, server-side repository sözleşmeleri üzerinden incele; doğrudan tablo veya Meta değişikliği yapma." },
+    rules: { purpose: "İnsan kaynaklı rehberlik, kural taslağı ve kapsam/slice tanımı.", componentPath: "src/app/dashboard/guidance-studio-panel.tsx", recordGuide: "Guidance/normalization taslaklarını ve bunların immutable kaynak bağlarını incele; taslak policy değildir." },
+    "strict-policies": { purpose: "Bağlayıcı policy taslağı, iki kişiyle yayın ve kapsam/limit doğrulaması.", componentPath: "src/app/dashboard/instruction-policy-studio-panel.tsx", recordGuide: "Strict policy lifecycle kayıtlarını ve approval gereğini incele; yayınlama veya onaylama yapma." },
+    "decision-room": { purpose: "Frozen kanıtla analiz ve karar taslağı üretimi.", componentPath: "src/app/dashboard/decision-room-panel.tsx", recordGuide: "Decision Room run/asset ve frozen-context sözleşmelerini yalnız oku; yeni action üretme." },
+    approvals: { purpose: "Onay bekleyen typed action önerilerinin salt-okunur incelemesi.", componentPath: "src/app/dashboard/approval-queue-panel.tsx", recordGuide: "Approval Queue kayıtlarını yalnız yorumla; approve/reject/execute yapma." },
+    autonomy: { purpose: "Otonomi sınırları, izin valfleri ve insan onayı kuralları.", componentPath: "src/app/dashboard/autonomy-studio-panel.tsx", recordGuide: "Autonomy policy/scope sözleşmesini incele; capability veya action yetkisi açma." },
+    categories: { purpose: "İç kampanya kategorileri ve slice/künye kapsamı.", componentPath: "src/app/dashboard/category-inventory-panel.tsx", recordGuide: "Kategori profile/assignment kanıtlarını incele; belirsiz künye için yalnız inceleme önerisi üret." },
+    promotions: { purpose: "Gönderi öne çıkarma için preflight ve insan onaylı hazırlık.", componentPath: "src/app/dashboard/promotion-preflight-panel.tsx", recordGuide: "Promotion preflight/binding kayıtlarını incele; yayın veya Meta write yapma." },
+    analysis: { purpose: "Zaman aralığına bağlı, kanıt tabanlı analiz taslağı.", componentPath: "src/app/dashboard/operating-dashboard.tsx#renderAnalysis", recordGuide: "Frozen context, analiz run ve outcome kanıtını incele; eksik veri varsa açıkça belirt." },
+  };
+  const guide = guides[view] ?? { purpose: "Bu görünümün operasyonel bağlamını ve açık karar sorusunu inceleme.", componentPath: "src/app/dashboard/operating-dashboard.tsx", recordGuide: "İlgili read-model ve server-side repository sözleşmesini önce bul; doğrudan kalıcı değişiklik yapma." };
+  return { pageLabel, ...guide };
+}
+
+export function buildCodexManualTask(guide: CodexPageGuide): string {
   return [
     "ReklamZeka Orchestrator görevi",
     "",
-    `Bağlam: ${input.pageLabel} · ${input.entityLabel}`,
-    handoff,
+    `Ekran: ${guide.pageLabel}`,
+    `Ekranın amacı: ${guide.purpose}`,
+    `Uygulama adresi: ${guide.componentPath}`,
+    `Kalıcı kayıt kılavuzu: ${guide.recordGuide}`,
+    "Genel kılavuz: plans/proje/v2/STATE.md ve plans/proje/v2/CHECKLIST.md dosyalarını önce oku.",
     "",
     "Önce mevcut kanıtı, belirsizlikleri ve gerekli soruları çıkar. Ardından yalnız taslak analiz, künye düzeltme önerisi veya kural önerisi sun.",
     "Kısıt: policy yayınlama/onaylama, action yürütme, bütçe veya durum değiştirme ve Meta write yapma. Her öneri insan onayı beklemeli.",
@@ -494,14 +513,11 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   }, [agentSessions, selectedAgentSessionRef]);
 
   const transferCurrentContextToCodex = useCallback(async () => {
-    const isCampaign = activeView === "campaigns";
-    const entityRef = isCampaign ? `campaign_${currentCampaign.id.replace("cmp-", "")}` : "portfolio_current";
-    const entityLabel = isCampaign ? currentCampaign.name : activeTitle === "Bugün" ? "Tüm Meta portföyü" : `${activeTitle} görünümü`;
-    setAgentEntityRef(entityRef);
-    setAgentEntityLabel(entityLabel);
+    const guide = codexPageGuide(activeView, activeTitle);
+    setAgentEntityRef("portfolio_current");
+    setAgentEntityLabel(`${guide.pageLabel} · çalışma kılavuzu`);
     setAgentHandoff(null);
-    const handoff = await createAgentHandoff(entityRef);
-    const task = buildCodexManualTask({ pageLabel: activeTitle, entityLabel, handoffRef: handoff?.handoffRef ?? null });
+    const task = buildCodexManualTask(guide);
     setCodexManualTask(task);
     try {
       await navigator.clipboard.writeText(task);
@@ -510,7 +526,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
       setToast("Görev Orchestrator alanında hazır; Codex Desktop'a geçip elle kopyalayın.");
     }
     setActiveView("agent");
-  }, [activeTitle, activeView, createAgentHandoff, currentCampaign]);
+  }, [activeTitle, activeView]);
 
   function navigate(view: ViewId) {
     setActiveView(view);

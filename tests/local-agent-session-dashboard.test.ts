@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   approvalQueueScopeAfterCampaignSelection,
   buildCodexManualTask,
+  codexPageGuide,
   OperatingDashboard,
   resolveAgentSessionSelection,
 } from "@/app/dashboard/operating-dashboard";
@@ -42,14 +43,11 @@ describe("local agent session dashboard", () => {
     expect(approvalQueueScopeAfterCampaignSelection("cmp-istanbul", "cmp-gcc", scope)).toBeNull();
   });
 
-  it("builds a bounded manual Codex task without granting policy or Meta authority", () => {
-    const task = buildCodexManualTask({
-      pageLabel: "Kampanyalar",
-      entityLabel: "Yurtdışı FTR",
-      handoffRef: "handoff_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    });
-    expect(task).toContain("Yurtdışı FTR");
-    expect(task).toContain("handoff_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  it("builds a page-guided manual Codex task without requiring campaign context or granting authority", () => {
+    const task = buildCodexManualTask(codexPageGuide("budgets", "Bütçeler"));
+    expect(task).toContain("Ekran: Bütçeler");
+    expect(task).toContain("budget-lab-panel.tsx");
+    expect(task).toContain("STATE.md");
     expect(task).toContain("Meta write yapma");
     expect(task).toContain("Operatör isteği");
   });
