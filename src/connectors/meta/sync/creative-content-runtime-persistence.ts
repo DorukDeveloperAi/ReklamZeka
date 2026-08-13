@@ -7,7 +7,12 @@ import {
   type MetaAssetContentScope,
 } from "./asset-content-persistence";
 
-export const META_CREATIVE_CONTENT_FIELD_CATALOG_VERSION = "meta-creative-post-v23" as const;
+// v24 adds creative.actor_id.  It is primary Graph evidence for a Page actor
+// when object_story_spec is absent or redacted in an ads edge response.  The
+// value is still never treated as a canonical link by this adapter: the
+// persistence repository must resolve it against the same connection's asset
+// mirror before a creative/post relationship can be written.
+export const META_CREATIVE_CONTENT_FIELD_CATALOG_VERSION = "meta-creative-post-v24" as const;
 
 export type MetaCreativeSourcePage = Readonly<{
   workspaceId: string;

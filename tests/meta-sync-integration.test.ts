@@ -109,7 +109,7 @@ describe("Meta S1.3 runtime persistence integration", () => {
     expect(graphLevel).toBe("adset");
   });
 
-  it("requests the live-verified v23 creative/post field catalog without rejected fields", async () => {
+  it("requests the actor-aware creative/post field catalog without rejected fields", async () => {
     let requestedFields = "";
     const fetchImpl = async (input: string | URL, init?: RequestInit) => {
       const url = new URL(input);
@@ -130,6 +130,7 @@ describe("Meta S1.3 runtime persistence integration", () => {
 
     expect(requestedFields).toContain("effective_instagram_story_id");
     expect(requestedFields).toContain("effective_instagram_media_id");
+    expect(requestedFields).toContain("actor_id");
     expect(requestedFields).toContain("call_to_action_type");
     expect(requestedFields).toContain("link_url");
     expect(requestedFields).not.toContain("link_description");
@@ -205,7 +206,7 @@ describe("Meta S1.3 runtime persistence integration", () => {
     };
     const transport = new Transport(async () => ({
       records: [{ id: "ad-a", creative: { id: "creative-a", body: "private copy" } }],
-      nextCursor: null, usageHeadroom: 1, sourceGraphVersion: "v23.0", fieldCatalogVersion: "meta-creative-post-v23",
+      nextCursor: null, usageHeadroom: 1, sourceGraphVersion: "v23.0", fieldCatalogVersion: "meta-creative-post-v24",
     }));
     const runtime = new MetaPartialReadSyncRuntime({ transport, creativePagePersistence: writer });
     const result = await runtime.run({ ...key, plan: [creativeSlice] });

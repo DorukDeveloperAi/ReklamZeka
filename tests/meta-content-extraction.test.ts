@@ -151,6 +151,23 @@ describe("Meta effective ad content extraction", () => {
     expect(first.issues).toContainEqual({ code: "dynamic_selection_unresolved" });
   });
 
+  it("uses Graph creative.actor_id only as explicit Page-actor evidence when the story spec is absent", () => {
+    const result = extractMetaAdContent({
+      id: "ad_actor_fallback",
+      creative: {
+        id: "creative_actor_fallback",
+        actor_id: "page_actor_fallback",
+        effective_object_story_id: "page_actor_fallback_post_fallback",
+      },
+    });
+
+    expect(result.post).toMatchObject({
+      externalPostId: "page_actor_fallback_post_fallback",
+      actorPageExternalId: "page_actor_fallback",
+      provenance: { actorPageExternalId: "creative.actor_id" },
+    });
+  });
+
   it("prefers explicit Instagram identity and preserves alternate object-story identity", () => {
     const result = extractMetaAdContent({
       creative: {

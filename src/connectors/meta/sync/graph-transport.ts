@@ -27,7 +27,7 @@ const CREATIVE_POST_FIELDS = [
   "effective_status",
   "campaign_id",
   "adset_id",
-  "creative{id,name,title,body,call_to_action_type,link_url,object_type,object_story_id,effective_object_story_id,effective_instagram_story_id,effective_instagram_media_id,instagram_permalink_url,object_story_spec,asset_feed_spec}",
+  "creative{id,name,actor_id,title,body,call_to_action_type,link_url,object_type,object_story_id,effective_object_story_id,effective_instagram_story_id,effective_instagram_media_id,instagram_permalink_url,object_story_spec,asset_feed_spec}",
 ].join(",");
 
 function inventoryPath(accountId: string, level: MetaReadRequest["entityLevel"]): string {

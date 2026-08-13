@@ -27,7 +27,7 @@ import { classifyMetaSyncError } from "./runtime";
 import { sliceId, stableHash, type MetaReadRequest, type MetaReadTransport, type MetaSyncErrorReason } from "./types";
 
 const SERVICE_SCHEMA_VERSION = "meta-s14-live-v1";
-const CONTENT_FIELD_CATALOG_VERSION = "meta-creative-post-v23";
+const CONTENT_FIELD_CATALOG_VERSION = "meta-creative-post-v24";
 
 export interface MetaSecretReferenceResolver {
   resolve(reference: string): Promise<string>;
