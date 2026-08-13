@@ -431,6 +431,138 @@ export const localAgentHandoffs = pgTable("local_agent_handoffs", {
   `),
 ]);
 
+/**
+ * One durable, vendor-neutral Orchestrator conversation per local operator.
+ * The header is immutable; page changes are captured on individual turns.
+ */
+export const orchestratorConversations = pgTable("orchestrator_conversations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull(),
+  conversationRef: text("conversation_ref").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  uniqueIndex("orchestrator_conversations_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("orchestrator_conversations_workspace_ref_unique").on(table.workspaceId, table.conversationRef),
+  index("orchestrator_conversations_operator_idx").on(table.workspaceId, table.userId, table.createdAt),
+  foreignKey({
+    columns: [table.workspaceId, table.userId],
+    foreignColumns: [memberships.workspaceId, memberships.userId],
+    name: "orchestrator_conversations_workspace_membership_fk",
+  }).onDelete("cascade"),
+  check("orchestrator_conversations_identity", sql`
+    ${table.conversationRef} ~ '^conversation_[a-f0-9]{32}$'
+  `),
+]);
+
+/** A completed or failed model invocation. Rows are append-only execution receipts. */
+export const orchestratorConversationTurns = pgTable("orchestrator_conversation_turns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull(),
+  conversationRef: text("conversation_ref").notNull(),
+  turnRef: text("turn_ref").notNull(),
+  turnNumber: integer("turn_number").notNull(),
+  provider: text("provider").notNull(),
+  providerThreadRef: text("provider_thread_ref"),
+  outcome: text("outcome").notNull(),
+  failureCode: text("failure_code"),
+  pageGuide: jsonb("page_guide").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  uniqueIndex("orchestrator_conversation_turns_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("orchestrator_conversation_turns_workspace_ref_unique").on(table.workspaceId, table.turnRef),
+  uniqueIndex("orchestrator_conversation_turns_workspace_conversation_ref_unique")
+    .on(table.workspaceId, table.conversationRef, table.turnRef),
+  uniqueIndex("orchestrator_conversation_turns_sequence_unique")
+    .on(table.workspaceId, table.conversationRef, table.turnNumber),
+  index("orchestrator_conversation_turns_timeline_idx")
+    .on(table.workspaceId, table.conversationRef, table.turnNumber),
+  foreignKey({
+    columns: [table.workspaceId, table.conversationRef],
+    foreignColumns: [orchestratorConversations.workspaceId, orchestratorConversations.conversationRef],
+    name: "orchestrator_conversation_turns_workspace_conversation_fk",
+  }).onDelete("cascade"),
+  check("orchestrator_conversation_turns_identity", sql`
+    ${table.turnRef} ~ '^turn_[a-f0-9]{32}$'
+    and ${table.turnNumber} between 1 and 1000000
+    and ${table.provider} = 'codex_cli'
+    and (${table.providerThreadRef} is null or ${table.providerThreadRef} ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
+  `),
+  check("orchestrator_conversation_turns_outcome", sql`
+    (${table.outcome} = 'completed' and ${table.providerThreadRef} is not null and ${table.failureCode} is null)
+    or (${table.outcome} = 'failed' and ${table.failureCode} in
+      ('adapter_unavailable', 'adapter_timeout', 'adapter_failed', 'invalid_provider_output') and ${table.providerThreadRef} is null)
+  `),
+  check("orchestrator_conversation_turns_page_guide", sql`
+    jsonb_typeof(${table.pageGuide}) = 'object'
+    and ${table.pageGuide} ?& array['version', 'pageId', 'pageLabel', 'purpose', 'codePath', 'recordPath']
+    and ${table.pageGuide} - array['version', 'pageId', 'pageLabel', 'purpose', 'codePath', 'recordPath'] = '{}'::jsonb
+    and ${table.pageGuide} #>> '{version}' = 'orchestrator-page-guide/1.0.0'
+  `),
+]);
+
+/** User/assistant transcript material. Only final assistant text is stored. */
+export const orchestratorConversationMessages = pgTable("orchestrator_conversation_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull(),
+  conversationRef: text("conversation_ref").notNull(),
+  turnRef: text("turn_ref").notNull(),
+  messageRef: text("message_ref").notNull(),
+  messageNumber: integer("message_number").notNull(),
+  role: text("role").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  uniqueIndex("orchestrator_conversation_messages_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("orchestrator_conversation_messages_workspace_ref_unique").on(table.workspaceId, table.messageRef),
+  uniqueIndex("orchestrator_conversation_messages_sequence_unique")
+    .on(table.workspaceId, table.conversationRef, table.messageNumber),
+  index("orchestrator_conversation_messages_turn_idx").on(table.workspaceId, table.turnRef, table.messageNumber),
+  foreignKey({
+    columns: [table.workspaceId, table.conversationRef, table.turnRef],
+    foreignColumns: [orchestratorConversationTurns.workspaceId,
+      orchestratorConversationTurns.conversationRef, orchestratorConversationTurns.turnRef],
+    name: "orchestrator_conversation_messages_workspace_turn_fk",
+  }).onDelete("cascade"),
+  check("orchestrator_conversation_messages_identity", sql`
+    ${table.messageRef} ~ '^message_[a-f0-9]{32}$'
+    and ${table.messageNumber} between 1 and 2000000
+    and ${table.role} in ('user', 'assistant')
+    and length(${table.content}) between 1 and 30000
+  `),
+]);
+
+/** Explicit erasure marker; the transcript remains immutable until workspace purge. */
+export const orchestratorConversationTombstones = pgTable("orchestrator_conversation_tombstones", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull(),
+  conversationRef: text("conversation_ref").notNull(),
+  tombstoneRef: text("tombstone_ref").notNull(),
+  userId: uuid("user_id").notNull(),
+  reason: text("reason").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  uniqueIndex("orchestrator_conversation_tombstones_workspace_id_unique").on(table.workspaceId, table.id),
+  uniqueIndex("orchestrator_conversation_tombstones_workspace_ref_unique")
+    .on(table.workspaceId, table.tombstoneRef),
+  uniqueIndex("orchestrator_conversation_tombstones_conversation_unique")
+    .on(table.workspaceId, table.conversationRef),
+  foreignKey({
+    columns: [table.workspaceId, table.conversationRef],
+    foreignColumns: [orchestratorConversations.workspaceId, orchestratorConversations.conversationRef],
+    name: "orchestrator_conversation_tombstones_workspace_conversation_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.workspaceId, table.userId],
+    foreignColumns: [memberships.workspaceId, memberships.userId],
+    name: "orchestrator_conversation_tombstones_workspace_membership_fk",
+  }).onDelete("cascade"),
+  check("orchestrator_conversation_tombstones_identity", sql`
+    ${table.tombstoneRef} ~ '^tombstone_[a-f0-9]{32}$'
+    and ${table.reason} = 'operator_requested'
+  `),
+]);
+
 export const dataSources = pgTable("data_sources", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
@@ -2474,6 +2606,94 @@ export const effectiveCampaignContextInvalidations = pgTable("effective_campaign
   `),
   check("effective_campaign_context_invalidations_reason", sql`
     ${table.reasonCode} in ('source_changed', 'source_removed', 'manual_rebuild')
+  `),
+]);
+
+/**
+ * Append-only, recommendation-only operating-rule drafts over an exact user-labelled slice.
+ * This store is deliberately independent from strict policy publication and action execution.
+ */
+export const sliceRuleWorkspaceDrafts = pgTable("slice_rule_workspace_drafts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  seriesRef: text("series_ref").notNull(),
+  revision: integer("revision").notNull(),
+  previousDraftHash: text("previous_draft_hash").notNull(),
+  draftRef: text("draft_ref").notNull(),
+  draftHash: text("draft_hash").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  market: text("market").notNull(),
+  serviceRef: text("service_ref").notNull(),
+  campaignFamilyRef: text("campaign_family_ref").notNull(),
+  countryOrRegion: text("country_or_region"),
+  audienceStrategy: text("audience_strategy"),
+  platform: text("platform"),
+  operatingMode: text("operating_mode").notNull(),
+  lifecycleState: text("lifecycle_state").notNull(),
+  createdByActorId: uuid("created_by_actor_id").notNull(),
+  draftPayload: jsonb("draft_payload").$type<Record<string, unknown>>().notNull(),
+  draftedAt: timestamp("drafted_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.workspaceId, table.createdByActorId],
+    foreignColumns: [memberships.workspaceId, memberships.userId],
+    name: "slice_rule_workspace_drafts_membership_scope_fk",
+  }).onDelete("restrict"),
+  uniqueIndex("slice_rule_workspace_drafts_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slice_rule_workspace_drafts_series_revision_unique").on(table.workspaceId, table.seriesRef, table.revision),
+  uniqueIndex("slice_rule_workspace_drafts_workspace_hash_unique").on(table.workspaceId, table.draftHash),
+  uniqueIndex("slice_rule_workspace_drafts_workspace_idempotency_unique").on(table.workspaceId, table.idempotencyKey),
+  index("slice_rule_workspace_drafts_scope_idx").on(table.workspaceId, table.market, table.serviceRef, table.campaignFamilyRef, table.draftedAt),
+  check("slice_rule_workspace_drafts_identity", sql`
+    ${table.seriesRef} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+    and ${table.idempotencyKey} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+    and ${table.draftRef} ~ '^slice_rule_draft_[a-f0-9]{20}$'
+    and ${table.draftHash} ~ '^[a-f0-9]{64}$'
+    and ${table.revision} >= 1
+    and ((${table.revision} = 1 and ${table.previousDraftHash} = 'GENESIS')
+      or (${table.revision} > 1 and ${table.previousDraftHash} ~ '^[a-f0-9]{64}$'))
+    and ${table.market} in ('domestic', 'international')
+    and ${table.serviceRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.campaignFamilyRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and (${table.countryOrRegion} is null or (length(${table.countryOrRegion}) between 1 and 120 and btrim(${table.countryOrRegion}) = ${table.countryOrRegion}))
+    and (${table.audienceStrategy} is null or (length(${table.audienceStrategy}) between 1 and 120 and btrim(${table.audienceStrategy}) = ${table.audienceStrategy}))
+    and (${table.platform} is null or ${table.platform} in ('facebook', 'instagram', 'mixed'))
+    and ${table.operatingMode} = 'recommendation_only'
+    and ${table.lifecycleState} = 'draft'
+  `),
+  check("slice_rule_workspace_drafts_payload_exact", sql`(
+    jsonb_typeof(${table.draftPayload}) = 'object'
+    and ${table.draftPayload} #>> '{schemaVersion}' = 'slice-rule-workspace-draft/1.0.0'
+    and ${table.draftPayload} #>> '{workspaceId}' = ${table.workspaceId}::text
+    and ${table.draftPayload} #>> '{seriesRef}' = ${table.seriesRef}
+    and (${table.draftPayload} #>> '{revision}')::integer = ${table.revision}
+    and ${table.draftPayload} #>> '{previousDraftHash}' = ${table.previousDraftHash}
+    and ${table.draftPayload} #>> '{draftRef}' = ${table.draftRef}
+    and ${table.draftPayload} #>> '{draftHash}' = ${table.draftHash}
+    and ${table.draftPayload} #>> '{idempotencyKey}' = ${table.idempotencyKey}
+    and ${table.draftPayload} #>> '{status}' = ${table.lifecycleState}
+    and ${table.draftPayload} #>> '{operatingMode}' = ${table.operatingMode}
+    and ${table.draftPayload} #>> '{scope,market}' = ${table.market}
+    and ${table.draftPayload} #>> '{scope,serviceRef}' = ${table.serviceRef}
+    and ${table.draftPayload} #>> '{scope,campaignFamilyRef}' = ${table.campaignFamilyRef}
+    and (${table.draftPayload} #>> '{scope,countryOrRegion}') is not distinct from ${table.countryOrRegion}
+    and (${table.draftPayload} #>> '{scope,audienceStrategy}') is not distinct from ${table.audienceStrategy}
+    and (${table.draftPayload} #>> '{scope,platform}') is not distinct from ${table.platform}
+    and ${table.draftPayload} #>> '{operatingRule,automationMode}' = 'recommendation_only'
+    and (${table.draftPayload} #>> '{createdAt}')::timestamptz = ${table.draftedAt}
+    and ${table.draftPayload} #> '{authority}' = '{
+      "canPublish": false, "canApprove": false, "canExecute": false,
+      "canWriteMeta": false, "canEnableAutomation": false
+    }'::jsonb
+    and ${table.draftPayload} #> '{operatingRule,authority}' = '{
+      "canPublish": false, "canApprove": false, "canExecute": false,
+      "canWriteMeta": false, "canEnableAutomation": false
+    }'::jsonb
+  ) is true`),
+  check("slice_rule_workspace_drafts_no_forbidden_authority", sql`
+    ${table.draftPayload}::text !~* '"(approvalGranted|writeEnabled|policyPublished|actionAuthorized)"[[:space:]]*:[[:space:]]*true'
+    and ${table.draftPayload}::text !~* '"[^"[:space:]]*(token|secret|authorization|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
   `),
 ]);
 

@@ -47,6 +47,13 @@ type AgentHandoffSummary = Readonly<{
   createdAt: string;
   expiresAt: string;
 }>;
+type OrchestratorConversationSummary = Readonly<{
+  conversationRef: string;
+  createdAt: string;
+  pageGuide: Readonly<{ pageId: DashboardViewId; pageLabel: string }> | null;
+  providerThreadRef: string | null;
+  messages: readonly Readonly<{ messageRef: string; role: "user" | "assistant"; content: string; createdAt: string }>[];
+}>;
 type PersistedCampaignContextSummary = Readonly<{ campaignRef: string; label: string; objective: string | null; capturedAt: string; sourceState: "frozen_valid" }>;
 type PortfolioCapabilitySummary = Readonly<{
   connections: readonly Readonly<{ connectionRef: string; displayName: string; status: "active" | "disconnected" | "revoked" | "invalid"; readReady: boolean; accountCount: number; }>[],
@@ -364,7 +371,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   const [selectedPersistedCampaignRef, setSelectedPersistedCampaignRef] = useState<string | null>(null);
   const [autonomy, setAutonomy] = useState<Record<string, string>>({ analysis: "Otomatik", recommendation: "Otomatik", decrease: "Onaya sun", increase: "Onaya sun", pause: "Onaya sun", create: "Her zaman manuel" });
   const agentMessages: Array<{ from: "agent" | "user"; text: string }> = [
-    { from: "agent", text: "Bu dashboard model çalıştırmaz. Aktif Codex veya Claude session'ını doğrulayın, bağlam için kısa ömürlü handoff üretin ve konuşmayı seçtiğiniz CLI içinde sürdürün." },
+    { from: "agent", text: "Bu alan aynı workspace ve operatöre bağlı kalıcı Orchestrator konuşmasıdır. Codex CLI yalnız read-only model çalışma transportudur; karar, policy ve action yetkisi taşımaz." },
   ];
   const [toast, setToast] = useState<string | null>(null);
   const [metaInventory, setMetaInventory] = useState<MetaInventorySnapshot | null>(null);
@@ -382,6 +389,12 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   const [agentEntityRef, setAgentEntityRef] = useState("portfolio_current");
   const [agentEntityLabel, setAgentEntityLabel] = useState("Tüm Meta portföyü");
   const [codexManualTask, setCodexManualTask] = useState<string | null>(null);
+  const [orchestratorConversation, setOrchestratorConversation] = useState<OrchestratorConversationSummary | null>(null);
+  const [orchestratorState, setOrchestratorState] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [orchestratorInput, setOrchestratorInput] = useState("");
+  const [orchestratorSending, setOrchestratorSending] = useState(false);
+  const [orchestratorError, setOrchestratorError] = useState<string | null>(null);
+  const [agentSourceView, setAgentSourceView] = useState<DashboardViewId>(initialView === "agent" ? "today" : initialView);
   const [draftPolicyTemplate, setDraftPolicyTemplate] = useState<CampaignIntentTemplateRef>("");
 
   const filteredCampaigns = useMemo(() => filterCampaignPortfolio(campaigns, portfolioFilters), [portfolioFilters]);
@@ -444,6 +457,47 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   }, [refreshMetaInventory]);
 
   useEffect(() => { void refreshAgentSessions(); }, [refreshAgentSessions]);
+
+  const refreshOrchestratorConversation = useCallback(async () => {
+    try {
+      const response = await fetch("/api/orchestrator-conversation", { cache: "no-store", credentials: "same-origin",
+        headers: { "X-ReklamZeka-Intent": "orchestrator-conversation-read" } });
+      const payload = await response.json() as { conversation?: OrchestratorConversationSummary | null;
+        error?: { message?: string } };
+      if (!response.ok || !("conversation" in payload)) throw new Error(payload.error?.message ?? "Orchestrator sohbeti kullanılamıyor.");
+      setOrchestratorConversation(payload.conversation ?? null);
+      setOrchestratorState("ready");
+      setOrchestratorError(null);
+    } catch (error) {
+      setOrchestratorState("unavailable");
+      setOrchestratorError(error instanceof Error ? error.message : "Orchestrator sohbeti kullanılamıyor.");
+    }
+  }, []);
+
+  useEffect(() => { void refreshOrchestratorConversation(); }, [refreshOrchestratorConversation]);
+
+  const sendOrchestratorMessage = useCallback(async () => {
+    const message = orchestratorInput.trim();
+    if (!message || orchestratorSending || orchestratorState === "unavailable") return;
+    setOrchestratorSending(true);
+    setOrchestratorError(null);
+    try {
+      const body = JSON.stringify({ conversationRef: orchestratorConversation?.conversationRef ?? null,
+        pageId: agentSourceView, message });
+      const response = await fetch("/api/orchestrator-conversation", { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "orchestrator-conversation-send" }, body });
+      const payload = await response.json() as { conversation?: OrchestratorConversationSummary;
+        error?: { message?: string } };
+      if (!response.ok || !payload.conversation) throw new Error(payload.error?.message ?? "Codex yanıtı alınamadı.");
+      setOrchestratorConversation(payload.conversation);
+      setOrchestratorInput("");
+      setOrchestratorState("ready");
+    } catch (error) {
+      setOrchestratorError(error instanceof Error ? error.message : "Codex yanıtı alınamadı.");
+      await refreshOrchestratorConversation();
+    } finally { setOrchestratorSending(false); }
+  }, [agentSourceView, orchestratorConversation?.conversationRef, orchestratorInput,
+    orchestratorSending, orchestratorState, refreshOrchestratorConversation]);
 
   useEffect(() => {
     let active = true;
@@ -514,6 +568,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
 
   const transferCurrentContextToCodex = useCallback(async () => {
     const guide = codexPageGuide(activeView, activeTitle);
+    if (activeView !== "agent") setAgentSourceView(activeView);
     setAgentEntityRef("portfolio_current");
     setAgentEntityLabel(`${guide.pageLabel} · çalışma kılavuzu`);
     setAgentHandoff(null);
@@ -529,6 +584,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   }, [activeTitle, activeView]);
 
   function navigate(view: ViewId) {
+    if (view === "agent" && activeView !== "agent") setAgentSourceView(activeView);
     setActiveView(view);
     setToast(null);
   }
@@ -693,10 +749,25 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   }
 
   function renderAgent() {
+    const sourceTitle = navGroups.flatMap((group) => group.items)
+      .find((item) => item.id === agentSourceView)?.label ?? "Bugün";
+    const visibleMessages = orchestratorConversation?.messages.length
+      ? orchestratorConversation.messages.map((message) => ({ key: message.messageRef,
+        from: message.role === "assistant" ? "agent" as const : "user" as const, text: message.content }))
+      : agentMessages.map((message, index) => ({ key: `intro-${index}`, ...message }));
     return <>
       <section className={styles.pageHero}><div><span className={styles.kicker}>REKLAMZEKA ORCHESTRATOR</span><h1>Tek agent, farklı vendor; aynı yetki ve karar sözleşmesi.</h1><p>Codex veya Claude session'ı değişebilir. Kampanya bağlamı, kurallar, skill'ler ve otonomi valfi ReklamZeka'da kalır.</p></div><StatusPill tone={agentSessions.length ? "good" : agentSessionError ? "warning" : "neutral"}>{agentSessionsLoading ? "Session kontrolü" : agentSessions.length ? `● ${agentSessions.length} session bağlı` : "Session bağlı değil"}</StatusPill></section>
       <div className={styles.agentWorkspace}>
-        <section className={styles.agentChat}><header><div><span className={styles.agentMark}>✦</span><div><strong>Orchestrator çalışma alanı</strong><small>Bağlam: {agentEntityLabel}</small></div></div><button onClick={() => void refreshAgentSessions(true)}>Session'ları yenile</button></header><div className={styles.chatMessages}>{agentMessages.map((message, index) => <div key={`${message.from}-${index}`} data-from={message.from}><span>{message.from === "agent" ? "RZ" : "Siz"}</span><p>{message.text}</p></div>)}</div>{codexManualTask ? <div className={styles.codexManualTask}><header><strong>Codex için hazır görev</strong><button onClick={() => void navigator.clipboard.writeText(codexManualTask).then(() => setToast("Görev yeniden kopyalandı."), () => setToast("Kopyalama kullanılamadı; metni seçip kopyalayın."))}>Tekrar kopyala</button></header><textarea aria-label="Codex görevi" readOnly value={codexManualTask} /><small>Bu manuel aktarım Meta veya policy işlemi başlatmaz.</small></div> : null}<div className={styles.chatComposer}><textarea aria-label="Orchestrator'a mesaj" placeholder="Sohbet Codex/Claude CLI transport'u bağlandıktan sonra burada devam edebilir." value="" disabled /><button disabled>CLI bekleniyor</button></div><footer>Bu sohbet yüzeyi model çalıştırmaz · Agent yalnız read/draft/proposal araçlarına erişir · Meta writer yok</footer></section>
+        <section className={styles.agentChat}>
+          <header><div><span className={styles.agentMark}>✦</span><div><strong>Orchestrator çalışma alanı</strong><small>Kaynak ekran: {sourceTitle} · konuşma sayfalar arasında korunur</small></div></div><button onClick={() => void refreshOrchestratorConversation()}>Sohbeti yenile</button></header>
+          <div className={styles.chatMessages}>
+            {visibleMessages.map((message) => <div key={message.key} data-from={message.from}><span>{message.from === "agent" ? "RZ" : "Siz"}</span><p>{message.text}</p></div>)}
+          </div>
+          {orchestratorError ? <p className={styles.agentChatError} role="alert">{orchestratorError}</p> : null}
+          {codexManualTask ? <div className={styles.codexManualTask}><header><strong>Codex için hazır görev</strong><button onClick={() => void navigator.clipboard.writeText(codexManualTask).then(() => setToast("Görev yeniden kopyalandı."), () => setToast("Kopyalama kullanılamadı; metni seçip kopyalayın."))}>Tekrar kopyala</button></header><textarea aria-label="Codex görevi" readOnly value={codexManualTask} /><small>Bu manuel aktarım Meta veya policy işlemi başlatmaz.</small></div> : null}
+          <div className={styles.chatComposer}><textarea aria-label="Orchestrator'a mesaj" placeholder={orchestratorState === "unavailable" ? "Kalıcı sohbet kapalı; manuel Codex aktarımını kullanın." : "Bu ekran bağlamında neyi analiz edelim veya hangi taslak kuralı hazırlayalım?"} value={orchestratorInput} disabled={orchestratorState !== "ready" || orchestratorSending} onChange={(event) => setOrchestratorInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendOrchestratorMessage(); } }} /><button disabled={orchestratorState !== "ready" || orchestratorSending || !orchestratorInput.trim()} onClick={() => void sendOrchestratorMessage()}>{orchestratorSending ? "Yanıt bekleniyor…" : "Gönder"}</button></div>
+          <footer>Codex CLI · read-only sandbox · yalnız nihai yanıt ledger'a yazılır · approval/action/Meta writer yok</footer>
+        </section>
         <aside className={styles.agentConfiguration}>
           <section className={`${styles.panel} ${styles.agentSessionHub}`}><header className={styles.panelHeader}><div><span className={styles.kicker}>LOCAL SESSION HUB</span><h2>Dashboard ↔ CLI handoff</h2></div><StatusPill tone={agentSessions.length ? "good" : "neutral"}>{agentSessionsLoading ? "Kontrol" : `${agentSessions.length} aktif`}</StatusPill></header>
             {agentSessionError ? <p role="alert">{agentSessionError}</p> : null}

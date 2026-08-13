@@ -782,7 +782,10 @@
 - [ ] Bütçe stüdyosu: envelope/lock/target/forecast/simulation.
   - [x] Gerçek proposal ledger salt-okunur list/detail, before-after, mapping/suppression ve
     trace summary; ayrı `budget_lab:read` local-session scope'u.
-  - [ ] Kural/target edit akışı.
+- [ ] Kural/target edit akışı.
+  - [x] Persistent Slice Rule Workspace draft: exact pazar/hizmet/aile ve opsiyonel
+    geo/audience/platform scope, recommendation-only revision/hash/audit/RLS; policy/action/Meta
+    write bağlantısı kapalı.
   - [x] Explicit dry-run compose ve append-only draft persistence; aynı transaction'da audit,
     public-safe çıktı ve approval/execute/Meta-write yetkisi `false`.
 - [ ] Approval inbox, automation run, verify/rollback ve tek timeline.
@@ -888,6 +891,8 @@
 - [x] Operating Dashboard + Orchestrator çift-yüzey bilgi mimarisi ve etkileşimli demo kabuğu.
 - [ ] Operating Dashboard gerçek backend state'iyle responsive/browser E2E.
 - [ ] Orchestrator skill/context/autonomy/handoff çalışma alanı ve dashboard↔CLI E2E.
+  - [x] Workspace/user-bound conversation/turn/message ledger, sayfa-guide snapshotı ve local
+    `codex exec --json`/`resume --json` read-only transportu; manual fallback korunur.
 
 ## Ana plan kapanışı
 

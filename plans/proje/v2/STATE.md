@@ -41,6 +41,33 @@
   kapalı composer'dır. İlk kalıcı sohbet dilimi, DB ledger + güvenli `codex exec --json` /
   `resume --json` adapter'ı ile hazırlanacak; experimental app-server protokolü ilk transport olmayacak.
 
+## 2026-08-13 — İlk gerçek read/rule/Orchestrator dikeyleri
+
+- `GET /api/meta/read-mirror` artık yalnız cookie/session ve tenant-bağlı canonical DB aynasından
+  account → campaign → ad set → ad → creative/post, içerik/CTA/destination/hedefleme/budget-owner
+  projection'ı döndürür. Yanıt opaque ref, freshness/quality reason ve `ready|partial|stale|empty|
+  unavailable` source state taşır; Graph/secret çağrısı ve publish/approve/execute/Meta-write yetkisi
+  yoktur. Güncel boş DB smoke'u dürüstçe `unavailable: active_connection_unavailable` döner. Dashboard
+  görünümü bu source'u kullanacak bir sonraki UI dilimine ayrıldı; eski `/api/meta/inventory` route'u
+  bilinçli 503 davranışını korur.
+- `slice_rule_workspace_drafts` ile ilk persistent **Slice Rule Workspace** eklendi. Taslaklar
+  append-only/revision+hash+audit zincirlidir; pazar (`yerli|yabancı`), hizmet ve kampanya ailesi
+  zorunludur; geo/audience/platform varsa exact scope'a bağlanır ve eksik alan tahmin edilmez. Mod DB
+  ve application katmanında yalnız `recommendation_only`dir: policy/publish/approve/execute/Meta write/
+  automation yetkileri false, owner/admin/analyst yazımı ve viewer read-only sınırı RLS FORCE,
+  revoke, immutable/tombstone korumasıyla uygulanır. Bu dilim henüz Budget Lab impact/dry-run veya
+  Dashboard editörü bağlamaz.
+- Kalıcı **ReklamZeka Orchestrator** conversation/turn/message ledger'i eklendi. Dashboard'un bütün
+  sayfaları aynı workspace/user konuşmasını kullanır; her turn page-guide snapshotı taşır. Yerel
+  transport yalnız sabit executable/cwd, shell=false, read-only sandbox, allowlisted environment ve
+  `codex exec --json` / exact-thread `resume --json` kullanır; JSONL'den sadece son agent yanıtı
+  saklanır, experimental app-server veya sahte token streaming kullanılmaz. Session yok/adapter kapalı
+  halde manuel `Codex'e aktar` fallback'i korunur. Sohbet policy/action/Meta-write yetkisi vermez ve
+  kalıcı kural/bütçe değişikliği için ileride ayrı typed UI confirmation gerekir.
+- Kanıt: slice live outer-rollback verifier; read-mirror boş DB smoke; gerçek Codex `exec`+`resume`
+  kabulü; 34 odaklı test, typecheck, db:check, production build ve secret scan geçti. Yeni forward
+  migrationlar yerel geliştirme DB'sine uygulandı.
+
 ## 2026-08-12 — Portföy pazar sınırı
 
 - Kullanıcıyla yürütülen mevcut portföy istişaresinde **pazar**, tüm künye ve slice'ların ilk

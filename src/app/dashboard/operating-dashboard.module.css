@@ -448,6 +448,8 @@
 .chatComposer textarea { min-height: 66px; resize: none; padding: 9px; border: 0; background: transparent; color: var(--rz-text); font-size: .7rem; line-height: 1.5; }
 .chatComposer textarea:focus { outline: 0; }
 .chatComposer button { align-self: end; min-height: 34px; padding: 0 12px; border: 0; border-radius: 8px; color: #111; background: var(--rz-green); font-size: .61rem; font-weight: 850; cursor: pointer; }
+.chatComposer button:disabled { cursor: not-allowed; opacity: .5; }
+.agentChatError { margin: 0 16px 12px; padding: 9px 11px; border: 1px solid rgba(255,132,123,.28); border-radius: 8px; background: rgba(255,132,123,.055); color: var(--rz-red); font-size: .6rem; }
 .codexManualTask { display: grid; gap: 8px; margin: 0 16px 14px; padding: 12px; border: 1px solid rgba(184,242,84,.28); border-radius: 10px; background: rgba(184,242,84,.045); }
 .codexManualTask > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .codexManualTask strong { font-size: .67rem; }
