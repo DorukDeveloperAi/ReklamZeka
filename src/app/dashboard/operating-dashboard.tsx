@@ -12,6 +12,7 @@ import { PromotionPreflightPanel } from "./promotion-preflight-panel";
 import { AutonomyStudioPanel } from "./autonomy-studio-panel";
 import { GuidanceStudioPanel } from "./guidance-studio-panel";
 import { SliceRuleWorkspacePanel } from "./slice-rule-workspace-panel";
+import { OperationalTimelinePanel } from "./operational-timeline-panel";
 import { DeliveryHealthAlertPanel } from "./delivery-health-alert-panel";
 import { CategoryInventoryPanel } from "./category-inventory-panel";
 import { InstructionPolicyStudioPanel } from "./instruction-policy-studio-panel";
@@ -353,13 +354,6 @@ const approvalItems = [
   { id: "apr-observe", risk: "K1", title: "İstanbul kampanyasını izleme listesine al", entity: "İstanbul · Saç Ekimi · WhatsApp", before: "Normal izleme", after: "48 saat guardrail izleme", evidence: "CPL arttı fakat korunan bölge floor'u aktif", policy: "no-transfer · no-change preferred", dependency: "Meta write yok" },
 ] as const;
 
-const timeline = [
-  { time: "11:42", type: "Analysis", title: "Günlük portföy analizi tamamlandı", detail: "32 kampanya · 4 kategori · 3 karar adayı", actor: "ReklamZeka Worker" },
-  { time: "11:39", type: "Data", title: "Deterministik ön işleme güncellendi", detail: "L1 canonical → L4 evidence · coverage %98,7", actor: "Pipeline" },
-  { time: "11:31", type: "External", title: "Meta üzerinde harici bütçe değişikliği görüldü", detail: "GCC kampanyası · ₺1.600 → ₺1.700 / gün", actor: "Meta Ads Manager" },
-  { time: "10:18", type: "Rule", title: "İstanbul bütçe koruması yayınlandı", detail: "geo_market=istanbul · floor ₺38.000 · no-transfer", actor: "Siz" },
-  { time: "09:04", type: "Decision", title: "Evergreen awareness için no-change", detail: "Learning stabil · frequency guardrail içinde", actor: "Orchestrator Agent" },
-] as const;
 
 const agentSkills = [
   ["Campaign Context Resolver", "Meta yapısı + iç kategorileri tek effective contextte çözer."],
@@ -1093,7 +1087,7 @@ export function OperatingDashboard({ model, initialView = "today" }: { model: Op
   }
 
   function renderTimeline() {
-    return <><section className={styles.pageHero}><div><span className={styles.kicker}>APPEND-ONLY TIMELINE</span><h1>Veri, karar ve hareket aynı kronolojide.</h1><p>Sync'ten outcome'a kadar bizim ve Meta üzerindeki harici değişikliklerin tamamı tek izde.</p></div><button className={styles.secondaryButton}>Filtrele</button></section><section className={styles.panel}><div className={styles.timeline}>{timeline.map((event) => <article key={`${event.time}-${event.title}`}><time>{event.time}</time><span className={styles.timelineDot} data-type={event.type} /><div><StatusPill tone="neutral">{event.type}</StatusPill><h2>{event.title}</h2><p>{event.detail}</p><small>{event.actor}</small></div><button aria-label={`${event.title} detayını aç`}>→</button></article>)}</div></section></>;
+    return <OperationalTimelinePanel />;
   }
 
   const content = activeView === "today" ? renderToday() : activeView === "campaigns" ? renderCampaigns() : activeView === "analysis" ? renderAnalysis() : activeView === "decision-room" ? <DecisionRoomPanel /> : activeView === "practice-lab" ? <PracticeLabPanel /> : activeView === "budgets" ? <BudgetLabPanel /> : activeView === "rules" ? <><SliceRuleWorkspacePanel /><GuidanceStudioPanel onOpenSession={() => navigate("decision-room")} /></> : activeView === "strict-policies" ? <InstructionPolicyStudioPanel initialCampaignIntentTemplate={draftPolicyTemplate} /> : activeView === "categories" ? <CategoryInventoryPanel onOpenSession={() => navigate("decision-room")} /> : activeView === "autonomy" ? <AutonomyStudioPanel /> : activeView === "meta" ? renderMetaConnection() : activeView === "agent" ? renderAgent() : activeView === "approvals" ? <ApprovalQueuePanel campaignRef={approvalQueueCampaignRef} /> : activeView === "promotions" ? <PromotionPreflightPanel /> : activeView === "alerts" ? <DeliveryHealthAlertPanel /> : renderTimeline();

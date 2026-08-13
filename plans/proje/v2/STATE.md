@@ -101,6 +101,17 @@
   künye preview üretmez. Çoklu geo etiketi, istenen etiketi gerçekten içerdiğinde ek kapsamı gizlemez;
   kategori kanıtı olmayan genişletilmiş scope için fallback yoktur.
 
+## 2026-08-13 — İlk gerçek operasyon izi
+
+- Dashboard Timeline'daki statik örnekler kaldırıldı. Yeni salt-okunur `operational-timeline/1.0.0`
+  projection'ı yalnız tenant-bound append-only kayıt defterlerinden Slice Rule taslak revizyonu,
+  delivery/payment alarm olayı, ActionUnit önerisi ve insan onay kararını zaman sırasıyla okur.
+  Ham kimlik, hash, token, Meta ID, kanıt payload'ı ve authority bilgisi public yüzeye taşınmaz.
+- Bu ilk görünüm tam evrensel timeline iddiası değildir: outcome, sync ve policy lifecycle kayıtlarının
+  tek korelasyon grafiğinde birleştirilmesi sonraki dilimdir. Ancak gösterilen kayıtlar artık demo
+  değil; boş veya unavailable durum açıkça gösterilir. Yetki bütün response/UI katmanında publish,
+  approve, execute, automation ve Meta write için kapalıdır.
+
 ## 2026-08-12 — Portföy pazar sınırı
 
 - Kullanıcıyla yürütülen mevcut portföy istişaresinde **pazar**, tüm künye ve slice'ların ilk
