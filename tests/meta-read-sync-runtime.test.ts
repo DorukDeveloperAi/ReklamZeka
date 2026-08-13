@@ -50,6 +50,7 @@ function result(): MetaSyncResult {
 function fixture(overrides: Readonly<{
   resolveSecret?: () => Promise<string>;
   accountIds?: readonly string[];
+  recoveryAccountId?: string;
 }> = {}) {
   const inventoryPagePersistence: MetaInventoryPagePersistencePort = {
     writePage: vi.fn(async (page) => ({ inserted: 0, updated: 0, unchanged: 0, stale: 0, disappeared: 0, pageHash: page.pageHash })),
@@ -70,6 +71,13 @@ function fixture(overrides: Readonly<{
     accounts: { resolve: accountResolve },
     inventoryPagePersistence,
     durablePersistence,
+    ...(overrides.recoveryAccountId === undefined ? {} : {
+      recoveryLane: {
+        id: "inventory_ad_set_v1" as const,
+        accountId: overrides.recoveryAccountId,
+        parentRunId: "meta.read.recovery.inventory_ad_set.v1",
+      },
+    }),
     runtimeFactory: (options) => {
       wiredOptions = options;
       return { run: runtimeRun };
@@ -130,6 +138,28 @@ describe("production Meta read sync composition", () => {
     expect(setup.wiredOptions()?.deadlineAtEpochMs).toEqual(expect.any(Number));
     await expect(setup.service.run({ parentRunId: "run_daily", dateStart: "2026-08-01", dateStop: "2026-08-07", maxRunDurationMs: 4_999 }))
       .rejects.toEqual(new ProductionMetaReadSyncError("sync_failed"));
+  });
+
+  it("resumes only the configured account inventory/ad-set lane with a stable parent id", async () => {
+    const setup = fixture({ accountIds: ["act_123456", "act_987654"], recoveryAccountId: "act_123456" });
+    await setup.service.runRecoveryLane({
+      dateStart: "2026-08-01", dateStop: "2026-08-07", initialPageSize: 100, maxRunDurationMs: 5_000,
+    });
+    const runtimeInput = setup.runtimeRun.mock.calls[0]![0];
+    expect(runtimeInput.parentRunId).toBe("meta.read.recovery.inventory_ad_set.v1");
+    expect(runtimeInput.plan).toEqual([
+      expect.objectContaining({ stream: "inventory", entityLevel: "ad_set", accountId: "act_123456" }),
+    ]);
+    expect(runtimeInput.plan.every((slice) => slice.stream === "inventory" && slice.entityLevel === "ad_set" && slice.accountId === "act_123456")).toBe(true);
+    expect(JSON.stringify(runtimeInput)).not.toContain("act_987654");
+  });
+
+  it("fails closed when the server-configured recovery account is outside the derived scope", async () => {
+    const setup = fixture({ accountIds: ["act_987654"], recoveryAccountId: "act_123456" });
+    await expect(setup.service.runRecoveryLane({ dateStart: "2026-08-01", dateStop: "2026-08-07" }))
+      .rejects.toEqual(new ProductionMetaReadSyncError("account_scope_unavailable"));
+    expect(setup.secretResolve).not.toHaveBeenCalled();
+    expect(setup.runtimeRun).not.toHaveBeenCalled();
   });
 
   it("fails closed with a redacted error when the private secret cannot be resolved", async () => {

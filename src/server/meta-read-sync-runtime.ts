@@ -46,6 +46,20 @@ export type ProductionMetaReadSyncInput = Readonly<{
   maxRunDurationMs?: number;
 }>;
 
+/**
+ * A deliberately narrow, server-owned recovery route. Callers can tune only
+ * bounded execution controls and dates; they never choose an account, stream,
+ * entity level, parent id, token, or transport.
+ */
+export type ProductionMetaReadSyncRecoveryInput = Readonly<Omit<ProductionMetaReadSyncInput, "parentRunId">>;
+
+type ServerOwnedMetaRecoveryLane = Readonly<{
+  id: "inventory_ad_set_v1";
+  accountId: string;
+  /** Stable across invocations so the durable cursor is restored exactly. */
+  parentRunId: string;
+}>;
+
 export type ProductionMetaReadSyncResult = Readonly<{
   status: MetaSyncResult["parentRun"]["status"];
   streamCounts: Readonly<{ completed: number; partial: number; failed: number }>;
@@ -76,6 +90,7 @@ type ProductionMetaReadSyncDependencies = Readonly<{
   affectedGeoMaterialization?: "completed" | "deferred";
   fetchImpl?: MetaFetch;
   runtimeFactory?: RuntimeFactory;
+  recoveryLane?: ServerOwnedMetaRecoveryLane;
 }>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -112,6 +127,24 @@ export class ProductionMetaReadSyncService {
   constructor(private readonly dependencies: ProductionMetaReadSyncDependencies) {}
 
   async run(input: ProductionMetaReadSyncInput): Promise<ProductionMetaReadSyncResult> {
+    return this.runInternal(input, null);
+  }
+
+  /**
+   * Resumes one preconfigured inventory/ad-set lane only. The lane is selected
+   * after the normal server-derived scope and account-scope checks, rather than
+   * from CLI/HTTP input. Its stable parent id restores the existing durable
+   * cursor on every idempotent recovery invocation.
+   */
+  async runRecoveryLane(input: ProductionMetaReadSyncRecoveryInput): Promise<ProductionMetaReadSyncResult> {
+    const lane = this.dependencies.recoveryLane;
+    if (!lane || !META_ACCOUNT.test(lane.accountId) || !RUN_REF.test(lane.parentRunId)) {
+      throw new ProductionMetaReadSyncError("account_scope_unavailable");
+    }
+    return this.runInternal({ ...input, parentRunId: lane.parentRunId }, lane);
+  }
+
+  private async runInternal(input: ProductionMetaReadSyncInput, recoveryLane: ServerOwnedMetaRecoveryLane | null): Promise<ProductionMetaReadSyncResult> {
     if (!RUN_REF.test(input.parentRunId)) throw new ProductionMetaReadSyncError("sync_failed");
     if (input.requestTimeoutMs !== undefined && (!Number.isInteger(input.requestTimeoutMs) || input.requestTimeoutMs < 1_000 || input.requestTimeoutMs > 60_000)) {
       throw new ProductionMetaReadSyncError("sync_failed");
@@ -141,6 +174,9 @@ export class ProductionMetaReadSyncService {
       if (!accountIds.length || accountIds.length > 1_000 || accountIds.some((id) => !META_ACCOUNT.test(id))) {
         throw new ProductionMetaReadSyncError("account_scope_unavailable");
       }
+      if (recoveryLane && !accountIds.includes(recoveryLane.accountId)) {
+        throw new ProductionMetaReadSyncError("account_scope_unavailable");
+      }
 
       let token: string;
       try {
@@ -164,17 +200,24 @@ export class ProductionMetaReadSyncService {
         ...(input.maxAttempts === undefined ? {} : { maxAttempts: input.maxAttempts }),
         ...(input.maxRunDurationMs === undefined ? {} : { deadlineAtEpochMs: Date.now() + input.maxRunDurationMs }),
       });
+      const fullPlan = planMetaReadSync({
+        accountIds: recoveryLane ? [recoveryLane.accountId] : accountIds,
+        dateStart: input.dateStart,
+        dateStop: input.dateStop,
+        ...(input.dateSliceDays === undefined ? {} : { dateSliceDays: input.dateSliceDays }),
+        ...(input.initialPageSize === undefined ? {} : { initialPageSize: input.initialPageSize }),
+      });
+      // Keep recovery intentionally smaller than a normal inventory plan. It
+      // cannot silently grow to campaigns, ads, creative, or insights.
+      const plan = recoveryLane
+        ? fullPlan.filter((slice) => slice.stream === "inventory" && slice.entityLevel === "ad_set")
+        : fullPlan;
+      if (!plan.length) throw new ProductionMetaReadSyncError("account_scope_unavailable");
       const result = await runtime.run({
         parentRunId: input.parentRunId,
         workspaceId: scope.workspaceId,
         connectionId: scope.connectionId,
-        plan: planMetaReadSync({
-          accountIds,
-          dateStart: input.dateStart,
-          dateStop: input.dateStop,
-          ...(input.dateSliceDays === undefined ? {} : { dateSliceDays: input.dateSliceDays }),
-          ...(input.initialPageSize === undefined ? {} : { initialPageSize: input.initialPageSize }),
-        }),
+        plan,
       });
       return summarize(result as MetaSyncResult, this.dependencies.affectedGeoMaterialization ?? "completed");
     } catch (error) {
@@ -220,7 +263,18 @@ export function createDrizzleProductionMetaReadSyncService(input: Readonly<{
   inventoryTransactionMode?: "atomic" | "idempotent_page";
   /** Server-composed recovery mode for durable checkpoint replay. */
   durableTransactionMode?: "atomic" | "idempotent_checkpoint";
+  /**
+   * Server deployment configuration for one resumable recovery lane. It is
+   * deliberately absent from request inputs and does not grant write access.
+   */
+  recoveryInventoryAdSetAccountId?: string;
 }>): ProductionMetaReadSyncService {
+  const recoveryInventoryAdSetAccountId = input.recoveryInventoryAdSetAccountId;
+  const recoveryLane = recoveryInventoryAdSetAccountId === undefined ? undefined : Object.freeze({
+    id: "inventory_ad_set_v1" as const,
+    accountId: recoveryInventoryAdSetAccountId,
+    parentRunId: "meta.read.recovery.inventory_ad_set.v1",
+  });
   return new ProductionMetaReadSyncService({
     scopeResolver: input.scopeResolver,
     connections: new DrizzleMetaConnectionRepository(input.database),
@@ -238,5 +292,6 @@ export function createDrizzleProductionMetaReadSyncService(input: Readonly<{
       }),
     insightPagePersistence: new DrizzleMetaInsightPagePersistence(input.database),
     fetchImpl: input.fetchImpl,
+    recoveryLane,
   });
 }

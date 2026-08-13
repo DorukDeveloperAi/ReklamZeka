@@ -6,7 +6,8 @@ import { createDrizzleProductionMetaReadSyncService } from "../src/server/meta-r
 
 process.loadEnvFile(".env.local");
 const workspaceId = process.env.REKLAMZEKA_LOCAL_WORKSPACE_ID;
-if (!workspaceId || process.env.META_TOKEN_SECURITY_STATUS !== "rotated") {
+const recoveryInventoryAdSetAccountId = process.env.REKLAMZEKA_META_RECOVERY_ACCOUNT_ID;
+if (!workspaceId || !recoveryInventoryAdSetAccountId || process.env.META_TOKEN_SECURITY_STATUS !== "rotated") {
   throw new Error("read-only sync preflight rejected");
 }
 
@@ -25,12 +26,12 @@ try {
     deferAffectedGeoMaterialization: true,
     inventoryTransactionMode: "idempotent_page",
     durableTransactionMode: "idempotent_checkpoint",
+    recoveryInventoryAdSetAccountId,
   });
-  // One invocation is bounded and resumes from its immutable page cursor. The
-  // prior page size of 10 turned a normal 1k-ad-set inventory into hundreds of
-  // serialized GETs, so it commonly had no final CLI JSON before interruption.
-  const result = await service.run({
-    parentRunId: `meta.read.initial.${today.toISOString().slice(0, 10).replaceAll("-", "")}`,
+  // This is exactly one server-owned account + inventory/ad-set lane. Its
+  // stable parent id restores the previous durable cursor; it does not fan out
+  // to the rest of the account scope or to any other Meta stream.
+  const result = await service.runRecoveryLane({
     dateStart: start.toISOString().slice(0, 10),
     dateStop: today.toISOString().slice(0, 10),
     dateSliceDays: 7,
