@@ -161,6 +161,14 @@
   mirror zincirini tek transaction'da tekrar doğrular ve missing/stale/ambiguous durumda bağ yazmaz.
   Bu checkpoint ActionUnit, queue, grant, execution veya Meta write üretmez.
 
+## 2026-08-13 — S1.4 canlı asset/post recovery durumu
+
+- Bounded server-owned S1.4 recovery, active read-only bağlantıda yalnız GET ile 79 canonical actor asset,
+  1.182 canonical post/media satırı ve Graph-returned creative/post evidence okudu; Meta write sıfırdır.
+  Ancak seçilen creative sayfalarında exact actor/post eşleşmesi doğrulanamadığından hiçbir mevcut creative
+  post/actor'a tahminle bağlanmadı. Recovery sonucu bu nedenle `partial`dir; Dashboard/post bağlamı
+  eksikmiş gibi gösterilir, mevcut creative copy için sahte post provenance iddiası kurulmaz.
+
 ## 2026-08-12 — Portföy pazar sınırı
 
 - Kullanıcıyla yürütülen mevcut portföy istişaresinde **pazar**, tüm künye ve slice'ların ilk
