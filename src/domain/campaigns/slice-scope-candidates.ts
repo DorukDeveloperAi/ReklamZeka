@@ -12,7 +12,8 @@ const FAMILY = /^campaign_family_[a-z0-9][a-z0-9_.:-]{0,111}$/;
 const SAFE_OPTIONAL = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const CLOSED = Object.freeze({ canSave: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false });
 
-type Scope = Readonly<{ market: Market; serviceRef: string; campaignFamilyRef: string; countryOrRegion?: string; audienceStrategy?: string; platform?: string; conversionRoute?: string }>;
+type Scope = Readonly<{ market: Market; serviceRef: string; campaignFamilyRef: string; countryOrRegion?: string; audienceStrategy?: string;
+  platform?: "facebook" | "instagram" | "mixed"; conversionRoute?: "lead_form" | "whatsapp" | "landing_page" }>;
 function oneDimension(key: string, dimensions: readonly CategoryDimension[]): CategoryDimension | null {
   const found = dimensions.filter((dimension) => dimension.key === key);
   return found.length === 1 ? found[0]! : null;

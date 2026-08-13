@@ -88,6 +88,10 @@ type ScopeCandidate = Readonly<{ campaignRef: string; scope: Scope; requiresFroz
 type ScopeCandidateState = Readonly<{ status: "loading" }>
   | Readonly<{ status: "ready"; candidates: readonly ScopeCandidate[] }>
   | Readonly<{ status: "unavailable" }>;
+type OperationalReadiness = Readonly<{ candidateRef: string; scope: Scope; frozenContext: "ready" | "missing" | "not_eligible"; budgetImpact: "eligible" | "blocked" }>;
+type OperationalReadinessState = Readonly<{ status: "loading" }>
+  | Readonly<{ status: "ready"; items: readonly OperationalReadiness[] }>
+  | Readonly<{ status: "unavailable" }>;
 
 type Form = Readonly<{
   seriesRef: string;
@@ -207,6 +211,18 @@ export function parseSliceScopeCandidates(value: unknown): readonly ScopeCandida
     || value.authority.canApprove !== false || value.authority.canExecute !== false || value.authority.canWriteMeta !== false
     || !noOpenedAuthority(value)) throw new Error("Slice kapsam aday sözleşmesi güvenli değil.");
   return value.candidates as ScopeCandidate[];
+}
+
+/** A readiness response is explanatory only; it cannot supply a budget command or authority. */
+export function parseSliceOperationalReadiness(value: unknown): readonly OperationalReadiness[] {
+  if (!object(value) || value.version !== "slice-operational-readiness/1.0.0" || !Array.isArray(value.items)
+    || value.items.length > 1000 || !value.items.every((item) => object(item) && typeof item.candidateRef === "string"
+      && item.candidateRef.length > 0 && isScope(item.scope) && ["ready", "missing", "not_eligible"].includes(String(item.frozenContext))
+      && ["eligible", "blocked"].includes(String(item.budgetImpact)))
+    || !object(value.authority) || value.authority.canSave !== false || value.authority.canPublish !== false
+    || value.authority.canApprove !== false || value.authority.canExecute !== false || value.authority.canWriteMeta !== false
+    || !noOpenedAuthority(value)) throw new Error("Slice operasyon uygunluk sözleşmesi güvenli değil.");
+  return value.items as OperationalReadiness[];
 }
 
 /** The panel accepts only opaque candidate references discovered by the server. */
@@ -415,6 +431,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   const [approvalQueue, setApprovalQueue] = useState<ApprovalQueueState>({ status: "loading" });
   const [temporal, setTemporal] = useState<TemporalState>({ status: "loading" });
   const [scopeCandidates, setScopeCandidates] = useState<ScopeCandidateState>({ status: "loading" });
+  const [operationalReadiness, setOperationalReadiness] = useState<OperationalReadinessState>({ status: "loading" });
   const head = snapshot?.items.find((item) => item.seriesRef === headRef) ?? undefined;
   const editableHead = head === undefined || isEditableRule(head.operatingRule.rule);
   const command = useMemo(() => editableHead ? buildSliceRuleDraftCommand(form, head) : null, [editableHead, form, head]);
@@ -448,6 +465,15 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     } catch { setScopeCandidates({ status: "unavailable" }); }
   }, []);
   useEffect(() => { void loadScopeCandidates(); }, [loadScopeCandidates]);
+  const loadOperationalReadiness = useCallback(async () => {
+    try {
+      const response = await fetch("/api/slice-operational-readiness", { cache: "no-store", credentials: "same-origin",
+        headers: { "X-ReklamZeka-Intent": "slice-operational-readiness-read" } });
+      if (!response.ok) throw new Error("Slice operasyon uygunluğu okunamadı.");
+      setOperationalReadiness({ status: "ready", items: parseSliceOperationalReadiness(await response.json()) });
+    } catch { setOperationalReadiness({ status: "unavailable" }); }
+  }, []);
+  useEffect(() => { void loadOperationalReadiness(); }, [loadOperationalReadiness]);
   const applyScopeCandidate = (candidate: ScopeCandidate) => {
     setHeadRef(null); setImpactState({ status: "idle" });
     setForm((current) => ({ ...current, market: candidate.scope.market, serviceRef: candidate.scope.serviceRef,
@@ -568,6 +594,18 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
         </fieldset>
         {head && !editableHead ? <p className={styles.impactNotice} role="status"><strong>Bu taslak türü bu ilk editörde değiştirilemez.</strong> Kayıt korunur; yanlışlıkla başka bir kurala dönüştürülemez.</p> : null}
         <div className={styles.safety}><strong>Yetki sınırı</strong><span>Policy yayınlama: kapalı</span><span>Onay: kapalı</span><span>Action/Meta write: kapalı</span><span>Otomasyon: kapalı</span></div>
+        <section className={styles.impact} aria-label="Operasyon uygunluğu">
+          <div className={styles.panelTitle}><div><span>FROZEN CONTEXT · READINESS</span><h2>Operasyon uygunluğu</h2></div><small>Salt-okur</small></div>
+          {operationalReadiness.status === "loading" ? <p className={styles.impactNotice}>Frozen context uygunluğu okunuyor…</p> : null}
+          {operationalReadiness.status === "unavailable" ? <p className={styles.impactNotice}>Uygunluk kaynağı şu anda kullanılamıyor.</p> : null}
+          {operationalReadiness.status === "ready" && operationalReadiness.items.length === 0 ? <p className={styles.impactNotice}>Kapsam adayı için henüz frozen context uygunluğu yok.</p> : null}
+          {operationalReadiness.status === "ready" ? operationalReadiness.items.map((item) => <div className={styles.impactResult} key={item.candidateRef}>
+            <strong>{item.scope.market === "domestic" ? "Yerli" : "Yabancı"} · {item.scope.serviceRef} · {item.scope.campaignFamilyRef}</strong>
+            <span>Frozen context: {item.frozenContext === "ready" ? "hazır" : item.frozenContext === "missing" ? "eksik" : "kapsamla eşleşmiyor"}</span>
+            <span>Bütçe etki önizlemesi: {item.budgetImpact === "eligible" ? "uygun" : "engelli"}</span>
+          </div>) : null}
+          <small>Bu gösterge frozen context oluşturmaz; policy, action, onay veya Meta write yetkisi vermez.</small>
+        </section>
         {message ? <p className={styles.message} role="status">{message}</p> : null}
         <button className={styles.save} type="button" disabled={!command || !snapshot.authority.canSaveDraft || saving} onClick={() => void save()}>{saving ? "Kaydediliyor…" : head ? "Yeni revizyonu kaydet" : "Taslağı kaydet"}</button>
         <section className={styles.impact} aria-labelledby="slice-rule-impact-heading">
