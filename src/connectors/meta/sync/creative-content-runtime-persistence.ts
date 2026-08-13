@@ -1,4 +1,4 @@
-import { extractMetaAdContent } from "@/domain/meta/content/extract";
+import { extractMetaAdContent, type MetaAdContentExtraction } from "@/domain/meta/content/extract";
 
 import {
   hashMetaContentPayload,
@@ -43,6 +43,20 @@ function required(value: string, label: string): string {
 }
 
 /**
+ * The bounded ads stream proves creative copy but does not read the Page/IG
+ * actor graph. Post identity is therefore deliberately left unresolved until
+ * the dedicated asset/post reader supplies independent actor evidence.
+ */
+function withoutUnverifiedPostIdentity(extraction: MetaAdContentExtraction): MetaAdContentExtraction {
+  if (extraction.post === null) return extraction;
+  return {
+    ...extraction,
+    post: null,
+    issues: [...extraction.issues, { code: "post_identity_unresolved" }],
+  };
+}
+
+/**
  * Adapts a normal `MetaAssetContentPersistenceRun` page writer to the partial
  * sync runtime. The writer resolves its tenant/account scope once; every page
  * thereafter is derived solely from the already-read `creative_post` payload.
@@ -70,7 +84,7 @@ export class MetaCreativeContentRuntimePersistence implements MetaCreativeSource
     const fieldCatalogVersion = required(page.fieldCatalogVersion, "fieldCatalogVersion");
     const records = page.records.map((payload) => ({
       adAccountExternalId: required(page.externalAccountId, "externalAccountId"),
-      extraction: extractMetaAdContent(payload),
+      extraction: withoutUnverifiedPostIdentity(extractMetaAdContent(payload)),
       sourceRevision: typeof payload.updated_time === "string" && payload.updated_time.trim()
         ? payload.updated_time
         : observedAt,

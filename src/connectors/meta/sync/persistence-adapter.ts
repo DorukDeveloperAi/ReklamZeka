@@ -200,7 +200,11 @@ export class DrizzleMetaSyncTransactionManager implements MetaSyncTransactionMan
       }));
       if (slices.length > 0) await database.insert(schema.metaSyncSlices).values(slices).onConflictDoUpdate({
           target: [schema.metaSyncSlices.runId, schema.metaSyncSlices.sliceKey],
-          set: { status: sql`excluded.status`, cursor: sql`excluded.cursor`, checkpoint: sql`excluded.checkpoint`, completedAt: sql`excluded.completed_at` },
+          set: {
+            status: sql`excluded.status`, cursor: sql`excluded.cursor`, checkpoint: sql`excluded.checkpoint`,
+            errorClassification: sql`excluded.error_classification`, errorDetail: sql`excluded.error_detail`,
+            completedAt: sql`excluded.completed_at`,
+          },
         });
     }
 

@@ -65,7 +65,11 @@ describe("creative runtime canonical persistence adapter", () => {
         sourceGraphVersion: "v23.0",
         fieldCatalogVersion: META_CREATIVE_CONTENT_FIELD_CATALOG_VERSION,
         sourcePayloadHash: expect.stringMatching(/^[a-f0-9]{64}$/),
-        extraction: expect.objectContaining({ adContext: expect.objectContaining({ externalAdId: "ad_fixture" }) }),
+        extraction: expect.objectContaining({
+          adContext: expect.objectContaining({ externalAdId: "ad_fixture" }),
+          post: null,
+          issues: expect.arrayContaining([expect.objectContaining({ code: "post_identity_unresolved" })]),
+        }),
       })],
     });
     expect(JSON.stringify(pages[0]?.checkpoint)).not.toContain("private creative copy");
