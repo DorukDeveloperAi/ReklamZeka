@@ -4,160 +4,162 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "780e52f7e",
+      "hash": "13b515647",
       "tarih": "2026-08-13",
-      "konu": "docs(state): record Meta mirror recovery progress",
+      "konu": "docs(state): record empty bounded insight recovery",
       "tur": "is",
       "kapsam": [
         "docs"
       ]
     },
     {
-      "hash": "7be94eb7d",
+      "hash": "e875877d5",
       "tarih": "2026-08-13",
-      "konu": "fix(meta): checkpoint bounded read sync runs",
+      "konu": "fix: bound Meta insight recovery to one day",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "5f4d941fa",
+      "hash": "6027dde23",
       "tarih": "2026-08-13",
-      "konu": "fix(meta): allow bounded retries for read sync recovery",
+      "konu": "docs(state): record partial live asset recovery",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "b6179d9a2",
+      "tarih": "2026-08-13",
+      "konu": "fix(meta): replay only verified actor post bindings",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "73f85b51e",
+      "hash": "05afe327a",
       "tarih": "2026-08-13",
-      "konu": "feat(rules): bind saved budget drafts to exact slice rules",
+      "konu": "fix(meta): report bounded materialization failures",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "d514ff535",
+      "tarih": "2026-08-13",
+      "konu": "feat(meta): materialize bounded S1.4 recovery",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "04b1924a1",
+      "hash": "44f71e06e",
       "tarih": "2026-08-13",
-      "konu": "docs(state): include budget proposal operational trace",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "a11c0dbbb",
-      "tarih": "2026-08-13",
-      "konu": "feat(timeline): include verified budget proposal traces",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "ac3db6610",
-      "tarih": "2026-08-13",
-      "konu": "docs(state): record Meta sync checkpoint coverage",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "3724584f2",
-      "tarih": "2026-08-13",
-      "konu": "fix(meta): recover durable sync checkpoints without callback transactions",
+      "konu": "fix(meta): bootstrap live recovery from S1.4 reads",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "5f282256b",
+      "hash": "984fd836b",
       "tarih": "2026-08-13",
-      "konu": "docs(state): reconcile delivered operation surfaces",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "f9cde2fc1",
-      "tarih": "2026-08-13",
-      "konu": "chore(meta): serialize local read sync channel",
+      "konu": "chore(meta): add live recovery verifier",
       "tur": "is",
       "kapsam": [
         "chore"
       ]
     },
     {
-      "hash": "7e29715fc",
+      "hash": "a2a74a601",
       "tarih": "2026-08-13",
-      "konu": "feat(meta): add idempotent inventory bootstrap fallback",
+      "konu": "fix(meta): recover actor posts from creative evidence",
       "tur": "is",
       "kapsam": [
-        "feat"
+        "fix"
       ]
     },
     {
-      "hash": "0164bc3de",
+      "hash": "f9e3cdc77",
       "tarih": "2026-08-13",
-      "konu": "docs(state): record partial live Meta mirror",
+      "konu": "docs(state): record allocation binding writer",
       "tur": "is",
       "kapsam": [
         "docs"
       ]
     },
     {
-      "hash": "b69b83747",
+      "hash": "506add07b",
       "tarih": "2026-08-13",
-      "konu": "feat(meta): support deferred affected geo backfill",
+      "konu": "feat(rules): add server-private allocation binding writer",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "82dc46ace",
+      "hash": "f10112eb3",
       "tarih": "2026-08-13",
-      "konu": "fix(meta): bound initial targeting sync pages",
+      "konu": "docs(state): record temporal and allocation foundations",
       "tur": "is",
       "kapsam": [
-        "fix"
+        "docs"
       ]
     },
     {
-      "hash": "b63075483",
+      "hash": "acdaa0842",
       "tarih": "2026-08-13",
-      "konu": "fix(manifest): classify budget pool JSONB surfaces",
+      "konu": "Add immutable slice rule allocation bindings",
+      "tur": "is",
+      "kapsam": []
+    },
+    {
+      "hash": "700bdf3de",
+      "tarih": "2026-08-13",
+      "konu": "feat: expose temporal recommendation ledger safely",
       "tur": "is",
       "kapsam": [
-        "fix"
+        "feat"
+      ]
+    },
+    {
+      "hash": "07261d2fe",
+      "tarih": "2026-08-13",
+      "konu": "feat(recommendations): add temporal evaluation ledger",
+      "tur": "is",
+      "kapsam": [
+        "feat"
       ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 34
+      "adet": 23
     },
     {
       "kapsam": "fix",
-      "adet": 13
+      "adet": 19
     },
     {
       "kapsam": "docs",
-      "adet": 9
+      "adet": 12
+    },
+    {
+      "kapsam": "chore",
+      "adet": 2
     },
     {
       "kapsam": "test",
       "adet": 2
     },
     {
-      "kapsam": "chore",
+      "kapsam": "?",
       "adet": 1
     },
     {
@@ -165,7 +167,7 @@
       "adet": 1
     }
   ],
-  "isSayisi": 354,
+  "isSayisi": 382,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-13",
   "planlar": [
@@ -186,5 +188,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "bdc59adcf991"
+  "damga": "f377c2c6f766"
 }
