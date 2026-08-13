@@ -136,6 +136,10 @@ const columns = [
   // may interpret as a mutable dependency.
   "budget_pool_hierarchy_revisions.hierarchy_payload",
   "slice_rule_budget_pool_bindings.binding_payload",
+  // Entity bindings freeze server-resolved hierarchy and source evidence only;
+  // archive impact must not invent a category dependency from this evidence.
+  "slice_rule_allocation_entity_bindings.source_evidence",
+  "slice_rule_allocation_entity_bindings.binding_payload",
   // Rule-to-budget provenance pins immutable hashes only; no category edge is
   // inferred by archive impact from this advisory linkage.
   "slice_rule_budget_proposal_bindings.binding_payload",

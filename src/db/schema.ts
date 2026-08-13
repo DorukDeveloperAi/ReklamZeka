@@ -2769,6 +2769,88 @@ export const sliceRuleBudgetPoolBindings = pgTable("slice_rule_budget_pool_bindi
   check("slice_rule_budget_pool_bindings_payload_exact", sql`(jsonb_typeof(${table.bindingPayload}) = 'object' and ${table.bindingPayload} #>> '{draftHash}' = ${table.draftHash} and ${table.bindingPayload} #>> '{hierarchyHash}' = ${table.hierarchyHash} and ${table.bindingPayload} #>> '{poolRef}' = ${table.poolRef} and ${table.bindingPayload} #>> '{market}' = ${table.market} and (${table.bindingPayload} #>> '{boundAt}')::timestamptz = ${table.boundAt} and ${table.bindingPayload} #> '{authority}' = '{"canPublish":false,"canApprove":false,"canExecute":false,"canWriteMeta":false,"canEnableAutomation":false}'::jsonb) is true`),
 ]);
 
+/**
+ * Immutable, server-resolved target for one exact allocation in a Slice Rule
+ * draft. This is source evidence only: it confers no approval, action, or
+ * Meta write capability.
+ */
+export const sliceRuleAllocationEntityBindings = pgTable("slice_rule_allocation_entity_bindings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  draftHash: text("draft_hash").notNull(),
+  allocationRef: text("allocation_ref").notNull(),
+  adAccountId: uuid("ad_account_id").notNull(),
+  campaignId: uuid("campaign_id").notNull(),
+  adSetId: uuid("ad_set_id").notNull(),
+  budgetOwnerLevel: text("budget_owner_level").notNull(),
+  budgetOwnerEntityId: uuid("budget_owner_entity_id").notNull(),
+  budgetKind: text("budget_kind").notNull(),
+  currency: text("currency").notNull(),
+  currentAmountMinor: bigint("current_amount_minor", { mode: "number" }).notNull(),
+  sourceEvidenceHash: text("source_evidence_hash").notNull(),
+  sourceObservedAt: timestamp("source_observed_at", { withTimezone: true }).notNull(),
+  sourceEvidence: jsonb("source_evidence").$type<Record<string, unknown>>().notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  boundByActorId: uuid("bound_by_actor_id").notNull(),
+  bindingPayload: jsonb("binding_payload").$type<Record<string, unknown>>().notNull(),
+  boundAt: timestamp("bound_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.draftHash], foreignColumns: [sliceRuleWorkspaceDrafts.workspaceId, sliceRuleWorkspaceDrafts.draftHash], name: "slice_rule_allocation_entity_bindings_draft_scope_fk" }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.workspaceId, table.adSetId, table.campaignId, table.adAccountId],
+    foreignColumns: [metaAdSets.workspaceId, metaAdSets.id, metaAdSets.campaignId, metaAdSets.adAccountId],
+    name: "slice_rule_allocation_entity_bindings_canonical_hierarchy_fk",
+  }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.boundByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "slice_rule_allocation_entity_bindings_membership_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("slice_rule_allocation_entity_bindings_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slice_rule_allocation_entity_bindings_exact_unique").on(table.workspaceId, table.draftHash, table.allocationRef),
+  uniqueIndex("slice_rule_allocation_entity_bindings_idempotency_unique").on(table.workspaceId, table.idempotencyKey),
+  index("slice_rule_allocation_entity_bindings_target_idx").on(table.workspaceId, table.adAccountId, table.campaignId, table.adSetId, table.boundAt.desc()),
+  check("slice_rule_allocation_entity_bindings_identity", sql`
+    ${table.draftHash} ~ '^[a-f0-9]{64}$'
+    and ${table.allocationRef} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+    and ${table.idempotencyKey} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
+    and ${table.budgetOwnerLevel} in ('campaign', 'ad_set')
+    and ((${table.budgetOwnerLevel} = 'campaign' and ${table.budgetOwnerEntityId} = ${table.campaignId})
+      or (${table.budgetOwnerLevel} = 'ad_set' and ${table.budgetOwnerEntityId} = ${table.adSetId}))
+    and ${table.budgetKind} in ('daily', 'lifetime')
+    and ${table.currency} ~ '^[A-Z]{3}$'
+    and ${table.currentAmountMinor} >= 0
+    and ${table.sourceEvidenceHash} ~ '^[a-f0-9]{64}$'
+  `),
+  check("slice_rule_allocation_entity_bindings_source_evidence_exact", sql`(
+    jsonb_typeof(${table.sourceEvidence}) = 'object'
+    and ${table.sourceEvidence} #>> '{evidenceHash}' = ${table.sourceEvidenceHash}
+    and (${table.sourceEvidence} #>> '{observedAt}')::timestamptz = ${table.sourceObservedAt}
+    and ${table.sourceEvidence} #>> '{sourceKind}' = 'canonical_meta_inventory'
+    and ${table.sourceEvidence} #>> '{rawPayloadHash}' ~ '^[a-f0-9]{64}$'
+    and ${table.sourceEvidence} #>> '{sourceGraphVersion}' ~ '^[A-Za-z0-9][A-Za-z0-9./_-]{0,127}$'
+    and ${table.sourceEvidence} #>> '{fieldCatalogVersion}' ~ '^[A-Za-z0-9][A-Za-z0-9./_-]{0,127}$'
+  ) is true`),
+  check("slice_rule_allocation_entity_bindings_payload_exact", sql`(
+    jsonb_typeof(${table.bindingPayload}) = 'object'
+    and ${table.bindingPayload} #>> '{schemaVersion}' = 'slice-rule-allocation-entity-binding/1.0.0'
+    and ${table.bindingPayload} #>> '{draftHash}' = ${table.draftHash}
+    and ${table.bindingPayload} #>> '{allocationRef}' = ${table.allocationRef}
+    and ${table.bindingPayload} #>> '{hierarchy,adAccountId}' = ${table.adAccountId}::text
+    and ${table.bindingPayload} #>> '{hierarchy,campaignId}' = ${table.campaignId}::text
+    and ${table.bindingPayload} #>> '{hierarchy,adSetId}' = ${table.adSetId}::text
+    and ${table.bindingPayload} #>> '{budgetOwner,level}' = ${table.budgetOwnerLevel}
+    and ${table.bindingPayload} #>> '{budgetOwner,entityId}' = ${table.budgetOwnerEntityId}::text
+    and ${table.bindingPayload} #>> '{budget,kind}' = ${table.budgetKind}
+    and ${table.bindingPayload} #>> '{budget,currency}' = ${table.currency}
+    and (${table.bindingPayload} #>> '{budget,currentAmountMinor}')::bigint = ${table.currentAmountMinor}
+    and ${table.bindingPayload} #> '{sourceEvidence}' = ${table.sourceEvidence}
+    and (${table.bindingPayload} #>> '{boundAt}')::timestamptz = ${table.boundAt}
+    and ${table.bindingPayload} #> '{authority}' = '{"recommendationOnly":true,"canPublish":false,"canApprove":false,"canExecute":false,"canWriteMeta":false,"canEnableAutomation":false}'::jsonb
+  ) is true`),
+  check("slice_rule_allocation_entity_bindings_no_forbidden_authority", sql`
+    ${table.bindingPayload}::text !~* '"(approvalGranted|writeEnabled|policyPublished|actionAuthorized)"[[:space:]]*:[[:space:]]*true'
+    and ${table.bindingPayload}::text !~* '"[^"[:space:]]*(token|secret|authorization|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
+  `),
+]);
+
 /** Append-only, advisory-only budget proposal revisions over one exact frozen campaign context. */
 export const budgetProposalVersions = pgTable("budget_proposal_versions", {
   id: uuid("id").primaryKey().defaultRandom(),

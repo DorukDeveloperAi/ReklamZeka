@@ -34,7 +34,7 @@ describe("explicit workspace tombstone purge adapter", () => {
 
     expect(evidence.candidateCount).toBe(1);
     expect(evidence.revision).toMatch(/^[a-f0-9]{64}$/);
-    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(132);
+    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(133);
     const allSchemaTables = Object.values(schema)
       .flatMap((value) => isTable(value) ? [getTableName(value)] : [])
       .sort();
@@ -80,7 +80,7 @@ describe("explicit workspace tombstone purge adapter", () => {
     expect(result).toEqual({ purgedRowCount: 0, membershipCount: 0 });
     expect(inspectCalls).toBe(3);
     const deletes = statements.filter((statement) => statement.includes("delete from"));
-    expect(deletes).toHaveLength(132);
+    expect(deletes).toHaveLength(133);
     expect(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_invalidations")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_heads")));
     expect(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_heads")))
@@ -175,6 +175,10 @@ describe("explicit workspace tombstone purge adapter", () => {
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from budget_proposal_versions")));
     expect(deletes.findIndex((statement) => statement.includes("delete from slice_rule_budget_proposal_bindings")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from slice_rule_workspace_drafts")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from slice_rule_allocation_entity_bindings")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from slice_rule_workspace_drafts")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from slice_rule_allocation_entity_bindings")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from meta_ad_sets")));
     expect(deletes.findIndex((statement) => statement.includes("delete from budget_proposal_versions")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_contexts")));
     expect(deletes.findIndex((statement) => statement.includes("delete from decision_room_inbox_reads")))
