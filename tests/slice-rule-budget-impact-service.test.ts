@@ -49,6 +49,7 @@ describe("Slice Rule to Budget Lab impact bridge", () => {
       authority: { recommendationOnly: true, canPublish: false, canApprove: false,
         canCreateProposal: false, canExecute: false, canWriteMeta: false } });
     expect(h.budgetLab.dryRun).toHaveBeenCalledOnce();
+    expect(h.scopeEvidence.loadExact).toHaveBeenCalledWith({ ...budgetCommand.scope, workspaceId, expectedScope: scope });
   });
 
   it("fails closed on a stale hash or exact scope and never invokes Budget Lab", async () => {

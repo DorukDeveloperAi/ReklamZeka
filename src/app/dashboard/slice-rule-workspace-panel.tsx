@@ -281,6 +281,35 @@ function ruleLabel(rule: SliceRule): string {
   if (rule.kind === "delivery_guardrail") return `Teslimat koruması · ${rule.condition}`;
   return rule.kind;
 }
+
+function percent(basisPoints: number): string {
+  return String(basisPoints / 100);
+}
+
+function isEditableRule(rule: SliceRule): rule is Extract<SliceRule, { kind: Form["ruleKind"] }> {
+  return rule.kind === "period_budget_cap" || rule.kind === "budget_distribution"
+    || rule.kind === "winner_continuation_rotation" || rule.kind === "delivery_guardrail";
+}
+
+/** A selected immutable head becomes the exact starting point for its next revision. */
+function formFromItem(item: SliceRuleWorkspaceItem): Form {
+  const rule = item.operatingRule.rule;
+  const shared = { ...EMPTY_FORM, seriesRef: item.seriesRef, market: item.scope.market,
+    serviceRef: item.scope.serviceRef, campaignFamilyRef: item.scope.campaignFamilyRef,
+    countryOrRegion: item.scope.countryOrRegion ?? "", audienceStrategy: item.scope.audienceStrategy ?? "",
+    platform: item.scope.platform ?? "", ruleKind: isEditableRule(rule) ? rule.kind : "period_budget_cap",
+    priority: String(item.operatingRule.priority),
+    metric: item.operatingRule.verification.metric, reviewCadence: item.operatingRule.verification.reviewCadence,
+    rollbackWhen: item.operatingRule.verification.rollbackWhen } as Form;
+  if (!isEditableRule(rule)) return shared;
+  if (rule.kind === "period_budget_cap") return { ...shared, period: rule.period, currency: rule.currency, maximumDecimal: rule.maximumDecimal };
+  if (rule.kind === "budget_distribution") return { ...shared, distributionDimension: rule.dimension,
+    distributionAllocations: rule.allocations.map((allocation) => `${allocation.key}: ${percent(allocation.basisPoints)}`).join("\n") };
+  if (rule.kind === "winner_continuation_rotation") return { ...shared, continuationPercent: percent(rule.continuationBasisPoints),
+    evaluationWindowDays: String(rule.evaluationWindowDays) };
+  if (rule.kind === "delivery_guardrail") return { ...shared, condition: rule.condition };
+  return shared;
+}
 function date(value: string): string {
   return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(value));
 }
@@ -298,7 +327,8 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   const [impactRaw, setImpactRaw] = useState(EMPTY_BUDGET_COMMAND);
   const [impactState, setImpactState] = useState<ImpactState>({ status: "idle" });
   const head = snapshot?.items.find((item) => item.seriesRef === headRef) ?? undefined;
-  const command = useMemo(() => buildSliceRuleDraftCommand(form, head), [form, head]);
+  const editableHead = head === undefined || isEditableRule(head.operatingRule.rule);
+  const command = useMemo(() => editableHead ? buildSliceRuleDraftCommand(form, head) : null, [editableHead, form, head]);
   const impactCommand = useMemo(() => buildSliceRuleBudgetImpactCommand(head, impactRaw), [head, impactRaw]);
   const update = <K extends keyof Form>(key: K, value: Form[K]) => setForm((current) => ({ ...current, [key]: value }));
   const save = async () => {
@@ -346,10 +376,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     {props.state.status === "unavailable" || props.state.status === "error" ? <section className={styles.state} role="alert"><h2>{props.state.status === "unavailable" ? "Kaynak bağlı değil" : "Çalışma alanı okunamadı"}</h2><p>{props.state.message}</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
     {snapshot ? <div className={styles.grid}>
       <section className={styles.panel}><div className={styles.panelTitle}><div><span>MEVCUT TASLAKLAR</span><h2>{snapshot.items.length} güncel seri</h2></div><small>Append-only</small></div>
-        <div className={styles.list}>{snapshot.items.length === 0 ? <p>Henüz kayıtlı slice rule taslağı yok.</p> : snapshot.items.map((item) => <button key={item.draftRef} type="button" data-active={headRef === item.seriesRef} onClick={() => { setHeadRef(item.seriesRef); setImpactState({ status: "idle" }); setForm((current) => ({ ...current, seriesRef: item.seriesRef, market: item.scope.market,
-          serviceRef: item.scope.serviceRef, campaignFamilyRef: item.scope.campaignFamilyRef,
-          countryOrRegion: item.scope.countryOrRegion ?? "", audienceStrategy: item.scope.audienceStrategy ?? "",
-          platform: item.scope.platform ?? "" })); }}><strong>{item.seriesRef} · r{item.revision}</strong><span>{item.scope.market === "domestic" ? "Yerli" : "Yabancı"} · {item.scope.serviceRef} · {item.scope.campaignFamilyRef}</span><small>{ruleLabel(item.operatingRule.rule)} · {date(item.createdAt)}</small></button>)}</div>
+        <div className={styles.list}>{snapshot.items.length === 0 ? <p>Henüz kayıtlı slice rule taslağı yok.</p> : snapshot.items.map((item) => <button key={item.draftRef} type="button" data-active={headRef === item.seriesRef} onClick={() => { setHeadRef(item.seriesRef); setImpactState({ status: "idle" }); setForm(formFromItem(item)); }}><strong>{item.seriesRef} · r{item.revision}</strong><span>{item.scope.market === "domestic" ? "Yerli" : "Yabancı"} · {item.scope.serviceRef} · {item.scope.campaignFamilyRef}</span><small>{ruleLabel(item.operatingRule.rule)} · {date(item.createdAt)}</small></button>)}</div>
         <button className={styles.newButton} type="button" onClick={() => { setHeadRef(null); setImpactState({ status: "idle" }); setForm(EMPTY_FORM); }}>+ Yeni seri</button>
       </section>
       <section className={styles.panel}><div className={styles.panelTitle}><div><span>{head ? `REVİZYON ${head.revision + 1}` : "YENİ TASLAK"}</span><h2>Kapsam ve kural</h2></div><small>{snapshot.authority.canSaveDraft ? "Owner · Admin · Analyst" : "Viewer · salt okunur"}</small></div>
@@ -368,6 +395,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
           <label>Beklenen metrik<select value={form.metric} onChange={(event) => update("metric", event.target.value as Form["metric"])}><option value="qualified_leads">Nitelikli lead</option><option value="cost_per_qualified_lead">Nitelikli lead maliyeti</option><option value="engagement_rate">Etkileşim oranı</option><option value="delivery_health">Teslimat sağlığı</option></select></label>
           <label>Geri alma / yeniden inceleme koşulu<textarea value={form.rollbackWhen} onChange={(event) => update("rollbackWhen", event.target.value)} rows={3} /></label>
         </fieldset>
+        {head && !editableHead ? <p className={styles.impactNotice} role="status"><strong>Bu taslak türü bu ilk editörde değiştirilemez.</strong> Kayıt korunur; yanlışlıkla başka bir kurala dönüştürülemez.</p> : null}
         <div className={styles.safety}><strong>Yetki sınırı</strong><span>Policy yayınlama: kapalı</span><span>Onay: kapalı</span><span>Action/Meta write: kapalı</span><span>Otomasyon: kapalı</span></div>
         {message ? <p className={styles.message} role="status">{message}</p> : null}
         <button className={styles.save} type="button" disabled={!command || !snapshot.authority.canSaveDraft || saving} onClick={() => void save()}>{saving ? "Kaydediliyor…" : head ? "Yeni revizyonu kaydet" : "Taslağı kaydet"}</button>

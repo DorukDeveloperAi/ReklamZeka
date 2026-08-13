@@ -39,6 +39,8 @@ export interface BudgetImpactScopeEvidencePort {
     adAccountId: string;
     campaignId: string;
     contextHash: string;
+    /** Optional scope facets must be proven from this exact frozen context too. */
+    expectedScope: ExactSliceRuleScope;
   }>): Promise<Readonly<{
     state: "ready" | "missing" | "stale" | "ambiguous";
     scope: ExactSliceRuleScope | null;
@@ -148,7 +150,7 @@ export class SliceRuleBudgetImpactService {
 
     const evidence = await this.scopeEvidence.loadExact({ workspaceId: input.workspaceId,
       adAccountId: input.budgetCommand.scope.adAccountId, campaignId: input.budgetCommand.scope.campaignId,
-      contextHash: input.budgetCommand.scope.contextHash });
+      contextHash: input.budgetCommand.scope.contextHash, expectedScope: draft.scope });
     if (evidence.state !== "ready" || evidence.scope === null || evidence.evidenceRefs.length < 1
       || evidence.evidenceRefs.some((ref) => !REF.test(ref))) {
       throw new SliceRuleBudgetImpactError("scope_evidence_not_ready");

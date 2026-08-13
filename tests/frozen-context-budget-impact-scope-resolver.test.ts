@@ -18,6 +18,8 @@ import {
 const workspaceId = "11111111-1111-4111-8111-111111111111";
 const adAccountId = "22222222-2222-4222-8222-222222222222";
 const campaignId = "33333333-3333-4333-8333-333333333333";
+const requiredScope = Object.freeze({ market: "international" as const,
+  serviceRef: "service_physical_therapy_rehab", campaignFamilyRef: "campaign_family_intensive_ftr" });
 
 function category(dimensionKey: string, definitionKey: string, suffix: string) {
   const dimension: CategoryDimension = { id: `dimension-${suffix}`, workspaceId, key: dimensionKey,
@@ -81,7 +83,7 @@ function harness(value = context(), invalidated = false) {
 describe("frozen context Slice Rule budget impact scope resolver", () => {
   it("maps only exact frozen canonical category evidence", async () => {
     const h = harness();
-    await expect(h.resolver.loadExact(h.scope)).resolves.toMatchObject({ state: "ready", scope: {
+    await expect(h.resolver.loadExact({ ...h.scope, expectedScope: requiredScope })).resolves.toMatchObject({ state: "ready", scope: {
       market: "international", serviceRef: "service_physical_therapy_rehab",
       campaignFamilyRef: "campaign_family_intensive_ftr",
     }, evidenceRefs: [expect.stringMatching(/^context_[a-f0-9]{64}$/),
@@ -93,26 +95,44 @@ describe("frozen context Slice Rule budget impact scope resolver", () => {
 
   it("uses the closed yerli/yabanci mapping and never accepts caller-style market values", async () => {
     const domestic = harness(context({ market: "yerli" }));
-    await expect(domestic.resolver.loadExact(domestic.scope)).resolves.toMatchObject({ state: "ready",
+    await expect(domestic.resolver.loadExact({ ...domestic.scope, expectedScope: { ...requiredScope, market: "domestic" } })).resolves.toMatchObject({ state: "ready",
       scope: { market: "domestic" } });
     const nonCanonical = harness(context({ market: "international" }));
-    await expect(nonCanonical.resolver.loadExact(nonCanonical.scope)).resolves.toEqual({
+    await expect(nonCanonical.resolver.loadExact({ ...nonCanonical.scope, expectedScope: requiredScope })).resolves.toEqual({
       state: "ambiguous", scope: null, evidenceRefs: [] });
+  });
+
+  it("requires every optional draft facet to be present and identical in frozen category evidence", async () => {
+    const value = context({ categories: [
+      category("market", "yabanci", "market"),
+      category("service_line", "service_physical_therapy_rehab", "service"),
+      category("campaign_family", "campaign_family_intensive_ftr", "family"),
+      category("geo_market", "Arap Bölgesi", "geo"),
+      category("audience_strategy", "Özel hedefleme", "audience"),
+      category("publisher_platform", "instagram", "platform"),
+    ] });
+    const h = harness(value);
+    const expected = { ...requiredScope, countryOrRegion: "Arap Bölgesi", audienceStrategy: "Özel hedefleme",
+      platform: "instagram" as const };
+    await expect(h.resolver.loadExact({ ...h.scope, expectedScope: expected })).resolves.toMatchObject({ state: "ready",
+      scope: expected, evidenceRefs: expect.arrayContaining([expect.stringMatching(/^category_resolution_[a-f0-9]{64}$/)]) });
+    await expect(h.resolver.loadExact({ ...h.scope, expectedScope: { ...expected, platform: "facebook" } })).resolves.toMatchObject({
+      state: "ambiguous", scope: null });
   });
 
   it("fails closed for missing, duplicate or invalidated frozen evidence", async () => {
     const missingContext = context({ categories: [category("market", "yabanci", "market"),
       category("service_line", "service_physical_therapy_rehab", "service")] });
     const missing = harness(missingContext);
-    await expect(missing.resolver.loadExact(missing.scope)).resolves.toMatchObject({ state: "missing", scope: null });
+    await expect(missing.resolver.loadExact({ ...missing.scope, expectedScope: requiredScope })).resolves.toMatchObject({ state: "missing", scope: null });
 
     const duplicateContext = context({ categories: [category("market", "yabanci", "market-a"),
       category("market", "yerli", "market-b"), category("service_line", "service_physical_therapy_rehab", "service"),
       category("campaign_family", "campaign_family_intensive_ftr", "family")] });
     const duplicate = harness(duplicateContext);
-    await expect(duplicate.resolver.loadExact(duplicate.scope)).resolves.toMatchObject({ state: "ambiguous", scope: null });
+    await expect(duplicate.resolver.loadExact({ ...duplicate.scope, expectedScope: requiredScope })).resolves.toMatchObject({ state: "ambiguous", scope: null });
 
     const stale = harness(context(), true);
-    await expect(stale.resolver.loadExact(stale.scope)).resolves.toMatchObject({ state: "stale", scope: null });
+    await expect(stale.resolver.loadExact({ ...stale.scope, expectedScope: requiredScope })).resolves.toMatchObject({ state: "stale", scope: null });
   });
 });

@@ -4,6 +4,7 @@ import {
   type EffectiveCampaignContextInput,
 } from "@/analyses/effective-campaign-context";
 import type { BudgetImpactScopeEvidencePort } from "@/application/slice-rule-budget-impact-service";
+import type { ExactSliceRuleScope } from "@/application/slice-rule-workspace-service";
 import type { BudgetFrozenContextPort } from "@/application/budget-proposal-service";
 import { BudgetProposalRepositoryError } from "@/connectors/budget/budget-proposal-drizzle-repository";
 import type { FrozenCategoryContext } from "@/domain/categories/registry";
@@ -15,6 +16,12 @@ const REQUIRED_DIMENSIONS = Object.freeze({
   market: "market",
   service: "service_line",
   campaignFamily: "campaign_family",
+} as const);
+
+const OPTIONAL_DIMENSIONS = Object.freeze({
+  countryOrRegion: "geo_market",
+  audienceStrategy: "audience_strategy",
+  platform: "publisher_platform",
 } as const);
 
 function contextInput(context: EffectiveCampaignContext): EffectiveCampaignContextInput {
@@ -116,14 +123,29 @@ export class FrozenContextBudgetImpactScopeResolver implements BudgetImpactScope
       || !CAMPAIGN_FAMILY_REF.test(familyEvidence!.key)) {
       return Object.freeze({ state: "ambiguous" as const, scope: null, evidenceRefs: Object.freeze([]) });
     }
-    return Object.freeze({ state: "ready" as const,
-      scope: Object.freeze({ market: canonicalMarket, serviceRef: serviceEvidence!.key,
-        campaignFamilyRef: familyEvidence!.key }),
-      evidenceRefs: Object.freeze([
+    const scope: Record<string, string> = { market: canonicalMarket, serviceRef: serviceEvidence!.key,
+      campaignFamilyRef: familyEvidence!.key };
+    const evidenceRefs = [
         `context_${frozen.context.contextHash}`,
         `category_resolution_${marketEvidence!.category.resolutionHash}`,
         `category_resolution_${serviceEvidence!.category.resolutionHash}`,
         `category_resolution_${familyEvidence!.category.resolutionHash}`,
-      ]) });
+      ];
+    for (const [facet, dimensionKey] of Object.entries(OPTIONAL_DIMENSIONS) as readonly [keyof typeof OPTIONAL_DIMENSIONS, string][]) {
+      const expected = input.expectedScope[facet];
+      if (expected === undefined) continue;
+      const evidence = exactDefinition(frozen.context, dimensionKey);
+      if (evidence.state !== "ready") {
+        return Object.freeze({ state: evidence.state, scope: null, evidenceRefs: Object.freeze([]) });
+      }
+      if (evidence.key !== expected) {
+        return Object.freeze({ state: "ambiguous" as const, scope: null, evidenceRefs: Object.freeze([]) });
+      }
+      scope[facet] = evidence.key;
+      evidenceRefs.push(`category_resolution_${evidence.category.resolutionHash}`);
+    }
+    return Object.freeze({ state: "ready" as const,
+      scope: Object.freeze(scope) as ExactSliceRuleScope,
+      evidenceRefs: Object.freeze(evidenceRefs) });
   }
 }

@@ -93,6 +93,12 @@
 - Kanıt: Rule impact resolver/service/HTTP/panel 17 odaklı test; alert panel/ledger 12 odaklı test;
   typecheck ve db check geçti. Bu yüzeyler gerçek Meta bağlamı yokken boş/unavailable gösterir; demo
   alarm veya performans iddiası üretmez.
+- Slice Rule Workspace'e açık **bütçe dağılımı** taslağı da eklendi: ülke/bölge, kampanya kategorisi
+  veya sonuç rotası için her dilim kullanıcı tarafından `dilim: yüzde` olarak girilir ve toplam tam
+  `%100` değilse kayıt oluşmaz. Bu dağıtım da yalnız recommendation-only taslaktır. Budget impact
+  resolver'ı, taslağın istediği ülke/bölge, hedefleme stratejisi veya yayın platformunu ancak aynı
+  frozen context'te tekil, eş değer kategori kanıtı varsa kabul eder; eksik, çoklu veya farklı künye
+  preview üretmez. Kategori kanıtı olmayan genişletilmiş scope için fallback yoktur.
 
 ## 2026-08-12 — Portföy pazar sınırı
 
