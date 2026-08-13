@@ -19,14 +19,20 @@ const pool = new Pool({ connectionString: process.env.DIRECT_DATABASE_URL ?? pro
 // Nested creative payloads are materially wider than inventory rows. Keep the
 // recovery page bounded without letting a caller choose the size.
 const creativeLane = recoveryLane === "creative_ad_v1" || recoveryLane === "creative_ad_v2";
-const initialPageSize = creativeLane ? 20 : 100;
-const requestTimeoutMs = creativeLane ? 60_000 : 20_000;
-const maxAttempts = creativeLane ? 1 : 3;
+const insightLane = recoveryLane === "insights_ad_v1";
+const wideReadLane = creativeLane || insightLane;
+const initialPageSize = creativeLane ? 20 : insightLane ? 25 : 100;
+const requestTimeoutMs = wideReadLane ? 60_000 : 20_000;
+const maxAttempts = wideReadLane ? 1 : 3;
 
 try {
   const database = drizzle(pool, { schema });
   const today = new Date();
-  const start = new Date(today.valueOf() - 7 * 86_400_000);
+  // An insight recovery is one closed UTC source day only. Its date is
+  // derived in this server-owned command; callers cannot fan it out or add
+  // today's incomplete reporting window.
+  const insightDay = new Date(today.valueOf() - 86_400_000).toISOString().slice(0, 10);
+  const start = insightLane ? null : new Date(today.valueOf() - 7 * 86_400_000);
   const service = createDrizzleProductionMetaReadSyncService({
     database,
     scopeResolver: { resolve: async () => ({ workspaceId, connectionId: "6d695103-4dc0-44ba-8a1b-67702449c4a1" }) },
@@ -41,9 +47,9 @@ try {
   // stable parent id restores the previous durable cursor; it does not fan out
   // to the rest of the account scope or to any other Meta stream.
   const result = await service.runRecoveryLane({
-    dateStart: start.toISOString().slice(0, 10),
-    dateStop: today.toISOString().slice(0, 10),
-    dateSliceDays: 7,
+    dateStart: insightLane ? insightDay : start!.toISOString().slice(0, 10),
+    dateStop: insightLane ? insightDay : today.toISOString().slice(0, 10),
+    dateSliceDays: insightLane ? 1 : 7,
     initialPageSize,
     requestTimeoutMs,
     maxAttempts,

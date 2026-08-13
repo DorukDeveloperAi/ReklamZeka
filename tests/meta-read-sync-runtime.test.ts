@@ -67,6 +67,7 @@ function fixture(overrides: Readonly<{
   const connectionFind = vi.fn(async () => connection);
   const secretResolve = vi.fn(overrides.resolveSecret ?? (async () => token));
   const accountResolve = vi.fn(async () => overrides.accountIds ?? ["act_123456"]);
+  const recoveryLaneId = overrides.recoveryLaneId ?? "inventory_ad_set_v1";
   const service = new ProductionMetaReadSyncService({
     scopeResolver: { resolve: vi.fn(async () => ({ workspaceId, connectionId })) },
     connections: { find: connectionFind, list: vi.fn(), save: vi.fn() },
@@ -79,9 +80,9 @@ function fixture(overrides: Readonly<{
     }),
     ...(overrides.recoveryAccountId === undefined ? {} : {
       recoveryLane: {
-        id: overrides.recoveryLaneId ?? "inventory_ad_set_v1",
+        id: recoveryLaneId,
         accountId: overrides.recoveryAccountId,
-        parentRunId: "meta.read.recovery.inventory_ad_set.v1",
+        parentRunId: `meta.read.recovery.${recoveryLaneId.replace(/_v1$/, "").replaceAll("_", ".")}.v1`,
       },
     }),
     runtimeFactory: (options) => {
@@ -161,7 +162,7 @@ describe("production Meta read sync composition", () => {
       dateStart: "2026-08-01", dateStop: "2026-08-07", initialPageSize: 100, maxRunDurationMs: 5_000,
     });
     const runtimeInput = setup.runtimeRun.mock.calls[0]![0];
-    expect(runtimeInput.parentRunId).toBe("meta.read.recovery.inventory_ad_set.v1");
+    expect(runtimeInput.parentRunId).toBe("meta.read.recovery.inventory.ad.set.v1");
     expect(runtimeInput.plan).toEqual([
       expect.objectContaining({ stream: "inventory", entityLevel: "ad_set", accountId: "act_123456" }),
     ]);
@@ -178,12 +179,22 @@ describe("production Meta read sync composition", () => {
   });
 
   it("limits a configured creative or insight lane to its exact ad stream", async () => {
-    for (const [lane, stream] of [["creative_ad_v1", "creative_post"], ["creative_ad_v2", "creative_post"], ["insights_ad_v1", "insights"]] as const) {
+    for (const [lane, stream] of [["creative_ad_v1", "creative_post"], ["creative_ad_v2", "creative_post"]] as const) {
       const setup = fixture({ accountIds: ["act_123456"], recoveryAccountId: "act_123456", recoveryLaneId: lane });
       await setup.service.runRecoveryLane({ dateStart: "2026-08-01", dateStop: "2026-08-07" });
       const plan = setup.runtimeRun.mock.calls[0]![0].plan;
       expect(plan).toEqual([expect.objectContaining({ stream, entityLevel: "ad", accountId: "act_123456" })]);
     }
+  });
+
+  it("limits an insight recovery to one date and gives that date its own resumable parent", async () => {
+    const setup = fixture({ accountIds: ["act_123456"], recoveryAccountId: "act_123456", recoveryLaneId: "insights_ad_v1" });
+    await setup.service.runRecoveryLane({ dateStart: "2026-08-01", dateStop: "2026-08-01", dateSliceDays: 1 });
+    const runtimeInput = setup.runtimeRun.mock.calls[0]![0];
+    expect(runtimeInput.parentRunId).toBe("meta.read.recovery.insights.ad.v1.2026-08-01");
+    expect(runtimeInput.plan).toEqual([expect.objectContaining({ stream: "insights", entityLevel: "ad", accountId: "act_123456", dateStart: "2026-08-01", dateStop: "2026-08-01" })]);
+    await expect(setup.service.runRecoveryLane({ dateStart: "2026-08-01", dateStop: "2026-08-02", dateSliceDays: 1 }))
+      .rejects.toEqual(new ProductionMetaReadSyncError("sync_failed"));
   });
 
   it("fails closed with a redacted error when the private secret cannot be resolved", async () => {

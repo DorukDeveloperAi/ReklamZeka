@@ -148,6 +148,16 @@ export class ProductionMetaReadSyncService {
     if (!lane || !META_ACCOUNT.test(lane.accountId) || !RUN_REF.test(lane.parentRunId)) {
       throw new ProductionMetaReadSyncError("account_scope_unavailable");
     }
+    // Insight evidence is date-grained. A recovery must be exactly one day so
+    // an empty Graph page stays an exact empty observation rather than a
+    // synthetic aggregate, and so a later day cannot inherit this day's
+    // completed cursor set.
+    if (lane.id === "insights_ad_v1") {
+      if (input.dateStart !== input.dateStop || (input.dateSliceDays !== undefined && input.dateSliceDays !== 1)) {
+        throw new ProductionMetaReadSyncError("sync_failed");
+      }
+      return this.runInternal({ ...input, dateSliceDays: 1, parentRunId: `${lane.parentRunId}.${input.dateStart}` }, lane);
+    }
     return this.runInternal({ ...input, parentRunId: lane.parentRunId }, lane);
   }
 
