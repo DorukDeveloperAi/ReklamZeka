@@ -32,14 +32,14 @@
   güncel veri kanıtlamaz.
 - Token değeri hiçbir log/projection'a taşınmadı. Bootstrap yalnız `META_TOKEN_SECURITY_STATUS=rotated`
   önkoşulunda ve server-private secret resolver ile çalışır; scheduler/Meta write yine aktif değildir.
-- Slice/budget/policy altyapısı mevcut olsa da, browser-yerel brief, statik rule katalogları ve
-  persistent policy/budget ledger henüz tek kullanıcı akışında birleşmez. İlk ürün dilimi
-  `Slice Rule Workspace` olacaktır: yabancı FTR gibi kanıtlı bir scope için recommendation-only
-  budget-cap taslağı → impact preview → Budget Lab dry-run → append-only timeline; publish/approve/
-  execute/Meta write kapalı.
-- Orchestrator'da gerçek session/handoff çekirdeği vardır; dashboard sohbeti ise bugün sabit mesaj ve
-  kapalı composer'dır. İlk kalıcı sohbet dilimi, DB ledger + güvenli `codex exec --json` /
-  `resume --json` adapter'ı ile hazırlanacak; experimental app-server protokolü ilk transport olmayacak.
+- Slice/budget/policy altyapısı, persistent Slice Rule Workspace ve Budget Lab dry-run impact
+  preview ile aynı kullanıcı akışında bağlandı. Kural yalnız kaydedilmiş exact draft ref/hash/scope
+  üzerinden değerlendirilir; publish/approve/execute/Meta write kapalıdır.
+- Orchestrator artık kalıcı conversation/turn/message ledger'i ve güvenli yerel Codex adapter'ıyla
+  Dashboard'a bağlıdır: sabit executable/cwd, shell=false, read-only sandbox ve yalnız normalize edilmiş
+  JSONL son yanıtı kullanılır. Konuşma bütün sayfalarda aynıdır; her tur yalnız page-guide snapshotı
+  taşır. Experimental app-server kullanılmaz; session/adapter yoksa manuel `Codex'e aktar` fallback'i
+  korunur. Sohbet typed kullanıcı onayı olmadan kural/bütçe/policy veya Meta değişikliği yapamaz.
 
 ## 2026-08-13 — İlk gerçek read/rule/Orchestrator dikeyleri
 
@@ -47,16 +47,17 @@
   account → campaign → ad set → ad → creative/post, içerik/CTA/destination/hedefleme/budget-owner
   projection'ı döndürür. Yanıt opaque ref, freshness/quality reason ve `ready|partial|stale|empty|
   unavailable` source state taşır; Graph/secret çağrısı ve publish/approve/execute/Meta-write yetkisi
-  yoktur. Güncel boş DB smoke'u dürüstçe `unavailable: active_connection_unavailable` döner. Dashboard
-  görünümü bu source'u kullanacak bir sonraki UI dilimine ayrıldı; eski `/api/meta/inventory` route'u
-  bilinçli 503 davranışını korur.
+  yoktur. Dashboard bu projection'ı ayrı source-state kartı ve hiyerarşi yüzeyiyle kullanır; eksik
+  hiyerarşi/insight alanlarını `partial` veya `unavailable` diye gösterir. Eski `/api/meta/inventory`
+  route'u bilinçli 503 davranışını korur.
 - `slice_rule_workspace_drafts` ile ilk persistent **Slice Rule Workspace** eklendi. Taslaklar
   append-only/revision+hash+audit zincirlidir; pazar (`yerli|yabancı`), hizmet ve kampanya ailesi
   zorunludur; geo/audience/platform varsa exact scope'a bağlanır ve eksik alan tahmin edilmez. Mod DB
   ve application katmanında yalnız `recommendation_only`dir: policy/publish/approve/execute/Meta write/
   automation yetkileri false, owner/admin/analyst yazımı ve viewer read-only sınırı RLS FORCE,
-  revoke, immutable/tombstone korumasıyla uygulanır. Bu dilim henüz Budget Lab impact/dry-run veya
-  Dashboard editörü bağlamaz.
+  revoke, immutable/tombstone korumasıyla uygulanır. Dashboard editörü yalnız kaydedilmiş exact
+  draft ref/hash/scope ile Budget Lab dry-run impact preview'a bağlanır; stale, eksik veya kanıtsız
+  kapsam fail-closed kalır. Preview proposal, approval, action veya Meta write oluşturmaz.
 - Kalıcı **ReklamZeka Orchestrator** conversation/turn/message ledger'i eklendi. Dashboard'un bütün
   sayfaları aynı workspace/user konuşmasını kullanır; her turn page-guide snapshotı taşır. Yerel
   transport yalnız sabit executable/cwd, shell=false, read-only sandbox, allowlisted environment ve
