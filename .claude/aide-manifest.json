@@ -184,7 +184,7 @@
       "pkg": "skill:pm"
     },
     ".claude/skills/pm/scripts/ayar.mjs": {
-      "hash": "cf30008b1673a741",
+      "hash": "a93a7297a14db7f5",
       "pkg": "skill:pm"
     },
     ".claude/skills/pm/scripts/dispatch.mjs": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-12T21:44:16.204Z",
+  "updatedAt": "2026-08-13T09:24:21.910Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",
