@@ -17,6 +17,7 @@ import { MetaCreativeContentRuntimePersistence } from "@/connectors/meta/sync/cr
 import { TransactionBackedMetaSyncPersistenceAdapter, DrizzleMetaSyncTransactionManager } from "@/connectors/meta/sync/persistence-adapter";
 import { planMetaReadSync } from "@/connectors/meta/sync/planner";
 import { MetaPartialReadSyncRuntime, type MetaSyncResult, type MetaSyncRuntimeOptions } from "@/connectors/meta/sync/runtime";
+import { planMetaInsightQuery } from "@/domain/meta/insights/capability-catalog";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -55,6 +56,12 @@ export type ProductionMetaReadSyncInput = Readonly<{
  * entity level, parent id, token, or transport.
  */
 export type ProductionMetaReadSyncRecoveryInput = Readonly<Omit<ProductionMetaReadSyncInput, "parentRunId">>;
+
+/**
+ * A bounded historical hydration, not an operator-selectable sync endpoint.
+ * Account selection and the campaign-only stream filter remain server-owned.
+ */
+export type ProductionMetaInsightBootstrapInput = Readonly<Omit<ProductionMetaReadSyncInput, "parentRunId">>;
 
 export type ServerOwnedMetaRecoveryLaneId = "inventory_ad_set_v1" | "creative_ad_v1" | "creative_ad_v2" | "insights_ad_v1";
 
@@ -98,14 +105,61 @@ type ProductionMetaReadSyncDependencies = Readonly<{
   fetchImpl?: MetaFetch;
   runtimeFactory?: RuntimeFactory;
   recoveryLane?: ServerOwnedMetaRecoveryLane;
+  /**
+   * Optional only for deterministic tests. The production composition installs
+   * the fixed GET-only capability selector below; no request can provide it.
+   */
+  insightBootstrapAccountSelector?: (input: Readonly<{
+    client: MetaGraphClient;
+    accountIds: readonly string[];
+  }>) => Promise<readonly string[]>;
 }>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const RUN_REF = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const META_ACCOUNT = /^act_[0-9]{1,32}$/;
+const INSIGHT_BOOTSTRAP_ACCOUNT_LIMIT = 10;
 
 function validScope(scope: ServerDerivedMetaSyncScope): boolean {
   return UUID.test(scope.workspaceId) && UUID.test(scope.connectionId);
+}
+
+type InsightCapabilityProbeResponse = Readonly<{ data?: readonly unknown[] }>;
+
+/**
+ * Fixed, minimally wide capability gate for historical hydration. A non-empty
+ * campaign-level row proves that this DB-derived account can contribute source
+ * evidence; errors or empty responses are deliberately excluded rather than
+ * guessed. This is body-less GET through MetaGraphClient only.
+ */
+async function selectInsightBootstrapAccounts(input: Readonly<{
+  client: MetaGraphClient;
+  accountIds: readonly string[];
+}>): Promise<readonly string[]> {
+  const plan = planMetaInsightQuery({
+    graphApiVersion: "v23.0",
+    level: "campaign",
+    metrics: ["impressions"],
+    attribution: { mode: "account_default" },
+    timeIncrement: 1,
+    grantedPermissions: ["ads_read"],
+  });
+  if (plan.status !== "planned") throw new ProductionMetaReadSyncError("sync_failed");
+  const selected: string[] = [];
+  for (const accountId of input.accountIds.slice(0, INSIGHT_BOOTSTRAP_ACCOUNT_LIMIT)) {
+    try {
+      const response = await input.client.get<InsightCapabilityProbeResponse>(`/${accountId}/insights`, {
+        ...plan.parameters,
+        date_preset: "last_30d",
+        limit: "1",
+      });
+      if (Array.isArray(response.data) && response.data.length > 0) selected.push(accountId);
+    } catch {
+      // A capability failure for one account must not broaden the run to it or
+      // prevent a separately proven account from being hydrated.
+    }
+  }
+  return Object.freeze(selected);
 }
 
 function summarize(result: MetaSyncResult, affectedGeoMaterialization: "completed" | "deferred"): ProductionMetaReadSyncResult {
@@ -161,7 +215,24 @@ export class ProductionMetaReadSyncService {
     return this.runInternal({ ...input, parentRunId: lane.parentRunId }, lane);
   }
 
-  private async runInternal(input: ProductionMetaReadSyncInput, recoveryLane: ServerOwnedMetaRecoveryLane | null): Promise<ProductionMetaReadSyncResult> {
+  /**
+   * Hydrates only campaign-level insights for accounts whose fixed, read-only
+   * capability probe returns a row. The caller cannot choose account IDs,
+   * stream/entity level, parent id, token, or Graph parameters.
+   */
+  async runInsightBootstrap(input: ProductionMetaInsightBootstrapInput): Promise<ProductionMetaReadSyncResult> {
+    if (input.dateStart > input.dateStop) throw new ProductionMetaReadSyncError("sync_failed");
+    return this.runInternal({
+      ...input,
+      parentRunId: `meta.read.insight.bootstrap.v1.${input.dateStart}.${input.dateStop}`,
+    }, null, "insight_bootstrap");
+  }
+
+  private async runInternal(
+    input: ProductionMetaReadSyncInput,
+    recoveryLane: ServerOwnedMetaRecoveryLane | null,
+    mode: "normal" | "insight_bootstrap" = "normal",
+  ): Promise<ProductionMetaReadSyncResult> {
     if (!RUN_REF.test(input.parentRunId)) throw new ProductionMetaReadSyncError("sync_failed");
     if (input.requestTimeoutMs !== undefined && (!Number.isInteger(input.requestTimeoutMs) || input.requestTimeoutMs < 1_000 || input.requestTimeoutMs > 60_000)) {
       throw new ProductionMetaReadSyncError("sync_failed");
@@ -203,11 +274,12 @@ export class ProductionMetaReadSyncService {
       }
       if (!token.trim()) throw new ProductionMetaReadSyncError("connection_unavailable");
 
-      const transport = new MetaGraphSyncTransport(new MetaGraphClient(token, this.dependencies.fetchImpl, {
+      const client = new MetaGraphClient(token, this.dependencies.fetchImpl, {
         graphApiVersion: connection.graphApiVersion,
         ...(input.requestTimeoutMs === undefined ? {} : { requestTimeoutMs: input.requestTimeoutMs }),
         ...(input.maxAttempts === undefined ? {} : { maxAttempts: 1 }),
-      }));
+      });
+      const transport = new MetaGraphSyncTransport(client);
       const createRuntime = this.dependencies.runtimeFactory ?? ((options) => new MetaPartialReadSyncRuntime(options));
       const runtime = createRuntime({
         transport,
@@ -218,8 +290,15 @@ export class ProductionMetaReadSyncService {
         ...(input.maxAttempts === undefined ? {} : { maxAttempts: input.maxAttempts }),
         ...(input.maxRunDurationMs === undefined ? {} : { deadlineAtEpochMs: Date.now() + input.maxRunDurationMs }),
       });
+      const bootstrapAccountIds = mode === "insight_bootstrap"
+        ? await (this.dependencies.insightBootstrapAccountSelector ?? selectInsightBootstrapAccounts)({ client, accountIds })
+        : accountIds;
+      if (!bootstrapAccountIds.length || (mode === "insight_bootstrap" && bootstrapAccountIds.length > INSIGHT_BOOTSTRAP_ACCOUNT_LIMIT)
+        || bootstrapAccountIds.some((id) => !accountIds.includes(id) || !META_ACCOUNT.test(id))) {
+        throw new ProductionMetaReadSyncError("account_scope_unavailable");
+      }
       const fullPlan = planMetaReadSync({
-        accountIds: recoveryLane ? [recoveryLane.accountId] : accountIds,
+        accountIds: recoveryLane ? [recoveryLane.accountId] : bootstrapAccountIds,
         dateStart: input.dateStart,
         dateStop: input.dateStop,
         ...(input.dateSliceDays === undefined ? {} : { dateSliceDays: input.dateSliceDays }),
@@ -233,7 +312,9 @@ export class ProductionMetaReadSyncService {
           : recoveryLane.id === "creative_ad_v1" || recoveryLane.id === "creative_ad_v2"
             ? slice.stream === "creative_post" && slice.entityLevel === "ad"
             : slice.stream === "insights" && slice.entityLevel === "ad")
-        : fullPlan;
+        : mode === "insight_bootstrap"
+          ? fullPlan.filter((slice) => slice.stream === "insights" && slice.entityLevel === "campaign")
+          : fullPlan;
       if (!plan.length) throw new ProductionMetaReadSyncError("account_scope_unavailable");
       const result = await runtime.run({
         parentRunId: input.parentRunId,

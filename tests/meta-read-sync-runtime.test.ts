@@ -54,6 +54,7 @@ function fixture(overrides: Readonly<{
   recoveryAccountId?: string;
   recoveryLaneId?: "inventory_ad_set_v1" | "creative_ad_v1" | "creative_ad_v2" | "insights_ad_v1";
   creativePagePersistence?: MetaCreativeSourcePagePersistencePort;
+  insightBootstrapAccountSelector?: (input: Readonly<{ accountIds: readonly string[] }>) => Promise<readonly string[]>;
 }> = {}) {
   const inventoryPagePersistence: MetaInventoryPagePersistencePort = {
     writePage: vi.fn(async (page) => ({ inserted: 0, updated: 0, unchanged: 0, stale: 0, disappeared: 0, pageHash: page.pageHash })),
@@ -84,6 +85,9 @@ function fixture(overrides: Readonly<{
         accountId: overrides.recoveryAccountId,
         parentRunId: `meta.read.recovery.${recoveryLaneId.replace(/_v1$/, "").replaceAll("_", ".")}.v1`,
       },
+    }),
+    ...(overrides.insightBootstrapAccountSelector === undefined ? {} : {
+      insightBootstrapAccountSelector: async (input) => overrides.insightBootstrapAccountSelector!({ accountIds: input.accountIds }),
     }),
     runtimeFactory: (options) => {
       wiredOptions = options;
@@ -195,6 +199,31 @@ describe("production Meta read sync composition", () => {
     expect(runtimeInput.plan).toEqual([expect.objectContaining({ stream: "insights", entityLevel: "ad", accountId: "act_123456", dateStart: "2026-08-01", dateStop: "2026-08-01" })]);
     await expect(setup.service.runRecoveryLane({ dateStart: "2026-08-01", dateStop: "2026-08-02", dateSliceDays: 1 }))
       .rejects.toEqual(new ProductionMetaReadSyncError("sync_failed"));
+  });
+
+  it("bootstraps only capability-selected campaign insight windows with a date-bound resumable parent", async () => {
+    const selector = vi.fn(async ({ accountIds }: Readonly<{ accountIds: readonly string[] }>) => {
+      expect(accountIds).toEqual(["act_123456", "act_987654"]);
+      return ["act_987654"];
+    });
+    const setup = fixture({ accountIds: ["act_123456", "act_987654"], insightBootstrapAccountSelector: selector });
+    await setup.service.runInsightBootstrap({
+      dateStart: "2026-07-14", dateStop: "2026-08-12", dateSliceDays: 7, initialPageSize: 25, maxRunDurationMs: 5_000,
+    });
+    const runtimeInput = setup.runtimeRun.mock.calls[0]![0];
+    expect(runtimeInput.parentRunId).toBe("meta.read.insight.bootstrap.v1.2026-07-14.2026-08-12");
+    expect(runtimeInput.plan).toHaveLength(5);
+    expect(runtimeInput.plan.every((slice) => slice.stream === "insights" && slice.entityLevel === "campaign"
+      && slice.accountId === "act_987654")).toBe(true);
+    expect(JSON.stringify(runtimeInput.plan)).not.toContain("act_123456");
+    expect(selector).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed when the capability gate cannot prove an account", async () => {
+    const setup = fixture({ insightBootstrapAccountSelector: async () => [] });
+    await expect(setup.service.runInsightBootstrap({ dateStart: "2026-07-14", dateStop: "2026-08-12" }))
+      .rejects.toEqual(new ProductionMetaReadSyncError("account_scope_unavailable"));
+    expect(setup.runtimeRun).not.toHaveBeenCalled();
   });
 
   it("fails closed with a redacted error when the private secret cannot be resolved", async () => {

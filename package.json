@@ -48,6 +48,7 @@
     "verify:meta-s14-read": "tsx scripts/verify-meta-s14-read.ts",
     "verify:meta-targeting-shape": "tsx scripts/verify-meta-targeting-shape.ts",
     "verify:meta-insight-capabilities": "tsx scripts/verify-meta-insight-capabilities.ts",
+    "run:meta-insight-bootstrap": "tsx scripts/run-meta-insight-bootstrap.ts",
     "verify:meta-change-timeline-db": "tsx scripts/verify-meta-change-timeline-postgres.ts",
     "verify:meta-connection-db": "tsx scripts/verify-meta-connection-postgres.ts",
     "verify:workspace-tombstone-db": "tsx scripts/verify-workspace-tombstone-postgres.ts",
