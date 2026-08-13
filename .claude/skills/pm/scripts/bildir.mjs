@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=motor
 // bildir.mjs — sistemin telefona SESİ: `happy notify` sarmalayıcısı ve push
 // dedupe state'inin (~/.claude/pm/bildirim-durum.json) TEK YAZARI.
 //

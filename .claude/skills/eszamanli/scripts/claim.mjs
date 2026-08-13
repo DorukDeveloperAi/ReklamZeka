@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=motor
 /**
  * claim.mjs — eşzamanlı session protokolünün CLI'ı (/eszamanli skill'inin makine yüzü).
  *

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=motor
 /**
  * kasa.mjs — OTURUM KASASI: AÇIK SEKMELERİN yeniden-başlatılabilir yedeği.
  *

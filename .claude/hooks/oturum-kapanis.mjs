@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=motor
 /**
  * oturum-kapanis.mjs — OTURUM boyutunun kapanış VE açılış halkası.
  *

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// sg: katman=modul rol=defter
 /**
  * Claude session status hook.
  *
