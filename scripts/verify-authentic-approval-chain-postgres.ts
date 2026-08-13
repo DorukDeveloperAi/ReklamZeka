@@ -60,6 +60,19 @@ async function assignScopeCategories(source: NonNullable<typeof fixture>) {
     await profiles.mutate({ workspaceId: source.workspaceId, workspaceRef: source.workspaceRef, actorId: source.actorId, actorRef: source.actorRef, role: "owner", occurredAt: effectiveAt, command: { operation: "publish", profileRef: created.profile.profileRef, expectedVersion: created.profile.version, expectedProfileHash: created.profile.profileHash, expectedRegistryHash: profileState.registryHash, reasonCode: "approval_chain_fixture" } });
   }
 }
+async function assignAdSetGuardrailCategory(source: NonNullable<typeof fixture>, adSetId: string) {
+  const authoring = new DrizzleCategoryAuthoringRepository(database as never); let state = await authoring.inspect(source.workspaceId);
+  const profiles = new DrizzleCategoryProfileLifecycleRepository(database as never); const effectiveAt = source.occurredAt;
+  const dimension = "guardrail_scope"; const definition = "guardrail_verified";
+  state = (await authoring.mutate({ workspaceId: source.workspaceId, actorId: source.actorId, actorRef: source.actorRef, role: "owner", occurredAt: effectiveAt, command: { operation: "create_dimension", key: dimension, name: dimension, description: null, cardinality: "single", allowedEntityLevels: ["ad_set"], expectedRegistryHash: state.registryHash } })).state;
+  const dimensionRef = categoryDimensionPublicRef(dimension);
+  state = (await authoring.mutate({ workspaceId: source.workspaceId, actorId: source.actorId, actorRef: source.actorRef, role: "owner", occurredAt: effectiveAt, command: { operation: "create_definition", dimensionRef, key: definition, label: definition, description: null, expectedRegistryHash: state.registryHash } })).state;
+  state = (await authoring.mutate({ workspaceId: source.workspaceId, actorId: source.actorId, actorRef: source.actorRef, role: "owner", occurredAt: effectiveAt, command: { operation: "create_assignment", dimensionRef, definitionRef: categoryDefinitionPublicRef(dimension, definition), entityLevel: "ad_set", entityRef: categoryEntityPublicRef(source.workspaceId, "ad_set", adSetId), viaAdRef: null, assignmentOperation: "override", manualLock: false, confidenceBasisPoints: 10_000, expectedRegistryHash: state.registryHash } })).state;
+  let profileState = await profiles.inspect(source.workspaceId, source.workspaceRef);
+  const created = await profiles.mutate({ workspaceId: source.workspaceId, workspaceRef: source.workspaceRef, actorId: source.actorId, actorRef: source.actorRef, role: "owner", occurredAt: effectiveAt, command: { operation: "create_draft", definitionRef: categoryDefinitionPublicRef(dimension, definition), expectedRegistryHash: profileState.registryHash, parentDefinitionRef: null, label: definition, description: "Authentic approval-chain ad set fixture", color: "#A31F34", bindings: { analysisPlaybookRefs: ["analysis_playbook_approval_chain"], ruleInstructionBundleRefs: [], budgetPolicyRefs: [], transferPolicyRefs: [], schedulePolicyRefs: [], actionPolicyRefs: [], creativePolicyRefs: [] } } });
+  profileState = created.state;
+  await profiles.mutate({ workspaceId: source.workspaceId, workspaceRef: source.workspaceRef, actorId: source.actorId, actorRef: source.actorRef, role: "owner", occurredAt: effectiveAt, command: { operation: "publish", profileRef: created.profile.profileRef, expectedVersion: created.profile.version, expectedProfileHash: created.profile.profileHash, expectedRegistryHash: profileState.registryHash, reasonCode: "approval_chain_adset_fixture" } });
+}
 const fetch0 = globalThis.fetch;
 try {
   globalThis.fetch = (async () => { evidence.metaCalls += 1; throw new Error("network_not_allowed"); }) as typeof fetch;
@@ -71,6 +84,7 @@ try {
   const adSetRef = `adset_${source.campaignRef}`;
   const adSetId = randomUUID();
   await database.insert(schema.metaAdSets).values({ id: adSetId, workspaceId: source.workspaceId, adAccountId: source.adAccountId, campaignId: source.campaignId, externalAdSetId: adSetRef, name: "Approval chain fixture", rawPayloadHash: "c".repeat(64), sourceGraphVersion: "v23.0", fieldCatalogVersion: "approval-chain-fixture", provenance: { fixture: true }, fetchedAt: now, firstSeenAt: now, lastSeenAt: now });
+  await assignAdSetGuardrailCategory(source, adSetId);
   // A hierarchy change is accepted by the source reader only when its immutable
   // change snapshot carries the same complete campaign/ad-set shape.
   const snapshotAt = new Date(now.getTime() - 1_000).toISOString();

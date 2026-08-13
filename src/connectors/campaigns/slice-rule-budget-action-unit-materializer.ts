@@ -25,7 +25,7 @@ const HASH = /^[a-f0-9]{64}$/;
 const REF = /^[a-z][a-z0-9_.:-]{0,127}$/;
 
 export class SliceRuleBudgetActionUnitMaterializerError extends Error {
-  constructor(readonly code: "invalid_input" | "membership_required" | "role_denied" | "source_missing" | "source_ambiguous" | "stale_source" | "delivery_hold" | "ad_set_owner_unsupported" | "budget_mismatch" | "policy_unavailable" | "queue_rejected" | "corrupt_store") {
+  constructor(readonly code: "invalid_input" | "membership_required" | "role_denied" | "source_missing" | "source_ambiguous" | "stale_source" | "delivery_hold" | "ad_set_owner_unsupported" | "budget_mismatch" | "policy_unavailable" | "guardrail_category_unavailable" | "guardrail_geo_unavailable" | "guardrail_rejected" | "queue_rejected" | "corrupt_store") {
     super("Bütçe ActionUnit taslağı güvenli biçimde oluşturulamadı");
   }
 }
@@ -195,6 +195,8 @@ export class DrizzleSliceRuleBudgetActionUnitMaterializer {
       ).resolve(Object.freeze({ workspaceId: input.workspaceId, workspaceRef, accountRef: contexts[0]!.accountRef,
         campaignRef: contexts[0]!.campaignRef, entity: Object.freeze({ level: "adset" as const, ref: adSet[0]!.externalAdSetId }),
         evaluatedAt: input.proposedAt, notBefore }));
+      if (evidence.categoryEvidence.status !== "known") throw new SliceRuleBudgetActionUnitMaterializerError("guardrail_category_unavailable");
+      if (evidence.affectedGeoEvidence.status !== "known") throw new SliceRuleBudgetActionUnitMaterializerError("guardrail_geo_unavailable");
       const guardrails = resolveSliceRuleBudgetActionGuardrails({ workspaceRef, evaluatedAt: input.proposedAt,
         action: Object.freeze({ actionHash: digest(intent), actionType: applicability.actionType, accountRef: contexts[0]!.accountRef,
           campaignRef: contexts[0]!.campaignRef, entity: intent.entity,
@@ -202,7 +204,7 @@ export class DrizzleSliceRuleBudgetActionUnitMaterializer {
             relativeDeltaBasisPoints: relativeDeltaBasisPoints(s.beforeAmountMinor, s.afterAmountMinor) }) }),
         categoryEvidence: evidence.categoryEvidence, affectedGeoEvidence: evidence.affectedGeoEvidence,
         revisions: await new DrizzleActionGuardrailPolicyRepository(tx as Database, input.workspaceId, workspaceRef).listArtifacts() });
-      if (!guardrails) throw new SliceRuleBudgetActionUnitMaterializerError("queue_rejected");
+      if (!guardrails) throw new SliceRuleBudgetActionUnitMaterializerError("guardrail_rejected");
       // This hash is resolved from the already persisted, tenant-bound context
       // above. It is never part of the materialize command or browser payload.
       const valve: ActionValveContext = { workspaceRef, accountGroupRef: null, accountRef: contexts[0]!.accountRef,
