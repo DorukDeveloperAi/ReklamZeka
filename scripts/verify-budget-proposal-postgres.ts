@@ -190,10 +190,18 @@ async function materializeReadyBudgetContext(source: NonNullable<typeof fixture>
       : messages.some((message) => message.includes("date")) ? "date"
       : messages.some((message) => message.includes("json")) ? "json"
       : "other";
-    throw new Error(`budget_verifier_l3_window_${code}_${kind}_${category}_query${l3QueryStage}`);
+    const stage = messages.find((message) => message.startsWith("budget_verifier_l3_query_")) ?? "budget_verifier_l3_query_unknown";
+    throw new Error(`budget_verifier_l3_window_${code}_${kind}_${category}_${stage}`);
   }
-  const l3 = await createDrizzleTimeframeBoundAnalysisContextComposer({ database: database as never, now: () => new Date(l3AsOf) })
-    .composeAndSave({ workspaceId: source.workspaceId, entityType: "campaign", entityRef: source.campaignRef, timeframe });
+  let l3: Awaited<ReturnType<ReturnType<typeof createDrizzleTimeframeBoundAnalysisContextComposer>["composeAndSave"]>>;
+  try {
+    l3 = await createDrizzleTimeframeBoundAnalysisContextComposer({ database: database as never, now: () => new Date(l3AsOf) })
+      .composeAndSave({ workspaceId: source.workspaceId, entityType: "campaign", entityRef: source.campaignRef, timeframe });
+  } catch (error) {
+    const code = error && typeof error === "object" && "diagnosticCode" in error && typeof error.diagnosticCode === "string"
+      ? error.diagnosticCode : "unknown";
+    throw new Error(`budget_verifier_l3_persistence_${code}`);
+  }
   return Object.freeze({ contextHash: l3.context.contextHash,
     ready: l3.context.data.trustStatus === "ready" && l3.context.data.blockers.length === 0
       && l3.context.data.featureRefs.length === 1 && l3.context.data.featureRefs[0] === featureRef
@@ -319,7 +327,14 @@ try {
 }
 await pool.end();
 
-if (Object.entries(evidence).some(([key, value]) => key.endsWith("Calls") ? value !== 0 : value !== true)) {
+const evidencePassed = evidence.tablesApplied && evidence.sourceBoundContext && evidence.readyL3Context
+  && evidence.exactContextBinding && evidence.mappingSuppression && evidence.mappingIndependentScenarios
+  && evidence.idempotency && evidence.revisionChain && evidence.draftAuditAtomic && evidence.draftIdempotency
+  && evidence.publicProjectionSafe && evidence.crossTenantBlocked && evidence.immutableRows && evidence.rlsAndGrants
+  && evidence.metaCalls === 0 && evidence.executionCalls === 0 && evidence.proposalRowsRolledBack && evidence.fixtureCommitted
+  && evidence.tombstoneCleanup && evidence.purgeCandidateCount === 0 && evidence.foreignPurgeCandidateCount === 0
+  && evidence.activeSurvivorCount === 0 && evidence.foreignActiveSurvivorCount === 0;
+if (!evidencePassed) {
   throw new Error(`Budget proposal doğrulaması başarısız: ${JSON.stringify(evidence)}`);
 }
 console.log(JSON.stringify(evidence));

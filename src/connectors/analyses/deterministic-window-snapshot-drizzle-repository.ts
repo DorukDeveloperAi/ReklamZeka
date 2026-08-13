@@ -44,7 +44,10 @@ export class DrizzleDeterministicWindowSnapshotRepository {
       if (rows(await tx.execute(sql`select id from workspaces where id = ${scope.workspaceId}::uuid and lifecycle_state = 'active' for update`)).length !== 1) fail("not_found");
       const current = rows<{ id: unknown; feature_payload: unknown }>(await tx.execute(sql`
         select feature.id::text as id, feature.feature_payload from deterministic_feature_snapshots feature
-        where feature.workspace_id = ${scope.workspaceId}::uuid and feature.feature_hash = any(${expected.featureHashes}::text[])
+        where feature.workspace_id = ${scope.workspaceId}::uuid
+          and feature.feature_hash in (
+            select value from jsonb_array_elements_text(${JSON.stringify(expected.featureHashes)}::jsonb)
+          )
           and not exists (
             select 1 from deterministic_feature_snapshot_invalidations invalidation
             where invalidation.workspace_id = feature.workspace_id
@@ -63,7 +66,10 @@ export class DrizzleDeterministicWindowSnapshotRepository {
       if (inserted.length !== 1 || typeof inserted[0]!.id !== "string") fail("corrupt_store");
       await tx.execute(sql`insert into deterministic_window_snapshot_features (workspace_id, window_snapshot_id, feature_snapshot_id, feature_ref, feature_hash)
         select ${scope.workspaceId}::uuid, ${inserted[0]!.id}::uuid, feature.id, feature.feature_ref, feature.feature_hash from deterministic_feature_snapshots feature
-        where feature.workspace_id = ${scope.workspaceId}::uuid and feature.feature_hash = any(${expected.featureHashes}::text[])`);
+        where feature.workspace_id = ${scope.workspaceId}::uuid
+          and feature.feature_hash in (
+            select value from jsonb_array_elements_text(${JSON.stringify(expected.featureHashes)}::jsonb)
+          )`);
       return Object.freeze({ window: expected, outcome: "inserted" as const });
   }
 

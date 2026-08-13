@@ -17,5 +17,8 @@ describe("budget proposal PostgreSQL verifier", () => {
     expect(source).toContain("new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge)");
     expect(source).toContain("proposalRowsRolledBack");
     expect(source).toContain("tombstoneCleanup");
+    expect(source).toContain("const evidencePassed =");
+    expect(source).toContain("evidence.purgeCandidateCount === 0");
+    expect(source).not.toContain('Object.entries(evidence).some');
   });
 });

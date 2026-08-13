@@ -30,10 +30,21 @@ type EvidenceBoundContextWriter = Readonly<{
 }>;
 
 export class TimeframeBoundAnalysisContextComposerError extends Error {
-  constructor(readonly code: "invalid_input" | "source_rejected" | "stale_source" | "persistence_rejected") {
+  constructor(
+    readonly code: "invalid_input" | "source_rejected" | "stale_source" | "persistence_rejected",
+    readonly diagnosticCode?: string,
+  ) {
     super(`Timeframe-bound analysis context rejected: ${code}`);
     this.name = "TimeframeBoundAnalysisContextComposerError";
   }
+}
+
+function diagnosticCodeOf(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const candidate = "diagnosticCode" in error && typeof error.diagnosticCode === "string"
+    ? error.diagnosticCode
+    : "code" in error && typeof error.code === "string" ? error.code : undefined;
+  return candidate && /^[a-z_]{2,80}(?::[a-z_]{2,80})?$/.test(candidate) ? candidate : undefined;
 }
 
 function required(value: unknown): string {
@@ -113,7 +124,7 @@ export class TimeframeBoundAnalysisContextComposer {
     } catch { throw new TimeframeBoundAnalysisContextComposerError("source_rejected"); }
     let persisted: Awaited<ReturnType<EvidenceBoundContextWriter["save"]>>;
     try { persisted = await this.writer.save(context, { mode: "evidence_bound" }); }
-    catch { throw new TimeframeBoundAnalysisContextComposerError("persistence_rejected"); }
+    catch (error) { throw new TimeframeBoundAnalysisContextComposerError("persistence_rejected", diagnosticCodeOf(error)); }
     if (persisted.record.invalidated || persisted.record.context.contextHash !== context.contextHash) {
       throw new TimeframeBoundAnalysisContextComposerError("persistence_rejected");
     }

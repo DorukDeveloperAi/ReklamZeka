@@ -42,6 +42,11 @@ describe("DrizzleFrozenDiagnosticEvidenceRepository", () => {
     const result = await new DrizzleFrozenDiagnosticEvidenceRepository().saveInTransaction(database as never, { contextId, context: context() });
     expect(result).toBe("inserted");
     expect(calls).toHaveLength(2);
+    expect(calls[0]).toContain("jsonb_array_elements_text");
+    expect(calls[0]).toContain("deterministic_window_snapshots l3_window");
+    expect(calls[0]).not.toContain("deterministic_window_snapshots window");
+    expect(calls[0]).not.toContain(" = any(");
+    expect(calls[0]).not.toContain("for share");
     expect(calls[1]).toContain("insert into frozen_diagnostic_evidence");
     expect(calls[1]).toContain("category_cohort_profile_hash");
     expect(calls[1]).toContain("canAccessNetwork");

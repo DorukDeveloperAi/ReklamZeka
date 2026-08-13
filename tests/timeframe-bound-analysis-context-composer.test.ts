@@ -59,4 +59,17 @@ describe("TimeframeBoundAnalysisContextComposer", () => {
       .rejects.toMatchObject({ code: "source_rejected" } satisfies Partial<TimeframeBoundAnalysisContextComposerError>);
     expect(materializeForTimeframe).not.toHaveBeenCalled();
   });
+
+  it("keeps a bounded repository diagnostic while preserving the public persistence rejection", async () => {
+    const source = sourceContext(); const l3 = window();
+    const record = { context: source, analysisDataScope: { metaConnectionId, adAccountId, campaignId: "40000000-0000-4000-8000-000000000004" }, sourceComponents: [], invalidated: false } as const;
+    const composer = new TimeframeBoundAnalysisContextComposer(
+      { loadLatestValid: async () => record },
+      { materializeForTimeframe: async () => ({ window: l3, outcome: "inserted" as const }) },
+      { save: async () => { throw Object.assign(new Error("private"), { code: "workspace_scope_mismatch" }); } },
+      () => new Date("2026-08-02T00:00:01.000Z"),
+    );
+    await expect(composer.composeAndSave({ workspaceId, entityType: "campaign", entityRef: "campaign_safe", timeframe }))
+      .rejects.toMatchObject({ code: "persistence_rejected", diagnosticCode: "workspace_scope_mismatch" });
+  });
 });

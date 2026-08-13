@@ -229,6 +229,16 @@ describe("effective campaign context persistence contract", () => {
     });
   });
 
+  it("classifies bounded driver type/query failures without releasing native details", async () => {
+    for (const [nativeCode, diagnosticCode] of [["22P02", "driver_type_error"], ["42703", "driver_query_error"], ["0A000", "driver_query_error"]] as const) {
+      const database = { transaction: vi.fn(async () => {
+        throw Object.assign(new Error("wrapped"), { cause: Object.assign(new Error("private"), { code: nativeCode }) });
+      }) };
+      await expect(new DrizzleEffectiveCampaignContextRepository(database as never).save(context()))
+        .rejects.toMatchObject({ code: "persistence_rejected", diagnosticCode });
+    }
+  });
+
   it("rejects evidence-bound contexts whose claimed L2/L3 evidence is absent or stale", async () => {
     const existing = context({ evidenceBound: true });
     const { schemaVersion: _schemaVersion, contextHash: _contextHash, capabilities: _capabilities, ...input } = existing;
@@ -249,6 +259,14 @@ describe("effective campaign context persistence contract", () => {
     await expect(new DrizzleEffectiveCampaignContextRepository({ transaction: async (callback: (tx: typeof transaction) => Promise<unknown>) => callback(transaction) } as never)
       .save(frozen, { mode: "evidence_bound" }))
       .rejects.toMatchObject({ code: "workspace_scope_mismatch" } satisfies Partial<EffectiveCampaignContextRepositoryError>);
+  });
+
+  it("uses JSON reference manifests for exact L2/L3 verification instead of scalar text-array coercion", () => {
+    const source = readFileSync("src/connectors/analyses/effective-campaign-context-drizzle-repository.ts", "utf8");
+    expect(source).toContain("jsonb_array_elements_text(${JSON.stringify(featureRefs)}::jsonb)");
+    expect(source).toContain("jsonb_array_elements_text(${JSON.stringify(windowRefs)}::jsonb)");
+    expect(source).not.toContain("feature_ref = any(${featureRefs}::text[])");
+    expect(source).not.toContain("window_ref = any(${windowRefs}::text[])");
   });
 
   it("rejects a newly persisted legacy payload while old v1 replay remains buildable", async () => {

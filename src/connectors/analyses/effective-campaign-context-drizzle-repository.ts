@@ -95,13 +95,14 @@ export class EffectiveCampaignContextRepositoryError extends Error {
  */
 type PersistenceWriteStage = "workspace_lock" | "mirror_scope" | "analysis_evidence" | "outcome_evidence"
   | "cadence_evidence" | "authority_snapshot_evidence" | "authority_binding_evidence" | "idempotency_lookup" | "identity_lookup"
-  | "context_insert" | "components_insert" | "policy_sidecar_insert" | "policy_items_insert" | "diagnostic_evidence_insert" | "persistence_reload";
+  | "context_insert" | "components_insert" | "policy_sidecar_insert" | "policy_items_insert" | "diagnostic_evidence_insert"
+  | "diagnostic_evidence_lookup" | "persistence_reload";
 
 function persistenceDiagnosticCode(error: unknown, stage: PersistenceWriteStage): EffectiveCampaignContextRepositoryError["diagnosticCode"] {
   let candidate: unknown = error;
   // Drizzle wraps the pg error in `cause`; inspect at most three wrapper
   // layers and consume its SQLSTATE only. Messages and metadata remain sealed.
-  for (let depth = 0; depth < 3; depth += 1) {
+  for (let depth = 0; depth < 6; depth += 1) {
     if (candidate && typeof candidate === "object" && "code" in candidate && typeof candidate.code === "string") break;
     candidate = candidate && typeof candidate === "object" && "cause" in candidate ? candidate.cause : undefined;
   }
@@ -119,6 +120,9 @@ function persistenceDiagnosticCode(error: unknown, stage: PersistenceWriteStage)
     case "23505": return "unique_violation";
     case "42501": return "insufficient_privilege";
     case "P0001": return "trigger_rejected";
+    case "22P02": return "driver_type_error";
+    case "0A000":
+    case "42703": return "driver_query_error";
     default: return `driver_rejected:${stage}`;
   }
 }
@@ -321,7 +325,9 @@ async function assertDeterministicAnalysisData(
       and feature.ad_account_id = ${mirror.adAccountId}::uuid
       and feature.entity_level = ${entityLevel}::meta_insight_entity_level
       and feature.external_entity_id = ${context.identity.entityRef}
-      and feature.feature_ref = any(${featureRefs}::text[])
+      and feature.feature_ref in (
+        select value from jsonb_array_elements_text(${JSON.stringify(featureRefs)}::jsonb)
+      )
       and not exists (
         select 1 from deterministic_feature_snapshot_invalidations invalidation
         where invalidation.workspace_id = feature.workspace_id
@@ -360,7 +366,9 @@ async function assertDeterministicAnalysisData(
       and l3_window.ad_account_id = ${mirror.adAccountId}::uuid
       and l3_window.entity_level = ${entityLevel}::meta_insight_entity_level
       and l3_window.external_entity_id = ${context.identity.entityRef}
-      and l3_window.window_ref = any(${windowRefs}::text[])
+      and l3_window.window_ref in (
+        select value from jsonb_array_elements_text(${JSON.stringify(windowRefs)}::jsonb)
+      )
       and not exists (
         select 1
         from deterministic_window_snapshot_features affected_binding
@@ -776,7 +784,15 @@ export class DrizzleEffectiveCampaignContextRepository {
         && context.metaAnalysisConfigEvidence !== undefined && context.categories.length > 0) {
         persistenceStage = "diagnostic_evidence_insert";
         try { await new DrizzleFrozenDiagnosticEvidenceRepository().saveInTransaction(transaction, { contextId: inserted[0]!.id, context }); }
-        catch (error) { if (error instanceof FrozenDiagnosticEvidenceRepositoryError) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch"); throw error; }
+        catch (error) {
+          if (error instanceof FrozenDiagnosticEvidenceRepositoryError) {
+            if (error.diagnosticStage !== undefined) {
+              throw new EffectiveCampaignContextRepositoryError("persistence_rejected", `driver_rejected:diagnostic_evidence_${error.diagnosticStage}`);
+            }
+            throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+          }
+          throw error;
+        }
       }
       persistenceStage = "persistence_reload";
       return Object.freeze({
