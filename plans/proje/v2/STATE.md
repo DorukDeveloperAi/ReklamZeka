@@ -3646,3 +3646,19 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   `tests/slice-rule-budget-action-unit-http.test.ts`, `npm run typecheck`, `npm run db:check`,
   `npm run check:security-boundaries`; canlı recovery aggregate-only olarak 11/25/0 bağı ve sıfır
   Meta write doğruladı.
+
+## 2026-08-13 — K2/K3 bütçe onay policy çalışma alanı
+
+- Policy Bundle Studio, exact applicability seçimiyle artık üç ayrı onay sınıfını işler: K2 bütçe
+  azaltma, K3 bütçe artırma ve K4 mevcut gönderi öne çıkarma. K2/K3 policy'si K4'e veya birbirine
+  fallback yapmaz; aynı `policyRef` sonraki revizyonda kapsam değiştiremez.
+- Böylece kullanıcının görünür bütçe zinciri tamamlanır: Slice Rule taslağı → frozen impact ve
+  saved proposal → tek allocation seçimi → exact K2/K3 published policy → yalnız insan onay kuyruğu.
+  Policy taslağını hazırlayan kişi kendi current hash'ini yayımlayamaz; farklı owner/admin'ın
+  human-presence doğrulamalı yayını gerekir.
+- Bu bir execution açılışı değildir. Queue'ya gönderim dahi policy, context, mirror budget, currency,
+  delivery hold ve immutable provenance yeniden doğrulanmadan mümkün değildir. Approval kaydı Meta
+  transportuna, bütçe yazımına veya otomasyona yetki vermez.
+- Kanıt: `tests/policy-bundle-studio.test.ts`, `tests/policy-bundle-dashboard.test.ts`,
+  `tests/approval-policy-registry.test.ts`, `tests/slice-rule-budget-action-unit-http.test.ts`,
+  `npm run typecheck`, `npm run check:security-boundaries`, `npm run db:check`.
