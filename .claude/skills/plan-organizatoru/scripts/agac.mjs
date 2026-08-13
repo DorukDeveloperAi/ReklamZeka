@@ -154,7 +154,7 @@ const GETIRIR_ANAHTARLAR = ['katman', 'dugum', 'kenar', 'kaldir', 'dokunur'];
 // 28'in union'ı değişir de bu liste durursa O TEST KIRILIR. Sessiz drift imkânsız.
 // Küme bağlayıcıdır, SIRA DEĞİL.
 const KENAR_TIPLERI = ['icerir', 'ust', 've', 'veya', 'capraz', 'aittir', 'calistirir', 'dogurur',
-  'bagli', 'uyesi', 'tutar', 'esler', 'catisir', 'korur', 'dagitir', 'izler'];
+  'bagli', 'uyesi', 'tutar', 'esler', 'catisir', 'korur', 'dagitir', 'izler', 'tetikler'];
 // Gramer ilkelleri — charset ÖLÇÜLDÜ (2026-08-04, canlı graf 864 düğüm: `AD:YOL` desenine
 // uymayan 0). Taslaktan İKİ DARALTMA yapıldı (genişletme yasak): `@` düştü (0 kullanım) ·
 // `*` YOL'dan düştü (joker rezervi; `*` taşıyan 7 düğümün tamamı UÇUCU `kilit:` katmanıdır ve
