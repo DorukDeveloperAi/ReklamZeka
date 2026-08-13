@@ -13,13 +13,13 @@ import { categoryDefinitionPublicRef } from "@/domain/categories/public-referenc
 import { buildEffectiveGuidancePack, type EffectiveGuidancePack } from "@/domain/guidance/registry";
 import { projectMetaAnalysisConfig } from "@/domain/meta/analysis-config-projection";
 import type { CategoryHierarchyTarget } from "@/domain/categories/service";
-import { CurrentDecisionCadenceReader, type CurrentDecisionCadence } from "@/connectors/decisions/current-decision-cadence-reader";
-import { CurrentReviewedGuidanceReader, type CurrentReviewedGuidanceManifest } from "@/connectors/guidance/current-reviewed-guidance-reader";
-import { CurrentGuidanceCampaignSelectionReader } from "@/connectors/guidance/current-guidance-campaign-selection-reader";
+import { CurrentDecisionCadenceReader, CurrentDecisionCadenceReaderError, type CurrentDecisionCadence } from "@/connectors/decisions/current-decision-cadence-reader";
+import { CurrentReviewedGuidanceReader, CurrentReviewedGuidanceReaderError, type CurrentReviewedGuidanceManifest } from "@/connectors/guidance/current-reviewed-guidance-reader";
+import { CurrentGuidanceCampaignSelectionReader, CurrentGuidanceCampaignSelectionReaderError } from "@/connectors/guidance/current-guidance-campaign-selection-reader";
 import type { GuidanceCampaignSelection } from "@/connectors/guidance/guidance-campaign-selection-drizzle-repository";
-import { CurrentMetaHierarchyConfigReader, type CurrentMetaHierarchyConfig } from "@/connectors/meta/current-meta-hierarchy-config-reader";
+import { CurrentMetaHierarchyConfigReader, CurrentMetaHierarchyConfigReaderError, type CurrentMetaHierarchyConfig } from "@/connectors/meta/current-meta-hierarchy-config-reader";
 import { DrizzleInstructionPolicyLifecycleRepository } from "@/connectors/policies/instruction-policy-lifecycle-drizzle-repository";
-import { DrizzleTrustedPolicyAuthorityRepository, type LoadedTrustedPolicyAuthority } from "@/connectors/policies/trusted-policy-authority-drizzle-repository";
+import { DrizzleTrustedPolicyAuthorityRepository, TrustedPolicyAuthorityRepositoryError, type LoadedTrustedPolicyAuthority } from "@/connectors/policies/trusted-policy-authority-drizzle-repository";
 import { DrizzlePromotionTemplateLifecycleRepository } from "@/connectors/meta/promotion/promotion-template-lifecycle-drizzle-repository";
 import type { PromotionTemplateLifecycleState } from "@/application/promotion-template-lifecycle-service";
 import type { InstructionPolicyLifecycleState } from "@/application/instruction-policy-lifecycle-service";
@@ -45,6 +45,11 @@ export class CurrentEffectiveAnalysisContextSourceReaderError extends Error {
 function sourceFailureCode(error: unknown): string {
   if (error instanceof CurrentEffectiveAnalysisContextSourceReaderError) return error.code;
   if (error instanceof CurrentCategoryCompositionError) return `category_composition_${error.code}`;
+  if (error instanceof CurrentMetaHierarchyConfigReaderError) return `meta_hierarchy_${error.code}`;
+  if (error instanceof CurrentDecisionCadenceReaderError) return `cadence_${error.code}`;
+  if (error instanceof CurrentReviewedGuidanceReaderError) return `reviewed_guidance_${error.code}`;
+  if (error instanceof CurrentGuidanceCampaignSelectionReaderError) return `guidance_selection_${error.code}`;
+  if (error instanceof TrustedPolicyAuthorityRepositoryError) return `policy_authority_${error.code}`;
   if (error instanceof Error && SOURCE_FAILURE_CODES.has(error.message)) return error.message;
   return "source_reader_unavailable";
 }
