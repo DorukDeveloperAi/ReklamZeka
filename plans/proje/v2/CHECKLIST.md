@@ -784,10 +784,12 @@
 - [ ] Bütçe stüdyosu: envelope/lock/target/forecast/simulation.
   - [x] Gerçek proposal ledger salt-okunur list/detail, before-after, mapping/suppression ve
     trace summary; ayrı `budget_lab:read` local-session scope'u.
-- [ ] Kural/target edit akışı.
+  - [ ] Kural/target edit akışı.
   - [x] Persistent Slice Rule Workspace draft: exact pazar/hizmet/aile ve opsiyonel
     geo/audience/platform scope, recommendation-only revision/hash/audit/RLS; policy/action/Meta
     write bağlantısı kapalı.
+  - [x] Kaydedilmiş Slice Rule draft'ından frozen-context kanıtlı salt-okunur Budget Lab impact/dry-run
+    preview; stale/ambiguous/pazar uyuşmazlığı fail-closed, persistence/action/Meta write sıfır.
   - [x] Explicit dry-run compose ve append-only draft persistence; aynı transaction'da audit,
     public-safe çıktı ve approval/execute/Meta-write yetkisi `false`.
 - [ ] Approval inbox, automation run, verify/rollback ve tek timeline.

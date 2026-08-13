@@ -80,6 +80,20 @@
   reddini, append-only korumayı, audit zincirini ve sıfır Meta write'ı doğruladı. Bu checkpoint henüz
   Dashboard alarm panelini veya temporal evaluator'ı bağlamaz.
 
+## 2026-08-13 — Kural impact ve alarm kullanıcı yüzeyleri
+
+- Kurallar ekranı, persistent Slice Rule Workspace panelini Guidance Studio yanında gösterir. Kullanıcı
+  recommendation-only taslak oluşturabilir; yalnız kaydedilmiş exact draft ref/hash/scope üzerinden
+  frozen context'ten çözülen pazar/hizmet/aile kanıtıyla Budget Lab dry-run impact preview isteyebilir.
+  Kaydedilmemiş form, stale/missing draft, bozuk/çoklu kategori, pazar uyuşmazlığı veya unsupported rule
+  türü preview üretmez. Preview persistence/proposal/approval/action/Meta write oluşturmaz.
+- Teslimat Alarmları Dashboard yüzeyi, confirmed/suspected ayrımı, atama, checklist, insan workflow
+  durumu ve recommendation hold bilgisini gösterir. UI yalnız server-izinli `assign/start/check/resolve/
+  reopen` geçişini sunar; approval/execute/automation/Meta write kontrolü yoktur.
+- Kanıt: Rule impact resolver/service/HTTP/panel 17 odaklı test; alert panel/ledger 12 odaklı test;
+  typecheck ve db check geçti. Bu yüzeyler gerçek Meta bağlamı yokken boş/unavailable gösterir; demo
+  alarm veya performans iddiası üretmez.
+
 ## 2026-08-12 — Portföy pazar sınırı
 
 - Kullanıcıyla yürütülen mevcut portföy istişaresinde **pazar**, tüm künye ve slice'ların ilk
