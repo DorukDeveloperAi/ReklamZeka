@@ -5104,6 +5104,40 @@ export const actionProposalUnitFrozenContexts = pgTable("action_proposal_unit_fr
   check("action_proposal_unit_frozen_contexts_hashes", sql`${table.contextHash} ~ '^[a-f0-9]{64}$' and ${table.bindingHash} ~ '^[a-f0-9]{64}$'`),
 ]);
 
+/** Immutable source edge from one reviewed scenario selection to its queued budget unit. */
+export const sliceRuleBudgetActionUnitBindings = pgTable("slice_rule_budget_action_unit_bindings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  selectionId: uuid("selection_id").notNull(),
+  actionProposalUnitId: uuid("action_proposal_unit_id").notNull(),
+  bindingHash: text("binding_hash").notNull(),
+  bindingPayload: jsonb("binding_payload").$type<Record<string, unknown>>().notNull(),
+  boundByActorId: uuid("bound_by_actor_id").notNull(),
+  boundAt: timestamp("bound_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.selectionId], foreignColumns: [sliceRuleScenarioAllocationSelections.workspaceId, sliceRuleScenarioAllocationSelections.id], name: "slice_rule_budget_action_unit_bindings_selection_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.actionProposalUnitId], foreignColumns: [actionProposalUnits.workspaceId, actionProposalUnits.id], name: "slice_rule_budget_action_unit_bindings_unit_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.boundByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "slice_rule_budget_action_unit_bindings_membership_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("slice_rule_budget_action_unit_bindings_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slice_rule_budget_action_unit_bindings_selection_unique").on(table.selectionId),
+  uniqueIndex("slice_rule_budget_action_unit_bindings_unit_unique").on(table.actionProposalUnitId),
+  check("slice_rule_budget_action_unit_bindings_hash", sql`${table.bindingHash} ~ '^[a-f0-9]{64}$'`),
+  check("slice_rule_budget_action_unit_bindings_payload_exact", sql`(
+    jsonb_typeof(${table.bindingPayload}) = 'object'
+    and ${table.bindingPayload} #>> '{schemaVersion}' = 'slice-rule-budget-action-unit-binding/1.0.0'
+    and ${table.bindingPayload} #>> '{bindingHash}' = ${table.bindingHash}
+    and ${table.bindingPayload} #>> '{selectionId}' = ${table.selectionId}::text
+    and ${table.bindingPayload} #>> '{actionProposalUnitId}' = ${table.actionProposalUnitId}::text
+    and (${table.bindingPayload} #>> '{boundAt}')::timestamptz = ${table.boundAt}
+    and ${table.bindingPayload} #> '{authority}' = '{"canApprove":false,"canExecute":false,"canWriteMeta":false}'::jsonb
+  ) is true`),
+  check("slice_rule_budget_action_unit_bindings_no_forbidden_authority", sql`
+    ${table.bindingPayload}::text !~* '"(approvalGranted|writeEnabled|policyPublished|actionAuthorized)"[[:space:]]*:[[:space:]]*true'
+    and ${table.bindingPayload}::text !~* '"[^"[:space:]]*(token|secret|authorization|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
+  `),
+]);
+
 /** Immutable edges preserve the proposal DAG without carrying approval state. */
 export const actionProposalDependencies = pgTable("action_proposal_dependencies", {
   id: uuid("id").primaryKey().defaultRandom(),
