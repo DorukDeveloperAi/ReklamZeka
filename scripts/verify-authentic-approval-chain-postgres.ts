@@ -33,7 +33,7 @@ import { retryWorkspaceTombstoneTransport } from "./support/workspace-tombstone-
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const url = process.env.DATABASE_URL?.trim(); if (!url) throw new Error("DATABASE_URL yapılandırılmadı");
-const createPool = () => new Pool({ connectionString: url, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 20_000 });
+const createPool = () => new Pool({ connectionString: url, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 20_000, query_timeout: 90_000, keepAlive: true });
 let pool = createPool(); let database = drizzle(pool, { schema }); const rollback = Symbol("authentic-approval-chain-rollback");
 const evidence = { readyL3: false, ruleSaved: false, savedProposal: false, allocationBound: false, selected: false, materialized: false, exactReplay: false, queueRead: false, canExecuteFalse: false, rollbackClean: false, cleanup: false, metaCalls: 0, executionCalls: 0 };
 const rows = (v: unknown): readonly Record<string, unknown>[] => v && typeof v === "object" && "rows" in v && Array.isArray(v.rows) ? v.rows as readonly Record<string, unknown>[] : [];
