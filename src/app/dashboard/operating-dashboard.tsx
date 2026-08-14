@@ -26,6 +26,7 @@ import { CanonicalCampaignPortfolioPanel } from "./canonical-campaign-portfolio-
 import { campaignContextBridge } from "./campaign-planning-brief-panel";
 import { LocalSessionConnector } from "./local-session-connector";
 import { SkillCatalogContextStrip, type SkillCatalogContext } from "./skill-catalog-context-strip";
+import { SkillCatalogPanel } from "./skill-catalog-panel";
 import {
   dashboardLocationFromSearch,
   dashboardLocationHref,
@@ -1192,7 +1193,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
         { id: "learning", label: "Öğrenim", description: "İnsan onaylı yaklaşımlar" },
       ]} />
       {rulesArea === "guidance" ? <><GuidanceStudioPanel onSessionRequiredChange={setRulesSessionRequired} />
-        {rulesSessionRequired === false ? <><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /><SliceRuleWorkspacePanel /></> : null}</>
+        {rulesSessionRequired === false ? <><SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /><SliceRuleWorkspacePanel /></> : null}</>
         : rulesArea === "policies" ? <InstructionPolicyStudioPanel />
           : rulesArea === "authority" ? <AutonomyStudioPanel />
             : <PracticeLabPanel />}
