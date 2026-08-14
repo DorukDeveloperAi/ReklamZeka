@@ -3760,3 +3760,15 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   `tests/slice-rule-budget-action-unit-materializer.test.ts`,
   `tests/action-proposal-queue-drizzle-repository.test.ts`,
   `npm run verify:action-proposal-queue-db` ve `npm run typecheck`.
+
+## 2026-08-14 — 30 günlük canonical Meta insight bootstrap tamamlandı
+
+- Server-private, GET-only insight bootstrap iki canonical hesap için 10/10 campaign-insight
+  tarih dilimini durable cursor ile tamamladı: bootstrap kaynağında 759 `meta_daily_insights`
+  satırı, 48 kampanya ve 2026-07-14–2026-08-12 kapsamı vardır; cursor ve error classification
+  kalmamıştır. Tüm canonical tabloda 761 satır, 4 hesap ve 50 kampanya görülür.
+- Bu, gün bazında tam yoğunluk demek değildir: ikinci hesap bazı günlerde Meta satırı döndürmedi.
+  Trust/readiness ve Dashboard bu boşluğu `partial`/`not_ready` olarak göstermeyi sürdürür;
+  sıfır performans veya tam 30-gün coverage çıkarımı yapılmaz.
+- Bootstrap yalnız Graph GET çağrıları yaptı; Meta write 0'dır. Scheduler/cron etkin değildir ve
+  bu kanıt otomatik işletim kabulü değildir.
