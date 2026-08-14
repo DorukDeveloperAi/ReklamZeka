@@ -25,6 +25,7 @@ import { CanonicalPerformancePanel } from "./canonical-performance-panel";
 import { CanonicalCampaignPortfolioPanel } from "./canonical-campaign-portfolio-panel";
 import { campaignContextBridge } from "./campaign-planning-brief-panel";
 import { LocalSessionConnector } from "./local-session-connector";
+import { SkillCatalogContextStrip, type SkillCatalogContext } from "./skill-catalog-context-strip";
 import {
   dashboardLocationFromSearch,
   dashboardLocationHref,
@@ -87,9 +88,58 @@ type PortfolioCapabilitySummary = Readonly<{
 }>;
 
 type MetaReadMirrorLoadState = "loading" | "ready" | "session_required" | "unavailable";
+export type SkillCatalogLoadState = "idle" | "loading" | "ready" | "session_required" | "unavailable" | "legacy";
 
 function plainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function safeSkillName(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z][A-Za-z0-9 ]{0,95}$/.test(value);
+}
+
+function onlyKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  return Object.keys(value).every((key) => keys.includes(key));
+}
+
+/** Maps the catalog's GET projection into the drawer-safe context and drops every identifier and source field. */
+export function skillCatalogContextFromResponse(value: unknown): SkillCatalogContext | null {
+  if (!plainRecord(value)) return null;
+  const authority = plainRecord(value.authority) ? value.authority : null;
+  const activeProfile = value.activeProfile;
+  const skillsProjection = value.skills;
+  const playbooks = value.playbooks;
+  if (!onlyKeys(value, ["contractVersion", "activeProfile", "playbooks", "skills", "authority"])
+    || value.contractVersion !== "skill-catalog-ui/1.0.0" || !Array.isArray(skillsProjection)
+    || !Array.isArray(playbooks) || !authority
+    || !onlyKeys(authority, ["canSelectProfile", "canCreatePlaybookRevision", "canTombstonePlaybook", "canPersist", "canCreateRule", "canDraftPolicy", "canAlterScope", "canPublish", "canApprove", "canExecute", "canWriteMeta"])
+    || !["canSelectProfile", "canCreatePlaybookRevision", "canTombstonePlaybook"].every((key) => typeof authority[key] === "boolean")
+    || !["canPersist", "canCreateRule", "canDraftPolicy", "canAlterScope", "canPublish", "canApprove", "canExecute", "canWriteMeta"].every((key) => authority[key] === false)
+    || playbooks.some((playbook) => !plainRecord(playbook) || !onlyKeys(playbook, ["kind", "ref", "revision", "state", "title", "url", "freshness"]) || playbook.kind !== "playbook")) return null;
+  if (activeProfile === null) return Object.freeze({ profileLabel: "", skills: Object.freeze([]), legacy: true });
+  if (!plainRecord(activeProfile) || !onlyKeys(activeProfile, ["kind", "ref", "revision", "state"])
+    || activeProfile.kind !== "profile" || typeof activeProfile.ref !== "string" || typeof activeProfile.state !== "string") return null;
+  const revision = activeProfile.revision;
+  if (typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 1) return null;
+  const skills = skillsProjection.map((candidate) => {
+    if (!plainRecord(candidate) || !onlyKeys(candidate, ["ref", "name", "version", "lifecycle", "citationRequired", "negativeCapabilities"])
+      || typeof candidate.ref !== "string" || !safeSkillName(candidate.name)
+      || typeof candidate.version !== "string" || !/^\d+\.\d+\.\d+$/.test(candidate.version)
+      || candidate.lifecycle !== "released" || candidate.citationRequired !== true || !Array.isArray(candidate.negativeCapabilities)
+      || candidate.negativeCapabilities.some((capability) => typeof capability !== "string")) return null;
+    return Object.freeze({ name: candidate.name, version: candidate.version });
+  });
+  if (skills.some((skill) => skill === null)) return null;
+  return Object.freeze({
+    profileLabel: `Aktif skill profili · revizyon ${revision}`,
+    skills: Object.freeze(skills as SkillCatalogContext["skills"]),
+  });
+}
+
+export function skillCatalogLoadState(status: number, payload: unknown): SkillCatalogLoadState {
+  if (status === 401 && plainRecord(payload) && plainRecord(payload.error) && payload.error.code === "local_session_required") return "session_required";
+  const context = status === 200 ? skillCatalogContextFromResponse(payload) : null;
+  return context?.legacy ? "legacy" : context ? "ready" : "unavailable";
 }
 
 const nullableText = (value: unknown): boolean => value === null || typeof value === "string";
@@ -477,6 +527,8 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
   const [orchestratorInput, setOrchestratorInput] = useState("");
   const [orchestratorSending, setOrchestratorSending] = useState(false);
   const [orchestratorError, setOrchestratorError] = useState<string | null>(null);
+  const [skillCatalogContext, setSkillCatalogContext] = useState<SkillCatalogContext | null>(null);
+  const [skillCatalogState, setSkillCatalogState] = useState<SkillCatalogLoadState>("idle");
   const [agentSourceView, setAgentSourceView] = useState<DashboardViewId>(initialLocationRef.current.view);
   const [draftPolicyTemplate, setDraftPolicyTemplate] = useState<CampaignIntentTemplateRef>("");
   const [rulesSessionRequired, setRulesSessionRequired] = useState<boolean | null>(null);
@@ -692,15 +744,38 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     }
   }, []);
 
+  const refreshSkillCatalog = useCallback(async (): Promise<boolean> => {
+    setSkillCatalogState("loading");
+    setSkillCatalogContext(null);
+    try {
+      const response = await fetch("/api/skill-catalog", { method: "GET", cache: "no-store", credentials: "same-origin",
+        headers: { "X-ReklamZeka-Intent": "skill-catalog-read" } });
+      const payload: unknown = await response.json();
+      const state = skillCatalogLoadState(response.status, payload);
+      const context = state === "ready" || state === "legacy" ? skillCatalogContextFromResponse(payload) : null;
+      setSkillCatalogContext(context);
+      setSkillCatalogState(state);
+      return state === "ready" || state === "legacy";
+    } catch {
+      setSkillCatalogContext(null);
+      setSkillCatalogState("unavailable");
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
     if (activeView === "agent") void refreshOrchestratorConversation();
   }, [activeView, refreshOrchestratorConversation]);
 
+  useEffect(() => {
+    if (activeView === "agent") void refreshSkillCatalog();
+  }, [activeView, refreshSkillCatalog]);
+
   const verifyOrchestratorWorkspace = useCallback(async () => {
     const connected = await refreshOrchestratorConversation();
-    if (connected) await refreshAgentSessions();
+    if (connected) await Promise.all([refreshAgentSessions(), refreshSkillCatalog()]);
     return connected;
-  }, [refreshAgentSessions, refreshOrchestratorConversation]);
+  }, [refreshAgentSessions, refreshOrchestratorConversation, refreshSkillCatalog]);
 
   const sendOrchestratorMessage = useCallback(async () => {
     const message = orchestratorInput.trim();
@@ -915,6 +990,10 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     return <div className={`${styles.agentWorkspace} ${orchestratorState === "ready" ? "" : styles.agentWorkspaceSingle}`}>
         <section className={styles.agentChat}>
           <header><div><span className={styles.agentMark}>✦</span><div><strong>Agent çalışma alanı</strong><small>Kaynak ekran: {sourceTitle} · konuşma sayfalar arasında korunur</small></div></div><button onClick={() => void refreshOrchestratorConversation()}>Sohbeti yenile</button></header>
+          {skillCatalogState === "ready" || skillCatalogState === "legacy" ? <SkillCatalogContextStrip context={skillCatalogContext} />
+            : skillCatalogState === "loading" ? <p role="status">Skill bağlamı güvenli projeksiyondan okunuyor…</p>
+              : skillCatalogState === "session_required" ? <p role="status">Skill bağlamı için yerel oturum gerekli; kayıt veya seçim gösterilmez.</p>
+                : skillCatalogState === "unavailable" ? <p role="status">Skill bağlamı kullanılamıyor; kayıt veya seçim gösterilmez.</p> : null}
           <div className={styles.chatMessages}>
             {orchestratorState === "loading" ? <p role="status">Kalıcı konuşma kaynağı doğrulanıyor…</p> : null}
             {orchestratorState === "session_required" ? <LocalSessionConnector title="Orchestrator konuşmasını bağlayın" onVerify={verifyOrchestratorWorkspace} /> : null}
