@@ -9,9 +9,10 @@ import {
   metaReadMirrorFromResponse,
   portfolioCapabilityFromResponse,
   resolveMetaAccountFocus,
-  todayInventorySummary,
+  todayCanonicalSummary,
 } from "@/app/dashboard/operating-dashboard";
 import type { MetaInventorySnapshot } from "@/connectors/meta/types";
+import type { MetaReadMirrorProjection } from "@/domain/meta/read-mirror-projection";
 
 const model = {
   periodDays: 7, spend: "₺0", conversions: 0, cpa: "₺0", roas: "0",
@@ -26,6 +27,22 @@ function inventory(): MetaInventorySnapshot {
     capabilities: [], accounts: [], pages: [], errors: [], refreshedAt: "2026-08-11T09:30:00.000Z", nextAutomaticRefreshAt: "2026-08-11T09:45:00.000Z",
     audit: { eventId: "audit_inventory", action: "connection.inventory_refreshed", occurredAt: "2026-08-11T09:30:00.000Z", writeOperations: 0 },
   };
+}
+
+function canonicalMirror(): MetaReadMirrorProjection {
+  const projection = {
+    version: "meta-read-mirror-projection/1.0.0", sourceState: "ready",
+    observedAt: "2026-08-13T12:00:00.000Z", latestCanonicalObservationAt: "2026-08-13T11:59:00.000Z",
+    freshnessAgeMinutes: 1, freshnessThresholdMinutes: 1440, reasonCodes: [],
+    summary: { connections: 1, accounts: 4, campaigns: 32, adSets: 80, ads: 120, creatives: 75, posts: 40 },
+    authority: { actionAuthority: "none", canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false },
+    connections: [{ connectionRef: "connection_aaaaaaaaaaaaaaaaaaaaaaaa", name: "Meta", status: "active", accessMode: "read_only",
+      accounts: [{ accountRef: "account_bbbbbbbbbbbbbbbbbbbbbbbb", name: "Hesap", currency: "TRY", timezone: "Europe/Istanbul",
+        freshness: { inventoryStatus: "completed", creativeStatus: "completed", insightStatus: "completed", insightObservedAt: "2026-08-13T11:59:00.000Z", insightCanonicalRowCount: 7, latestObservedAt: "2026-08-13T11:59:00.000Z" }, campaigns: [] }] }],
+  };
+  const parsed = metaReadMirrorFromResponse(projection);
+  if (!parsed) throw new Error("test mirror must satisfy the canonical contract");
+  return parsed;
 }
 
 describe("Today inventory summary", () => {
@@ -61,17 +78,14 @@ describe("Today inventory summary", () => {
     expect(metaReadMirrorErrorState(503, { error: { code: "source_unavailable", message: "Yok" } })).toBe("unavailable");
   });
 
-  it("uses only a structurally valid read-only inventory snapshot for verified counts and freshness", () => {
-    expect(todayInventorySummary(inventory())).toEqual({
-      state: "verified", adAccounts: 4, campaigns: 32, refreshedAt: "2026-08-11T09:30:00.000Z",
+  it("derives Today counts only from the validated canonical mirror", () => {
+    expect(todayCanonicalSummary(canonicalMirror())).toEqual({
+      state: "ready", accounts: 4, campaigns: 32, adSets: 80, ads: 120, observedAt: "2026-08-13T12:00:00.000Z",
     });
   });
 
-  it("fails closed instead of turning absent or malformed inventory into live counts", () => {
-    expect(todayInventorySummary(null)).toEqual({ state: "unavailable", adAccounts: null, campaigns: null, refreshedAt: null });
-    expect(todayInventorySummary({ ...inventory(), summary: { ...inventory().summary, campaigns: -1 } })).toEqual({
-      state: "unavailable", adAccounts: null, campaigns: null, refreshedAt: null,
-    });
+  it("fails closed instead of turning an absent mirror into live counts", () => {
+    expect(todayCanonicalSummary(null)).toEqual({ state: "unavailable", accounts: null, campaigns: null, adSets: null, ads: null, observedAt: null });
   });
 
   it("keeps account focus within the current read-only inventory snapshot", () => {
@@ -84,14 +98,16 @@ describe("Today inventory summary", () => {
     expect(resolveMetaAccountFocus([], "act_a")).toBe("");
   });
 
-  it("labels the initial Today surface as demo/unavailable and does not claim hardcoded account or campaign totals", () => {
+  it("renders an honest loading state without demo decisions, brands or portfolio rows", () => {
     const html = renderToStaticMarkup(createElement(OperatingDashboard, { model }));
-    expect(html).toContain("Meta inventory yükleniyor · demo");
-    expect(html).toContain("Kampanya sayısı doğrulanmadı");
-    expect(html).toContain("demo sayıları canlı veri değildir");
+    expect(html).toContain("OPERATING REVIEW · KANONİK KAYNAK");
+    expect(html).toContain("Kanonik ayna okunuyor");
+    expect(html).toContain("Kampanya sayısı kullanılamıyor");
+    expect(html).toContain("Eksik veri sıfır veya örnek değer olarak gösterilmez.");
     expect(html).toContain("Canlı outcome metriği olmadan CPA gösterilmez.");
-    expect(html).toContain("Örnek karar biçimleri");
-    expect(html).toContain("3 senaryoyu aç");
+    expect(html).not.toContain("Örnek karar biçimleri");
+    expect(html).not.toContain("Planlama senaryoları");
+    expect(html).not.toContain("Demo Marka");
     expect(html).not.toContain("₺128.000");
     expect(html).not.toContain("32 aktif kampanya");
   });

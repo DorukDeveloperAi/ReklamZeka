@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ApprovalQueueDetailRecord, ApprovalQueueReadService, ApprovalQueueRecord } from "@/application/approval-queue-read-service";
+import { LocalSessionConnector } from "./local-session-connector";
 import styles from "./operating-dashboard.module.css";
 
 type ApprovalQueueListResult = Awaited<ReturnType<ApprovalQueueReadService["list"]>>;
@@ -135,7 +136,7 @@ export function ApprovalQueueReadSurface(props: Readonly<{
   onRetry(): void;
   onSelect(item: ApprovalQueueRecord): void;
   decision?: DecisionControl;
-  onOpenSession?: () => void;
+  onConnect?: () => Promise<boolean>;
 }>) {
   const ready = props.state.status === "ready" ? props.state : null;
   return <>
@@ -160,10 +161,10 @@ export function ApprovalQueueReadSurface(props: Readonly<{
     </section>
 
     {props.state.status === "loading" ? <section className={`${styles.panel} ${styles.approvalQueueState}`} role="status"><span className={styles.liveDot} /><h2>Onay kuyruğu okunuyor</h2><p>Tenant kapsamı, public-safe projection ve ActionUnit bütünlüğü sunucuda doğrulanıyor.</p></section> : null}
-    {props.state.status === "session_required" ? <section className={`${styles.panel} ${styles.approvalQueueState}`} role="alert"><strong>YEREL OTURUM GEREKLİ</strong><h2>Dashboard oturumunu bağlayın</h2><p>{props.state.message}</p>{props.onOpenSession ? <button onClick={props.onOpenSession}>Decision Room’da oturumu bağla</button> : <button onClick={props.onRetry}>Tekrar dene</button>}</section> : null}
-    {props.state.status === "unavailable" ? <section className={`${styles.panel} ${styles.approvalQueueState}`} role="alert"><strong>Kaynak henüz bağlı değil</strong><h2>{props.state.message}</h2><p>Fixture kayıtlar canlı kuyruk gibi gösterilmez. Güvenli yerel oturum ve gerçek read repository bağlandığında bu görünüm açılır.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></section> : null}
+    {props.state.status === "session_required" ? <section className={`${styles.panel} ${styles.approvalQueueState}`} role="alert"><strong>YEREL OTURUM GEREKLİ</strong><h2>Onay çalışma alanını bağlayın</h2><p>{props.state.message}</p>{props.onConnect ? <LocalSessionConnector title="Onay çalışma alanını bağlayın" onVerify={props.onConnect} /> : <button onClick={props.onRetry}>Tekrar dene</button>}</section> : null}
+    {props.state.status === "unavailable" ? <section className={`${styles.panel} ${styles.approvalQueueState}`} role="alert"><strong>Kaynak henüz bağlı değil</strong><h2>{props.state.message}</h2><p>Bağlı üretim repository’si olmadan örnek onay kaydı gösterilmez.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></section> : null}
     {props.state.status === "error" ? <section className={`${styles.panel} ${styles.approvalQueueState}`} role="alert"><strong>Onay kuyruğu okunamadı</strong><h2>{props.state.message}</h2><p>Kapsam dışı veya güvenli projection sınırını aşan kayıtlar kısmen gösterilmez.</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
-    {ready && ready.result.items.length === 0 ? <section className={`${styles.panel} ${styles.approvalQueueState}`}><strong>Kaynak bağlı · kuyruk boş</strong><h2>İncelenecek ActionUnit bulunmuyor.</h2><p>Bu gerçek tenant-bound boş yanıttır; demo fallback değildir.</p></section> : null}
+    {ready && ready.result.items.length === 0 ? <section className={`${styles.panel} ${styles.approvalQueueState}`}><strong>Kaynak bağlı · kuyruk boş</strong><h2>İncelenecek ActionUnit bulunmuyor.</h2><p>Bağlı çalışma alanı boş yanıt döndürdü; örnek kayıt eklenmedi.</p></section> : null}
     {ready && ready.result.items.length > 0 ? <div className={styles.approvalQueueWorkspace}>
       <section className={`${styles.panel} ${styles.approvalQueueIndex}`}>
         <header className={styles.panelHeader}><div><span className={styles.kicker}>ACTION UNITS</span><h2>{ready.result.items.length} kayıt</h2></div><span>Public-safe</span></header>
@@ -213,7 +214,7 @@ function ApprovalQueueDetail({ item, loading, decision }: Readonly<{
   </section>;
 }
 
-export function ApprovalQueuePanel({ campaignRef = null, onOpenSession }: Readonly<{ campaignRef?: string | null; onOpenSession?: () => void }>) {
+export function ApprovalQueuePanel({ campaignRef = null }: Readonly<{ campaignRef?: string | null }>) {
   const [state, setState] = useState<ApprovalQueueDashboardState>({ status: "loading" });
   const [decisionBusy, setDecisionBusy] = useState(false);
   const [decisionConfirmed, setDecisionConfirmed] = useState(false);
@@ -230,12 +231,14 @@ export function ApprovalQueuePanel({ campaignRef = null, onOpenSession }: Readon
       if (!response.ok) {
         const remoteError = "error" in payload ? payload.error : undefined;
         setState({ status: remoteError?.code === "local_session_required" ? "session_required" : response.status === 503 ? "unavailable" : "error", message: remoteError?.message ?? "Onay kuyruğu yanıtı alınamadı." });
-        return;
+        return false;
       }
       if (!("result" in payload) || payload.result.view !== "list") throw new Error("invalid_contract");
       setState({ status: "ready", result: payload.result, selected: null, detailLoading: false });
+      return true;
     } catch {
       setState({ status: "error", message: "Onay kuyruğu bağlantısı şu anda kullanılamıyor." });
+      return false;
     }
   }, [campaignRef]);
 
@@ -280,7 +283,7 @@ export function ApprovalQueuePanel({ campaignRef = null, onOpenSession }: Readon
     }
   }, [decisionBusy, decisionConfirmed, load, state]);
 
-  return <ApprovalQueueReadSurface state={state} onRetry={() => void load()} onSelect={(item) => void select(item)} onOpenSession={onOpenSession} decision={{
+  return <ApprovalQueueReadSurface state={state} onRetry={() => void load()} onSelect={(item) => void select(item)} onConnect={load} decision={{
     busy: decisionBusy,
     confirmed: decisionConfirmed,
     error: decisionError,

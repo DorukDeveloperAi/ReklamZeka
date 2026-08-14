@@ -80,18 +80,20 @@ describe("Approval Queue dashboard", () => {
       state: { ...ready(), result: { ...ready().result, items: [] } },
     }));
     expect(unavailable).toContain("Kaynak henüz bağlı değil");
-    expect(unavailable).toContain("Fixture kayıtlar canlı kuyruk gibi gösterilmez");
+    expect(unavailable).toContain("örnek onay kaydı gösterilmez");
     expect(error).toContain("Onay kuyruğu okunamadı");
     expect(empty).toContain("Kaynak bağlı · kuyruk boş");
-    expect(empty).toContain("demo fallback değildir");
+    expect(empty).toContain("örnek kayıt eklenmedi");
   });
 
-  it("routes a missing local session to the Decision Room bind surface", () => {
+  it("offers the shared session connector in the approval context", () => {
     const html = renderToStaticMarkup(createElement(ApprovalQueueReadSurface, {
-      ...callbacks, onOpenSession: vi.fn(), state: { status: "session_required", message: "Oturumu bağlayın." },
+      ...callbacks, onConnect: vi.fn(async () => false), state: { status: "session_required", message: "Oturumu bağlayın." },
     }));
     expect(html).toContain("YEREL OTURUM GEREKLİ");
-    expect(html).toContain("Decision Room’da oturumu bağla");
+    expect(html).toContain("Onay çalışma alanını bağlayın");
+    expect(html).toContain("npm run local-session:mint");
+    expect(html).not.toContain("Decision Room’da oturumu bağla");
     expect(html).not.toContain("Kaynak henüz bağlı değil");
   });
 

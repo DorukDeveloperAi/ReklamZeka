@@ -1,0 +1,56 @@
+{
+  "capturedAt": "2026-08-14T12:14:00+03:00",
+  "surface": "Codex in-app browser",
+  "baseUrl": "http://localhost:3000/dashboard",
+  "increment": "merge-static-analysis-into-production-decision-read-model",
+  "informationArchitecture": {
+    "navigationTargetsBefore": 16,
+    "navigationTargetsAfter": 15,
+    "staticAnalysisViewRemoved": true,
+    "canonicalViewLabel": "Analiz & Kararlar",
+    "legacyAnalysisEntryRedirected": true,
+    "fakeOperationalClaimsFound": []
+  },
+  "capability": {
+    "readModel": "production PostgreSQL Decision Room repository",
+    "currentBrowserState": "local_session_required",
+    "dryRunBackend": "real_but_environment_blocked",
+    "dryRunControlRendered": false,
+    "reason": "Exact source refs and settlement configuration are not available in the current browser session; the UI does not claim or simulate execution."
+  },
+  "interaction": {
+    "tabs": ["Rutinler", "Koşumlar", "Sonuçlar"],
+    "tabsSwitch": true,
+    "selectedTabAfterInteraction": "Rutinler",
+    "honestUnavailableState": true,
+    "localSessionRecoveryVisible": true,
+    "sampleFallbackRendered": false
+  },
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "height": 720,
+      "bodyFits": true,
+      "singleH1": true,
+      "visualInspection": "pass"
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "bodyFits": true,
+      "contentWidth": 390,
+      "heroWidth": 362,
+      "statePanelWidth": 362,
+      "singleH1": true,
+      "visualInspection": "pass"
+    }
+  ],
+  "console": {
+    "productErrors": 0,
+    "productWarnings": 0,
+    "developmentFastRefreshWarningsIgnored": 3
+  },
+  "openAcceptance": "operator_minted_local_session_required_for_live_rows"
+}

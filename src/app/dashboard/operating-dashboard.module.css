@@ -230,21 +230,6 @@
 .copyPreview p { margin: 0; color: var(--rz-muted); font-size: .63rem; }
 .copyPreview footer { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
 
-.analysisBuilder { display: grid; grid-template-columns: repeat(4, 1fr) auto; align-items: stretch; margin-bottom: 10px; border: 1px solid var(--rz-line); border-radius: 12px; background: var(--rz-surface); overflow: hidden; }
-.analysisBuilder > div { display: grid; gap: 5px; padding: 15px; border-right: 1px solid var(--rz-line); }
-.analysisBuilder span, .analysisBuilder small { color: var(--rz-muted); font-size: .56rem; }
-.analysisBuilder strong { font-size: .67rem; }
-.analysisBuilder button { padding: 0 16px; border: 0; background: var(--rz-green); color: #111; font-size: .65rem; font-weight: 800; cursor: pointer; }
-.runList { display: grid; }
-.runList article { display: grid; grid-template-columns: minmax(220px, .8fr) 1.5fr auto; align-items: center; gap: 22px; min-height: 0; padding: 16px 18px; border: 0; border-bottom: 1px solid var(--rz-line); border-radius: 0; background: transparent; }
-.runList article:last-child { border-bottom: 0; }
-.runList h3 { margin: 7px 0 4px; font-size: .76rem; }
-.runList p { margin: 0; color: var(--rz-muted); font-size: .6rem; }
-.runList dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 0; }
-.runList dl div { display: grid; gap: 5px; }
-.runList dt { color: var(--rz-dim); font-size: .54rem; }
-.runList dd { margin: 0; font-size: .63rem; }
-.runList article > button { border: 0; background: transparent; color: var(--rz-muted); cursor: pointer; }
 
 .budgetHero { display: grid; grid-template-columns: 1fr 280px; gap: 10px; margin-bottom: 10px; }
 .budgetHero > div { min-height: 135px; padding: 20px; border: 1px solid var(--rz-line); border-radius: 12px; background: var(--rz-surface); }
@@ -732,6 +717,21 @@
 .decisionRoomState h2 { max-width: 760px; margin: 2px 0; font-size: 1.08rem; }
 .decisionRoomState p { max-width: 680px; margin: 0; color: var(--rz-muted); font-size: .65rem; line-height: 1.55; }
 .decisionRoomState button, .decisionRoomList footer button { margin-top: 7px; padding: 8px 11px; border: 1px solid var(--rz-line-strong); border-radius: 8px; background: var(--rz-surface-3); cursor: pointer; font-size: .61rem; }
+.localSessionConnector { display: grid; grid-template-columns: minmax(0, .9fr) minmax(320px, 1.1fr); gap: 20px; width: 100%; margin-top: 12px; padding: 16px; border: 1px solid rgba(184,242,84,.2); border-radius: 12px; background: rgba(184,242,84,.035); }
+.localSessionInstructions, .localSessionFields { display: grid; align-content: start; gap: 7px; min-width: 0; }
+.localSessionInstructions > span { color: var(--rz-green); font: 750 .52rem ui-monospace, monospace; letter-spacing: .08em; }
+.localSessionInstructions > strong { font-size: .76rem; }
+.localSessionInstructions > p { margin: 0; color: var(--rz-muted); font-size: .58rem; line-height: 1.55; }
+.localSessionInstructions > code { width: fit-content; max-width: 100%; padding: 7px 9px; overflow-wrap: anywhere; border: 1px solid var(--rz-line); border-radius: 7px; color: var(--rz-text); background: var(--rz-surface-3); font-size: .56rem; }
+.localSessionFields > label { color: var(--rz-muted); font-size: .55rem; }
+.localSessionFields > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
+.localSessionFields input { min-width: 0; min-height: 36px; padding: 0 10px; border: 1px solid var(--rz-line-strong); border-radius: 8px; color: var(--rz-text); background: var(--rz-input); font: .62rem ui-monospace, monospace; }
+.localSessionFields button { min-height: 36px; margin: 0; padding: 0 12px; border: 1px solid rgba(184,242,84,.35); border-radius: 8px; color: #111; background: var(--rz-green); cursor: pointer; font-size: .6rem; font-weight: 800; }
+.localSessionFields button:disabled { cursor: not-allowed; opacity: .5; }
+.localSessionFields > small { color: var(--rz-dim); font-size: .51rem; line-height: 1.45; }
+.localSessionFeedback { margin: 2px 0 0 !important; font-size: .56rem !important; }
+.localSessionFeedback[data-state="error"] { color: var(--rz-red) !important; }
+.localSessionFeedback[data-state="connected"] { color: var(--rz-green) !important; }
 .decisionRoomList { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .decisionRoomList article { display: flex; flex-direction: column; min-height: 218px; padding: 17px; }
 .decisionRoomList header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -976,8 +976,6 @@
   .campaignDecisionTimeline li:nth-child(2) { border-right: 0; }
   .campaignDecisionTimeline li:nth-child(-n+2) { border-bottom: 1px solid var(--rz-line); }
   .briefPlan > div:last-child { grid-column: 1 / -1; border-top: 1px solid var(--rz-line); border-right: 0; }
-  .analysisBuilder { grid-template-columns: repeat(2, 1fr); }
-  .analysisBuilder button { min-height: 46px; grid-column: 1 / -1; }
   .approvalList { grid-template-columns: 1fr; }
   .approvalList > article { min-height: 0; }
   .metaMetricGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1036,11 +1034,6 @@
   .splitWorkspace, .guidanceWorkspace { grid-template-columns: 1fr; }
   .hierarchy { grid-template-columns: 1fr 1fr; }
   .hierarchy > div::after { display: none; }
-  .analysisBuilder { grid-template-columns: 1fr; }
-  .analysisBuilder > div { border-right: 0; border-bottom: 1px solid var(--rz-line); }
-  .analysisBuilder button { grid-column: auto; }
-  .runList article { grid-template-columns: 1fr auto; }
-  .runList dl { grid-column: 1 / -1; grid-template-columns: 1fr; }
   .budgetHero { grid-template-columns: 1fr; }
   .budgetRows article { grid-template-columns: 1fr 1fr; gap: 14px; }
   .budgetRows article > div:first-child, .budgetRows article > button { grid-column: 1 / -1; }
@@ -1093,6 +1086,8 @@
   .metaAccountDetail dl div:nth-child(-n+2) { border-bottom: 1px solid var(--rz-line); }
   .scopeDisclosure { align-items: flex-start; flex-direction: column; }
   .sourceFooter { flex-direction: column; padding: 12px 14px 20px; }
+  .localSessionConnector { grid-template-columns: 1fr; gap: 14px; padding: 13px; }
+  .localSessionFields > div { grid-template-columns: 1fr; }
   .decisionRoomList { grid-template-columns: 1fr; }
   .practiceLabDetail > header { flex-direction: column; }
   .practiceLabFacts { grid-template-columns: 1fr; }

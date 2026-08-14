@@ -7,6 +7,7 @@ import type {
   DecisionRoomRunStatus,
   DecisionRoomScheduleSummary,
 } from "@/application/decision-room-read-service";
+import { LocalSessionConnector } from "./local-session-connector";
 import styles from "./operating-dashboard.module.css";
 
 type View = DecisionRoomReadResult["view"];
@@ -19,7 +20,7 @@ type AgentEnvelope = Readonly<{ result: DecisionRoomReadResult }>;
 type ErrorEnvelope = Readonly<{ error?: Readonly<{ message?: string }> }>;
 
 const LABELS: Readonly<Record<View, string>> = {
-  schedules: "Rutinler", runs: "Koşumlar", inbox: "Analiz kutusu",
+  schedules: "Rutinler", runs: "Koşumlar", inbox: "Sonuçlar",
 };
 
 function time(value: string | null) {
@@ -35,12 +36,12 @@ export function DecisionRoomReadSurface(props: Readonly<{
   onView: (view: View) => void;
   onRetry: () => void;
   onMarkRead: (notificationRef: string) => void;
-  onConnect?: (capability: string) => void;
+  onConnect?: () => Promise<boolean>;
 }>) {
   const { state, view } = props;
   return <>
     <section className={styles.pageHero}>
-      <div><span className={styles.kicker}>DECISION ROOM · READ MODEL</span><h1>Analiz rutinleri ve sonuçları, tek güvenli yüzeyde.</h1><p>Dashboard ile Codex/Claude aynı salt okunur kontratı kullanır. Bu ekran Meta değişikliği, bütçe hareketi veya onay yürütmez.</p></div>
+      <div><span className={styles.kicker}>ANALİZ & KARARLAR · CANLI READ MODEL</span><h1>Gerçek analiz rutinleri ve sonuçları, tek karar yüzeyinde.</h1><p>Yalnız bağlı çalışma alanının rutinleri, koşumları ve sonuçları gösterilir. Bu ekran Meta değişikliği, bütçe hareketi veya onay yürütmez.</p></div>
       <span className={styles.readOnlyBadge}>READ ONLY · AUTHORITY NONE</span>
     </section>
 
@@ -49,24 +50,9 @@ export function DecisionRoomReadSurface(props: Readonly<{
     </section>
 
     {state.status === "loading" ? <section className={`${styles.panel} ${styles.decisionRoomState}`} role="status"><span className={styles.liveDot} /><h2>Decision Room kaynağı okunuyor</h2><p>Çalışma alanı ve okuyucu kimliği yalnız sunucu oturumundan bağlanır.</p></section> : null}
-    {state.status === "unavailable" || state.status === "error" ? <section className={`${styles.panel} ${styles.decisionRoomState}`} role="alert"><strong>{state.status === "unavailable" ? "Kaynak henüz bağlı değil" : "Decision Room okunamadı"}</strong><h2>{state.message}</h2><p>Demo verisi canlı sonuç gibi gösterilmez. Üretim read repository ve güvenilir kimlik bağlama etkinleştiğinde bu görünüm otomatik açılacak.</p><button onClick={props.onRetry}>Tekrar kontrol et</button>{state.status === "unavailable" && props.onConnect ? <LocalSessionForm onConnect={props.onConnect} /> : null}</section> : null}
+    {state.status === "unavailable" || state.status === "error" ? <section className={`${styles.panel} ${styles.decisionRoomState}`} role="alert"><strong>{state.status === "unavailable" ? "Kaynak henüz bağlı değil" : "Kaynak okunamadı"}</strong><h2>{state.status === "unavailable" ? "Analiz & Kararlar kaynağı henüz bağlı değil." : "Analiz & Kararlar şu anda okunamıyor."}</h2><p>{state.message}</p><p>Bağlı üretim kaynağı yokken örnek kayıt gösterilmez.</p><button onClick={props.onRetry}>Tekrar kontrol et</button>{state.status === "unavailable" && props.onConnect ? <LocalSessionConnector title="Yerel dashboard oturumunu bağlayın" onVerify={props.onConnect} /> : null}</section> : null}
     {state.status === "ready" ? <DecisionRoomItems view={view} result={state.result} onMarkRead={props.onMarkRead} /> : null}
   </>;
-}
-
-function LocalSessionForm(props: Readonly<{ onConnect: (capability: string) => void }>) {
-  const [capability, setCapability] = useState("");
-  return <form onSubmit={(event) => {
-    event.preventDefault();
-    const submitted = capability.trim();
-    setCapability("");
-    if (submitted) props.onConnect(submitted);
-  }}>
-    <label htmlFor="local-session-capability">Tek kullanımlık yerel oturum capability</label>
-    <input id="local-session-capability" type="password" autoComplete="off" spellCheck={false}
-      value={capability} onChange={(event) => setCapability(event.target.value)} />
-    <button type="submit" disabled={!capability.trim()}>Yerel oturumu bağla</button>
-  </form>;
 }
 
 function DecisionRoomItems(props: Readonly<{
@@ -74,7 +60,7 @@ function DecisionRoomItems(props: Readonly<{
   result: DecisionRoomReadResult;
   onMarkRead: (notificationRef: string) => void;
 }>) {
-  if (props.result.items.length === 0) return <section className={`${styles.panel} ${styles.decisionRoomState}`}><strong>Kaynak bağlı · kayıt yok</strong><h2>{LABELS[props.view]} görünümü boş</h2><p>Bu, demo fallback değildir; bağlı çalışma alanının gerçek salt okunur yanıtıdır.</p></section>;
+  if (props.result.items.length === 0) return <section className={`${styles.panel} ${styles.decisionRoomState}`}><strong>Kaynak bağlı · kayıt yok</strong><h2>{LABELS[props.view]} görünümü boş</h2><p>Bağlı çalışma alanı bu görünüm için gerçek bir kayıt döndürmedi; örnek içerik eklenmedi.</p></section>;
 
   if (props.view === "schedules") return <section className={styles.decisionRoomList}>{(props.result.items as DecisionRoomScheduleSummary[]).map((item) => <article className={styles.panel} key={item.scheduleRef}><header><span>{item.enabled ? "ETKİN" : "KAPALI"}</span><strong>{item.frequency === "daily" ? "Her gün" : `Haftalık · gün ${item.dayOfWeek}`}</strong></header><h2>{item.templateRef}</h2><p>{item.accountRef} · {item.campaignRef}</p><dl><div><dt>Saat</dt><dd>{item.localTime} · {item.timezone}</dd></div><div><dt>Timeframe</dt><dd>{item.timeframeRef}</dd></div><div><dt>Sonraki</dt><dd>{time(item.nextRunAt)}</dd></div><div><dt>Sürüm</dt><dd>r{item.revision}</dd></div></dl></article>)}</section>;
 
@@ -122,32 +108,25 @@ export function DecisionRoomPanel() {
     }
   }, [load]);
 
-  const connect = useCallback(async (capability: string) => {
+  const verifyConnectedSession = useCallback(async () => {
     try {
-      const response = await fetch("/api/local-session", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${capability}`,
-          "X-ReklamZeka-Intent": "bootstrap-local-session",
-        },
-        credentials: "same-origin",
-      });
-      if (!response.ok) throw new Error("session_rejected");
       const verified = await fetch("/api/decision-room?view=inbox&limit=1", {
         cache: "no-store", credentials: "same-origin",
       });
       if (!verified.ok) {
         setState({ status: "error", message: "Güvenli yerel oturum cookie'si saklanamadı veya veritabanı üyeliği doğrulanmadı. Origin olarak http://localhost kullanın." });
-        return;
+        return false;
       }
       const payload = await verified.json() as AgentEnvelope;
       if (payload.result.view !== "inbox") throw new Error("invalid_contract");
       setView("inbox");
       setState({ status: "ready", result: payload.result });
+      return true;
     } catch {
-      setState({ status: "error", message: "Yerel oturum capability doğrulanamadı veya süresi doldu." });
+      setState({ status: "error", message: "Yerel oturum cookie'si üretildi ancak Decision Room kaynağı doğrulanamadı." });
+      return false;
     }
-  }, [load]);
+  }, []);
 
-  return <DecisionRoomReadSurface view={view} state={state} onView={setView} onRetry={() => void load()} onMarkRead={(ref) => void markRead(ref)} onConnect={(value) => void connect(value)} />;
+  return <DecisionRoomReadSurface view={view} state={state} onView={setView} onRetry={() => void load()} onMarkRead={(ref) => void markRead(ref)} onConnect={verifyConnectedSession} />;
 }
