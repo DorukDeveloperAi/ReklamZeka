@@ -39,7 +39,8 @@ describe("local Meta read mirror runtime", () => {
     const load = vi.fn().mockResolvedValue(projection);
     const response = await createLocalMetaReadMirrorRouteHandler({ database: database as never, config, repository: { load } })(request(true));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(projection);
+    expect(await response.json()).toMatchObject({ ...projection, source: { kind: "canonical_meta_mirror", state: "empty",
+      reasonCodes: ["canonical_hierarchy_empty"] } });
     expect(load).toHaveBeenCalledWith(config.workspaceId);
     expect(response.headers.get("x-reklamzeka-access-mode")).toBe("read-only");
     expect(response.headers.get("x-reklamzeka-action-authority")).toBe("none");

@@ -31,6 +31,7 @@ const required = [
   "docs/qa/2026-08-14-dashboard-meta-orchestrator-operations-browser-evidence.json",
   "docs/qa/2026-08-14-dashboard-approved-ia-browser-evidence.json",
   "docs/qa/2026-08-14-dashboard-shell-routing-browser-evidence.json",
+  "docs/qa/2026-08-14-dashboard-persisted-campaign-operator-acceptance.md",
 ];
 for (const path of required) if (!existsSync(resolve(root, path))) failures.push(`eksik: ${path}`);
 
@@ -147,6 +148,7 @@ if (failures.length === 0) {
     failures.push("onaylı A bilgi mimarisi desktop/etkileşim kanıtı başarısız");
   }
   const shellRoutingEvidence = JSON.parse(readFileSync(resolve(root, "docs/qa/2026-08-14-dashboard-shell-routing-browser-evidence.json"), "utf8"));
+  const operatorAcceptance = readFileSync(resolve(root, "docs/qa/2026-08-14-dashboard-persisted-campaign-operator-acceptance.md"), "utf8");
   if (shellRoutingEvidence.primaryNavigation.visibleTargetCount !== 7
     || !shellRoutingEvidence.primaryNavigation.activeDestinationUsesAriaCurrent
     || !shellRoutingEvidence.routing.browserBackRestoredCampaignPromotion
@@ -170,6 +172,9 @@ if (failures.length === 0) {
     || !shellRoutingEvidence.campaignContextRecovery.clearContextRemovesCampaignQuery
     || shellRoutingEvidence.campaignContextRecovery.clearedUrl !== "/dashboard?view=decision-room"
     || shellRoutingEvidence.campaignContextRecovery.operatorSessionProofMinted) failures.push("campaign deep-link recovery/mobile browser kanıtı başarısız");
+  for (const expected of ["Status: `PENDING_OPERATOR_PROOF`", "Kararlarda incele", "Tüm çalışma alanına dön", "PASS_OPERATOR_PROOF", "Meta write veya execute çalıştırılmadığı"]) {
+    if (!operatorAcceptance.includes(expected)) failures.push(`operator campaign kabul paketi eksik: ${expected}`);
+  }
 }
 
 if (failures.length > 0) {

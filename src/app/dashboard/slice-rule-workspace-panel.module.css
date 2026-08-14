@@ -1,7 +1,7 @@
 .workspace { display: grid; gap: 20px; color: #e9eef4; }
 .hero { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; padding: 26px; border: 1px solid #283640; border-radius: 20px; background: linear-gradient(135deg, #101b22, #13282d); }
 .hero span, .panelTitle span { color: #7cd8c6; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
-.hero h1 { margin: 7px 0 8px; max-width: 700px; font-size: clamp(24px, 3vw, 38px); }
+.hero h2 { margin: 7px 0 8px; max-width: 700px; font-size: clamp(24px, 3vw, 38px); }
 .hero p { margin: 0; max-width: 720px; color: #9dafb9; line-height: 1.6; }
 .hero > strong { flex: none; padding: 9px 12px; border: 1px solid #3b776c; border-radius: 999px; color: #a4eadc; font-size: 11px; }
 .grid { display: grid; grid-template-columns: minmax(280px, .78fr) minmax(420px, 1.3fr); gap: 18px; align-items: start; }

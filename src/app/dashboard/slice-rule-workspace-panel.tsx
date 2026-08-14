@@ -561,7 +561,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     }
   };
   return <div className={styles.workspace}>
-    <header className={styles.hero}><div><span>SLICE RULE WORKSPACE</span><h1>Kanıtlı kapsam için işletim kuralı taslağı</h1><p>Pazar, hizmet ve kampanya ailesi açıkça seçilir. Bu alan yalnız öneri taslağı kaydeder.</p></div><strong>RECOMMENDATION ONLY · AUTHORITY NONE</strong></header>
+    <header className={styles.hero}><div><span>SLICE RULE WORKSPACE</span><h2>Kanıtlı kapsam için işletim kuralı taslağı</h2><p>Pazar, hizmet ve kampanya ailesi açıkça seçilir. Bu alan yalnız öneri taslağı kaydeder.</p></div><strong>RECOMMENDATION ONLY · AUTHORITY NONE</strong></header>
     {props.state.status === "loading" ? <section className={styles.state} role="status">Taslak kayıt defteri doğrulanıyor…</section> : null}
     {props.state.status === "unavailable" || props.state.status === "error" ? <section className={styles.state} role="alert"><h2>{props.state.status === "unavailable" ? "Kaynak bağlı değil" : "Çalışma alanı okunamadı"}</h2><p>{props.state.message}</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
     {snapshot ? <div className={styles.grid}>

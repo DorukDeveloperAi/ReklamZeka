@@ -1048,7 +1048,76 @@ TypeScript, campaign URL/history + context odak testleri (5 dosya / 21 test), ex
 
 - **P1 kapatıldı — iç panel yarışları:** Campaign context üst katmanında sıralı istek koruması vardı; Decision Room ve Onay Kuyruğu içindeki liste/detay isteklerinde yoktu. Hızlı A → B geçişinde geç gelen A yanıtı B altında görünür olabiliyordu. Her iki panel artık istek epoch'u kullanır; liste/context yenilemesi eski detail epoch'unu geçersiz kılar. Onay detayının unit ref'i yanında seçili campaign alias'ı da doğrulanır; Decision Room rutin/koşum yanıtı da seçili campaign alias'ına ait olmalıdır. Uyuşmazlık fail-closed hata durumudur.
 - **P2 iyileştirildi — seçili durum ve alt navigasyon:** Decision Room görünüm seçicisi artık adlandırılmış `nav`, gerçek button türü ve etkin öğede `aria-current="page"` kullanır. Campaign portföyü ve onay kuyruğu seçicileri `aria-pressed` ile seçili kaydı bildirir.
-- **Açık P2:** Route/history sonrası odağı yeni H1/ana landmark'a taşıma ve seçili kaydın detail başlığına odaklama henüz uygulanmadı. Bu, görsel tasarım değil, tüm yüzeylere dokunan erişilebilirlik increment'i olarak ayrı tutuldu.
-- **Ayrı ürün kararı:** Aktif `/dashboard` runtime'ı demo fixture import etmiyor. Buna karşılık legacy `/pilot`, `/reports/demo`, `/api/dashboard`, `/api/insights` zinciri ve mount edilmemiş campaign-planning başlangıç senaryoları repository'de kalıyor. Bunlar aktif dashboard ihlali değildir; fakat yeniden etkinleştirme/yanlış sahiplenme riski taşır. Kaldırma, deprecated legacy boundary veya provenance'lı sunucu template kataloğu seçimi kullanıcı kararı gerektirir.
+- **Sonraki increment'te kapatıldı:** Route/history sonrası odağı yeni landmark'a taşıma ve seçili kaydın detail başlığına odaklama, bölüm 30'da uygulandı.
+- **Karar:** Kullanıcının “demo da olsa veri gerçek hattan çekilsin” yönü doğrultusunda legacy public demo zinciri kapatıldı; bölüm 31'e bakın.
 
 Bu increment'in odak testleri, epoch kontrolleri ve ARIA çıktısını da kapsar. Gerçek persisted context ile kontrollü geciktirilmiş A → B network senaryosu ile operator browser kabulü, local-session proof gerektirdiği için açık DoD olarak kalır.
+
+## 30. Landmark ve odak devamlılığı
+
+Önceki shell'de outer `main`, sidebar/topbar/footer ile aynı seviyedeydi; değişen sayfa içeriği ise landmark olmayan bir `div` idi. Route/history veya campaign recovery sonrasında klavye odağı kaldırılmış bir kontrol üzerinde kalabiliyordu.
+
+- Shell root artık nötr `div`; tek named `main` gerçek değişen içeriktir ve her hedefte `tabIndex=-1` ile programatik odak hedefidir.
+- View, alt-alan veya campaign context değiştiğinde odak yalnız ilgili içerik ana landmark'ına taşınır; asistan drawer'ın URL durumu tek başına odak sıçraması oluşturmaz.
+- Portföy ve onay kuyruğu seçicilerinde kullanıcı bir kayıt seçtiğinde, doğrulanmış detail heading programatik odak alır. İlk veri yüklemesi bu odağı zorlamaz.
+- IA, portföy ve onay surface testleri landmark, tab stop, seçili state ve detail focus contract'ını kapsar.
+
+Bu P2 erişilebilirlik increment'i typecheck ve focused testlerle doğrulandı. Route/history ve gerçek persisted context ile ekran okuyucu kabulü, operator browser yolculuğunun kalan kanıtıdır.
+
+## 31. Legacy fixture demo public sınırı kaldırıldı
+
+Kullanıcı kararı: demo adını taşısa bile operasyonel veri frontend fixture'ından yayınlanmamalı; gerçek backend yolu yoksa yüzey gizlenmelidir.
+
+- `/pilot`, `/reports/demo` ve eski imzalı rapor URL'si `/dashboard`'a yönlenir.
+- `/api/dashboard`, `/api/insights`, `/api/reports/demo-share` ve legacy report CSV endpoint'i `410 legacy_demo_retired` ve `no-store` döndürür.
+- Root sayfa yalnız `/dashboard` girişini sunar; eski “pilot yolculuğu” çağrısı kaldırıldı.
+- Root durum metni de eski saha-pilot vaatini taşımayı bıraktı; kullanıcıya yalnız kanonik kaynak durumunun dashboard'da doğrulanacağı söylenir.
+- Fixture sınıfları ve tarihsel testler repository'de kalır, fakat production public route veya dashboard render zincirinde erişilemez. Bunlar `LIVE`, `PERSISTED_SAMPLE` veya saha pilotu kanıtı olarak etiketlenmez.
+
+Typecheck, fixture-isolation odak testleri, güncellenmiş `check:pilot-web`, tam test paketi, experience/security kapıları ve production build PASS'tir. Production server HTTP kabulü de `/pilot` ve `/reports/demo` için `307 → /dashboard`; `GET /api/dashboard`, `GET /api/insights` ve `POST /api/reports/demo-share` için `410 legacy_demo_retired` ve `Cache-Control: no-store` sonucunu doğruladı. Bu doğrulamada local-session proof, cookie/storage veya mutation kullanılmadı.
+
+## 32. Gerçek persisted campaign operator kabul paketi
+
+Kalan uçtan uca kanıt browser fixture'ı veya otomasyonla üretilemez; local-session proof yalnız workspace operatörünün güvenli akışında kullanılabilir. Bu nedenle `docs/qa/2026-08-14-dashboard-persisted-campaign-operator-acceptance.md` aşağıdaki sınırları olan bir kabul paketi olarak eklendi:
+
+- Kanonik portföy → `Kararlarda incele` → campaign-süzülmüş Koşumlar → Onay Kuyruğu → browser geri/ileri → bağlamı temizleme yolculuğunu kapsar.
+- Gerçek `EMPTY` sonuç başarı sayılır; `UNAVAILABLE` ve `BLOCKED_EXTERNAL` dürüstçe kaydedilir fakat DoD'u kapatmaz.
+- Public-safe URL şekli ve ekran state'i dışında proof/token/cookie/storage/raw Meta ID/tenant payload kaydedilmez.
+- Meta write, execute ve karar mutation'ı kabul kapsamı dışındadır.
+
+`check:experience`, bu paketin mevcut ve `PENDING_OPERATOR_PROOF` olarak dürüstçe işaretlenmiş olmasını denetler; bunu gerçek browser acceptance yerine saymaz.
+
+## 33. Campaign recovery sayfa başlığı
+
+Bağımsız final tarama, seçili campaign ile doğrudan açılan recovery görünümünün normal dashboard yüzeylerinden farklı olarak H1 içermediğini doğruladı. Bu, klavye/ekran okuyucu kullanıcılarının route değişiminden sonra odaklanan ana landmark içinde sayfa adını ayırt etmesini zayıflatıyordu.
+
+- Recovery başlığı `h2` yerine tek `h1` oldu; shell her durumda tek named `main` ve tek H1 sözleşmesini korur.
+- IA SSR regression testi, `decision-room&campaign=ref_…` fail-closed recovery çıktısında tam bir H1 ve tam bir main bulunduğunu doğrular.
+
+TypeScript ve ilgili IA/campaign-context testleri PASS'tir (2 dosya / 9 test). Bu yalnız semantic heading düzeltmesidir; context doğrulama, local-session veya fail-closed davranışını değiştirmez.
+
+## 34. Final denetim semantic daraltmaları
+
+İki bağımsız final denetim, aktif anonim ve hata yollarında aşağıdaki kanıtlanmış erişilebilirlik sorunlarını buldu. Hiçbiri yeni capability gerektirmez; mevcut yapının semantiği daraltıldı.
+
+- Rehber kaynağı kullanılamazken, alt Slice Rule çalışma alanı kendi H1'i ile rehber recovery H1'ine eşlik edebiliyordu. Slice Rule artık ana `Kurallar & Yetkiler` yüzeyinin alt başlığıdır (`h2`); görsel tipografi korunur.
+- Dar ekranda görünür ana navigation bir `div` idi. Aynı kontroller artık adlandırılmış `nav aria-label="Ana navigasyon"` landmark'ı içindedir.
+- Asistan drawer'ının tıklanabilir backdrop'u ve görünür kapatma düğmesi aynı erişilebilir adı taşıyordu. Backdrop artık erişilebilirlik ağacında olmayan bir katmandır; tek odaklanabilir kapatma düğmesi kalır.
+
+IA regression testi recovery H1'ini, mobil nav landmark'ını, Slice Rule hiyerarşisini ve tek asistan kapatma adını kontrol eder. Bu değişiklikler modal focus trap, backdrop click veya herhangi bir authority davranışını değiştirmez.
+
+## 35. Operator kabul sonucu: persisted context kullanılamıyor
+
+Güvenli operator kabulü gerçek bağlı Chrome oturumunda çalıştırıldı. Hiçbir proof/token/cookie/storage/raw Meta kimliği okunmadı veya kaydedilmedi; Meta write, execute, onay veya ret çağrısı yapılmadı.
+
+| Adım | Sonuç | Kanıtlanan kullanıcı durumu |
+|---|---|---|
+| Kanonik portföy | PASS | Portföy erişilebilir, `Kararlarda incele` eylemi görünür; console error/warning `0/0`. |
+| Campaign → karar bağlamı | UNAVAILABLE | Public-safe `campaign=ref_…` URL'si açıldı; geçerli frozen context bulunmadığından genel kayıt fallback'i yapılmadı. |
+| Koşumlar ve Onay Kuyruğu | UNAVAILABLE | Doğrulanmış frozen context ve türetilmiş alias yok; campaign-süzülmüş panel mount edilmedi. |
+| Tüm çalışma alanına dön | PASS | Campaign parametresi ve seçili detay temizlendi, ana landmark odağı korundu. |
+| Mobil recovery | PASS | İstenen 390×844 ölçümünde yatay taşma yok; klavye odağı `MAIN → Tekrar kontrol et → Tüm çalışma alanına dön`. |
+
+Salt-okunur canlı doğrulayıcı `no_valid_campaign_context` döndürdü; bu bir frontend/demo fallback'i veya alias eşlemesiyle gizlenmedi. Operatör sırasında bildirilen ileri-history gözlemi, aynı fail-closed URL ile bağımsız olarak yeniden üretildiğinde campaign parametresi korunarak sonuçlandı; tek başına dar kod değişikliğini haklı çıkaran deterministik bir bug kanıtı değildir.
+
+Dolayısıyla acceptance paketi kasıtlı olarak `PENDING_OPERATOR_PROOF` durumunda kalır. Kapanış için, gerçek persisted frozen campaign context oluşturulmuş/var olan bir workspace'te campaign-süzülmüş Koşumlar ve Onay Kuyruğu yolunun ayrıca çalıştırılması gerekir.

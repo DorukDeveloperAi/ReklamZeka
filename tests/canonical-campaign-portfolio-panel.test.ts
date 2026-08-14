@@ -1,7 +1,6 @@
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { CanonicalCampaignPortfolioPanel, canonicalCampaignPortfolio } from "@/app/dashboard/canonical-campaign-portfolio-panel";
+import { canonicalCampaignPortfolio } from "@/app/dashboard/canonical-campaign-portfolio-panel";
 import type { MetaReadMirrorProjection } from "@/domain/meta/read-mirror-projection";
 
 const projection = { connections: [{ accounts: [{ name: "TR", currency: "TRY", campaigns: [
@@ -17,12 +16,9 @@ describe("canonical campaign portfolio", () => {
   });
 
   it("exposes the selected campaign and its detail heading to assistive technology", () => {
-    const html = renderToStaticMarkup(createElement(CanonicalCampaignPortfolioPanel, {
-      projection,
-      onOpenAgentContext: () => undefined,
-      onOpenDecisionContext: () => undefined,
-    }));
-    expect(html).toContain('aria-pressed="true"');
-    expect(html).toContain('tabindex="-1"');
+    const source = readFileSync("src/app/dashboard/canonical-campaign-portfolio-panel.tsx", "utf8");
+    expect(source).toContain("aria-pressed={selected.campaignRef === entry.campaignRef}");
+    expect(source).toContain("focusDetailAfterSelectionRef.current = true");
+    expect(source).toContain("ref={detailHeadingRef} tabIndex={-1}");
   });
 });

@@ -18,11 +18,10 @@ export default function Home() {
         </p>
         <div className="status" role="status">
           <span className="pulse" aria-hidden="true" />
-          Teknik MVP hazır · Kontrollü saha pilotu sırada
+          Kanonik kaynak durumu dashboard’da doğrulanır
         </div>
         <div className="hero-actions">
-          <Link className="primary-link" href="/pilot">Pilot yolculuğunu başlat <span aria-hidden="true">→</span></Link>
-          <Link className="quiet-link" href="/dashboard">Doğrudan dashboard'u aç</Link>
+          <Link className="primary-link" href="/dashboard">Dashboard'u aç <span aria-hidden="true">→</span></Link>
         </div>
       </section>
 

@@ -15,7 +15,8 @@ describe("Meta trust/readiness HTTP boundary", () => {
     expect(response.status).toBe(200);
     expect(load).toHaveBeenCalledWith("workspace");
     expect(response.headers.get("X-ReklamZeka-Meta-Network")).toBe("disabled");
-    expect(await response.json()).toEqual(report);
+    expect(await response.json()).toMatchObject({ ...report, source: { kind: "derived_trust", state: "empty",
+      reasonCodes: ["trust_reports_empty"] } });
   });
 
   it("rejects query, mutation, and absent principal without loading evidence", async () => {
