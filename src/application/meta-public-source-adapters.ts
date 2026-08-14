@@ -14,9 +14,14 @@ function unique(codes: readonly string[]): readonly string[] {
 }
 
 export function metaReadMirrorPublicSource(value: MetaReadMirrorProjection): PublicSource {
+  const fallback = value.sourceState === "partial" ? "canonical_meta_mirror_partial"
+    : value.sourceState === "stale" ? "freshness_stale"
+      : value.sourceState === "empty" ? "canonical_meta_mirror_empty"
+        : value.sourceState === "unavailable" ? "canonical_meta_mirror_unavailable" : null;
   return publicSource({ kind: "canonical_meta_mirror", state: value.sourceState === "ready" ? "ready" : value.sourceState,
     observedAt: value.observedAt, freshnessAt: value.latestCanonicalObservationAt,
-    freshnessThresholdMinutes: value.freshnessThresholdMinutes, reasonCodes: value.reasonCodes });
+    freshnessThresholdMinutes: value.freshnessThresholdMinutes,
+    reasonCodes: value.reasonCodes.length ? value.reasonCodes : fallback ? [fallback] : [] });
 }
 
 export function canonicalPerformancePublicSource(value: CanonicalPerformanceReadProjection): PublicSource {
@@ -31,9 +36,10 @@ export function canonicalPerformancePublicSource(value: CanonicalPerformanceRead
 export function derivedTrustPublicSource(value: MetaTrustReadinessReadProjection): PublicSource {
   const reports = value.reports.map(({ report }) => report);
   const state = reports.length === 0 ? "empty" : reports.every((report) => report.status === "ready") ? "ready" : "partial";
+  const reasonCodes = reports.length ? unique(reports.flatMap((report) => report.reasonCodes)) : ["trust_reports_empty"];
   return publicSource({ kind: "derived_trust", state, observedAt: latest(reports.map((report) => report.evaluatedAt)),
     freshnessAt: latest(reports.map((report) => report.evaluatedAt)), freshnessThresholdMinutes: null,
-    reasonCodes: reports.length ? unique(reports.flatMap((report) => report.reasonCodes)) : ["trust_reports_empty"] });
+    reasonCodes: reasonCodes.length ? reasonCodes : state === "partial" ? ["derived_trust_partial"] : [] });
 }
 
 export function graphCapabilityPublicSource(input: Readonly<{

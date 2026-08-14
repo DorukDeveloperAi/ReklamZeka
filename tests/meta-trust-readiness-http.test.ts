@@ -27,4 +27,14 @@ describe("Meta trust/readiness HTTP boundary", () => {
     expect((await handler(request())).status).toBe(403);
     expect(load).not.toHaveBeenCalled();
   });
+
+  it("marks an unreadable trust report unavailable instead of returning a degraded report", async () => {
+    const handler = createMetaTrustReadinessHttpHandler({ load: vi.fn().mockRejectedValue(new Error("private database text")),
+      workspaceId: vi.fn().mockResolvedValue("workspace") });
+    const response = await handler(request());
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: { code: "source_unavailable" }, source: {
+      kind: "derived_trust", state: "unavailable", reasonCodes: ["derived_trust_unavailable"],
+    } });
+  });
 });

@@ -12,8 +12,8 @@ describe("Meta public source adapters", () => {
       sourceState, observedAt: "2026-08-14T12:00:00.000Z", latestCanonicalObservationAt: "2026-08-14T11:00:00.000Z",
       freshnessAgeMinutes: 60, freshnessThresholdMinutes: 1440, reasonCodes: [], summary: {}, authority: {}, connections: [] } as never);
     expect(mirror("ready").state).toBe("ready");
-    expect(mirror("partial").state).toBe("partial");
-    expect(mirror("stale").state).toBe("stale");
+    expect(mirror("partial")).toMatchObject({ state: "partial", reasonCodes: ["canonical_meta_mirror_partial"] });
+    expect(mirror("stale")).toMatchObject({ state: "stale", reasonCodes: ["freshness_stale"] });
     expect(mirror("empty").state).toBe("empty");
     expect(mirror("unavailable").state).toBe("unavailable");
   });
