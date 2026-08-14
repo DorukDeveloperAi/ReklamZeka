@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 02043cf6096a -->
+<!-- durum-damga: a397d50c534e -->
 
 ## Künye
 
@@ -14,13 +14,16 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 447 |
+| iş commit'i (tüm geçmiş) | 450 |
 | ilk / son iş | 2026-08-06 / 2026-08-14 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-14 | `docs` | describe manual dashboard approval flow | `ac54d9c60` |
+| 2026-08-14 | `docs` | record canonical insight bootstrap | `972e72abb` |
+| 2026-08-14 | `test` | isolate verifier cleanup connection | `1046fc2ce` |
 | 2026-08-14 | `test` | bound queue verifier transport | `de22424a1` |
 | 2026-08-14 | `test` | retry tombstone transport | `b9e55c672` |
 | 2026-08-14 | `test` | complete guardrail category context | `ae91bcce6` |
@@ -33,16 +36,13 @@
 | 2026-08-14 | `fix` | enforce published budget guardrails | `2834bf3f7` |
 | 2026-08-14 | `fix` | make budget approval scenario selectable | `edb2b8d03` |
 | 2026-08-14 | `fix` | bind approval fixture hierarchy evidence | `c1e68ad04` |
-| 2026-08-14 | `fix` | align approval chain source evidence | `82b419413` |
-| 2026-08-14 | `fix` | preserve category composition diagnostics | `dadf63549` |
-| 2026-08-14 | `fix` | publish approval chain category profiles | `26983ac27` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `fix         ` ████████████████████████ 19
-- `feat        ` ████████████████████ 16
-- `docs        ` ███████████████ 12
-- `test        ` ███████████████ 12
+- `fix         ` ████████████████████████ 18
+- `feat        ` ████████████████████ 15
+- `docs        ` █████████████████ 13
+- `test        ` █████████████████ 13
 - `refactor    ` █ 1
 
 ## Planlar

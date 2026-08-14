@@ -4,6 +4,33 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "ac54d9c60",
+      "tarih": "2026-08-14",
+      "konu": "docs(local): describe manual dashboard approval flow",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "972e72abb",
+      "tarih": "2026-08-14",
+      "konu": "docs(state): record canonical insight bootstrap",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "1046fc2ce",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): isolate verifier cleanup connection",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
       "hash": "de22424a1",
       "tarih": "2026-08-14",
       "konu": "test(approval): bound queue verifier transport",
@@ -110,58 +137,31 @@
       "kapsam": [
         "fix"
       ]
-    },
-    {
-      "hash": "82b419413",
-      "tarih": "2026-08-14",
-      "konu": "fix(verification): align approval chain source evidence",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "dadf63549",
-      "tarih": "2026-08-14",
-      "konu": "fix(analysis): preserve category composition diagnostics",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "26983ac27",
-      "tarih": "2026-08-14",
-      "konu": "fix(verification): publish approval chain category profiles",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "fix",
-      "adet": 19
+      "adet": 18
     },
     {
       "kapsam": "feat",
-      "adet": 16
+      "adet": 15
     },
     {
       "kapsam": "docs",
-      "adet": 12
+      "adet": 13
     },
     {
       "kapsam": "test",
-      "adet": 12
+      "adet": 13
     },
     {
       "kapsam": "refactor",
       "adet": 1
     }
   ],
-  "isSayisi": 447,
+  "isSayisi": 450,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-14",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "02043cf6096a"
+  "damga": "a397d50c534e"
 }
