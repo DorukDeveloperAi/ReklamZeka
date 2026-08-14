@@ -1,0 +1,186 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "de22424a1",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): bound queue verifier transport",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "b9e55c672",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): retry tombstone transport",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "ae91bcce6",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): complete guardrail category context",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "4b8187658",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): materialize active ad set evidence",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "4f9d5407e",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): bind ad set category evidence",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "438d52f9d",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): evaluate guardrails at command time",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "cddda92c0",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): materialize complete guardrail evidence",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "3377eee7b",
+      "tarih": "2026-08-14",
+      "konu": "fix(approval): bind geo evidence through hierarchy",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "294e5e398",
+      "tarih": "2026-08-14",
+      "konu": "fix(meta): label trust freshness in hours",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "2834bf3f7",
+      "tarih": "2026-08-14",
+      "konu": "fix(approval): enforce published budget guardrails",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "edb2b8d03",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): make budget approval scenario selectable",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "c1e68ad04",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): bind approval fixture hierarchy evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "82b419413",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): align approval chain source evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "dadf63549",
+      "tarih": "2026-08-14",
+      "konu": "fix(analysis): preserve category composition diagnostics",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "26983ac27",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): publish approval chain category profiles",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "fix",
+      "adet": 19
+    },
+    {
+      "kapsam": "feat",
+      "adet": 16
+    },
+    {
+      "kapsam": "docs",
+      "adet": 12
+    },
+    {
+      "kapsam": "test",
+      "adet": 12
+    },
+    {
+      "kapsam": "refactor",
+      "adet": 1
+    }
+  ],
+  "isSayisi": 447,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-14",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "02043cf6096a"
+}
