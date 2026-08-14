@@ -11,3 +11,9 @@
 # ölüydü. Kök neden bu beyanın YOKLUĞUYDU (agent-ide'de emsali vardı, burada yoktu).
 .claude/aide-manifest.json  merge=ours
 .claude/filing/DEVRALIS.md  merge=ours
+
+# DURUM logu + günlük durum JSON'u da TÜREVDİR (`aide durum` üretir). agent-ide'de bu
+# beyan vardı, burada yoktu → bu turda çakışan ikinci yol buydu.
+docs/DURUM.md               merge=ours
+docs/durum/*.json           merge=ours
+.claude/filing/kaptan-goals/*.json  merge=ours
