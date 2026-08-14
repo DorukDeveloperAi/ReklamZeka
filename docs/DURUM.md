@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 0cc0ad030d80 -->
+<!-- durum-damga: dca4cf2c2385 -->
 
 ## Künye
 
@@ -14,7 +14,7 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 177 |
+| iş commit'i (tüm geçmiş) | 452 |
 | ilk / son iş | 2026-08-06 / 2026-08-14 |
 
 ## Son iş commit'leri
@@ -23,28 +23,28 @@
 |---|---|---|---|
 | 2026-08-14 | `—` | DURUM türevlerini de merge=ours ile beyan et (agent-ide emsali) | `e709edff3` |
 | 2026-08-14 | `—` | aide türevlerini merge=ours ile beyan et — boot'u öldüren çakışmanın kök nedeni | `0b287b002` |
-| 2026-08-10 | `feat` | wire private analysis context composer | `add0d55b4` |
-| 2026-08-10 | `docs` | record ready source bundle evidence | `4c85d52ad` |
-| 2026-08-10 | `feat` | assemble ready analysis source bundles | `ec66e64c6` |
-| 2026-08-10 | `feat` | bind authority to source snapshots | `4fcf60ffe` |
-| 2026-08-10 | `test` | cover guidance selection revisions | `fe302fdfd` |
-| 2026-08-10 | `feat` | compose selected guidance snapshots | `b8adfacd0` |
-| 2026-08-10 | `feat` | compose categories in source snapshots | `7a23913f7` |
-| 2026-08-10 | `feat` | bind guidance selections to campaigns | `e0ddf6972` |
-| 2026-08-10 | `feat` | validate reviewed guidance manifests | `ede8d665f` |
-| 2026-08-10 | `feat` | share cadence snapshot reads | `695003a0e` |
-| 2026-08-10 | `feat` | validate current Meta hierarchy config | `59c51bc78` |
-| 2026-08-10 | `feat` | add current source snapshot seam | `20cef249d` |
-| 2026-08-10 | `fix` | harden current cadence reader | `62daebfec` |
+| 2026-08-14 | `docs` | describe manual dashboard approval flow | `ac54d9c60` |
+| 2026-08-14 | `docs` | record canonical insight bootstrap | `972e72abb` |
+| 2026-08-14 | `test` | isolate verifier cleanup connection | `1046fc2ce` |
+| 2026-08-14 | `test` | bound queue verifier transport | `de22424a1` |
+| 2026-08-14 | `test` | retry tombstone transport | `b9e55c672` |
+| 2026-08-14 | `test` | complete guardrail category context | `ae91bcce6` |
+| 2026-08-14 | `test` | materialize active ad set evidence | `4b8187658` |
+| 2026-08-14 | `test` | bind ad set category evidence | `4f9d5407e` |
+| 2026-08-14 | `test` | evaluate guardrails at command time | `438d52f9d` |
+| 2026-08-14 | `test` | materialize complete guardrail evidence | `cddda92c0` |
+| 2026-08-14 | `fix` | bind geo evidence through hierarchy | `3377eee7b` |
+| 2026-08-14 | `fix` | label trust freshness in hours | `294e5e398` |
+| 2026-08-14 | `fix` | enforce published budget guardrails | `2834bf3f7` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 43
-- `fix         ` ███ 6
-- `docs        ` ██ 4
-- `chore       ` ██ 3
-- `?           ` █ 2
-- `test        ` █ 2
+- `fix         ` ████████████████████████ 17
+- `feat        ` ████████████████████ 14
+- `docs        ` ██████████████████ 13
+- `test        ` ██████████████████ 13
+- `?           ` ███ 2
+- `refactor    ` █ 1
 
 ## Planlar
 

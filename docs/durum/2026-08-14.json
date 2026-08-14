@@ -18,117 +18,117 @@
       "kapsam": []
     },
     {
-      "hash": "add0d55b4",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): wire private analysis context composer",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "4c85d52ad",
-      "tarih": "2026-08-10",
-      "konu": "docs(a10): record ready source bundle evidence",
+      "hash": "ac54d9c60",
+      "tarih": "2026-08-14",
+      "konu": "docs(local): describe manual dashboard approval flow",
       "tur": "is",
       "kapsam": [
         "docs"
       ]
     },
     {
-      "hash": "ec66e64c6",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): assemble ready analysis source bundles",
+      "hash": "972e72abb",
+      "tarih": "2026-08-14",
+      "konu": "docs(state): record canonical insight bootstrap",
       "tur": "is",
       "kapsam": [
-        "feat"
+        "docs"
       ]
     },
     {
-      "hash": "4fcf60ffe",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): bind authority to source snapshots",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "fe302fdfd",
-      "tarih": "2026-08-10",
-      "konu": "test(a10): cover guidance selection revisions",
+      "hash": "1046fc2ce",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): isolate verifier cleanup connection",
       "tur": "is",
       "kapsam": [
         "test"
       ]
     },
     {
-      "hash": "b8adfacd0",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): compose selected guidance snapshots",
+      "hash": "de22424a1",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): bound queue verifier transport",
       "tur": "is",
       "kapsam": [
-        "feat"
+        "test"
       ]
     },
     {
-      "hash": "7a23913f7",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): compose categories in source snapshots",
+      "hash": "b9e55c672",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): retry tombstone transport",
       "tur": "is",
       "kapsam": [
-        "feat"
+        "test"
       ]
     },
     {
-      "hash": "e0ddf6972",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): bind guidance selections to campaigns",
+      "hash": "ae91bcce6",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): complete guardrail category context",
       "tur": "is",
       "kapsam": [
-        "feat"
+        "test"
       ]
     },
     {
-      "hash": "ede8d665f",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): validate reviewed guidance manifests",
+      "hash": "4b8187658",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): materialize active ad set evidence",
       "tur": "is",
       "kapsam": [
-        "feat"
+        "test"
       ]
     },
     {
-      "hash": "695003a0e",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): share cadence snapshot reads",
+      "hash": "4f9d5407e",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): bind ad set category evidence",
       "tur": "is",
       "kapsam": [
-        "feat"
+        "test"
       ]
     },
     {
-      "hash": "59c51bc78",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): validate current Meta hierarchy config",
+      "hash": "438d52f9d",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): evaluate guardrails at command time",
       "tur": "is",
       "kapsam": [
-        "feat"
+        "test"
       ]
     },
     {
-      "hash": "20cef249d",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): add current source snapshot seam",
+      "hash": "cddda92c0",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): materialize complete guardrail evidence",
       "tur": "is",
       "kapsam": [
-        "feat"
+        "test"
       ]
     },
     {
-      "hash": "62daebfec",
-      "tarih": "2026-08-10",
-      "konu": "fix(a10): harden current cadence reader",
+      "hash": "3377eee7b",
+      "tarih": "2026-08-14",
+      "konu": "fix(approval): bind geo evidence through hierarchy",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "294e5e398",
+      "tarih": "2026-08-14",
+      "konu": "fix(meta): label trust freshness in hours",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "2834bf3f7",
+      "tarih": "2026-08-14",
+      "konu": "fix(approval): enforce published budget guardrails",
       "tur": "is",
       "kapsam": [
         "fix"
@@ -137,31 +137,31 @@
   ],
   "kapsamDagilimi": [
     {
-      "kapsam": "feat",
-      "adet": 43
+      "kapsam": "fix",
+      "adet": 17
     },
     {
-      "kapsam": "fix",
-      "adet": 6
+      "kapsam": "feat",
+      "adet": 14
     },
     {
       "kapsam": "docs",
-      "adet": 4
+      "adet": 13
     },
     {
-      "kapsam": "chore",
-      "adet": 3
+      "kapsam": "test",
+      "adet": 13
     },
     {
       "kapsam": "?",
       "adet": 2
     },
     {
-      "kapsam": "test",
-      "adet": 2
+      "kapsam": "refactor",
+      "adet": 1
     }
   ],
-  "isSayisi": 177,
+  "isSayisi": 452,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-14",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "0cc0ad030d80"
+  "damga": "dca4cf2c2385"
 }
