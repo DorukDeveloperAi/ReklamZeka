@@ -9,6 +9,7 @@ import {
   type OrchestratorTurnEvidence,
 } from "@/application/orchestrator-conversation";
 import { CORE_SKILL_MANIFESTS, coreSkillManifest, SKILL_CATALOG_VERSION } from "@/domain/orchestrator/skill-catalog";
+import { isOfficialGuidanceSourceUrl } from "@/domain/guidance/registry";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -32,6 +33,7 @@ const SOURCE_REF = /^source_[a-z0-9_.:-]{1,127}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const EVIDENCE_SCOPE = "page_guidance_and_verified_workspace_playbooks" as const;
 const UNCERTAINTY = "agent_inference_no_meta_or_action_authority" as const;
+const SOURCE_TYPES = new Set(["owner_statement", "official_meta_guidance", "business_strategy", "observed_result", "experiment_outcome", "operating_note"]);
 
 export class OrchestratorConversationRepositoryError extends Error {
   constructor(readonly code: "invalid_input" | "corrupt_store" | "conversation_unavailable") {
@@ -75,6 +77,19 @@ function unavailableEvidence(state: Exclude<OrchestratorTurnEvidence["state"], "
     historicalSourceState: "not_applicable", evidenceScope: EVIDENCE_SCOPE, uncertainty: UNCERTAINTY });
 }
 
+type HistoricalSourceCitation = Readonly<{ title: string; type: string; url: string | null;
+  freshness: "fresh" | "stale" | "not_scheduled" }>;
+function historicalSourceCitation(value: unknown): HistoricalSourceCitation {
+  if (!exact(value, ["sourceTitle", "sourceType", "sourceUrl", "freshness"])
+    || typeof value.sourceTitle !== "string" || !value.sourceTitle.trim() || value.sourceTitle.length > 160
+    || /[\u0000-\u001f\u007f]/.test(value.sourceTitle) || typeof value.sourceType !== "string"
+    || !SOURCE_TYPES.has(value.sourceType) || !["fresh", "stale", "not_scheduled"].includes(value.freshness as string)
+    || !(value.sourceUrl === null || typeof value.sourceUrl === "string"
+      && value.sourceType === "official_meta_guidance" && isOfficialGuidanceSourceUrl(value.sourceUrl))) throw new Error("invalid_citation");
+  return Object.freeze({ title: value.sourceTitle.trim(), type: value.sourceType, url: value.sourceUrl,
+    freshness: value.freshness as HistoricalSourceCitation["freshness"] });
+}
+
 /** Never joins mutable sources: this read projection reports only ledger-frozen evidence. */
 export function orchestratorTurnEvidenceFromLedger(row: EvidenceTurnRow): OrchestratorTurnEvidence {
   if (!TURN.test(row.turn_ref)) return unavailableEvidence("missing_or_invalid");
@@ -105,21 +120,31 @@ export function orchestratorTurnEvidenceFromLedger(row: EvidenceTurnRow): Orches
       return Object.freeze({ ref: found.ref, version: found.version, hash: found.hash, name: found.name });
     }).sort((left, right) => left.ref.localeCompare(right.ref));
     if (new Set(manifests.map((manifest) => manifest.ref)).size !== CORE_SKILL_MANIFESTS.length) throw new Error("duplicate_manifest");
+    const sourceDetailRecorded = row.playbook_snapshots.every((playbook) => exact(playbook,
+      ["playbookRef", "revision", "playbookHash", "sourceRef", "citation"]));
+    const legacySourceDetail = row.playbook_snapshots.every((playbook) => exact(playbook,
+      ["playbookRef", "revision", "playbookHash", "sourceRef"]));
+    if (!sourceDetailRecorded && !legacySourceDetail) throw new Error("mixed_or_invalid_citations");
     const playbooks = row.playbook_snapshots.map((playbook) => {
-      if (!exact(playbook, ["playbookRef", "revision", "playbookHash", "sourceRef"])
+      if (!exact(playbook, sourceDetailRecorded
+        ? ["playbookRef", "revision", "playbookHash", "sourceRef", "citation"]
+        : ["playbookRef", "revision", "playbookHash", "sourceRef"])
         || typeof playbook.playbookRef !== "string" || !PLAYBOOK_REF.test(playbook.playbookRef)
         || !Number.isSafeInteger(playbook.revision) || (playbook.revision as number) < 1
         || typeof playbook.playbookHash !== "string" || !HASH.test(playbook.playbookHash)
         || typeof playbook.sourceRef !== "string" || !SOURCE_REF.test(playbook.sourceRef)) throw new Error("invalid_playbook");
+      const citation = sourceDetailRecorded ? historicalSourceCitation(playbook.citation) : null;
       return Object.freeze({ playbookRef: playbook.playbookRef, revision: playbook.revision as number,
-        playbookHash: playbook.playbookHash, sourceRef: playbook.sourceRef });
+        playbookHash: playbook.playbookHash, sourceRef: playbook.sourceRef,
+        citation });
     }).sort((left, right) => left.playbookRef.localeCompare(right.playbookRef));
     if (new Set(playbooks.map((playbook) => playbook.playbookRef)).size !== playbooks.length) throw new Error("duplicate_playbook");
     return Object.freeze({ state: "bound", pageGuide: Object.freeze({ pageLabel: guide.pageLabel, purpose: guide.purpose,
       scope: guide.recordPath }), profileLabel: `Workspace skill profili · revizyon ${row.profile_snapshot.revision}`,
     skills: Object.freeze(manifests.map(({ name, version }) => Object.freeze({ name, version }))),
-    playbooks: Object.freeze(playbooks.map((playbook) => Object.freeze({ label: `Doğrulanmış çalışma notu · revizyon ${playbook.revision}` }))),
-    historicalSourceState: "not_recorded", evidenceScope: EVIDENCE_SCOPE, uncertainty: UNCERTAINTY });
+    playbooks: Object.freeze(playbooks.map((playbook) => Object.freeze({ label: `Doğrulanmış çalışma notu · revizyon ${playbook.revision}`,
+      source: playbook.citation }))), historicalSourceState: playbooks.length === 0 ? "not_applicable"
+      : sourceDetailRecorded ? "available" : "detail_not_recorded", evidenceScope: EVIDENCE_SCOPE, uncertainty: UNCERTAINTY });
   } catch { return unavailableEvidence("missing_or_invalid"); }
 }
 

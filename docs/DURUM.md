@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: edda929f6992 -->
+<!-- durum-damga: 26197ef43b84 -->
 
 ## Künye
 
@@ -14,13 +14,19 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 465 |
+| iş commit'i (tüm geçmiş) | 471 |
 | ilk / son iş | 2026-08-06 / 2026-08-14 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-14 | `feat` | expose frozen turn evidence | `42f0364f0` |
+| 2026-08-14 | `feat` | bind workspace playbooks to turns | `a483e4e3b` |
+| 2026-08-14 | `fix` | enforce user-authored rule boundaries | `653f647a8` |
+| 2026-08-14 | `feat` | guide pool hierarchy drafts | `40bcb182e` |
+| 2026-08-14 | `feat` | revise user playbooks safely | `ad6044644` |
+| 2026-08-14 | `feat` | show read-only decision trace | `3996b7e91` |
 | 2026-08-14 | `fix` | retain operational audit coverage | `04d011008` |
 | 2026-08-14 | `feat` | add unified preparation gate | `92a7ddf3d` |
 | 2026-08-14 | `feat` | manage skill catalog in rules | `4fe3836ce` |
@@ -30,20 +36,14 @@
 | 2026-08-14 | `feat` | add skill catalog repository and panel | `aed4290b8` |
 | 2026-08-14 | `feat` | add read-only skill catalog context strip | `fba099714` |
 | 2026-08-14 | `feat` | add skill catalog application service | `dd816b584` |
-| 2026-08-14 | `feat` | add immutable skill catalog package one | `04814eb4e` |
-| 2026-08-14 | `feat` | simplify shell to monitor manage agent | `f22413287` |
-| 2026-08-14 | `test` | guard canonical temporal feed | `3e97de2a4` |
-| 2026-08-14 | `test` | harden public source states | `670288d39` |
-| 2026-08-14 | `—` | DURUM türevlerini de merge=ours ile beyan et (agent-ide emsali) | `e709edff3` |
-| 2026-08-14 | `—` | aide türevlerini merge=ours ile beyan et — boot'u öldüren çakışmanın kök nedeni | `0b287b002` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 19
-- `fix         ` █████████████████████ 17
-- `test        ` ██████████████████ 14
-- `docs        ` █████████ 7
-- `?           ` ███ 2
+- `feat        ` ████████████████████████ 23
+- `fix         ` ███████████████ 14
+- `test        ` ██████████████ 13
+- `docs        ` ███████ 7
+- `?           ` ██ 2
 - `refactor    ` █ 1
 
 ## Planlar

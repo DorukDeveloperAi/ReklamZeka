@@ -12,7 +12,8 @@ const profilePayload = { corePack };
 const profile = { profile_ref: "profile_default", revision: 1, profile_hash: digest(profilePayload), payload: profilePayload };
 const playbookPayload = { title: "Dönüşüm notu", body: "İki varyantı kanıtla karşılaştır." };
 const playbook = { playbook_ref: "playbook_alpha", revision: 2, playbook_hash: digest(playbookPayload), payload: playbookPayload,
-  source_ref: "source_guidance", source_status: "published", review_by: "2050-01-01T00:00:00.000Z" };
+  source_ref: "source_guidance", source_status: "published", review_by: "2050-01-01T00:00:00.000Z",
+  source_title: "Meta yardım", source_type: "official_meta_guidance", source_url: "https://www.facebook.com/business/help/learning" };
 
 function database(results: readonly unknown[][]) {
   const dialect = new PgDialect(); const queue = [...results]; const queries: ReturnType<PgDialect["sqlToQuery"]>[] = [];
@@ -26,7 +27,8 @@ describe("workspace skill catalog turn binding loader", () => {
     const fixture = database([[profile], [playbook]]);
     const binding = await new DrizzleWorkspaceSkillCatalogBindingRepository(fixture.db as never).loadActive({ workspaceId });
     expect(binding).toMatchObject({ profile: { profileRef: "profile_default", revision: 1, profileHash: profile.profile_hash },
-      playbooks: [{ playbookRef: "playbook_alpha", revision: 2, playbookHash: playbook.playbook_hash, sourceRef: "source_guidance" }] });
+      playbooks: [{ playbookRef: "playbook_alpha", revision: 2, playbookHash: playbook.playbook_hash, sourceRef: "source_guidance",
+        citation: { sourceTitle: "Meta yardım", sourceType: "official_meta_guidance", sourceUrl: "https://www.facebook.com/business/help/learning", freshness: "fresh" } }] });
     expect(binding.bindingHash).toMatch(/^[a-f0-9]{64}$/);
     expect(fixture.queries.map((query) => query.sql).join("\n")).toContain("where workspace_id = $1::uuid and state = 'active'");
     expect(fixture.queries[1]!.sql).toContain("select distinct on (playbook_ref)");

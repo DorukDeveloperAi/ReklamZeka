@@ -453,7 +453,9 @@
 .turnEvidence dd { margin: 0; overflow-wrap: anywhere; }
 .turnEvidenceSkills { display: grid; gap: 4px; }
 .turnEvidence ul { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.turnEvidence li { padding: 3px 5px; border: 1px solid var(--rz-line); border-radius: 5px; background: rgba(255,255,255,.025); color: var(--rz-muted); }
+.turnEvidence li { display: grid; gap: 2px; padding: 3px 5px; border: 1px solid var(--rz-line); border-radius: 5px; background: rgba(255,255,255,.025); color: var(--rz-muted); }
+.turnEvidence li small { color: var(--rz-dim); font-size: .52rem; overflow-wrap: anywhere; }
+.turnEvidence li a { color: var(--rz-green); }
 .turnEvidenceUnavailable { color: #ffd29a; }
 .chatComposer { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin: 0 16px 14px; padding: 7px; border: 1px solid var(--rz-line-strong); border-radius: 11px; background: #0b0f0d; }
 .chatComposer textarea { min-height: 66px; resize: none; padding: 9px; border: 0; background: transparent; color: var(--rz-text); font-size: .7rem; line-height: 1.5; }

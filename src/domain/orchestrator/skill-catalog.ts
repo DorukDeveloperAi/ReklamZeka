@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isOfficialGuidanceSourceUrl } from "@/domain/guidance/registry";
 
 export const SKILL_CATALOG_VERSION = "skill-catalog/1.0.0" as const;
 export const WORKSPACE_SKILL_CATALOG_BINDING_VERSION = "workspace-skill-catalog-binding/1.0.0" as const;
@@ -44,11 +45,18 @@ export function defaultSkillCatalogBinding() {
   return Object.freeze({ profile, manifests: Object.freeze(manifests), bindingHash });
 }
 
+export type WorkspacePlaybookSourceCitation = Readonly<{
+  sourceTitle: string;
+  sourceType: "owner_statement" | "official_meta_guidance" | "business_strategy" | "observed_result" | "experiment_outcome" | "operating_note";
+  sourceUrl: string | null;
+  freshness: "fresh" | "stale" | "not_scheduled";
+}>;
 export type WorkspacePlaybookSnapshot = Readonly<{
   playbookRef: string;
   revision: number;
   playbookHash: string;
   sourceRef: string;
+  citation: WorkspacePlaybookSourceCitation;
 }>;
 export type WorkspacePlaybookGuidance = Readonly<WorkspacePlaybookSnapshot & { title: string; body: string }>;
 export type WorkspaceSkillCatalogBinding = Readonly<{
@@ -79,6 +87,9 @@ const PLAYBOOK_REF = /^playbook_[a-z0-9][a-z0-9_-]{0,86}$/;
 const SOURCE_REF = /^source_[a-z0-9_.:-]{1,127}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
+const SOURCE_TYPES = new Set<WorkspacePlaybookSourceCitation["sourceType"]>([
+  "owner_statement", "official_meta_guidance", "business_strategy", "observed_result", "experiment_outcome", "operating_note",
+]);
 export const MAX_ACTIVE_PLAYBOOKS = 12;
 export const MAX_PLAYBOOK_GUIDANCE_BYTES = 48 * 1024;
 
@@ -111,15 +122,25 @@ export function createWorkspaceSkillCatalogBinding(input: Readonly<{
     if (!PLAYBOOK_REF.test(playbook.playbookRef) || !Number.isSafeInteger(playbook.revision) || playbook.revision < 1
       || !HASH.test(playbook.playbookHash) || !SOURCE_REF.test(playbook.sourceRef) || typeof playbook.title !== "string"
       || !playbook.title.trim() || playbook.title.length > 240 || CONTROL.test(playbook.title) || typeof playbook.body !== "string"
-      || !playbook.body.trim() || playbook.body.length > 16_000 || CONTROL.test(playbook.body)) bindingFail();
+      || !playbook.body.trim() || playbook.body.length > 16_000 || CONTROL.test(playbook.body)
+      || !exact(playbook.citation, ["sourceTitle", "sourceType", "sourceUrl", "freshness"])
+      || typeof playbook.citation.sourceTitle !== "string" || !playbook.citation.sourceTitle.trim()
+      || playbook.citation.sourceTitle.length > 160 || CONTROL.test(playbook.citation.sourceTitle)
+      || typeof playbook.citation.sourceType !== "string" || !SOURCE_TYPES.has(playbook.citation.sourceType as WorkspacePlaybookSourceCitation["sourceType"])
+      || !["fresh", "stale", "not_scheduled"].includes(playbook.citation.freshness as string)
+      || !(playbook.citation.sourceUrl === null || typeof playbook.citation.sourceUrl === "string"
+        && playbook.citation.sourceType === "official_meta_guidance" && isOfficialGuidanceSourceUrl(playbook.citation.sourceUrl))) bindingFail();
     return Object.freeze({ playbookRef: playbook.playbookRef, revision: playbook.revision,
-      playbookHash: playbook.playbookHash, sourceRef: playbook.sourceRef, title: playbook.title.trim(), body: playbook.body.trim() });
+      playbookHash: playbook.playbookHash, sourceRef: playbook.sourceRef, citation: Object.freeze({
+        sourceTitle: playbook.citation.sourceTitle.trim(), sourceType: playbook.citation.sourceType as WorkspacePlaybookSourceCitation["sourceType"],
+        sourceUrl: playbook.citation.sourceUrl, freshness: playbook.citation.freshness as WorkspacePlaybookSourceCitation["freshness"],
+      }), title: playbook.title.trim(), body: playbook.body.trim() });
   }).sort((a, b) => a.playbookRef.localeCompare(b.playbookRef));
   if (new Set(playbooks.map((playbook) => playbook.playbookRef)).size !== playbooks.length
     || Buffer.byteLength(playbooks.map(({ title, body }) => `${title}\n${body}`).join("\n"), "utf8") > MAX_PLAYBOOK_GUIDANCE_BYTES) bindingFail();
   const profile = Object.freeze({ version: SKILL_CATALOG_VERSION, profileRef: input.profile.profileRef,
     revision: input.profile.revision, profileHash: input.profile.profileHash });
-  const snapshots = playbooks.map(({ playbookRef, revision, playbookHash, sourceRef }) => Object.freeze({ playbookRef, revision, playbookHash, sourceRef }));
+  const snapshots = playbooks.map(({ playbookRef, revision, playbookHash, sourceRef, citation }) => Object.freeze({ playbookRef, revision, playbookHash, sourceRef, citation }));
   const bindingHash = createHash("sha256").update(JSON.stringify({ profile, manifests, playbooks: snapshots })).digest("hex");
   return Object.freeze({ profile, manifests: Object.freeze(manifests), playbooks: Object.freeze(playbooks), bindingHash });
 }
@@ -131,6 +152,6 @@ export function unavailableWorkspaceSkillCatalogBinding() {
 
 export function workspaceSkillCatalogTurnSnapshot(binding: WorkspaceSkillCatalogBinding): WorkspaceSkillCatalogTurnSnapshot {
   return Object.freeze({ profile: binding.profile, manifests: binding.manifests,
-    playbooks: Object.freeze(binding.playbooks.map(({ playbookRef, revision, playbookHash, sourceRef }) =>
-      Object.freeze({ playbookRef, revision, playbookHash, sourceRef }))), bindingHash: binding.bindingHash });
+    playbooks: Object.freeze(binding.playbooks.map(({ playbookRef, revision, playbookHash, sourceRef, citation }) =>
+      Object.freeze({ playbookRef, revision, playbookHash, sourceRef, citation }))), bindingHash: binding.bindingHash });
 }

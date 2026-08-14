@@ -20,7 +20,8 @@ function boundLedgerRow(overrides: Record<string, unknown> = {}) {
       profileHash: "1".repeat(64) },
     manifest_snapshots: CORE_SKILL_MANIFESTS.map(({ ref, version, hash }) => ({ ref, version, hash })),
     playbook_snapshots: [{ playbookRef: "playbook_alpha", revision: 2, playbookHash: "2".repeat(64),
-      sourceRef: "source_guidance" }],
+      sourceRef: "source_guidance", citation: { sourceTitle: "Meta yardım", sourceType: "official_meta_guidance",
+        sourceUrl: "https://www.facebook.com/business/help/learning", freshness: "fresh" } }],
     skill_catalog_binding_hash: "3".repeat(64),
     ...overrides,
   };
@@ -30,10 +31,12 @@ describe("orchestrator historical turn evidence projection", () => {
   it("projects frozen page/skill evidence in stable order without refs, hashes, source IDs, or playbook text", () => {
     const evidence = orchestratorTurnEvidenceFromLedger(boundLedgerRow());
     expect(evidence).toMatchObject({ state: "bound", pageGuide: { pageLabel: "Kurallar & Yetkiler" },
-      profileLabel: "Workspace skill profili · revizyon 4", historicalSourceState: "not_recorded",
+      profileLabel: "Workspace skill profili · revizyon 4", historicalSourceState: "available",
       evidenceScope: "page_guidance_and_verified_workspace_playbooks",
       uncertainty: "agent_inference_no_meta_or_action_authority" });
     expect(evidence.skills.map((skill) => skill.name)).toEqual([...evidence.skills.map((skill) => skill.name)].sort());
+    expect(evidence.playbooks).toEqual([{ label: "Doğrulanmış çalışma notu · revizyon 2", source: {
+      title: "Meta yardım", type: "official_meta_guidance", url: "https://www.facebook.com/business/help/learning", freshness: "fresh" } }]);
     expect(JSON.stringify(evidence)).not.toMatch(/profile_workspace|playbook_alpha|source_guidance|[123]{32}|body|prompt/i);
   });
 
@@ -43,7 +46,18 @@ describe("orchestrator historical turn evidence projection", () => {
     expect(orchestratorTurnEvidenceFromLedger(boundLedgerRow({ profile_snapshot: { version: "unavailable_not_bound" },
       manifest_snapshots: [], playbook_snapshots: [], skill_catalog_binding_hash: "UNAVAILABLE_NOT_BOUND" })).state).toBe("unavailable_not_bound");
     expect(orchestratorTurnEvidenceFromLedger(boundLedgerRow({ playbook_snapshots: [{ playbookRef: "playbook_alpha", revision: 2,
-      playbookHash: "2".repeat(64), sourceRef: "source_guidance", body: "leak" }] })).state).toBe("missing_or_invalid");
+      playbookHash: "2".repeat(64), sourceRef: "source_guidance" }] })).historicalSourceState).toBe("detail_not_recorded");
+    expect(orchestratorTurnEvidenceFromLedger(boundLedgerRow({ playbook_snapshots: [{ playbookRef: "playbook_alpha", revision: 2,
+      playbookHash: "2".repeat(64), sourceRef: "source_guidance", citation: { sourceTitle: "Meta yardım",
+        sourceType: "official_meta_guidance", sourceUrl: "https://example.test/bad", freshness: "fresh" } }] })).state).toBe("missing_or_invalid");
+  });
+
+  it("does not reinterpret a completed turn when its current mutable source later changes", () => {
+    const frozenRow = boundLedgerRow();
+    const atTurn = orchestratorTurnEvidenceFromLedger(frozenRow);
+    const mutableSourceAfterTurn = { title: "Sonradan değişen başlık", url: "https://example.test/current", freshness: "stale" };
+    expect(mutableSourceAfterTurn).not.toEqual(atTurn.playbooks[0]?.source);
+    expect(orchestratorTurnEvidenceFromLedger(frozenRow)).toEqual(atTurn);
   });
 
   it("drops malformed evidence before it reaches the dashboard and never accepts a body/source field", () => {
@@ -52,9 +66,11 @@ describe("orchestrator historical turn evidence projection", () => {
       providerThreadRef: null, messages: [{ messageRef, turnRef, messageNumber: 1, role: "assistant", content: "Kanıt açıklaması", createdAt: at, evidence }] } };
     const parsed = orchestratorConversationFromResponse(payload);
     expect(parsed?.messages[0]?.evidence).toMatchObject({ state: "bound", skills: expect.any(Array) });
-    expect(JSON.stringify(parsed)).not.toMatch(/playbook_alpha|source_guidance|profile_workspace|[123]{32}/);
+    expect(JSON.stringify(parsed)).not.toMatch(/playbook_alpha|source_guidance|profile_workspace|[123]{32}|raw playbook|Dönüşüm notu|İki varyant/);
     expect(orchestratorConversationFromResponse({ conversation: { ...payload.conversation, messages: [{ ...payload.conversation.messages[0],
       evidence: { ...evidence, body: "raw playbook" } }] } })).toBeNull();
+    expect(orchestratorConversationFromResponse({ conversation: { ...payload.conversation, messages: [{ ...payload.conversation.messages[0],
+      evidence: { ...evidence, playbooks: [{ ...evidence.playbooks[0], source: { ...evidence.playbooks[0]!.source!, url: "https://example.test/not-allowed" } }] } }] } })).toBeNull();
     expect(orchestratorConversationFromResponse({ conversation: { ...payload.conversation, messages: [{ ...payload.conversation.messages[0],
       role: "user", evidence }] } })).toBeNull();
   });

@@ -18,7 +18,8 @@ const workspaceId = "11111111-1111-4111-a111-111111111111";
 const userId = "22222222-2222-4222-a222-222222222222";
 const threadRef = "33333333-3333-4333-a333-333333333333";
 
-function binding(playbooks: readonly Readonly<{ playbookRef: string; revision: number; playbookHash: string; sourceRef: string; title: string; body: string }>[] = []) {
+function binding(playbooks: readonly Readonly<{ playbookRef: string; revision: number; playbookHash: string; sourceRef: string;
+  citation: { sourceTitle: string; sourceType: "official_meta_guidance"; sourceUrl: string; freshness: "fresh" }; title: string; body: string }>[] = []) {
   return createWorkspaceSkillCatalogBinding({ profile: { profileRef: "profile_default", revision: 1, profileHash: "a".repeat(64) },
     manifests: CORE_SKILL_MANIFESTS.map(({ ref, version, hash }) => ({ ref, version, hash })), playbooks });
 }
@@ -103,7 +104,8 @@ describe("persistent Orchestrator conversation", () => {
   it("binds active user playbooks into the prompt and freezes only their safe evidence in the turn", async () => {
     const source = memoryRepository();
     const catalog = loader(binding([{ playbookRef: "playbook_alpha", revision: 3, playbookHash: "b".repeat(64),
-      sourceRef: "source_guidance", title: "Dönüşüm notu", body: "İki varyantın kanıtını karşılaştır." }]));
+      sourceRef: "source_guidance", citation: { sourceTitle: "Meta yardım", sourceType: "official_meta_guidance",
+        sourceUrl: "https://www.facebook.com/business/help/learning", freshness: "fresh" }, title: "Dönüşüm notu", body: "İki varyantın kanıtını karşılaştır." }]));
     const execute = vi.fn(async () => ({ providerThreadRef: threadRef, finalResponse: "Karar alanları açıklandı." }));
     const service = new OrchestratorConversationService(source.repository, { execute }, catalog);
     await service.send({ workspaceId, userId, conversationRef: null, pageId: "analysis", message: "Kanıtları açıkla" });

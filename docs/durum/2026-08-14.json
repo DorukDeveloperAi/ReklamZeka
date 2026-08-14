@@ -4,6 +4,60 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "42f0364f0",
+      "tarih": "2026-08-14",
+      "konu": "feat(agent): expose frozen turn evidence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "a483e4e3b",
+      "tarih": "2026-08-14",
+      "konu": "feat(agent): bind workspace playbooks to turns",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "653f647a8",
+      "tarih": "2026-08-14",
+      "konu": "fix(agent): enforce user-authored rule boundaries",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "40bcb182e",
+      "tarih": "2026-08-14",
+      "konu": "feat(budget): guide pool hierarchy drafts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ad6044644",
+      "tarih": "2026-08-14",
+      "konu": "feat(skills): revise user playbooks safely",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "3996b7e91",
+      "tarih": "2026-08-14",
+      "konu": "feat(slice-rules): show read-only decision trace",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "04d011008",
       "tarih": "2026-08-14",
       "konu": "fix(tombstone): retain operational audit coverage",
@@ -83,70 +137,20 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "04814eb4e",
-      "tarih": "2026-08-14",
-      "konu": "feat: add immutable skill catalog package one",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "f22413287",
-      "tarih": "2026-08-14",
-      "konu": "feat(dashboard): simplify shell to monitor manage agent",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "3e97de2a4",
-      "tarih": "2026-08-14",
-      "konu": "test(timeline): guard canonical temporal feed",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "670288d39",
-      "tarih": "2026-08-14",
-      "konu": "test(source): harden public source states",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "e709edff3",
-      "tarih": "2026-08-14",
-      "konu": "DURUM türevlerini de merge=ours ile beyan et (agent-ide emsali)",
-      "tur": "is",
-      "kapsam": []
-    },
-    {
-      "hash": "0b287b002",
-      "tarih": "2026-08-14",
-      "konu": "aide türevlerini merge=ours ile beyan et — boot'u öldüren çakışmanın kök nedeni",
-      "tur": "is",
-      "kapsam": []
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 19
+      "adet": 23
     },
     {
       "kapsam": "fix",
-      "adet": 17
+      "adet": 14
     },
     {
       "kapsam": "test",
-      "adet": 14
+      "adet": 13
     },
     {
       "kapsam": "docs",
@@ -161,7 +165,7 @@
       "adet": 1
     }
   ],
-  "isSayisi": 465,
+  "isSayisi": 471,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-14",
   "planlar": [
@@ -182,5 +186,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "edda929f6992"
+  "damga": "26197ef43b84"
 }

@@ -74,8 +74,9 @@ export type OrchestratorTurnEvidence = Readonly<{
   pageGuide: Readonly<{ pageLabel: string; purpose: string; scope: string }> | null;
   profileLabel: string | null;
   skills: readonly Readonly<{ name: string; version: string }>[];
-  playbooks: readonly Readonly<{ label: string }>[];
-  historicalSourceState: "not_recorded" | "not_applicable";
+  playbooks: readonly Readonly<{ label: string; source: Readonly<{ title: string; type: string; url: string | null;
+    freshness: "fresh" | "stale" | "not_scheduled" }> | null }>[];
+  historicalSourceState: "available" | "detail_not_recorded" | "not_applicable";
   evidenceScope: "page_guidance_and_verified_workspace_playbooks";
   uncertainty: "agent_inference_no_meta_or_action_authority";
 }>;

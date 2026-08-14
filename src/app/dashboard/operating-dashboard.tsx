@@ -88,8 +88,9 @@ type OrchestratorTurnEvidenceSummary = Readonly<{
   pageGuide: Readonly<{ pageLabel: string; purpose: string; scope: string }> | null;
   profileLabel: string | null;
   skills: readonly Readonly<{ name: string; version: string }>[];
-  playbooks: readonly Readonly<{ label: string }>[];
-  historicalSourceState: "not_recorded" | "not_applicable";
+  playbooks: readonly Readonly<{ label: string; source: Readonly<{ title: string; type: string; url: string | null;
+    freshness: "fresh" | "stale" | "not_scheduled" }> | null }>[];
+  historicalSourceState: "available" | "detail_not_recorded" | "not_applicable";
   evidenceScope: "page_guidance_and_verified_workspace_playbooks";
   uncertainty: "agent_inference_no_meta_or_action_authority";
 }>;
@@ -122,10 +123,27 @@ function safeConversationContent(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 30_000 && !/[\u0000\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value);
 }
 
+/** Mirrors the published GuidanceSource allowlist before rendering a historical external link. */
+function safeHistoricalSourceUrl(value: unknown): value is string {
+  if (typeof value !== "string" || value !== value.trim() || /[\s\u0000-\u001f\u007f\\]/u.test(value)) return false;
+  try {
+    const url = new URL(value); const host = url.hostname.toLowerCase(); const path = url.pathname.replace(/\/+$/, "") || "/";
+    if (url.protocol !== "https:" || url.username || url.password || url.port || url.hash) return false;
+    if ((host === "facebook.com" || host === "www.facebook.com") && ["/business/help", "/business/ads-guide"].some((root) => path === root || path.startsWith(`${root}/`))) return true;
+    if (host === "developers.facebook.com") return path === "/docs" || path.startsWith("/docs/");
+    if ((host === "meta.com" || host === "www.meta.com") && ["/help", "/business", "/policies", "/technologies"].some((root) => path === root || path.startsWith(`${root}/`))) return true;
+    if (host === "developers.meta.com") return path === "/" || path === "/docs" || path.startsWith("/docs/");
+    if (host === "transparency.meta.com") return path === "/policies" || path.startsWith("/policies/");
+    if (host === "developers.instagram.com") return path === "/" || path === "/docs" || path.startsWith("/docs/");
+    if (host === "help.instagram.com") return path === "/" || /^\/[0-9]+(?:\/.*)?$/.test(path);
+    return host === "business.instagram.com" && (path === "/blog" || path.startsWith("/blog/"));
+  } catch { return false; }
+}
+
 function orchestratorEvidenceFromResponse(value: unknown): OrchestratorTurnEvidenceSummary | null {
   if (!plainRecord(value) || !onlyKeys(value, ["state", "pageGuide", "profileLabel", "skills", "playbooks", "historicalSourceState", "evidenceScope", "uncertainty"])
     || !["bound", "legacy_not_recorded", "unavailable_not_bound", "missing_or_invalid"].includes(value.state as string)
-    || !["not_recorded", "not_applicable"].includes(value.historicalSourceState as string)
+    || !["available", "detail_not_recorded", "not_applicable"].includes(value.historicalSourceState as string)
     || value.evidenceScope !== "page_guidance_and_verified_workspace_playbooks"
     || value.uncertainty !== "agent_inference_no_meta_or_action_authority" || !Array.isArray(value.skills)
     || !Array.isArray(value.playbooks) || value.skills.length > 9 || value.playbooks.length > 12
@@ -139,17 +157,28 @@ function orchestratorEvidenceFromResponse(value: unknown): OrchestratorTurnEvide
     return Object.freeze({ name: skill.name, version: skill.version });
   });
   const playbooks = value.playbooks.map((playbook) => {
-    if (!plainRecord(playbook) || !onlyKeys(playbook, ["label"]) || !safeEvidenceText(playbook.label, 160)) return null;
-    return Object.freeze({ label: playbook.label });
+    if (!plainRecord(playbook) || !onlyKeys(playbook, ["label", "source"]) || !safeEvidenceText(playbook.label, 160)) return null;
+    const source = playbook.source;
+    if (!(source === null || plainRecord(source) && onlyKeys(source, ["title", "type", "url", "freshness"])
+      && safeEvidenceText(source.title, 160) && typeof source.type === "string"
+      && ["owner_statement", "official_meta_guidance", "business_strategy", "observed_result", "experiment_outcome", "operating_note"].includes(source.type)
+      && ["fresh", "stale", "not_scheduled"].includes(source.freshness as string)
+      && (source.url === null || source.type === "official_meta_guidance" && safeHistoricalSourceUrl(source.url)))) return null;
+    return Object.freeze({ label: playbook.label, source: source === null ? null : Object.freeze({ title: source.title as string,
+      type: source.type as string, url: source.url as string | null, freshness: source.freshness as "fresh" | "stale" | "not_scheduled" }) });
   });
   if (skills.some((skill) => skill === null) || playbooks.some((playbook) => playbook === null)) return null;
+  const acceptedPlaybooks = playbooks.filter((playbook): playbook is NonNullable<typeof playbook> => playbook !== null);
   const state = value.state as OrchestratorTurnEvidenceSummary["state"];
   if (state === "bound" && (!guide || value.profileLabel === null)) return null;
   if (state !== "bound" && (guide !== null || value.profileLabel !== null || skills.length || playbooks.length)) return null;
+  if ((value.historicalSourceState === "available" && acceptedPlaybooks.some((playbook) => playbook.source === null))
+    || (value.historicalSourceState === "detail_not_recorded" && acceptedPlaybooks.some((playbook) => playbook.source !== null))
+    || (value.historicalSourceState === "not_applicable" && acceptedPlaybooks.length !== 0)) return null;
   return Object.freeze({ state, pageGuide: guide === null ? null : Object.freeze({ pageLabel: guide.pageLabel as string,
     purpose: guide.purpose as string, scope: guide.scope as string }), profileLabel: value.profileLabel as string | null,
   skills: Object.freeze(skills as OrchestratorTurnEvidenceSummary["skills"]),
-  playbooks: Object.freeze(playbooks as OrchestratorTurnEvidenceSummary["playbooks"]),
+  playbooks: Object.freeze(acceptedPlaybooks),
   historicalSourceState: value.historicalSourceState as OrchestratorTurnEvidenceSummary["historicalSourceState"],
   evidenceScope: "page_guidance_and_verified_workspace_playbooks", uncertainty: "agent_inference_no_meta_or_action_authority" });
 }
@@ -1092,8 +1121,8 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
               {message.evidence.state === "bound" && message.evidence.pageGuide ? <>
                 <dl><div><dt>Sayfa amacı</dt><dd>{message.evidence.pageGuide.purpose}</dd></div><div><dt>Kayıt kapsamı</dt><dd>{message.evidence.pageGuide.scope}</dd></div><div><dt>Skill profili</dt><dd>{message.evidence.profileLabel}</dd></div></dl>
                 <div className={styles.turnEvidenceSkills}><strong>Çekirdek skill’ler</strong><ul>{message.evidence.skills.map((skill) => <li key={`${skill.name}-${skill.version}`}>{skill.name} · {skill.version}</li>)}</ul></div>
-                <div className={styles.turnEvidenceSkills}><strong>Kullanıcı playbook snapshotları</strong>{message.evidence.playbooks.length ? <ul>{message.evidence.playbooks.map((playbook) => <li key={playbook.label}>{playbook.label}</li>)}</ul> : <small>Bu turn için doğrulanmış workspace playbook’u bağlı değildi.</small>}</div>
-                <small>Başlık, kaynak bağlantısı ve freshness bu historical snapshot’ta kaydedilmedi; güncel kaynakla birleştirilmedi.</small>
+                <div className={styles.turnEvidenceSkills}><strong>Kullanıcı playbook snapshotları</strong>{message.evidence.playbooks.length ? <ul>{message.evidence.playbooks.map((playbook) => <li key={playbook.label}><span>{playbook.label}</span>{playbook.source ? <small>{playbook.source.url ? <a href={playbook.source.url} target="_blank" rel="noreferrer">{playbook.source.title}</a> : playbook.source.title} · {playbook.source.type} · {playbook.source.freshness}</small> : <small>Tarihsel kaynak ayrıntısı kaydedilmedi.</small>}</li>)}</ul> : <small>Bu turn için doğrulanmış workspace playbook’u bağlı değildi.</small>}</div>
+                {message.evidence.historicalSourceState === "detail_not_recorded" ? <small>Tarihsel kaynak başlığı, bağlantısı ve freshness bu eski snapshot’ta kaydedilmedi; güncel kaynakla birleştirilmedi.</small> : null}
               </> : <p className={styles.turnEvidenceUnavailable}>{message.evidence.state === "legacy_not_recorded" ? "Bu eski turn için kanıt snapshot’ı kaydedilmedi; güncel kaynak durumu tarihsel kanıt gibi gösterilmez." : message.evidence.state === "unavailable_not_bound" ? "Bu turn’de workspace skill/playbook kanıtı çözümlenemedi; model çalıştırılmadı." : "Kanıt snapshot’ı eksik veya doğrulanamadı; güncel kaynak durumu kullanılmadı."}</p>}
             </details> : null}</div></div>)}
           </div>
