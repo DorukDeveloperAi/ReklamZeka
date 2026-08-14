@@ -3,6 +3,12 @@ import { defaultSkillCatalogBinding } from "@/domain/orchestrator/skill-catalog"
 
 export const ORCHESTRATOR_CONVERSATION_VERSION = "orchestrator-conversation/1.0.0" as const;
 export const ORCHESTRATOR_PAGE_GUIDE_VERSION = "orchestrator-page-guide/1.0.0" as const;
+export const ORCHESTRATOR_FACILITATION_OUTPUT_CONTRACT = Object.freeze([
+  "Yalnız açıklayıcı sorular sor; kanıtı, kapsamı, eksikleri ve riskleri haritala.",
+  "Yalnız kullanıcının sağladığı metni simüle et veya açıkla; kullanıcının karar vermesi gereken alanları belirt.",
+  "Kural, policy veya binding instruction metni üretme, taslak oluşturma, tamamlama ya da yeniden yazma.",
+  "Kural, policy ve binding instruction yalnız kullanıcı tarafından yazılır.",
+] as const);
 
 export type OrchestratorPageGuide = Readonly<{
   version: typeof ORCHESTRATOR_PAGE_GUIDE_VERSION;
@@ -121,14 +127,15 @@ function safeMessage(value: unknown): string {
   return normalized;
 }
 
-function prompt(guide: OrchestratorPageGuide, message: string): string {
+export function orchestratorFacilitationPrompt(guide: OrchestratorPageGuide, message: string): string {
   return [
     "ReklamZeka Orchestrator olarak Türkçe yanıt ver.",
     `Aktif ekran: ${guide.pageLabel}.`,
     `Ekranın amacı: ${guide.purpose}`,
     `Kod kılavuzu: ${guide.codePath}.`,
     `Kalıcı kayıt alanı: ${guide.recordPath}.`,
-    "Yalnız analiz, açıklama, taslak kural ve öneri üret. Policy yayınlama/onaylama, action yürütme, bütçe veya durum değiştirme, raw Meta/SQL ve Meta write yapma.",
+    ...ORCHESTRATOR_FACILITATION_OUTPUT_CONTRACT,
+    "Policy yayınlama/onaylama, action yürütme, bütçe veya durum değiştirme, raw Meta/SQL ve Meta write yapma.",
     "Kanıt eksikse tahmin etme; eksik kanıtı veya operatör kararını açıkça belirt.",
     "Araç çalışmaları veya iç muhakeme yerine yalnız operatöre yönelik nihai cevabı döndür.",
     "",
@@ -191,7 +198,7 @@ export class OrchestratorConversationService {
       let result: Awaited<ReturnType<OrchestratorModelAdapter["execute"]>>;
       try {
         result = await this.adapter.execute({ providerThreadRef: before.providerThreadRef,
-          prompt: prompt(guide, message) });
+          prompt: orchestratorFacilitationPrompt(guide, message) });
       } catch (reason) {
         const code = reason instanceof OrchestratorAdapterError ? reason.code : "adapter_failed";
         await this.repository.appendTurn({ workspaceId: input.workspaceId, userId: input.userId,

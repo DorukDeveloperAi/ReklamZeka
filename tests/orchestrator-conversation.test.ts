@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   OrchestratorAdapterError,
   OrchestratorConversationService,
+  ORCHESTRATOR_FACILITATION_OUTPUT_CONTRACT,
+  orchestratorFacilitationPrompt,
   orchestratorPageGuide,
   type OrchestratorConversationRepository,
   type OrchestratorConversationSnapshot,
@@ -46,18 +48,19 @@ describe("persistent Orchestrator conversation", () => {
   it("keeps one vendor-neutral conversation while each turn freezes its source page guide", async () => {
     const source = memoryRepository();
     const execute = vi.fn(async (input: { providerThreadRef: string | null }) => ({ providerThreadRef: threadRef,
-      finalResponse: input.providerThreadRef ? "Bütçe kuralı taslağı" : "İlk analiz" }));
+      finalResponse: input.providerThreadRef ? "Bütçe etkisi ve karar eksikleri" : "İlk analiz" }));
     let refCounter = 0;
     const service = new OrchestratorConversationService(source.repository, { execute },
       () => new Date("2026-08-13T09:00:00.000Z"), (kind) => `${kind}_${(++refCounter).toString(16).padStart(32, "0")}`);
     const first = await service.send({ workspaceId, userId, conversationRef: null,
       pageId: "analysis", message: "Düşüşü açıkla" });
     const second = await service.send({ workspaceId, userId,
-      conversationRef: first.conversation.conversationRef, pageId: "budgets", message: "Taslak kural öner" });
+      conversationRef: first.conversation.conversationRef, pageId: "budgets", message: "Bu kullanıcı metninin bütçe etkisini simüle et" });
     expect(first.conversation.conversationRef).toBe(second.conversation.conversationRef);
     expect(second.conversation.messages.map((message) => message.content))
-      .toEqual(["Düşüşü açıkla", "İlk analiz", "Taslak kural öner", "Bütçe kuralı taslağı"]);
-    expect(execute).toHaveBeenNthCalledWith(1, expect.objectContaining({ providerThreadRef: null }));
+      .toEqual(["Düşüşü açıkla", "İlk analiz", "Bu kullanıcı metninin bütçe etkisini simüle et", "Bütçe etkisi ve karar eksikleri"]);
+    expect(execute).toHaveBeenNthCalledWith(1, expect.objectContaining({ providerThreadRef: null,
+      prompt: expect.stringContaining("Kural, policy veya binding instruction metni üretme") }));
     expect(execute).toHaveBeenNthCalledWith(2, expect.objectContaining({ providerThreadRef: threadRef }));
     expect(source.appendTurn.mock.calls[1]![0].pageGuide).toEqual(orchestratorPageGuide("budgets"));
     expect(source.appendTurn.mock.calls[1]![0].pageGuide.recordPath).toContain("budget proposal");
@@ -69,6 +72,20 @@ describe("persistent Orchestrator conversation", () => {
       pageLabel: "Ayarlar",
       recordPath: "Meta readiness / category registry / promotion template lifecycle",
     });
+  });
+
+  it("makes the agent a facilitator, never a rule, policy or binding-instruction author", () => {
+    const prompt = orchestratorFacilitationPrompt(orchestratorPageGuide("rules"), "Kanıtları açıkla");
+    expect(ORCHESTRATOR_FACILITATION_OUTPUT_CONTRACT).toEqual(expect.arrayContaining([
+      expect.stringContaining("açıklayıcı sorular"),
+      expect.stringContaining("kanıtı, kapsamı, eksikleri ve riskleri"),
+      expect.stringContaining("kullanıcının sağladığı metni simüle et veya açıkla"),
+      expect.stringContaining("Kural, policy ve binding instruction yalnız kullanıcı tarafından yazılır"),
+    ]));
+    expect(prompt).toContain("Kural, policy veya binding instruction metni üretme");
+    expect(prompt).not.toContain("taslak kural");
+    expect(prompt).not.toContain("kural taslağı üret");
+    expect(prompt).not.toContain("policy taslağı üret");
   });
 
   it("rejects secret material and records adapter failures without inventing an assistant response", async () => {
