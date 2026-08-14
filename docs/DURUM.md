@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: dca4cf2c2385 -->
+<!-- durum-damga: edda929f6992 -->
 
 ## Künye
 
@@ -14,35 +14,35 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 452 |
+| iş commit'i (tüm geçmiş) | 465 |
 | ilk / son iş | 2026-08-06 / 2026-08-14 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-14 | `fix` | retain operational audit coverage | `04d011008` |
+| 2026-08-14 | `feat` | add unified preparation gate | `92a7ddf3d` |
+| 2026-08-14 | `feat` | manage skill catalog in rules | `4fe3836ce` |
+| 2026-08-14 | `feat` | show safe skill catalog context | `3bd1ca607` |
+| 2026-08-14 | `feat` | add guarded scenario selection | `d79562e58` |
+| 2026-08-14 | `feat` | add private skill catalog route acceptance | `c27504ecd` |
+| 2026-08-14 | `feat` | add skill catalog repository and panel | `aed4290b8` |
+| 2026-08-14 | `feat` | add read-only skill catalog context strip | `fba099714` |
+| 2026-08-14 | `feat` | add skill catalog application service | `dd816b584` |
+| 2026-08-14 | `feat` | add immutable skill catalog package one | `04814eb4e` |
+| 2026-08-14 | `feat` | simplify shell to monitor manage agent | `f22413287` |
+| 2026-08-14 | `test` | guard canonical temporal feed | `3e97de2a4` |
+| 2026-08-14 | `test` | harden public source states | `670288d39` |
 | 2026-08-14 | `—` | DURUM türevlerini de merge=ours ile beyan et (agent-ide emsali) | `e709edff3` |
 | 2026-08-14 | `—` | aide türevlerini merge=ours ile beyan et — boot'u öldüren çakışmanın kök nedeni | `0b287b002` |
-| 2026-08-14 | `docs` | describe manual dashboard approval flow | `ac54d9c60` |
-| 2026-08-14 | `docs` | record canonical insight bootstrap | `972e72abb` |
-| 2026-08-14 | `test` | isolate verifier cleanup connection | `1046fc2ce` |
-| 2026-08-14 | `test` | bound queue verifier transport | `de22424a1` |
-| 2026-08-14 | `test` | retry tombstone transport | `b9e55c672` |
-| 2026-08-14 | `test` | complete guardrail category context | `ae91bcce6` |
-| 2026-08-14 | `test` | materialize active ad set evidence | `4b8187658` |
-| 2026-08-14 | `test` | bind ad set category evidence | `4f9d5407e` |
-| 2026-08-14 | `test` | evaluate guardrails at command time | `438d52f9d` |
-| 2026-08-14 | `test` | materialize complete guardrail evidence | `cddda92c0` |
-| 2026-08-14 | `fix` | bind geo evidence through hierarchy | `3377eee7b` |
-| 2026-08-14 | `fix` | label trust freshness in hours | `294e5e398` |
-| 2026-08-14 | `fix` | enforce published budget guardrails | `2834bf3f7` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `fix         ` ████████████████████████ 17
-- `feat        ` ████████████████████ 14
-- `docs        ` ██████████████████ 13
-- `test        ` ██████████████████ 13
+- `feat        ` ████████████████████████ 19
+- `fix         ` █████████████████████ 17
+- `test        ` ██████████████████ 14
+- `docs        ` █████████ 7
 - `?           ` ███ 2
 - `refactor    ` █ 1
 
