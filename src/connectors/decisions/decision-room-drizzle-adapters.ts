@@ -749,13 +749,20 @@ export class DrizzleDecisionRoomReadRepository implements DecisionRoomReadReposi
     after: ReadAfter | null;
     limit: number;
     readerRef: string | null;
+    campaignRef: string | null;
   }> {
-    exactReadInput(input, reader ? ["workspaceRef", "readerRef", "after", "limit"] : ["workspaceRef", "after", "limit"]);
+    exactReadInput(input, reader ? ["workspaceRef", "readerRef", "after", "limit"] : ["workspaceRef", "campaignRef", "after", "limit"]);
     if (input.workspaceRef !== this.workspaceRef) throw new DecisionRoomPersistenceError("workspace_scope_mismatch");
     return Object.freeze({
       after: readAfter(input.after, temporal),
       limit: readLimit(input.limit),
       readerRef: reader ? opaqueRef(input.readerRef) : null,
+      campaignRef: reader || input.campaignRef === undefined || input.campaignRef === null ? null : (() => {
+        if (typeof input.campaignRef !== "string" || !/^campaign_[a-f0-9]{20}$/.test(input.campaignRef)) {
+          throw new DecisionRoomPersistenceError("invalid_input");
+        }
+        return input.campaignRef;
+      })(),
     });
   }
 
@@ -770,6 +777,7 @@ export class DrizzleDecisionRoomReadRepository implements DecisionRoomReadReposi
       from decision_room_schedules
       where workspace_id = ${this.workspaceId}::uuid and workspace_ref = ${this.workspaceRef}
         and superseded_at is null
+        and (${valid.campaignRef}::text is null or concat('campaign_', substring(encode(digest(concat(${this.workspaceId}, ':campaign:', campaign_id::text), 'sha256'), 'hex') from 1 for 20)) = ${valid.campaignRef})
         and (${valid.after?.ref ?? null}::text is null or schedule_ref > ${valid.after?.ref ?? null})
       order by schedule_ref asc
       limit ${valid.limit}
@@ -806,6 +814,7 @@ export class DrizzleDecisionRoomReadRepository implements DecisionRoomReadReposi
       left join decision_room_schedules schedule
         on schedule.workspace_id = run.workspace_id and schedule.id = run.schedule_id
       where run.workspace_id = ${this.workspaceId}::uuid
+        and (${valid.campaignRef}::text is null or concat('campaign_', substring(encode(digest(concat(${this.workspaceId}, ':campaign:', run.campaign_id::text), 'sha256'), 'hex') from 1 for 20)) = ${valid.campaignRef})
         and (${valid.after?.sortAt ?? null}::timestamptz is null
           or (run.started_at, run.run_ref) < (${valid.after?.sortAt ?? null}::timestamptz, ${valid.after?.ref ?? null}::text))
       order by run.started_at desc, run.run_ref desc

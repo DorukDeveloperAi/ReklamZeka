@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "dashboard-shell-routing-browser-evidence/1.1.0",
+  "capturedAt": "2026-08-14T11:12:59Z",
+  "target": "http://10.16.17.16:3000/dashboard",
+  "sourceState": "local_session_required",
+  "primaryNavigation": {
+    "visibleTargetCount": 7,
+    "targets": [
+      "Bugün",
+      "Kampanyalar",
+      "Analiz & Kararlar",
+      "Bütçeler",
+      "Onay kuyruğu",
+      "Kurallar & Yetkiler",
+      "Ayarlar"
+    ],
+    "activeDestinationUsesAriaCurrent": true
+  },
+  "routing": {
+    "campaigns": "/dashboard?view=campaigns",
+    "campaignPromotion": "/dashboard?view=campaigns&area=promotion",
+    "rules": "/dashboard?view=rules",
+    "strictPolicies": "/dashboard?view=rules&area=policies",
+    "browserBackRestoredCampaignPromotion": true,
+    "browserForwardRestoredRulesGuidance": true,
+    "browserForwardRestoredStrictPolicies": true,
+    "restoredActiveSubareaUsesAriaCurrent": true
+  },
+  "deepLinks": {
+    "legacyInput": "/dashboard?view=strict-policies",
+    "legacyCanonicalResult": "/dashboard?view=rules&area=policies",
+    "invalidInput": "/dashboard?view=secrets&area=raw",
+    "invalidCanonicalResult": "/dashboard",
+    "invalidResultHeading": "Bugün neye güvenebileceğinizi tek bakışta görün."
+  },
+  "campaignContextRecovery": {
+    "deepLink": "/dashboard?view=decision-room&campaign=ref_abcdef012345",
+    "withoutSessionShows": "Kampanya bağlamı için yerel oturum gerekli",
+    "generalDecisionRecordsMounted": false,
+    "clearContextRemovesCampaignQuery": true,
+    "clearedUrl": "/dashboard?view=decision-room",
+    "operatorSessionProofMinted": false
+  },
+  "responsive": {
+    "viewport": "390x844",
+    "mobileNavigationVisible": true,
+    "campaignContextRecoveryVisible": true,
+    "documentHorizontalOverflow": false
+  },
+  "assistant": {
+    "openUrl": "/dashboard?view=rules&area=policies&assistant=1",
+    "role": "dialog",
+    "ariaModal": true,
+    "initialFocus": "Asistanı kapat",
+    "shiftTabWrappedTo": "local-session-capability",
+    "tabWrappedBackTo": "Asistanı kapat",
+    "escapeClosedDialog": true,
+    "escapeRemovedAssistantQuery": true,
+    "focusReturnedToTrigger": true
+  },
+  "console": {
+    "productErrors": 0,
+    "productWarnings": 0,
+    "developmentInfoOnly": true
+  },
+  "securityBoundary": {
+    "agentOrBrowserMintedLocalSessionProof": false,
+    "browserStorageInspected": false,
+    "cookiesInspected": false,
+    "mutationAttempted": false
+  }
+}

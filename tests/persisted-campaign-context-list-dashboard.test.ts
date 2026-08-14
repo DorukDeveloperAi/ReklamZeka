@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLocalSessionRequiredResponse, persistedCampaignContextsFromResponse } from "@/app/dashboard/operating-dashboard";
+import { campaignContextRecoveryState, isLocalSessionRequiredResponse, persistedCampaignContextsFromResponse } from "@/app/dashboard/operating-dashboard";
 
 describe("persisted campaign context dashboard list", () => {
   const response = { contractVersion: "campaign-context-list-read-model/1.0.0", view: "list", items: [{ campaignRef: "ref_abcdef012345", label: "Persisted campaign · abcdef", objective: "lead_generation", capturedAt: "2026-08-10T12:00:00.000Z", sourceState: "frozen_valid" }], writeOperations: 0 };
@@ -18,5 +18,13 @@ describe("persisted campaign context dashboard list", () => {
     expect(isLocalSessionRequiredResponse({ error: { code: "local_session_required", message: "Oturumu bağlayın." } })).toBe(true);
     expect(isLocalSessionRequiredResponse({ error: { code: "source_not_configured", message: "no" } })).toBe(false);
     expect(isLocalSessionRequiredResponse({ error: { code: "local_session_required", message: "x", raw: "no" } })).toBe(false);
+  });
+
+  it("offers campaign recovery only for the exact local-session HTTP contract", () => {
+    const required = { error: { code: "local_session_required", message: "Oturumu bağlayın." } };
+    expect(campaignContextRecoveryState(401, required)).toBe("session_required");
+    expect(campaignContextRecoveryState(403, required)).toBe("unavailable");
+    expect(campaignContextRecoveryState(401, { error: { code: "forbidden", message: "Yasak" } })).toBe("unavailable");
+    expect(campaignContextRecoveryState(401, { error: { code: "local_session_required", message: "x", unexpected: true } })).toBe("unavailable");
   });
 });

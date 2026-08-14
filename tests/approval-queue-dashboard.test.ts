@@ -109,6 +109,8 @@ describe("Approval Queue dashboard", () => {
     expect(html).toContain("Bağımlılıklar");
     expect(html).toContain("8 Ağu 2026");
     expect(html).toContain("K2");
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('tabindex="-1"');
   });
 
   it("keeps the authority boundary concise when no trusted decision adapter is supplied", () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { ApprovalQueueDetailRecord, ApprovalQueueReadService, ApprovalQueueRecord } from "@/application/approval-queue-read-service";
 import { LocalSessionConnector } from "./local-session-connector";
 import styles from "./operating-dashboard.module.css";
@@ -137,6 +137,7 @@ export function ApprovalQueueReadSurface(props: Readonly<{
   onSelect(item: ApprovalQueueRecord): void;
   decision?: DecisionControl;
   onConnect?: () => Promise<boolean>;
+  detailHeadingRef?: RefObject<HTMLHeadingElement | null>;
 }>) {
   const ready = props.state.status === "ready" ? props.state : null;
   return <>
@@ -155,7 +156,7 @@ export function ApprovalQueueReadSurface(props: Readonly<{
         <header className={styles.panelHeader}><div><span className={styles.kicker}>EYLEM SATIRLARI</span><h2>{ready.result.items.length} kayıt</h2></div><span>Güvenli özet</span></header>
         <div>{ready.result.items.map((item) => {
           const values = valuePair(item.beforeAfter);
-          return <button key={item.unitRef} data-active={ready.selected?.unitRef === item.unitRef} onClick={() => props.onSelect(item)}>
+          return <button key={item.unitRef} data-active={ready.selected?.unitRef === item.unitRef} aria-pressed={ready.selected?.unitRef === item.unitRef} onClick={() => props.onSelect(item)}>
             <header><span data-tone={toneForStatus(item.status)}>{STATUS_LABELS[item.status]}</span><i>{item.risk}</i></header>
             <strong>{ACTION_LABELS[item.actionType]}</strong>
             <small>{item.entity.label ?? ENTITY_LABELS[item.entity.type]} · {timestamp(item.createdAt)}</small>
@@ -163,21 +164,22 @@ export function ApprovalQueueReadSurface(props: Readonly<{
           </button>;
         })}</div>
       </section>
-      <ApprovalQueueDetail item={ready.selected} loading={ready.detailLoading} decision={props.decision} />
+      <ApprovalQueueDetail item={ready.selected} loading={ready.detailLoading} decision={props.decision} detailHeadingRef={props.detailHeadingRef} />
     </div> : null}
   </>;
 }
 
-function ApprovalQueueDetail({ item, loading, decision }: Readonly<{
+function ApprovalQueueDetail({ item, loading, decision, detailHeadingRef }: Readonly<{
   item: ApprovalQueueRecord | ApprovalQueueDetailRecord | null;
   loading: boolean;
   decision?: DecisionControl;
+  detailHeadingRef?: RefObject<HTMLHeadingElement | null>;
 }>) {
   if (loading) return <section className={`${styles.panel} ${styles.approvalQueueState}`} role="status"><span className={styles.liveDot} /><h2>Eylem satırı doğrulanıyor</h2><p>Liste özeti ile detay kaydı eşleştiriliyor.</p></section>;
   if (!item) return <section className={`${styles.panel} ${styles.approvalQueueState}`}><strong>Kayıt seçin</strong><h2>Önce/sonra, otonomi izi ve bağımlılıklar burada açılır.</h2><p>Tam kimlikler, hash, token, prompt ve ham Meta payload bu yüzeye çıkmaz.</p></section>;
   const values = valuePair(item.beforeAfter);
   return <section className={`${styles.panel} ${styles.approvalQueueDetail}`}>
-    <header><div><span className={styles.kicker}>{ENTITY_LABELS[item.entity.type].toUpperCase()} · {item.risk}</span><h2>{ACTION_LABELS[item.actionType]}</h2><p>{item.entity.label ?? item.entity.ref} · {item.accountRef}</p></div><span className={styles.readOnlyBadge}>YALNIZ KARAR · UYGULAMA YOK</span></header>
+    <header><div><span className={styles.kicker}>{ENTITY_LABELS[item.entity.type].toUpperCase()} · {item.risk}</span><h2 ref={detailHeadingRef} tabIndex={-1}>{ACTION_LABELS[item.actionType]}</h2><p>{item.entity.label ?? item.entity.ref} · {item.accountRef}</p></div><span className={styles.readOnlyBadge}>YALNIZ KARAR · UYGULAMA YOK</span></header>
     <div className={styles.approvalQueueFacts}><div><span>Durum</span><strong data-tone={toneForStatus(item.status)}>{STATUS_LABELS[item.status]}</strong><small>{item.summaryCode.replaceAll("_", " ")}</small></div><div><span>Otonomi kararı</span><strong>{item.autonomy.decision.replaceAll("_", " ")}</strong><small>{item.autonomy.profileRef}</small></div><div><span>Geçerlilik</span><strong>{timestamp(item.expiresAt)}</strong><small>Oluşturuldu: {timestamp(item.createdAt)}</small></div></div>
     <section className={styles.approvalQueueChange} aria-label={`${values.field} önce ve sonra`}><span>{values.field}</span><div><p><small>Önce</small><strong>{values.before}</strong></p><i>→</i><p><small>Sonra</small><strong>{values.after}</strong></p></div></section>
     <div className={styles.approvalQueueTrace}><h3>Otonomi izi</h3>{item.autonomy.trace.map((step, index) => <article key={`${step.scope}-${index}`}><span>{index + 1}</span><p><strong>{step.scope}</strong><small>{step.decision.replaceAll("_", " ")} · {step.reasonCode.replaceAll("_", " ")}</small></p></article>)}</div>
@@ -199,23 +201,47 @@ function ApprovalQueueDetail({ item, loading, decision }: Readonly<{
   </section>;
 }
 
-export function ApprovalQueuePanel({ campaignRef = null }: Readonly<{ campaignRef?: string | null }>) {
+export function ApprovalQueuePanel({ campaignRef = null, campaignLabel = null, onClearCampaignContext, campaignContextPending = false }: Readonly<{
+  campaignRef?: string | null;
+  campaignLabel?: string | null;
+  onClearCampaignContext?: () => void;
+  campaignContextPending?: boolean;
+}>) {
   const [state, setState] = useState<ApprovalQueueDashboardState>({ status: "loading" });
   const mounted = useRef(false);
   const [decisionBusy, setDecisionBusy] = useState(false);
   const [decisionConfirmed, setDecisionConfirmed] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
+  const listRequestEpoch = useRef(0);
+  const detailRequestEpoch = useRef(0);
+  const detailHeadingRef = useRef<HTMLHeadingElement>(null);
+  const focusDetailAfterSelectionRef = useRef(false);
+
+  useEffect(() => {
+    if (!focusDetailAfterSelectionRef.current || state.status !== "ready" || !state.selected || state.detailLoading) return;
+    focusDetailAfterSelectionRef.current = false;
+    detailHeadingRef.current?.focus();
+  }, [state]);
 
   const load = useCallback(async () => {
+    const requestEpoch = listRequestEpoch.current + 1;
+    listRequestEpoch.current = requestEpoch;
+    // A list refresh/context change makes every previously selected detail and
+    // its confirmation state ineligible for display or a follow-up decision.
+    detailRequestEpoch.current += 1;
+    setDecisionConfirmed(false);
+    setDecisionError(null);
+    setDecisionNotice(null);
     if (!mounted.current) return false;
     setState({ status: "loading" });
+    if (campaignContextPending) return false;
     try {
       const query = new URLSearchParams({ view: "list", limit: "50" });
       if (campaignRef !== null) query.set("campaignRef", campaignRef);
       const response = await fetch(`/api/approval-queue?${query}`, { cache: "no-store" });
       const payload = await response.json() as Envelope<ApprovalQueueListResult> | ErrorEnvelope;
-      if (!mounted.current) return false;
+      if (!mounted.current || listRequestEpoch.current !== requestEpoch) return false;
       if (!response.ok) {
         const remoteError = "error" in payload ? payload.error : undefined;
         setState({ status: remoteError?.code === "local_session_required" ? "session_required" : response.status === 503 ? "unavailable" : "error", message: remoteError?.message ?? "Onay kuyruğu yanıtı alınamadı." });
@@ -225,14 +251,18 @@ export function ApprovalQueuePanel({ campaignRef = null }: Readonly<{ campaignRe
       setState({ status: "ready", result: payload.result, selected: null, detailLoading: false });
       return true;
     } catch {
-      if (mounted.current) setState({ status: "error", message: "Onay kuyruğu bağlantısı şu anda kullanılamıyor." });
+      if (mounted.current && listRequestEpoch.current === requestEpoch) setState({ status: "error", message: "Onay kuyruğu bağlantısı şu anda kullanılamıyor." });
       return false;
     }
-  }, [campaignRef]);
+  }, [campaignContextPending, campaignRef]);
 
   useEffect(() => { mounted.current = true; void load(); return () => { mounted.current = false; }; }, [load]);
 
   const select = useCallback(async (summary: ApprovalQueueRecord) => {
+    const requestEpoch = detailRequestEpoch.current + 1;
+    detailRequestEpoch.current = requestEpoch;
+    const selectedCampaignRef = campaignRef;
+    focusDetailAfterSelectionRef.current = true;
     setDecisionConfirmed(false);
     setDecisionError(null);
     setDecisionNotice(null);
@@ -242,14 +272,17 @@ export function ApprovalQueuePanel({ campaignRef = null }: Readonly<{ campaignRe
       const response = await fetch(`/api/approval-queue?${query}`, { cache: "no-store" });
       if (!response.ok) throw new Error("detail_failed");
       const payload = await response.json() as Envelope<ApprovalQueueDetailResult>;
-      if (payload.result.view !== "detail" || payload.result.item.unitRef !== summary.unitRef) throw new Error("invalid_contract");
+      if (detailRequestEpoch.current !== requestEpoch) return;
+      if (payload.result.view !== "detail" || payload.result.item.unitRef !== summary.unitRef
+        || selectedCampaignRef !== null && payload.result.item.campaignRef !== selectedCampaignRef) throw new Error("invalid_contract");
       setState((current) => current.status === "ready"
+        && current.selected?.unitRef === summary.unitRef
         ? { ...current, selected: payload.result.item, detailLoading: false }
         : current);
     } catch {
-      setState({ status: "error", message: "Eylem satırı güvenli biçimde okunamadı." });
+      if (mounted.current && detailRequestEpoch.current === requestEpoch) setState({ status: "error", message: "Eylem satırı güvenli biçimde okunamadı." });
     }
-  }, []);
+  }, [campaignRef]);
 
   const decide = useCallback(async (kind: DecisionKind) => {
     if (state.status !== "ready" || !state.selected || state.selected.status !== "awaiting_approval"
@@ -271,12 +304,12 @@ export function ApprovalQueuePanel({ campaignRef = null }: Readonly<{ campaignRe
     }
   }, [decisionBusy, decisionConfirmed, load, state]);
 
-  return <ApprovalQueueReadSurface state={state} onRetry={() => void load()} onSelect={(item) => void select(item)} onConnect={load} decision={{
+  return <>{campaignRef && campaignLabel ? <section className={`${styles.panel} ${styles.decisionRoomState}`} aria-label="Seçili kampanyanın onay bağlamı"><strong>SEÇİLİ KAMPANYA BAĞLAMI</strong><h2>{campaignLabel}</h2><p>Bu kuyruk, frozen bağlamın doğruladığı kampanya alias’ıyla sunucuda süzülür.</p>{onClearCampaignContext ? <button onClick={onClearCampaignContext}>Tüm çalışma alanına dön</button> : null}</section> : null}<ApprovalQueueReadSurface state={state} onRetry={() => void load()} onSelect={(item) => void select(item)} onConnect={load} detailHeadingRef={detailHeadingRef} decision={{
     busy: decisionBusy,
     confirmed: decisionConfirmed,
     error: decisionError,
     notice: decisionNotice,
     setConfirmed: setDecisionConfirmed,
     decide: (kind) => void decide(kind),
-  }} />;
+  }} /></>;
 }

@@ -175,11 +175,12 @@ export function campaignDecisionTimeline(input: Readonly<{
   ]);
 }
 
-function campaignContextBridge(value: unknown, expectedCampaignRef: string): Readonly<{ context: unknown; approvalQueueCampaignRef: string }> | null {
-  if (!exactObject(value, ["contractVersion", "view", "campaignRef", "approvalQueueCampaignRef", "context"])
+export function campaignContextBridge(value: unknown, expectedCampaignRef: string): Readonly<{ context: unknown; approvalQueueCampaignRef: string; decisionRoomCampaignRef: string }> | null {
+  if (!exactObject(value, ["contractVersion", "view", "campaignRef", "approvalQueueCampaignRef", "decisionRoomCampaignRef", "context"])
     || value.contractVersion !== "campaign-context-read-model/1.1.0" || value.view !== "context"
-    || value.campaignRef !== expectedCampaignRef || !ENTITY_REF.test(String(value.approvalQueueCampaignRef))) return null;
-  return Object.freeze({ context: value.context, approvalQueueCampaignRef: value.approvalQueueCampaignRef as string });
+    || value.campaignRef !== expectedCampaignRef || !ENTITY_REF.test(String(value.approvalQueueCampaignRef))
+    || !/^campaign_[a-f0-9]{20}$/.test(String(value.decisionRoomCampaignRef))) return null;
+  return Object.freeze({ context: value.context, approvalQueueCampaignRef: value.approvalQueueCampaignRef as string, decisionRoomCampaignRef: value.decisionRoomCampaignRef as string });
 }
 
 function emptyCampaignContext(value: unknown, expectedCampaignRef: string): boolean {
@@ -482,7 +483,7 @@ function CampaignPlanningBriefPanelContent({ context, initialScenarioRef, onAppr
             : "Pazar sınırı uygulanır; daha özel bir kural için insan doğrulamalı kapsam gerekir."}</small>
     </div>
     <div className={styles.briefNextDecision} data-source-state={sourceState}>
-      <span>PERSISTED KAMPANYA BAĞLAMI</span><strong>{sourceState === "ready" ? "Frozen campaign context doğrulandı" : sourceState === "empty" ? "Henüz frozen context yok" : sourceState === "loading" ? "Frozen context okunuyor" : sourceState === "unavailable" ? "Context kaynağı kullanılamıyor" : "Demo bağlamı persisted kaynağa bağlı değil"}</strong>
+      <span>PERSISTED KAMPANYA BAĞLAMI</span><strong>{sourceState === "ready" ? "Frozen campaign context doğrulandı" : sourceState === "empty" ? "Henüz frozen context yok" : sourceState === "loading" ? "Frozen context okunuyor" : sourceState === "unavailable" ? "Context kaynağı kullanılamıyor" : "Seçili bağlam kalıcı kaynağa bağlı değil"}</strong>
       <small>{sourceState === "ready" ? "Brief/timeline birleşimi yalnız bu doğrulanmış kaynakla açılır." : "Bu durum proposal, approval veya Meta write yetkisi vermez."}</small>
     </div>
     {sourceState === "ready" && persistedHint ? <div className={styles.briefNextDecision} data-source-state="hint">

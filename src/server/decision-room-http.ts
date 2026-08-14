@@ -52,8 +52,9 @@ export function createDecisionRoomHttpHandlers(dependencies: HttpDependencies) {
     async GET(request: Request) {
       try {
         const url = new URL(request.url);
-        if (!exactSearchParams(url, ["view", "limit", "cursor"])) throw new DecisionRoomReadError("invalid_input");
+        if (!exactSearchParams(url, ["view", "campaignRef", "limit", "cursor"])) throw new DecisionRoomReadError("invalid_input");
         const view = url.searchParams.get("view");
+        const campaignRef = url.searchParams.get("campaignRef");
         const rawLimit = url.searchParams.get("limit");
         const cursor = url.searchParams.get("cursor");
         const principal = await principalOrThrow(request, dependencies.resolvePrincipal);
@@ -61,6 +62,7 @@ export function createDecisionRoomHttpHandlers(dependencies: HttpDependencies) {
           name: "decision_room_list",
           arguments: {
             view: view as "schedules" | "runs" | "inbox",
+            campaignRef,
             limit: rawLimit === null ? undefined : Number(rawLimit),
             cursor,
           },

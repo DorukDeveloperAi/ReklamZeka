@@ -16,7 +16,7 @@ describe("campaign context read service", () => {
   it("returns only the public projection for a matching valid campaign", async () => {
     const service = new CampaignContextReadService({ loadLatestValidCampaignPublic: async () => ({ context, analysisDataScope: { metaConnectionId: "33333333-3333-4333-8333-333333333333", adAccountId: "44444444-4444-4444-8444-444444444444", campaignId }, sourceComponents: [], invalidated: false }), listLatestValidCampaignPublic: async () => [] });
     const result = await service.get({ workspaceId, campaignRef });
-    expect(result).toMatchObject({ view: "context", campaignRef, approvalQueueCampaignRef: "entity_1eb4e78c07f9c395", context: { identity: { campaignRef }, writeOperations: 0 } });
+    expect(result).toMatchObject({ view: "context", campaignRef, approvalQueueCampaignRef: "entity_1eb4e78c07f9c395", decisionRoomCampaignRef: "campaign_5329ed6dc764c3e70e87", context: { identity: { campaignRef }, writeOperations: 0 } });
     expect(JSON.stringify(result)).not.toContain("campaign_primary");
   });
 

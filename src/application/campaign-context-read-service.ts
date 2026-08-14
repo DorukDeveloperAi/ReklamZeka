@@ -12,6 +12,14 @@ function approvalQueueCampaignRef(workspaceId: string, campaignId: string): stri
   return `entity_${createHash("sha256").update(`${workspaceId}:entity:${campaignId.toLowerCase()}`).digest("hex").slice(0, 16)}`;
 }
 
+/** The Decision Room uses a distinct, tenant-scoped public alias for the same frozen campaign. */
+function decisionRoomCampaignRef(workspaceId: string, campaignId: string): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(campaignId)) {
+    throw new CampaignContextReadError("unsafe_source");
+  }
+  return `campaign_${createHash("sha256").update(`${workspaceId}:campaign:${campaignId.toLowerCase()}`).digest("hex").slice(0, 20)}`;
+}
+
 export class CampaignContextReadError extends Error {
   constructor(readonly code: "invalid_input" | "source_unavailable" | "unsafe_source") {
     super(`Campaign context read rejected: ${code}`);
@@ -49,6 +57,7 @@ export class CampaignContextReadService {
       view: "context" as const,
       campaignRef: input.campaignRef,
       approvalQueueCampaignRef: queueCampaignRef,
+      decisionRoomCampaignRef: decisionRoomCampaignRef(input.workspaceId, record.analysisDataScope.campaignId),
       context,
     });
   }

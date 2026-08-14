@@ -17,6 +17,9 @@ describe("Decision Room dashboard surface", () => {
     expect(html).toContain("ANALİZ &amp; KARARLAR · CANLI READ MODEL");
     expect(html).toContain("Gerçek analiz rutinleri ve sonuçları, tek karar yüzeyinde.");
     expect(html).toContain("Sonuçlar");
+    expect(html).toContain('<nav class=');
+    expect(html).toContain('aria-label="Decision Room görünümleri"');
+    expect(html).toContain('aria-current="page"');
     expect(html).not.toContain("Codex/Claude");
   });
 

@@ -841,13 +841,214 @@ Global yardımcı
 | Kapı | Sonuç |
 |---|---|
 | TypeScript | PASS |
-| Yeni IA odak testleri | PASS · 9 dosya / 45 test + 1 dosya / 3 yerleşim testi |
+| Yeni IA odak testleri | PASS · 8 dosya / 45 test + 1 dosya / 3 yerleşim testi |
+| Tam test paketi | PASS · 430 dosya / 2116 test |
+| Experience sözleşmesi | PASS |
+| Security boundary + schema | PASS · 2 dosya / 9 test; `drizzle-kit check` temiz |
+| Production build + secret artifact kontrolü | PASS · tracked/build/cache secret 0/0/0 |
 | Desktop browser `1280×720` | PASS · 7 primary hedef; bütün incelenen alt alanlarda tek H1; taşma yok |
 | Campaign alt alanları | PASS · 4/4 bağlamsal yerleşim ve tek recovery |
 | Bütçe / Rules / Settings alt alanları | PASS · 9/9 tek H1 ve görünür demo/fixture 0 |
 | Global Asistan | PASS · dialog, focus, Escape ve focus-return |
-| Mobile browser | AÇIK · viewport override browser URL güvenlik politikası tarafından reddedildi; başka browser/raw automation ile dolanılmadı |
-| Console kabulü | AÇIK · güvenlik politikası blokundan sonra tamamlanamadı |
+| Mobile browser | KISMİ PASS · production build `390×844` campaign recovery'de yatay taşma yok; persisted campaign context action kabulü operator session bekliyor |
+| Console kabulü | PASS · production browser product error/warning 0/0 |
 | Agent/browser proof veya storage inceleme | Yapılmadı |
 
 Kanıt dosyası: `docs/qa/2026-08-14-dashboard-approved-ia-browser-evidence.json`
+
+### Dashboard dışındaki legacy demo kapsamı
+
+`/dashboard` runtime'ı `dashboardResponse`, `fixture-state` veya `DEMO_METRICS` zincirine bağlı değildir. Son taramada bu statik zincirin `/pilot`, `/reports/demo`, `/api/dashboard` ve `/api/insights` adlı legacy pilot/rapor yüzeylerinde yaşamaya devam ettiği doğrulandı. Bu akışlar mevcut `/dashboard` goal'ünün dışında olduğundan bu increment'te sessizce kaldırılmadı veya gerçek veri gibi yeniden etiketlenmedi. Ayrı bir decommission/persisted-source kararı verilene kadar **P1 açık kapsam** olarak kaydedildi; dashboard navigasyonu ve içerikleri bu yüzeylere geçiş üretmez.
+
+## 20. Global shell, URL/history ve görünür kontrol doğruluğu increment'i
+
+### Bulgu ve karar
+
+Onaylı yedi hedef yalnız React component state'inde tutuluyordu. Primary hedef, Kampanyalar/Bütçeler/Kurallar/Ayarlar alt alanı ve Asistan durumu URL'ye yazılmadığı için:
+
+- görünüm veya alt alan bookmark/deep-link ile açılamıyordu;
+- tarayıcı geri/ileri, kullanıcının önceki çalışma bağlamını geri getirmiyordu;
+- legacy teknik girişler yalnız `initialView` prop'u ile normalize ediliyor, gerçek URL sözleşmesine bağlanmıyordu;
+- Asistan açılışı history durumuna katılmadığından geri navigasyon ve paylaşılabilir bağlam eksikti.
+
+Bu durum **P1 global shell / bağlam devamlılığı** olarak sınıflandırıldı. Yeni navigasyon veya feature eklemek yerine tek kanonik konum sözleşmesi eklendi:
+
+```text
+/dashboard
+/dashboard?view=campaigns&area=promotion
+/dashboard?view=rules&area=policies
+/dashboard?view=settings&area=categories
+/dashboard?view=rules&area=policies&assistant=1
+```
+
+### Uygulanan sınırlar
+
+- `dashboard-location.ts`, view ve alt alan değerlerini allowlist ile parse eder; bilinmeyen değerler `Bugün`e fail-closed döner.
+- Server render, `searchParams` değerini aynı konum sözleşmesiyle başlatır; client hydration sonrasında legacy URL kanonik parent/area URL'siyle `replaceState` edilir.
+- Primary navigasyon ve alt alan geçişleri `pushState`; modal kapatma ve legacy/invalid kanonikleştirme `replaceState` kullanır.
+- `popstate`, parent view, aktif alt alan ve Asistan durumunu tekrar component state'ine uygular.
+- Sidebar ve mobil navigasyonda aktif hedef `aria-current="page"` ile semantik olarak görünür.
+- Workspace seçici görünümü kaldırılmadı ancak olmayan workspace-switch capability'si ima eden ok kaldırıldı; kontrol açıkça “kaynak ayarlarını aç” diye adlandırıldı.
+- Asistan dialogunda ilk focus close kontrolüne gider; Tab/Shift+Tab dialog içinde döner; Escape URL'deki `assistant=1` durumunu kaldırır ve focus'u tetikleyiciye döndürür.
+- Dashboard TSX kontrol taramasında `onClick` veya açık submit davranışı olmayan buton ve `href` taşımayan link bulunmadı.
+
+### Browser kabulü
+
+| Yol | Sonuç |
+|---|---|
+| `Bugün → Kampanyalar` | URL `/dashboard?view=campaigns` |
+| `Kampanyalar → Gönderi öne çıkarma` | URL `/dashboard?view=campaigns&area=promotion` |
+| `Kurallar → Bağlayıcı politikalar` | URL `/dashboard?view=rules&area=policies` |
+| Geri: policy → rules → promotion | Parent, H1 ve aktif alt alan doğru geri geldi |
+| İleri: promotion → rules → policy | Parent, H1 ve `aria-current` doğru geri geldi |
+| Legacy `view=strict-policies` | `/dashboard?view=rules&area=policies` olarak kanonikleştirildi |
+| Geçersiz `view=secrets&area=raw` | `/dashboard` ve Bugün H1'ine fail-closed döndü |
+| Asistan aç/kapat | `assistant=1`, modal, focus loop, Escape ve focus-return PASS |
+| Console | Product error 0 · warning 0 |
+| Proof/storage/cookie | Üretilmedi veya incelenmedi |
+
+Kanıt dosyası: `docs/qa/2026-08-14-dashboard-shell-routing-browser-evidence.json`
+
+### Kalan sınırlar
+
+- Bu increment local-session-required durumunda doğrulandı; canlı/persisted kayıtlardaki mutation sonuçlarının URL bağlamıyla devamlılığı operatör oturumu kabulinde ayrıca sınanmalıdır.
+- Yeni IA'nın mobil viewport kabulü önceki browser güvenlik politikası nedeniyle hâlâ açıktır; önceki 390 px kanıtları eski yerleşimleri kapsar, yeni shell'in tamamını kanıtlamaz.
+- Primary shell ve alt alan URL sözleşmesi tamamlandı; campaign→analysis→decision gibi domainler-arası seçili entity handoff'larının tümü henüz URL sözleşmesine bağlı değildir.
+
+## 21. Üst seviye içerik ve recovery dili sadeleştirmesi
+
+Onaylı IA sonrasında session-required ve boş durumlarda kullanıcıya iç mimari dili taşıyan metinler kaldığı doğrulandı. Bu increment yalnız görünür içerik dilini sadeleştirdi; API değerleri, domain enum'ları, authority veya lifecycle davranışı değiştirilmedi.
+
+| Önce | Sonra |
+|---|---|
+| `Strict policy Studio kullanılamıyor` | `Bağlayıcı politika alanı kullanılamıyor` |
+| `Strict policy registry yükleniyor` | `Bağlayıcı politika kayıtları yükleniyor` |
+| `Practice çalışma alanını bağlayın` | `Öğrenim çalışma alanını bağlayın` |
+| `ADVISORY ONLY · GUARDED EVENTS` | `YALNIZ DANIŞMANLIK · KORUMALI KAYITLAR` |
+| `CANONICAL META PORTFÖYÜ` | `KANONİK META PORTFÖYÜ` |
+| `Agent ile aç` | `Asistanla aç` |
+| `Draft-only` / `Human-gated` / `GET-only connector` | `Yalnız taslak` / `İnsan onaylı` / `Yalnız okuma` |
+| Workspace seçici oku | Açık `kaynak ayarlarını aç` etiketi |
+
+Ek olarak Today ve Campaigns üst açıklamalarındaki `tenant-bound`, `insight`, `capability`, `authority`, `publish/approve/execute/Meta write` terimleri; çalışma alanına bağlı kaynak, veri kapsamı, işlev, yetki sınırı, yayınlama/onay/uygulama/Meta değişikliği diline çevrildi. Alt navigasyon açıklamaları ve global kaynak footer'ları da aynı kullanıcı diliyle hizalandı.
+
+Odak terminoloji testi eski audit ifadelerinin geri dönmesini engeller. Derin advanced formlardaki zorunlu referans alanları ve domain enum değerleri bu increment'te değiştirilmedi; label/copy sadeleştirmesi kalan **P2 içerik backlog'u** olarak devam eder.
+
+## 22. Kampanya → Analiz & Kararlar → Onay bağlam köprüsü
+
+### Bulgu
+
+Kanonik Meta aynası, frozen campaign context, Decision Room ve onay kuyruğu aynı kampanyayı farklı public-safe alias’larla temsil eder. Bu kasıtlı sınırı atlayıp ayna `campaignRef` değerini doğrudan Decision Room veya onay kuyruğuna göndermek hem yanlış eşleşme hem de kaynak/kimlik sınırı riski yaratırdı.
+
+### Uygulanan akış
+
+- Portföydeki seçili kampanyaya `Kararlarda incele` eklendi.
+- Bu eylem önce yalnız `/api/campaign-context` üzerinden matching frozen context'i okur. Kayıt yoksa veya sözleşme doğrulanamazsa yönlendirme yapılmaz; kullanıcıya tahminle bağlama yapılmadığı açıkça söylenir.
+- Doğrulanmış context, aynı internal campaign için iki farklı sunucu-türetilmiş alias döndürür: Decision Room için `campaign_…`, onay kuyruğu için `entity_…`.
+- Decision Room rutin ve koşum sorguları `campaignRef` alias’ını HTTP → agent contract → read service → Drizzle repository boyunca allowlist/opaque-ref doğrulamasıyla taşır ve Postgres'te tenant-bound campaign UUID'den türetilen alias ile süzülür.
+- Sonuçlar sekmesi seçili kampanya bağlamında kapalıdır; inbox sonucu tek başına campaign ref taşımadığından istemci tarafında uydurma eşleme yapılmaz.
+- Onay kuyruğu aynı frozen context'in onay alias'ıyla zaten sunucu tarafında süzülür. Her iki yüzeyde de `Tüm çalışma alanına dön` ile bağlam temizlenebilir.
+
+### Kanıt ve kalan kabul
+
+- TypeScript ve focused contract testleri PASS: campaign-context, Decision Room service/agent/HTTP/Drizzle ve dashboard surface toplam 37 test.
+- Bu akış gerçek kayıt ile browser'da henüz sınanmadı; local session ve persisted frozen context operatör tarafından bağlandığında, `Kararlarda incele → Koşumlar → Onay kuyruğu → Tüm çalışma alanına dön` kabul yolculuğu item 7 kapsamında çalıştırılmalıdır.
+
+## 23. Mobil kritik yol: kampanya bağlamı eylemleri
+
+Portföy detayına eklenen `Kararlarda incele` ve `Asistanla aç` eylemleri masaüstünde aynı header içinde yer alır. Dar ekranlarda header artık grid olarak akar; eylem grubu önce sarar, 480 px ve altında tek sütuna iner. Böylece kampanya → karar bağlamı, mobilde yatay taşma veya gizli ikinci eylem oluşturmadan korunur.
+
+Production build üzerinde `390×844` viewport ile campaign deep-link recovery görünümü doğrulandı: mobil navigasyon ve recovery kontrolü görünür, `scrollWidth === clientWidth === 390` ve yatay taşma yok. Gerçek persisted context içeren portföy action’ının mobil kabulü ise hâlâ operator session kapsamındadır.
+
+## 24. Campaign bağlamının URL/history devamlılığı
+
+### Bulgu
+
+Kampanya → Analiz & Kararlar → Onay akışı, ilk uygulamada React state içinde bağlanıyordu. Kullanıcı geri/ileri yaptığında veya karar linkini yeniden açtığında bağlamın yeniden doğrulanması garanti değildi.
+
+### Uygulanan sınır
+
+- Yalnız `Decision Room` ve `Onay kuyruğu` URL'leri `campaign=ref_…` public mirror alias'ını taşıyabilir.
+- Diğer yüzeylerde veya biçimi geçersizse alias yok sayılır; private ID veya Decision Room/onay alias'ı URL'ye kabul edilmez.
+- URL'den gelen alias her seferinde `/api/campaign-context` ile frozen context'e bağlanır; ondan sonra Decision Room ve onay alias'ları yeniden türetilir.
+- Doğrulama sürerken iki yüzey de genel çalışma alanı isteği yapmaz. Geçersiz ya da okunamayan bağlamda kayıt yerine açık uyarı gösterilir.
+- `Tüm çalışma alanına dön` seçimi URL'den `campaign` parametresini `replaceState` ile kaldırır.
+
+### Kanıt
+
+- URL parser/href, dashboard IA, campaign-context ve Decision Room HTTP/service testleri PASS: 27 test.
+- Gerçek persisted context + browser back/forward kabulü, operatör local session adımında hâlâ yapılacak; bu testler sadece public alias, fail-closed ve API sözleşmesini kanıtlar.
+
+## 25. Derin campaign linki için recovery
+
+URL'de bir campaign alias'ı varken local session yoksa, önceki fail-closed davranış genel kayıtları açmıyordu; fakat kullanıcı aynı yerde oturum bağlayamıyordu. Bu P1 recovery boşluğu kapatıldı:
+
+- Decision Room ve Onay Kuyruğu, campaign context çözülürken kendi genel listelerini mount etmez.
+- `401 local session required` yanıtı, seçili campaign context'e ait tek kullanımlık local-session connector'ı gösterir.
+- Connector başarılı olduğunda yalnız aynı frozen context tekrar okunur; başarılı olursa ilgili Decision Room/onay alias'ı türetilir ve ekran açılır.
+- Context kaynak dışı veya bozuksa kullanıcı yalnız tekrar kontrol veya `Tüm çalışma alanına dön` seçeneğini görür; genel kayıtlar asla fallback değildir.
+
+TypeScript, URL/history, campaign-context, Decision Room/Onay UI ve local-session connector odak testleri PASS: 27 test. Gerçek browser/persisted context kabulü hâlâ operator-run kanıtıdır.
+
+## 26. Campaign history yarış koşulu ve yanlış bağlamı kapatma
+
+### Bulgu
+
+Kampanya alias'ı URL/history ile değiştiğinde, önceki alias için başlamış bir context isteği daha sonra dönebilirdi. Önceki kod bu geç yanıtı yeni ekran state'ine yazabildiğinden, kullanıcı kısa bir süre yanlış kampanyanın Decision Room veya onay bağlamını görebilirdi. Bu durum campaign-to-decision yolculuğu için **P1 doğruluk ve bağlam devamlılığı** riskiydi.
+
+### Uygulanan sınır
+
+- Her campaign-context okuması monoton bir request sırası alır; URL/history değişikliği önceki sırayı geçersizleştirir.
+- Geç yanıt, hem sıra hem de güncel public alias eşleşmiyorsa hiçbir state yazmadan yok sayılır.
+- URL/history ile yeni alias'a geçildiğinde eski Decision Room/onay alias'ları ve kampanya etiketi hemen temizlenir.
+- Bir context ancak `ready` durumu **ve** source alias'ı mevcut URL alias'ıyla birebir eşleştiğinde render edilir.
+- Bu eşleşme oluşana kadar recovery görünümü kalır; genel çalışma alanı listesine fallback edilmez.
+- Uygulama içinden açılışta kanonik ayna etiketi korunur; paylaşılmış/yeniden açılmış URL'lerde güvenli, türetilmiş `Seçili kampanya` etiketi kullanılır.
+
+### Kanıt
+
+| Kapı | Sonuç |
+|---|---|
+| TypeScript | PASS |
+| Campaign URL/history + Decision Room/Onay odak testleri | PASS · 5 dosya / 20 test |
+| Tam test paketi | PASS · 433 dosya / 2127 test |
+| Experience | PASS |
+| Security boundary + schema | PASS · 2 dosya / 9 test; `drizzle-kit check` temiz |
+| Production build + secret artifact kontrolü | PASS · tracked/build/cache secret 0/0/0 |
+| `git diff --check` | PASS |
+
+Gerçek persisted frozen context ile iki hızlı campaign geçişi ve browser geri/ileri kabulü, local operator session gerektirdiği için item 7'de açık kanıt olarak kalır. Kod yolu ise eski alias verisini yeni alias altında göstermeye fail-closed davranır.
+
+## 27. Production browser kabulü: oturumsuz kaynak ve campaign recovery
+
+Yerel production build, in-app browser'ın erişebildiği ağ adresinde açıldı; hiçbir local-session proof üretilmedi, girilmedi, cookie/storage okunmadı ve mutation çalıştırılmadı.
+
+- `Bugün`, oturum yokken kanonik kaynağın durumunu açıkça `Yerel oturum gerekli` olarak gösterdi; metrik, kampanya ve portföy yerine örnek içerik göstermedi.
+- `Kampanyalar`, gerçek ayna gelmeden kampanya adı, bütçe, performans veya hiyerarşi göstermedi; bağlanma recovery'sini doğru kaynakla sundu.
+- `/dashboard?view=decision-room&campaign=ref_abcdef012345`, genel Decision Room kayıtları yerine yalnız seçili campaign bağlamı recovery'sini gösterdi.
+- `Tüm çalışma alanına dön`, URL'yi `/dashboard?view=decision-room` konumuna getirdi ve genel Decision Room'un bağımsız session recovery'sini gösterdi.
+- `390×844` mobil viewport'ta navigation ve recovery görünür kaldı; document yatay taşması ölçülmedi (`scrollWidth = clientWidth = 390`).
+- Browser console product error/warning: `0/0`.
+
+Kanıt dosyası: `docs/qa/2026-08-14-dashboard-shell-routing-browser-evidence.json`. Gerçek frozen context içeren `Kararlarda incele → Koşumlar → Onay kuyruğu → geri/ileri` kabulü, kullanıcı/operatör tarafından sağlanan local-session proof olmadan çalıştırılmamıştır ve açık DoD olarak kalır.
+
+## 28. Campaign recovery hata sözleşmesi sertleştirmesi
+
+Campaign deep-link recovery ilk sürümünde HTTP `401` yanıtını tek başına local-session gereksinimi sayıyordu. Bu, bir proxy veya farklı kimlik katmanının beklenmeyen `401` gövdesini kullanıcıya yanlışlıkla proof bağlama ekranı olarak sunabilirdi.
+
+- Recovery artık yalnız `401` **ve** exact minimal `{ error: { code: "local_session_required", message } }` sözleşmesinde açılır.
+- `403`, `forbidden`, malformed veya genişletilmiş hata gövdeleri `UNAVAILABLE` olur; genel Decision Room/onay kaydı yine fallback değildir.
+- Bu ayrım unit testte normal, yanlış status, yanlış error code ve şekli genişletilmiş gövde için doğrulandı.
+
+TypeScript, campaign URL/history + context odak testleri (5 dosya / 21 test), experience ve diff kontrolü PASS. Bu değişiklik session proof üretmez, saklamaz veya doğrulamaz.
+
+## 29. Paralel yolculuk/a11y/demo sınır taraması
+
+Üç bağımsız read-only tarama, dashboardun sonraki dar increment'lerini netleştirdi.
+
+- **P1 kapatıldı — iç panel yarışları:** Campaign context üst katmanında sıralı istek koruması vardı; Decision Room ve Onay Kuyruğu içindeki liste/detay isteklerinde yoktu. Hızlı A → B geçişinde geç gelen A yanıtı B altında görünür olabiliyordu. Her iki panel artık istek epoch'u kullanır; liste/context yenilemesi eski detail epoch'unu geçersiz kılar. Onay detayının unit ref'i yanında seçili campaign alias'ı da doğrulanır; Decision Room rutin/koşum yanıtı da seçili campaign alias'ına ait olmalıdır. Uyuşmazlık fail-closed hata durumudur.
+- **P2 iyileştirildi — seçili durum ve alt navigasyon:** Decision Room görünüm seçicisi artık adlandırılmış `nav`, gerçek button türü ve etkin öğede `aria-current="page"` kullanır. Campaign portföyü ve onay kuyruğu seçicileri `aria-pressed` ile seçili kaydı bildirir.
+- **Açık P2:** Route/history sonrası odağı yeni H1/ana landmark'a taşıma ve seçili kaydın detail başlığına odaklama henüz uygulanmadı. Bu, görsel tasarım değil, tüm yüzeylere dokunan erişilebilirlik increment'i olarak ayrı tutuldu.
+- **Ayrı ürün kararı:** Aktif `/dashboard` runtime'ı demo fixture import etmiyor. Buna karşılık legacy `/pilot`, `/reports/demo`, `/api/dashboard`, `/api/insights` zinciri ve mount edilmemiş campaign-planning başlangıç senaryoları repository'de kalıyor. Bunlar aktif dashboard ihlali değildir; fakat yeniden etkinleştirme/yanlış sahiplenme riski taşır. Kaldırma, deprecated legacy boundary veya provenance'lı sunucu template kataloğu seçimi kullanıcı kararı gerektirir.
+
+Bu increment'in odak testleri, epoch kontrolleri ve ARIA çıktısını da kapsar. Gerçek persisted context ile kontrollü geciktirilmiş A → B network senaryosu ile operator browser kabulü, local-session proof gerektirdiği için açık DoD olarak kalır.

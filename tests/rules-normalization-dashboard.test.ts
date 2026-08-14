@@ -20,12 +20,12 @@ describe("Rules normalization dashboard integration", () => {
     expect(guidance).toBeGreaterThanOrEqual(0);
     expect(normalization).toBe(-1);
     expect(sliceRule).toBe(-1);
-    expect(html).toContain("Guidance → Normalization → Slice Rule");
+    expect(html).toContain("Rehber → normalizasyon → dilim kuralı");
   });
 
   it("keeps the strict policy screen separate from the normalization workbench", () => {
     const html = renderToStaticMarkup(createElement(OperatingDashboard, { model, initialView: "strict-policies" }));
-    expect(html).toContain("Strict policy registry yükleniyor");
+    expect(html).toContain("Bağlayıcı politika kayıtları yükleniyor");
     expect(html).not.toContain("Owner talimatını yapılandırılmış taslak olarak değerlendir");
   });
 

@@ -28,10 +28,10 @@ describe("Practice Lab dashboard", () => {
     }));
     expect(unavailable).toContain("Kaynak henüz bağlı değil");
     expect(unavailable).toContain("kaynağı yapılandırılana kadar");
-    expect(sessionRequired).toContain("Practice çalışma alanını bağlayın");
+    expect(sessionRequired).toContain("Öğrenim çalışma alanını bağlayın");
     expect(sessionRequired).toContain("local-session-capability");
-    expect(error).toContain("Practice Lab okunamadı");
-    expect(empty).toContain("Kaynak bağlı · practice yok");
+    expect(error).toContain("Öğrenim kayıtları okunamadı");
+    expect(empty).toContain("Kaynak bağlı · yaklaşım kaydı yok");
     expect(empty).toContain("Kaynak başarıyla okundu");
     expect(empty).not.toMatch(/demo|fixture/i);
     expect(empty).not.toContain("Yerel oturum gerekli");
@@ -41,8 +41,8 @@ describe("Practice Lab dashboard", () => {
     const html = renderToStaticMarkup(createElement(PracticeLabReadSurface, {
       ...callbacks, state: { status: "loading" },
     }));
-    expect(html).toContain("ADVISORY ONLY · GUARDED EVENTS");
-    expect(html).toContain("guidance, policy, otomasyon veya eylem üretmez");
+    expect(html).toContain("YALNIZ DANIŞMANLIK · KORUMALI KAYITLAR");
+    expect(html).toContain("rehber, politika, otomasyon veya eylem üretmez");
     expect(html).not.toContain("Onayla");
   });
 

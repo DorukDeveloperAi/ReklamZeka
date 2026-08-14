@@ -23,8 +23,24 @@ import { NormalizationWorkbenchPanel } from "./normalization-workbench-panel";
 import { MetaTrustReadinessPanel } from "./meta-trust-readiness-panel";
 import { CanonicalPerformancePanel } from "./canonical-performance-panel";
 import { CanonicalCampaignPortfolioPanel } from "./canonical-campaign-portfolio-panel";
+import { campaignContextBridge } from "./campaign-planning-brief-panel";
 import { LocalSessionConnector } from "./local-session-connector";
+import {
+  dashboardLocationFromSearch,
+  dashboardLocationHref,
+  normalizeDashboardLocation,
+  type BudgetArea,
+  type CampaignArea,
+  type DashboardLocation,
+  type DashboardViewId,
+  type RulesArea,
+  type SettingsArea,
+  type ViewId,
+} from "./dashboard-location";
 import styles from "./operating-dashboard.module.css";
+
+export { normalizeDashboardLocation } from "./dashboard-location";
+export type { DashboardLocation, DashboardViewId } from "./dashboard-location";
 
 export type OperatingDashboardModel = Readonly<{
   periodDays: number;
@@ -38,40 +54,6 @@ export type OperatingDashboardModel = Readonly<{
   timezone: string;
   attribution: string;
 }>;
-
-export type DashboardViewId = "today" | "campaigns" | "analysis" | "decision-room" | "practice-lab" | "budgets" | "rules" | "strict-policies" | "categories" | "autonomy" | "agent" | "approvals" | "promotions" | "alerts" | "timeline" | "meta" | "settings";
-type ViewId = "today" | "campaigns" | "decision-room" | "budgets" | "approvals" | "rules" | "settings";
-type BudgetArea = "proposals" | "pools";
-type CampaignArea = "portfolio" | "classification" | "promotion" | "timeline";
-type RulesArea = "guidance" | "policies" | "authority" | "learning";
-type SettingsArea = "meta" | "categories" | "promotion-templates";
-
-export type DashboardLocation = Readonly<{
-  view: ViewId;
-  budgetArea: BudgetArea;
-  campaignArea: CampaignArea;
-  rulesArea: RulesArea;
-  settingsArea: SettingsArea;
-  assistantOpen: boolean;
-}>;
-
-/** Preserve old entry points while exposing only the approved, user-job-led IA. */
-export function normalizeDashboardLocation(initialView: DashboardViewId): DashboardLocation {
-  const base = { budgetArea: "proposals", campaignArea: "portfolio", rulesArea: "guidance",
-    settingsArea: "meta", assistantOpen: false } as const;
-  if (initialView === "analysis") return { ...base, view: "decision-room" };
-  if (initialView === "strict-policies") return { ...base, view: "rules", rulesArea: "policies" };
-  if (initialView === "autonomy") return { ...base, view: "rules", rulesArea: "authority" };
-  if (initialView === "practice-lab") return { ...base, view: "rules", rulesArea: "learning" };
-  if (initialView === "categories") return { ...base, view: "settings", settingsArea: "categories" };
-  if (initialView === "meta") return { ...base, view: "settings", settingsArea: "meta" };
-  if (initialView === "promotions") return { ...base, view: "campaigns", campaignArea: "promotion" };
-  if (initialView === "timeline") return { ...base, view: "campaigns", campaignArea: "timeline" };
-  if (initialView === "alerts") return { ...base, view: "today" };
-  if (initialView === "agent") return { ...base, view: "today", assistantOpen: true };
-  if (initialView === "settings") return { ...base, view: "settings" };
-  return { ...base, view: initialView };
-}
 
 type AgentSessionSummary = Readonly<{
   clientRef: string;
@@ -218,6 +200,11 @@ export function isLocalSessionRequiredResponse(value: unknown): boolean {
   return Object.keys(error).length === 2
     && error.code === "local_session_required"
     && typeof error.message === "string" && error.message.length > 0 && error.message.length <= 240;
+}
+
+/** Only the exact local-session envelope may offer a proof-connection recovery. */
+export function campaignContextRecoveryState(status: number, value: unknown): "session_required" | "unavailable" {
+  return status === 401 && isLocalSessionRequiredResponse(value) ? "session_required" : "unavailable";
 }
 
 /** Accept only the deliberately redacted, read-only portfolio contract. */
@@ -436,17 +423,36 @@ export function buildCodexManualTask(guide: CodexPageGuide): string {
   ].join("\n");
 }
 
-export function OperatingDashboard({ initialView = "today" }: { model?: OperatingDashboardModel; initialView?: DashboardViewId }) {
-  const initialLocation = normalizeDashboardLocation(initialView);
-  const [activeView, setActiveView] = useState<ViewId>(initialLocation.view);
-  const [budgetArea, setBudgetArea] = useState<BudgetArea>(initialLocation.budgetArea);
-  const [campaignArea, setCampaignArea] = useState<CampaignArea>(initialLocation.campaignArea);
-  const [rulesArea, setRulesArea] = useState<RulesArea>(initialLocation.rulesArea);
-  const [settingsArea, setSettingsArea] = useState<SettingsArea>(initialLocation.settingsArea);
-  const [assistantOpen, setAssistantOpen] = useState(initialLocation.assistantOpen);
+export function OperatingDashboard({ initialView = "today", initialLocation }: Readonly<{
+  model?: OperatingDashboardModel;
+  initialView?: DashboardViewId;
+  initialLocation?: DashboardLocation;
+}>) {
+  const initialLocationRef = useRef(initialLocation ?? normalizeDashboardLocation(initialView));
+  const [activeView, setActiveView] = useState<ViewId>(initialLocationRef.current.view);
+  const [budgetArea, setBudgetArea] = useState<BudgetArea>(initialLocationRef.current.budgetArea);
+  const [campaignArea, setCampaignArea] = useState<CampaignArea>(initialLocationRef.current.campaignArea);
+  const [rulesArea, setRulesArea] = useState<RulesArea>(initialLocationRef.current.rulesArea);
+  const [settingsArea, setSettingsArea] = useState<SettingsArea>(initialLocationRef.current.settingsArea);
+  const [assistantOpen, setAssistantOpen] = useState(initialLocationRef.current.assistantOpen);
   const assistantTriggerRef = useRef<HTMLButtonElement>(null);
   const assistantCloseRef = useRef<HTMLButtonElement>(null);
+  const assistantDrawerRef = useRef<HTMLElement>(null);
+  const assistantWasOpenRef = useRef(initialLocationRef.current.assistantOpen);
+  const contentRef = useRef<HTMLElement>(null);
+  const lastContentFocusKeyRef = useRef("");
+  const [requestedCampaignRef, setRequestedCampaignRef] = useState<string | null>(initialLocationRef.current.campaignRef);
+  const requestedCampaignRefRef = useRef<string | null>(initialLocationRef.current.campaignRef);
+  const campaignContextRequestRef = useRef(0);
+  const [requestedCampaignLabel, setRequestedCampaignLabel] = useState("Seçili kampanya");
+  const [campaignContextResolution, setCampaignContextResolution] = useState<"idle" | "loading" | "session_required" | "unavailable" | "ready">("idle");
   const [approvalQueueCampaignRef, setApprovalQueueCampaignRef] = useState<string | null>(null);
+  const [campaignDecisionContext, setCampaignDecisionContext] = useState<Readonly<{
+    sourceCampaignRef: string;
+    label: string;
+    decisionRoomCampaignRef: string;
+    approvalQueueCampaignRef: string;
+  }> | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [metaInventory, setMetaInventory] = useState<MetaInventorySnapshot | null>(null);
   const [metaLoading, setMetaLoading] = useState(true);
@@ -474,12 +480,112 @@ export function OperatingDashboard({ initialView = "today" }: { model?: Operatin
   const [orchestratorInput, setOrchestratorInput] = useState("");
   const [orchestratorSending, setOrchestratorSending] = useState(false);
   const [orchestratorError, setOrchestratorError] = useState<string | null>(null);
-  const [agentSourceView, setAgentSourceView] = useState<ViewId>(initialLocation.view);
+  const [agentSourceView, setAgentSourceView] = useState<ViewId>(initialLocationRef.current.view);
   const [draftPolicyTemplate, setDraftPolicyTemplate] = useState<CampaignIntentTemplateRef>("");
   const [rulesSessionRequired, setRulesSessionRequired] = useState<boolean | null>(null);
   const [categoryAssignmentHandoff, setCategoryAssignmentHandoff] = useState<CategoryAssignmentHandoff | null>(null);
 
+  const dashboardLocation = useMemo<DashboardLocation>(() => ({ view: activeView,
+    budgetArea, campaignArea, rulesArea, settingsArea, assistantOpen,
+    campaignRef: activeView === "decision-room" || activeView === "approvals" ? requestedCampaignRef : null }),
+  [activeView, assistantOpen, budgetArea, campaignArea, requestedCampaignRef, rulesArea, settingsArea]);
+  const contentFocusKey = `${activeView}:${budgetArea}:${campaignArea}:${rulesArea}:${settingsArea}:${requestedCampaignRef ?? ""}`;
+  const applyDashboardLocation = useCallback((location: DashboardLocation) => {
+    setActiveView(location.view);
+    setBudgetArea(location.budgetArea);
+    setCampaignArea(location.campaignArea);
+    setRulesArea(location.rulesArea);
+    setSettingsArea(location.settingsArea);
+    setAssistantOpen(location.assistantOpen);
+    const campaignChanged = requestedCampaignRefRef.current !== location.campaignRef;
+    if (campaignChanged) {
+      // Any response for the previous opaque alias is no longer allowed to
+      // resolve this screen after a navigation or a history restoration.
+      campaignContextRequestRef.current += 1;
+      requestedCampaignRefRef.current = location.campaignRef;
+      setRequestedCampaignLabel("Seçili kampanya");
+      setCampaignDecisionContext(null);
+      setApprovalQueueCampaignRef(null);
+      setCampaignContextResolution(location.campaignRef === null ? "idle" : "loading");
+    }
+    setRequestedCampaignRef(location.campaignRef);
+    if (location.campaignRef === null) {
+      setCampaignDecisionContext(null);
+      setApprovalQueueCampaignRef(null);
+      setCampaignContextResolution("idle");
+    }
+    setToast(null);
+  }, []);
+  const commitDashboardLocation = useCallback((location: DashboardLocation, mode: "push" | "replace" = "push") => {
+    applyDashboardLocation(location);
+    const href = dashboardLocationHref(location);
+    const current = `${window.location.pathname}${window.location.search}`;
+    if (current === href) return;
+    window.history[mode === "push" ? "pushState" : "replaceState"]({ dashboardLocation: location }, "", href);
+  }, [applyDashboardLocation]);
+
+  useEffect(() => {
+    const initial = initialLocationRef.current;
+    const canonicalHref = dashboardLocationHref(initial);
+    if (`${window.location.pathname}${window.location.search}` !== canonicalHref) {
+      window.history.replaceState({ dashboardLocation: initial }, "", canonicalHref);
+    }
+    const restoreLocation = () => applyDashboardLocation(dashboardLocationFromSearch(new URLSearchParams(window.location.search)));
+    window.addEventListener("popstate", restoreLocation);
+    return () => window.removeEventListener("popstate", restoreLocation);
+  }, [applyDashboardLocation]);
+
+  useEffect(() => {
+    if (lastContentFocusKeyRef.current === "") {
+      lastContentFocusKeyRef.current = contentFocusKey;
+      return;
+    }
+    if (lastContentFocusKeyRef.current === contentFocusKey) return;
+    lastContentFocusKeyRef.current = contentFocusKey;
+    const frame = window.requestAnimationFrame(() => contentRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [contentFocusKey]);
+
   const activeTitle = useMemo(() => navGroups.flatMap((group) => group.items).find((item) => item.id === activeView)?.label ?? "Bugün", [activeView]);
+
+  const refreshRequestedCampaignContext = useCallback(async (): Promise<boolean> => {
+    const requestId = campaignContextRequestRef.current + 1;
+    campaignContextRequestRef.current = requestId;
+    if (!requestedCampaignRef) return false;
+    if (campaignDecisionContext?.sourceCampaignRef === requestedCampaignRef) {
+      if (requestedCampaignRefRef.current === requestedCampaignRef && campaignContextRequestRef.current === requestId) {
+        setCampaignContextResolution("ready");
+      }
+      return true;
+    }
+    setCampaignContextResolution("loading");
+    try {
+      const response = await fetch(`/api/campaign-context?campaignRef=${encodeURIComponent(requestedCampaignRef)}`, {
+      cache: "no-store", credentials: "same-origin",
+      });
+      const payload: unknown = await response.json();
+      if (requestedCampaignRefRef.current !== requestedCampaignRef || campaignContextRequestRef.current !== requestId) return false;
+      const bridge = response.ok ? campaignContextBridge(payload, requestedCampaignRef) : null;
+      if (!bridge) {
+        setCampaignDecisionContext(null);
+        setApprovalQueueCampaignRef(null);
+        setCampaignContextResolution(campaignContextRecoveryState(response.status, payload));
+        return false;
+      }
+      setCampaignDecisionContext(Object.freeze({ sourceCampaignRef: requestedCampaignRef, label: requestedCampaignLabel, decisionRoomCampaignRef: bridge.decisionRoomCampaignRef, approvalQueueCampaignRef: bridge.approvalQueueCampaignRef }));
+      setApprovalQueueCampaignRef(bridge.approvalQueueCampaignRef);
+      setCampaignContextResolution("ready");
+      return true;
+    } catch {
+      if (requestedCampaignRefRef.current !== requestedCampaignRef || campaignContextRequestRef.current !== requestId) return false;
+      setCampaignDecisionContext(null);
+      setApprovalQueueCampaignRef(null);
+      setCampaignContextResolution("unavailable");
+      return false;
+    }
+  }, [campaignDecisionContext?.sourceCampaignRef, requestedCampaignLabel, requestedCampaignRef]);
+
+  useEffect(() => { if (requestedCampaignRef) void refreshRequestedCampaignContext(); else setCampaignContextResolution("idle"); }, [refreshRequestedCampaignContext, requestedCampaignRef]);
 
   const refreshMetaInventory = useCallback(async (announce = false) => {
     setMetaLoading(true);
@@ -614,16 +720,37 @@ export function OperatingDashboard({ initialView = "today" }: { model?: Operatin
   }, [assistantOpen, refreshOrchestratorConversation]);
 
   useEffect(() => {
-    if (!assistantOpen) return;
+    if (!assistantOpen) {
+      if (assistantWasOpenRef.current) window.setTimeout(() => assistantTriggerRef.current?.focus(), 0);
+      assistantWasOpenRef.current = false;
+      return;
+    }
+    assistantWasOpenRef.current = true;
     assistantCloseRef.current?.focus();
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setAssistantOpen(false);
-      window.setTimeout(() => assistantTriggerRef.current?.focus(), 0);
+      if (event.key === "Escape") {
+        commitDashboardLocation({ ...dashboardLocation, assistantOpen: false }, "replace");
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const drawer = assistantDrawerRef.current;
+      if (!drawer) return;
+      const focusable = [...drawer.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), textarea:not([disabled]), select:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex='-1'])")]
+        .filter((element) => element.getAttribute("aria-hidden") !== "true");
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [assistantOpen]);
+  }, [assistantOpen, commitDashboardLocation, dashboardLocation]);
 
   const verifyOrchestratorWorkspace = useCallback(async () => {
     const connected = await refreshOrchestratorConversation();
@@ -732,17 +859,17 @@ export function OperatingDashboard({ initialView = "today" }: { model?: Operatin
     } catch {
       setToast("Görev Orchestrator alanında hazır; Codex Desktop'a geçip elle kopyalayın.");
     }
-    setAssistantOpen(true);
-  }, [activeTitle, activeView]);
+    commitDashboardLocation({ ...dashboardLocation, assistantOpen: true });
+  }, [activeTitle, activeView, commitDashboardLocation, dashboardLocation]);
 
   function navigate(view: ViewId) {
-    setActiveView(view);
-    setToast(null);
+    const keepsCampaignContext = view === "decision-room" || view === "approvals";
+    commitDashboardLocation({ ...dashboardLocation, view, assistantOpen: false,
+      campaignRef: keepsCampaignContext ? requestedCampaignRef : null });
   }
 
   function openSettings(area: SettingsArea = "meta") {
-    setSettingsArea(area);
-    navigate("settings");
+    commitDashboardLocation({ ...dashboardLocation, view: "settings", settingsArea: area, assistantOpen: false });
   }
 
   function openAgentContext(entityRef: string, label: string) {
@@ -750,12 +877,22 @@ export function OperatingDashboard({ initialView = "today" }: { model?: Operatin
     setAgentEntityRef(entityRef);
     setAgentEntityLabel(label);
     setAgentHandoff(null);
-    setAssistantOpen(true);
+    commitDashboardLocation({ ...dashboardLocation, assistantOpen: true });
+  }
+
+  function openCampaignDecisionContext(campaignRef: string, label: string) {
+    commitDashboardLocation({ ...dashboardLocation, view: "decision-room", assistantOpen: false, campaignRef });
+    // Navigation resets untrusted labels. Keep the current mirror label only
+    // for this immediate in-app transition; shared URLs remain deliberately generic.
+    setRequestedCampaignLabel(label);
+  }
+
+  function clearCampaignDecisionContext() {
+    commitDashboardLocation({ ...dashboardLocation, campaignRef: null }, "replace");
   }
 
   function closeAssistant() {
-    setAssistantOpen(false);
-    window.setTimeout(() => assistantTriggerRef.current?.focus(), 0);
+    commitDashboardLocation({ ...dashboardLocation, assistantOpen: false }, "replace");
   }
 
   function renderToday() {
@@ -775,14 +912,14 @@ export function OperatingDashboard({ initialView = "today" }: { model?: Operatin
 
     return <>
       <section className={styles.pageHero}>
-        <div><span className={styles.kicker}>OPERATING REVIEW · KANONİK KAYNAK</span><h1>Bugün neye güvenebileceğinizi tek bakışta görün.</h1><p>Hesap ve kampanya sayıları yalnız tenant-bound Meta aynasından; performans yalnız yeterli günlük insight kapsamından gelir. Eksik veri sıfır veya örnek değer olarak gösterilmez.</p></div>
+        <div><span className={styles.kicker}>GÜNLÜK OPERASYON · KANONİK KAYNAK</span><h1>Bugün neye güvenebileceğinizi tek bakışta görün.</h1><p>Hesap ve kampanya sayıları yalnız bu çalışma alanına bağlı Meta aynasından; performans yalnız yeterli günlük veri kapsamından gelir. Eksik veri sıfır veya örnek değer olarak gösterilmez.</p></div>
         <button className={styles.primaryButton} onClick={() => openAgentContext("portfolio_current", "Bugün · kanonik portföy")}><span>✦</span> Asistanla çalış</button>
       </section>
 
       <section className={styles.signalStrip} aria-label="Kanonik kaynak durumu">
-        <div><span className={summary.state === "ready" ? styles.liveDot : undefined} /><strong>{sourceLabel}</strong><small>{summary.observedAt ? `${formatMetaTime(summary.observedAt)} · read-only` : metaReadMirrorError ?? "Kaynak doğrulaması tamamlanmadı."}</small></div>
+        <div><span className={summary.state === "ready" ? styles.liveDot : undefined} /><strong>{sourceLabel}</strong><small>{summary.observedAt ? `${formatMetaTime(summary.observedAt)} · salt-okunur` : metaReadMirrorError ?? "Kaynak doğrulaması tamamlanmadı."}</small></div>
         <div><strong>{summary.campaigns === null ? "Kampanya sayısı kullanılamıyor" : `${summary.campaigns} kampanya`}</strong><small>{summary.accounts === null ? "Hesap sayısı kullanılamıyor" : `${summary.accounts} hesap · ${summary.adSets} ad set · ${summary.ads} reklam`}</small></div>
-        <div><strong>Yetki: salt-okunur</strong><small>Publish, approve, execute ve Meta write kapalı</small></div>
+        <div><strong>Yetki: salt-okunur</strong><small>Yayınlama, onay, uygulama ve Meta değişikliği kapalı</small></div>
         <button onClick={() => void refreshMetaReadMirror(true)}>Kaynağı yenile <span>→</span></button>
       </section>
 
@@ -792,7 +929,7 @@ export function OperatingDashboard({ initialView = "today" }: { model?: Operatin
         <section className={styles.panel} aria-labelledby="portfolio-summary-title">
           <header className={styles.panelHeader}><div><span className={styles.kicker}>KANONİK PORTFÖY ÖZETİ</span><h2 id="portfolio-summary-title">{hasCanonicalSource ? "Aynalanmış Meta yapısı" : "Portföy kaynağı bekleniyor"}</h2></div><StatusPill tone={sourceTone}>{sourceLabel}</StatusPill></header>
           {hasCanonicalSource ? <div className={styles.contextGrid}>
-            <div><span>Hesap</span><strong>{summary.accounts}</strong><small>tenant-bound ayna</small></div>
+            <div><span>Hesap</span><strong>{summary.accounts}</strong><small>çalışma alanına bağlı ayna</small></div>
             <div><span>Kampanya</span><strong>{summary.campaigns}</strong><small>örnek satır eklenmez</small></div>
             <div><span>Ad set</span><strong>{summary.adSets}</strong><small>kanonik hiyerarşi</small></div>
             <div><span>Reklam</span><strong>{summary.ads}</strong><small>salt-okunur durum</small></div>
@@ -814,18 +951,18 @@ export function OperatingDashboard({ initialView = "today" }: { model?: Operatin
       : metaReadMirrorState === "session_required" ? "Kampanyalar için yerel oturum gerekli"
         : "Kanonik kampanya kaynağı kullanılamıyor";
     return <>
-      <section className={styles.pageHero}><div><span className={styles.kicker}>KAMPANYA ÇALIŞMA ALANI · KANONİK BAĞLAM</span><h1>Kampanyayı bulun, sınıflandırın ve ilgili operasyonu aynı bağlamda yürütün.</h1><p>Portföy, künye incelemesi, mevcut gönderi ön kontrolü ve operasyon geçmişi birbirinden kopuk sayfalar değildir. Her capability gerçek kaynağı ve kendi authority sınırı hazır olduğunda açılır.</p></div>{campaignArea === "portfolio" ? <button className={styles.primaryButton} onClick={() => void refreshMetaReadMirror(true)}>Kaynağı yenile</button> : null}</section>
-      <SectionNav<CampaignArea> label="Kampanya çalışma alanı" active={campaignArea} onChange={setCampaignArea} items={[
-        { id: "portfolio", label: "Portföy", description: "Campaign → creative" },
+      <section className={styles.pageHero}><div><span className={styles.kicker}>KAMPANYA ÇALIŞMA ALANI · KANONİK BAĞLAM</span><h1>Kampanyayı bulun, sınıflandırın ve ilgili operasyonu aynı bağlamda yürütün.</h1><p>Portföy, künye incelemesi, mevcut gönderi ön kontrolü ve operasyon geçmişi birbirinden kopuk sayfalar değildir. Her işlev yalnız gerçek kaynağı ve kendi yetki sınırı hazır olduğunda açılır.</p></div>{campaignArea === "portfolio" ? <button className={styles.primaryButton} onClick={() => void refreshMetaReadMirror(true)}>Kaynağı yenile</button> : null}</section>
+      <SectionNav<CampaignArea> label="Kampanya çalışma alanı" active={campaignArea} onChange={(area) => commitDashboardLocation({ ...dashboardLocation, campaignArea: area })} items={[
+        { id: "portfolio", label: "Portföy", description: "Kampanya → kreatif" },
         { id: "classification", label: "Künye inceleme", description: "Eksik ve çelişkili sınıflar" },
         { id: "promotion", label: "Gönderi öne çıkarma", description: "K4 ön kontrol" },
         { id: "timeline", label: "Geçmiş", description: "Kural, alarm ve karar izi" },
       ]} />
       {campaignArea === "portfolio" && hasCanonicalCampaignSource && metaReadMirror
-        ? <CanonicalCampaignPortfolioPanel projection={metaReadMirror} onOpenAgentContext={openAgentContext} />
+        ? <CanonicalCampaignPortfolioPanel projection={metaReadMirror} onOpenAgentContext={openAgentContext} onOpenDecisionContext={(campaignRef, label) => void openCampaignDecisionContext(campaignRef, label)} />
         : campaignArea === "portfolio" ? <section className={styles.panel} aria-labelledby="campaign-source-state-title">
           <header className={styles.panelHeader}><div><span className={styles.kicker}>KAYNAK DURUMU</span><h2 id="campaign-source-state-title">{unavailableTitle}</h2></div><StatusPill tone={metaReadMirrorState === "unavailable" ? "warning" : "neutral"}>{metaReadMirrorState}</StatusPill></header>
-          <p>{metaReadMirrorState === "session_required" ? "Tenant-bound kampanya aynası yerel oturum olmadan okunamaz. Bu sınır aşılmadan kampanya adı, bütçe, performans veya hiyerarşi gösterilmez." : metaReadMirrorState === "loading" ? "Kanonik ayna doğrulanıyor. Sonuç gelene kadar ekran örnek içerikle doldurulmaz." : metaReadMirrorError ?? "Kanonik ayna beklenen salt-okunur sözleşmeyle doğrulanamadı."}</p>
+          <p>{metaReadMirrorState === "session_required" ? "Çalışma alanına bağlı kampanya aynası yerel oturum olmadan okunamaz. Bu sınır aşılmadan kampanya adı, bütçe, performans veya hiyerarşi gösterilmez." : metaReadMirrorState === "loading" ? "Kanonik ayna doğrulanıyor. Sonuç gelene kadar ekran örnek içerikle doldurulmaz." : metaReadMirrorError ?? "Kanonik ayna beklenen salt-okunur sözleşmeyle doğrulanamadı."}</p>
           {metaReadMirrorState === "session_required" ? <LocalSessionConnector title="Kanonik kampanya kaynağını bağlayın" onVerify={verifyAndRefreshLocalSession} /> : null}
           <div className={styles.agentActions}>{metaReadMirrorState === "session_required" ? null : <button className={styles.primaryButton} onClick={() => void refreshMetaReadMirror(true)}>Tekrar dene</button>}<button onClick={() => openSettings("meta")}>Kaynak ayarları</button></div>
         </section> : campaignArea === "classification" ? <CampaignClassificationReviewPanel onPrepareAssignment={(handoff) => {
@@ -856,7 +993,7 @@ export function OperatingDashboard({ initialView = "today" }: { model?: Operatin
           {orchestratorError && orchestratorState === "ready" ? <p className={styles.agentChatError} role="alert">{orchestratorError}</p> : null}
           {codexManualTask ? <div className={styles.codexManualTask}><header><strong>Codex için hazır görev</strong><button onClick={() => void navigator.clipboard.writeText(codexManualTask).then(() => setToast("Görev yeniden kopyalandı."), () => setToast("Kopyalama kullanılamadı; metni seçip kopyalayın."))}>Tekrar kopyala</button></header><textarea aria-label="Codex görevi" readOnly value={codexManualTask} /><small>Bu manuel aktarım Meta veya policy işlemi başlatmaz.</small></div> : null}
           <div className={styles.chatComposer}><textarea aria-label="Orchestrator'a mesaj" placeholder={orchestratorState === "ready" ? "Bu ekran bağlamında neyi analiz edelim veya hangi taslak kuralı hazırlayalım?" : "Kalıcı konuşma kaynağı bağlandığında mesaj gönderebilirsiniz."} value={orchestratorInput} disabled={orchestratorState !== "ready" || orchestratorSending} onChange={(event) => setOrchestratorInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendOrchestratorMessage(); } }} /><button disabled={orchestratorState !== "ready" || orchestratorSending || !orchestratorInput.trim()} onClick={() => void sendOrchestratorMessage()}>{orchestratorSending ? "Yanıt bekleniyor…" : "Gönder"}</button></div>
-          <footer>Codex CLI · read-only sandbox · yalnız nihai yanıt ledger'a yazılır · approval/action/Meta writer yok</footer>
+          <footer>Codex CLI · salt-okunur çalışma alanı · yalnız nihai yanıt kayda yazılır · onay, uygulama veya Meta değişikliği yok</footer>
         </section>
         {orchestratorState === "ready" ? <aside className={styles.agentConfiguration}>
           <section className={`${styles.panel} ${styles.agentSessionHub}`}><header className={styles.panelHeader}><div><span className={styles.kicker}>LOCAL SESSION HUB</span><h2>Dashboard ↔ CLI handoff</h2></div><StatusPill tone={agentSessions.length ? "good" : "neutral"}>{agentSessionsLoading ? "Kontrol" : `${agentSessions.length} aktif`}</StatusPill></header>
@@ -988,7 +1125,7 @@ export function OperatingDashboard({ initialView = "today" }: { model?: Operatin
       </section>
 
       <section className={styles.panel}>
-        <header className={styles.panelHeader}><div><span className={styles.kicker}>CAPABILITY MATRIX</span><h2>Yetki, doğrulama ve etkinlik</h2></div><StatusPill tone="good">GET-only connector</StatusPill></header>
+        <header className={styles.panelHeader}><div><span className={styles.kicker}>YETKİ VE HAZIRLIK</span><h2>Yetki, doğrulama ve etkinlik</h2></div><StatusPill tone="good">Yalnız okuma</StatusPill></header>
         <div className={styles.capabilityTable} role="table" aria-label="Meta yetenekleri">
           <div className={styles.capabilityHead} role="row"><span>Yetenek</span><span>Token izni</span><span>Canlı doğrulama</span><span>ReklamZeka’da etkin</span><span>Açıklama</span></div>
           {inventory.capabilities.map((capability) => <div className={styles.capabilityRow} role="row" key={capability.id}><strong>{capability.label}</strong><StatusPill tone={capability.granted ? "good" : "neutral"}>{capability.granted ? "Var" : "Yok"}</StatusPill><StatusPill tone={capability.verified ? "info" : "neutral"}>{capability.verified ? "Doğrulandı" : "Çalıştırılmadı"}</StatusPill><StatusPill tone={capability.enabled ? "good" : "danger"}>{capability.enabled ? "Açık" : "Kapalı"}</StatusPill><small>{capability.note}</small></div>)}
@@ -1030,12 +1167,12 @@ export function OperatingDashboard({ initialView = "today" }: { model?: Operatin
 
   function renderBudgets() {
     return <>
-      <SectionNav<BudgetArea> label="Bütçe çalışma alanı" active={budgetArea} onChange={setBudgetArea} items={[
-        { id: "proposals", label: "Öneriler", description: "Before/after ve sınırlar" },
+      <SectionNav<BudgetArea> label="Bütçe çalışma alanı" active={budgetArea} onChange={(area) => commitDashboardLocation({ ...dashboardLocation, budgetArea: area })} items={[
+        { id: "proposals", label: "Öneriler", description: "Önce/sonra ve sınırlar" },
         { id: "pools", label: "Bütçe havuzları", description: "Hiyerarşi ve tavanlar" },
       ]} />
       {budgetArea === "proposals" ? <BudgetLabPanel /> : <>
-        <section className={styles.pageHero}><div><span className={styles.kicker}>BÜTÇE HAVUZLARI · İLERİ DÜZEY</span><h1>Bütçe sınırlarını önerilerle aynı çalışma alanında yönetin.</h1><p>Havuz hiyerarşisi bütçe kararının girdisidir; kural sayfasında ayrı bir teknik modül değildir. Kaynak bağlı değilse limit veya pazar dağılımı uydurulmaz.</p></div><StatusPill>Draft-only</StatusPill></section>
+        <section className={styles.pageHero}><div><span className={styles.kicker}>BÜTÇE HAVUZLARI · İLERİ DÜZEY</span><h1>Bütçe sınırlarını önerilerle aynı çalışma alanında yönetin.</h1><p>Havuz hiyerarşisi bütçe kararının girdisidir; kural sayfasında ayrı bir teknik modül değildir. Kaynak bağlı değilse limit veya pazar dağılımı uydurulmaz.</p></div><StatusPill>Yalnız taslak</StatusPill></section>
         <BudgetPoolHierarchyPanel />
       </>}
     </>;
@@ -1043,11 +1180,11 @@ export function OperatingDashboard({ initialView = "today" }: { model?: Operatin
 
   function renderRules() {
     return <>
-      <SectionNav<RulesArea> label="Kurallar ve yetkiler" active={rulesArea} onChange={setRulesArea} items={[
+      <SectionNav<RulesArea> label="Kurallar ve yetkiler" active={rulesArea} onChange={(area) => commitDashboardLocation({ ...dashboardLocation, rulesArea: area })} items={[
         { id: "guidance", label: "Rehberler & kurallar", description: "Talimat → normalize kural" },
-        { id: "policies", label: "Bağlayıcı politikalar", description: "Strict lifecycle ve etki" },
-        { id: "authority", label: "Yetki & onay", description: "Autonomy ve policy bundle" },
-        { id: "learning", label: "Öğrenim", description: "İnsan kapılı Practice Lab" },
+        { id: "policies", label: "Bağlayıcı politikalar", description: "Yaşam döngüsü ve etki" },
+        { id: "authority", label: "Yetki & onay", description: "Yetki sınırları ve onay politikaları" },
+        { id: "learning", label: "Öğrenim", description: "İnsan onaylı yaklaşımlar" },
       ]} />
       {rulesArea === "guidance" ? <><GuidanceStudioPanel onSessionRequiredChange={setRulesSessionRequired} />
         {rulesSessionRequired === false ? <><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /><SliceRuleWorkspacePanel /></> : null}</>
@@ -1059,24 +1196,37 @@ export function OperatingDashboard({ initialView = "today" }: { model?: Operatin
 
   function renderSettings() {
     return <>
-      <SectionNav<SettingsArea> label="Yönetim ayarları" active={settingsArea} onChange={setSettingsArea} items={[
-        { id: "meta", label: "Meta bağlantısı", description: "Readiness ve kaynak tanısı" },
+      <SectionNav<SettingsArea> label="Yönetim ayarları" active={settingsArea} onChange={(area) => commitDashboardLocation({ ...dashboardLocation, settingsArea: area })} items={[
+        { id: "meta", label: "Meta bağlantısı", description: "Hazırlık ve kaynak tanısı" },
         { id: "categories", label: "Kategori registry", description: "Tanım, profil ve atama" },
-        { id: "promotion-templates", label: "Promotion şablonları", description: "Şablon lifecycle" },
+        { id: "promotion-templates", label: "Öne çıkarma şablonları", description: "Şablon yaşam döngüsü" },
       ]} />
       {settingsArea === "meta" ? renderMetaConnection() : settingsArea === "categories" ? <CategoryInventoryPanel
         assignmentHandoff={categoryAssignmentHandoff} onAssignmentHandoffConsumed={() => setCategoryAssignmentHandoff(null)} /> : <>
-        <section className={styles.pageHero}><div><span className={styles.kicker}>PROMOTION TEMPLATE · İLERİ DÜZEY</span><h1>Gönderi akışında kullanılan şablonları ayrı bir yönetim bağlamında hazırlayın.</h1><p>Şablon ve immutable hedef kitle preset yaşam döngüsü burada yönetilir; gerçek gönderi ön kontrolü Kampanyalar içindeki ilgili akışta kalır.</p></div><StatusPill>Human-gated</StatusPill></section>
+        <section className={styles.pageHero}><div><span className={styles.kicker}>ÖNE ÇIKARMA ŞABLONLARI · İLERİ DÜZEY</span><h1>Gönderi akışında kullanılan şablonları ayrı bir yönetim bağlamında hazırlayın.</h1><p>Şablon ve değiştirilemez hedef kitle ön ayarı yaşam döngüsü burada yönetilir; gerçek gönderi ön kontrolü Kampanyalar içindeki ilgili akışta kalır.</p></div><StatusPill>İnsan onaylı</StatusPill></section>
         <PromotionTemplateAuthoringPanel />
       </>}
     </>;
   }
 
+  function renderCampaignContextRecovery() {
+    const sessionRequired = campaignContextResolution === "session_required";
+    const loading = campaignContextResolution === "loading";
+    return <section className={`${styles.panel} ${styles.decisionRoomState}`} role={loading ? "status" : "alert"} aria-label="Seçili kampanya bağlamı doğrulama">
+      <strong>SEÇİLİ KAMPANYA BAĞLAMI</strong><h2>{loading ? "Kampanya bağlamı doğrulanıyor" : sessionRequired ? "Kampanya bağlamı için yerel oturum gerekli" : "Kampanya bağlamı doğrulanamadı"}</h2>
+      <p>{loading ? "Analiz ve onay kayıtları, frozen bağlam doğrulanana kadar açılmaz." : sessionRequired ? "Bu linkteki kampanya için analiz ve onay kayıtlarını açmak üzere yerel dashboard oturumunu bağlayın." : "Kampanya kaynağı veya frozen context güvenli biçimde okunamadı; genel çalışma alanı kayıtları gösterilmedi."}</p>
+      {sessionRequired ? <LocalSessionConnector title="Kampanya bağlamını bağlayın" onVerify={refreshRequestedCampaignContext} /> : loading ? null : <button onClick={() => void refreshRequestedCampaignContext()}>Tekrar kontrol et</button>}
+      {!loading ? <button onClick={clearCampaignDecisionContext}>Tüm çalışma alanına dön</button> : null}
+    </section>;
+  }
+
+  const campaignContextReady = requestedCampaignRef === null || (campaignContextResolution === "ready"
+    && campaignDecisionContext?.sourceCampaignRef === requestedCampaignRef);
   const content = activeView === "today" ? renderToday()
     : activeView === "campaigns" ? renderCampaigns()
-      : activeView === "decision-room" ? <DecisionRoomPanel />
+      : activeView === "decision-room" ? !campaignContextReady ? renderCampaignContextRecovery() : <DecisionRoomPanel campaignContext={campaignDecisionContext ? { label: campaignDecisionContext.label, campaignRef: campaignDecisionContext.decisionRoomCampaignRef } : null} campaignContextPending={!campaignContextReady} onClearCampaignContext={clearCampaignDecisionContext} />
         : activeView === "budgets" ? renderBudgets()
-          : activeView === "approvals" ? <ApprovalQueuePanel campaignRef={approvalQueueCampaignRef} />
+          : activeView === "approvals" ? !campaignContextReady ? renderCampaignContextRecovery() : <ApprovalQueuePanel campaignRef={approvalQueueCampaignRef} campaignLabel={campaignDecisionContext?.label ?? null} campaignContextPending={!campaignContextReady} onClearCampaignContext={campaignDecisionContext ? clearCampaignDecisionContext : undefined} />
             : activeView === "rules" ? renderRules() : renderSettings();
   const firstMirrorAccount = metaReadMirror?.connections.flatMap((connection) => connection.accounts)[0] ?? null;
   const workspaceName = firstMirrorAccount?.name ?? metaReadMirror?.connections[0]?.name ?? "Çalışma alanı";
@@ -1084,44 +1234,44 @@ export function OperatingDashboard({ initialView = "today" }: { model?: Operatin
     ? `${metaReadMirror.summary.accounts} hesap · ${metaReadMirror.sourceState}`
     : metaReadMirrorState === "loading" ? "Kanonik kaynak kontrol ediliyor"
       : metaReadMirrorState === "session_required" ? "Yerel oturum gerekli" : "Kanonik kaynak kullanılamıyor";
-  const sourceFooter = activeView === "today" ? "Kanonik Meta özeti + delivery health alert ledger"
-    : activeView === "campaigns" ? campaignArea === "portfolio" ? "Kanonik Meta campaign → creative hiyerarşisi"
+  const sourceFooter = activeView === "today" ? "Kanonik Meta özeti + teslimat sağlığı alarm kayıtları"
+    : activeView === "campaigns" ? campaignArea === "portfolio" ? "Kanonik Meta kampanya → kreatif hiyerarşisi"
       : campaignArea === "classification" ? "Kanonik sınıflandırma inceleme kuyruğu"
-        : campaignArea === "promotion" ? "Existing-post K4 preflight · server-provided katalog"
-          : "Append-only operasyon ve zamansal öneri izi"
-      : activeView === "decision-room" ? "Decision Room read model · frozen kanıt"
-        : activeView === "budgets" ? budgetArea === "proposals" ? "Budget proposal ledger" : "Immutable budget pool hierarchy"
-          : activeView === "approvals" ? "Cross-domain Approval Queue read model"
-            : activeView === "rules" ? rulesArea === "guidance" ? "Guidance → Normalization → Slice Rule"
-              : rulesArea === "policies" ? "Strict policy registry + impact"
-                : rulesArea === "authority" ? "Autonomy revision + K2/K3/K4 policy bundle"
-                  : "Advised Practice human-gated lifecycle"
-              : settingsArea === "meta" ? "Meta connection, readiness ve salt-okunur tanı"
-                : settingsArea === "categories" ? "Category Registry + guarded authoring"
-                  : "PromotionTemplate authoring + lifecycle";
+        : campaignArea === "promotion" ? "Mevcut gönderi K4 ön kontrolü · sunucu kataloğu"
+          : "Değiştirilemez operasyon ve zamansal öneri geçmişi"
+      : activeView === "decision-room" ? "Analiz ve karar kayıtları · dondurulmuş kanıt"
+        : activeView === "budgets" ? budgetArea === "proposals" ? "Bütçe önerileri kayıtları" : "Değiştirilemez bütçe havuzu hiyerarşisi"
+          : activeView === "approvals" ? "Alanlar arası onay kuyruğu kayıtları"
+            : activeView === "rules" ? rulesArea === "guidance" ? "Rehber → normalizasyon → dilim kuralı"
+              : rulesArea === "policies" ? "Bağlayıcı politika kayıtları ve etki analizi"
+                : rulesArea === "authority" ? "Yetki revizyonları ve onay/güvenlik politikaları"
+                  : "İnsan onaylı öğrenim yaşam döngüsü"
+              : settingsArea === "meta" ? "Meta bağlantısı, hazırlık ve salt-okunur tanı"
+                : settingsArea === "categories" ? "Kategori kayıtları ve korumalı düzenleme"
+                  : "Öne çıkarma şablonları ve yaşam döngüsü";
   const authorityFooter = activeView === "approvals"
-    ? "Karar kaydı var · grant/execute/Meta write yok"
-    : "Kaynak bazlı authority · kapsam dışı action veya Meta write yok";
+    ? "Karar kaydı var · yetki verme, uygulama veya Meta değişikliği yok"
+    : "Kaynağın izin verdiği kadar yetki · kapsam dışı uygulama veya Meta değişikliği yok";
 
-  return <main className={styles.appShell}>
+  return <div className={styles.appShell}>
     <aside className={styles.sidebar}>
       <div className={styles.brand}><span>RZ</span><div><strong>ReklamZeka</strong><small>Operating System</small></div></div>
-      <nav aria-label="Ana navigasyon">{navGroups.map((group) => <div key={group.label}><span>{group.label}</span>{group.items.map((item) => <button key={item.id} data-active={activeView === item.id} onClick={() => navigate(item.id)}><Icon name={item.icon} /><strong>{item.label}</strong>{item.badge ? <i data-live={item.badge === "●"}>{item.badge}</i> : null}</button>)}</div>)}</nav>
-      <div className={styles.sidebarFooter}><span className={metaReadMirror?.sourceState === "ready" ? styles.liveDot : undefined} /><div><strong>Meta Mirror</strong><small>{workspaceSource}</small></div><button aria-label="Bağlantı ayarları" onClick={() => openSettings("meta")}>•••</button></div>
+      <nav aria-label="Ana navigasyon">{navGroups.map((group) => <div key={group.label}><span>{group.label}</span>{group.items.map((item) => <button type="button" key={item.id} data-active={activeView === item.id} aria-current={activeView === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><Icon name={item.icon} /><strong>{item.label}</strong>{item.badge ? <i data-live={item.badge === "●"}>{item.badge}</i> : null}</button>)}</div>)}</nav>
+      <div className={styles.sidebarFooter}><span className={metaReadMirror?.sourceState === "ready" ? styles.liveDot : undefined} /><div><strong>Meta veri aynası</strong><small>{workspaceSource}</small></div><button aria-label="Bağlantı ayarları" onClick={() => openSettings("meta")}>•••</button></div>
     </aside>
     <section className={styles.workspace}>
-      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button className={styles.workspacePicker} onClick={() => openSettings("meta")}><span className={styles.avatar}>RZ</span><span><strong>{workspaceName}</strong><small>{workspaceSource}</small></span><i>⌄</i></button><div className={styles.topActions}><button className={styles.codexTransferButton} disabled={agentHandoffLoading} onClick={() => void transferCurrentContextToCodex()}>{agentHandoffLoading ? "Hazırlanıyor…" : "Codex'e aktar"}</button><button ref={assistantTriggerRef} className={styles.autonomyButton} aria-expanded={assistantOpen} aria-controls="dashboard-assistant" onClick={() => { setAgentSourceView(activeView); setAssistantOpen(true); }}><span className={styles.liveDot} /> Asistan</button></div></header>
-      <div className={styles.mobileNav}>{navGroups.flatMap((group) => group.items).map((item) => <button key={item.id} data-active={activeView === item.id} onClick={() => navigate(item.id)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</div>
-      <div className={styles.content} aria-label={activeTitle}>{content}</div>
+      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button type="button" className={styles.workspacePicker} aria-label={`${workspaceName} kaynak ayarlarını aç`} onClick={() => openSettings("meta")}><span className={styles.avatar}>RZ</span><span><strong>{workspaceName}</strong><small>{workspaceSource}</small></span><i aria-hidden="true">Ayarlar</i></button><div className={styles.topActions}><button type="button" className={styles.codexTransferButton} disabled={agentHandoffLoading} onClick={() => void transferCurrentContextToCodex()}>{agentHandoffLoading ? "Hazırlanıyor…" : "Codex'e aktar"}</button><button type="button" ref={assistantTriggerRef} className={styles.autonomyButton} aria-expanded={assistantOpen} aria-controls="dashboard-assistant" onClick={() => { setAgentSourceView(activeView); commitDashboardLocation({ ...dashboardLocation, assistantOpen: true }); }}><span className={styles.liveDot} /> Asistan</button></div></header>
+      <div className={styles.mobileNav}>{navGroups.flatMap((group) => group.items).map((item) => <button type="button" key={item.id} data-active={activeView === item.id} aria-current={activeView === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</div>
+      <main ref={contentRef} className={styles.content} tabIndex={-1} aria-label={activeTitle}>{content}</main>
       <footer className={styles.sourceFooter}><span>{sourceFooter}</span><span>{authorityFooter}</span></footer>
     </section>
     {assistantOpen ? <div className={styles.assistantBackdrop}>
-      <button type="button" className={styles.assistantDismiss} aria-label="Asistanı kapat" onClick={closeAssistant} />
-      <aside id="dashboard-assistant" className={styles.assistantDrawer} role="dialog" aria-modal="true" aria-labelledby="dashboard-assistant-title">
+      <button type="button" tabIndex={-1} className={styles.assistantDismiss} aria-label="Asistanı kapat" onClick={closeAssistant} />
+      <aside ref={assistantDrawerRef} id="dashboard-assistant" className={styles.assistantDrawer} role="dialog" aria-modal="true" aria-labelledby="dashboard-assistant-title">
         <header className={styles.assistantDrawerHeader}><div><span className={styles.kicker}>REKLAMZEKA ORCHESTRATOR</span><h2 id="dashboard-assistant-title">Bağlamı kaybetmeden çalışın.</h2><p>Kalıcı konuşma ve kısa ömürlü CLI handoff; policy, approval, action veya Meta write yetkisi taşımaz.</p></div><div><StatusPill tone={agentSessions.length ? "good" : agentSessionError ? "warning" : "neutral"}>{agentSessionsLoading ? "Session kontrolü" : agentSessions.length ? `${agentSessions.length} session` : "Session yok"}</StatusPill><button ref={assistantCloseRef} type="button" aria-label="Asistanı kapat" onClick={closeAssistant}>×</button></div></header>
         <div className={styles.assistantDrawerBody}>{renderAgent()}</div>
       </aside>
     </div> : null}
     {toast ? <div className={styles.toast} role="status"><span>✓</span><p>{toast}</p><button onClick={() => setToast(null)} aria-label="Bildirimi kapat">×</button></div> : null}
-  </main>;
+  </div>;
 }
