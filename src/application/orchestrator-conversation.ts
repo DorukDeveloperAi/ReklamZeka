@@ -60,6 +60,24 @@ export type OrchestratorMessage = Readonly<{
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  /**
+   * Server-projected historical binding evidence.  It deliberately contains
+   * no catalog/source refs, hashes, or playbook text.
+   */
+  evidence?: OrchestratorTurnEvidence;
+}>;
+
+export type OrchestratorTurnEvidenceState = "bound" | "legacy_not_recorded" | "unavailable_not_bound" | "missing_or_invalid";
+
+export type OrchestratorTurnEvidence = Readonly<{
+  state: OrchestratorTurnEvidenceState;
+  pageGuide: Readonly<{ pageLabel: string; purpose: string; scope: string }> | null;
+  profileLabel: string | null;
+  skills: readonly Readonly<{ name: string; version: string }>[];
+  playbooks: readonly Readonly<{ label: string }>[];
+  historicalSourceState: "not_recorded" | "not_applicable";
+  evidenceScope: "page_guidance_and_verified_workspace_playbooks";
+  uncertainty: "agent_inference_no_meta_or_action_authority";
 }>;
 
 export type OrchestratorConversationSnapshot = Readonly<{

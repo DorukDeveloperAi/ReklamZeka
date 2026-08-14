@@ -438,9 +438,23 @@
 .chatMessages > div { display: grid; grid-template-columns: 27px minmax(0, 1fr); gap: 9px; max-width: 84%; }
 .chatMessages > div[data-from="user"] { align-self: flex-end; grid-template-columns: minmax(0, 1fr) 27px; }
 .chatMessages > div[data-from="user"] span { grid-column: 2; }
-.chatMessages > div[data-from="user"] p { grid-column: 1; grid-row: 1; background: rgba(123,198,255,.09); }
+.chatMessages > div[data-from="user"] .chatMessageBody { grid-column: 1; grid-row: 1; }
 .chatMessages span { display: grid; place-items: center; width: 27px; height: 27px; border: 1px solid rgba(184,242,84,.24); border-radius: 8px; color: var(--rz-green); background: rgba(184,242,84,.05); font-size: .52rem; font-weight: 850; }
-.chatMessages p { margin: 0; padding: 12px 14px; border: 1px solid var(--rz-line); border-radius: 3px 11px 11px 11px; background: rgba(255,255,255,.025); color: #cbd3ce; font-size: .72rem; line-height: 1.6; }
+.chatMessageBody { display: grid; gap: 7px; min-width: 0; }
+.chatMessageBody > p { margin: 0; padding: 12px 14px; border: 1px solid var(--rz-line); border-radius: 3px 11px 11px 11px; background: rgba(255,255,255,.025); color: #cbd3ce; font-size: .72rem; line-height: 1.6; white-space: pre-wrap; }
+.chatMessages > div[data-from="user"] .chatMessageBody > p { background: rgba(123,198,255,.09); }
+.turnEvidence { border: 1px solid rgba(184,242,84,.2); border-radius: 8px; background: rgba(184,242,84,.035); color: var(--rz-muted); font-size: .57rem; }
+.turnEvidence summary { padding: 8px 10px; color: var(--rz-green); font-weight: 800; cursor: pointer; }
+.turnEvidence > p, .turnEvidence > small, .turnEvidence > dl, .turnEvidenceSkills { display: block; margin: 0 10px 9px; line-height: 1.55; }
+.turnEvidence strong { color: var(--rz-text); }
+.turnEvidence dl { display: grid; gap: 5px; }
+.turnEvidence dl div { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px; }
+.turnEvidence dt { color: var(--rz-dim); }
+.turnEvidence dd { margin: 0; overflow-wrap: anywhere; }
+.turnEvidenceSkills { display: grid; gap: 4px; }
+.turnEvidence ul { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.turnEvidence li { padding: 3px 5px; border: 1px solid var(--rz-line); border-radius: 5px; background: rgba(255,255,255,.025); color: var(--rz-muted); }
+.turnEvidenceUnavailable { color: #ffd29a; }
 .chatComposer { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin: 0 16px 14px; padding: 7px; border: 1px solid var(--rz-line-strong); border-radius: 11px; background: #0b0f0d; }
 .chatComposer textarea { min-height: 66px; resize: none; padding: 9px; border: 0; background: transparent; color: var(--rz-text); font-size: .7rem; line-height: 1.5; }
 .chatComposer textarea:focus { outline: 0; }
@@ -1075,6 +1089,7 @@
   .categoryArchiveAction { width: 100%; min-width: 0; }
   .agentChat { min-height: 610px; }
   .chatMessages > div { max-width: 96%; }
+  .turnEvidence dl div { grid-template-columns: 1fr; gap: 2px; }
   .approvalQueueFacts { grid-template-columns: 1fr; }
   .approvalQueueFacts > div { border-right: 0; border-bottom: 1px solid var(--rz-line); }
   .approvalQueueFacts > div:last-child { border-bottom: 0; }

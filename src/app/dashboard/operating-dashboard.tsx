@@ -80,7 +80,18 @@ type OrchestratorConversationSummary = Readonly<{
   createdAt: string;
   pageGuide: Readonly<{ pageId: DashboardViewId; pageLabel: string }> | null;
   providerThreadRef: string | null;
-  messages: readonly Readonly<{ messageRef: string; role: "user" | "assistant"; content: string; createdAt: string }>[];
+  messages: readonly Readonly<{ messageRef: string; role: "user" | "assistant"; content: string; createdAt: string;
+    evidence: OrchestratorTurnEvidenceSummary | null }>[];
+}>;
+type OrchestratorTurnEvidenceSummary = Readonly<{
+  state: "bound" | "legacy_not_recorded" | "unavailable_not_bound" | "missing_or_invalid";
+  pageGuide: Readonly<{ pageLabel: string; purpose: string; scope: string }> | null;
+  profileLabel: string | null;
+  skills: readonly Readonly<{ name: string; version: string }>[];
+  playbooks: readonly Readonly<{ label: string }>[];
+  historicalSourceState: "not_recorded" | "not_applicable";
+  evidenceScope: "page_guidance_and_verified_workspace_playbooks";
+  uncertainty: "agent_inference_no_meta_or_action_authority";
 }>;
 type PersistedCampaignContextSummary = Readonly<{ campaignRef: string; label: string; objective: string | null; capturedAt: string; sourceState: "frozen_valid" }>;
 type PortfolioCapabilitySummary = Readonly<{
@@ -101,6 +112,77 @@ function safeSkillName(value: unknown): value is string {
 
 function onlyKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
   return Object.keys(value).every((key) => keys.includes(key));
+}
+
+function safeEvidenceText(value: unknown, maximum = 480): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= maximum && !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+function safeConversationContent(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 30_000 && !/[\u0000\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value);
+}
+
+function orchestratorEvidenceFromResponse(value: unknown): OrchestratorTurnEvidenceSummary | null {
+  if (!plainRecord(value) || !onlyKeys(value, ["state", "pageGuide", "profileLabel", "skills", "playbooks", "historicalSourceState", "evidenceScope", "uncertainty"])
+    || !["bound", "legacy_not_recorded", "unavailable_not_bound", "missing_or_invalid"].includes(value.state as string)
+    || !["not_recorded", "not_applicable"].includes(value.historicalSourceState as string)
+    || value.evidenceScope !== "page_guidance_and_verified_workspace_playbooks"
+    || value.uncertainty !== "agent_inference_no_meta_or_action_authority" || !Array.isArray(value.skills)
+    || !Array.isArray(value.playbooks) || value.skills.length > 9 || value.playbooks.length > 12
+    || !(value.profileLabel === null || safeEvidenceText(value.profileLabel, 140))) return null;
+  const guide = value.pageGuide;
+  if (!(guide === null || plainRecord(guide) && onlyKeys(guide, ["pageLabel", "purpose", "scope"])
+    && safeEvidenceText(guide.pageLabel) && safeEvidenceText(guide.purpose) && safeEvidenceText(guide.scope))) return null;
+  const skills = value.skills.map((skill) => {
+    if (!plainRecord(skill) || !onlyKeys(skill, ["name", "version"]) || !safeSkillName(skill.name)
+      || typeof skill.version !== "string" || !/^\d+\.\d+\.\d+$/.test(skill.version)) return null;
+    return Object.freeze({ name: skill.name, version: skill.version });
+  });
+  const playbooks = value.playbooks.map((playbook) => {
+    if (!plainRecord(playbook) || !onlyKeys(playbook, ["label"]) || !safeEvidenceText(playbook.label, 160)) return null;
+    return Object.freeze({ label: playbook.label });
+  });
+  if (skills.some((skill) => skill === null) || playbooks.some((playbook) => playbook === null)) return null;
+  const state = value.state as OrchestratorTurnEvidenceSummary["state"];
+  if (state === "bound" && (!guide || value.profileLabel === null)) return null;
+  if (state !== "bound" && (guide !== null || value.profileLabel !== null || skills.length || playbooks.length)) return null;
+  return Object.freeze({ state, pageGuide: guide === null ? null : Object.freeze({ pageLabel: guide.pageLabel as string,
+    purpose: guide.purpose as string, scope: guide.scope as string }), profileLabel: value.profileLabel as string | null,
+  skills: Object.freeze(skills as OrchestratorTurnEvidenceSummary["skills"]),
+  playbooks: Object.freeze(playbooks as OrchestratorTurnEvidenceSummary["playbooks"]),
+  historicalSourceState: value.historicalSourceState as OrchestratorTurnEvidenceSummary["historicalSourceState"],
+  evidenceScope: "page_guidance_and_verified_workspace_playbooks", uncertainty: "agent_inference_no_meta_or_action_authority" });
+}
+
+/** Fails closed before a read-only conversation payload reaches the Agent UI. */
+export function orchestratorConversationFromResponse(value: unknown): OrchestratorConversationSummary | null {
+  if (!plainRecord(value)) return null;
+  if (value.conversation === null) return null;
+  if (!plainRecord(value.conversation)) return null;
+  const conversation = value.conversation;
+  if (!onlyKeys(conversation, ["conversationRef", "createdAt", "pageGuide", "providerThreadRef", "messages"])
+    || !safeEvidenceText(conversation.conversationRef, 80) || !isoText(conversation.createdAt)
+    || !(conversation.providerThreadRef === null || safeEvidenceText(conversation.providerThreadRef, 80)) || !Array.isArray(conversation.messages)) return null;
+  const currentGuide = conversation.pageGuide;
+  if (!(currentGuide === null || plainRecord(currentGuide) && onlyKeys(currentGuide, ["version", "pageId", "pageLabel", "purpose", "codePath", "recordPath"])
+    && safeEvidenceText(currentGuide.version, 80) && typeof currentGuide.pageId === "string" && safeEvidenceText(currentGuide.pageLabel)
+    && safeEvidenceText(currentGuide.purpose) && safeEvidenceText(currentGuide.codePath) && safeEvidenceText(currentGuide.recordPath))) return null;
+  const messages = conversation.messages.map((message) => {
+    if (!plainRecord(message) || !onlyKeys(message, ["messageRef", "turnRef", "messageNumber", "role", "content", "createdAt", "evidence"])
+      || !safeEvidenceText(message.messageRef, 80) || !safeEvidenceText(message.turnRef, 80)
+      || !Number.isSafeInteger(message.messageNumber) || !["user", "assistant"].includes(message.role as string)
+      || !safeConversationContent(message.content) || !isoText(message.createdAt)) return null;
+    if (message.role === "user" && message.evidence !== undefined) return null;
+    const evidence = message.role === "assistant" ? orchestratorEvidenceFromResponse(message.evidence) : null;
+    if (message.role === "assistant" && !evidence) return null;
+    return Object.freeze({ messageRef: message.messageRef as string, role: message.role as "user" | "assistant",
+      content: message.content as string, createdAt: message.createdAt as string, evidence });
+  });
+  if (messages.some((message) => message === null)) return null;
+  return Object.freeze({ conversationRef: conversation.conversationRef as string, createdAt: conversation.createdAt as string,
+    pageGuide: currentGuide === null ? null : Object.freeze({ pageId: currentGuide.pageId as DashboardViewId,
+      pageLabel: currentGuide.pageLabel as string }), providerThreadRef: conversation.providerThreadRef as string | null,
+    messages: Object.freeze(messages as OrchestratorConversationSummary["messages"]) });
 }
 
 /** Maps the catalog's GET projection into the drawer-safe context and drops every identifier and source field. */
@@ -726,15 +808,16 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     try {
       const response = await fetch("/api/orchestrator-conversation", { cache: "no-store", credentials: "same-origin",
         headers: { "X-ReklamZeka-Intent": "orchestrator-conversation-read" } });
-      const payload = await response.json() as { conversation?: OrchestratorConversationSummary | null;
-        error?: { code?: string; message?: string } };
-      if (!response.ok || !("conversation" in payload)) {
-        setOrchestratorState(response.status === 401 || payload.error?.code === "local_session_required"
+      const payload: unknown = await response.json();
+      const responseError = plainRecord(payload) && plainRecord(payload.error) ? payload.error : null;
+      const conversation = response.ok ? orchestratorConversationFromResponse(payload) : null;
+      if (!response.ok || !(plainRecord(payload) && Object.hasOwn(payload, "conversation")) || conversation === null && (plainRecord(payload) && payload.conversation !== null)) {
+        setOrchestratorState(response.status === 401 || responseError?.code === "local_session_required"
           ? "session_required" : "unavailable");
-        setOrchestratorError(payload.error?.message ?? "Orchestrator sohbeti kullanılamıyor.");
+        setOrchestratorError(typeof responseError?.message === "string" ? responseError.message : "Orchestrator sohbeti kullanılamıyor.");
         return false;
       }
-      setOrchestratorConversation(payload.conversation ?? null);
+      setOrchestratorConversation(conversation);
       setOrchestratorState("ready");
       setOrchestratorError(null);
       return true;
@@ -788,10 +871,11 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
         pageId: agentSourceView, message });
       const response = await fetch("/api/orchestrator-conversation", { method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "orchestrator-conversation-send" }, body });
-      const payload = await response.json() as { conversation?: OrchestratorConversationSummary;
-        error?: { message?: string } };
-      if (!response.ok || !payload.conversation) throw new Error(payload.error?.message ?? "Codex yanıtı alınamadı.");
-      setOrchestratorConversation(payload.conversation);
+      const payload: unknown = await response.json();
+      const conversation = response.ok ? orchestratorConversationFromResponse(payload) : null;
+      const responseError = plainRecord(payload) && plainRecord(payload.error) ? payload.error : null;
+      if (!response.ok || !conversation) throw new Error(typeof responseError?.message === "string" ? responseError.message : "Codex yanıtı alınamadı.");
+      setOrchestratorConversation(conversation);
       setOrchestratorInput("");
       setOrchestratorState("ready");
     } catch (error) {
@@ -986,7 +1070,8 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
       .find((item) => item.id === agentSourceView)?.label ?? "İzle";
     const visibleMessages = orchestratorState === "ready"
       ? (orchestratorConversation?.messages.map((message) => ({ key: message.messageRef,
-          from: message.role === "assistant" ? "agent" as const : "user" as const, text: message.content })) ?? [])
+          from: message.role === "assistant" ? "agent" as const : "user" as const, text: message.content,
+          evidence: message.evidence })) ?? [])
       : [];
     return <div className={`${styles.agentWorkspace} ${orchestratorState === "ready" ? "" : styles.agentWorkspaceSingle}`}>
         <section className={styles.agentChat}>
@@ -1000,7 +1085,17 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
             {orchestratorState === "session_required" ? <LocalSessionConnector title="Orchestrator konuşmasını bağlayın" onVerify={verifyOrchestratorWorkspace} /> : null}
             {orchestratorState === "unavailable" ? <p role="alert">{orchestratorError ?? "Kalıcı Orchestrator konuşması kullanılamıyor."} Manuel Codex aktarımı kullanılabilir.</p> : null}
             {orchestratorState === "ready" && !visibleMessages.length ? <p>Kalıcı konuşma bağlı; henüz mesaj yok.</p> : null}
-            {visibleMessages.map((message) => <div key={message.key} data-from={message.from}><span>{message.from === "agent" ? "RZ" : "Siz"}</span><p>{message.text}</p></div>)}
+            {visibleMessages.map((message) => <div key={message.key} data-from={message.from}><span>{message.from === "agent" ? "RZ" : "Siz"}</span><div className={styles.chatMessageBody}><p>{message.text}</p>{message.evidence ? <details className={styles.turnEvidence}>
+              <summary>Kanıt ayrıntısı</summary>
+              <p><strong>Kanıt kapsamı:</strong> Sayfa yönlendirmesi + doğrulanmış workspace playbookları</p>
+              <p><strong>Belirsizlik:</strong> Agent çıkarımıdır; Meta/action yetkisi yok.</p>
+              {message.evidence.state === "bound" && message.evidence.pageGuide ? <>
+                <dl><div><dt>Sayfa amacı</dt><dd>{message.evidence.pageGuide.purpose}</dd></div><div><dt>Kayıt kapsamı</dt><dd>{message.evidence.pageGuide.scope}</dd></div><div><dt>Skill profili</dt><dd>{message.evidence.profileLabel}</dd></div></dl>
+                <div className={styles.turnEvidenceSkills}><strong>Çekirdek skill’ler</strong><ul>{message.evidence.skills.map((skill) => <li key={`${skill.name}-${skill.version}`}>{skill.name} · {skill.version}</li>)}</ul></div>
+                <div className={styles.turnEvidenceSkills}><strong>Kullanıcı playbook snapshotları</strong>{message.evidence.playbooks.length ? <ul>{message.evidence.playbooks.map((playbook) => <li key={playbook.label}>{playbook.label}</li>)}</ul> : <small>Bu turn için doğrulanmış workspace playbook’u bağlı değildi.</small>}</div>
+                <small>Başlık, kaynak bağlantısı ve freshness bu historical snapshot’ta kaydedilmedi; güncel kaynakla birleştirilmedi.</small>
+              </> : <p className={styles.turnEvidenceUnavailable}>{message.evidence.state === "legacy_not_recorded" ? "Bu eski turn için kanıt snapshot’ı kaydedilmedi; güncel kaynak durumu tarihsel kanıt gibi gösterilmez." : message.evidence.state === "unavailable_not_bound" ? "Bu turn’de workspace skill/playbook kanıtı çözümlenemedi; model çalıştırılmadı." : "Kanıt snapshot’ı eksik veya doğrulanamadı; güncel kaynak durumu kullanılmadı."}</p>}
+            </details> : null}</div></div>)}
           </div>
           {orchestratorError && orchestratorState === "ready" ? <p className={styles.agentChatError} role="alert">{orchestratorError}</p> : null}
           {codexManualTask ? <div className={styles.codexManualTask}><header><strong>Codex için hazır görev</strong><button onClick={() => void navigator.clipboard.writeText(codexManualTask).then(() => setToast("Görev yeniden kopyalandı."), () => setToast("Kopyalama kullanılamadı; metni seçip kopyalayın."))}>Tekrar kopyala</button></header><textarea aria-label="Codex görevi" readOnly value={codexManualTask} /><small>Bu manuel aktarım Meta veya policy işlemi başlatmaz.</small></div> : null}

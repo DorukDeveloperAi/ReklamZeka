@@ -6,7 +6,9 @@ import {
   type OrchestratorConversationSnapshot,
   type OrchestratorMessage,
   type OrchestratorPageGuide,
+  type OrchestratorTurnEvidence,
 } from "@/application/orchestrator-conversation";
+import { CORE_SKILL_MANIFESTS, coreSkillManifest, SKILL_CATALOG_VERSION } from "@/domain/orchestrator/skill-catalog";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -15,6 +17,8 @@ type ConversationDatabase = Pick<Database, "execute" | "transaction">;
 
 type ConversationRow = Readonly<{ conversation_ref: string; created_at: Date | string }>;
 type TurnRow = Readonly<{ provider_thread_ref: string | null; page_guide: unknown }>;
+type EvidenceTurnRow = Readonly<{ turn_ref: string; page_guide: unknown; profile_snapshot: unknown;
+  manifest_snapshots: unknown; playbook_snapshots: unknown; skill_catalog_binding_hash: unknown }>;
 type MessageRow = Readonly<{ message_ref: string; turn_ref: string; message_number: number;
   role: string; content: string; created_at: Date | string }>;
 
@@ -22,6 +26,12 @@ const CONVERSATION = /^conversation_[a-f0-9]{32}$/;
 const TURN = /^turn_[a-f0-9]{32}$/;
 const MESSAGE = /^message_[a-f0-9]{32}$/;
 const PROVIDER_THREAD = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PROFILE_REF = /^profile_[a-z0-9][a-z0-9_-]{0,86}$/;
+const PLAYBOOK_REF = /^playbook_[a-z0-9][a-z0-9_-]{0,86}$/;
+const SOURCE_REF = /^source_[a-z0-9_.:-]{1,127}$/;
+const HASH = /^[a-f0-9]{64}$/;
+const EVIDENCE_SCOPE = "page_guidance_and_verified_workspace_playbooks" as const;
+const UNCERTAINTY = "agent_inference_no_meta_or_action_authority" as const;
 
 export class OrchestratorConversationRepositoryError extends Error {
   constructor(readonly code: "invalid_input" | "corrupt_store" | "conversation_unavailable") {
@@ -54,13 +64,73 @@ function pageGuide(value: unknown): OrchestratorPageGuide {
   return canonical;
 }
 
-function message(row: MessageRow): OrchestratorMessage {
+function exact(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value as Record<string, unknown>).length === keys.length
+    && Object.keys(value as Record<string, unknown>).every((key) => keys.includes(key));
+}
+
+function unavailableEvidence(state: Exclude<OrchestratorTurnEvidence["state"], "bound">): OrchestratorTurnEvidence {
+  return Object.freeze({ state, pageGuide: null, profileLabel: null, skills: Object.freeze([]), playbooks: Object.freeze([]),
+    historicalSourceState: "not_applicable", evidenceScope: EVIDENCE_SCOPE, uncertainty: UNCERTAINTY });
+}
+
+/** Never joins mutable sources: this read projection reports only ledger-frozen evidence. */
+export function orchestratorTurnEvidenceFromLedger(row: EvidenceTurnRow): OrchestratorTurnEvidence {
+  if (!TURN.test(row.turn_ref)) return unavailableEvidence("missing_or_invalid");
+  const legacy = exact(row.profile_snapshot, ["version"]) && row.profile_snapshot.version === "legacy_not_recorded"
+    && Array.isArray(row.manifest_snapshots) && row.manifest_snapshots.length === 0
+    && Array.isArray(row.playbook_snapshots) && row.playbook_snapshots.length === 0
+    && row.skill_catalog_binding_hash === "LEGACY_NOT_BOUND";
+  if (legacy) return unavailableEvidence("legacy_not_recorded");
+  const unavailable = exact(row.profile_snapshot, ["version"]) && row.profile_snapshot.version === "unavailable_not_bound"
+    && Array.isArray(row.manifest_snapshots) && row.manifest_snapshots.length === 0
+    && Array.isArray(row.playbook_snapshots) && row.playbook_snapshots.length === 0
+    && row.skill_catalog_binding_hash === "UNAVAILABLE_NOT_BOUND";
+  if (unavailable) return unavailableEvidence("unavailable_not_bound");
+  try {
+    const guide = pageGuide(row.page_guide);
+    if (!exact(row.profile_snapshot, ["version", "profileRef", "revision", "profileHash"])
+      || row.profile_snapshot.version !== SKILL_CATALOG_VERSION || typeof row.profile_snapshot.profileRef !== "string"
+      || !PROFILE_REF.test(row.profile_snapshot.profileRef) || !Number.isSafeInteger(row.profile_snapshot.revision)
+      || (row.profile_snapshot.revision as number) < 1 || typeof row.profile_snapshot.profileHash !== "string"
+      || !HASH.test(row.profile_snapshot.profileHash) || !Array.isArray(row.manifest_snapshots)
+      || row.manifest_snapshots.length !== CORE_SKILL_MANIFESTS.length || !Array.isArray(row.playbook_snapshots)
+      || row.playbook_snapshots.length > 12 || typeof row.skill_catalog_binding_hash !== "string"
+      || !HASH.test(row.skill_catalog_binding_hash)) throw new Error("invalid_binding");
+    const manifests = row.manifest_snapshots.map((manifest) => {
+      if (!exact(manifest, ["ref", "version", "hash"]) || typeof manifest.ref !== "string"
+        || typeof manifest.version !== "string" || typeof manifest.hash !== "string") throw new Error("invalid_manifest");
+      const found = coreSkillManifest(manifest.ref, manifest.version, manifest.hash);
+      return Object.freeze({ ref: found.ref, version: found.version, hash: found.hash, name: found.name });
+    }).sort((left, right) => left.ref.localeCompare(right.ref));
+    if (new Set(manifests.map((manifest) => manifest.ref)).size !== CORE_SKILL_MANIFESTS.length) throw new Error("duplicate_manifest");
+    const playbooks = row.playbook_snapshots.map((playbook) => {
+      if (!exact(playbook, ["playbookRef", "revision", "playbookHash", "sourceRef"])
+        || typeof playbook.playbookRef !== "string" || !PLAYBOOK_REF.test(playbook.playbookRef)
+        || !Number.isSafeInteger(playbook.revision) || (playbook.revision as number) < 1
+        || typeof playbook.playbookHash !== "string" || !HASH.test(playbook.playbookHash)
+        || typeof playbook.sourceRef !== "string" || !SOURCE_REF.test(playbook.sourceRef)) throw new Error("invalid_playbook");
+      return Object.freeze({ playbookRef: playbook.playbookRef, revision: playbook.revision as number,
+        playbookHash: playbook.playbookHash, sourceRef: playbook.sourceRef });
+    }).sort((left, right) => left.playbookRef.localeCompare(right.playbookRef));
+    if (new Set(playbooks.map((playbook) => playbook.playbookRef)).size !== playbooks.length) throw new Error("duplicate_playbook");
+    return Object.freeze({ state: "bound", pageGuide: Object.freeze({ pageLabel: guide.pageLabel, purpose: guide.purpose,
+      scope: guide.recordPath }), profileLabel: `Workspace skill profili · revizyon ${row.profile_snapshot.revision}`,
+    skills: Object.freeze(manifests.map(({ name, version }) => Object.freeze({ name, version }))),
+    playbooks: Object.freeze(playbooks.map((playbook) => Object.freeze({ label: `Doğrulanmış çalışma notu · revizyon ${playbook.revision}` }))),
+    historicalSourceState: "not_recorded", evidenceScope: EVIDENCE_SCOPE, uncertainty: UNCERTAINTY });
+  } catch { return unavailableEvidence("missing_or_invalid"); }
+}
+
+function message(row: MessageRow, evidence: OrchestratorTurnEvidence | undefined): OrchestratorMessage {
   if (!MESSAGE.test(row.message_ref) || !TURN.test(row.turn_ref)
     || !Number.isSafeInteger(row.message_number) || row.message_number < 1 || row.message_number > 2_000_000
     || (row.role !== "user" && row.role !== "assistant")
     || typeof row.content !== "string" || row.content.length < 1 || row.content.length > 30_000) fail("corrupt_store");
   return Object.freeze({ messageRef: row.message_ref, turnRef: row.turn_ref, messageNumber: row.message_number,
-    role: row.role, content: row.content, createdAt: iso(row.created_at) });
+    role: row.role, content: row.content, createdAt: iso(row.created_at),
+    ...(row.role === "assistant" ? { evidence: evidence ?? unavailableEvidence("missing_or_invalid") } : {}) });
 }
 
 async function snapshot(executor: Executor, scope: Readonly<{ workspaceId: string; userId: string;
@@ -101,11 +171,27 @@ async function snapshot(executor: Executor, scope: Readonly<{ workspaceId: strin
     from orchestrator_conversation_messages
     where workspace_id = ${scope.workspaceId}::uuid and conversation_ref = ${scope.conversationRef}
     order by message_number asc limit 200
-  `)).map(message);
-  if (storedMessages.some((item, index) => item.messageNumber !== index + 1)) fail("corrupt_store");
+  `));
+  const evidenceRows = rows<EvidenceTurnRow>(await executor.execute(sql`
+    select turn.turn_ref, turn.page_guide, turn.profile_snapshot, turn.manifest_snapshots,
+      turn.playbook_snapshots, turn.skill_catalog_binding_hash
+    from orchestrator_conversation_turns turn
+    join orchestrator_conversations conversation on conversation.workspace_id = turn.workspace_id
+      and conversation.conversation_ref = turn.conversation_ref
+    where turn.workspace_id = ${scope.workspaceId}::uuid and turn.conversation_ref = ${scope.conversationRef}
+      and conversation.user_id = ${scope.userId}::uuid
+    order by turn.turn_number asc limit 100
+  `));
+  const evidenceByTurn = new Map<string, OrchestratorTurnEvidence>();
+  for (const row of evidenceRows) {
+    if (!TURN.test(row.turn_ref) || evidenceByTurn.has(row.turn_ref)) fail("corrupt_store");
+    evidenceByTurn.set(row.turn_ref, orchestratorTurnEvidenceFromLedger(row));
+  }
+  const publicMessages = storedMessages.map((stored) => message(stored, evidenceByTurn.get(stored.turn_ref)));
+  if (publicMessages.some((item, index) => item.messageNumber !== index + 1)) fail("corrupt_store");
   return Object.freeze({ conversationRef: conversation.conversation_ref, createdAt: iso(conversation.created_at),
     pageGuide: latest ? pageGuide(latest.page_guide) : null, providerThreadRef: latestCompleted,
-    messages: Object.freeze(storedMessages) });
+    messages: Object.freeze(publicMessages) });
 }
 
 export class DrizzleOrchestratorConversationRepository implements OrchestratorConversationRepository {
