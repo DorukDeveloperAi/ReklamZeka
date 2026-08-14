@@ -190,11 +190,12 @@ export class DrizzleOrchestratorConversationRepository implements OrchestratorCo
       await transaction.execute(sql`
         insert into orchestrator_conversation_turns (
           workspace_id, conversation_ref, turn_ref, turn_number, provider, provider_thread_ref,
-          outcome, failure_code, page_guide, created_at
+          outcome, failure_code, page_guide, profile_snapshot, manifest_snapshots, skill_catalog_binding_hash, created_at
         ) values (
           ${input.workspaceId}::uuid, ${input.conversationRef}, ${input.turnRef}, ${counters.turn_number},
           'codex_cli', ${input.providerThreadRef}, ${input.outcome}, ${input.failureCode},
-          ${JSON.stringify(input.pageGuide)}::jsonb, ${input.createdAt}::timestamptz
+          ${JSON.stringify(input.pageGuide)}::jsonb, ${JSON.stringify(input.skillCatalogBinding.profile)}::jsonb,
+          ${JSON.stringify(input.skillCatalogBinding.manifests)}::jsonb, ${input.skillCatalogBinding.bindingHash}, ${input.createdAt}::timestamptz
         )
       `);
       await transaction.execute(sql`

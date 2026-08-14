@@ -467,6 +467,9 @@ export const orchestratorConversationTurns = pgTable("orchestrator_conversation_
   outcome: text("outcome").notNull(),
   failureCode: text("failure_code"),
   pageGuide: jsonb("page_guide").$type<Record<string, unknown>>().notNull(),
+  profileSnapshot: jsonb("profile_snapshot").$type<Record<string, unknown>>().notNull().default({ version: "legacy_not_recorded" }),
+  manifestSnapshots: jsonb("manifest_snapshots").$type<readonly Record<string, unknown>[]>().notNull().default([]),
+  skillCatalogBindingHash: text("skill_catalog_binding_hash").notNull().default("LEGACY_NOT_RECORDED"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
   uniqueIndex("orchestrator_conversation_turns_workspace_id_unique").on(table.workspaceId, table.id),
@@ -499,6 +502,29 @@ export const orchestratorConversationTurns = pgTable("orchestrator_conversation_
     and ${table.pageGuide} - array['version', 'pageId', 'pageLabel', 'purpose', 'codePath', 'recordPath'] = '{}'::jsonb
     and ${table.pageGuide} #>> '{version}' = 'orchestrator-page-guide/1.0.0'
   `),
+  check("orchestrator_conversation_turns_skill_catalog_binding", sql`
+    (${table.skillCatalogBindingHash} = 'LEGACY_NOT_RECORDED' and ${table.profileSnapshot} = '{"version":"legacy_not_recorded"}'::jsonb and ${table.manifestSnapshots} = '[]'::jsonb)
+    or (${table.skillCatalogBindingHash} ~ '^[a-f0-9]{64}$'
+      and jsonb_typeof(${table.profileSnapshot}) = 'object'
+      and ${table.profileSnapshot} ?& array['version', 'profileRef', 'revision', 'profileHash']
+      and ${table.profileSnapshot} - array['version', 'profileRef', 'revision', 'profileHash'] = '{}'::jsonb
+      and jsonb_typeof(${table.manifestSnapshots}) = 'array' and jsonb_array_length(${table.manifestSnapshots}) between 1 and 9)
+  `),
+]);
+
+/** Workspace selection of an immutable release-owned core skill pack. */
+export const orchestratorProfileRevisions = pgTable("orchestrator_profile_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  profileRef: text("profile_ref").notNull(), revision: integer("revision").notNull(), previousHash: text("previous_hash").notNull(),
+  profileHash: text("profile_hash").notNull(), state: text("state").notNull(), payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  createdByActorId: uuid("created_by_actor_id").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("orchestrator_profile_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("orchestrator_profile_revisions_identity_unique").on(table.workspaceId, table.profileRef, table.revision),
+  uniqueIndex("orchestrator_profile_revisions_hash_unique").on(table.workspaceId, table.profileHash),
+  index("orchestrator_profile_revisions_current_idx").on(table.workspaceId, table.profileRef, table.revision),
+  foreignKey({ columns: [table.workspaceId, table.createdByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "orchestrator_profile_revisions_membership_fk" }).onDelete("restrict"),
+  check("orchestrator_profile_revisions_identity", sql`${table.profileRef} ~ '^profile_[a-z0-9][a-z0-9_-]{0,86}$' and ${table.revision} >= 1 and ${table.profileHash} ~ '^[a-f0-9]{64}$' and (${table.revision} = 1 and ${table.previousHash} = 'GENESIS' or ${table.revision} > 1 and ${table.previousHash} ~ '^[a-f0-9]{64}$') and ${table.state} in ('active', 'tombstoned')`),
 ]);
 
 /** User/assistant transcript material. Only final assistant text is stored. */
@@ -1807,6 +1833,24 @@ export const guidanceSources = pgTable("guidance_sources", {
       and ${table.reviewedAt} >= ${table.capturedAt} and ${table.reviewBy} > ${table.reviewedAt}
     )
   `),
+]);
+
+/** Explicit human-authored playbook revisions; agents only ever read their public projection. */
+export const orchestratorPlaybookRevisions = pgTable("orchestrator_playbook_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  playbookRef: text("playbook_ref").notNull(), revision: integer("revision").notNull(), previousHash: text("previous_hash").notNull(),
+  playbookHash: text("playbook_hash").notNull(), state: text("state").notNull(), sourceId: uuid("source_id").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(), createdByActorId: uuid("created_by_actor_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("orchestrator_playbook_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("orchestrator_playbook_revisions_identity_unique").on(table.workspaceId, table.playbookRef, table.revision),
+  uniqueIndex("orchestrator_playbook_revisions_hash_unique").on(table.workspaceId, table.playbookHash),
+  index("orchestrator_playbook_revisions_current_idx").on(table.workspaceId, table.playbookRef, table.revision),
+  foreignKey({ columns: [table.workspaceId, table.sourceId], foreignColumns: [guidanceSources.workspaceId, guidanceSources.id], name: "orchestrator_playbook_revisions_source_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.createdByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "orchestrator_playbook_revisions_membership_fk" }).onDelete("restrict"),
+  check("orchestrator_playbook_revisions_identity", sql`${table.playbookRef} ~ '^playbook_[a-z0-9][a-z0-9_-]{0,86}$' and ${table.revision} >= 1 and ${table.playbookHash} ~ '^[a-f0-9]{64}$' and (${table.revision} = 1 and ${table.previousHash} = 'GENESIS' or ${table.revision} > 1 and ${table.previousHash} ~ '^[a-f0-9]{64}$') and ${table.state} in ('active', 'tombstoned')`),
+  check("orchestrator_playbook_revisions_no_authority", sql`${table.payload}::text !~* '"(policy|rule|scope|approval|execute|meta[_-]?write|persist|publish)"[[:space:]]*:'`),
 ]);
 
 /** Append-only soft-guidance card revisions. The authority check cannot mint policy or action rights. */

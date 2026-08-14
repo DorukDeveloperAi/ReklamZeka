@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { defaultSkillCatalogBinding } from "@/domain/orchestrator/skill-catalog";
 
 export const ORCHESTRATOR_CONVERSATION_VERSION = "orchestrator-conversation/1.0.0" as const;
 export const ORCHESTRATOR_PAGE_GUIDE_VERSION = "orchestrator-page-guide/1.0.0" as const;
@@ -74,6 +75,7 @@ export type OrchestratorConversationRepository = Readonly<{
     providerThreadRef: string | null;
     outcome: "completed" | "failed";
     failureCode: OrchestratorAdapterFailureCode | null;
+    skillCatalogBinding: ReturnType<typeof defaultSkillCatalogBinding>;
     createdAt: string;
   }>) => Promise<OrchestratorConversationSnapshot>;
 }>;
@@ -184,6 +186,7 @@ export class OrchestratorConversationService {
       if (!before) throw new OrchestratorConversationError("conversation_unavailable");
       const createdAt = this.clock().toISOString();
       const turnRef = this.ref("turn");
+      const skillCatalogBinding = defaultSkillCatalogBinding();
       const userMessageRef = this.ref("message");
       let result: Awaited<ReturnType<OrchestratorModelAdapter["execute"]>>;
       try {
@@ -194,14 +197,14 @@ export class OrchestratorConversationService {
         await this.repository.appendTurn({ workspaceId: input.workspaceId, userId: input.userId,
           conversationRef: before.conversationRef, turnRef, pageGuide: guide, userMessageRef,
           userContent: message, assistantMessageRef: null, assistantContent: null,
-          providerThreadRef: null, outcome: "failed", failureCode: code, createdAt });
+          providerThreadRef: null, outcome: "failed", failureCode: code, createdAt, skillCatalogBinding });
         throw new OrchestratorConversationError(code);
       }
       const conversation = await this.repository.appendTurn({ workspaceId: input.workspaceId,
         userId: input.userId, conversationRef: before.conversationRef, turnRef, pageGuide: guide,
         userMessageRef, userContent: message, assistantMessageRef: this.ref("message"),
         assistantContent: result.finalResponse, providerThreadRef: result.providerThreadRef,
-        outcome: "completed", failureCode: null, createdAt });
+        outcome: "completed", failureCode: null, createdAt, skillCatalogBinding });
       return Object.freeze({ contractVersion: ORCHESTRATOR_CONVERSATION_VERSION, conversation, authority: AUTHORITY });
     });
   }
