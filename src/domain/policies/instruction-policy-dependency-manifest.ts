@@ -30,6 +30,13 @@ const opaquePolicyContext = new Set([
   "action_proposal_units.summary_payload",
   "action_execution_attempts.admission_payload",
   "action_execution_events.event_payload",
+  // Append-only gate audit and skill-catalog snapshots are private historical
+  // context. Policy impact must not infer mutable authority from them.
+  "action_preparation_gate_snapshots.snapshot_payload",
+  "orchestrator_profile_revisions.payload",
+  "orchestrator_playbook_revisions.payload",
+  "orchestrator_conversation_turns.profile_snapshot",
+  "orchestrator_conversation_turns.manifest_snapshots",
   "robust_cohort_diagnostic_assets.profile",
   "robust_cohort_diagnostic_assets.member_evidence_refs",
   "robust_cohort_diagnostic_assets.result_payload",

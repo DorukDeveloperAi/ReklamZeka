@@ -61,6 +61,15 @@ const opaqueCategoryContext = new Set([
   // replay; archive handling must retain it as opaque historical context.
   "action_execution_attempts.admission_payload",
   "action_execution_events.event_payload",
+  // Private gate audit binds frozen hashes and a server-disabled flag; it is
+  // historical evidence, never a mutable category selection source.
+  "action_preparation_gate_snapshots.snapshot_payload",
+  // Skill catalog revisions and the turn-bound catalog snapshots are immutable
+  // UI/runtime history, not category dependency inputs.
+  "orchestrator_profile_revisions.payload",
+  "orchestrator_playbook_revisions.payload",
+  "orchestrator_conversation_turns.profile_snapshot",
+  "orchestrator_conversation_turns.manifest_snapshots",
   // A cohort diagnostic is an immutable replay artifact. Its compatibility
   // profile/member hashes are historical commitments, not mutable archive edges.
   "robust_cohort_diagnostic_assets.profile",
@@ -149,6 +158,11 @@ const columns = [
   "slice_rule_scenario_allocation_selections.selection_evidence",
   "slice_rule_scenario_allocation_selections.selection_payload",
   "slice_rule_budget_action_unit_bindings.binding_payload",
+  "action_preparation_gate_snapshots.snapshot_payload",
+  "orchestrator_profile_revisions.payload",
+  "orchestrator_playbook_revisions.payload",
+  "orchestrator_conversation_turns.profile_snapshot",
+  "orchestrator_conversation_turns.manifest_snapshots",
   // Delivery/payment alert records are historical evidence and checklist
   // state, never category or policy selection inputs.
   "delivery_health_alert_ledger_records.checklist_payload",

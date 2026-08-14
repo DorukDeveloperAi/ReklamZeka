@@ -28,6 +28,11 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "orchestrator_conversation_tombstones",
   "orchestrator_conversation_turns",
   "orchestrator_conversations",
+  "orchestrator_playbook_revisions",
+  "orchestrator_profile_revisions",
+  // Gate snapshots reference selection/action rows and must be removed before
+  // their immutable provenance parents during a tombstone-only purge.
+  "action_preparation_gate_snapshots",
   "slice_rule_workspace_drafts",
   "budget_pool_hierarchy_revisions",
   "slice_rule_budget_pool_bindings",
@@ -538,6 +543,15 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'orchestrator_conversations', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from orchestrator_conversations where workspace_id = ${workspaceId}::uuid
+      union all select 'orchestrator_playbook_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from orchestrator_playbook_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'orchestrator_profile_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from orchestrator_profile_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'action_preparation_gate_snapshots', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from action_preparation_gate_snapshots where workspace_id = ${workspaceId}::uuid
       union all select 'slice_rule_workspace_drafts', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from slice_rule_workspace_drafts where workspace_id = ${workspaceId}::uuid
@@ -603,6 +617,7 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     };
 
     // Children first. This ordering is stable to minimize lock-order deadlocks.
+    await remove(sql`with removed as (delete from action_preparation_gate_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from candidate_preview_binding_invalidations where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from candidate_preview_binding_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from candidate_preview_binding_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
@@ -656,6 +671,8 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from connection_secrets where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from daily_ad_metrics where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from sync_runs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from orchestrator_playbook_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from orchestrator_profile_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guidance_campaign_selection_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guidance_campaign_selection_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guidance_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
