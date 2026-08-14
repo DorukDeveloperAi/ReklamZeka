@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: d6adf7e15f89 -->
+<!-- durum-damga: 0cc0ad030d80 -->
 
 ## Künye
 
@@ -14,13 +14,14 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 176 |
+| iş commit'i (tüm geçmiş) | 177 |
 | ilk / son iş | 2026-08-06 / 2026-08-14 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-14 | `—` | DURUM türevlerini de merge=ours ile beyan et (agent-ide emsali) | `e709edff3` |
 | 2026-08-14 | `—` | aide türevlerini merge=ours ile beyan et — boot'u öldüren çakışmanın kök nedeni | `0b287b002` |
 | 2026-08-10 | `feat` | wire private analysis context composer | `add0d55b4` |
 | 2026-08-10 | `docs` | record ready source bundle evidence | `4c85d52ad` |
@@ -35,16 +36,15 @@
 | 2026-08-10 | `feat` | validate current Meta hierarchy config | `59c51bc78` |
 | 2026-08-10 | `feat` | add current source snapshot seam | `20cef249d` |
 | 2026-08-10 | `fix` | harden current cadence reader | `62daebfec` |
-| 2026-08-10 | `feat` | compose evidence-bound analysis contexts | `f64d77c3c` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
 - `feat        ` ████████████████████████ 43
 - `fix         ` ███ 6
-- `docs        ` ███ 5
+- `docs        ` ██ 4
 - `chore       ` ██ 3
+- `?           ` █ 2
 - `test        ` █ 2
-- `?           ` █ 1
 
 ## Planlar
 

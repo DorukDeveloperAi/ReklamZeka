@@ -4,6 +4,13 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "e709edff3",
+      "tarih": "2026-08-14",
+      "konu": "DURUM türevlerini de merge=ours ile beyan et (agent-ide emsali)",
+      "tur": "is",
+      "kapsam": []
+    },
+    {
       "hash": "0b287b002",
       "tarih": "2026-08-14",
       "konu": "aide türevlerini merge=ours ile beyan et — boot'u öldüren çakışmanın kök nedeni",
@@ -126,15 +133,6 @@
       "kapsam": [
         "fix"
       ]
-    },
-    {
-      "hash": "f64d77c3c",
-      "tarih": "2026-08-10",
-      "konu": "feat(a10): compose evidence-bound analysis contexts",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -148,22 +146,22 @@
     },
     {
       "kapsam": "docs",
-      "adet": 5
+      "adet": 4
     },
     {
       "kapsam": "chore",
       "adet": 3
     },
     {
-      "kapsam": "test",
+      "kapsam": "?",
       "adet": 2
     },
     {
-      "kapsam": "?",
-      "adet": 1
+      "kapsam": "test",
+      "adet": 2
     }
   ],
-  "isSayisi": 176,
+  "isSayisi": 177,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-14",
   "planlar": [
@@ -184,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "d6adf7e15f89"
+  "damga": "0cc0ad030d80"
 }
