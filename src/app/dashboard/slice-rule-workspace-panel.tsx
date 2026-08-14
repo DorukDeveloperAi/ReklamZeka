@@ -80,6 +80,12 @@ type ApprovalQueueState = Readonly<{ status: "loading" }>
   | Readonly<{ status: "ready"; selections: readonly ApprovalQueueSelection[] }>
   | Readonly<{ status: "queued"; selectionRef: string; persistence: "inserted" | "unchanged" }>
   | Readonly<{ status: "unavailable" | "error"; message: string }>;
+type SelectionCandidate = Readonly<{ candidateRef: string; scenarioLabel: string; beforeAmountMinor: number; afterAmountMinor: number; currency: string;
+  status: "selectable" | "blocked"; blockReason: "delivery_hold" | "market_boundary" | "scope_unavailable" | "stale_source" | "already_selected" | null }>;
+type SelectionState = Readonly<{ status: "loading" }>
+  | Readonly<{ status: "ready"; candidates: readonly SelectionCandidate[] }>
+  | Readonly<{ status: "selected"; selectionRef: string; persistence: "inserted" | "unchanged" }>
+  | Readonly<{ status: "unavailable" | "error"; message: string }>;
 type TemporalCandidate = Readonly<{ candidateRef: string; ruleSeriesRef: string; reviewCadence: "daily" | "weekly" | "monthly"; windowRef: string; capturedAt: string }>;
 type TemporalState = Readonly<{ status: "loading" }>
   | Readonly<{ status: "ready"; candidates: readonly TemporalCandidate[]; result: string | null }>
@@ -164,6 +170,16 @@ export function parseSliceRuleBudgetActionSelections(value: unknown): readonly A
       && typeof entry.selectedAt === "string") || !object(value.authority) || value.authority.canApprove !== false
     || value.authority.canExecute !== false || value.authority.canWriteMeta !== false) throw new Error("Onay kuyruğu seçim sözleşmesi güvenli değil.");
   return value.selections as ApprovalQueueSelection[];
+}
+export function parseSliceRuleScenarioSelectionCandidates(value: unknown): readonly SelectionCandidate[] {
+  if (!object(value) || value.contractVersion !== "slice-rule-scenario-selection/1.0.0" || !Array.isArray(value.candidates)
+    || value.candidates.length > 100 || !object(value.authority) || Object.keys(value.authority).length !== 5 || value.authority.canSelect !== false || value.authority.canApprove !== false
+    || value.authority.canExecute !== false || value.authority.canWriteMeta !== false || value.authority.canEnableAutomation !== false || !value.candidates.every((candidate) => object(candidate) && Object.keys(candidate).length === 7
+      && typeof candidate.candidateRef === "string" && /^selection_candidate_[a-f0-9]{64}$/.test(candidate.candidateRef)
+      && typeof candidate.scenarioLabel === "string" && Number.isSafeInteger(candidate.beforeAmountMinor) && Number.isSafeInteger(candidate.afterAmountMinor)
+      && typeof candidate.currency === "string" && ["selectable", "blocked"].includes(String(candidate.status))
+      && (candidate.blockReason === null || ["delivery_hold", "market_boundary", "scope_unavailable", "stale_source", "already_selected"].includes(String(candidate.blockReason))))) throw new Error("Senaryo seçimi sözleşmesi güvenli değil.");
+  return value.candidates as SelectionCandidate[];
 }
 function isScope(value: unknown): value is Scope {
   if (!object(value) || !["domestic", "international"].includes(String(value.market))
@@ -428,6 +444,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   const [message, setMessage] = useState<string | null>(null);
   const [impactRaw, setImpactRaw] = useState(EMPTY_BUDGET_COMMAND);
   const [impactState, setImpactState] = useState<ImpactState>({ status: "idle" });
+  const [selection, setSelection] = useState<SelectionState>({ status: "loading" });
   const [approvalQueue, setApprovalQueue] = useState<ApprovalQueueState>({ status: "loading" });
   const [temporal, setTemporal] = useState<TemporalState>({ status: "loading" });
   const [scopeCandidates, setScopeCandidates] = useState<ScopeCandidateState>({ status: "loading" });
@@ -437,6 +454,15 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   const command = useMemo(() => editableHead ? buildSliceRuleDraftCommand(form, head) : null, [editableHead, form, head]);
   const impactCommand = useMemo(() => buildSliceRuleBudgetImpactCommand(head, impactRaw), [head, impactRaw]);
   const update = <K extends keyof Form>(key: K, value: Form[K]) => setForm((current) => ({ ...current, [key]: value }));
+  const loadSelectionCandidates = useCallback(async () => {
+    try {
+      const response = await fetch("/api/slice-rule-scenario-selections", { cache: "no-store", credentials: "same-origin",
+        headers: { "X-ReklamZeka-Intent": "slice-rule-scenario-selection-read" } });
+      if (!response.ok) throw new Error("Seçilebilir senaryolar okunamadı.");
+      setSelection({ status: "ready", candidates: parseSliceRuleScenarioSelectionCandidates(await response.json()) });
+    } catch (reason) { setSelection({ status: "unavailable", message: reason instanceof Error ? reason.message : "Seçilebilir senaryolar okunamadı." }); }
+  }, []);
+  useEffect(() => { void loadSelectionCandidates(); }, [loadSelectionCandidates]);
   const loadApprovalSelections = useCallback(async () => {
     try {
       const response = await fetch("/api/slice-rule-budget-action-units", { cache: "no-store", credentials: "same-origin",
@@ -504,6 +530,19 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
       if (!response.ok || (payload.persistence !== "inserted" && payload.persistence !== "unchanged")) throw new Error(payload.error?.message ?? "İnsan onay kuyruğu isteği reddedildi.");
       setApprovalQueue({ status: "queued", selectionRef: selection.selectionRef, persistence: payload.persistence });
     } catch (reason) { setApprovalQueue({ status: "error", message: reason instanceof Error ? reason.message : "İnsan onay kuyruğu isteği reddedildi." }); }
+  };
+  const selectScenario = async (candidate: SelectionCandidate) => {
+    setSelection({ status: "loading" });
+    try {
+      const response = await fetch("/api/slice-rule-scenario-selections", { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-scenario-select" },
+        body: JSON.stringify({ command: { candidateRef: candidate.candidateRef, idempotencyKey: `selection.${candidate.candidateRef.slice(-20)}` } }) });
+      const payload = await response.json() as { selectionRef?: string; persistence?: "inserted" | "unchanged"; error?: { message?: string } };
+      if (!response.ok || !/^selection_[a-f0-9]{64}$/.test(String(payload.selectionRef)) || (payload.persistence !== "inserted" && payload.persistence !== "unchanged")) throw new Error(payload.error?.message ?? "Senaryo seçimi reddedildi.");
+      const selectionRef = String(payload.selectionRef);
+      setSelection({ status: "selected", selectionRef, persistence: payload.persistence });
+      await loadApprovalSelections();
+    } catch (reason) { setSelection({ status: "error", message: reason instanceof Error ? reason.message : "Senaryo seçimi reddedildi." }); }
   };
   const save = async () => {
     if (!command || !snapshot?.authority.canSaveDraft) return;
@@ -636,6 +675,18 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
             <span>Proposal: {impactState.result.persistence} · provenance: {impactState.result.provenance}</span>
             <span>Onay · action · otomasyon · Meta write: kapalı</span>
           </div> : null}
+          <div className={styles.impactResult} aria-label="Exact senaryo seçimi">
+            <strong>Exact senaryo ve allocation seçimi</strong>
+            <span>Yalnız sunucunun mevcut rule-linked öneriden türettiği tek allocation seçilir. Tarayıcı tutar, entity, kapsam, action veya approval göndermez.</span>
+            {selection.status === "loading" ? <span>Seçilebilir senaryolar doğrulanıyor…</span> : null}
+            {selection.status === "ready" && selection.candidates.length === 0 ? <span>Seçilebilir immutable senaryo yok.</span> : null}
+            {selection.status === "ready" ? selection.candidates.map((candidate) => <div className={styles.row} key={candidate.candidateRef}>
+              <span>{candidate.scenarioLabel} · {candidate.beforeAmountMinor} → {candidate.afterAmountMinor} {candidate.currency}{candidate.blockReason ? ` · ${candidate.blockReason.replaceAll("_", " ")}` : ""}</span>
+              <button className={styles.save} type="button" disabled={candidate.status !== "selectable"} onClick={() => void selectScenario(candidate)}>{candidate.status === "selectable" ? "Bu senaryoyu seç" : "Seçim kapalı"}</button>
+            </div>) : null}
+            {selection.status === "selected" ? <span>Seçim kaydedildi: {selection.selectionRef.slice(0, 20)}… · {selection.persistence}. Approval, action ve Meta write kapalıdır.</span> : null}
+            {(selection.status === "unavailable" || selection.status === "error") ? <span role="alert">{selection.message}</span> : null}
+          </div>
           <div className={styles.impactResult} aria-label="İnsan onay kuyruğu">
             <strong>Seçilmiş senaryoyu insan onay kuyruğuna gönder</strong>
             <span>Yalnız seçilmiş immutable allocation kullanılır; tutar, kampanya, policy veya Meta kimliği tarayıcıdan gönderilmez.</span>

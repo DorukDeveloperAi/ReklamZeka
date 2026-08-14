@@ -12,6 +12,7 @@ import {
   parseSliceRuleWorkspaceSnapshot,
   parseSliceScopeCandidates,
   parseSliceOperationalReadiness,
+  parseSliceRuleScenarioSelectionCandidates,
   SliceRuleWorkspaceSurface,
 } from "@/app/dashboard/slice-rule-workspace-panel";
 
@@ -27,6 +28,15 @@ const snapshot = { contractVersion: "slice-rule-workspace-http/1.0.0", items: [i
   canSaveDraft: true, ...closed } } as const;
 
 describe("Slice Rule Workspace panel", () => {
+  it("accepts only opaque, authority-closed scenario candidates and keeps delivery holds blocked", () => {
+    const candidateRef = `selection_candidate_${"a".repeat(64)}`;
+    const result = parseSliceRuleScenarioSelectionCandidates({ contractVersion: "slice-rule-scenario-selection/1.0.0", candidates: [{ candidateRef,
+      scenarioLabel: "scenario.keep", beforeAmountMinor: 100, afterAmountMinor: 120, currency: "TRY", status: "blocked", blockReason: "delivery_hold" }],
+      authority: { canSelect: false, canApprove: false, canExecute: false, canWriteMeta: false, canEnableAutomation: false } });
+    expect(result[0]).toMatchObject({ candidateRef, status: "blocked", blockReason: "delivery_hold" });
+    expect(() => parseSliceRuleScenarioSelectionCandidates({ contractVersion: "slice-rule-scenario-selection/1.0.0", candidates: [{ ...result[0], amount: 1 }],
+      authority: { canSelect: false, canApprove: false, canExecute: false, canWriteMeta: false, canEnableAutomation: false } })).toThrow("güvenli değil");
+  });
   it("renders mandatory/optional scope and makes the closed authority explicit", () => {
     const html = renderToStaticMarkup(createElement(SliceRuleWorkspaceSurface, { state: { status: "ready",
       snapshot: parseSliceRuleWorkspaceSnapshot(snapshot) }, onRetry: vi.fn(), onSaved: vi.fn(async () => undefined) }));
