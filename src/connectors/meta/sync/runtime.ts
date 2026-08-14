@@ -2,6 +2,8 @@ import { ConnectorError } from "@/connectors/contract";
 import { META_SYNC_STREAMS, stableHash, type MetaParentSyncRun, type MetaReadRequest, type MetaReadTransport, type MetaStreamRun, type MetaSyncError, type MetaSyncErrorReason, type MetaSyncRecord, type MetaSyncSlice } from "./types";
 import type { MetaSyncDurableKey, MetaSyncDurablePersistence } from "./persistence-adapter";
 import { MetaInventoryMaterializationError, parseMetaInventoryPage, type MetaInventoryPagePersistencePort } from "./inventory-materialization";
+import { MetaInsightMaterializationError, type MetaInsightSourcePagePersistencePort } from "./insights-materialization";
+import type { MetaCreativeSourcePagePersistencePort } from "./creative-content-runtime-persistence";
 
 type MutableStreamRun = { -readonly [Key in keyof MetaStreamRun]: MetaStreamRun[Key] } & { completedSliceIds: string[]; cursorBySlice: Record<string, { cursor: string | null; cursorId: string; updatedAt: string }> };
 type MutableParentRun = { -readonly [Key in keyof MetaParentSyncRun]: MetaParentSyncRun[Key] } & { streamRunIds: string[] };
@@ -53,6 +55,10 @@ export type MetaSyncRuntimeOptions = Readonly<{
   minPageSize?: number;
   persistence?: MetaSyncDurablePersistence;
   inventoryPagePersistence?: MetaInventoryPagePersistencePort;
+  insightPagePersistence?: MetaInsightSourcePagePersistencePort;
+  creativePagePersistence?: MetaCreativeSourcePagePersistencePort;
+  /** Server-owned boundary: stop only between checkpointed pages. */
+  deadlineAtEpochMs?: number;
 }>;
 export type MetaSyncResult = Readonly<{ parentRun: MetaParentSyncRun; streamRuns: readonly MetaStreamRun[]; inserted: number; updated: number; unchanged: number; writeNetworkCalls: 0 }>;
 
@@ -78,6 +84,7 @@ export class MetaPartialReadSyncRuntime {
   private readonly random: () => number;
   private readonly maxAttempts: number;
   private readonly minPageSize: number;
+  private readonly deadlineAtEpochMs: number | null;
 
   constructor(private readonly options: MetaSyncRuntimeOptions) {
     this.store = options.store ?? new InMemoryMetaSyncStore();
@@ -86,7 +93,9 @@ export class MetaPartialReadSyncRuntime {
     this.random = options.random ?? Math.random;
     this.maxAttempts = options.maxAttempts ?? 3;
     this.minPageSize = options.minPageSize ?? 10;
+    this.deadlineAtEpochMs = options.deadlineAtEpochMs ?? null;
     if (!Number.isSafeInteger(this.maxAttempts) || this.maxAttempts < 1) throw new Error("maxAttempts en az 1 olmalıdır");
+    if (this.deadlineAtEpochMs !== null && (!Number.isSafeInteger(this.deadlineAtEpochMs) || this.deadlineAtEpochMs <= 0)) throw new Error("Meta sync süre sınırı geçersiz");
   }
 
   async run(input: Readonly<{ parentRunId: string; workspaceId: string; connectionId: string; plan: readonly MetaSyncSlice[] }>): Promise<MetaSyncResult> {
@@ -128,7 +137,13 @@ export class MetaPartialReadSyncRuntime {
       }
       if (stream.completedSliceIds.length === slices.length) { stream.status = "completed"; stream.error = null; }
       this.store.saveStream(stream);
-      await this.persist(durableKey);
+      // A completed final stream is persisted atomically with the parent below.
+      // Persist intermediate/partial streams before the next external page so
+      // restart durability is preserved without writing an identical snapshot
+      // twice at the terminal boundary.
+      if (stream.status !== "completed" || this.hasPendingWork(parent, input.plan)) {
+        await this.persist(durableKey);
+      }
     }
     const streams = this.store.streamsFor(parent.id);
     parent.status = streams.every((stream) => stream.status === "completed")
@@ -146,6 +161,17 @@ export class MetaPartialReadSyncRuntime {
     let pageSize = slice.pageSize;
     let inserted = 0; let updated = 0; let unchanged = 0;
     do {
+      // Return a normal, resumable partial result instead of depending on an
+      // external process kill. An in-flight GET remains bounded by transport.
+      if (this.deadlineAtEpochMs !== null && this.now().valueOf() >= this.deadlineAtEpochMs) {
+        stream.cursorBySlice[slice.id] = { cursor, cursorId: stableHash({ sliceId: slice.id, cursor }), updatedAt: this.now().toISOString() };
+        this.store.saveStream(stream);
+        await this.persist(durableKey);
+        return { completed: false, inserted, updated, unchanged, error: {
+          reason: "timeout", retryable: true,
+          message: "Meta salt-okunur koşum süre penceresine ulaştı; checkpoint sonraki koşumda devam edecek",
+        } };
+      }
       const cursorId = stableHash({ sliceId: slice.id, cursor });
       const request: MetaReadRequest = { method: "GET", stream: slice.stream, accountId: slice.accountId, entityLevel: slice.entityLevel, dateStart: slice.dateStart, dateStop: slice.dateStop, cursor, limit: pageSize, correlation: { parentRunId: parent.id, streamRunId: stream.id, accountId: slice.accountId, sliceId: slice.id, cursorId } };
       const pageResult = await this.fetchBounded(request);
@@ -183,6 +209,54 @@ export class MetaPartialReadSyncRuntime {
           } };
         }
       }
+      if (this.options.insightPagePersistence && slice.stream === "insights" && slice.entityLevel !== "account") {
+        try {
+          // The canonical writer has an exact sync-run/slice FK. Persist the current (not next)
+          // cursor first so a first page is materialized against an existing immutable scope.
+          stream.cursorBySlice[slice.id] = { cursor, cursorId, updatedAt: this.now().toISOString() };
+          this.store.saveStream(stream);
+          await this.persist(durableKey);
+          await this.options.insightPagePersistence.writeSourcePage({
+            workspaceId: parent.workspaceId, connectionId: parent.connectionId, externalAccountId: slice.accountId,
+            entityLevel: slice.entityLevel, parentRunId: parent.id, sliceId: slice.id, cursorId, observedAt,
+            records: page.records,
+          });
+        } catch (error) {
+          const reason = error instanceof MetaInsightMaterializationError ? error.code : "repository_write";
+          return { completed: false, inserted, updated, unchanged, error: {
+            reason: "malformed_response", retryable: false,
+            // The code is a closed parser/repository classification only. It
+            // deliberately excludes Graph payload, account IDs, SQL and error
+            // detail so an operator can repair a stalled GET-only hydration.
+            message: `Meta insight canonical materialization doğrulaması başarısız: ${reason}`,
+          } };
+        }
+      }
+      if (this.options.creativePagePersistence && slice.stream === "creative_post" && slice.entityLevel === "ad") {
+        try {
+          if (!page.sourceGraphVersion || !page.fieldCatalogVersion) {
+            throw new Error("Creative provenance metadata is missing");
+          }
+          // The canonical writer's checkpoint is FK-bound to this exact
+          // durable slice. Make the current cursor visible before it writes;
+          // this mirrors the insight path and never advances to nextCursor.
+          stream.cursorBySlice[slice.id] = { cursor, cursorId, updatedAt: this.now().toISOString() };
+          this.store.saveStream(stream);
+          await this.persist(durableKey);
+          await this.options.creativePagePersistence.writeSourcePage({
+            workspaceId: parent.workspaceId, connectionId: parent.connectionId,
+            externalAccountId: slice.accountId, parentRunId: parent.id,
+            sliceId: slice.id, cursorId, nextCursor: page.nextCursor, observedAt,
+            sourceGraphVersion: page.sourceGraphVersion, fieldCatalogVersion: page.fieldCatalogVersion,
+            records: page.records,
+          });
+        } catch {
+          return { completed: false, inserted, updated, unchanged, error: {
+            reason: "malformed_response", retryable: false,
+            message: "Meta creative/Page/Instagram canonical materialization doğrulaması başarısız",
+          } };
+        }
+      }
       for (const payload of page.records) {
         const externalId = typeof payload.id === "string" ? payload.id : stableHash(payload);
         const identity = `${parent.workspaceId}:${parent.connectionId}:${slice.accountId}:${slice.stream}:${slice.entityLevel}:${slice.dateStart ?? "all"}:${slice.dateStop ?? "all"}:${externalId}`;
@@ -194,7 +268,9 @@ export class MetaPartialReadSyncRuntime {
           snapshotHash: stableHash(payload),
           // Canonical inventory persistence already holds the validated fields;
           // the generic restart ledger needs only identity and hash evidence.
-          payload: this.options.inventoryPagePersistence && slice.stream === "inventory" ? {} : payload,
+          payload: (this.options.inventoryPagePersistence && slice.stream === "inventory")
+            || (this.options.insightPagePersistence && slice.stream === "insights")
+            || (this.options.creativePagePersistence && slice.stream === "creative_post") ? {} : payload,
           firstSeenAt: this.now().toISOString(),
           lastSeenAt: this.now().toISOString(),
         });
@@ -208,8 +284,17 @@ export class MetaPartialReadSyncRuntime {
     } while (cursor !== null);
     stream.completedSliceIds.push(slice.id);
     this.store.saveStream(stream);
-    await this.persist(durableKey);
     return { completed: true, inserted, updated, unchanged, error: null };
+  }
+
+  private hasPendingWork(parent: MutableParentRun, plan: readonly MetaSyncSlice[]): boolean {
+    return parent.streamRunIds.some((streamId) => {
+      const stream = this.store.stream(streamId);
+      if (!stream || stream.status === "completed") return false;
+      return plan.some((slice) => slice.stream === stream.stream
+        && slice.accountId === stream.accountId
+        && !stream.completedSliceIds.includes(slice.id));
+    });
   }
 
   private async persist(key: MetaSyncDurableKey): Promise<void> {
@@ -220,9 +305,19 @@ export class MetaPartialReadSyncRuntime {
   private async fetchBounded(request: MetaReadRequest): Promise<{ page: Awaited<ReturnType<MetaReadTransport["get"]>> } | { error: MetaSyncError }> {
     let lastError: MetaSyncError | null = null;
     for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
+      // A Graph request that already began is bounded by the transport timeout,
+      // but a retry must not extend a server-owned run window indefinitely.
+      if (this.deadlineAtEpochMs !== null && this.now().valueOf() >= this.deadlineAtEpochMs) {
+        return { error: { reason: "timeout", retryable: true,
+          message: "Meta salt-okunur koşum süre penceresine ulaştı; checkpoint sonraki koşumda devam edecek" } };
+      }
       try { return { page: await this.options.transport.get(request) }; }
       catch (error) {
         lastError = classifyMetaSyncError(error);
+        if (this.deadlineAtEpochMs !== null && this.now().valueOf() >= this.deadlineAtEpochMs) {
+          return { error: { reason: "timeout", retryable: true,
+            message: "Meta salt-okunur koşum süre penceresine ulaştı; checkpoint sonraki koşumda devam edecek" } };
+        }
         if (!lastError.retryable || attempt === this.maxAttempts) break;
         const delay = Math.round(100 * 2 ** (attempt - 1) * (0.5 + this.random()));
         await this.sleep(delay);

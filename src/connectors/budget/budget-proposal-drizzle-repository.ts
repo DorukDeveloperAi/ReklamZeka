@@ -15,6 +15,8 @@ import type {
   FrozenBudgetContext,
 } from "@/application/budget-proposal-service";
 import { hashBudgetProposal, verifyBudgetProposal } from "@/application/budget-proposal-service";
+import { DrizzleSliceRuleBudgetProposalBindingRepository } from "@/connectors/campaigns/slice-rule-budget-proposal-binding-drizzle-repository";
+import { verifySliceRuleWorkspaceDraft, type SliceRuleWorkspaceDraft } from "@/application/slice-rule-workspace-service";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -330,6 +332,32 @@ export class DrizzleBudgetProposalRepository implements BudgetFrozenContextPort,
         )
       `);
       return Object.freeze({ outcome: "inserted" as const, auditAppended: true });
+    });
+  }
+
+  async appendRuleLinkedDraft(input: Readonly<{
+    proposal: BudgetProposal;
+    actorId: string;
+    occurredAt: string;
+    draft: SliceRuleWorkspaceDraft;
+    bindingIdempotencyKey: string;
+  }>): Promise<Readonly<{ outcome: "inserted" | "unchanged"; bindingOutcome: "inserted" | "unchanged"; auditAppended: boolean }>> {
+    if (!verifyBudgetProposal(input.proposal) || !verifySliceRuleWorkspaceDraft(input.draft)
+      || input.draft.workspaceId !== input.proposal.scope.workspaceId || !UUID.test(input.actorId)
+      || !/^\d{4}-\d{2}-\d{2}T.*Z$/.test(input.occurredAt) || !Number.isFinite(Date.parse(input.occurredAt))) {
+      throw new BudgetProposalRepositoryError("invalid_input");
+    }
+    return this.database.transaction(async (transaction) => {
+      // Both nested repository calls are savepoints on this outer transaction:
+      // a binding/audit failure rolls the proposal insertion back as well.
+      const budget = new DrizzleBudgetProposalRepository(transaction);
+      const persisted = await budget.appendDraft({ proposal: input.proposal, actorId: input.actorId, occurredAt: input.occurredAt });
+      const binding = await new DrizzleSliceRuleBudgetProposalBindingRepository(transaction as Database).append({
+        draft: input.draft, proposal: input.proposal, actorId: input.actorId,
+        boundAt: new Date(input.occurredAt).toISOString(), idempotencyKey: input.bindingIdempotencyKey,
+      });
+      return Object.freeze({ outcome: persisted.outcome, bindingOutcome: binding.outcome,
+        auditAppended: persisted.auditAppended || binding.outcome === "inserted" });
     });
   }
 

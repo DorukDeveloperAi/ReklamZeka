@@ -2,7 +2,7 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { createPolicyScopeSnapshot, createTrustedPolicyCatalog } from "@/application/trusted-policy-composition";
+import { createFrozenPolicyManualLock, createPolicyScopeSnapshot, createTrustedPolicyCatalog } from "@/application/trusted-policy-composition";
 import { DrizzleTrustedPolicyAuthorityRepository } from
   "@/connectors/policies/trusted-policy-authority-drizzle-repository";
 
@@ -10,6 +10,20 @@ const workspaceId = "11111111-1111-4111-8111-111111111111";
 function stable(value: unknown): unknown { return Array.isArray(value) ? value.map(stable) : value && typeof value === "object"
   ? Object.fromEntries(Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, stable(v)])) : value; }
 function digest(value: unknown) { return createHash("sha256").update(JSON.stringify(stable(value))).digest("hex"); }
+function authorityRow(catalog: ReturnType<typeof createTrustedPolicyCatalog>, scope: ReturnType<typeof createPolicyScopeSnapshot>,
+  manualLocks: readonly ReturnType<typeof createFrozenPolicyManualLock>[] = [], overrides: Record<string, unknown> = {}) {
+  const core = { schemaVersion: "tenant-authority-snapshot/1.0.0" as const, snapshotRef: "authority_snapshot_empty",
+    repository: { ref: "repository_policy_authority", revision: "42", verified: true },
+    authority: { productionAuthoritySourceBound: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false },
+    validity: { notBefore: "2026-08-09T00:00:00.000Z", expiresAt: "2026-08-10T00:00:00.000Z" },
+    policyAuthority: { catalogHash: catalog.catalogHash, scope, manualLocks } };
+  const snapshotHash = digest(core);
+  return { snapshot_id: "22222222-2222-4222-8222-222222222222", snapshot_ref: core.snapshotRef, snapshot_hash: snapshotHash,
+    repository_ref: core.repository.ref, repository_revision: core.repository.revision, verified_at: core.validity.notBefore,
+    expires_at: core.validity.expiresAt, snapshot_payload: { ...core, snapshotHash },
+    catalog_id: "33333333-3333-4333-8333-333333333333", catalog_revision_hash: catalog.catalogHash, catalog_payload: catalog,
+    binding_rows: [], account_group_refs: [], manual_lock_rows: [], current_snapshot_count: 1, ...overrides };
+}
 
 describe("DrizzleTrustedPolicyAuthorityRepository", () => {
   it("uses protected current heads and requires an exact immutable ref/hash pair for replay", async () => {
@@ -63,6 +77,18 @@ describe("DrizzleTrustedPolicyAuthorityRepository", () => {
     }
   });
 
+  it("scopes identical authority facts to their immutable snapshot without weakening tenant keys", () => {
+    const migration = readFileSync("drizzle/20260810193000_policy_authority_binding_snapshot_uniqueness.sql", "utf8");
+    expect(migration).toContain('DROP INDEX IF EXISTS "policy_authority_bindings_exact_unique"');
+    expect(migration).toContain('"policy_authority_bindings_snapshot_exact_unique"');
+    expect(migration).toContain('"authority_snapshot_id", "policy_revision_id", "binding_kind", "binding_ref", "binding_version"');
+    expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|TRUNCATE|DELETE FROM/);
+    const renderedSchema = readFileSync("src/db/schema.ts", "utf8");
+    expect(renderedSchema).toContain('policy_authority_bindings_snapshot_exact_unique');
+    expect(renderedSchema).toContain('policy_authority_bindings_snapshot_scope_fk');
+    expect(renderedSchema).toContain('policy_authority_bindings_catalog_scope_fk');
+  });
+
   it("fails closed when no current repository-verified tenant snapshot exists", async () => {
     const execute = vi.fn(async () => execute.mock.calls.length === 1 ? { rows: [{ id: workspaceId }] } : { rows: [] });
     await expect(new DrizzleTrustedPolicyAuthorityRepository({ execute } as never).load({ workspaceId,
@@ -75,12 +101,55 @@ describe("DrizzleTrustedPolicyAuthorityRepository", () => {
       "policy_authority_catalogs"]) expect(rendered).toContain(family);
   });
 
+  it("renders persisted authority timestamps as canonical UTC ISO values", async () => {
+    const execute = vi.fn(async () => execute.mock.calls.length === 1 ? { rows: [{ id: workspaceId }] } : { rows: [] });
+    await expect(new DrizzleTrustedPolicyAuthorityRepository({ execute } as never).load({ workspaceId,
+      accountRef: "account_primary", evaluatedAt: "2026-08-09T12:00:00.000Z" }))
+      .rejects.toMatchObject({ code: "not_found" });
+    const rendered = new PgDialect().sqlToQuery((execute.mock.calls as unknown[][])[1]![0] as never).sql;
+    expect(rendered).toContain("to_char(snapshot.verified_at at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')");
+    expect(rendered).toContain("to_char(snapshot.expires_at at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')");
+    expect(rendered).toContain("to_char(latest_lock.recorded_at at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')");
+    expect(rendered).not.toContain("snapshot.verified_at::text");
+    expect(rendered).not.toContain("snapshot.expires_at::text");
+    expect(rendered).not.toContain("latest_lock.recorded_at::text");
+  });
+
   it("rejects malformed scope before reading tenant records", async () => {
     const execute = vi.fn();
     await expect(new DrizzleTrustedPolicyAuthorityRepository({ execute } as never).load({ workspaceId: "bad",
       accountRef: "account_primary", evaluatedAt: "2026-08-09T12:00:00.000Z" }))
       .rejects.toMatchObject({ code: "invalid_input" });
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("accepts only a completely empty relational backing for a no-policy authority", async () => {
+    const emptyCatalog = createTrustedPolicyCatalog({ workspaceRef: "workspace_primary", catalogRef: "authority_catalog_empty",
+      catalogVersion: 1, instructionPolicyRegistryHash: "a".repeat(64), bindings: [] });
+    const emptyScope = createPolicyScopeSnapshot({ workspaceRef: "workspace_primary", evaluatedAt: "2026-08-09T12:00:00.000Z",
+      accountGroupRefs: [], objectiveRefs: [], topicRefs: [], canonicalObjective: null });
+    const load = async (row: Record<string, unknown>) => {
+      const execute = vi.fn(async () => execute.mock.calls.length === 1 ? { rows: [{ id: workspaceId }] } : { rows: [row] });
+      return new DrizzleTrustedPolicyAuthorityRepository({ execute } as never).load({ workspaceId,
+        accountRef: "account_primary", evaluatedAt: "2026-08-09T13:00:00.000Z" });
+    };
+    await expect(load(authorityRow(emptyCatalog, emptyScope))).resolves.toMatchObject({ catalog: { bindings: [] },
+      scope: { accountGroupRefs: [], topicRefs: [] }, manualLocks: [] });
+
+    const nonemptyCatalog = createTrustedPolicyCatalog({ workspaceRef: "workspace_primary", catalogRef: "authority_catalog_bound",
+      catalogVersion: 1, instructionPolicyRegistryHash: "a".repeat(64), bindings: [{ policyRef: "policy_primary", policyVersion: 1,
+        policyHash: "b".repeat(64), authorityTier: "metric_rule", decision: { decisionKey: "budget", positionKey: "hold" },
+        categoryProfileRef: null, categoryProfileVersion: null, categoryProfileHash: null, manualLockRef: null }] });
+    await expect(load(authorityRow(nonemptyCatalog, emptyScope))).rejects.toMatchObject({ code: "corrupt_store" });
+
+    const groupedScope = createPolicyScopeSnapshot({ workspaceRef: "workspace_primary", evaluatedAt: "2026-08-09T12:00:00.000Z",
+      accountGroupRefs: ["account_group_primary"], objectiveRefs: [], topicRefs: [], canonicalObjective: null });
+    await expect(load(authorityRow(emptyCatalog, groupedScope, [], { account_group_refs: ["account_group_primary"] })))
+      .rejects.toMatchObject({ code: "corrupt_store" });
+
+    const lock = createFrozenPolicyManualLock({ workspaceRef: "workspace_primary", lockRef: "lock_primary", policyRef: "policy_primary",
+      policyVersion: 1, policyHash: "b".repeat(64), evaluatedAt: emptyScope.evaluatedAt });
+    await expect(load(authorityRow(emptyCatalog, emptyScope, [lock]))).rejects.toMatchObject({ code: "corrupt_store" });
   });
 
   it("binds the repository composition closure to the loaded account", async () => {
@@ -93,6 +162,7 @@ describe("DrizzleTrustedPolicyAuthorityRepository", () => {
     const core = { schemaVersion: "tenant-authority-snapshot/1.0.0", snapshotRef: "authority_snapshot_primary",
       repository: { ref: "repository_policy_authority", revision: "42", verified: true },
       authority: { productionAuthoritySourceBound: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false },
+      validity: { notBefore: "2026-08-09T00:00:00.000Z", expiresAt: "2026-08-10T00:00:00.000Z" },
       policyAuthority: { catalogHash: catalog.catalogHash, scope, manualLocks: [] } };
     const snapshotHash = digest(core); const row = { snapshot_id: "22222222-2222-4222-8222-222222222222",
       snapshot_ref: core.snapshotRef, snapshot_hash: snapshotHash, repository_ref: core.repository.ref, repository_revision: "42",
@@ -104,9 +174,23 @@ describe("DrizzleTrustedPolicyAuthorityRepository", () => {
           bindingVersion: "1", bindingHash: "d".repeat(64), authorityTierRef: "authority_tier_metric", decisionRef: "decision_budget" }],
       account_group_refs: ["account_group_primary"], manual_lock_rows: [], current_snapshot_count: 1 };
     const execute = vi.fn(async () => execute.mock.calls.length === 1 ? { rows: [{ id: workspaceId }] } : { rows: [row] });
-    const loaded = await new DrizzleTrustedPolicyAuthorityRepository({ execute } as never).load({ workspaceId,
-      accountRef: "account_primary", evaluatedAt: "2026-08-09T12:00:00.000Z" });
-    expect(() => loaded.compose({ workspaceId, capturedAt: "2026-08-09T12:00:00.000Z",
+    const repository = new DrizzleTrustedPolicyAuthorityRepository({ execute } as never);
+    const loaded = await repository.load({ workspaceId,
+      accountRef: "account_primary", evaluatedAt: "2026-08-09T13:00:00.000Z" });
+    // The snapshot's immutable authority scope predates the read snapshot but
+    // its signed validity interval covers it, so a pre-materialized proof is usable.
+    expect(loaded.scope.evaluatedAt).toBe("2026-08-09T12:00:00.000Z");
+    expect(() => loaded.compose({ workspaceId, capturedAt: "2026-08-09T13:00:00.000Z",
       identity: { accountRef: "account_other" } } as never, {} as never)).toThrowError(expect.objectContaining({ code: "workspace_scope_mismatch" }));
+    const project = (repository as unknown as { project(value: unknown, input: unknown): unknown }).project.bind(repository);
+    for (const invalid of [
+      { ...row, snapshot_payload: { ...row.snapshot_payload, validity: { expiresAt: row.expires_at } } },
+      { ...row, snapshot_payload: { ...row.snapshot_payload, validity: { notBefore: "2026-08-09T14:00:00.000Z", expiresAt: row.expires_at } } },
+      { ...row, expires_at: "2026-08-09T12:30:00.000Z", snapshot_payload: { ...row.snapshot_payload,
+        validity: { notBefore: row.verified_at, expiresAt: "2026-08-09T12:30:00.000Z" } } },
+    ]) {
+      expect(() => project(invalid, { workspaceId, accountRef: "account_primary", evaluatedAt: "2026-08-09T13:00:00.000Z" }))
+        .toThrowError(expect.objectContaining({ code: "corrupt_store" }));
+    }
   });
 });

@@ -4,8 +4,9 @@ import { BudgetLabAgentContract } from "@/application/budget-lab-agent-contract"
 import { BudgetLabReadService } from "@/application/budget-lab-read-service";
 import { BudgetLabDraftService } from "@/application/budget-lab-draft-service";
 import { DrizzleBudgetProposalRepository } from "@/connectors/budget/budget-proposal-drizzle-repository";
-import { resolveTrustedLocalDraftPrincipal, resolveTrustedLocalReadPrincipal, type LocalDecisionRoomConfig } from "@/server/local-decision-room-runtime";
-import { budgetLabNotConfiguredResponse, createBudgetLabHttpHandler, createBudgetLabPostHandler } from "@/server/budget-lab-http";
+import { LocalDecisionRoomBoundaryError, resolveTrustedLocalDraftPrincipal, resolveTrustedLocalReadPrincipal, type LocalDecisionRoomConfig } from "@/server/local-decision-room-runtime";
+import { budgetLabNotConfiguredResponse, budgetLabSessionRequiredResponse, createBudgetLabHttpHandler, createBudgetLabPostHandler } from "@/server/budget-lab-http";
+import { LocalSessionCapabilityError } from "@/security/local-session-capability";
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -25,8 +26,9 @@ export function createLocalBudgetLabRouteHandler(input: Readonly<{
         ),
         resolvePrincipal: async () => bound.principal,
       })(request);
-    } catch {
-      return budgetLabNotConfiguredResponse();
+    } catch (reason) {
+      return reason instanceof LocalDecisionRoomBoundaryError || reason instanceof LocalSessionCapabilityError
+        ? budgetLabSessionRequiredResponse() : budgetLabNotConfiguredResponse();
     }
   };
 }
@@ -46,8 +48,9 @@ export function createLocalBudgetLabPostHandler(input: Readonly<{
         ),
         resolvePrincipal: async () => bound.principal,
       })(request);
-    } catch {
-      return budgetLabNotConfiguredResponse();
+    } catch (reason) {
+      return reason instanceof LocalDecisionRoomBoundaryError || reason instanceof LocalSessionCapabilityError
+        ? budgetLabSessionRequiredResponse() : budgetLabNotConfiguredResponse();
     }
   };
 }

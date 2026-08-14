@@ -5,6 +5,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type {
   ApprovalActionType,
   ApprovalBeforeAfter,
+  ApprovalQueueDetailRecord,
   ApprovalQueueRecord,
   ApprovalQueueRepository,
 } from "@/application/approval-queue-read-service";
@@ -28,7 +29,12 @@ const CURRENCY = /^[A-Z]{3}$/;
 const DECIMAL = /^(0|[1-9]\d{0,29})(?:\.(\d{1,12}))?$/;
 const CODE = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const PRIVATE_REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
+const PUBLIC_ENTITY_REF = /^entity_[a-f0-9]{16}$/;
 const ACTION_TYPES: readonly ApprovalActionType[] = ["status_pause", "status_activate", "budget_decrease", "budget_increase"];
+const UUID_TEXT = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i;
+const FULL_HASH_TEXT = /\b[a-f0-9]{64}\b/i;
+const META_ID_TEXT = /\b(?:act_|campaign_|adset_|ad_)\d{5,}\b/i;
+const CREDENTIAL_TEXT = /\b(?:rzs1\.|EA[A-Za-z0-9]{30,}|Bearer\s+)[A-Za-z0-9._-]*/i;
 
 type SourceRow = Readonly<{
   unit_ref: unknown;
@@ -40,12 +46,16 @@ type SourceRow = Readonly<{
   campaign_id: unknown;
   ad_set_id: unknown;
   ad_id: unknown;
+  campaign_scope_id: unknown;
   policy_snapshot_id: unknown;
   proposed_at: unknown;
   expires_at: unknown;
   current_event_type: unknown;
   action_plan_payload: unknown;
   dependencies: unknown;
+  summary_payload?: unknown;
+  summary_hash?: unknown;
+  decision_timeline?: unknown;
 }>;
 
 type DependencySource = Readonly<{ unit_ref: unknown; status: unknown }>;
@@ -86,6 +96,18 @@ function instant(value: unknown): string {
   const candidate = value instanceof Date ? value.toISOString() : value;
   if (typeof candidate !== "string" || !Number.isFinite(Date.parse(candidate))) fail("corrupt_store");
   return new Date(candidate).toISOString();
+}
+
+/**
+ * The stored summary is hash-bound, but its labels still cross a public read
+ * boundary. Validate them here too so a direct repository consumer cannot
+ * accidentally bypass the service-level presentation guard.
+ */
+function publicSummaryText(value: unknown): string {
+  if (typeof value !== "string" || !value.trim() || value !== value.trim() || value.length > 240
+    || /[\u0000-\u001f\u007f]/.test(value) || UUID_TEXT.test(value) || FULL_HASH_TEXT.test(value)
+    || META_ID_TEXT.test(value) || CREDENTIAL_TEXT.test(value) || /^\d{8,}$/.test(value)) fail("corrupt_store");
+  return value;
 }
 
 function publicRef(kind: "account" | "entity" | "autonomy", workspaceId: string, internalId: unknown): string {
@@ -221,8 +243,9 @@ function currentStatus(eventType: unknown): ApprovalQueueRecord["status"] {
 }
 
 function mapRow(row: SourceRow, workspaceId: string): ApprovalQueueRecord {
-  exact(row, ["unit_ref", "bundle_ref", "initial_state", "risk", "action_type", "ad_account_id", "campaign_id",
-    "ad_set_id", "ad_id", "policy_snapshot_id", "proposed_at", "expires_at", "current_event_type",
+  const { summary_payload: _summaryPayload, summary_hash: _summaryHash, decision_timeline: _decisionTimeline, ...baseRow } = row;
+  exact(baseRow, ["unit_ref", "bundle_ref", "initial_state", "risk", "action_type", "ad_account_id", "campaign_id",
+    "ad_set_id", "ad_id", "campaign_scope_id", "policy_snapshot_id", "proposed_at", "expires_at", "current_event_type",
     "action_plan_payload", "dependencies"]);
   if (typeof row.unit_ref !== "string" || !UNIT_REF.test(row.unit_ref)
     || typeof row.bundle_ref !== "string" || !BUNDLE_REF.test(row.bundle_ref)
@@ -243,6 +266,7 @@ function mapRow(row: SourceRow, workspaceId: string): ApprovalQueueRecord {
     || plan.capabilities.canGrantApproval !== false || plan.capabilities.canAccessRawGraph !== false
     || typeof plan.contextHash !== "string" || !HASH.test(plan.contextHash)) fail("corrupt_store");
   const binding = entityBinding(row, plan);
+  const campaignId = uuid(row.campaign_scope_id);
   const createdAt = instant(row.proposed_at);
   const expiresAt = instant(row.expires_at);
   if (expiresAt <= createdAt) fail("corrupt_store");
@@ -254,6 +278,7 @@ function mapRow(row: SourceRow, workspaceId: string): ApprovalQueueRecord {
     risk: row.risk as "K2" | "K3",
     actionType,
     accountRef: publicRef("account", workspaceId, row.ad_account_id),
+    campaignRef: publicRef("entity", workspaceId, campaignId),
     entity: Object.freeze({ type: binding.type, ref: publicRef("entity", workspaceId, binding.id), label: null }),
     beforeAfter: beforeAfter(actionType, plan.action),
     autonomy: Object.freeze({
@@ -266,6 +291,52 @@ function mapRow(row: SourceRow, workspaceId: string): ApprovalQueueRecord {
     dependencies: dependencies(row.dependencies),
     summaryCode: `approval.${actionType}`,
   });
+}
+
+function evidenceKind(ref: unknown): ApprovalQueueDetailRecord["sourceEvidence"][number]["kind"] {
+  if (typeof ref !== "string" || !PRIVATE_REF.test(ref)) fail("corrupt_store");
+  if (ref.startsWith("budget_proposal_")) return "budget_proposal";
+  if (ref.startsWith("slice_rule_draft_")) return "slice_rule";
+  if (ref.startsWith("delivery_alert_")) return "delivery_alert";
+  return "other";
+}
+
+function detailRow(row: SourceRow, workspaceId: string): ApprovalQueueDetailRecord {
+  if (!("summary_payload" in row) || !("summary_hash" in row) || !("decision_timeline" in row)) fail("corrupt_store");
+  const base = mapRow(row, workspaceId);
+  const summary = row.summary_payload;
+  exact(summary, ["safety", "before", "after", "evidence"]);
+  if (row.summary_hash === null || typeof row.summary_hash !== "string" || !HASH.test(row.summary_hash)
+    || digest(summary) !== row.summary_hash || summary.safety !== "public_safe" || !Array.isArray(summary.evidence)
+    || summary.evidence.length > 50) fail("corrupt_store");
+  exact(summary.before, ["label", "value"]);
+  exact(summary.after, ["label", "value"]);
+  publicSummaryText(summary.before.label);
+  publicSummaryText(summary.before.value);
+  publicSummaryText(summary.after.label);
+  publicSummaryText(summary.after.value);
+  const sourceEvidence = summary.evidence.map((candidate) => {
+    exact(candidate, ["evidenceRef", "label"]);
+    return Object.freeze({ kind: evidenceKind(candidate.evidenceRef), label: publicSummaryText(candidate.label), integrity: "hash_verified" as const });
+  });
+  if (new Set(summary.evidence.map((candidate) => (candidate as Record<string, unknown>).evidenceRef)).size !== sourceEvidence.length) fail("corrupt_store");
+  if (!Array.isArray(row.decision_timeline) || row.decision_timeline.length > 49) fail("corrupt_store");
+  let previousAt = Date.parse(base.createdAt);
+  const decisions = row.decision_timeline.map((candidate) => {
+    exact(candidate, ["event_type", "occurred_at", "reason_code"]);
+    const kind: Record<string, "approved" | "rejected" | "changes_requested"> = {
+      unit_approved: "approved", unit_rejected: "rejected", unit_changes_requested: "changes_requested",
+    };
+    if (typeof candidate.event_type !== "string" || !Object.hasOwn(kind, candidate.event_type)
+      || candidate.reason_code !== null && (typeof candidate.reason_code !== "string" || !CODE.test(candidate.reason_code))) fail("corrupt_store");
+    const occurredAt = instant(candidate.occurred_at);
+    if (Date.parse(occurredAt) < previousAt) fail("corrupt_store");
+    previousAt = Date.parse(occurredAt);
+    return Object.freeze({ decision: kind[candidate.event_type]!, occurredAt, reasonCode: candidate.reason_code as string | null });
+  });
+  return Object.freeze({ ...base, sourceEvidence: Object.freeze(sourceEvidence), decisionHistory: Object.freeze([
+    Object.freeze({ decision: "proposed" as const, occurredAt: base.createdAt, reasonCode: null }), ...decisions,
+  ]) });
 }
 
 function validateInput(value: unknown, keys: readonly string[]): asserts value is Record<string, unknown> {
@@ -288,9 +359,12 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
   }
 
   async list(input: Parameters<ApprovalQueueRepository["list"]>[0]): Promise<readonly ApprovalQueueRecord[]> {
-    validateInput(input, ["workspaceId", "before", "limit"]);
+    validateInput(input, ["workspaceId", "entityRef", "campaignRef", "before", "limit"]);
     this.assertBoundWorkspace(input.workspaceId);
     if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 101) fail("invalid_input");
+    if (input.entityRef !== null && (typeof input.entityRef !== "string" || !PUBLIC_ENTITY_REF.test(input.entityRef))) fail("invalid_input");
+    if (input.campaignRef !== null && (typeof input.campaignRef !== "string" || !PUBLIC_ENTITY_REF.test(input.campaignRef))
+      || input.entityRef !== null && input.campaignRef !== null) fail("invalid_input");
     if (input.before !== null && (!input.before || typeof input.before !== "object"
       || Object.keys(input.before).sort().join("|") !== "createdAt|unitRef"
       || !Number.isFinite(Date.parse(input.before.createdAt)) || !UNIT_REF.test(input.before.unitRef))) fail("invalid_input");
@@ -299,6 +373,7 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
     const result = rows(await this.database.execute(sql`
       select unit.unit_ref, bundle.bundle_ref, unit.initial_state, unit.risk, unit.action_type,
         unit.ad_account_id, unit.campaign_id, unit.ad_set_id, unit.ad_id,
+        coalesce(unit.campaign_id, unit_ad_set.campaign_id, unit_ad.campaign_id) as campaign_scope_id,
         bundle.policy_snapshot_id, unit.proposed_at, unit.expires_at,
         current_event.event_type as current_event_type, unit.action_plan_payload,
         coalesce((
@@ -326,6 +401,10 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
       from action_proposal_units unit
       join action_proposal_bundles bundle
         on bundle.workspace_id = unit.workspace_id and bundle.id = unit.bundle_id
+      left join meta_ad_sets unit_ad_set
+        on unit_ad_set.workspace_id = unit.workspace_id and unit_ad_set.id = unit.ad_set_id
+      left join meta_ads unit_ad
+        on unit_ad.workspace_id = unit.workspace_id and unit_ad.id = unit.ad_id
       left join lateral (
         select event.value ->> 'eventType' as event_type
         from action_approval_decision_events decision
@@ -335,6 +414,10 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
         order by decision.ordinal desc, (event.value ->> 'sequence')::integer desc limit 1
       ) current_event on true
       where unit.workspace_id = ${this.workspaceId}::uuid
+        and (${input.entityRef}::text is null or concat('entity_', substring(encode(digest(${this.workspaceId}::text || ':entity:' ||
+          coalesce(unit.campaign_id, unit.ad_set_id, unit.ad_id)::text, 'sha256'), 'hex') from 1 for 16)) = ${input.entityRef}::text)
+        and (${input.campaignRef}::text is null or concat('entity_', substring(encode(digest(${this.workspaceId}::text || ':entity:' ||
+          coalesce(unit.campaign_id, unit_ad_set.campaign_id, unit_ad.campaign_id)::text, 'sha256'), 'hex') from 1 for 16)) = ${input.campaignRef}::text)
         and (${beforeAt}::timestamptz is null
           or (unit.proposed_at, unit.unit_ref) < (${beforeAt}::timestamptz, ${beforeRef}::text))
       order by unit.proposed_at desc, unit.unit_ref desc
@@ -343,15 +426,26 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
     return Object.freeze(result.map((row) => mapRow(row, this.workspaceId)));
   }
 
-  async get(input: Parameters<ApprovalQueueRepository["get"]>[0]): Promise<ApprovalQueueRecord | null> {
+  async get(input: Parameters<ApprovalQueueRepository["get"]>[0]): Promise<ApprovalQueueDetailRecord | null> {
     validateInput(input, ["workspaceId", "unitRef"]);
     this.assertBoundWorkspace(input.workspaceId);
     if (!UNIT_REF.test(input.unitRef)) fail("invalid_input");
     const result = rows(await this.database.execute(sql`
       select unit.unit_ref, bundle.bundle_ref, unit.initial_state, unit.risk, unit.action_type,
         unit.ad_account_id, unit.campaign_id, unit.ad_set_id, unit.ad_id,
+        coalesce(unit.campaign_id, unit_ad_set.campaign_id, unit_ad.campaign_id) as campaign_scope_id,
         bundle.policy_snapshot_id, unit.proposed_at, unit.expires_at,
-        current_event.event_type as current_event_type, unit.action_plan_payload,
+        current_event.event_type as current_event_type, unit.action_plan_payload, unit.summary_payload, unit.summary_hash,
+        coalesce((
+          select jsonb_agg(jsonb_build_object('event_type', event.value ->> 'eventType',
+            'occurred_at', event.value ->> 'occurredAt', 'reason_code', event.value ->> 'reasonCode')
+            order by decision.ordinal, (event.value ->> 'sequence')::integer)
+          from action_approval_decision_events decision
+          cross join lateral jsonb_array_elements(decision.event_payloads) event(value)
+          where decision.workspace_id = unit.workspace_id and decision.bundle_id = unit.bundle_id
+            and event.value ->> 'unitRef' = unit.unit_ref
+            and event.value ->> 'eventType' in ('unit_approved', 'unit_rejected', 'unit_changes_requested')
+        ), '[]'::jsonb) as decision_timeline,
         coalesce((
           select jsonb_agg(jsonb_build_object('unit_ref', edge.dependency_unit_ref, 'status',
             case dependency_event.event_type
@@ -377,6 +471,10 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
       from action_proposal_units unit
       join action_proposal_bundles bundle
         on bundle.workspace_id = unit.workspace_id and bundle.id = unit.bundle_id
+      left join meta_ad_sets unit_ad_set
+        on unit_ad_set.workspace_id = unit.workspace_id and unit_ad_set.id = unit.ad_set_id
+      left join meta_ads unit_ad
+        on unit_ad.workspace_id = unit.workspace_id and unit_ad.id = unit.ad_id
       left join lateral (
         select event.value ->> 'eventType' as event_type
         from action_approval_decision_events decision
@@ -389,6 +487,6 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
       limit 2
     `));
     if (result.length > 1) fail("corrupt_store");
-    return result[0] ? mapRow(result[0], this.workspaceId) : null;
+    return result[0] ? detailRow(result[0], this.workspaceId) : null;
   }
 }

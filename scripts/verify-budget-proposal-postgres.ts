@@ -1,17 +1,17 @@
-import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-import { buildEffectiveCampaignContext } from "@/analyses/effective-campaign-context";
 import { BudgetLabDraftService } from "@/application/budget-lab-draft-service";
 import { BudgetProposalService, type BudgetProposalInput } from "@/application/budget-proposal-service";
-import { DrizzleEffectiveCampaignContextRepository } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
 import { DrizzleBudgetProposalRepository } from "@/connectors/budget/budget-proposal-drizzle-repository";
+import { DrizzleWorkspaceTombstonePurgePort } from "@/connectors/meta/workspace-tombstone-purge-drizzle-adapter";
+import { DrizzleWorkspaceTombstoneStore, WorkspaceTombstoneService } from "@/connectors/meta/workspace-tombstone-drizzle-service";
 import * as schema from "@/db/schema";
 import type { BudgetScenarioDefinition } from "@/domain/budget/scenario-composer";
-import { buildEffectiveGuidancePack, createGuidanceRegistry } from "@/domain/guidance/registry";
+import { materializeCurrentEffectiveAnalysisContextSourceFixture } from "./support/current-effective-analysis-context-source-fixture";
+import { materializeReadyBudgetContext } from "./support/materialize-ready-budget-context";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const databaseUrl = process.env.DATABASE_URL?.trim();
@@ -19,23 +19,16 @@ if (!databaseUrl) throw new Error("DATABASE_URL yapılandırılmadı");
 
 const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 20_000 });
 const database = drizzle(pool, { schema });
-const rollback = Symbol("rollback");
-const workspaceId = randomUUID();
-const foreignWorkspaceId = randomUUID();
-const actorId = randomUUID();
-const connectionId = randomUUID();
-const sourceId = randomUUID();
-const accountId = randomUUID();
-const campaignId = randomUUID();
-const snapshotRef = `snapshot_${"a".repeat(20)}`;
-const now = "2026-08-07T12:00:00.000Z";
+const rollback = Symbol("budget-proposal-rollback");
 
 const evidence = {
-  tablesApplied: false, exactContextBinding: false, mappingSuppression: false,
+  tablesApplied: false, sourceBoundContext: false, readyL3Context: false, exactContextBinding: false, mappingSuppression: false,
   mappingIndependentScenarios: false, idempotency: false, revisionChain: false,
   draftAuditAtomic: false, draftIdempotency: false,
   publicProjectionSafe: false, crossTenantBlocked: false, immutableRows: false,
-  rlsAndGrants: false, metaCalls: 0, executionCalls: 0, temporaryRowsCommitted: true,
+  rlsAndGrants: false, metaCalls: 0, executionCalls: 0, proposalRowsRolledBack: false,
+  fixtureCommitted: false, tombstoneCleanup: false, purgeCandidateCount: -1, foreignPurgeCandidateCount: -1,
+  activeSurvivorCount: -1, foreignActiveSurvivorCount: -1,
 };
 
 function rows(result: unknown): readonly Record<string, unknown>[] {
@@ -72,7 +65,16 @@ function scenario(kind: BudgetScenarioDefinition["kind"], requestedBudgetMinor: 
   };
 }
 
+const originalFetch = globalThis.fetch;
+let fixture: Awaited<ReturnType<typeof materializeCurrentEffectiveAnalysisContextSourceFixture>> | null = null;
 try {
+  globalThis.fetch = (async () => { evidence.metaCalls += 1; throw new Error("network_not_allowed"); }) as typeof fetch;
+  fixture = await materializeCurrentEffectiveAnalysisContextSourceFixture(database as never);
+  const sourceFixture = fixture;
+  evidence.fixtureCommitted = true;
+  const prepared = await materializeReadyBudgetContext(database, sourceFixture);
+  evidence.sourceBoundContext = prepared.ready;
+  evidence.readyL3Context = prepared.ready;
   await database.transaction(async (transaction) => {
     const applied = rows(await transaction.execute(sql`
       select to_regclass('public.budget_proposal_versions')::text as versions,
@@ -81,57 +83,7 @@ try {
     evidence.tablesApplied = Boolean(applied?.versions && applied?.alternatives);
     if (!evidence.tablesApplied) throw new Error("Budget proposal migration uygulanmadı");
 
-    await transaction.insert(schema.workspaces).values([
-      { id: workspaceId, name: "Budget proposal verifier" },
-      { id: foreignWorkspaceId, name: "Foreign budget proposal verifier" },
-    ]);
-    await transaction.insert(schema.users).values({ id: actorId, email: `budget-verifier-${actorId}@example.invalid` });
-    await transaction.insert(schema.metaConnections).values({
-      id: connectionId, workspaceId, externalConnectionKey: "budget-verifier", displayName: "Budget verifier",
-      graphApiVersion: "v1", fieldCatalogVersion: "fields-v1", status: "active",
-    });
-    await transaction.insert(schema.dataSources).values({
-      id: sourceId, workspaceId, metaConnectionId: connectionId, platform: "meta_ads",
-      externalAccountId: "account_safe", displayName: "Budget verifier",
-    });
-    await transaction.insert(schema.adAccounts).values({
-      id: accountId, workspaceId, dataSourceId: sourceId, externalAccountId: "account_safe",
-      name: "Budget verifier", currency: "TRY", timezone: "Europe/Istanbul",
-    });
-    await transaction.insert(schema.adCampaigns).values({
-      id: campaignId, workspaceId, adAccountId: accountId,
-      externalCampaignId: "campaign_safe", name: "Budget verifier campaign",
-    });
-    await transaction.insert(schema.metaChangeSnapshots).values({
-      workspaceId, metaConnectionId: connectionId, adAccountId: accountId,
-      publicRef: snapshotRef, snapshotHash: "b".repeat(64), schemaVersion: 1,
-      fieldCatalogVersion: "fields-v1", capturedAt: new Date(now), canonicalPayload: { entities: [] },
-      safeAggregate: { entityCounts: { campaign: 1, adSet: 0, ad: 0 }, knownFieldCount: 1, unknownFieldCount: 0 },
-    });
-    const registry = createGuidanceRegistry({ workspaceId, sources: [], cards: [], bindings: [], sets: [] });
-    const guidance = buildEffectiveGuidancePack(registry, {
-      workspaceId, accountId: "account_safe", objective: "sales", internalCategoryIds: [],
-      entity: { type: "campaign", id: "campaign_safe" }, topics: [], requiredTopics: [], evaluatedAt: now,
-      budget: { maxCards: 10, maxSources: 10, maxCharacters: 10_000 },
-    });
-    const context = buildEffectiveCampaignContext({
-      workspaceId, capturedAt: now,
-      identity: { connectionRef: "budget-verifier", accountRef: "account_safe", campaignRef: "campaign_safe", entityRef: "campaign_safe", entityType: "campaign", hierarchyRefs: ["campaign_safe"] },
-      meta: {
-        objective: { state: "known", value: "sales" }, optimizationEvent: { state: "known", value: "purchase" },
-        configuredStatus: { state: "known", value: "ACTIVE" }, effectiveStatus: { state: "known", value: "ACTIVE" },
-        budgetOwnerRef: { state: "known", value: "campaign_safe" }, targetingSignature: { state: "unknown", reason: "not_loaded" },
-        actorRef: { state: "known", value: "actor_safe" }, destinationRef: { state: "known", value: null },
-      },
-      categories: [], guidance, policies: [],
-      cadence: { profileRef: "cadence_safe", decision: "eligible", reason: "window_open", cooldownUntil: null },
-      data: { trustStatus: "ready", snapshotRefs: [snapshotRef], featureRefs: [snapshotRef], windowRefs: ["window_safe"], blockers: [] },
-      history: { changeRefs: [], decisionRefs: [], experimentRefs: [], practiceRefs: [], outcomeRefs: [] },
-      versions: { metaCatalog: "meta_v1", categoryResolver: "category_v1", guidanceRegistry: "guidance_v1", metricCatalog: "metric_v1", formulaCatalog: "formula_v1", timeframeResolver: "timeframe_v1", instructionPolicyRegistry: "9".repeat(64), promotionRegistry: "8".repeat(64) },
-    });
-    await new DrizzleEffectiveCampaignContextRepository(transaction as never).save(context);
-
-    const scope = { workspaceId, adAccountId: accountId, campaignId, contextHash: context.contextHash };
+    const scope = { workspaceId: sourceFixture.workspaceId, adAccountId: sourceFixture.adAccountId, campaignId: sourceFixture.campaignId, contextHash: prepared.contextHash };
     const repository = new DrizzleBudgetProposalRepository(transaction as never);
     const service = new BudgetProposalService(repository, repository);
     const base: BudgetProposalInput = {
@@ -145,7 +97,7 @@ try {
       },
     };
     const first = await service.create(base);
-    evidence.exactContextBinding = first.proposal.scope.contextHash === context.contextHash;
+    evidence.exactContextBinding = first.proposal.scope.contextHash === prepared.contextHash;
     evidence.mappingSuppression = first.proposal.alternatives[2]?.status === "suppressed";
     evidence.mappingIndependentScenarios = first.proposal.alternatives.slice(0, 2).every((item) => item.status === "composed");
     evidence.idempotency = (await service.create(base)).persistence === "unchanged";
@@ -157,33 +109,33 @@ try {
     const draftService = new BudgetLabDraftService(repository, repository);
     const draftCommand = {
       ...base,
-      scope: { adAccountId: accountId, campaignId, contextHash: context.contextHash },
+      scope: { adAccountId: sourceFixture.adAccountId, campaignId: sourceFixture.campaignId, contextHash: prepared.contextHash },
       seriesRef: "budget.series.draft-verifier", revision: 1, previousProposalHash: "GENESIS",
       idempotencyKey: "budget.verifier.draft.r1", createdAt: "2026-08-07T14:00:00.000Z",
     } as const;
-    const draft = await draftService.saveDraft(workspaceId, actorId, "2026-08-07T14:00:01.000Z", draftCommand);
-    const replay = await draftService.saveDraft(workspaceId, actorId, "2026-08-07T14:00:02.000Z", draftCommand);
+    const draft = await draftService.saveDraft(sourceFixture.workspaceId, sourceFixture.actorId, "2026-08-07T14:00:01.000Z", draftCommand);
+    const replay = await draftService.saveDraft(sourceFixture.workspaceId, sourceFixture.actorId, "2026-08-07T14:00:02.000Z", draftCommand);
     const auditRows = rows(await transaction.execute(sql`
       select action, resource_id, previous_hash, event_hash from audit_events
-      where workspace_id = ${workspaceId}::uuid and action = 'budget.draft_saved'
+      where workspace_id = ${sourceFixture.workspaceId}::uuid and action = 'budget.draft_saved'
     `));
     evidence.draftAuditAtomic = draft.persistence === "inserted" && draft.auditAppended
       && auditRows.length === 1 && auditRows[0]?.resource_id === draft.proposal.proposalRef
       && typeof auditRows[0]?.previous_hash === "string" && typeof auditRows[0]?.event_hash === "string";
     evidence.draftIdempotency = replay.persistence === "unchanged" && !replay.auditAppended && auditRows.length === 1;
-    const publicView = await repository.loadPublic({ workspaceId, seriesRef: base.seriesRef });
+    const publicView = await repository.loadPublic({ workspaceId: sourceFixture.workspaceId, seriesRef: base.seriesRef });
     const serialized = JSON.stringify(publicView);
-    evidence.publicProjectionSafe = ![workspaceId, accountId, campaignId, context.contextHash,
-      "account_safe", "campaign_safe", "ankara", "dubai"]
+    evidence.publicProjectionSafe = ![sourceFixture.workspaceId, sourceFixture.adAccountId, sourceFixture.campaignId, prepared.contextHash,
+      sourceFixture.accountRef, sourceFixture.campaignRef, "ankara", "dubai"]
       .some((secret) => serialized.includes(secret)) && publicView.writeOperations === 0;
     try {
-      await new DrizzleBudgetProposalRepository(transaction as never).loadPublic({ workspaceId: foreignWorkspaceId, seriesRef: base.seriesRef });
+      await new DrizzleBudgetProposalRepository(transaction as never).loadPublic({ workspaceId: sourceFixture.foreignWorkspaceId, seriesRef: base.seriesRef });
     } catch {
       evidence.crossTenantBlocked = true;
     }
     try {
       await transaction.transaction(async (savepoint) => {
-        await savepoint.execute(sql`update budget_proposal_versions set series_ref = 'tampered' where workspace_id = ${workspaceId}::uuid`);
+        await savepoint.execute(sql`update budget_proposal_versions set series_ref = 'tampered' where workspace_id = ${sourceFixture.workspaceId}::uuid`);
       });
     } catch {
       evidence.immutableRows = true;
@@ -201,19 +153,45 @@ try {
   });
 } catch (error) {
   if (error !== rollback) throw error;
+} finally {
+  globalThis.fetch = originalFetch;
+  if (fixture) {
+    const residual = rows(await database.execute(sql`
+      select (select count(*)::int from budget_proposal_versions where workspace_id = ${fixture.workspaceId}::uuid)
+        + (select count(*)::int from budget_proposal_alternatives where workspace_id = ${fixture.workspaceId}::uuid)
+        + (select count(*)::int from audit_events where workspace_id = ${fixture.workspaceId}::uuid and action = 'budget.draft_saved') as count
+    `))[0];
+    evidence.proposalRowsRolledBack = Number(residual?.count) === 0;
+    const purge = new DrizzleWorkspaceTombstonePurgePort();
+    const tombstones = new WorkspaceTombstoneService(new DrizzleWorkspaceTombstoneStore(database as never, purge),
+      { authorize: async (input) => input.approvalRef === "ephemeral-fixture-approved" }, fixture.actorId, 60_000);
+    for (const workspaceId of [fixture.workspaceId, fixture.foreignWorkspaceId]) {
+      const plan = await tombstones.dryRun(workspaceId, new Date().toISOString());
+      await tombstones.execute({ planRef: plan.planRef, approvalRef: "ephemeral-fixture-approved", now: new Date().toISOString() });
+    }
+    evidence.purgeCandidateCount = (await purge.inspect(database as never, fixture.workspaceId)).candidateCount;
+    evidence.foreignPurgeCandidateCount = (await purge.inspect(database as never, fixture.foreignWorkspaceId)).candidateCount;
+    const survivors = rows(await database.execute(sql`
+      select count(*) filter (where id = ${fixture.workspaceId}::uuid and lifecycle_state = 'active')::int as primary_count,
+        count(*) filter (where id = ${fixture.foreignWorkspaceId}::uuid and lifecycle_state = 'active')::int as foreign_count
+      from workspaces where id in (${fixture.workspaceId}::uuid, ${fixture.foreignWorkspaceId}::uuid)
+    `))[0];
+    evidence.activeSurvivorCount = Number(survivors?.primary_count ?? -1);
+    evidence.foreignActiveSurvivorCount = Number(survivors?.foreign_count ?? -1);
+    evidence.tombstoneCleanup = evidence.purgeCandidateCount === 0 && evidence.foreignPurgeCandidateCount === 0
+      && evidence.activeSurvivorCount === 0 && evidence.foreignActiveSurvivorCount === 0;
+  }
 }
-
-const residual = rows(await database.execute(sql`
-  select (select count(*)::int from workspaces where id in (${workspaceId}::uuid, ${foreignWorkspaceId}::uuid))
-    + (select count(*)::int from users where id = ${actorId}::uuid)
-    + (select count(*)::int from budget_proposal_versions where workspace_id = ${workspaceId}::uuid)
-    + (select count(*)::int from budget_proposal_alternatives where workspace_id = ${workspaceId}::uuid)
-    + (select count(*)::int from audit_events where workspace_id = ${workspaceId}::uuid) as count
-`))[0];
-evidence.temporaryRowsCommitted = Number(residual?.count) !== 0;
 await pool.end();
 
-if (Object.entries(evidence).some(([key, value]) => key.endsWith("Calls") ? value !== 0 : value !== (key === "temporaryRowsCommitted" ? false : true))) {
+const evidencePassed = evidence.tablesApplied && evidence.sourceBoundContext && evidence.readyL3Context
+  && evidence.exactContextBinding && evidence.mappingSuppression && evidence.mappingIndependentScenarios
+  && evidence.idempotency && evidence.revisionChain && evidence.draftAuditAtomic && evidence.draftIdempotency
+  && evidence.publicProjectionSafe && evidence.crossTenantBlocked && evidence.immutableRows && evidence.rlsAndGrants
+  && evidence.metaCalls === 0 && evidence.executionCalls === 0 && evidence.proposalRowsRolledBack && evidence.fixtureCommitted
+  && evidence.tombstoneCleanup && evidence.purgeCandidateCount === 0 && evidence.foreignPurgeCandidateCount === 0
+  && evidence.activeSurvivorCount === 0 && evidence.foreignActiveSurvivorCount === 0;
+if (!evidencePassed) {
   throw new Error(`Budget proposal doğrulaması başarısız: ${JSON.stringify(evidence)}`);
 }
 console.log(JSON.stringify(evidence));

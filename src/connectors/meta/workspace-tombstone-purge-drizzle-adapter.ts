@@ -24,6 +24,18 @@ type DeleteCountRow = Readonly<{ count: number | string }>;
  * It intentionally excludes workspaces, audit_events, users and meta_connections.
  */
 export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
+  "orchestrator_conversation_messages",
+  "orchestrator_conversation_tombstones",
+  "orchestrator_conversation_turns",
+  "orchestrator_conversations",
+  "slice_rule_workspace_drafts",
+  "budget_pool_hierarchy_revisions",
+  "slice_rule_budget_pool_bindings",
+  "slice_rule_allocation_entity_bindings",
+  "slice_rule_scenario_allocation_selections",
+  "slice_rule_budget_action_unit_bindings",
+  "slice_rule_budget_proposal_bindings",
+  "delivery_health_alert_ledger_records",
   "local_agent_handoffs",
   "local_agent_sessions",
   "memberships",
@@ -61,11 +73,17 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "business_outcome_entity_heads",
   "business_outcome_signals",
   "business_outcome_batches",
+  "candidate_preview_binding_invalidations",
+  "candidate_preview_binding_heads",
+  "candidate_preview_binding_revisions",
   "progressive_formalization_revisions",
+  "normalization_workbench_revisions",
   "guidance_sources",
   "guidance_cards",
   "guidance_bindings",
   "guidance_sets",
+  "guidance_campaign_selection_heads",
+  "guidance_campaign_selection_revisions",
   "autonomy_rule_revisions",
   "action_guardrail_policy_revisions",
   "approval_policy_definition_revisions",
@@ -74,6 +92,16 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "advised_practice_events",
   "effective_campaign_contexts",
   "effective_campaign_context_components",
+  "creative_fatigue_config_diagnostic_assets",
+  "meta_creative_window_insight_snapshots",
+  "meta_creative_config_snapshots",
+  "creative_diagnostic_definition_revisions",
+  "creative_diagnostic_settlement_policies",
+  "creative_diagnostic_settlement_policy_revisions",
+  "robust_cohort_diagnostic_assets",
+  "frozen_diagnostic_evidence",
+  "effective_campaign_policy_compositions",
+  "effective_campaign_policy_composition_items",
   "effective_campaign_context_invalidations",
   "budget_proposal_versions",
   "budget_proposal_alternatives",
@@ -85,6 +113,8 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "action_proposal_initial_events",
   "action_approval_decision_events",
   "action_approval_evidence_grants",
+  "action_execution_attempts",
+  "action_execution_events",
   "audience_preset_revisions",
   "audience_preset_authoring_revisions",
   "promotion_template_revisions",
@@ -115,6 +145,11 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "meta_sync_runs",
   "meta_sync_slices",
   "meta_sync_record_ledger",
+  "deterministic_feature_snapshot_invalidations",
+  "deterministic_window_snapshot_features",
+  "deterministic_window_snapshots",
+  "deterministic_feature_snapshot_sources",
+  "deterministic_feature_snapshots",
   "meta_daily_insights",
   "meta_daily_insight_metrics",
   "daily_ad_metrics",
@@ -157,6 +192,8 @@ async function deleteCount(executor: DrizzleExecutor, statement: ReturnType<type
  * serializable, locked caller transaction. No table name is catalog-derived.
  */
 export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePurgePort {
+  /** Optional bounded observer for verifier diagnostics; it receives no SQL or row data. */
+  constructor(private readonly diagnostics?: Readonly<{ onDeletePhase(phase: number): void }>) {}
   async inspect(executor: DrizzleExecutor, workspaceId: string): Promise<WorkspaceTombstonePurgeEvidence> {
     if (!workspaceId) throw new WorkspaceTombstoneError("invalid_input");
 
@@ -209,9 +246,21 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'strict_instruction_policy_revisions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from strict_instruction_policy_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'candidate_preview_binding_invalidations', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from candidate_preview_binding_invalidations where workspace_id = ${workspaceId}::uuid
+      union all select 'candidate_preview_binding_heads', count(*)::int,
+        coalesce(md5(string_agg(workspace_id::text || ':' || formalization_ref || ':' || xmin::text || ':' || ctid::text, ',' order by workspace_id, formalization_ref)), md5(''))
+      from candidate_preview_binding_heads where workspace_id = ${workspaceId}::uuid
+      union all select 'candidate_preview_binding_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from candidate_preview_binding_revisions where workspace_id = ${workspaceId}::uuid
       union all select 'progressive_formalization_revisions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from progressive_formalization_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'normalization_workbench_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from normalization_workbench_revisions where workspace_id = ${workspaceId}::uuid
       union all select 'tenant_authority_snapshots', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from tenant_authority_snapshots where workspace_id = ${workspaceId}::uuid
       union all select 'tenant_authority_snapshot_heads', count(*)::int, coalesce(md5(string_agg(workspace_id::text || ':' || xmin::text || ':' || ctid::text, ',' order by workspace_id)), md5('')) from tenant_authority_snapshot_heads where workspace_id = ${workspaceId}::uuid
       union all select 'account_groups', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from account_groups where workspace_id = ${workspaceId}::uuid
@@ -243,6 +292,12 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'guidance_sets', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from guidance_sets where workspace_id = ${workspaceId}::uuid
+      union all select 'guidance_campaign_selection_heads', count(*)::int,
+        coalesce(md5(string_agg(workspace_id::text || ':' || ad_account_id::text || ':' || campaign_id::text || ':' || revision_id::text || ':' || xmin::text || ':' || ctid::text, ',' order by workspace_id, ad_account_id, campaign_id)), md5(''))
+      from guidance_campaign_selection_heads where workspace_id = ${workspaceId}::uuid
+      union all select 'guidance_campaign_selection_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from guidance_campaign_selection_revisions where workspace_id = ${workspaceId}::uuid
       union all select 'autonomy_rule_revisions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from autonomy_rule_revisions where workspace_id = ${workspaceId}::uuid
@@ -267,6 +322,36 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'effective_campaign_context_components', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from effective_campaign_context_components where workspace_id = ${workspaceId}::uuid
+      union all select 'creative_fatigue_config_diagnostic_assets', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from creative_fatigue_config_diagnostic_assets where workspace_id = ${workspaceId}::uuid
+      union all select 'meta_creative_window_insight_snapshots', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from meta_creative_window_insight_snapshots where workspace_id = ${workspaceId}::uuid
+      union all select 'meta_creative_config_snapshots', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from meta_creative_config_snapshots where workspace_id = ${workspaceId}::uuid
+      union all select 'creative_diagnostic_definition_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from creative_diagnostic_definition_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'creative_diagnostic_settlement_policies', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from creative_diagnostic_settlement_policies where workspace_id = ${workspaceId}::uuid
+      union all select 'creative_diagnostic_settlement_policy_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from creative_diagnostic_settlement_policy_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'robust_cohort_diagnostic_assets', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from robust_cohort_diagnostic_assets where workspace_id = ${workspaceId}::uuid
+      union all select 'frozen_diagnostic_evidence', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from frozen_diagnostic_evidence where workspace_id = ${workspaceId}::uuid
+      union all select 'effective_campaign_policy_compositions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from effective_campaign_policy_compositions where workspace_id = ${workspaceId}::uuid
+      union all select 'effective_campaign_policy_composition_items', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from effective_campaign_policy_composition_items where workspace_id = ${workspaceId}::uuid
       union all select 'effective_campaign_context_invalidations', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from effective_campaign_context_invalidations where workspace_id = ${workspaceId}::uuid
@@ -298,6 +383,12 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'action_approval_evidence_grants', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from action_approval_evidence_grants where workspace_id = ${workspaceId}::uuid
+      union all select 'action_execution_attempts', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from action_execution_attempts where workspace_id = ${workspaceId}::uuid
+      union all select 'action_execution_events', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from action_execution_events where workspace_id = ${workspaceId}::uuid
       union all select 'audience_preset_authoring_revisions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from audience_preset_authoring_revisions where workspace_id = ${workspaceId}::uuid
@@ -391,6 +482,21 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'meta_daily_insights', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from meta_daily_insights where workspace_id = ${workspaceId}::uuid
+      union all select 'deterministic_feature_snapshots', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from deterministic_feature_snapshots where workspace_id = ${workspaceId}::uuid
+      union all select 'deterministic_feature_snapshot_sources', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from deterministic_feature_snapshot_sources where workspace_id = ${workspaceId}::uuid
+      union all select 'deterministic_feature_snapshot_invalidations', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from deterministic_feature_snapshot_invalidations where workspace_id = ${workspaceId}::uuid
+      union all select 'deterministic_window_snapshot_features', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from deterministic_window_snapshot_features where workspace_id = ${workspaceId}::uuid
+      union all select 'deterministic_window_snapshots', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from deterministic_window_snapshots where workspace_id = ${workspaceId}::uuid
       union all select 'meta_daily_insight_metrics', count(*)::int,
         coalesce(md5(string_agg(metric.id::text || ':' || metric.xmin::text || ':' || metric.ctid::text, ',' order by metric.id)), md5(''))
       from meta_daily_insight_metrics metric
@@ -420,6 +526,42 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'local_agent_sessions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from local_agent_sessions where workspace_id = ${workspaceId}::uuid
+      union all select 'orchestrator_conversation_messages', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from orchestrator_conversation_messages where workspace_id = ${workspaceId}::uuid
+      union all select 'orchestrator_conversation_tombstones', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from orchestrator_conversation_tombstones where workspace_id = ${workspaceId}::uuid
+      union all select 'orchestrator_conversation_turns', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from orchestrator_conversation_turns where workspace_id = ${workspaceId}::uuid
+      union all select 'orchestrator_conversations', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from orchestrator_conversations where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_rule_workspace_drafts', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from slice_rule_workspace_drafts where workspace_id = ${workspaceId}::uuid
+      union all select 'budget_pool_hierarchy_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from budget_pool_hierarchy_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_rule_budget_pool_bindings', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from slice_rule_budget_pool_bindings where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_rule_allocation_entity_bindings', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from slice_rule_allocation_entity_bindings where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_rule_scenario_allocation_selections', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from slice_rule_scenario_allocation_selections where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_rule_budget_action_unit_bindings', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from slice_rule_budget_action_unit_bindings where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_rule_budget_proposal_bindings', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from slice_rule_budget_proposal_bindings where workspace_id = ${workspaceId}::uuid
+      union all select 'delivery_health_alert_ledger_records', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from delivery_health_alert_ledger_records where workspace_id = ${workspaceId}::uuid
       union all select 'operational_events', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from operational_events where workspace_id = ${workspaceId}::uuid
@@ -452,19 +594,27 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     }
 
     let purgedRowCount = 0;
+    let phase = 0;
     const remove = async (statement: ReturnType<typeof sql>) => {
+      this.diagnostics?.onDeletePhase(++phase);
       const count = await deleteCount(executor, statement);
       purgedRowCount += count;
       return count;
     };
 
     // Children first. This ordering is stable to minimize lock-order deadlocks.
+    await remove(sql`with removed as (delete from candidate_preview_binding_invalidations where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from candidate_preview_binding_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from candidate_preview_binding_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from progressive_formalization_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from normalization_workbench_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from strict_instruction_policy_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from instruction_policy_raw_provenance where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from autonomy_rule_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_guardrail_policy_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_compatibility_artifact_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from action_execution_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from action_execution_attempts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_approval_evidence_grants where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_approval_decision_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_proposal_dependencies where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
@@ -479,6 +629,11 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from promotion_template_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from promotion_template_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from audience_preset_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from deterministic_feature_snapshot_invalidations where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from deterministic_window_snapshot_features where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from deterministic_window_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from deterministic_feature_snapshot_sources where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from deterministic_feature_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (
       delete from meta_daily_insight_metrics where daily_insight_id in (
         select id from meta_daily_insights where workspace_id = ${input.workspaceId}::uuid
@@ -501,6 +656,8 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from connection_secrets where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from daily_ad_metrics where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from sync_runs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guidance_campaign_selection_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guidance_campaign_selection_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guidance_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guidance_sets where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guidance_cards where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
@@ -521,6 +678,10 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from business_outcome_batches where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from business_outcome_evidence_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from business_outcome_entity_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_rule_budget_action_unit_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_rule_scenario_allocation_selections where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_rule_budget_proposal_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_rule_allocation_entity_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from budget_proposal_alternatives where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from budget_proposal_versions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from analysis_template_definitions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
@@ -540,6 +701,16 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from account_group_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from account_groups where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_context_invalidations where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from creative_fatigue_config_diagnostic_assets where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from meta_creative_window_insight_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from meta_creative_config_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from creative_diagnostic_definition_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from creative_diagnostic_settlement_policy_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from creative_diagnostic_settlement_policies where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from robust_cohort_diagnostic_assets where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from frozen_diagnostic_evidence where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from effective_campaign_policy_composition_items where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from effective_campaign_policy_compositions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_context_components where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_contexts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_assignments where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
@@ -560,6 +731,14 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from insights where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from report_shares where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from operational_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from orchestrator_conversation_messages where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from orchestrator_conversation_tombstones where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from orchestrator_conversation_turns where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from orchestrator_conversations where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_rule_budget_pool_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_rule_workspace_drafts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from budget_pool_hierarchy_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from delivery_health_alert_ledger_records where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from local_agent_handoffs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from local_agent_sessions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     const membershipCount = await remove(sql`with removed as (delete from memberships where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

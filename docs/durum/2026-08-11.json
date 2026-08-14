@@ -1,0 +1,182 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "389bb7e5f",
+      "tarih": "2026-08-11",
+      "konu": "feat(brief): add ephemeral operator notes",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ac69c8e4f",
+      "tarih": "2026-08-11",
+      "konu": "feat(brief): expose planning template library",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "0b976f766",
+      "tarih": "2026-08-11",
+      "konu": "feat(portfolio): add planning sequence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "69d8af2cb",
+      "tarih": "2026-08-11",
+      "konu": "feat(brief): open workbook lanes as drafts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7357644f1",
+      "tarih": "2026-08-11",
+      "konu": "feat(dashboard): add offline workbook portfolio snapshot",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "bb4ab0d88",
+      "tarih": "2026-08-11",
+      "konu": "fix(dashboard): separate demo from live performance",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "9f89d358f",
+      "tarih": "2026-08-11",
+      "konu": "fix(meta): expose safe rotation guidance",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "f99902c39",
+      "tarih": "2026-08-11",
+      "konu": "fix(context): guide dashboard session bootstrap",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "28107999f",
+      "tarih": "2026-08-11",
+      "konu": "fix(session): accept zero-length route body",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "a1039cfe1",
+      "tarih": "2026-08-11",
+      "konu": "feat(dashboard): add read-only Meta account focus",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "677f3f351",
+      "tarih": "2026-08-11",
+      "konu": "fix(policies): classify diagnostic JSONB dependencies",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "e13ad1236",
+      "tarih": "2026-08-11",
+      "konu": "feat(dashboard): carry brief intent into draft template",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "91b430eaf",
+      "tarih": "2026-08-11",
+      "konu": "feat(dashboard): link brief to draft policy workspace",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "355909eb2",
+      "tarih": "2026-08-11",
+      "konu": "fix(dashboard): clear scenario after manual brief edit",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "18fd1037f",
+      "tarih": "2026-08-11",
+      "konu": "feat(dashboard): add workbook campaign scenarios",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "feat",
+      "adet": 42
+    },
+    {
+      "kapsam": "fix",
+      "adet": 8
+    },
+    {
+      "kapsam": "test",
+      "adet": 6
+    },
+    {
+      "kapsam": "docs",
+      "adet": 4
+    }
+  ],
+  "isSayisi": 289,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-11",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "25a0cdf6b822"
+}

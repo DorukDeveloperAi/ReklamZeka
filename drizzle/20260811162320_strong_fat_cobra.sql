@@ -1,0 +1,1 @@
+CREATE INDEX "frozen_diagnostic_evidence_cohort_compatibility_idx" ON "frozen_diagnostic_evidence" USING btree ("workspace_id","entity_type","objective","funnel","optimization_event","category_composition_hash","policy_set_hash","captured_at");

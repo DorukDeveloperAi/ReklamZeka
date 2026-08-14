@@ -30,6 +30,7 @@ const ids = {
   source: randomUUID(),
   account: randomUUID(),
   campaign: randomUUID(),
+  guidanceSelectionRevision: randomUUID(),
   adSet: randomUUID(),
   categoryDimension: randomUUID(),
   categoryDefinition: randomUUID(),
@@ -81,6 +82,8 @@ let workspaceTombstoned = false;
 let lifecycleAuditRetained = false;
 let foreignWorkspaceUntouched = false;
 let hardDeleteBlocked = false;
+let guidanceSelectionDeleteBlocked = false;
+let guidanceSelectionPurged = false;
 let publicOutputRedacted = false;
 let rollbackClean = false;
 
@@ -128,6 +131,37 @@ try {
     await transaction.insert(schema.adCampaigns).values({
       id: ids.campaign, workspaceId: ids.workspace, adAccountId: ids.account,
       externalCampaignId: "e2e-campaign", name: "E2E campaign",
+    });
+    await transaction.insert(schema.guidanceCampaignSelectionRevisions).values({
+      id: ids.guidanceSelectionRevision,
+      workspaceId: ids.workspace,
+      adAccountId: ids.account,
+      campaignId: ids.campaign,
+      selectionRef: "guidance_selection_tombstone_fixture",
+      revision: 1,
+      selectionVersion: "guidance-campaign-selection/1.0.0",
+      selectedSetRef: "set_tombstone_fixture",
+      selectedSetVersion: 1,
+      selectedSetHash: "a".repeat(64),
+      topics: ["quality"],
+      requiredTopics: [],
+      budget: { maxCards: 1, maxSources: 1, maxCharacters: 256 },
+      sourceSelectionHash: "b".repeat(64),
+      effectiveAt: new Date(occurredAt),
+      previousSelectionHash: "GENESIS",
+      selectionHash: "c".repeat(64),
+      actorRef: "actor_owner",
+      actorRole: "owner",
+      occurredAt: new Date(occurredAt),
+    });
+    await transaction.insert(schema.guidanceCampaignSelectionHeads).values({
+      workspaceId: ids.workspace,
+      adAccountId: ids.account,
+      campaignId: ids.campaign,
+      revisionId: ids.guidanceSelectionRevision,
+      selectionRef: "guidance_selection_tombstone_fixture",
+      revision: 1,
+      selectionHash: "c".repeat(64),
     });
     await transaction.insert(schema.metaAdSets).values({
       id: ids.adSet, workspaceId: ids.workspace, adAccountId: ids.account, campaignId: ids.campaign,
@@ -286,6 +320,16 @@ try {
       eventHash: `seed-${randomUUID()}`, occurredAt: new Date("2026-08-07T12:59:00.000Z"),
     });
 
+    try {
+      await transaction.transaction(async (savepoint) => {
+        await savepoint.delete(schema.guidanceCampaignSelectionRevisions)
+          .where(eq(schema.guidanceCampaignSelectionRevisions.id, ids.guidanceSelectionRevision));
+      });
+    } catch (error) {
+      const outer = error as { code?: string; cause?: { code?: string } };
+      guidanceSelectionDeleteBlocked = outer.code === "P0001" || outer.cause?.code === "P0001";
+    }
+
     const purgePort = new DrizzleWorkspaceTombstonePurgePort();
     const targetBefore = await purgePort.inspect(transaction as never, ids.workspace);
     const foreignBefore = await purgePort.inspect(transaction as never, ids.foreignWorkspace);
@@ -308,6 +352,10 @@ try {
     });
 
     targetRowsPurged = (await purgePort.inspect(transaction as never, ids.workspace)).candidateCount === 0;
+    const [remainingGuidanceSelection] = await transaction.select({ count: sql<number>`count(*)::int` })
+      .from(schema.guidanceCampaignSelectionRevisions)
+      .where(eq(schema.guidanceCampaignSelectionRevisions.workspaceId, ids.workspace));
+    guidanceSelectionPurged = remainingGuidanceSelection?.count === 0;
     foreignWorkspaceUntouched = (await purgePort.inspect(transaction as never, ids.foreignWorkspace)).revision
       === foreignBefore.revision;
     const [workspace] = await transaction.select({
@@ -364,7 +412,8 @@ try {
       && !JSON.stringify({ preview, result }).includes(ids.connection)
       && result.auditEventsAppended === 2;
     if (!targetRowsPurged || !workspaceTombstoned || !lifecycleAuditRetained
-      || !foreignWorkspaceUntouched || !hardDeleteBlocked || !publicOutputRedacted) {
+      || !foreignWorkspaceUntouched || !hardDeleteBlocked || !guidanceSelectionDeleteBlocked
+      || !guidanceSelectionPurged || !publicOutputRedacted) {
       throw new Error("Workspace tombstone PostgreSQL acceptance failed");
     }
     throw rollback;
@@ -388,6 +437,8 @@ console.log(JSON.stringify({
   lifecycleAuditEventsRetained: lifecycleAuditRetained ? 2 : 0,
   foreignWorkspaceUntouched,
   hardDeleteBlocked,
+  guidanceSelectionDeleteBlocked,
+  guidanceSelectionPurged,
   publicOutputRedacted,
   rollbackClean,
   temporaryRowsCommitted: false,

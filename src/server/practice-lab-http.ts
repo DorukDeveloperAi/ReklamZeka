@@ -43,6 +43,10 @@ export function practiceLabNotConfiguredResponse() {
   return error("source_not_configured", "Practice Lab çalışma alanı ve yerel kimlik bağlama katmanı henüz etkin değil.", 503);
 }
 
+export function practiceLabSessionRequiredResponse() {
+  return error("local_session_required", "Practice Lab için yerel dashboard oturumunu bağlayın.", 401);
+}
+
 export function createPracticeLabHttpHandlers(input: Readonly<{
   contract: PracticeLabAgentContract;
   lifecycle: Pick<AdvisedPracticeLifecycleService, "mutate">;

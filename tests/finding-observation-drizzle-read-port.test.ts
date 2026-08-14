@@ -5,6 +5,7 @@ import {
   buildFindingObservations,
 } from "@/analyses/finding-observation-builder";
 import {
+  assertRepositoryFeatureSourceRead,
   DrizzleFindingObservationReadPort,
   FINDING_OBSERVATION_SETTLEMENT_POLICY_VERSION,
   FindingObservationReadAdapterError,
@@ -129,6 +130,22 @@ describe("DrizzleFindingObservationReadPort", () => {
     });
     expect(JSON.stringify(first)).not.toContain(ids.insight);
     expect(database.calls).toBe(2);
+  });
+
+  it("keeps relational L1 identities server-private while giving the L2 writer an exact manifest", async () => {
+    const adapter = port(new FixtureDatabase([row()]));
+    const featureRead = await adapter.readForFeatureSnapshot(query());
+
+    expect(featureRead.read.snapshotRefs).toEqual(featureRead.sourceManifest.map((item) => item.snapshotRef));
+    expect(featureRead.sourceManifest).toEqual([{
+      dailyInsightId: ids.insight,
+      snapshotRef: expect.stringMatching(/^snapshot_[a-f0-9]{32}$/),
+      contentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      sourcePayloadHash: "source-hash-1",
+    }]);
+    expect(() => assertRepositoryFeatureSourceRead(featureRead)).not.toThrow();
+    expect(() => assertRepositoryFeatureSourceRead({ ...featureRead })).toThrowError(FindingObservationReadAdapterError);
+    expect(JSON.stringify(featureRead.read)).not.toContain(ids.insight);
   });
 
   it("is directly consumable by the observation builder", async () => {

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "@/db/schema";
 import type { MetaSyncStoreSnapshot } from "./runtime";
@@ -74,27 +74,49 @@ type ReklamZekaDatabase = NodePgDatabase<typeof schema>;
 
 /** Concrete PostgreSQL implementation for the Drizzle S1.3 tables. */
 export class DrizzleMetaSyncTransactionManager implements MetaSyncTransactionManager {
-  constructor(private readonly database: ReklamZekaDatabase) {}
+  constructor(
+    private readonly database: ReklamZekaDatabase,
+    private readonly options: Readonly<{ transactionMode?: "atomic" | "idempotent_checkpoint" }> = {},
+  ) {}
 
   transaction<T>(work: (transaction: MetaSyncPersistenceTransaction) => Promise<T>): Promise<T> {
-    return this.database.transaction(async (databaseTransaction) => work({
-      load: (key) => this.load(databaseTransaction as ReklamZekaDatabase, key),
-      save: (key, snapshot) => this.save(databaseTransaction as ReklamZekaDatabase, key, snapshot),
-    }));
+    const bind = (database: ReklamZekaDatabase): MetaSyncPersistenceTransaction => ({
+      load: (key) => this.load(database, key),
+      save: (key, snapshot) => this.save(database, key, snapshot),
+    });
+    // This is a server-selected recovery path for a verified pooler callback
+    // defect. Every durable relation uses deterministic identities/upserts, so
+    // an interrupted checkpoint is safely replayed; the normal default remains
+    // a single atomic transaction.
+    return this.options.transactionMode === "idempotent_checkpoint"
+      ? work(bind(this.database))
+      : this.database.transaction(async (databaseTransaction) => work(bind(databaseTransaction as ReklamZekaDatabase)));
   }
 
-  private async accountId(database: ReklamZekaDatabase, key: MetaSyncDurableKey, externalAccountId: string): Promise<string> {
-    const rows = await database.select({ id: schema.adAccounts.id })
+  private async accountIds(
+    database: ReklamZekaDatabase,
+    key: MetaSyncDurableKey,
+    externalAccountIds: readonly string[],
+  ): Promise<ReadonlyMap<string, string>> {
+    const expected = [...new Set(externalAccountIds)].sort();
+    if (expected.length === 0) return new Map();
+    const rows = await database.select({
+      id: schema.adAccounts.id,
+      externalAccountId: schema.adAccounts.externalAccountId,
+    })
       .from(schema.adAccounts)
       .innerJoin(schema.dataSources, eq(schema.adAccounts.dataSourceId, schema.dataSources.id))
       .where(and(
         eq(schema.adAccounts.workspaceId, key.workspaceId),
         eq(schema.dataSources.metaConnectionId, key.connectionId),
-        eq(schema.adAccounts.externalAccountId, externalAccountId),
-      )).limit(1);
-    const id = rows[0]?.id;
-    if (!id) throw new Error(`Meta sync account mapping bulunamadı: ${externalAccountId}`);
-    return id;
+        inArray(schema.adAccounts.externalAccountId, expected),
+      ));
+    const mapping = new Map(rows.map((row) => [row.externalAccountId, row.id]));
+    const missing = expected.find((externalAccountId) => !mapping.has(externalAccountId));
+    if (missing || mapping.size !== expected.length) {
+      throw new Error(`Meta sync account mapping bulunamadı: ${missing ?? "ambiguous"}`);
+    }
+    return mapping;
   }
 
   private async save(database: ReklamZekaDatabase, key: MetaSyncDurableKey, snapshot: MetaSyncStoreSnapshot): Promise<void> {
@@ -102,6 +124,15 @@ export class DrizzleMetaSyncTransactionManager implements MetaSyncTransactionMan
     if (!parent || parent.workspaceId !== key.workspaceId || parent.connectionId !== key.connectionId) {
       throw new Error("Meta sync durable snapshot scope uyuşmuyor");
     }
+    const accountIds = await this.accountIds(database, key, [
+      ...snapshot.streams.map((stream) => stream.accountId),
+      ...snapshot.records.map((record) => record.accountId),
+    ]);
+    const accountId = (externalAccountId: string): string => {
+      const resolved = accountIds.get(externalAccountId);
+      if (!resolved) throw new Error(`Meta sync account mapping bulunamadı: ${externalAccountId}`);
+      return resolved;
+    };
     const portfolioId = stableUuid(`portfolio:${key.workspaceId}:${key.connectionId}:${key.parentRunId}`);
     await database.insert(schema.metaPortfolioSyncRuns).values({
       id: portfolioId,
@@ -117,24 +148,31 @@ export class DrizzleMetaSyncTransactionManager implements MetaSyncTransactionMan
       set: { status: parent.status, finishedAt: parent.status === "completed" ? new Date() : null },
     });
 
-    for (const stream of snapshot.streams.filter((candidate) => candidate.parentRunId === key.parentRunId)) {
-      const adAccountId = await this.accountId(database, key, stream.accountId);
+    // A snapshot contains every stream so a restart is deterministic. Persisting
+    // each stream/slice with an individual round trip made a normal 5-account
+    // checkpoint hundreds of remote statements long. Build the exact immutable
+    // checkpoint rows first, then upsert each relation in one statement.
+    const persistedStreams = snapshot.streams.filter((candidate) => candidate.parentRunId === key.parentRunId).map((stream) => {
+      const adAccountId = accountId(stream.accountId);
       const streamType = persistedMetaSyncStream(stream.stream);
       const streamId = stableUuid(`stream:${key.workspaceId}:${key.connectionId}:${adAccountId}:${streamType}`);
       const latestCursor = Object.values(stream.cursorBySlice).sort((a, b) => a.updatedAt.localeCompare(b.updatedAt)).at(-1)?.cursor ?? null;
-      await database.insert(schema.metaSyncStreams).values({
+      const runId = stableUuid(`run:${key.workspaceId}:${key.connectionId}:${key.parentRunId}:${stream.stream}:${stream.accountId}`);
+      return { stream, adAccountId, streamType, streamId, runId, latestCursor };
+    });
+    if (persistedStreams.length > 0) {
+      await database.insert(schema.metaSyncStreams).values(persistedStreams.map(({ stream, adAccountId, streamType, streamId, latestCursor }) => ({
         id: streamId, workspaceId: key.workspaceId, metaConnectionId: key.connectionId, adAccountId,
         streamType, status: stream.status, cursor: latestCursor,
         checkpoint: { completedSliceIds: stream.completedSliceIds, cursorBySlice: stream.cursorBySlice },
         lastErrorClassification: this.errorClassification(stream.error?.reason),
         lastError: stream.error ? { message: stream.error.message, retryable: stream.error.retryable } : null,
         updatedAt: new Date(),
-      }).onConflictDoUpdate({
+      }))).onConflictDoUpdate({
         target: [schema.metaSyncStreams.workspaceId, schema.metaSyncStreams.metaConnectionId, schema.metaSyncStreams.adAccountId, schema.metaSyncStreams.streamType],
-        set: { status: stream.status, cursor: latestCursor, checkpoint: { completedSliceIds: stream.completedSliceIds, cursorBySlice: stream.cursorBySlice }, lastErrorClassification: this.errorClassification(stream.error?.reason), lastError: stream.error ? { message: stream.error.message, retryable: stream.error.retryable } : null, updatedAt: new Date() },
+        set: { status: sql`excluded.status`, cursor: sql`excluded.cursor`, checkpoint: sql`excluded.checkpoint`, lastErrorClassification: sql`excluded.last_error_classification`, lastError: sql`excluded.last_error`, updatedAt: sql`excluded.updated_at` },
       });
-      const runId = stableUuid(`run:${key.workspaceId}:${key.connectionId}:${key.parentRunId}:${stream.stream}:${stream.accountId}`);
-      await database.insert(schema.metaSyncRuns).values({
+      await database.insert(schema.metaSyncRuns).values(persistedStreams.map(({ stream, adAccountId, streamType, streamId, runId, latestCursor }) => ({
         id: runId, workspaceId: key.workspaceId, metaConnectionId: key.connectionId, adAccountId,
         portfolioRunId: portfolioId, streamId, streamType, idempotencyKey: stream.id,
         status: stream.status, cursor: latestCursor,
@@ -142,14 +180,14 @@ export class DrizzleMetaSyncTransactionManager implements MetaSyncTransactionMan
         errorClassification: this.errorClassification(stream.error?.reason),
         errorDetail: stream.error ? { message: stream.error.message, retryable: stream.error.retryable } : null,
         startedAt: new Date(), finishedAt: stream.status === "completed" ? new Date() : null,
-      }).onConflictDoUpdate({
+      }))).onConflictDoUpdate({
         target: [schema.metaSyncRuns.workspaceId, schema.metaSyncRuns.metaConnectionId, schema.metaSyncRuns.adAccountId, schema.metaSyncRuns.streamType, schema.metaSyncRuns.idempotencyKey],
-        set: { status: stream.status, cursor: latestCursor, checkpoint: { completedSliceIds: stream.completedSliceIds, cursorBySlice: stream.cursorBySlice }, errorClassification: this.errorClassification(stream.error?.reason), errorDetail: stream.error ? { message: stream.error.message, retryable: stream.error.retryable } : null, finishedAt: stream.status === "completed" ? new Date() : null },
+        set: { status: sql`excluded.status`, cursor: sql`excluded.cursor`, checkpoint: sql`excluded.checkpoint`, errorClassification: sql`excluded.error_classification`, errorDetail: sql`excluded.error_detail`, finishedAt: sql`excluded.finished_at` },
       });
-      for (const [sliceKey, cursor] of Object.entries(stream.cursorBySlice)) {
+      const slices = persistedStreams.flatMap(({ stream, adAccountId, streamType, runId }) => Object.entries(stream.cursorBySlice).map(([sliceKey, cursor]) => {
         const prefix = `${stream.stream}:${stream.accountId}:`;
         const [entityLevel, dateStart, dateStop] = sliceKey.slice(prefix.length).split(":") as [MetaEntityLevel, string, string];
-        await database.insert(schema.metaSyncSlices).values({
+        return {
           id: stableUuid(`slice:${runId}:${sliceKey}`), workspaceId: key.workspaceId, metaConnectionId: key.connectionId,
           adAccountId, runId, streamType, entityLevel: entityLevel === "account" ? null : entityLevel,
           dateStart: dateStart === "all" ? null : dateStart, dateStop: dateStop === "all" ? null : dateStop,
@@ -158,24 +196,28 @@ export class DrizzleMetaSyncTransactionManager implements MetaSyncTransactionMan
           errorClassification: stream.completedSliceIds.includes(sliceKey) ? null : this.errorClassification(stream.error?.reason),
           errorDetail: stream.completedSliceIds.includes(sliceKey) || !stream.error ? null : { message: stream.error.message, retryable: stream.error.retryable },
           completedAt: stream.completedSliceIds.includes(sliceKey) ? new Date(cursor.updatedAt) : null,
-        }).onConflictDoUpdate({
+        };
+      }));
+      if (slices.length > 0) await database.insert(schema.metaSyncSlices).values(slices).onConflictDoUpdate({
           target: [schema.metaSyncSlices.runId, schema.metaSyncSlices.sliceKey],
-          set: { status: stream.completedSliceIds.includes(sliceKey) ? "completed" : stream.status, cursor: cursor.cursor, checkpoint: { cursorId: cursor.cursorId, updatedAt: cursor.updatedAt }, completedAt: stream.completedSliceIds.includes(sliceKey) ? new Date(cursor.updatedAt) : null },
+          set: {
+            status: sql`excluded.status`, cursor: sql`excluded.cursor`, checkpoint: sql`excluded.checkpoint`,
+            errorClassification: sql`excluded.error_classification`, errorDetail: sql`excluded.error_detail`,
+            completedAt: sql`excluded.completed_at`,
+          },
         });
-      }
     }
 
-    for (const record of snapshot.records) {
-      const adAccountId = await this.accountId(database, key, record.accountId);
-      await database.insert(schema.metaSyncRecordLedger).values({
+    if (snapshot.records.length > 0) {
+      await database.insert(schema.metaSyncRecordLedger).values(snapshot.records.map((record) => ({
         id: stableUuid(`record:${key.workspaceId}:${key.connectionId}:${record.identity}`),
-        workspaceId: key.workspaceId, metaConnectionId: key.connectionId, adAccountId,
+        workspaceId: key.workspaceId, metaConnectionId: key.connectionId, adAccountId: accountId(record.accountId),
         streamType: persistedMetaSyncStream(record.stream), entityLevel: record.entityLevel === "account" ? null : record.entityLevel,
         recordIdentity: record.identity, snapshotHash: record.snapshotHash,
         firstSeenAt: new Date(record.firstSeenAt), lastSeenAt: new Date(record.lastSeenAt),
-      }).onConflictDoUpdate({
+      }))).onConflictDoUpdate({
         target: [schema.metaSyncRecordLedger.workspaceId, schema.metaSyncRecordLedger.metaConnectionId, schema.metaSyncRecordLedger.recordIdentity],
-        set: { snapshotHash: record.snapshotHash, lastSeenAt: new Date(record.lastSeenAt) },
+        set: { snapshotHash: sql`excluded.snapshot_hash`, lastSeenAt: sql`excluded.last_seen_at` },
       });
     }
   }

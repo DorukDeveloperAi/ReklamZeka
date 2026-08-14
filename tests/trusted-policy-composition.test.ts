@@ -72,17 +72,17 @@ function lifecycle(entries: readonly Readonly<{ policyRef: string; status?: "pub
       changedPaths: ["status"] })) };
 }
 
-function category(withProfile = false): FrozenCategoryContext {
+function category(withProfile = false, entityId = "campaign_primary"): FrozenCategoryContext {
   const resolved = resolveEffectiveCategory({
     dimension: { id: "dimension_type", workspaceId, key: "campaign_type", version: 1, cardinality: "single",
       allowedEntityLevels: ["campaign"], archivedAt: null },
     definitions: [{ id: "definition_evergreen", workspaceId, dimensionId: "dimension_type", key: "evergreen",
       label: "Evergreen", version: 1, archivedAt: null }],
     assignments: [{ id: "assignment_evergreen", workspaceId, dimensionId: "dimension_type",
-      definitionId: "definition_evergreen", entity: { level: "campaign", id: "campaign_primary" }, operation: "add",
+      definitionId: "definition_evergreen", entity: { level: "campaign", id: entityId }, operation: "add",
       source: "manual", manualLock: true, evidence: [{ kind: "owner", ref: "evidence_owner" }], confidence: 1,
       version: 1, archivedAt: null }],
-    path: { workspaceId, nodes: [{ level: "campaign", id: "campaign_primary" }] },
+    path: { workspaceId, nodes: [{ level: "campaign", id: entityId }] },
   }).frozenContext;
   if (!withProfile) return resolved;
   return bindCategoryProfiles(resolved, [createCategoryProfile({ workspaceRef, profileRef: "category_profile_evergreen",
@@ -103,14 +103,14 @@ function guidance() {
     requiredTopics: [], evaluatedAt: capturedAt, budget: { maxCards: 10, maxSources: 10, maxCharacters: 10_000 } });
 }
 
-function baseContext(withProfile = false): EffectiveCampaignContextInput {
+function baseContext(withProfile = false, categoryEntityId = "campaign_primary"): EffectiveCampaignContextInput {
   return { workspaceId, capturedAt, identity: { connectionRef: "connection_primary", accountRef: "account_primary",
     campaignRef: "campaign_primary", entityRef: "campaign_primary", entityType: "campaign", hierarchyRefs: ["campaign_primary"] },
   meta: { objective: { state: "known", value: "lead_generation" }, optimizationEvent: { state: "known", value: "lead" },
     configuredStatus: { state: "known", value: "ACTIVE" }, effectiveStatus: { state: "known", value: "ACTIVE" },
     budgetOwnerRef: { state: "known", value: "campaign_primary" }, targetingSignature: { state: "unknown", reason: "not_observed" },
     actorRef: { state: "known", value: "actor_primary" }, destinationRef: { state: "known", value: null } },
-  categories: [category(withProfile)], guidance: guidance(), policies: [],
+  categories: [category(withProfile, categoryEntityId)], guidance: guidance(), policies: [],
   cadence: { profileRef: "cadence_primary", decision: "no_change", reason: "stable", cooldownUntil: null },
   data: { trustStatus: "ready", snapshotRefs: ["snapshot_primary"], featureRefs: [], windowRefs: [], blockers: [] },
   history: { changeRefs: [], decisionRefs: [], experimentRefs: [], practiceRefs: [], outcomeRefs: [] },
@@ -217,13 +217,25 @@ describe("trusted policy frozen-context composition", () => {
       .toThrowError(expect.objectContaining<Partial<TrustedPolicyCompositionError>>({ code: "scope_mismatch" }));
   });
 
+  it("uses a source-owned internal category target without conflating it with external Meta refs", () => {
+    const state = lifecycle([{ policyRef: "policy_metric" }]); const current = state.current[0]!;
+    const catalog = createTrustedPolicyCatalog({ workspaceRef, catalogRef: "policy_catalog_internal_category", catalogVersion: 1,
+      instructionPolicyRegistryHash: state.registryHash, bindings: [binding(current, "metric_rule", "hold")] });
+    const internalId = "4f2b4dfd-8a2b-4f27-9d5b-4d7753f4de12";
+    const input = { baseContext: baseContext(false, internalId), workspaceRef, lifecycle: state, catalog, scope: scope(), manualLocks: [],
+      categoryTarget: { level: "campaign" as const, id: internalId } };
+    expect(composeTrustedPolicyContext(input).context.policies).toHaveLength(1);
+    expect(() => composeTrustedPolicyContext({ ...input, categoryTarget: { level: "campaign" as const, id: "4f2b4dfd-8a2b-4f27-9d5b-4d7753f4de13" } }))
+      .toThrowError(expect.objectContaining<Partial<TrustedPolicyCompositionError>>({ code: "scope_mismatch" }));
+  });
+
   it("binds canonical objective evidence to the frozen Meta objective and reviewed mapping catalog", () => {
     const state = lifecycle([{ policyRef: "policy_metric" }]); const current = state.current[0]!;
     const catalog = createTrustedPolicyCatalog({ workspaceRef, catalogRef: "policy_catalog_objective", catalogVersion: 1,
       instructionPolicyRegistryHash: state.registryHash, bindings: [binding(current, "metric_rule", "hold")] });
     const valid = { baseContext: baseContext(), workspaceRef, lifecycle: state, catalog, manualLocks: [] } as const;
     expect(() => composeTrustedPolicyContext({ ...valid, scope: scope("sales") }))
-      .toThrowError(expect.objectContaining<Partial<TrustedPolicyCompositionError>>({ code: "scope_mismatch" }));
+      .toThrowError(expect.objectContaining<Partial<TrustedPolicyCompositionError>>({ code: "scope_mismatch", diagnosticCode: "canonical_objective" }));
     const mapped = scope();
     expect(() => composeTrustedPolicyContext({ ...valid, scope: { ...mapped,
       objectiveEvidence: { ...mapped.objectiveEvidence, mappingHash: "a".repeat(64) } } }))

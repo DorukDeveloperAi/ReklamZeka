@@ -7,7 +7,11 @@ import type { PracticeLabDetail } from "@/application/practice-lab-read-service"
 const callbacks = { onRetry: vi.fn(), onSelect: vi.fn(), onPrepareDraft: vi.fn() };
 
 describe("Practice Lab dashboard", () => {
-  it("distinguishes unavailable, error, and real empty states without demo fallback", () => {
+  it("distinguishes session, unavailable, error, and real empty states", () => {
+    const sessionRequired = renderToStaticMarkup(createElement(PracticeLabReadSurface, {
+      ...callbacks, onConnect: vi.fn(async () => false),
+      state: { status: "session_required", message: "Yerel oturum gerekli." },
+    }));
     const unavailable = renderToStaticMarkup(createElement(PracticeLabReadSurface, {
       ...callbacks, state: { status: "unavailable", message: "Yerel oturum gerekli." },
     }));
@@ -23,10 +27,13 @@ describe("Practice Lab dashboard", () => {
       },
     }));
     expect(unavailable).toContain("Kaynak henüz bağlı değil");
-    expect(unavailable).toContain("Demo practice gösterilmez");
+    expect(unavailable).toContain("kaynağı yapılandırılana kadar");
+    expect(sessionRequired).toContain("Practice çalışma alanını bağlayın");
+    expect(sessionRequired).toContain("local-session-capability");
     expect(error).toContain("Practice Lab okunamadı");
     expect(empty).toContain("Kaynak bağlı · practice yok");
-    expect(empty).toContain("fixture veya demo fallback değildir");
+    expect(empty).toContain("Kaynak başarıyla okundu");
+    expect(empty).not.toMatch(/demo|fixture/i);
     expect(empty).not.toContain("Yerel oturum gerekli");
   });
 

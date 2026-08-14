@@ -3,7 +3,6 @@ import { existsSync } from "node:fs";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { buildEffectiveCampaignContext } from "@/analyses/effective-campaign-context";
 import {
   ANALYSIS_TEMPLATE_DEFINITION_VERSION,
   ANALYSIS_TIMEFRAME_DEFINITION_VERSION,
@@ -15,17 +14,15 @@ import {
   DrizzleDecisionRoomAnalysisAssetRegistry,
   DrizzleDecisionRoomAnalysisRuntimeAssetLoader,
 } from "@/connectors/analyses/decision-room-analysis-registry-drizzle";
-import { DrizzleEffectiveCampaignContextRepository } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
-import { DrizzleGuidanceRegistryRepository } from "@/connectors/guidance/guidance-drizzle-repository";
 import {
   DrizzleDecisionRoomRunStore,
   DrizzleDecisionRoomScheduleRegistry,
 } from "@/connectors/decisions/decision-room-drizzle-adapters";
-import { DrizzleDecisionCadenceProfileRepository } from "@/connectors/decisions/decision-cadence-profile-drizzle-repository";
 import * as schema from "@/db/schema";
 import { DECISION_CADENCE_VERSION } from "@/domain/decisions/cadence";
 import { DECISION_ROOM_SCHEDULE_VERSION, type DecisionRoomSchedule } from "@/domain/decisions/schedule";
-import { buildEffectiveGuidancePack, createGuidanceRegistry } from "@/domain/guidance/registry";
+import { createDrizzleEffectiveAnalysisContextComposer } from "@/server/effective-analysis-context-composer-runtime";
+import { materializeCurrentEffectiveAnalysisContextSourceFixture } from "./support/current-effective-analysis-context-source-fixture";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const databaseUrl = process.env.DATABASE_URL?.trim();
@@ -39,14 +36,6 @@ const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeout
 const database = drizzle(pool, { schema });
 const rollback = Symbol("rollback");
 const now = "2026-08-07T12:00:00.000Z";
-const workspaceId = randomUUID();
-const foreignWorkspaceId = randomUUID();
-const actorId = randomUUID();
-const connectionId = randomUUID();
-const sourceId = randomUUID();
-const accountId = randomUUID();
-const campaignId = randomUUID();
-const snapshotRef = `snapshot_${"a".repeat(20)}`;
 
 let tablesApplied = false;
 let versionedRegistry = false;
@@ -66,6 +55,8 @@ let crossTenantBlocked = false;
 let immutableRows = false;
 let rlsAndGrants = false;
 let temporaryRowsCommitted = true;
+let verifierWorkspaceId: string | null = null;
+let verifierForeignWorkspaceId: string | null = null;
 
 function resultRows(result: unknown): readonly Record<string, unknown>[] {
   return result && typeof result === "object" && "rows" in result && Array.isArray(result.rows)
@@ -95,7 +86,9 @@ function timeframe(revision: number, days: number): AnalysisTimeframeDefinition 
   };
 }
 
-function template(revision: number, timeframeDefinitionHash: string, contextHash: string, threshold: string): AnalysisTemplateDefinition {
+function template(revision: number, timeframeDefinitionHash: string, contextHash: string, threshold: string, scope: Readonly<{
+  connectionId: string; accountId: string; accountRef: string; campaignRef: string; snapshotRef: string;
+}>): AnalysisTemplateDefinition {
   return {
     version: ANALYSIS_TEMPLATE_DEFINITION_VERSION,
     templateRef: "template_daily",
@@ -103,15 +96,15 @@ function template(revision: number, timeframeDefinitionHash: string, contextHash
     timeframeRef: "timeframe_daily",
     timeframeDefinitionHash,
     contextHash,
-    requestedPasses: ["campaign"],
-    hierarchy: [{ entityRef: "campaign_safe", entityType: "campaign", parentEntityRef: null }],
+    requestedPasses: ["entity"],
+    hierarchy: [{ entityRef: scope.campaignRef, entityType: "campaign", parentEntityRef: null }],
     checks: [{
-      checkKey: "spend_guard", passKey: "campaign", entityRef: "campaign_safe", entityType: "campaign",
-      parentEntityRef: null, hierarchyPathRefs: ["campaign_safe"], driverEvidenceRefs: [],
-      externalEntityId: "campaign_safe", metaConnectionId: connectionId, adAccountId: accountId,
+      checkKey: "spend_guard", passKey: "entity", entityRef: scope.campaignRef, entityType: "campaign",
+      parentEntityRef: null, hierarchyPathRefs: [scope.campaignRef], driverEvidenceRefs: [],
+      externalEntityId: scope.campaignRef, metaConnectionId: scope.connectionId, adAccountId: scope.accountId,
       attributionLabel: "7d_click_1d_view", expectedCurrency: "TRY",
       spec: { kind: "threshold", metric: "spendMinor", operator: "gt", thresholdDecimal: threshold, minimumSample: 1 },
-      maxRowsPerQuery: 10, expectedSnapshotRefs: [snapshotRef],
+      maxRowsPerQuery: 10, expectedSnapshotRefs: [scope.snapshotRef],
     }],
     cadence: {
       profile: {
@@ -140,96 +133,33 @@ try {
       && applied?.run_asset && applied?.guidance_binding);
     if (!tablesApplied) throw new Error("Analiz asset migration uygulanmadı");
 
-    await transaction.insert(schema.workspaces).values([
-      { id: workspaceId, name: "Analysis asset verifier" },
-      { id: foreignWorkspaceId, name: "Foreign analysis asset verifier" },
-    ]);
-    await transaction.insert(schema.users).values({ id: actorId, email: `analysis-assets-${actorId}@example.invalid` });
-    await transaction.insert(schema.memberships).values({ workspaceId, userId: actorId, role: "owner" });
-    await transaction.insert(schema.metaConnections).values({
-      id: connectionId, workspaceId, externalConnectionKey: "analysis-assets", displayName: "Analysis assets",
-      graphApiVersion: "v1", fieldCatalogVersion: "fields-v1", status: "active",
-    });
-    await transaction.insert(schema.dataSources).values({
-      id: sourceId, workspaceId, metaConnectionId: connectionId, platform: "meta_ads",
-      externalAccountId: "account_safe", displayName: "Analysis assets",
-    });
-    await transaction.insert(schema.adAccounts).values({
-      id: accountId, workspaceId, dataSourceId: sourceId, externalAccountId: "account_safe",
-      name: "Analysis assets", currency: "TRY", timezone: "Europe/Istanbul",
-    });
-    await transaction.insert(schema.adCampaigns).values({
-      id: campaignId, workspaceId, adAccountId: accountId,
-      externalCampaignId: "campaign_safe", name: "Analysis assets campaign",
-    });
-    await transaction.insert(schema.metaChangeSnapshots).values({
-      workspaceId, metaConnectionId: connectionId, adAccountId: accountId,
-      publicRef: snapshotRef, snapshotHash: "b".repeat(64), schemaVersion: 1,
-      fieldCatalogVersion: "fields-v1", capturedAt: new Date(now), canonicalPayload: { entities: [] },
-      safeAggregate: { entityCounts: { campaign: 1, adSet: 0, ad: 0 }, knownFieldCount: 1, unknownFieldCount: 0 },
-    });
-    const guidanceRegistry = createGuidanceRegistry({ workspaceId, sources: [{ id: "source_verify", workspaceId,
-      sourceType: "observed_result", title: "Observed verifier", sourceRef: "evidence_verify",
-      sourceUrl: null, content: "Verified deterministic observation", author: "actor_verify",
-      capturedAt: now, reviewedAt: now, reviewBy: null, status: "published", version: 1 }],
-    cards: [{ id: "guidance_verify", workspaceId, sourceType: "observed_result", sourceIds: ["source_verify"],
-      title: "Observed verifier", body: "Verified deterministic observation", rationale: null,
-      strength: "consider", topic: "verification", decisionKey: null, positionKey: null,
-      authority: "guidance_only", status: "published", effectiveFrom: now, effectiveTo: null,
-      ownerRef: "actor_verify", version: 1 }], bindings: [{ id: "binding_verify", workspaceId,
-      cardId: "guidance_verify", facet: "account_group", value: "account_group_verify", entityType: null,
-      mode: "default", priority: 50, version: 1 }], sets: [{ id: "guidance_set_verify", workspaceId,
-      name: "Verifier set", orderedCardIds: ["guidance_verify"], reviewStatus: "reviewed", version: 1 }] });
-    await new DrizzleGuidanceRegistryRepository(transaction as never).save(guidanceRegistry,
-      { expectedRegistryHash: null });
-    const guidance = buildEffectiveGuidancePack(guidanceRegistry, {
-      workspaceId, accountId: "account_safe", accountGroupIds: ["account_group_verify"], objective: "sales",
-      internalCategoryIds: [], entity: { type: "campaign", id: "campaign_safe" }, topics: ["verification"],
-      requiredTopics: ["verification"], guidanceSetIds: ["guidance_set_verify"], evaluatedAt: now,
-      budget: { maxCards: 10, maxSources: 10, maxCharacters: 10_000 },
-    });
-    const context = buildEffectiveCampaignContext({
-      workspaceId, capturedAt: now,
-      identity: {
-        connectionRef: "analysis-assets", accountRef: "account_safe", campaignRef: "campaign_safe",
-        entityRef: "campaign_safe", entityType: "campaign", hierarchyRefs: ["campaign_safe"],
-      },
-      meta: {
-        objective: { state: "known", value: "sales" }, optimizationEvent: { state: "known", value: "purchase" },
-        configuredStatus: { state: "known", value: "ACTIVE" }, effectiveStatus: { state: "known", value: "ACTIVE" },
-        budgetOwnerRef: { state: "known", value: "campaign_safe" }, targetingSignature: { state: "unknown", reason: "not_loaded" },
-        actorRef: { state: "known", value: "actor_safe" }, destinationRef: { state: "known", value: null },
-      },
-      categories: [], guidance, policies: [],
-      cadence: { profileRef: "cadence_safe", decision: "eligible", reason: "window_open", cooldownUntil: null },
-      data: { trustStatus: "ready", snapshotRefs: [snapshotRef], featureRefs: [snapshotRef], windowRefs: ["window_safe"], blockers: [] },
-      history: { changeRefs: [], decisionRefs: [], experimentRefs: [], practiceRefs: [], outcomeRefs: [] },
-      versions: {
-        metaCatalog: "meta_v1", categoryResolver: "category_v1", guidanceRegistry: "guidance_v1",
-        metricCatalog: "metric_v1", formulaCatalog: "formula_v1", timeframeResolver: "timeframe_v1",
-        instructionPolicyRegistry: "9".repeat(64),
-        promotionRegistry: "8".repeat(64),
-      },
-    });
-    await new DrizzleEffectiveCampaignContextRepository(transaction as never).save(context);
-
-    const cadenceProfile = template(1, "a".repeat(64), context.contextHash, "1000").cadence.profile;
-    await new DrizzleDecisionCadenceProfileRepository(transaction as never).publish({
-      workspaceId, workspaceRef: "workspace_safe", actorId, actorRef: "actor_verify", role: "owner",
-      accountRef: "account_safe", campaignRef: "campaign_safe", profileRef: "cadence_safe",
-      revision: 1, expectedCurrentHash: "GENESIS", profile: cadenceProfile, occurredAt: now,
-    });
+    // The verifier must exercise the same L1/L2/L3 provenance chain as runtime
+    // composition.  In particular, do not persist a hand-built context: the
+    // repository rejects those because their evidence components are untrusted.
+    const fixture = await materializeCurrentEffectiveAnalysisContextSourceFixture(transaction as never, new Date(now));
+    const { workspaceId, foreignWorkspaceId, accountRef, campaignRef, snapshotRef } = fixture;
+    verifierWorkspaceId = workspaceId;
+    verifierForeignWorkspaceId = foreignWorkspaceId;
+    const context = (await createDrizzleEffectiveAnalysisContextComposer({ database: transaction as never })
+      .composeAndSave(fixture.request)).context;
+    const guidance = context.guidance;
+    const sourceScope = {
+      connectionId: (await transaction.execute(sql`select id::text from meta_connections
+        where workspace_id = ${workspaceId}::uuid limit 1`)).rows[0]?.id as string,
+      accountId: fixture.adAccountId, accountRef, campaignRef, snapshotRef,
+    };
+    if (!sourceScope.connectionId) throw new Error("authentic_source_connection_missing");
 
     const registry = new DrizzleDecisionRoomAnalysisAssetRegistry(transaction as never, workspaceId);
     const timeframeV1 = timeframe(1, 7);
     const timeframeV1Result = await registry.publishTimeframe(timeframeV1, now);
-    const templateV1 = template(1, timeframeV1Result.definitionHash, context.contextHash, "1000");
-    const templateV1Result = await registry.publishTemplate({ accountRef: "account_safe", campaignRef: "campaign_safe", definition: templateV1, publishedAt: now });
+    const templateV1 = template(1, timeframeV1Result.definitionHash, context.contextHash, "1000", sourceScope);
+    const templateV1Result = await registry.publishTemplate({ accountRef, campaignRef, definition: templateV1, publishedAt: now });
     versionedRegistry = timeframeV1Result.outcome === "inserted" && templateV1Result.outcome === "inserted";
 
     const schedule: DecisionRoomSchedule = {
-      version: DECISION_ROOM_SCHEDULE_VERSION, scheduleRef: "schedule_daily", workspaceRef: "workspace_safe",
-      accountRef: "account_safe", campaignRef: "campaign_safe", timeframeRef: "timeframe_daily",
+      version: DECISION_ROOM_SCHEDULE_VERSION, scheduleRef: "schedule_daily", workspaceRef: fixture.workspaceRef,
+      accountRef, campaignRef, timeframeRef: "timeframe_daily",
       templateRef: "template_daily", timezone: "Europe/Istanbul", localTime: "15:00", frequency: "daily",
       enabled: true, catchUpPolicy: "run_once", tickGraceMinutes: 5,
       dstPolicy: { gap: "next_valid", overlap: "first_occurrence" }, notificationChannel: "in_app_inbox",
@@ -246,21 +176,21 @@ try {
 
     const timeframeV2 = timeframe(2, 3);
     const timeframeV2Result = await registry.publishTimeframe(timeframeV2, "2026-08-07T12:01:00Z");
-    const templateV2 = template(2, timeframeV2Result.definitionHash, context.contextHash, "2000");
-    await registry.publishTemplate({ accountRef: "account_safe", campaignRef: "campaign_safe", definition: templateV2, publishedAt: "2026-08-07T12:01:00Z" });
+    const templateV2 = template(2, timeframeV2Result.definitionHash, context.contextHash, "2000", sourceScope);
+    await registry.publishTemplate({ accountRef, campaignRef, definition: templateV2, publishedAt: "2026-08-07T12:01:00Z" });
 
     const store = new DrizzleDecisionRoomRunStore(transaction as never, workspaceId);
     const scheduled = await store.claim({
       idempotencyKey: `idempotency_${"1".repeat(32)}`, scopeKey: "2".repeat(64), triggerKind: "scheduled",
       scheduleRef: schedule.scheduleRef, scheduleDefinitionHash: storedSchedule!.definitionHash,
-      triggerRef: schedule.scheduleRef, accountRef: "account_safe", campaignRef: "campaign_safe",
+      triggerRef: schedule.scheduleRef, accountRef, campaignRef,
       timeframeRef: "timeframe_daily", templateRef: "template_daily",
       now: "2026-08-07T12:02:00Z", leaseUntil: "2026-08-07T12:07:00Z",
     });
     if (scheduled.status !== "claimed") throw new Error("scheduled claim failed");
     const loader = new DrizzleDecisionRoomAnalysisRuntimeAssetLoader(transaction as never, workspaceId);
     const scheduledAssets = await loader.loadExact({
-      runRef: scheduled.runRef, workspaceRef: "workspace_safe", accountRef: "account_safe", campaignRef: "campaign_safe",
+      runRef: scheduled.runRef, workspaceRef: fixture.workspaceRef, accountRef, campaignRef,
       timeframeRef: "timeframe_daily", templateRef: "template_daily", triggerKind: "scheduled",
     });
     scheduleRevisionFrozen = scheduledAssets.resolvedTimeframe.inclusiveDayCount === 7
@@ -269,12 +199,12 @@ try {
     const manual = await store.claim({
       idempotencyKey: `idempotency_${"3".repeat(32)}`, scopeKey: "4".repeat(64), triggerKind: "manual",
       scheduleRef: null, scheduleDefinitionHash: null, triggerRef: "manual_asset_check",
-      accountRef: "account_safe", campaignRef: "campaign_safe", timeframeRef: "timeframe_daily", templateRef: "template_daily",
+      accountRef, campaignRef, timeframeRef: "timeframe_daily", templateRef: "template_daily",
       now: "2026-08-07T12:03:00Z", leaseUntil: "2026-08-07T12:08:00Z",
     });
     if (manual.status !== "claimed") throw new Error("manual claim failed");
     const manualInput = {
-      runRef: manual.runRef, workspaceRef: "workspace_safe", accountRef: "account_safe", campaignRef: "campaign_safe",
+      runRef: manual.runRef, workspaceRef: fixture.workspaceRef, accountRef, campaignRef,
       timeframeRef: "timeframe_daily", templateRef: "template_daily", triggerKind: "manual" as const,
     };
     const manualAssets = await loader.loadExact(manualInput);
@@ -294,8 +224,8 @@ try {
     const timeframeV3 = timeframe(3, 1);
     const timeframeV3Result = await registry.publishTimeframe(timeframeV3, "2026-08-07T12:04:00Z");
     await registry.publishTemplate({
-      accountRef: "account_safe", campaignRef: "campaign_safe",
-      definition: template(3, timeframeV3Result.definitionHash, context.contextHash, "3000"),
+      accountRef, campaignRef,
+      definition: template(3, timeframeV3Result.definitionHash, context.contextHash, "3000", sourceScope),
       publishedAt: "2026-08-07T12:04:00Z",
     });
     retryFrozen = (await loader.loadExact(manualInput)).resolvedTimeframe.inclusiveDayCount === 3;
@@ -305,7 +235,7 @@ try {
       order by occurred_at, id
     `));
     guidanceRevisionFrozen = guidanceBindings.length === 2
-      && guidanceBindings.every((row) => row.registry_hash === guidanceRegistry.registryHash
+      && guidanceBindings.every((row) => row.registry_hash === guidance.registryHash
         && row.pack_hash === guidance.packHash && row.authority === "guidance_only"
         && Array.isArray(row.selected_set_refs) && row.selected_set_refs.length === 1
         && Array.isArray(row.card_refs) && row.card_refs.length === 1
@@ -457,8 +387,11 @@ try {
   if (error !== rollback) throw error;
 }
 
-const residue = await database.execute(sql`select count(*)::int as count from workspaces where id in (${workspaceId}::uuid, ${foreignWorkspaceId}::uuid)`);
-temporaryRowsCommitted = Number(resultRows(residue)[0]?.count ?? -1) !== 0;
+if (verifierWorkspaceId && verifierForeignWorkspaceId) {
+  const residue = await database.execute(sql`select count(*)::int as count from workspaces
+    where id in (${verifierWorkspaceId}::uuid, ${verifierForeignWorkspaceId}::uuid)`);
+  temporaryRowsCommitted = Number(resultRows(residue)[0]?.count ?? -1) !== 0;
+}
 await pool.end();
 
 const result = {

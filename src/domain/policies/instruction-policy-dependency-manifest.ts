@@ -17,6 +17,8 @@ const policyContract = new Set([
   "policy_manual_lock_revisions.payload",
   "authority_topic_revisions.payload",
   "policy_semantic_binding_revisions.payload",
+  "candidate_preview_binding_revisions.decision",
+  "candidate_preview_binding_revisions.payload",
   "decision_cadence_profile_revisions.profile_payload",
   "progressive_formalization_revisions.revision_payload",
 ]);
@@ -26,6 +28,19 @@ const opaquePolicyContext = new Set([
   "action_proposal_units.unit_payload",
   "action_proposal_units.action_plan_payload",
   "action_proposal_units.summary_payload",
+  "action_execution_attempts.admission_payload",
+  "action_execution_events.event_payload",
+  "robust_cohort_diagnostic_assets.profile",
+  "robust_cohort_diagnostic_assets.member_evidence_refs",
+  "robust_cohort_diagnostic_assets.result_payload",
+  "robust_cohort_diagnostic_assets.capabilities",
+  "creative_diagnostic_definition_revisions.definition_payload",
+  "creative_diagnostic_settlement_policy_revisions.payload",
+  "meta_creative_config_snapshots.config_payload",
+  "meta_creative_window_insight_snapshots.daily_coverage",
+  "creative_fatigue_config_diagnostic_assets.result_payload",
+  "creative_fatigue_config_diagnostic_assets.capabilities",
+  "frozen_diagnostic_evidence.capabilities",
 ]);
 
 const policyAuthorityJsonbColumns = Object.freeze([...policyContract]

@@ -1,0 +1,4 @@
+CREATE UNIQUE INDEX "guidance_cards_workspace_row_unique" ON "guidance_cards" USING btree ("workspace_id","id");--> statement-breakpoint
+CREATE UNIQUE INDEX "guidance_sources_workspace_row_unique" ON "guidance_sources" USING btree ("workspace_id","id");--> statement-breakpoint
+ALTER TABLE "normalization_workbench_revisions" ADD CONSTRAINT "normalization_workbench_revisions_source_scope_fk" FOREIGN KEY ("workspace_id","source_id") REFERENCES "public"."guidance_sources"("workspace_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "normalization_workbench_revisions" ADD CONSTRAINT "normalization_workbench_revisions_card_scope_fk" FOREIGN KEY ("workspace_id","card_id") REFERENCES "public"."guidance_cards"("workspace_id","id") ON DELETE restrict ON UPDATE no action;

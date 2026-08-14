@@ -20,6 +20,7 @@ function failure(reason: unknown) {
   return error("unavailable", "Autonomy Studio şu anda kullanılamıyor.", 503);
 }
 export function autonomyRuleStudioNotConfiguredResponse() { return error("source_not_configured", "Autonomy Studio yerel çalışma alanına henüz bağlanmadı.", 503); }
+export function autonomyRuleStudioSessionRequiredResponse() { return error("local_session_required", "Yetki kuralları için yerel dashboard oturumunu bağlayın.", 401); }
 
 export function createAutonomyRuleStudioHttpHandlers(input: Readonly<{
   service: Pick<AutonomyRuleStudioService, "list" | "createDraft">;

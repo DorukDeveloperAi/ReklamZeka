@@ -84,7 +84,7 @@ function staged() {
   });
 }
 
-function stagedBudget() {
+function stagedBudget(approvalPolicy: ApprovalPolicy = policy) {
   const action: TypedActionIntent = {
     kind: "budget_change", entity: { level: "campaign", ref: "campaign_12345" }, budgetKind: "daily",
     currency: "TRY", beforeDecimal: "100", afterDecimal: "90", budgetOwnerRef: "campaign_12345",
@@ -94,7 +94,7 @@ function stagedBudget() {
     budgetLimits: { currency: "TRY", maximumAbsoluteDeltaDecimal: "20", maximumRelativeDeltaBasisPoints: null,
       limitRefs: ["limit_budget"] },
   });
-  return new ActionProposalStagingService(policy).stage({
+  return new ActionProposalStagingService(approvalPolicy).stage({
     plan: { planRef: "plan_budget", revision: 1, planHash: "b".repeat(64) },
     workspaceRef: "workspace_alpha", accountRef: "act_12345",
     requester: { actorRef: "actor_operator", role: "operator" },
@@ -120,6 +120,18 @@ function trustedDefinitions(patch: { workspaceRef?: string; policyRef?: string; 
     normalizedBy: { actorRef: "actor_analyst", role: "analyst" } });
   const published = publishApprovalPolicy({ draft, actor: { actorRef: "actor_owner", role: "owner" },
     decisionRef: "decision_publish_policy", reasonRef: "reason_reviewed",
+    publishedAt: "2026-08-07T10:30:00.000Z" });
+  return { draft, published, definitions: [draft, published] as const };
+}
+
+function trustedBudgetDefinitions() {
+  const draft = createApprovalPolicyDraft({ workspaceRef: "workspace_alpha",
+    policy: { ...policy, policyRef: "policy_budget_queue", revision: 1 },
+    applicability: { actionType: "budget_decrease", risk: "K2" },
+    effectiveFrom: "2026-08-07T10:00:00.000Z", expiresAt: null,
+    normalizedBy: { actorRef: "actor_analyst", role: "analyst" } });
+  const published = publishApprovalPolicy({ draft, actor: { actorRef: "actor_owner", role: "owner" },
+    decisionRef: "decision_budget_policy", reasonRef: "reason_budget_reviewed",
     publishedAt: "2026-08-07T10:30:00.000Z" });
   return { draft, published, definitions: [draft, published] as const };
 }
@@ -323,6 +335,21 @@ describe("DrizzleActionProposalQueueRepository", () => {
     })]);
     await expect(repository.appendInitial(proposal)).resolves.toMatchObject({ outcome: "unchanged" });
     expect(database.table(schema.actionProposalBundles)).toHaveLength(1);
+  });
+
+  it("binds a K2 budget unit only to its exact published budget-decrease policy", async () => {
+    const trusted = trustedBudgetDefinitions();
+    const proposal = stagedBudget(trusted.published.policy);
+    const database = new AtomicQueueDatabase();
+    database.setTable(schema.approvalPolicyDefinitionRevisions, definitionRows(trusted.definitions));
+    bindFrozenContexts(database, proposal);
+    await expect(new DrizzleActionProposalQueueRepository(database as never, workspaceId).appendInitial(proposal))
+      .resolves.toMatchObject({ outcome: "inserted" });
+    expect(database.table(schema.actionApprovalPolicySnapshots)).toEqual([expect.objectContaining({
+      sourceDefinitionId: trustedDefinitionId,
+      sourceDefinitionCanonicalHash: trusted.published.canonicalHash,
+      policyRef: trusted.published.policyRef,
+    })]);
   });
 
   it("performs zero queue writes when trusted K4 source is missing, ambiguous, mismatched, cross-tenant, draft, disabled, or expired", async () => {

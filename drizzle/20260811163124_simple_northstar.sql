@@ -1,0 +1,3 @@
+ALTER TABLE "frozen_diagnostic_evidence" ADD COLUMN "category_cohort_profile_hash" text;--> statement-breakpoint
+CREATE INDEX "frozen_diagnostic_evidence_cohort_profile_idx" ON "frozen_diagnostic_evidence" USING btree ("workspace_id","entity_type","objective","funnel","optimization_event","category_cohort_profile_hash","policy_set_hash","captured_at");--> statement-breakpoint
+ALTER TABLE "frozen_diagnostic_evidence" ADD CONSTRAINT "frozen_diagnostic_evidence_cohort_profile_hash" CHECK ("frozen_diagnostic_evidence"."category_cohort_profile_hash" is null or "frozen_diagnostic_evidence"."category_cohort_profile_hash" ~ '^[a-f0-9]{64}$');

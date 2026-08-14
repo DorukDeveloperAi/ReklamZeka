@@ -1,16 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { BudgetLabDetailResult, BudgetLabListResult, BudgetLabSummary } from "@/application/budget-lab-read-service";
 import type { PublicBudgetProposal } from "@/connectors/budget/budget-proposal-drizzle-repository";
+import { LocalSessionConnector } from "./local-session-connector";
 import styles from "./operating-dashboard.module.css";
 
 type State =
   | Readonly<{ status: "loading" }>
-  | Readonly<{ status: "unavailable" | "error"; message: string }>
+  | Readonly<{ status: "session_required" | "unavailable" | "error"; message: string }>
   | Readonly<{ status: "ready"; result: BudgetLabListResult; selected: PublicBudgetProposal | null }>;
 type Envelope<T> = Readonly<{ result: T }>;
-type ErrorEnvelope = Readonly<{ error?: Readonly<{ message?: string }> }>;
+type ErrorEnvelope = Readonly<{ error?: Readonly<{ code?: string; message?: string }> }>;
 
 function timestamp(value: string) {
   return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(value));
@@ -24,14 +25,16 @@ export function BudgetLabReadSurface(props: Readonly<{
   state: State;
   onRetry(): void;
   onSelect(item: BudgetLabSummary): void;
+  onConnect?: () => Promise<boolean>;
 }>) {
   const ready = props.state.status === "ready" ? props.state : null;
   return <>
     <section className={styles.pageHero}><div><span className={styles.kicker}>BUDGET LAB · VERIFIED READ MODEL</span><h1>Deterministik bütçe önerilerini, izleri ve sınırlarıyla okuyun.</h1><p>Her öneri dondurulmuş kampanya bağlamından gelir. Bu yüzey senaryo üretmez, taslak kaydetmez, onaylamaz, execute etmez ve Meta’ya yazmaz.</p></div><span className={styles.readOnlyBadge}>READ ONLY · AUTHORITY NONE</span></section>
     {props.state.status === "loading" ? <section className={`${styles.panel} ${styles.budgetLabState}`} role="status"><span className={styles.liveDot} /><h2>Bütçe önerileri doğrulanıyor</h2><p>Tenant kapsamı, proposal bütünlüğü ve alternatif sırası sunucuda kontrol edilir.</p></section> : null}
-    {props.state.status === "unavailable" ? <section className={`${styles.panel} ${styles.budgetLabState}`} role="alert"><strong>Kaynak henüz bağlı değil</strong><h2>{props.state.message}</h2><p>Demo bütçe kayıtları canlı sonuç gibi gösterilmez. Güvenli yerel oturum ve gerçek repository bağlandığında bu görünüm açılır.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></section> : null}
+    {props.state.status === "session_required" ? <section className={`${styles.panel} ${styles.budgetLabState}`} role="alert"><strong>YEREL OTURUM GEREKLİ</strong><h2>Bütçe çalışma alanını bağlayın</h2><p>{props.state.message}</p>{props.onConnect ? <LocalSessionConnector title="Bütçe çalışma alanını bağlayın" onVerify={props.onConnect} /> : <button onClick={props.onRetry}>Tekrar dene</button>}</section> : null}
+    {props.state.status === "unavailable" ? <section className={`${styles.panel} ${styles.budgetLabState}`} role="alert"><strong>Kaynak henüz bağlı değil</strong><h2>{props.state.message}</h2><p>Bağlı üretim repository’si olmadan örnek bütçe kaydı gösterilmez.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></section> : null}
     {props.state.status === "error" ? <section className={`${styles.panel} ${styles.budgetLabState}`} role="alert"><strong>Budget Lab okunamadı</strong><h2>{props.state.message}</h2><p>Kapsam dışı, bozuk veya güvenli projection sınırını aşan kayıtlar kısmen gösterilmez.</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
-    {ready && ready.result.items.length === 0 ? <section className={`${styles.panel} ${styles.budgetLabState}`}><strong>Kaynak bağlı · öneri yok</strong><h2>Bu çalışma alanında henüz deterministik bütçe önerisi bulunmuyor.</h2><p>Bu gerçek tenant-bound boş yanıttır; fixture veya demo fallback değildir.</p></section> : null}
+    {ready && ready.result.items.length === 0 ? <section className={`${styles.panel} ${styles.budgetLabState}`}><strong>Kaynak bağlı · öneri yok</strong><h2>Bu çalışma alanında henüz deterministik bütçe önerisi bulunmuyor.</h2><p>Bağlı çalışma alanı boş yanıt döndürdü; örnek kayıt eklenmedi.</p></section> : null}
     {ready && ready.result.items.length > 0 ? <div className={styles.budgetLabWorkspace}>
       <section className={`${styles.panel} ${styles.budgetLabIndex}`}><header className={styles.panelHeader}><div><span className={styles.kicker}>PROPOSAL LEDGER</span><h2>{ready.result.items.length} öneri</h2></div><span>Public-safe</span></header><div>{ready.result.items.map((item) => <button key={item.proposalRef} data-active={ready.selected?.proposalRef === item.proposalRef} onClick={() => props.onSelect(item)}><span><strong>{item.seriesRef} · r{item.revision}</strong><small>{timestamp(item.createdAt)} · {item.composedCount} hazır · {item.suppressedCount} bastırılmış</small></span><i>{item.mappingStatus}</i></button>)}</div></section>
       <BudgetProposalDetail item={ready.selected} />
@@ -52,21 +55,25 @@ function BudgetProposalDetail({ item }: Readonly<{ item: PublicBudgetProposal | 
 
 export function BudgetLabPanel() {
   const [state, setState] = useState<State>({ status: "loading" });
+  const mounted = useRef(false);
   const load = useCallback(async () => {
+    if (!mounted.current) return false;
     setState({ status: "loading" });
     try {
-      const response = await fetch("/api/budget-lab?view=list&limit=50", { cache: "no-store" });
+      const response = await fetch("/api/budget-lab?view=list&limit=50", { cache: "no-store", credentials: "same-origin" });
       const payload = await response.json() as Envelope<BudgetLabListResult> | ErrorEnvelope;
+      if (!mounted.current) return false;
       if (!response.ok) {
-        const message = "error" in payload ? payload.error?.message : undefined;
-        setState({ status: response.status === 503 ? "unavailable" : "error", message: message ?? "Budget Lab yanıtı alınamadı." });
-        return;
+        const remoteError = "error" in payload ? payload.error : undefined;
+        setState({ status: remoteError?.code === "local_session_required" ? "session_required" : response.status === 503 ? "unavailable" : "error", message: remoteError?.message ?? "Budget Lab yanıtı alınamadı." });
+        return false;
       }
       if (!("result" in payload) || payload.result.view !== "list") throw new Error("invalid_contract");
       setState({ status: "ready", result: payload.result, selected: null });
-    } catch { setState({ status: "error", message: "Budget Lab bağlantısı şu anda kullanılamıyor." }); }
+      return true;
+    } catch { if (mounted.current) setState({ status: "error", message: "Budget Lab bağlantısı şu anda kullanılamıyor." }); return false; }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { mounted.current = true; void load(); return () => { mounted.current = false; }; }, [load]);
   const select = useCallback(async (summary: BudgetLabSummary) => {
     try {
       const query = new URLSearchParams({ view: "detail", seriesRef: summary.seriesRef, revision: String(summary.revision) });
@@ -77,5 +84,5 @@ export function BudgetLabPanel() {
       setState((current) => current.status === "ready" ? { ...current, selected: payload.result.item } : current);
     } catch { setState({ status: "error", message: "Bütçe önerisi güvenli biçimde okunamadı." }); }
   }, []);
-  return <BudgetLabReadSurface state={state} onRetry={() => void load()} onSelect={(item) => void select(item)} />;
+  return <BudgetLabReadSurface state={state} onRetry={() => void load()} onSelect={(item) => void select(item)} onConnect={load} />;
 }

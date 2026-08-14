@@ -180,7 +180,7 @@ describe("Drizzle reviewed ApprovalPolicy registry", () => {
 
   it("exposes no approval, grant, execution, snapshot, or Meta method", () => {
     expect(Object.getOwnPropertyNames(DrizzleApprovalPolicyRegistryRepository.prototype).sort())
-      .toEqual(["append", "constructor", "latestArtifact", "listArtifacts", "resolveExistingPostPolicy"]);
+      .toEqual(["append", "constructor", "latestArtifact", "listArtifacts", "resolveExistingPostPolicy", "resolvePolicy"]);
     expect(() => new DrizzleApprovalPolicyRegistryRepository({} as never, "invalid", workspaceRef))
       .toThrow(ApprovalPolicyRegistryRepositoryError);
   });

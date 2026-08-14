@@ -13,15 +13,15 @@ const workspaceId = "workspace_private_composer";
 const request = Object.freeze({ workspaceId, accountRef: "account_primary", entityType: "campaign" as const,
   entityRef: "campaign_primary" });
 
-function category() {
+function category(entityId = "campaign_primary") {
   const dimension: CategoryDimension = { id: "dimension_primary", workspaceId, key: "service", version: 1,
     cardinality: "single", allowedEntityLevels: ["campaign"], archivedAt: null };
   const definition: CategoryDefinition = { id: "definition_primary", workspaceId, dimensionId: dimension.id,
     key: "lead", label: "Lead", version: 1, archivedAt: null };
   const frozen = resolveEffectiveCategory({ dimension, definitions: [definition],
-    path: { workspaceId, nodes: [{ level: "campaign", id: "campaign_primary" }] }, assignments: [{
+    path: { workspaceId, nodes: [{ level: "campaign", id: entityId }] }, assignments: [{
       id: "assignment_primary", workspaceId, dimensionId: dimension.id, definitionId: definition.id,
-      entity: { level: "campaign", id: "campaign_primary" }, operation: "add", source: "manual", manualLock: false,
+      entity: { level: "campaign", id: entityId }, operation: "add", source: "manual", manualLock: false,
       evidence: [{ kind: "owner", ref: "owner_evidence" }], confidence: 1, version: 1, archivedAt: null,
     }] }).frozenContext;
   return bindCategoryProfiles(frozen, [createCategoryProfile({ workspaceRef: "workspace_private_composer",
@@ -79,18 +79,27 @@ function authority(): RepositoryVerifiedAuthority {
 
 function source(options: Readonly<{ authority?: RepositoryVerifiedAuthority }> = {}): EffectiveAnalysisContextReadySource {
   return { status: "ready", capturedAt: "2026-08-10T15:00:00.000Z", facts: facts(),
-    categories: { workspaceId, dimensions: [{ frozenContext: category() }] },
+    categories: { workspaceId, target: { level: "campaign", id: request.entityRef }, dimensions: [{ frozenContext: category() }] },
     lifecycle: { registryHash: "c".repeat(64), current: [], history: [], diffs: [] }, authority: options.authority ?? authority() };
 }
 
-function composer(options: Readonly<{ invalidated?: boolean; authority?: RepositoryVerifiedAuthority; source?: EffectiveAnalysisContextReadySource }> = {}) {
+function composer(options: Readonly<{ invalidated?: boolean; authority?: RepositoryVerifiedAuthority; source?: EffectiveAnalysisContextReadySource;
+  saveError?: unknown }> = {}) {
   const save = vi.fn(async (context) => ({ outcome: "inserted" as const,
     record: { context, sourceComponents: [], invalidated: options.invalidated ?? false } }));
+  if (options.saveError !== undefined) save.mockRejectedValue(options.saveError);
   const instance = new EffectiveAnalysisContextComposer({ loadCurrent: vi.fn(async () => options.source ?? source(options)) }, { save });
   return { instance, save };
 }
 
 describe("EffectiveAnalysisContextComposer", () => {
+  it("can compose a source-bound base for a derived evidence writer without persisting the base identity", async () => {
+    const { instance, save } = composer();
+    const result = await instance.compose(request);
+    expect(result.context.policyAuthorityEvidence?.snapshotRef).toBe("authority_snapshot_primary");
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it("accepts only scope input, derives config/category/authority evidence, and persists evidence-bound", async () => {
     const { instance, save } = composer();
     const result = await instance.composeAndSave(request);
@@ -100,6 +109,31 @@ describe("EffectiveAnalysisContextComposer", () => {
     expect(result.context.policyAuthorityEvidence?.snapshotRef).toBe("authority_snapshot_primary");
     expect(result.context.capabilities).toEqual({ containsRawL0: false, canAuthorizeAction: false, canExecuteWrite: false });
     expect(save).toHaveBeenCalledWith(result.context, { mode: "evidence_bound" });
+  });
+
+  it("accepts a source-bound internal category target after validating the external Meta request separately", async () => {
+    const internalCampaignId = "4f2b4dfd-8a2b-4f27-9d5b-4d7753f4de12";
+    const repositorySource: EffectiveAnalysisContextReadySource = {
+      ...source(),
+      categories: { workspaceId, target: { level: "campaign", id: internalCampaignId },
+        dimensions: [{ frozenContext: category(internalCampaignId) }] },
+    };
+    const { instance, save } = composer({ source: repositorySource });
+
+    await expect(instance.composeAndSave(request)).resolves.toMatchObject({ outcome: "inserted" });
+    expect(save).toHaveBeenCalledOnce();
+  });
+
+  it("passes the source-owned internal category target to the authority closure", async () => {
+    const internalCampaignId = "4f2b4dfd-8a2b-4f27-9d5b-4d7753f4de12";
+    const compose = vi.fn((base: Parameters<RepositoryVerifiedAuthority["compose"]>[0], lifecycle: Parameters<RepositoryVerifiedAuthority["compose"]>[1]) =>
+      authority().compose(base, lifecycle));
+    const repositorySource: EffectiveAnalysisContextReadySource = { ...source({ authority: { compose } }),
+      categories: { workspaceId, target: { level: "campaign", id: internalCampaignId },
+        dimensions: [{ frozenContext: category(internalCampaignId) }] } };
+
+    await expect(composer({ source: repositorySource }).instance.composeAndSave(request)).resolves.toMatchObject({ outcome: "inserted" });
+    expect(compose).toHaveBeenCalledWith(expect.anything(), expect.anything(), { level: "campaign", id: internalCampaignId });
   });
 
   it("rejects caller-injected context fields and an authority closure without production proof", async () => {
@@ -113,9 +147,22 @@ describe("EffectiveAnalysisContextComposer", () => {
       .rejects.toMatchObject({ code: "authority_rejected" } satisfies Partial<EffectiveAnalysisContextComposerError>);
   });
 
+  it("preserves a sanitized authority diagnostic while retaining the fail-closed rejection", async () => {
+    const rejected = { compose: () => { const error = new Error("scope mismatch");
+      Object.assign(error, { code: "scope_mismatch", diagnosticCode: "canonical_objective" }); throw error; } } as unknown as RepositoryVerifiedAuthority;
+    await expect(composer({ authority: rejected }).instance.composeAndSave(request))
+      .rejects.toMatchObject({ code: "authority_rejected", diagnosticCode: "scope_mismatch:canonical_objective" } satisfies Partial<EffectiveAnalysisContextComposerError>);
+  });
+
   it("rejects a save that is already invalidated", async () => {
     await expect(composer({ invalidated: true }).instance.composeAndSave(request))
       .rejects.toMatchObject({ code: "invalidated_save" } satisfies Partial<EffectiveAnalysisContextComposerError>);
+  });
+
+  it("preserves only a typed persistence diagnostic while keeping save rejection fail-closed", async () => {
+    const rejected = Object.assign(new Error("driver detail must not escape"), { code: "workspace_scope_mismatch" });
+    await expect(composer({ saveError: rejected }).instance.composeAndSave(request))
+      .rejects.toMatchObject({ code: "source_rejected", diagnosticCode: "workspace_scope_mismatch" } satisfies Partial<EffectiveAnalysisContextComposerError>);
   });
 
   it("rejects a repository source that truthfully remains not ready", async () => {

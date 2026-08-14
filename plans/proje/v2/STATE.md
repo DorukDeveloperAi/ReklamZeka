@@ -3,6 +3,990 @@
 > Kümülatif ilerleme defteri. v1'in ayrıntılı tur geçmişi
 > [v1 STATE](../v1/STATE.md)'te değişmeden korunur.
 
+## 2026-08-13 — Master tamamlanma sırası
+
+- Kullanıcı-görünür üretim hedefi, teknik alt maddelerin tek başına kapanmasından ayrıştırıldı ve
+  `MASTER.md` altında sekiz fazda sabitlendi: gerçek salt-okunur Meta aynası; kanıtlı künye/slice;
+  kural ve bütçe çalışma alanı; zamansal öneri/alarm; kalıcı ReklamZeka Orchestrator sohbeti; birleşik
+  insan karar akışı; ayrıca izinli typed Meta write pilotu; üretim kapanışı.
+- Mevcut ağırlıklı ilerleme yaklaşık `%55` olarak kaydedildi: teknik/güvenlik altyapısı `%65`, gerçek
+  kullanıcı işletim döngüsü `%40`. Bu oran kabul kanıtı değildir; her fazın master kabul kapısı ve
+  ayrıntılı CHECKLIST maddeleri korunur.
+- `yerli/yabancı` sınırı, tahminle künye yasağı, draft≠policy, iki kişi policy yayını ve agentın
+  publish/approve/execute/Meta-write yetkisinin kapalı kalması bütün fazlarda değişmezdir.
+
+## 2026-08-13 — Dashboard güvenlik sınırı tarayıcı kabulü
+
+- Yerel Dashboard, oturumsuz gerçek tarayıcıda kontrol edildi. `Kurallar & akışlar` alanı Bütçe
+  Havuzları, Guidance → Normalization → Slice Rule yüzeylerini görünür kılıyor; kalıcı kayıt
+  gerektiren her panel yerel oturum bağlanana kadar açıkça `kaynak bağlı değil`/`oturum gerekli`
+  durumunda ve yazma denetimleri kapalıdır. Demo havuz veya kural kaydı üretilmedi.
+- Onay Kuyruğu, kaynak olmadan fixture satırı göstermiyor; `approval_only`, execute kapalı ve
+  Meta write kapalı durumunu açıkça gösteriyor. Orchestrator yüzeyi aynı şekilde session yokken
+  composer'ı devre dışı bırakıyor ve yalnız manuel aktarım fall-back'ini bırakıyor.
+- Tarayıcı konsolunda hata/uyarı görülmedi. Bu yalnız **oturumsuz fail-closed** kabulüdür; gerçek
+  workspace principal ile Rule → BudgetProposal → ActionUnit → insan kararı ve gerçek Meta
+  read-mirror hiyerarşisi browser kabulü hâlâ açıktır.
+
+## 2026-08-13 — Faz 0 kanıt/durum uzlaştırması
+
+- Canonical Meta mirror için ayrı **trust/readiness** read projection eklendi. Aktif connection ve
+  account kapsamı requestten değil, salt-okunur repeatable-read transaction içinde canonical DB'den
+  çözülür; Dashboard yalnız opaque connection/account ref'leri, stream coverage/freshness ve reason
+  code'ları görür. Eşik sürümü/report hash'i kanıta bağlıdır; Graph/secret çağrısı, publish/approve/
+  execute/Meta write yoktur. Oturum yoksa rapor fail-closed kalır. Gerçek principal ile browser
+  kabulü hâlâ açık olup bu kayıt onu tamamlanmış saymaz.
+
+- **Salt-okunur Meta bootstrap'i gerçek tenantta çalıştırıldı.** Güvenlik işareti `rotated` sonrası
+  read-only connection doctor kabulü geçti; beş erişilebilir hesap için canonical data-source/account
+  kökleri oluşturuldu. Dayanıklı, yalnız GET mirror checkpoint'leri şu ana kadar 422 kampanya, 1086
+  reklam seti ve 1336 reklam yazdı. Bu yalnız GET çağrılarıyla gerçekleşti; Meta write sıfırdır.
+  Inventory recovery yaratıcı streamini başlatacak kadar ilerledi, ancak bir inventory sayfası upstream
+  hatasıyla `partial` kaldığı ve creative/insight streamleri tamamlanmadığı için canlı kabul henüz
+  tamamlanmış sayılmaz; recovery komutu bu state'i idempotent checkpoint'ten sürdürür.
+  Sunucu yapılandırmasındaki doğrulanmış tek hesap için ayrık inventory/ad-set recovery lane'i canlıda
+  `completed` oldu; lane yalnız GET yapar, requestten account/stream kabul etmez ve aynı durable
+  cursor/parent üzerinden tekrar başlatılır. Creative için ayrı canonical lane ilk canlı checkpoint'te
+  **145 creative** ve **180 ad–creative bağı** yazdı; post/Page/Instagram aktör kanıtı bu dar ads
+  lane'inde okunmadığından post ilişkisi bilerek `unresolved` bırakılır, uydurulmaz. Insight lane'i
+  teknik olarak `completed` döndü fakat seçili yedi günlük pencerede Meta günlük insight satırı
+  döndürmedi; metrik/performance önerileri bu hesap için hâlâ `unavailable` kalır.
+- `/api/meta/read-mirror` Dashboard'un kullandığı canonical DB read-model'idir; eski
+  `/api/meta/inventory` route'u bilinçli biçimde `503` kalır. Hiyerarşinin campaign kısmı mevcut
+  tenantta gerçek veriye bağlıdır. Ad-set/ad/creative/insight tamamlaması ve ayrıntılı immutable
+  affected-geo snapshot backfill'i henüz canlı kabulden geçmediği için bu alanlar `partial`/`unavailable`
+  olarak görünmelidir; dashboard bunları demo gibi göstermemelidir.
+- Meta sync scheduler substrate'i (registry, lease, worker ve private factory) artık güvenli yerel
+  `run:meta-read-sync-schedule` runner'ıyla çağrılabilir. Runner varsayılan olarak kapalıdır;
+  yalnız açık `REKLAMZEKA_META_SCHEDULE_RUNNER_ENABLED=true` ve `META_TOKEN_SECURITY_STATUS=rotated`
+  ile due schedule'ları çalıştırır, scope/account/token kabul etmez ve yalnız GET-only tick sonucunun
+  aggregate özetini yazar. Enabled schedule/cron işletimi ve üç ardışık canlı fire kabulü henüz açık
+  kalır. `verify:meta-read-sync-schedule-db` yalnız substrate'i kanıtlar; güncel veri kanıtlamaz.
+- Token değeri hiçbir log/projection'a taşınmadı. Bootstrap yalnız `META_TOKEN_SECURITY_STATUS=rotated`
+  önkoşulunda ve server-private secret resolver ile çalışır; scheduler/Meta write yine aktif değildir.
+- Slice/budget/policy altyapısı, persistent Slice Rule Workspace, Budget Lab dry-run impact preview
+  ve açık kullanıcı isteğiyle kaydedilen **advisory BudgetProposal draft** zinciriyle aynı kullanıcı
+  akışında bağlandı. Kaydedilen öneri, exact Slice Rule draft ref/hash/scope ile immutable provenance
+  kaydına bağlıdır; publish/approve/execute/Meta write kapalıdır.
+- Orchestrator artık kalıcı conversation/turn/message ledger'i ve güvenli yerel Codex adapter'ıyla
+  Dashboard'a bağlıdır: sabit executable/cwd, shell=false, read-only sandbox ve yalnız normalize edilmiş
+  JSONL son yanıtı kullanılır. Konuşma bütün sayfalarda aynıdır; her tur yalnız page-guide snapshotı
+  taşır. Experimental app-server kullanılmaz; session/adapter yoksa manuel `Codex'e aktar` fallback'i
+  korunur. Sohbet typed kullanıcı onayı olmadan kural/bütçe/policy veya Meta değişikliği yapamaz.
+
+## 2026-08-13 — İlk gerçek read/rule/Orchestrator dikeyleri
+
+- `GET /api/meta/read-mirror` artık yalnız cookie/session ve tenant-bağlı canonical DB aynasından
+  account → campaign → ad set → ad → creative/post, içerik/CTA/destination/hedefleme/budget-owner
+  projection'ı döndürür. Yanıt opaque ref, freshness/quality reason ve `ready|partial|stale|empty|
+  unavailable` source state taşır; Graph/secret çağrısı ve publish/approve/execute/Meta-write yetkisi
+  yoktur. Dashboard bu projection'ı ayrı source-state kartı ve hiyerarşi yüzeyiyle kullanır; eksik
+  hiyerarşi/insight alanlarını `partial` veya `unavailable` diye gösterir. Eski `/api/meta/inventory`
+  route'u bilinçli 503 davranışını korur.
+- `slice_rule_workspace_drafts` ile ilk persistent **Slice Rule Workspace** eklendi. Taslaklar
+  append-only/revision+hash+audit zincirlidir; pazar (`yerli|yabancı`), hizmet ve kampanya ailesi
+  zorunludur; geo/audience/platform varsa exact scope'a bağlanır ve eksik alan tahmin edilmez. Mod DB
+  ve application katmanında yalnız `recommendation_only`dir: policy/publish/approve/execute/Meta write/
+  automation yetkileri false, owner/admin/analyst yazımı ve viewer read-only sınırı RLS FORCE,
+  revoke, immutable/tombstone korumasıyla uygulanır. Dashboard editörü yalnız kaydedilmiş exact
+  draft ref/hash/scope ile Budget Lab dry-run impact preview'a bağlanır; stale, eksik veya kanıtsız
+  kapsam fail-closed kalır. Preview proposal, approval, action veya Meta write oluşturmaz.
+- Kalıcı **ReklamZeka Orchestrator** conversation/turn/message ledger'i eklendi. Dashboard'un bütün
+  sayfaları aynı workspace/user konuşmasını kullanır; her turn page-guide snapshotı taşır. Yerel
+  transport yalnız sabit executable/cwd, shell=false, read-only sandbox, allowlisted environment ve
+  `codex exec --json` / exact-thread `resume --json` kullanır; JSONL'den sadece son agent yanıtı
+  saklanır, experimental app-server veya sahte token streaming kullanılmaz. Session yok/adapter kapalı
+  halde manuel `Codex'e aktar` fallback'i korunur. Sohbet policy/action/Meta-write yetkisi vermez ve
+  kalıcı kural/bütçe değişikliği için ileride ayrı typed UI confirmation gerekir.
+- Kanıt: slice live outer-rollback verifier; read-mirror boş DB smoke; gerçek Codex `exec`+`resume`
+  kabulü; 34 odaklı test, typecheck, db:check, production build ve secret scan geçti. Yeni forward
+  migrationlar yerel geliştirme DB'sine uygulandı.
+
+## 2026-08-13 — Persistent delivery/payment alarm ledger'i
+
+- `delivery_health_alerts` zinciri, `confirmed` resmi durum kanıtını ve `suspected` harcama/teslimat
+  anomalisini ayrı immutable olaylar olarak kaydeder. Alarmın ataması, dört maddelik kontrol listesi,
+  `open → investigating → resolved/reopen` geçmişi ve evidence hash'i append-only audit zincirindedir.
+- `hold_recommendations` yalnız öneri baskılama işaretidir; approval/action/execute/automation/Meta-write
+  yetkisi vermez. Alarm materialization server-private; HTTP yalnız public-safe okuma ve insan workflow
+  geçişi sunar. RLS FORCE, revoke, tombstone purge ve audit korumaları uygulanır.
+- Canlı DB verifier; iki kanıt seviyesinin ayrılığını, idempotency, checklist zorunluluğunu, viewer write
+  reddini, append-only korumayı, audit zincirini ve sıfır Meta write'ı doğruladı. Bu checkpoint henüz
+  Dashboard alarm panelini veya temporal evaluator'ı bağlamaz.
+
+## 2026-08-13 — Kural impact ve alarm kullanıcı yüzeyleri
+
+- Kurallar ekranı, persistent Slice Rule Workspace panelini Guidance Studio yanında gösterir. Kullanıcı
+  recommendation-only taslak oluşturabilir; yalnız kaydedilmiş exact draft ref/hash/scope üzerinden
+  frozen context'ten çözülen pazar/hizmet/aile kanıtıyla Budget Lab dry-run impact preview isteyebilir.
+  Kaydedilmemiş form, stale/missing draft, bozuk/çoklu kategori, pazar uyuşmazlığı veya unsupported rule
+  türü preview üretmez. Preview persistence/proposal/approval/action/Meta write oluşturmaz. Ayrı ve
+  açık “öneri taslağını kaydet” isteği, preview'ı tekrar doğrular ve immutable rule→BudgetProposal
+  provenance bağını kaydeder; policy yayınlama, approval, action, otomasyon ve Meta write yine kapalıdır.
+- Dönüşüm rotası (`lead_form|whatsapp|landing_page`) artık serbest metin değildir: yalnız frozen
+  `conversion_route` category evidence içinden tekil ve canonical biçimde çözülür; yoksa veya
+  çelişirse impact `needs_review` kalır.
+- Teslimat Alarmları Dashboard yüzeyi, confirmed/suspected ayrımı, atama, checklist, insan workflow
+  durumu ve recommendation hold bilgisini gösterir. UI yalnız server-izinli `assign/start/check/resolve/
+  reopen` geçişini sunar; approval/execute/automation/Meta write kontrolü yoktur.
+- Kanıt: Rule impact resolver/service/HTTP/panel 17 odaklı test; alert panel/ledger 12 odaklı test;
+  typecheck ve db check geçti. Bu yüzeyler gerçek Meta bağlamı yokken boş/unavailable gösterir; demo
+  alarm veya performans iddiası üretmez.
+- Slice Rule Workspace'e açık **bütçe dağılımı** taslağı da eklendi: ülke/bölge, kampanya kategorisi
+  veya sonuç rotası için her dilim kullanıcı tarafından `dilim: yüzde` olarak girilir ve toplam tam
+  `%100` değilse kayıt oluşmaz. Bu dağıtım da yalnız recommendation-only taslaktır. Budget impact
+  resolver'ı, taslağın istediği ülke/bölge, hedefleme stratejisi veya yayın platformunu ancak aynı
+  frozen context'te exact category membership kanıtı varsa kabul eder; eksik, çelişkili veya farklı
+  künye preview üretmez. Çoklu geo etiketi, istenen etiketi gerçekten içerdiğinde ek kapsamı gizlemez;
+  kategori kanıtı olmayan genişletilmiş scope için fallback yoktur.
+- Ayrı `budget_pool_hierarchy_revisions` kayıt defteri artık bütün bütçe havuzu ağacını immutable
+  revizyon olarak saklar. Her kayıt tam olarak bir yerli ve bir yabancı pazar kökü, aynı para birimi,
+  child ≤ parent tavanı ve parent zaman penceresi sınırını doğrular; named alt-havuzlar bu iki sınırı
+  delemez. RLS FORCE/revoke, append-only+tombstone koruması ve audit kaydı uygulanır. Bu yalnız
+  recommendation-only taslaktır: gerçek harcama tahsisi, policy publish, approval, otomasyon veya
+  Meta write yetkisi vermez; bir sonraki dilim bunu Rule Workspace editörü ve frozen impact ile bağlar.
+- Rules ekranındaki **Bütçe Havuzları** paneli, bu kayıt defterini aynı local-session sınırından okur
+  ve yeni revizyon taslağı kaydedebilir. Kullanıcı iki pazar kökünü ve alt havuz ağacını açık şemada
+  görür; server tüm hiyerarşi/pazar/tavan/zaman kurallarını yeniden doğrular. Bu yüzey henüz Rule
+  taslağıyla otomatik eşleştirme veya gerçek bütçe önerisi üretmez.
+
+## 2026-08-13 — İlk gerçek operasyon izi
+
+- Dashboard Timeline'daki statik örnekler kaldırıldı. Yeni salt-okunur `operational-timeline/1.0.0`
+  projection'ı yalnız tenant-bound append-only kayıt defterlerinden Slice Rule taslak revizyonu,
+  doğrulanmış immutable BudgetProposal taslağı, delivery/payment alarm olayı, ActionUnit önerisi ve
+  insan onay kararını zaman sırasıyla okur. BudgetProposal payload/hash'i projection öncesi yeniden
+  doğrulanır; bu proposal exact Slice Rule provenance'ına bağlıysa timeline bunu ham ref/hash
+  göstermeden ayrıca belirtir. Public timeline ham ref veya hash taşımaz.
+  Ham kimlik, hash, token, Meta ID, kanıt payload'ı ve authority bilgisi public yüzeye taşınmaz.
+- Bu ilk görünüm tam evrensel timeline iddiası değildir: outcome, sync ve policy lifecycle kayıtlarının
+  tek korelasyon grafiğinde birleştirilmesi sonraki dilimdir. Ancak gösterilen kayıtlar artık demo
+  değil; boş veya unavailable durum açıkça gösterilir. Yetki bütün response/UI katmanında publish,
+  approve, execute, automation ve Meta write için kapalıdır.
+- Approval Queue detail v1.4, mevcut ActionUnit summary hash'ini yeniden doğruladıktan sonra
+  public-safe kaynak kanıt etiketlerini ve append-only insan karar geçmişini zaman sırasıyla gösterir.
+  Bu yalnız karar izidir; yeni approval semantiği, execution veya Meta write yüzeyi oluşturmaz.
+
+## 2026-08-13 — Zamansal öneri ve güvenli budget-action temeli
+
+- `temporal-recommendation/1.0.0`, exact frozen context, doğrulanmış Slice Rule taslağı ve settled
+  deterministic window'u mevcut append-only decision ledger'a bağlar. Açık aynı-account delivery
+  alarmı varsa yeni bir immutable `no_change`/hold kaydı; yoksa advisory recommendation kaydı üretir.
+  Alert head'i idempotency kimliğinin parçasıdır; geçmiş karar yeniden yazılmaz. Session-bound API
+  yalnız context/rule/window seçimini alır; alert, metrik veya sonuç kabul etmez. Timeline sonuçları
+  gösterir; publish/approve/execute/automation/Meta write tümü kapalıdır.
+- Gelecek human-approved budget action için `slice_rule_allocation_entity_bindings` immutable
+  persistence katmanı eklendi. Binding, serbest allocation ref'ini doğrudan Meta kimliği saymaz;
+  ileride yalnız canonical campaign/ad-set hiyerarşisi, budget owner/kind/currency/current snapshot
+  ve evidence hash'i doğrulandıktan sonra hazırlanabilir. Server-private writer istemciden Meta ID,
+  tutar, currency veya owner kabul etmez; exact persisted draft→proposal→frozen-context→current
+  mirror zincirini tek transaction'da tekrar doğrular ve missing/stale/ambiguous durumda bağ yazmaz.
+  Bu checkpoint ActionUnit, queue, grant, execution veya Meta write üretmez.
+- ApprovalPolicy applicability artık yalnız üç exact çift kabul eder: mevcut gönderi için
+  `existing_post_promotion/K4`, bütçe azaltma için `budget_decrease/K2` ve bütçe artırma için
+  `budget_increase/K3`. K4 policy'si bütçe işlemine fallback olamaz; policy taslağını normalleştiren
+  kişi kendi taslağını publish edemez. Queue, K2/K3 budget unit'i geldiğinde aynı exact published
+  policy definition'ı tekrar çözüp snapshot'a bağlar; bu sırada ActionUnit üretimi veya Meta write
+  yeni bir public yüzey olarak açılmamıştır.
+- Birden fazla advisory BudgetProposal alternatifi arasından seçim artık `slice_rule_scenario_allocation_selections`
+  immutable kaydıyla owner/admin tarafından açıkça sabitlenir. Kayıt, exact Slice Rule draft,
+  bound BudgetProposal, campaign/ad-set allocation evidence, `composed/planned` scenario ve tek
+  before/after allocation değerini server-side tekrar doğrular. Bu seçim ActionUnit, approval,
+  execute veya Meta write değildir; campaign-owner action taslağı için yalnız provenance temelidir.
+
+## 2026-08-13 — S1.4 canlı asset/post recovery durumu
+
+- Bounded server-owned S1.4 recovery, active read-only bağlantıda yalnız GET ile 79 canonical actor asset,
+  1.182 canonical post/media satırı ve Graph-returned creative/post evidence okudu; Meta write sıfırdır.
+  Ancak seçilen creative sayfalarında exact actor/post eşleşmesi doğrulanamadığından hiçbir mevcut creative
+  post/actor'a tahminle bağlanmadı. Recovery sonucu bu nedenle `partial`dir; Dashboard/post bağlamı
+  eksikmiş gibi gösterilir, mevcut creative copy için sahte post provenance iddiası kurulmaz.
+- Insight recovery de tek UTC gününe ve date-isolated parent run'a daraltıldı; canlı GET-only koşum
+  `completed` oldu fakat Meta o gün için insight satırı döndürmedi. Bu yüzden `meta_daily_insights`
+  boş kalır ve performance/budget önerileri bu gerçek hesap verisiyle açılmaz.
+
+## 2026-08-12 — Portföy pazar sınırı
+
+- Kullanıcıyla yürütülen mevcut portföy istişaresinde **pazar**, tüm künye ve slice'ların ilk
+  işletim ayrımı olarak sabitlendi: yalnız `yerli` veya `yabancı` vardır; karma/çoklu pazar
+  işletim kategorisi yoktur. Aynı slice, bütçe havuzu, sonuç değerlendirmesi veya otomasyon kararı
+  iki pazarı birleştiremez.
+- Bu karar, `pazar_siniri` review-only taslak kuralına işlendi. Kural bütün write yetkilerini kapalı
+  tutar; Meta/CRM adı, bütçe, kampanya durumu veya hedefleme değiştirmez. Sonraki kurallar bu sınır
+  altında, `pazar → ana kampanya hedefi → kampanya işlevi → kampanya ailesi` sırasıyla eklenecektir.
+- Canlı 30 günlük yalnız-okunur Meta kontrolü, yabancı `Intensive FTR` altında Arapça WhatsApp ve
+  Rusça form-lead rotalarının eşdeğer olmayan platform sonuçları ürettiğini doğruladı. Bu nedenle
+  `sonuc_olcum_siniri` taslağı rota, ülke/bölge ve hedef kitle stratejisini ayrı değerlendirme
+  şeritlerinde tutar; haftalık nitelikli-lead incelemesi dışında otomatik bütçe/Meta değişimi açmaz.
+- Değerlendirme havuzu tek bir sabit hiyerarşiye bağlanmadı: `degerlendirme_kumesi` kuralı pazar
+  sınırını zorunlu tutarken, her strateji için ana kampanya hedefi, aile, rota, ülke/bölge, hedef
+  kitle stratejisi ve platformdan gerekli olanları seçebilir. Eksik künye otomatik olarak o
+  karşılaştırmadan dışarıda kalır; tahminle gruplama yapılmaz.
+- İsim denetimi kampanya ana kimliği ile dönüşüm rotasını ayıracak biçimde düzeltildi: örneğin
+  `Fizik Tedavi · Intensive FTR` hizmet/aile kimliğidir; WhatsApp canlı route/ölçüm özelliğidir ve
+  kampanya adının başına geçemez. İsimde rota hiç yazmıyorsa yalnız bilgi `unknown` kalır; isimden
+  rota uydurulmaz. Her öneri insan incelemeli ve yeniden adlandırma/Meta write yetkisizdir.
+- Her slice taslağı artık türetilmiş `zamansalDegerlendirme` taşır: doğrulanmış mevcut kurulum
+  bir sonraki günlük/haftalık/aylık ölçüm penceresine kadar korunur; teslimat kesintisi,
+  kapsam/hedefleme değişimi veya yeni sonuç kanıtı yeniden insan incelemesi tetikler. Bu bilgi
+  scheduler ya da otomasyon değildir; karar modu her zaman `insan_incelemeli_oneri` olarak kapalıdır.
+- Slice kapsamı artık `campaignFamilyRef` taşıyabilir. Böylece `Intensive FTR` gibi bir kampanya
+  ailesinin kuralı, aynı hizmet hattındaki farklı aile/rota çalışmalarından ayrıdır; rota aile
+  kimliği yerine kullanılmaz.
+- Taslak brief de kampanya ailesini rota dışında, isteğe bağlı ve insan-doğrulanmış bir kapsam alanı
+  olarak taşır. `Intensive FTR` seçildiğinde değerlendirme cohort anahtarı aileyi içerir; aile
+  atanmamışsa mevcut brief kümeleri korunur. Bu geçici UI alanı kalıcı künye, proposal veya Meta
+  değişimi yaratmaz.
+- `degerlendirme_kumesi` taslağı artık bir kampanya künyesini deterministik olarak değerlendirme
+  cohort'una çözer. Strateji gerekli boyutları (ör. ana hedef+aile veya ülke+hedefleme+platform)
+  seçer; pazar her zaman zorunludur. Eksik künye ya da slice uyuşmazlığı bir kampanyayı tahminle
+  gruba katmak yerine dışarıda bırakır. Bu yalnız salt-okunur öneri kapsamıdır; otomasyon veya Meta
+  değişimi açılmaz.
+- Mevcut portföyün kural kataloğu, önce tüm pazarı ayıran sınırı; ardından yalnız uygun yabancı
+  `FTR · Intensive FTR` slice'ında değerlendirme kümesi, sonuç-ölçüm sınırı ve korunmuş ülke/platform
+  dağılımı taslaklarını döndürür. Yerli bir FTR/WhatsApp çalışması benzer route taşısa bile yabancı
+  FTR kurallarını devralmaz. Katalog öncelik sırası deterministiktir ve tüm kayıtların yetkileri kapalıdır.
+- Dashboard brief'i artık seçili geçici künyeye uyan kural taslaklarını görünür kılar. Yabancı AR/FTR
+  senaryosunda pazar sınırı, değerlendirme kümesi, sonuç-ölçüm ayrımı ve mevcut hedefleme/bütçe korunumu
+  birlikte görünür; değerlendirme kümesi için hedefleme/platform künyesi eksikse kampanya açıkça dışarıda
+  kalır. Browser kabulünde bu durum, kapalı Meta-write yüzeyi ve sıfır console hata/uyarısı doğrulandı.
+- Brief'e insan-doğrulanmış `hedefleme yaklaşımı` ve `yayın platformu` alanları eklendi. Bu alanlar
+  kampanya adından/rotadan türetilmez; seçilmediklerinde özel FTR kıyas kümesi dışarıda kalır. AR/FTR
+  senaryosunda `özel/seçilmiş hedefleme + Instagram` seçildiğinde cohort'a dahil olma yalnız salt-okunur
+  olarak görünür; proposal, approval, execute ve Meta write kapalı kalır. Browser'da bu geçiş ve sıfır
+  console hata/uyarısı doğrulandı.
+
+## 2026-08-10 — Merkezi ürün akışı ve kademeli teslim ilkesi
+
+- Bundan sonraki ana hat, teknik alt-katmanları tek başına tamamlamak değil; kullanıcının kampanyayı
+  nasıl sınıflandırdığını ve hangi sırayla karar verdiğini görünür, denetlenebilir bir akışa çevirmektir:
+  **kampanya bağlamı → dinamik brief/şablon → salt-okunur öneri → satır-bazlı insan onayı → ayrı,
+  açıkça izinli uygulama**. Her checkpoint bu zincirde gözle görünür bir ilerleme üretmelidir.
+- Öncelik sırası: (1) çalışma kitabından türetilen kategori ve brief şablonlarını Dashboard'da
+  etkileşimli/read-only karar yüzeyine bağlamak, (2) öneri ve approval inbox'ını aynı context/timeline
+  içinde birleştirmek, (3) yalnız bu ürün döngüsü hazır olduğunda A13'ün gerçek transport ve
+  read-after-write kabulünü ayrı kullanıcı izniyle ele almak. Meta write, publish veya otomatik execute
+  bu sıralama ile açılmaz.
+- A09/A10'un mevcut fail-closed kanıtları korunur; ancak yeni ayrıntı yalnız güvenlik ihlali, veri
+  bütünlüğü riski veya bu üç ürün adımını açan somut bir blocker olduğunda yapılır. Kapsam dışı
+  "mükemmelleştirme" işleri checklist'e yeni teslimat gibi eklenmez.
+- `outputs/campaign_budget_tracker_20260810/kampanya_butce_harcama_takip_kesinti_analizli.xlsx`
+  salt-okunur ürün girdisi olarak incelendi: karar eksenleri **pazar → dil → iş amacı → ana grup →
+  dönüşüm yolu**dur; `Lead` ve `Bilinirlik / İzlenme / Trafik` aynı sonuç havuzu değildir; AR WhatsApp
+  ve RU form lead şeritleri ayrı tutulur. Ödeme/teslimat kesintisi sayfası, ani harcama çöküşünün önce
+  sağlıklı teslimat olarak yeniden doğrulanması gerektiğini gösterir. Dashboard briefi bu sınıfları
+  seçilebilir kılar, fakat Excel'i canlı Meta kaynağı veya yazma yetkisi gibi sunmaz.
+- Brief'e bu matrisin altı insan-incelemeli başlangıç senaryosu eklendi: yerli form/WhatsApp lead,
+  AR WhatsApp ve RU form FTR, yerli üst huni içerik/gönderi ve kesinti sonrası toparlama. Seçim yalnız
+  geçici brief girdisini değiştirir; form/WhatsApp veya yerli/yabancı havuzlarını birleştirmez ve
+  campaign create/publish/approval/execute/Meta write başlatmaz.
+- Brief'ten **Taslak talimat alanını aç** geçişi, kampanya planı ile normalizasyon çalışma alanını
+  tek operatör akışında bağlar. Geçiş yalnız dashboard görünümünü değiştirir: campaign/brief state'i,
+  source ref'i veya policy verisi aktarılmaz; kullanıcı Guidance zincirini ve yapılandırılmış niyeti
+  ayrı ayrı doğrular. Böylece görünür devam adımı vardır, fakat otomatik policy/publish/approval/action
+  veya Meta write anlamı yüklenmez.
+- Bu geçiş, yalnız briefin koşulundan türetilmiş düzenlenebilir bir başlangıç şablonunu gösterir:
+  kesinti `delivery_recovery`, lead hedefi `lead_quality`, diğer durumlar `new_campaign_plan`.
+  Şablon kaynak, campaign, kapsam veya policy ref'i değildir; normalizasyon alanı bunun açık işaretini
+  gösterir ve kullanıcı alanları değiştirebilir.
+- Brief ayrıca teklif/değer önerisi, hedef kitle sınırı, nitelikli lead tanımı ve kapasite/geri dönüş
+  notu için dört browser-yerel çalışma alanı taşır. Bu alanlar kaydedilmez veya normalizasyon/policy
+  yüzeyine aktarılmaz; yalnız insanın ilk planlama konuşmasını somutlaştırır.
+
+## 2026-08-11 — A14 canlı performans kaynağı olmadan demo dürüstlüğü
+
+- Today yüzeyindeki sabit harcama, sonuç, CPA, lead kalitesi ve bütçe gerçekleşmesi değerleri kaldırıldı.
+  Read-only inventory yalnız varlık sayısını doğruladığı için performans/CRM/bütçe sonucunu doğrulamaz;
+  bu kartlar artık açık `Kaynak bekleniyor` durumunda kalır. Böylece inventory gelse dahi, ayrı
+  insight/timeframe/outcome/budget-owner kanıtı olmadan KPI iddiası yapılmaz.
+- Karar masası ve portföy kartları da `DEMO`/`Örnek karar biçimleri`/`3 senaryo` olarak etiketlendi;
+  gerçek Approval Queue'ya geçiş ayrı kaldı. Browser'da Today ve Kampanyalar akışı, demo sınırı,
+  brief görünürlüğü ve sıfır console uyarısıyla doğrulandı. Meta write/approval/execute eklenmedi.
+
+## 2026-08-11 — A14 offline çalışma kitabı portföy snapshotı
+
+- Kullanıcının verdiği bütçe/harcama takip çalışma kitabından türetilen tarihli, salt-okunur portföy
+  özeti Kampanyalar yüzeyine eklendi. Kaynak/dönem/capture zamanı açıkça görünür; 27 kampanya,
+  yerli-yabancı ayrımı ve AR WhatsApp FTR / RU form FTR şeritleri yalnız kategorileme ve brief
+  başlangıç bağlamı olarak kullanılır.
+- Snapshot Meta mirror, live KPI, Approval Queue veya kalıcı kaynak değildir. Kesinti kuralı görünür
+  biçimde "önce teslimatı doğrula"dır; form ve WhatsApp sonuçları birleştirilmez. Browser kabulünde
+  offline etiketi, iki rota şeridi, kesinti sınırı ve sıfır console uyarısı doğrulandı.
+- Her offline şerit `Brief'te aç` ile yalnız ilgili geçici başlangıç senaryosuna bağlanır. Örneğin
+  AR WhatsApp FTR seçimi kısa ömürlü briefte uluslararası/Arapça/FTR/WhatsApp alanlarını açar;
+  persisted campaign bağlamı, proposal, approval veya Meta write oluşturmaz. Browser bu geçişi ve
+  kapalı yetki sınırını doğruladı.
+- Aynı snapshot artık portföy seviyesinde kısa bir sıra önerir: önce kesintiyi ayır, sonra lead
+  şeritlerini rota sınırıyla incele, son olarak üst huniyi lead kararından ayrı değerlendir. Bu
+  sıralama çalışma kitabındaki gözlemi görünür kılar; güncel performans hükmü veya otomatik launch
+  planı değildir.
+- Kampanyalar yüzeyindeki görünür şablon kütüphanesi, altı mevcut brief başlangıcını (yerli form/
+  WhatsApp, AR/RU FTR, üst huni ve kesinti toparlama) aynı geçici akışta açar. Tarayıcı kabulünde
+  toparlanma seçimi briefi `Önce engeli çöz` durumuna alır; yeni campaign, policy, approval veya
+  Meta write oluşturmaz.
+
+## 2026-08-12 — A08 oturum bağlı portföy kapsamı
+
+- `GET /api/meta/portfolio-capability` yalnız aynı-origin, cookie-only `decision_room:read`
+  principal'ı için tenant-bound portföy capability snapshotını döndürür. Sorgu parametresi,
+  bearer/cross-origin istek ve oturumsuz erişim fail-closed kalır; yanıt cache edilmez ve action
+  authority `none`dır.
+- Meta bağlantısı ekranı gerçek bağlantı envanteri olmasa bile hesap grubu durumunu dürüstçe
+  `oturum gerekli`/`kaynak yok` olarak gösterir; demo hesap grubu veya erişim uydurmaz. Kaynak
+  geldiğinde hesap başına read readiness ve grup sayısı görünür, fakat grup üyeliği hiçbir hesabın
+  plan/publish/approve/execute/Meta-write yetkisini genişletmez.
+- Focused runtime/domain/dashboard testleri, tam unit paketi (367 dosya/1889 test), production
+  build, DB/security/architecture/model-provider/secret kapıları geçti. Gerçek browser kabulünde
+  oturumsuz dashboard `Oturum gerekli` ve kapalı yazma sınırını gösterdi; Meta veya action çağrısı
+  yapılmadı.
+
+- Autonomy Studio'nun draft kapsam seçicisi, mevcut append-only sözleşmenin desteklediği
+  `account_group` seviyesini de görünür kılar. Grup ref'i yalnız kural değerlendirme kapsamıdır;
+  draft yüzeyinin publish/approve/execute/Meta-write yetkileri yine false kalır.
+
+- Account-group scoped otonomi taslağı artık aynı transaction içinde tenant'a ait güncel ve
+  `active` group revision head'ini `FOR SHARE` ile doğrular. Serbest biçimli, yabancı tenant'a
+  ait veya arşivlenmiş group ref'i `scope_unavailable` ile kaydedilmeden reddedilir; mevcut
+  immutable draft/publish yetki sınırları değişmez.
+
+- Otonomi valfine çözümlenen kural listesi de her `account_group` scope'unu güncel `active`
+  revision head'iyle toplu olarak yeniden doğrular. Sonradan arşivlenmiş ya da kaybolmuş grup,
+  geçmişte publish edilmiş olsa bile action-valve girdisinden çıkarılır; diğer tenant/genel
+  kurallar etkilenmez.
+
+## 2026-08-11 — A09 draft-only owner talimatı normalizasyonu
+
+- Strict Policy Studio içindeki normalizasyon çalışma alanı, owner talimatının mevcut Guidance Studio
+  `source → card → reviewed set` zincirini yalnız opaque ref ile seçer. Sunucu aynı tenant içindeki
+  güncel immutable ID/version/hash kayıtlarını transaction içinde yeniden çözer ve append-only taslak
+  revision'a pinler; ham source metni yeni revision'a kopyalanmaz.
+- Kullanıcı normalize başlık/açıklama/topic/güç, varsayımlar ve açık soruları yapılandırılmış olarak
+  girer. Eksik veya drift etmiş source/card/set `needs_input`/conflict olarak fail-closed kalır;
+  strict DSL JSON, strict-policy lifecycle, publish, G3/G4, approval, action ve Meta write bu yüzeyde
+  yoktur. Bütün capability alanları false'tur.
+- Aynı workbench artık server-side `instruction-policy-normalization/1.0.0` değerlendirmesini de
+  cookie-only read yetkisiyle çağırır: yasaklama, insan onayı, bütçe koruma veya tercih niyeti için
+  gerekli kapsam/operasyon/ref alanlarını açık soru veya `ready_for_draft` sonucu olarak döndürür.
+  Bu sonuç bir StrictInstructionPolicy değildir; persistence, lifecycle, semantic diff/impact,
+  publish ve bütün write capability'leri bu çağrıdan erişilemez kalır.
+- Private kayıt RLS FORCE, public-role revoke, immutable/tombstone guard, tenant-composite FK ve
+  tombstone silme sırasıyla korunur. Focused testler, tam unit paketi (360 dosya/1840 test), production
+  build, DB/security/architecture/model-boundary/secret kapıları doğrulandı. Authoritative strict-policy
+  impact/semantic-diff bağlama ayrı açık checkpoint'tir.
+
+## 2026-08-13 — İki kişi ayrılığıyla strict policy promotion
+
+- Strict policy publish işlemi artık draft'ı oluşturan actor ref ile yapılamaz. Aynı immutable draft
+  revision/hash için farklı bir `owner` veya `admin` publish kararını vermelidir. Kontrol workspace
+  kilidi, güncel membership, exact impact/registry doğrulaması, context invalidation ve append-only
+  audit ile aynı transaction içinde çalışır.
+- Bu yalnız policy promotion yönetişimidir: approval/action/Meta write capability'leri kapalı kalır;
+  pause/archive için yeni bir ikinci kişi şartı getirilmemiştir.
+
+## 2026-08-13 — Payment/delivery interruption alarm sözleşmesi
+
+- `delivery-health-alert/1.0.0`, resmi Meta account/delivery state ile ölçülmüş harcama kesintisini
+  aynı olaya çevirmeden ayrı kanıt seviyelerinde (`confirmed` / `suspected`) hashler. Her iki olay
+  kritik ve sorumlu actor'a yöneliktir; doğrulanmış durumda öneriler tutulur, şüpheli durumda insan
+  incelemesi istenir.
+- Bu yalnız domain sözleşmesidir; kalıcı alert/revision timeline ve atama ekranı sonraki checkpoint'te
+  eklenecek. Alarmdan action, approval, otonomi veya Meta write yetkisi doğmaz.
+
+## 2026-08-11 — A14 persisted frozen-context seçimi
+
+- Session-bound, query'siz `GET /api/campaign-contexts` yalnız latest-valid campaign contextler için
+  opaque public alias, güvenli Meta objective, capture zamanı ve `frozen_valid` durumunu döndürür.
+  Context hash'i, private entity kimliği, kategori/policy kanıtı ve herhangi bir write yetkisi taşınmaz.
+- Dashboard bu listeyi demo portföyünden ayrı gösterir. Persisted seçimde brief bilerek
+  `classification_triage`/bilinmiyor başlangıcına döner; demo kampanyanın pazar, hizmet veya rota
+  varsayımları gerçek frozen context'e aktarılmaz. Exact tek-context read tamamlanınca mevcut
+  redacted objective sinyali görünür; veri yoksa unavailable/empty durumuna dürüstçe düşer.
+- Approval, execute ve Meta write kapıları değişmedi. Sonraki ürün adımı, mevcut read-only context,
+  brief ve approval görünümünü gerçek oturumlu browser'da birlikte kabul etmektir.
+
+## 2026-08-11 — A14 yerel session bootstrap canlı onarımı
+
+- `.env.local` içindeki local session config geçerliydi; canlı dashboard bootstrap'i yine de `403` dönüyordu.
+  Sebep Next Route Handler'ın gerçek sıfır-gövdeli POST isteğini non-null `ReadableStream` olarak
+  sunmasıydı. Bootstrap artık yalnız açık `Content-Length: 0` ve gerçekten boş stream'i kabul eder;
+  chunked/bilinmeyen uzunluklu veya dolu gövde, cross-site, replay ve yanlış scope reddi korunur.
+- Browser'da tek-kullanımlık capability ile HttpOnly local session cookie başarıyla kuruldu. Decision Room
+  bağlı workspace'te dürüst `kayıt yok` read modelini, Campaigns ise `seçilebilir frozen campaign context
+  yok` durumunu gösterdi. Bu gerçek session acceptance'tır; persisted context/approval happy-path'i için
+  doğrulanmış bir campaign context henüz mevcut olmadığından o birleşim kabulü açık kalır.
+- Campaign-context route'u artık eksik/geçersiz local credential'ı `401 local_session_required` olarak
+  ayırır ve database sorgusu yapmaz. Dashboard bu güvenli zarfı tanıyıp kullanıcıyı Decision Room session
+  bootstrap yüzeyine yönlendirir; oturumlu fakat boş listede ayrı `seçilebilir frozen context yok` mesajı
+  kalır. Bu ayırım UI'da ve gerçek loopback route'ta doğrulandı; hiç write/Meta çağrısı yapılmadı.
+
+## 2026-08-11 — A14 portföy/browser doğrulama sınırı
+
+- Yerel Dashboard'da kampanya görünümüne geçiş ile objective filtresi (`OUTCOME_AWARENESS`) gerçek UI
+  etkileşimiyle doğrulandı: görünür liste 3'ten 1'e indi ve brief aynı awareness campaign'e geçti.
+  Demo bağlamın `unbound` işareti ve tüm action/Meta-write kapıları korundu.
+- `GET /api/campaign-contexts` normal yerel istekte `503 source_not_configured` ve read-only/authority-none
+  güvenlik başlıkları döndürüyor. Bu yüzden persisted context → brief → approval semantic happy path henüz
+  kabul edilmiş değildir; gerçek yerel session ve geçerli frozen context ile tekrar çalıştırılacaktır.
+
+## 2026-08-11 — A14 demo portföy drill-down
+
+- Filtreli seçili campaign için portföy → hesap → campaign → ad set → ad → creative/post katmanlarını
+  native progressive disclosure ile gösteren salt-okunur hiyerarşi eklendi. Hiyerarşi seçili campaign'e
+  bağlıdır; örneğin awareness filtresi İstanbul/GCC demo dallarını göstermez.
+- Bu R-14.1'in yalnız ürün navigasyonu kısmıdır: yüzey deterministic demo olarak etiketlenir ve gerçek
+  frozen context, tenant asset graph, account-group, approval veya Meta write iddia etmez. Bunlar gerçek
+  kaynak/session ile ayrı kabul gerektiren açık kapsamlardır.
+
+## 2026-08-11 — A14 Today envanter doğruluğu
+
+- Today hero ve sistem özeti, kampanya/hesap sayısını yalnız structurally doğrulanmış read-only Meta
+  inventory snapshot'ı geldiğinde gösterir; capture zamanı da aynı kaynaktan yazılır.
+- Kaynak yüklenirken, eksikken veya bozuksa ekran `demo/unavailable` olarak açık kalır ve önceden sabit
+  yazılmış canlı pipeline/32 kampanya/4 hesap iddiasını yapmaz. Otonomi valfi ve bütün write sınırları
+  değişmeden kapalıdır.
+- Browser kabulünde local inventory unavailable iken bu açık durum, sıfır execute/Meta-write kontrolü ve
+  console uyarısı olmadan doğrulandı. Turbopack'ın yalnız izlenmeyen dev cache'inde bulunan eksik SST
+  referansı güvenli cache yenilemesiyle giderildi; ürün kodu veya kaynak veri değişmedi.
+
+## 2026-08-11 — A14 çoklu hesap odağı
+
+- Meta read mirror, güncel inventory snapshotındaki erişilebilir reklam hesapları arasında salt-okunur
+  odak seçimi sunar. Yenilenmiş snapshotta bulunmayan eski seçim ilk güncel hesaba düşer; bu tercih
+  hiçbir API isteği, account-group, sayfa/Instagram eşleşmesi veya Meta değişikliği üretmez.
+- Sayfa ve Instagram listesi kaynak account ilişkisi taşımadığı için kaynak-genel kalır; UI ilişki
+  uydurmaz. Yerel browser oturumunda inventory `503` olduğundan UI dürüstçe unavailable durumu gösterdi;
+  gerçek çoklu-hesap seçimi browser kabulü, canlı inventory ile hâlâ açık kalır.
+
+## 2026-08-11 — Meta mirror güvenlik durumunun görünürlüğü
+
+- Public inventory route canlı Meta connector çağırmaya devam etmez. Ortam `META_TOKEN_SECURITY_STATUS`
+  ile `temporary_exposed` ise yalnız güvenli, secret-free rotasyon + normal salt-okunur sync yönlendirmesi
+  döndürür; token, hesap kimliği veya scope dışarı çıkmaz.
+- Browser Meta bağlantısı ekranı bu yönlendirmeyi ve `0` Meta write sınırını gösterdi. Session workspace
+  için read-only PostgreSQL sayımı da active connection/account/campaign/asset değerlerini `0` buldu;
+  bu nedenle gerçek inventory varmış gibi bir fallback eklenmedi. Token rotasyonu ve normal sync sonrası
+  gerçek multi-account browser acceptance açık kalır.
+
+## 2026-08-11 — A14 demo portföy hiyerarşisi ve filtreler
+
+- Kampanyalar yüzeyindeki salt-okunur portföy katmanı artık Meta objective ve iç kategori ile
+  daraltılabilir; görünür kampanya sayısı ve seçili campaign/brief aynı filtre sonucundan gelir.
+- Bu yüzey yalnız deterministik demo snapshot'ını sunar. `unbound demo context` işareti korunur;
+  persisted account-group, asset graph, approval mutation, action veya Meta write taklit edilmez.
+- Böylece sonraki ürün checkpoint'i filtreli seçimden gerçek frozen campaign context'e geçiştir;
+  bu bağ kurulana kadar demo verisi canlı karar kaynağı sayılmaz.
+
+## 2026-08-11 — A14 context-bound read-only karar zaman çizelgesi
+
+- Brief paneli yalnız gerçek frozen context'ten doğrulanmış `entity_…` Approval Queue alias'ı geldiğinde
+  dört sabit aşamalı bir zaman çizelgesi açar: persisted context, geçici/deterministik brief ve öneri,
+  persisted approval listesi ve kapalı uygulama güvenliği. Demo veya unbound context bu yüzeyi hiç
+  render etmez; dolayısıyla fixture/draft durumu kalıcı karar tarihi gibi gösterilmez.
+- Approval listesi yalnız `GET /api/approval-queue?view=list&campaignRef=…` ile okunur. Client projection
+  contract sürümünü, exact response anahtarlarını, campaign alias eşleşmesini ve bütün authority bitlerini
+  (`canExecute`/`canWriteMeta` dahil) doğrular. Her sapma approval aşamasını `unavailable` yapar; mutation
+  kontrolü, approval kararı veya Meta write capability'si eklenmez.
+- Hedefli SSR/pure-contract testleri, unbound görünümün timeline üretmediğini; campaign-matching read-only
+  yanıtın dört aşamayı ürettiğini; cross-campaign, malformed veya write-capable yanıtın fail-closed
+  kaldığını doğrular. Gerçek local-session browser semantic acceptance, DB'de persisted context +
+  ActionUnit bulunmadığı için hâlâ açıktır.
+
+## 2026-08-10 — A14 approval inbox execution-safety görünümü
+
+- Approval Queue, onay kaydı, mirror yeniden kontrolü, ayrı human-presence seremonisi, kapalı Meta
+  transportu ve verify/rollback sözleşmesini beş aşamalı salt-okunur bir durum panelinde gösterir.
+  Panelde execute, rollback veya Meta çağrısı başlatan bir kontrol yoktur.
+- Gerçek dashboard tarayıcısında masaüstü görünüm ve 390px responsive görünüm doğrulandı: panel tek
+  sütuna iner, yatay taşma üretmez ve etkileşimli button içermez. Mevcut API'lerin local ortamda
+  unavailable dönmesi panelin güvenlik durumunu değiştirmez.
+
+## 2026-08-10 — A14 seçili kampanya → dinamik brief bağlamı
+
+- Kampanyalar ekranındaki seçili campaign, proposal-only brief'in başlangıç sınıflandırmasını artık
+  doğrudan belirler. İstanbul örneği WhatsApp lead akışıyla, GCC örneği uluslararası/Arapça/form
+  akışıyla ve awareness örneği üst-huni ölçüm sınırıyla başlar. Kullanıcı brief alanlarını yalnız
+  geçici olarak değiştirebilir ve "Bağlamı geri yükle" ile seçili campaign varsayımına dönebilir.
+- Bu bağ bugün dashboard'un açıkça demo olan campaign projection'ından gelir; persisted current effective
+  context veya bir campaign mutation'ı iddia etmez. Yeni kampanya/proposal/approval/execute/Meta write
+  oluşmaz. Tarayıcıda GCC → geçici WhatsApp → bağlamdan form geri yükleme ve GCC → İstanbul WhatsApp
+  bağlam geçişi doğrulandı.
+
+## 2026-08-10 — A14 brief → salt-okunur öneri
+
+- `interactive-campaign-template/1.2.0`, aynı kampanya brief'inden tek deterministik öneri üretir:
+  sınıflandırma eksikse bağlamı çöz, teslimat kesintisiyse toparlanmayı ayır, eksik bilgi varsa brief'i
+  tamamla, bağlam kapalıysa kampanya şeridini insan incelemesine al. Bu öneri ActionUnit, onay veya
+  Meta değişikliği değildir.
+- Dashboard brief paneli önerinin nedenini ve sonraki insan adımını seçili bağlamla birlikte gösterir.
+  Ayrı persisted proposal/onay timeline bağlantısı hâlâ açıktır; demo campaign bağlamı gerçek approval
+  kaydı gibi sunulmaz. Tarayıcı kabulünde GCC kampanyasında kapasite `bilinmiyor` seçimi öneriyi
+  `Brief'i tamamlayın` durumuna geçirir; bağlamı geri yükleyince yalnız insan inceleme önerisi döner.
+  Brief panelinde create/publish/execute kontrolü yoktur.
+
+## 2026-08-10 — A14 persisted campaign-context read boundary
+
+- Frozen `EffectiveCampaignContext`, opaque public `campaignRef` ile tenant SQL içinde çözülür; yalnız
+  en güncel, invalidation almamış campaign context ve public-redacted projection döner. Private Meta
+  kimliği ve ham context browser'a taşınmaz.
+- `/api/campaign-context` local-session `decision_room:read` sınırına bağlı, tek-parametreli ve
+  `read-only`/`Action-Authority: none` yanıt verir. UI henüz demo kimlikleriyle bu route'u çağırmaz;
+  gerçek persisted ref geldiğinde brief/timeline birleşiminin kaynağı budur.
+- Brief paneli, yalnız geçerli `persistedCampaignRef` verildiğinde bu read yolunu kullanır; demo seçiminde
+  açıkça `persisted kaynağa bağlı değil` durumunu gösterir. Böylece demo, canlı approval/context verisi
+  gibi görünmez.
+- Context `ref_…` kimliği Approval Queue filtresinin `entity_…` kimliği değildir. Context read service
+  private persisted campaign UUID'sinden ayrı, tenant-bound `approvalQueueCampaignRef` üretir; brief
+  bu değeri yalnız formatı doğrulandıktan sonra inbox'a aktarır ve farklı campaign seçilince önce temizler.
+  Böylece iki public alias birbirinin yerine geçirilemez.
+
+## 2026-08-10 — A14 entity/campaign-scoped Approval Queue read boundary
+
+- Approval Queue read modeli `entityRef` veya onunla aynı istekte kullanılamayan `campaignRef` ile
+  exact opaque filtreyi tenant-bound SQL içinde uygular. Public ref, private UUID'den yalnız repository
+  içinde yeniden türetilir; UI veya agent workspace/private ID gönderemez. Keyset pagination filtreyle
+  birlikte korunur ve dönmüş satırın entity/campaign ref'i istenen filtreyle birebir eşleşmiyorsa bütün
+  yanıt fail-closed olur.
+- Campaign filtresi, direct campaign ActionUnit'inin yanı sıra ad-set ve ad ActionUnit'lerini tenant-scoped
+  üst campaign ilişkisiyle çözer. Böylece gerçek child hareketler doğru campaign timeline kaynağına dahil
+  olur. Dashboard'a sahte veya fixture tabanlı birleşik timeline bağlanmadı. PostgreSQL ve local-session
+  ortamı 2026-08-11'de doğrulandı; bu campaign-context/inbox birleşimi için özel live HTTP kabulü sıradadır.
+
+## 2026-08-11 — A14 context → Approval Queue alias bridge acceptance boundary
+
+- Context/inbox bağının iki alias sözleşmesi hedefli servis, HTTP, dashboard ve verifier testleri ile;
+  ardından tam kalite kapıları (`npm test`, production build, DB, security, architecture, model API,
+  security-boundary ve secret-artifact kontrolleri) geçilerek doğrulandı. Sözleşme salt-okunurdur;
+  context ve inbox yanıtları `Action-Authority: none` taşır ve Meta/model/action write capability'si açmaz.
+- `verify:campaign-context-approval-queue-live`, gerçek local session ile iki local HTTP handler'ını aynı
+  outer rollback transaction'ında çağırır; capability token'ı yazdırmaz ve network/write çağrı sayıları
+  sıfırdır. Mevcut veritabanında geçerli frozen campaign context bulunmadığı için sonuç dürüstçe
+  `no_valid_campaign_context` fail-closed blocker'ıdır. Bu verifier **semantic live başarı veya ortak
+  campaign scope kanıtı değildir**; gerçek persisted context + ActionUnit fixture'ı oluştuğunda yeniden
+  çalıştırılacaktır.
+- Browser audit yalnız demo/unbound ve read-only UI sınırını kapsar: persisted frozen context bulunmadığı
+  için tarayıcıdan context alias'ının gerçek Approval Queue sonucu ile birleştiği kanıtlanmadı. Bu nedenle
+  A14'ün gerçek-session browser semantic acceptance işi açık kalır; demo görünüm canlı context/timeline
+  gibi sunulmaz.
+
+## 2026-08-10 — A13 execution-time Meta mirror revalidation
+
+- Disabled admission ledger, approval/grant zincirini yeniden bağladıktan sonra current persisted Meta
+  mirror'dan aynı account ve exact campaign/ad set/ad hiyerarşisini, latest authentic snapshot hash'ini
+  ve status/budget-owner matrisini tekrar çözer. Frozen admission'ın eligibility snapshot/result hash'i
+  bu yeniden hesaplanan sonuçla eşleşmezse hiçbir attempt/event yazılmaz.
+- Bu yalnız stale veya dış müdahale edilmiş adayları fail-closed tutan read-side güvenlik bağıdır. Meta
+  transportu, dispatch, executor, read-after-write veya rollback ve bütün write capability'leri kapalıdır.
+
+## 2026-08-10 — A13 ayrı execution-admission seremonisi
+
+- `ActionExecutionAdmissionService`, approval anından bağımsız `admit_execution` human-presence
+  proof'unu tek kez tüketir. Plan/freshness/eligibility browser'dan kabul edilmez; yalnız server-owned
+  source portundan yüklenir ve admission ledger'a disabled sonuç yazdırır. Owner/admin dışı roller ve
+  proof replay'i fail-closed'dur.
+- Bu checkpoint bir execute veya transport API'si açmaz. Persisted source/runtime bağı aşağıdaki
+  checkpoint'te tamamlanmıştır; sıradaki açık kapı read-after-write ve rollback tasarımıdır.
+
+## 2026-08-10 — A13 persisted admission-source runtime
+
+- `DrizzleActionExecutionAdmissionSourceRepository`, immutable ActionUnit/approval lifecycle ile active
+  connection'ın current Meta mirror hiyerarşisini ve latest authentic snapshot'ını read-only bağlar.
+  Action plan, account/entity scope veya snapshot tutarsızlığı source'u reddeder. Sink, admission
+  yazmadan önce aynı mirror kanıtını kendi kısa transaction'ında tekrar doğrular.
+- `createLocalActionExecutionAdmissionService` yalnız bu source, single-use ceremony store ve disabled
+  admission sink'ini birleştiren private composition root'tur. HTTP handler, scheduler, Meta transport
+  veya action execution eklenmemiştir; gerçek session/DB acceptance ve read-after-write/rollback sonraki
+  açık kapılardır.
+
+## 2026-08-10 — A13 verify / rollback fail-closed contract
+
+- `action-execution-verification/1.0.0`, frozen admission ve immutable action plan'dan doğrulanacak
+  target değeri ile önceki değeri taşıyan rollback adayını hash-bound üretir. `accepted` transport,
+  current mirror'da expected-value eşleşmesinden; bu eşleşme de platform review/delivery sonucundan
+  ayrıdır. Böylece pending review/delivery, write verification ile karıştırılmaz.
+- Retryable transport veya read eksikliği `parked`, read-after-write farkı `failed` kalır. Doğrulanmış
+  satır bile rollback'i otomatikleştirmez: yalnız yeni, ayrı insan onaylı action adayına dönüşebilir;
+  limited/rejected platform state manual recovery ister. Transport/DB event append/UI/Meta write yoktur.
+
+## 2026-08-10 — A10 cadence/experiment adapter canlı kabulü
+
+- `npm run verify:cadence-experiment-lifecycle-db`, gerçek owner cookie session'ı ile local
+  cadence publish ve experiment plan→outcome HTTP handler'larını aynı outer rollback PostgreSQL
+  transaction'ında çalıştırır. Cadence revision, experiment head zinciri ve üç audit event'i kalıcı
+  akışta doğrulanır; stale outcome `409`, direct revision update append-only guard tarafından reddedilir.
+- Live kabul, experiment resolver'ın intent'i yanlışlıkla `draft` allowlist'inde aradığını ve geçerli
+  iki revisionlı plan→outcome geçmişinin repository tarafından bozuk sayıldığını ortaya çıkardı. Resolver
+  artık publish-intent allowlist'ini, repository ise yalnız gerçek current head'i kilitler. Endpointler
+  action/approval/Meta-write authority açmaz; rollback sonrası fixture sıfırdır.
+
+## 2026-08-10 — A10 policy-configured PostgreSQL dry-run kabulü
+
+- `npm run verify:decision-room-dry-run-db`, tek outer rollback içinde gerçek cookie-only
+  `decision_room:dry_run` capability'si, server-bound operator settlement policy ref/cutoff'ı,
+  immutable effective context/cadence/template ve L2 daily insight ile completed Decision Room run
+  ve decision ledger üretir. Handler `analysis-dry-run` access mode'u ve `actionAuthority:none`
+  döndürür; Meta network/write çağrısı ve rollback sonrası fixture kalıntısı sıfırdır.
+- Canlı zincir 32-haneli L2 content-hash snapshot alias'ını 20-haneli tarihsel Meta snapshot alias'ı
+  ile birlikte forward-only schema kontrolünde kabul eder. Context, template ve observation aynı
+  immutable alias'a bağlıdır; eski 20-haneli alias biçimi replay-uyumlu kalır.
+- Bu kabul Meta write, campaign create/publish, approval veya action execution açmaz. Browser
+  acceptance ayrı açık çevresel kabul noktasıdır.
+
+## 2026-08-11 — A10 authentic L1→L3 dry-run verifier correction
+
+- Önceki dry-run verifier'ı güncel relational evidence sözleşmesine uymayan elle kurulmuş ready
+  context kullanıyordu. Verifier artık normal L1 observation → persisted L2 feature snapshot → L3
+  timeframe window → evidence-bound frozen context zincirini kurmadan Decision Room dry-run'a geçmez;
+  replay, stale L1, tenant/tamper, network/Meta-write ve cleanup negatifleri bu gerçek ref'lere bağlıdır.
+- Hedefli statik verifier/runtime testleri ve typecheck yeşildir. Sequential canlı PostgreSQL verifier da
+  geçer: `.env.local`daki 6543 transaction ve 5432 session pooler endpointleri `ClientRead/idle in
+  transaction` gösterebilir, ancak blocking PID yoktur; durum 114 FK-sıralı tombstone delete round-trip'i
+  boyunca ilerler ve complete run/ledger/cleanup kanıtı alınır. Paralel workspace cleanup denemesi SQLSTATE
+  `40001` serializable conflict verdiğinden geri alındı; fixture recovery yalnız sequential
+  WorkspaceTombstoneService ile yapılır.
+
+## 2026-08-11 — A10 frozen L2/L3 → Decision Room → L5 runtime bridge
+
+- Decision Room runtime admissiondan sonra observation kaynağını yeniden L1'den seçmez. Frozen contextteki
+  exact L2 feature refleri ve L3 window bindingleri tenant/scope/hash/state/coverage bakımından private
+  readers ile yeniden doğrulanır; calculator girişi yalnız bu immutable L2 payloadlardan türetilir.
+- Eksik, stale, foreign, tahrif edilmiş veya L3→L2 coverage'ı eksik evidence `evidence_not_frozen` ile
+  ledger staging öncesi reddedilir. Successful run deterministik L5 compact-agent-context ref/hash/payload
+  commitmentini immutable analysis ledger frozen context'ine bağlar; public executor/action sözleşmesi
+  genişlemez ve Meta/network/write yetkisi üretmez.
+- Runtime birim kanıtı ve authentic dry-run canlı PostgreSQL kabulü yeşildir. Pooler görünümü progress
+  halindeki sequential tombstone cleanup'tır; runtime veya evidence sözleşmesi için blocker değildir.
+
+## 2026-08-11 — A11 authentic budget-proposal PostgreSQL acceptance refresh
+
+- Budget proposal verifier'ındaki eski sentetik frozen-context save kaldırıldı. Verifier artık shared
+  current-source fixture ve closed-world composer ile source-bound context üretir; proposal scope hash'i
+  bu gerçek context hash'ine exact bağlanır.
+- PostgreSQL outer rollback altında keep/conservative ve mapping-suppression davranışı, idempotency,
+  revision/audit, public-safe projection, cross-tenant/immutable/RLS negatifleri ve sıfır network/action
+  doğrulanır. Primary ve foreign fixture workspace'leri sequential WorkspaceTombstoneService ile temizlenir;
+  residue guard buna göre kontrol edilir.
+
+## 2026-08-11 — A10 Agenda v2 ve frozen-L2 advisory diagnostics
+
+- Analysis agenda `2.0.0`, deterministic exact pass sırasını `general → group_account → objective →
+  internal_category → entity → topic → history` olarak freeze eder. Persistent Decision Room asset
+  CHECK'i yalnız v2'yi kabul eder; v1 historical payload semantik olarak dönüştürülmez, authentication
+  öncesi fail-closed kalır. Forward-only migration yerel PostgreSQL'e uygulanmıştır.
+- Frozen primary L2 evidence üzerinden replay-stable spend contribution advisory hesaplanır. Peer
+  veya metric kapsamı eksikse sonuç sırasıyla `insufficient_data`/`unknown` olur. Creative-level
+  feature ve complete billing/destination config L2 payloadında olmadığı için fatigue/config finding
+  üretmek yerine açık `not_supported` taşır; hiçbir ledger kararı, action veya Meta write yetkisi açılmaz.
+
+## 2026-08-11 — A10.5a frozen diagnostic evidence substrate
+
+- Immutable `frozen_diagnostic_evidence` sidecar'ı exact frozen context hash/ref, L2/L3 ref+hash
+  manifestleri, subject hierarchy, objective/funnel/optimization, category/policy/config/source
+  commitmentsini taşır. Yedi capability flag'i yapısal olarak false'tur; writer yalnız ready L2/L3,
+  config ve category facts transaction içinde doğrulanabiliyorsa insert eder, aksi halde
+  `insufficient_evidence` ile row oluşturmadan reddeder.
+- Forward-only PostgreSQL migration FORCE RLS, public/API role revoke, append-only/tombstoning-only
+  guard ve tombstone FK sırasını ekler. Outer-rollback live verifier authentic fixture/composer ile
+  exact hash/capability zarfını, missing/cross-tenant/tamper negatiflerini, RLS/revoke, tombstone
+  aggregate, zero network ve zero residue'yu doğrular. Bu yalnız substrate'tir; cohort veya creative
+  fatigue/config sonucu henüz üretilmez.
+
+## 2026-08-11 — A10.5b repository-selected robust cohort substrate
+
+- `robust_cohort_diagnostic_assets`, yalnız target frozen diagnostic evidence ve metric/funnel/direction
+  girişiyle çalışır; caller cohort üye listesi veremez. Repository aynı workspace/ad-account ve exact
+  objective/funnel/optimization/category-composition/policy-set profile'ından ready, uninvalidated,
+  primary L2 evidence seçer; mixed/stale/non-primary/missing target veya sample<4 fail-closed olur.
+- MAD sonucu ve exact member ref/hash manifesti immutable advisory assette freeze edilir. Yeni forward-only
+  migrationlar RLS/FORCE/revoke, append-only/tombstone guard ve purge sırasını taşır. Authentic fixture
+  henüz explicit funnel commitment üretmediği için positive cohort live acceptance **açık** kalır;
+  null funnel’da runtime sonuç uydurmaz.
+
+## 2026-08-11 — A10.5b normal sync fixture acceptance
+
+- İzole test kökü dışında doğrudan kaynak/evidence satırı yazmadan normal GET-only Meta sync zinciri
+  canlı doğrulandı: beş campaign, beş ad set ve beş campaign L1 insight, ardından iki canonical
+  change snapshot/timeline normal runtime ve repository yazıcılarıyla oluştu. Doğrulayıcı sonunda
+  yalnız standart locked tombstone lifecycle'ı ile çalışma alanını temizler; Meta write/network call
+  sıfırdır.
+- Remote pooler round-trip çoğalmasını azaltmak için durable sync store aynı account mappingini bir
+  kez çözer, record ledger'ını toplu upsert eder ve terminal checkpoint'i parent snapshotıyla birlikte
+  yazar. Restart durability regression ile korunur.
+- Bu kanıt henüz uygun funnel/category, guidance/cadence/authority, L2/L3 ve dört üyeli MAD asset
+  dikeyini kurmaz; robust cohort positive acceptance bu nedenle **açık** kalır.
+
+## 2026-08-11 — A10.5c creative fatigue V2 hesap sözleşmesi
+
+- `creative-fatigue-config-diagnostics/2.0.0`, günlük frequency veya CTR ortalaması
+  kullanmaz: eşit/bitişik baseline-recent pencereler için frequency doğrudan source-grain
+  değer, CTR ise `clicks / impressions` ratio-of-sums olarak hesaplanır. Daily kayıtlar
+  yalnız tamlık/settlement kanıtıdır; frequency türetilmez ya da çoklu ad/creative arasında
+  birleştirilmez.
+- Bu yalnız saf, advisory hesap sözleşmesidir. Source-owned all-days Meta pencereleri,
+  binding/config snapshotları, immutable repository ve canlı PostgreSQL kabulü henüz
+  açık kaldığından Decision Room'a finding bağlanmamış, tüm yetkiler kapalıdır.
+
+## 2026-08-11 — A10.5c direct creative config evidence contract
+
+- `creative-diagnostic-config-snapshot/1.0.0`, objective, optimization, billing ve
+  destination alanlarını ya ref/source-ref/source-hash ile doğrudan observed ya da
+  `not_observed|unsupported|ambiguous` olarak explicit unknown saklar. `promoted_object`,
+  implicit billing veya destination fallback'i sözleşme dışında tutulur.
+- Bu saf sınır henüz mirror reader veya immutable persistence değildir; source-owned
+  snapshot/definition/window repository ve PostgreSQL acceptance açık kalır. Böylece
+  config drift veya fatigue finding'i bu contract tek başına üretmez.
+
+## 2026-08-11 — A10.5c current mirror creative config reader
+
+- Server-private `DrizzleCreativeDiagnosticSourceRepository`, active tenant/account/ad hierarchy,
+  exact current ad→creative binding ve source hashes üzerinden direct config snapshot üretir. Binding
+  ambiguity fail-closed; billing/destination gibi absent mirror alanları explicit unknown kalır;
+  destination opaque digest/ref dışında taşınmaz.
+- Okuyucu current read-only projection'dır. Immutable config/window snapshot tabloları, definition
+  lifecycle, invalidation ve PostgreSQL verifier henüz açık olduğundan hiçbir diagnostic asset veya
+  Decision Room finding'i yazmaz.
+
+## 2026-08-11 — A10.5c immutable creative diagnostic substrate
+
+- Forward-only creative diagnostic migration; definition revisions, exact ad→creative config
+  snapshots, baseline/recent all-days window snapshots ve immutable advisory asset tablolarını
+  tenant-composite FK, FORCE RLS, public-role revoke, append-only/tombstoning delete guard ile
+  ekledi. Workspace purge allowlist/inspection/delete sırası bu dört tabloyu kapsar.
+- Bu yalnız persistence substrate'tir: source writer, definition lifecycle, current-vs-historical
+  invalidation, V2 result materializer ve PostgreSQL acceptance henüz tamamlanmadığı için
+  asset/finding üretilmez; G4 ve tüm write/action/network capability'leri kapalıdır.
+
+## 2026-08-11 — A10.5c immutable diagnostic definition contract
+
+- `creative-diagnostic-definition/1.0.0`, minimum impressions, frequency artışı,
+  CTR düşüşü ve coverage-gap eşiklerini exact shape/revision/previous-hash ile canonicalize
+  eder. Calculator veya persistence caller eşiği kabul etmeyecek şekilde definition hash'ini
+  tek kaynak yapar.
+- Bu saf contract henüz owner/admin lifecycle writer veya current published-definition loader
+  değildir; schema substrate üzerinde definition revision materialization ve asset writer açık
+  kalır. Capability yüzeyi değişmez.
+
+## 2026-08-11 — A10.5c diagnostic definition transition gate
+
+- Saf lifecycle gate, aynı definition ref için yalnız contiguous revision ve exact previous hash ile
+  ilerlemeye izin verir; published→draft gerilemesi ile retired sonrası tüm transition'lar reddedilir.
+  Bu, private repository insert'inin OCC/append-only ön koşuludur.
+- Server-private `DrizzleCreativeDiagnosticDefinitionRepository`, active workspace ve owner/admin
+  membership'ini aynı transaction içinde kilitler; definition-ref advisory lock altında son iki immutable
+  revision zincirini ve payload hashini doğrular. Yalnız exact latest replay yazısız döner; yeni revision
+  append-only insert ve audit hash-chain ile birlikte commit olur. Public route, publish/approve/execute,
+  Meta write ve network capability eklenmemiştir.
+- Aynı private repository, yalnız exact en son `published` revision'ı yükler; eski published revision'a
+  fallback yapmaz. Definition invalidation ve V2 asset materializer henüz açık kaldığından lifecycle
+  production-ready sayılmaz ve asset/finding materialization kapalıdır.
+
+## 2026-08-11 — A10.5c daily frequency source-grain request
+
+- GET-only Meta insights transport, bir günlük `time_increment=1` sorgusuna canonical `frequency`
+  source alanını da ekler. Capability catalog bunu non-additive olarak taşımaya devam eder; source
+  persistence veya V2 diagnostic günlük/çoklu-gün frequency toplamı ya da ortalaması çıkaramaz.
+- Bu yalnız source-read kapsamını tamamlar. Immutable creative config/window snapshot materializer ve
+  advisory asset writer henüz açık olduğundan hiçbir fatigue finding, Decision Room veya action
+  yetkisi oluşmaz.
+
+## 2026-08-11 — A10.5c ad-bound creative config snapshot materializer
+
+- `DrizzleCreativeDiagnosticConfigSnapshotRepository`, yalnız immutable frozen diagnostic evidence'ın
+  exact `ad` contextini ve tenant/account/ad scope'unu doğruladıktan sonra current mirror'dan direct
+  creative config snapshot alır. Persisted hash target evidence + frozen context + exact binding/content
+  hashlerini bağlar; conflict sonrası yalnız payload/hash-eş mevcut satırı replay sayar.
+- Missing/ambiguous binding veya campaign/ad-set level target `insufficient_evidence`/fail-closed olur.
+  Bu config snapshot tek başına fatigue/config finding'i veya herhangi bir write/action yetkisi üretmez.
+  Gerçek ad-level lifecycle fixture ve PostgreSQL outer-rollback acceptance henüz açıktır; doğrudan SQL
+  fixture ile bu kabul uydurulmamıştır.
+
+## 2026-08-11 — A10.5c creative settlement policy contract
+
+- `creative-diagnostic-settlement-policy/1.0.0`, explicit `settlementLagDays`, revision,
+  previous-hash ve published state'i tek canonical policy hashine bağlar. Cutoff yalnız supplied
+  IANA timezone ve canonical evaluation timestamp ile hesaplanır; timezone veya lag default'u yoktur.
+- İlk saf sözleşme artık tenant-scoped append-only policy ledger'a taşındı:
+  `creative_diagnostic_settlement_policies` guarded current-head'i ve immutable revision zinciri,
+  exact ref/hash/revision/state/lag payload'ını saklar. Private owner/admin writer aktif workspace ve
+  membership'i aynı transaction'da kilitler, contiguous previous-hash/OCC uygular ve audit chain'e
+  yazar; reader yalnız current published revision'ı kabul eder. Forward-only migration RLS+FORCE,
+  public-role revoke, tombstone-only delete ve workspace purge sırasını kapsar; local PostgreSQL
+  migration ile Supabase security verifier'ı geçti.
+- Bu hâlâ creative window source materializer veya diagnostic finding değildir. Pencere writer'ı
+  policy ref/hash'ini replay evidence olarak bağlamadan, settled window ya da fatigue sonucu üretemez;
+  ad-level outer-rollback lifecycle kabulü bu nedenle açık kalır.
+
+## 2026-08-11 — A10.5c policy-bound daily creative window evidence
+
+- `DrizzleCreativeDiagnosticWindowInsightSnapshotRepository`, yalnız current published settlement
+  policy'yi caller-owned transaction içinde çözer; active tenant/ad/config snapshot üzerinden aynı
+  güne ait tek canonical Meta `ad` insight'ını ve exactly-one `frequency`/`clicks`/`impressions`
+  metriclerini doğrular. Policy cutoff'u geçmemiş gün, eksik/tekrarlı metric, ambiguous insight ya da
+  aggregate period `insufficient_evidence` olur.
+- Frequency non-additive olduğu için writer çok günlük değeri toplamaz ya da ortalamaz: şimdilik
+  yalnız source-grain tek günlük baseline/recent snapshot yazar. Kaydedilen snapshot policy ref/hash,
+  metric/source hash manifest'i ve settled daily coverage'ı taşır; action, approval, Meta write ve
+  network capability'si açılmaz. Gerçek ad-level outer-rollback source fixture/verifier ve sonraki
+  all-days direct-window source contractı hâlâ açıktır.
+
+## 2026-08-11 — A10.5c immutable daily creative fatigue/config advisory asset
+
+- Private asset writer, only-current-published definition'ı aynı transaction içinde çözer; exact
+  target evidence, same-creative baseline/recent config snapshots ve policy-bound windows dışındaki
+  her kombinasyonu reddeder. V2 fatigue sonucu, config snapshot hash farkı ve iki settlement commitment
+  immutable `creative_fatigue_config_diagnostic_assets` payload'ında tek diagnostic hash'e bağlanır.
+- Unsettled coverage yine finding değil `insufficient_data` olur. Asset sadece advisory capability
+  envelope taşır; Decision Room action/finding bağlama, live ad-level source fixture ve multi-day
+  direct-frequency window contractı açık kalır.
+
+## 2026-08-11 — A10.5c direct all-days creative frequency source
+
+- GET-only private Meta source reader, exact ad `/insights` edge'inde reviewed planner ile
+  `time_increment=all_days` kullanır. Period frequency doğrudan bu tek source-grain yanıttan gelir;
+  canonical günlük rows yalnız tam calendar coverage kanıtıdır. Source pagination, duplicate/missing
+  ad result, malformed metric ya da coverage/timezone/settlement uyumsuzluğu fail-closed kalır.
+- Immutable window writer bu direct source hash'ini exact key'e ekler; aynı tarih/policy ama değişmiş
+  source artık eski snapshot'ı ezmez. Forward-only index migration local PostgreSQL'e uygulandı ve
+  Supabase security verifier geçti. Normal sync materializer da daily observed `frequency` metricini
+  canonical mirror'a taşır. Gerçek credential-backed ad-level outer-rollback read acceptance ve
+  Decision Room'a finding bağlama henüz açık; bu source yalnız read-only/advisory zincirdedir.
+  Settled window source evidence veya fatigue finding iddiası bununla açılmaz.
+
+## 2026-08-11 — A10.5c private direct-window runtime composition
+
+- `ProductionCreativeDiagnosticWindowService`, çağıranın connection, access token veya Meta account
+  vermesine izin vermez: server-derived config scope'tan active tenant ad/account/data-source
+  zinciriyle connection'ı çözer, active read-only connection'ın environment secret'ını server-side
+  alır ve yalnız GET-only `MetaGraphCreativeWindowAllDaysSource` ile policy-bound window writer'ı
+  kurar. Redacted sonuç yalnız immutable snapshot hash/ref ve `inserted` bilgisini döndürür.
+- Scope/connection/secret/source eksikliği fail-closed, tüm action/approval/Meta-write capability'leri
+  false'tur. Bu root için unit/build/architecture/security-boundary kanıtı vardır; credential-backed
+  ad-level outer-rollback source acceptance ile Decision Room finding bağlama hâlâ açık kalır.
+
+## 2026-08-11 — Campaign planning taxonomy v1.3
+
+- `outputs/campaign_budget_tracker_20260810/kampanya_butce_harcama_takip_kesinti_analizli.xlsx`
+  incelendi: karar eksenleri pazar → dil → iş amacı → ana grup/hizmet → dönüşüm yolu; yerli/yabancı
+  ve form/WhatsApp lead'leri ayrı toplam ve CPL havuzlarında tutuluyor. Ödeme/teslimat kesintisi
+  adayları ayrıca performans ölçekleme kararından ayrıştırılıyor.
+- Interactive brief artık bu eksenleri machine-readable `variantRef` ve `comparisonBoundary` ile
+  taşır. Domestic/international × form/WhatsApp lead varyantları ayrı cohort key üretir; pazar veya
+  teslimat sağlığı `unknown` ise lane üretmez, kıyas anahtarı `null` kalır ve yalnız sonraki insan
+  kararını ister. Recovery/triage blokları önceliklidir; create/publish/approve/execute/Meta-write
+  yetkileri false kalır.
+- Bu yalnız client-side proposal-only planlama yardımıdır: Excel'den otomatik kampanya, bütçe veya
+  performans hükmü üretilmez; persisted context'ten semantic market/delivery inference da yapılmaz.
+- Local dashboard browser acceptance: domestic WhatsApp varyantı görünür; `market=unknown` veya
+  `deliveryHealth=unknown` seçimi next-decision'a döner, lane ve variant üretmez ve tüm write
+  kapasitelerini kapalı tutar.
+
+## 2026-08-11 — Persisted context → brief objective hint
+
+- Brief paneli, session-bound `/api/campaign-context` yolundan gelen authentic public frozen context'in
+  yalnız canonical Meta objective alanını parse eder. `lead_generation` → lead acquisition ve
+  awareness/traffic/engagement → upper-funnel eşlemesi açık bir kullanıcı butonu ile uygulanabilir;
+  sales/app-growth için hedef uydurulmaz. Malformed veya unknown objective hiç hint üretmez.
+- Bu köprü market, language, service, conversion route veya delivery health'i isim/status'ten çıkarmaz;
+  bunlar human classification olarak kalır. Persisted context yoksa hint görünmez, demo seed'e veya
+  approval/Meta write yetkisine dönüşmez. Gerçek persisted-context browser happy path, environment'ta
+  aktif source bulunmadığından ayrı açık kabul noktasıdır.
+
+## 2026-08-11 — A07 field-pilot source coverage census
+
+- Yeni read-only `census:field-pilot-source-db` REPEATABLE READ altında yalnız aggregate workspace/account
+  sayıları ve evidence-family missing reason'larını verir; raw ID, secret veya yazı üretmez. Canlı
+  `.env.local` sonucu 0 eligible workspace / 0 account ve tüm ailelerde unavailable döndü, exit 2 ile
+  field-pilot closure'ı doğru biçimde engelledi. `docs/qa/field-pilot.json` veya A07 PASS iddiası eklenmedi.
+
+## 2026-08-10 — Local MCP/session canlı kabulü
+
+- Yerel geliştirme sunucusu ve yönetilen `.env.local` session yapılandırmasıyla `npm run verify:mcp-live`
+  gerçek HTTP/STDIO zincirinde geçti: register, dashboard discovery, handoff consume, replay reddi ve boş
+  MCP stderr doğrulandı. Bu doğrulama yalnız local coordination/read yüzeyini kullanır; Meta network/write,
+  policy publish ve action execution sıfırdır.
+- `.codex/config.toml` güvenli varsayılanları korunur: `required = false` ve
+  `default_tools_approval_mode = "prompt"`. Bu checkpoint bunları değiştirmez.
+- Gerçek tarayıcı oturumu/responsive kabulü bu agent oturumunda callable browser-control surface olmadığı
+  için henüz çalıştırılmadı; açık kabul noktası olarak kalır.
+
+## 2026-08-10 — Dinamik kampanya brief şablonları
+
+- `interactive-campaign-template/1.0.0`, operasyonel sınıflandırmayı pazar → dil → hizmet →
+  dönüşüm yolu olarak taşır; delivery health ve randevu/operasyon kapasitesini performans başarısından
+  ayrı ön koşul yapar. Bu, kampanya bütçe/harcama takibindeki lead ile üst-huni ayrımı ve kesinti
+  gözlemlerini karar sözleşmesine taşır; çalışma kitabındaki dönemsel sonuçlardan kalıcı bütçe kuralı
+  türetmez.
+- Lead acquisition, upper-funnel education, market/service learning, continuity recovery ve
+  classification triage şablonları yalnız soru, ölçüm ayrımı ve insan-incelemeli sıra üretir. Kesinti
+  veya sınıflandırılmamış kayıt `blocked`; eksik kapasite/dil/hizmet/rota `needs_input` kalır. Form ve
+  WhatsApp varsayılan olarak farklı sonuç yollarıdır. Campaign create/publish/approve/execute/Meta write
+  capability'leri yapısal olarak false'tur.
+
+## 2026-08-10 — A09 complete relational authority-impact acceptance
+
+- `verify:instruction-policy-authority-impact-db`, tek outer rollback altında gerçek draft → empty
+  authority bootstrap → impact-OCC publish → private semantic/account-group/topic writer → bound catalog/
+  snapshot materialization zincirini çalıştırır. Authority bağları hiçbir sentetik SQL authority satırı
+  olmadan private owner/admin lifecycle yazarlarından gelir.
+- Publish sonrasında bağ yoksa preview `trusted_authority_catalog` ailesini partial/blocked tutar. Aynı
+  published policy için semantic fact, tenant-local non-disappeared account membership ve category-free
+  active topic kaydedilip snapshot yenilendiğinde beş aile exact, integrity sıfır ve
+  `coverage.complete=true` / `mutationAllowed=true` olur. Bu, policy publish ya da Meta/action write
+  çalıştırmaz; bütün capability değerleri false kalır.
+- Canlı doğrulama iki gerçek hatayı da kapattı: account-group writer tek elemanlı ref listesini artık
+  PostgreSQL `text[]` olarak taşır; topic lifecycle active fakat category-bağsız authority fact'e izin verir.
+  Impact reader, sidecar zorunluluğunu mevcut frozen contextlere uygular; context yoksa doğrulanmış
+  relational binding'i sahte bozukluk saymaz. Cross-tenant görünürlük, RLS/revoke, append-only guard,
+  network/action sıfır ve rollback sonrası sıfır kalıntı yine kanıtlandı.
+- 2026-08-11 tekrar kabulünde canlı katalog, `frozen_diagnostic_evidence.capabilities` ve
+  `creative_fatigue_config_diagnostic_assets.capabilities` alanlarının policy dependency manifestinde
+  eksik olduğunu ortaya çıkardı. İki alan immutable/opaque historical evidence olarak sınıflandırıldı;
+  manifest testleri artık schema satırındaki **tüm** JSONB alanlarını tarıyor. Bunun ardından gerçek
+  PostgreSQL verifier yeniden `completeExactFixture:true` döndü: ilk publish impact-OCC ile geçiyor,
+  authority bağlanmadan sonraki mutation `trusted_authority_catalog` partial/blocked kalıyor, bağlar
+  materialize edilince beş aile tekrar exact oluyor. Network/action 0 ve outer rollback kalıntısızdır.
+- Browser/session kabulü ayrı açık çevresel kapıdır. G4/A13, HTTP/MCP/UI write yüzeyi veya Meta write
+  eklenmedi.
+
+## 2026-08-10 — A08 multi-business portfolio capability read model
+
+- `DrizzleMetaPortfolioCapabilityRepository`, workspace'in bütün connection/data-source/ad-account
+  topolojisini ve yalnız current active account-group membership'ini tek kısa `REPEATABLE READ, READ ONLY`
+  snapshotta toplar. Dışarı yalnız opaque connection/account ref'leri, display name, currency/timezone,
+  spend cap, current group refs ve read-readiness çıkar; external account ID, connection key, raw payload
+  veya secret metadata çıkmaz.
+- Grup üyeliği shared context'tir; child account permission veya capability'sini genişletemez. `ready`
+  ancak aktif connection'da `ads_read` + `accounts.read`, account'ta `ads_read` ve
+  `meta-account-capability/1.0.0` read evidence birlikte olduğunda verilir. Her eksik/corrupt kanıt
+  `partial`/`unavailable` kalır; publish/approve/execute/Meta-write her durumda false'tur.
+- Bu yalnız read model foundation'ıdır: group-scope inheritance ve dashboard/browser acceptance henüz
+  açık kalır.
+
+## 2026-08-10 — A08 source-bound account-read capability evidence
+
+- Canonical `/me/adaccounts` asset discovery artık `meta-account-capability/1.0.0` evidence'ına
+  dönüştürülür ve mevcut private asset persistence transaction'ında yalnız aynı tenant/connection'ın
+  bilinen `ad_accounts` satırlarına yazılır. Evidence source snapshot hash'i, source status ve exact
+  checked time taşır; daha yeni checked time'dan eski snapshot overwrite edemez.
+- Verified listede görünen hesap `ads_read` + `canReadAccount:true` alır. Listede görünmeyen bilinen
+  hesap ile empty/permission-missing/unsupported/unavailable discovery `ads_read` taşımayan,
+  `canReadAccount:false` kanıtına güncellenir; eski permission sessizce korunmaz. Her capability setinde
+  publish/approve/execute/Meta-write false'tur.
+- Bu source evidence, group inheritance veya Meta write authority değildir. Concrete PostgreSQL live
+  acceptance için yerel connection environment'i bulunmadığından, salt kod/test kanıtı ile sınırlıdır.
+
+## 2026-08-10 — A09 authority materializer consistency hardening
+
+- `policy_authority_bindings` exact-uniqueness'i global policy fact yerine immutable authority
+  snapshot kapsamına taşındı; böylece aynı fact farklı historical snapshotlarda yeniden bağlanabilir,
+  tenant-composite foreign key'ler korunur. Materializer current group/topic head revision+hash+active
+  durumunu ve semantic ref'in en güncel immutable revision'ını transaction içinde yeniden doğrular.
+- Aynı catalog hash'i mevcut current immutable catalog revision'ını tekrar kullanır. Geçerli aynı current
+  snapshot (kaynak binding sayısı dahil) audit veya invalidation yazmadan idempotent döner; expiry-bound
+  yenileme yeni snapshot/binding üretebilir. Catalog head değişiminde OCC fail-closed kalır.
+- Effective-context policy composition registry hash'i snapshot payload içindeki var olmayan bir JSON yolu
+  yerine authority catalog revision payload'ından doğrulanır. Bu checkpoint capability/impact coverage veya
+  action yüzeyi açmaz.
+
 ## Aşama durumları
 
 | # | aşama | durum | bağımlı | kanıt / açık iş |
@@ -81,6 +1065,100 @@
 - Canlı PostgreSQL şema kabulü de geçti: catalog ve snapshot head tabloları ile iki OCC trigger'ı
   mevcuttur; verifier bütün publish/approve/execute/Meta-write capability'lerini `false` doğrular.
   Gerçek oturum/browser kabulü ile impact coverage'ın daha geniş mutation kapsamı hâlâ açık kalır.
+
+## 2026-08-10 — A09.3a policy-authority invalidation fidelity
+
+- Catalog materializer ve private manual-lock writer artık tahmini catalog/snapshot veya policy hash'i
+  invalidation hedefi olarak yazmaz. Aynı kısa transaction içinde workspace'in mevcut frozen context
+  component kayıtlarından yalnız gerçek `policy_authority_workspace` ref/version çiftlerini okur ve
+  her birini append-only invalidation fact'iyle kapatır; böylece eski authority closure taşıyan context
+  yeniden seçilemez.
+- Bu checkpoint authority/impact kapsamını genişletmez: complete exact-impact coverage sağlanmadı,
+  `mutationAllowed=false` ve bütün publish/approve/execute/Meta-write capability'leri false kalır.
+  HTTP/MCP/UI veya action adapter eklenmedi.
+
+## 2026-08-10 — A09.3b effective policy-composition sidecar
+
+- Trusted-authority ile compose edilen yeni effective context, registry hash'i, authority component,
+  snapshot/catalog/scope hash'i ve çözüm hash'ini; her policy için exact immutable strict revision,
+  applied/suppressed/parked state ve reason ile aynı save transaction'ında append-only yazar. Authority
+  snapshot, catalog/binding zinciri veya bağlanan immutable strict revision eksik/mismatched ise save
+  fail-closed kalır. Legacy context
+  sidecar-sız historical replay olarak korunur; bu alan action/promotion yetkisi açmaz ve complete
+  exact-impact coverage sınırı değişmez.
+
+## 2026-08-10 — A09.3c family-by-family authority impact evaluation
+
+- Policy impact preview, yalnız A09.3b immutable composition sidecar'ı mevcut, context payload ile
+  header/itemları birebir tutarlı ve relational authority zinciri temiz olduğunda ilgili aileyi
+  `exactRelational` olarak bildirir. Legacy, eksik, bozuk veya belirsiz sidecar taşıyan context bütün
+  authority ailelerini `partialOrUnknown` bırakır; tek ailedeki bozukluk diğer ailelerin kanıtını silmez.
+- Active manual lock kesin engeldir. Frozen action bridge hash'i unit/context kimliğinden yeniden
+  hesaplanır; invalidated non-terminal unit engel, invalidated terminal unit ise yalnız tarihsel etkidir.
+  Coverage ve `mutationAllowed`, bütün beş ailenin exact olması ile bütünlük/kesin engellerin temiz
+  olmasına bağlıdır. G4 capability'leri yapısal olarak false kalır.
+
+## 2026-08-10 — A09.3d live authority-impact fail-closed acceptance
+
+- `verify:instruction-policy-authority-impact-db`, tek outer rollback içinde gerçek draft → empty
+  authority bootstrap → impact-OCC publish zincirini PostgreSQL'de çalıştırır. Published policy için
+  authority bridge yoksa preview `trusted_authority_catalog` ailesini partial bırakır ve mutation'ı
+  kapatır; cross-tenant görünürlük, RLS/revoke, append-only triggers, sıfır network/action ve rollback
+  sonrası sıfır geçici satır da doğrulanır.
+- Canlı çalışma, impact SQL'indeki iki parantez hatasını ve `policy_contexts` CTE'sindeki eksik
+  `ad_account_id` seçimini; pending sidecar migration'daki composite parent unique anahtar eksikliğini
+  ortaya çıkardı. Düzeltilmiş migration, yerel Drizzle migrator ile başarıyla uygulandı.
+- Bu artık **complete-positive acceptance**tır: account-group, topic ve policy-semantic revisions
+  server-private lifecycle yazarlarıyla üretildi; verifier sentetik authority satırı kullanmadan
+  `completeExactFixture:true` raporladı. Browser/session kabulü ayrı açık çevresel kabul noktası olarak kalır.
+
+## 2026-08-11 — A09.4a transaction-local authoritative G3 evidence bridge
+
+- Progressive G3 preview, yalnız aynı caller-owned transaction içinde exact G2 guidance-set manifestine
+  bağlı en fazla 100 run → analysis asset → frozen context zincirini okur. Her frozen context yeniden
+  canonicalize/hash-authenticate edilir; history içindeki outcome envelope'ları da workspace/ref/hash
+  eşleşmeli immutable `business_outcome_evidence_snapshots` satırlarıyla ilişkisel olarak doğrulanır.
+- Her historical context kendi capture zamanında kendi frozen authority snapshot ref/hash'iyle yeniden
+  yüklenir. Mixed-account, missing/tampered context, missing/forged outcome snapshot veya authority
+  replay başarısızlığında bridge source-bound iddiasını bırakır ve G3 preview incomplete/blocked kalır.
+- Draft G3 adayı için mevcut production authority catalog'ı kasıtlı olarak kullanılmaz: catalog yalnız
+  published policy taşır. Bu yüzden `candidate_authority_tier_decision_binding_unavailable` blocker'ı
+  G3 promote'u revision/audit yazmadan reddeder. G4, HTTP/UI, action/network/Meta write veya
+  `productionAuthoritySourceBound` semantiği değişmedi.
+- Kanıt: 7 focused suite/23 test, `npm run typecheck`, `git diff --check`. Gerçek positive G3 canlı
+  acceptance henüz iddia edilmez; ayrı owner-confirmed candidate preview-binding lifecycle'i sonraki
+  forward-only checkpoint'tir.
+
+## 2026-08-11 — A09.4b private candidate preview-binding evidence
+
+- Draft policy, production authority catalog'ına sokulmadan ayrı append-only candidate ledger'da
+  exact G2 head, reviewed guidance manifesti, draft policy revision/hash, active target account,
+  canonical authority tier/structured decision ve repository-verified basis snapshot ile bağlanır.
+  Read-time kontrol snapshot geçerliliğini, tenant/account scope'u, catalog/binding bütünlüğünü ve
+  current draft/G2/guidance head'lerini yeniden doğrular; herhangi bir drift fail-closed'dur.
+- `candidate_preview_binding_*` tablolarda FORCE RLS, public/API rol revoke, tombstoning-only
+  delete ve OCC head korumaları vardır. Tombstone purge invalidation → head → revision sırasıyla
+  bağımlılıkları kaldırır. Decision JSON CHECK'i NULL-true üç değerli mantığına karşı `IS TRUE`
+  ile kapalıdır; tier sözlüğü canonical `PolicyAuthorityTier` ile aynıdır.
+- Gerçek PostgreSQL outer-rollback kanıtı normal source/outcome/timeframe/Decision Room/G0→G2
+  lifecycle'ından candidate binding üretir; positive binding, cross-tenant/tamper/stale retleri,
+  G4/action/Meta/network kapılarının false/zero kalması ve residue=0 doğrulanır. Bu yalnız private
+  G3 preview evidence'ıdır: draft `productionAuthoritySourceBound=false` kalır; G4 yetkisi açılmaz.
+
+## 2026-08-11 — A09.4c candidate-aware G3 review/promotion
+
+- Candidate ledger'dan gelen tier/structured decision, historical outcome zinciri ve repository
+  doğrulamalı exact impact ayrı `candidateReviewEvidenceBound` altında birleşir. Bu kanıt, draftın
+  production policy catalog'unda bulunmamasını source-bound eksikliği saymaz; buna karşılık
+  `productionAuthoritySourceBound` ve `sourceBound` draft için false kalır.
+- Progressive G3 preview artık candidate-review evidence + complete historical evidence + exact
+  impact ister. Hazır durumdaki owner-confirmed `promote_g3`, gerçek impact sayılarıyla immutable
+  formalization revision/audit üretir; malformed/stale/cross-tenant candidate evidence preview'i
+  fail-closed bırakır ve yazı yapmaz.
+- Outer-rollback PostgreSQL verifier normal source → outcome → timeframe → Decision Room → G0–G2
+  lifecycle'ıyla positive preview/G3 promotionı, negative retleri, residue=0 ve network/action/Meta
+  çağrılarının sıfırını doğrular. G4 için A13 risk/cap/approval/rollout/action-valve kanıtı hâlâ
+  yoktur; G4 ve bütün ilgili yetkiler kapalıdır.
 
 ## 2026-08-10 — A10.1 kalıcı DecisionCadenceProfile
 
@@ -2208,3 +3286,489 @@ korumalarını kur. Production Meta writer yalnız ayrı sandbox/read-after-writ
   data trust durumu bu root tarafından da değiştirilmez.
 - Kanıt: `tests/effective-analysis-context-composer-runtime.test.ts`,
   `tests/effective-analysis-context-composer.test.ts`, `npx tsc --noEmit`, `git diff --check`.
+
+## 2026-08-10 — A10.4c-13 narrow PostgreSQL root fail-closed smoke
+
+- `verify:ready-effective-analysis-context-root-db`, outer rollback altında concrete private composition
+  root'un scope-checked sentetik bundle'daki uydurma authority kanıtını relational authority
+  catalog/snapshot/binding zinciri olmadığı için `source_rejected` olarak fail-closed reddettiğini
+  (`syntheticAuthorityRejected:true`) test eder. Network/action çağrısı sıfır, geçici satırlar rollback
+  sonrasında yoktur; persistence başarısı iddia edilmez.
+- Bu **closed-world current-source acceptance değildir**: test, root/persistence sınırını izole etmek için
+  source reader'ı scope-checked ready bundle ile değiştirir. Canonical Meta hierarchy/config, category
+  profile/assignment, reviewed guidance/selection, policy lifecycle, relational authority catalog/snapshot/
+  bindings, promotion registry ve cadence reader'ın birlikte seedlendiği gerçek source-reader acceptance
+  hâlâ açık bir sonraki dar checkpoint'tir. Bu nedenle hiçbir yeni action, Meta write, HTTP/UI veya G4
+  yetkisi açılmaz.
+- Kanıt: `npm run verify:ready-effective-analysis-context-root-db`, `npm run typecheck`,
+  `npm run check:secret-artifacts`, `git diff --check`.
+## 2026-08-10 — A09 policy semantic binding private lifecycle
+
+- `DrizzlePolicySemanticBindingLifecycleRepository`, yalnız server-private owner/admin çağrısında aktif
+  workspace ve üyeliği kilit altında yeniden doğrular; tam published `policyRef/version/hash` olmadan
+  semantic fact yazmaz. Kaynak tabloda zaten var olan append-only chain kullanılır: kaynak-advisory lock,
+  immutable previous hash OCC, canonical JSON fact/revision hash, exact-latest retry ve stale conflict
+  tek transaction içindedir.
+- Her yeni binding, persisted frozen `policy_authority` context sürümlerini gerçek kayıtlı ref/version
+  üzerinden invalidate eder ve audit hash-chain olayı yazar. HTTP/UI/MCP/action yüzeyi yoktur; bütün
+  publish/approve/execute/Meta-write ve diğer runtime yetkileri false döner.
+- Hedefli test, `typecheck` ve `db:check` geçti. `DrizzleAccountGroupLifecycleRepository` de active workspace
+  ve owner/admin üyeliğini kilit altında yeniden doğrular; grup-advisory lock ve exact predecessor OCC ile
+  opaque account ref'lerini yalnız tenant-local, görünür `ad_accounts` satırlarına bağlayıp immutable active/
+  archived revision ve membership satırlarını yazar. Exact immutable retry no-op'tur; her yeni revision frozen
+  `policy_authority` context sürümlerini invalidate eder ve aynı transaction'da audit hash-chain olayı üretir.
+  HTTP/UI/MCP/action yüzeyi yoktur ve tüm yetkiler false kalır. Topic private writer, complete-positive live
+  relational fixture ve gerçek browser acceptance hâlâ açık bağımlılıklardır.
+
+## 2026-08-10 — A10/A12 L5 compact agent context budget
+
+- Yeni saf `compact-agent-context/1.0.0`, yalnız authentic frozen `EffectiveCampaignContext`,
+  `AnalysisAgenda` ve deterministic finding run'ı kabul eder. Context/finding/agenda bağı veya hash'i
+  değişirse fail-closed olur; L0 raw/secret alan, dahili tenant/entity/snapshot referansı ve write authority
+  hiçbir çıktıya girmez.
+- Bağlam, public-safe aliaslarla yalnız gerekli meta/data/guidance/finding özetini taşır. Entity, finding,
+  guidance card ve source limitleri deterministic öncelik sırasıyla uygulanır; her kesinti `omitted`,
+  `truncated`, `moreAvailable` ve neden kodlarıyla görünürdür. Time-series ve drill-down bu saf pakette
+  sıfırdır; bunların typed transportu ile L2/L3 Postgres materialization hâlâ açık kalır.
+- Kanıt: `tests/compact-agent-context.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 L1 canonical Meta insight page parser
+
+- `parseMetaInsightPage`, Graph v23 insights response'undaki dar catalog alanlarını canonical daily
+  insight sözleşmesine çevirir. Currency minor-unit dönüşümü, exact action/action-value type extraction,
+  capability catalog provenance ve hash-only source trace aynı deterministik page hash'ine bağlanır.
+- Foreign account, geçersiz tarih/para, malformed response ve duplicate canonical identity persistence'a
+  ulaşmadan fail-closed kalır. Parser L0 raw sayfayı outputta tutmaz ve hiçbir network/action/write authority
+  açmaz.
+- Bu yalnız L1 parse sınırıdır: canonical `meta_daily_insights` transaction writer'ı ile normal sync runtime
+  binding'i henüz eklenmemiştir; dolayısıyla L2 incremental materialization iddiası yoktur.
+- Kanıt: `tests/insights-materialization.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 L1 canonical insight writer and sync binding
+
+- `DrizzleMetaInsightPagePersistence`, yalnız parser'ın canonical sayfasını kabul eder; active tenant
+  account/connection ve matching insights run+slice scope'unu transaction içinde doğrular. Değişen günlük
+  insight satırı ve metric seti aynı transactionda upsert edilir; aynı content hash yalnız unchanged olur.
+- Normal `MetaPartialReadSyncRuntime`, insight cursor'ını ilerletmeden önce source sayfasını bu server-private
+  writer'a geçirir. Writer hatası slice'ı fail-closed `malformed_response` yapar; writer bağlıyken generic
+  restart ledger insight raw payloadını `{}` dışında saklayamaz. Server production composition root writer'ı
+  inject eder; yeni HTTP/action/Meta-write yüzeyi açılmaz.
+- Bu checkpoint L1 persistence'ı kapatır; L2 feature snapshot/invalidation ve L3 rollup hâlâ açıktır.
+- Kanıt: `tests/meta-sync-integration.test.ts`, `tests/meta-read-sync-runtime.test.ts`,
+  `tests/insights-materialization.test.ts`, `npm run verify:meta-sync-db`, `npm run typecheck`,
+  `git diff --check`.
+
+## 2026-08-10 — A10 interaktif kampanya brief karar akışı
+
+- Excel'deki operasyonel kırılımı (`pazar → dil → iş amacı → ana grup`, dönüşüm yolu ve bütçe
+  seviyesi) yansıtan brief contract'i `1.1.0`'a yükseltildi. Brief artık yalnız serbest metin sorular
+  değil, chat/UI için tek deterministik `nextDecision` ve insan incelemeli sıralı campaign lane'leri
+  üretir.
+- Lead, upper-funnel education ve market/service learning ayrı lane/ölçüm sınırlarında kalır. Form,
+  WhatsApp ve upper-funnel erişimi kıyaslanmaz; sınıflandırılmamış veya delivery-interrupted kayıtlar
+  lane üretmeden triage/recovery'de bloklanır. Bu bir planning aid'dir; campaign yaratma, approval,
+  publish, execute veya Meta-write yetkisi taşımaz.
+- Kanıt: `tests/interactive-campaign-template.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 immutable L2 feature snapshot contract
+
+- `deterministic-feature-snapshot/1.0.0`, yalnız authentic L1 observation metric sonucu ve aynı
+  observation'ın canonical source-ref manifestini kabul eder. Result/source manifest hash'i, formula
+  catalog sürümü, entity scope ve all-false capability seti immutable feature hash'ine girer.
+- Raw/secret alan veya forged metric result hash'i fail-closed reddedilir. Bu saf contract DB tablosu veya
+  L1-change invalidation yazmaz; bunlar sonraki L2 persistence checkpoint'inde relational source manifest ile
+  bağlanacaktır.
+- Kanıt: `tests/deterministic-feature-snapshot.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 L2 private relational-source manifest seam
+
+- Canonical L1 observation adapter'ı, public `FindingObservationReadPort` sonucunu değiştirmeden
+  server-private `readForFeatureSnapshot()` yüzeyi ekler. Bu yüzey her opaque `snapshotRef` için
+  exact tenant-owned `meta_daily_insights.id` ve canonical `contentHash` taşır.
+- İç UUID hiç bir finding/context/model girdisine sızmaz; public `read()` yalnız hash-türetilmiş
+  snapshot referanslarını döndürmeye devam eder. Böylece sonraki L2 persistence migration'ı,
+  bağlamı bozmeden relational source-manifest FK'sini yazıcı tarafında yeniden doğrulayabilir.
+- Bu yalnız kanıt taşıma checkpoint'idir: feature header/item tablosu, selective invalidation ve L3
+  rollup henüz eklenmedi; herhangi bir yetki veya Meta write açılmaz.
+
+## 2026-08-10 — A10 L2 relational storage substrate
+
+- `deterministic_feature_snapshots` immutable L2 header'ı ile
+  `deterministic_feature_snapshot_sources` exact L1 source-manifest item'ı eklendi. Kaynak item,
+  workspace-scope FK ile hem frozen feature'a hem canonical `meta_daily_insights` satırına bağlıdır;
+  header’da hashli feature/source manifest ve all-false capability payloadı tutulur.
+- Yeni forward migration, iki public tabloda ENABLE+FORCE RLS, API rollerinden revoke, tenant composite
+  FK/index ve yalnız workspace tombstoning anında DELETE kabul eden append-only trigger taşır. Tombstone
+  purger child source item → feature header → L1 insight sırasını açıkça uygular.
+- Drizzle meta snapshot zinciri önceki forward migrations için eksik snapshot ürettiği için generator
+  fazladan tarihsel delta çıkardı; migration güvenle yalnız L2 delta'ya daraltıldı. `db:check` bu
+  reconciled journal'ı doğrular. Henüz materialization writer veya L1-change invalidation yazıcısı yoktur.
+
+## 2026-08-10 — A10 L2 private materializer
+
+- `DrizzleDeterministicFeatureSnapshotRepository`, yalnız private read adapter'ın runtime-attested
+  source manifestini kabul eder; feature hash'i repository girişinde yeniden kurulur/doğrulanır.
+- Kısa transaction active workspace ile tenant account/connection scope'unu ve her selected L1 row'un
+  current `source_payload_hash` değerini recheck eder. Eşleşme kaybolursa immutable L2 insert yapılmadan
+  `source_changed` verir; aynı feature hash exact payloadla yalnız unchanged replay olur.
+- Bu katman action/approval/Meta-write authority taşımaz. L1 change sonrası L2/L3 consumer invalidation
+  henüz ayrı bir sonraki checkpoint'tir.
+
+## 2026-08-10 — A10 L1→L2 immutable invalidation evidence
+
+- `deterministic_feature_snapshot_invalidations`, bir L2 feature'ın captured L1 source satırı sonradan
+  değiştiğinde önceki/yeni `source_payload_hash`, exact feature ve daily-insight tenant-scope FKs ile
+  yazılan append-only olay günlüğüdür. Event hash'i aynı değişimi idempotent kılar; frozen feature'ın
+  hash'i veya payload'ı asla güncellenmez.
+- Canonical L1 writer bunu kendi kısa transaction'ında, günlük insight satırı upsert edildikten ve aynı
+  scoped `deterministic_feature_snapshot_sources` bağları çözüldükten sonra yazar. İlk kez görülen bir
+  kaynak için olay yoktur; yalnız mevcut kaynak hash'i değiştiğinde olay üretilir.
+- Forward-only migration ENABLE+FORCE RLS, tüm public/API rollerinden revoke, composite tenant FK/index
+  ve yalnız workspace tombstoning sırasında DELETE'e izin veren append-only trigger ekler. Tombstone
+  purge sırası invalidation → source item → feature header → L1 insight olarak genişletildi.
+- Bu yalnız stale kanıtıdır: L2/L3 reader'ın bu olayları read-time selective rejection veya rematerialize
+  planına dönüştürmesi sonraki checkpoint'tir. Action/approval/Meta-write yetkisi açılmaz.
+- Kanıt: `tests/meta-sync-persistence.test.ts`, `tests/deterministic-feature-snapshot-migration.test.ts`,
+  `tests/meta-workspace-tombstone-purge-drizzle-adapter.test.ts`, `npm run typecheck`, `npm run db:check`.
+
+## 2026-08-10 — A10 private current L2 reader
+
+- `DrizzleDeterministicFeatureSnapshotRepository.loadCurrent()` exact workspace/feature ref'i altında
+  persisted payload'ı tekrar hash-authenticate eder ve ilgili immutable invalidation event'lerini sıralı
+  okur. Payload, scope veya event hash'i bozuksa `corrupt_store` ile fail-closed olur.
+- Event yoksa `ready`, en az bir event varsa aynı historic feature ile `stale` döner; yeni L1 satırını
+  seçmez, feature'ı değiştirmez ve bir fallback türetmez. Bu, read-time selective rejection için private
+  primitive'tir.
+- Decision Room/context/action akışına bağlanmamıştır; L3 window materialization ve stale feature'ın
+  hangi future context'e gireceğine dair policy sonraki checkpoint'te kalır.
+- Kanıt: `tests/deterministic-feature-snapshot-drizzle-repository.test.ts`,
+  `tests/deterministic-feature-snapshot.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 saf L3 window artifact
+
+- `deterministic-window-snapshot/1.0.0`, verified resolved timeframe ile yalnız aynı tenant/connection/
+  account/entity scope'ta, settled ve `ready` durumundaki L2 feature'ları exact ref/hash/source-manifest
+  listesiyle freeze eder. Window hash ve ref tüm canonical bileşenlerden türetilir.
+- L2 feature pencerenin dışına taşarsa, scope karışırsa veya settled/ready değilse artifact oluşmaz. Raw,
+  action ve write authority yapısal olarak yoktur.
+- Saf contract'ın immutable relational persistence'ı ve L2 invalidation tüketimi aşağıdaki checkpoint'te
+  eklendi; Decision Room'a bağlama hâlâ ayrıdır.
+- Kanıt: `tests/deterministic-window-snapshot.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 private L3 window materializer substrate
+
+- `deterministic_window_snapshots` ve `deterministic_window_snapshot_features`, L3 window hash/payload
+  ile exact L2 feature id/ref/hash soy zincirini tenant composite FK/index altında immutable saklar.
+  Migration ENABLE+FORCE RLS, revoke, append-only/tombstone guard ve purge child→header sırasını taşır.
+- `DrizzleDeterministicWindowSnapshotRepository.save()`, saf artifact'i yeniden kurar; active workspace
+  altında tüm feature hashlerini invalidation-free readback ile doğrular. Eksik/stale kaynakta header veya
+  binding insert etmeden `source_changed` verir; action/approval/Meta-write yetkisi yoktur.
+- Private L3 current reader exact persisted payload/bindingleri yeniden canonicalize eder; bağlı L2
+  invalidation varsa yeni bir pencere seçmeden `stale` döner. Decision Room/context bağlantısı hâlâ açık
+  kalır.
+- Kanıt: `tests/deterministic-window-snapshot-drizzle-repository.test.ts`,
+  `tests/meta-workspace-tombstone-purge-drizzle-adapter.test.ts`, `npm run typecheck`, `npm run db:check`.
+
+## 2026-08-10 — A10 frozen context L2/L3 evidence closure
+
+- Frozen context'teki `featureRefs` ve `windowRefs`, save transaction'ında exact tenant, mirror ve entity
+  scope'taki immutable L2/L3 payloadlara yeniden bağlanır. L2 hash-authentication, L3'nün exact L2 bağları
+  ve yeni L1 invalidation yokluğu zorunludur; ready context'te feature/window çiftinden biri eksikse context
+  kaydedilmez. Historic/legacy boş data context'leri replay uyumluluğunu korur.
+- Effective-context component ve invalidation allowlist'i L2 feature/L3 window tipleriyle forward-only
+  genişletildi; RLS+FORCE ve public/API-role revoke yeniden açıkça uygulanır. L1 writer, değişen günlük
+  source'un bağlı L2 feature ref'i için idempotent context invalidation olayı da yazar; frozen payloadlar
+  asla değiştirilmez.
+- Bu checkpoint Decision Room'a L3 drill-down veya action yetkisi bağlamaz; bütün capability'ler false
+  kalır. Kanıt: `tests/effective-campaign-context-persistence.test.ts`,
+  `tests/meta-sync-persistence.test.ts`, `tests/deterministic-window-snapshot-drizzle-repository.test.ts`,
+  `npm run typecheck`, `npm run db:check`.
+
+## 2026-08-10 — A10 private timeframe-bound L2→L3 materialization
+
+- `materializeForTimeframe`, serbest bir eski window ref'i kabul etmez. Aynı workspace lock altında yalnız
+  exact connection/account/entity scope ve resolved timeframe içine bütünüyle sığan, invalidation-free L2
+  feature payloadlarını re-authenticate eder; boş, bozuk veya stale set fail-closed kalır.
+- Seçilen set saf L3 contract ile yeniden kurulur ve var olan immutable save recheck'inden geçer. Böylece L2
+  yazarlarıyla aynı workspace lock sınırında snapshot seti kaymaz; yeni tablo, HTTP/MCP, action veya Meta
+  write yüzeyi eklenmez.
+- Decision Room/template timeframe bindingi henüz bu private primitive'i çağırmaz; bu bağlantı ayrı
+  checkpoint'te kurulacaktır. Kanıt: `tests/deterministic-window-snapshot-drizzle-repository.test.ts`,
+  `tests/deterministic-window-snapshot.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A10 Decision Room L3 admission boundary
+
+- Yeni Decision Room analysis run'ı, yalnız `ready`/blockersız frozen context'te en az bir canonical L2
+  `feature_…` ve L3 `window_…` referansı varsa başlar. Context persistence bu ref'leri already exact
+  tenant/mirror/entity L2/L3 artefactlarına bağladığından, run asset loader invalidated context'i zaten
+  seçmez; bu gate serbest veya pre-L3 context'i deterministic olarak reddeder.
+- Observation reader'ın L1 `snapshotRef` çıktısı context'in `snapshotRefs` listesine karşı doğrulanır;
+  önceki yanlış L2 `featureRefs` karşılaştırması kaldırıldı. Böylece L1 evidence ile L2 feature kimliği
+  birbirinin yerine geçirilemez.
+- Mevcut claim edilmiş run asset'inin historical replay yolu yeni current-admission kontrolüne zorlanmaz.
+  Bu checkpoint HTTP/action/Meta write eklemez; current context'i L3'e bağlayan private authoring/composition
+  akışı hâlâ sonraki bağımlılıktır. Kanıt: `tests/decision-room-analysis-runtime.test.ts`,
+  `npm run typecheck`, `git diff --check`.
+
+## 2026-08-10 — A13 typed Meta write-spec boundary
+
+- `meta-write-spec/1.0.0`, yalnız immutable `approval_required` action plan'dan typed
+  status pause/activate ile campaign/ad-set daily/lifetime budget değişikliği adayını üretir.
+  Raw Graph path/field, external ID, token veya transport taşımaz; K0/K1/K4 ve bütün forged/invalid
+  planlar reddedilir.
+- Üretilen spec execute/Meta-write authority vermez: ayrı bir single-use human execution grant,
+  persisted freshness recheck, opaque-ref resolution ve read-after-write executor'ı hâlâ zorunludur.
+  Bu checkpoint ağ çağrısı yapmaz ve gerçek Meta write açmaz.
+- Kanıt: `tests/meta-write-spec.test.ts`, `tests/autonomy-valve.test.ts`, `npm run typecheck`.
+
+## 2026-08-10 — A13 separate execution admission boundary
+
+- `action-execution-admission/1.0.0`, approval kararını execute yerine geçirmez. Hedef unit'in
+  approval grant'i tüketilmemiş/geçerli olmalı; yalnız hedef ve dependency closure'ının exact
+  current freshness'i kabul edilir; ayrı human-presence kanıtı exact unit/hash/scope ve policy'nin
+  grant-consumer rolüne bağlıdır.
+- Admission, typed status/budget write-spec'i taşır fakat `admitted_for_disabled_executor` ile
+  döner: execute, Meta write ve network dispatch capability'leri false'tur. Raw Graph, K0/K1/K4,
+  stale/bozuk plan veya bağımlılık hiçbir executor'a ulaşamaz.
+- Sonraki bağımlılık: server-private idempotent execution ledger, opaque Meta target resolution,
+  human execution ceremony, read-after-write verify ve rollback. Bu checkpoint gerçek Meta write
+  veya bir ağ çağrısı yapmaz.
+- Kanıt: `tests/action-execution-admission.test.ts`, `tests/meta-write-spec.test.ts`,
+  `tests/approval-lifecycle.test.ts`, `npm run typecheck`.
+
+## 2026-08-10 — A13 durable disabled-execution admission ledger
+
+- `action_execution_attempts` ve `action_execution_events`, approved unit → disabled-executor
+  admission geçişinin kalıcı ve idempotent kaydıdır. Repository çağıranın plan/hedef/ref'lerini
+  güvenmez; workspace, unit, approve kararı ve grant'i aynı transaction içinde tekrar çözer,
+  DB'deki immutable planla typed write-spec hash'ini yeniden üretir.
+- İlk ve tek mevcut olay `admitted`tir. Event payload'ı yapısal olarak
+  `executionAuthority: none` ve `networkDispatched: false` taşır; RLS/FORCE RLS, public-role
+  revoke, append-only+tombstone koruması ve tenant-composite FK'ler migration ile eklenmiştir.
+- Bu bir executor değildir: insan execution ceremony, tek-kullanımlık grant tüketimi, opaque
+  Meta target çözümü, dispatch, read-after-write ve rollback sonraki merkezi checkpoint'tir.
+  Bu checkpoint ağ çağrısı ve gerçek Meta write yapmaz.
+- Kanıt: `tests/action-execution-admission-drizzle-repository.test.ts`,
+  `tests/action-execution-admission.test.ts`, `tests/meta-workspace-tombstone-purge-drizzle-adapter.test.ts`,
+  `npm run typecheck`, `npm run db:check`.
+
+## 2026-08-10 — A13 parent-state and budget-owner eligibility matrix
+
+- `meta-write-eligibility/1.0.0`, typed write-spec ile immutable source snapshot'ı yeniden
+  bağlar. Pause adayında target'ın effective ACTIVE olması; activate adayında target'ın configured
+  PAUSED ve tüm parent'ların effective ACTIVE olması; budget adayında ise campaign/adset'in exact
+  active budget owner olması zorunludur. Unknown, inactive veya cross-target durumların tamamı
+  reason-coded `blocked` döner.
+- Sonuç yalnız `eligible_for_separate_human_execution` adaylığıdır. Execute, Meta write ve network
+  dispatch capability'leri yapısal olarak false kalır; hiçbir database mutation, HTTP endpoint,
+  Graph request veya gerçek Meta write eklenmedi.
+- Kanıt: `tests/meta-write-eligibility.test.ts`, `tests/meta-write-spec.test.ts`,
+  `tests/autonomy-valve.test.ts`, `npm run typecheck`.
+
+## 2026-08-10 — A13 eligibility-bound disabled admission
+
+- `action-execution-admission/1.0.0`, artık typed write-spec yanında aynı unit scope'una ait
+  eligibility snapshot/result hash'ini de immutable admission hash'ine dahil eder. Target state,
+  parent chain, budget owner veya workspace/account scope'u uygun değilse disabled-executor
+  admission dahi üretilmez.
+- Bu checkpoint caller-provided source snapshot'ı salt domain sözleşmesinde bağlar; sonraki server-
+  private executor checkpoint'i aynı snapshotı current persisted Meta mirror'dan yeniden çözmek
+  zorundadır. Bu nedenle execution/Meta-write/network capability'leri false kalır ve yeni transport,
+  DB write veya HTTP endpoint yoktur.
+- Kanıt: `tests/action-execution-admission.test.ts`,
+  `tests/action-execution-admission-drizzle-repository.test.ts`,
+  `tests/meta-write-eligibility.test.ts`, `npm run typecheck`.
+
+## 2026-08-10 — A10 interactive proposal-only campaign brief surface
+
+- Kampanyalar görünümündeki `CampaignPlanningBriefPanel`, çalışma kitabında görünen sıralamayı
+  (pazar → dil → hizmet → iş amacı → dönüşüm yolu → kapasite/kreatif) kullanıcı tarafından
+  değiştirilebilir bir taslakta uygular. Her değişimde mevcut pure brief yeniden hesaplanır ve
+  yalnız tek sonraki eksik karar, planlanan şerit, insan-incelemeli sıra ile kıyas sınırı gösterilir.
+- Lead form/WhatsApp, üst huni, öğrenme, kesinti ve sınıflandırma durumları mevcut domain
+  sözleşmesinden gelir; panel yeni bir iş kuralı veya kalıcı source of truth oluşturmaz. State
+  browser oturumunda geçicidir; API, database write, campaign create/publish/approval/execute ve
+  Meta write eklenmedi.
+- Kanıt: `tests/campaign-planning-brief-panel.test.ts`,
+  `tests/interactive-campaign-template.test.ts`, `npm run build`; gerçek browser kabulünde route
+  `lead_form → whatsapp` değişimi doğru outcome'a döndü, write control sayısı `0` kaldı ve
+  390/768/1440 viewport'larında yatay taşma `0` doğrulandı.
+
+## 2026-08-10 — A10 private timeframe-bound L3 context composer
+
+- `TimeframeBoundAnalysisContextComposer`, input olarak yalnız workspace/entity/timeframe alır. Son geçerli,
+  invalidate edilmemiş context repository'den çözülür; private mirror UUID'leri ve server clock ile L3
+  materializer çağrılır. Caller context/fact, L2 feature, window ref, database ID veya capture time
+  enjekte edemez.
+- Yeni context mevcut immutable context'in canonical bileşenlerini korur ancak yalnız materializer'ın exact
+  L2 feature refs ve L3 window ref'iyle `data.ready` olur; evidence-bound writer bütün relational recheck'leri
+  tekrar uygular. Authority snapshot, context'in yeni capture anında geçerli değilse persistence reddeder.
+- Tek server-private Drizzle root bu reader/materializer/writer'ı aynı database sınırında kurar; HTTP, MCP,
+  action veya Meta write yüzeyi eklenmedi. Kanıt: `tests/timeframe-bound-analysis-context-composer.test.ts`,
+  `tests/timeframe-bound-analysis-context-composer-runtime.test.ts`, `npm run typecheck`, `git diff --check`.
+
+## 2026-08-11 — A10.4c-14 closed-world current-source persistence acceptance
+
+- Gerçek PostgreSQL verifier, tek bir geçici tenantta canonical Meta hierarchy/config snapshot'ı, category
+  profile/composition, cadence, reviewed guidance selection/pack, policy lifecycle, repository-verified
+  authority snapshot/catalog ve promotion registry zincirini normal private lifecycle'ler üzerinden kurar.
+  `DrizzleCurrentEffectiveAnalysisContextSourceReader` aynı read-only snapshotta bu kaynakları çözer;
+  server-private composer context'i `evidence_bound` olarak yazar ve tekrar yükler.
+- Empty published policy registry artık ayrı bir policy iddia etmediğinde boş `ANY(...)` binding sorgusu
+  çalıştırmaz; snapshot/catalog/registry hash'i doğrulandıktan sonra zero-item immutable composition sidecar
+  yazılır. Nonempty policy bağlamları exact relational binding doğrulamasını korur.
+- Verifier public campaign read sınırında iç UUID/hash kullanmaz, API'nin SHA-256 türetilmiş `ref_…` aliasını
+  kullanır. Cross-tenant scope ve malformed alias reddedilir. Ağ, action ve Meta write çağrıları sıfırdır.
+  Primary ve foreign fixture workspace'leri yalnız locked tombstone servisiyle temizlenir; survivor sayıları
+  sıfırdır. Bu acceptance data window bağlamaz: `data.not_ready` / `analysis_window_not_bound` korunur;
+  Decision Room, HTTP/MCP, approval veya G4 capability'si açılmaz.
+- Kanıt: `npm run verify:current-effective-analysis-context-source-db`; `npm test` (316 dosya/1.719 test),
+  `npm run build`, `npm run db:check`, `npm run check:security`, `npm run check:security-boundaries`,
+  `npm run check:secret-artifacts` ve `git diff --check`.
+
+## 2026-08-13 — Meta mirror gerçek okuma durumu ve bütçe önerisi→insan onayı köprüsü
+
+- Tek-hesap, GET-only Meta recovery şeritleri güvenli `rotated` token durumu ile yeniden çalıştırıldı.
+  Insight şeridi teknik olarak tamamlandı fakat seçili kapalı gün için Meta sıfır kayıt döndürdü; bu nedenle
+  canonical `meta_daily_insights` satırı hâlâ yoktur. Creative v2 şeridi iki dayanıklı checkpointte toplam
+  278 yeni creative kaydı yazıp tamamlandı; Meta write çağrısı her koşumda sıfır kaldı.
+- Ayna şu anda creative metinlerini taşısa da creative→post/actor ilişkisi kanıtlı değildir. Bu nedenle
+  içerik/künye çıkarımı kullanılabilir bir inceleme girdisidir; ama S1.4 actor/post kaynak doğrulaması,
+  performans metriği ve otomatik karar için yeterli kabul edilmez. Dashboard bu durumu `partial`/`unavailable`
+  olarak göstermeye devam etmelidir; demo ya da başarı etiketiyle gizlenemez.
+- Seçilmiş, immutable Slice Rule bütçe senaryosu artık yalnız mevcut frozen proposal, campaign budget-owner
+  binding, güncel canonical daily budget, currency, delivery-hold ve exact K2/K3 yayınlanmış onay politikası
+  birlikte doğrulanınca bir `ActionUnit` taslağına dönüştürülebilir. Bu taslak mevcut insan onay kuyruğuna
+  gider; approval, execution, Meta write ve otomasyon yetkileri açılmaz.
+- Köprü workspace UUID'sinden kamu ref'i türetmez: onay politikası ledger'ındaki exact `workspaceRef`,
+  policy revision/hash zinciri üzerinden tekrar çözülür. Eksik, stale, farklı-workspace veya applicability
+  uyuşmayan politika `policy_unavailable` ile fail-closed kalır. Bu noktada kullanıcı arayüzü materializer
+  komutunu henüz açmaz; dolayısıyla canlıda otomatik ya da tek-tık Meta değişikliği yoktur.
+- Kanıt: `tests/slice-rule-budget-action-unit-materializer.test.ts`,
+  `tests/approval-policy-registry.test.ts`, `tests/action-proposal-queue-drizzle-repository.test.ts`,
+  `npm run typecheck`, `git diff --check`; Meta recovery çıktılarında `writeNetworkCalls:0`.
+
+## 2026-08-13 — Creative kaynak bağı ve seçilmiş bütçe senaryosunun insan kuyruğu
+
+- `creative_ad_v2` GET-only recovery artık Graph'ın `creative.actor_id` kanıtını v24 alan kataloğundan
+  ister. Object-story bilgisinin redakte ya da eksik olması doğrudan bağ sayılmaz: repository aynı
+  connection'ın canonical asset aynasında eşleşmeyi yeniden doğrulamadan creative→actor/post ilişkisi
+  yazmaz. Bounded canlı recovery sonucunda 11 canonical creative post/actor bağı, 25 ad→creative→post
+  bağı ve sıfır aktif ilişki tutarsızlığı oluştu; Meta write çağrısı sıfırdır. Kalan kanıtsız creative'ler
+  hâlâ `unresolved` olarak kalır.
+- Slice Rule panelindeki seçilmiş tek-allocation senaryo, yalnız açık cookie-bound “insan onayına gönder”
+  komutuyla ActionUnit taslağına ilerleyebilir. Tarayıcı yalnız opaque seçim kanıtını, idempotency anahtarını
+  ve zaman penceresini taşır; kampanya, tutar, para birimi, policy ve iç UUID sunucuda immutable
+  provenance'dan yeniden çözülür. Sonuç mevcut Approval Queue'da görünür; onay, execute, otomasyon ve
+  Meta write yetkileri hâlâ kapalıdır.
+- Insight recovery'nin seçili kapalı gün için sıfır satır dönmesi değişmedi. Bu nedenle performans/kohort
+  çıkarımı ve metric-temelli bütçe önerisi, insight kanıtı gelene kadar `unavailable`/`needs review`
+  sınırında kalır; creative metninden otomatik performans sonucu çıkarılmaz.
+- Kanıt: `tests/meta-content-extraction.test.ts`, `tests/meta-sync-integration.test.ts`,
+  `tests/slice-rule-budget-action-unit-http.test.ts`, `npm run typecheck`, `npm run db:check`,
+  `npm run check:security-boundaries`; canlı recovery aggregate-only olarak 11/25/0 bağı ve sıfır
+  Meta write doğruladı.
+
+## 2026-08-13 — K2/K3 bütçe onay policy çalışma alanı
+
+- Policy Bundle Studio, exact applicability seçimiyle artık üç ayrı onay sınıfını işler: K2 bütçe
+  azaltma, K3 bütçe artırma ve K4 mevcut gönderi öne çıkarma. K2/K3 policy'si K4'e veya birbirine
+  fallback yapmaz; aynı `policyRef` sonraki revizyonda kapsam değiştiremez.
+- Böylece kullanıcının görünür bütçe zinciri tamamlanır: Slice Rule taslağı → frozen impact ve
+  saved proposal → tek allocation seçimi → exact K2/K3 published policy → yalnız insan onay kuyruğu.
+  Policy taslağını hazırlayan kişi kendi current hash'ini yayımlayamaz; farklı owner/admin'ın
+  human-presence doğrulamalı yayını gerekir.
+- Bu bir execution açılışı değildir. Queue'ya gönderim dahi policy, context, mirror budget, currency,
+  delivery hold ve immutable provenance yeniden doğrulanmadan mümkün değildir. Approval kaydı Meta
+  transportuna, bütçe yazımına veya otomasyona yetki vermez.
+- Kanıt: `tests/policy-bundle-studio.test.ts`, `tests/policy-bundle-dashboard.test.ts`,
+  `tests/approval-policy-registry.test.ts`, `tests/slice-rule-budget-action-unit-http.test.ts`,
+  `npm run typecheck`, `npm run check:security-boundaries`, `npm run db:check`.
+
+## 2026-08-13 — Normalizasyon görünürlüğü ve doğrulanmış boş insight teslimatı
+
+- Rules yüzeyi artık sıralı olarak Guidance → Normalization → Slice Rule akışını gösterir. Normalization
+  ham insan dilini yalnız structured taslak, varsayım ve açık sorulara çevirir; policy değildir ve publish,
+  approval, action veya Meta write yetkisi taşımaz. Strict Policy yüzeyinden çıkarılarak iki farklı policy
+  yolu izlenimi engellendi.
+- Canlı Meta insight durumu aggregate-only kanıtla ayrıştırıldı: bir account stream'i completed olmasına
+  rağmen canonical daily insight sayısı sıfırdır; dashboard bunu `insight_delivery_empty_verified` olarak
+  gösterir. Incomplete ve hiç gözlenmemiş stream'ler ayrı reason code alır. Bu bilgi yalnız read modeldir,
+  Meta write ya da veri uydurma yapmaz.
+
+## 2026-08-13 — 30 günlük canonical Meta insight bootstrap tamamlandı
+
+- Server-private, GET-only insight bootstrap iki canonical hesap için 10/10 campaign-insight tarih
+  dilimini durable cursor üzerinden tamamladı. Bootstrap kaynağında 759 canonical
+  `meta_daily_insights` satırı, 48 campaign ve 2026-07-14–2026-08-12 kapsaması vardır; cursor ve
+  error classification kalmamıştır. Tüm canonical tabloda 761 satır, 4 account ve 50 campaign görülür.
+- Bu, günlük yoğunluğun eksiksiz olduğu anlamına gelmez: ikinci hesapta Meta bazı günler satır
+  döndürmedi. Trust/readiness ve Dashboard, account/gün coverage eksikliğini `partial`/`not_ready`
+  olarak göstermeyi sürdürmeli; boş gün sıfır performans ya da tam 30-gün coverage diye yorumlanmaz.
+- Bootstrap yalnız Graph GET çağrıları yaptı; Meta write 0'dır. Scheduler/cron etkinleştirilmedi;
+  runner kapalıdır ve normal otomatik işletim kanıtı değildir.
+
+## 2026-08-14 — Kanonik Meta kampanya portföyü Dashboard'a bağlandı
+
+- Kampanyalar yüzeyi, güvenli yerel oturum ve doğrulanmış `meta/read-mirror` kaynağı hazır olduğunda
+  artık demo hiyerarşisi yerine canonical account → campaign → ad set → ad → creative/post aynasını
+  gösterir. Objective, durum, bütçe sahibi, hedefleme özeti ve aynalanmış metin yalnız mevcut read
+  modelden gelir; kampanya referansları opaque kalır.
+- Oturum ya da kaynak yoksa eski demo görünümü yalnız açık `fallback` olarak kalır; gerçek portföy,
+  KPI, kategori veya policy sonucu taklit edilmez. Bu yüzey Meta write, policy yayını, approval veya
+  action yetkisi vermez.
+- Kanıt: `6d3298f`, `tests/canonical-campaign-portfolio-panel.test.ts`,
+  `tests/portfolio-dashboard.test.ts`, `npm run typecheck` ve `git diff --check`.
+
+## 2026-08-14 — Künye incelemesinden denetimli manuel atamaya geçiş
+
+- Canonical kampanya künye inceleme kuyruğundaki eksik pazar, hizmet veya kampanya ailesi satırı,
+  mevcut guarded Category Inventory atama formuna yalnız opaque ve workspace-bound kampanya hedefi ile
+  ön-doldurulur. Tanım seçimi bilerek boş kalır: owner/admin kanıtı inceleyip tanımı ve manuel kilidi
+  kendi seçer; authoring tarafı aktif hedefi, rolü ve registry hash'ini yeniden doğrular.
+- Review ve Slice Scope Candidate read modelleri artık ham dahili kampanya kimliği taşımaz; pazar
+  boyutu da Slice Rule sözleşmesindeki `market` ekseniyle hizalanır. Otomatik künye ataması, yeni bir
+  mutation yolu, policy/action yetkisi ve Meta write yoktur.
+- Kanıt: `ebf137c`, ilgili classification/scope/category authoring odak testleri, `npm run typecheck`
+  ve `git diff --check`.
+
+## 2026-08-14 — Slice kapsamından frozen-context hazırlık görünümü
+
+- Rules yüzeyi, server-derived ve queryless hazırlık read modelinde her tutarlı Slice Scope adayının
+  yalnız iki gerçek kapısını gösterir: geçerli frozen campaign context bulunup bulunmadığı ve aynı
+  immutable scope için Budget Impact'in ilişkisel olarak uygunluğu. Bu eşleme, istemcinin kampanya,
+  account veya context ref'i sunmasıyla değil, canonical aday ve en güncel geçerli frozen kayıtların
+  tenant içi yeniden çözümüyle yapılır.
+- L2/L3 window, temporal öneri veya compose sonucu için eksik kanıttan iddia üretilmez. Görünüm salt
+  okunurdur; context compose, rule/policy save, action ve Meta write çağrısı yapmaz.
+- Kanıt: `c5814de`, `tests/slice-operational-readiness-{service,http}.test.ts`,
+  `tests/slice-scope-candidates.test.ts`, `tests/slice-rule-workspace-panel.test.ts`,
+  `npm run typecheck` ve `git diff --check`.
+
+## 2026-08-14 — İnsan onay kuyruğu frozen-context hash bağını doğruluyor
+
+- Slice Rule'dan seçilmiş budget allocation ile materialize edilen ActionPlan'in `contextHash` alanı,
+  artık valve bağlamının türetilmiş digest'i değil, materializer'ın aynı transaction içinde çözdüğü
+  persisted frozen campaign context hash'idir. Bu değer istemci veya materialize komutundan kabul
+  edilmez; Action Proposal Queue böylece ActionUnit'i gerçek immutable context kaydıyla yeniden
+  doğrular.
+- K2/K3 insan onayı, approval-only davranışı ve tüm `canExecute`/Meta write kapıları değişmedi.
+  Queue DB kabulü inserted/exact replay/immutability/decision replay/RLS-grant/outer-rollback ile
+  geçti; `metaCalls=0`, `executionCalls=0`. Bu browser human-presence seremonisini bypass eden bir
+  kanıt değildir.
+- Kanıt: `6d77969`, `tests/autonomy-valve.test.ts`,
+  `tests/slice-rule-budget-action-unit-materializer.test.ts`,
+  `tests/action-proposal-queue-drizzle-repository.test.ts`,
+  `npm run verify:action-proposal-queue-db` ve `npm run typecheck`.
+
+## 2026-08-14 — 30 günlük canonical Meta insight bootstrap tamamlandı
+
+- Server-private, GET-only insight bootstrap iki canonical hesap için 10/10 campaign-insight
+  tarih dilimini durable cursor ile tamamladı: bootstrap kaynağında 759 `meta_daily_insights`
+  satırı, 48 kampanya ve 2026-07-14–2026-08-12 kapsamı vardır; cursor ve error classification
+  kalmamıştır. Tüm canonical tabloda 761 satır, 4 hesap ve 50 kampanya görülür.
+- Bu, gün bazında tam yoğunluk demek değildir: ikinci hesap bazı günlerde Meta satırı döndürmedi.
+  Trust/readiness ve Dashboard bu boşluğu `partial`/`not_ready` olarak göstermeyi sürdürür;
+  sıfır performans veya tam 30-gün coverage çıkarımı yapılmaz.
+- Bootstrap yalnız Graph GET çağrıları yaptı; Meta write 0'dır. Scheduler/cron etkin değildir ve
+  bu kanıt otomatik işletim kabulü değildir.

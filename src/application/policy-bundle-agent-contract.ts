@@ -92,7 +92,7 @@ export class PolicyBundleAgentContract {
 
 export const POLICY_BUNDLE_AGENT_TOOLS = Object.freeze([Object.freeze({
   name: "policy_bundle_read",
-  description: "Read the K4 policy-bundle revision feed, server catalog, and selection-aware readiness for the server-bound workspace. This tool cannot draft, publish, approve, grant, execute, or write Meta.",
+  description: "Read the exact K2 budget-decrease, K3 budget-increase, and K4 promotion policy-bundle revision feed, server catalog, and selection-aware readiness for the server-bound workspace. This tool cannot draft, publish, approve, grant, execute, or write Meta.",
   inputSchema: Object.freeze({
     type: "object",
     additionalProperties: false,

@@ -10,6 +10,33 @@
 > Oturum: ot:2026-08-06/reklamzeka-baslangic
 > Sürüm: v2 · Önceki: [v1](../v1/MASTER.md) · Revizyon: [REVIZYON.md](REVIZYON.md)
 
+## 2026-08-13 yürütme özeti
+
+Master'ın ayrıntılı kapsamı aşağıda korunur. Uygulama sırası, kullanıcıya görünür dikey
+sonuç üretmek için şudur: **(0)** kanıt/durum uzlaştırması, **(1)** gerçek salt-okunur
+Meta aynası, **(2)** yerli/yabancı sınırını koruyan kanıtlı künye ve slice, **(3)**
+çok-katmanlı bütçe havuzu ve custom rule/policy taslağı, **(4)** zamansal öneri ile
+payment/delivery alarmı, **(5)** Dashboard'un tüm sayfalarında kalıcı ReklamZeka
+Orchestrator/Codex CLI sohbeti, **(6)** birleşik insan onay akışı, **(7)** yalnız ayrıca
+açık kullanıcı izniyle dar typed Meta write pilotu ve **(8)** production kapanışı.
+
+Yaklaşık durum: teknik/güvenlik altyapısı `%65`, gerçek kullanıcı işletim döngüsü `%40`,
+ağırlıklı üretim hedefi `%55`. Bu oran kabul değildir; aşağıdaki fazların kendi kanıt
+kapıları tamamlanmadan ilerleme iddiası yapılamaz. Faz 5, Faz 1–4 ile paralel yürüyebilir;
+gerçek kural/bütçe kayıtlarına bağlanması Faz 3–4'e bağlıdır.
+
+Faz 0'un güncel gerçeği: güvenli read-only bağlantı doctor kabulü sonrası beş hesap canonical
+root olarak bootstrap edildi ve ilk live sync 320 kampanyayı aynaya yazdı. Dashboard gerçek
+DB-backed `read-mirror` projection'ını kullanır; eski inventory route'u bilinçli olarak kapalıdır.
+Ad-set/ad/creative/insight ile ayrıntılı immutable geo backfill henüz canlı uçtan uca kabulden
+geçmediğinden ürün bu alanları `partial`/`unavailable` gösterir. Scheduler ve tüm Meta write
+yolları hâlâ kapalıdır.
+
+Değişmez sınırlar: yerli/yabancı karışmaz; eksik künye tahmin edilmez; isim değişikliği
+yalnız önerilir; taslak policy değildir; taslağın sahibi kendi policy'sini yayımlayamaz;
+agent publish/approve/execute/Meta write yetkisi taşımaz; canlı Meta write ayrıca açık
+kullanıcı izni olmadan başlamaz.
+
 ## Planın konumu ve kapsamı
 
 Bu dosya projenin **tek kanonik ana planıdır**. v1'in tamamlanan ürün, veri,

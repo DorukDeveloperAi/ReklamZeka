@@ -64,6 +64,13 @@ const budgetLimits = {
 } as const;
 
 describe("typed action risk classification", () => {
+  it("uses only a typed server frozen-context hash when one is supplied", () => {
+    const frozen = "a".repeat(64);
+    expect(buildActionPlan(status(), context({ frozenContextHash: frozen }))).toMatchObject({ contextHash: frozen });
+    expect(() => buildActionPlan(status(), context({ frozenContextHash: "forged" } as never)))
+      .toThrowError(expect.objectContaining({ code: "invalid_contract" }));
+  });
+
   it.each([
     [{ kind: "no_change", entity: { level: "campaign", ref: "campaign_leads_tr" }, reasonRef: "reason_observe" }, "K0", "no_write"],
     [{ kind: "internal_annotation", entity: { level: "campaign", ref: "campaign_leads_tr" }, annotationRef: "annotation_review" }, "K1", "approval_required"],

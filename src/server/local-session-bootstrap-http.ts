@@ -42,9 +42,16 @@ export function createLocalSessionBootstrapHandler(input: Readonly<{
         || (contentLength !== null && contentLength !== "0")) {
         throw new LocalDecisionRoomBoundaryError("untrusted_request");
       }
-      // Exact empty body. Rejecting a present stream avoids buffering an
-      // unbounded chunked body when Content-Length is absent.
-      if (request.body !== null) throw new LocalDecisionRoomBoundaryError("untrusted_request");
+      // Exact empty body. Next's Route Handler adapter can expose a readable
+      // stream even when a browser sends POST with Content-Length: 0, so a
+      // non-null stream alone is not evidence of a payload. We still reject
+      // unknown-length/chunked streams before reading them, and consume only
+      // an explicitly zero-length stream to prove it is empty.
+      if (request.body !== null) {
+        if (contentLength !== "0" || (await request.text()).length !== 0) {
+          throw new LocalDecisionRoomBoundaryError("untrusted_request");
+        }
+      }
       const token = bearerToken(request);
       if (!token) throw new LocalDecisionRoomBoundaryError("untrusted_request");
       const osUid = typeof process.getuid === "function" ? process.getuid() : -1;

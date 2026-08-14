@@ -1,0 +1,18 @@
+.panel { border: 1px solid var(--line, #d9dfeb); border-radius: 16px; padding: 18px; background: var(--surface, #fff); display: grid; gap: 14px; }
+.header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.title { margin: 0; font-size: 16px; }
+.hint { margin: 4px 0 0; color: var(--muted, #5b6472); font-size: 13px; line-height: 1.45; }
+.badge { white-space: nowrap; border-radius: 999px; padding: 4px 8px; background: #f2f4f8; font-size: 12px; color: #4a5565; }
+.roots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.root { padding: 12px; border-radius: 10px; background: #f8fafc; border: 1px solid #edf0f4; }
+.root strong { display: block; font-size: 13px; }
+.root span { display: block; margin-top: 4px; color: #5b6472; font-size: 12px; }
+.editor { display: grid; gap: 7px; }
+.editor label { font-size: 13px; font-weight: 600; }
+.editor textarea { min-height: 220px; width: 100%; resize: vertical; border: 1px solid #cbd3df; border-radius: 10px; padding: 10px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: #1b2430; background: #fff; }
+.actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.actions button { border: 0; border-radius: 9px; background: #202b3d; color: #fff; padding: 9px 12px; cursor: pointer; }
+.actions button:disabled { cursor: not-allowed; opacity: .55; }
+.status { color: #5b6472; font-size: 13px; }
+.error { color: #aa2635; font-size: 13px; }
+@media (max-width: 700px) { .roots { grid-template-columns: 1fr; } .header { display: grid; } }

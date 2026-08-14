@@ -166,21 +166,18 @@ function compactOutcomeEvidence(context: EffectiveCampaignContext): Deterministi
 }
 
 function passFor(entityType: FindingEntityType): AnalysisPassKey {
-  return entityType === "account" ? "account_objective" : entityType;
+  return entityType === "account" ? "group_account" : "entity";
 }
 
 function passAllowsEntity(pass: AnalysisPassKey, entityType: FindingEntityType): boolean {
   const allowed: Readonly<Record<AnalysisPassKey, readonly FindingEntityType[]>> = {
-    data_health: ["account", "campaign"],
-    account_objective: ["account", "campaign"],
-    category: ["campaign"],
-    campaign: ["campaign"],
-    ad_set: ["ad_set"],
-    ad: ["ad"],
-    creative: ["creative"],
-    budget_pacing: ["campaign", "ad_set"],
+    general: ["account", "campaign"],
+    group_account: ["account", "campaign"],
+    objective: ["account", "campaign"],
+    internal_category: ["campaign"],
+    entity: ["campaign", "ad_set", "ad", "creative"],
+    topic: ["campaign"],
     history: ["campaign"],
-    decision: ["campaign"],
   };
   return allowed[pass].includes(entityType);
 }
@@ -373,7 +370,7 @@ export function buildDeterministicFindings(input: Readonly<{
 
     const protectedCards = input.context.guidance.applied.filter((card) => (
       (card.strength === "must" || card.strength === "avoid")
-      && (card.topic === record.checkKey || card.topic === record.metricKey || (passKey === "budget_pacing" && card.topic === "budget"))
+      && (card.topic === record.checkKey || card.topic === record.metricKey || (passKey === "entity" && card.topic === "budget"))
     )).map((card) => card.cardId).sort(compareText);
     const suppressionReasons: string[] = [];
     if (protectedCards.length > 0) suppressionReasons.push("protected_guidance");

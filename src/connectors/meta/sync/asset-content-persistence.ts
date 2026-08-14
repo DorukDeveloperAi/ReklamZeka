@@ -146,6 +146,8 @@ export interface MetaAssetContentTransaction {
   upsertAssets(rows: readonly MetaAssetRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
   upsertDiscoveries(rows: readonly MetaAssetDiscoveryRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
   upsertEdges(rows: readonly MetaAssetEdgeRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
+  /** Optional foundation extension: stores source-bound account read evidence only. */
+  materializeAccountReadCapabilities?(scope: ResolvedMetaAssetContentScope, snapshot: CanonicalMetaAssetMirrorSnapshot): Promise<void>;
   upsertContent(rows: readonly MetaContentRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
   /** Optional for backward-compatible repositories; required when a page carries linked post/media inventory. */
   upsertPostMediaItems?(rows: readonly MetaPostMediaItemRow[]): Promise<readonly MetaCanonicalWriteOutcome[]>;
@@ -386,6 +388,9 @@ export class MetaAssetContentPersistenceRun {
       const summary: Record<MetaCanonicalWriteOutcome, number> = {
         inserted: 0, updated: 0, unchanged: 0, stale: 0,
       };
+      if (page.assetSnapshot && transaction.materializeAccountReadCapabilities) {
+        await transaction.materializeAccountReadCapabilities(this.scope, page.assetSnapshot);
+      }
       for (const batch of chunks(assets, this.batchSize)) addOutcomes(summary, await transaction.upsertAssets(batch));
       for (const batch of chunks(discoveries, this.batchSize)) {
         addOutcomes(summary, await transaction.upsertDiscoveries(batch));

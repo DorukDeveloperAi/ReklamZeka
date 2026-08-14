@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   persistedMetaSyncStream,
   TransactionBackedMetaSyncPersistenceAdapter,
@@ -10,6 +10,8 @@ import { MetaPartialReadSyncRuntime, type MetaSyncStoreSnapshot } from "@/connec
 import type { MetaReadRequest, MetaReadTransport, MetaSyncSlice } from "@/connectors/meta/sync/types";
 import { MetaGraphClient } from "@/connectors/meta/graph-client";
 import { MetaGraphSyncTransport } from "@/connectors/meta/sync/graph-transport";
+import type { MetaInsightSourcePagePersistencePort } from "@/connectors/meta/sync/insights-materialization";
+import type { MetaCreativeSourcePagePersistencePort } from "@/connectors/meta/sync/creative-content-runtime-persistence";
 
 class TransactionFixture implements MetaSyncTransactionManager {
   private snapshots = new Map<string, MetaSyncStoreSnapshot>();
@@ -78,6 +80,8 @@ describe("Meta S1.3 runtime persistence integration", () => {
     expect(calls[0]?.method).toBe("GET");
     expect(calls[0]?.url.pathname).toBe("/v23.0/act_fixture/insights");
     expect(calls[0]?.url.searchParams.get("level")).toBe("campaign");
+    expect(calls[0]?.url.searchParams.get("time_increment")).toBe("1");
+    expect(calls[0]?.url.searchParams.get("fields")?.split(",")).toContain("frequency");
     expect(calls[0]?.url.searchParams.get("action_breakdowns")).toBe("action_type");
     expect(calls[0]?.url.searchParams.get("use_account_attribution_setting")).toBe("true");
     expect(page).toMatchObject({
@@ -105,7 +109,7 @@ describe("Meta S1.3 runtime persistence integration", () => {
     expect(graphLevel).toBe("adset");
   });
 
-  it("requests the live-verified v23 creative/post field catalog without rejected fields", async () => {
+  it("requests the actor-aware creative/post field catalog without rejected fields", async () => {
     let requestedFields = "";
     const fetchImpl = async (input: string | URL, init?: RequestInit) => {
       const url = new URL(input);
@@ -126,6 +130,7 @@ describe("Meta S1.3 runtime persistence integration", () => {
 
     expect(requestedFields).toContain("effective_instagram_story_id");
     expect(requestedFields).toContain("effective_instagram_media_id");
+    expect(requestedFields).toContain("actor_id");
     expect(requestedFields).toContain("call_to_action_type");
     expect(requestedFields).toContain("link_url");
     expect(requestedFields).not.toContain("link_description");
@@ -178,5 +183,61 @@ describe("Meta S1.3 runtime persistence integration", () => {
     const transport = new Transport(async () => ({ records: [], nextCursor: null, usageHeadroom: 1 }));
     await expect(new MetaPartialReadSyncRuntime({ transport, persistence }).run({ ...key, plan: [slice] })).rejects.toThrow("transaction rollback");
     expect(transactions.snapshot(key)).toBeUndefined();
+  });
+
+  it("writes an insight page before advancing its durable cursor and never retains its raw payload", async () => {
+    const transactions = new TransactionFixture();
+    const persistence = new TransactionBackedMetaSyncPersistenceAdapter(transactions);
+    const writer: MetaInsightSourcePagePersistencePort = { writeSourcePage: vi.fn(async () => ({ inserted: 1, updated: 0, unchanged: 0, stale: 0, pageHash: "a".repeat(64) })) };
+    const transport = new Transport(async () => ({ records: [{ account_id: "account-a", campaign_id: "campaign-a" }], nextCursor: null, usageHeadroom: 1 }));
+    const result = await new MetaPartialReadSyncRuntime({ transport, persistence, insightPagePersistence: writer }).run({ ...key, plan: [slice] });
+    expect(result.parentRun.status).toBe("completed");
+    expect(writer.writeSourcePage).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: "workspace-a", externalAccountId: "account-a", entityLevel: "campaign" }));
+    expect(transactions.snapshot(key)?.records[0]?.payload).toEqual({});
+  });
+
+  it("writes each creative/Post page through the canonical content port and never retains raw payload", async () => {
+    const creativeSlice: MetaSyncSlice = {
+      id: "creative_post:account-a:ad:all:all", stream: "creative_post", accountId: "account-a",
+      entityLevel: "ad", dateStart: null, dateStop: null, pageSize: 50,
+    };
+    const writer: MetaCreativeSourcePagePersistencePort = {
+      writeSourcePage: vi.fn(async () => ({ inserted: 1, updated: 0, unchanged: 0, stale: 0, cursor: null, recordCount: 1 })),
+    };
+    const transport = new Transport(async () => ({
+      records: [{ id: "ad-a", creative: { id: "creative-a", body: "private copy" } }],
+      nextCursor: null, usageHeadroom: 1, sourceGraphVersion: "v23.0", fieldCatalogVersion: "meta-creative-post-v24",
+    }));
+    const runtime = new MetaPartialReadSyncRuntime({ transport, creativePagePersistence: writer });
+    const result = await runtime.run({ ...key, plan: [creativeSlice] });
+    expect(result.parentRun.status).toBe("completed");
+    expect(writer.writeSourcePage).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId: "workspace-a", connectionId: "connection-a", externalAccountId: "account-a",
+      sliceId: creativeSlice.id, nextCursor: null,
+    }));
+    expect(result.writeNetworkCalls).toBe(0);
+    expect(result.parentRun.id).toBe("run-a");
+    expect(runtime.store.snapshot().records[0]?.payload).toEqual({});
+  });
+
+  it("coalesces a terminal slice, stream and parent into one final durable checkpoint", async () => {
+    const transactions = new TransactionFixture();
+    const persistence = new TransactionBackedMetaSyncPersistenceAdapter(transactions);
+    const transport = new Transport(async () => ({
+      records: [{ id: "campaign-a" }], nextCursor: null, usageHeadroom: 1,
+    }));
+
+    const result = await new MetaPartialReadSyncRuntime({ transport, persistence }).run({
+      ...key,
+      plan: [slice],
+    });
+
+    expect(result.parentRun.status).toBe("completed");
+    // restore + initial scope + page cursor/record + terminal parent snapshot
+    expect(transactions.commits).toBe(4);
+    expect(transactions.snapshot(key)?.streams[0]).toMatchObject({
+      status: "completed",
+      completedSliceIds: [slice.id],
+    });
   });
 });

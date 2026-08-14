@@ -81,6 +81,45 @@ describe("Meta S1.3 partial read-sync", () => {
     expect(classifyMetaSyncError(Object.assign(new Error("timeout"), { name: "AbortError" }))).toMatchObject({ reason: "timeout", retryable: true });
   });
 
+  it("returns a durable partial result at a server-owned page boundary", async () => {
+    const snapshots: unknown[] = [];
+    const persistence = {
+      restore: async () => null,
+      persist: async (_key: unknown, snapshot: unknown) => { snapshots.push(snapshot); },
+    };
+    const transport = new FixtureTransport(async () => ({ records: [{ id: "must-not-fetch" }], nextCursor: null, usageHeadroom: 0.5 }));
+    const result = await new MetaPartialReadSyncRuntime({
+      transport,
+      persistence,
+      now: fixedNow,
+      deadlineAtEpochMs: fixedNow().valueOf(),
+    }).run({ parentRunId: "bounded", workspaceId: "ws", connectionId: "conn", plan: plan().slice(0, 2) });
+
+    expect(transport.requests).toEqual([]);
+    expect(result.parentRun.status).toBe("partial");
+    expect(result.streamRuns.every((stream) => stream.status === "partial")).toBe(true);
+    expect(result.streamRuns.every((stream) => stream.error?.reason === "timeout")).toBe(true);
+    expect(snapshots.length).toBeGreaterThan(0);
+  });
+
+  it("does not start a retry after the server-owned deadline has elapsed", async () => {
+    let now = fixedNow().valueOf() - 1;
+    const transport = new FixtureTransport(async () => {
+      now = fixedNow().valueOf();
+      throw Object.assign(new Error("temporary"), { name: "AbortError" });
+    });
+    const result = await new MetaPartialReadSyncRuntime({
+      transport,
+      now: () => new Date(now),
+      deadlineAtEpochMs: fixedNow().valueOf(),
+      maxAttempts: 3,
+    }).run({ parentRunId: "deadline-retry", workspaceId: "ws", connectionId: "conn", plan: plan().slice(0, 1) });
+
+    expect(transport.requests).toHaveLength(1);
+    expect(result.streamRuns[0]?.status).toBe("partial");
+    expect(result.streamRuns[0]?.error?.reason).toBe("timeout");
+  });
+
   it("makes revision updates idempotently by source identity", async () => {
     const store = new InMemoryMetaSyncStore();
     let revision = 1;

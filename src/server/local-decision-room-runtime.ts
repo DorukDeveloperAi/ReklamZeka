@@ -174,8 +174,9 @@ export function assertTrustedLocalDecisionRoomRequest(
     request.headers.get("x-reklamzeka-intent") ?? "",
   ) && !["autonomy-rule-create-draft", "guidance-studio-create", "guidance-studio-revise",
     "guidance-set-create", "guidance-set-revise", "instruction-policy-mutate",
-    "practice-lab-propose-standardization", "promotion-template-lifecycle-draft",
-    "progressive-formalization-mutate"].includes(
+    "practice-lab-propose-standardization", "promotion-template-lifecycle-draft", "slice-rule-workspace-save", "slice-rule-budget-impact-save",
+    "slice-rule-budget-action-unit-materialize",
+    "progressive-formalization-mutate", "delivery-health-alert-transition"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if (operation === "decide" && ![
@@ -390,7 +391,7 @@ export async function resolveTrustedLocalExperimentRecordPrincipal(input: Readon
   verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
     now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
     requiredScope: "experiment_record:mutate", expected: input.config });
-  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", "cookie");
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "publish", "cookie");
   return bindPrincipal(input.database, input.config);
 }
 
@@ -544,6 +545,34 @@ export async function resolveTrustedLocalInstructionPolicyPrincipal(input: Reado
   assertTrustedLocalDecisionRoomRequest(input.request, input.config,
     input.requiredScope === "instruction_policy:read" ? "read"
       : input.requiredScope === "instruction_policy:draft" ? "draft" : "publish", "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
+/**
+ * Cookie-only, read-only binding for the Slice Rule -> Budget Lab impact
+ * preview/save. Preview is read-only; saving remains an explicit cookie-bound
+ * advisory draft and requires both independent draft capabilities.
+ */
+export async function resolveTrustedLocalSliceRuleBudgetImpactPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  const token = cookieToken(input.request);
+  const intent = input.request.headers.get("x-reklamzeka-intent");
+  if (bearerToken(input.request) !== null || token === null
+    || !["slice-rule-budget-impact-preview", "slice-rule-budget-impact-save", "slice-rule-budget-action-unit-read",
+      "slice-rule-budget-action-unit-materialize"].includes(intent ?? "")) {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  const verification = { token, key: input.config.signingKey, now: Math.floor(Date.now() / 1000),
+    osUid: typeof process.getuid === "function" ? process.getuid() : -1, expected: input.config };
+  const operation = intent === "slice-rule-budget-impact-save" || intent === "slice-rule-budget-action-unit-materialize"
+    ? "draft" : "read";
+  verifyLocalSessionCapability({ ...verification, requiredScope: operation === "draft" ? "instruction_policy:draft" : "instruction_policy:read" });
+  verifyLocalSessionCapability({ ...verification, requiredScope: operation === "draft" ? "budget_lab:draft" : "budget_lab:read" });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, operation, "cookie");
   return bindPrincipal(input.database, input.config);
 }
 

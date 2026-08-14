@@ -8,6 +8,18 @@ const callbacks = {
 };
 
 describe("Decision Room dashboard surface", () => {
+  it("is the single production-backed analysis and decision surface", () => {
+    const html = renderToStaticMarkup(createElement(DecisionRoomReadSurface, {
+      ...callbacks,
+      view: "inbox",
+      state: { status: "unavailable", message: "Yerel oturum gerekli." },
+    }));
+    expect(html).toContain("ANALİZ &amp; KARARLAR · CANLI READ MODEL");
+    expect(html).toContain("Gerçek analiz rutinleri ve sonuçları, tek karar yüzeyinde.");
+    expect(html).toContain("Sonuçlar");
+    expect(html).not.toContain("Codex/Claude");
+  });
+
   it("labels an unavailable production source without rendering demo records", () => {
     const html = renderToStaticMarkup(createElement(DecisionRoomReadSurface, {
       ...callbacks,
@@ -15,7 +27,7 @@ describe("Decision Room dashboard surface", () => {
       state: { status: "unavailable", message: "Decision Room çalışma alanı henüz etkin değil." },
     }));
     expect(html).toContain("Kaynak henüz bağlı değil");
-    expect(html).toContain("Demo verisi canlı sonuç gibi gösterilmez");
+    expect(html).toContain("Bağlı üretim kaynağı yokken örnek kayıt gösterilmez");
     expect(html).toContain("READ ONLY · AUTHORITY NONE");
     expect(html).not.toContain("Günlük portföy kontrolü");
     expect(html).not.toContain("Onayla");
@@ -50,7 +62,7 @@ describe("Decision Room dashboard surface", () => {
       },
     }));
     expect(html).toContain("Kaynak bağlı · kayıt yok");
-    expect(html).toContain("gerçek salt okunur yanıtıdır");
+    expect(html).toContain("örnek içerik eklenmedi");
     expect(html).not.toContain("Kaynak henüz bağlı değil");
   });
 });

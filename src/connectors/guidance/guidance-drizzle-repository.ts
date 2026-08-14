@@ -217,8 +217,8 @@ async function loadRegistry(database: GuidanceDatabase, workspaceId: string): Pr
   return createGuidanceRegistry({ workspaceId, sources, cards, bindings, sets });
 }
 
-async function insertRegistry(database: GuidanceDatabase, registry: GuidanceRegistry): Promise<void> {
-  const now = new Date();
+async function insertRegistry(database: GuidanceDatabase, registry: GuidanceRegistry, observedAt?: Date): Promise<void> {
+  const now = observedAt ?? new Date();
   if (registry.sources.length > 0) await database.insert(schema.guidanceSources).values(registry.sources.map((source) => ({
     workspaceId: source.workspaceId,
     sourceKey: source.id,
@@ -281,7 +281,8 @@ async function insertRegistry(database: GuidanceDatabase, registry: GuidanceRegi
   }))).onConflictDoNothing();
 }
 
-async function persistRegistry(database: GuidanceDatabase, validated: GuidanceRegistry, expectedRegistryHash: string | null) {
+async function persistRegistry(database: GuidanceDatabase, validated: GuidanceRegistry, expectedRegistryHash: string | null,
+  observedAt?: Date) {
   await assertWorkspace(database, validated.workspaceId, true);
   const current = await loadRegistry(database, validated.workspaceId);
   if (current.registryHash === validated.registryHash) {
@@ -293,7 +294,7 @@ async function persistRegistry(database: GuidanceDatabase, validated: GuidanceRe
     : expectedRegistryHash === current.registryHash;
   if (!expectedMatches) throw new GuidanceRepositoryError("optimistic_conflict", "Guidance registry revision değişti");
   assertGuidanceRegistryEvolution(current, validated);
-  await insertRegistry(database, validated);
+  await insertRegistry(database, validated, observedAt);
   const persisted = await loadRegistry(database, validated.workspaceId);
   if (persisted.registryHash !== validated.registryHash) {
     throw new GuidanceRepositoryError("optimistic_conflict", "Guidance registry atomik olarak doğrulanamadı");
@@ -324,10 +325,16 @@ export class DrizzleGuidanceRegistryRepository {
 
   async save(registry: GuidanceRegistry, guard: Readonly<{
     expectedRegistryHash: string | null;
+    /** Deterministic caller-owned transaction time; used only for lifecycle timestamps. */
+    observedAt?: string;
   }>): Promise<Readonly<{ outcome: "inserted" | "unchanged"; registryHash: string }>> {
     const validated = validatedRegistry(registry);
+    const observedAt = guard.observedAt === undefined ? undefined : new Date(guard.observedAt);
+    if (observedAt !== undefined && (!Number.isFinite(observedAt.getTime()) || observedAt.toISOString() !== guard.observedAt)) {
+      throw new GuidanceRepositoryError("corrupt_store", "Guidance lifecycle zamanı geçersiz");
+    }
     return this.database.transaction(async (transaction) => {
-      const persisted = await persistRegistry(transaction as GuidanceDatabase, validated, guard.expectedRegistryHash);
+      const persisted = await persistRegistry(transaction as GuidanceDatabase, validated, guard.expectedRegistryHash, observedAt);
       return Object.freeze({ outcome: persisted.outcome, registryHash: persisted.registryHash });
     });
   }

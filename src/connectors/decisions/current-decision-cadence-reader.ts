@@ -133,9 +133,9 @@ export class CurrentDecisionCadenceReader {
       }>>(await transaction.execute(sql`
         select cadence.id::text as revision_id,
           cadence.profile_ref, cadence.revision, cadence.profile_version, cadence.profile_hash, cadence.profile_payload,
-          cadence.created_at::text as profile_created_at,
-          coalesce(campaign.start_at, campaign.first_seen_at)::text as observed_from,
-          campaign.source_updated_at::text as last_material_change_at,
+          to_char(cadence.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as profile_created_at,
+          to_char(coalesce(campaign.start_at, campaign.first_seen_at) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as observed_from,
+          to_char(campaign.source_updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as last_material_change_at,
           coalesce(campaign.effective_status, campaign.configured_status)::text as campaign_status,
           to_char(transaction_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as database_now
         from workspaces workspace

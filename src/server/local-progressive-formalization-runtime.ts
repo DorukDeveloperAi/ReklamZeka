@@ -3,6 +3,10 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { ProgressiveFormalizationService } from "@/application/progressive-formalization-service";
 import { DrizzleProgressiveFormalizationRepository } from
   "@/connectors/guidance/progressive-formalization-drizzle-repository";
+import { createPersistedProgressiveFormalizationPreviewResolver } from
+  "@/connectors/guidance/progressive-formalization-drizzle-repository";
+import { createDrizzleAuthoritativeG3EvidenceBridge } from
+  "@/connectors/guidance/authoritative-g3-evidence-bridge-drizzle-resolver";
 import * as schema from "@/db/schema";
 import { LocalDecisionRoomBoundaryError, resolveTrustedLocalInstructionPolicyPrincipal,
   type LocalDecisionRoomConfig } from "@/server/local-decision-room-runtime";
@@ -20,7 +24,8 @@ export function createLocalProgressiveFormalizationHandlers(input: Readonly<{
     const bound = await resolveTrustedLocalInstructionPolicyPrincipal({ request, database: input.database,
       config: input.config, requiredScope });
     const service = new ProgressiveFormalizationService(
-      new DrizzleProgressiveFormalizationRepository(input.database as Database), [bound.membership]);
+      new DrizzleProgressiveFormalizationRepository(input.database as Database,
+        createPersistedProgressiveFormalizationPreviewResolver(createDrizzleAuthoritativeG3EvidenceBridge())), [bound.membership]);
     const handlers = createProgressiveFormalizationHttpHandlers({ service, resolvePrincipal: async () => bound.principal });
     return method === "GET" ? handlers.GET(request) : handlers.POST(request);
   } catch (reason) {

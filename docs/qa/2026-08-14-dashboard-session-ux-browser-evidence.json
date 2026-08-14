@@ -1,0 +1,52 @@
+{
+  "capturedAt": "2026-08-14T12:05:00+03:00",
+  "surface": "Codex in-app browser",
+  "baseUrl": "http://localhost:3000/dashboard",
+  "increment": "contextual-local-session-connector",
+  "securityBoundary": {
+    "operatorMintCommandVisible": true,
+    "agentOrBrowserMintedProof": false,
+    "proofInputType": "password",
+    "proofClearedAfterSubmit": true,
+    "proofPersistedByClient": false,
+    "cookieMintAuthority": "server-only"
+  },
+  "states": {
+    "sessionRequired": "pass",
+    "invalidProofRejected": "pass",
+    "invalidProofMessageVisible": true,
+    "happyPath": "operator_proof_required"
+  },
+  "views": [
+    {
+      "id": "today",
+      "connectorVisibleInContext": true,
+      "decisionRoomNavigationRequired": false
+    },
+    {
+      "id": "campaigns",
+      "connectorVisibleInContext": true,
+      "decisionRoomNavigationRequired": false
+    }
+  ],
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "height": 720,
+      "bodyFits": true,
+      "visualInspection": "pass"
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "bodyFits": true,
+      "singleH1": true,
+      "formControlWidth": 317,
+      "visualInspection": "pass"
+    }
+  ],
+  "consoleErrors": 0,
+  "consoleWarnings": 0
+}

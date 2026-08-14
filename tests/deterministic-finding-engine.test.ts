@@ -98,7 +98,7 @@ function input(protectedGuidance = true) {
   const effectiveContext = context(protectedGuidance);
   const agenda = buildAnalysisAgenda({
     context: effectiveContext, resolvedTimeframe: timeframe,
-    requestedPasses: ["campaign", "ad_set", "ad", "budget_pacing"],
+    requestedPasses: ["entity"],
   });
   const analysis = analyze({
     definitionRef: "analysis:sales@v1", contextRef: effectiveContext.contextHash,
@@ -114,7 +114,7 @@ function input(protectedGuidance = true) {
   return {
     agenda, context: effectiveContext, analysis, hierarchy,
     metricBundles: hierarchy.map((node) => metricBundle(node.entityRef)),
-    passAssignments: [{ recordId: pacingRecord.recordId, passKey: "budget_pacing" as const }],
+    passAssignments: [{ recordId: pacingRecord.recordId, passKey: "entity" as const }],
   };
 }
 
@@ -129,15 +129,16 @@ describe("deterministic finding engine", () => {
     });
     expect(replay).toEqual(first);
     expect(first.findingRunId).toMatch(/^finding_run_[a-f0-9]{24}$/);
-    expect(first.findings.map((finding) => finding.entityRef)).toEqual(["campaign_primary", "adset-1", "ad-1", "campaign_primary"]);
-    expect(first.findings[0]?.drivers).toEqual([expect.objectContaining({ entityRef: "adset-1", depth: 1 })]);
-    expect(first.findings.at(-1)?.passKey).toBe("budget_pacing");
+    expect(first.findings.map((finding) => finding.entityRef)).toEqual(["ad-1", "adset-1", "campaign_primary", "campaign_primary"]);
+    expect(first.findings.find((finding) => finding.checkKey === "roas_floor" && finding.entityRef === "campaign_primary")?.drivers)
+      .toEqual([expect.objectContaining({ entityRef: "adset-1", depth: 1 })]);
+    expect(first.findings.every((finding) => finding.passKey === "entity")).toBe(true);
   });
 
   it("keeps insufficient data and an unresolved driver explicit", () => {
     const result = buildDeterministicFindings(input(false));
-    const campaign = result.findings.find((finding) => finding.entityRef === "campaign_primary")!;
-    const adSet = result.findings.find((finding) => finding.entityRef === "adset-1")!;
+    const campaign = result.findings.find((finding) => finding.entityRef === "campaign_primary" && finding.checkKey === "roas_floor")!;
+    const adSet = result.findings.find((finding) => finding.entityRef === "adset-1" && finding.checkKey === "roas_floor")!;
     const ad = result.findings.find((finding) => finding.entityRef === "ad-1")!;
     expect(campaign.drivers.map((driver) => driver.entityRef)).toEqual(["adset-1"]);
     expect(adSet.unresolvedReasons).toContain("driver_unresolved");
@@ -149,7 +150,7 @@ describe("deterministic finding engine", () => {
 
   it("shows a protected finding but suppresses proposal eligibility", () => {
     const result = buildDeterministicFindings(input(true));
-    const campaign = result.findings.find((finding) => finding.entityRef === "campaign_primary")!;
+    const campaign = result.findings.find((finding) => finding.entityRef === "campaign_primary" && finding.checkKey === "roas_floor")!;
     expect(campaign.state).toBe("finding");
     expect(campaign.suppression).toEqual(expect.objectContaining({
       findingVisible: true,
@@ -164,7 +165,7 @@ describe("deterministic finding engine", () => {
     const outcomeContext = context(false, true);
     const outcomeAgenda = buildAnalysisAgenda({
       context: outcomeContext, resolvedTimeframe: timeframe,
-      requestedPasses: ["campaign", "ad_set", "ad", "budget_pacing"],
+      requestedPasses: ["entity"],
     });
     const outcomeAnalysis = analyze({
       definitionRef: base.analysis.definitionRef,
@@ -237,7 +238,7 @@ describe("deterministic finding engine", () => {
     const adRecord = base.analysis.records.find((record) => record.entityRef === "ad-1")!;
     expect(() => buildDeterministicFindings({
       ...base,
-      passAssignments: [{ recordId: adRecord.recordId, passKey: "campaign" }],
+      passAssignments: [{ recordId: adRecord.recordId, passKey: "topic" }],
     })).toThrowError(expect.objectContaining<Partial<DeterministicFindingEngineError>>({ code: "invalid_input" }));
   });
 });

@@ -218,6 +218,14 @@ export class DrizzleInstructionPolicyLifecycleRepository implements InstructionP
           : command.operation === "pause" ? current.policy.status === "published" : current.policy.status !== "archived";
         if (!allowed) throw new InstructionPolicyLifecycleError("invalid_transition");
         if (!["owner", "admin"].includes(input.role)) throw new InstructionPolicyLifecycleError("forbidden");
+        // A draft is an authored proposal, not its own policy approval.  The
+        // publication decision therefore needs a second owner/admin identity
+        // bound to the exact current draft revision.  Pause/archive remain an
+        // operational lifecycle decision and deliberately do not use this
+        // promotion-only separation rule.
+        if (command.operation === "publish" && current.policy.owner.actorRef === input.actorRef) {
+          throw new InstructionPolicyLifecycleError("approval_required");
+        }
         const impact = await this.impactRepositoryFactory(tx).preview(input.workspaceId, command.policyRef, command.operation);
         if (!impact) throw new InstructionPolicyLifecycleError("not_found");
         if (impact.operation !== command.operation || impact.registryHash !== before.state.registryHash

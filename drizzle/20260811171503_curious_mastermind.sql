@@ -1,0 +1,2 @@
+DROP INDEX "meta_creative_window_insight_snapshots_exact_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "meta_creative_window_insight_snapshots_exact_unique" ON "meta_creative_window_insight_snapshots" USING btree ("config_snapshot_id","window_kind","start_date","end_date","attribution_label","settlement_policy_hash","source_hash");

@@ -74,7 +74,7 @@ describe("local Approval Queue route", () => {
     expect(database.execute).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects damaged or non-local capabilities before database access", async () => {
+  it("reports damaged or non-local capabilities as session-required before database access", async () => {
     const database = { execute: vi.fn() };
     const handler = createLocalApprovalQueueRouteHandler({
       database: database as never,
@@ -82,8 +82,10 @@ describe("local Approval Queue route", () => {
     });
     const valid = token();
     const damaged = `${valid.slice(0, -1)}${valid.endsWith("x") ? "y" : "x"}`;
-    expect((await handler(request(damaged))).status).toBe(503);
-    expect((await handler(request(valid, { "X-Forwarded-For": "127.0.0.1" }))).status).toBe(503);
+    const damagedResponse = await handler(request(damaged));
+    expect(damagedResponse.status).toBe(401);
+    expect(await damagedResponse.json()).toMatchObject({ error: { code: "local_session_required" } });
+    expect((await handler(request(valid, { "X-Forwarded-For": "127.0.0.1" }))).status).toBe(401);
     expect(database.execute).not.toHaveBeenCalled();
   });
 });

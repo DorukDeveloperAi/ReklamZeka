@@ -14,13 +14,19 @@ export type ApprovalPolicyDefinitionState = "draft" | "published" | "disabled";
 export type ApprovalPolicyAuthorRole = "owner" | "admin" | "analyst";
 export type ApprovalPolicyPublisherRole = "owner" | "admin";
 
+/** A policy is bound to one exact action/risk pair; there is no K4 fallback. */
+export type ApprovalPolicyApplicability =
+  | Readonly<{ actionType: "existing_post_promotion"; risk: "K4" }>
+  | Readonly<{ actionType: "budget_decrease"; risk: "K2" }>
+  | Readonly<{ actionType: "budget_increase"; risk: "K3" }>;
+
 export type ApprovalPolicyDefinitionRevision = Readonly<{
   version: typeof APPROVAL_POLICY_DEFINITION_VERSION;
   workspaceRef: string;
   policyRef: string;
   revision: number;
   previousHash: string | null;
-  applicability: Readonly<{ actionType: "existing_post_promotion"; risk: "K4" }>;
+  applicability: ApprovalPolicyApplicability;
   policy: ApprovalPolicy;
   policyHash: string;
   state: ApprovalPolicyDefinitionState;
@@ -58,7 +64,7 @@ export type ResolvedApprovalPolicyDefinition = Readonly<{
     policyRef: string;
     revision: number;
     canonicalHash: string;
-    applicability: Readonly<{ actionType: "existing_post_promotion"; risk: "K4" }>;
+    applicability: ApprovalPolicyApplicability;
   }>;
 }>;
 
@@ -88,6 +94,7 @@ const AUTHORITY = Object.freeze({
   canWriteMeta: false as const,
   canPromoteGuidance: false as const,
 });
+const DEFAULT_APPLICABILITY = Object.freeze({ actionType: "existing_post_promotion" as const, risk: "K4" as const });
 
 function fail(code: ApprovalPolicyRegistryError["code"]): never { throw new ApprovalPolicyRegistryError(code); }
 function exact(value: unknown, keys: readonly string[]): asserts value is Record<string, unknown> {
@@ -112,6 +119,17 @@ function stable(value: unknown): unknown {
   return value;
 }
 function digest(value: unknown): string { return createHash("sha256").update(JSON.stringify(stable(value))).digest("hex"); }
+function normalizeApplicability(value: unknown): ApprovalPolicyApplicability {
+  exact(value, ["actionType", "risk"]);
+  if (value.actionType === "existing_post_promotion" && value.risk === "K4") return DEFAULT_APPLICABILITY;
+  if (value.actionType === "budget_decrease" && value.risk === "K2") {
+    return Object.freeze({ actionType: "budget_decrease", risk: "K2" });
+  }
+  if (value.actionType === "budget_increase" && value.risk === "K3") {
+    return Object.freeze({ actionType: "budget_increase", risk: "K3" });
+  }
+  fail("invalid_input");
+}
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value);
@@ -188,24 +206,32 @@ function emptyLifecycleProvenance(input: Readonly<{
 export function createApprovalPolicyDraft(input: Readonly<{
   workspaceRef: string;
   policy: ApprovalPolicy;
+  applicability?: ApprovalPolicyApplicability;
   effectiveFrom: string;
   expiresAt: string | null;
   normalizedBy: Readonly<{ actorRef: string; role: ApprovalPolicyAuthorRole }>;
 }>): ApprovalPolicyDefinitionRevision {
-  exact(input, ["workspaceRef", "policy", "effectiveFrom", "expiresAt", "normalizedBy"]);
+  exact(input, ["workspaceRef", "policy", "effectiveFrom", "expiresAt", "normalizedBy",
+    ...(Object.hasOwn(input, "applicability") ? ["applicability"] : [])]);
   exact(input.normalizedBy, ["actorRef", "role"]);
   if (!(["owner", "admin", "analyst"] as const).includes(input.normalizedBy.role)) fail("invalid_input");
   const workspaceRef = ref(input.workspaceRef);
+  const selectedApplicability = input.applicability === undefined
+    ? DEFAULT_APPLICABILITY
+    : normalizeApplicability(input.applicability);
   if (!input.policy || input.policy.revision !== 1) fail("invalid_input");
   const policyRef = ref(input.policy.policyRef);
   const normalized = normalizePolicy(input.policy, policyRef, input.policy.revision);
+  if (!normalized.approverRoles.some((entry) => entry.risk === selectedApplicability.risk && entry.roles.length > 0)) {
+    fail("invalid_input");
+  }
   const effectiveFrom = instant(input.effectiveFrom);
   const expiresAt = input.expiresAt === null ? null : instant(input.expiresAt);
   if (expiresAt !== null && expiresAt <= effectiveFrom) fail("invalid_input");
   const { policyHash, ...policy } = normalized;
   return artifact({
     version: APPROVAL_POLICY_DEFINITION_VERSION, workspaceRef, policyRef, revision: policy.revision, previousHash: null,
-    applicability: Object.freeze({ actionType: "existing_post_promotion", risk: "K4" }),
+    applicability: selectedApplicability,
     policy: deepFreeze(policy), policyHash, state: "draft", effectiveFrom, expiresAt,
     provenance: emptyLifecycleProvenance(input.normalizedBy),
     authority: AUTHORITY,
@@ -227,6 +253,9 @@ export function reviseApprovalPolicyDraft(input: Readonly<{
   if (current.state !== "published" && current.state !== "disabled") fail("invalid_transition");
   if (input.policy.policyRef !== current.policyRef || input.policy.revision !== current.revision + 1) fail("invalid_input");
   const normalized = normalizePolicy(input.policy, current.policyRef, current.revision + 1);
+  if (!normalized.approverRoles.some((entry) => entry.risk === current.applicability.risk && entry.roles.length > 0)) {
+    fail("invalid_input");
+  }
   const effectiveFrom = instant(input.effectiveFrom);
   const expiresAt = input.expiresAt === null ? null : instant(input.expiresAt);
   if (expiresAt !== null && expiresAt <= effectiveFrom) fail("invalid_input");
@@ -234,7 +263,7 @@ export function reviseApprovalPolicyDraft(input: Readonly<{
   return artifact({
     version: APPROVAL_POLICY_DEFINITION_VERSION, workspaceRef: current.workspaceRef,
     policyRef: current.policyRef, revision: current.revision + 1, previousHash: current.canonicalHash,
-    applicability: Object.freeze({ actionType: "existing_post_promotion", risk: "K4" }),
+    applicability: current.applicability,
     policy: deepFreeze(policy), policyHash, state: "draft", effectiveFrom, expiresAt,
     provenance: emptyLifecycleProvenance(input.normalizedBy), authority: AUTHORITY,
   });
@@ -252,6 +281,7 @@ export function publishApprovalPolicy(input: Readonly<{
   const draft = assertValidApprovalPolicyDefinition(input.draft);
   if (draft.state !== "draft") fail("invalid_transition");
   if (!(["owner", "admin"] as const).includes(input.actor.role)) fail("publish_forbidden");
+  if (input.actor.actorRef === draft.provenance.normalizedByActorRef) fail("publish_forbidden");
   const nextRevision = draft.revision + 1;
   const normalized = normalizePolicy({ ...draft.policy, revision: nextRevision }, draft.policyRef, nextRevision);
   const { policyHash, ...policy } = normalized;
@@ -306,7 +336,6 @@ export function assertValidApprovalPolicyDefinition(value: unknown): ApprovalPol
     "disableDecisionRef", "disableReasonRef", "disabledAt"]);
   exact(candidate.authority, ["canApprove", "canGrant", "canExecute", "canWriteMeta", "canPromoteGuidance"]);
   if (candidate.version !== APPROVAL_POLICY_DEFINITION_VERSION
-    || candidate.applicability.actionType !== "existing_post_promotion" || candidate.applicability.risk !== "K4"
     || !["draft", "published", "disabled"].includes(candidate.state)
     || candidate.authority.canApprove !== false || candidate.authority.canGrant !== false
     || candidate.authority.canExecute !== false || candidate.authority.canWriteMeta !== false
@@ -316,8 +345,12 @@ export function assertValidApprovalPolicyDefinition(value: unknown): ApprovalPol
     : typeof candidate.previousHash !== "string" || !HASH.test(candidate.previousHash)) fail("invalid_input");
   const workspaceRef = ref(candidate.workspaceRef);
   const policyRef = ref(candidate.policyRef);
+  const selectedApplicability = normalizeApplicability(candidate.applicability);
   const normalized = normalizePolicy(candidate.policy, policyRef, candidate.revision);
   if (normalized.policyHash !== candidate.policyHash) fail("corrupt_registry");
+  if (!normalized.approverRoles.some((entry) => entry.risk === selectedApplicability.risk && entry.roles.length > 0)) {
+    fail("invalid_input");
+  }
   const effectiveFrom = instant(candidate.effectiveFrom);
   const expiresAt = candidate.expiresAt === null ? null : instant(candidate.expiresAt);
   if (expiresAt !== null && expiresAt <= effectiveFrom) fail("invalid_input");
@@ -350,19 +383,21 @@ export function assertValidApprovalPolicyDefinition(value: unknown): ApprovalPol
   const { canonicalHash, ...core } = candidate;
   if (digest(core) !== canonicalHash) fail("corrupt_registry");
   const { policyHash, ...policy } = normalized;
-  return artifact({ ...core, workspaceRef, policyRef, policy: deepFreeze(policy),
+  return artifact({ ...core, workspaceRef, policyRef, applicability: selectedApplicability, policy: deepFreeze(policy),
     policyHash, effectiveFrom, expiresAt, authority: AUTHORITY });
 }
 
-/** Exact-one, latest-lifecycle, published-and-active resolver for the only supported applicability. */
-export function resolvePublishedExistingPostPolicy(input: Readonly<{
+/** Exact-one, latest-lifecycle, published-and-active resolver for one declared applicability. */
+export function resolvePublishedApprovalPolicy(input: Readonly<{
   workspaceRef: string;
   evaluatedAt: string;
+  applicability: ApprovalPolicyApplicability;
   definitions: readonly ApprovalPolicyDefinitionRevision[];
 }>): ResolvedApprovalPolicyDefinition {
-  exact(input, ["workspaceRef", "evaluatedAt", "definitions"]);
+  exact(input, ["workspaceRef", "evaluatedAt", "applicability", "definitions"]);
   const workspaceRef = ref(input.workspaceRef);
   const evaluatedAt = instant(input.evaluatedAt);
+  const selectedApplicability = normalizeApplicability(input.applicability);
   if (!Array.isArray(input.definitions) || input.definitions.length > 1_000) fail("invalid_input");
   const latest = new Map<string, ApprovalPolicyDefinitionRevision>();
   const chains = new Map<string, ApprovalPolicyDefinitionRevision[]>();
@@ -394,6 +429,8 @@ export function resolvePublishedExistingPostPolicy(input: Readonly<{
     }
   }
   const applicable = [...latest.values()].filter((definition) => definition.state === "published"
+    && definition.applicability.actionType === selectedApplicability.actionType
+    && definition.applicability.risk === selectedApplicability.risk
     && definition.effectiveFrom <= evaluatedAt && (definition.expiresAt === null || definition.expiresAt > evaluatedAt));
   if (applicable.length === 0) fail("not_found");
   if (applicable.length !== 1) fail("ambiguous");
@@ -411,4 +448,13 @@ export function resolvePublishedExistingPostPolicy(input: Readonly<{
       applicability: selected.applicability,
     },
   });
+}
+
+/** Compatibility wrapper for the original K4 promotion-only resolver. */
+export function resolvePublishedExistingPostPolicy(input: Readonly<{
+  workspaceRef: string;
+  evaluatedAt: string;
+  definitions: readonly ApprovalPolicyDefinitionRevision[];
+}>): ResolvedApprovalPolicyDefinition {
+  return resolvePublishedApprovalPolicy({ ...input, applicability: DEFAULT_APPLICABILITY });
 }

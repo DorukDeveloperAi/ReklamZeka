@@ -2,7 +2,7 @@
 
 > Tek yazar: `oturum.mjs durum`. Kaynaklar: `plans/oturumlar/*.md` (oturumun ELLE beyanı)
 > × plan künyelerindeki `> Oturum:` alanı (planın ELLE beyanı). Sınıf: motor · deterministik · 0 token.
-> Hüküm sayımı: TAM 2 · SÜRÜYOR 1 · EKSİK 0 · BOŞ 0
+> Hüküm sayımı: TAM 2 · SÜRÜYOR 1 · EKSİK 0 · BOŞ 1
 
 ## ✓ ot:2026-08-06/reklamzeka-faz-0-kurulum — TAM
 
@@ -24,6 +24,12 @@
 - **commit and push** · session `9a339aed` · KAPALI · başlangıç 2026-08-08T07:07:35.779Z · bitiş 2026-08-10T06:06:30Z
 - Hedefler: 5/5 kapalı
 - devir: `plans/oturumlar/devir/2026-08-10-commit-and-push.json` · sıradaki: —
+- Planlar: — (bu oturum plan üretmedi ya da planlar `> Oturum:` beyanı taşımıyor)
+
+## · ot:2026-08-14/dashboard-holistik-ux-goal — BOŞ
+
+- **Goal — ReklamZeka Dashboard Holistik UX, Sadeleştirme ve İşlevsellik** · session `—` · AÇIK · başlangıç —
+- Hedefler: 0/0 kapalı
 - Planlar: — (bu oturum plan üretmedi ya da planlar `> Oturum:` beyanı taşımıyor)
 
 ## ⚠ Sahipsiz oturum beyanı (ADVISORY)

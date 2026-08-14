@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./instruction-policy-studio.module.css";
+import { LocalSessionConnector } from "./local-session-connector";
 import { ProgressiveFormalizationPanel } from "./progressive-formalization-panel";
 
 type PolicyStatus = "draft" | "published" | "paused" | "archived";
@@ -29,11 +30,13 @@ type ImpactOperation = "publish" | "pause" | "archive";
 export type InstructionPolicyImpact = Readonly<{ contractVersion: "instruction-policy-impact/1.0.0";
   impactHash: string; operation: ImpactOperation; registryHash: string;
   target: Readonly<{ policyRef: string; policyVersion: number; policyHash: string; status: PolicyStatus }>;
-  exactBlockers: Readonly<{ currentInboundExceptions: number; enabledSchedules: number; nonTerminalActionUnits: number }>;
+  exactBlockers: Readonly<{ currentInboundExceptions: number; enabledSchedules: number; nonTerminalActionUnits: number;
+    activeManualLocks: number }>;
   historicalImpact: Readonly<{ historicalInboundExceptions: number; directAppliedContexts: number;
     directSuppressedContexts: number; directParkedContexts: number; alreadyInvalidatedContexts: number;
     budgetProposals: number; currentAnalysisTemplates: number; supersededAnalysisTemplates: number;
-    runAssets: number; decisionLedgerRecords: number; terminalActionUnits: number }>;
+    runAssets: number; decisionLedgerRecords: number; terminalActionUnits: number;
+    invalidatedTerminalActionUnits: number }>;
   invalidationPlan: Readonly<{ registryComponents: number; contextsNeedingInvalidation: number }>;
   coverage: Readonly<{ complete: boolean; manifestVersion: string; exactRelational: readonly string[];
     exactContractRef: readonly string[]; partialOrUnknown: readonly string[]; nonAuthoritativeNotes: readonly string[];
@@ -57,10 +60,11 @@ const POLICY_AUTHORITY_KEYS = ["canExecute", "canWriteMeta", "canApprove", "canS
   "canAccessNetwork", "canQuerySql"] as const;
 const IMPACT_AUTHORITY_KEYS = ["canPublish", "canPause", "canArchive", "canApprove", "canExecute", "canSchedule",
   "canCallTool", "canWriteMeta"] as const;
-const BLOCKER_KEYS = ["currentInboundExceptions", "enabledSchedules", "nonTerminalActionUnits"] as const;
+const BLOCKER_KEYS = ["currentInboundExceptions", "enabledSchedules", "nonTerminalActionUnits", "activeManualLocks"] as const;
 const HISTORY_KEYS = ["historicalInboundExceptions", "directAppliedContexts", "directSuppressedContexts",
   "directParkedContexts", "alreadyInvalidatedContexts", "budgetProposals", "currentAnalysisTemplates",
-  "supersededAnalysisTemplates", "runAssets", "decisionLedgerRecords", "terminalActionUnits"] as const;
+  "supersededAnalysisTemplates", "runAssets", "decisionLedgerRecords", "terminalActionUnits",
+  "invalidatedTerminalActionUnits"] as const;
 const INTEGRITY_KEYS = ["unclassifiedJsonbColumns", "missingManifestJsonbColumns", "brokenPolicyRevisionChains",
   "unresolvedExceptionRefs", "malformedContextPolicies", "inconsistentContextComponents",
   "corruptActionLifecycleRows", "rowCapExceeded"] as const;
@@ -256,9 +260,11 @@ export async function loadInstructionPolicyStudioSnapshot(request: typeof fetch 
   let payload: unknown = null;
   try { payload = await response.json(); } catch { /* public fallback below */ }
   if (!response.ok) {
+    const code = object(payload) && object(payload.error) && typeof payload.error.code === "string"
+      ? payload.error.code : String(response.status);
     const message = object(payload) && object(payload.error) && typeof payload.error.message === "string"
       ? payload.error.message : "Talimat politikası kaynağı kullanılamıyor.";
-    throw new PolicyStudioError(String(response.status), message);
+    throw new PolicyStudioError(code, message);
   }
   return parseInstructionPolicyStudioSnapshot(payload);
 }
@@ -458,19 +464,22 @@ export function InstructionPolicyStudioPanel() {
   const [snapshot, setSnapshot] = useState<InstructionPolicyStudioSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const reload = useCallback(async () => {
+  const [sessionRequired, setSessionRequired] = useState(false);
+  const reload = useCallback(async (): Promise<boolean> => {
     setLoading(true); setError(null);
-    try { setSnapshot(await loadInstructionPolicyStudioSnapshot()); }
-    catch (reason) { setSnapshot(null); setError(reason instanceof Error ? reason.message : "Talimat politikası kaynağı kullanılamıyor."); }
+    setSessionRequired(false);
+    try { setSnapshot(await loadInstructionPolicyStudioSnapshot()); return true; }
+    catch (reason) { setSnapshot(null); setSessionRequired(reason instanceof PolicyStudioError
+        && reason.code === "local_session_required");
+      setError(reason instanceof Error ? reason.message : "Talimat politikası kaynağı kullanılamıyor."); return false; }
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void reload(); }, [reload]);
-  if (loading) return <><section className={styles.empty} aria-live="polite">Strict policy registry yükleniyor…</section>
-    <ProgressiveFormalizationPanel /></>;
-  if (error || !snapshot) return <><section className={styles.error} role="alert"><strong>Strict policy Studio kullanılamıyor.</strong>
+  if (loading) return <section className={styles.empty} aria-live="polite"><h1>Strict policy registry yükleniyor…</h1></section>;
+  if (error || !snapshot) return <section className={styles.error} role="alert"><h1>Strict policy Studio kullanılamıyor.</h1>
     <p>{error ?? "Talimat politikası kaynağı güvenli biçimde bağlanamadı."}</p><p>Dependency impact: henüz hesaplanmadı.</p>
-    <button className={styles.retry} type="button" onClick={() => void reload()}>Tekrar dene</button></section>
-    <ProgressiveFormalizationPanel /></>;
-  return <><InstructionPolicyStudioView snapshot={snapshot} onReload={reload} />
+    {sessionRequired ? <LocalSessionConnector title="Bağlayıcı politika çalışma alanını bağlayın" onVerify={reload} />
+      : <button className={styles.retry} type="button" onClick={() => void reload()}>Tekrar dene</button>}</section>;
+  return <><InstructionPolicyStudioView snapshot={snapshot} onReload={async () => { await reload(); }} />
     <ProgressiveFormalizationPanel /></>;
 }

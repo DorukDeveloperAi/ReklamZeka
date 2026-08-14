@@ -280,7 +280,7 @@ export class DrizzleCategoryProfileRepository {
         previous_profile_hash, status, profile_hash, profile_payload
       from category_profile_revisions
       where workspace_id = ${this.workspaceId}::uuid
-        and category_definition_id = any(${categoryDefinitionIds}::uuid[])
+        and category_definition_id = any(array[${sql.join(categoryDefinitionIds.map((id) => sql`${id}::uuid`), sql`, `)}])
       order by category_definition_id, version desc
     `));
     if (found.length !== categoryDefinitionIds.length

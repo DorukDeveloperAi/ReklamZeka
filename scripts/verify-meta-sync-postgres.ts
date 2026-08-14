@@ -6,6 +6,7 @@ import { Pool } from "pg";
 import * as schema from "@/db/schema";
 import { TransactionBackedMetaSyncPersistenceAdapter, DrizzleMetaSyncTransactionManager } from "@/connectors/meta/sync/persistence-adapter";
 import { MetaPartialReadSyncRuntime } from "@/connectors/meta/sync/runtime";
+import { DrizzleMetaInsightPagePersistence } from "@/connectors/meta/sync/insights-drizzle-repository";
 import type { MetaReadRequest, MetaReadTransport, MetaSyncSlice } from "@/connectors/meta/sync/types";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
@@ -62,31 +63,35 @@ let restoredCursor: string | null = null;
 let persistedRuns = 0;
 let persistedSlices = 0;
 let ledgerRecords = 0;
+let persistedInsights = 0;
+let persistedInsightMetrics = 0;
 
 try {
   const firstConnection = database();
   const firstTransport = new Transport(async (request) => {
     if (request.cursor === "page-2") throw new Error("fixture connection restart");
-    return { records: [{ id: "campaign-page-1" }], nextCursor: "page-2", usageHeadroom: 0.5 };
+    return { records: [{ account_id: externalAccountId, campaign_id: "campaign-page-1", date_start: "2026-08-01", date_stop: "2026-08-01", spend: "10.00", impressions: "100", reach: "80", clicks: "4", actions: [{ action_type: "lead", value: "1" }], action_values: [] }], nextCursor: "page-2", usageHeadroom: 0.5 };
   });
   try {
     const persistence = new TransactionBackedMetaSyncPersistenceAdapter(new DrizzleMetaSyncTransactionManager(firstConnection.db));
-    const partial = await new MetaPartialReadSyncRuntime({ transport: firstTransport, persistence, maxAttempts: 1 }).run({ parentRunId, workspaceId, connectionId, plan: [slice] });
+    const partial = await new MetaPartialReadSyncRuntime({ transport: firstTransport, persistence, insightPagePersistence: new DrizzleMetaInsightPagePersistence(firstConnection.db), maxAttempts: 1 }).run({ parentRunId, workspaceId, connectionId, plan: [slice] });
     firstStatus = partial.parentRun.status;
   } finally {
     await firstConnection.pool.end();
   }
 
   const restartedConnection = database();
-  const restartedTransport = new Transport(async (request) => ({ records: [{ id: "campaign-page-2" }], nextCursor: null, usageHeadroom: 0.5 }));
+  const restartedTransport = new Transport(async () => ({ records: [{ account_id: externalAccountId, campaign_id: "campaign-page-2", date_start: "2026-08-01", date_stop: "2026-08-01", spend: "20.00", impressions: "200", reach: "150", clicks: "8", actions: [{ action_type: "lead", value: "2" }], action_values: [] }], nextCursor: null, usageHeadroom: 0.5 }));
   try {
     const persistence = new TransactionBackedMetaSyncPersistenceAdapter(new DrizzleMetaSyncTransactionManager(restartedConnection.db));
-    const resumed = await new MetaPartialReadSyncRuntime({ transport: restartedTransport, persistence }).run({ parentRunId, workspaceId, connectionId, plan: [slice] });
+    const resumed = await new MetaPartialReadSyncRuntime({ transport: restartedTransport, persistence, insightPagePersistence: new DrizzleMetaInsightPagePersistence(restartedConnection.db) }).run({ parentRunId, workspaceId, connectionId, plan: [slice] });
     restoredStatus = resumed.parentRun.status;
     restoredCursor = restartedTransport.requests[0]?.cursor ?? null;
     persistedRuns = (await restartedConnection.db.select({ value: count() }).from(schema.metaSyncRuns).where(eq(schema.metaSyncRuns.workspaceId, workspaceId)))[0]?.value ?? 0;
     persistedSlices = (await restartedConnection.db.select({ value: count() }).from(schema.metaSyncSlices).where(eq(schema.metaSyncSlices.workspaceId, workspaceId)))[0]?.value ?? 0;
     ledgerRecords = (await restartedConnection.db.select({ value: count() }).from(schema.metaSyncRecordLedger).where(and(eq(schema.metaSyncRecordLedger.workspaceId, workspaceId), eq(schema.metaSyncRecordLedger.metaConnectionId, connectionId))))[0]?.value ?? 0;
+    persistedInsights = (await restartedConnection.db.select({ value: count() }).from(schema.metaDailyInsights).where(eq(schema.metaDailyInsights.workspaceId, workspaceId)))[0]?.value ?? 0;
+    persistedInsightMetrics = (await restartedConnection.db.select({ value: count() }).from(schema.metaDailyInsightMetrics).innerJoin(schema.metaDailyInsights, eq(schema.metaDailyInsightMetrics.dailyInsightId, schema.metaDailyInsights.id)).where(eq(schema.metaDailyInsights.workspaceId, workspaceId)))[0]?.value ?? 0;
   } finally {
     await restartedConnection.pool.end();
   }
@@ -96,12 +101,12 @@ try {
   finally { await cleanup.pool.end(); }
 }
 
-if (firstStatus !== "partial" || restoredStatus !== "completed" || restoredCursor !== "page-2" || persistedRuns !== 1 || persistedSlices !== 1 || ledgerRecords !== 2) {
+if (firstStatus !== "partial" || restoredStatus !== "completed" || restoredCursor !== "page-2" || persistedRuns !== 1 || persistedSlices !== 1 || ledgerRecords !== 2 || persistedInsights !== 2 || persistedInsightMetrics < 10) {
   throw new Error("PostgreSQL Meta sync restart kabulü başarısız");
 }
 
 console.log(JSON.stringify({
   firstStatus, restoredStatus, restoredFromCursor: true,
-  persistedRuns, persistedSlices, ledgerRecords,
+  persistedRuns, persistedSlices, ledgerRecords, persistedInsights, persistedInsightMetrics,
   temporaryWorkspaceRemoved: true, writeNetworkCalls: 0,
 }));

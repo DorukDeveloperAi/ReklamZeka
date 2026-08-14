@@ -37,6 +37,36 @@ export type FindingObservationSettlementPolicy = Readonly<{
   resolve(query: FindingObservationReadQuery): Promise<FindingObservationSettlementDecision>;
 }>;
 
+/**
+ * Server-private L1 identity evidence for the L2 writer.  The public
+ * observation contract deliberately exposes only the opaque snapshot ref;
+ * this companion record lets a later immutable feature manifest bind that
+ * ref to the tenant-owned canonical row without leaking database ids into a
+ * finding, context, or model input.
+ */
+export type FindingObservationFeatureSourceItem = Readonly<{
+  dailyInsightId: string;
+  snapshotRef: string;
+  contentHash: string;
+  sourcePayloadHash: string;
+}>;
+
+export type FindingObservationFeatureSourceRead = Readonly<{
+  read: FindingObservationReadResult;
+  sourceManifest: readonly FindingObservationFeatureSourceItem[];
+}>;
+
+// The L2 writer must accept only a read result produced by this adapter. The
+// proof is runtime-opaque: callers can use an issued value but cannot mint a
+// structurally similar object that reaches persistence.
+const featureSourceReadProofs = new WeakSet<object>();
+
+export function assertRepositoryFeatureSourceRead(value: unknown): asserts value is FindingObservationFeatureSourceRead {
+  if (!value || typeof value !== "object" || !featureSourceReadProofs.has(value)) {
+    throw new FindingObservationReadAdapterError("integrity_violation", "L2 source manifest repository proof taşımıyor");
+  }
+}
+
 export type FindingObservationReadAdapterErrorCode =
   | "invalid_query"
   | "persistence_failure"
@@ -418,6 +448,15 @@ export class DrizzleFindingObservationReadPort implements FindingObservationRead
   ) {}
 
   async read(query: FindingObservationReadQuery): Promise<FindingObservationReadResult> {
+    return (await this.readForFeatureSnapshot(query)).read;
+  }
+
+  /**
+   * Deliberately not part of FindingObservationReadPort: callers composing
+   * public findings cannot receive database identifiers.  The future L2
+   * persistence adapter is the sole intended consumer.
+   */
+  async readForFeatureSnapshot(query: FindingObservationReadQuery): Promise<FindingObservationFeatureSourceRead> {
     validateQuery(query);
     // Resolve and authenticate policy evidence before any database access.
     const policyCutoffDate = await resolveSettlementPolicy(this.settlementPolicy, query);
@@ -511,10 +550,16 @@ export class DrizzleFindingObservationReadPort implements FindingObservationRead
       const truncated = rawRows.length > query.maxRows;
       const canonical = rawRows.slice(0, query.maxRows).map(canonicalFromRaw);
       const assessment = quality({ query, rows: canonical, truncated, policyCutoffDate });
-      const snapshotRefs = canonical.length > 0
-        ? canonical.map(({ row, internalId }) => `snapshot_${digest(`${internalId}:${row.contentHash}`).slice(0, 32)}`)
+      const sourceManifest = canonical.map(({ row, internalId }) => Object.freeze({
+        dailyInsightId: internalId,
+        snapshotRef: `snapshot_${digest(`${internalId}:${row.contentHash}`).slice(0, 32)}`,
+        contentHash: row.contentHash,
+        sourcePayloadHash: row.sourcePayloadHash,
+      }));
+      const snapshotRefs = sourceManifest.length > 0
+        ? sourceManifest.map(({ snapshotRef }) => snapshotRef)
         : [`snapshot_empty_${digest(JSON.stringify(query)).slice(0, 24)}`];
-      return Object.freeze({
+      const read = Object.freeze({
         queryRef: query.queryRef,
         rows: Object.freeze(canonical.map(({ row }) => row)),
         snapshotRefs: Object.freeze([...new Set(snapshotRefs)].sort()),
@@ -523,6 +568,12 @@ export class DrizzleFindingObservationReadPort implements FindingObservationRead
         qualityStatus: assessment.reasons.length === 0 ? "ready" : "degraded",
         qualityReasonCodes: assessment.reasons,
       });
+      const featureRead = Object.freeze({
+        read,
+        sourceManifest: Object.freeze([...sourceManifest].sort((left, right) => left.snapshotRef.localeCompare(right.snapshotRef))),
+      });
+      featureSourceReadProofs.add(featureRead);
+      return featureRead;
     } catch (error) {
       if (error instanceof FindingObservationReadAdapterError) throw error;
       fail("persistence_failure", "Canonical insight read başarısız", error);

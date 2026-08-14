@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { EFFECTIVE_CONTEXT_POLICY_AUTHORITY_COMPONENT_REF } from "@/analyses/effective-campaign-context";
 import * as schema from "@/db/schema";
+import { invalidatePersistedPolicyAuthorityContexts } from "@/connectors/policies/policy-authority-context-invalidation";
 
 type Database = NodePgDatabase<typeof schema>;
 type Row = Readonly<Record<string, unknown>>;
@@ -99,15 +99,8 @@ export class DrizzlePolicyManualLockRepository {
         values (${randomUUID()}::uuid, ${input.workspaceId}::uuid, ${policy.id}::uuid, ${command.lockRef}, ${sequence},
           ${head ? previousHash : null}, ${revisionHash}, ${command.operation}, ${input.actorRef}, ${input.role},
           ${command.reasonCode}, ${JSON.stringify(payload)}::jsonb, ${input.occurredAt}::timestamptz)`);
-      const invalidation = Object.freeze({ workspaceId: input.workspaceId, componentType: "policy_authority",
-        componentRef: EFFECTIVE_CONTEXT_POLICY_AUTHORITY_COMPONENT_REF, componentVersion: command.expectedPolicyHash,
-        scopeKind: "workspace_component", entityType: null, entityRef: null, reasonCode: "source_changed", observedAt: input.occurredAt,
-        lockRef: command.lockRef, revisionHash });
-      await tx.execute(sql`insert into effective_campaign_context_invalidations (workspace_id, event_hash, component_type,
-        component_ref, component_version, scope_kind, entity_type, entity_ref, reason_code, observed_at)
-        values (${input.workspaceId}::uuid, ${digest(invalidation)}, 'policy_authority',
-          ${EFFECTIVE_CONTEXT_POLICY_AUTHORITY_COMPONENT_REF}, ${command.expectedPolicyHash}, 'workspace_component',
-          null, null, 'source_changed', ${input.occurredAt}::timestamptz) on conflict (workspace_id, event_hash) do nothing`);
+      await invalidatePersistedPolicyAuthorityContexts({ executor: tx, workspaceId: input.workspaceId,
+        observedAt: input.occurredAt, changeRef: revisionHash });
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`audit:${input.workspaceId}`}, 0))`);
       const previousAuditHash = String(rows<{ event_hash: unknown }>(await tx.execute(sql`select event_hash from audit_events
         where workspace_id = ${input.workspaceId}::uuid order by occurred_at desc, created_at desc, id desc limit 1`))[0]?.event_hash ?? "GENESIS");

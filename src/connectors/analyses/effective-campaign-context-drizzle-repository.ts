@@ -10,6 +10,9 @@ import {
   type EffectiveCampaignContext,
   type EffectiveCampaignContextInput,
 } from "@/analyses/effective-campaign-context";
+import { assertDeterministicFeatureSnapshot, type DeterministicFeatureSnapshot } from "@/analyses/deterministic-feature-snapshot";
+import { buildDeterministicWindowSnapshot, type DeterministicWindowSnapshot } from "@/analyses/deterministic-window-snapshot";
+import { DrizzleFrozenDiagnosticEvidenceRepository, FrozenDiagnosticEvidenceRepositoryError } from "@/connectors/analyses/frozen-diagnostic-evidence-drizzle-repository";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -32,6 +35,8 @@ export const CONTEXT_SOURCE_COMPONENT_TYPES = Object.freeze([
   "business_outcome_evidence",
   "cadence_profile",
   "guidance_selection",
+  "deterministic_feature_snapshot",
+  "deterministic_window_snapshot",
 ] as const);
 
 export type ContextSourceComponentType = typeof CONTEXT_SOURCE_COMPONENT_TYPES[number];
@@ -56,6 +61,8 @@ export type ContextInvalidationInput = Readonly<ContextSourceComponentRef & {
 
 export type StoredEffectiveCampaignContext = Readonly<{
   context: EffectiveCampaignContext;
+  /** Server-private IDs needed only to bind current L2/L3 evidence. */
+  analysisDataScope?: Readonly<{ metaConnectionId: string; adAccountId: string; campaignId: string }>;
   sourceComponents: readonly ContextSourceComponentRef[];
   invalidated: boolean;
 }>;
@@ -69,9 +76,54 @@ export class EffectiveCampaignContextRepositoryError extends Error {
     | "workspace_scope_mismatch"
     | "identity_conflict"
     | "not_found"
-    | "corrupt_store") {
+    | "corrupt_store"
+    /** A driver-level write failure deliberately carries no raw database detail across the boundary. */
+    | "persistence_rejected",
+    /** A bounded server-private driver category; never a SQL statement, constraint, or tenant value. */
+    readonly diagnosticCode?: "check_violation" | "foreign_key_violation" | "unique_violation"
+      | "insufficient_privilege" | "trigger_rejected" | "driver_type_error" | "driver_query_error"
+      | `driver_rejected:${PersistenceWriteStage}`) {
     super(`Effective campaign context persistence reddedildi: ${code}`);
     this.name = "EffectiveCampaignContextRepositoryError";
+  }
+}
+
+/**
+ * Deliberately maps only PostgreSQL SQLSTATE classes safe for server-side
+ * diagnosis. Do not propagate message/detail/constraint/table/schema: each
+ * may disclose private query structure or tenant-owned data.
+ */
+type PersistenceWriteStage = "workspace_lock" | "mirror_scope" | "analysis_evidence" | "outcome_evidence"
+  | "cadence_evidence" | "authority_snapshot_evidence" | "authority_binding_evidence" | "idempotency_lookup" | "identity_lookup"
+  | "context_insert" | "components_insert" | "policy_sidecar_insert" | "policy_items_insert" | "diagnostic_evidence_insert"
+  | "diagnostic_evidence_lookup" | "persistence_reload";
+
+function persistenceDiagnosticCode(error: unknown, stage: PersistenceWriteStage): EffectiveCampaignContextRepositoryError["diagnosticCode"] {
+  let candidate: unknown = error;
+  // Drizzle wraps the pg error in `cause`; inspect at most three wrapper
+  // layers and consume its SQLSTATE only. Messages and metadata remain sealed.
+  for (let depth = 0; depth < 6; depth += 1) {
+    if (candidate && typeof candidate === "object" && "code" in candidate && typeof candidate.code === "string") break;
+    candidate = candidate && typeof candidate === "object" && "cause" in candidate ? candidate.cause : undefined;
+  }
+  if (!candidate || typeof candidate !== "object" || !("code" in candidate) || typeof candidate.code !== "string") {
+    // Error classes are bounded diagnostic categories, unlike arbitrary text.
+    // They help distinguish a driver serialization/query boundary from SQLSTATE
+    // failures without releasing messages, table names, or parameter values.
+    if (error instanceof TypeError) return "driver_type_error";
+    if (error && typeof error === "object" && "name" in error && error.name === "DrizzleQueryError") return "driver_query_error";
+    return `driver_rejected:${stage}`;
+  }
+  switch (candidate.code) {
+    case "23514": return "check_violation";
+    case "23503": return "foreign_key_violation";
+    case "23505": return "unique_violation";
+    case "42501": return "insufficient_privilege";
+    case "P0001": return "trigger_rejected";
+    case "22P02": return "driver_type_error";
+    case "0A000":
+    case "42703": return "driver_query_error";
+    default: return `driver_rejected:${stage}`;
   }
 }
 
@@ -149,6 +201,16 @@ export function sourceComponentsOf(context: EffectiveCampaignContext): readonly 
       componentType: "source_snapshot" as const,
       componentRef: snapshotRef,
       componentVersion: snapshotRef,
+    })),
+    ...context.data.featureRefs.map((featureRef) => ({
+      componentType: "deterministic_feature_snapshot" as const,
+      componentRef: featureRef,
+      componentVersion: featureRef,
+    })),
+    ...context.data.windowRefs.map((windowRef) => ({
+      componentType: "deterministic_window_snapshot" as const,
+      componentRef: windowRef,
+      componentVersion: windowRef,
     })),
     ...context.categories.map((category) => ({
       componentType: "category_resolution" as const,
@@ -234,6 +296,114 @@ async function assertBusinessOutcomeEvidence(database: ContextDatabase, context:
   }
 }
 
+/**
+ * L2/L3 references are admissible in a frozen context only when their exact,
+ * tenant-scoped immutable payloads still authenticate and no captured L1 input
+ * has invalidated them. This is deliberately a save-time recheck: a caller may
+ * never turn a free-form ref into ready analytical evidence.
+ */
+async function assertDeterministicAnalysisData(
+  database: ContextDatabase,
+  context: EffectiveCampaignContext,
+  mirror: MirrorScope,
+): Promise<void> {
+  const { featureRefs, windowRefs } = context.data;
+  if (featureRefs.length === 0 && windowRefs.length === 0) return;
+  if (featureRefs.length === 0 || windowRefs.length === 0
+    || context.data.trustStatus !== "ready" || context.data.blockers.length > 0) {
+    throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+  }
+  const entityLevel = context.identity.entityType === "campaign" ? "campaign"
+    : context.identity.entityType === "ad_set" ? "ad_set"
+      : context.identity.entityType === "ad" ? "ad" : null;
+  if (entityLevel === null) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+  const featureRows = resultRows<{ feature_ref: string; feature_hash: string; feature_payload: unknown }>(await database.execute(sql`
+    select feature.feature_ref, feature.feature_hash, feature.feature_payload
+    from deterministic_feature_snapshots feature
+    where feature.workspace_id = ${context.workspaceId}::uuid
+      and feature.meta_connection_id = ${mirror.metaConnectionId}::uuid
+      and feature.ad_account_id = ${mirror.adAccountId}::uuid
+      and feature.entity_level = ${entityLevel}::meta_insight_entity_level
+      and feature.external_entity_id = ${context.identity.entityRef}
+      and feature.feature_ref in (
+        select value from jsonb_array_elements_text(${JSON.stringify(featureRefs)}::jsonb)
+      )
+      and not exists (
+        select 1 from deterministic_feature_snapshot_invalidations invalidation
+        where invalidation.workspace_id = feature.workspace_id
+          and invalidation.feature_snapshot_id = feature.id
+      )
+    for share
+  `));
+  if (featureRows.length !== featureRefs.length
+    || new Set(featureRows.map((row) => row.feature_ref)).size !== featureRefs.length) {
+    throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+  }
+  try {
+    for (const row of featureRows) {
+      assertDeterministicFeatureSnapshot(row.feature_payload);
+      const feature = row.feature_payload;
+      if (feature.featureRef !== row.feature_ref || feature.featureHash !== row.feature_hash
+        || feature.scope.workspaceId !== context.workspaceId
+        || feature.scope.metaConnectionId !== mirror.metaConnectionId
+        || feature.scope.adAccountId !== mirror.adAccountId
+        || feature.scope.entityLevel !== entityLevel
+        || feature.scope.externalEntityId !== context.identity.entityRef) throw new Error("scope");
+    }
+  } catch {
+    throw new EffectiveCampaignContextRepositoryError("corrupt_store");
+  }
+  const windowRows = resultRows<{ window_ref: string; window_hash: string; window_payload: unknown; features: unknown }>(await database.execute(sql`
+    select l3_window.window_ref, l3_window.window_hash, l3_window.window_payload,
+      coalesce(jsonb_agg(feature.feature_payload order by feature.feature_ref), '[]'::jsonb) as features
+    from deterministic_window_snapshots l3_window
+    join deterministic_window_snapshot_features binding
+      on binding.workspace_id = l3_window.workspace_id and binding.window_snapshot_id = l3_window.id
+    join deterministic_feature_snapshots feature
+      on feature.workspace_id = binding.workspace_id and feature.id = binding.feature_snapshot_id
+    where l3_window.workspace_id = ${context.workspaceId}::uuid
+      and l3_window.meta_connection_id = ${mirror.metaConnectionId}::uuid
+      and l3_window.ad_account_id = ${mirror.adAccountId}::uuid
+      and l3_window.entity_level = ${entityLevel}::meta_insight_entity_level
+      and l3_window.external_entity_id = ${context.identity.entityRef}
+      and l3_window.window_ref in (
+        select value from jsonb_array_elements_text(${JSON.stringify(windowRefs)}::jsonb)
+      )
+      and not exists (
+        select 1
+        from deterministic_window_snapshot_features affected_binding
+        join deterministic_feature_snapshot_invalidations invalidation
+          on invalidation.workspace_id = affected_binding.workspace_id
+         and invalidation.feature_snapshot_id = affected_binding.feature_snapshot_id
+        where affected_binding.workspace_id = l3_window.workspace_id
+          and affected_binding.window_snapshot_id = l3_window.id
+      )
+    group by l3_window.id
+  `));
+  if (windowRows.length !== windowRefs.length
+    || new Set(windowRows.map((row) => row.window_ref)).size !== windowRefs.length) {
+    throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+  }
+  const covered = new Set<string>();
+  try {
+    for (const row of windowRows) {
+      if (!Array.isArray(row.features)) throw new Error("features");
+      (row.features as unknown[]).forEach(assertDeterministicFeatureSnapshot);
+      const window = buildDeterministicWindowSnapshot({
+        timeframe: (row.window_payload as DeterministicWindowSnapshot).resolvedTimeframe,
+        features: row.features as DeterministicFeatureSnapshot[],
+      });
+      if (window.windowRef !== row.window_ref || window.windowHash !== row.window_hash) throw new Error("hash");
+      window.featureRefs.forEach((ref) => covered.add(ref));
+    }
+  } catch {
+    throw new EffectiveCampaignContextRepositoryError("corrupt_store");
+  }
+  if (covered.size !== featureRefs.length || featureRefs.some((ref) => !covered.has(ref))) {
+    throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+  }
+}
+
 /** Evidence-bound contexts may name cadence only when the exact immutable tenant row exists. */
 async function assertCadenceEvidence(
   database: ContextDatabase,
@@ -252,6 +422,76 @@ async function assertCadenceEvidence(
     limit 2 for share
   `));
   if (matches.length !== 1) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+}
+
+type PolicyCompositionEvidence = Readonly<{
+  instructionPolicyRegistryHash: string; authorityComponentVersion: string; authoritySnapshotRef: string;
+  authoritySnapshotHash: string; authorityCatalogHash: string; authorityScopeHash: string; compositionHash: string;
+  items: ReadonlyArray<Readonly<{ policyRevisionId: string; policyRef: string; policyVersion: number; policyHash: string; state: "applied" | "suppressed" | "parked_conflict"; reason: string; }> >;
+}>;
+
+/** Re-reads every authority proof and strict revision under the caller's save transaction. */
+async function policyCompositionEvidence(database: ContextDatabase, context: EffectiveCampaignContext,
+  onStage: (stage: Extract<PersistenceWriteStage, "authority_snapshot_evidence" | "authority_binding_evidence">) => void): Promise<PolicyCompositionEvidence | null> {
+  const evidence = context.policyAuthorityEvidence;
+  if (evidence === undefined) return null; // legacy payloads deliberately remain sidecar-less.
+  if (context.versions.instructionPolicyRegistry === undefined || context.versions.policyAuthority === undefined) {
+    throw new EffectiveCampaignContextRepositoryError("invalid_input");
+  }
+  onStage("authority_snapshot_evidence");
+  const authority = resultRows<{ snapshot_ref: string }>(await database.execute(sql`
+    select snapshot.snapshot_ref from tenant_authority_snapshots snapshot
+    where snapshot.workspace_id = ${context.workspaceId}::uuid
+      and snapshot.snapshot_ref = ${evidence.snapshotRef} and snapshot.snapshot_hash = ${evidence.snapshotHash}
+      and snapshot.verified_at <= ${context.capturedAt}::timestamptz
+      and snapshot.expires_at > ${context.capturedAt}::timestamptz
+      and snapshot.snapshot_payload #>> '{policyAuthority,catalogHash}' = ${evidence.catalogHash}
+      and snapshot.snapshot_payload #>> '{policyAuthority,scope,scopeHash}' = ${evidence.scopeHash}
+      and exists (select 1 from policy_authority_catalog_revisions catalog
+        where catalog.workspace_id = snapshot.workspace_id
+          and catalog.revision_hash = ${evidence.catalogHash}
+          and catalog.payload #>> '{instructionPolicyRegistryHash}' = ${context.versions.instructionPolicyRegistry})
+    limit 2 for share
+  `));
+  if (authority.length !== 1) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+  const core = { instructionPolicyRegistryHash: context.versions.instructionPolicyRegistry,
+    authorityComponentVersion: context.versions.policyAuthority, authoritySnapshotRef: evidence.snapshotRef,
+    authoritySnapshotHash: evidence.snapshotHash, authorityCatalogHash: evidence.catalogHash, authorityScopeHash: evidence.scopeHash,
+    items: [] as PolicyCompositionEvidence["items"] };
+  // An authenticated empty registry has no policy ref to bind. Avoid issuing
+  // an empty `ANY($n::text[])` driver binding: it cannot add evidence and is
+  // rejected by some pg/Drizzle driver combinations before SQL execution.
+  if (context.policies.length === 0) {
+    return Object.freeze({ ...core, compositionHash: digest(core), items: Object.freeze([]) });
+  }
+  onStage("authority_binding_evidence");
+  const rows = resultRows<{ id: string; policy_ref: string; policy_version: number; canonical_hash: string }>(await database.execute(sql`
+    select distinct policy.id::text as id, policy.policy_ref, policy.policy_version, policy.canonical_hash
+    from policy_authority_bindings binding
+    join strict_instruction_policy_revisions policy on policy.workspace_id = binding.workspace_id and policy.id = binding.policy_revision_id
+    join tenant_authority_snapshots snapshot on snapshot.workspace_id = binding.workspace_id and snapshot.id = binding.authority_snapshot_id
+    join policy_authority_catalog_revisions catalog on catalog.workspace_id = binding.workspace_id and catalog.id = binding.authority_catalog_revision_id
+    where binding.workspace_id = ${context.workspaceId}::uuid and policy.policy_ref = any(${context.policies.map((policy) => policy.policyRef)}::text[])
+      and snapshot.snapshot_ref = ${evidence.snapshotRef} and snapshot.snapshot_hash = ${evidence.snapshotHash}
+      and catalog.revision_hash = ${evidence.catalogHash}
+      and catalog.payload #>> '{instructionPolicyRegistryHash}' = ${context.versions.instructionPolicyRegistry}
+  `));
+  const current = new Map<string, typeof rows[number]>();
+  for (const row of rows) {
+    if (current.has(row.policy_ref)) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+    current.set(row.policy_ref, row);
+  }
+  if (current.size !== context.policies.length) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+  const items = context.policies.map((policy) => {
+    const row = current.get(policy.policyRef); if (!row) throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+    return Object.freeze({ policyRevisionId: row.id, policyRef: row.policy_ref, policyVersion: row.policy_version,
+      policyHash: row.canonical_hash, state: policy.state, reason: policy.reason });
+  });
+  const populatedCore = { instructionPolicyRegistryHash: context.versions.instructionPolicyRegistry,
+    authorityComponentVersion: context.versions.policyAuthority, authoritySnapshotRef: evidence.snapshotRef,
+    authoritySnapshotHash: evidence.snapshotHash, authorityCatalogHash: evidence.catalogHash, authorityScopeHash: evidence.scopeHash,
+    items: items.map(({ policyRevisionId: _id, ...item }) => item) };
+  return Object.freeze({ ...populatedCore, compositionHash: digest(populatedCore), items: Object.freeze(items) });
 }
 
 async function assertWorkspace(database: ContextDatabase, workspaceId: string, lock: boolean): Promise<void> {
@@ -422,6 +662,11 @@ async function loadRecord(database: ContextDatabase, row: ContextRow): Promise<S
   }
   return Object.freeze({
     context,
+    analysisDataScope: Object.freeze({
+      metaConnectionId: row.metaConnectionId,
+      adAccountId: row.adAccountId,
+      campaignId: row.campaignId,
+    }),
     sourceComponents: Object.freeze(components.map((component) => Object.freeze(component))),
     invalidated: await isInvalidated(database, row),
   });
@@ -447,11 +692,20 @@ export class DrizzleEffectiveCampaignContextRepository {
     }
     const expectedIdentityHash = identityHash(context);
     const components = sourceComponentsOf(context);
-    return this.database.transaction(async (transaction) => {
+    let persistenceStage: PersistenceWriteStage = "workspace_lock";
+    try {
+      return await this.database.transaction(async (transaction) => {
       await assertWorkspace(transaction, context.workspaceId, true);
+      persistenceStage = "mirror_scope";
       const mirror = await assertMirrorScope(transaction, context);
+      persistenceStage = "analysis_evidence";
+      await assertDeterministicAnalysisData(transaction, context, mirror);
+      persistenceStage = "outcome_evidence";
       await assertBusinessOutcomeEvidence(transaction, context);
+      persistenceStage = "cadence_evidence";
       await assertCadenceEvidence(transaction, context, mirror);
+      const policyComposition = await policyCompositionEvidence(transaction, context, (stage) => { persistenceStage = stage; });
+      persistenceStage = "idempotency_lookup";
       const sameHash = await transaction.select().from(schema.effectiveCampaignContexts).where(and(
         eq(schema.effectiveCampaignContexts.workspaceId, context.workspaceId),
         eq(schema.effectiveCampaignContexts.contextHash, context.contextHash),
@@ -471,12 +725,14 @@ export class DrizzleEffectiveCampaignContextRepository {
       if (context.versions.promotionRegistry === undefined) {
         throw new EffectiveCampaignContextRepositoryError("invalid_input");
       }
+      persistenceStage = "identity_lookup";
       const sameIdentity = await transaction.select().from(schema.effectiveCampaignContexts).where(and(
         eq(schema.effectiveCampaignContexts.workspaceId, context.workspaceId),
         eq(schema.effectiveCampaignContexts.identityHash, expectedIdentityHash),
       )).limit(1);
       if (sameIdentity[0]) throw new EffectiveCampaignContextRepositoryError("identity_conflict");
 
+      persistenceStage = "context_insert";
       const inserted = await transaction.insert(schema.effectiveCampaignContexts).values({
         workspaceId: context.workspaceId,
         identityHash: expectedIdentityHash,
@@ -495,16 +751,62 @@ export class DrizzleEffectiveCampaignContextRepository {
         contextPayload: context as unknown as Record<string, unknown>,
       }).returning();
       if (!inserted[0]) throw new EffectiveCampaignContextRepositoryError("identity_conflict");
+      persistenceStage = "components_insert";
       await transaction.insert(schema.effectiveCampaignContextComponents).values(components.map((component) => ({
         workspaceId: context.workspaceId,
         contextId: inserted[0]!.id,
         ...component,
       })));
+      if (policyComposition !== null) {
+        persistenceStage = "policy_sidecar_insert";
+        const composition = await transaction.insert(schema.effectiveCampaignPolicyCompositions).values({
+          workspaceId: context.workspaceId, contextId: inserted[0]!.id,
+          instructionPolicyRegistryHash: policyComposition.instructionPolicyRegistryHash,
+          authorityComponentVersion: policyComposition.authorityComponentVersion,
+          authoritySnapshotRef: policyComposition.authoritySnapshotRef, authoritySnapshotHash: policyComposition.authoritySnapshotHash,
+          authorityCatalogHash: policyComposition.authorityCatalogHash, authorityScopeHash: policyComposition.authorityScopeHash,
+          compositionHash: policyComposition.compositionHash,
+        }).returning({ id: schema.effectiveCampaignPolicyCompositions.id });
+        if (!composition[0]) throw new EffectiveCampaignContextRepositoryError("corrupt_store");
+        if (policyComposition.items.length) {
+          persistenceStage = "policy_items_insert";
+          await transaction.insert(schema.effectiveCampaignPolicyCompositionItems).values(policyComposition.items.map((item) => ({
+          workspaceId: context.workspaceId, compositionId: composition[0]!.id, ...item,
+          })));
+        }
+      }
+      // A10 substrate is optional only when the frozen context itself is not
+      // analytically ready. Once all persisted facts exist, a missing or bad
+      // diagnostic envelope rejects this transaction rather than inventing a
+      // cohort/config/creative interpretation.
+      if (context.data.trustStatus === "ready" && context.data.blockers.length === 0
+        && context.data.featureRefs.length > 0 && context.data.windowRefs.length > 0
+        && context.metaAnalysisConfigEvidence !== undefined && context.categories.length > 0) {
+        persistenceStage = "diagnostic_evidence_insert";
+        try { await new DrizzleFrozenDiagnosticEvidenceRepository().saveInTransaction(transaction, { contextId: inserted[0]!.id, context }); }
+        catch (error) {
+          if (error instanceof FrozenDiagnosticEvidenceRepositoryError) {
+            if (error.diagnosticStage !== undefined) {
+              throw new EffectiveCampaignContextRepositoryError("persistence_rejected", `driver_rejected:diagnostic_evidence_${error.diagnosticStage}`);
+            }
+            throw new EffectiveCampaignContextRepositoryError("workspace_scope_mismatch");
+          }
+          throw error;
+        }
+      }
+      persistenceStage = "persistence_reload";
       return Object.freeze({
         outcome: "inserted" as const,
         record: await loadRecord(transaction, inserted[0]),
       });
-    });
+      });
+    } catch (error) {
+      // Preserve our semantic classification. A database/driver exception is
+      // intentionally collapsed to one stable repository code: callers must
+      // remain fail-closed and never receive SQL, constraint, or tenant data.
+      if (error instanceof EffectiveCampaignContextRepositoryError) throw error;
+      throw new EffectiveCampaignContextRepositoryError("persistence_rejected", persistenceDiagnosticCode(error, persistenceStage));
+    }
   }
 
   async loadHistorical(workspaceId: string, contextHash: string): Promise<StoredEffectiveCampaignContext> {
@@ -540,6 +842,51 @@ export class DrizzleEffectiveCampaignContextRepository {
       if (!record.invalidated) return record;
     }
     return null;
+  }
+
+  /**
+   * Resolves the stable UI-safe campaign alias inside the tenant query. The
+   * caller never submits or receives the underlying Meta campaign reference.
+   */
+  async loadLatestValidCampaignPublic(input: Readonly<{
+    workspaceId: string;
+    campaignRef: string;
+  }>): Promise<StoredEffectiveCampaignContext | null> {
+    required(input.workspaceId);
+    if (!/^ref_[a-f0-9]{12}$/.test(input.campaignRef)) {
+      throw new EffectiveCampaignContextRepositoryError("invalid_input");
+    }
+    await assertWorkspace(this.database, input.workspaceId, false);
+    const candidates = await this.database.select().from(schema.effectiveCampaignContexts).where(and(
+      eq(schema.effectiveCampaignContexts.workspaceId, input.workspaceId),
+      eq(schema.effectiveCampaignContexts.entityType, "campaign"),
+      sql`concat('ref_', substring(encode(digest(${schema.effectiveCampaignContexts.campaignRef}, 'sha256'), 'hex') from 1 for 12)) = ${input.campaignRef}`,
+    )).orderBy(desc(schema.effectiveCampaignContexts.capturedAt), desc(schema.effectiveCampaignContexts.createdAt));
+    for (const candidate of candidates) {
+      const record = await loadRecord(this.database, candidate);
+      if (!record.invalidated) return record;
+    }
+    return null;
+  }
+
+  /** Server-private discovery query; the application layer projects aliases only. */
+  async listLatestValidCampaignPublic(input: Readonly<{ workspaceId: string }>): Promise<readonly StoredEffectiveCampaignContext[]> {
+    required(input.workspaceId);
+    await assertWorkspace(this.database, input.workspaceId, false);
+    const candidates = await this.database.select().from(schema.effectiveCampaignContexts).where(and(
+      eq(schema.effectiveCampaignContexts.workspaceId, input.workspaceId),
+      eq(schema.effectiveCampaignContexts.entityType, "campaign"),
+    )).orderBy(desc(schema.effectiveCampaignContexts.capturedAt), desc(schema.effectiveCampaignContexts.createdAt));
+    const campaignIds = new Set<string>();
+    const records: StoredEffectiveCampaignContext[] = [];
+    for (const candidate of candidates) {
+      if (campaignIds.has(candidate.campaignId)) continue;
+      const record = await loadRecord(this.database, candidate);
+      if (record.invalidated) continue;
+      campaignIds.add(candidate.campaignId);
+      records.push(record);
+    }
+    return Object.freeze(records);
   }
 
   async invalidate(input: ContextInvalidationInput): Promise<Readonly<{

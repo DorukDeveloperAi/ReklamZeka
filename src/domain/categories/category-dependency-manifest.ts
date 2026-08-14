@@ -57,6 +57,23 @@ const opaqueCategoryContext = new Set([
   "action_proposal_units.unit_payload",
   "action_proposal_units.action_plan_payload",
   "action_proposal_units.summary_payload",
+  // The admission ledger duplicates an already-frozen proposal/write-spec for
+  // replay; archive handling must retain it as opaque historical context.
+  "action_execution_attempts.admission_payload",
+  "action_execution_events.event_payload",
+  // A cohort diagnostic is an immutable replay artifact. Its compatibility
+  // profile/member hashes are historical commitments, not mutable archive edges.
+  "robust_cohort_diagnostic_assets.profile",
+  "robust_cohort_diagnostic_assets.member_evidence_refs",
+  "robust_cohort_diagnostic_assets.result_payload",
+  "robust_cohort_diagnostic_assets.capabilities",
+  // Creative diagnostic persistence commits historical config/window/result
+  // hashes. None exposes a mutable category-reference edge.
+  "creative_diagnostic_definition_revisions.definition_payload",
+  "creative_diagnostic_settlement_policy_revisions.payload",
+  "meta_creative_config_snapshots.config_payload",
+  "meta_creative_window_insight_snapshots.daily_coverage",
+  "creative_fatigue_config_diagnostic_assets.result_payload",
 ]);
 
 const columns = [
@@ -107,12 +124,69 @@ const columns = [
   "policy_manual_lock_revisions.payload",
   "authority_topic_revisions.payload",
   "policy_semantic_binding_revisions.payload",
+  "normalization_workbench_revisions.revision_payload",
+  // Conversation page guides are UI navigation snapshots only; they do not
+  // carry a mutable category edge.
+  "orchestrator_conversation_turns.page_guide",
+  // Slice-rule drafts retain their own immutable scope vocabulary. Category
+  // archive must not infer an internal category link from opaque refs here.
+  "slice_rule_workspace_drafts.draft_payload",
+  // Advisory budget-pool trees and bindings constrain market/caps only. They
+  // carry no internal category or strict-policy reference that archive impact
+  // may interpret as a mutable dependency.
+  "budget_pool_hierarchy_revisions.hierarchy_payload",
+  "slice_rule_budget_pool_bindings.binding_payload",
+  // Entity bindings freeze server-resolved hierarchy and source evidence only;
+  // archive impact must not invent a category dependency from this evidence.
+  "slice_rule_allocation_entity_bindings.source_evidence",
+  "slice_rule_allocation_entity_bindings.binding_payload",
+  // Rule-to-budget provenance pins immutable hashes only; no category edge is
+  // inferred by archive impact from this advisory linkage.
+  "slice_rule_budget_proposal_bindings.binding_payload",
+  // A selected scenario allocation and the later ActionUnit provenance edge
+  // pin immutable draft/proposal/action hashes. Category archive must not
+  // reinterpret their historical evidence as a current mutable category link.
+  "slice_rule_scenario_allocation_selections.selection_evidence",
+  "slice_rule_scenario_allocation_selections.selection_payload",
+  "slice_rule_budget_action_unit_bindings.binding_payload",
+  // Delivery/payment alert records are historical evidence and checklist
+  // state, never category or policy selection inputs.
+  "delivery_health_alert_ledger_records.checklist_payload",
+  "delivery_health_alert_ledger_records.record_payload",
+  // Candidate-preview authority evidence pins a policy/guidance/snapshot basis;
+  // it carries no category reference, so archive impact has no category edge.
+  "candidate_preview_binding_revisions.decision",
+  "candidate_preview_binding_revisions.payload",
   "guidance_cards.source_ids",
   "guidance_sets.ordered_card_ids",
+  // Campaign guidance selection stores guidance topic labels and pack limits,
+  // not internal category references. Archive impact therefore has no
+  // category edge to resolve from these immutable selection facts.
+  "guidance_campaign_selection_revisions.topics",
+  "guidance_campaign_selection_revisions.required_topics",
+  "guidance_campaign_selection_revisions.budget",
   "advised_practice_definitions.payload",
   "advised_practice_events.payload",
   "effective_campaign_contexts.snapshot_refs",
   "effective_campaign_contexts.context_payload",
+  // Frozen diagnostic evidence carries immutable hashes/manifests for replay;
+  // it has no mutable category-reference edge beyond the context it commits to.
+  "frozen_diagnostic_evidence.hierarchy_refs",
+  "frozen_diagnostic_evidence.feature_manifest",
+  "frozen_diagnostic_evidence.window_manifest",
+  "frozen_diagnostic_evidence.canonical_config_evidence",
+  "frozen_diagnostic_evidence.source_refs",
+  "frozen_diagnostic_evidence.capabilities",
+  "robust_cohort_diagnostic_assets.profile",
+  "robust_cohort_diagnostic_assets.member_evidence_refs",
+  "robust_cohort_diagnostic_assets.result_payload",
+  "robust_cohort_diagnostic_assets.capabilities",
+  "creative_diagnostic_definition_revisions.definition_payload",
+  "creative_diagnostic_settlement_policy_revisions.payload",
+  "meta_creative_config_snapshots.config_payload",
+  "meta_creative_window_insight_snapshots.daily_coverage",
+  "creative_fatigue_config_diagnostic_assets.result_payload",
+  "creative_fatigue_config_diagnostic_assets.capabilities",
   "budget_proposal_versions.proposal_payload",
   "budget_proposal_alternatives.alternative_payload",
   "analysis_timeframe_definitions.definition_payload",
@@ -144,6 +218,12 @@ const columns = [
   "meta_daily_insight_metrics.value_json",
   "meta_daily_insight_metrics.provenance",
   "meta_daily_insight_metrics.availability",
+  // L2 feature payloads carry only canonical metrics/source hashes; no mutable category or policy edge.
+  "deterministic_feature_snapshots.quality_reason_codes",
+  "deterministic_feature_snapshots.metric_result",
+  "deterministic_feature_snapshots.feature_payload",
+  // L3 window payload is an immutable feature-hash envelope, not a category/policy dependency.
+  "deterministic_window_snapshots.window_payload",
   "audit_events.metadata",
   "insights.evidence",
   "operational_events.tags",
@@ -166,6 +246,8 @@ const columns = [
   "action_approval_decision_events.command_payload",
   "action_approval_decision_events.event_payloads",
   "action_approval_evidence_grants.grant_payload",
+  "action_execution_attempts.admission_payload",
+  "action_execution_events.event_payload",
   "autonomy_rule_revisions.source_guidance_refs",
   "autonomy_rule_revisions.artifact_payload",
   "action_guardrail_policy_revisions.action_types",

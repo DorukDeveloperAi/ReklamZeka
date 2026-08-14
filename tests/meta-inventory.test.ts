@@ -82,6 +82,21 @@ describe("Meta read-only inventory", () => {
     expect(calls).toBe(2);
   });
 
+  it("bounds a response body that never completes", async () => {
+    let signal: AbortSignal | undefined;
+    const fetchImpl: MetaFetch = vi.fn(async (_input, init) => {
+      signal = init?.signal ?? undefined;
+      return ({
+      ok: true,
+      headers: new Headers(),
+      json: async () => new Promise<never>(() => undefined),
+      }) as unknown as Response;
+    });
+    const client = new MetaGraphClient(token, fetchImpl, { requestTimeoutMs: 1_000 });
+    await expect(client.get("/me")).rejects.toMatchObject({ code: "invalid_data", retryable: false });
+    expect(signal?.aborted).toBe(true);
+  }, 2_000);
+
   it("fails closed for an invalid token", async () => {
     const fetchImpl: MetaFetch = vi.fn(async () => json({ data: { is_valid: false } }));
     await expect(discoverMetaInventory({ token, fetchImpl })).rejects.toMatchObject({ code: "authentication" });
@@ -89,19 +104,24 @@ describe("Meta read-only inventory", () => {
 
   it("keeps the public route fail-closed without a network call even when a server token exists", async () => {
     const previous = process.env.META_ACCESS_TOKEN;
+    const previousStatus = process.env.META_TOKEN_SECURITY_STATUS;
     process.env.META_ACCESS_TOKEN = token;
+    process.env.META_TOKEN_SECURITY_STATUS = "temporary_exposed";
     const network = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network must remain unreachable"));
     try {
       const response = await getMetaInventory();
       expect(response.status).toBe(503);
       const body = await response.text();
-      expect(body).toContain("Meta portföyü güvenli oturum bağlantısı kurulana kadar kullanılamıyor");
+      expect(body).toContain("mevcut token güvenlik incelemesinde");
+      expect(body).toContain("normal salt-okunur sync");
       expect(body).not.toContain(token);
       expect(response.headers.get("cache-control")).toContain("no-store");
       expect(network).not.toHaveBeenCalled();
     } finally {
       if (previous === undefined) delete process.env.META_ACCESS_TOKEN;
       else process.env.META_ACCESS_TOKEN = previous;
+      if (previousStatus === undefined) delete process.env.META_TOKEN_SECURITY_STATUS;
+      else process.env.META_TOKEN_SECURITY_STATUS = previousStatus;
     }
   });
 

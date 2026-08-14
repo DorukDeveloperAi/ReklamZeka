@@ -3,6 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
+  approvalQueueScopeAfterCampaignSelection,
+  buildCodexManualTask,
+  codexPageGuide,
   OperatingDashboard,
   resolveAgentSessionSelection,
 } from "@/app/dashboard/operating-dashboard";
@@ -20,8 +23,9 @@ describe("local agent session dashboard", () => {
       freshnessHours: 0, freshnessLabel: "şimdi", currency: "TRY", timezone: "Europe/Istanbul",
       attribution: "7d_click_1d_view",
     } }));
-    expect(html).toContain("Bağlı değil");
-    expect(html).toContain("API doğrulaması olmadan bağlı gösterilmez");
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("> Asistan</button>");
+    expect(html).not.toContain("session bağlı");
     expect(html).not.toContain("Codex CLI bağlı");
   });
 
@@ -32,5 +36,27 @@ describe("local agent session dashboard", () => {
     expect(resolveAgentSessionSelection([first], "")).toBe(first.sessionRef);
     expect(resolveAgentSessionSelection([first, second], "")).toBe("");
     expect(resolveAgentSessionSelection([first, second], second.sessionRef)).toBe(second.sessionRef);
+  });
+
+  it("clears a resolved approval queue scope before changing campaigns", () => {
+    const scope = "entity_1eb4e78c07f9c395";
+    expect(approvalQueueScopeAfterCampaignSelection("cmp-istanbul", "cmp-istanbul", scope)).toBe(scope);
+    expect(approvalQueueScopeAfterCampaignSelection("cmp-istanbul", "cmp-gcc", scope)).toBeNull();
+  });
+
+  it("builds a page-guided manual Codex task without requiring campaign context or granting authority", () => {
+    const task = buildCodexManualTask(codexPageGuide("budgets", "Bütçeler"));
+    expect(task).toContain("Ekran: Bütçeler");
+    expect(task).toContain("budget-lab-panel.tsx");
+    expect(task).toContain("STATE.md");
+    expect(task).toContain("Meta write yapma");
+    expect(task).toContain("Operatör isteği");
+  });
+
+  it("guides Codex to the delivery alert ledger without granting alert authority", () => {
+    const task = buildCodexManualTask(codexPageGuide("alerts", "Teslimat alarmları"));
+    expect(task).toContain("delivery-health-alert-panel.tsx");
+    expect(task).toContain("Delivery health alert ledger");
+    expect(task).toContain("Meta write yapma");
   });
 });

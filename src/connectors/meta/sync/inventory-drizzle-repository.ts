@@ -20,6 +20,11 @@ type ReklamZekaDatabase = NodePgDatabase<typeof schema>;
 type WriteOutcome = MetaInventoryCanonicalWriteOutcome;
 type Existing = Readonly<{ externalId: string; sourceRevision: string; sourcePriority: number; payloadHash: string }>;
 type AffectedGeoRepositoryFactory = (database: ReklamZekaDatabase, workspaceId: string) => MetaAffectedGeoAppendPort;
+type InventoryPersistenceOptions = Readonly<{
+  materializeAffectedGeo?: boolean;
+  /** Only for a connection that cannot complete PostgreSQL transaction callbacks. */
+  transactionMode?: "atomic" | "idempotent_page";
+}>;
 
 const incomingRevision = sql<string>`excluded.provenance ->> 'sourceRevision'`;
 const incomingPriority = sql<number>`case
@@ -78,13 +83,20 @@ function appendIssue(issues: readonly MetaInventoryFieldIssue[], field: string, 
  * calls and never persists or logs the source page itself.
  */
 export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePersistencePort {
+  private readonly materializeAffectedGeo: boolean;
+  private readonly transactionMode: "atomic" | "idempotent_page";
   constructor(private readonly database: ReklamZekaDatabase,
     private readonly affectedGeoRepository: AffectedGeoRepositoryFactory = (database, workspaceId) =>
-      new DrizzleMetaAffectedGeoSnapshotRepository(database, workspaceId)) {}
+      // writeAdSets already owns the page transaction; nesting one savepoint per
+      // ad set turns a normal targeting page into hundreds of remote round trips.
+      new DrizzleMetaAffectedGeoSnapshotRepository(database, workspaceId, "caller"),
+    options: InventoryPersistenceOptions = {}) {
+    this.materializeAffectedGeo = options.materializeAffectedGeo ?? true;
+    this.transactionMode = options.transactionMode ?? "atomic";
+  }
 
   async writePage(page: CanonicalMetaInventoryPage, privateSource?: unknown): Promise<MetaInventoryWriteSummary> {
-    return this.database.transaction(async (transaction) => {
-      const database = transaction as ReklamZekaDatabase;
+    const write = async (database: ReklamZekaDatabase) => {
       const accountId = await this.resolveAccount(database, page);
       const outcomes = page.entityLevel === "campaign"
         ? await this.writeCampaigns(database, accountId, page, page.records as readonly CanonicalMetaInventoryCampaign[])
@@ -93,7 +105,13 @@ export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePer
           : await this.writeAds(database, accountId, page, page.records as readonly CanonicalMetaInventoryAd[]);
       const disappeared = page.terminal ? await this.markDisappeared(database, accountId, page) : 0;
       return summary(outcomes, disappeared, page.pageHash);
-    });
+    };
+    // All canonical writes use deterministic identities and revision guards, so
+    // a retry after a connection-level interruption is safe. The default stays
+    // atomic; the opt-in fallback exists solely for broken transaction callbacks.
+    return this.transactionMode === "atomic"
+      ? this.database.transaction(async (transaction) => write(transaction as ReklamZekaDatabase))
+      : write(this.database);
   }
 
   private async resolveAccount(database: ReklamZekaDatabase, page: CanonicalMetaInventoryPage): Promise<string> {
@@ -229,10 +247,12 @@ export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePer
       const resolved = resolvedRows.find((row) => row.externalAdSetId === entry.externalId);
       return !resolved || resolved.campaignId !== campaigns.get(entry.externalCampaignId);
     })) throw new Error("Meta inventory affected-geo hierarchy kapsamı çözülemedi");
-    await appendKnownAffectedGeoForCanonicalAdSetPage({ page, privateSource, adAccountId: accountId,
-      hierarchy: resolvedRows.map((row) => ({ externalAdSetId: row.externalAdSetId,
-        campaignId: row.campaignId, adSetId: row.id })), outcomes,
-      repository: this.affectedGeoRepository(database, page.workspaceId) });
+    if (this.materializeAffectedGeo) {
+      await appendKnownAffectedGeoForCanonicalAdSetPage({ page, privateSource, adAccountId: accountId,
+        hierarchy: resolvedRows.map((row) => ({ externalAdSetId: row.externalAdSetId,
+          campaignId: row.campaignId, adSetId: row.id })), outcomes,
+        repository: this.affectedGeoRepository(database, page.workspaceId) });
+    }
     await this.markObserved(database, schema.metaAdSets, schema.metaAdSets.externalAdSetId, schema.metaAdSets.adAccountId,
       schema.metaAdSets.workspaceId, schema.metaAdSets.fetchedAt, schema.metaAdSets.provenance, ids, accountId, page);
     return outcomes;

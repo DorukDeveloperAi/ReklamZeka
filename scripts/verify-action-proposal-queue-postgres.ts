@@ -24,6 +24,7 @@ const connectionId = randomUUID();
 const sourceId = randomUUID();
 const accountId = randomUUID();
 const campaignId = randomUUID();
+const contextId = randomUUID();
 const evidence = { tablesApplied: false, inserted: false, exactReplay: false, immutable: false,
   decisionTablesApplied: false, decisionInserted: false, decisionExactReplay: false,
   decisionImmutable: false, rlsAndGrants: false, exactRows: false, rollbackClean: false,
@@ -53,11 +54,15 @@ const autonomyRule: AutonomyRule = {
 };
 const action = { kind: "status_change" as const, entity: { level: "campaign" as const, ref: "campaign_12345" },
   fromStatus: "ACTIVE" as const, toStatus: "PAUSED" as const };
+const persistedFrozenContextHash = "d".repeat(64);
 const actionPlan = buildActionPlan(action, {
   workspaceRef: "workspace_verifier", accountGroupRef: null, accountRef: "act_12345",
   internalCategoryRefs: [], campaignRef: "campaign_12345", entity: action.entity,
   evaluatedAt: "2026-08-07T17:00:00.000Z", rules: [autonomyRule], budgetLimits: null,
   protection: { protectedInternalCategoryRefs: [], affectedGeoRefs: [], protectedGeoRefs: [], changeDisposition: "allowed", policyRefs: [] },
+  // A queue candidate may only name the exact persisted context that this
+  // verifier seeds below; it must not reuse a valve-context digest.
+  frozenContextHash: persistedFrozenContextHash,
 });
 const proposal = new ActionProposalStagingService({
   version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_verifier", revision: 1, autonomyMode: "approval_only",
@@ -134,6 +139,34 @@ try {
     });
     await transaction.insert(schema.adCampaigns).values({
       id: campaignId, workspaceId, adAccountId: accountId, externalCampaignId: "campaign_12345", name: "Verifier",
+    });
+    // Queue persistence deliberately resolves an already-frozen, tenant-bound context
+    // before it stages an ActionUnit.  This verifier used to predate that invariant and
+    // therefore exercised only the rejection path.  Seed the smallest canonical context
+    // fixture here; it is rolled back with the rest of this acceptance transaction.
+    const capturedAt = "2026-08-07T17:00:00.000Z";
+    const contextHash = persistedFrozenContextHash;
+    if (proposal.bundle.units[0]!.contextHash !== contextHash) throw new Error("frozen_context_binding_missing");
+    const snapshotRefs = ["snapshot_aaaaaaaaaaaaaaaaaaaa"];
+    await transaction.insert(schema.effectiveCampaignContexts).values({
+      id: contextId, workspaceId, identityHash: "b".repeat(64), contextHash,
+      schemaVersion: "effective-campaign-context/1.0.0", metaConnectionId: connectionId,
+      adAccountId: accountId, campaignId, connectionRef: "action-queue-verifier", accountRef: "act_12345",
+      campaignRef: "campaign_12345", entityType: "campaign", entityRef: "campaign_12345",
+      capturedAt: new Date(capturedAt), snapshotRefs,
+      contextPayload: {
+        workspaceId, schemaVersion: "effective-campaign-context/1.0.0", contextHash, capturedAt,
+        identity: {
+          connectionRef: "action-queue-verifier", accountRef: "act_12345",
+          campaignRef: "campaign_12345", entityType: "campaign", entityRef: "campaign_12345",
+        },
+        data: { snapshotRefs },
+        capabilities: { containsRawL0: false, canAuthorizeAction: false, canExecuteWrite: false },
+      },
+    });
+    await transaction.insert(schema.effectiveCampaignContextComponents).values({
+      workspaceId, contextId, componentType: "policy_authority",
+      componentRef: "policy_authority_workspace", componentVersion: "a".repeat(64),
     });
     const repository = new DrizzleActionProposalQueueRepository(transaction as never, workspaceId);
     evidence.inserted = (await repository.appendInitial(proposal)).outcome === "inserted";

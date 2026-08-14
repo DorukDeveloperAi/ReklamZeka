@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -37,5 +37,14 @@ describe("legacy Meta MCP secret artifact boundary", () => {
   it("passes when the configured legacy value is absent from tracked artifacts", async () => {
     const { root } = await fixture("safe\n"); const result = await run(root);
     expect(result.status).toBe(0); expect(result.stdout).toContain("SECRET ARTIFACT CHECK PASS");
+  });
+
+  it("treats Next development cache as cache rather than production build output", async () => {
+    const { root, legacySecret } = await fixture("safe\n");
+    await mkdir(join(root, ".next", "dev", "cache"), { recursive: true });
+    await writeFile(join(root, ".next", "dev", "cache", "turbopack.sst"), legacySecret);
+    const result = await run(root);
+    expect(result.status).toBe(0); expect(result.stdout).toContain("SECRET ARTIFACT CHECK PASS");
+    expect(`${result.stdout}${result.stderr}`).not.toContain(legacySecret);
   });
 });

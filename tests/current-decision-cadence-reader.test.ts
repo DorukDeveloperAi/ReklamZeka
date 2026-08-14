@@ -49,6 +49,8 @@ describe("CurrentDecisionCadenceReader", () => {
     expect(rendered).toContain("cadence.ad_account_id = account.id");
     expect(rendered).toContain("cadence.campaign_id = campaign.id");
     expect(rendered).toContain("transaction_timestamp()");
+    expect(rendered).toContain("to_char(cadence.created_at at time zone 'UTC'");
+    expect(rendered).toContain("to_char(coalesce(campaign.start_at, campaign.first_seen_at) at time zone 'UTC'");
     expect(harness.transaction).toHaveBeenCalledTimes(1);
   });
 

@@ -58,7 +58,7 @@ export type InstructionPolicyLifecycleRepository = Readonly<{
 }>;
 
 export class InstructionPolicyLifecycleError extends Error {
-  constructor(readonly code: "invalid_input" | "not_found" | "conflict" | "invalid_transition" | "forbidden"
+  constructor(readonly code: "invalid_input" | "not_found" | "conflict" | "invalid_transition" | "forbidden" | "approval_required"
     | "dependency_blocked") {
     super(`Talimat politikası lifecycle işlemi reddedildi: ${code}`);
     this.name = "InstructionPolicyLifecycleError";

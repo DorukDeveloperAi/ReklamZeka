@@ -53,3 +53,37 @@ npm run verify:local-workspace-bootstrap-db
 It creates fixtures only inside an outer transaction, verifies idempotency,
 audit, and foreign-tenant isolation, then rolls everything back. It makes no
 Meta, HTTP, or other network calls beyond the configured PostgreSQL connection.
+
+## Dashboard'da manuel oturum ve onay akışı
+
+Yerel Dashboard yalnız yapılandırılmış `http://localhost` origin'inde çalıştırılır:
+
+```sh
+npm run dev -- --hostname localhost
+```
+
+Ardından, aynı işletim sistemi kullanıcısı tek-kullanımlık proof'u üretir ve 90 saniye
+içinde Dashboard > Decision Room > **Yerel oturumu bağla** alanına yapıştırır:
+
+```sh
+npm run local-session:mint
+```
+
+Proof bir kimlik bilgisi sayılır; terminal geçmişine, ekran kaydına veya başka kişiye
+aktarılmaz. Agent ya da browser otomasyonu proof üretmez ve cookie mint etmez.
+
+Oturum bağlandıktan sonra güvenli manuel akış şöyledir:
+
+1. **Categories** içindeki canonical campaign review satırından eksik pazar/hizmet/aile
+   künyesini mevcut guarded form ile, insan incelemesi sonucunda atayın.
+2. **Rules** içinde yalnız server-derived slice kapsamını kullanarak
+   `recommendation_only` taslağını kaydedin. Taslak tek başına policy ya da action yetkisi değildir.
+3. Uygunsa Budget Lab'de immutable scenario/allocation seçin ve **İnsan onayına gönder**
+   ile mevcut Approval Queue'ya bir ActionUnit taslağı oluşturun. Miktar, entity ve frozen
+   context istemciden kabul edilmez; server bunları yeniden çözer.
+4. **Approval Queue**'da ayrı insan kararıyla approve/reject/request changes verin.
+   Bu karar execute veya Meta write yapmaz; execution authority kapalı kalır.
+
+Bu akışta otomatik bütçe değişikliği, aç/kapa, isim düzeltme veya Meta write yoktur.
+Doğrulama için browser kabulünde source-bound campaign trace, Rule/selection provenance,
+Approval Queue kararı ve `canExecute=false` görünmelidir.

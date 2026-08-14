@@ -1,14 +1,23 @@
 import { ConnectorError } from "@/connectors/contract";
 import { discoverMetaAssetMirror } from "@/connectors/meta/asset-mirror";
 import { MetaGraphClient, META_GRAPH_API_VERSION, type MetaFetch } from "@/connectors/meta/graph-client";
-import { discoverMetaPostMediaInventory } from "@/connectors/meta/post-media-inventory";
+import {
+  discoverMetaPostMediaInventory,
+  recoverMetaPostMediaInventoryFromCreativeEvidence,
+  type MetaCreativePostRecoveryTarget,
+} from "@/connectors/meta/post-media-inventory";
 import type { CanonicalMetaAssetMirrorSnapshot } from "@/domain/meta/asset-mirror";
 import { extractMetaAdContent } from "@/domain/meta/content/extract";
-import type { CanonicalMetaPostMediaInventory } from "@/domain/meta/content/post-media-inventory";
+import {
+  normalizeMetaPostMediaInventory,
+  type CanonicalMetaPostMediaInventory,
+} from "@/domain/meta/content/post-media-inventory";
 import {
   hashMetaContentPayload,
+  MetaAssetContentPersistenceError,
   MetaAssetContentPersistenceRun,
   type MetaAssetContentPage,
+  type MetaAdContentRecord,
   type MetaAssetContentRepository,
   type MetaAssetContentScope,
   type MetaAssetContentWriteSummary,
@@ -18,7 +27,7 @@ import { classifyMetaSyncError } from "./runtime";
 import { sliceId, stableHash, type MetaReadRequest, type MetaReadTransport, type MetaSyncErrorReason } from "./types";
 
 const SERVICE_SCHEMA_VERSION = "meta-s14-live-v1";
-const CONTENT_FIELD_CATALOG_VERSION = "meta-creative-post-v23";
+const CONTENT_FIELD_CATALOG_VERSION = "meta-creative-post-v24";
 
 export interface MetaSecretReferenceResolver {
   resolve(reference: string): Promise<string>;
@@ -59,6 +68,16 @@ type PostInventoryDiscovery = (input: Readonly<{
   maxPagesPerActor?: number;
 }>) => Promise<CanonicalMetaPostMediaInventory>;
 
+type PostInventoryRecovery = (input: Readonly<{
+  token: string;
+  workspaceId: string;
+  connectionExternalKey: string;
+  targets: readonly MetaCreativePostRecoveryTarget[];
+  fetchImpl?: MetaFetch;
+  now?: () => Date;
+  maxPagesPerActor?: number;
+}>) => Promise<CanonicalMetaPostMediaInventory>;
+
 export type MetaS14LiveReadOptions = Readonly<{
   secretResolver: MetaSecretReferenceResolver;
   beginPersistenceRun: BeginMetaAssetContentPersistenceRun;
@@ -67,6 +86,7 @@ export type MetaS14LiveReadOptions = Readonly<{
   transportFactory?: (token: string) => MetaReadTransport;
   discoverAssets?: AssetDiscovery;
   discoverPostInventory?: PostInventoryDiscovery;
+  recoverPostInventory?: PostInventoryRecovery;
   now?: () => Date;
   sleep?: (milliseconds: number) => Promise<void>;
   random?: () => number;
@@ -118,6 +138,8 @@ export type MetaS14LiveReadResult = Readonly<{
     items: number;
     verifiedDiscoveries: number;
     partialDiscoveries: number;
+    recoveryTargetActors: number;
+    recoveredItems: number;
     persistenceInvoked: boolean;
     extensionPersistenceInvoked: boolean;
     failureReason: MetaSyncErrorReason | null;
@@ -215,6 +237,37 @@ function hasCopy(extraction: ReturnType<typeof extractMetaAdContent>): boolean {
   );
 }
 
+function mergePostInventories(
+  inventory: CanonicalMetaPostMediaInventory,
+  recovery: CanonicalMetaPostMediaInventory,
+): CanonicalMetaPostMediaInventory {
+  return normalizeMetaPostMediaInventory({
+    schemaVersion: inventory.schemaVersion,
+    workspaceId: inventory.workspaceId,
+    connectionExternalKey: inventory.connectionExternalKey,
+    fetchedAt: inventory.fetchedAt > recovery.fetchedAt ? inventory.fetchedAt : recovery.fetchedAt,
+    items: [...inventory.items, ...recovery.items],
+    discoveries: [...inventory.discoveries, ...recovery.discoveries],
+    writeOperations: 0,
+  });
+}
+
+/** A deferred record may replay only after the exact actor/post pair was returned by Graph. */
+function graphVerifiedReplayRecords(
+  page: MetaAssetContentPage,
+  inventory: CanonicalMetaPostMediaInventory,
+): readonly MetaAdContentRecord[] {
+  const verified = new Set(inventory.items.map((item) =>
+    `${item.actor.type}:${item.actor.externalId}:${item.externalContentId}`));
+  return page.content.filter((record) => {
+    const post = record.extraction.post;
+    if (!post) return false;
+    const actorType = post.platform === "facebook" ? "facebook_page" : "instagram_account";
+    const actorExternalId = actorType === "facebook_page" ? post.actorPageExternalId : post.actorInstagramExternalId;
+    return actorExternalId !== null && verified.has(`${actorType}:${actorExternalId}:${post.externalPostId}`);
+  });
+}
+
 /**
  * S1.4 read orchestrator. Raw IDs, tokens and ad text stay inside the connector/persistence
  * boundary; the returned result contains only deterministic references and aggregate evidence.
@@ -282,6 +335,7 @@ export class MetaS14LiveAssetContentService {
     const fetchImpl = this.options.fetchImpl;
     const discoverAssets = this.options.discoverAssets ?? discoverMetaAssetMirror;
     const discoverPostInventory = this.options.discoverPostInventory ?? discoverMetaPostMediaInventory;
+    const recoverPostInventory = this.options.recoverPostInventory ?? recoverMetaPostMediaInventoryFromCreativeEvidence;
     const transport = this.options.transportFactory?.(token)
       ?? new MetaGraphSyncTransport(new MetaGraphClient(token, fetchImpl));
     const persistence = await this.options.beginPersistenceRun(scope);
@@ -294,6 +348,8 @@ export class MetaS14LiveAssetContentService {
       unchanged: 0,
       stale: 0,
     };
+    const creativeRecoveryTargets: MetaCreativePostRecoveryTarget[] = [];
+    const deferredContentPages: MetaAssetContentPage[] = [];
 
     // All discovery HTTP completes before writePage opens a repository transaction.
     const assetSnapshot = await discoverAssets({
@@ -332,6 +388,8 @@ export class MetaS14LiveAssetContentService {
         persistence,
         persistenceEvidence,
         sliceKey: creativeSliceKeys.get(accountId)!,
+        recoveryTargets: creativeRecoveryTargets,
+        deferredContentPages,
       }),
     );
 
@@ -346,6 +404,20 @@ export class MetaS14LiveAssetContentService {
         now: this.now,
         maxPagesPerActor: this.maxPagesPerActor,
       });
+      const inventoryPostIds = new Set(inventory.items.map((item) => item.externalContentId));
+      const recoveryTargets = creativeRecoveryTargets.filter((target) => !inventoryPostIds.has(target.externalPostId));
+      const recovered = recoveryTargets.length === 0
+        ? null
+        : await recoverPostInventory({
+          token,
+          workspaceId: scope.workspaceId,
+          connectionExternalKey: scope.connectionExternalKey,
+          targets: recoveryTargets,
+          fetchImpl,
+          now: this.now,
+          maxPagesPerActor: this.maxPagesPerActor,
+        });
+      const completeInventory = recovered ? mergePostInventories(inventory, recovered) : inventory;
       addWrite(persistenceEvidence, await persistence.writePage({
         sliceKey: postMediaSliceKey,
         cursor: null,
@@ -353,24 +425,36 @@ export class MetaS14LiveAssetContentService {
           schemaVersion: SERVICE_SCHEMA_VERSION,
           phase: "post_media_inventory",
           runCorrelationId,
-          itemCount: inventory.items.length,
-          discoveryCount: inventory.discoveries.length,
-          snapshotHash: inventory.snapshotHash,
+          itemCount: completeInventory.items.length,
+          discoveryCount: completeInventory.discoveries.length,
+          snapshotHash: completeInventory.snapshotHash,
+          recoveryTargetActors: new Set(recoveryTargets.map((target) => `${target.actorType}:${target.actorExternalId}`)).size,
+          recoveredItemCount: recovered?.items.length ?? 0,
           terminal: true,
         },
-        postMediaInventory: inventory,
+        postMediaInventory: completeInventory,
         content: [],
       }));
+      // A creative page can only be deferred because its verified actor did not
+      // exist in the mirror yet. Recovery is complete before this replay and
+      // no Graph request or inferred relationship is involved here.
+      for (const page of deferredContentPages) {
+        const content = graphVerifiedReplayRecords(page, completeInventory);
+        if (content.length === 0) continue;
+        addWrite(persistenceEvidence, await persistence.writePage({ ...page, content }));
+      }
       if (this.options.postInventoryPersistence) {
-        await this.options.postInventoryPersistence.persist(inventory);
+        await this.options.postInventoryPersistence.persist(completeInventory);
       }
       postInventoryEvidence = {
-        status: inventory.discoveries.some((entry) => entry.status === "partial" || entry.status === "unavailable" || entry.status === "permission_missing")
+        status: completeInventory.discoveries.some((entry) => entry.status === "partial" || entry.status === "unavailable" || entry.status === "permission_missing")
           ? "partial"
           : "completed",
-        items: inventory.items.length,
-        verifiedDiscoveries: inventory.discoveries.filter((entry) => entry.status === "verified" || entry.status === "empty").length,
-        partialDiscoveries: inventory.discoveries.filter((entry) => entry.status !== "verified" && entry.status !== "empty").length,
+        items: completeInventory.items.length,
+        verifiedDiscoveries: completeInventory.discoveries.filter((entry) => entry.status === "verified" || entry.status === "empty").length,
+        partialDiscoveries: completeInventory.discoveries.filter((entry) => entry.status !== "verified" && entry.status !== "empty").length,
+        recoveryTargetActors: new Set(recoveryTargets.map((target) => `${target.actorType}:${target.actorExternalId}`)).size,
+        recoveredItems: recovered?.items.length ?? 0,
         persistenceInvoked: true,
         extensionPersistenceInvoked: Boolean(this.options.postInventoryPersistence),
         failureReason: null,
@@ -381,6 +465,8 @@ export class MetaS14LiveAssetContentService {
         items: 0,
         verifiedDiscoveries: 0,
         partialDiscoveries: 1,
+        recoveryTargetActors: 0,
+        recoveredItems: 0,
         persistenceInvoked: false,
         extensionPersistenceInvoked: false,
         failureReason: classifyMetaSyncError(error).reason,
@@ -428,6 +514,8 @@ export class MetaS14LiveAssetContentService {
     persistence: MetaAssetContentPageWriter;
     persistenceEvidence: MutablePersistenceEvidence;
     sliceKey: string;
+    recoveryTargets: MetaCreativePostRecoveryTarget[];
+    deferredContentPages: MetaAssetContentPage[];
   }>): Promise<MetaS14AccountEvidence> {
     const ref = accountRef(input.accountId);
     const correlationId = stableHash({ runId: input.runId, accountId: input.accountId, stream: "creative_post" });
@@ -494,28 +582,48 @@ export class MetaS14LiveAssetContentService {
         fetchedAt,
       }));
       const nextCursor = page.nextCursor;
+      const persistencePage: MetaAssetContentPage = {
+        sliceKey: input.sliceKey,
+        cursor: nextCursor,
+        checkpoint: {
+          schemaVersion: SERVICE_SCHEMA_VERSION,
+          phase: "creative_post",
+          runCorrelationId: input.runCorrelationId,
+          accountRef: ref,
+          correlationId,
+          requestCursorId,
+          cursorId: stableHash({ correlationId, cursor: nextCursor }),
+          pageOrdinal,
+          fetchedRecordCount: page.records.length,
+          extractedContentCount: records.length,
+          nextCursorPresent: nextCursor !== null,
+          terminal: nextCursor === null,
+        },
+        content: records,
+      };
+      for (const record of records) {
+        const post = record.extraction.post;
+        if (!post) continue;
+        const actorType = post.platform === "facebook" ? "facebook_page" : "instagram_account";
+        const actorExternalId = actorType === "facebook_page" ? post.actorPageExternalId : post.actorInstagramExternalId;
+        if (actorExternalId) input.recoveryTargets.push({ actorType, actorExternalId, externalPostId: post.externalPostId });
+      }
       let summary: MetaAssetContentWriteSummary;
       try {
-        summary = await input.persistence.writePage({
-          sliceKey: input.sliceKey,
-          cursor: nextCursor,
-          checkpoint: {
-            schemaVersion: SERVICE_SCHEMA_VERSION,
-            phase: "creative_post",
-            runCorrelationId: input.runCorrelationId,
-            accountRef: ref,
-            correlationId,
-            requestCursorId,
-            cursorId: stableHash({ correlationId, cursor: nextCursor }),
-            pageOrdinal,
-            fetchedRecordCount: page.records.length,
-            extractedContentCount: records.length,
-            nextCursorPresent: nextCursor !== null,
-            terminal: nextCursor === null,
-          },
-          content: records,
-        });
-      } catch {
+        summary = await input.persistence.writePage(persistencePage);
+      } catch (error) {
+        if (error instanceof MetaAssetContentPersistenceError && error.code === "wrong_actor") {
+          input.deferredContentPages.push(persistencePage);
+          cursor = nextCursor;
+          if (cursor === null) return { ...evidence, status: "completed", failureReason: null };
+          pageSize = page.usageHeadroom < 0.2
+            ? Math.max(this.minPageSize, Math.floor(pageSize / 2))
+            : page.usageHeadroom > 0.7
+              ? Math.min(500, pageSize + Math.max(1, Math.floor(pageSize / 4)))
+              : pageSize;
+          if (page.usageHeadroom <= 0.1) await this.sleep(250);
+          continue;
+        }
         return { ...evidence, status: "partial", failureReason: "unknown" };
       }
       addWrite(input.persistenceEvidence, summary);

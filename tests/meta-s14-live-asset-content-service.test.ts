@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ConnectorError } from "@/connectors/contract";
+import { MetaAssetContentPersistenceError } from "@/connectors/meta/sync/asset-content-persistence";
 import {
   MetaS14LiveAssetContentService,
   type MetaAssetContentPageWriter,
@@ -10,6 +11,7 @@ import { planMetaReadSync } from "@/connectors/meta/sync/planner";
 import { META_ASSET_MIRROR_SCHEMA_VERSION, normalizeMetaAssetMirror } from "@/domain/meta/asset-mirror";
 import {
   META_POST_MEDIA_INVENTORY_SCHEMA_VERSION,
+  contentHashFor,
   normalizeMetaPostMediaInventory,
 } from "@/domain/meta/content/post-media-inventory";
 
@@ -56,6 +58,31 @@ function postInventory() {
     fetchedAt,
     items: [],
     discoveries: [],
+    writeOperations: 0,
+  });
+}
+
+function graphVerifiedRecoveryInventory() {
+  const externalPostId = "page-private_post-private";
+  const actorExternalId = "page-private";
+  return normalizeMetaPostMediaInventory({
+    schemaVersion: META_POST_MEDIA_INVENTORY_SCHEMA_VERSION,
+    workspaceId: "workspace-fixture",
+    connectionExternalKey: "connection-external-fixture",
+    fetchedAt,
+    items: [{
+      externalContentId: externalPostId,
+      contentKind: "page_post",
+      actor: { type: "facebook_page", externalId: actorExternalId, displayName: null, username: null },
+      messageOrCaption: "verified", mediaType: "text", publishedAt: null, lifecycle: "unknown",
+      contentHash: contentHashFor({ externalContentId: externalPostId, contentKind: "page_post", actorType: "facebook_page", actorExternalId, messageOrCaption: "verified", mediaType: "text", publishedAt: null, lifecycle: "unknown" }),
+      ownership: { kind: "accessible", evidence: "/me/accounts" },
+      readCapability: { status: "verified", evidence: "edge_read_succeeded" },
+      promotionEligibility: { status: "unknown", reason: "not_verified_by_inventory_read" },
+      previewSource: { classification: "server_only_sensitive", permalink: null },
+      provenance: { sourceEdge: `/${actorExternalId}/posts`, sourceGraphVersion: "v23.0", fieldCatalogVersion: "fixture-v1", fetchedAt, rawPayloadHash: hash },
+    }],
+    discoveries: [{ actorType: "facebook_page", actorExternalId, sourceEdge: `/${actorExternalId}/posts`, status: "verified", itemCount: 1, reason: null, promotionEligibility: "unknown" }],
     writeOperations: 0,
   });
 }
@@ -145,6 +172,12 @@ function makeService(input: Readonly<{
       expect(options.token).toBe(secret);
       return postInventory();
     },
+    // Keep orchestration fixtures hermetic; recovery itself is verified against
+    // a Graph-shaped GET fixture in the post-media inventory test suite.
+    recoverPostInventory: async (options) => {
+      expect(options.token).toBe(secret);
+      return postInventory();
+    },
     postInventoryPersistence: {
       persist: async (inventory) => { input.persistedInventories.push(structuredClone(inventory)); },
     },
@@ -183,6 +216,41 @@ const runInput = {
 } as const;
 
 describe("Meta S1.4 live asset/content orchestration", () => {
+  it("replays only Graph-verified deferred actor/post records after inventory persistence", async () => {
+    const pages: MetaAssetContentPage[] = [];
+    let inventoryWritten = false;
+    const writer: MetaAssetContentPageWriter = {
+      writePage: async (page) => {
+        if (page.postMediaInventory) inventoryWritten = true;
+        if (page.content.length > 0 && !inventoryWritten) {
+          throw new MetaAssetContentPersistenceError("wrong_actor", "actor missing before recovery");
+        }
+        pages.push(structuredClone(page));
+        return { inserted: page.content.length, updated: 0, unchanged: 0, stale: 0, cursor: page.cursor, recordCount: page.content.length };
+      },
+    };
+    const service = new MetaS14LiveAssetContentService({
+      secretResolver: { resolve: async () => secret },
+      beginPersistenceRun: async () => writer,
+      transportFactory: () => new FixtureTransport(),
+      discoverAssets: async () => assetSnapshot(),
+      discoverPostInventory: async () => postInventory(),
+      recoverPostInventory: async () => graphVerifiedRecoveryInventory(),
+      now: () => new Date(fetchedAt), maxAttempts: 1, maxPagesPerAccount: 3, maxPagesPerActor: 1,
+    });
+    const result = await service.run({
+      ...runInput,
+      selectedAdAccountExternalIds: [accountA],
+      sliceKeys: { ...runInput.sliceKeys, creativeByAdAccountExternalId: { [accountA]: creativeSliceKeys[accountA]! } },
+    });
+
+    const replayed = pages.filter((page) => page.content.length > 0);
+    expect(result.postInventoryEvidence.recoveredItems).toBe(1);
+    expect(replayed).toHaveLength(1);
+    expect(replayed[0]?.content[0]?.extraction.post?.externalPostId).toBe("page-private_post-private");
+    expect(replayed[0]?.content.every((record) => record.extraction.post?.externalPostId === "page-private_post-private")).toBe(true);
+  });
+
   it("persists page deltas with advancing checkpoints and isolates a partial account", async () => {
     const writer = new CapturingWriter();
     const transport = new FixtureTransport();
@@ -202,7 +270,9 @@ describe("Meta S1.4 live asset/content orchestration", () => {
         contentWithCopy: 2,
         existingPostBindings: 1,
       },
-      postInventoryEvidence: { status: "completed", persistenceInvoked: true },
+      postInventoryEvidence: {
+        status: "completed", persistenceInvoked: true, recoveryTargetActors: 1, recoveredItems: 0,
+      },
       writeNetworkCalls: 0,
     });
     expect(result.creativeEvidence.accounts.map((entry) => entry.status).sort()).toEqual(["completed", "partial"]);

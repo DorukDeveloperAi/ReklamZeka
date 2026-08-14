@@ -8,18 +8,19 @@ import {
 } from "@/analyses/timeframe-resolver";
 import { inspectMetaPersistenceWrite } from "@/domain/meta/data-lifecycle";
 
-export const ANALYSIS_AGENDA_VERSION = "analysis-agenda/1.0.0" as const;
+/**
+ * V2 deliberately describes the deliberation scopes, not Meta object types.
+ * Object-level calculator selection remains in the template/check contract.
+ */
+export const ANALYSIS_AGENDA_VERSION = "analysis-agenda/2.0.0" as const;
 export const ANALYSIS_PASS_ORDER = [
-  "data_health",
-  "account_objective",
-  "category",
-  "campaign",
-  "ad_set",
-  "ad",
-  "creative",
-  "budget_pacing",
+  "general",
+  "group_account",
+  "objective",
+  "internal_category",
+  "entity",
+  "topic",
   "history",
-  "decision",
 ] as const;
 
 export type AnalysisPassKey = typeof ANALYSIS_PASS_ORDER[number];
@@ -155,32 +156,29 @@ function selectionRefs(
 
 function metricsFor(pass: AnalysisPassKey, objective: CampaignObjective | null): readonly AnalysisMetric[] {
   const playbook = objective === null ? null : OBJECTIVE_PLAYBOOKS[objective];
-  if (pass === "data_health" || pass === "category" || pass === "history") return [];
-  if (pass === "account_objective") return uniqueMetrics(playbook?.guardrailMetrics ?? ["spendMinor"]);
-  if (pass === "campaign" || pass === "decision") {
+  if (pass === "general" || pass === "internal_category" || pass === "topic" || pass === "history") return [];
+  if (pass === "group_account" || pass === "objective") return uniqueMetrics(playbook?.guardrailMetrics ?? ["spendMinor"]);
+  if (pass === "entity") {
     return uniqueMetrics([
       ...(playbook?.primaryMetrics ?? []),
       ...(playbook?.diagnosticMetrics ?? []),
       ...(playbook?.guardrailMetrics ?? ["spendMinor"]),
     ]);
   }
-  if (pass === "budget_pacing") {
-    return uniqueMetrics(["spendMinor", ...(playbook?.primaryMetrics ?? [])]);
-  }
-  return uniqueMetrics(playbook?.diagnosticMetrics ?? []);
+  return [];
 }
 
 function blockersFor(pass: AnalysisPassKey, context: EffectiveCampaignContext): readonly string[] {
   const blockers: string[] = [];
-  if (pass === "data_health") {
+  if (pass === "general") {
     if (context.data.trustStatus !== "ready") blockers.push(`trust_${context.data.trustStatus}`);
     blockers.push(...context.data.blockers);
   }
-  if (pass === "account_objective" && context.meta.objective.state === "unknown") {
+  if (pass === "objective" && context.meta.objective.state === "unknown") {
     blockers.push(`objective_unknown:${context.meta.objective.reason}`);
   }
-  if (pass === "category" && context.categories.length === 0) blockers.push("category_context_missing");
-  if (pass === "decision") {
+  if (pass === "internal_category" && context.categories.length === 0) blockers.push("category_context_missing");
+  if (pass === "topic") {
     if (context.guidance.conflicting.length > 0) blockers.push("guidance_conflict_unresolved");
     if (context.cadence.decision !== "eligible") blockers.push(`cadence_${context.cadence.decision}`);
   }

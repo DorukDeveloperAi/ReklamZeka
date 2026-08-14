@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApprovalQueueReadError, ApprovalQueueReadService, type ApprovalQueueRecord, type ApprovalQueueRepository } from "@/application/approval-queue-read-service";
+import { ApprovalQueueReadError, ApprovalQueueReadService, type ApprovalQueueDetailRecord, type ApprovalQueueRecord, type ApprovalQueueRepository } from "@/application/approval-queue-read-service";
 
 const workspaceId = "11111111-1111-4111-a111-111111111111";
 
@@ -7,7 +7,7 @@ function record(patch: Partial<ApprovalQueueRecord> = {}): ApprovalQueueRecord {
   return {
     unitRef: "action_unit_aaaaaaaaaaaaaaaaaaaa", bundleRef: "action_bundle_bbbbbbbbbbbbbbbbbbbb",
     status: "awaiting_approval", risk: "K2", actionType: "budget_decrease",
-    accountRef: "account_0123456789abcdef", entity: { type: "campaign", ref: "entity_fedcba9876543210", label: "Korunan bölge kampanyası" },
+    accountRef: "account_0123456789abcdef", campaignRef: "entity_fedcba9876543210", entity: { type: "campaign", ref: "entity_fedcba9876543210", label: "Korunan bölge kampanyası" },
     beforeAfter: { field: "daily_budget_minor", beforeMinor: 100_000, afterMinor: 95_000, currency: "TRY" },
     autonomy: { profileRef: "autonomy_0123456789abcdef", decision: "approval_required", trace: [
       { scope: "workspace", decision: "approval_required", reasonCode: "workspace.approval_only" },
@@ -20,7 +20,15 @@ function record(patch: Partial<ApprovalQueueRecord> = {}): ApprovalQueueRecord {
 }
 
 function repository(records: readonly ApprovalQueueRecord[]): ApprovalQueueRepository {
-  return { list: vi.fn(async () => records), get: vi.fn(async ({ unitRef }) => records.find((item) => item.unitRef === unitRef) ?? null) };
+  return { list: vi.fn(async () => records), get: vi.fn(async ({ unitRef }) => {
+    const item = records.find((candidate) => candidate.unitRef === unitRef);
+    return item ? detail(item) : null;
+  }) };
+}
+
+function detail(item: ApprovalQueueRecord): ApprovalQueueDetailRecord {
+  return { ...item, sourceEvidence: [{ kind: "budget_proposal", label: "Bütçe önerisi", integrity: "hash_verified" }],
+    decisionHistory: [{ decision: "proposed", occurredAt: item.createdAt, reasonCode: null }] };
 }
 
 describe("Approval Queue public read service", () => {
@@ -33,7 +41,7 @@ describe("Approval Queue public read service", () => {
       beforeAfter: { beforeMinor: 100_000, afterMinor: 95_000 }, autonomy: { decision: "approval_required" },
       dependencies: [{ status: "approved" }] }], authority: { readOnly: true, canApprove: false, canReject: false, canRequestChanges: false, canGrant: false, canExecute: false, canWriteMeta: false } });
     expect(detail.item.unitRef).toBe(record().unitRef);
-    expect(repo.list).toHaveBeenCalledWith({ workspaceId, before: null, limit: 26 });
+    expect(repo.list).toHaveBeenCalledWith({ workspaceId, entityRef: null, campaignRef: null, before: null, limit: 26 });
     expect(JSON.stringify({ list, detail })).not.toContain(workspaceId);
   });
 
@@ -44,7 +52,7 @@ describe("Approval Queue public read service", () => {
     expect(page.nextCursor).not.toBeNull();
     const nextRepo = repository([]);
     await new ApprovalQueueReadService(nextRepo).list({ workspaceId, cursor: page.nextCursor });
-    expect(nextRepo.list).toHaveBeenCalledWith({ workspaceId, before: { createdAt: newer.createdAt, unitRef: newer.unitRef }, limit: 26 });
+    expect(nextRepo.list).toHaveBeenCalledWith({ workspaceId, entityRef: null, campaignRef: null, before: { createdAt: newer.createdAt, unitRef: newer.unitRef }, limit: 26 });
     await expect(new ApprovalQueueReadService(repository([older, newer])).list({ workspaceId }))
       .rejects.toEqual(expect.objectContaining({ code: "unsafe_source" }));
   });
@@ -67,6 +75,31 @@ describe("Approval Queue public read service", () => {
     await expect(new ApprovalQueueReadService(repository([])).get({ workspaceId, unitRef: record().unitRef }))
       .rejects.toEqual(expect.objectContaining({ code: "not_found" }));
     await expect(new ApprovalQueueReadService(repository([])).list({ workspaceId, limit: 101 })).rejects.toBeInstanceOf(ApprovalQueueReadError);
+  });
+
+  it("returns only the exact opaque entity scope and rejects a mismatched source row", async () => {
+    const exactEntityRef = record().entity.ref;
+    const foreign = record({ unitRef: "action_unit_dddddddddddddddddddd", entity: { ...record().entity, ref: "entity_0123456789abcdef" } });
+    const source = repository([record()]);
+    const result = await new ApprovalQueueReadService(source).list({ workspaceId, entityRef: exactEntityRef });
+    expect(result).toMatchObject({ entityRef: exactEntityRef, items: [{ entity: { ref: exactEntityRef } }] });
+    expect(source.list).toHaveBeenCalledWith({ workspaceId, entityRef: exactEntityRef, campaignRef: null, before: null, limit: 26 });
+    await expect(new ApprovalQueueReadService(repository([foreign])).list({ workspaceId, entityRef: exactEntityRef }))
+      .rejects.toEqual(expect.objectContaining({ code: "unsafe_source" }));
+  });
+
+  it("returns the resolved campaign scope for child units and rejects mixed or mismatched scope", async () => {
+    const campaignRef = record().campaignRef;
+    const child = record({ entity: { ...record().entity, type: "ad_set", ref: "entity_0123456789abcdef" } });
+    const source = repository([child]);
+    await expect(new ApprovalQueueReadService(source).list({ workspaceId, campaignRef })).resolves.toMatchObject({
+      campaignRef, items: [{ campaignRef, entity: { type: "ad_set" } }],
+    });
+    expect(source.list).toHaveBeenCalledWith({ workspaceId, entityRef: null, campaignRef, before: null, limit: 26 });
+    await expect(new ApprovalQueueReadService(repository([record({ campaignRef: "entity_0123456789abcdef" })])).list({ workspaceId, campaignRef }))
+      .rejects.toEqual(expect.objectContaining({ code: "unsafe_source" }));
+    await expect(new ApprovalQueueReadService(repository([])).list({ workspaceId, entityRef: record().entity.ref, campaignRef }))
+      .rejects.toEqual(expect.objectContaining({ code: "invalid_input" }));
   });
 
   it("aligns canonical status action types and returns a deeply immutable projection", async () => {

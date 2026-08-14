@@ -82,6 +82,16 @@ describe("Existing-post promotion preflight dashboard", () => {
     expect(html).not.toContain("type=\"text\"");
   });
 
+  it("offers the shared local-session connector when the catalog requires a session", () => {
+    const html = renderToStaticMarkup(createElement(PromotionPreflightSurface, {
+      ...callbacks, onConnect: vi.fn(async () => false),
+      state: { status: "session_required", message: "Yerel oturum gerekli." },
+    }));
+    expect(html).toContain("Öne çıkarma çalışma alanını bağlayın");
+    expect(html).toContain("local-session-capability");
+    expect(html).not.toContain("<select");
+  });
+
   it("shows a distinct trusted empty state without rendering selectors", () => {
     const empty = Object.fromEntries(Object.keys(catalog).map((key) => [key, []])) as unknown as PromotionPreflightCatalog;
     const html = renderToStaticMarkup(createElement(PromotionPreflightSurface, {
@@ -113,16 +123,18 @@ describe("Existing-post promotion preflight dashboard", () => {
       state: { status: "ready", catalog, selection, result, evaluating: false, message: null },
     }));
     expect(html).toContain("Mevcut gönderi · değişmez");
-    expect(html).toContain("K4 reklam önerisi · approval_required");
+    expect(html).toContain("K4 reklam önerisi · insan onayı gerekli");
     expect(html).toContain("₺1.200");
-    expect(html).toContain(selection.promotionTemplateRef);
-    expect(html).toContain(selection.audiencePresetRef);
+    expect(html).toContain("Lead · mevcut IG gönderisi · v3");
+    expect(html).toContain("İstanbul · Saç Ekimi · immutable v4");
+    expect(html).not.toContain(`<small>${selection.postRef}</small>`);
+    expect(html).not.toContain(`<dd>${selection.promotionTemplateRef}</dd>`);
     expect(html).toContain("Preflight persist: kapalı");
     expect(html).toContain("Approval: kapalı");
     expect(html).toContain("Execute: kapalı");
     expect(html).toContain("Meta write: kapalı");
     expect(html).toContain("Creative generation: kapalı");
-    expect(html).toContain("Tek ActionUnit onay taslağı oluştur");
+    expect(html).toContain("Tek eylem satırlı onay taslağı oluştur");
     expect(html).not.toContain(">Onayla<");
   });
 

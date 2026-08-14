@@ -1,6 +1,8 @@
 # ReklamZeka Meta Reklam İşletim Sistemi — CHECKLIST (v2)
 
 > Ana plan kümülatiftir. `[x]` yalnız kanıtlı teslimi, `[ ]` kalan işi gösterir.
+> Kullanıcı-görünür tamamlanma sırası için [MASTER](./MASTER.md) belgesini kullanın;
+> bu dosya ayrıntılı kanıt ve kalan iş kaynağıdır.
 
 - [x] Bütün ürün görüşmelerini vizyon, davranış sözleşmesi, yetki paylaşımı, kullanıcı
   yolculukları ve S0–S6 teslim kapılarıyla birleştiren kanonik ürün distilasyonu.
@@ -30,6 +32,19 @@
 - [x] Account/campaign/adset/ad/creative/post çekirdek entity şeması, raw hash/provenance,
   first/last seen ve soft disappearance.
 - [ ] Multi-business connection, account group ve account-level permission/capability modeli.
+  - [x] Server-private, tenant-bound portfolio capability reader: bütün connection/account/current
+    account-group topolojisini tek kısa read-only snapshotta çözer; account currency/timezone/spend cap
+    ve read-readiness bağımsız kalır. Grup üyeliği permission/capability genişletemez; connection
+    `ads_read`+`accounts.read`, account `ads_read` ve sürümlü account-read evidence eksikse sonucu
+    `partial/unavailable` bırakır; publish/approve/execute/Meta-write yapısal olarak false'tur.
+  - [x] `/me/adaccounts` canonical asset discovery'sinden `meta-account-capability/1.0.0`
+    account-read evidence materialization: aynı asset persistence transaction'ında connection'ın tüm
+    bilinen hesapları source listesine karşı yeniden değerlendirir. Listede yok/empty/permission-missing/
+    unavailable hesap eski grant'i korumaz; `ads_read` ve `canReadAccount=false` ile fail-closed güncellenir.
+  - [x] Cookie-only, query'siz `GET /api/meta/portfolio-capability` aynı tenant-bound salt-okur
+    snapshotı public-safe capability modeli olarak sunar. Dashboard gerçek kaynak yoksa demo grup
+    uydurmaz; yerel oturum gereksinimini, hesap-grubunun yalnız kapsam etiketi olduğunu ve tüm
+    publish/approve/execute/Meta-write alanlarının kapalı kaldığını açıkça gösterir.
 - [x] Facebook Page, Instagram, pixel/dataset, app/WhatsApp destination asset graph.
   - [x] Asset ve edge canonical şeması, capability/provenance/orphan alanları.
   - [x] Parçalı canlı sync, ownership/capability çözümlemesi ve iki hesap kanıtı.
@@ -65,6 +80,10 @@
     raporu maskeli, eksik insights'i `not_ready` bırakan fail-closed kanıt.
   - [x] S1.5 lifecycle/diff sonrası kalıcı trust raporu, restart/replay ve iki hesap
     isolation PostgreSQL E2E; eksik insight coverage sebepli `not_ready` olarak korunuyor.
+  - [x] İki canonical hesapta 30 günlük bounded GET-only campaign insight bootstrap: 10/10
+    tarih dilimi, 759 source satırı/48 campaign ve tamamlanmış durable cursor. İkinci hesapta
+    günlük Meta teslimatı seyrek olduğundan day-level coverage trust/readiness'te `partial`/
+    `not_ready` kalır; scheduler/cron kapalı, Meta write 0.
 
 ## A09 — İç kategori ve talimat
 
@@ -91,11 +110,23 @@
   - [x] Tüm category/guidance/policy/data refs'lerini birleştiren saf EffectiveCampaignContext.
   - [x] Context persistence, selective invalidation ve public redaction projection'ı.
 - [x] Strict instruction/policy DSL ve negatif parser matrisi.
+  - [x] Draft policy'nin publish'i iki kişi ayrılığı ister: taslağın owner actor'u kendi current draft
+    hash'ini publish edemez; aynı exact revision için farklı bir owner/admin approval gerekir.
+  - [x] Payment/delivery alarm çekirdeği: resmi Meta state ile harcama kesintisi kanıtını sırasıyla
+    `confirmed` ve `suspected` olarak ayırır; kritik uyarı yalnız insan incelemesi/öneri üretir ve
+    bütün action/Meta-write capability'leri false kalır.
 - [ ] Raw natural-language → normalized draft + assumption/question/impact preview.
   - [x] `owner_statement` ham metni ayrı provenance kaydı olarak koruyan, guidance-only
     card + tek scope binding üreten gerçek taslak authoring akışı.
   - [x] G0→G4 saf sözleşmede normalized draft, varsayım/soru, semantic diff, replay ve
     affected-scope/conflict/impact preview doğrulaması; ambiguity/partial sonuç fail-closed.
+  - [x] Draft-only normalizasyon çalışma alanı: Guidance source/card/reviewed-set immutable zincirini
+    server-side hash/version ile yeniden çözen, yapılandırılmış normalize guidance + varsayım/açık soru
+    taslağını append-only kaydeden cookie-only yüzey. Strict policy, publish, G3/G4, approval/action ve
+    Meta write bu checkpoint'te kapalıdır.
+  - [x] Cookie-only server-side structured normalization assessment: bağlayıcı niyet/kapsam/operasyon
+    eksiklerini `needs_input` olarak, tamamını yalnız `ready_for_draft` olarak döndürür; policy
+    lifecycle veya persistence çağırmaz.
   - [ ] Gerçek normalization/application servisi; diff ve impact'in authoritative resolver/
     ledger/dependency reader'dan hesaplanması, persistence/API/UI ve insan onaylı kabul.
 - [ ] Precedence/inheritance/suppression/PARKED_CONFLICT resolver.
@@ -136,10 +167,26 @@
     catalog/snapshot/binding, audit ve `policy_authority` invalidation tek transaction'dadır.
     Current kullanım deterministic head, tarihsel replay explicit immutable snapshot ref/hash kullanır;
     HTTP/MCP/UI ve bütün write capability'leri kapalıdır.
+  - [x] A09.3a invalidation fidelity: catalog materializer ve manual-lock writer, türetilmiş
+    catalog/policy hash'i değil aynı workspace'te frozen context'e gerçekten yazılmış her
+    `policy_authority_workspace` ref/version çiftini geçersizleştirir. Bu yalnız stale-context
+    önlemidir; exact-impact coverage hâlâ incomplete ve `mutationAllowed=false` kalır.
+  - [x] A09.3b immutable effective-context policy-composition sidecar: source-bound authority
+    snapshot/catalog/scope ve exact strict revisionler save transaction'ında doğrulanıp append-only
+    kaydedilir; registry doğrulaması snapshot JSON kısayoluna değil relational catalog revision
+    payload'ına bağlıdır. Aynı immutable fact farklı historical snapshotlarda snapshot-kapsamlı binding
+    ile saklanır; legacy context sidecar-less kalır ve promotion authority vermez.
   - [x] Migration journal ile canlı PostgreSQL schema/RLS/OCC/rollback kabulü: 52/52 migration,
     authority catalog, frozen context, progressive formalization ve Supabase security verifier'ları geçti.
-  - [ ] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
-    context ailelerinin complete exact-impact coverage'ı ve gerçek oturumlu browser kabulü.
+  - [x] Trusted authority catalog, manual policy lock, account-group/topic ve opaque action-policy
+    context ailelerinin complete exact-impact coverage'ı için canlı PostgreSQL kabulü. Repository preview
+    aileleri immutable policy-composition sidecar ve relational zincir üzerinden ayrı ayrı değerlendirir;
+    verifier gerçek draft→empty bootstrap→publish-OCC ardından semantic/account-group/topic private
+    lifecycle writerları ve bound catalog/snapshot materialization'ı ile `coverage.complete=true` ve
+    `mutationAllowed=true` kanıtlar. Authority satırları sentetik SQL ile üretilmez; cross-tenant, RLS/
+    revoke, append-only, network/action sıfır ve outer rollback doğrulanır. Legacy/missing/corrupt rows
+    partial kalır; G4 yetkisi açılmaz.
+  - [ ] Gerçek oturumlu browser kabulü; local browser session kurulmadan tamamlanmış sayılmaz.
 - [ ] Başlangıç objective/internal kategori playbook seti.
   - [x] Altı canonical objective playbook'una version/hash ile bağlı, review-required ve
     authority-free starter category/profile proposal kataloğu.
@@ -165,6 +212,10 @@
     her zaman kapalı salt-okur dimension/definition archive-impact önizlemesi.
   - [x] Canlı hierarchy path'leri üzerinden bounded portföy çapında effective single-dimension
     conflict taraması; creative reuse path-bazlı, 20.000 yol/100 boyut hard cap ve fail-closed sonuç.
+  - [x] Canonical kampanya künye inceleme kuyruğundaki eksik `market`/hizmet/aile alanından, yalnız
+    mevcut guarded Category Inventory formuna opaque hedef ve boyut ön-seçimli manuel handoff.
+    Tanım seçimi, rol/registry-hash/aktif-hedef doğrulaması ve mutation aynı canonical authoring
+    sınırında kalır; otomatik atama, policy/action ve Meta write yoktur.
   - [ ] Archive preview dependency coverage'ini tamamlayıp güvenli mutation guard'ına bağlama.
     - [x] Sürümlü JSONB dependency manifest'i, `pg_catalog` drift kontrolü, canonical+legacy
       category ref lineage'ı, promotion/practice/budget geçmişi, conservative non-terminal
@@ -229,6 +280,24 @@
     append-only PostgreSQL persistence, workspace lock/membership/OCC/audit, cookie-only API ve responsive UI.
   - [x] G3/G4 storage contract, exact JSONB/hash-chain/RLS/revoke/immutability ve injected-ready replay;
     production preview eksik authority/risk/cap/approval/rollout/valve kanıtında fail-closed kalır.
+  - [x] A09.4a transaction-local authoritative G3 evidence bridge: G2 exact set manifesti üzerinden
+    bounded run→asset→hash-authenticated frozen context→relational outcome snapshot zinciri ve her
+    context'in own historical authority snapshot'ı same-executor'da doğrulanır. Mixed-account/tamper/
+    missing evidence fail-closed; draft candidate için ayrı trusted tier/decision preview binding yoksa
+    G3 promotion zero-write blocked kalır. Bu G3 positive acceptance veya G4 yetkisi iddia etmez.
+  - [x] A09.4b server-private candidate preview-binding ledger: G2 head, reviewed guidance
+    manifesti, draft policy sürümü, hedef account ve geçerli repository-verified authority basis
+    snapshot'ı immutable/OCC/auditli bağlanır. Candidate tier/decision yalnız bu ledger'dan okunur;
+    draft için `productionAuthoritySourceBound=false`, bütün G4/action/Meta yetkileri false kalır.
+    PostgreSQL outer-rollback verifier'ı normal lifecycle fixture ile positive candidate binding,
+    cross-tenant/tamper/stale retleri ve sıfır action/network çağrısını kanıtlar; candidate
+    ilişkileri tombstone purge sırasına dahildir.
+  - [x] A09.4c candidate-aware authoritative G3 review projection: draft için production
+    source-bound kanıtı aranmadan, ayrı repository-verified candidate review evidence, authenticated
+    historical outcome ve authoritative exact-impact preview'iyle owner-confirmed G3 promotion yapılır.
+    Impact sayıları gerçek preview'den gelir; cross-tenant/tamper/stale negative'ler zero-write'tır.
+    Bu yalnız G3 formalization state'idir: `productionAuthoritySourceBound=false` ve G4/action/Meta
+    yetkileri kapalı kalır.
   - [ ] G3 authoritative conflict/impact/historical-outcome resolver ile G4 A13 evidence binding'i ve
     bağlı PostgreSQL/gerçek session acceptance.
 - [ ] AdvisedPractice candidate→trial→outcome→standardization lifecycle.
@@ -244,6 +313,24 @@
 
 - [x] Kampanya objective/funnel/event/classification temel sözleşmesi.
 - [x] Altı objective için primary/diagnostic/guardrail/min-sample karar playbook temeli.
+- [x] İşletim taksonomisine dayalı, insan-incelemeli interaktif kampanya brief şablonları: pazar/dil/
+  hizmet/dönüşüm yolu sınıflandırmasını delivery health ve kapasiteden ayrı tutar; lead edinimi,
+  üst-huni eğitim, pazar-hizmet öğrenmesi, kesinti toparlanması ve sınıflandırma triage'ını
+  deterministic seçer. Her brief, UI/sohbetin tek bir sonraki eksik kararı sorması için typed
+  `nextDecision` ve insan incelemeli, sıralı campaign lane'leri taşır. Form ve WhatsApp sonucu
+  varsayılan olarak aynı KPI değildir; hiçbir campaign create/publish/approval/Meta-write yetkisi vermez.
+  - [x] Kampanyalar ekranında geçici `proposal-only` brief paneli: kullanıcı iş amacı, pazar/dil,
+    hizmet, rota, kapasite, teslimat ve kreatifi değiştirdikçe tek sonraki karar, kampanya şeridi,
+    sıra ve kıyas sınırı yeniden hesaplanır. Panel hiçbir kalıcı mutation yapmaz.
+  - [x] Read-only inventory performans/CRM/budget evidence'i taşımadığında Today KPI'ları `Kaynak
+    bekleniyor` olur; demo karar ve portföy örnekleri gerçek approval/performans kaydı gibi
+    etiketlenmez.
+  - [x] Kullanıcıdan gelen tarihli çalışma kitabı, canlı Meta mirror'dan ayrı açık bir offline portföy
+    snapshotı olarak görünür; pazar/dil/rota ayrımı ve kesinti sınırı brief başlangıç bağlamına
+    taşınır, KPI/approval/Meta-write iddiasına dönüşmez.
+  - [x] Offline portföy şeridi, yalnız eşleştirilmiş geçici brief senaryosunu açar; kullanıcı
+    değişikliği veya context seçimiyle senaryo etiketi sıfırlanır ve hiçbir kalıcı kampanya/policy
+    state'i taşınmaz.
 - [ ] Meta config + çoklu internal category + policy composition.
   - [x] A10.4a immutable/replay-safe `meta-analysis-config-snapshot/2.0.0`: reviewed
     campaign objective ve ad-set optimization-goal mapping sürümleri hash'e freeze edilir;
@@ -311,6 +398,17 @@
     dört scope anahtarıyla (`workspaceId/accountRef/entityType/entityRef`) sınırlıdır; caller facts/
     context enjeksiyonu, HTTP, MCP, Decision Room veya action/write adapter'ı eklenmez. Rejected source
     ve invalidated persistence sonucu fail-closed kalır.
+  - [x] A10.4c-13 dar PostgreSQL root fail-closed smoke: outer rollback içinde scope-checked sentetik
+    ready bundle'ın relational authority catalog/snapshot/binding zinciri olmadan `source_rejected`
+    kaldığı (`syntheticAuthorityRejected:true`) ve sıfır network/action çağrısı doğrulanır. Bu kabul,
+    closed-world current-source veya persistence başarısı iddia etmez.
+  - [x] A10.4c-14 closed-world current-source persistence acceptance: gerçek private lifecycle fixture'ı
+    canonical hierarchy/config, category, cadence, reviewed guidance selection, policy lifecycle,
+    authority snapshot/catalog ve promotion registry zincirini aynı kaynak sözleşmesiyle kurar; source
+    reader → evidence-bound writer → reload canlı PostgreSQL'de doğrulanır. Cross-tenant/malformed public
+    alias fail-closed, network/action/Meta write sıfır ve iki tenantın locked tombstone cleanup'ı sıfır
+    survivor verir. Data window bağlanmadığından `analysis_window_not_bound` ve bütün G4/action
+    capability'leri kapalı kalır.
 - [x] Mevcut AnalysisMetric sözlüğünü eksiksiz kapsayan sürümlü additive/non-additive/ratio-of-sums kataloğu.
 - [x] Rolling/fixed/calendar/lifetime/learning/action-relative timeframe resolver.
 - [x] Trend/anomali/pacing/threshold/period/cohort/pre-post saf analiz ailesi.
@@ -349,9 +447,16 @@
   - [x] Cookie-only server-bound `DecisionCadenceProfile` yayınlama API'si: actor/rol/clock istemciden
     alınmaz; owner/admin membership, current-hash OCC ve append-only audit repository transaction'ında tekrar
     doğrulanır. Action/approval/Meta-write authority yapısal olarak `false` kalır.
-  - [ ] Policy-configured canlı PostgreSQL dry-run acceptance.
+  - [x] Policy-configured canlı PostgreSQL dry-run acceptance: verifier sahte ready-context yerine
+    gerçek L1 observation → persisted L2 feature → L3 window → evidence-bound context zincirini kurar;
+    completed run/ledger, replay, stale/tenant/tamper negatifleri ve Meta network/write sıfırı kanıtlanır.
+    Supabase pooler üzerindeki 114 FK-sıralı tombstone delete round-trip'i uzun sürer ama deadlock değildir;
+    parallel cleanup serializable conflict ürettiği için bilinçli olarak kullanılmaz.
 - [x] Versioned AnalysisAgenda ve general→group→objective→category→entity→topic pass orkestrasyonu.
   - [x] Deterministik on-pass agenda, category/topic subset ve context/timeframe-bound finding çekirdeği.
+  - [x] Agenda v2 frozen asset contract: exact sıralı `general → group_account → objective →
+    internal_category → entity → topic → history` pass'leri hashli persistent run assetine freeze edilir;
+    v1 frozen payload yeniden yorumlanmaz ve L2 okumasından önce fail-closed reddedilir.
   - [x] A10.2c agenda hash+payload'ı ilk run claim'inde immutable Decision Room run assetine freeze edilir;
     runtime aynı context/timeframe/pass'lerden tekrar üretip birebir eşleşme olmadan L2 okuması ya da ledger
     staging'i başlatmaz. Legacy bağsız asset fail-closed kalır.
@@ -361,7 +466,7 @@
 - [ ] DecisionCadenceProfile, no-change/repeat suppression ve ExperimentRecord lifecycle.
   - [x] Settle/observation/learning/cooldown/evidence/repeat saf karar kapısı ve tek değişkenli experiment çekirdeği.
   - [x] Manual/scheduled ortak executor, idempotency/overlap/retry/lease ve in-app inbox çekirdeği.
-  - [ ] Cadence/experiment PostgreSQL persistence ve Decision Room adapter binding'i.
+  - [x] Cadence/experiment PostgreSQL persistence ve Decision Room adapter binding'i.
     - [x] A10.1 tenant-scoped immutable `DecisionCadenceProfile` revision persistence:
       owner/admin membership recheck, current-hash OCC, audit kaydı, RLS/FORCE RLS ve tombstone
       purge sözleşmesi; tüm action/approval/Meta-write capability'leri false.
@@ -375,7 +480,73 @@
     - [x] A10.2e ExperimentRecord plan/outcome endpoint'i ayrı local-session scope/intent altında yalnız
       owner/admin/analyst'e açılır; actor/rol/clock istemciden alınmaz, append-only plan→outcome hash zinciri
       ve audit transaction'ı korunur. Endpoint action/approval/Meta-write authority üretmez.
+    - [x] Canlı local-session PostgreSQL acceptance: gerçek owner cookie capability ile cadence publish,
+      experiment plan→outcome, stale outcome conflict, immutable revision guard ve audit chain aynı outer
+      rollback'te doğrulanır; action/Meta write ve kalıcı fixture sıfırdır.
 - [ ] L0–L5 Postgres pipeline, incremental materialization/invalidation ve context budget.
+  - [x] Meta Graph insights sayfasından canonical L1 daily-insight parser: v23 capability catalog
+    provenance, hash-only source trace, exact action-type extraction, currency minor-unit dönüşümü ve
+    foreign/malformed/duplicate sayfa reddi.
+  - [x] Canonical L1 Drizzle writer + normal Meta sync binding: runtime cursor'ı ilerlemeden önce tenant/
+    account/run/slice scope'lu daily insight ve metric upsert'i yapılır; raw insight restart ledger'dan
+    çıkarılır. Outer-cleanup PostgreSQL restart acceptance iki canonical insight+metric seti ve raw-ledger
+    redactionını doğrular.
+  - [x] Saf immutable L2 feature snapshot contract: authenticated observation metric-result hash'i,
+    source-manifest hash'i, formula catalog sürümü ve all-false capability seti freeze edilir. DB
+    persistence/invalidation bağlantısı sonraki checkpoint'tir.
+  - [x] L2 yazıcı hazırlığı: public observation/finding sözleşmesine iç UUID eklemeden, yalnız
+    server-private adapter ile opaque snapshotRef ↔ canonical daily-insight id/contentHash manifest
+    bağını taşır. Relational feature header/item persistence ve invalidation hâlâ açık kalır.
+  - [x] L2 relational storage substrate: immutable tenant-scoped feature header ve exact L1
+    source-manifest item tabloları, composite tenant FK/index, FORCE RLS/revoke ve tombstone-only
+    append-only guard ile forward migration olarak eklendi. Server-private materialization writer ve
+    L1-change invalidation tüketicisi hâlâ açık kalır.
+  - [x] Server-private L2 materializer: yalnız runtime-attested canonical source manifest'i kabul eder;
+    active tenant/account/connection scope ve her L1 row'un current source payload hash'i aynı transactionda
+    yeniden doğrulanır. Immutable header+source item insert idempotenttir; stale source fail-closed olur.
+  - [x] L1→L2 invalidation evidence journal: canonical insight writer, yalnız önceden var olan bir L1
+    source payload hash'i değiştiğinde exact relational feature-source bağlarını çözer ve immutable,
+    idempotent invalidation olayı yazar. Olay historic feature'ı değiştirmez; L2/L3 reader'ın selective
+    stale-rejection tüketicisi hâlâ açık kalır.
+  - [x] Private L2 current reader: persisted feature payload'ını yeniden doğrular; exact feature'a bağlı
+    herhangi bir L1 invalidation varsa replacement/fallback üretmeden `stale` döner. Karar runtime'ına
+    veya action yüzeyine henüz bağlanmaz.
+  - [x] Saf L3 window artifact: yalnız same-scope, settled ve `ready` L2 feature'ları doğrulanmış
+    resolved timeframe içine freeze eder; exact feature/source-manifest hash listesi ve all-false
+    capability seti taşır. Relational persistence/invalidation tüketimi sonraki checkpoint'tir.
+  - [x] Private L3 materializer substrate: immutable tenant-scoped window header+exact L2 bindingleri
+    forward migration ile saklanır; save transaction'ı aktif workspace ve invalidation-free L2 setini
+    tekrar doğrular, eksik/stale seti `source_changed` ile insert öncesi reddeder.
+  - [x] Private L3 current reader: saklanan window payload'ı ve exact L2 bindingleri yeniden canonicalize
+    edilir; bağlı L2 invalidation varsa replacement/fallback üretmeden `stale` döner. Decision Room,
+    context veya action yüzeyine henüz bağlı değildir.
+  - [x] Frozen-context L2/L3 evidence closure: `featureRefs` ve `windowRefs` yalnız aynı tenant/mirror/entity
+    scope'taki, hash-authenticated ve invalidation-free immutable artefactlar olarak kaydedilir; L1 kaynak
+    değişimi exact L2 component üzerinden ilgili frozen context'leri invalidate eder. Yeni ready analytical
+    context için feature/window ikilisinden biri eksikse fail-closed olur.
+  - [x] Private L2→L3 timeframe materializer: caller'ın bir window ref'i seçmesine izin vermeden, aynı kısa
+    workspace kilidi altında exact scope/timeframe için tüm current, invalidation-free L2 feature setini okur
+    ve deterministic L3 artefact olarak saklar. Decision Room bindingi sonraki checkpoint'tir.
+  - [x] Decision Room L3 admission gate: yeni run asset'i yalnız ready, blockersız ve hash-biçimli frozen
+    L2 feature + L3 window referanslarını taşıyan context ile çalışır; L1 observation ref'i L2 ref'iyle
+    karıştırılmaz. Tarihsel frozen run replay davranışı değişmez.
+  - [x] Frozen L2/L3 Decision Room runtime bridge: admission sonrası runtime yeni L1 observation seçmez;
+    contextteki exact ready L2 feature ve complete L3 window bindinglerini private reader'larla yeniden
+    doğrular, yalnız bunlardan calculator observation üretir ve deterministic L5 compact context ref/hash'ini
+    immutable analysis ledger'a freeze eder. Missing/stale/foreign/tamper evidence ledger staging öncesi
+    fail-closed'dur; authentic PostgreSQL dry-run acceptance sequential tombstone cleanup ile kanıtlıdır.
+  - [x] Frozen-L2 advisory contribution diagnostic: authenticated primary feature setinden deterministic
+    spend contribution hesaplanır; peer veya metric kanıtı yoksa açık `insufficient_data`/`unknown` döner.
+    Creative/config alanları frozen L2 payloadında yoksa fatigue/config uydurmak yerine `not_supported`
+    kalır; ledger/action/Meta-write yetkisi etkilenmez.
+  - [x] A10.5a frozen diagnostic evidence substrate: exact frozen context, L2/L3 manifestleri,
+    hierarchy, objective/funnel/optimization, category-policy/config/source commitmentsi immutable
+    tenant sidecar'da saklanır. Writer yalnız gerçek ready persisted facts ile çalışır; RLS/FORCE/revoke,
+    append-only/tombstone guard ve outer-rollback live verifier hash/capability/tamper/tenant/cleanup
+    negatiflerini doğrular. Cohort/fatigue hesapları bu substrate'in sonraki ayrı checkpointleridir.
+  - [x] Private timeframe-bound context composer: son geçerli repository context'inin private mirror scope'u
+    ve server clock'u ile L2→L3 materializer çağrılır; yeni evidence-bound context yalnız exact window'un
+    feature/window ref'lerini taşır. Caller context, feature, scope UUID veya capture time veremez.
 - [x] Frozen EffectiveCampaignContext resolver ve top-down/bounded bottom-up driver tools.
   - [x] Authentic category/guidance doğrulayan, raw/write authority taşımayan saf frozen context/hash.
   - [x] Append-only persistence, exact-scope invalidation, historical replay ve public-safe projection.
@@ -430,6 +601,8 @@
 - [ ] Natural-language instruction translator ve ambiguity eval seti.
 - [ ] Salt-okur local-session/advisor ledger, import/DB saldırı testi ve redaksiyon.
 - [ ] Karar defteri/context budget ve deterministic fallback.
+  - [x] Confirmed/suspected delivery-health alert ledger: atama, zorunlu checklist, insan workflow
+    durumu ve recommendation hold/release append-only zinciri; action/Meta authority kapalı.
 - [ ] Injection/cross-tenant/secret/action-bypass tam negatif matrisi.
 - [x] LocalAgentClient/session contract ve modelsiz deterministic fixture client; 15 safe read/draft/preflight
   tool'u exact local-session scope'a bağlı, correlation replay/cross-session ve authority/raw/tool injection fail-closed.
@@ -462,6 +635,10 @@
   - [ ] Official Meta source claim guard, semantic retrieval/ranking ve analysis-run binding.
 - [ ] Act/test/observe/no-change + cadence ihlali proposal suppression eval'i.
 - [ ] L4/L5 compact context, bounded drill-down ve raw L0 access negatifleri.
+  - [x] Saf L5 compact-agent-context sözleşmesi: authentic frozen context/agenda/finding-run ile
+    deterministik public projection, entity/finding/guidance/source hard budget, açık
+    truncation/`moreAvailable` ve raw/internal-ref negatifleri. Drill-down transportu ve L2/L3
+    materialization bu checkpoint'in dışındadır.
 - [ ] draft_advised_practice authority boundary ve standardization bypass negatifleri.
 - [ ] ReklamZeka OrchestratorProfile ve altı vendor-agnostic skill manifesti/conformance eval'i.
 - [ ] RuleCoach owner+Meta source+evidence+conflict deliberation ve publish-bypass negatifleri.
@@ -469,13 +646,46 @@
 ## A13 — Eylem valfi, scheduler ve rutin
 
 - [ ] Typed Meta writer allowlist; raw Graph write yok.
+  - [x] Transport-bağımsız `meta-write-spec/1.0.0`, immutable approval-required planı yalnız
+    typed status/budget adaylarına çevirir; raw Graph path/field, K0/K1/K4 ve write authority
+    taşımaz. Gerçek executor/read-after-write/rollback hâlâ açık kalır.
+  - [x] `action-execution-admission/1.0.0`, approved unit + tüketilmemiş approval evidence,
+    dependency closure freshness'i ve ayrı action-bound human-presence kanıtını birlikte
+    doğrular. Çıktı yalnız disabled executor adaydır; execution/Meta-write/network capability
+    yapısal olarak false kalır.
+    Admission, ayrıca aynı workspace/account scope'taki `meta-write-eligibility` snapshot ve
+    result hash'ini immutable admission hash'ine bağlar; blocked eligibility admission oluşturmaz.
+  - [x] Server-private, append-only admission ledger; unit/approve karar/grant zincirini
+    tenant içinde yeniden bağlar, typed spec hash'ini doğrular ve yalnız `admitted` olayı yazar.
+    İdempotent kayıt vardır; dispatch, Meta transportu ve write authority yoktur. Ledger yazmadan
+    hemen önce current persisted Meta mirror'dan account/target/parent/budget-owner ve latest snapshot
+    yeniden çözülür; frozen eligibility snapshot/result hash ile birebir eşleşmeyen aday fail-closed'dur.
+  - [x] Ayrı `admit_execution` insan-varlığı seremonisi yalnız owner/admin'in tek-kullanımlık,
+    action-unit bağlı proof'unu tüketir. Server-owned source lifecycle/freshness/plan/eligibility
+    yükler; browser bu kanıtları veya execution evidence'i enjekte edemez. Sonuç yalnız disabled
+    admission ledger çağrısıdır; HTTP/Meta executor hâlâ yoktur.
+  - [x] Server-private Drizzle admission source, immutable queue/approval lifecycle'inden plan ve
+    freshness'i, active tenant Meta mirror'dan da same-account hierarchy/status/budget-owner/latest
+    snapshot kanıtını yükler. Private runtime bu source'u disabled sink'e bağlar; source veya mirror
+    eksik/tamper edilmişse fail-closed'dur. HTTP/cron/Meta transport yüzeyi eklenmemiştir.
 - [ ] Campaign/adset/ad pause/activate eligibility ve parent/effective-status matrisi.
+  - [x] `meta-write-eligibility/1.0.0`, frozen source snapshot üstünde campaign/adset/ad target
+    eşleşmesini, pause için effective ACTIVE'i ve activate için bütün parent effective ACTIVE
+    zincirini fail-closed doğrular. Unknown/inactive parent veya stale target adaylığı bloklar.
 - [ ] Campaign/adset budget owner write; ad-level budget negatif testi.
+  - [x] Aynı matriste budget yalnız campaign/adset'in exact aktif budget owner olması halinde
+    separate-human-execution adayına dönüşür; ad-level veya foreign/missing owner bloklanır.
 - [ ] K0–K4 valve, account allowlist, caps, kill switch ve çift anahtar.
   - [x] Saf K0–K4 typed action sınıflandırması; workspace default `approval_only`, scoped
     en-dar resolver, expiry/conflict/child-widening/kill-switch ve budget/protection guard'ları.
 - [x] Approval state machine, expiry, stale-plan ve separation of duties.
 - [ ] Idempotent execute, Meta error taxonomy, read-after-write ve rollback.
+  - [x] `action-execution-verification/1.0.0` frozen admission+plan'dan expected target value ve
+    yalnız yeni approved action'a dönüşebilecek prior-value rollback adayını üretir. Transport kabulü,
+    read-after-write eşleşmesi ve Meta review/delivery ayrı tutulur; retryable hata/read eksikliği
+    `parked`, değer farkı `failed`, rollback ise otomatik değil yeni insan onayı gerektirir.
+  - [ ] Gerçek typed Meta transport, idempotent dispatch/event append, live read-after-write ve
+    yeni rollback action lifecycle'i; açık insan onayı olmadan eklenmez.
 - [ ] Hourly/daily/weekly/monthly/after-sync scheduler; DST/misfire/idempotency.
   - [x] Decision Room daily/weekly timezone+DST, skip/run_once catch-up ve duplicate-slot çekirdeği.
   - [x] Immutable schedule revision, exact hierarchy binding ve kalıcı lease/run store.
@@ -519,8 +729,64 @@
 
 ## A14 — Kontrol merkezi ve rollout
 
+- [ ] Merkezi operatör akışı: kampanya bağlamı → dinamik brief/şablon → öneri → insan onayı → ayrı
+  uygulama durumu. Alt-katman işleri yalnız bu akışın güvenlik veya veri bütünlüğü blocker'ı olduğunda
+  öncelik alır.
+  - [x] Çalışma kitabındaki lead/üst-huni, kesinti, randevu/operasyon kapasitesi ve WhatsApp/form ayrımını
+    taşıyan `interactive-campaign-template/1.0.0` karar sözleşmesi; campaign create/publish/approve/
+    execute/Meta-write yetkileri kapalı.
+  - [ ] Şablonları mevcut kampanya bağlamı ve kullanıcı girdisiyle Dashboard'da etkileşimli brief/
+    öneri yüzeyine bağlama; eksik bağlam `needs_input`, kesinti `blocked` kalır.
+    - [x] Seçili dashboard demo campaign'i, brief başlangıç inputunu deterministik belirler; kullanıcı
+      geçici değişikliği "Bağlamı geri yükle" ile geri alabilir. Persisted current context bağlama
+      hâlâ açık olduğundan bu yalnız demo/read-only bağdır.
+    - [x] Aynı brief'ten deterministik salt-okunur öneri: sınıflandırma/kesinti/eksik bilgi için önce
+      insanın çözmesi gereken adımı, kapalı bağlamda kampanya şeridi incelemesini gösterir. ActionUnit,
+      approval veya Meta write üretmez.
+    - [x] Opaque public campaign ref → latest-valid frozen context için session-bound read boundary;
+      public redaction, invalidation fail-closed ve zero-write HTTP contract'i. Dashboard'ın gerçek
+      persisted campaign ref ile brief/timeline bağlaması açık.
+    - [x] Brief paneli yalnız doğrulanmış persisted public ref olduğunda context read yolunu kullanır;
+      demo bağlamı explicit unbound kalır ve gerçek kampanya verisi taklit etmez.
+    - [x] Session-bound `GET /api/campaign-contexts`, en güncel geçerli frozen campaign contextleri
+      yalnız opaque alias, güvenli objective/capturedAt özeti ve `frozen_valid` durumuyla listeler.
+      Dashboard seçimi demo seçiminden ayrıdır; source yoksa açıkça unavailable/empty kalır.
+    - [x] Context public ref'i ile Approval Queue'nun tenant-bound `entity_…` campaign alias'ı
+      bilinçli olarak ayrıdır: server private campaign UUID'den queue alias'ını üretir; brief yalnız
+      doğrulanmış alias'ı inbox'a aktarır ve campaign değişiminde eski scope'u temizler. Hedefli testler
+      ve tam kalite kapıları geçti; gerçek persisted context bulunmadığından canlı semantic birleşim kabulü
+      bu işaretle tamamlanmış sayılmaz.
+    - [x] Brief'ten draft-only normalizasyon alanına açık kullanıcı geçişi: yalnız dashboard
+      navigasyonu yapar; campaign/brief state'i ya da policy/source ref'i aktarmadan Guidance
+      zinciri ve structured niyetin ayrı insan doğrulamasını korur.
+    - [x] Brief koşulundan türetilen düzenlenebilir draft şablon tercihi (`delivery_recovery`,
+      `lead_quality` veya `new_campaign_plan`) normalizasyon alanında açıkça gösterilir; kapsam,
+      source/policy ref'i ve hiçbir write yetkisi aktarılmaz.
+  - [ ] Brief, öneri, approval ve execution-safety durumunu aynı salt-okunur zaman çizelgesinde gösterme.
+    - [x] Exact, tenant-bound keyset ActionUnit filtresi: opaque `entityRef` veya onunla aynı istekte
+      kullanılamayan `campaignRef` database içinde yeniden çözülür. Campaign filtresi direct campaign ile
+      ad-set/ad üst-campaign hiyerarşisini kapsar; public source sonucu filtreyle eşleşmezse fail-closed
+      kalır. Dashboard timeline bağlama açık.
+    - [x] Doğrulanmış frozen-context alias'ı açıldığında dört sıralı read-only karar zaman çizelgesi:
+      persisted context → ephemeral brief/öneri → exact persisted approval listesi → execute/Meta-write
+      kapalı. Alias, response şeması veya read-only authority bitlerinden biri değişirse approval aşaması
+      fail-closed `unavailable` kalır; demo/unbound bağlamda timeline render edilmez.
+
 - [ ] Bugün/portfolio hiyerarşi ve internal/Meta filtreler.
+  - [x] Dashboard'da Meta objective ve iç kategori ile daraltılan salt-okunur demo portföy görünümü;
+    seçili kampanya/brief filtre sonucu ile tutarlı kalır. Kaynak açıkça unbound deterministik demo
+    snapshot'tır; persisted account-group/asset graph, action ve Meta write iddiası yoktur.
+  - [x] Filtre sonrası seçili demo kampanyası için progressive portföy → hesap → campaign → ad set → ad
+    → creative/post drill-down. Bu yalnız navigasyon örneğidir; frozen context, gerçek Meta asset graph
+    veya approval/write yetkisi yerine geçmez.
+  - [x] Güvenli yerel oturum ve doğrulanmış `meta/read-mirror` hazır olduğunda Kampanyalar yüzeyi,
+    demo yerine canonical account → campaign → ad set → ad → creative/post hiyerarşisini salt-okunur
+    gösterir. Kaynak/oturum yoksa demo açık fallback kalır; bu yüzey KPI, policy, action veya Meta
+    write yetkisi üretmez.
 - [ ] Account-group switcher, multi-account connection health ve Page/Instagram asset graph.
+  - [x] Güncel read-only Meta inventory içindeki hesaplar için yerel, salt-okunur account focus seçimi;
+    silinmiş/eski seçim güncel snapshotta ilk hesaba fail-closed düşer. Account-group veya Page/Instagram
+    ilişki verisi kaynakta olmadığından bu seçim onları taklit etmez.
 - [ ] Kategori/talimat stüdyosu ve raw/normalized/version/conflict görünümü.
   - [x] Guidance Studio eksik/expired dashboard capability'yi DB arızasından ayırır; 401
     `local_session_required` ile Decision Room tek-kullanımlık bootstrap yüzeyine yönlendirir.
@@ -531,14 +797,29 @@
   - [x] Gerçek proposal ledger salt-okunur list/detail, before-after, mapping/suppression ve
     trace summary; ayrı `budget_lab:read` local-session scope'u.
   - [ ] Kural/target edit akışı.
+  - [x] Persistent Slice Rule Workspace draft: exact pazar/hizmet/aile ve opsiyonel
+    geo/audience/platform scope, recommendation-only revision/hash/audit/RLS; policy/action/Meta
+    write bağlantısı kapalı.
+  - [x] Kaydedilmiş Slice Rule draft'ından frozen-context kanıtlı salt-okunur Budget Lab impact/dry-run
+    preview; stale/ambiguous/pazar uyuşmazlığı fail-closed, persistence/action/Meta write sıfır.
+  - [x] Tutarlı Slice Scope adayları için server-derived frozen-context ve exact Budget Impact hazırlık
+    görünümü. İstemci kapsam/kimlik göndermez; context yoksa veya scope eşleşmezse uygunluk kapalı
+    görünür. L2/L3/temporal/compose sonucu uydurulmaz ve hiçbir policy/action/Meta write çağrılmaz.
   - [x] Explicit dry-run compose ve append-only draft persistence; aynı transaction'da audit,
     public-safe çıktı ve approval/execute/Meta-write yetkisi `false`.
 - [ ] Approval inbox, automation run, verify/rollback ve tek timeline.
   - [x] Restart-durable awaiting-approval veri modeli ve public-safe read contract.
+  - [x] Slice Rule budget allocation materializer'ından gelen ActionUnit, yalnız aynı transaction'da
+    server'ın çözdüğü persisted frozen context hash'iyle Queue'ya bağlanır. İstemci hash veremez;
+    Queue exact immutable context eşleşmesini yeniden doğrular. Bu approval-only kabulde Meta write
+    ve execution sıfır, human-presence browser seremonisi ayrıdır.
   - [x] Tenant-bound Drizzle read adapter, ayrı `approval_queue:read` kapsamlı GET API ve
     fixture'sız dashboard list/detail inbox bağlantısı.
   - [x] İnsan-varlığı kanıtlı, tek-ActionUnit approve/reject/request-changes mutation katmanı;
     macOS sistem diyaloğu, kısa ömürlü tek-kullanımlık proof ve atomik append-only karar kaydı.
+  - [x] Approval Queue'da salt-okunur execution-safety zinciri: onay kaydı, mirror recheck, ayrı
+    seremoninin zorunluluğu, kapalı transport ve verify/rollback contract'i; execute/rollback/Meta
+    çağrısı başlatan kontrol yok. Masaüstü ve 390px tarayıcı görünümü doğrulandı.
 - [ ] Mevcut creative library + context/performance karşılaştırması.
 - [ ] Yayındaki reklam metni/dynamic variant/CTA/destination/post kaynağı explorer'ı.
 - [ ] Instagram/Page post seçici, PromotionTemplate/AudiencePreset ve existing-post guided flow.
@@ -633,6 +914,8 @@
 - [x] Operating Dashboard + Orchestrator çift-yüzey bilgi mimarisi ve etkileşimli demo kabuğu.
 - [ ] Operating Dashboard gerçek backend state'iyle responsive/browser E2E.
 - [ ] Orchestrator skill/context/autonomy/handoff çalışma alanı ve dashboard↔CLI E2E.
+  - [x] Workspace/user-bound conversation/turn/message ledger, sayfa-guide snapshotı ve local
+    `codex exec --json`/`resume --json` read-only transportu; manual fallback korunur.
 
 ## Ana plan kapanışı
 

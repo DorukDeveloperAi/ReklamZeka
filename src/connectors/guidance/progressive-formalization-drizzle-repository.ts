@@ -23,6 +23,8 @@ import {
   type ProgressiveFormalizationTransitionInput,
 } from "@/domain/guidance/progressive-formalization";
 import { assertStrictInstructionPolicyArtifact } from "@/domain/policies/instruction-policy-dsl";
+import type { AuthoritativeG3EvidenceBridge } from
+  "@/connectors/guidance/authoritative-g3-evidence-bridge-drizzle-resolver";
 
 type Database = NodePgDatabase<typeof schema>;
 type Executor = Pick<Database, "execute">;
@@ -116,7 +118,8 @@ function reviewedGuidanceManifest(set: Row | undefined, orderedCardRefs: readonl
 }
 
 async function persistedPreview(database: Executor, input: Readonly<{ workspaceId: string; workspaceRef: string;
-  formalizationRef: string; target: "G3" | "G4"; policyRef: string | null }>): Promise<ProgressiveFormalizationPreview> {
+  formalizationRef: string; target: "G3" | "G4"; policyRef: string | null }>,
+  evidenceBridge?: AuthoritativeG3EvidenceBridge): Promise<ProgressiveFormalizationPreview> {
   const state = await load(database, input.workspaceId); const flow = findFlow(state, input.formalizationRef);
   if (input.target === "G3") {
     if (flow.level !== "G2" || input.policyRef === null) throw new ProgressiveFormalizationStudioError("invalid_transition");
@@ -179,27 +182,61 @@ async function persistedPreview(database: Executor, input: Readonly<{ workspaceI
       ...strictPolicy.scope.internalCategoryRefs, ...strictPolicy.scope.entities.map((entity) => entity.ref),
       ...strictPolicy.scope.topicRefs,
     ].sort();
-    const unresolved = ["dependency_production_policy_authority_catalog"];
+    const unresolved = ["dependency_candidate_review_evidence"];
+    const bridge = evidenceBridge === undefined || !setMatchesReview ? null : await evidenceBridge.resolve(database as never, {
+      workspaceId: input.workspaceId, formalizationRef: input.formalizationRef, g2RevisionHash: flow.revisions[2]!.revisionHash,
+      policy: strictPolicy, guidanceSetRef,
+      guidanceSetVersion: Number(currentSet?.version), guidanceSetHash: String(currentSet?.record_hash),
+    });
+    const replayEvaluated = bridge?.evaluatedRevisionRefs ?? evaluatedRevisionRefs;
+    const replayOutcomes = bridge?.outcomeEvidenceRefs ?? [];
+    const bridgeReplayStatus = bridge === null ? replayStatus
+      : bridge.historicalRunsEvaluated === 0 ? "no_history" as const
+        : replayOutcomes.length > 0 ? "complete" as const : "incomplete" as const;
+    const bridgeUnresolved = bridge === null ? unresolved : [
+      ...(bridge.candidateReviewEvidenceBound ? [] : ["dependency_candidate_review_evidence"]),
+      ...(bridge.exactImpact ? [] : ["dependency_exact_instruction_policy_impact"]),
+      ...(bridge.candidateTierDecisionBound ? [] : ["dependency_candidate_authority_tier_decision"]),
+    ].sort();
+    const impact = bridge?.impact;
+    const affectedEntityCount = impact === null || impact === undefined ? 0
+      : impact.historicalImpact.directAppliedContexts + impact.historicalImpact.directSuppressedContexts
+        + impact.historicalImpact.directParkedContexts + impact.historicalImpact.currentAnalysisTemplates
+        + impact.historicalImpact.runAssets;
+    const affectedBudgetCount = impact?.historicalImpact.budgetProposals ?? 0;
+    const affectedAutomationCount = impact === null || impact === undefined ? 0
+      : impact.exactBlockers.enabledSchedules + impact.exactBlockers.nonTerminalActionUnits
+        + impact.historicalImpact.terminalActionUnits;
     const normalizedDraft = createNormalizedPolicyDraft({ schemaVersion: NORMALIZED_POLICY_DRAFT_VERSION,
       workspaceRef: input.workspaceRef, formalizationRef: input.formalizationRef, guidanceSetRef, strictPolicy,
       assumptions: [], questions: [], semanticDiff: { status: exactMatch ? "resolved" : "ambiguous",
         items: semanticItems, diffHash: digest(semanticItems) },
-      historicalReplay: { status: replayStatus, evaluatedRevisionRefs, changedOutcomeRefs: [], unknownOutcomeRefs,
-        replayHash: digest({ guidanceSetRef, evaluatedRevisionRefs, unknownOutcomeRefs }) },
-      conflictPreview: { status: "unknown", conflictRefs: [],
-        previewHash: digest({ policyRef: strictPolicy.policyRef, productionAuthoritySourceBound: false }) },
-      impactPreview: { status: "partial", affectedScopeRefs, affectedEntityCount: 0,
-        affectedPolicyCount: policyCount, affectedBudgetCount: 0, affectedAutomationCount: 0,
-        unresolvedDependencyRefs: unresolved, previewHash: digest({ affectedScopeRefs, policyCount, unresolved }) } });
-    const blockers: FormalizationBlocker[] = ["production_policy_authority_catalog_unavailable",
-      "conflict_preview_unknown", "impact_preview_incomplete"];
+      historicalReplay: { status: bridgeReplayStatus, evaluatedRevisionRefs: replayEvaluated,
+        changedOutcomeRefs: replayOutcomes, unknownOutcomeRefs: bridgeReplayStatus === "complete" ? [] : unknownOutcomeRefs,
+        replayHash: digest({ guidanceSetRef, evaluatedRevisionRefs: replayEvaluated, changedOutcomeRefs: replayOutcomes,
+          historicalContextHashes: bridge?.historicalContextHashes ?? [],
+          unknownOutcomeRefs: bridgeReplayStatus === "complete" ? [] : unknownOutcomeRefs }) },
+      conflictPreview: { status: bridge?.candidateReviewEvidenceBound === true ? "clear" : "unknown",
+        conflictRefs: bridge?.candidateConflictRefs ?? [],
+        previewHash: digest({ policyRef: strictPolicy.policyRef, candidateReviewEvidenceBound: bridge?.candidateReviewEvidenceBound === true,
+          candidateTierDecisionBound: bridge?.candidateTierDecisionBound === true, candidateConflictRefs: bridge?.candidateConflictRefs ?? [] }) },
+      impactPreview: { status: bridge?.exactImpact === true ? "complete" : "partial", affectedScopeRefs, affectedEntityCount,
+        affectedPolicyCount: policyCount, affectedBudgetCount, affectedAutomationCount,
+        unresolvedDependencyRefs: bridgeUnresolved, previewHash: digest({ affectedScopeRefs, policyCount, affectedEntityCount,
+          affectedBudgetCount, affectedAutomationCount, impactHash: impact?.impactHash ?? null, unresolved: bridgeUnresolved }) } });
+    const blockers: FormalizationBlocker[] = [
+      ...(bridge?.candidateReviewEvidenceBound === true ? [] : ["candidate_review_evidence_unavailable" as const]),
+      ...(bridge === null || bridge.candidateTierDecisionBound === true ? [] : ["candidate_authority_tier_decision_binding_unavailable" as const]),
+      ...(bridge?.exactImpact === true ? [] : ["impact_preview_incomplete" as const]),
+      ...(bridge?.candidateReviewEvidenceBound === true && bridge.candidateTierDecisionBound ? [] : ["conflict_preview_unknown" as const]),
+    ];
     if (!setMatchesReview) blockers.push("reviewed_guidance_set_not_found");
     if (!currentCardsPublished) blockers.push("guidance_card_not_published");
     if (!exactMatch) blockers.push("semantic_diff_unresolved");
-    if (matchingRuns.length > 0) blockers.push("historical_replay_incomplete");
+    if (bridgeReplayStatus !== "complete") blockers.push("historical_replay_incomplete");
     return basePreview({ target: "G3", formalizationRef: input.formalizationRef, headHash: flow.headHash,
-      blockers, normalizedDraft, g4Payload: null, historicalRunsEvaluated: matchingRuns.length,
-      productionAuthoritySourceBound: false, persistedGuidance: setMatchesReview && currentCardsPublished,
+      blockers, normalizedDraft, g4Payload: null, historicalRunsEvaluated: bridge?.historicalRunsEvaluated ?? matchingRuns.length,
+      productionAuthoritySourceBound: bridge?.sourceBound === true, persistedGuidance: setMatchesReview && currentCardsPublished,
       persistedPolicy: strictPolicy.status === "draft" });
   }
   if (flow.level !== "G3") throw new ProgressiveFormalizationStudioError("invalid_transition");
@@ -241,6 +278,11 @@ export type ProgressiveFormalizationPreviewResolver = (database: Executor, input
   workspaceId: string; workspaceRef: string; formalizationRef: string; target: "G3" | "G4";
   policyRef: string | null }>) => Promise<ProgressiveFormalizationPreview>;
 
+export function createPersistedProgressiveFormalizationPreviewResolver(
+  evidenceBridge?: AuthoritativeG3EvidenceBridge): ProgressiveFormalizationPreviewResolver {
+  return (database, input) => persistedPreview(database, input, evidenceBridge);
+}
+
 function appendInput(input: Parameters<ProgressiveFormalizationRepository["mutate"]>[0], state: ProgressiveFormalizationState,
   payload: ProgressiveFormalizationTransitionInput["payload"], formalizationRef: string): ProgressiveFormalizationTransitionInput {
   return { schemaVersion: PROGRESSIVE_FORMALIZATION_VERSION, transition: input.command.operation,
@@ -250,7 +292,7 @@ function appendInput(input: Parameters<ProgressiveFormalizationRepository["mutat
 
 export class DrizzleProgressiveFormalizationRepository implements ProgressiveFormalizationRepository {
   constructor(private readonly database: Database,
-    private readonly resolvePreview: ProgressiveFormalizationPreviewResolver = persistedPreview) {}
+    private readonly resolvePreview: ProgressiveFormalizationPreviewResolver = createPersistedProgressiveFormalizationPreviewResolver()) {}
 
   async inspect(workspaceId: string) {
     if (!UUID.test(workspaceId)) throw new ProgressiveFormalizationStudioError("invalid_input");

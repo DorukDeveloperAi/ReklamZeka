@@ -13,10 +13,11 @@ describe("InstructionPolicyImpactService", () => {
     const repository: InstructionPolicyImpactRepository = { preview: vi.fn(async () => ({
       impactHash: "a".repeat(64), operation: "archive", registryHash: "b".repeat(64),
       target: { policyRef: "policy_health", policyVersion: 1, policyHash: "c".repeat(64), status: "published" },
-      exactBlockers: { currentInboundExceptions: 0, enabledSchedules: 0, nonTerminalActionUnits: 0 },
+      exactBlockers: { currentInboundExceptions: 0, enabledSchedules: 0, nonTerminalActionUnits: 0, activeManualLocks: 0 },
       historicalImpact: { historicalInboundExceptions: 0, directAppliedContexts: 0, directSuppressedContexts: 0,
         directParkedContexts: 0, alreadyInvalidatedContexts: 0, budgetProposals: 0, currentAnalysisTemplates: 0,
-        supersededAnalysisTemplates: 0, runAssets: 0, decisionLedgerRecords: 0, terminalActionUnits: 0 },
+        supersededAnalysisTemplates: 0, runAssets: 0, decisionLedgerRecords: 0, terminalActionUnits: 0,
+        invalidatedTerminalActionUnits: 0 },
       invalidationPlan: { registryComponents: 0, contextsNeedingInvalidation: 0 }, coverage: { complete: false,
         manifestVersion: "instruction-policy-dependency-manifest/1.0.0", exactRelational: [], exactContractRef: [],
         partialOrUnknown: ["manual_policy_locks"], nonAuthoritativeNotes: ["action_context_hash_index_explain_not_verified"],

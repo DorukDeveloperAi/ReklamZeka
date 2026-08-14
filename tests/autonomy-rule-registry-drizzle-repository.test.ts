@@ -116,6 +116,30 @@ describe("Drizzle Autonomy Rule Registry", () => {
     }
   });
 
+  it("requires an exact current active account-group head for account-group scoped drafts", async () => {
+    const artifact = draft({ scope: { level: "account_group", ref: "account_group_international_ftr" } });
+    const missing = database([
+      { rows: [{ id: workspaceId, lifecycle_state: "active" }] },
+      { rows: [] },
+    ]);
+    await expect(new DrizzleAutonomyRuleRegistryRepository(missing as never, workspaceId, workspaceRef).append(artifact))
+      .rejects.toEqual(expect.objectContaining({ code: "scope_unavailable" }));
+
+    const groupId = "33333333-3333-4333-a333-333333333333";
+    const accepted = database([
+      { rows: [{ id: workspaceId, lifecycle_state: "active" }] },
+      { rows: [{ id: groupId }] },
+      { rows: [] }, { rows: [] },
+      { rows: [{ canonical_hash: artifact.canonicalHash }] },
+    ]);
+    await expect(new DrizzleAutonomyRuleRegistryRepository(accepted as never, workspaceId, workspaceRef).append(artifact))
+      .resolves.toMatchObject({ outcome: "inserted" });
+    const groupScopeQuery = new PgDialect().sqlToQuery(accepted.execute.mock.calls[1]![0]).sql;
+    expect(groupScopeQuery).toMatch(/account_groups group_head/i);
+    expect(groupScopeQuery).toMatch(/revision\.status = 'active'/i);
+    expect(groupScopeQuery).toContain("for share");
+  });
+
   it("resolves only public action-valve rules and strips publication/guidance metadata", async () => {
     const artifact = published(draft({ sourceGuidanceRefs: ["guidance_safety"] }));
     const db = database([
@@ -129,6 +153,28 @@ describe("Drizzle Autonomy Rule Registry", () => {
     }]);
     expect(JSON.stringify(result)).not.toMatch(/guidance|publishedBy|decision|reason|canonicalHash/);
     expect(new PgDialect().sqlToQuery(db.execute.mock.calls[0]![0]).sql).toContain("for share");
+  });
+
+  it("excludes a group-scoped published rule when its current active group head is absent", async () => {
+    const artifact = published(draft({ scope: { level: "account_group", ref: "account_group_international_ftr" } }));
+    const activeGroup = database([
+      { rows: [{ id: workspaceId, lifecycle_state: "active" }] },
+      { rows: [{ artifact_payload: artifact }] },
+      { rows: [{ group_ref: "account_group_international_ftr" }] },
+    ]);
+    await expect(new DrizzleAutonomyRuleRegistryRepository(activeGroup as never, workspaceId, workspaceRef).resolve())
+      .resolves.toHaveLength(1);
+    const activeScopeQuery = new PgDialect().sqlToQuery(activeGroup.execute.mock.calls[2]![0]).sql;
+    expect(activeScopeQuery).toMatch(/group_ref = any/i);
+    expect(activeScopeQuery).toMatch(/revision\.status = 'active'/i);
+
+    const archived = database([
+      { rows: [{ id: workspaceId, lifecycle_state: "active" }] },
+      { rows: [{ artifact_payload: artifact }] },
+      { rows: [] },
+    ]);
+    await expect(new DrizzleAutonomyRuleRegistryRepository(archived as never, workspaceId, workspaceRef).resolve())
+      .resolves.toEqual([]);
   });
 
   it("reads the latest artifact with limit one even when a rule has multiple revisions", async () => {

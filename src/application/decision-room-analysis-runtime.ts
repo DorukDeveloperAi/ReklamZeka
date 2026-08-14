@@ -9,12 +9,17 @@ import {
 } from "@/analyses/finding-calculators";
 import {
   buildFindingObservationPlan,
-  materializeFindingObservations,
-  type FindingObservationReadPort,
 } from "@/analyses/finding-observation-builder";
+import type { FindingObservation } from "@/analyses/finding-calculators";
 import type { FindingHierarchyNode, FindingMetricBundle } from "@/analyses/finding-engine";
 import type { ResolvedAnalysisTimeframe } from "@/analyses/timeframe-resolver";
 import { validateResolvedAnalysisTimeframe } from "@/analyses/timeframe-resolver";
+import type { DeterministicFeatureSnapshot } from "@/analyses/deterministic-feature-snapshot";
+import type { DeterministicWindowSnapshot } from "@/analyses/deterministic-window-snapshot";
+import {
+  calculateFrozenL2Contribution,
+  type FrozenContributionDiagnostic,
+} from "@/analyses/frozen-l2-advisory-diagnostics";
 import { runDecisionRoom, type DecisionRoomDraftPort } from "@/application/decision-room";
 import type { DecisionRoomAnalysisPort } from "@/domain/decisions/executor";
 import {
@@ -95,6 +100,39 @@ export type DecisionRoomAnalysisRuntimeAssetPort = Readonly<{
   }>): Promise<DecisionRoomAnalysisRuntimeAssets>;
 }>;
 
+/**
+ * Private evidence reader used before a run can consume its frozen context.
+ * It deliberately reads the exact L2/L3 refs already frozen in that context;
+ * it has no L1/Meta transport and never selects a replacement snapshot.
+ */
+export type DecisionRoomFrozenEvidencePort = Readonly<{
+  loadFeature(input: Readonly<{ workspaceId: string; featureRef: string }>): Promise<Readonly<{
+    state: "ready" | "stale"; feature: DeterministicFeatureSnapshot;
+  }>>;
+  loadWindow(input: Readonly<{ workspaceId: string; windowRef: string }>): Promise<Readonly<{
+    state: "ready" | "stale"; window: DeterministicWindowSnapshot;
+  }>>;
+}>;
+
+/**
+ * Bounded advisory-only diagnostics derived from the exact L2 set already
+ * authenticated for this run. They are deliberately not ledger/action input:
+ * the existing ledger contract does not yet persist a diagnostic artifact.
+ */
+export type FrozenL2RuntimeAdvisoryDiagnostics = Readonly<{
+  contribution: FrozenContributionDiagnostic;
+  creativeFatigue: Readonly<{
+    state: "not_supported";
+    reason: "creative_level_not_persisted";
+    capabilities: Readonly<{ canAuthorizeAction: false; canExecuteWrite: false; canWriteMeta: false }>;
+  }>;
+  configuration: Readonly<{
+    state: "not_supported";
+    reason: "complete_config_not_bound" | "config_evidence_not_bound";
+    capabilities: Readonly<{ canAuthorizeAction: false; canExecuteWrite: false; canWriteMeta: false }>;
+  }>;
+}>;
+
 export class DecisionRoomAnalysisRuntimeError extends Error {
   constructor(readonly code:
     | "invalid_input"
@@ -110,8 +148,7 @@ export class DecisionRoomAnalysisRuntimeError extends Error {
 const MAX_CHECKS = 100;
 const REF = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/;
 const PASSES: readonly AnalysisPassKey[] = [
-  "data_health", "account_objective", "category", "campaign", "ad_set", "ad", "creative",
-  "budget_pacing", "history", "decision",
+  "general", "group_account", "objective", "internal_category", "entity", "topic", "history",
 ];
 
 function compare(left: string, right: string): number {
@@ -175,6 +212,12 @@ export function validateDecisionRoomAnalysisRuntimeAssets(
     || !Array.isArray(assets.checks) || assets.checks.length < 1 || assets.checks.length > MAX_CHECKS) {
     throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
   }
+  if (assets.context.data.trustStatus !== "ready" || assets.context.data.blockers.length !== 0
+    || assets.context.data.featureRefs.length === 0 || assets.context.data.windowRefs.length === 0
+    || assets.context.data.featureRefs.some((featureRef) => !/^feature_[a-f0-9]{24}$/.test(featureRef))
+    || assets.context.data.windowRefs.some((windowRef) => !/^window_[a-f0-9]{24}$/.test(windowRef))) {
+    throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
+  }
   if (assets.requestedPasses.length < 1 || new Set(assets.requestedPasses).size !== assets.requestedPasses.length
     || assets.requestedPasses.some((pass) => !PASSES.includes(pass))) {
     throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
@@ -213,7 +256,7 @@ export function validateDecisionRoomAnalysisRuntimeAssets(
       || !Array.isArray(check.expectedSnapshotRefs) || check.expectedSnapshotRefs.length < 1
       || new Set(check.expectedSnapshotRefs).size !== check.expectedSnapshotRefs.length
       || check.expectedSnapshotRefs.some((snapshot: string) => !REF.test(snapshot)
-        || !assets.context.data.featureRefs.includes(snapshot))) {
+        || !assets.context.data.snapshotRefs.includes(snapshot))) {
       throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
     }
     identities.add(identity);
@@ -286,6 +329,60 @@ function mergeMetricBundles(
   }));
 }
 
+async function revalidateFrozenEvidence(
+  context: EffectiveCampaignContext,
+  evidence: DecisionRoomFrozenEvidencePort,
+): Promise<readonly DeterministicFeatureSnapshot[]> {
+  const features = await Promise.all(context.data.featureRefs.map((featureRef) => evidence.loadFeature({ workspaceId: context.workspaceId, featureRef })));
+  const windows = await Promise.all(context.data.windowRefs.map((windowRef) => evidence.loadWindow({ workspaceId: context.workspaceId, windowRef })));
+  if (features.some((entry) => entry.state !== "ready" || entry.feature.scope.workspaceId !== context.workspaceId)
+    || windows.some((entry) => entry.state !== "ready" || entry.window.scope.workspaceId !== context.workspaceId)) {
+    throw new DecisionRoomAnalysisRuntimeError("evidence_not_frozen");
+  }
+  const frozenFeatures = new Set(context.data.featureRefs);
+  const covered = new Set<string>();
+  for (const entry of windows) {
+    if (entry.window.featureRefs.some((featureRef) => !frozenFeatures.has(featureRef))) {
+      throw new DecisionRoomAnalysisRuntimeError("evidence_not_frozen");
+    }
+    entry.window.featureRefs.forEach((featureRef) => covered.add(featureRef));
+  }
+  if (covered.size !== frozenFeatures.size || [...frozenFeatures].some((featureRef) => !covered.has(featureRef))) {
+    throw new DecisionRoomAnalysisRuntimeError("evidence_not_frozen");
+  }
+  return Object.freeze(features.map((entry) => entry.feature));
+}
+
+function observationFromFrozenFeature(feature: DeterministicFeatureSnapshot): FindingObservation {
+  return Object.freeze({
+    observationRef: feature.observationRef, role: feature.role, startDate: feature.startDate, endDate: feature.endDate,
+    timezone: feature.timezone, sampleSize: feature.sampleSize, settled: feature.settled,
+    qualityStatus: feature.qualityStatus, qualityReasonCodes: feature.qualityReasonCodes,
+    metricResult: feature.metricResult, snapshotRefs: feature.sourceSnapshotRefs,
+  });
+}
+
+/**
+ * Does not substitute entity peers or current config during replay. L2 currently
+ * persists campaign/ad-set/ad only, and the frozen config projection has no
+ * billing/destination pair required by creative/config diagnostics.
+ */
+export function deriveFrozenL2RuntimeAdvisoryDiagnostics(
+  context: EffectiveCampaignContext,
+  features: readonly DeterministicFeatureSnapshot[],
+): FrozenL2RuntimeAdvisoryDiagnostics {
+  const capability = Object.freeze({ canAuthorizeAction: false, canExecuteWrite: false, canWriteMeta: false });
+  return Object.freeze({
+    contribution: calculateFrozenL2Contribution({ metric: "spendMinor", features }),
+    creativeFatigue: Object.freeze({ state: "not_supported", reason: "creative_level_not_persisted", capabilities: capability }),
+    configuration: Object.freeze({
+      state: "not_supported",
+      reason: context.metaAnalysisConfigEvidence === undefined ? "config_evidence_not_bound" : "complete_config_not_bound",
+      capabilities: capability,
+    }),
+  });
+}
+
 /**
  * Deterministic AnalysisPort used by both manual executor calls and schedule ticks.
  * It performs no model, Meta network/write, authority or external notification call.
@@ -293,7 +390,7 @@ function mergeMetricBundles(
 export class DecisionRoomDeterministicAnalysisRuntime implements DecisionRoomAnalysisPort {
   constructor(
     private readonly assets: DecisionRoomAnalysisRuntimeAssetPort,
-    private readonly observations: FindingObservationReadPort,
+    private readonly frozenEvidence: DecisionRoomFrozenEvidencePort,
     private readonly drafts: DecisionRoomDraftPort,
   ) {}
 
@@ -320,6 +417,17 @@ export class DecisionRoomDeterministicAnalysisRuntime implements DecisionRoomAna
       throw new DecisionRoomAnalysisRuntimeError("asset_not_bound");
     }
     validateDecisionRoomAnalysisRuntimeAssets(input, prepared);
+    let frozenFeatures: readonly DeterministicFeatureSnapshot[];
+    try {
+      frozenFeatures = await revalidateFrozenEvidence(prepared.context, this.frozenEvidence);
+    } catch (error) {
+      if (error instanceof DecisionRoomAnalysisRuntimeError) throw error;
+      throw new DecisionRoomAnalysisRuntimeError("evidence_not_frozen");
+    }
+    // Evaluate bounded diagnostics only against the just re-authenticated set.
+    // Their current contract is advisory and intentionally cannot alter room status,
+    // cadence, finding eligibility, ledger content, or executor return shape.
+    deriveFrozenL2RuntimeAdvisoryDiagnostics(prepared.context, frozenFeatures);
 
     const evaluated = [] as Array<Readonly<{
       check: DecisionRoomAnalysisRuntimeCheck;
@@ -327,18 +435,12 @@ export class DecisionRoomDeterministicAnalysisRuntime implements DecisionRoomAna
       metricResults: readonly MetaMetricAggregationResult[];
     }>>;
     for (const check of prepared.checks) {
-      const observations = await materializeFindingObservations({
-        workspaceId: prepared.context.workspaceId,
-        metaConnectionId: check.metaConnectionId,
-        adAccountId: check.adAccountId,
-        entityLevel: check.entityType,
-        externalEntityId: check.externalEntityId,
-        attributionLabel: check.attributionLabel,
-        expectedCurrency: check.expectedCurrency,
-        timeframe: prepared.resolvedTimeframe,
-        spec: check.spec,
-        maxRowsPerQuery: check.maxRowsPerQuery,
-      }, this.observations);
+      const observations = frozenFeatures
+        .filter((feature) => feature.scope.externalEntityId === check.externalEntityId
+          && feature.scope.entityLevel === check.entityType
+          && feature.sourceSnapshotRefs.some((snapshotRef) => check.expectedSnapshotRefs.includes(snapshotRef)))
+        .map(observationFromFrozenFeature);
+      if (observations.length === 0) throw new DecisionRoomAnalysisRuntimeError("evidence_not_frozen");
       evaluated.push(Object.freeze({
         check,
         finding: calculateDeterministicFinding({

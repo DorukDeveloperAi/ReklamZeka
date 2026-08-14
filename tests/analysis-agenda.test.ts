@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ANALYSIS_AGENDA_VERSION,
   ANALYSIS_PASS_ORDER,
   AnalysisAgendaError,
   buildAnalysisAgenda,
@@ -117,12 +118,13 @@ const timeframe = resolveAnalysisTimeframe({
 describe("AnalysisAgenda", () => {
   it("builds the complete deterministic top-down agenda", () => {
     const agenda = buildAnalysisAgenda({ context: context(), resolvedTimeframe: timeframe });
+    expect(agenda.contractVersion).toBe(ANALYSIS_AGENDA_VERSION);
     expect(agenda.passes.map((pass) => pass.key)).toEqual(ANALYSIS_PASS_ORDER);
-    expect(agenda.passes.map((pass) => pass.ordinal)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(agenda.passes.map((pass) => pass.ordinal)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(agenda.passes.every((pass) => pass.direction === "top_down")).toBe(true);
-    expect(agenda.passes.find((pass) => pass.key === "campaign")?.requiredMetrics)
+    expect(agenda.passes.find((pass) => pass.key === "entity")?.requiredMetrics)
       .toEqual(expect.arrayContaining(["roas", "purchases", "revenueMinor", "spendMinor"]));
-    expect(agenda.passes.find((pass) => pass.key === "data_health")?.blockers)
+    expect(agenda.passes.find((pass) => pass.key === "general")?.blockers)
       .toEqual(["insights_partial", "trust_degraded"]);
     expect(agenda.driverBudget).toEqual({ maxDepth: 2, maxDriversPerFinding: 3 });
     expect(agenda.capabilities).toEqual({ containsRawData: false, canAuthorizeAction: false, canExecuteWrite: false });
@@ -131,16 +133,23 @@ describe("AnalysisAgenda", () => {
   it("canonicalizes a user subset independently of request order", () => {
     const first = buildAnalysisAgenda({
       context: context(), resolvedTimeframe: timeframe,
-      requestedPasses: ["decision", "campaign", "budget_pacing"],
+      requestedPasses: ["topic", "entity", "history"],
     });
     const replay = buildAnalysisAgenda({
       context: context(), resolvedTimeframe: timeframe,
-      requestedPasses: ["budget_pacing", "decision", "campaign"],
+      requestedPasses: ["history", "topic", "entity"],
     });
     expect(replay).toEqual(first);
-    expect(first.passes.map((pass) => pass.key)).toEqual(["campaign", "budget_pacing", "decision"]);
+    expect(first.passes.map((pass) => pass.key)).toEqual(["entity", "topic", "history"]);
     expect(first.agendaId).toMatch(/^agenda_[a-f0-9]{24}$/);
     expect(first.agendaHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("rejects the retired object-level v1 pass vocabulary rather than silently reinterpreting replay", () => {
+    expect(() => buildAnalysisAgenda({
+      context: context(), resolvedTimeframe: timeframe,
+      requestedPasses: ["campaign"] as never,
+    })).toThrowError(expect.objectContaining<Partial<AnalysisAgendaError>>({ code: "invalid_input" }));
   });
 
   it("canonicalizes bounded category and guidance selections into agenda and pass identities", () => {

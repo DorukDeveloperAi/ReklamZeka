@@ -82,7 +82,7 @@ function authority(): RepositoryVerifiedAuthority {
 
 function readySource(): EffectiveAnalysisContextReadySource {
   return { status: "ready", capturedAt: "2026-08-10T15:00:00.000Z", facts: facts(),
-    categories: { workspaceId, dimensions: [{ frozenContext: category() }] },
+    categories: { workspaceId, target: { level: "campaign", id: request.entityRef }, dimensions: [{ frozenContext: category() }] },
     lifecycle: { registryHash: "c".repeat(64), current: [], history: [], diffs: [] }, authority: authority() };
 }
 

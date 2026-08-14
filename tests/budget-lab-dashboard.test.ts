@@ -11,10 +11,21 @@ describe("Budget Lab dashboard", () => {
     const error = renderToStaticMarkup(createElement(BudgetLabReadSurface, { ...callbacks, state: { status: "error", message: "Kaynak güvenli değil." } }));
     const empty = renderToStaticMarkup(createElement(BudgetLabReadSurface, { ...callbacks, state: { status: "ready", result: { contractVersion: "budget-lab-read-model/1.0.0", view: "list", items: [], nextCursor: null, authority: { canDraft: false, canApprove: false, canExecute: false, canWriteMeta: false } }, selected: null } }));
     expect(unavailable).toContain("Kaynak henüz bağlı değil");
-    expect(unavailable).toContain("Demo bütçe kayıtları canlı sonuç gibi gösterilmez");
+    expect(unavailable).toContain("örnek bütçe kaydı gösterilmez");
     expect(error).toContain("Budget Lab okunamadı");
     expect(empty).toContain("Kaynak bağlı · öneri yok");
-    expect(empty).toContain("fixture veya demo fallback değildir");
+    expect(empty).toContain("örnek kayıt eklenmedi");
+  });
+
+  it("offers the shared session connector in the budget context", () => {
+    const html = renderToStaticMarkup(createElement(BudgetLabReadSurface, { ...callbacks,
+      onConnect: vi.fn(async () => false), state: { status: "session_required", message: "Oturumu bağlayın." },
+    }));
+    expect(html).toContain("YEREL OTURUM GEREKLİ");
+    expect(html).toContain("Bütçe çalışma alanını bağlayın");
+    expect(html).toContain("npm run local-session:mint");
+    expect(html).not.toContain("Decision Room’da oturumu bağla");
+    expect(html).not.toContain("Kaynak henüz bağlı değil");
   });
 
   it("renders read-only boundaries before any source result", () => {

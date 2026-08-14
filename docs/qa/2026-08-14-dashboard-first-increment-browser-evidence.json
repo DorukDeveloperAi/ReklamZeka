@@ -1,0 +1,53 @@
+{
+  "capturedAt": "2026-08-14T11:54:38+03:00",
+  "surface": "Codex in-app browser",
+  "baseUrl": "http://localhost:3000/dashboard",
+  "increment": "today-and-campaigns-canonical-only",
+  "sourceBoundary": {
+    "state": "session_required",
+    "canonicalDataRendered": false,
+    "reason": "Tenant-bound read mirror requires a local dashboard session in this browser context.",
+    "fallbackRendered": false
+  },
+  "views": [
+    {
+      "id": "today",
+      "singleH1": true,
+      "honestSourceState": true,
+      "canonicalPerformanceUnavailableState": true,
+      "hardcodedDemoContentFound": false
+    },
+    {
+      "id": "campaigns",
+      "singleH1": true,
+      "honestSourceState": true,
+      "recoveryActionsPresent": true,
+      "hardcodedDemoContentFound": false
+    }
+  ],
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "height": 720,
+      "bodyFits": true,
+      "visualInspection": "pass"
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "bodyFits": true,
+      "visualInspection": "pass"
+    }
+  ],
+  "forbiddenTerms": [
+    "Demo Marka",
+    "OFFLINE ÇALIŞMA",
+    "deterministik demo",
+    "7 AĞUSTOS"
+  ],
+  "forbiddenTermsFound": [],
+  "consoleErrors": 0,
+  "consoleWarnings": 0
+}

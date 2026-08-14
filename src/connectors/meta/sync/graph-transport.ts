@@ -6,6 +6,7 @@ import {
 } from "@/domain/meta/insights/capability-catalog";
 import type { MetaReadPage, MetaReadRequest, MetaReadTransport } from "./types";
 import { META_INVENTORY_FIELD_CATALOG_VERSION } from "./inventory-materialization";
+import { META_CREATIVE_CONTENT_FIELD_CATALOG_VERSION } from "./creative-content-runtime-persistence";
 
 type GraphPage = Readonly<{
   data?: readonly Readonly<Record<string, unknown>>[];
@@ -26,7 +27,7 @@ const CREATIVE_POST_FIELDS = [
   "effective_status",
   "campaign_id",
   "adset_id",
-  "creative{id,name,title,body,call_to_action_type,link_url,object_type,object_story_id,effective_object_story_id,effective_instagram_story_id,effective_instagram_media_id,instagram_permalink_url,object_story_spec,asset_feed_spec}",
+  "creative{id,name,actor_id,title,body,call_to_action_type,link_url,object_type,object_story_id,effective_object_story_id,effective_instagram_story_id,effective_instagram_media_id,instagram_permalink_url,object_story_spec,asset_feed_spec}",
 ].join(",");
 
 function inventoryPath(accountId: string, level: MetaReadRequest["entityLevel"]): string {
@@ -67,18 +68,22 @@ export class MetaGraphSyncTransport implements MetaReadTransport {
       fields: CREATIVE_POST_FIELDS,
       limit: String(request.limit), ...(request.cursor ? { after: request.cursor } : {}),
     });
-    return this.page(response.data, response.usageHeadroom);
+    return this.page(response.data, response.usageHeadroom, META_CREATIVE_CONTENT_FIELD_CATALOG_VERSION);
   }
 
   private async insights(request: MetaReadRequest): Promise<MetaReadPage> {
     if (!request.dateStart || !request.dateStop) throw new ConnectorError("invalid_data", "Insight slice tarih aralığı zorunludur", false);
     if (request.entityLevel === "account") throw new ConnectorError("invalid_data", "Insight sync account seviyesi planlamaz", false);
+    const timeIncrement = request.insightTimeIncrement ?? 1;
     const plan = planMetaInsightQuery({
       graphApiVersion: this.client.graphApiVersion,
       level: request.entityLevel,
-      metrics: ["spendMinor", "impressions", "reach", "clicks", "conversions", "revenueMinor"],
+      // Frequency is non-additive, but the planner is explicitly querying one
+      // source-grain day at a time. It is persisted as a source observation;
+      // no downstream aggregate is permitted to sum or average it.
+      metrics: ["spendMinor", "impressions", "reach", "frequency", "clicks", "conversions", "revenueMinor"],
       attribution: { mode: "account_default" },
-      timeIncrement: 1,
+      timeIncrement,
       // Connection doctor owns permission verification. This fixed value tells the pure
       // planner which already-authorized read capability this transport is invoking.
       grantedPermissions: ["ads_read"],
@@ -86,7 +91,8 @@ export class MetaGraphSyncTransport implements MetaReadTransport {
     if (plan.status !== "planned") {
       throw new ConnectorError("invalid_data", `Meta insight capability planı kullanılamıyor: ${plan.reasonCode}`, false);
     }
-    const response = await this.client.getWithUsage<GraphPage>(`/${request.accountId}/insights`, {
+    const insightPath = request.insightSubjectId ? `/${request.insightSubjectId}/insights` : `/${request.accountId}/insights`;
+    const response = await this.client.getWithUsage<GraphPage>(insightPath, {
       ...plan.parameters,
       time_range: JSON.stringify({ since: request.dateStart, until: request.dateStop }),
       limit: String(request.limit),

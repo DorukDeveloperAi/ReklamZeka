@@ -1,0 +1,186 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "3377eee7b",
+      "tarih": "2026-08-14",
+      "konu": "fix(approval): bind geo evidence through hierarchy",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "294e5e398",
+      "tarih": "2026-08-14",
+      "konu": "fix(meta): label trust freshness in hours",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "2834bf3f7",
+      "tarih": "2026-08-14",
+      "konu": "fix(approval): enforce published budget guardrails",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "edb2b8d03",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): make budget approval scenario selectable",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "c1e68ad04",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): bind approval fixture hierarchy evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "82b419413",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): align approval chain source evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "dadf63549",
+      "tarih": "2026-08-14",
+      "konu": "fix(analysis): preserve category composition diagnostics",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "26983ac27",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): publish approval chain category profiles",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "dadb6dc62",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): retry tombstone transport failures",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "029a34eeb",
+      "tarih": "2026-08-14",
+      "konu": "fix(verification): align fixture insight date to analysis window",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "6a70c7c1a",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): read authentic queue projection",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "d71df2d9b",
+      "tarih": "2026-08-14",
+      "konu": "test(approval): verify authentic rule budget queue chain",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "36061fcee",
+      "tarih": "2026-08-14",
+      "konu": "refactor(verification): share ready budget context fixture",
+      "tur": "is",
+      "kapsam": [
+        "refactor"
+      ]
+    },
+    {
+      "hash": "5a5aacb50",
+      "tarih": "2026-08-14",
+      "konu": "docs(state): record frozen action context binding",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "6d7796951",
+      "tarih": "2026-08-14",
+      "konu": "fix(approval): bind materialized units to frozen context",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "fix",
+      "adet": 20
+    },
+    {
+      "kapsam": "feat",
+      "adet": 19
+    },
+    {
+      "kapsam": "docs",
+      "adet": 15
+    },
+    {
+      "kapsam": "test",
+      "adet": 5
+    },
+    {
+      "kapsam": "refactor",
+      "adet": 1
+    }
+  ],
+  "isSayisi": 440,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-14",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "68e43c747f0a"
+}

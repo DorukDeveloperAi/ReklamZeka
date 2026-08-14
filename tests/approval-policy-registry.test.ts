@@ -13,6 +13,7 @@ import {
   disableApprovalPolicy,
   publishApprovalPolicy,
   reviseApprovalPolicyDraft,
+  resolvePublishedApprovalPolicy,
   resolvePublishedExistingPostPolicy,
 } from "@/domain/actions/approval-policy-registry";
 
@@ -88,6 +89,42 @@ describe("reviewed ApprovalPolicy definition registry", () => {
       provenance: { publishedByRole: "admin", publicationDecisionRef: "decision_publish_policy" } });
     expect(() => publishApprovalPolicy({ ...command, actor: { actorRef: "actor_analyst", role: "analyst" } as never }))
       .toThrowError(expect.objectContaining({ code: "publish_forbidden" }));
+    expect(() => publishApprovalPolicy({ ...command, actor: { actorRef: "actor_analyst", role: "owner" } }))
+      .toThrowError(expect.objectContaining({ code: "publish_forbidden" }));
+  });
+
+  it("requires an explicit K2/K3 applicability and never falls back to the K4 promotion policy", () => {
+    const budgetPolicy = {
+      ...policy("policy_budget_decrease"),
+      approverRoles: [{ risk: "K2" as const, roles: ["owner" as const] }],
+      separationOfDutiesRisks: ["K2" as const],
+    };
+    const draft = createApprovalPolicyDraft({
+      workspaceRef: "workspace_alpha", policy: budgetPolicy,
+      applicability: { actionType: "budget_decrease", risk: "K2" },
+      effectiveFrom: "2026-08-07T00:00:00.000Z", expiresAt: null,
+      normalizedBy: { actorRef: "actor_analyst", role: "analyst" },
+    });
+    const publishedBudget = publishApprovalPolicy({
+      draft, actor: { actorRef: "actor_owner", role: "owner" },
+      decisionRef: "decision_budget_policy", reasonRef: "reason_budget_policy",
+      publishedAt: "2026-08-07T10:00:00.000Z",
+    });
+    expect(resolvePublishedApprovalPolicy({
+      workspaceRef: "workspace_alpha", evaluatedAt: "2026-08-07T12:00:00.000Z",
+      applicability: { actionType: "budget_decrease", risk: "K2" },
+      definitions: [draft, publishedBudget],
+    }).source.applicability).toEqual({ actionType: "budget_decrease", risk: "K2" });
+    expect(() => resolvePublishedExistingPostPolicy({
+      workspaceRef: "workspace_alpha", evaluatedAt: "2026-08-07T12:00:00.000Z",
+      definitions: [draft, publishedBudget],
+    })).toThrowError(expect.objectContaining({ code: "not_found" }));
+    expect(() => createApprovalPolicyDraft({
+      workspaceRef: "workspace_alpha", policy: budgetPolicy,
+      applicability: { actionType: "budget_increase", risk: "K3" },
+      effectiveFrom: "2026-08-07T00:00:00.000Z", expiresAt: null,
+      normalizedBy: { actorRef: "actor_analyst", role: "analyst" },
+    })).toThrowError(expect.objectContaining({ code: "invalid_input" }));
   });
 
   it("resolves exactly one latest published-active policy and produces lifecycle-compatible policyHash", () => {
@@ -192,7 +229,7 @@ describe("reviewed ApprovalPolicy definition registry", () => {
         normalizedBy: { actorRef: "actor_admin", role: "admin" } });
     const expiring = publishApprovalPolicy({
       draft: expiringDraft,
-      actor: { actorRef: "actor_admin", role: "admin" }, decisionRef: "decision_publish_expiring",
+      actor: { actorRef: "actor_owner", role: "owner" }, decisionRef: "decision_publish_expiring",
       reasonRef: "reason_timeboxed", publishedAt: "2026-08-07T01:00:00.000Z",
     });
     expect(() => resolvePublishedExistingPostPolicy({ workspaceRef: "workspace_alpha",

@@ -1,0 +1,90 @@
+{
+  "capturedAt": "2026-08-14T12:57:17+03:00",
+  "surface": "Codex in-app browser",
+  "baseUrl": "http://localhost:3000/dashboard",
+  "increment": "meta-orchestrator-alerts-promotion-timeline-source-state-and-simplification",
+  "sourceState": "local_session_required",
+  "views": [
+    {
+      "id": "meta",
+      "contextualSessionConnector": true,
+      "blockedAlerts": 1,
+      "blockedForms": 1,
+      "nestedSourcePanelsDeferredUntilInventoryReady": true,
+      "visibleRawMetaIdentifiers": false,
+      "singleH1": true,
+      "demoOrFixtureWordVisible": false
+    },
+    {
+      "id": "agent",
+      "contextualSessionConnector": true,
+      "blockedAlerts": 0,
+      "blockedForms": 1,
+      "staticSkillPackVisible": false,
+      "nonPersistedAutonomyControlsVisible": false,
+      "fakeAssistantFallbackVisible": false,
+      "sessionHubDeferredUntilConversationReady": true,
+      "singleH1": true,
+      "demoOrFixtureWordVisible": false
+    },
+    {
+      "id": "alerts",
+      "contextualSessionConnector": true,
+      "blockedAlerts": 1,
+      "blockedForms": 1,
+      "staticSafetyStripVisible": false,
+      "singleH1": true,
+      "demoOrFixtureWordVisible": false
+    },
+    {
+      "id": "promotions",
+      "contextualSessionConnector": true,
+      "blockedAlerts": 1,
+      "blockedForms": 1,
+      "authoringDeferredUntilCatalogReady": true,
+      "technicalRefsVisibleInPreview": false,
+      "singleH1": true,
+      "demoOrFixtureWordVisible": false
+    },
+    {
+      "id": "timeline",
+      "contextualSessionConnector": true,
+      "blockedAlerts": 1,
+      "blockedForms": 1,
+      "temporalRecommendationsDeferredUntilTimelineReady": true,
+      "singleH1": true,
+      "demoOrFixtureWordVisible": false
+    }
+  ],
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "maximumBodyScrollWidth": 1265,
+      "bodyFits": true,
+      "singleH1AllViews": true,
+      "oneContextualSessionFormAllViews": true
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "maximumBodyScrollWidth": 375,
+      "bodyFits": true,
+      "singleH1AllViews": true,
+      "oneContextualSessionFormAllViews": true
+    }
+  ],
+  "rapidNavigation": {
+    "sequence": ["meta", "agent", "alerts", "promotions", "timeline"],
+    "interViewDelayMs": 40,
+    "productErrors": 0,
+    "productWarnings": 0
+  },
+  "securityBoundary": {
+    "agentOrBrowserMintedProof": false,
+    "cookieAuthority": "server-only",
+    "proofOrStorageInspected": false
+  },
+  "openAcceptance": "operator_minted_local_session_required_for_live_meta_inventory_orchestrator_conversation_alert_ledger_promotion_catalog_and_operational_timeline_records"
+}

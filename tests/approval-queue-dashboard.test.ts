@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ApprovalQueueReadSurface, recordApprovalDecision } from "@/app/dashboard/approval-queue-panel";
-import type { ApprovalQueueRecord } from "@/application/approval-queue-read-service";
+import type { ApprovalQueueDetailRecord, ApprovalQueueRecord } from "@/application/approval-queue-read-service";
 
 const callbacks = { onRetry: vi.fn(), onSelect: vi.fn() };
 const item = {
@@ -12,6 +12,7 @@ const item = {
   risk: "K2",
   actionType: "budget_decrease",
   accountRef: "account_1111111111111111",
+  campaignRef: "entity_2222222222222222",
   entity: { type: "campaign", ref: "entity_2222222222222222", label: "GCC Lead Kampanyası" },
   beforeAfter: { field: "daily_budget_minor", beforeMinor: 170_000, afterMinor: 156_400, currency: "TRY" },
   autonomy: {
@@ -32,8 +33,10 @@ function ready(selected: ApprovalQueueRecord | null = null) {
   return {
     status: "ready" as const,
     result: {
-      contractVersion: "approval-queue-read-model/1.0.0" as const,
+      contractVersion: "approval-queue-read-model/1.4.0" as const,
       view: "list" as const,
+      entityRef: null,
+      campaignRef: null,
       items: [item],
       nextCursor: null,
       authority: {
@@ -48,6 +51,23 @@ function ready(selected: ApprovalQueueRecord | null = null) {
 }
 
 describe("Approval Queue dashboard", () => {
+  it("renders hash-verified source labels and ordered human decision history without execution controls", () => {
+    const detail: ApprovalQueueDetailRecord = { ...item, sourceEvidence: [
+      { kind: "budget_proposal", label: "Yabancı FTR bütçe tavanı", integrity: "hash_verified" },
+      { kind: "slice_rule", label: "Yabancı FTR slice kuralı", integrity: "hash_verified" },
+    ], decisionHistory: [
+      { decision: "proposed", occurredAt: item.createdAt, reasonCode: null },
+      { decision: "changes_requested", occurredAt: "2026-08-07T10:00:00.000Z", reasonCode: "human.changes_requested" },
+    ] };
+    const html = renderToStaticMarkup(createElement(ApprovalQueueReadSurface, { ...callbacks, state: ready(detail) }));
+    expect(html).toContain("Doğrulanmış kaynak kanıtı");
+    expect(html).toContain("Yabancı FTR bütçe tavanı");
+    expect(html).toContain("hash doğrulandı");
+    expect(html).toContain("İnsan karar geçmişi");
+    expect(html).toContain("changes requested");
+    expect(html).not.toContain("Meta write etkin");
+  });
+
   it("distinguishes unavailable, error, and true empty without a fixture fallback", () => {
     const unavailable = renderToStaticMarkup(createElement(ApprovalQueueReadSurface, {
       ...callbacks, state: { status: "unavailable", message: "Yerel oturum gerekli." },
@@ -60,10 +80,21 @@ describe("Approval Queue dashboard", () => {
       state: { ...ready(), result: { ...ready().result, items: [] } },
     }));
     expect(unavailable).toContain("Kaynak henüz bağlı değil");
-    expect(unavailable).toContain("Fixture kayıtlar canlı kuyruk gibi gösterilmez");
+    expect(unavailable).toContain("örnek onay kaydı gösterilmez");
     expect(error).toContain("Onay kuyruğu okunamadı");
     expect(empty).toContain("Kaynak bağlı · kuyruk boş");
-    expect(empty).toContain("demo fallback değildir");
+    expect(empty).toContain("örnek kayıt eklenmedi");
+  });
+
+  it("offers the shared session connector in the approval context", () => {
+    const html = renderToStaticMarkup(createElement(ApprovalQueueReadSurface, {
+      ...callbacks, onConnect: vi.fn(async () => false), state: { status: "session_required", message: "Oturumu bağlayın." },
+    }));
+    expect(html).toContain("YEREL OTURUM GEREKLİ");
+    expect(html).toContain("Onay çalışma alanını bağlayın");
+    expect(html).toContain("npm run local-session:mint");
+    expect(html).not.toContain("Decision Room’da oturumu bağla");
+    expect(html).not.toContain("Kaynak henüz bağlı değil");
   });
 
   it("renders rows and a public-safe detail with before/after, trace, expiry, and dependencies", () => {
@@ -80,14 +111,15 @@ describe("Approval Queue dashboard", () => {
     expect(html).toContain("K2");
   });
 
-  it("keeps execute and Meta authority visibly disabled when no trusted decision adapter is supplied", () => {
+  it("keeps the authority boundary concise when no trusted decision adapter is supplied", () => {
     const html = renderToStaticMarkup(createElement(ApprovalQueueReadSurface, {
       ...callbacks, state: ready(item),
     }));
-    expect(html).toContain("DECISION RECORD · NO META WRITE");
-    expect(html).toContain("Tekil insan kararı");
-    expect(html).toContain("Execute kapalı");
-    expect(html).toContain("Meta write kapalı");
+    expect(html).toContain("İNSAN KARARI · META WRITE YOK");
+    expect(html).toContain("Onay yalnız karar kaydıdır");
+    expect(html).not.toContain("Uygulama zinciri henüz kapalı");
+    expect(html).not.toContain("Mirror yeniden kontrolü");
+    expect(html).not.toContain("NO TRANSPORT");
     expect(html).not.toContain(">Onayla<");
     expect(html).not.toContain(">Reddet<");
     expect(html).not.toContain(">Değişiklik iste<");
@@ -106,7 +138,7 @@ describe("Approval Queue dashboard", () => {
         decide: vi.fn(),
       },
     }));
-    expect(html).toContain("Bu ActionUnit için karar ver");
+    expect(html).toContain("Bu eylem satırı için karar ver");
     expect(html).toContain("1.700");
     expect(html).toContain("1.564");
     expect(html).toContain("type=\"checkbox\"");

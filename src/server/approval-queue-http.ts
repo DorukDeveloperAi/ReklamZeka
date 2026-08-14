@@ -17,6 +17,7 @@ const HEADERS = Object.freeze({
   "X-ReklamZeka-Access-Mode": "read-only",
   "X-ReklamZeka-Action-Authority": "none",
 });
+const ENTITY_REF = /^entity_[a-f0-9]{16}$/;
 
 function error(code: string, message: string, status: number) {
   return NextResponse.json({ error: { code, message } }, { status, headers: HEADERS });
@@ -56,6 +57,11 @@ export function approvalQueueNotConfiguredResponse() {
   );
 }
 
+/** The local runtime uses this exact response when a session proof is absent or invalid. */
+export function approvalQueueSessionRequiredResponse() {
+  return error("local_session_required", "Onay Kuyruğu için yerel dashboard oturumunu bağlayın.", 401);
+}
+
 export function createApprovalQueueHttpHandler(input: Readonly<{
   contract: ApprovalQueueAgentContract;
   resolvePrincipal(request: Request): Promise<TrustedDecisionRoomPrincipal | null>;
@@ -63,17 +69,21 @@ export function createApprovalQueueHttpHandler(input: Readonly<{
   return async function GET(request: Request) {
     try {
       const url = new URL(request.url);
-      if (!exactSearchParams(url, ["view", "unitRef", "limit", "cursor"])) {
+      if (!exactSearchParams(url, ["view", "unitRef", "entityRef", "campaignRef", "limit", "cursor"])) {
         throw new ApprovalQueueReadError("invalid_input");
       }
       const view = url.searchParams.get("view") ?? "list";
       const unitRef = url.searchParams.get("unitRef");
+      const entityRef = url.searchParams.get("entityRef");
+      const campaignRef = url.searchParams.get("campaignRef");
       const rawLimit = url.searchParams.get("limit");
       const cursor = url.searchParams.get("cursor");
+      if (entityRef !== null && !ENTITY_REF.test(entityRef) || campaignRef !== null && !ENTITY_REF.test(campaignRef)
+        || entityRef !== null && campaignRef !== null) throw new ApprovalQueueReadError("invalid_input");
       let call: ApprovalQueueAgentCall;
       if (view === "list" && unitRef === null) {
-        call = { name: "approval_queue_list", arguments: { limit: boundedLimit(rawLimit), cursor } };
-      } else if (view === "detail" && unitRef !== null && rawLimit === null && cursor === null) {
+        call = { name: "approval_queue_list", arguments: { entityRef, campaignRef, limit: boundedLimit(rawLimit), cursor } };
+      } else if (view === "detail" && unitRef !== null && entityRef === null && campaignRef === null && rawLimit === null && cursor === null) {
         call = { name: "approval_queue_get", arguments: { unitRef } };
       } else {
         throw new ApprovalQueueReadError("invalid_input");

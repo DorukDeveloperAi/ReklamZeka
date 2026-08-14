@@ -1,0 +1,182 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "fc382f8f2",
+      "tarih": "2026-08-12",
+      "konu": "fix(rules): exclude inactive group scopes on resolve",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "842102ea8",
+      "tarih": "2026-08-12",
+      "konu": "fix(rules): verify account group scope on draft",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "bcf63ded5",
+      "tarih": "2026-08-12",
+      "konu": "feat(rules): expose account group draft scope",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ce8605f59",
+      "tarih": "2026-08-12",
+      "konu": "docs(a08): record portfolio capability read boundary",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "914aa6406",
+      "tarih": "2026-08-12",
+      "konu": "feat(brief): classify audience and platform scope",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "bf6720d23",
+      "tarih": "2026-08-12",
+      "konu": "feat(brief): show applicable portfolio rules",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "8b86fa5f8",
+      "tarih": "2026-08-12",
+      "konu": "feat(rules): catalog current portfolio scopes",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "303223af3",
+      "tarih": "2026-08-12",
+      "konu": "feat(rules): resolve scoped campaign evaluation cohorts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "728f53432",
+      "tarih": "2026-08-12",
+      "konu": "feat(brief): scope comparisons by campaign family",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4538eba61",
+      "tarih": "2026-08-12",
+      "konu": "feat(meta): recognize route naming variants safely",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "930eb9e7c",
+      "tarih": "2026-08-12",
+      "konu": "feat(rules): scope rules to campaign families",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "cdb1c2465",
+      "tarih": "2026-08-12",
+      "konu": "feat(rules): add temporal review semantics",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "60e04fb25",
+      "tarih": "2026-08-12",
+      "konu": "fix(meta): separate campaign identity from conversion route",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "85f777d15",
+      "tarih": "2026-08-12",
+      "konu": "feat(rules): support scoped evaluation cohorts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e00015c6b",
+      "tarih": "2026-08-12",
+      "konu": "feat(rules): separate international acquisition measurement lanes",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "feat",
+      "adet": 45
+    },
+    {
+      "kapsam": "fix",
+      "adet": 10
+    },
+    {
+      "kapsam": "docs",
+      "adet": 3
+    },
+    {
+      "kapsam": "test",
+      "adet": 2
+    }
+  ],
+  "isSayisi": 309,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-12",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "8dae37cccdeb"
+}

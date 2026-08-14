@@ -35,6 +35,10 @@ export function existingPostPromotionCatalogNotConfiguredResponse() {
   return error("source_not_configured", "Öne çıkarma seçim kataloğu ve yerel kimlik bağlama katmanı henüz etkin değil.", 503);
 }
 
+export function existingPostPromotionCatalogSessionRequiredResponse() {
+  return error("local_session_required", "Öne çıkarma seçim kataloğu için yerel dashboard oturumunu bağlayın.", 401);
+}
+
 export function createExistingPostPromotionCatalogHttpHandler(input: Readonly<{
   service: Pick<ExistingPostPromotionCatalogService, "list">;
   origin: string;

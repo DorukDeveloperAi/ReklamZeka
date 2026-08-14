@@ -34,7 +34,6 @@ describe("explicit workspace tombstone purge adapter", () => {
 
     expect(evidence.candidateCount).toBe(1);
     expect(evidence.revision).toMatch(/^[a-f0-9]{64}$/);
-    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES).toHaveLength(100);
     const allSchemaTables = Object.values(schema)
       .flatMap((value) => isTable(value) ? [getTableName(value)] : [])
       .sort();
@@ -80,7 +79,25 @@ describe("explicit workspace tombstone purge adapter", () => {
     expect(result).toEqual({ purgedRowCount: 0, membershipCount: 0 });
     expect(inspectCalls).toBe(3);
     const deletes = statements.filter((statement) => statement.includes("delete from"));
-    expect(deletes).toHaveLength(100);
+    expect(deletes).toHaveLength(WORKSPACE_TOMBSTONE_PURGE_TABLES.length);
+    expect(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_invalidations")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_heads")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_heads")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_revisions")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_revisions")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from progressive_formalization_revisions")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from normalization_workbench_revisions")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from guidance_sets")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_revisions")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from strict_instruction_policy_revisions")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_revisions")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from guidance_sets")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_revisions")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from tenant_authority_snapshots")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from action_execution_events")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from action_execution_attempts")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from action_execution_attempts")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from action_approval_evidence_grants")));
     expect(deletes.findIndex((statement) => statement.includes("delete from guidance_analysis_run_bindings")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from decision_room_runs")));
     expect(deletes.findIndex((statement) => statement.includes("delete from strict_instruction_policy_revisions")))
@@ -115,6 +132,16 @@ describe("explicit workspace tombstone purge adapter", () => {
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from category_definitions")));
     expect(deletes.findIndex((statement) => statement.includes("delete from meta_daily_insight_metrics")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from meta_daily_insights where")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from deterministic_feature_snapshot_sources")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from deterministic_feature_snapshots")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from deterministic_feature_snapshot_invalidations")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from deterministic_feature_snapshot_sources")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from deterministic_window_snapshot_features")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from deterministic_window_snapshots")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from deterministic_window_snapshots")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from deterministic_feature_snapshots")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from deterministic_feature_snapshots")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from meta_daily_insights where")));
     expect(deletes.findIndex((statement) => statement.includes("delete from meta_ad_creative_bindings")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from meta_creatives where")));
     expect(deletes.findIndex((statement) => statement.includes("delete from meta_change_events")))
@@ -135,10 +162,22 @@ describe("explicit workspace tombstone purge adapter", () => {
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_contexts")));
     expect(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_context_components")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_contexts")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_policy_composition_items")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_policy_compositions")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_policy_compositions")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_contexts")));
     expect(deletes.findIndex((statement) => statement.includes("delete from decision_ledger_records")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_contexts")));
     expect(deletes.findIndex((statement) => statement.includes("delete from budget_proposal_alternatives")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from budget_proposal_versions")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from slice_rule_budget_proposal_bindings")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from budget_proposal_versions")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from slice_rule_budget_proposal_bindings")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from slice_rule_workspace_drafts")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from slice_rule_allocation_entity_bindings")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from slice_rule_workspace_drafts")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from slice_rule_allocation_entity_bindings")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from meta_ad_sets")));
     expect(deletes.findIndex((statement) => statement.includes("delete from budget_proposal_versions")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from effective_campaign_contexts")));
     expect(deletes.findIndex((statement) => statement.includes("delete from decision_room_inbox_reads")))

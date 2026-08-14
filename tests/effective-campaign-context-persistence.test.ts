@@ -155,6 +155,24 @@ describe("effective campaign context persistence contract", () => {
     expect(sourceComponentsOf(frozen)).toContainEqual({ componentType: "business_outcome_evidence", componentRef: "campaign_primary", componentVersion: "a".repeat(64) });
   });
 
+  it("records frozen L2 features and L3 windows as invalidatable source components", () => {
+    const existing = context();
+    const { schemaVersion: _schemaVersion, contextHash: _contextHash, capabilities: _capabilities, ...input } = existing;
+    const frozen = buildEffectiveCampaignContext({ ...input, data: {
+      ...input.data,
+      featureRefs: ["feature_aaaaaaaaaaaaaaaaaaaaaaaa"],
+      windowRefs: ["window_bbbbbbbbbbbbbbbbbbbbbbbb"],
+    } });
+    expect(sourceComponentsOf(frozen)).toContainEqual({
+      componentType: "deterministic_feature_snapshot", componentRef: "feature_aaaaaaaaaaaaaaaaaaaaaaaa",
+      componentVersion: "feature_aaaaaaaaaaaaaaaaaaaaaaaa",
+    });
+    expect(sourceComponentsOf(frozen)).toContainEqual({
+      componentType: "deterministic_window_snapshot", componentRef: "window_bbbbbbbbbbbbbbbbbbbbbbbb",
+      componentVersion: "window_bbbbbbbbbbbbbbbbbbbbbbbb",
+    });
+  });
+
   it("binds Meta config and cadence evidence to exact top-level values and source components", () => {
     const frozen = context({ evidenceBound: true });
     expect(frozen.metaAnalysisConfigEvidence?.snapshot.snapshotHash).toMatch(/^[a-f0-9]{64}$/);
@@ -181,6 +199,74 @@ describe("effective campaign context persistence contract", () => {
     await expect(repository.save(context(), { mode: "evidence_bound" }))
       .rejects.toMatchObject({ code: "invalid_input" } satisfies Partial<EffectiveCampaignContextRepositoryError>);
     expect(database.transaction).not.toHaveBeenCalled();
+  });
+
+  it("collapses an untyped database failure to a stable fail-closed persistence code", async () => {
+    const database = { transaction: vi.fn(async () => { throw new Error("driver detail"); }) };
+    const repository = new DrizzleEffectiveCampaignContextRepository(database as never);
+
+    await expect(repository.save(context()))
+      .rejects.toMatchObject({ code: "persistence_rejected", diagnosticCode: "driver_rejected:workspace_lock" } satisfies Partial<EffectiveCampaignContextRepositoryError>);
+  });
+
+  it("classifies a PostgreSQL constraint failure without exposing its constraint or query", async () => {
+    const driverError = Object.assign(new Error("private constraint detail"), {
+      code: "23514", constraint: "effective_campaign_contexts_private_check",
+      query: "insert into effective_campaign_contexts ...",
+    });
+    const repository = new DrizzleEffectiveCampaignContextRepository({
+      // Drizzle wraps the native pg exception; classification must traverse
+      // only the private cause chain and still expose no raw driver material.
+      transaction: vi.fn(async () => { throw Object.assign(new Error("wrapped"), { cause: driverError }); }),
+    } as never);
+
+    await expect(repository.save(context()))
+      .rejects.toMatchObject({ code: "persistence_rejected", diagnosticCode: "check_violation" } satisfies Partial<EffectiveCampaignContextRepositoryError>);
+    await repository.save(context()).catch((error: unknown) => {
+      expect(error).not.toHaveProperty("constraint");
+      expect(error).not.toHaveProperty("query");
+      expect(error).not.toHaveProperty("detail");
+    });
+  });
+
+  it("classifies bounded driver type/query failures without releasing native details", async () => {
+    for (const [nativeCode, diagnosticCode] of [["22P02", "driver_type_error"], ["42703", "driver_query_error"], ["0A000", "driver_query_error"]] as const) {
+      const database = { transaction: vi.fn(async () => {
+        throw Object.assign(new Error("wrapped"), { cause: Object.assign(new Error("private"), { code: nativeCode }) });
+      }) };
+      await expect(new DrizzleEffectiveCampaignContextRepository(database as never).save(context()))
+        .rejects.toMatchObject({ code: "persistence_rejected", diagnosticCode });
+    }
+  });
+
+  it("rejects evidence-bound contexts whose claimed L2/L3 evidence is absent or stale", async () => {
+    const existing = context({ evidenceBound: true });
+    const { schemaVersion: _schemaVersion, contextHash: _contextHash, capabilities: _capabilities, ...input } = existing;
+    const frozen = buildEffectiveCampaignContext({ ...input, data: {
+      ...input.data,
+      featureRefs: ["feature_aaaaaaaaaaaaaaaaaaaaaaaa"],
+      windowRefs: ["window_bbbbbbbbbbbbbbbbbbbbbbbb"],
+    } });
+    const executeResults = [{ rows: [{ id: workspaceId }] }, { rows: [{
+      metaConnectionId: "00000000-0000-0000-0000-000000000201",
+      adAccountId: "00000000-0000-0000-0000-000000000202",
+      campaignId: "00000000-0000-0000-0000-000000000203",
+    }] }, { rows: [] }];
+    const select = vi.fn().mockReturnValue({ from: vi.fn(() => ({ where: vi.fn(async () => [{
+      publicRef: snapshotRef, capturedAt: new Date("2026-08-07T11:00:00.000Z"),
+    }]) })) });
+    const transaction = { execute: vi.fn(async () => executeResults.shift()), select };
+    await expect(new DrizzleEffectiveCampaignContextRepository({ transaction: async (callback: (tx: typeof transaction) => Promise<unknown>) => callback(transaction) } as never)
+      .save(frozen, { mode: "evidence_bound" }))
+      .rejects.toMatchObject({ code: "workspace_scope_mismatch" } satisfies Partial<EffectiveCampaignContextRepositoryError>);
+  });
+
+  it("uses JSON reference manifests for exact L2/L3 verification instead of scalar text-array coercion", () => {
+    const source = readFileSync("src/connectors/analyses/effective-campaign-context-drizzle-repository.ts", "utf8");
+    expect(source).toContain("jsonb_array_elements_text(${JSON.stringify(featureRefs)}::jsonb)");
+    expect(source).toContain("jsonb_array_elements_text(${JSON.stringify(windowRefs)}::jsonb)");
+    expect(source).not.toContain("feature_ref = any(${featureRefs}::text[])");
+    expect(source).not.toContain("window_ref = any(${windowRefs}::text[])");
   });
 
   it("rejects a newly persisted legacy payload while old v1 replay remains buildable", async () => {
@@ -234,5 +320,49 @@ describe("effective campaign context persistence contract", () => {
     expect(migration).toContain("effective_campaign_contexts_no_authority");
     expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|TRUNCATE|DELETE FROM/);
     expect(migration).not.toContain("DROP CONSTRAINT");
+  });
+
+  it("makes A09 policy composition source-bound, append-only and legacy-optional", () => {
+    const migration = readFileSync("drizzle/20260810190000_effective_context_policy_composition.sql", "utf8");
+    const repository = readFileSync("src/connectors/analyses/effective-campaign-context-drizzle-repository.ts", "utf8");
+    for (const table of ["effective_campaign_policy_compositions", "effective_campaign_policy_composition_items"]) {
+      expect(migration).toContain(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`);
+      expect(migration).toContain(`ALTER TABLE "${table}" FORCE ROW LEVEL SECURITY`);
+    }
+    expect(migration).toContain("effective_campaign_policy_compositions_context_scope_fk");
+    expect(migration).toContain("effective_campaign_policy_compositions_workspace_id_unique");
+    expect(migration).toContain("effective_campaign_policy_composition_items_revision_scope_fk");
+    expect(migration).toContain("effective_campaign_policy_composition_immutable");
+    expect(migration).toContain("lifecycle_state = 'tombstoning'");
+    expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|TRUNCATE/);
+    expect(repository).toContain("policy_authority_bindings binding");
+    expect(repository).toContain("snapshot.snapshot_ref = ${evidence.snapshotRef}");
+    expect(repository).toContain("snapshot.snapshot_payload #>> '{policyAuthority,scope,scopeHash}' = ${evidence.scopeHash}");
+    expect(repository).toContain("catalog.revision_hash = ${evidence.catalogHash}");
+    expect(repository).toContain("catalog.payload #>> '{instructionPolicyRegistryHash}' = ${context.versions.instructionPolicyRegistry}");
+    expect(repository).not.toContain("tenant_authority_snapshot_heads head");
+    expect(repository).toContain("if (current.has(row.policy_ref)) throw new EffectiveCampaignContextRepositoryError");
+    expect(repository).toContain("if (evidence === undefined) return null");
+    expect(repository).not.toContain("order by policy_ref, policy_version desc");
+  });
+
+  it("creates a zero-item sidecar from an authenticated empty authority catalog without a driver empty-array query", () => {
+    const repository = readFileSync("src/connectors/analyses/effective-campaign-context-drizzle-repository.ts", "utf8");
+    const emptyCatalog = repository.indexOf("if (context.policies.length === 0)");
+    const bindingQuery = repository.indexOf("policy.policy_ref = any(${context.policies.map((policy) => policy.policyRef)}::text[])");
+    expect(emptyCatalog).toBeGreaterThan(-1);
+    expect(bindingQuery).toBeGreaterThan(emptyCatalog);
+    expect(repository).toContain("compositionHash: digest(core), items: Object.freeze([])");
+  });
+
+  it("extends the existing context component allowlist with private L2/L3 evidence safely", () => {
+    const migration = readFileSync("drizzle/20260810184501_third_hulk.sql", "utf8");
+    expect(migration).toContain("'deterministic_feature_snapshot', 'deterministic_window_snapshot'");
+    for (const table of ["effective_campaign_context_components", "effective_campaign_context_invalidations"]) {
+      expect(migration).toContain(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`);
+      expect(migration).toContain(`ALTER TABLE "${table}" FORCE ROW LEVEL SECURITY`);
+    }
+    expect(migration).toContain("FROM PUBLIC, anon, authenticated, service_role");
+    expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|TRUNCATE/);
   });
 });

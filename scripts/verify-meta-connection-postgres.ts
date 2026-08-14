@@ -81,6 +81,9 @@ try {
       audit,
       fetchImpl: doctorFetch,
       now: () => timestamp,
+      // This verifier uses an in-memory fixture secret and a GET-only fixture
+      // transport; it must not inherit the real environment's rotation gate.
+      tokenSecurityStatus: () => "rotated",
     });
     const scope = { workspaceId, connectionId };
     const reference = secrets.reference(scope);
@@ -103,6 +106,7 @@ try {
       audit,
       fetchImpl: doctorFetch,
       now: () => timestamp,
+      tokenSecurityStatus: () => "rotated",
     });
     const checked = await restarted.doctor({ userId: adminId }, workspaceId, connectionId);
     restartDurable = checked.status === "active" && checked.secretConfigured;
@@ -153,6 +157,7 @@ try {
       audit,
       fetchImpl: async () => json({ data: { is_valid: false } }),
       now: () => timestamp,
+      tokenSecurityStatus: () => "rotated",
     });
     await invalidService.register({
       actor: { userId: adminId },

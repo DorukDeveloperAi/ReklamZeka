@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 
@@ -39,7 +40,15 @@ function budgetPlan() {
   return buildActionPlan(action, context(action.entity));
 }
 
+function summaryHashOf(summary: Record<string, unknown>) {
+  return createHash("sha256").update(JSON.stringify({ after: summary.after, before: summary.before,
+    evidence: summary.evidence, safety: summary.safety })).digest("hex");
+}
+
 function sourceRow(patch: Record<string, unknown> = {}) {
+  const summaryPayload = { safety: "public_safe", before: { label: "Günlük bütçe", value: "₺1.000" },
+    after: { label: "Günlük bütçe", value: "₺950,50" }, evidence: [{ evidenceRef: "budget_proposal_alpha", label: "Bütçe önerisi" }] };
+  const summaryHash = summaryHashOf(summaryPayload);
   return {
     unit_ref: unitRef,
     bundle_ref: "action_bundle_bbbbbbbbbbbbbbbbbbbb",
@@ -50,12 +59,16 @@ function sourceRow(patch: Record<string, unknown> = {}) {
     campaign_id: campaignId,
     ad_set_id: null,
     ad_id: null,
+    campaign_scope_id: campaignId,
     policy_snapshot_id: policyId,
     proposed_at: "2026-08-07T13:00:00.000Z",
     expires_at: "2026-08-08T13:00:00.000Z",
     current_event_type: null,
     action_plan_payload: budgetPlan(),
     dependencies: [{ unit_ref: "action_unit_cccccccccccccccccccc", status: "awaiting_approval" }],
+    summary_payload: summaryPayload,
+    summary_hash: summaryHash,
+    decision_timeline: [],
     ...patch,
   };
 }
@@ -77,7 +90,7 @@ describe("Approval Queue Drizzle read repository", () => {
   it("maps one tenant's persisted proposal to an exact public-safe read model", async () => {
     const fixture = database([sourceRow()]);
     const repository = new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId);
-    const result = await repository.list({ workspaceId, before: null, limit: 26 });
+    const result = await repository.list({ workspaceId, entityRef: null, campaignRef: null, before: null, limit: 26 });
 
     expect(result).toEqual([expect.objectContaining({
       unitRef,
@@ -108,15 +121,40 @@ describe("Approval Queue Drizzle read repository", () => {
     const repository = new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId);
     await repository.list({
       workspaceId,
+      entityRef: null,
+      campaignRef: null,
       before: { createdAt: "2026-08-07T13:00:00.000Z", unitRef },
       limit: 26,
     });
     const query = fixture.queries[0]!;
     expect(query.sql).toContain("where unit.workspace_id = $1::uuid");
-    expect(query.sql).toContain("(unit.proposed_at, unit.unit_ref) < ($3::timestamptz, $4::text)");
+    expect(query.sql).toContain("(unit.proposed_at, unit.unit_ref) < ($9::timestamptz, $10::text)");
     expect(query.sql).toContain("order by unit.proposed_at desc, unit.unit_ref desc");
     expect(query.sql).not.toMatch(/\boffset\b/i);
-    expect(query.params).toEqual([workspaceId, "2026-08-07T13:00:00.000Z", "2026-08-07T13:00:00.000Z", unitRef, 26]);
+    expect(query.params).toEqual([workspaceId, null, workspaceId, null, null, workspaceId, null, "2026-08-07T13:00:00.000Z", "2026-08-07T13:00:00.000Z", unitRef, 26]);
+  });
+
+  it("filters by the derived public entity reference inside the tenant-scoped query", async () => {
+    const fixture = database([]);
+    const repository = new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId);
+    await repository.list({ workspaceId, entityRef: "entity_0123456789abcdef", campaignRef: null, before: null, limit: 26 });
+    const query = fixture.queries[0]!;
+    expect(query.sql).toContain("coalesce(unit.campaign_id, unit.ad_set_id, unit.ad_id)");
+    expect(query.sql).toContain("digest($3::text || ':entity:'");
+    expect(query.params).toEqual([workspaceId, "entity_0123456789abcdef", workspaceId, "entity_0123456789abcdef", null, workspaceId, null, null, null, null, 26]);
+    expect(query.sql).not.toContain("campaign_alpha");
+  });
+
+  it("resolves a campaign scope through direct, ad-set, or ad unit bindings", async () => {
+    const fixture = database([]);
+    const repository = new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId);
+    await repository.list({ workspaceId, entityRef: null, campaignRef: "entity_0123456789abcdef", before: null, limit: 26 });
+    const query = fixture.queries[0]!;
+    expect(query.sql).toContain("left join meta_ad_sets unit_ad_set");
+    expect(query.sql).toContain("left join meta_ads unit_ad");
+    expect(query.sql).toContain("coalesce(unit.campaign_id, unit_ad_set.campaign_id, unit_ad.campaign_id)");
+    expect(query.params).toEqual([workspaceId, null, workspaceId, null, "entity_0123456789abcdef", workspaceId,
+      "entity_0123456789abcdef", null, null, null, 26]);
   });
 
   it("returns tenant-bound detail and null for not found", async () => {
@@ -124,7 +162,11 @@ describe("Approval Queue Drizzle read repository", () => {
     const result = await new DrizzleApprovalQueueReadRepository(found.db as never, workspaceId)
       .get({ workspaceId, unitRef });
     expect(result?.unitRef).toBe(unitRef);
+    expect(result?.sourceEvidence).toEqual([{ kind: "budget_proposal", label: "Bütçe önerisi", integrity: "hash_verified" }]);
+    expect(result?.decisionHistory).toEqual([{ decision: "proposed", occurredAt: "2026-08-07T13:00:00.000Z", reasonCode: null }]);
     expect(found.queries[0]?.sql).toContain("unit.workspace_id = $1::uuid and unit.unit_ref = $2");
+    expect(found.queries[0]?.sql).toContain("unit.summary_payload, unit.summary_hash");
+    expect(found.queries[0]?.sql).toContain("unit_changes_requested");
     expect(found.queries[0]?.params).toEqual([workspaceId, unitRef]);
 
     await expect(new DrizzleApprovalQueueReadRepository(database([]).db as never, workspaceId)
@@ -134,24 +176,48 @@ describe("Approval Queue Drizzle read repository", () => {
   it("projects append-only decision and dependency event state instead of the initial fixture state", async () => {
     const fixture = database([sourceRow({
       current_event_type: "unit_approved",
+      decision_timeline: [{ event_type: "unit_approved", occurred_at: "2026-08-07T13:30:00.000Z", reason_code: "human.confirmed" }],
       dependencies: [{ unit_ref: "action_unit_cccccccccccccccccccc", status: "changes_requested" }],
     })]);
     const result = await new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId)
       .get({ workspaceId, unitRef });
-    expect(result).toMatchObject({ status: "approved", dependencies: [{ status: "changes_requested" }] });
+    expect(result).toMatchObject({ status: "approved", dependencies: [{ status: "changes_requested" }],
+      decisionHistory: [{ decision: "proposed" }, { decision: "approved", reasonCode: "human.confirmed" }] });
     expect(fixture.queries[0]?.sql).toContain("jsonb_array_elements(decision.event_payloads)");
+  });
+
+  it.each([
+    ["a summary whose stored hash no longer matches", () => sourceRow({ summary_hash: "f".repeat(64) })],
+    ["an unsafe source-evidence label despite a matching summary hash", () => {
+      const row = sourceRow();
+      const summary = { ...(row.summary_payload as Record<string, unknown>), evidence: [{ evidenceRef: "budget_proposal_alpha", label: "act_123456789012" }] };
+      return { ...row, summary_payload: summary, summary_hash: summaryHashOf(summary) };
+    }],
+    ["a malformed before/after summary pair despite a matching hash", () => {
+      const row = sourceRow();
+      const summary = { ...(row.summary_payload as Record<string, unknown>), before: { label: "Günlük bütçe", value: "₺1.000", extra: true } };
+      return { ...row, summary_payload: summary, summary_hash: summaryHashOf(summary) };
+    }],
+    ["a decision event ordered before the proposal", () => sourceRow({ decision_timeline: [
+      { event_type: "unit_approved", occurred_at: "2026-08-07T12:59:59.000Z", reason_code: "human.confirmed" },
+    ] })],
+  ])("fails closed on invalid detail projection: %s", async (_label, make) => {
+    const fixture = database([make()]);
+    await expect(new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId)
+      .get({ workspaceId, unitRef }))
+      .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "corrupt_store" }));
   });
 
   it("rejects cross-tenant access and malformed inputs before database I/O", async () => {
     const fixture = database();
     const repository = new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId);
-    await expect(repository.list({ workspaceId: foreignWorkspaceId, before: null, limit: 26 }))
+    await expect(repository.list({ workspaceId: foreignWorkspaceId, entityRef: null, campaignRef: null, before: null, limit: 26 }))
       .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "workspace_scope_mismatch" }));
     await expect(repository.get({ workspaceId: foreignWorkspaceId, unitRef }))
       .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "workspace_scope_mismatch" }));
-    await expect(repository.list({ workspaceId, before: null, limit: 0 }))
+    await expect(repository.list({ workspaceId, entityRef: null, campaignRef: null, before: null, limit: 0 }))
       .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "invalid_input" }));
-    await expect(repository.list({ workspaceId: 7, before: null, limit: 26 } as never))
+    await expect(repository.list({ workspaceId: 7, entityRef: null, campaignRef: null, before: null, limit: 26 } as never))
       .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "invalid_input" }));
     await expect(repository.get({ workspaceId, unitRef, execute: true } as never))
       .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "invalid_input" }));
@@ -174,7 +240,7 @@ describe("Approval Queue Drizzle read repository", () => {
   ])("fails closed on malformed persisted %s", async (_label, make) => {
     const fixture = database([make()]);
     await expect(new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId)
-      .list({ workspaceId, before: null, limit: 26 }))
+      .list({ workspaceId, entityRef: null, campaignRef: null, before: null, limit: 26 }))
       .rejects.toEqual(expect.objectContaining<Partial<ApprovalQueueDrizzleReadError>>({ code: "corrupt_store" }));
   });
 });

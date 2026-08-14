@@ -8,18 +8,18 @@ import { CATEGORY_PROFILE_VERSION } from "@/domain/categories/category-profile";
 import type { EffectiveAnalysisContextFacts, EffectiveAnalysisContextRequest,
   EffectiveAnalysisContextSource, EffectiveAnalysisContextReadySource, RepositoryVerifiedAuthority } from "@/application/effective-analysis-context-composer";
 import { DrizzleCurrentCategoryCompositionReader, resolveCurrentCategoryCompositionInSnapshot,
-  type CurrentCategoryComposition } from "@/application/current-category-composition-resolver";
+  CurrentCategoryCompositionError, type CurrentCategoryComposition } from "@/application/current-category-composition-resolver";
 import { categoryDefinitionPublicRef } from "@/domain/categories/public-reference";
 import { buildEffectiveGuidancePack, type EffectiveGuidancePack } from "@/domain/guidance/registry";
 import { projectMetaAnalysisConfig } from "@/domain/meta/analysis-config-projection";
 import type { CategoryHierarchyTarget } from "@/domain/categories/service";
-import { CurrentDecisionCadenceReader, type CurrentDecisionCadence } from "@/connectors/decisions/current-decision-cadence-reader";
-import { CurrentReviewedGuidanceReader, type CurrentReviewedGuidanceManifest } from "@/connectors/guidance/current-reviewed-guidance-reader";
-import { CurrentGuidanceCampaignSelectionReader } from "@/connectors/guidance/current-guidance-campaign-selection-reader";
+import { CurrentDecisionCadenceReader, CurrentDecisionCadenceReaderError, type CurrentDecisionCadence } from "@/connectors/decisions/current-decision-cadence-reader";
+import { CurrentReviewedGuidanceReader, CurrentReviewedGuidanceReaderError, type CurrentReviewedGuidanceManifest } from "@/connectors/guidance/current-reviewed-guidance-reader";
+import { CurrentGuidanceCampaignSelectionReader, CurrentGuidanceCampaignSelectionReaderError } from "@/connectors/guidance/current-guidance-campaign-selection-reader";
 import type { GuidanceCampaignSelection } from "@/connectors/guidance/guidance-campaign-selection-drizzle-repository";
-import { CurrentMetaHierarchyConfigReader, type CurrentMetaHierarchyConfig } from "@/connectors/meta/current-meta-hierarchy-config-reader";
+import { CurrentMetaHierarchyConfigReader, CurrentMetaHierarchyConfigReaderError, type CurrentMetaHierarchyConfig } from "@/connectors/meta/current-meta-hierarchy-config-reader";
 import { DrizzleInstructionPolicyLifecycleRepository } from "@/connectors/policies/instruction-policy-lifecycle-drizzle-repository";
-import { DrizzleTrustedPolicyAuthorityRepository, type LoadedTrustedPolicyAuthority } from "@/connectors/policies/trusted-policy-authority-drizzle-repository";
+import { DrizzleTrustedPolicyAuthorityRepository, TrustedPolicyAuthorityRepositoryError, type LoadedTrustedPolicyAuthority } from "@/connectors/policies/trusted-policy-authority-drizzle-repository";
 import { DrizzlePromotionTemplateLifecycleRepository } from "@/connectors/meta/promotion/promotion-template-lifecycle-drizzle-repository";
 import type { PromotionTemplateLifecycleState } from "@/application/promotion-template-lifecycle-service";
 import type { InstructionPolicyLifecycleState } from "@/application/instruction-policy-lifecycle-service";
@@ -28,6 +28,31 @@ import * as schema from "@/db/schema";
 type Database = NodePgDatabase<typeof schema>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const WORKSPACE_REF = /^workspace_[a-z0-9][a-z0-9_.:-]{0,126}$/;
+const SOURCE_FAILURE_CODES = new Set([
+  "scope_not_found", "category_scope_unavailable", "category_hierarchy_unavailable",
+  "guidance_pack_unavailable", "policy_authority_unavailable", "current_source_bundle_unavailable",
+  "guidance_selection_unavailable", "meta_scope_unavailable", "cadence_unavailable", "corrupt_store", "invalid_input",
+]);
+
+/** A finite diagnostic for server-side acceptance, never a database/driver message. */
+export class CurrentEffectiveAnalysisContextSourceReaderError extends Error {
+  constructor(readonly code: string) {
+    super(`Current effective analysis source unavailable: ${code}`);
+    this.name = "CurrentEffectiveAnalysisContextSourceReaderError";
+  }
+}
+
+function sourceFailureCode(error: unknown): string {
+  if (error instanceof CurrentEffectiveAnalysisContextSourceReaderError) return error.code;
+  if (error instanceof CurrentCategoryCompositionError) return `category_composition_${error.code}`;
+  if (error instanceof CurrentMetaHierarchyConfigReaderError) return `meta_hierarchy_${error.code}`;
+  if (error instanceof CurrentDecisionCadenceReaderError) return `cadence_${error.code}`;
+  if (error instanceof CurrentReviewedGuidanceReaderError) return `reviewed_guidance_${error.code}`;
+  if (error instanceof CurrentGuidanceCampaignSelectionReaderError) return `guidance_selection_${error.code}`;
+  if (error instanceof TrustedPolicyAuthorityRepositoryError) return `policy_authority_${error.code}`;
+  if (error instanceof Error && SOURCE_FAILURE_CODES.has(error.message)) return error.message;
+  return "source_reader_unavailable";
+}
 
 function rows(value: unknown): readonly Readonly<Record<string, unknown>>[] {
   if (!value || typeof value !== "object" || !("rows" in value) || !Array.isArray(value.rows)) {
@@ -85,6 +110,7 @@ export function buildReadyEffectiveAnalysisContextSourceInSnapshot(input: Readon
   request: EffectiveAnalysisContextRequest;
   capturedAt: string;
   hierarchy: CurrentMetaHierarchyConfig;
+  categoryTarget: CategoryHierarchyTarget;
   categories: CurrentCategoryComposition;
   guidance: EffectiveGuidancePack;
   cadence: CurrentDecisionCadence;
@@ -92,13 +118,17 @@ export function buildReadyEffectiveAnalysisContextSourceInSnapshot(input: Readon
   authority: LoadedTrustedPolicyAuthority;
   promotion: PromotionTemplateLifecycleState;
 }>): EffectiveAnalysisContextReadySource {
-  const { request, capturedAt, hierarchy, categories, guidance, cadence, lifecycle, authority, promotion } = input;
+  const { request, capturedAt, hierarchy, categoryTarget, categories, guidance, cadence, lifecycle, authority, promotion } = input;
   if (hierarchy.capturedAt !== capturedAt || hierarchy.identity.accountRef !== request.accountRef
     || hierarchy.identity.hierarchyRefs.at(-1) !== request.entityRef || categories.workspaceId !== request.workspaceId
-    || categories.dimensions.length === 0 || guidance.workspaceId !== request.workspaceId || guidance.evaluatedAt !== capturedAt
+    || categories.dimensions.length === 0 || categories.dimensions.some((dimension) => dimension.frozenContext.path.at(-1)?.id !== categoryTarget.id)
+    || guidance.workspaceId !== request.workspaceId || guidance.evaluatedAt !== capturedAt
     || cadence.decision.evaluatedAt !== capturedAt || !/^[a-f0-9]{64}$/.test(lifecycle.registryHash)
     || !/^[a-f0-9]{64}$/.test(promotion.registryHash)
     || authority.authoritySnapshot.workspaceId !== request.workspaceId
+    || !Number.isFinite(Date.parse(authority.scope.evaluatedAt))
+    || new Date(authority.scope.evaluatedAt).toISOString() !== authority.scope.evaluatedAt
+    || Date.parse(authority.scope.evaluatedAt) > Date.parse(capturedAt)
     || authority.authoritySnapshot.verifiedAt > capturedAt || authority.authoritySnapshot.expiresAt <= capturedAt
     || authority.catalog.instructionPolicyRegistryHash !== lifecycle.registryHash) throw new Error("current_source_bundle_unavailable");
   const facts: EffectiveAnalysisContextFacts = Object.freeze({
@@ -119,7 +149,7 @@ export function buildReadyEffectiveAnalysisContextSourceInSnapshot(input: Readon
       promotionRegistry: promotion.registryHash }),
   });
   const source: EffectiveAnalysisContextReadySource = Object.freeze({ status: "ready", capturedAt, facts,
-    categories: Object.freeze({ workspaceId: categories.workspaceId, dimensions: categories.dimensions.map((dimension) =>
+    categories: Object.freeze({ workspaceId: categories.workspaceId, target: categoryTarget, dimensions: categories.dimensions.map((dimension) =>
       Object.freeze({ frozenContext: dimension.frozenContext })) }), lifecycle,
     authority: authority as RepositoryVerifiedAuthority });
   // Prove all pre-authority evidence is already a valid persistence payload.
@@ -146,6 +176,57 @@ function categoryTarget(input: EffectiveAnalysisContextRequest, hierarchy: Curre
     return Object.freeze({ level: "creative", id: input.entityRef, viaAdId });
   }
   return Object.freeze({ level: input.entityType, id: input.entityRef });
+}
+
+/**
+ * Category assignments are persisted against internal Meta hierarchy UUIDs,
+ * while the immutable hierarchy reader intentionally exposes only external
+ * refs. Resolve the complete path in this same RR/RO snapshot and accept
+ * exactly one tenant-bound path—never an arbitrary external-ref match.
+ */
+export async function resolvedCategoryTarget(transaction: Pick<Database, "execute">, workspaceId: string,
+  input: EffectiveAnalysisContextRequest, hierarchy: CurrentMetaHierarchyConfig): Promise<CategoryHierarchyTarget> {
+  const external = categoryTarget(input, hierarchy);
+  const result = input.entityType === "campaign" ? await transaction.execute(sql`
+    select campaign.id::text as entity_id from ad_campaigns campaign
+    join ad_accounts account on account.workspace_id = campaign.workspace_id and account.id = campaign.ad_account_id
+    where campaign.workspace_id = ${workspaceId}::uuid and account.external_account_id = ${input.accountRef}
+      and campaign.external_campaign_id = ${external.id} and campaign.disappeared_at is null limit 2
+  `) : input.entityType === "ad_set" ? await transaction.execute(sql`
+    select ad_set.id::text as entity_id from meta_ad_sets ad_set
+    join ad_campaigns campaign on campaign.workspace_id = ad_set.workspace_id and campaign.id = ad_set.campaign_id
+    join ad_accounts account on account.workspace_id = campaign.workspace_id and account.id = campaign.ad_account_id
+    where ad_set.workspace_id = ${workspaceId}::uuid and account.external_account_id = ${input.accountRef}
+      and campaign.external_campaign_id = ${hierarchy.identity.campaignRef} and ad_set.external_ad_set_id = ${external.id}
+      and campaign.disappeared_at is null and ad_set.disappeared_at is null limit 2
+  `) : input.entityType === "ad" ? await transaction.execute(sql`
+    select ad.id::text as entity_id from meta_ads ad
+    join meta_ad_sets ad_set on ad_set.workspace_id = ad.workspace_id and ad_set.id = ad.ad_set_id
+    join ad_campaigns campaign on campaign.workspace_id = ad_set.workspace_id and campaign.id = ad_set.campaign_id
+    join ad_accounts account on account.workspace_id = campaign.workspace_id and account.id = campaign.ad_account_id
+    where ad.workspace_id = ${workspaceId}::uuid and account.external_account_id = ${input.accountRef}
+      and campaign.external_campaign_id = ${hierarchy.identity.campaignRef} and ad_set.external_ad_set_id = ${hierarchy.identity.hierarchyRefs[1]}
+      and ad.external_ad_id = ${external.id} and campaign.disappeared_at is null and ad_set.disappeared_at is null and ad.disappeared_at is null limit 2
+  `) : await transaction.execute(sql`
+    select creative.id::text as entity_id, ad.id::text as ad_id from meta_creatives creative
+    join meta_ads ad on ad.workspace_id = creative.workspace_id and ad.creative_id = creative.id
+    join meta_ad_sets ad_set on ad_set.workspace_id = ad.workspace_id and ad_set.id = ad.ad_set_id
+    join ad_campaigns campaign on campaign.workspace_id = ad_set.workspace_id and campaign.id = ad_set.campaign_id
+    join ad_accounts account on account.workspace_id = campaign.workspace_id and account.id = campaign.ad_account_id
+    where creative.workspace_id = ${workspaceId}::uuid and account.external_account_id = ${input.accountRef}
+      and campaign.external_campaign_id = ${hierarchy.identity.campaignRef} and ad_set.external_ad_set_id = ${hierarchy.identity.hierarchyRefs[1]}
+      and ad.external_ad_id = ${hierarchy.identity.hierarchyRefs[2]} and creative.external_creative_id = ${external.id}
+      and campaign.disappeared_at is null and ad_set.disappeared_at is null and ad.disappeared_at is null and creative.disappeared_at is null limit 2
+  `);
+  const candidates = rows(result);
+  if (candidates.length !== 1 || typeof candidates[0]!.entity_id !== "string" || !UUID.test(candidates[0]!.entity_id)) {
+    throw new Error("category_hierarchy_unavailable");
+  }
+  if (input.entityType === "creative") {
+    if (typeof candidates[0]!.ad_id !== "string" || !UUID.test(candidates[0]!.ad_id)) throw new Error("category_hierarchy_unavailable");
+    return Object.freeze({ level: "creative", id: candidates[0]!.entity_id, viaAdId: candidates[0]!.ad_id });
+  }
+  return Object.freeze({ level: input.entityType, id: candidates[0]!.entity_id });
 }
 
 /**
@@ -226,7 +307,7 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
   async loadCurrent(input: EffectiveAnalysisContextRequest): Promise<EffectiveAnalysisContextSource> {
     if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).length !== 4
       || !inputIsValid(input)) throw new Error("invalid_input");
-    return this.database.transaction(async (transaction) => {
+    try { return await this.database.transaction(async (transaction) => {
       const tx = transaction as unknown as Database;
       await tx.execute(sql`set transaction isolation level repeatable read, read only`);
       const scope = rows(await tx.execute(sql`
@@ -262,10 +343,11 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
       `));
       if (workspaceRefs.length !== 1 || typeof workspaceRefs[0]!.workspace_ref !== "string"
         || !WORKSPACE_REF.test(workspaceRefs[0]!.workspace_ref)) throw new Error("category_scope_unavailable");
+      const resolvedTarget = await resolvedCategoryTarget(tx, input.workspaceId, input, hierarchy);
       const categories = await this.categoryResolver.resolveInTransaction(tx, workspaceRefs[0]!.workspace_ref,
-        input.workspaceId, categoryTarget(input, hierarchy));
+        input.workspaceId, resolvedTarget);
       if (categories.workspaceId !== input.workspaceId || categories.dimensions.length === 0
-        || categories.dimensions.some((dimension) => dimension.frozenContext.path.at(-1)?.id !== input.entityRef)) {
+        || categories.dimensions.some((dimension) => dimension.frozenContext.path.at(-1)?.id !== resolvedTarget.id)) {
         throw new Error("corrupt_store");
       }
       const cadence: CurrentDecisionCadence = await this.cadenceReader.readCurrentInTransaction(tx, {
@@ -296,13 +378,18 @@ export class DrizzleCurrentEffectiveAnalysisContextSourceReader {
       });
       if (!/^[a-f0-9]{64}$/.test(lifecycle.registryHash)
         || authority.authoritySnapshot.workspaceId !== input.workspaceId
+        || !Number.isFinite(Date.parse(authority.scope.evaluatedAt))
+        || new Date(authority.scope.evaluatedAt).toISOString() !== authority.scope.evaluatedAt
+        || Date.parse(authority.scope.evaluatedAt) > Date.parse(capturedAt)
         || authority.authoritySnapshot.verifiedAt > capturedAt || authority.authoritySnapshot.expiresAt <= capturedAt
         || authority.catalog.instructionPolicyRegistryHash !== lifecycle.registryHash) {
         throw new Error("policy_authority_unavailable");
       }
       const promotion = await this.promotionReader.inspectInTransaction(tx, input.workspaceId);
-      return buildReadyEffectiveAnalysisContextSourceInSnapshot({ request: input, capturedAt, hierarchy, categories,
+      return buildReadyEffectiveAnalysisContextSourceInSnapshot({ request: input, capturedAt, hierarchy, categoryTarget: resolvedTarget, categories,
         guidance: pack, cadence, lifecycle, authority, promotion });
-    });
+    }); } catch (error) {
+      throw new CurrentEffectiveAnalysisContextSourceReaderError(sourceFailureCode(error));
+    }
   }
 }

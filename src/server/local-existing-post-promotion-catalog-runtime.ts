@@ -6,11 +6,14 @@ import * as schema from "@/db/schema";
 import {
   createExistingPostPromotionCatalogHttpHandler,
   existingPostPromotionCatalogNotConfiguredResponse,
+  existingPostPromotionCatalogSessionRequiredResponse,
 } from "@/server/existing-post-promotion-catalog-http";
 import {
+  LocalDecisionRoomBoundaryError,
   resolveTrustedLocalReadPrincipal,
   type LocalDecisionRoomConfig,
 } from "@/server/local-decision-room-runtime";
+import { LocalSessionCapabilityError } from "@/security/local-session-capability";
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -23,8 +26,11 @@ export function createLocalExistingPostPromotionCatalogRouteHandler(input: Reado
     try {
       // This dashboard surface is intentionally browser-cookie only. Reject a
       // bearer before membership or catalog storage is touched.
-      if (request.headers.has("authorization") || !request.headers.get("cookie")) {
+      if (request.headers.has("authorization")) {
         return existingPostPromotionCatalogNotConfiguredResponse();
+      }
+      if (!request.headers.get("cookie")) {
+        return existingPostPromotionCatalogSessionRequiredResponse();
       }
       const bound = await resolveTrustedLocalReadPrincipal({
         request,
@@ -41,10 +47,11 @@ export function createLocalExistingPostPromotionCatalogRouteHandler(input: Reado
         origin: input.config.origin,
         resolvePrincipal: async () => bound.principal,
       })(request);
-    } catch {
-      return existingPostPromotionCatalogNotConfiguredResponse();
+    } catch (reason) {
+      return reason instanceof LocalDecisionRoomBoundaryError || reason instanceof LocalSessionCapabilityError
+        ? existingPostPromotionCatalogSessionRequiredResponse() : existingPostPromotionCatalogNotConfiguredResponse();
     }
   };
 }
 
-export { existingPostPromotionCatalogNotConfiguredResponse };
+export { existingPostPromotionCatalogNotConfiguredResponse, existingPostPromotionCatalogSessionRequiredResponse };

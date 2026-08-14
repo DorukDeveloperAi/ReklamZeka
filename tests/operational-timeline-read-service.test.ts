@@ -1,0 +1,51 @@
+import { describe, expect, it } from "vitest";
+import { OperationalTimelineReadError, OperationalTimelineReadService } from "@/application/operational-timeline-read-service";
+
+const principal = { actor: { userId: "11111111-1111-4111-8111-111111111111" }, workspaceId: "22222222-2222-4222-8222-222222222222", workspaceRef: "workspace_demo", readerRef: "reader_demo" } as const;
+const memberships = [{ workspaceId: principal.workspaceId, userId: principal.actor.userId, role: "viewer" as const }];
+describe("operational timeline read service", () => {
+  it("returns only a timestamped, authority-closed cross-ledger projection", async () => {
+    const service = new OperationalTimelineReadService({ list: async () => [{ kind: "delivery_alert" as const,
+      occurredAt: "2026-08-13T12:00:00.000Z", title: "Şüpheli teslimat kesintisi", detail: "Alarm durumu: açık" }] }, memberships);
+    await expect(service.list(principal)).resolves.toMatchObject({ contractVersion: "operational-timeline/1.0.0",
+      authority: { readOnly: true, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false, canEnableAutomation: false } });
+  });
+  it("rejects private identifiers rather than leaking them through the timeline", async () => {
+    const service = new OperationalTimelineReadService({ list: async () => [{ kind: "slice_rule_draft" as const,
+      occurredAt: "2026-08-13T12:00:00.000Z", title: "Kural", detail: "11111111-1111-4111-8111-111111111111" }] }, memberships);
+    await expect(service.list(principal)).rejects.toBeInstanceOf(OperationalTimelineReadError);
+  });
+  it("admits a public-safe persisted budget proposal trace but keeps every authority closed", async () => {
+    const service = new OperationalTimelineReadService({ list: async () => [{ kind: "budget_proposal" as const,
+      occurredAt: "2026-08-13T12:00:00.000Z", title: "Bütçe önerisi taslağı kaydedildi",
+      detail: "Revizyon 2 · 3 senaryo · uygulama yetkisi yok" }] }, memberships);
+    await expect(service.list(principal)).resolves.toMatchObject({ items: [expect.objectContaining({ kind: "budget_proposal" })],
+      authority: { canApprove: false, canExecute: false, canWriteMeta: false } });
+  });
+  it("keeps an exact rule-linked proposal as a public-safe timeline description", async () => {
+    const service = new OperationalTimelineReadService({ list: async () => [{ kind: "budget_proposal" as const,
+      occurredAt: "2026-08-13T12:00:00.000Z", title: "Bütçe önerisi taslağı kaydedildi",
+      detail: "Revizyon 2 · 3 senaryo · exact kural kaynağı bağlı · uygulama yetkisi yok" }] }, memberships);
+    await expect(service.list(principal)).resolves.toMatchObject({ items: [expect.objectContaining({
+      detail: expect.stringContaining("kural kaynağı bağlı"),
+    })] });
+  });
+  it("admits only a public-safe temporal evaluation projection with no action authority", async () => {
+    const service = new OperationalTimelineReadService({ list: async () => [{ kind: "temporal_evaluation" as const,
+      occurredAt: "2026-08-13T12:00:00.000Z", title: "Zamansal kural değerlendirmesi kaydedildi",
+      detail: "Öneri üretildi · window ready · uygulama yetkisi yok" }] }, memberships);
+    await expect(service.list(principal)).resolves.toMatchObject({ items: [expect.objectContaining({ kind: "temporal_evaluation" })],
+      authority: { canApprove: false, canExecute: false, canWriteMeta: false } });
+  });
+  it("passes only an opaque campaign alias to the repository for a campaign trace", async () => {
+    let received: unknown = null;
+    const service = new OperationalTimelineReadService({ list: async (input) => { received = input; return []; } }, memberships);
+    await expect(service.list(principal, { campaignRef: "ref_abcdef012345" })).resolves.toMatchObject({ items: [] });
+    expect(received).toEqual({ workspaceId: principal.workspaceId, limit: 50, campaignRef: "ref_abcdef012345" });
+  });
+  it("rejects private, malformed, or cross-contract campaign filter input before reading", async () => {
+    const service = new OperationalTimelineReadService({ list: async () => [] }, memberships);
+    await expect(service.list(principal, { campaignRef: "campaign_123" })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(service.list(principal, { campaignRef: "11111111-1111-4111-8111-111111111111" })).rejects.toMatchObject({ code: "invalid_input" });
+  });
+});
