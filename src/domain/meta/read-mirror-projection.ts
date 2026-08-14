@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { metaPublicReference } from "@/domain/meta/public-reference";
 
 export const META_READ_MIRROR_PROJECTION_VERSION = "meta-read-mirror-projection/1.0.0" as const;
 
@@ -165,9 +165,7 @@ const STREAM_READY = new Set(["completed"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function fail(code: MetaReadMirrorProjectionError["code"]): never { throw new MetaReadMirrorProjectionError(code); }
-function ref(kind: "connection" | "account" | "campaign" | "ad_set" | "ad" | "creative" | "post", workspaceId: string, id: string): string {
-  return `${kind}_${createHash("sha256").update(`${workspaceId}\u0000${kind}\u0000${id}`).digest("hex").slice(0, 24)}`;
-}
+const ref = metaPublicReference;
 function iso(value: string | null): string | null {
   if (value === null) return null;
   if (!Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) fail("corrupt_store");

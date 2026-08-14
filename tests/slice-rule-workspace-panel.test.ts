@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  buildSliceRuleBudgetImpactCommand,
+  buildTypedBudgetImpactCommand,
   buildSliceRuleDraftCommand,
   classifySliceRuleBudgetImpactFailure,
   EMPTY_SLICE_RULE_FORM,
@@ -128,21 +128,14 @@ describe("Slice Rule Workspace panel", () => {
       authority: { ...snapshot.authority, canWriteMeta: true } })).toThrow("güvenli sözleşmeyi");
   });
 
-  it("builds an impact request only from a saved exact supported draft", () => {
-    const budgetCommand = { scope: { adAccountId: "33333333-3333-4333-8333-333333333333",
-      campaignId: "44444444-4444-4444-8444-444444444444", contextHash: "c".repeat(64) },
-      seriesRef: "budget.preview", revision: 1, previousProposalHash: "GENESIS",
-      idempotencyKey: "budget.preview.r1", createdAt: "2026-08-13T10:01:00.000Z",
-      scenarios: [{ scenarioRef: "scenario.keep" }], outcomeProxy: null };
-    expect(buildSliceRuleBudgetImpactCommand(item, JSON.stringify(budgetCommand))).toMatchObject({
-      seriesRef: item.seriesRef, expectedDraftRef: item.draftRef, expectedDraftHash: item.draftHash,
-      expectedScope: item.scope, budgetCommand,
-    });
-    expect(buildSliceRuleBudgetImpactCommand(undefined, JSON.stringify(budgetCommand))).toBeNull();
-    expect(buildSliceRuleBudgetImpactCommand({ ...item, operatingRule: { ...item.operatingRule,
-      rule: { kind: "delivery_guardrail", condition: "delivery_interrupted", response: "needs_human_review" } } },
-    JSON.stringify(budgetCommand))).toBeNull();
-    expect(buildSliceRuleBudgetImpactCommand(item, JSON.stringify({ ...budgetCommand, canExecute: true }))).toBeNull();
+  it("builds a typed impact command without browser-visible frozen identifiers", () => {
+    const form = { label: "keep", mode: "keep" as const, requestedBudgetDecimal: "120.00", startDate: "2026-08-01", endDate: "2026-08-31" };
+    const command = buildTypedBudgetImpactCommand(item, form);
+    expect(command).toMatchObject({ label: "keep", requestedBudgetDecimal: "120.00" });
+    expect(JSON.stringify(command)).not.toMatch(/adAccountId|campaignId|contextHash/);
+    expect(buildTypedBudgetImpactCommand(undefined, form)).toBeNull();
+    expect(buildTypedBudgetImpactCommand({ ...item, operatingRule: { ...item.operatingRule,
+      rule: { kind: "delivery_guardrail", condition: "delivery_interrupted", response: "needs_human_review" } } }, form)).toBeNull();
   });
 
   it("accepts only an exact, non-persistent and authority-closed impact response", () => {

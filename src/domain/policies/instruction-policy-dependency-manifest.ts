@@ -35,9 +35,12 @@ const opaquePolicyContext = new Set([
   "action_preparation_gate_snapshots.snapshot_payload",
   "orchestrator_profile_revisions.payload",
   "orchestrator_playbook_revisions.payload",
+  "orchestrator_interview_kit_revisions.payload",
+  "orchestrator_interview_kit_revisions.source_snapshot",
   "orchestrator_conversation_turns.profile_snapshot",
   "orchestrator_conversation_turns.manifest_snapshots",
   "orchestrator_conversation_turns.playbook_snapshots",
+  "orchestrator_conversation_turns.interview_kit_snapshots",
   // Immutable aggregate turn evidence is historical context only; it cannot
   // become a policy authority dependency during impact evaluation.
   "orchestrator_conversation_turns.evidence_context_snapshot",

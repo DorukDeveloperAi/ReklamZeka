@@ -55,7 +55,10 @@ export function CanonicalPerformancePanel() {
   useEffect(() => { void refresh(); }, [refresh]);
   const selectedAccount = useMemo(() => projection?.accounts.find((account) => account.accountRef === selectedAccountRef) ?? null, [projection, selectedAccountRef]);
   const window = selectedAccount?.windows.find((candidate) => candidate.days === 7) ?? null;
-  const ready = state === "ready" && projection?.source.state === "ready" && window?.state === "ready";
+  // A portfolio may be partial because another account lacks coverage. That must
+  // stay visible in the source strip, but it must not hide a selected account's
+  // independently complete, single-currency seven-day window.
+  const ready = state === "ready" && window?.state === "ready";
   const waiting = state === "loading" ? "Kanonik insight okunuyor" : state === "session_required" ? "Yerel oturum gerekli" : projection?.source ? sourceLabel(projection.source) : "Kapsam yetersiz";
   const sourceDetail = projection?.source.freshnessAt ? `Son kaynak: ${new Date(projection.source.freshnessAt).toLocaleString("tr-TR")}` : reasons(window, projection?.source ?? null);
   return <section aria-label="Canlı performans durumu">

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { BudgetLabDraftCommand, BudgetLabDraftResult } from "@/application/budget-lab-draft-service";
+import type { BudgetLabDraftResult } from "@/application/budget-lab-draft-service";
+import type { UserBudgetScenarioCommand } from "@/application/slice-rule-budget-impact-context-candidate-service";
 import type { SliceRule } from "@/domain/campaigns/slice-operating-rule";
 import styles from "./slice-rule-workspace-panel.module.css";
 
@@ -143,20 +144,10 @@ const EMPTY_FORM: Form = Object.freeze({ seriesRef: "", market: "international",
   distributionAllocations: "", continuationPercent: "80", evaluationWindowDays: "7",
   condition: "delivery_interrupted", priority: "50", metric: "cost_per_qualified_lead", reviewCadence: "weekly",
   rollbackWhen: "Yeni sonuç kanıtı, teslimat kesintisi veya kapsam değişimi insan incelemesini gerektirirse." });
-const EMPTY_BUDGET_COMMAND = `{
-  "scope": {
-    "adAccountId": "",
-    "campaignId": "",
-    "contextHash": ""
-  },
-  "seriesRef": "budget.preview",
-  "revision": 1,
-  "previousProposalHash": "GENESIS",
-  "idempotencyKey": "budget.preview.r1",
-  "createdAt": "",
-  "scenarios": [],
-  "outcomeProxy": null
-}`;
+type BudgetImpactContextCandidate = Readonly<{ candidateRef: string; campaignRef: string; capturedAt: string; currency: string; currentBudgetDecimal: string; scope: Scope }>;
+type BudgetImpactContextCandidateSnapshot = Readonly<{ contractVersion: "slice-rule-budget-impact-context-candidates/1.0.0"; seriesRef: string; candidates: readonly BudgetImpactContextCandidate[]; authority: Readonly<{ canPreview: false; canSave: false; canApprove: false; canExecute: false; canWriteMeta: false }> }>;
+type TypedScenarioForm = Readonly<{ label: string; mode: "keep" | "conservative"; requestedBudgetDecimal: string; startDate: string; endDate: string }>;
+const EMPTY_TYPED_SCENARIO: TypedScenarioForm = Object.freeze({ label: "keep", mode: "keep", requestedBudgetDecimal: "", startDate: "", endDate: "" });
 
 function object(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -321,21 +312,17 @@ export function parseTemporalEvaluationCandidates(value: unknown): readonly Temp
   return value.candidates as TemporalCandidate[];
 }
 
-export function buildSliceRuleBudgetImpactCommand(item: SliceRuleWorkspaceItem | undefined, raw: string) {
-  if (!item || item.status !== "draft" || item.operatingMode !== "recommendation_only" || !isClosed(item.authority)
-    || !isClosed(item.operatingRule.authority) || item.operatingRule.rule.kind === "delivery_guardrail") return null;
-  let budgetCommand: unknown;
-  try { budgetCommand = JSON.parse(raw); } catch { return null; }
-  if (!object(budgetCommand) || !noOpenedAuthority(budgetCommand)
-    || Object.keys(budgetCommand).sort().join("|") !== ["createdAt", "idempotencyKey", "outcomeProxy",
-      "previousProposalHash", "revision", "scenarios", "scope", "seriesRef"].sort().join("|")
-    || !object(budgetCommand.scope) || Object.keys(budgetCommand.scope).sort().join("|")
-      !== ["adAccountId", "campaignId", "contextHash"].sort().join("|")
-    || !Array.isArray(budgetCommand.scenarios) || budgetCommand.scenarios.length < 1
-    || budgetCommand.scenarios.length > 3) return null;
-  return Object.freeze({ seriesRef: item.seriesRef, expectedDraftRef: item.draftRef,
-    expectedDraftHash: item.draftHash, expectedScope: item.scope,
-    budgetCommand: budgetCommand as unknown as BudgetLabDraftCommand });
+/** Converts only decision-relevant user input. Mirror/pacing/allocation proof stays server-only. */
+export function buildTypedBudgetImpactCommand(item: SliceRuleWorkspaceItem | undefined, form: TypedScenarioForm): UserBudgetScenarioCommand | null {
+  if (!item || item.operatingRule.rule.kind === "delivery_guardrail" || !isClosed(item.authority)) return null;
+  if (!/^[a-z][a-z0-9_.:-]{0,127}$/.test(form.label) || !["keep", "conservative"].includes(form.mode) || !/^(0|[1-9]\d{0,29})(?:\.\d{1,2})?$/.test(form.requestedBudgetDecimal) || !/^\d{4}-\d{2}-\d{2}$/.test(form.startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(form.endDate) || form.startDate > form.endDate) return null;
+  return Object.freeze({ ...form });
+}
+export function parseBudgetImpactContextCandidates(value: unknown): BudgetImpactContextCandidateSnapshot {
+  if (!object(value) || value.contractVersion !== "slice-rule-budget-impact-context-candidates/1.0.0" || typeof value.seriesRef !== "string" || !Array.isArray(value.candidates)
+    || !object(value.authority) || value.authority.canPreview !== false || value.authority.canSave !== false || value.authority.canApprove !== false || value.authority.canExecute !== false || value.authority.canWriteMeta !== false
+    || !value.candidates.every((candidate) => object(candidate) && Object.keys(candidate).length === 6 && /^budget_impact_context_[a-f0-9]{24}$/.test(String(candidate.candidateRef)) && /^campaign_[a-f0-9]{16}$/.test(String(candidate.campaignRef)) && typeof candidate.capturedAt === "string" && /^[A-Z]{3}$/.test(String(candidate.currency)) && /^(0|[1-9]\d{0,29})(?:\.\d{1,2})?$/.test(String(candidate.currentBudgetDecimal)) && isScope(candidate.scope))) throw new Error("Bütçe etki bağlam aday sözleşmesi güvenli değil.");
+  return value as unknown as BudgetImpactContextCandidateSnapshot;
 }
 
 export function parseSliceRuleBudgetImpactResult(value: unknown, expected: SliceRuleWorkspaceItem): ImpactResult {
@@ -507,7 +494,8 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   const [headRef, setHeadRef] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [impactRaw, setImpactRaw] = useState(EMPTY_BUDGET_COMMAND);
+  const [scenarioForm, setScenarioForm] = useState<TypedScenarioForm>(EMPTY_TYPED_SCENARIO);
+  const [impactContexts, setImpactContexts] = useState<Readonly<{ status: "idle" | "loading" | "ready" | "unavailable"; candidates: readonly BudgetImpactContextCandidate[]; selectedRef: string; message?: string }>>({ status: "idle", candidates: [], selectedRef: "" });
   const [impactState, setImpactState] = useState<ImpactState>({ status: "idle" });
   const [selection, setSelection] = useState<SelectionState>({ status: "loading" });
   const [approvalQueue, setApprovalQueue] = useState<ApprovalQueueState>({ status: "loading" });
@@ -522,7 +510,8 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     ? poolBinding.snapshot.hierarchy?.nodes.filter((node) => node.market === head.scope.market) ?? [] : [];
   const editableHead = head === undefined || isEditableRule(head.operatingRule.rule);
   const command = useMemo(() => editableHead ? buildSliceRuleDraftCommand(form, head) : null, [editableHead, form, head]);
-  const impactCommand = useMemo(() => frozenPoolBinding ? buildSliceRuleBudgetImpactCommand(head, impactRaw) : null, [head, impactRaw, frozenPoolBinding]);
+  const impactCommand = useMemo(() => frozenPoolBinding ? buildTypedBudgetImpactCommand(head, scenarioForm) : null, [head, scenarioForm, frozenPoolBinding]);
+  const selectedImpactContext = impactContexts.candidates.find((candidate) => candidate.candidateRef === impactContexts.selectedRef) ?? null;
   const update = <K extends keyof Form>(key: K, value: Form[K]) => setForm((current) => ({ ...current, [key]: value }));
   const loadSelectionCandidates = useCallback(async () => {
     try {
@@ -579,6 +568,16 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     } catch (reason) { setPoolBinding({ status: "unavailable", message: reason instanceof Error ? reason.message : "Bütçe havuzu bağları okunamadı." }); }
   }, []);
   useEffect(() => { void loadPoolBinding(); }, [loadPoolBinding]);
+  const loadImpactContexts = useCallback(async (seriesRef: string) => {
+    setImpactContexts({ status: "loading", candidates: [], selectedRef: "" });
+    try {
+      const response = await fetch(`/api/slice-rule-budget-impact-context-candidates?${new URLSearchParams({ seriesRef })}`, { cache: "no-store", credentials: "same-origin", headers: { "X-ReklamZeka-Intent": "slice-rule-budget-impact-context-candidates-read" } });
+      if (!response.ok) throw new Error("Bütçe etki bağlamları okunamadı.");
+      const result = parseBudgetImpactContextCandidates(await response.json());
+      setImpactContexts({ status: "ready", candidates: result.candidates, selectedRef: "" });
+    } catch (reason) { setImpactContexts({ status: "unavailable", candidates: [], selectedRef: "", message: reason instanceof Error ? reason.message : "Bütçe etki bağlamları okunamadı." }); }
+  }, []);
+  useEffect(() => { if (head && frozenPoolBinding && head.operatingRule.rule.kind !== "delivery_guardrail") void loadImpactContexts(head.seriesRef); else setImpactContexts({ status: "idle", candidates: [], selectedRef: "" }); }, [frozenPoolBinding, head, loadImpactContexts]);
   const applyScopeCandidate = (candidate: ScopeCandidate) => {
     setHeadRef(null); setImpactState({ status: "idle" });
     setForm((current) => ({ ...current, market: candidate.scope.market, serviceRef: candidate.scope.serviceRef,
@@ -656,8 +655,8 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
       setImpactState({ status: "unsupported", message: "Teslimat koruması bütçe etki önizlemesi üretmez. Bu kural delivery inceleme akışında değerlendirilir." });
       return;
     }
-    if (!impactCommand) {
-      setImpactState({ status: "error", message: "Exact Budget Lab dry-run komutu eksik veya geçersiz. En az bir açık senaryo ve frozen context kimlikleri gerekir." });
+    if (!impactCommand || !selectedImpactContext) {
+      setImpactState({ status: "error", message: "Önizleme için doğrulanmış bir frozen bağlam ve eksiksiz kullanıcı senaryosu gerekir." });
       return;
     }
     const requestedHead = head;
@@ -665,7 +664,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     try {
       const response = await fetch("/api/slice-rule-workspace", { method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-budget-impact-preview" },
-        body: JSON.stringify({ command: impactCommand }) });
+        body: JSON.stringify({ command: { seriesRef: requestedHead.seriesRef, candidateRef: selectedImpactContext?.candidateRef, budgetCommand: impactCommand } }) });
       const payload = await response.json() as { error?: { code?: string } };
       if (!response.ok) { setImpactState(classifySliceRuleBudgetImpactFailure(payload.error?.code, response.status)); return; }
       setImpactState({ status: "ready", result: parseSliceRuleBudgetImpactResult(payload, requestedHead) });
@@ -675,13 +674,13 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     }
   };
   const saveAdvisoryDraft = async () => {
-    if (!head || impactState.status !== "ready" || !impactCommand) return;
+    if (!head || impactState.status !== "ready" || !impactCommand || !selectedImpactContext) return;
     const requestedHead = head;
     setImpactState({ status: "loading" });
     try {
       const response = await fetch("/api/slice-rule-workspace", { method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-budget-impact-save" },
-        body: JSON.stringify({ command: impactCommand }) });
+        body: JSON.stringify({ command: { seriesRef: requestedHead.seriesRef, candidateRef: selectedImpactContext?.candidateRef, budgetCommand: impactCommand } }) });
       const payload = await response.json() as { error?: { code?: string } };
       if (!response.ok) { setImpactState(classifySliceRuleBudgetImpactFailure(payload.error?.code, response.status)); return; }
       setImpactState({ status: "saved", result: parseSliceRuleBudgetImpactSavedResult(payload, requestedHead) });
@@ -755,11 +754,17 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
           {head && head.operatingRule.rule.kind !== "delivery_guardrail" && !frozenPoolBinding ? <p className={styles.impactNotice} role="status"><strong>Önizleme kapalı.</strong> Bu bütçeyi etkileyen taslak için önce aynı pazar içindeki immutable bütçe havuzu bağını kaydedin.</p> : null}
           {head?.operatingRule.rule.kind === "delivery_guardrail" ? <p className={styles.impactNotice} role="status"><strong>Desteklenmiyor.</strong> Teslimat koruması doğrudan bütçe senaryosu değildir; otomatik bir bütçe etkisi varsayılmaz.</p> : null}
           {head && head.operatingRule.rule.kind !== "delivery_guardrail" ? <>
-            <label className={styles.impactInput}>Exact Budget Lab dry-run komutu
-              <textarea value={impactRaw} onChange={(event) => { setImpactRaw(event.target.value); setImpactState({ status: "idle" }); }} rows={13} spellCheck={false} />
-              <small>Komut, sunucudaki aynı frozen campaign context ve scope kanıtıyla doğrulanır. UI kapsamı kanıt yerine geçmez.</small>
-            </label>
-            <button className={styles.preview} type="button" disabled={impactState.status === "loading" || !impactCommand}
+            <div className={styles.impactResult} aria-label="Frozen bütçe bağlamı">
+              <strong>Doğrulanmış frozen bağlam</strong>
+              <span>Bağlam yalnız sunucuda çözülür; kampanya UUID’si, hesap UUID’si ve context hash tarayıcıya gelmez.</span>
+              {impactContexts.status === "loading" ? <span>Uygun bağlamlar doğrulanıyor…</span> : null}
+              {impactContexts.status === "unavailable" ? <span role="alert">{impactContexts.message}</span> : null}
+              {impactContexts.status === "ready" && impactContexts.candidates.length === 0 ? <span>Bu immutable kapsam ve havuz için hazır bağlam yok.</span> : null}
+              {impactContexts.status === "ready" && impactContexts.candidates.length > 0 ? <label>Bağlam<select value={impactContexts.selectedRef} onChange={(event) => { setImpactContexts({ ...impactContexts, selectedRef: event.target.value }); setImpactState({ status: "idle" }); }}><option value="">Frozen bağlam seçin</option>{impactContexts.candidates.map((candidate) => <option key={candidate.candidateRef} value={candidate.candidateRef}>{candidate.campaignRef} · {candidate.currentBudgetDecimal} {candidate.currency} · {date(candidate.capturedAt)}</option>)}</select></label> : null}
+            </div>
+            <fieldset className={styles.impactInput}><legend>Kullanıcının bütçe senaryosu</legend><small>Bu form yalnız senaryo girdisini taşır. Kural, policy, onay, action veya Meta write üretmez.</small>
+              <div className={styles.fields}><label>Senaryo etiketi<input value={scenarioForm.label} onChange={(event) => setScenarioForm({ ...scenarioForm, label: event.target.value })} /></label><label>Mod<select value={scenarioForm.mode} onChange={(event) => setScenarioForm({ ...scenarioForm, mode: event.target.value as TypedScenarioForm["mode"] })}><option value="keep">Mevcutu koru</option><option value="conservative">Temkinli</option></select></label><label>İstenen bütçe<input inputMode="decimal" value={scenarioForm.requestedBudgetDecimal} onChange={(event) => setScenarioForm({ ...scenarioForm, requestedBudgetDecimal: event.target.value })} /></label><label>Dönem başlangıcı<input type="date" value={scenarioForm.startDate} onChange={(event) => setScenarioForm({ ...scenarioForm, startDate: event.target.value })} /></label><label>Dönem bitişi<input type="date" value={scenarioForm.endDate} onChange={(event) => setScenarioForm({ ...scenarioForm, endDate: event.target.value })} /></label></div><small>Mevcut bütçe, allocation, kategori/geo, zaman damgası ve pacing kanıtı yalnız seçili frozen bağlamdan sunucuda türetilir; eksikse önizleme üretilemez.</small></fieldset>
+            <button className={styles.preview} type="button" disabled={impactState.status === "loading" || !impactCommand || !selectedImpactContext}
               onClick={() => void previewImpact()}>{impactState.status === "loading" ? "Kanıt doğrulanıyor…" : "Salt-okur etkiyi önizle"}</button>
           </> : null}
           {["unsupported", "unavailable", "stale", "scope", "error"].includes(impactState.status)

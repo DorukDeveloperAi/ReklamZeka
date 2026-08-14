@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { orchestratorPageGuide } from "@/application/orchestrator-conversation";
+import { orchestratorInterviewKitSnapshotHash, orchestratorPageGuide } from "@/application/orchestrator-conversation";
 import { orchestratorConversationFromResponse } from "@/app/dashboard/operating-dashboard";
 import { DrizzleOrchestratorConversationRepository, orchestratorTurnEvidenceFromLedger } from
   "@/connectors/agents/orchestrator-conversation-drizzle-repository";
@@ -75,6 +75,20 @@ describe("orchestrator historical turn evidence projection", () => {
       authority: { canPersist: false, canCreateRule: false, canDraftPolicy: false, canExecute: false, canWriteMeta: false } } });
     expect(evidence.skillRun.receipt?.selectedSkills).toHaveLength(2);
     expect(JSON.stringify(evidence.skillRun)).not.toMatch(/profile_workspace|playbook_alpha|source_guidance|raw|prompt/i);
+  });
+
+  it("projects only an immutable source-bound user interview kit and rejects tampering", () => {
+    const snapshots = [{ kitRef: `interview_kit_${"d".repeat(32)}`, revision: 3, kitHash: "4".repeat(64), name: "Kampanya durum kontrolü",
+      source: { title: "Meta yardım", url: "https://www.facebook.com/business/help/learning", version: 7,
+        recordHash: "5".repeat(64), reviewBy: "2026-09-01T00:00:00.000Z" } }];
+    const evidence = orchestratorTurnEvidenceFromLedger(boundLedgerRow({ interview_kit_snapshots: snapshots,
+      interview_kit_binding_hash: orchestratorInterviewKitSnapshotHash(snapshots) }));
+    expect(evidence.interviewKits).toEqual({ state: "bound", kits: [{ name: "Kampanya durum kontrolü", revision: 3,
+      source: { title: "Meta yardım", url: "https://www.facebook.com/business/help/learning", version: 7,
+        reviewBy: "2026-09-01T00:00:00.000Z" } }] });
+    expect(JSON.stringify(evidence.interviewKits)).not.toContain("interview_kit_");
+    expect(orchestratorTurnEvidenceFromLedger(boundLedgerRow({ interview_kit_snapshots: [{ ...snapshots[0]!, name: "Değiştirildi" }],
+      interview_kit_binding_hash: orchestratorInterviewKitSnapshotHash(snapshots) })).interviewKits.state).toBe("missing_or_invalid");
   });
 
   it("drops malformed evidence before it reaches the dashboard and never accepts a body/source field", () => {

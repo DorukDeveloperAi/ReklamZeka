@@ -20,5 +20,6 @@ describe("canonical campaign portfolio", () => {
     expect(source).toContain("aria-pressed={selected.campaignRef === entry.campaignRef}");
     expect(source).toContain("focusDetailAfterSelectionRef.current = true");
     expect(source).toContain("ref={detailHeadingRef} tabIndex={-1}");
+    expect(source).toContain("<CampaignPerformanceEvidencePanel campaignRef={selected.campaignRef} />");
   });
 });

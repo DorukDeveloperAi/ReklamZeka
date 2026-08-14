@@ -28,8 +28,8 @@ import { campaignContextBridge } from "./campaign-planning-brief-panel";
 import { LocalSessionConnector } from "./local-session-connector";
 import { SkillCatalogContextStrip, type SkillCatalogContext } from "./skill-catalog-context-strip";
 import { SkillCatalogPanel } from "./skill-catalog-panel";
-import { OrchestratorTurnReadOnlyEvidence, OrchestratorTurnSkillRunEvidence, type OrchestratorReadOnlyEvidenceSummary,
-  type OrchestratorSkillRunSummary } from "./orchestrator-turn-evidence";
+import { OrchestratorTurnReadOnlyEvidence, OrchestratorTurnSkillRunEvidence, OrchestratorTurnInterviewKitEvidence, type OrchestratorReadOnlyEvidenceSummary,
+  type OrchestratorSkillRunSummary, type OrchestratorInterviewKitSummary } from "./orchestrator-turn-evidence";
 import {
   dashboardLocationFromSearch,
   dashboardLocationHref,
@@ -98,6 +98,7 @@ type OrchestratorTurnEvidenceSummary = Readonly<{
   uncertainty: "agent_inference_no_meta_or_action_authority";
   readOnlyEvidence: OrchestratorReadOnlyEvidenceSummary;
   skillRun: OrchestratorSkillRunSummary;
+  interviewKits: OrchestratorInterviewKitSummary;
 }>;
 type PersistedCampaignContextSummary = Readonly<{ campaignRef: string; label: string; objective: string | null; capturedAt: string; sourceState: "frozen_valid" }>;
 type PortfolioCapabilitySummary = Readonly<{
@@ -146,7 +147,7 @@ function safeHistoricalSourceUrl(value: unknown): value is string {
 }
 
 function orchestratorEvidenceFromResponse(value: unknown): OrchestratorTurnEvidenceSummary | null {
-  if (!plainRecord(value) || !onlyKeys(value, ["state", "pageGuide", "profileLabel", "skills", "playbooks", "historicalSourceState", "evidenceScope", "uncertainty", "readOnlyEvidence", "skillRun"])
+  if (!plainRecord(value) || !onlyKeys(value, ["state", "pageGuide", "profileLabel", "skills", "playbooks", "historicalSourceState", "evidenceScope", "uncertainty", "readOnlyEvidence", "skillRun", "interviewKits"])
     || !["bound", "legacy_not_recorded", "unavailable_not_bound", "missing_or_invalid"].includes(value.state as string)
     || !["available", "detail_not_recorded", "not_applicable"].includes(value.historicalSourceState as string)
     || value.evidenceScope !== "page_guidance_and_verified_workspace_playbooks"
@@ -228,10 +229,28 @@ function orchestratorEvidenceFromResponse(value: unknown): OrchestratorTurnEvide
     authority: Object.freeze({ canPersist: false as const, canCreateRule: false as const, canDraftPolicy: false as const,
       canAlterScope: false as const, canPublish: false as const, canApprove: false as const, canExecute: false as const,
       canWriteMeta: false as const }) }) });
+  const interviewKits = value.interviewKits;
+  if (!plainRecord(interviewKits) || !onlyKeys(interviewKits, ["state", "kits"])
+    || !["bound", "legacy_not_recorded", "unavailable_not_bound", "missing_or_invalid"].includes(interviewKits.state as string)
+    || !Array.isArray(interviewKits.kits) || interviewKits.kits.length > 12) return null;
+  const kitRows = interviewKits.kits.map((kit) => {
+    if (!plainRecord(kit) || !onlyKeys(kit, ["name", "revision", "source"]) || !safeEvidenceText(kit.name, 160)
+      || !Number.isSafeInteger(kit.revision) || (kit.revision as number) < 1 || !plainRecord(kit.source)
+      || !onlyKeys(kit.source, ["title", "url", "version", "reviewBy"]) || !safeEvidenceText(kit.source.title, 160)
+      || !safeHistoricalSourceUrl(kit.source.url) || !Number.isSafeInteger(kit.source.version) || (kit.source.version as number) < 1
+      || !isoText(kit.source.reviewBy)) return null;
+    return Object.freeze({ name: kit.name as string, revision: kit.revision as number,
+      source: Object.freeze({ title: kit.source.title as string, url: kit.source.url as string,
+        version: kit.source.version as number, reviewBy: kit.source.reviewBy as string }) });
+  });
+  if ((interviewKits.state === "bound" && kitRows.some((kit) => kit === null))
+    || (interviewKits.state !== "bound" && kitRows.length !== 0)) return null;
+  const interviewKitEvidence = Object.freeze({ state: interviewKits.state as OrchestratorInterviewKitSummary["state"],
+    kits: Object.freeze(kitRows.filter((kit): kit is NonNullable<typeof kit> => kit !== null)) });
   const acceptedPlaybooks = playbooks.filter((playbook): playbook is NonNullable<typeof playbook> => playbook !== null);
   const state = value.state as OrchestratorTurnEvidenceSummary["state"];
   if (state === "bound" && (!guide || value.profileLabel === null)) return null;
-  if (state !== "bound" && (guide !== null || value.profileLabel !== null || skills.length || playbooks.length)) return null;
+  if (state !== "bound" && (guide !== null || value.profileLabel !== null || skills.length || playbooks.length || interviewKitEvidence.kits.length)) return null;
   if ((value.historicalSourceState === "available" && acceptedPlaybooks.some((playbook) => playbook.source === null))
     || (value.historicalSourceState === "detail_not_recorded" && acceptedPlaybooks.some((playbook) => playbook.source !== null))
     || (value.historicalSourceState === "not_applicable" && acceptedPlaybooks.length !== 0)) return null;
@@ -240,7 +259,7 @@ function orchestratorEvidenceFromResponse(value: unknown): OrchestratorTurnEvide
   skills: Object.freeze(skills as OrchestratorTurnEvidenceSummary["skills"]),
   playbooks: Object.freeze(acceptedPlaybooks),
   historicalSourceState: value.historicalSourceState as OrchestratorTurnEvidenceSummary["historicalSourceState"],
-  evidenceScope: "page_guidance_and_verified_workspace_playbooks", uncertainty: "agent_inference_no_meta_or_action_authority", readOnlyEvidence, skillRun: skillRunEvidence });
+  evidenceScope: "page_guidance_and_verified_workspace_playbooks", uncertainty: "agent_inference_no_meta_or_action_authority", readOnlyEvidence, skillRun: skillRunEvidence, interviewKits: interviewKitEvidence });
 }
 
 /** Fails closed before a read-only conversation payload reaches the Agent UI. */
@@ -1183,6 +1202,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
               <p><strong>Belirsizlik:</strong> Agent çıkarımıdır; Meta/action yetkisi yok.</p>
               <OrchestratorTurnReadOnlyEvidence evidence={message.evidence.readOnlyEvidence} />
               <OrchestratorTurnSkillRunEvidence evidence={message.evidence.skillRun} />
+              <OrchestratorTurnInterviewKitEvidence evidence={message.evidence.interviewKits} />
               {message.evidence.state === "bound" && message.evidence.pageGuide ? <>
                 <dl><div><dt>Sayfa amacı</dt><dd>{message.evidence.pageGuide.purpose}</dd></div><div><dt>Kayıt kapsamı</dt><dd>{message.evidence.pageGuide.scope}</dd></div><div><dt>Skill profili</dt><dd>{message.evidence.profileLabel}</dd></div></dl>
                 <div className={styles.turnEvidenceSkills}><strong>Çekirdek skill’ler</strong><ul>{message.evidence.skills.map((skill) => <li key={`${skill.name}-${skill.version}`}>{skill.name} · {skill.version}</li>)}</ul></div>

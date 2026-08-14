@@ -12,8 +12,10 @@ const CANDIDATE = /^budget_impact_context_[a-f0-9]{24}$/;
 const CLOSED = Object.freeze({ canPreview: false as const, canSave: false as const, canApprove: false as const, canExecute: false as const, canWriteMeta: false as const });
 
 type Contexts = Readonly<{ listLatestValidCampaignPublic(input: Readonly<{ workspaceId: string }>): Promise<readonly StoredEffectiveCampaignContext[]> }>;
-export type BudgetImpactContextCandidate = Readonly<{ candidateRef: string; campaignRef: string; capturedAt: string; scope: ExactSliceRuleScope }>;
-export type UserBudgetScenarioCommand = Readonly<Omit<BudgetLabDraftCommand, "scope">>;
+export type BudgetImpactContextCandidate = Readonly<{ candidateRef: string; campaignRef: string; capturedAt: string; currency: string; currentBudgetDecimal: string; scope: ExactSliceRuleScope }>;
+export type UserBudgetScenarioCommand = Readonly<{ label: string; mode: "keep" | "conservative"; requestedBudgetDecimal: string; startDate: string; endDate: string }>;
+type TechnicalTemplate = Readonly<{ currency: string; currentAmountMinor: number; observedAt: string; allocationRef: string; categoryRef: string; geoRef: string; groupRefs: readonly string[] }>;
+type Templates = Readonly<{ loadExact(input: Readonly<{ workspaceId: string; adAccountId: string; campaignId: string; contextHash: string; scope: ExactSliceRuleScope }>): Promise<TechnicalTemplate | null> }>;
 
 export class BudgetImpactContextCandidateError extends Error {
   constructor(readonly code: "invalid_input" | "draft_missing" | "pool_binding_required" | "candidate_missing" | "candidate_stale" | "market_boundary") {
@@ -30,13 +32,15 @@ function sameScope(left: ExactSliceRuleScope, right: ExactSliceRuleScope) { retu
 function validUserCommand(value: unknown): value is UserBudgetScenarioCommand {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
-  const keys = ["seriesRef", "revision", "previousProposalHash", "idempotencyKey", "createdAt", "scenarios", "outcomeProxy"];
+  const keys = ["label", "mode", "requestedBudgetDecimal", "startDate", "endDate"];
   return Object.keys(record).length === keys.length && Object.keys(record).every((key) => keys.includes(key))
-    && typeof record.seriesRef === "string" && REF.test(record.seriesRef)
-    && typeof record.idempotencyKey === "string" && REF.test(record.idempotencyKey)
-    && Number.isInteger(record.revision) && Number(record.revision) >= 1
-    && typeof record.createdAt === "string" && Array.isArray(record.scenarios);
+    && typeof record.label === "string" && REF.test(record.label) && ["keep", "conservative"].includes(String(record.mode))
+    && typeof record.requestedBudgetDecimal === "string" && /^(0|[1-9]\d{0,29})(?:\.\d{1,2})?$/.test(record.requestedBudgetDecimal)
+    && typeof record.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(record.startDate)
+    && typeof record.endDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(record.endDate) && record.startDate <= record.endDate;
 }
+function decimal(minor: number) { return `${Math.floor(minor / 100)}.${String(minor % 100).padStart(2, "0")}`; }
+function toMinor(value: string) { const [whole, fraction = ""] = value.split("."); return Number(BigInt(whole!) * 100n + BigInt(fraction.padEnd(2, "0"))); }
 
 /**
  * Lists only server-verified frozen contexts. The public token is deterministic
@@ -44,7 +48,7 @@ function validUserCommand(value: unknown): value is UserBudgetScenarioCommand {
  */
 export class BudgetImpactContextCandidateService {
   constructor(private readonly drafts: CurrentSliceRuleDraftPort, private readonly contexts: Contexts,
-    private readonly scopeEvidence: BudgetImpactScopeEvidencePort, private readonly pools: SliceRuleBudgetPoolBindingEvidencePort,
+    private readonly scopeEvidence: BudgetImpactScopeEvidencePort, private readonly pools: SliceRuleBudgetPoolBindingEvidencePort, private readonly templates: Templates,
     private readonly memberships: readonly WorkspaceMembership[]) {}
 
   private async draft(principal: TrustedDecisionRoomPrincipal, seriesRef: string): Promise<SliceRuleWorkspaceDraft> {
@@ -66,9 +70,11 @@ export class BudgetImpactContextCandidateService {
       const evidence = await this.scopeEvidence.loadExact({ workspaceId: principal.workspaceId, adAccountId: scope.adAccountId,
         campaignId: scope.campaignId, contextHash: record.context.contextHash, expectedScope: draft.scope });
       if (evidence.state !== "ready" || evidence.scope === null || !sameScope(evidence.scope, draft.scope)) continue;
+      const template = await this.templates.loadExact({ workspaceId: principal.workspaceId, adAccountId: scope.adAccountId, campaignId: scope.campaignId, contextHash: record.context.contextHash, scope: draft.scope });
+      if (!template) continue;
       candidates.push(Object.freeze({ candidateRef: candidateRef(principal.workspaceId, draft.draftHash, record),
         campaignRef: `campaign_${createHash("sha256").update(record.context.identity.campaignRef).digest("hex").slice(0, 16)}`,
-        capturedAt: record.context.capturedAt, scope: draft.scope }));
+        capturedAt: record.context.capturedAt, currency: template.currency, currentBudgetDecimal: decimal(template.currentAmountMinor), scope: draft.scope }));
     }
     return Object.freeze({ contractVersion: "slice-rule-budget-impact-context-candidates/1.0.0" as const,
       seriesRef: draft.seriesRef, candidates: Object.freeze(candidates.slice(0, 50)), authority: CLOSED });
@@ -86,9 +92,12 @@ export class BudgetImpactContextCandidateService {
       if (evidence.state !== "ready" || evidence.scope === null) throw new BudgetImpactContextCandidateError("candidate_stale");
       if (evidence.scope.market !== draft.scope.market) throw new BudgetImpactContextCandidateError("market_boundary");
       if (!sameScope(evidence.scope, draft.scope)) throw new BudgetImpactContextCandidateError("candidate_stale");
+      const template = await this.templates.loadExact({ workspaceId: principal.workspaceId, adAccountId: scope.adAccountId, campaignId: scope.campaignId, contextHash: record.context.contextHash, scope: draft.scope });
+      if (!template) throw new BudgetImpactContextCandidateError("candidate_stale");
+      const requestedMinor = toMinor(input.budgetCommand.requestedBudgetDecimal); const requestedDecimal = decimal(requestedMinor);
       return Object.freeze({ workspaceId: principal.workspaceId, actorId: principal.actor.userId, seriesRef: draft.seriesRef,
         expectedDraftRef: draft.draftRef, expectedDraftHash: draft.draftHash, expectedScope: draft.scope,
-        budgetCommand: Object.freeze({ ...input.budgetCommand, scope: Object.freeze({ adAccountId: scope.adAccountId, campaignId: scope.campaignId, contextHash: record.context.contextHash }) }) });
+        budgetCommand: Object.freeze({ scope: Object.freeze({ adAccountId: scope.adAccountId, campaignId: scope.campaignId, contextHash: record.context.contextHash }), seriesRef: `budget.impact.${draft.seriesRef}`.slice(0, 127), revision: 1, previousProposalHash: "GENESIS", idempotencyKey: `budget.impact.${input.candidateRef.slice(-12)}.${input.budgetCommand.label}`.slice(0, 127), createdAt: new Date().toISOString(), outcomeProxy: null, scenarios: [Object.freeze({ scenarioRef: `scenario.${input.budgetCommand.label}`, kind: input.budgetCommand.mode, minorUnitScale: 2, requestedBudgetMinor: requestedMinor, allocations: [Object.freeze({ ref: template.allocationRef, currentAmountMinor: template.currentAmountMinor, categoryRef: template.categoryRef, geoRef: template.geoRef, groupRefs: template.groupRefs })], constraints: [], strategy: Object.freeze({ mode: "fixed", targets: [Object.freeze({ ref: template.allocationRef, amountMinor: requestedMinor })] }), pacing: Object.freeze({ period: Object.freeze({ startDate: input.budgetCommand.startDate, endDate: input.budgetCommand.endDate, timezone: "Europe/Istanbul" }), asOfAt: template.observedAt, amounts: Object.freeze({ currency: template.currency, plannedDecimal: decimal(template.currentAmountMinor), committedDecimal: decimal(template.currentAmountMinor), actualDecimal: "0.00", requestedCommitmentDecimal: requestedDecimal }), signal: Object.freeze({ kind: "business_outcome", metricRef: "delivery_health", sampleSize: 0, coverageBps: 0, observedThroughAt: template.observedAt, retrievedAt: template.observedAt, learningPhase: false, lastMaterialChangeAt: null }), policy: Object.freeze({ moneyScale: 2, moneyRounding: "half_even", minimumElapsedBps: 0, conservativeRemainingRateBps: 10_000, forecastMinimumDecimal: "0", forecastMaximumDecimal: requestedDecimal, maximumFreshnessMinutes: 10_080, minimumCoverageBps: 0, minimumSampleSize: 0, attributionLagMinutes: 0, suppressDuringLearning: true, cooldownMinutes: 0, allowProxyAction: false, maximumChangeBps: 10_000, maximumChangeAbsoluteDecimal: requestedDecimal }) }) })] }) });
     }
     throw new BudgetImpactContextCandidateError("candidate_missing");
   }

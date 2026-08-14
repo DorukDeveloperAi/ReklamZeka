@@ -21,6 +21,7 @@ type PlaybookRow = Readonly<{
   source_ref: unknown; source_status: unknown; review_by: Date | string | null;
   source_title: unknown; source_type: unknown; source_url: unknown;
 }>;
+type KitRow = Readonly<{ kit_ref: unknown; revision: unknown; kit_hash: unknown; payload: unknown; source_snapshot: unknown }>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH = /^[a-f0-9]{64}$/;
@@ -113,7 +114,20 @@ export class DrizzleWorkspaceSkillCatalogBindingRepository implements WorkspaceS
         citation: Object.freeze({ sourceTitle: title, sourceType: type, sourceUrl, freshness: evaluatedFreshness }),
         title: playbook.payload.title, body: playbook.payload.body });
     });
+    const kitRows = rows<KitRow>(await this.database.execute(sql`
+      select current.kit_ref,current.revision,current.kit_hash,current.payload,current.source_snapshot
+      from (select distinct on(kit_ref) kit_ref,revision,kit_hash,state,payload,source_snapshot from orchestrator_interview_kit_revisions
+        where workspace_id=${scope.workspaceId}::uuid order by kit_ref,revision desc) current where current.state='active' order by current.kit_ref limit 13
+    `));
+    const interviewKits = kitRows.map((kit) => {
+      if (typeof kit.kit_ref !== "string" || typeof kit.revision !== "number" || typeof kit.kit_hash !== "string" || !HASH.test(kit.kit_hash)
+        || !exact(kit.payload,["name","explanation","questions","applicability"]) || typeof kit.payload.name !== "string" || typeof kit.payload.explanation !== "string"
+        || !Array.isArray(kit.payload.questions) || !exact(kit.payload.applicability,["pages","intents"]) || !Array.isArray(kit.payload.applicability.pages) || !Array.isArray(kit.payload.applicability.intents)
+        || !exact(kit.source_snapshot,["optionId","title","url","version","recordHash","reviewBy"]) || typeof kit.source_snapshot.title !== "string" || typeof kit.source_snapshot.url !== "string" || !isOfficialGuidanceSourceUrl(kit.source_snapshot.url)
+        || typeof kit.source_snapshot.version !== "number" || typeof kit.source_snapshot.recordHash !== "string" || !HASH.test(kit.source_snapshot.recordHash) || typeof kit.source_snapshot.reviewBy !== "string" || Date.parse(kit.source_snapshot.reviewBy) <= evaluatedAt) unavailable();
+      return Object.freeze({kitRef:kit.kit_ref,revision:kit.revision,kitHash:kit.kit_hash,name:kit.payload.name,explanation:kit.payload.explanation,questions:Object.freeze(kit.payload.questions as string[]),pages:Object.freeze(kit.payload.applicability.pages as string[]),intents:Object.freeze(kit.payload.applicability.intents as string[]),source:Object.freeze({title:kit.source_snapshot.title,url:kit.source_snapshot.url,version:kit.source_snapshot.version,recordHash:kit.source_snapshot.recordHash,reviewBy:kit.source_snapshot.reviewBy})});
+    });
     return createWorkspaceSkillCatalogBinding({ profile: { profileRef: profile.profile_ref,
-      revision: profile.revision, profileHash: profile.profile_hash }, manifests, playbooks });
+      revision: profile.revision, profileHash: profile.profile_hash }, manifests, playbooks, interviewKits });
   }
 }

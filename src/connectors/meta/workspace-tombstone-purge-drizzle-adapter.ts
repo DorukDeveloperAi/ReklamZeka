@@ -29,6 +29,7 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "orchestrator_conversation_turns",
   "orchestrator_conversations",
   "orchestrator_playbook_revisions",
+  "orchestrator_interview_kit_revisions",
   "orchestrator_profile_revisions",
   // Gate snapshots reference selection/action rows and must be removed before
   // their immutable provenance parents during a tombstone-only purge.
@@ -546,6 +547,9 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'orchestrator_playbook_revisions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from orchestrator_playbook_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'orchestrator_interview_kit_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from orchestrator_interview_kit_revisions where workspace_id = ${workspaceId}::uuid
       union all select 'orchestrator_profile_revisions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from orchestrator_profile_revisions where workspace_id = ${workspaceId}::uuid
@@ -671,6 +675,7 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from connection_secrets where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from daily_ad_metrics where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from sync_runs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from orchestrator_interview_kit_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from orchestrator_playbook_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from orchestrator_profile_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guidance_campaign_selection_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./skill-catalog-panel.module.css";
+import { InterviewKitPanel } from "./interview-kit-panel";
 
 type Authority = Readonly<{
   canSelectProfile: boolean;
@@ -212,7 +213,7 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
   if (state === "unavailable" || !catalog) return <section className={styles.panel} role="alert"><h2>Skill profili ve playbooklar kullanılamıyor</h2><p>{message ?? "Katalog kaynağı doğrulanamadı."}</p><button type="button" onClick={() => void reload()}>Tekrar dene</button></section>;
 
   const canCreate = catalog.authority.canCreatePlaybookRevision && mutation === null;
-  return <section className={styles.panel} aria-labelledby="skill-catalog-title">
+  return <><section className={styles.panel} aria-labelledby="skill-catalog-title">
     <header className={styles.header}><div><span>YÖNETİM · KURALLAR</span><h2 id="skill-catalog-title">Skill profili ve playbooklar</h2><p>Profil ve playbook kayıtları yalnız siz açıkça seçtiğinizde veya kaydettiğinizde değişir.</p></div><button type="button" onClick={() => void reload()} disabled={mutation !== null}>Yenile</button></header>
 
     <section className={styles.profile} aria-label="Skill profili">
@@ -246,5 +247,5 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
     {pendingTombstone ? <section className={styles.confirmation} role="alertdialog" aria-labelledby="skill-catalog-confirm-title" aria-describedby="skill-catalog-confirm-copy"><h3 id="skill-catalog-confirm-title">Playbook’u kaldır?</h3><p id="skill-catalog-confirm-copy">{pendingTombstone.title ?? "Bu playbook"} artık etkin listede görünmez. Bu işlem açık kullanıcı onayı gerektirir.</p><div><button type="button" onClick={() => setPendingTombstone(null)} disabled={mutation === "tombstone"}>Vazgeç</button><button type="button" onClick={() => void tombstonePlaybook()} disabled={mutation === "tombstone"}>{mutation === "tombstone" ? "Kaldırılıyor…" : "Kaldırmayı onayla"}</button></div></section> : null}
     {pendingRevision ? <section className={styles.confirmation} role="alertdialog" aria-labelledby="skill-catalog-revision-confirm-title" aria-describedby="skill-catalog-revision-confirm-copy"><h3 id="skill-catalog-revision-confirm-title">Yeni revizyonu kaydet?</h3><p id="skill-catalog-revision-confirm-copy">Mevcut kayıt değişmez; düzenlediğiniz metin yeni, immutable bir revizyon olarak eklenecek.</p><div><button type="button" onClick={() => setPendingRevision(null)} disabled={mutation === "revise"}>Vazgeç</button><button type="button" onClick={() => void saveRevision()} disabled={mutation === "revise"}>{mutation === "revise" ? "Kaydediliyor…" : "Kaydetmeyi onayla"}</button></div></section> : null}
     {message ? <p className={styles.feedback} role="status">{message}</p> : null}
-  </section>;
+  </section><InterviewKitPanel /></>;
 }

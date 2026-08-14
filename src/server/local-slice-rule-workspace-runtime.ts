@@ -2,6 +2,9 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { BudgetLabDraftService } from "@/application/budget-lab-draft-service";
 import { SliceRuleBudgetImpactService } from "@/application/slice-rule-budget-impact-service";
+import { BudgetImpactContextCandidateService } from "@/application/slice-rule-budget-impact-context-candidate-service";
+import { DrizzleEffectiveCampaignContextRepository } from "@/connectors/analyses/effective-campaign-context-drizzle-repository";
+import { DrizzleSliceRuleBudgetImpactTemplateRepository } from "@/connectors/campaigns/slice-rule-budget-impact-template-drizzle-repository";
 import { SliceRuleWorkspaceService } from "@/application/slice-rule-workspace-service";
 import { DrizzleBudgetProposalRepository } from "@/connectors/budget/budget-proposal-drizzle-repository";
 import { FrozenContextBudgetImpactScopeResolver } from "@/connectors/campaigns/frozen-context-budget-impact-scope-resolver";
@@ -36,11 +39,15 @@ export function createLocalSliceRuleWorkspaceHandlers(input: Readonly<{
           database: input.database, config: input.config });
         const rules = new DrizzleSliceRuleWorkspaceRepository(input.database as never);
         const budgets = new DrizzleBudgetProposalRepository(input.database as never);
+        const pools = new DrizzleSliceRuleBudgetPoolBindingRepository(input.database as never);
+        const candidates = new BudgetImpactContextCandidateService(rules,
+          new DrizzleEffectiveCampaignContextRepository(input.database as never), new FrozenContextBudgetImpactScopeResolver(budgets), pools, new DrizzleSliceRuleBudgetImpactTemplateRepository(input.database as never), [bound.membership]);
         const service = new SliceRuleBudgetImpactService(rules,
           new FrozenContextBudgetImpactScopeResolver(budgets), new BudgetLabDraftService(budgets, budgets),
-          new DrizzleSliceRuleBudgetPoolBindingRepository(input.database as never));
+          pools);
         return createSliceRuleBudgetImpactHttpHandler({ service,
-          resolvePrincipal: async () => bound.principal })(request);
+          resolvePrincipal: async () => bound.principal,
+          resolveCandidateCommand: (principal, command) => candidates.resolve(principal, command) })(request);
       }
       const bound = await resolveTrustedLocalInstructionPolicyPrincipal({ request, database: input.database,
         config: input.config, requiredScope: operation === "read" ? "instruction_policy:read" : "instruction_policy:draft" });

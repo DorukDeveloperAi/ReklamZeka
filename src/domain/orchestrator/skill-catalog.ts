@@ -59,22 +59,24 @@ export type WorkspacePlaybookSnapshot = Readonly<{
   citation: WorkspacePlaybookSourceCitation;
 }>;
 export type WorkspacePlaybookGuidance = Readonly<WorkspacePlaybookSnapshot & { title: string; body: string }>;
+export type WorkspaceInterviewKitGuidance = Readonly<{ kitRef: string; revision: number; kitHash: string; name: string; explanation: string; questions: readonly string[]; pages: readonly string[]; intents: readonly string[]; source: Readonly<{ title: string; url: string; version: number; recordHash: string; reviewBy: string }> }>;
 export type WorkspaceSkillCatalogBinding = Readonly<{
   profile: Readonly<{ version: typeof SKILL_CATALOG_VERSION; profileRef: string; revision: number; profileHash: string }>;
   manifests: readonly Readonly<{ ref: string; version: string; hash: string }>[];
   playbooks: readonly WorkspacePlaybookGuidance[];
+  interviewKits: readonly WorkspaceInterviewKitGuidance[];
   bindingHash: string;
 }>;
 export type WorkspaceSkillCatalogTurnSnapshot = Readonly<{
   profile: WorkspaceSkillCatalogBinding["profile"];
   manifests: WorkspaceSkillCatalogBinding["manifests"];
   playbooks: readonly WorkspacePlaybookSnapshot[];
+  interviewKits: readonly Readonly<{ kitRef: string; revision: number; kitHash: string; source: Readonly<{ title: string; url: string; version: number; recordHash: string; reviewBy: string }> }>[];
   bindingHash: string;
 }>;
 export type UnavailableWorkspaceSkillCatalogTurnSnapshot = Readonly<{
   profile: Readonly<{ version: "unavailable_not_bound" }>;
-  manifests: readonly never[];
-  playbooks: readonly never[];
+  manifests: readonly never[]; playbooks: readonly never[]; interviewKits: readonly never[];
   bindingHash: "UNAVAILABLE_NOT_BOUND";
 }>;
 
@@ -107,7 +109,7 @@ function exact(value: unknown, keys: readonly string[]): value is Record<string,
 export function createWorkspaceSkillCatalogBinding(input: Readonly<{
   profile: Readonly<{ profileRef: string; revision: number; profileHash: string }>;
   manifests: readonly Readonly<{ ref: string; version: string; hash: string }>[];
-  playbooks: readonly WorkspacePlaybookGuidance[];
+  playbooks: readonly WorkspacePlaybookGuidance[]; interviewKits?: readonly WorkspaceInterviewKitGuidance[];
 }>): WorkspaceSkillCatalogBinding {
   if (!PROFILE_REF.test(input.profile.profileRef) || !Number.isSafeInteger(input.profile.revision)
     || input.profile.revision < 1 || !HASH.test(input.profile.profileHash)
@@ -138,20 +140,27 @@ export function createWorkspaceSkillCatalogBinding(input: Readonly<{
   }).sort((a, b) => a.playbookRef.localeCompare(b.playbookRef));
   if (new Set(playbooks.map((playbook) => playbook.playbookRef)).size !== playbooks.length
     || Buffer.byteLength(playbooks.map(({ title, body }) => `${title}\n${body}`).join("\n"), "utf8") > MAX_PLAYBOOK_GUIDANCE_BYTES) bindingFail();
+  const interviewKits = (input.interviewKits ?? []).map((kit) => {
+    if (!/^interview_kit_[a-f0-9]{32}$/.test(kit.kitRef) || !Number.isSafeInteger(kit.revision) || kit.revision < 1 || !HASH.test(kit.kitHash)
+      || typeof kit.name !== "string" || !kit.name.trim() || typeof kit.explanation !== "string" || !kit.explanation.trim() || !Array.isArray(kit.questions) || kit.questions.length < 1 || kit.questions.length > 12
+      || !Array.isArray(kit.pages) || !kit.pages.length || !Array.isArray(kit.intents) || !kit.intents.length || !exact(kit.source, ["title","url","version","recordHash","reviewBy"])
+      || typeof kit.source.title !== "string" || !isOfficialGuidanceSourceUrl(kit.source.url) || !Number.isInteger(kit.source.version) || !HASH.test(kit.source.recordHash) || !Number.isFinite(Date.parse(kit.source.reviewBy))) bindingFail();
+    return Object.freeze({ ...kit, questions: Object.freeze([...kit.questions]), pages: Object.freeze([...kit.pages]), intents: Object.freeze([...kit.intents]), source: Object.freeze({ ...kit.source }) });
+  });
   const profile = Object.freeze({ version: SKILL_CATALOG_VERSION, profileRef: input.profile.profileRef,
     revision: input.profile.revision, profileHash: input.profile.profileHash });
   const snapshots = playbooks.map(({ playbookRef, revision, playbookHash, sourceRef, citation }) => Object.freeze({ playbookRef, revision, playbookHash, sourceRef, citation }));
-  const bindingHash = createHash("sha256").update(JSON.stringify({ profile, manifests, playbooks: snapshots })).digest("hex");
-  return Object.freeze({ profile, manifests: Object.freeze(manifests), playbooks: Object.freeze(playbooks), bindingHash });
+  const bindingHash = createHash("sha256").update(JSON.stringify({ profile, manifests, playbooks: snapshots, interviewKits })).digest("hex");
+  return Object.freeze({ profile, manifests: Object.freeze(manifests), playbooks: Object.freeze(playbooks), interviewKits: Object.freeze(interviewKits), bindingHash });
 }
 
 export function unavailableWorkspaceSkillCatalogBinding() {
   return Object.freeze({ profile: Object.freeze({ version: "unavailable_not_bound" }), manifests: Object.freeze([]),
-    playbooks: Object.freeze([]), bindingHash: "UNAVAILABLE_NOT_BOUND" as const });
+    playbooks: Object.freeze([]), interviewKits: Object.freeze([]), bindingHash: "UNAVAILABLE_NOT_BOUND" as const });
 }
 
 export function workspaceSkillCatalogTurnSnapshot(binding: WorkspaceSkillCatalogBinding): WorkspaceSkillCatalogTurnSnapshot {
   return Object.freeze({ profile: binding.profile, manifests: binding.manifests,
     playbooks: Object.freeze(binding.playbooks.map(({ playbookRef, revision, playbookHash, sourceRef, citation }) =>
-      Object.freeze({ playbookRef, revision, playbookHash, sourceRef, citation }))), bindingHash: binding.bindingHash });
+      Object.freeze({ playbookRef, revision, playbookHash, sourceRef, citation }))), interviewKits: Object.freeze(binding.interviewKits.map(({ kitRef, revision, kitHash, source }) => Object.freeze({ kitRef, revision, kitHash, source }))), bindingHash: binding.bindingHash });
 }

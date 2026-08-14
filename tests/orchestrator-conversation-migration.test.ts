@@ -8,6 +8,8 @@ const catalogBindingMigration = readFileSync("drizzle/20260814140114_regular_ste
 const catalogBindingHardeningMigration = readFileSync("drizzle/20260814140309_mushy_boomerang.sql", "utf8");
 const readOnlyEvidenceMigration = readFileSync("drizzle/20260814144129_orchestrator_readonly_evidence_context.sql", "utf8");
 const skillRunMigration = readFileSync("drizzle/20260814145753_simple_masked_marvel.sql", "utf8");
+const interviewKitMigration = readFileSync("drizzle/20260814154319_lush_warbird.sql", "utf8");
+const interviewKitTurnMigration = readFileSync("drizzle/20260814154728_plain_misty_knight.sql", "utf8");
 const repository = readFileSync("src/connectors/agents/orchestrator-conversation-drizzle-repository.ts", "utf8");
 
 describe("Orchestrator conversation ledger migration", () => {
@@ -64,5 +66,21 @@ describe("Orchestrator conversation ledger migration", () => {
     expect(skillRunMigration).not.toMatch(/grant\s+.*(?:anon|authenticated)|disable row level security|drop trigger/i);
     expect(repository).toContain("JSON.stringify(input.skillRunSnapshot)");
     expect(repository).not.toContain("loadActive(");
+  });
+
+  it("stores user-authored interview kits and per-turn kit snapshots as private immutable evidence", () => {
+    expect(interviewKitMigration).toContain('CREATE TABLE "orchestrator_interview_kit_revisions"');
+    expect(interviewKitMigration).toContain("ALTER TABLE orchestrator_interview_kit_revisions ENABLE ROW LEVEL SECURITY");
+    expect(interviewKitMigration).toContain("ALTER TABLE orchestrator_interview_kit_revisions FORCE ROW LEVEL SECURITY");
+    expect(interviewKitMigration).toContain("REVOKE ALL PRIVILEGES ON TABLE orchestrator_interview_kit_revisions FROM PUBLIC, anon, authenticated, service_role");
+    expect(interviewKitMigration).toContain("CREATE TRIGGER orchestrator_interview_kit_revisions_append_only");
+    expect(interviewKitMigration).toContain("'questions'");
+    expect(interviewKitMigration).not.toMatch(/grant\s+.*(?:anon|authenticated)|disable row level security/i);
+    expect(interviewKitTurnMigration).toContain('ADD COLUMN "interview_kit_snapshots" jsonb');
+    expect(interviewKitTurnMigration).toContain('ADD COLUMN "interview_kit_binding_hash" text');
+    expect(interviewKitTurnMigration).toContain("'LEGACY_NOT_RECORDED'");
+    expect(interviewKitTurnMigration).toContain("'UNAVAILABLE_NOT_BOUND'");
+    expect(interviewKitTurnMigration).not.toMatch(/grant\s+.*(?:anon|authenticated)|disable row level security|drop trigger/i);
+    expect(repository).toContain("JSON.stringify(input.interviewKitSnapshots)");
   });
 });

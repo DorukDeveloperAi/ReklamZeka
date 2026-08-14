@@ -68,9 +68,12 @@ const opaqueCategoryContext = new Set([
   // UI/runtime history, not category dependency inputs.
   "orchestrator_profile_revisions.payload",
   "orchestrator_playbook_revisions.payload",
+  "orchestrator_interview_kit_revisions.payload",
+  "orchestrator_interview_kit_revisions.source_snapshot",
   "orchestrator_conversation_turns.profile_snapshot",
   "orchestrator_conversation_turns.manifest_snapshots",
   "orchestrator_conversation_turns.playbook_snapshots",
+  "orchestrator_conversation_turns.interview_kit_snapshots",
   // Turn evidence is a bounded aggregate replay snapshot; it intentionally
   // contains no mutable category edge for archive evaluation.
   "orchestrator_conversation_turns.evidence_context_snapshot",
@@ -168,9 +171,12 @@ const columns = [
   "action_preparation_gate_snapshots.snapshot_payload",
   "orchestrator_profile_revisions.payload",
   "orchestrator_playbook_revisions.payload",
+  "orchestrator_interview_kit_revisions.payload",
+  "orchestrator_interview_kit_revisions.source_snapshot",
   "orchestrator_conversation_turns.profile_snapshot",
   "orchestrator_conversation_turns.manifest_snapshots",
   "orchestrator_conversation_turns.playbook_snapshots",
+  "orchestrator_conversation_turns.interview_kit_snapshots",
   "orchestrator_conversation_turns.evidence_context_snapshot",
   "orchestrator_conversation_turns.skill_run_snapshot",
   // Delivery/payment alert records are historical evidence and checklist

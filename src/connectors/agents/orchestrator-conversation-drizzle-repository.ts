@@ -7,6 +7,7 @@ import {
   type OrchestratorMessage,
   type OrchestratorPageGuide,
   type OrchestratorTurnEvidence,
+  orchestratorInterviewKitSnapshotHash,
 } from "@/application/orchestrator-conversation";
 import { CORE_SKILL_MANIFESTS, coreSkillManifest, SKILL_CATALOG_VERSION } from "@/domain/orchestrator/skill-catalog";
 import { isOfficialGuidanceSourceUrl } from "@/domain/guidance/registry";
@@ -21,7 +22,7 @@ type ConversationDatabase = Pick<Database, "execute" | "transaction">;
 type ConversationRow = Readonly<{ conversation_ref: string; created_at: Date | string }>;
 type TurnRow = Readonly<{ provider_thread_ref: string | null; page_guide: unknown }>;
 type EvidenceTurnRow = Readonly<{ turn_ref: string; page_guide: unknown; profile_snapshot: unknown;
-  manifest_snapshots: unknown; playbook_snapshots: unknown; skill_catalog_binding_hash: unknown;
+  manifest_snapshots: unknown; playbook_snapshots: unknown; skill_catalog_binding_hash: unknown; interview_kit_snapshots?: unknown; interview_kit_binding_hash?: unknown;
   evidence_context_snapshot?: unknown; evidence_context_hash?: unknown;
   skill_run_snapshot?: unknown; skill_run_hash?: unknown }>;
 type MessageRow = Readonly<{ message_ref: string; turn_ref: string; message_number: number;
@@ -33,6 +34,7 @@ const MESSAGE = /^message_[a-f0-9]{32}$/;
 const PROVIDER_THREAD = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PROFILE_REF = /^profile_[a-z0-9][a-z0-9_-]{0,86}$/;
 const PLAYBOOK_REF = /^playbook_[a-z0-9][a-z0-9_-]{0,86}$/;
+const INTERVIEW_KIT_REF = /^interview_kit_[a-f0-9]{32}$/;
 const SOURCE_REF = /^source_[a-z0-9_.:-]{1,127}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const EVIDENCE_SCOPE = "page_guidance_and_verified_workspace_playbooks" as const;
@@ -80,7 +82,38 @@ function unavailableEvidence(state: Exclude<OrchestratorTurnEvidence["state"], "
   return Object.freeze({ state, pageGuide: null, profileLabel: null, skills: Object.freeze([]), playbooks: Object.freeze([]),
     historicalSourceState: "not_applicable", evidenceScope: EVIDENCE_SCOPE, uncertainty: UNCERTAINTY,
     readOnlyEvidence: Object.freeze({ state: "missing_or_invalid", performance: null, timeline: null }),
-    skillRun: Object.freeze({ state: "missing_or_invalid", receipt: null }) });
+    skillRun: Object.freeze({ state: "missing_or_invalid", receipt: null }),
+    interviewKits: Object.freeze({ state: "missing_or_invalid", kits: Object.freeze([]) }) });
+}
+
+function interviewKitEvidence(snapshot: unknown, hash: unknown): OrchestratorTurnEvidence["interviewKits"] {
+  if (snapshot === undefined && hash === undefined) return Object.freeze({ state: "legacy_not_recorded", kits: Object.freeze([]) });
+  if (Array.isArray(snapshot) && snapshot.length === 0 && hash === "LEGACY_NOT_RECORDED") return Object.freeze({ state: "legacy_not_recorded", kits: Object.freeze([]) });
+  if (Array.isArray(snapshot) && snapshot.length === 0 && hash === "UNAVAILABLE_NOT_BOUND") return Object.freeze({ state: "unavailable_not_bound", kits: Object.freeze([]) });
+  if (!Array.isArray(snapshot) || snapshot.length > 12 || typeof hash !== "string" || !HASH.test(hash)
+    || orchestratorInterviewKitSnapshotHash(snapshot as readonly Record<string, unknown>[]) !== hash) {
+    return Object.freeze({ state: "missing_or_invalid", kits: Object.freeze([]) });
+  }
+  try {
+    const kits = snapshot.map((kit) => {
+      if (!exact(kit, ["kitRef", "revision", "kitHash", "name", "source"])
+        || typeof kit.kitRef !== "string" || !INTERVIEW_KIT_REF.test(kit.kitRef)
+        || !Number.isSafeInteger(kit.revision) || (kit.revision as number) < 1
+        || typeof kit.kitHash !== "string" || !HASH.test(kit.kitHash)
+        || typeof kit.name !== "string" || !kit.name.trim() || kit.name.length > 160 || /[\u0000-\u001f\u007f]/.test(kit.name)
+        || !exact(kit.source, ["title", "url", "version", "recordHash", "reviewBy"])
+        || typeof kit.source.title !== "string" || !kit.source.title.trim() || kit.source.title.length > 160 || /[\u0000-\u001f\u007f]/.test(kit.source.title)
+        || typeof kit.source.url !== "string" || !isOfficialGuidanceSourceUrl(kit.source.url)
+        || !Number.isSafeInteger(kit.source.version) || (kit.source.version as number) < 1
+        || typeof kit.source.recordHash !== "string" || !HASH.test(kit.source.recordHash)
+        || typeof kit.source.reviewBy !== "string" || !Number.isFinite(Date.parse(kit.source.reviewBy))) throw new Error("invalid_interview_kit");
+      return Object.freeze({ kitRef: kit.kitRef, name: kit.name.trim(), revision: kit.revision as number,
+        source: Object.freeze({ title: kit.source.title.trim(), url: kit.source.url, version: kit.source.version as number,
+          reviewBy: new Date(kit.source.reviewBy).toISOString() }) });
+    }).sort((left, right) => left.kitRef.localeCompare(right.kitRef));
+    if (new Set(kits.map((kit) => kit.kitRef)).size !== kits.length) throw new Error("duplicate_interview_kit");
+    return Object.freeze({ state: "bound", kits: Object.freeze(kits.map(({ name, revision, source }) => Object.freeze({ name, revision, source }))) });
+  } catch { return Object.freeze({ state: "missing_or_invalid", kits: Object.freeze([]) }); }
 }
 
 function readOnlyEvidence(snapshot: unknown, hash: unknown): OrchestratorTurnEvidence["readOnlyEvidence"] {
@@ -164,13 +197,13 @@ export function orchestratorTurnEvidenceFromLedger(row: EvidenceTurnRow): Orches
     && Array.isArray(row.playbook_snapshots) && row.playbook_snapshots.length === 0
     && row.skill_catalog_binding_hash === "LEGACY_NOT_BOUND";
   if (legacy) return Object.freeze({ ...unavailableEvidence("legacy_not_recorded"), readOnlyEvidence: readOnlyEvidence(row.evidence_context_snapshot, row.evidence_context_hash),
-    skillRun: skillRunEvidence(row.skill_run_snapshot, row.skill_run_hash, row.evidence_context_hash) });
+    skillRun: skillRunEvidence(row.skill_run_snapshot, row.skill_run_hash, row.evidence_context_hash), interviewKits: interviewKitEvidence(row.interview_kit_snapshots, row.interview_kit_binding_hash) });
   const unavailable = exact(row.profile_snapshot, ["version"]) && row.profile_snapshot.version === "unavailable_not_bound"
     && Array.isArray(row.manifest_snapshots) && row.manifest_snapshots.length === 0
     && Array.isArray(row.playbook_snapshots) && row.playbook_snapshots.length === 0
     && row.skill_catalog_binding_hash === "UNAVAILABLE_NOT_BOUND";
   if (unavailable) return Object.freeze({ ...unavailableEvidence("unavailable_not_bound"), readOnlyEvidence: readOnlyEvidence(row.evidence_context_snapshot, row.evidence_context_hash),
-    skillRun: skillRunEvidence(row.skill_run_snapshot, row.skill_run_hash, row.evidence_context_hash) });
+    skillRun: skillRunEvidence(row.skill_run_snapshot, row.skill_run_hash, row.evidence_context_hash), interviewKits: interviewKitEvidence(row.interview_kit_snapshots, row.interview_kit_binding_hash) });
   try {
     const guide = pageGuide(row.page_guide);
     if (!exact(row.profile_snapshot, ["version", "profileRef", "revision", "profileHash"])
@@ -214,7 +247,8 @@ export function orchestratorTurnEvidenceFromLedger(row: EvidenceTurnRow): Orches
       source: playbook.citation }))), historicalSourceState: playbooks.length === 0 ? "not_applicable"
       : sourceDetailRecorded ? "available" : "detail_not_recorded", evidenceScope: EVIDENCE_SCOPE, uncertainty: UNCERTAINTY,
       readOnlyEvidence: readOnlyEvidence(row.evidence_context_snapshot, row.evidence_context_hash),
-      skillRun: skillRunEvidence(row.skill_run_snapshot, row.skill_run_hash, row.evidence_context_hash) });
+      skillRun: skillRunEvidence(row.skill_run_snapshot, row.skill_run_hash, row.evidence_context_hash),
+      interviewKits: interviewKitEvidence(row.interview_kit_snapshots, row.interview_kit_binding_hash) });
   } catch { return unavailableEvidence("missing_or_invalid"); }
 }
 
@@ -269,7 +303,7 @@ async function snapshot(executor: Executor, scope: Readonly<{ workspaceId: strin
   `));
   const evidenceRows = rows<EvidenceTurnRow>(await executor.execute(sql`
     select turn.turn_ref, turn.page_guide, turn.profile_snapshot, turn.manifest_snapshots,
-      turn.playbook_snapshots, turn.skill_catalog_binding_hash, turn.evidence_context_snapshot, turn.evidence_context_hash,
+      turn.playbook_snapshots, turn.skill_catalog_binding_hash, turn.interview_kit_snapshots, turn.interview_kit_binding_hash, turn.evidence_context_snapshot, turn.evidence_context_hash,
       turn.skill_run_snapshot, turn.skill_run_hash
     from orchestrator_conversation_turns turn
     join orchestrator_conversations conversation on conversation.workspace_id = turn.workspace_id
@@ -372,7 +406,7 @@ export class DrizzleOrchestratorConversationRepository implements OrchestratorCo
       await transaction.execute(sql`
         insert into orchestrator_conversation_turns (
           workspace_id, conversation_ref, turn_ref, turn_number, provider, provider_thread_ref,
-          outcome, failure_code, page_guide, profile_snapshot, manifest_snapshots, playbook_snapshots, skill_catalog_binding_hash,
+          outcome, failure_code, page_guide, profile_snapshot, manifest_snapshots, playbook_snapshots, skill_catalog_binding_hash, interview_kit_snapshots, interview_kit_binding_hash,
           evidence_context_snapshot, evidence_context_hash, skill_run_snapshot, skill_run_hash, created_at
         ) values (
           ${input.workspaceId}::uuid, ${input.conversationRef}, ${input.turnRef}, ${counters.turn_number},
@@ -380,7 +414,7 @@ export class DrizzleOrchestratorConversationRepository implements OrchestratorCo
           ${JSON.stringify(input.pageGuide)}::jsonb, ${JSON.stringify(input.skillCatalogSnapshot.profile)}::jsonb,
           ${JSON.stringify(input.skillCatalogSnapshot.manifests)}::jsonb,
           ${JSON.stringify(input.skillCatalogSnapshot.playbooks)}::jsonb,
-          ${input.skillCatalogSnapshot.bindingHash}, ${JSON.stringify(input.evidenceContextSnapshot)}::jsonb,
+          ${input.skillCatalogSnapshot.bindingHash}, ${JSON.stringify(input.interviewKitSnapshots)}::jsonb, ${input.interviewKitBindingHash}, ${JSON.stringify(input.evidenceContextSnapshot)}::jsonb,
           ${input.evidenceContextHash}, ${JSON.stringify(input.skillRunSnapshot)}::jsonb, ${input.skillRunHash}, ${input.createdAt}::timestamptz
         )
       `);

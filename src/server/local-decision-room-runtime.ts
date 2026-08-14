@@ -562,7 +562,7 @@ export async function resolveTrustedLocalSliceRuleBudgetImpactPrincipal(input: R
   const token = cookieToken(input.request);
   const intent = input.request.headers.get("x-reklamzeka-intent");
   if (bearerToken(input.request) !== null || token === null
-    || !["slice-rule-budget-impact-preview", "slice-rule-budget-impact-save", "slice-rule-budget-action-unit-read",
+    || !["slice-rule-budget-impact-preview", "slice-rule-budget-impact-save", "slice-rule-budget-impact-context-candidates-read", "slice-rule-budget-action-unit-read",
       "slice-rule-budget-action-unit-materialize", "slice-rule-scenario-selection-read", "slice-rule-scenario-select"].includes(intent ?? "")) {
     throw new LocalDecisionRoomBoundaryError("untrusted_request");
   }

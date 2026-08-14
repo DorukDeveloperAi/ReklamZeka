@@ -470,6 +470,8 @@ export const orchestratorConversationTurns = pgTable("orchestrator_conversation_
   profileSnapshot: jsonb("profile_snapshot").$type<Record<string, unknown>>().notNull().default({ version: "legacy_not_recorded" }),
   manifestSnapshots: jsonb("manifest_snapshots").$type<readonly Record<string, unknown>[]>().notNull().default([]),
   playbookSnapshots: jsonb("playbook_snapshots").$type<readonly Record<string, unknown>[]>().notNull().default([]),
+  interviewKitSnapshots: jsonb("interview_kit_snapshots").$type<readonly Record<string, unknown>[]>().notNull().default([]),
+  interviewKitBindingHash: text("interview_kit_binding_hash").notNull().default("LEGACY_NOT_RECORDED"),
   skillCatalogBindingHash: text("skill_catalog_binding_hash").notNull().default("LEGACY_NOT_RECORDED"),
   evidenceContextSnapshot: jsonb("evidence_context_snapshot").$type<Record<string, unknown>>().notNull().default({ version: "legacy_not_recorded" }),
   evidenceContextHash: text("evidence_context_hash").notNull().default("LEGACY_NOT_RECORDED"),
@@ -508,14 +510,15 @@ export const orchestratorConversationTurns = pgTable("orchestrator_conversation_
     and ${table.pageGuide} #>> '{version}' = 'orchestrator-page-guide/1.0.0'
   `),
   check("orchestrator_conversation_turns_skill_catalog_binding", sql`
-    (${table.skillCatalogBindingHash} = 'LEGACY_NOT_RECORDED' and ${table.profileSnapshot} = '{"version":"legacy_not_recorded"}'::jsonb and ${table.manifestSnapshots} = '[]'::jsonb and ${table.playbookSnapshots} = '[]'::jsonb)
-    or (${table.skillCatalogBindingHash} = 'UNAVAILABLE_NOT_BOUND' and ${table.profileSnapshot} = '{"version":"unavailable_not_bound"}'::jsonb and ${table.manifestSnapshots} = '[]'::jsonb and ${table.playbookSnapshots} = '[]'::jsonb)
+    (${table.skillCatalogBindingHash} = 'LEGACY_NOT_RECORDED' and ${table.profileSnapshot} = '{"version":"legacy_not_recorded"}'::jsonb and ${table.manifestSnapshots} = '[]'::jsonb and ${table.playbookSnapshots} = '[]'::jsonb and ${table.interviewKitSnapshots} = '[]'::jsonb and ${table.interviewKitBindingHash}='LEGACY_NOT_RECORDED')
+    or (${table.skillCatalogBindingHash} = 'UNAVAILABLE_NOT_BOUND' and ${table.profileSnapshot} = '{"version":"unavailable_not_bound"}'::jsonb and ${table.manifestSnapshots} = '[]'::jsonb and ${table.playbookSnapshots} = '[]'::jsonb and ${table.interviewKitSnapshots} = '[]'::jsonb and ${table.interviewKitBindingHash}='UNAVAILABLE_NOT_BOUND')
     or (${table.skillCatalogBindingHash} ~ '^[a-f0-9]{64}$'
       and jsonb_typeof(${table.profileSnapshot}) = 'object'
       and ${table.profileSnapshot} ?& array['version', 'profileRef', 'revision', 'profileHash']
       and ${table.profileSnapshot} - array['version', 'profileRef', 'revision', 'profileHash'] = '{}'::jsonb
       and jsonb_typeof(${table.manifestSnapshots}) = 'array' and jsonb_array_length(${table.manifestSnapshots}) between 1 and 9
       and jsonb_typeof(${table.playbookSnapshots}) = 'array' and jsonb_array_length(${table.playbookSnapshots}) between 0 and 12
+      and ${table.interviewKitBindingHash} ~ '^[a-f0-9]{64}$' and jsonb_typeof(${table.interviewKitSnapshots})='array' and jsonb_array_length(${table.interviewKitSnapshots}) between 0 and 12
       and ${table.playbookSnapshots}::text !~* '"(body|content|prompt|token|secret|authorization)"[[:space:]]*:')
   `),
   check("orchestrator_conversation_turns_evidence_context", sql`
@@ -1879,6 +1882,27 @@ export const orchestratorPlaybookRevisions = pgTable("orchestrator_playbook_revi
   foreignKey({ columns: [table.workspaceId, table.createdByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "orchestrator_playbook_revisions_membership_fk" }).onDelete("restrict"),
   check("orchestrator_playbook_revisions_identity", sql`${table.playbookRef} ~ '^playbook_[a-z0-9][a-z0-9_-]{0,86}$' and ${table.revision} >= 1 and ${table.playbookHash} ~ '^[a-f0-9]{64}$' and (${table.revision} = 1 and ${table.previousHash} = 'GENESIS' or ${table.revision} > 1 and ${table.previousHash} ~ '^[a-f0-9]{64}$') and ${table.state} in ('active', 'tombstoned')`),
   check("orchestrator_playbook_revisions_no_authority", sql`${table.payload}::text !~* '"(policy|rule|scope|approval|execute|meta[_-]?write|persist|publish)"[[:space:]]*:'`),
+]);
+
+/** User-authored facilitation checklists. These are not rules, policies, or action instructions. */
+export const orchestratorInterviewKitRevisions = pgTable("orchestrator_interview_kit_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  kitRef: text("kit_ref").notNull(), revision: integer("revision").notNull(), previousHash: text("previous_hash").notNull(),
+  kitHash: text("kit_hash").notNull(), state: text("state").notNull(), sourceId: uuid("source_id").notNull(),
+  sourceSnapshot: jsonb("source_snapshot").$type<Record<string, unknown>>().notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(), createdByActorId: uuid("created_by_actor_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("orchestrator_interview_kit_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("orchestrator_interview_kit_revisions_identity_unique").on(table.workspaceId, table.kitRef, table.revision),
+  uniqueIndex("orchestrator_interview_kit_revisions_hash_unique").on(table.workspaceId, table.kitHash),
+  index("orchestrator_interview_kit_revisions_current_idx").on(table.workspaceId, table.kitRef, table.revision),
+  foreignKey({ columns: [table.workspaceId, table.sourceId], foreignColumns: [guidanceSources.workspaceId, guidanceSources.id], name: "orchestrator_interview_kit_revisions_source_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.createdByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "orchestrator_interview_kit_revisions_membership_fk" }).onDelete("restrict"),
+  check("orchestrator_interview_kit_revisions_identity", sql`${table.kitRef} ~ '^interview_kit_[a-f0-9]{32}$' and ${table.revision} >= 1 and ${table.kitHash} ~ '^[a-f0-9]{64}$' and (${table.revision} = 1 and ${table.previousHash} = 'GENESIS' or ${table.revision} > 1 and ${table.previousHash} ~ '^[a-f0-9]{64}$') and ${table.state} in ('active', 'archived')`),
+  check("orchestrator_interview_kit_revisions_payload", sql`jsonb_typeof(${table.payload}) = 'object' and ${table.payload} ?& array['name','explanation','questions','applicability'] and ${table.payload} - array['name','explanation','questions','applicability'] = '{}'::jsonb and jsonb_typeof(${table.payload}->'questions') = 'array' and jsonb_array_length(${table.payload}->'questions') between 1 and 12 and ${table.payload}::text !~* '"(policy|rule|scope|approval|execute|meta[_-]?write|persist|publish|action)"[[:space:]]*:'`),
+  check("orchestrator_interview_kit_revisions_source_snapshot", sql`jsonb_typeof(${table.sourceSnapshot}) = 'object' and ${table.sourceSnapshot} ?& array['optionId','title','url','version','recordHash','reviewBy'] and ${table.sourceSnapshot} - array['optionId','title','url','version','recordHash','reviewBy'] = '{}'::jsonb and ${table.sourceSnapshot}->>'recordHash' ~ '^[a-f0-9]{64}$'`),
 ]);
 
 /** Append-only soft-guidance card revisions. The authority check cannot mint policy or action rights. */
