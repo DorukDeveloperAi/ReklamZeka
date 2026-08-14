@@ -750,7 +750,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     setSkillCatalogContext(null);
     try {
       const response = await fetch("/api/skill-catalog", { method: "GET", cache: "no-store", credentials: "same-origin",
-        headers: { "X-ReklamZeka-Intent": "skill-catalog-read" } });
+        headers: { "X-ReklamZeka-Intent": "skill-catalog-agent-read" } });
       const payload: unknown = await response.json();
       const state = skillCatalogLoadState(response.status, payload);
       const context = state === "ready" || state === "legacy" ? skillCatalogContextFromResponse(payload) : null;

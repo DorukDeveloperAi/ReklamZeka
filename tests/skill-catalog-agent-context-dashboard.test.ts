@@ -38,7 +38,7 @@ describe("Agent skill catalog context strip", () => {
     const source = readFileSync("src/app/dashboard/operating-dashboard.tsx", "utf8");
     const catalogSlice = source.slice(source.indexOf("const refreshSkillCatalog"), source.indexOf("const verifyOrchestratorWorkspace"));
     expect(catalogSlice).toContain('method: "GET"');
-    expect(catalogSlice).toContain('"X-ReklamZeka-Intent": "skill-catalog-read"');
+    expect(catalogSlice).toContain('"X-ReklamZeka-Intent": "skill-catalog-agent-read"');
     expect(catalogSlice).not.toContain("POST");
     expect(catalogSlice).not.toMatch(/skill-profile-select|skill-playbook|tombstone/);
   });

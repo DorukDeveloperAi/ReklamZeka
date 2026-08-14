@@ -21,7 +21,9 @@ type Playbook = Readonly<{
   ref: string;
   revision: number;
   state: "active";
-  title?: string;
+  title: string;
+  body: string;
+  sourceRef: string;
   url?: string | null;
   freshness?: "current" | "stale" | "not_scheduled";
 }>;
@@ -32,13 +34,18 @@ type Catalog = Readonly<{
   authority: Authority;
 }>;
 type LoadState = "loading" | "ready" | "session_required" | "unavailable";
-type Mutation = "profile" | "create" | "tombstone" | null;
+type Mutation = "profile" | "create" | "revise" | "tombstone" | null;
 
 const SOURCE_REF = /^source_[a-z0-9_.:-]+$/;
 const CLOSED_AUTHORITY_FIELDS = ["canPersist", "canCreateRule", "canDraftPolicy", "canAlterScope", "canPublish", "canApprove", "canExecute", "canWriteMeta"] as const;
+const PRIVATE_IDENTIFIER = /\b(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[a-f0-9]{64})\b/i;
 
 function record(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+function publicPlaybookText(value: unknown, maximum: number): value is string {
+  return typeof value === "string" && !!value.trim() && value.length <= maximum && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)
+    && !PRIVATE_IDENTIFIER.test(value);
 }
 
 function catalogFromResponse(value: unknown): Catalog | null {
@@ -59,12 +66,13 @@ function catalogFromResponse(value: unknown): Catalog | null {
       citationRequired: true as const, negativeCapabilities: Object.freeze([...item.negativeCapabilities] as string[]) });
   });
   const playbooks = value.playbooks.map((item) => {
-    if (!record(item) || item.kind !== "playbook" || typeof item.ref !== "string" || typeof item.revision !== "number"
-      || !Number.isSafeInteger(item.revision) || item.revision < 1 || item.state !== "active" || !(item.title === undefined || typeof item.title === "string")
+    if (!record(item) || item.kind !== "playbook" || typeof item.ref !== "string" || !/^playbook_[a-z0-9][a-z0-9_-]{0,86}$/.test(item.ref) || typeof item.revision !== "number"
+      || !Number.isSafeInteger(item.revision) || item.revision < 1 || item.state !== "active" || !publicPlaybookText(item.title, 240)
+      || !publicPlaybookText(item.body, 16_000) || typeof item.sourceRef !== "string" || !SOURCE_REF.test(item.sourceRef)
       || !(item.url === undefined || item.url === null || typeof item.url === "string")
       || !(item.freshness === undefined || item.freshness === "current" || item.freshness === "stale" || item.freshness === "not_scheduled")) return null;
     return Object.freeze({ kind: "playbook" as const, ref: item.ref, revision: item.revision, state: "active" as const,
-      title: item.title as string | undefined, url: item.url as string | null | undefined,
+      title: item.title as string, body: item.body as string, sourceRef: item.sourceRef as string, url: item.url as string | null | undefined,
       freshness: item.freshness as Playbook["freshness"] });
   });
   if (skills.some((item) => item === null) || playbooks.some((item) => item === null)) return null;
@@ -96,6 +104,10 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
   const [body, setBody] = useState("");
   const [sourceRef, setSourceRef] = useState("");
   const [pendingTombstone, setPendingTombstone] = useState<Playbook | null>(null);
+  const [editingPlaybook, setEditingPlaybook] = useState<Playbook | null>(null);
+  const [revisionTitle, setRevisionTitle] = useState("");
+  const [revisionBody, setRevisionBody] = useState("");
+  const [pendingRevision, setPendingRevision] = useState<Readonly<{ playbookRef: string; expectedRevision: number; title: string; body: string; sourceRef: string }> | null>(null);
 
   const reload = useCallback(async () => {
     setState("loading");
@@ -133,7 +145,7 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
 
   const corePack = useMemo(() => catalog?.skills.map(({ ref, version }) => ({ ref, version })) ?? [], [catalog]);
 
-  const mutate = useCallback(async (intent: "skill-profile-select" | "skill-playbook-create" | "skill-playbook-tombstone", payload: Record<string, unknown>, kind: Exclude<Mutation, null>) => {
+  const mutate = useCallback(async (intent: "skill-profile-select" | "skill-playbook-create" | "skill-playbook-revise" | "skill-playbook-tombstone", payload: Record<string, unknown>, kind: Exclude<Mutation, null>) => {
     setMutation(kind);
     setMessage(null);
     try {
@@ -143,7 +155,7 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
       if (!response.ok) throw new Error(responseMessage(result, "İşlem tamamlanamadı."));
       const refreshed = await reload();
       if (!refreshed) throw new Error("İşlem kaydedildi ancak katalog yeniden doğrulanamadı.");
-      setMessage(kind === "profile" ? "Temel skill profili seçildi." : kind === "create" ? "Playbook kaydedildi." : "Playbook kaldırıldı.");
+      setMessage(kind === "profile" ? "Temel skill profili seçildi." : kind === "create" ? "Playbook kaydedildi." : kind === "revise" ? "Yeni playbook revizyonu kaydedildi." : "Playbook kaldırıldı.");
       return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "İşlem tamamlanamadı.");
@@ -175,6 +187,26 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
     if (saved) setPendingTombstone(null);
   }
 
+  function startRevision(playbook: Playbook) {
+    setEditingPlaybook(playbook);
+    setRevisionTitle(playbook.title);
+    setRevisionBody(playbook.body);
+    setPendingRevision(null);
+  }
+
+  function prepareRevision(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingPlaybook || !catalog?.authority.canCreatePlaybookRevision || !revisionTitle.trim() || !revisionBody.trim()) return;
+    setPendingRevision({ playbookRef: editingPlaybook.ref, expectedRevision: editingPlaybook.revision,
+      title: revisionTitle.trim(), body: revisionBody.trim(), sourceRef: editingPlaybook.sourceRef });
+  }
+
+  async function saveRevision() {
+    if (!pendingRevision || !catalog?.authority.canCreatePlaybookRevision) return;
+    const saved = await mutate("skill-playbook-revise", { ...pendingRevision, confirmed: true }, "revise");
+    if (saved) { setPendingRevision(null); setEditingPlaybook(null); setRevisionTitle(""); setRevisionBody(""); }
+  }
+
   if (state === "loading" && !catalog) return <section className={styles.panel} aria-busy="true"><h2>Skill profili ve playbooklar</h2><p>Yayınlanmış kaynaklar doğrulanıyor…</p></section>;
   if (state === "session_required") return null;
   if (state === "unavailable" || !catalog) return <section className={styles.panel} role="alert"><h2>Skill profili ve playbooklar kullanılamıyor</h2><p>{message ?? "Katalog kaynağı doğrulanamadı."}</p><button type="button" onClick={() => void reload()}>Tekrar dene</button></section>;
@@ -200,9 +232,19 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
       {!catalog.authority.canCreatePlaybookRevision ? <p className={styles.permission}>Bu rol playbook kaydı oluşturamaz.</p> : null}
     </form>
 
-    <section className={styles.playbooks} aria-label="Etkin playbooklar"><h3>Etkin playbooklar</h3>{catalog.playbooks.length ? <ul>{catalog.playbooks.map((playbook) => <li key={playbook.ref}><div><strong>{playbook.title ?? "Başlıksız playbook"}</strong><small>revizyon {playbook.revision}{playbook.freshness ? ` · ${playbook.freshness}` : ""}</small>{playbook.url ? <a href={playbook.url} target="_blank" rel="noreferrer">Kaynağı aç</a> : null}</div><button type="button" disabled={!catalog.authority.canTombstonePlaybook || mutation !== null} onClick={() => setPendingTombstone(playbook)}>Kaldır</button></li>)}</ul> : <p>Etkin playbook yok.</p>}</section>
+    <section className={styles.playbooks} aria-label="Etkin playbooklar"><h3>Etkin playbooklar</h3>{catalog.playbooks.length ? <ul>{catalog.playbooks.map((playbook) => <li key={playbook.ref}><div><strong>{playbook.title}</strong><small>revizyon {playbook.revision}{playbook.freshness ? ` · ${playbook.freshness}` : ""}</small>{playbook.url ? <a href={playbook.url} target="_blank" rel="noreferrer">Kaynağı aç</a> : null}</div><div className={styles.playbookActions}><button type="button" disabled={!catalog.authority.canCreatePlaybookRevision || mutation !== null} onClick={() => startRevision(playbook)}>Revizyon oluştur</button><button type="button" disabled={!catalog.authority.canTombstonePlaybook || mutation !== null} onClick={() => setPendingTombstone(playbook)}>Kaldır</button></div></li>)}</ul> : <p>Etkin playbook yok.</p>}</section>
+
+    {editingPlaybook ? <form className={styles.form} onSubmit={prepareRevision} aria-label="Playbook revizyonu">
+      <h3>Playbook revizyonu</h3><p>Mevcut metni siz düzenlersiniz. Yeni kayıt aynı playbook zincirine append-only olarak eklenir.</p>
+      <label><span>Başlık</span><input value={revisionTitle} maxLength={240} disabled={!canCreate} onChange={(event) => setRevisionTitle(event.target.value)} /></label>
+      <label><span>Playbook metni</span><textarea value={revisionBody} maxLength={16_000} disabled={!canCreate} onChange={(event) => setRevisionBody(event.target.value)} /></label>
+      <label><span>Yayınlanmış kaynak referansı</span><input value={editingPlaybook.sourceRef} disabled readOnly /></label>
+      <small>Kaynak, güncel playbook ile aynı olmalıdır; sunucu revision head ve kaynak eşleşmesini yeniden doğrular.</small>
+      <div className={styles.playbookActions}><button type="button" disabled={mutation !== null} onClick={() => { setEditingPlaybook(null); setPendingRevision(null); }}>Vazgeç</button><button type="submit" disabled={!canCreate || !revisionTitle.trim() || !revisionBody.trim()}>Yeni revizyonu kaydet</button></div>
+    </form> : null}
 
     {pendingTombstone ? <section className={styles.confirmation} role="alertdialog" aria-labelledby="skill-catalog-confirm-title" aria-describedby="skill-catalog-confirm-copy"><h3 id="skill-catalog-confirm-title">Playbook’u kaldır?</h3><p id="skill-catalog-confirm-copy">{pendingTombstone.title ?? "Bu playbook"} artık etkin listede görünmez. Bu işlem açık kullanıcı onayı gerektirir.</p><div><button type="button" onClick={() => setPendingTombstone(null)} disabled={mutation === "tombstone"}>Vazgeç</button><button type="button" onClick={() => void tombstonePlaybook()} disabled={mutation === "tombstone"}>{mutation === "tombstone" ? "Kaldırılıyor…" : "Kaldırmayı onayla"}</button></div></section> : null}
+    {pendingRevision ? <section className={styles.confirmation} role="alertdialog" aria-labelledby="skill-catalog-revision-confirm-title" aria-describedby="skill-catalog-revision-confirm-copy"><h3 id="skill-catalog-revision-confirm-title">Yeni revizyonu kaydet?</h3><p id="skill-catalog-revision-confirm-copy">Mevcut kayıt değişmez; düzenlediğiniz metin yeni, immutable bir revizyon olarak eklenecek.</p><div><button type="button" onClick={() => setPendingRevision(null)} disabled={mutation === "revise"}>Vazgeç</button><button type="button" onClick={() => void saveRevision()} disabled={mutation === "revise"}>{mutation === "revise" ? "Kaydediliyor…" : "Kaydetmeyi onayla"}</button></div></section> : null}
     {message ? <p className={styles.feedback} role="status">{message}</p> : null}
   </section>;
 }

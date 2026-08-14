@@ -5,10 +5,11 @@ const panel = readFileSync("src/app/dashboard/skill-catalog-panel.tsx", "utf8");
 const dashboard = readFileSync("src/app/dashboard/operating-dashboard.tsx", "utf8");
 
 describe("SkillCatalogPanel Yönet → Kurallar surface", () => {
-  it("uses the local-session GET projection and only the three explicit UI mutation intents", () => {
+  it("uses the local-session GET projection and only explicit user mutation intents", () => {
     expect(panel).toContain('"X-ReklamZeka-Intent": "skill-catalog-read"');
     expect(panel).toContain('"skill-profile-select"');
     expect(panel).toContain('"skill-playbook-create"');
+    expect(panel).toContain('"skill-playbook-revise"');
     expect(panel).toContain('"skill-playbook-tombstone"');
     expect(panel).toContain('credentials: "same-origin"');
     expect(panel).toContain('method: "POST"');
@@ -21,8 +22,11 @@ describe("SkillCatalogPanel Yönet → Kurallar surface", () => {
     expect(panel).toContain('onClick={() => void selectProfile()}');
     expect(panel).toContain('onSubmit={(event) => void createPlaybook(event)}');
     expect(panel).toContain('onClick={() => setPendingTombstone(playbook)}');
+    expect(panel).toContain("startRevision(playbook)");
     expect(panel).toContain('role="alertdialog"');
     expect(panel).toContain("Kaldırmayı onayla");
+    expect(panel).toContain("Yeni revizyonu kaydet");
+    expect(panel).toContain("Kaydetmeyi onayla");
     expect(panel).toContain("catalog.activeProfile ? \"Etkin\"");
   });
 

@@ -1,6 +1,132 @@
-import { sql } from "drizzle-orm"; import type { NodePgDatabase } from "drizzle-orm/node-postgres"; import type { CatalogItem, SkillCatalogRepository } from "@/application/skill-catalog-service"; import { catalogHash,newRef } from "@/application/skill-catalog-service"; import * as schema from "@/db/schema";
-type DB=NodePgDatabase<typeof schema>; const rows=<T>(r:unknown)=>((r as {rows?:T[]}).rows??[]);
-export class DrizzleSkillCatalogRepository implements SkillCatalogRepository { constructor(private readonly db:Pick<DB,"execute"|"transaction">){} async list(w:string){const p=rows<CatalogItem>(await this.db.execute(sql`select 'profile' kind,profile_ref ref,revision,state from orchestrator_profile_revisions where workspace_id=${w}::uuid and state='active' order by revision desc limit 1`));const b=rows<CatalogItem>(await this.db.execute(sql`select 'playbook' kind,p.playbook_ref ref,p.revision,p.state,s.title,s.source_url url,case when s.review_by is null then 'not_scheduled' when s.review_by<=now() then 'stale' else 'current' end freshness from orchestrator_playbook_revisions p join guidance_sources s on s.workspace_id=p.workspace_id and s.id=p.source_id where p.workspace_id=${w}::uuid and p.state='active' order by p.revision desc`));return [...p,...b];}
- async appendProfile(x:{workspaceId:string;actorId:string;pack:unknown}){const payload={corePack:x.pack};return rows<CatalogItem>(await this.db.execute(sql`insert into orchestrator_profile_revisions(workspace_id,profile_ref,revision,previous_hash,profile_hash,state,payload,created_by_actor_id) values(${x.workspaceId}::uuid,'profile_default',1,'GENESIS',${catalogHash(payload)},'active',${JSON.stringify(payload)}::jsonb,${x.actorId}::uuid) returning 'profile' kind,profile_ref ref,revision,state`))[0]!;}
- async appendPlaybook(x:{workspaceId:string;actorId:string;title:string;body:string;sourceRef:string}){const s=rows<{id:string}>(await this.db.execute(sql`select id from guidance_sources where workspace_id=${x.workspaceId}::uuid and source_ref=${x.sourceRef} and status='published' limit 1`))[0];if(!s)throw new Error("source_not_found");const payload={title:x.title,body:x.body};return rows<CatalogItem>(await this.db.execute(sql`insert into orchestrator_playbook_revisions(workspace_id,playbook_ref,revision,previous_hash,playbook_hash,state,source_id,payload,created_by_actor_id) values(${x.workspaceId}::uuid,${newRef()},1,'GENESIS',${catalogHash(payload)},'active',${s.id}::uuid,${JSON.stringify(payload)}::jsonb,${x.actorId}::uuid) returning 'playbook' kind,playbook_ref ref,revision,state`))[0]!;}
- async tombstone(x:{workspaceId:string;actorId:string;ref:string}){return rows<CatalogItem>(await this.db.execute(sql`insert into orchestrator_playbook_revisions(workspace_id,playbook_ref,revision,previous_hash,playbook_hash,state,source_id,payload,created_by_actor_id) select workspace_id,playbook_ref,revision+1,playbook_hash,playbook_hash,'tombstoned',source_id,payload,${x.actorId}::uuid from orchestrator_playbook_revisions where workspace_id=${x.workspaceId}::uuid and playbook_ref=${x.ref} order by revision desc limit 1 returning 'playbook' kind,playbook_ref ref,revision,state`))[0]!;}}
+import { sql } from "drizzle-orm";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+
+import { catalogHash, newRef, type CatalogItem, type SkillCatalogRepository } from "@/application/skill-catalog-service";
+import * as schema from "@/db/schema";
+
+type DB = NodePgDatabase<typeof schema>;
+type Executor = Pick<DB, "execute">;
+type TransactionalDB = Pick<DB, "execute" | "transaction">;
+const HASH = /^[a-f0-9]{64}$/;
+const PLAYBOOK_REF = /^playbook_[a-z0-9][a-z0-9_-]{0,86}$/;
+
+const rows = <T>(value: unknown): readonly T[] => {
+  if (!value || typeof value !== "object" || !("rows" in value) || !Array.isArray(value.rows)) throw new Error("corrupt_store");
+  return value.rows as readonly T[];
+};
+const one = <T>(value: readonly T[], code: string): T => { if (value.length !== 1) throw new Error(code); return value[0]!; };
+
+type Head = Readonly<{ revision: number; playbook_hash: string; source_id: string; state: string; payload: unknown }>;
+type Source = Readonly<{ id: string }>;
+type Inserted = Readonly<{ revision: number }>;
+
+function item(input: Readonly<{ ref: string; revision: number; state: string; title: string; body: string; sourceRef: string }>): CatalogItem {
+  return Object.freeze({ kind: "playbook", ref: input.ref, revision: input.revision, state: input.state,
+    title: input.title, body: input.body, sourceRef: input.sourceRef });
+}
+
+async function source(executor: Executor, workspaceId: string, sourceRef: string): Promise<Source> {
+  return one(rows<Source>(await executor.execute(sql`
+    select id from guidance_sources
+    where workspace_id = ${workspaceId}::uuid and source_ref = ${sourceRef} and status = 'published'
+    limit 2
+  `)), "source_not_found");
+}
+
+async function head(executor: Executor, workspaceId: string, playbookRef: string): Promise<Head> {
+  const current = one(rows<Head>(await executor.execute(sql`
+    select revision, playbook_hash, source_id, state, payload
+    from orchestrator_playbook_revisions
+    where workspace_id = ${workspaceId}::uuid and playbook_ref = ${playbookRef}
+    order by revision desc
+    limit 1 for update
+  `)), "playbook_not_found");
+  if (!Number.isSafeInteger(current.revision) || current.revision < 1 || !HASH.test(current.playbook_hash)
+    || current.state !== "active" || !PLAYBOOK_REF.test(playbookRef)) throw new Error("stale_head");
+  return current;
+}
+
+/** Private, append-only catalog writer; content is user-authored and has no authority semantics. */
+export class DrizzleSkillCatalogRepository implements SkillCatalogRepository {
+  constructor(private readonly db: TransactionalDB) {}
+
+  async list(workspaceId: string) {
+    const profile = rows<CatalogItem>(await this.db.execute(sql`
+      select 'profile' kind, profile_ref ref, revision, state
+      from orchestrator_profile_revisions
+      where workspace_id = ${workspaceId}::uuid and state = 'active'
+      order by revision desc limit 1
+    `));
+    const playbooks = rows<CatalogItem>(await this.db.execute(sql`
+      select 'playbook' kind, current.playbook_ref ref, current.revision, current.state,
+        current.payload ->> 'title' title, current.payload ->> 'body' body, source.source_ref "sourceRef",
+        source.source_url url, case when source.review_by is null then 'not_scheduled'
+          when source.review_by <= now() then 'stale' else 'current' end freshness
+      from (
+        select distinct on (playbook_ref) playbook_ref, revision, state, source_id, payload
+        from orchestrator_playbook_revisions
+        where workspace_id = ${workspaceId}::uuid
+        order by playbook_ref, revision desc
+      ) current
+      join guidance_sources source on source.workspace_id = ${workspaceId}::uuid and source.id = current.source_id
+      where current.state = 'active'
+      order by current.revision desc, current.playbook_ref
+    `));
+    return Object.freeze([...profile, ...playbooks]);
+  }
+
+  async appendProfile(input: Readonly<{ workspaceId: string; actorId: string; pack: unknown }>) {
+    const payload = { corePack: input.pack };
+    return one(rows<CatalogItem>(await this.db.execute(sql`
+      insert into orchestrator_profile_revisions(workspace_id, profile_ref, revision, previous_hash, profile_hash, state, payload, created_by_actor_id)
+      values(${input.workspaceId}::uuid, 'profile_default', 1, 'GENESIS', ${catalogHash(payload)}, 'active', ${JSON.stringify(payload)}::jsonb, ${input.actorId}::uuid)
+      returning 'profile' kind, profile_ref ref, revision, state
+    `)), "write_conflict");
+  }
+
+  async appendPlaybook(input: Readonly<{ workspaceId: string; actorId: string; title: string; body: string; sourceRef: string }>) {
+    return this.db.transaction(async (transaction) => {
+      const linkedSource = await source(transaction, input.workspaceId, input.sourceRef);
+      const payload = { title: input.title, body: input.body };
+      const ref = newRef();
+      const inserted = one(rows<Inserted>(await transaction.execute(sql`
+        insert into orchestrator_playbook_revisions(workspace_id, playbook_ref, revision, previous_hash, playbook_hash, state, source_id, payload, created_by_actor_id)
+        values(${input.workspaceId}::uuid, ${ref}, 1, 'GENESIS', ${catalogHash(payload)}, 'active', ${linkedSource.id}::uuid, ${JSON.stringify(payload)}::jsonb, ${input.actorId}::uuid)
+        returning revision
+      `)), "write_conflict");
+      return item({ ref, revision: inserted.revision, state: "active", title: input.title, body: input.body, sourceRef: input.sourceRef });
+    });
+  }
+
+  async appendPlaybookRevision(input: Readonly<{ workspaceId: string; actorId: string; playbookRef: string; expectedRevision: number; title: string; body: string; sourceRef: string }>) {
+    return this.db.transaction(async (transaction) => {
+      await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`playbook:${input.workspaceId}:${input.playbookRef}`}, 0))`);
+      const current = await head(transaction, input.workspaceId, input.playbookRef);
+      if (current.revision !== input.expectedRevision) throw new Error("stale_head");
+      const linkedSource = await source(transaction, input.workspaceId, input.sourceRef);
+      if (linkedSource.id !== current.source_id) throw new Error("source_mismatch");
+      const payload = { title: input.title, body: input.body };
+      if (catalogHash(payload) === current.playbook_hash) throw new Error("duplicate_revision");
+      const inserted = one(rows<Inserted>(await transaction.execute(sql`
+        insert into orchestrator_playbook_revisions(workspace_id, playbook_ref, revision, previous_hash, playbook_hash, state, source_id, payload, created_by_actor_id)
+        values(${input.workspaceId}::uuid, ${input.playbookRef}, ${current.revision + 1}, ${current.playbook_hash}, ${catalogHash(payload)}, 'active', ${linkedSource.id}::uuid, ${JSON.stringify(payload)}::jsonb, ${input.actorId}::uuid)
+        returning revision
+      `)), "write_conflict");
+      return item({ ref: input.playbookRef, revision: inserted.revision, state: "active", title: input.title, body: input.body, sourceRef: input.sourceRef });
+    });
+  }
+
+  async tombstone(input: Readonly<{ workspaceId: string; actorId: string; ref: string }>) {
+    return this.db.transaction(async (transaction) => {
+      await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`playbook:${input.workspaceId}:${input.ref}`}, 0))`);
+      const current = await head(transaction, input.workspaceId, input.ref);
+      const inserted = one(rows<Inserted>(await transaction.execute(sql`
+        insert into orchestrator_playbook_revisions(workspace_id, playbook_ref, revision, previous_hash, playbook_hash, state, source_id, payload, created_by_actor_id)
+        values(${input.workspaceId}::uuid, ${input.ref}, ${current.revision + 1}, ${current.playbook_hash},
+          ${catalogHash({ state: "tombstoned", previousHash: current.playbook_hash, payload: current.payload })}, 'tombstoned', ${current.source_id}::uuid, ${JSON.stringify(current.payload)}::jsonb, ${input.actorId}::uuid)
+        returning revision
+      `)), "write_conflict");
+      return Object.freeze({ kind: "playbook" as const, ref: input.ref, revision: inserted.revision, state: "tombstoned" });
+    });
+  }
+}
