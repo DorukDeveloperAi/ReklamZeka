@@ -14,6 +14,7 @@ import {
   parseSliceOperationalReadiness,
   parseSliceRuleScenarioSelectionCandidates,
   parseActionPreparationFlag,
+  parseSliceRuleDecisionTrace,
   SliceRuleWorkspaceSurface,
 } from "@/app/dashboard/slice-rule-workspace-panel";
 
@@ -34,6 +35,18 @@ describe("Slice Rule Workspace panel", () => {
       .toEqual({ visible: true, enabled: false, reason: "server_disabled" });
     expect(() => parseActionPreparationFlag({ actionPreparation: { visible: true, enabled: true, reason: "server_disabled" } }))
       .toThrow("güvenli değil");
+  });
+  it("accepts only a closed, opaque decision trace and rejects opened execution state", () => {
+    const trace = parseSliceRuleDecisionTrace({ decisionTrace: { contractVersion: "slice-rule-decision-trace/1.0.0", items: [{
+      selectionRef: `selection_${"a".repeat(64)}`, selectedAt: "2026-08-14T10:00:00.000Z",
+      actionUnit: { presence: true, status: "approved" },
+      decisionHistory: [{ decision: "proposed", occurredAt: "2026-08-14T10:01:00.000Z", reasonCode: null },
+        { decision: "approved", occurredAt: "2026-08-14T10:02:00.000Z", reasonCode: "human.confirmed" }],
+      execution: { safetyState: "server_disabled", closure: "admission_closed" },
+    }] } });
+    expect(trace[0]).toMatchObject({ actionUnit: { status: "approved" }, execution: { safetyState: "server_disabled" } });
+    expect(() => parseSliceRuleDecisionTrace({ decisionTrace: { contractVersion: "slice-rule-decision-trace/1.0.0", items: [{ ...trace[0],
+      execution: { safetyState: "executor_enabled", closure: "admission_closed" } }] } })).toThrow("güvenli değil");
   });
   it("accepts only opaque, authority-closed scenario candidates and keeps delivery holds blocked", () => {
     const candidateRef = `selection_candidate_${"a".repeat(64)}`;
@@ -56,6 +69,7 @@ describe("Slice Rule Workspace panel", () => {
     expect(html).toContain("Kaydedilmemiş form kapsamı kullanılmaz");
     expect(html).toContain("Kanıtlı kapsam adayları");
     expect(html).toContain("Frozen context, bütçe etkisi, policy ve action yetkisi üretmez");
+    expect(html).toContain("Karar izi");
   });
 
   it("accepts candidates only as form-prefill data with frozen budget evidence still required", () => {

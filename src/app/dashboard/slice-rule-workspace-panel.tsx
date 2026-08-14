@@ -77,8 +77,15 @@ type ImpactState = Readonly<{ status: "idle" | "loading" }>
   | Readonly<{ status: "unsupported" | "unavailable" | "stale" | "scope" | "error"; message: string }>;
 type ApprovalQueueSelection = Readonly<{ selectionRef: string; selectedAt: string }>;
 type ActionPreparationFlag = Readonly<{ visible: true; enabled: false; reason: "server_disabled" }>;
+type DecisionTraceItem = Readonly<{
+  selectionRef: string;
+  selectedAt: string;
+  actionUnit: Readonly<{ presence: boolean; status: "not_materialized" | "awaiting_approval" | "approved" | "rejected" | "changes_requested" }>;
+  decisionHistory: readonly Readonly<{ decision: "proposed" | "approved" | "rejected" | "changes_requested"; occurredAt: string; reasonCode: string | null }>[];
+  execution: Readonly<{ safetyState: "server_disabled"; closure: "not_admitted" | "admission_closed" }>;
+}>;
 type ApprovalQueueState = Readonly<{ status: "loading" }>
-  | Readonly<{ status: "ready"; selections: readonly ApprovalQueueSelection[]; actionPreparation: ActionPreparationFlag }>
+  | Readonly<{ status: "ready"; selections: readonly ApprovalQueueSelection[]; decisionTrace: readonly DecisionTraceItem[]; actionPreparation: ActionPreparationFlag }>
   | Readonly<{ status: "queued"; selectionRef: string; persistence: "inserted" | "unchanged" }>
   | Readonly<{ status: "unavailable" | "error"; message: string }>;
 type SelectionCandidate = Readonly<{ candidateRef: string; scenarioLabel: string; beforeAmountMinor: number; afterAmountMinor: number; currency: string;
@@ -178,6 +185,28 @@ export function parseActionPreparationFlag(value: unknown): ActionPreparationFla
     throw new Error("Action preparation flag sözleşmesi güvenli değil.");
   }
   return value.actionPreparation as ActionPreparationFlag;
+}
+export function parseSliceRuleDecisionTrace(value: unknown): readonly DecisionTraceItem[] {
+  if (!object(value) || !object(value.decisionTrace) || value.decisionTrace.contractVersion !== "slice-rule-decision-trace/1.0.0"
+    || !Array.isArray(value.decisionTrace.items) || value.decisionTrace.items.length > 100
+    || !value.decisionTrace.items.every((item) => object(item) && Object.keys(item).length === 5
+      && typeof item.selectionRef === "string" && /^selection_[a-f0-9]{64}$/.test(item.selectionRef)
+      && typeof item.selectedAt === "string" && Number.isFinite(Date.parse(item.selectedAt))
+      && object(item.actionUnit) && Object.keys(item.actionUnit).length === 2 && typeof item.actionUnit.presence === "boolean"
+      && ["not_materialized", "awaiting_approval", "approved", "rejected", "changes_requested"].includes(String(item.actionUnit.status))
+      && object(item.execution) && Object.keys(item.execution).length === 2 && item.execution.safetyState === "server_disabled"
+      && ["not_admitted", "admission_closed"].includes(String(item.execution.closure))
+      && Array.isArray(item.decisionHistory) && item.decisionHistory.length <= 2
+      && item.decisionHistory.every((event) => object(event) && Object.keys(event).length === 3
+        && ["proposed", "approved", "rejected", "changes_requested"].includes(String(event.decision))
+        && typeof event.occurredAt === "string" && Number.isFinite(Date.parse(event.occurredAt))
+        && (event.reasonCode === null || typeof event.reasonCode === "string" && /^[a-z][a-z0-9_.:-]{0,127}$/.test(event.reasonCode)))
+      && (item.actionUnit.presence ? item.actionUnit.status !== "not_materialized" && item.decisionHistory.length >= 1
+        && item.decisionHistory[0]?.decision === "proposed" && ["admission_closed", "not_admitted"].includes(String(item.execution.closure))
+        : item.actionUnit.status === "not_materialized" && item.decisionHistory.length === 0 && item.execution.closure === "not_admitted"))) {
+    throw new Error("Karar izi sözleşmesi güvenli değil.");
+  }
+  return value.decisionTrace.items as DecisionTraceItem[];
 }
 export function parseSliceRuleScenarioSelectionCandidates(value: unknown): readonly SelectionCandidate[] {
   if (!object(value) || value.contractVersion !== "slice-rule-scenario-selection/1.0.0" || !Array.isArray(value.candidates)
@@ -477,7 +506,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
         headers: { "X-ReklamZeka-Intent": "slice-rule-budget-action-unit-read" } });
       const payload = await response.json();
       if (!response.ok) throw new Error("Seçilmiş senaryolar okunamadı.");
-      setApprovalQueue({ status: "ready", selections: parseSliceRuleBudgetActionSelections(payload), actionPreparation: parseActionPreparationFlag(payload) });
+      setApprovalQueue({ status: "ready", selections: parseSliceRuleBudgetActionSelections(payload), decisionTrace: parseSliceRuleDecisionTrace(payload), actionPreparation: parseActionPreparationFlag(payload) });
     } catch (reason) { setApprovalQueue({ status: "unavailable", message: reason instanceof Error ? reason.message : "Seçilmiş senaryolar okunamadı." }); }
   }, []);
   useEffect(() => { void loadApprovalSelections(); }, [loadApprovalSelections]);
@@ -707,6 +736,19 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
             </div>) : null}
             {approvalQueue.status === "queued" ? <span>Seçim onay kuyruğuna eklendi ({approvalQueue.persistence}). Onay, execute ve Meta write hâlâ kapalıdır.</span> : null}
             {(approvalQueue.status === "unavailable" || approvalQueue.status === "error") ? <span role="alert">{approvalQueue.message}</span> : null}
+          </div>
+          <div className={styles.impactResult} aria-label="Karar izi">
+            <strong>Karar izi</strong>
+            <span>Selection → ActionUnit → insan kararı → execution closure zinciri salt okunurdur. Meta write kapalıdır.</span>
+            {approvalQueue.status === "loading" ? <span>Karar izi doğrulanıyor…</span> : null}
+            {approvalQueue.status === "ready" && approvalQueue.decisionTrace.length === 0 ? <span>Gösterilebilecek doğrulanmış karar izi yok.</span> : null}
+            {approvalQueue.status === "ready" ? approvalQueue.decisionTrace.map((trace) => <div className={styles.row} key={trace.selectionRef}>
+              <span>Seçim: {trace.selectionRef.slice(0, 20)}… · {date(trace.selectedAt)}</span>
+              <span>ActionUnit: {trace.actionUnit.presence ? trace.actionUnit.status.replaceAll("_", " ") : "hazırlanmadı"}</span>
+              <span>Kararlar: {trace.decisionHistory.length ? trace.decisionHistory.map((event) => `${event.decision.replaceAll("_", " ")} · ${date(event.occurredAt)}${event.reasonCode ? ` · ${event.reasonCode}` : ""}`).join(" | ") : "henüz yok"}</span>
+              <span>Execution: {trace.execution.safetyState} · {trace.execution.closure.replaceAll("_", " ")}</span>
+            </div>) : null}
+            {(approvalQueue.status === "unavailable" || approvalQueue.status === "error") ? <span role="alert">Karar izi güvenli biçimde okunamadı.</span> : null}
           </div>
           <div className={styles.impactResult} aria-label="Zamansal değerlendirme">
             <strong>Zamansal değerlendirme</strong>

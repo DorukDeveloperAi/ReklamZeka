@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { DrizzleSliceRuleBudgetActionUnitMaterializer, SliceRuleBudgetActionUnitMaterializerError } from "@/connectors/campaigns/slice-rule-budget-action-unit-materializer";
+import { DrizzleSliceRuleDecisionTraceReadRepository, SLICE_RULE_DECISION_TRACE_VERSION } from "@/connectors/campaigns/slice-rule-decision-trace-drizzle-read-repository";
 import * as schema from "@/db/schema";
 import type { TrustedDecisionRoomPrincipal } from "@/application/decision-room-agent-contract";
 import { publicActionPreparationFlag } from "@/domain/actions/action-preparation-flag";
@@ -37,15 +38,18 @@ async function command(request: Request): Promise<Command> {
 /** Public refs are evidence hashes, never the selection's internal UUID. */
 export function selectionRef(evidenceHash: string) { return `selection_${evidenceHash}`; }
 export function createSliceRuleBudgetActionUnitHttpHandlers(input: Readonly<{
-  database: SelectionReader & ConstructorParameters<typeof DrizzleSliceRuleBudgetActionUnitMaterializer>[0];
+  database: SelectionReader & ConstructorParameters<typeof DrizzleSliceRuleBudgetActionUnitMaterializer>[0]
+    & ConstructorParameters<typeof DrizzleSliceRuleDecisionTraceReadRepository>[0];
   resolvePrincipal(request: Request): Promise<TrustedDecisionRoomPrincipal>;
 }>) {
   const selectionRows = async (workspaceId: string) => input.database.select({ id: schema.sliceRuleScenarioAllocationSelections.id,
     selectionEvidenceHash: schema.sliceRuleScenarioAllocationSelections.selectionEvidenceHash, selectedAt: schema.sliceRuleScenarioAllocationSelections.selectedAt })
     .from(schema.sliceRuleScenarioAllocationSelections).where(eq(schema.sliceRuleScenarioAllocationSelections.workspaceId, workspaceId)).limit(101);
   return Object.freeze({
-    GET: async (request: Request) => { try { requestShape(request, "GET", "slice-rule-budget-action-unit-read"); const principal = await input.resolvePrincipal(request); const rows = await selectionRows(principal.workspaceId);
-      return NextResponse.json({ contractVersion: "slice-rule-budget-action-unit-http/1.0.0", selections: rows.map((row) => ({ selectionRef: selectionRef(row.selectionEvidenceHash), selectedAt: row.selectedAt.toISOString() })), actionPreparation: publicActionPreparationFlag(), authority: AUTHORITY }, { headers: HEADERS });
+    GET: async (request: Request) => { try { requestShape(request, "GET", "slice-rule-budget-action-unit-read"); const principal = await input.resolvePrincipal(request); const [rows, trace] = await Promise.all([
+      selectionRows(principal.workspaceId), new DrizzleSliceRuleDecisionTraceReadRepository(input.database).list(principal.workspaceId),
+    ]);
+      return NextResponse.json({ contractVersion: "slice-rule-budget-action-unit-http/1.0.0", selections: rows.map((row) => ({ selectionRef: selectionRef(row.selectionEvidenceHash), selectedAt: row.selectedAt.toISOString() })), decisionTrace: { contractVersion: SLICE_RULE_DECISION_TRACE_VERSION, items: trace }, actionPreparation: publicActionPreparationFlag(), authority: AUTHORITY }, { headers: HEADERS });
     } catch { return response("unavailable", "Seçilmiş bütçe senaryoları güvenli biçimde okunamadı.", 503); } },
     POST: async (request: Request) => { try { requestShape(request, "POST", "slice-rule-budget-action-unit-materialize"); const [parsed, principal] = await Promise.all([command(request), input.resolvePrincipal(request)]);
       const rows = await input.database.select({ id: schema.sliceRuleScenarioAllocationSelections.id }).from(schema.sliceRuleScenarioAllocationSelections).where(and(eq(schema.sliceRuleScenarioAllocationSelections.workspaceId, principal.workspaceId), eq(schema.sliceRuleScenarioAllocationSelections.selectionEvidenceHash, parsed.selectionRef.slice("selection_".length)))).limit(2);
