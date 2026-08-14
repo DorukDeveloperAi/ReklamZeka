@@ -1,5 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { canonicalCampaignPortfolio } from "@/app/dashboard/canonical-campaign-portfolio-panel";
+import { CanonicalCampaignPortfolioPanel, canonicalCampaignPortfolio } from "@/app/dashboard/canonical-campaign-portfolio-panel";
 import type { MetaReadMirrorProjection } from "@/domain/meta/read-mirror-projection";
 
 const projection = { connections: [{ accounts: [{ name: "TR", currency: "TRY", campaigns: [
@@ -12,5 +14,15 @@ describe("canonical campaign portfolio", () => {
     expect(canonicalCampaignPortfolio(projection).map(({ campaignRef, accountName, currency }) => [campaignRef, accountName, currency])).toEqual([
       ["campaign_a", "TR", "TRY"], ["campaign_b", "TR", "TRY"], ["campaign_c", "GCC", "AED"],
     ]);
+  });
+
+  it("exposes the selected campaign and its detail heading to assistive technology", () => {
+    const html = renderToStaticMarkup(createElement(CanonicalCampaignPortfolioPanel, {
+      projection,
+      onOpenAgentContext: () => undefined,
+      onOpenDecisionContext: () => undefined,
+    }));
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('tabindex="-1"');
   });
 });
