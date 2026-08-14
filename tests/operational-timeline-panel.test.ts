@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { operationalTimelineFromResponse } from "@/app/dashboard/operational-timeline-panel";
 
@@ -16,5 +17,10 @@ describe("operational timeline panel contract", () => {
     expect(operationalTimelineFromResponse({ ...base, items: [{ ...temporal, privateRef: "x" }] })).toBeNull();
     expect(operationalTimelineFromResponse({ ...base, authority: { ...authority, canExecute: true } })).toBeNull();
     expect(operationalTimelineFromResponse({ ...base, items: [temporal, { ...temporal, occurredAt: "2026-08-14T12:00:00.000Z" }] })).toBeNull();
+  });
+  it("does not request or render a second temporal feed", () => {
+    const source = readFileSync("src/app/dashboard/operational-timeline-panel.tsx", "utf8");
+    expect(source).not.toContain("/api/temporal-recommendations");
+    expect(source).not.toContain("TemporalRecord");
   });
 });
