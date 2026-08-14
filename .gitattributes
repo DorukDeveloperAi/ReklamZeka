@@ -1,0 +1,19 @@
+# aide TÜREVLERİ — `merge=ours`: iki makine aynı türevi bağımsız üretir ve içerik
+# çakışması KAÇINILMAZDIR; ama çakışma sahte olur, çünkü dosya bir sonraki `aide sync` /
+# `aide filing` koşumunda zaten yeniden ÜRETİLİR. Yerel hâli tutmak doğru davranıştır.
+#
+# ⚠ `merge=ours` driver'ı REPO-YERELDİR (`.git/config`, klonla GELMEZ) ve tanımlı değilse
+#   git bu beyanı SESSİZCE yok sayar. `aide tasima` onu idempotent olarak kurar; elle:
+#     git config merge.ours.driver true
+#
+# ÖLÇÜLDÜ (2026-08-14): bu iki dosya `origin/HEAD` ile çakışıyordu, merge geri sarılıyordu,
+# `tasima-once`/`tasima-sonra` HER boot tick'inde borç bırakıyordu ve BOOT 822 dakikadır
+# ölüydü. Kök neden bu beyanın YOKLUĞUYDU (agent-ide'de emsali vardı, burada yoktu).
+.claude/aide-manifest.json  merge=ours
+.claude/filing/DEVRALIS.md  merge=ours
+
+# DURUM logu + günlük durum JSON'u da TÜREVDİR (`aide durum` üretir). agent-ide'de bu
+# beyan vardı, burada yoktu → bu turda çakışan ikinci yol buydu.
+docs/DURUM.md               merge=ours
+docs/durum/*.json           merge=ours
+.claude/filing/kaptan-goals/*.json  merge=ours

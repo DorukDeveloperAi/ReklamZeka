@@ -4,6 +4,20 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "e709edff3",
+      "tarih": "2026-08-14",
+      "konu": "DURUM türevlerini de merge=ours ile beyan et (agent-ide emsali)",
+      "tur": "is",
+      "kapsam": []
+    },
+    {
+      "hash": "0b287b002",
+      "tarih": "2026-08-14",
+      "konu": "aide türevlerini merge=ours ile beyan et — boot'u öldüren çakışmanın kök nedeni",
+      "tur": "is",
+      "kapsam": []
+    },
+    {
       "hash": "ac54d9c60",
       "tarih": "2026-08-14",
       "konu": "docs(local): describe manual dashboard approval flow",
@@ -119,34 +133,16 @@
       "kapsam": [
         "fix"
       ]
-    },
-    {
-      "hash": "edb2b8d03",
-      "tarih": "2026-08-14",
-      "konu": "fix(verification): make budget approval scenario selectable",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "c1e68ad04",
-      "tarih": "2026-08-14",
-      "konu": "fix(verification): bind approval fixture hierarchy evidence",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "fix",
-      "adet": 18
+      "adet": 17
     },
     {
       "kapsam": "feat",
-      "adet": 15
+      "adet": 14
     },
     {
       "kapsam": "docs",
@@ -157,11 +153,15 @@
       "adet": 13
     },
     {
+      "kapsam": "?",
+      "adet": 2
+    },
+    {
       "kapsam": "refactor",
       "adet": 1
     }
   ],
-  "isSayisi": 450,
+  "isSayisi": 452,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-14",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "a397d50c534e"
+  "damga": "dca4cf2c2385"
 }

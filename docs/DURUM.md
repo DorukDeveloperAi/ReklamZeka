@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: a397d50c534e -->
+<!-- durum-damga: dca4cf2c2385 -->
 
 ## Künye
 
@@ -14,13 +14,15 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 450 |
+| iş commit'i (tüm geçmiş) | 452 |
 | ilk / son iş | 2026-08-06 / 2026-08-14 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-14 | `—` | DURUM türevlerini de merge=ours ile beyan et (agent-ide emsali) | `e709edff3` |
+| 2026-08-14 | `—` | aide türevlerini merge=ours ile beyan et — boot'u öldüren çakışmanın kök nedeni | `0b287b002` |
 | 2026-08-14 | `docs` | describe manual dashboard approval flow | `ac54d9c60` |
 | 2026-08-14 | `docs` | record canonical insight bootstrap | `972e72abb` |
 | 2026-08-14 | `test` | isolate verifier cleanup connection | `1046fc2ce` |
@@ -34,15 +36,14 @@
 | 2026-08-14 | `fix` | bind geo evidence through hierarchy | `3377eee7b` |
 | 2026-08-14 | `fix` | label trust freshness in hours | `294e5e398` |
 | 2026-08-14 | `fix` | enforce published budget guardrails | `2834bf3f7` |
-| 2026-08-14 | `fix` | make budget approval scenario selectable | `edb2b8d03` |
-| 2026-08-14 | `fix` | bind approval fixture hierarchy evidence | `c1e68ad04` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `fix         ` ████████████████████████ 18
-- `feat        ` ████████████████████ 15
-- `docs        ` █████████████████ 13
-- `test        ` █████████████████ 13
+- `fix         ` ████████████████████████ 17
+- `feat        ` ████████████████████ 14
+- `docs        ` ██████████████████ 13
+- `test        ` ██████████████████ 13
+- `?           ` ███ 2
 - `refactor    ` █ 1
 
 ## Planlar

@@ -1,7 +1,7 @@
 # DEVRALIŞ — ReklamZeka
 
 > **TÜREVDİR, elle düzenlenmez.** Her `aide filing` koşumunda yeniden üretilir.
-> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-14 10:26
+> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-10 18:49
 
 Bu belge bir sonraki Claude hesabının **ilk okuyacağı** dosyadır: neyin yarıda kaldığını
 ve hangi komutla devam edileceğini söyler.
