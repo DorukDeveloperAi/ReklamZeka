@@ -76,8 +76,9 @@ type ImpactState = Readonly<{ status: "idle" | "loading" }>
   | Readonly<{ status: "saved"; result: SavedImpactResult }>
   | Readonly<{ status: "unsupported" | "unavailable" | "stale" | "scope" | "error"; message: string }>;
 type ApprovalQueueSelection = Readonly<{ selectionRef: string; selectedAt: string }>;
+type ActionPreparationFlag = Readonly<{ visible: true; enabled: false; reason: "server_disabled" }>;
 type ApprovalQueueState = Readonly<{ status: "loading" }>
-  | Readonly<{ status: "ready"; selections: readonly ApprovalQueueSelection[] }>
+  | Readonly<{ status: "ready"; selections: readonly ApprovalQueueSelection[]; actionPreparation: ActionPreparationFlag }>
   | Readonly<{ status: "queued"; selectionRef: string; persistence: "inserted" | "unchanged" }>
   | Readonly<{ status: "unavailable" | "error"; message: string }>;
 type SelectionCandidate = Readonly<{ candidateRef: string; scenarioLabel: string; beforeAmountMinor: number; afterAmountMinor: number; currency: string;
@@ -170,6 +171,13 @@ export function parseSliceRuleBudgetActionSelections(value: unknown): readonly A
       && typeof entry.selectedAt === "string") || !object(value.authority) || value.authority.canApprove !== false
     || value.authority.canExecute !== false || value.authority.canWriteMeta !== false) throw new Error("Onay kuyruğu seçim sözleşmesi güvenli değil.");
   return value.selections as ApprovalQueueSelection[];
+}
+export function parseActionPreparationFlag(value: unknown): ActionPreparationFlag {
+  if (!object(value) || !object(value.actionPreparation) || value.actionPreparation.visible !== true
+    || value.actionPreparation.enabled !== false || value.actionPreparation.reason !== "server_disabled") {
+    throw new Error("Action preparation flag sözleşmesi güvenli değil.");
+  }
+  return value.actionPreparation as ActionPreparationFlag;
 }
 export function parseSliceRuleScenarioSelectionCandidates(value: unknown): readonly SelectionCandidate[] {
   if (!object(value) || value.contractVersion !== "slice-rule-scenario-selection/1.0.0" || !Array.isArray(value.candidates)
@@ -469,7 +477,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
         headers: { "X-ReklamZeka-Intent": "slice-rule-budget-action-unit-read" } });
       const payload = await response.json();
       if (!response.ok) throw new Error("Seçilmiş senaryolar okunamadı.");
-      setApprovalQueue({ status: "ready", selections: parseSliceRuleBudgetActionSelections(payload) });
+      setApprovalQueue({ status: "ready", selections: parseSliceRuleBudgetActionSelections(payload), actionPreparation: parseActionPreparationFlag(payload) });
     } catch (reason) { setApprovalQueue({ status: "unavailable", message: reason instanceof Error ? reason.message : "Seçilmiş senaryolar okunamadı." }); }
   }, []);
   useEffect(() => { void loadApprovalSelections(); }, [loadApprovalSelections]);
@@ -690,6 +698,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
           <div className={styles.impactResult} aria-label="İnsan onay kuyruğu">
             <strong>Seçilmiş senaryoyu insan onay kuyruğuna gönder</strong>
             <span>Yalnız seçilmiş immutable allocation kullanılır; tutar, kampanya, policy veya Meta kimliği tarayıcıdan gönderilmez.</span>
+            {approvalQueue.status === "ready" && approvalQueue.actionPreparation.visible ? <span>Action preparation görünür, ancak execution varsayılan olarak kapalıdır ({approvalQueue.actionPreparation.reason}).</span> : null}
             {approvalQueue.status === "loading" ? <span>Seçilmiş senaryolar okunuyor…</span> : null}
             {approvalQueue.status === "ready" && approvalQueue.selections.length === 0 ? <span>Onaya gönderilecek seçilmiş senaryo yok.</span> : null}
             {approvalQueue.status === "ready" ? approvalQueue.selections.map((selection) => <div className={styles.row} key={selection.selectionRef}>

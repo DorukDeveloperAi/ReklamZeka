@@ -17,6 +17,7 @@ describe("Slice Rule budget ActionUnit HTTP boundary", () => {
     expect(response.status).toBe(200);
     const payload = await response.json();
     expect(payload.selections).toEqual([{ selectionRef: selectionRef(evidenceHash), selectedAt: "2026-08-13T12:00:00.000Z" }]);
+    expect(payload.actionPreparation).toEqual({ visible: true, enabled: false, reason: "server_disabled" });
     expect(JSON.stringify(payload)).not.toContain("33333333-3333-4333-8333-333333333333");
     expect(response.headers.get("X-ReklamZeka-Meta-Write")).toBe("disabled");
   });

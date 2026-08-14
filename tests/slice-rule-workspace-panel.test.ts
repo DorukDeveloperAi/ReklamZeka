@@ -13,6 +13,7 @@ import {
   parseSliceScopeCandidates,
   parseSliceOperationalReadiness,
   parseSliceRuleScenarioSelectionCandidates,
+  parseActionPreparationFlag,
   SliceRuleWorkspaceSurface,
 } from "@/app/dashboard/slice-rule-workspace-panel";
 
@@ -28,6 +29,12 @@ const snapshot = { contractVersion: "slice-rule-workspace-http/1.0.0", items: [i
   canSaveDraft: true, ...closed } } as const;
 
 describe("Slice Rule Workspace panel", () => {
+  it("accepts only the visible, server-disabled action preparation projection", () => {
+    expect(parseActionPreparationFlag({ actionPreparation: { visible: true, enabled: false, reason: "server_disabled" } }))
+      .toEqual({ visible: true, enabled: false, reason: "server_disabled" });
+    expect(() => parseActionPreparationFlag({ actionPreparation: { visible: true, enabled: true, reason: "server_disabled" } }))
+      .toThrow("güvenli değil");
+  });
   it("accepts only opaque, authority-closed scenario candidates and keeps delivery holds blocked", () => {
     const candidateRef = `selection_candidate_${"a".repeat(64)}`;
     const result = parseSliceRuleScenarioSelectionCandidates({ contractVersion: "slice-rule-scenario-selection/1.0.0", candidates: [{ candidateRef,

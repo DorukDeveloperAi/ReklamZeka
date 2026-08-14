@@ -9,6 +9,7 @@ import {
 } from "@/domain/actions/action-execution-admission";
 import { createMetaWriteSpec } from "@/domain/actions/meta-write-spec";
 import { assessMetaWriteEligibility, type MetaWriteEligibilitySnapshot } from "@/domain/actions/meta-write-eligibility";
+import { appendActionPreparationGateSnapshot, evaluateUnifiedActionPreparationGateForUnit, UnifiedActionPreparationGateError } from "@/connectors/campaigns/unified-action-preparation-gate";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -145,7 +146,7 @@ export class DrizzleActionExecutionAdmissionRepository {
   }
 
   async admit(input: Readonly<{ workspaceId: string; admission: ActionExecutionAdmission }>): Promise<Readonly<{
-    outcome: "inserted" | "unchanged";
+    outcome: "inserted" | "unchanged" | "blocked";
     executionRef: string;
     admissionHash: string;
     capabilities: Readonly<{ canExecute: false; canWriteMeta: false; canDispatchNetwork: false }>;
@@ -207,6 +208,29 @@ export class DrizzleActionExecutionAdmissionRepository {
         || input.admission.writeSpec.specHash !== expectedSpec.specHash
         || digest(input.admission.writeSpec) !== digest(expectedSpec)) {
         throw new ActionExecutionAdmissionRepositoryError("source_corrupt");
+      }
+      const gateBindings = rows<{ selection_id: string }>(await transaction.execute(sql`
+        select selection_id from slice_rule_budget_action_unit_bindings
+        where workspace_id = ${this.workspaceId}::uuid and action_proposal_unit_id = ${source.unit_id}::uuid limit 2
+      `));
+      if (gateBindings.length > 1) throw new ActionExecutionAdmissionRepositoryError("source_corrupt");
+      if (gateBindings.length === 1) {
+        const evaluatedAt = iso(source.database_now);
+        try {
+          const gate = await evaluateUnifiedActionPreparationGateForUnit(transaction as never, {
+            workspaceId: this.workspaceId, actionProposalUnitId: source.unit_id, stage: "admission", evaluatedAt,
+          });
+          await appendActionPreparationGateSnapshot(transaction as never, { workspaceId: this.workspaceId,
+            selectionId: null, actionProposalUnitId: source.unit_id, result: gate, evaluatedAt });
+          if (!gate.admissionEnabled) {
+            return Object.freeze({ outcome: "blocked" as const, executionRef: `action_execution_${"0".repeat(20)}`,
+              admissionHash: input.admission.admissionHash,
+              capabilities: Object.freeze({ canExecute: false as const, canWriteMeta: false as const, canDispatchNetwork: false as const }) });
+          }
+        } catch (error) {
+          if (error instanceof UnifiedActionPreparationGateError) throw new ActionExecutionAdmissionRepositoryError("source_missing");
+          throw error;
+        }
       }
       let mirrorEligibility;
       try {

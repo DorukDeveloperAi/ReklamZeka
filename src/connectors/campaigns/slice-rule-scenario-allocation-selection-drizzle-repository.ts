@@ -4,8 +4,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { verifyBudgetProposal, type BudgetProposal } from "@/application/budget-proposal-service";
 import { verifySliceRuleWorkspaceDraft } from "@/application/slice-rule-workspace-service";
-import { DrizzleBudgetProposalRepository } from "@/connectors/budget/budget-proposal-drizzle-repository";
-import { FrozenContextBudgetImpactScopeResolver } from "@/connectors/campaigns/frozen-context-budget-impact-scope-resolver";
+import { appendActionPreparationGateSnapshot, evaluateUnifiedActionPreparationGate, UnifiedActionPreparationGateError } from "@/connectors/campaigns/unified-action-preparation-gate";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -119,22 +118,16 @@ async function resolveSource(tx: WriterDatabase, input: SliceRuleScenarioAllocat
 }
 
 async function assertAdmission(tx: WriterDatabase, input: SliceRuleScenarioAllocationSelectionCommand, source: ResolvedSource): Promise<void> {
-  const scope = source.draft.draftPayload.scope;
-  if (source.proposal.scope.workspaceId !== input.workspaceId || source.proposal.scope.adAccountId !== source.entityBinding.adAccountId
-    || source.proposal.scope.campaignId !== source.entityBinding.campaignId) throw new SliceRuleScenarioAllocationSelectionRepositoryError("scope_mismatch");
-  const resolved = await new FrozenContextBudgetImpactScopeResolver(new DrizzleBudgetProposalRepository(tx as never)).loadExact({
-    workspaceId: input.workspaceId, adAccountId: source.entityBinding.adAccountId, campaignId: source.entityBinding.campaignId,
-    contextHash: source.proposal.scope.contextHash, expectedScope: scope,
-  });
-  if (resolved.state !== "ready" || !resolved.scope) throw new SliceRuleScenarioAllocationSelectionRepositoryError("stale_source");
-  if (resolved.scope.market !== scope.market) throw new SliceRuleScenarioAllocationSelectionRepositoryError("market_boundary");
-  const contexts = await tx.select().from(schema.effectiveCampaignContexts).where(and(
-    eq(schema.effectiveCampaignContexts.workspaceId, input.workspaceId), eq(schema.effectiveCampaignContexts.contextHash, source.proposal.scope.contextHash),
-    eq(schema.effectiveCampaignContexts.adAccountId, source.entityBinding.adAccountId), eq(schema.effectiveCampaignContexts.campaignId, source.entityBinding.campaignId),
-  )).limit(2);
-  if (contexts.length !== 1) throw new SliceRuleScenarioAllocationSelectionRepositoryError(contexts.length > 1 ? "source_ambiguous" : "stale_source");
-  const alerts = await tx.execute(sql`select 1 from delivery_health_alert_ledger_records h where h.workspace_id=${input.workspaceId}::uuid and h.account_ref=${contexts[0]!.accountRef} and h.status <> 'resolved' and not exists (select 1 from delivery_health_alert_ledger_records n where n.workspace_id=h.workspace_id and n.alert_ref=h.alert_ref and n.sequence>h.sequence) limit 1`);
-  if ((alerts.rows as unknown[]).length) throw new SliceRuleScenarioAllocationSelectionRepositoryError("delivery_hold");
+  try {
+    await evaluateUnifiedActionPreparationGate(tx, { workspaceId: input.workspaceId, draftHash: input.draftHash,
+      proposalHash: input.proposalHash, allocationRef: input.allocationRef, stage: "selection", evaluatedAt: input.selectedAt });
+  } catch (error) {
+    if (error instanceof UnifiedActionPreparationGateError) throw new SliceRuleScenarioAllocationSelectionRepositoryError(error.code);
+    throw error;
+  }
+  /* The source argument is intentionally retained so callers must resolve the
+   * exact composed allocation before this shared market/delivery gate. */
+  void source;
 }
 
 type CandidateCommand = Readonly<{ candidate: SliceRuleScenarioAllocationCandidate; draftHash: string; proposalHash: string; scenarioRef: string; allocationRef: string }>;
@@ -234,11 +227,16 @@ export class DrizzleSliceRuleScenarioAllocationSelectionRepository implements Sl
         scenarioRef: input.scenarioRef, allocationRef: input.allocationRef,
         beforeAmountMinor: selected.beforeAmountMinor, afterAmountMinor: selected.afterAmountMinor,
         selectionEvidence, selectedAt: input.selectedAt, authority: AUTHORITY });
-      await tx.insert(schema.sliceRuleScenarioAllocationSelections).values({ workspaceId: input.workspaceId, draftHash: input.draftHash,
+      const inserted = await tx.insert(schema.sliceRuleScenarioAllocationSelections).values({ workspaceId: input.workspaceId, draftHash: input.draftHash,
         proposalHash: input.proposalHash, proposalRef: source.proposal.proposalRef, scenarioRef: input.scenarioRef, allocationRef: input.allocationRef,
         beforeAmountMinor: selected.beforeAmountMinor, afterAmountMinor: selected.afterAmountMinor,
         selectionEvidenceHash: selectionEvidence.evidenceHash, selectionEvidence, idempotencyKey: input.idempotencyKey,
-        selectedByActorId: input.actorId, selectionPayload: payload, selectedAt: new Date(input.selectedAt) });
+        selectedByActorId: input.actorId, selectionPayload: payload, selectedAt: new Date(input.selectedAt) }).returning({ id: schema.sliceRuleScenarioAllocationSelections.id });
+      if (inserted.length !== 1) throw new SliceRuleScenarioAllocationSelectionRepositoryError("corrupt_store");
+      const gate = await evaluateUnifiedActionPreparationGate(tx, { workspaceId: input.workspaceId, draftHash: input.draftHash,
+        proposalHash: input.proposalHash, allocationRef: input.allocationRef, stage: "selection", evaluatedAt: input.selectedAt });
+      await appendActionPreparationGateSnapshot(tx, { workspaceId: input.workspaceId, selectionId: inserted[0]!.id,
+        actionProposalUnitId: null, result: gate, evaluatedAt: input.selectedAt });
       return Object.freeze({ outcome: "inserted" as const, selectionEvidenceHash: selectionEvidence.evidenceHash });
     });
   }

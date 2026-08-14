@@ -2963,6 +2963,7 @@ export const sliceRuleScenarioAllocationSelections = pgTable("slice_rule_scenari
   `),
 ]);
 
+
 /** Append-only, advisory-only budget proposal revisions over one exact frozen campaign context. */
 export const budgetProposalVersions = pgTable("budget_proposal_versions", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -5180,6 +5181,41 @@ export const sliceRuleBudgetActionUnitBindings = pgTable("slice_rule_budget_acti
     ${table.bindingPayload}::text !~* '"(approvalGranted|writeEnabled|policyPublished|actionAuthorized)"[[:space:]]*:[[:space:]]*true'
     and ${table.bindingPayload}::text !~* '"[^"[:space:]]*(token|secret|authorization|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
   `),
+]);
+
+/** Server-private, append-only evidence for the selection-derived action gate. */
+export const actionPreparationGateSnapshots = pgTable("action_preparation_gate_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  selectionId: uuid("selection_id"),
+  actionProposalUnitId: uuid("action_proposal_unit_id"),
+  stage: text("stage").notNull(),
+  evaluationHash: text("evaluation_hash").notNull(),
+  snapshotPayload: jsonb("snapshot_payload").$type<Record<string, unknown>>().notNull(),
+  evaluatedAt: timestamp("evaluated_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.workspaceId, table.selectionId], foreignColumns: [sliceRuleScenarioAllocationSelections.workspaceId, sliceRuleScenarioAllocationSelections.id], name: "action_preparation_gate_snapshots_selection_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.actionProposalUnitId], foreignColumns: [actionProposalUnits.workspaceId, actionProposalUnits.id], name: "action_preparation_gate_snapshots_unit_scope_fk" }).onDelete("restrict"),
+  uniqueIndex("action_preparation_gate_snapshots_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("action_preparation_gate_snapshots_exact_unique").on(table.workspaceId, table.stage, table.evaluationHash),
+  index("action_preparation_gate_snapshots_selection_idx").on(table.workspaceId, table.selectionId, table.stage, table.evaluatedAt.desc()),
+  index("action_preparation_gate_snapshots_unit_idx").on(table.workspaceId, table.actionProposalUnitId, table.stage, table.evaluatedAt.desc()),
+  check("action_preparation_gate_snapshots_subject_exact", sql`num_nonnulls(${table.selectionId}, ${table.actionProposalUnitId}) = 1`),
+  check("action_preparation_gate_snapshots_identity", sql`${table.stage} in ('selection', 'materialization', 'approval', 'admission') and ${table.evaluationHash} ~ '^[a-f0-9]{64}$'`),
+  check("action_preparation_gate_snapshots_payload_exact", sql`(
+    jsonb_typeof(${table.snapshotPayload}) = 'object'
+    and ${table.snapshotPayload} #>> '{version}' = 'action-preparation-gate-snapshot/1.0.0'
+    and ${table.snapshotPayload} #>> '{stage}' = ${table.stage}
+    and ${table.snapshotPayload} #>> '{evaluationHash}' = ${table.evaluationHash}
+    and ${table.snapshotPayload} #>> '{deliveryHold}' = 'false'
+    and ${table.snapshotPayload} #>> '{actionPreparation,key}' = 'action_preparation'
+    and ${table.snapshotPayload} #>> '{actionPreparation,enabled}' = 'false'
+    and ${table.snapshotPayload} #>> '{authority,canExecute}' = 'false'
+    and ${table.snapshotPayload} #>> '{authority,canDispatchNetwork}' = 'false'
+    and ${table.snapshotPayload} #>> '{authority,canWriteMeta}' = 'false'
+  ) is true`),
+  check("action_preparation_gate_snapshots_no_forbidden_material", sql`${table.snapshotPayload}::text !~* '"[^"[:space:]]*(token|secret|prompt|authorization|raw[_-]?(payload|request|response|json))"[[:space:]]*:'`),
 ]);
 
 /** Immutable edges preserve the proposal DAG without carrying approval state. */

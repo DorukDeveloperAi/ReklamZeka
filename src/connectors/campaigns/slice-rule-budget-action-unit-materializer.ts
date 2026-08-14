@@ -9,6 +9,7 @@ import { DrizzleActionGuardrailPolicyRepository } from "@/connectors/actions/act
 import { DrizzleActionProposalQueueRepository } from "@/connectors/actions/action-proposal-queue-drizzle-repository";
 import { createDrizzleAuthenticAffectedGeoEvidenceAdapter } from "@/connectors/actions/authentic-affected-geo-evidence-adapter";
 import { createDrizzleAuthenticCategoryEvidenceAdapter } from "@/connectors/actions/authentic-category-evidence-adapter";
+import { appendActionPreparationGateSnapshot, evaluateUnifiedActionPreparationGate, UnifiedActionPreparationGateError } from "@/connectors/campaigns/unified-action-preparation-gate";
 import { buildActionPlan, type ActionValveContext, type BudgetDeltaLimits, type ProtectionContext } from "@/domain/actions/autonomy-valve";
 import { resolveProtection, type ActionGuardrailPolicyRevision, type ProtectionResolutionInput } from "@/domain/actions/action-guardrail-policy";
 import type { ApprovalPolicy } from "@/domain/actions/approval-lifecycle";
@@ -25,7 +26,7 @@ const HASH = /^[a-f0-9]{64}$/;
 const REF = /^[a-z][a-z0-9_.:-]{0,127}$/;
 
 export class SliceRuleBudgetActionUnitMaterializerError extends Error {
-  constructor(readonly code: "invalid_input" | "membership_required" | "role_denied" | "source_missing" | "source_ambiguous" | "stale_source" | "delivery_hold" | "ad_set_owner_unsupported" | "budget_mismatch" | "policy_unavailable" | "guardrail_category_unavailable" | "guardrail_geo_unavailable" | "guardrail_rejected" | "queue_rejected" | "corrupt_store") {
+  constructor(readonly code: "invalid_input" | "membership_required" | "role_denied" | "source_missing" | "source_ambiguous" | "stale_source" | "scope_mismatch" | "market_boundary" | "delivery_hold" | "ad_set_owner_unsupported" | "budget_mismatch" | "policy_unavailable" | "guardrail_category_unavailable" | "guardrail_geo_unavailable" | "guardrail_rejected" | "queue_rejected" | "corrupt_store") {
     super("Bütçe ActionUnit taslağı güvenli biçimde oluşturulamadı");
   }
 }
@@ -167,6 +168,14 @@ export class DrizzleSliceRuleBudgetActionUnitMaterializer {
       if (campaign.length !== 1 || account.length !== 1 || adSet.length !== 1 || contexts.length !== 1 || campaign[0]!.dailyBudgetMinor !== s.beforeAmountMinor || account[0]!.currency !== target.currency) throw new SliceRuleBudgetActionUnitMaterializerError("stale_source");
       const alertHeads = await tx.execute(sql`select 1 from delivery_health_alert_ledger_records h where h.workspace_id=${input.workspaceId}::uuid and h.account_ref=${contexts[0]!.accountRef} and h.status <> 'resolved' and not exists (select 1 from delivery_health_alert_ledger_records n where n.workspace_id=h.workspace_id and n.alert_ref=h.alert_ref and n.sequence>h.sequence) limit 1`);
       if ((alertHeads.rows as unknown[]).length) throw new SliceRuleBudgetActionUnitMaterializerError("delivery_hold");
+      let preparationGate;
+      try {
+        preparationGate = await evaluateUnifiedActionPreparationGate(tx, { workspaceId: input.workspaceId, draftHash: s.draftHash,
+          proposalHash: s.proposalHash, allocationRef: s.allocationRef, stage: "materialization", evaluatedAt: input.proposedAt });
+      } catch (error) {
+        if (error instanceof UnifiedActionPreparationGateError) throw new SliceRuleBudgetActionUnitMaterializerError(error.code);
+        throw error;
+      }
       const applicability = s.afterAmountMinor > s.beforeAmountMinor
         ? Object.freeze({ actionType: "budget_increase" as const, risk: "K3" as const })
         : Object.freeze({ actionType: "budget_decrease" as const, risk: "K2" as const });
@@ -219,6 +228,8 @@ export class DrizzleSliceRuleBudgetActionUnitMaterializer {
       if (unit.length !== 1) throw new SliceRuleBudgetActionUnitMaterializerError("corrupt_store");
       const core = { schemaVersion: "slice-rule-budget-action-unit-binding/1.0.0", selectionId: s.id, actionProposalUnitId: unit[0]!.id, selectionEvidenceHash: s.selectionEvidenceHash, actionPlanHash: staged.summaries[0]!.actionPlanHash, boundAt: input.proposedAt, authority: { canApprove: false, canExecute: false, canWriteMeta: false } };
       const bindingHash = digest(core); await tx.insert(schema.sliceRuleBudgetActionUnitBindings).values({ workspaceId: input.workspaceId, selectionId: s.id, actionProposalUnitId: unit[0]!.id, bindingHash, bindingPayload: { ...core, bindingHash }, boundByActorId: input.actorId, boundAt: new Date(input.proposedAt) });
+      await appendActionPreparationGateSnapshot(tx, { workspaceId: input.workspaceId, selectionId: null,
+        actionProposalUnitId: unit[0]!.id, result: preparationGate, evaluatedAt: input.proposedAt });
       return Object.freeze({ outcome: "inserted" as const, actionUnitId: unit[0]!.id });
     });
   }

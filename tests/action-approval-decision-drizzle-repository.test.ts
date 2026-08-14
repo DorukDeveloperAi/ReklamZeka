@@ -92,6 +92,7 @@ class AtomicDecisionDatabase {
     this.queries.push(statement);
     if (statement.includes("select id from workspaces")) return { rows: [{ id: workspaceId }] };
     if (statement.includes("select b.id as bundle_id")) return { rows: [{ bundle_id: bundleId, unit_id: unitId }] };
+    if (statement.includes("from slice_rule_budget_action_unit_bindings")) return { rows: [] };
     if (statement.includes("coalesce(jsonb_agg")) {
       const event = this.seed.trace[0]!;
       return { rows: [{

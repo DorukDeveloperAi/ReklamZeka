@@ -63,6 +63,7 @@ class Database {
       ad_set_configured_status: null, ad_set_effective_status: null, target_configured_status: null, target_effective_status: null,
       campaign_budget_optimization: true, source_snapshot_hash: "d".repeat(64), source_snapshot_captured_at: at, database_now: at,
       decision_event_id: decisionId, approval_decision_ref: "decision_one", command_kind: "approve", approval_grant_id: grantId, approval_grant_ref: "grant_one" }] };
+    if (statement.includes("from slice_rule_budget_action_unit_bindings")) return { rows: [] };
     if (statement.includes("select execution_ref, admission_hash")) return { rows: this.attempts };
     if (statement.includes("insert into action_execution_attempts")) { this.attempts.push({ execution_ref: `action_execution_${"x".repeat(20)}`, admission_hash: admissionValue.admissionHash, write_spec_hash: admissionValue.writeSpec.specHash }); return { rows: [{ id: attemptId }] }; }
     if (statement.includes("insert into action_execution_events")) { this.events += 1; return { rows: [] }; }

@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 
 describe("slice rule scenario selection boundaries", () => {
   it("re-resolves frozen domestic/international scope and delivery holds inside the append transaction", () => {
-    const source = readFileSync("src/connectors/campaigns/slice-rule-scenario-allocation-selection-drizzle-repository.ts", "utf8");
+    const source = readFileSync("src/connectors/campaigns/unified-action-preparation-gate.ts", "utf8");
     expect(source).toContain("FrozenContextBudgetImpactScopeResolver");
-    expect(source).toContain("resolved.scope.market !== scope.market");
+    expect(source).toContain("resolved.scope.market !== draft.draftPayload.scope.market");
     expect(source).toContain("delivery_health_alert_ledger_records");
-    expect(source).toContain("pg_advisory_xact_lock");
-    expect(source.indexOf("await assertAdmission(tx, input, source)")).toBeLessThan(source.indexOf("const replay ="));
+    const selection = readFileSync("src/connectors/campaigns/slice-rule-scenario-allocation-selection-drizzle-repository.ts", "utf8");
+    expect(selection).toContain("pg_advisory_xact_lock");
+    expect(selection.indexOf("await assertAdmission(tx, input, source)")).toBeLessThan(selection.indexOf("const replay ="));
   });
   it("keeps selection outside agent, ActionUnit, approval, executor, and Meta write authority", () => {
     const repository = readFileSync("src/connectors/campaigns/slice-rule-scenario-allocation-selection-drizzle-repository.ts", "utf8");

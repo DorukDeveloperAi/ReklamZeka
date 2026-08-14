@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { DrizzleSliceRuleBudgetActionUnitMaterializer, SliceRuleBudgetActionUnitMaterializerError } from "@/connectors/campaigns/slice-rule-budget-action-unit-materializer";
 import * as schema from "@/db/schema";
 import type { TrustedDecisionRoomPrincipal } from "@/application/decision-room-agent-contract";
+import { publicActionPreparationFlag } from "@/domain/actions/action-preparation-flag";
 
 const HEADERS = Object.freeze({ "Cache-Control": "private, no-store, max-age=0", "X-Content-Type-Options": "nosniff",
   "X-ReklamZeka-Access-Mode": "human-approval-queue-only", "X-ReklamZeka-Action-Authority": "none", "X-ReklamZeka-Meta-Write": "disabled" });
@@ -44,7 +45,7 @@ export function createSliceRuleBudgetActionUnitHttpHandlers(input: Readonly<{
     .from(schema.sliceRuleScenarioAllocationSelections).where(eq(schema.sliceRuleScenarioAllocationSelections.workspaceId, workspaceId)).limit(101);
   return Object.freeze({
     GET: async (request: Request) => { try { requestShape(request, "GET", "slice-rule-budget-action-unit-read"); const principal = await input.resolvePrincipal(request); const rows = await selectionRows(principal.workspaceId);
-      return NextResponse.json({ contractVersion: "slice-rule-budget-action-unit-http/1.0.0", selections: rows.map((row) => ({ selectionRef: selectionRef(row.selectionEvidenceHash), selectedAt: row.selectedAt.toISOString() })), authority: AUTHORITY }, { headers: HEADERS });
+      return NextResponse.json({ contractVersion: "slice-rule-budget-action-unit-http/1.0.0", selections: rows.map((row) => ({ selectionRef: selectionRef(row.selectionEvidenceHash), selectedAt: row.selectedAt.toISOString() })), actionPreparation: publicActionPreparationFlag(), authority: AUTHORITY }, { headers: HEADERS });
     } catch { return response("unavailable", "Seçilmiş bütçe senaryoları güvenli biçimde okunamadı.", 503); } },
     POST: async (request: Request) => { try { requestShape(request, "POST", "slice-rule-budget-action-unit-materialize"); const [parsed, principal] = await Promise.all([command(request), input.resolvePrincipal(request)]);
       const rows = await input.database.select({ id: schema.sliceRuleScenarioAllocationSelections.id }).from(schema.sliceRuleScenarioAllocationSelections).where(and(eq(schema.sliceRuleScenarioAllocationSelections.workspaceId, principal.workspaceId), eq(schema.sliceRuleScenarioAllocationSelections.selectionEvidenceHash, parsed.selectionRef.slice("selection_".length)))).limit(2);
