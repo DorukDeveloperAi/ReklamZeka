@@ -4,7 +4,14 @@
 > NE İÇİN: devralan kişi ekranı devralmaz — bu klasörü devralır. Her kayıt bir AÇIK
 > sekmenin fotoğrafı + onu geri açan komuttur. Ölç: `node kasa.mjs list`.
 
-## Kayıtlar (1)
+## Kayıtlar (2)
+
+### 9a339aed — (başlıksız)
+
+- durum: CANLI · son aktivite: 2026-08-14T10:25:55.021Z · açık todo: 0/5
+- ilk iş: commit and push
+- brif: `plans/oturumlar/kasa/9a339aed.md`
+- başlat: `aide open 9a339aed-a0cc-4fd9-9711-7e8e4e5529ff --cwd /Users/ybg/dev/ReklamZeka`
 
 ### c2612865 — (başlıksız)
 
