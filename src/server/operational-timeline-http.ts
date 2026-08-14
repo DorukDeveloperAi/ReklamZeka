@@ -11,6 +11,10 @@ function failure(reason: unknown) {
   return NextResponse.json({ error: { code, message: status === 503 ? "Operasyon izi şu anda kullanılamıyor." : "Operasyon izi isteği reddedildi." } }, { status, headers: HEADERS });
 }
 export function operationalTimelineNotConfiguredResponse() { return failure(new OperationalTimelineReadError("source_unavailable")); }
+export function operationalTimelineSessionRequiredResponse() {
+  return NextResponse.json({ error: { code: "local_session_required",
+    message: "Operasyon izi için yerel dashboard oturumunu bağlayın." } }, { status: 401, headers: HEADERS });
+}
 export function createOperationalTimelineHttpHandler(input: Readonly<{ service: OperationalTimelineReadService; resolvePrincipal(request: Request): Promise<TrustedDecisionRoomPrincipal> }>) {
   return async (request: Request) => { try {
     const url = new URL(request.url);

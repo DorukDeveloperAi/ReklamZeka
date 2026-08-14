@@ -81,6 +81,8 @@
 .kicker { display: block; color: var(--rz-green); font-size: .61rem; font-weight: 850; letter-spacing: .16em; text-transform: uppercase; }
 .pageHero h1 { margin: 10px 0 11px; max-width: 900px; font-size: clamp(2.15rem, 4vw, 4rem); line-height: .98; letter-spacing: -.055em; }
 .pageHero p { max-width: 780px; margin: 0; color: var(--rz-muted); font-size: .9rem; line-height: 1.6; }
+.embeddedHero { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--rz-line); }
+.embeddedHero h2 { margin: 10px 0 11px; max-width: 900px; font-size: clamp(1.45rem, 2.4vw, 2.35rem); line-height: 1.05; letter-spacing: -.04em; }
 .primaryButton, .secondaryButton { flex: none; min-height: 39px; padding: 0 14px; border: 0; border-radius: 9px; color: #11150d !important; background: var(--rz-green); font-size: .73rem; font-weight: 800; cursor: pointer; }
 .primaryButton:disabled { opacity: .42; cursor: default; }
 .secondaryButton { color: var(--rz-text) !important; border: 1px solid var(--rz-line); background: var(--rz-surface); }
@@ -124,6 +126,13 @@
 .statusPill[data-tone="note"] { color: #cbb8ff; border-color: rgba(203,184,255,.25); background: rgba(203,184,255,.05); }
 
 .dashboardColumns { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(310px, .75fr); gap: 10px; margin-top: 10px; }
+.dashboardColumnsSingle { grid-template-columns: minmax(0, 1fr); }
+.contextTabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 6px; margin: 0 0 22px; padding: 6px; border: 1px solid var(--rz-line); border-radius: 12px; background: rgba(18,23,22,.72); }
+.contextTabs button { display: grid; gap: 4px; min-height: 52px; padding: 9px 11px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--rz-muted); cursor: pointer; text-align: left; }
+.contextTabs button:hover { color: var(--rz-text); background: rgba(255,255,255,.025); }
+.contextTabs button[data-active="true"] { color: var(--rz-text); border-color: rgba(184,242,84,.26); background: rgba(184,242,84,.065); }
+.contextTabs strong { font-size: .68rem; }
+.contextTabs small { color: var(--rz-dim); font-size: .55rem; line-height: 1.35; }
 .panelHeader { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 17px 18px 14px; border-bottom: 1px solid var(--rz-line); }
 .panelHeader h2 { margin: 6px 0 0; font-size: 1rem; letter-spacing: -.025em; }
 .panelHeader button, .detailHeader button, .copyPreview button { border: 0; background: transparent; color: var(--rz-muted); font-size: .64rem; cursor: pointer; }
@@ -289,6 +298,7 @@
 .guidanceDangerButton:disabled, .guidanceEditor button:disabled, .guidanceHeroActions button:disabled, .guidanceState button:disabled { cursor: not-allowed; opacity: .42; }
 .guidanceState { display: grid; place-items: start; gap: 9px; min-height: 240px; padding: 28px; }
 .guidanceState > strong { color: var(--rz-amber); font-size: .57rem; letter-spacing: .08em; }
+.guidanceState h1,
 .guidanceState h2 { margin: 2px 0 0; font-size: 1.08rem; }
 .guidanceState p { max-width: 670px; margin: 0; color: var(--rz-muted); font-size: .64rem; line-height: 1.55; }
 .guidanceState button { min-height: 35px; margin-top: 7px; padding: 0 12px; border: 1px solid var(--rz-line); border-radius: 8px; background: var(--rz-surface-3); color: var(--rz-text); cursor: pointer; }
@@ -305,6 +315,7 @@
 
 .categoryState { display: grid; place-items: start; gap: 8px; min-height: 230px; padding: 28px; }
 .categoryState > strong { color: var(--rz-amber); font-size: .59rem; }
+.categoryState h1,
 .categoryState h2 { margin: 4px 0 0; font-size: 1.1rem; }
 .categoryState p { max-width: 650px; margin: 0; color: var(--rz-muted); font-size: .65rem; line-height: 1.55; }
 .categoryState button { min-height: 34px; margin-top: 8px; padding: 0 12px; border: 1px solid var(--rz-line); border-radius: 8px; background: transparent; color: var(--rz-text); cursor: pointer; }
@@ -415,6 +426,7 @@
 .categoryEmpty p { color: var(--rz-muted); font-size: .6rem; }
 
 .agentWorkspace { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(340px, .75fr); gap: 10px; }
+.agentWorkspaceSingle { grid-template-columns: minmax(0, 1fr); }
 .agentChat { display: grid; grid-template-rows: auto minmax(300px, 1fr) auto auto; min-height: 660px; border: 1px solid var(--rz-line); border-radius: 13px; background: linear-gradient(145deg, #111813, #101413); overflow: hidden; }
 .agentChat > header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 15px 17px; border-bottom: 1px solid var(--rz-line); }
 .agentChat > header > div { display: flex; align-items: center; gap: 10px; }
@@ -492,23 +504,6 @@
 .approvalList footer { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; margin-top: auto; }
 .approvalList footer button { min-height: 34px; padding: 0 10px; border: 1px solid var(--rz-line); border-radius: 8px; background: transparent; color: var(--rz-muted); font-size: .58rem; cursor: pointer; }
 
-.approvalSafetyStrip { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 11px 13px; border: 1px solid rgba(255,194,104,.22); border-radius: 10px; background: rgba(255,194,104,.045); }
-.approvalSafetyStrip span { padding: 5px 8px; border: 1px solid rgba(255,194,104,.19); border-radius: 99px; color: #c9b58f; font-size: .55rem; }
-.approvalSafetyStrip strong { margin-left: auto; color: var(--rz-amber); font-size: .58rem; letter-spacing: .08em; }
-.executionSafetyPanel { overflow: hidden; margin-bottom: 10px; }
-.executionSafetyPanel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 15px 17px 13px; border-bottom: 1px solid var(--rz-line); }
-.executionSafetyPanel h2 { margin: 6px 0 4px; font-size: .94rem; }
-.executionSafetyPanel header p { margin: 0; color: var(--rz-muted); font-size: .57rem; line-height: 1.45; }
-.executionSafetyPanel > ol { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
-.executionSafetyPanel li { display: grid; grid-template-columns: 21px minmax(0, 1fr); grid-template-rows: auto auto; gap: 4px 8px; min-width: 0; padding: 12px; border-right: 1px solid var(--rz-line); }
-.executionSafetyPanel li:last-child { border-right: 0; }
-.executionSafetyPanel li > span { grid-row: span 2; display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--rz-line-strong); border-radius: 99px; color: var(--rz-muted); font: 700 .5rem ui-monospace, monospace; }
-.executionSafetyPanel li strong { overflow: hidden; font-size: .6rem; text-overflow: ellipsis; white-space: nowrap; }
-.executionSafetyPanel li small { grid-column: 1 / -1; min-height: 29px; color: var(--rz-muted); font-size: .51rem; line-height: 1.42; }
-.executionSafetyPanel li em { grid-column: 2; color: var(--rz-muted); font: 700 .49rem ui-monospace, monospace; font-style: normal; letter-spacing: .05em; text-transform: uppercase; }
-.executionSafetyPanel li em[data-tone="good"] { color: var(--rz-green); }
-.executionSafetyPanel li em[data-tone="warning"] { color: var(--rz-amber); }
-.executionSafetyPanel li em[data-tone="danger"] { color: #ff8f8f; }
 .approvalQueueState { display: grid; place-items: start; gap: 8px; min-height: 230px; padding: 28px; }
 .approvalQueueState h2 { margin: 4px 0 0; font-size: 1.1rem; }
 .approvalQueueState p { max-width: 650px; margin: 0; color: var(--rz-muted); font-size: .65rem; line-height: 1.55; }
@@ -956,6 +951,16 @@
 .policyRevisionFeed article button { padding: 7px 9px; border: 1px solid var(--rz-line); border-radius: 7px; color: var(--rz-text); background: var(--rz-surface-3); font-size: .52rem; cursor: pointer; }
 .policyRevisionFeed article button:disabled { opacity: .42; cursor: default; }
 
+.assistantBackdrop { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.58); }
+.assistantDismiss { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: default; }
+.assistantDrawer { position: absolute; top: 0; right: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); width: min(1080px, calc(100% - 56px)); height: 100%; border-left: 1px solid var(--rz-line-strong); background: radial-gradient(circle at 100% 0, rgba(51,78,43,.25), transparent 30rem), var(--rz-bg); box-shadow: -24px 0 80px rgba(0,0,0,.48); }
+.assistantDrawerHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 22px 24px; border-bottom: 1px solid var(--rz-line); }
+.assistantDrawerHeader h2 { margin: 7px 0 6px; font-size: 1.45rem; letter-spacing: -.035em; }
+.assistantDrawerHeader p { max-width: 680px; margin: 0; color: var(--rz-muted); font-size: .67rem; line-height: 1.5; }
+.assistantDrawerHeader > div:last-child { display: flex; align-items: center; gap: 10px; }
+.assistantDrawerHeader > div:last-child > button { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--rz-line); border-radius: 9px; background: var(--rz-surface); color: var(--rz-muted); cursor: pointer; font-size: 1.1rem; }
+.assistantDrawerBody { min-height: 0; padding: 16px; overflow: auto; }
+.assistantDrawer .agentChat { min-height: calc(100vh - 146px); }
 .sourceFooter { display: flex; justify-content: space-between; gap: 20px; padding: 13px 36px 22px; color: var(--rz-dim); font-size: .54rem; }
 .toast { position: fixed; right: 24px; bottom: 24px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: min(440px, calc(100% - 32px)); padding: 12px 14px; border: 1px solid rgba(184,242,84,.28); border-radius: 11px; background: #182018; box-shadow: 0 18px 60px rgba(0,0,0,.4); z-index: 50; }
 .toast > span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 99px; color: #111; background: var(--rz-green); font-weight: 900; }
@@ -990,9 +995,6 @@
   .practiceLabWorkspace { grid-template-columns: 1fr; }
   .budgetLabWorkspace { grid-template-columns: 1fr; }
   .approvalQueueWorkspace { grid-template-columns: 1fr; }
-  .executionSafetyPanel > ol { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .executionSafetyPanel li:nth-child(3) { border-right: 0; }
-  .executionSafetyPanel li:nth-child(-n+3) { border-bottom: 1px solid var(--rz-line); }
   .promotionPreflightWorkspace { grid-template-columns: 1fr; }
   .autonomyStudioGrid { grid-template-columns: 1fr; }
   .policyBundleGrid { grid-template-columns: 1fr; }
@@ -1024,6 +1026,13 @@
   .content { padding: 27px 14px 55px; }
   .pageHero { align-items: flex-start; flex-direction: column; gap: 18px; }
   .pageHero h1 { font-size: clamp(2rem, 11vw, 3.2rem); }
+  .contextTabs { display: flex; overflow-x: auto; scrollbar-width: none; }
+  .contextTabs button { flex: 0 0 170px; }
+  .assistantDrawer { width: calc(100% - 18px); }
+  .assistantDrawerHeader { padding: 17px; }
+  .assistantDrawerHeader p, .assistantDrawerHeader .statusPill { display: none; }
+  .assistantDrawerBody { padding: 10px; }
+  .assistantDrawer .agentChat { min-height: calc(100vh - 96px); }
   .signalStrip { grid-template-columns: 1fr 1fr; }
   .signalStrip > div { border-bottom: 1px solid var(--rz-line); }
   .signalStrip > div:nth-child(2) { border-right: 0; }
@@ -1063,12 +1072,6 @@
   .categoryArchiveAction { width: 100%; min-width: 0; }
   .agentChat { min-height: 610px; }
   .chatMessages > div { max-width: 96%; }
-  .approvalSafetyStrip { flex-wrap: wrap; }
-  .approvalSafetyStrip strong { width: 100%; margin-left: 0; }
-  .executionSafetyPanel > header { align-items: flex-start; flex-direction: column; }
-  .executionSafetyPanel > ol { grid-template-columns: 1fr; }
-  .executionSafetyPanel li, .executionSafetyPanel li:nth-child(3) { border-right: 0; border-bottom: 1px solid var(--rz-line); }
-  .executionSafetyPanel li:last-child { border-bottom: 0; }
   .approvalQueueFacts { grid-template-columns: 1fr; }
   .approvalQueueFacts > div { border-right: 0; border-bottom: 1px solid var(--rz-line); }
   .approvalQueueFacts > div:last-child { border-bottom: 0; }
@@ -1108,7 +1111,7 @@
 }
 
 @media (max-width: 480px) {
-  .topActions .autonomyButton { display: none; }
+  .topActions .autonomyButton { max-width: 92px; padding: 0 8px; }
   .signalStrip { grid-template-columns: 1fr; }
   .signalStrip > div { border-right: 0; }
   .contextGrid, .hierarchy { grid-template-columns: 1fr; }

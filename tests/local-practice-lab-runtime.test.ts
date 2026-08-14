@@ -83,11 +83,11 @@ describe("local Practice Lab route", () => {
     });
     const valid = token();
     const response = await handler(request(`${valid.slice(0, -1)}${valid.endsWith("x") ? "y" : "x"}`));
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(401);
     expect(await response.json()).toEqual({
       error: {
-        code: "source_not_configured",
-        message: "Practice Lab çalışma alanı ve yerel kimlik bağlama katmanı henüz etkin değil.",
+        code: "local_session_required",
+        message: "Practice Lab için yerel dashboard oturumunu bağlayın.",
       },
     });
     expect(database.execute).not.toHaveBeenCalled();

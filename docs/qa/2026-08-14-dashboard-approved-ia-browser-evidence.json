@@ -1,0 +1,79 @@
+{
+  "capturedAt": "2026-08-14T13:21:11+03:00",
+  "surface": "Codex in-app browser",
+  "baseUrl": "http://localhost:3000/dashboard",
+  "increment": "approved-option-a-primary-information-architecture-and-contextual-placement",
+  "sourceState": "local_session_required",
+  "primaryNavigation": {
+    "before": 15,
+    "after": 7,
+    "labels": [
+      "Bugün",
+      "Kampanyalar",
+      "Analiz & Kararlar",
+      "Bütçeler",
+      "Onay kuyruğu",
+      "Kurallar & Yetkiler",
+      "Ayarlar"
+    ],
+    "legacyTechnicalDestinationsVisible": false
+  },
+  "desktop": {
+    "width": 1280,
+    "height": 720,
+    "maximumBodyScrollWidth": 1280,
+    "bodyFits": true,
+    "singleH1AllInspectedAreas": true,
+    "visibleDemoOrFixtureCopy": false,
+    "todayBlockedForms": 1,
+    "todayDuplicateSessionRecovery": false
+  },
+  "campaignAreas": [
+    { "id": "portfolio", "singleH1": true, "contextualSessionForms": 1 },
+    { "id": "classification", "singleH1": true, "contextualSessionForms": 1 },
+    { "id": "promotion", "singleH1": true, "contextualSessionForms": 1 },
+    { "id": "timeline", "singleH1": true, "contextualSessionForms": 1 }
+  ],
+  "mergedAreas": [
+    { "parent": "budgets", "area": "proposals", "singleH1": true },
+    { "parent": "budgets", "area": "pools", "singleH1": true },
+    { "parent": "rules", "area": "guidance", "singleH1": true },
+    { "parent": "rules", "area": "policies", "singleH1": true },
+    { "parent": "rules", "area": "authority", "singleH1": true },
+    { "parent": "rules", "area": "learning", "singleH1": true },
+    { "parent": "settings", "area": "meta", "singleH1": true },
+    { "parent": "settings", "area": "categories", "singleH1": true },
+    { "parent": "settings", "area": "promotion-templates", "singleH1": true }
+  ],
+  "assistant": {
+    "primaryNavigationDestination": false,
+    "role": "dialog",
+    "ariaModal": true,
+    "focusMovesToClose": true,
+    "escapeCloses": true,
+    "focusReturnsToTrigger": true,
+    "pageH1CountWhileOpen": 1
+  },
+  "shell": {
+    "nonFunctionalSearchRemoved": true,
+    "nonFunctionalNotificationsRemoved": true,
+    "nonFunctionalProfileRemoved": true,
+    "codexTransferRetained": true,
+    "assistantTriggerRetained": true,
+    "metaSettingsEntryRetained": true
+  },
+  "mobileAcceptance": {
+    "status": "not_completed",
+    "reason": "in_app_browser_viewport_override_blocked_by_browser_url_security_policy",
+    "alternateBrowserOrRawAutomationUsed": false
+  },
+  "consoleAcceptance": {
+    "status": "not_completed_after_security_policy_block"
+  },
+  "securityBoundary": {
+    "agentOrBrowserMintedProof": false,
+    "proofOrStorageInspected": false,
+    "viewportOverrideResetAttempted": true,
+    "tabsFinalized": true
+  }
+}

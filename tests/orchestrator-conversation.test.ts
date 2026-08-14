@@ -63,6 +63,14 @@ describe("persistent Orchestrator conversation", () => {
     expect(source.appendTurn.mock.calls[1]![0].pageGuide.recordPath).toContain("budget proposal");
   });
 
+  it("accepts the consolidated Settings source guide without widening authority", () => {
+    expect(orchestratorPageGuide("settings")).toMatchObject({
+      pageId: "settings",
+      pageLabel: "Ayarlar",
+      recordPath: "Meta readiness / category registry / promotion template lifecycle",
+    });
+  });
+
   it("rejects secret material and records adapter failures without inventing an assistant response", async () => {
     const source = memoryRepository();
     const service = new OrchestratorConversationService(source.repository, {

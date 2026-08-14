@@ -23,8 +23,9 @@ describe("local agent session dashboard", () => {
       freshnessHours: 0, freshnessLabel: "şimdi", currency: "TRY", timezone: "Europe/Istanbul",
       attribution: "7d_click_1d_view",
     } }));
-    expect(html).toContain("Bağlı değil");
-    expect(html).toContain("API doğrulaması olmadan bağlı gösterilmez");
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("> Asistan</button>");
+    expect(html).not.toContain("session bağlı");
     expect(html).not.toContain("Codex CLI bağlı");
   });
 

@@ -56,4 +56,17 @@ describe("local existing-post promotion catalog runtime", () => {
     expect(response.status).toBe(503);
     expect(execute).not.toHaveBeenCalled();
   });
+
+  it("distinguishes a missing dashboard session from an unconfigured source", async () => {
+    const execute = vi.fn();
+    const response = await createLocalExistingPostPromotionCatalogRouteHandler({ database: { execute } as never, config })(
+      new Request("http://localhost:3000/api/existing-post-promotion-preflight", { headers: {
+        Host: "localhost:3000", Origin: "http://localhost:3000", "Sec-Fetch-Site": "same-origin",
+        "X-ReklamZeka-Intent": "existing-post-promotion-catalog-read",
+      } }),
+    );
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "local_session_required" } });
+    expect(execute).not.toHaveBeenCalled();
+  });
 });

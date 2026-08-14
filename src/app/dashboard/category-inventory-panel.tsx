@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CategoryProfileStudio } from "./category-profile-studio";
+import { LocalSessionConnector } from "./local-session-connector";
 import { StarterCategoryAdoption } from "./starter-category-adoption";
 import styles from "./operating-dashboard.module.css";
 
@@ -336,7 +337,10 @@ type RevisionDraft = Readonly<{ kind: "dimension"; ref: string; name: string; de
   cardinality: "single" | "multi"; levels: readonly Level[] } | { kind: "definition"; ref: string;
   label: string; description: string }>;
 
-export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => void }> = {}) {
+export function CategoryInventoryPanel(props: Readonly<{
+  assignmentHandoff?: CategoryAssignmentHandoff | null;
+  onAssignmentHandoffConsumed?(): void;
+}> = {}) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -357,7 +361,7 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
   const [definitionDraft, setDefinitionDraft] = useState({ dimensionRef: "", key: "", label: "", description: "" });
   const [assignmentDraft, setAssignmentDraft] = useState<CategoryAssignmentDraft>({ dimensionRef: "", definitionRef: "", level: "",
     targetKey: "", operation: "add" as "add" | "override" | "deny", manualLock: false, confidencePercent: "100" });
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<boolean> => {
     setLoading(true); setError(null); setSessionRequired(false); setAuthoring(null); setImpact(null);
     setArchiveConfirmed(false); setRevisionDraft(null);
     try {
@@ -393,9 +397,11 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
         setEffectiveHealth(null);
         setEffectiveHealthError(reason instanceof Error ? reason.message : "Effective kategori sağlığı alınamadı.");
       }
+      return true;
     } catch (reason) {
       setSessionRequired(reason instanceof InventoryError && reason.code === "local_session_required");
       setError(reason instanceof Error ? reason.message : "Kategori envanteri alınamadı.");
+      return false;
     } finally { setLoading(false); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
@@ -432,23 +438,26 @@ export function CategoryInventoryPanel(props: Readonly<{ onOpenSession?: () => v
     } finally { setMutating(false); }
   }, [refresh]);
   useEffect(() => {
-    const handoff = (event: Event) => {
-      const detail = (event as CustomEvent<CategoryAssignmentHandoff>).detail;
+    const prepare = (detail: CategoryAssignmentHandoff | null | undefined) => {
       if (!authoring || !detail) return;
       const next = buildCategoryAssignmentHandoffDraft(authoring, detail);
       if (!next) {
         setMutationError("İnceleme satırı bu aktif workspace hedefi veya kategori boyutuyla eşleşmedi; form güvenli biçimde boş bırakıldı.");
+        props.onAssignmentHandoffConsumed?.();
         return;
       }
       setAssignmentDraft(next); setMutationError(null); setMutationStatus("İnceleme hedefi hazırlandı. Tanımı siz seçin; atama henüz oluşturulmadı.");
+      props.onAssignmentHandoffConsumed?.();
       window.setTimeout(() => document.getElementById("category-assignment-form")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
     };
+    const handoff = (event: Event) => prepare((event as CustomEvent<CategoryAssignmentHandoff>).detail);
+    prepare(props.assignmentHandoff);
     window.addEventListener("reklamzeka:category-assignment-handoff", handoff);
     return () => window.removeEventListener("reklamzeka:category-assignment-handoff", handoff);
-  }, [authoring]);
+  }, [authoring, props.assignmentHandoff, props.onAssignmentHandoffConsumed]);
 
-  if (loading && !snapshot) return <><section className={`${styles.panel} ${styles.categoryState}`} aria-busy="true"><strong>İÇ KATEGORİLER</strong><h2>Kategori envanteri yükleniyor</h2><p>Aktif tanımlar ve doğrudan atama kapsamı okunuyor.</p></section><StarterCategoryAdoption /></>;
-  if (error && !snapshot) return <><section className={`${styles.panel} ${styles.categoryState}`} role="alert"><strong>{sessionRequired ? "YEREL OTURUM GEREKLİ" : "BAĞLANTI KURULAMADI"}</strong><h2>{sessionRequired ? "Dashboard oturumunu bağlayın" : "Kategori kaynağı kullanılamıyor"}</h2><p>{error}</p>{sessionRequired && props.onOpenSession ? <button type="button" onClick={props.onOpenSession}>Decision Room’da oturumu bağla</button> : <button type="button" onClick={() => void refresh()}>Yeniden dene</button>}</section><StarterCategoryAdoption /><CategoryProfileStudio /></>;
+  if (loading && !snapshot) return <section className={`${styles.panel} ${styles.categoryState}`} aria-busy="true"><strong>İÇ KATEGORİLER</strong><h1>Kategori envanteri yükleniyor</h1><p>Aktif tanımlar ve doğrudan atama kapsamı okunuyor.</p></section>;
+  if (error && !snapshot) return <section className={`${styles.panel} ${styles.categoryState}`} role="alert"><strong>{sessionRequired ? "YEREL OTURUM GEREKLİ" : "BAĞLANTI KURULAMADI"}</strong><h1>{sessionRequired ? "Kategori çalışma alanını bağlayın" : "Kategori kaynağı kullanılamıyor"}</h1><p>{error}</p>{sessionRequired ? <LocalSessionConnector title="Kategori çalışma alanını bağlayın" onVerify={refresh} /> : <button type="button" onClick={() => void refresh()}>Yeniden dene</button>}</section>;
   if (!snapshot) return <StarterCategoryAdoption />;
   const healthTotal = snapshot.health.dimensionsWithoutDefinitions + snapshot.health.definitionsWithoutDirectAssignments
     + snapshot.health.staleTargetAssignments + snapshot.health.assignmentsUnderArchivedRegistry;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LocalSessionConnector } from "./local-session-connector";
 import styles from "./operating-dashboard.module.css";
 
 type GuidanceFacet = "global" | "account_group" | "account" | "objective" | "funnel" | "optimization"
@@ -358,7 +359,9 @@ export function GuidanceSetStudio(props: Readonly<{
   </section>;
 }
 
-export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void }> = {}) {
+export function GuidanceStudioPanel(props: Readonly<{
+  onSessionRequiredChange?: (required: boolean) => void;
+}> = {}) {
   const [snapshot, setSnapshot] = useState<GuidanceStudioSnapshot | null>(null);
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
   const selectedRefRef = useRef<string | null>(null);
@@ -392,7 +395,7 @@ export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void
     setNotice(null);
   }, []);
 
-  const refresh = useCallback(async (options: Readonly<{ preserveDraft?: boolean; preferredRef?: string | null }> = {}) => {
+  const refresh = useCallback(async (options: Readonly<{ preserveDraft?: boolean; preferredRef?: string | null }> = {}): Promise<boolean> => {
     setLoading(true);
     setError(null);
     setSessionRequired(false);
@@ -403,6 +406,7 @@ export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void
       const payload = await responsePayload(response);
       if (!response.ok) throw errorFromResponse(response, payload);
       const next = parseGuidanceStudioSnapshot(payload);
+      props.onSessionRequiredChange?.(false);
       setSnapshot(next);
       const preferred = options.preferredRef ?? selectedRefRef.current;
       const nextSelected = next.items.find((item) => item.cardRef === preferred) ?? next.items[0] ?? null;
@@ -416,13 +420,17 @@ export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void
         selectedRefRef.current = nextSelected.cardRef;
         setSelectedRef(nextSelected.cardRef);
       }
+      return true;
     } catch (reason) {
-      setSessionRequired(reason instanceof GuidanceStudioRequestError && reason.code === "local_session_required");
+      const required = reason instanceof GuidanceStudioRequestError && reason.code === "local_session_required";
+      setSessionRequired(required);
+      props.onSessionRequiredChange?.(required);
       setError(reason instanceof Error ? reason.message : "Talimat kaynağı kullanılamıyor.");
+      return false;
     } finally {
       setLoading(false);
     }
-  }, [selectItem]);
+  }, [props.onSessionRequiredChange, selectItem]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -507,9 +515,9 @@ export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void
     }
   }
 
-  if (loading && !snapshot) return <section className={`${styles.panel} ${styles.guidanceState}`} aria-busy="true"><strong>TALİMAT STUDIO</strong><h2>Talimatlar yükleniyor</h2><p>Kalıcı guidance registry ve iç kategori kataloğu okunuyor.</p></section>;
-  if (error && !snapshot) return <section className={`${styles.panel} ${styles.guidanceState}`} role="alert"><strong>{sessionRequired ? "YEREL OTURUM GEREKLİ" : "BAĞLANTI KURULAMADI"}</strong><h2>{sessionRequired ? "Dashboard oturumunu bağlayın" : "Talimat kaynağı kullanılamıyor"}</h2><p>{error}</p>{sessionRequired && props.onOpenSession ? <button type="button" onClick={props.onOpenSession}>Decision Room’da oturumu bağla</button> : <button type="button" onClick={() => void refresh()}>Yeniden dene</button>}</section>;
-  if (!snapshot) return <section className={`${styles.panel} ${styles.guidanceState}`} role="alert"><strong>KAYNAK HAZIR DEĞİL</strong><h2>Talimat kaynağı doğrulanamadı</h2><p>Kalıcı registry yanıtı alınamadı.</p><button type="button" onClick={() => void refresh()}>Yeniden dene</button></section>;
+  if (loading && !snapshot) return <section className={`${styles.panel} ${styles.guidanceState}`} aria-busy="true"><strong>TALİMAT STUDIO</strong><h1>Talimatlar yükleniyor</h1><p>Kalıcı guidance registry ve iç kategori kataloğu okunuyor.</p></section>;
+  if (error && !snapshot) return <section className={`${styles.panel} ${styles.guidanceState}`} role="alert"><strong>{sessionRequired ? "YEREL OTURUM GEREKLİ" : "BAĞLANTI KURULAMADI"}</strong><h1>{sessionRequired ? "Talimat çalışma alanını bağlayın" : "Talimat kaynağı kullanılamıyor"}</h1><p>{error}</p>{sessionRequired ? <LocalSessionConnector title="Talimat çalışma alanını bağlayın" onVerify={refresh} /> : <button type="button" onClick={() => void refresh()}>Yeniden dene</button>}</section>;
+  if (!snapshot) return <section className={`${styles.panel} ${styles.guidanceState}`} role="alert"><strong>KAYNAK HAZIR DEĞİL</strong><h1>Talimat kaynağı doğrulanamadı</h1><p>Kalıcı registry yanıtı alınamadı.</p><button type="button" onClick={() => void refresh()}>Yeniden dene</button></section>;
 
   const authority = snapshot.authority;
   const editorLocked = saving || Boolean(selected && selected.status !== "draft");
@@ -577,6 +585,6 @@ export function GuidanceStudioPanel(props: Readonly<{ onOpenSession?: () => void
         </footer>
       </section> : null}
     </div>}
-    <GuidanceSetStudio snapshot={snapshot} onRefresh={() => refresh({ preserveDraft: true })} />
+    <GuidanceSetStudio snapshot={snapshot} onRefresh={async () => { await refresh({ preserveDraft: true }); }} />
   </>;
 }

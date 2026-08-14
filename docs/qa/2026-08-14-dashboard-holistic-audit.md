@@ -548,3 +548,306 @@ Kanıt dosyası: `docs/qa/2026-08-14-dashboard-analysis-decisions-browser-eviden
 - Kullanıcı tarafından mint edilen local session current in-app browser'a henüz bağlanmadığı için gerçek schedule/run/inbox satırlarının live browser kabulü açık.
 - Bu dış adım başka görünümlerin auditini durdurmaz.
 - Sıradaki önerilen holistik dilim: `Bütçeler + Onay kuyruğu + Autonomy Studio`; ayrı varlık gerekçeleri, tekrar eden approval/authority anlatıları ve gerçek proposal/action capability zinciri birlikte incelenmeli.
+
+## 16. Bütçeler + Onay kuyruğu + Autonomy Studio audit ve dar karar kapısı
+
+### Ortak kullanıcı yolculuğu
+
+```text
+bütçe sınırı / havuz
+→ deterministik öneri ve alternatif
+→ öneriden eylem satırları
+→ otonomi/policy değerlendirmesi
+→ tekil insan kararı
+→ ayrı execution admission (şu anda kapalı)
+```
+
+Üç yüzey aynı yolculuğun parçalarıdır; ancak aynı kullanıcı işi değildir. Bütçe planlama uzun süreli çalışma alanı, Onay kuyruğu domainler-arası insan inbox'ı, Autonomy ise seyrek kullanılan yönetim/configuration işidir.
+
+### View ve element survival matrisi
+
+| View / element | Gerçek kaynak veya davranış | Capability | Karar önerisi | Gerekçe |
+|---|---|---|---|---|
+| `Bütçeler` view | PostgreSQL budget proposal ledger + public-safe detail | `READ_ONLY`, draft API mevcut | `KEEP · STANDALONE_VIEW` | Envelope, havuz, alternatif, before/after ve constraint incelemesi bağımsız çalışma alanını hak eder. |
+| Proposal listesi | Gerçek version/revision repository | `VERIFIED_REAL` kod yolu, session-blocked browser | `KEEP + IMPROVE` | Kullanıcı önerileri karşılaştırır; gerçek veri yokken boş/unavailable kalır. |
+| Proposal detail | Mapping, alternatif, before/after, pacing, constraint, trace | `READ_ONLY` | `KEEP · DETAIL_PANEL` | Karar için gerekli kanıtı taşır; teknik ref'ler ileride daha anlaşılır label ister. |
+| Budget dry-run/save-draft POST | `budget-lab-dry-run` / `budget-lab-save-draft` | `REAL_BUT_ENV_BLOCKED` | `HIDE_UNTIL_READY` | Exact command input ve gerçek scope seçimi olmadan buton eklenmez. |
+| Bütçe Havuzları | Gerçek immutable hierarchy draft repository | `VERIFIED_REAL` draft yolu | `MOVE → Bütçeler / ADVANCED_SECTION` | Şu anda `Kurallar & akışlar` altında; kullanıcının bütçe zihinsel modeline aittir. |
+| Bütçe Havuzları frontend örneği | Sabit yerli/yabancı 500000 TRY JSON | `MISLEADING` | `REMOVE` | Gerçek snapshot yokken operasyonel limit öneriyordu; kaldırıldı ve `[]` gösteriliyor. |
+| `Onay kuyruğu` view | Cross-domain ActionUnit read/detail + macOS human-presence decision | `VERIFIED_REAL` karar kaydı, execute yok | `KEEP · STANDALONE_VIEW` | Bütçe, status ve promotion gibi farklı domainlerden tek insan inbox'ı olması ayrı view'i hak eder. |
+| Onay list/detail | before/after, risk, expiry, evidence, dependency, history | `VERIFIED_REAL` kod yolu, session-blocked browser | `KEEP + IMPROVE` | Temel kullanıcı işi “benden hangi karar bekleniyor?” sorusunu karşılar. |
+| Statik authority şeridi | Hero ile aynı üç ifadeyi tekrar ediyordu | `UNNECESSARY` | `REMOVE` | Karar bilgisi üretmiyordu; kaldırıldı. |
+| Beş adımlı execution safety vitrini | 5 sabit teknik adım | `UNNECESSARY` | `REMOVE` | Kuyruğu 192 px aşağı itiyor, gerçek satır/kanıt yerine mimari anlatıyordu; kaldırıldı. |
+| Approve/reject/request changes | Exact unit + checkbox + OS human presence | `VERIFIED_REAL`, no-execute | `KEEP` | Görünür kontrol gerçek ve kalıcı karar kaydı üretir; Meta write yapmaz. |
+| `Autonomy Studio` view | Autonomy revision read + normalized draft; nested policy bundle | `VERIFIED_REAL` draft yolu, publish ayrı | `MOVE_DEEPER / MERGE` | Seyrek yönetim işidir; primary nav'da çalışma yüzeyi gibi görünmesi feature spam yaratır. |
+| Autonomy revision feed | Gerçek immutable revisions | `READ_ONLY` | `KEEP · ADVANCED_SETTINGS` | Effective mode/kill switch/scope yönetim kanıtıdır. |
+| Autonomy draft form | Gerçek cookie-only normalized draft | `VERIFIED_REAL` draft, no publish | `KEEP + IMPROVE` | Serbest ref ve teknik dil yüksek; catalog seçimleri ve açıklayıcı label gerekir. |
+| K2/K3/K4 Policy Bundle tab | ApprovalPolicy/Guardrail draft ve human publication ceremony | `VERIFIED_REAL` | `MERGE → Kurallar & Yetkiler` | Autonomy'nin alt sekmesi değil, guidance→rule→policy→authority yaşam döngüsünün advanced parçasıdır. |
+
+### Uygulanan ortak UX düzeltmeleri
+
+- Bütçeler, Onay ve Autonomy `session_required` durumunda ortak `LocalSessionConnector`'ı kendi kaynak panelinde gösteriyor; Decision Room'a navigasyon ve bağlam kaybı kaldırıldı.
+- Autonomy local runtime artık bozuk/eksik cookie için `401 local_session_required`, gerçek source configuration eksikliği için `503 source_not_configured` döndürüyor.
+- Autonomy'de Policy Bundle sekmesine geçilse bile session recovery tek ve tutarlı kalıyor; nested ikinci unavailable paneli açılmıyor.
+- Bütçe Havuzları frontend'deki sabit iki pazar kökü, tarih ve `500000 TRY` tavanı kaldırıldı.
+- Onay kuyruğundaki tekrarlı safety strip ve beş adımlı execution vitrini kaldırıldı; kaynak/recovery veya gerçek kuyruk 192 px yukarı taşındı.
+- Varsayılan kullanıcı metninde `ActionUnit` yerine `eylem satırı` kullanıldı; domain kontrat adı kod/API'de korunuyor.
+- Bütçeler, Onay ve Autonomy async yüklemeleri mount yaşam döngüsüne bağlandı; hızlı görünüm geçişindeki geç state-update yarışı kapatıldı.
+
+### Doğrulama
+
+| Kapı | Sonuç |
+|---|---|
+| TypeScript | PASS |
+| Odak testler | PASS · 8 dosya / 29 test; sadeleştirme sonrası 5 dosya / 20 test |
+| Desktop 1280×720 | PASS · 3/3 bağlamsal connector, tek H1, taşma yok |
+| Mobile 390×844 | PASS · 3/3 connector, content 375 px, taşma yok |
+| Hızlı nav `Bütçeler → Autonomy → Onay` | PASS · 40 ms aralık, product error/warn 0/0 |
+| Agent/browser proof mint | Yapılmadı |
+
+Kanıt dosyası: `docs/qa/2026-08-14-dashboard-budget-approval-autonomy-browser-evidence.json`
+
+### Dar bilgi mimarisi karar kapısı
+
+#### Seçenek A — Görev frekansına göre ayır (`ÖNERİLEN`)
+
+- `Bütçeler` ayrı view olarak kalır; `BudgetPoolHierarchyPanel` buraya advanced section olarak taşınır.
+- `Onay kuyruğu` cross-domain insan inbox'ı olarak ayrı kalır.
+- `Autonomy Studio` primary nav'dan çıkar; `Kurallar & Yetkiler` altında advanced `Yetki & Onay` alanına taşınır.
+- K2/K3/K4 Policy Bundle aynı advanced yönetim alanında Autonomy ile yan yana, fakat Guidance/Strict Policy yaşam döngüsünden kopmadan sunulur.
+
+Artı: Günlük çalışma ile seyrek yönetim ayrılır; iki güçlü kullanıcı işi korunurken primary nav azalır.
+
+Eksi: Kurallar & Yetkiler birleşimi sonraki incrementte kendi iç bilgi mimarisi kararını gerektirir.
+
+#### Seçenek B — Üçünü ayrı tut
+
+Yalnız mevcut ekranlar sadeleştirilir; nav değişmez.
+
+Artı: En az yerleşim değişikliği.
+
+Eksi: Autonomy/Policy teknik modülleri primary nav'ı şişirmeye ve Rules/Strict Policies ile tekrar etmeye devam eder.
+
+#### Seçenek C — Tek `Kararlar` workspace'inde birleştir
+
+Bütçe önerileri, bütün onay satırları ve autonomy ayarları tek view olur.
+
+Artı: Proposal→approval geçişi kısa olabilir.
+
+Eksi: Günlük inbox, bütçe planlama ve admin ayarları aynı ekranda karışır; yüksek bilişsel yük ve rol karmaşası yaratır.
+
+**Önerilen kullanıcı kararı: Seçenek A.** Geniş navigasyon/yerleşim değişikliği bu karar onaylanmadan uygulanmayacak.
+
+## 17. Kurallar, strict policy, iç kategoriler ve Practice Lab audit
+
+### Veri ve capability haritası
+
+| Yüzey / parça | Kanonik API ve kaynak | Capability | Varlık / yerleşim önerisi |
+|---|---|---|---|
+| Guidance Studio | `/api/guidance-studio` → immutable guidance registry | Draft/revise/publish/archive gerçek; action ve Meta write yok | `KEEP · PARENT_SECTION` |
+| Guidance setleri | Aynı registry; yalnız yayınlanmış kartların sıralı seti | Draft/review/archive gerçek | `KEEP · PROGRESSIVE_DISCLOSURE` |
+| Normalization Workbench | `/api/normalization-workbench` + guidance choices | Draft-only structured normalization; publish/G3/action yok | `MOVE_DEEPER` · seçili guidance kaydının sonraki adımı |
+| Slice Rule Workspace | `/api/slice-rule-workspace`, scope/readiness/temporal/budget-impact API'leri | Advisory draft ve impact preview gerçek; authority none | `KEEP · PARENT_SECTION` · birleşik kural yaşam döngüsü içinde |
+| Strict Policy Studio | `/api/instruction-policies` + `/api/instruction-policy-impact` | Append-only draft/publish/pause/archive ve exact impact gate gerçek | `MERGE → Kurallar & Yetkiler` · advanced binding stage |
+| Progressive Formalization | `/api/progressive-formalization` | G2→G3/G4 preview ve guarded mutation gerçek | `MERGE` · strict policy editöründe bağlamsal dönüşüm adımı |
+| Kampanya künye inceleme | `/api/campaign-classification-review` + canonical Meta mirror | Read/review signal; assignment/action/Meta write yok | `MOVE → Kampanyalar / INLINE_CONTEXT` |
+| Category Inventory | `/api/category-inventory`, authoring, effective-health, archive-impact | Registry create/revise/assign/archive gerçek ve guarded | `KEEP · ADVANCED_SETTINGS` · ayrı admin amacı var |
+| Starter adoption | `/api/starter-category-adoption` | Preview/confirm gerçek; registry hash ve human confirmation gated | `MOVE_DEEPER` · ilk kurulum veya boş registry durumunda |
+| Category Profile Studio | `/api/category-profiles` | Profile lifecycle mutation gerçek | `KEEP · DETAIL_PANEL` · seçili kategori bağlamında |
+| Practice Lab | `/api/practice-lab` + advised-practice append-only repository | Read/detail/ephemeral draft; human-gated standardization event gerçek | `MOVE_DEEPER` · kural/analiz öğrenim alanı, primary nav değil |
+
+### Holistik bulgular
+
+1. `Kurallar & akışlar`, `Strict policies`, Autonomy içindeki Policy Bundle ve `Practice Lab` teknik lifecycle sınırlarını primary navigasyona yansıtıyor. Kullanıcı açısından bunlar ayrı ürünler değil, **ham yaklaşım → guidance → normalize kural → bağlayıcı policy → yetki → öğrenim** zincirinin aşamalarıdır.
+2. `Kurallar & akışlar` içinde Budget Pool, Guidance, Normalization ve Slice Rule aynı seviyede art arda render ediliyor. Budget Pool bütçe zihinsel modeline aittir; kalan üç parça tek kaydın aşamalı yaşam döngüsü olarak sunulmalıdır.
+3. `Strict policies` ayrı ve uzun süreli bir editör capability'sine sahip olsa da ana kullanıcı amacı Guidance/Rules'tan kopuk değildir. Deep link korunabilir; primary nav'da ayrı ürün gibi görünmesi önerilmez.
+4. `İç kategoriler` iki farklı işi karıştırıyor: günlük kampanya sınıflandırma incelemesi ve seyrek registry yönetimi. İnceleme kuyruğu Campaigns bağlamına taşınmalı; registry yönetimi admin/advanced alanında kalmalıdır.
+5. `Practice Lab` gerçek, persisted ve insan kapılı bir lifecycle taşır; placeholder değildir. Ancak seyrek kullanım, advisory authority ve standardization çıktısının guidance/policy zincirine yakınlığı nedeniyle primary nav'da ayrı sayfa olmayı hak etmiyor.
+6. Session yokken alt panellerin her biri ayrı hata üretip feature vitrini yaratıyordu. Bu dört view artık birer bağlamsal connector ve tek ana hata gösteriyor; alt capability'ler kaynak doğrulandıktan sonra açılıyor.
+
+### Uygulanan karar gerektirmeyen düzeltmeler
+
+- Guidance ve Category Inventory içindeki `Decision Room’da oturumu bağla` yönlendirmeleri kaldırıldı; ortak `LocalSessionConnector` ilgili sayfaya yedirildi.
+- Strict Policy Studio 401 `local_session_required` yanıtını ayırıyor ve kendi bağlamsal connector'ını gösteriyor.
+- Practice Lab runtime bozuk/eksik cookie için artık `401 local_session_required`, gerçek environment/source eksikliği için `503 source_not_configured` döndürüyor.
+- Practice Lab empty/unavailable metnindeki tekrarlı `demo/fixture fallback` anlatısı kaldırıldı; kaynak durumu ve gerçek boşluk doğrudan anlatılıyor.
+- Rules blocked durumda Normalization ve Slice Rule; Strict blocked durumda Progressive Formalization; Categories blocked durumda Starter Adoption ve Category Profile hata panelleri erteleniyor. Capability'ler yalnız ana kaynak doğrulandıktan sonra render ediliyor.
+- Rules, Strict, Categories ve Practice blocked/loading durumlarının her birinde tek `h1` sağlandı.
+
+### Doğrulama
+
+| Kapı | Sonuç |
+|---|---|
+| TypeScript | PASS |
+| Odak testler | PASS · 8 dosya / 27 test |
+| Desktop 1280 | PASS · 4/4 tek connector, tek H1, taşma yok |
+| Mobile 390×844 | PASS · maksimum scroll width 390 px, 4/4 tek connector ve tek H1 |
+| Görünür `demo` / `fixture` metni | 0 / 4 view |
+| Hızlı nav `Rules → Strict → Categories → Practice` | PASS · 40 ms aralık, product error/warn 0/0 |
+| Agent/browser proof mint veya storage inceleme | Yapılmadı |
+
+Kanıt dosyası: `docs/qa/2026-08-14-dashboard-rules-categories-practice-browser-evidence.json`
+
+### Açık bilgi mimarisi kararı
+
+Bu audit önceki **Seçenek A** önerisini güçlendirir:
+
+```text
+Bütçeler (Budget Pool dahil)          → ayrı çalışma yüzeyi
+Onay kuyruğu                          → ayrı cross-domain insan inbox'ı
+Kurallar & Yetkiler                   → Guidance + normalization + slice rule
+                                      + strict policy + policy bundle + autonomy
+İç kategori registry                 → advanced settings
+Kampanya künye inceleme               → Campaigns içinde inline
+Practice Lab                          → Kurallar/Analiz altında progressive disclosure
+```
+
+Bu yerleşim değişiklikleri kullanıcı A/B/C kararını vermeden uygulanmadı.
+
+## 18. Meta, Orchestrator, teslimat alarmı, gönderi öne çıkarma ve Timeline audit
+
+### Veri ve capability haritası
+
+| Yüzey / parça | Kanonik API ve kaynak | Capability | Varlık / yerleşim önerisi |
+|---|---|---|---|
+| Meta inventory ve bağlantı hazırlığı | `/api/meta/inventory`, `/api/meta/read-mirror`, `/api/meta/bootstrap-status`, `/api/meta/portfolio-capability` | Kanonik salt-okunur ayna, readiness ve bootstrap gerçek; session/environment ile bloklanabilir | `KEEP · ADVANCED_SETTINGS`; portföy hiyerarşisini `Kampanyalar`a taşı |
+| Meta trust/readiness ve Graph tanısı | Aynı server-bound Meta kaynakları | `REAL_BUT_ENV_BLOCKED`, no Meta write | `KEEP · PROGRESSIVE_DISCLOSURE`; yalnız tanı gerektiğinde aç |
+| Orchestrator konuşması | `/api/orchestrator-conversation` | Persisted konuşma read/post gerçek; local session gerekli | `MOVE → GLOBAL CONTEXTUAL ASSISTANT` |
+| CLI Session Hub ve handoff | `/api/local-agent-sessions`, `/api/local-agent-handoffs` | Kısa ömürlü, aynı kimlikli handoff gerçek | `MOVE_DEEPER · ADVANCED_SETTINGS` |
+| Statik skill pack / autonomy seçicileri / fallback mesaj | Frontend sabiti veya persist edilmeyen local state | `PLACEHOLDER / MISLEADING` | `REMOVE` |
+| Teslimat alarm ledger'ı | `/api/delivery-health-alerts` | Read/detail ve typed recommendation davranışı gerçek; session ile bloklanabilir | `MERGE → Bugün + Kampanya detayı`; derin triage URL'si korunabilir |
+| Gönderi öne çıkarma katalog + preflight | `/api/existing-post-promotion-preflight` | Kanonik katalog, ephemeral preflight ve ayrı K4 taslak komutu gerçek; approval/execute/Meta write kapalı | `MOVE → Kampanya / Kreatif akışı` |
+| Promotion template authoring | `/api/promotion-template-authoring` | Draft/lifecycle mutation gerçek | `MOVE_DEEPER · ADVANCED_SETTINGS` |
+| Operasyon izi | `/api/operational-timeline` | Salt-okunur persisted event listesi; exact opaque campaign alias filtresi | `MERGE → ilgili kampanya/karar/alarm detayı`; global audit log advanced olarak kalabilir |
+| Temporal recommendations | `/api/temporal-recommendations` | İkinci salt-okunur temporal kaynak | `INLINE_CONTEXT`; Timeline kaynağı hazır değilken ertelenir |
+
+### Holistik varlık ve entegrasyon kararı
+
+1. **Meta Bağlantısı** bağımsız bir günlük çalışma yüzeyi değil, bağlantı ve güven yönetimi alanıdır. Meta inventory, bootstrap ve readiness korunmalıdır; ancak aynı account→campaign hiyerarşisini hem burada hem `Kampanyalar`da göstermek tekrar yaratır. Ana hiyerarşi `Kampanyalar`da, teknik tanı ise Settings içindeki Meta alanında kalmalıdır.
+2. **Orchestrator Agent** kullanıcının bağlamdan çıkıp ayrı bir ürün açmasını gerektirmemelidir. Persisted konuşma capability'si global drawer/panel olarak kullanıcı bulunduğu campaign, karar veya alarm bağlamını devralmalı; CLI Session Hub ve manual handoff seyrek kullanılan advanced kontroller olmalıdır.
+3. **Teslimat Alarmları** ayrı teknik ledger olarak gerçek bir kaynağa sahiptir; fakat ana kullanıcı işi “bugün neye bakmalıyım?” ve “bu kampanyada ne bozuldu?” sorularına aittir. Özet `Bugün`e, ilgili kayıt kampanya detayına inline yedirilmeli; ayrı URL yalnız derin triage ve paylaşılabilir bağlantı için korunmalıdır.
+4. **Gönderi Öne Çıkarma** bağımsız ürün değildir. Kullanıcı mevcut gönderi veya kampanya bağlamından başlar; katalog seçimi, preflight ve K4 taslağı aynı akışta ilerlemelidir. Şablon yaşam döngüsü bu akışı şişirmeden advanced settings'e taşınmalıdır.
+5. **Timeline** tek başına amaç değil, başka bir kararın kanıtı ve geçmişidir. Campaign, approval, alert ve decision detayında ilgili kayıtlarla filtreli inline history daha anlamlıdır. Domainler-arası global audit ihtiyacı advanced log olarak deep-link ile korunabilir; primary nav'da bulunmamalıdır.
+
+Bu öneriler mevcut A/B/C karar kapısını değiştirmez. Önceki **Seçenek A** seçilirse sade hedef mimari şu yerleşimle tamamlanabilir:
+
+```text
+Bugün                    → önemli teslimat alarmı özeti
+Kampanyalar              → Meta hiyerarşisi + sınıflandırma + alarm + promotion + timeline context
+Analiz & Kararlar        → kanıt + karar + ilgili timeline context
+Bütçeler                 → Budget Pool + proposal
+Onay kuyruğu             → cross-domain insan inbox'ı + ilgili timeline context
+Kurallar & Yetkiler      → guidance + policy + autonomy + deeper Practice Lab
+Global yardımcı          → Orchestrator konuşması
+Settings / Advanced      → Meta bağlantısı + kategori registry + promotion template + session/handoff
+```
+
+### Uygulanan karar gerektirmeyen düzeltmeler
+
+- Meta, Orchestrator, Teslimat Alarmları, Gönderi Öne Çıkarma ve Timeline kendi kaynak durumunda ortak `LocalSessionConnector` gösteriyor; başka bir sayfaya yönlendirme gerekmiyor.
+- Beş yüzeyde `401 local_session_required` ile gerçek `503 unavailable/source_not_configured` ayrıldı. Timeline ve promotion catalog local runtime'ları da bu ayrımı fail-closed biçimde yapıyor.
+- Meta blocked durumunda trust, Graph ve portfolio tekrar panelleri; Promotion blocked durumunda authoring; Timeline blocked durumunda temporal alt kaynağı erteleniyor. Kullanıcı tek recovery noktası görüyor.
+- Meta hesap, kampanya, Page ve Instagram özetlerinden kullanıcıya değer katmayan raw identifier'lar kaldırıldı.
+- Orchestrator'daki altı sabit rol, sahte “6 active” skill pack, persist edilmeyen autonomy seçicileri ve fallback assistant mesajı kaldırıldı. Konuşma artık yalnız persisted kayıt, gerçek empty, loading veya unavailable/session state gösteriyor.
+- Delivery Alerts'teki hero'yu tekrar eden statik safety strip kaldırıldı; gerçek boşluk “ledger okundu, kayıt yok” diye ayrıldı.
+- Promotion sonucunda post/template/preset teknik ref'leri yerine katalog label'ları gösteriliyor; kullanıcı metnindeki `ActionUnit` adı `eylem satırı` olarak sadeleştirildi.
+- Timeline tek satırlı belirsiz sonuç yerine loading, session-required, unavailable, error, empty ve ready durumlarını ayrı gösteriyor; sahte “demo event” anlatısı kaldırıldı.
+
+### Açık P2 ve canlı kabul
+
+- Teslimat alarmı satırlarında public-safe `accountRef` ve `assigneeRef` hâlâ kullanıcı etiketi yerine görünebilir. Backend label/catalog kaynağı doğrulanmadan sahte eşleme eklenmedi; gerçek hesap ve aktör label'larıyla zenginleştirme P2'dir.
+- Meta hazır durumda bağlantı yönetimi ile portföy hiyerarşisi hâlâ aynı view içinde bulunur. Campaigns'a fiziksel taşıma hedef bilgi mimarisi onayı sonrasına bırakıldı.
+- Orchestrator global drawer, alert/promotion/timeline inline entegrasyonları geniş yerleşim değişikliğidir; kullanıcı A/B/C kararından sonra uygulanacaktır.
+- Gerçek kayıtların browser kabulü operator tarafından mint edilen local session gerektirir. Agent/browser proof üretmedi, cookie/storage incelemedi.
+
+### Doğrulama
+
+| Kapı | Sonuç |
+|---|---|
+| TypeScript | PASS |
+| Odak testler | PASS · 11 dosya / 44 test |
+| Tam unit suite + mimari kapılar | PASS · 429 dosya / 2111 test |
+| Experience sözleşmesi | PASS |
+| Security boundary + schema | PASS · 2 dosya / 9 test; `drizzle-kit check` temiz |
+| Production build + secret artifact kontrolü | PASS · tracked/build/cache secret 0/0/0 |
+| Odak browser desktop `1280` | PASS · 5/5 tek H1, tek bağlamsal form, taşma yok |
+| Odak browser mobile `390×844` | PASS · maksimum body scroll width 375 px, 5/5 tek form |
+| Görünür demo/fixture ve raw Meta ID | 0 / 5 view |
+| Hızlı nav `Meta → Orchestrator → Alerts → Promotion → Timeline` | PASS · 40 ms aralık, product error/warn 0/0 |
+| Agent/browser proof mint veya storage inceleme | Yapılmadı |
+
+Kanıt dosyası: `docs/qa/2026-08-14-dashboard-meta-orchestrator-operations-browser-evidence.json`
+
+## 19. Kullanıcı kararı A ve hedef bilgi mimarisi implementation increment'i
+
+### Kullanıcı kararı
+
+Kullanıcının önerilen A/B/C kapısına verdiği “tamam” yanıtı, önerilen **Seçenek A — görev frekansına göre ayır** onayı olarak kaydedildi. Geniş yerleşim değişikliği bu karar sonrasında uygulandı.
+
+```text
+Önce: 15 primary navigasyon hedefi
+Sonra: 7 kullanıcı amacı
+
+Çalışma
+├── Bugün
+├── Kampanyalar
+├── Analiz & Kararlar
+├── Bütçeler
+└── Onay kuyruğu
+
+Yönetim
+├── Kurallar & Yetkiler
+└── Ayarlar
+
+Global yardımcı
+└── Orchestrator dialog
+```
+
+### Uygulanan yerleşimler
+
+| Önceki ayrı görünüm / parça | Yeni yerleşim | Korunan gerçek capability |
+|---|---|---|
+| Budget Pool | `Bütçeler → Bütçe havuzları` | Immutable hierarchy read/draft yolu |
+| Strict Policies | `Kurallar & Yetkiler → Bağlayıcı politikalar` | Policy lifecycle + impact |
+| Autonomy Studio | `Kurallar & Yetkiler → Yetki & onay` | Autonomy revision + Policy Bundle |
+| Practice Lab | `Kurallar & Yetkiler → Öğrenim` | Append-only, insan kapılı lifecycle |
+| Campaign Classification Review | `Kampanyalar → Künye inceleme` | Canonical review queue |
+| Existing-post Promotion | `Kampanyalar → Gönderi öne çıkarma` | Server catalog + K4 preflight + approval draft sınırı |
+| Timeline | `Kampanyalar → Geçmiş` | Operational timeline + temporal read |
+| Delivery Alerts | `Bugün` içinde; ortak session doğrulandıktan sonra | Alert ledger + human workflow |
+| Meta Connection | `Ayarlar → Meta bağlantısı` | Inventory, mirror, readiness, bootstrap ve portfolio capability |
+| Category Registry | `Ayarlar → Kategori registry` | Registry authoring/profile/adoption |
+| PromotionTemplate authoring | `Ayarlar → Promotion şablonları` | Authoring dry-run + lifecycle |
+| Orchestrator Agent | Global `Asistan` dialog | Persisted conversation + short-lived CLI handoff |
+
+### Bağlam ve capability devamlılığı
+
+- Legacy `initialView` girişleri silinmedi; `normalizeDashboardLocation` ile doğru parent/alt alana yönlendiriliyor.
+- Kampanya künye incelemesindeki “Manuel atamayı hazırla” browser event'ine bağımlı bırakılmadı. Explicit handoff state, kullanıcıyı `Ayarlar → Kategori registry` içindeki guarded forma taşır; tanım seçimi ve onay yine kullanıcıdadır.
+- Promotion preflight ile PromotionTemplate authoring ayrıldı. Preflight artık şablon yönetimini aynı ekranda render etmez; authoring yalnız Ayarlar'da bulunur.
+- Today blocked durumda Meta ve Delivery Alerts için iki connector üretmiyor. Delivery ledger ortak session doğrulanana kadar mount edilmez; tek recovery korunur.
+- Orchestrator sayfa olmaktan çıktı. Dialog kaynak ekranı korur; açılışta close kontrolüne focus verir, `Escape` ile kapanır ve focus'u global tetikleyiciye döndürür.
+- Orchestrator konuşma guide allowlist'ine yeni kanonik `settings` bağlamı eklendi; backend bilinmeyen page ID'lerde fail-closed kalır.
+
+### Global shell sadeleştirmesi
+
+- Sonucu olmayan arama, bildirim ve profil kontrolleri kaldırıldı.
+- `Codex'e aktar`, `Asistan`, workspace/Meta settings girişi ve gerçek navigation kontrolleri korundu.
+- Sidebar ve mobil navigation aynı 7 hedefi kullanıyor.
+- Teknik `approval_only` gösterge butonu global assistant tetikleyicisi gibi davranmaktan çıkarıldı; kullanıcıya doğru adıyla `Asistan` sunuluyor.
+
+### Doğrulama ve açık kanıt
+
+| Kapı | Sonuç |
+|---|---|
+| TypeScript | PASS |
+| Yeni IA odak testleri | PASS · 9 dosya / 45 test + 1 dosya / 3 yerleşim testi |
+| Desktop browser `1280×720` | PASS · 7 primary hedef; bütün incelenen alt alanlarda tek H1; taşma yok |
+| Campaign alt alanları | PASS · 4/4 bağlamsal yerleşim ve tek recovery |
+| Bütçe / Rules / Settings alt alanları | PASS · 9/9 tek H1 ve görünür demo/fixture 0 |
+| Global Asistan | PASS · dialog, focus, Escape ve focus-return |
+| Mobile browser | AÇIK · viewport override browser URL güvenlik politikası tarafından reddedildi; başka browser/raw automation ile dolanılmadı |
+| Console kabulü | AÇIK · güvenlik politikası blokundan sonra tamamlanamadı |
+| Agent/browser proof veya storage inceleme | Yapılmadı |
+
+Kanıt dosyası: `docs/qa/2026-08-14-dashboard-approved-ia-browser-evidence.json`

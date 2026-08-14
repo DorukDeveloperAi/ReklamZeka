@@ -118,7 +118,7 @@ describe("Today inventory summary", () => {
     expect(html).toContain("Campaign → ad set → ad → creative/post");
     expect(html).toContain("Yetki: none · publish kapalı · approve kapalı · execute kapalı · Meta write kapalı");
     expect(html).toContain("PORTFÖY KAPSAMI");
-    expect(html).toContain("Portföy kapsamı kaynağı henüz güvenli biçimde bağlanmadı; demo gruplar gösterilmiyor.");
+    expect(html).toContain("Portföy kapsamı kaynağı henüz güvenli biçimde bağlanmadı.");
     expect(html).toContain("Bu görünümden bütçe, yayın, onay veya Meta yazma yapılamaz.");
   });
 

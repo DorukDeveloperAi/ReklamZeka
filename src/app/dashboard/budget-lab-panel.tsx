@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { BudgetLabDetailResult, BudgetLabListResult, BudgetLabSummary } from "@/application/budget-lab-read-service";
 import type { PublicBudgetProposal } from "@/connectors/budget/budget-proposal-drizzle-repository";
 import { LocalSessionConnector } from "./local-session-connector";
@@ -55,11 +55,14 @@ function BudgetProposalDetail({ item }: Readonly<{ item: PublicBudgetProposal | 
 
 export function BudgetLabPanel() {
   const [state, setState] = useState<State>({ status: "loading" });
+  const mounted = useRef(false);
   const load = useCallback(async () => {
+    if (!mounted.current) return false;
     setState({ status: "loading" });
     try {
       const response = await fetch("/api/budget-lab?view=list&limit=50", { cache: "no-store", credentials: "same-origin" });
       const payload = await response.json() as Envelope<BudgetLabListResult> | ErrorEnvelope;
+      if (!mounted.current) return false;
       if (!response.ok) {
         const remoteError = "error" in payload ? payload.error : undefined;
         setState({ status: remoteError?.code === "local_session_required" ? "session_required" : response.status === 503 ? "unavailable" : "error", message: remoteError?.message ?? "Budget Lab yanıtı alınamadı." });
@@ -68,9 +71,9 @@ export function BudgetLabPanel() {
       if (!("result" in payload) || payload.result.view !== "list") throw new Error("invalid_contract");
       setState({ status: "ready", result: payload.result, selected: null });
       return true;
-    } catch { setState({ status: "error", message: "Budget Lab bağlantısı şu anda kullanılamıyor." }); return false; }
+    } catch { if (mounted.current) setState({ status: "error", message: "Budget Lab bağlantısı şu anda kullanılamıyor." }); return false; }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { mounted.current = true; void load(); return () => { mounted.current = false; }; }, [load]);
   const select = useCallback(async (summary: BudgetLabSummary) => {
     try {
       const query = new URLSearchParams({ view: "detail", seriesRef: summary.seriesRef, revision: String(summary.revision) });

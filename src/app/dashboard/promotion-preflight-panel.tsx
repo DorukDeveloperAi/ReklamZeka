@@ -23,12 +23,14 @@ import {
   type PromotionTemplateLifecycleCommand,
   type PromotionTemplateLifecyclePublicState,
 } from "@/application/promotion-template-lifecycle-service";
+import { LocalSessionConnector } from "./local-session-connector";
 import styles from "./operating-dashboard.module.css";
 
 export type { PromotionPreflightCatalog, PromotionPreflightOption };
 
 export type PromotionPreflightSurfaceState =
   | Readonly<{ status: "loading" }>
+  | Readonly<{ status: "session_required"; message: string }>
   | Readonly<{ status: "unavailable" | "error"; message: string }>
   | Readonly<{
     status: "ready";
@@ -43,7 +45,7 @@ export type PromotionPreflightSurfaceState =
 
 type SelectionKey = keyof ExistingPostPromotionPreflightRequest;
 type MutableSelection = { -readonly [K in SelectionKey]?: ExistingPostPromotionPreflightRequest[K] };
-type ErrorEnvelope = Readonly<{ error?: Readonly<{ message?: string }> }>;
+type ErrorEnvelope = Readonly<{ error?: Readonly<{ code?: string; message?: string }> }>;
 type PromotionTemplateAuthoringState =
   | Readonly<{ status: "loading" }>
   | Readonly<{ status: "unavailable" | "error"; message: string }>
@@ -439,9 +441,12 @@ export async function requestExistingPostPromotionCatalog(fetcher: typeof fetch)
   });
   const payload = await response.json() as unknown;
   if (!response.ok) {
-    const message = payload && typeof payload === "object" && "error" in payload
-      ? (payload as ErrorEnvelope).error?.message : undefined;
-    throw Object.assign(new Error(message ?? "Öne çıkarma seçim kataloğu alınamadı."), { unavailable: response.status === 503 });
+    const problem = payload && typeof payload === "object" && "error" in payload
+      ? (payload as ErrorEnvelope).error : undefined;
+    throw Object.assign(new Error(problem?.message ?? "Öne çıkarma seçim kataloğu alınamadı."), {
+      unavailable: response.status === 503,
+      sessionRequired: response.status === 401 || problem?.code === "local_session_required",
+    });
   }
   return parseExistingPostPromotionCatalogResult(payload).catalog;
 }
@@ -580,7 +585,7 @@ export function PromotionTemplateLifecycleSurface(props: Readonly<{
   </section>;
 }
 
-function PromotionTemplateAuthoringPanel() {
+export function PromotionTemplateAuthoringPanel() {
   const [state, setState] = useState<PromotionTemplateAuthoringState>({ status: "loading" });
   const [lifecycle, setLifecycle] = useState<PromotionTemplateLifecycleState>({ status: "loading" });
   const loadLifecycle = useCallback(async () => {
@@ -633,19 +638,26 @@ function PromotionTemplateAuthoringPanel() {
 
 export function PromotionPreflightSurface(props: Readonly<{
   state: PromotionPreflightSurfaceState;
+  embedded?: boolean;
   onRetry(): void;
+  onConnect?(): Promise<boolean>;
   onChange(key: SelectionKey, value: string): void;
   onEvaluate(): void;
   onDraft(): void;
 }>) {
   const ready = props.state.status === "ready" ? props.state : null;
   const preview = ready?.result?.proposalPreview ?? null;
+  const selectedPostLabel = ready?.catalog.posts.find((item) => item.ref === ready.selection.postRef)?.label ?? "Mevcut gönderi";
+  const selectedTemplateLabel = ready?.catalog.templates.find((item) => item.ref === ready.selection.promotionTemplateRef)?.label ?? "Yayınlanmış şablon";
+  const selectedPresetLabel = ready?.catalog.audiencePresets.find((item) => item.ref === ready.selection.audiencePresetRef)?.label ?? "Kilitli hedef kitle";
+  const Heading = props.embedded ? "h2" : "h1";
   return <>
-    <section className={styles.pageHero}>
-      <div><span className={styles.kicker}>EXISTING POST PROMOTION · K4 PREFLIGHT</span><h1>Mevcut gönderiyi, kilitli şablon ve hedef kitleyle değerlendirin.</h1><p>Yalnız yayınlanmış Page/Instagram gönderileri ve sunucunun sunduğu referanslar kullanılabilir. Ön kontrol kendiliğinden taslak kaydetmez; ayrı komut yalnız K4 onay kuyruğu taslağı oluşturabilir. Kreatif üretme, hedef kitle değiştirme, onaylama ve Meta write kapalıdır.</p></div>
+    <section className={`${styles.pageHero} ${props.embedded ? styles.embeddedHero : ""}`}>
+      <div><span className={styles.kicker}>EXISTING POST PROMOTION · K4 PREFLIGHT</span><Heading>Mevcut gönderiyi, kilitli şablon ve hedef kitleyle değerlendirin.</Heading><p>Yalnız yayınlanmış Page/Instagram gönderileri ve sunucunun sunduğu referanslar kullanılabilir. Ön kontrol kendiliğinden taslak kaydetmez; ayrı komut yalnız K4 onay kuyruğu taslağı oluşturabilir. Kreatif üretme, hedef kitle değiştirme, onaylama ve Meta write kapalıdır.</p></div>
       <span className={styles.readOnlyBadge}>EPHEMERAL · APPROVAL REQUIRED</span>
     </section>
     {props.state.status === "loading" ? <section className={`${styles.panel} ${styles.promotionPreflightState}`} role="status"><strong>Kaynak doğrulanıyor</strong><h2>Yayınlanmış şablonlar ve mevcut gönderiler bekleniyor.</h2><p>Serbest ID, ham targeting veya kreatif alanı açılmaz.</p></section> : null}
+    {props.state.status === "session_required" ? <section className={`${styles.panel} ${styles.promotionPreflightState}`} role="alert"><strong>YEREL OTURUM GEREKLİ</strong><h2>Öne çıkarma çalışma alanını bağlayın</h2><p>{props.state.message}</p>{props.onConnect ? <LocalSessionConnector title="Öne çıkarma çalışma alanını bağlayın" onVerify={props.onConnect} /> : <button onClick={props.onRetry}>Tekrar dene</button>}</section> : null}
     {props.state.status === "unavailable" ? <section className={`${styles.panel} ${styles.promotionPreflightState}`} role="alert"><strong>Kaynak henüz bağlı değil</strong><h2>{props.state.message}</h2><p>Güvenilir seçenek kataloğu olmadan gönderi, hesap, şablon veya hedef kitle uydurulmaz. Meta write ve proposal persistence kapalı kalır.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></section> : null}
     {props.state.status === "error" ? <section className={`${styles.panel} ${styles.promotionPreflightState}`} role="alert"><strong>Preflight okunamadı</strong><h2>{props.state.message}</h2><p>Kısmi veya sözleşme dışı yanıtlar formu açmaz.</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
     {ready && !catalogHasSelections(ready.catalog) ? <section className={`${styles.panel} ${styles.promotionPreflightState}`}><strong>Kaynak bağlı · katalog boş</strong><h2>Bu çalışma alanında henüz uygun öne çıkarma seçimi bulunmuyor.</h2><p>Yayınlanmış şablon, immutable preset ve mevcut gönderi tamamlanmadan form açılmaz.</p></section> : null}
@@ -663,10 +675,10 @@ export function PromotionPreflightSurface(props: Readonly<{
         {!ready.result ? <div className={styles.promotionPreflightPlaceholder}><strong>Henüz değerlendirilmedi</strong><h2>Exact before → after özeti burada görünür.</h2><p>Bu özet bir teklif kaydı veya Meta değişikliği değildir.</p></div> : <>
           <header><div><span className={styles.kicker}>COMPATIBILITY & GUIDANCE</span><h2>{ready.result.status === "ready_for_approval_proposal" ? "Onay önerisine hazırlanabilir" : ready.result.status === "blocked" ? "Kurallar nedeniyle engellendi" : "İnsan incelemesi gerekiyor"}</h2></div><span data-status={ready.result.status}>{ready.result.status}</span></header>
           {ready.result.reasons.length ? <div className={styles.promotionPreflightReasons}>{ready.result.reasons.map((item) => <p key={`${item.source}:${item.code}`}><span>{item.source}</span><strong>{item.code}</strong><i data-disposition={item.disposition}>{item.disposition}</i></p>)}</div> : <p className={styles.promotionPreflightClear}>Şablon, preset, Meta uygunluğu ve aktif guidance kontrollerinde engel bulunmadı.</p>}
-          {preview ? <div className={styles.promotionBeforeAfter}><div><span>Önce</span><strong>Mevcut gönderi · değişmez</strong><small>{ready.selection.postRef}</small></div><b>→</b><div><span>Sonra</span><strong>K4 reklam önerisi · approval_required</strong><small>{preview.actorType} · {money(preview.budget.amountMinor, preview.budget.currency)} / {preview.budget.kind === "daily" ? "gün" : "dönem"}</small></div></div> : null}
-          {preview ? <dl className={styles.promotionPreflightFacts}><div><dt>Şablon</dt><dd>{ready.selection.promotionTemplateRef}</dd></div><div><dt>Immutable preset</dt><dd>{ready.selection.audiencePresetRef}</dd></div><div><dt>Timeframe</dt><dd>{timestamp(preview.timeframe.startAt, preview.timeframe.timezone)}{preview.timeframe.endAt ? ` → ${timestamp(preview.timeframe.endAt, preview.timeframe.timezone)} · ${preview.timeframe.durationDays} gün` : " → sürekli"}</dd></div><div><dt>Risk / durum</dt><dd>{preview.risk} · {preview.disposition}</dd></div></dl> : null}
-          {preview && !ready.draftResult ? <button disabled={ready.drafting} onClick={props.onDraft}>{ready.drafting ? "Taslak oluşturuluyor…" : "Tek ActionUnit onay taslağı oluştur"}</button> : null}
-          {ready.draftResult ? <div className={styles.promotionPreflightClear} role="status"><strong>Onay kuyruğu taslağı hazır</strong><p>{ready.draftResult.proposalRef} · {ready.draftResult.actionUnitRefs[0]} · {ready.draftResult.outcome}</p></div> : null}
+          {preview ? <div className={styles.promotionBeforeAfter}><div><span>Önce</span><strong>Mevcut gönderi · değişmez</strong><small>{selectedPostLabel}</small></div><b>→</b><div><span>Sonra</span><strong>K4 reklam önerisi · insan onayı gerekli</strong><small>{preview.actorType} · {money(preview.budget.amountMinor, preview.budget.currency)} / {preview.budget.kind === "daily" ? "gün" : "dönem"}</small></div></div> : null}
+          {preview ? <dl className={styles.promotionPreflightFacts}><div><dt>Şablon</dt><dd>{selectedTemplateLabel}</dd></div><div><dt>Kilitli hedef kitle</dt><dd>{selectedPresetLabel}</dd></div><div><dt>Zaman aralığı</dt><dd>{timestamp(preview.timeframe.startAt, preview.timeframe.timezone)}{preview.timeframe.endAt ? ` → ${timestamp(preview.timeframe.endAt, preview.timeframe.timezone)} · ${preview.timeframe.durationDays} gün` : " → sürekli"}</dd></div><div><dt>Risk / durum</dt><dd>{preview.risk} · {preview.disposition}</dd></div></dl> : null}
+          {preview && !ready.draftResult ? <button disabled={ready.drafting} onClick={props.onDraft}>{ready.drafting ? "Taslak oluşturuluyor…" : "Tek eylem satırlı onay taslağı oluştur"}</button> : null}
+          {ready.draftResult ? <div className={styles.promotionPreflightClear} role="status"><strong>Onay kuyruğu taslağı hazır</strong><p>1 eylem satırı · {ready.draftResult.outcome}</p></div> : null}
           <footer><span>Preflight persist: kapalı</span><span>Approval: kapalı</span><span>Execute: kapalı</span><span>Meta write: kapalı</span><span>Creative generation: kapalı</span></footer>
         </>}
       </section>
@@ -674,7 +686,7 @@ export function PromotionPreflightSurface(props: Readonly<{
   </>;
 }
 
-export function PromotionPreflightPanel() {
+export function PromotionPreflightPanel({ embedded = false }: Readonly<{ embedded?: boolean }> = {}) {
   const [state, setState] = useState<PromotionPreflightSurfaceState>({ status: "loading" });
   const selection = state.status === "ready" ? state.selection : {};
   const requiredPreset = useMemo(() => {
@@ -682,14 +694,19 @@ export function PromotionPreflightPanel() {
     return state.catalog.templates.find((item) => item.ref === state.selection.promotionTemplateRef)?.requiredAudiencePresetRef ?? null;
   }, [state]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<boolean> => {
     setState({ status: "loading" });
     try {
       const catalog = await requestExistingPostPromotionCatalog(fetch);
       setState({ status: "ready", catalog, selection: {}, result: null, evaluating: false, drafting: false, draftResult: null, message: null });
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Öne çıkarma seçim kataloğu alınamadı.";
-      setState({ status: error && typeof error === "object" && "unavailable" in error ? "unavailable" : "error", message });
+      const status = error && typeof error === "object" && "sessionRequired" in error && error.sessionRequired
+        ? "session_required" : error && typeof error === "object" && "unavailable" in error && error.unavailable
+          ? "unavailable" : "error";
+      setState({ status, message });
+      return false;
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -733,6 +750,7 @@ export function PromotionPreflightPanel() {
     }
   }, [selection, state]);
 
-  return <><PromotionTemplateAuthoringPanel /><PromotionPreflightSurface state={state} onRetry={() => void load()} onChange={change}
+  return <><PromotionPreflightSurface state={state} embedded={embedded}
+    onRetry={() => void load()} onConnect={load} onChange={change}
     onEvaluate={() => void evaluate()} onDraft={() => void draft()} /></>;
 }

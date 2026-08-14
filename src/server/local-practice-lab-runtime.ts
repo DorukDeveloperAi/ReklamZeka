@@ -5,7 +5,10 @@ import { PracticeLabReadService } from "@/application/practice-lab-read-service"
 import { AdvisedPracticeLifecycleService } from "@/application/advised-practice-lifecycle-service";
 import { DrizzleAdvisedPracticeRepository } from "@/connectors/guidance/advised-practice-drizzle-repository";
 import { resolveTrustedLocalPracticeLabPrincipal, type LocalDecisionRoomConfig } from "@/server/local-decision-room-runtime";
-import { createPracticeLabHttpHandlers, practiceLabNotConfiguredResponse } from "@/server/practice-lab-http";
+import { LocalDecisionRoomBoundaryError } from "@/server/local-decision-room-runtime";
+import { LocalSessionCapabilityError } from "@/security/local-session-capability";
+import { createPracticeLabHttpHandlers, practiceLabNotConfiguredResponse,
+  practiceLabSessionRequiredResponse } from "@/server/practice-lab-http";
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -30,8 +33,9 @@ export function createLocalPracticeLabRouteHandlers(input: Readonly<{
         resolvePrincipal: async () => bound.principal,
       });
       return operation === "read" ? handlers.GET(request) : handlers.POST(request);
-    } catch {
-      return practiceLabNotConfiguredResponse();
+    } catch (reason) {
+      return reason instanceof LocalDecisionRoomBoundaryError || reason instanceof LocalSessionCapabilityError
+        ? practiceLabSessionRequiredResponse() : practiceLabNotConfiguredResponse();
     }
   };
   return Object.freeze({ GET: (request: Request) => execute(request, "read"),

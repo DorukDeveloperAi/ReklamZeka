@@ -111,19 +111,15 @@ describe("Approval Queue dashboard", () => {
     expect(html).toContain("K2");
   });
 
-  it("keeps execute and Meta authority visibly disabled when no trusted decision adapter is supplied", () => {
+  it("keeps the authority boundary concise when no trusted decision adapter is supplied", () => {
     const html = renderToStaticMarkup(createElement(ApprovalQueueReadSurface, {
       ...callbacks, state: ready(item),
     }));
-    expect(html).toContain("DECISION RECORD · NO META WRITE");
-    expect(html).toContain("Tekil insan kararı");
-    expect(html).toContain("Execute kapalı");
-    expect(html).toContain("Meta write kapalı");
-    expect(html).toContain("Uygulama zinciri henüz kapalı");
-    expect(html).toContain("Mirror yeniden kontrolü");
-    expect(html).toContain("Ayrı execution seremonisi");
-    expect(html).toContain("Read-after-write sözleşmesi hazır");
-    expect(html).toContain("NO TRANSPORT");
+    expect(html).toContain("İNSAN KARARI · META WRITE YOK");
+    expect(html).toContain("Onay yalnız karar kaydıdır");
+    expect(html).not.toContain("Uygulama zinciri henüz kapalı");
+    expect(html).not.toContain("Mirror yeniden kontrolü");
+    expect(html).not.toContain("NO TRANSPORT");
     expect(html).not.toContain(">Onayla<");
     expect(html).not.toContain(">Reddet<");
     expect(html).not.toContain(">Değişiklik iste<");
@@ -142,7 +138,7 @@ describe("Approval Queue dashboard", () => {
         decide: vi.fn(),
       },
     }));
-    expect(html).toContain("Bu ActionUnit için karar ver");
+    expect(html).toContain("Bu eylem satırı için karar ver");
     expect(html).toContain("1.700");
     expect(html).toContain("1.564");
     expect(html).toContain("type=\"checkbox\"");

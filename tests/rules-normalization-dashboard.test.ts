@@ -11,17 +11,16 @@ const model = {
 };
 
 describe("Rules normalization dashboard integration", () => {
-  it("places the draft-only normalization workbench in the Rules flow, before Slice Rule work", () => {
+  it("defers normalization and Slice Rule until the Guidance source is verified", () => {
     const html = renderToStaticMarkup(createElement(OperatingDashboard, { model, initialView: "rules" }));
     const guidance = html.indexOf("Talimatlar yükleniyor");
     const normalization = html.indexOf("Owner talimatını yapılandırılmış taslak olarak değerlendir");
     const sliceRule = html.indexOf("Kanıtlı kapsam için işletim kuralı taslağı");
 
     expect(guidance).toBeGreaterThanOrEqual(0);
-    expect(normalization).toBeGreaterThan(guidance);
-    expect(sliceRule).toBeGreaterThan(normalization);
-    expect(html).toContain("Bu akış publish, G3, approval, action ve Meta write üretmez.");
-    expect(html).toContain("Normalization sadece structured draft + varsayım/açık soru üretir");
+    expect(normalization).toBe(-1);
+    expect(sliceRule).toBe(-1);
+    expect(html).toContain("Guidance → Normalization → Slice Rule");
   });
 
   it("keeps the strict policy screen separate from the normalization workbench", () => {
@@ -33,7 +32,7 @@ describe("Rules normalization dashboard integration", () => {
   it("gives Codex the complete draft-only Rules record guide", () => {
     const task = buildCodexManualTask(codexPageGuide("rules", "Kurallar & akışlar"));
     expect(task).toContain("normalization-workbench-panel.tsx");
-    expect(task).toContain("Guidance → Normalization → Slice Rule");
-    expect(task).toContain("strict policy veya uygulama değildir");
+    expect(task).toContain("Guidance → Normalization → Slice Rule → Policy → Authority");
+    expect(task).toContain("yayın, onay veya execution yapma");
   });
 });

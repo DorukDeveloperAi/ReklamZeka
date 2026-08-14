@@ -78,12 +78,18 @@ describe("Delivery/Payment alarm dashboard", () => {
   });
 
   it("distinguishes unavailable and true empty without fixture fallback", () => {
+    const sessionRequired = renderToStaticMarkup(createElement(DeliveryHealthAlertSurface, { ...callbacks,
+      onConnect: vi.fn(async () => false), state: { status: "session_required", message: "Yerel oturum gerekli." } }));
     const unavailable = renderToStaticMarkup(createElement(DeliveryHealthAlertSurface, { ...callbacks,
       state: { status: "unavailable", message: "Yerel oturum gerekli." } }));
     const empty = renderToStaticMarkup(createElement(DeliveryHealthAlertSurface, { ...callbacks,
       state: { status: "ready", result: { ...list, items: [] }, busyAlertRef: null, error: null, notice: null } }));
-    expect(unavailable).toContain("Fixture alarm canlı olay gibi gösterilmez");
+    expect(unavailable).toContain("Alarm kayıt defteri yapılandırılana kadar");
+    expect(unavailable).not.toMatch(/demo|fixture/i);
     expect(empty).toContain("Kaynak bağlı · açık veya geçmiş alarm yok");
-    expect(empty).toContain("demo fallback değildir");
+    expect(empty).toContain("Kayıt defteri başarıyla okundu");
+    expect(empty).not.toMatch(/demo|fixture/i);
+    expect(sessionRequired).toContain("Alarm çalışma alanını bağlayın");
+    expect(sessionRequired).toContain("local-session-capability");
   });
 });

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { normalizeDashboardLocation } from "@/app/dashboard/operating-dashboard";
 
 const dashboard = readFileSync("src/app/dashboard/operating-dashboard.tsx", "utf8");
 const decisionRoom = readFileSync("src/app/dashboard/decision-room-panel.tsx", "utf8");
@@ -20,9 +21,25 @@ describe("dashboard analysis and decision information architecture", () => {
   });
 
   it("routes the legacy analysis entry point to the canonical Decision Room read model", () => {
-    expect(dashboard).toContain('initialView === "analysis" ? "decision-room" : initialView');
+    expect(normalizeDashboardLocation("analysis").view).toBe("decision-room");
     expect(dashboard).toContain('componentPath: "src/app/dashboard/decision-room-panel.tsx"');
     expect(dashboard).not.toContain("function renderAnalysis()");
+  });
+
+  it("implements the approved seven-purpose primary IA and keeps legacy entries contextual", () => {
+    for (const label of ["Bugün", "Kampanyalar", "Analiz & Kararlar", "Bütçeler", "Onay kuyruğu", "Kurallar & Yetkiler", "Ayarlar"]) {
+      expect(dashboard).toContain(`label: "${label}"`);
+    }
+    for (const legacyNav of ["Strict policies", "İç kategoriler", "Autonomy Studio", "Practice Lab", "Meta bağlantısı", "Orchestrator Agent", "Teslimat alarmları", "Gönderi öne çıkarma", "Timeline"]) {
+      expect(dashboard).not.toContain(`label: "${legacyNav}", icon:`);
+    }
+    expect(normalizeDashboardLocation("strict-policies")).toMatchObject({ view: "rules", rulesArea: "policies" });
+    expect(normalizeDashboardLocation("autonomy")).toMatchObject({ view: "rules", rulesArea: "authority" });
+    expect(normalizeDashboardLocation("practice-lab")).toMatchObject({ view: "rules", rulesArea: "learning" });
+    expect(normalizeDashboardLocation("categories")).toMatchObject({ view: "settings", settingsArea: "categories" });
+    expect(normalizeDashboardLocation("promotions")).toMatchObject({ view: "campaigns", campaignArea: "promotion" });
+    expect(normalizeDashboardLocation("timeline")).toMatchObject({ view: "campaigns", campaignArea: "timeline" });
+    expect(normalizeDashboardLocation("agent")).toMatchObject({ view: "today", assistantOpen: true });
   });
 
   it("keeps session recovery inside each operational context without seeded frontend budgets", () => {

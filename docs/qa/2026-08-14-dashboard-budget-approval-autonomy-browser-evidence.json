@@ -1,0 +1,72 @@
+{
+  "capturedAt": "2026-08-14T12:29:00+03:00",
+  "surface": "Codex in-app browser",
+  "baseUrl": "http://localhost:3000/dashboard",
+  "increment": "contextual-session-and-approval-simplification",
+  "sourceState": "local_session_required",
+  "views": [
+    {
+      "id": "budgets",
+      "contextualSessionConnector": true,
+      "decisionRoomRedirectCopy": false,
+      "frontendSeededOperationalDataFound": false,
+      "demoOrFixtureWordVisible": false
+    },
+    {
+      "id": "autonomy",
+      "contextualSessionConnector": true,
+      "decisionRoomRedirectCopy": false,
+      "frontendSeededOperationalDataFound": false,
+      "demoOrFixtureWordVisible": false,
+      "nestedPolicyTabPreservesRecovery": true
+    },
+    {
+      "id": "approvals",
+      "contextualSessionConnector": true,
+      "decisionRoomRedirectCopy": false,
+      "frontendSeededOperationalDataFound": false,
+      "demoOrFixtureWordVisible": false
+    }
+  ],
+  "approvalSimplification": {
+    "staticSafetyPanelsRemoved": true,
+    "staticSafetyItemsRemoved": 5,
+    "sourceRecoveryTopBeforePx": 373,
+    "sourceRecoveryTopAfterPx": 181,
+    "verticalSpaceRecoveredPx": 192,
+    "visibleTechnicalActionUnitCopy": false,
+    "authorityBoundaryStillVisible": true
+  },
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "height": 720,
+      "bodyFits": true,
+      "singleH1": true
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "bodyFits": true,
+      "contentWidth": 375,
+      "singleH1": true,
+      "allThreeContextualConnectorsVisible": true
+    }
+  ],
+  "rapidNavigation": {
+    "sequence": ["budgets", "autonomy", "approvals"],
+    "interViewDelayMs": 40,
+    "productErrors": 0,
+    "productWarnings": 0,
+    "lateUnmountedStateUpdate": false
+  },
+  "securityBoundary": {
+    "agentOrBrowserMintedProof": false,
+    "cookieAuthority": "server-only",
+    "approvalCanExecute": false,
+    "approvalCanWriteMeta": false
+  },
+  "openAcceptance": "operator_minted_local_session_required_for_live_budget_proposals_autonomy_rules_and_approval_rows"
+}

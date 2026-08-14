@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AutonomyRuleDraftRequest, AutonomyRuleStudioResult } from "@/application/autonomy-rule-studio-service";
 import { LocalSessionConnector } from "./local-session-connector";
 import { PolicyBundleStudioPanel } from "./policy-bundle-studio-panel";
@@ -14,14 +14,16 @@ export function AutonomyStudioPanel() {
   const [tab, setTab] = useState<"autonomy" | "policy">("autonomy");
   const [state, setState] = useState<State>({ status: "loading" }); const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false); const [notice, setNotice] = useState<string | null>(null);
-  const load = useCallback(async () => { setState({ status: "loading" }); try {
+  const mounted = useRef(false);
+  const load = useCallback(async () => { if (!mounted.current) return false; setState({ status: "loading" }); try {
     const response = await fetch("/api/autonomy-rules", { cache: "no-store", credentials: "same-origin", headers: { "X-ReklamZeka-Intent": "autonomy-rules-read" } });
     const payload = await response.json() as AutonomyRuleStudioResult | { error?: { code?: string; message?: string } };
+    if (!mounted.current) return false;
     if (!response.ok || !("items" in payload)) { const error = "error" in payload ? payload.error : undefined; setState({ status: error?.code === "local_session_required" ? "session_required" : response.status === 503 ? "unavailable" : "error", message: error?.message ?? "Autonomy Studio okunamadı." }); return false; }
     setState({ status: "ready", result: payload });
     return true;
-  } catch { setState({ status: "error", message: "Autonomy Studio bağlantısı kurulamadı." }); return false; } }, []);
-  useEffect(() => { void load(); }, [load]);
+  } catch { if (mounted.current) setState({ status: "error", message: "Autonomy Studio bağlantısı kurulamadı." }); return false; } }, []);
+  useEffect(() => { mounted.current = true; void load(); return () => { mounted.current = false; }; }, [load]);
   const draft = useCallback(async () => { setSaving(true); setNotice(null); try {
     const scope = form.scopeLevel === "workspace" ? { level: "workspace" } : form.scopeLevel === "action_type" ? { level: "action_type", actionType: form.scopeRef }
       : { level: form.scopeLevel, ref: form.scopeRef };

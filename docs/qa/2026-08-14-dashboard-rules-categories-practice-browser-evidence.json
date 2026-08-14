@@ -1,0 +1,77 @@
+{
+  "capturedAt": "2026-08-14T12:40:36+03:00",
+  "surface": "Codex in-app browser",
+  "baseUrl": "http://localhost:3000/dashboard",
+  "increment": "rules-categories-practice-contextual-session-and-blocked-state-simplification",
+  "sourceState": "local_session_required",
+  "views": [
+    {
+      "id": "rules",
+      "contextualSessionConnector": true,
+      "decisionRoomRedirectCopy": false,
+      "blockedAlertsBefore": 3,
+      "blockedAlertsAfter": 1,
+      "nestedUnavailablePanelsDeferredUntilSourceReady": true,
+      "singleH1": true,
+      "demoOrFixtureWordVisible": false
+    },
+    {
+      "id": "strict-policies",
+      "contextualSessionConnector": true,
+      "blockedAlertsBefore": 2,
+      "blockedAlertsAfter": 1,
+      "progressiveFormalizationDeferredUntilRegistryReady": true,
+      "singleH1": true,
+      "demoOrFixtureWordVisible": false
+    },
+    {
+      "id": "categories",
+      "contextualSessionConnector": true,
+      "decisionRoomRedirectCopy": false,
+      "blockedAlertsBefore": 3,
+      "blockedAlertsAfter": 1,
+      "starterAndProfilePanelsDeferredUntilRegistryReady": true,
+      "singleH1": true,
+      "demoOrFixtureWordVisible": false
+    },
+    {
+      "id": "practice-lab",
+      "contextualSessionConnector": true,
+      "sessionResponse": "401 local_session_required",
+      "sourceNotConfiguredResponse": "503 source_not_configured",
+      "singleH1": true,
+      "demoOrFixtureWordVisible": false
+    }
+  ],
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "bodyScrollWidth": 1265,
+      "bodyFits": true,
+      "singleH1AllViews": true,
+      "oneContextualSessionFormAllViews": true
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "maximumScrollWidth": 390,
+      "bodyFits": true,
+      "singleH1AllViews": true,
+      "oneContextualSessionFormAllViews": true
+    }
+  ],
+  "rapidNavigation": {
+    "sequence": ["rules", "strict-policies", "categories", "practice-lab"],
+    "interViewDelayMs": 40,
+    "productErrors": 0,
+    "productWarnings": 0
+  },
+  "securityBoundary": {
+    "agentOrBrowserMintedProof": false,
+    "cookieAuthority": "server-only",
+    "proofOrStorageInspected": false
+  },
+  "openAcceptance": "operator_minted_local_session_required_for_live_guidance_policy_category_and_practice_records"
+}

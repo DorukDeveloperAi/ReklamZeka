@@ -9,15 +9,17 @@ import type {
   PracticeLabSummary,
 } from "@/application/practice-lab-read-service";
 import type { AdvisedPracticeLifecycleCommand } from "@/application/advised-practice-lifecycle-service";
+import { LocalSessionConnector } from "./local-session-connector";
 import styles from "./operating-dashboard.module.css";
 
 type State =
   | Readonly<{ status: "loading" }>
+  | Readonly<{ status: "session_required"; message: string }>
   | Readonly<{ status: "unavailable" | "error"; message: string }>
   | Readonly<{ status: "ready"; result: PracticeLabListResult; selected: PracticeLabDetail | null; draft: PracticeLabDraftResult["draft"] | null }>;
 
 type Envelope<T> = Readonly<{ result: T }>;
-type ErrorEnvelope = Readonly<{ error?: Readonly<{ message?: string }> }>;
+type ErrorEnvelope = Readonly<{ error?: Readonly<{ code?: string; message?: string }> }>;
 
 function timestamp(value: string) {
   return new Intl.DateTimeFormat("tr-TR", {
@@ -44,6 +46,7 @@ export function PracticeLabReadSurface(props: Readonly<{
   onSelect(practiceRef: string): void;
   onPrepareDraft(practiceRef: string): void;
   onMutate?(command: AdvisedPracticeLifecycleCommand): void;
+  onConnect?(): Promise<boolean>;
 }>) {
   const ready = props.state.status === "ready" ? props.state : null;
   return <>
@@ -53,9 +56,10 @@ export function PracticeLabReadSurface(props: Readonly<{
     </section>
 
     {props.state.status === "loading" ? <section className={`${styles.panel} ${styles.practiceLabState}`} role="status"><span className={styles.liveDot} /><h2>Practice zincirleri doğrulanıyor</h2><p>Tenant kapsamı ve append-only lifecycle bütünlüğü sunucuda kontrol edilir.</p></section> : null}
-    {props.state.status === "unavailable" ? <section className={`${styles.panel} ${styles.practiceLabState}`} role="alert"><strong>Kaynak henüz bağlı değil</strong><h2>{props.state.message}</h2><p>Demo practice gösterilmez. Aynı güvenli yerel oturum Decision Room ve Practice Lab okumalarını çalışma alanına bağlar.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></section> : null}
+    {props.state.status === "session_required" ? <section className={`${styles.panel} ${styles.practiceLabState}`} role="alert"><strong>YEREL OTURUM GEREKLİ</strong><h2>Practice çalışma alanını bağlayın</h2><p>{props.state.message}</p>{props.onConnect ? <LocalSessionConnector title="Practice çalışma alanını bağlayın" onVerify={props.onConnect} /> : <button onClick={props.onRetry}>Tekrar dene</button>}</section> : null}
+    {props.state.status === "unavailable" ? <section className={`${styles.panel} ${styles.practiceLabState}`} role="alert"><strong>Kaynak henüz bağlı değil</strong><h2>{props.state.message}</h2><p>Çalışma alanı kaynağı yapılandırılana kadar kayıt gösterilemez.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></section> : null}
     {props.state.status === "error" ? <section className={`${styles.panel} ${styles.practiceLabState}`} role="alert"><strong>Practice Lab okunamadı</strong><h2>{props.state.message}</h2><p>Güvensiz veya kapsam dışı kayıtlar kısmen gösterilmez; yüzey fail-closed davranır.</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
-    {ready && ready.result.items.length === 0 ? <section className={`${styles.panel} ${styles.practiceLabState}`}><strong>Kaynak bağlı · practice yok</strong><h2>Bu çalışma alanında henüz advised practice bulunmuyor.</h2><p>Bu gerçek, tenant-bound boş yanıttır; fixture veya demo fallback değildir.</p></section> : null}
+    {ready && ready.result.items.length === 0 ? <section className={`${styles.panel} ${styles.practiceLabState}`}><strong>Kaynak bağlı · practice yok</strong><h2>Bu çalışma alanında henüz advised practice bulunmuyor.</h2><p>Kaynak başarıyla okundu; eklenmiş bir yaklaşım kaydı bulunamadı.</p></section> : null}
     {ready && ready.result.items.length > 0 ? <div className={styles.practiceLabWorkspace}>
       <section className={`${styles.panel} ${styles.practiceLabIndex}`}>
         <header className={styles.panelHeader}><div><span className={styles.kicker}>ADVISED PRACTICES</span><h2>{ready.result.items.length} kayıt</h2></div><span>Public-safe projection</span></header>
@@ -89,20 +93,24 @@ function PracticeDetail(props: Readonly<{
 export function PracticeLabPanel() {
   const [state, setState] = useState<State>({ status: "loading" });
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<boolean> => {
     setState({ status: "loading" });
     try {
       const response = await fetch("/api/practice-lab?view=list&limit=50", { cache: "no-store" });
       const payload = await response.json() as Envelope<PracticeLabListResult> | ErrorEnvelope;
       if (!response.ok) {
-        const message = "error" in payload ? payload.error?.message : undefined;
-        setState({ status: response.status === 503 ? "unavailable" : "error", message: message ?? "Practice Lab yanıtı alınamadı." });
-        return;
+        const problem = "error" in payload ? payload.error : undefined;
+        const status = response.status === 401 || problem?.code === "local_session_required"
+          ? "session_required" : response.status === 503 ? "unavailable" : "error";
+        setState({ status, message: problem?.message ?? "Practice Lab yanıtı alınamadı." });
+        return false;
       }
       if (!("result" in payload) || payload.result.view !== "list") throw new Error("invalid_contract");
       setState({ status: "ready", result: payload.result, selected: null, draft: null });
+      return true;
     } catch {
       setState({ status: "error", message: "Practice Lab bağlantısı şu anda kullanılamıyor." });
+      return false;
     }
   }, []);
 
@@ -146,5 +154,7 @@ export function PracticeLabPanel() {
     }
   }, [load]);
 
-  return <PracticeLabReadSurface state={state} onRetry={() => void load()} onSelect={(ref) => void select(ref)} onPrepareDraft={(ref) => void prepareDraft(ref)} onMutate={(command) => void mutate(command)} />;
+  return <PracticeLabReadSurface state={state} onRetry={() => void load()} onConnect={load}
+    onSelect={(ref) => void select(ref)} onPrepareDraft={(ref) => void prepareDraft(ref)}
+    onMutate={(command) => void mutate(command)} />;
 }

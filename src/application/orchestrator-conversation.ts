@@ -14,12 +14,13 @@ export type OrchestratorPageGuide = Readonly<{
 
 const PAGE_GUIDES = Object.freeze({
   today: ["Bugün", "Portföy sağlığı, öncelikli uyarılar ve sıradaki operatör kararları.", "src/app/dashboard/operating-dashboard.tsx", "decision ledger / operational events"],
-  campaigns: ["Kampanyalar", "Kampanya yapısı, kanıtlı künye ve creative bağlamını inceleme.", "src/app/dashboard/operating-dashboard.tsx", "Meta read mirror / category assignments"],
+  campaigns: ["Kampanyalar", "Kampanya yapısı, kanıtlı künye, mevcut gönderi ön kontrolü ve operasyon geçmişini aynı bağlamda inceleme.", "src/app/dashboard/operating-dashboard.tsx", "Meta read mirror / category assignments / promotion preflight / operational timeline"],
   analysis: ["Analiz", "Frozen kanıt üzerinden zamansal performans teşhisi ve öneri taslağı.", "src/app/dashboard/operating-dashboard.tsx", "analysis snapshots / findings"],
   "decision-room": ["Karar Odası", "Kanıtlı bulguları ve önerileri tek karar bağlamında değerlendirme.", "src/app/dashboard/decision-room-panel.tsx", "decision room runs / ledger"],
   "practice-lab": ["Pratik Laboratuvarı", "Guidance adaylarını inceleyip bağlayıcı olmayan taslak hazırlama.", "src/app/dashboard/practice-lab-panel.tsx", "advised practice revisions"],
-  budgets: ["Bütçeler", "Bütçe havuzlarını, sınırları ve dağılım önerilerini taslak olarak çalışma.", "src/app/dashboard/budget-lab-panel.tsx", "budget proposal versions / alternatives"],
-  rules: ["Kurallar", "Slice kapsamlı guidance ve custom kural taslağı hazırlama.", "src/app/dashboard/guidance-studio-panel.tsx", "guidance registry / revisions"],
+  budgets: ["Bütçeler", "Bütçe havuzlarını, sınırları ve dağılım önerilerini taslak olarak çalışma.", "src/app/dashboard/budget-lab-panel.tsx", "budget proposal versions / alternatives / pool hierarchy"],
+  rules: ["Kurallar & Yetkiler", "Guidance, normalize kural, strict policy, yetki ve insan kapılı öğrenim zincirini inceleme.", "src/app/dashboard/operating-dashboard.tsx", "guidance / policy / autonomy / advised practice revisions"],
+  settings: ["Ayarlar", "Meta bağlantısı, kategori registry ve promotion şablonu yönetim kaynaklarını inceleme.", "src/app/dashboard/operating-dashboard.tsx", "Meta readiness / category registry / promotion template lifecycle"],
   "strict-policies": ["Strict Policies", "Taslağın policy uygunluğunu inceleme; yayın veya onay yetkisi yoktur.", "src/app/dashboard/instruction-policy-studio-panel.tsx", "instruction policy revisions"],
   categories: ["Kategoriler", "Yerli-yabancı sınırı ve diğer künye boyutlarını kanıtla inceleme.", "src/app/dashboard/category-inventory-panel.tsx", "category registry / assignments"],
   autonomy: ["Otonomi", "İzin sınırlarını ve action uygunluğunu taslak olarak değerlendirme.", "src/app/dashboard/autonomy-studio-panel.tsx", "autonomy rules / action guardrails"],

@@ -6,6 +6,7 @@ import type {
   DeliveryHealthAlertCommand,
   DeliveryHealthChecklistItem,
 } from "@/domain/meta/delivery-health-alert-ledger";
+import { LocalSessionConnector } from "./local-session-connector";
 import dashboardStyles from "./operating-dashboard.module.css";
 import styles from "./delivery-health-alert-panel.module.css";
 
@@ -60,6 +61,7 @@ export type DeliveryHealthAlertList = Readonly<{
 
 export type DeliveryHealthAlertDashboardState =
   | Readonly<{ status: "loading" }>
+  | Readonly<{ status: "session_required"; message: string }>
   | Readonly<{ status: "unavailable" | "error"; message: string }>
   | Readonly<{ status: "ready"; result: DeliveryHealthAlertList; busyAlertRef: string | null;
     error: string | null; notice: string | null }>;
@@ -202,44 +204,50 @@ function AlertCard(props: Readonly<{ item: PublicDeliveryHealthAlert; canManage:
 }
 
 export function DeliveryHealthAlertSurface(props: Readonly<{ state: DeliveryHealthAlertDashboardState; onRetry(): void;
+  embedded?: boolean;
+  onConnect?(): Promise<boolean>;
   onTransition(item: PublicDeliveryHealthAlert, command: DeliveryHealthAlertCommand): void }>) {
   const ready = props.state.status === "ready" ? props.state : null;
+  const Heading = props.embedded ? "h2" : "h1";
   return <>
-    <section className={dashboardStyles.pageHero}><div><span className={dashboardStyles.kicker}>DELIVERY & PAYMENT ALERTS · HUMAN WORKFLOW</span>
-      <h1>Ödeme ve teslimat kesintilerini kanıt seviyesiyle yönetin.</h1><p>Resmî Meta durumu ile performanstan türeyen şüphe ayrı tutulur. Açık alarm önerileri bekletebilir; bu ekran kampanya açıp kapatmaz, bütçe değiştirmez ve Meta’ya yazmaz.</p></div>
+    <section className={`${dashboardStyles.pageHero} ${props.embedded ? dashboardStyles.embeddedHero : ""}`}><div><span className={dashboardStyles.kicker}>DELIVERY & PAYMENT ALERTS · HUMAN WORKFLOW</span>
+      <Heading>Ödeme ve teslimat kesintilerini kanıt seviyesiyle yönetin.</Heading><p>Resmî Meta durumu ile performanstan türeyen şüphe ayrı tutulur. Açık alarm önerileri bekletebilir; bu ekran kampanya açıp kapatmaz, bütçe değiştirmez ve Meta’ya yazmaz.</p></div>
       <span className={dashboardStyles.readOnlyBadge}>WORKFLOW ONLY · AUTHORITY NONE</span></section>
-    <section className={styles.safetyStrip} aria-label="Alarm yetki sınırları"><span>Confirmed ≠ suspected</span><span>İnsan kontrol listesi</span>
-      <span>Öneri bekletme görünür</span><strong>NO META WRITE</strong></section>
     {props.state.status === "loading" ? <section className={styles.statePanel} role="status"><h2>Delivery alarm kayıtları okunuyor</h2><p>Tenant kapsamı ve append-only kayıt bütünlüğü doğrulanıyor.</p></section> : null}
-    {props.state.status === "unavailable" ? <section className={styles.statePanel} role="alert"><strong>Kaynak henüz bağlı değil</strong><h2>{props.state.message}</h2><p>Fixture alarm canlı olay gibi gösterilmez.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></section> : null}
+    {props.state.status === "session_required" ? <section className={styles.statePanel} role="alert"><strong>YEREL OTURUM GEREKLİ</strong><h2>Alarm çalışma alanını bağlayın</h2><p>{props.state.message}</p>{props.onConnect ? <LocalSessionConnector title="Alarm çalışma alanını bağlayın" onVerify={props.onConnect} /> : <button onClick={props.onRetry}>Tekrar dene</button>}</section> : null}
+    {props.state.status === "unavailable" ? <section className={styles.statePanel} role="alert"><strong>Kaynak henüz bağlı değil</strong><h2>{props.state.message}</h2><p>Alarm kayıt defteri yapılandırılana kadar iş akışı açılamaz.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></section> : null}
     {props.state.status === "error" ? <section className={styles.statePanel} role="alert"><strong>Alarm kayıtları okunamadı</strong><h2>{props.state.message}</h2><p>Bozuk veya yetki sınırını aşan yanıtlar kısmen gösterilmez.</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
     {ready?.error ? <p className={styles.feedback} role="alert">{ready.error}</p> : null}
     {ready?.notice ? <p className={styles.feedback} data-tone="good" role="status">{ready.notice}</p> : null}
-    {ready && ready.result.items.length === 0 ? <section className={styles.statePanel}><strong>Kaynak bağlı · açık veya geçmiş alarm yok</strong><h2>Bu çalışma alanında delivery/payment alarm kaydı bulunmuyor.</h2><p>Bu gerçek tenant-bound boş yanıttır; demo fallback değildir.</p></section> : null}
+    {ready && ready.result.items.length === 0 ? <section className={styles.statePanel}><strong>Kaynak bağlı · açık veya geçmiş alarm yok</strong><h2>Bu çalışma alanında delivery/payment alarm kaydı bulunmuyor.</h2><p>Kayıt defteri başarıyla okundu; gösterilebilir alarm bulunamadı.</p></section> : null}
     {ready && ready.result.items.length > 0 ? <section className={styles.alertGrid}>{ready.result.items.map((item) => <AlertCard key={item.alertRef}
       item={item} canManage={ready.result.authority.canManageWorkflow} busy={ready.busyAlertRef === item.alertRef}
       onTransition={props.onTransition} />)}</section> : null}
   </>;
 }
 
-export function DeliveryHealthAlertPanel() {
+export function DeliveryHealthAlertPanel({ embedded = false }: Readonly<{ embedded?: boolean }> = {}) {
   const [state, setState] = useState<DeliveryHealthAlertDashboardState>({ status: "loading" });
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<boolean> => {
     setState({ status: "loading" });
     try {
       const response = await fetch("/api/delivery-health-alerts", { cache: "no-store", credentials: "same-origin",
         headers: { "X-ReklamZeka-Intent": "delivery-health-alert-read" } });
       const payload = await response.json() as unknown;
       if (!response.ok) {
+        const code = record(payload) && record(payload.error) && typeof payload.error.code === "string"
+          ? payload.error.code : null;
         const message = record(payload) && record(payload.error) && typeof payload.error.message === "string"
           ? payload.error.message : "Delivery alarm kaynağı kullanılamıyor.";
-        setState({ status: response.status === 401 || response.status === 503 ? "unavailable" : "error", message });
-        return;
+        setState({ status: response.status === 401 || code === "local_session_required" ? "session_required"
+          : response.status === 503 ? "unavailable" : "error", message });
+        return false;
       }
       const result = parseDeliveryHealthAlertList(payload);
       if (!result) throw new Error("invalid_contract");
       setState({ status: "ready", result, busyAlertRef: null, error: null, notice: null });
-    } catch { setState({ status: "error", message: "Delivery alarm bağlantısı güvenli biçimde okunamadı." }); }
+      return true;
+    } catch { setState({ status: "error", message: "Delivery alarm bağlantısı güvenli biçimde okunamadı." }); return false; }
   }, []);
   useEffect(() => { void load(); }, [load]);
   const transition = useCallback(async (item: PublicDeliveryHealthAlert, command: DeliveryHealthAlertCommand) => {
@@ -254,6 +262,6 @@ export function DeliveryHealthAlertPanel() {
         error: reason instanceof Error ? reason.message : "Alarm iş akışı güncellenemedi.", notice: null } : current);
     }
   }, []);
-  return <DeliveryHealthAlertSurface state={state} onRetry={() => void load()}
+  return <DeliveryHealthAlertSurface state={state} embedded={embedded} onRetry={() => void load()} onConnect={load}
     onTransition={(item, command) => void transition(item, command)} />;
 }
