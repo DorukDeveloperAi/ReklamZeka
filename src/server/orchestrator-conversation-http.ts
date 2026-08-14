@@ -16,13 +16,14 @@ function errorResponse(reason: unknown) {
   }
   const code = reason instanceof OrchestratorConversationError ? reason.code : "invalid_input";
   const status = code === "conversation_unavailable" ? 404
-    : code === "adapter_unavailable" ? 503
+    : code === "adapter_unavailable" || code === "skill_catalog_unavailable" ? 503
       : code === "adapter_timeout" ? 504
         : code === "adapter_failed" || code === "invalid_provider_output" ? 502 : 400;
   const messages: Record<string, string> = {
     invalid_input: "Sohbet isteği geçersiz veya hassas kimlik bilgisi içeriyor.",
     conversation_unavailable: "Bu operatöre ait aktif konuşma bulunamadı.",
     adapter_unavailable: "Yerel Codex CLI kullanılamıyor; manuel Codex aktarımı kullanılabilir.",
+    skill_catalog_unavailable: "Etkin çalışma alanı skill profili veya playbook kanıtı çözümlenemedi; Agent turn'ü çalıştırılmadı.",
     adapter_timeout: "Codex yanıtı zaman aşımına uğradı; mesaj ledger'a başarısız turn olarak kaydedildi.",
     adapter_failed: "Codex çalışması güvenli biçimde tamamlanamadı.",
     invalid_provider_output: "Codex çıktısı güvenli nihai yanıt sözleşmesine uymadı.",

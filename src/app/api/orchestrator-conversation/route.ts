@@ -3,6 +3,8 @@ import { Pool } from "pg";
 import { OrchestratorConversationService } from "@/application/orchestrator-conversation";
 import { DrizzleOrchestratorConversationRepository } from
   "@/connectors/agents/orchestrator-conversation-drizzle-repository";
+import { DrizzleWorkspaceSkillCatalogBindingRepository } from
+  "@/connectors/orchestrator/workspace-skill-catalog-binding-drizzle-repository";
 import * as schema from "@/db/schema";
 import { LocalCodexExecAdapter, localCodexExecConfig } from "@/server/local-codex-exec-adapter";
 import { localDecisionRoomConfig, resolveTrustedLocalSessionIdentity } from
@@ -38,7 +40,8 @@ function handlers() {
       database = drizzle(pool, { schema });
     }
     const repository = new DrizzleOrchestratorConversationRepository(database as never);
-    const service = new OrchestratorConversationService(repository, new LocalCodexExecAdapter(codexConfig));
+    const skillCatalog = new DrizzleWorkspaceSkillCatalogBindingRepository(database as never);
+    const service = new OrchestratorConversationService(repository, new LocalCodexExecAdapter(codexConfig), skillCatalog);
     return createOrchestratorConversationHttpHandlers({ service, config,
       resolveIdentity: (request) => resolveTrustedLocalSessionIdentity({ request,
         database: database!, config, credential: "cookie" }) });

@@ -37,6 +37,7 @@ const opaquePolicyContext = new Set([
   "orchestrator_playbook_revisions.payload",
   "orchestrator_conversation_turns.profile_snapshot",
   "orchestrator_conversation_turns.manifest_snapshots",
+  "orchestrator_conversation_turns.playbook_snapshots",
   "robust_cohort_diagnostic_assets.profile",
   "robust_cohort_diagnostic_assets.member_evidence_refs",
   "robust_cohort_diagnostic_assets.result_payload",

@@ -4,6 +4,9 @@ import { WORKSPACE_TOMBSTONE_PURGE_TABLES } from
   "@/connectors/meta/workspace-tombstone-purge-drizzle-adapter";
 
 const migration = readFileSync("drizzle/20260813123350_majestic_george_stacy.sql", "utf8");
+const catalogBindingMigration = readFileSync("drizzle/20260814140114_regular_steve_rogers.sql", "utf8");
+const catalogBindingHardeningMigration = readFileSync("drizzle/20260814140309_mushy_boomerang.sql", "utf8");
+const repository = readFileSync("src/connectors/agents/orchestrator-conversation-drizzle-repository.ts", "utf8");
 
 describe("Orchestrator conversation ledger migration", () => {
   it("creates conversation/turn/message/tombstone storage with tenant-leftmost indexes", () => {
@@ -29,5 +32,16 @@ describe("Orchestrator conversation ledger migration", () => {
     expect(migration).toContain("orchestrator conversation ledger is append-only");
     expect(migration).toContain("SECURITY INVOKER SET search_path = ''");
     expect(migration).not.toMatch(/security definer/i);
+  });
+
+  it("extends the existing immutable turn ledger without backfilling legacy rows or exposing playbook text", () => {
+    expect(catalogBindingMigration).toContain('ADD COLUMN "playbook_snapshots" jsonb DEFAULT \'[]\'::jsonb NOT NULL');
+    expect(catalogBindingMigration).toContain("'LEGACY_NOT_RECORDED'");
+    expect(catalogBindingMigration).toContain("'UNAVAILABLE_NOT_BOUND'");
+    expect(catalogBindingHardeningMigration).toContain('"(body|content|prompt|token|secret|authorization)"');
+    expect(catalogBindingHardeningMigration).toContain("'skill_catalog_unavailable'");
+    expect(`${catalogBindingMigration}\n${catalogBindingHardeningMigration}`).not.toMatch(/grant\s+.*(?:anon|authenticated)|disable row level security/i);
+    expect(repository).toContain("JSON.stringify(input.skillCatalogSnapshot.playbooks)");
+    expect(repository).not.toContain("skillCatalogBinding");
   });
 });

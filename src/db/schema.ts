@@ -469,6 +469,7 @@ export const orchestratorConversationTurns = pgTable("orchestrator_conversation_
   pageGuide: jsonb("page_guide").$type<Record<string, unknown>>().notNull(),
   profileSnapshot: jsonb("profile_snapshot").$type<Record<string, unknown>>().notNull().default({ version: "legacy_not_recorded" }),
   manifestSnapshots: jsonb("manifest_snapshots").$type<readonly Record<string, unknown>[]>().notNull().default([]),
+  playbookSnapshots: jsonb("playbook_snapshots").$type<readonly Record<string, unknown>[]>().notNull().default([]),
   skillCatalogBindingHash: text("skill_catalog_binding_hash").notNull().default("LEGACY_NOT_RECORDED"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
@@ -494,7 +495,7 @@ export const orchestratorConversationTurns = pgTable("orchestrator_conversation_
   check("orchestrator_conversation_turns_outcome", sql`
     (${table.outcome} = 'completed' and ${table.providerThreadRef} is not null and ${table.failureCode} is null)
     or (${table.outcome} = 'failed' and ${table.failureCode} in
-      ('adapter_unavailable', 'adapter_timeout', 'adapter_failed', 'invalid_provider_output') and ${table.providerThreadRef} is null)
+      ('adapter_unavailable', 'adapter_timeout', 'adapter_failed', 'invalid_provider_output', 'skill_catalog_unavailable') and ${table.providerThreadRef} is null)
   `),
   check("orchestrator_conversation_turns_page_guide", sql`
     jsonb_typeof(${table.pageGuide}) = 'object'
@@ -503,12 +504,15 @@ export const orchestratorConversationTurns = pgTable("orchestrator_conversation_
     and ${table.pageGuide} #>> '{version}' = 'orchestrator-page-guide/1.0.0'
   `),
   check("orchestrator_conversation_turns_skill_catalog_binding", sql`
-    (${table.skillCatalogBindingHash} = 'LEGACY_NOT_RECORDED' and ${table.profileSnapshot} = '{"version":"legacy_not_recorded"}'::jsonb and ${table.manifestSnapshots} = '[]'::jsonb)
+    (${table.skillCatalogBindingHash} = 'LEGACY_NOT_RECORDED' and ${table.profileSnapshot} = '{"version":"legacy_not_recorded"}'::jsonb and ${table.manifestSnapshots} = '[]'::jsonb and ${table.playbookSnapshots} = '[]'::jsonb)
+    or (${table.skillCatalogBindingHash} = 'UNAVAILABLE_NOT_BOUND' and ${table.profileSnapshot} = '{"version":"unavailable_not_bound"}'::jsonb and ${table.manifestSnapshots} = '[]'::jsonb and ${table.playbookSnapshots} = '[]'::jsonb)
     or (${table.skillCatalogBindingHash} ~ '^[a-f0-9]{64}$'
       and jsonb_typeof(${table.profileSnapshot}) = 'object'
       and ${table.profileSnapshot} ?& array['version', 'profileRef', 'revision', 'profileHash']
       and ${table.profileSnapshot} - array['version', 'profileRef', 'revision', 'profileHash'] = '{}'::jsonb
-      and jsonb_typeof(${table.manifestSnapshots}) = 'array' and jsonb_array_length(${table.manifestSnapshots}) between 1 and 9)
+      and jsonb_typeof(${table.manifestSnapshots}) = 'array' and jsonb_array_length(${table.manifestSnapshots}) between 1 and 9
+      and jsonb_typeof(${table.playbookSnapshots}) = 'array' and jsonb_array_length(${table.playbookSnapshots}) between 0 and 12
+      and ${table.playbookSnapshots}::text !~* '"(body|content|prompt|token|secret|authorization)"[[:space:]]*:')
   `),
 ]);
 

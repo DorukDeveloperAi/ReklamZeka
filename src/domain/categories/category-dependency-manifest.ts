@@ -70,6 +70,7 @@ const opaqueCategoryContext = new Set([
   "orchestrator_playbook_revisions.payload",
   "orchestrator_conversation_turns.profile_snapshot",
   "orchestrator_conversation_turns.manifest_snapshots",
+  "orchestrator_conversation_turns.playbook_snapshots",
   // A cohort diagnostic is an immutable replay artifact. Its compatibility
   // profile/member hashes are historical commitments, not mutable archive edges.
   "robust_cohort_diagnostic_assets.profile",
@@ -163,6 +164,7 @@ const columns = [
   "orchestrator_playbook_revisions.payload",
   "orchestrator_conversation_turns.profile_snapshot",
   "orchestrator_conversation_turns.manifest_snapshots",
+  "orchestrator_conversation_turns.playbook_snapshots",
   // Delivery/payment alert records are historical evidence and checklist
   // state, never category or policy selection inputs.
   "delivery_health_alert_ledger_records.checklist_payload",
