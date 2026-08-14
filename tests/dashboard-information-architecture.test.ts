@@ -11,7 +11,7 @@ const budgetPools = readFileSync("src/app/dashboard/budget-pool-hierarchy-panel.
 
 describe("dashboard analysis and decision information architecture", () => {
   it("keeps one production-backed analysis surface and removes the static duplicate", () => {
-    expect(dashboard).toContain('{ id: "decision-room", label: "Analiz & Kararlar"');
+    expect(dashboard).toContain('{ id: "manage", label: "Yönet"');
     expect(dashboard).not.toContain('{ id: "analysis", label: "Analizler"');
     expect(dashboard).not.toContain("const analysisRuns");
     expect(dashboard).not.toContain("4 hesap · 32 kampanya");
@@ -21,25 +21,25 @@ describe("dashboard analysis and decision information architecture", () => {
   });
 
   it("routes the legacy analysis entry point to the canonical Decision Room read model", () => {
-    expect(normalizeDashboardLocation("analysis").view).toBe("decision-room");
+    expect(normalizeDashboardLocation("analysis")).toMatchObject({ view: "manage", manageArea: "decisions", decisionArea: "analysis" });
     expect(dashboard).toContain('componentPath: "src/app/dashboard/decision-room-panel.tsx"');
     expect(dashboard).not.toContain("function renderAnalysis()");
   });
 
-  it("implements the approved seven-purpose primary IA and keeps legacy entries contextual", () => {
-    for (const label of ["Bugün", "Kampanyalar", "Analiz & Kararlar", "Bütçeler", "Onay kuyruğu", "Kurallar & Yetkiler", "Ayarlar"]) {
+  it("implements the approved three-purpose primary IA and keeps legacy entries contextual", () => {
+    for (const label of ["İzle", "Yönet", "Agent"]) {
       expect(dashboard).toContain(`label: "${label}"`);
     }
     for (const legacyNav of ["Strict policies", "İç kategoriler", "Autonomy Studio", "Practice Lab", "Meta bağlantısı", "Orchestrator Agent", "Teslimat alarmları", "Gönderi öne çıkarma", "Timeline"]) {
       expect(dashboard).not.toContain(`label: "${legacyNav}", icon:`);
     }
-    expect(normalizeDashboardLocation("strict-policies")).toMatchObject({ view: "rules", rulesArea: "policies" });
-    expect(normalizeDashboardLocation("autonomy")).toMatchObject({ view: "rules", rulesArea: "authority" });
-    expect(normalizeDashboardLocation("practice-lab")).toMatchObject({ view: "rules", rulesArea: "learning" });
-    expect(normalizeDashboardLocation("categories")).toMatchObject({ view: "settings", settingsArea: "categories" });
-    expect(normalizeDashboardLocation("promotions")).toMatchObject({ view: "campaigns", campaignArea: "promotion" });
-    expect(normalizeDashboardLocation("timeline")).toMatchObject({ view: "campaigns", campaignArea: "timeline" });
-    expect(normalizeDashboardLocation("agent")).toMatchObject({ view: "today", assistantOpen: true });
+    expect(normalizeDashboardLocation("strict-policies")).toMatchObject({ view: "manage", manageArea: "rules", rulesArea: "policies" });
+    expect(normalizeDashboardLocation("autonomy")).toMatchObject({ view: "manage", manageArea: "rules", rulesArea: "authority" });
+    expect(normalizeDashboardLocation("practice-lab")).toMatchObject({ view: "manage", manageArea: "rules", rulesArea: "learning" });
+    expect(normalizeDashboardLocation("categories")).toMatchObject({ view: "manage", manageArea: "settings", settingsArea: "categories" });
+    expect(normalizeDashboardLocation("promotions")).toMatchObject({ view: "manage", manageArea: "portfolio", campaignArea: "promotion" });
+    expect(normalizeDashboardLocation("timeline")).toMatchObject({ view: "manage", manageArea: "portfolio", campaignArea: "timeline" });
+    expect(normalizeDashboardLocation("agent")).toMatchObject({ view: "agent" });
   });
 
   it("keeps session recovery inside each operational context without seeded frontend budgets", () => {

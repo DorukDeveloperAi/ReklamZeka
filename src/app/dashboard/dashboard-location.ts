@@ -1,5 +1,13 @@
-export type DashboardViewId = "today" | "campaigns" | "analysis" | "decision-room" | "practice-lab" | "budgets" | "rules" | "strict-policies" | "categories" | "autonomy" | "agent" | "approvals" | "promotions" | "alerts" | "timeline" | "meta" | "settings";
-export type ViewId = "today" | "campaigns" | "decision-room" | "budgets" | "approvals" | "rules" | "settings";
+export type DashboardViewId =
+  | "monitor" | "manage" | "agent"
+  | "today" | "campaigns" | "analysis" | "decision-room" | "practice-lab" | "budgets"
+  | "rules" | "strict-policies" | "categories" | "autonomy" | "approvals" | "promotions"
+  | "alerts" | "timeline" | "meta" | "settings";
+
+/** Internal IDs remain stable; the UI labels them İzle, Yönet and Agent. */
+export type ViewId = "monitor" | "manage" | "agent";
+export type ManageArea = "portfolio" | "decisions" | "rules" | "settings";
+export type DecisionArea = "analysis" | "budgets" | "approvals";
 export type BudgetArea = "proposals" | "pools";
 export type CampaignArea = "portfolio" | "classification" | "promotion" | "timeline";
 export type RulesArea = "guidance" | "policies" | "authority" | "learning";
@@ -7,11 +15,12 @@ export type SettingsArea = "meta" | "categories" | "promotion-templates";
 
 export type DashboardLocation = Readonly<{
   view: ViewId;
+  manageArea: ManageArea;
+  decisionArea: DecisionArea;
   budgetArea: BudgetArea;
   campaignArea: CampaignArea;
   rulesArea: RulesArea;
   settingsArea: SettingsArea;
-  assistantOpen: boolean;
   /** Public mirror alias only; it is revalidated against frozen context client-side. */
   campaignRef: string | null;
 }>;
@@ -20,20 +29,22 @@ type SearchRecord = Readonly<Record<string, string | readonly string[] | undefin
 type SearchReader = Readonly<{ get(name: string): string | null }>;
 
 const defaultLocation = Object.freeze({
-  view: "today",
+  view: "monitor",
+  manageArea: "portfolio",
+  decisionArea: "analysis",
   budgetArea: "proposals",
   campaignArea: "portfolio",
   rulesArea: "guidance",
   settingsArea: "meta",
-  assistantOpen: false,
   campaignRef: null,
 } satisfies DashboardLocation);
 
 const dashboardViews = new Set<DashboardViewId>([
-  "today", "campaigns", "analysis", "decision-room", "practice-lab", "budgets", "rules",
-  "strict-policies", "categories", "autonomy", "agent", "approvals", "promotions", "alerts",
-  "timeline", "meta", "settings",
+  "monitor", "manage", "agent", "today", "campaigns", "analysis", "decision-room", "practice-lab", "budgets",
+  "rules", "strict-policies", "categories", "autonomy", "approvals", "promotions", "alerts", "timeline", "meta", "settings",
 ]);
+const manageAreas = new Set<ManageArea>(["portfolio", "decisions", "rules", "settings"]);
+const decisionAreas = new Set<DecisionArea>(["analysis", "budgets", "approvals"]);
 const budgetAreas = new Set<BudgetArea>(["proposals", "pools"]);
 const campaignAreas = new Set<CampaignArea>(["portfolio", "classification", "promotion", "timeline"]);
 const rulesAreas = new Set<RulesArea>(["guidance", "policies", "authority", "learning"]);
@@ -46,59 +57,79 @@ function searchValue(search: SearchRecord | SearchReader, name: string): string 
   return typeof value === "string" ? value : Array.isArray(value) && typeof value[0] === "string" ? value[0] : null;
 }
 
-/** Preserve old entry points while exposing only the approved, user-job-led IA. */
+/** Preserve old entry points while exposing only the three approved product areas. */
 export function normalizeDashboardLocation(initialView: DashboardViewId): DashboardLocation {
   const base = { ...defaultLocation };
-  if (initialView === "analysis") return { ...base, view: "decision-room" };
-  if (initialView === "strict-policies") return { ...base, view: "rules", rulesArea: "policies" };
-  if (initialView === "autonomy") return { ...base, view: "rules", rulesArea: "authority" };
-  if (initialView === "practice-lab") return { ...base, view: "rules", rulesArea: "learning" };
-  if (initialView === "categories") return { ...base, view: "settings", settingsArea: "categories" };
-  if (initialView === "meta") return { ...base, view: "settings", settingsArea: "meta" };
-  if (initialView === "promotions") return { ...base, view: "campaigns", campaignArea: "promotion" };
-  if (initialView === "timeline") return { ...base, view: "campaigns", campaignArea: "timeline" };
-  if (initialView === "alerts") return { ...base, view: "today" };
-  if (initialView === "agent") return { ...base, view: "today", assistantOpen: true };
-  if (initialView === "settings") return { ...base, view: "settings" };
-  return { ...base, view: initialView };
+  if (initialView === "monitor" || initialView === "today" || initialView === "alerts") return base;
+  if (initialView === "agent") return { ...base, view: "agent" };
+  if (initialView === "manage") return { ...base, view: "manage" };
+  if (initialView === "campaigns") return { ...base, view: "manage", manageArea: "portfolio" };
+  if (initialView === "promotions") return { ...base, view: "manage", manageArea: "portfolio", campaignArea: "promotion" };
+  if (initialView === "timeline") return { ...base, view: "manage", manageArea: "portfolio", campaignArea: "timeline" };
+  if (initialView === "analysis" || initialView === "decision-room") return { ...base, view: "manage", manageArea: "decisions" };
+  if (initialView === "budgets") return { ...base, view: "manage", manageArea: "decisions", decisionArea: "budgets" };
+  if (initialView === "approvals") return { ...base, view: "manage", manageArea: "decisions", decisionArea: "approvals" };
+  if (initialView === "rules") return { ...base, view: "manage", manageArea: "rules" };
+  if (initialView === "strict-policies") return { ...base, view: "manage", manageArea: "rules", rulesArea: "policies" };
+  if (initialView === "autonomy") return { ...base, view: "manage", manageArea: "rules", rulesArea: "authority" };
+  if (initialView === "practice-lab") return { ...base, view: "manage", manageArea: "rules", rulesArea: "learning" };
+  if (initialView === "categories") return { ...base, view: "manage", manageArea: "settings", settingsArea: "categories" };
+  if (initialView === "meta" || initialView === "settings") return { ...base, view: "manage", manageArea: "settings" };
+  return base;
 }
 
-/** Parse only allowlisted view/area values; malformed or repeated input fails closed to the relevant default. */
+/** Parse only allowlisted view/area values; malformed or repeated input fails closed. */
 export function dashboardLocationFromSearch(search: SearchRecord | SearchReader): DashboardLocation {
   const requestedView = searchValue(search, "view");
-  const view = requestedView && dashboardViews.has(requestedView as DashboardViewId)
-    ? requestedView as DashboardViewId : "today";
-  const normalized = normalizeDashboardLocation(view);
+  const legacyView = requestedView && dashboardViews.has(requestedView as DashboardViewId)
+    ? requestedView as DashboardViewId : "monitor";
+  const normalized = normalizeDashboardLocation(legacyView);
   const area = searchValue(search, "area");
-  const assistantOpen = normalized.assistantOpen || searchValue(search, "assistant") === "1";
+  const tab = searchValue(search, "tab");
   const requestedCampaignRef = searchValue(search, "campaign");
-  const campaignRef = (normalized.view === "decision-room" || normalized.view === "approvals")
+  const isDecisionContext = normalized.manageArea === "decisions" || (legacyView === "manage" && area === "decisions");
+  const campaignRef = normalized.view === "manage" && isDecisionContext
     && requestedCampaignRef !== null && /^ref_[a-f0-9]{12}$/.test(requestedCampaignRef) ? requestedCampaignRef : null;
-  if (normalized.view === "campaigns" && area && campaignAreas.has(area as CampaignArea)) {
-    return { ...normalized, campaignArea: area as CampaignArea, assistantOpen, campaignRef };
+  const location = { ...normalized, campaignRef };
+  if (normalized.view !== "manage") return location;
+  // Legacy links used `area` for the leaf tab. Canonical Manage URLs reserve it
+  // for the approved parent area and use `tab` below.
+  if (legacyView === "campaigns") return { ...location, manageArea: "portfolio",
+    campaignArea: area && campaignAreas.has(area as CampaignArea) ? area as CampaignArea : normalized.campaignArea };
+  if (legacyView === "rules" || legacyView === "strict-policies" || legacyView === "autonomy" || legacyView === "practice-lab") {
+    return { ...location, manageArea: "rules",
+      rulesArea: area && rulesAreas.has(area as RulesArea) ? area as RulesArea : normalized.rulesArea };
   }
-  if (normalized.view === "budgets" && area && budgetAreas.has(area as BudgetArea)) {
-    return { ...normalized, budgetArea: area as BudgetArea, assistantOpen, campaignRef };
-  }
-  if (normalized.view === "rules" && area && rulesAreas.has(area as RulesArea)) {
-    return { ...normalized, rulesArea: area as RulesArea, assistantOpen, campaignRef };
-  }
-  if (normalized.view === "settings" && area && settingsAreas.has(area as SettingsArea)) {
-    return { ...normalized, settingsArea: area as SettingsArea, assistantOpen, campaignRef };
-  }
-  return { ...normalized, assistantOpen, campaignRef };
+  if (legacyView === "budgets") return { ...location, manageArea: "decisions", decisionArea: "budgets",
+    budgetArea: area && budgetAreas.has(area as BudgetArea) ? area as BudgetArea : normalized.budgetArea };
+  if (legacyView === "categories" || legacyView === "meta" || legacyView === "settings") return { ...location, manageArea: "settings",
+    settingsArea: area && settingsAreas.has(area as SettingsArea) ? area as SettingsArea : normalized.settingsArea };
+  const manageArea = area && manageAreas.has(area as ManageArea) ? area as ManageArea : normalized.manageArea;
+  if (manageArea === "portfolio") return { ...location, manageArea,
+    campaignArea: tab && campaignAreas.has(tab as CampaignArea) ? tab as CampaignArea : normalized.campaignArea };
+  if (manageArea === "decisions") return { ...location, manageArea,
+    decisionArea: tab && decisionAreas.has(tab as DecisionArea) ? tab as DecisionArea : normalized.decisionArea,
+    budgetArea: tab === "budgets" && searchValue(search, "detail") && budgetAreas.has(searchValue(search, "detail") as BudgetArea)
+      ? searchValue(search, "detail") as BudgetArea : normalized.budgetArea };
+  if (manageArea === "rules") return { ...location, manageArea,
+    rulesArea: tab && rulesAreas.has(tab as RulesArea) ? tab as RulesArea : normalized.rulesArea };
+  return { ...location, manageArea: "settings",
+    settingsArea: tab && settingsAreas.has(tab as SettingsArea) ? tab as SettingsArea : normalized.settingsArea };
 }
 
-/** Emit the smallest shareable URL while preserving the active subarea and dialog state. */
+/** Emit the smallest shareable URL while preserving the approved subarea. */
 export function dashboardLocationHref(location: DashboardLocation): string {
   const search = new URLSearchParams();
-  if (location.view !== "today") search.set("view", location.view);
-  if (location.view === "campaigns" && location.campaignArea !== "portfolio") search.set("area", location.campaignArea);
-  if (location.view === "budgets" && location.budgetArea !== "proposals") search.set("area", location.budgetArea);
-  if (location.view === "rules" && location.rulesArea !== "guidance") search.set("area", location.rulesArea);
-  if (location.view === "settings" && location.settingsArea !== "meta") search.set("area", location.settingsArea);
-  if (location.assistantOpen) search.set("assistant", "1");
-  if ((location.view === "decision-room" || location.view === "approvals") && location.campaignRef) search.set("campaign", location.campaignRef);
+  if (location.view !== "monitor") search.set("view", location.view);
+  if (location.view === "manage") {
+    if (location.manageArea !== "portfolio") search.set("area", location.manageArea);
+    if (location.manageArea === "portfolio" && location.campaignArea !== "portfolio") search.set("tab", location.campaignArea);
+    if (location.manageArea === "decisions" && location.decisionArea !== "analysis") search.set("tab", location.decisionArea);
+    if (location.manageArea === "decisions" && location.decisionArea === "budgets" && location.budgetArea !== "proposals") search.set("detail", location.budgetArea);
+    if (location.manageArea === "rules" && location.rulesArea !== "guidance") search.set("tab", location.rulesArea);
+    if (location.manageArea === "settings" && location.settingsArea !== "meta") search.set("tab", location.settingsArea);
+    if (location.manageArea === "decisions" && location.campaignRef) search.set("campaign", location.campaignRef);
+  }
   const query = search.toString();
   return query ? `/dashboard?${query}` : "/dashboard";
 }

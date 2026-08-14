@@ -23,8 +23,8 @@ describe("local agent session dashboard", () => {
       freshnessHours: 0, freshnessLabel: "şimdi", currency: "TRY", timezone: "Europe/Istanbul",
       attribution: "7d_click_1d_view",
     } }));
-    expect(html).toContain('aria-expanded="false"');
-    expect(html).toContain("> Asistan</button>");
+    expect(html).toContain(">Agent</strong>");
+    expect(html).not.toContain('role="dialog"');
     expect(html).not.toContain("session bağlı");
     expect(html).not.toContain("Codex CLI bağlı");
   });
@@ -50,6 +50,7 @@ describe("local agent session dashboard", () => {
     expect(task).toContain("budget-lab-panel.tsx");
     expect(task).toContain("STATE.md");
     expect(task).toContain("Meta write yapma");
+    expect(task).toContain("Kural veya policy metni üretme");
     expect(task).toContain("Operatör isteği");
   });
 

@@ -20,7 +20,7 @@ describe("Rules normalization dashboard integration", () => {
     expect(guidance).toBeGreaterThanOrEqual(0);
     expect(normalization).toBe(-1);
     expect(sliceRule).toBe(-1);
-    expect(html).toContain("Rehber → normalizasyon → dilim kuralı");
+    expect(html).toContain("Kullanıcı yazarlı kural ve bağlam kayıtları");
   });
 
   it("keeps the strict policy screen separate from the normalization workbench", () => {

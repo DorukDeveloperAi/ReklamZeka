@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const sources = [
   "src/app/dashboard/operating-dashboard.tsx",
+  "src/app/dashboard/source-state.ts",
   "src/app/dashboard/canonical-campaign-portfolio-panel.tsx",
   "src/app/dashboard/instruction-policy-studio-panel.tsx",
   "src/app/dashboard/practice-lab-panel.tsx",
@@ -31,10 +32,10 @@ describe("dashboard user-facing language", () => {
       "Öğrenim çalışma alanını bağlayın",
       "KANONİK META PORTFÖYÜ",
       "Asistanla aç",
-      "Yalnız taslak",
       "İnsan onaylı",
-      "Yalnız okuma",
-      "Meta değişikliği yok",
+      "Salt-okunur",
+      "Meta’da hiçbir değişiklik yapılamaz.",
+      "kural/policy metni üretmez",
     ]) expect(sources, phrase).toContain(phrase);
   });
 });

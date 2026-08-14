@@ -19,6 +19,7 @@ const required = [
   "tests/dashboard-information-architecture.test.ts",
   "tests/dashboard-approved-information-architecture.test.ts",
   "tests/dashboard-location.test.ts",
+  "tests/source-state.test.ts",
   "tests/dashboard-user-language.test.ts",
   "tests/dashboard-responsive-contract.test.ts",
   "tests/local-autonomy-rule-studio-runtime.test.ts",
@@ -58,18 +59,18 @@ if (failures.length === 0) {
     if (operatingDashboard.includes(fakeAnalysis)) failures.push(`statik Analizler operasyon içeriği kaldı: ${fakeAnalysis}`);
   }
   if (operatingDashboard.includes('{ id: "analysis", label: "Analizler"')) failures.push("statik Analizler görünümü navigasyonda kaldı");
-  if (!operatingDashboard.includes('{ id: "decision-room", label: "Analiz & Kararlar"')) failures.push("birleşik Analiz & Kararlar görünümü eksik");
-  for (const target of ['{ id: "today", label: "Bugün"', '{ id: "campaigns", label: "Kampanyalar"',
-    '{ id: "decision-room", label: "Analiz & Kararlar"', '{ id: "budgets", label: "Bütçeler"',
-    '{ id: "approvals", label: "Onay kuyruğu"', '{ id: "rules", label: "Kurallar & Yetkiler"',
-    '{ id: "settings", label: "Ayarlar"']) {
+  for (const target of ['{ id: "monitor", label: "İzle"', '{ id: "manage", label: "Yönet"', '{ id: "agent", label: "Agent"']) {
     if (!navigationSource.includes(target)) failures.push(`onaylı primary IA hedefi eksik: ${target}`);
   }
   for (const legacyTarget of ['{ id: "strict-policies", label:', '{ id: "categories", label:',
     '{ id: "autonomy", label:', '{ id: "practice-lab", label:', '{ id: "meta", label:',
-    '{ id: "agent", label:', '{ id: "alerts", label:', '{ id: "promotions", label:', '{ id: "timeline", label:']) {
+    '{ id: "alerts", label:', '{ id: "promotions", label:', '{ id: "timeline", label:']) {
     if (navigationSource.includes(legacyTarget)) failures.push(`legacy teknik hedef primary nav'da kaldı: ${legacyTarget}`);
   }
+  for (const boundary of ["Kararlar", "Onay kuyruğu", "Canlı Graph envanteri bu sürümde kapalıdır.", "kural/policy metni üretmez, alanlara kopyalamaz veya kayıt oluşturmaz"]) {
+    if (!operatingDashboard.includes(boundary)) failures.push(`üç alanlı dashboard sınırı eksik: ${boundary}`);
+  }
+  if (operatingDashboard.includes('fetch("/api/meta/inventory"')) failures.push("kapalı Graph capability için canlı envanter çağrısı kaldı");
   for (const legacyDependency of ["dashboardResponse", "fixture-state", "DEMO_METRICS"]) {
     if (dashboardPage.includes(legacyDependency)) failures.push(`dashboard runtime legacy fixture'a bağlı: ${legacyDependency}`);
   }
@@ -135,43 +136,7 @@ if (failures.length === 0) {
     || metaOperationsEvidence.viewports.some((viewport) => !viewport.bodyFits || !viewport.singleH1AllViews || !viewport.oneContextualSessionFormAllViews)
     || metaOperationsEvidence.rapidNavigation.productErrors !== 0 || metaOperationsEvidence.rapidNavigation.productWarnings !== 0
     || metaOperationsEvidence.securityBoundary.agentOrBrowserMintedProof || metaOperationsEvidence.securityBoundary.proofOrStorageInspected) failures.push("Meta/Orchestrator/operasyon browser veya güvenlik kanıtı başarısız");
-  const approvedIaEvidence = JSON.parse(readFileSync(resolve(root, "docs/qa/2026-08-14-dashboard-approved-ia-browser-evidence.json"), "utf8"));
-  if (approvedIaEvidence.primaryNavigation.after !== 7 || approvedIaEvidence.primaryNavigation.labels.length !== 7
-    || approvedIaEvidence.primaryNavigation.legacyTechnicalDestinationsVisible
-    || !approvedIaEvidence.desktop.bodyFits || !approvedIaEvidence.desktop.singleH1AllInspectedAreas
-    || approvedIaEvidence.desktop.visibleDemoOrFixtureCopy || approvedIaEvidence.desktop.todayDuplicateSessionRecovery
-    || approvedIaEvidence.campaignAreas.some((area) => !area.singleH1 || area.contextualSessionForms !== 1)
-    || approvedIaEvidence.mergedAreas.some((area) => !area.singleH1)
-    || approvedIaEvidence.assistant.primaryNavigationDestination || !approvedIaEvidence.assistant.ariaModal
-    || !approvedIaEvidence.assistant.focusMovesToClose || !approvedIaEvidence.assistant.escapeCloses
-    || !approvedIaEvidence.assistant.focusReturnsToTrigger || approvedIaEvidence.assistant.pageH1CountWhileOpen !== 1) {
-    failures.push("onaylı A bilgi mimarisi desktop/etkileşim kanıtı başarısız");
-  }
-  const shellRoutingEvidence = JSON.parse(readFileSync(resolve(root, "docs/qa/2026-08-14-dashboard-shell-routing-browser-evidence.json"), "utf8"));
   const operatorAcceptance = readFileSync(resolve(root, "docs/qa/2026-08-14-dashboard-persisted-campaign-operator-acceptance.md"), "utf8");
-  if (shellRoutingEvidence.primaryNavigation.visibleTargetCount !== 7
-    || !shellRoutingEvidence.primaryNavigation.activeDestinationUsesAriaCurrent
-    || !shellRoutingEvidence.routing.browserBackRestoredCampaignPromotion
-    || !shellRoutingEvidence.routing.browserForwardRestoredRulesGuidance
-    || !shellRoutingEvidence.routing.browserForwardRestoredStrictPolicies
-    || !shellRoutingEvidence.routing.restoredActiveSubareaUsesAriaCurrent
-    || shellRoutingEvidence.deepLinks.legacyCanonicalResult !== "/dashboard?view=rules&area=policies"
-    || shellRoutingEvidence.deepLinks.invalidCanonicalResult !== "/dashboard"
-    || !shellRoutingEvidence.assistant.ariaModal || !shellRoutingEvidence.assistant.escapeClosedDialog
-    || !shellRoutingEvidence.assistant.escapeRemovedAssistantQuery || !shellRoutingEvidence.assistant.focusReturnedToTrigger
-    || shellRoutingEvidence.console.productErrors !== 0 || shellRoutingEvidence.console.productWarnings !== 0
-    || shellRoutingEvidence.securityBoundary.agentOrBrowserMintedLocalSessionProof
-    || shellRoutingEvidence.securityBoundary.browserStorageInspected || shellRoutingEvidence.securityBoundary.cookiesInspected
-    || shellRoutingEvidence.securityBoundary.mutationAttempted) failures.push("global shell URL/history/focus browser kanıtı başarısız");
-  if (shellRoutingEvidence.responsive?.viewport !== "390x844"
-    || !shellRoutingEvidence.responsive.mobileNavigationVisible
-    || !shellRoutingEvidence.responsive.campaignContextRecoveryVisible
-    || shellRoutingEvidence.responsive.documentHorizontalOverflow
-    || shellRoutingEvidence.campaignContextRecovery?.withoutSessionShows !== "Kampanya bağlamı için yerel oturum gerekli"
-    || shellRoutingEvidence.campaignContextRecovery.generalDecisionRecordsMounted
-    || !shellRoutingEvidence.campaignContextRecovery.clearContextRemovesCampaignQuery
-    || shellRoutingEvidence.campaignContextRecovery.clearedUrl !== "/dashboard?view=decision-room"
-    || shellRoutingEvidence.campaignContextRecovery.operatorSessionProofMinted) failures.push("campaign deep-link recovery/mobile browser kanıtı başarısız");
   for (const expected of ["Status: `PENDING_OPERATOR_PROOF`", "Kararlarda incele", "Tüm çalışma alanına dön", "PASS_OPERATOR_PROOF", "Meta write veya execute çalıştırılmadığı"]) {
     if (!operatorAcceptance.includes(expected)) failures.push(`operator campaign kabul paketi eksik: ${expected}`);
   }
@@ -182,4 +147,4 @@ if (failures.length > 0) {
   failures.forEach((failure) => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log("EXPERIENCE PASS — onaylı 7-hedef IA, desktop/mobile etkileşim ve global shell URL/history/focus/campaign-recovery kanıtı bağlı");
+console.log("EXPERIENCE PASS — üç alanlı IA, kaynak sınırları ve mevcut session/campaign güvenlik kanıtları bağlı");
