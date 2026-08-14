@@ -201,9 +201,11 @@ function ApprovalQueueDetail({ item, loading, decision, detailHeadingRef }: Read
   </section>;
 }
 
-export function ApprovalQueuePanel({ campaignRef = null, campaignLabel = null, onClearCampaignContext, campaignContextPending = false }: Readonly<{
+export function ApprovalQueuePanel({ campaignRef = null, campaignLabel = null, selectedUnitRef = null, onClearCampaignContext, campaignContextPending = false }: Readonly<{
   campaignRef?: string | null;
   campaignLabel?: string | null;
+  /** An allowlisted DashboardLocation handoff; it is always re-read from the tenant-bound queue. */
+  selectedUnitRef?: string | null;
   onClearCampaignContext?: () => void;
   campaignContextPending?: boolean;
 }>) {
@@ -217,6 +219,7 @@ export function ApprovalQueuePanel({ campaignRef = null, campaignLabel = null, o
   const detailRequestEpoch = useRef(0);
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
   const focusDetailAfterSelectionRef = useRef(false);
+  const consumedSelectedUnitRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!focusDetailAfterSelectionRef.current || state.status !== "ready" || !state.selected || state.detailLoading) return;
@@ -230,6 +233,7 @@ export function ApprovalQueuePanel({ campaignRef = null, campaignLabel = null, o
     // A list refresh/context change makes every previously selected detail and
     // its confirmation state ineligible for display or a follow-up decision.
     detailRequestEpoch.current += 1;
+    consumedSelectedUnitRef.current = null;
     setDecisionConfirmed(false);
     setDecisionError(null);
     setDecisionNotice(null);
@@ -283,6 +287,24 @@ export function ApprovalQueuePanel({ campaignRef = null, campaignLabel = null, o
       if (mounted.current && detailRequestEpoch.current === requestEpoch) setState({ status: "error", message: "Eylem satırı güvenli biçimde okunamadı." });
     }
   }, [campaignRef]);
+
+  useEffect(() => {
+    if (selectedUnitRef === null) {
+      consumedSelectedUnitRef.current = null;
+      return;
+    }
+    if (state.status !== "ready" || consumedSelectedUnitRef.current === selectedUnitRef) return;
+    const summary = state.result.items.find((item) => item.unitRef === selectedUnitRef);
+    // The queue list is already tenant-scoped and (when present) campaign
+    // scoped. Do not issue an unbound detail lookup when the routed alias is
+    // absent from that verified list.
+    consumedSelectedUnitRef.current = selectedUnitRef;
+    if (!summary) {
+      setState({ status: "error", message: "İstenen onay kaydı seçili çalışma alanı veya kampanya kapsamında bulunamadı." });
+      return;
+    }
+    void select(summary);
+  }, [selectedUnitRef, select, state]);
 
   const decide = useCallback(async (kind: DecisionKind) => {
     if (state.status !== "ready" || !state.selected || state.selected.status !== "awaiting_approval"

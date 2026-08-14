@@ -7,6 +7,7 @@ import type { MetaBootstrapPreflight } from "@/connectors/meta/bootstrap-preflig
 import type { PublicSource } from "@/domain/source/public-source";
 import { DecisionRoomPanel } from "./decision-room-panel";
 import { BudgetLabPanel } from "./budget-lab-panel";
+import { BudgetPoolHierarchyPanel } from "./budget-pool-hierarchy-panel";
 import { PracticeLabPanel } from "./practice-lab-panel";
 import { ApprovalQueuePanel } from "./approval-queue-panel";
 import { PromotionPreflightPanel, PromotionTemplateAuthoringPanel } from "./promotion-preflight-panel";
@@ -27,6 +28,8 @@ import { campaignContextBridge } from "./campaign-planning-brief-panel";
 import { LocalSessionConnector } from "./local-session-connector";
 import { SkillCatalogContextStrip, type SkillCatalogContext } from "./skill-catalog-context-strip";
 import { SkillCatalogPanel } from "./skill-catalog-panel";
+import { OrchestratorTurnReadOnlyEvidence, OrchestratorTurnSkillRunEvidence, type OrchestratorReadOnlyEvidenceSummary,
+  type OrchestratorSkillRunSummary } from "./orchestrator-turn-evidence";
 import {
   dashboardLocationFromSearch,
   dashboardLocationHref,
@@ -93,6 +96,8 @@ type OrchestratorTurnEvidenceSummary = Readonly<{
   historicalSourceState: "available" | "detail_not_recorded" | "not_applicable";
   evidenceScope: "page_guidance_and_verified_workspace_playbooks";
   uncertainty: "agent_inference_no_meta_or_action_authority";
+  readOnlyEvidence: OrchestratorReadOnlyEvidenceSummary;
+  skillRun: OrchestratorSkillRunSummary;
 }>;
 type PersistedCampaignContextSummary = Readonly<{ campaignRef: string; label: string; objective: string | null; capturedAt: string; sourceState: "frozen_valid" }>;
 type PortfolioCapabilitySummary = Readonly<{
@@ -141,7 +146,7 @@ function safeHistoricalSourceUrl(value: unknown): value is string {
 }
 
 function orchestratorEvidenceFromResponse(value: unknown): OrchestratorTurnEvidenceSummary | null {
-  if (!plainRecord(value) || !onlyKeys(value, ["state", "pageGuide", "profileLabel", "skills", "playbooks", "historicalSourceState", "evidenceScope", "uncertainty"])
+  if (!plainRecord(value) || !onlyKeys(value, ["state", "pageGuide", "profileLabel", "skills", "playbooks", "historicalSourceState", "evidenceScope", "uncertainty", "readOnlyEvidence", "skillRun"])
     || !["bound", "legacy_not_recorded", "unavailable_not_bound", "missing_or_invalid"].includes(value.state as string)
     || !["available", "detail_not_recorded", "not_applicable"].includes(value.historicalSourceState as string)
     || value.evidenceScope !== "page_guidance_and_verified_workspace_playbooks"
@@ -168,6 +173,61 @@ function orchestratorEvidenceFromResponse(value: unknown): OrchestratorTurnEvide
       type: source.type as string, url: source.url as string | null, freshness: source.freshness as "fresh" | "stale" | "not_scheduled" }) });
   });
   if (skills.some((skill) => skill === null) || playbooks.some((playbook) => playbook === null)) return null;
+  const readOnly = value.readOnlyEvidence;
+  if (!plainRecord(readOnly) || !onlyKeys(readOnly, ["state", "performance", "timeline"])
+    || !["bound", "legacy_not_recorded", "unavailable_not_bound", "missing_or_invalid"].includes(readOnly.state as string)) return null;
+  const performance = readOnly.performance;
+  const timeline = readOnly.timeline;
+  const performanceValid = performance === null || plainRecord(performance)
+    && onlyKeys(performance, ["state", "accountCount", "campaignCount"])
+    && ["ready", "partial", "unavailable"].includes(performance.state as string)
+    && Number.isSafeInteger(performance.accountCount) && Number.isSafeInteger(performance.campaignCount)
+    && (performance.accountCount as number) >= 0 && (performance.accountCount as number) <= 100
+    && (performance.campaignCount as number) >= 0 && (performance.campaignCount as number) <= 200_000;
+  const timelineValid = timeline === null || plainRecord(timeline)
+    && onlyKeys(timeline, ["state", "eventCount", "latestOccurredAt"])
+    && ["ready", "unavailable"].includes(timeline.state as string)
+    && Number.isSafeInteger(timeline.eventCount) && (timeline.eventCount as number) >= 0 && (timeline.eventCount as number) <= 12
+    && (timeline.latestOccurredAt === null || typeof timeline.latestOccurredAt === "string" && isoText(timeline.latestOccurredAt));
+  if (!performanceValid || !timelineValid
+    || (readOnly.state === "bound" && (performance === null || timeline === null))
+    || (readOnly.state !== "bound" && (performance !== null || timeline !== null))) return null;
+  const readOnlyEvidence = Object.freeze({ state: readOnly.state as OrchestratorReadOnlyEvidenceSummary["state"],
+    performance: performance === null ? null : Object.freeze({ state: performance.state as "ready" | "partial" | "unavailable",
+      accountCount: performance.accountCount as number, campaignCount: performance.campaignCount as number }),
+    timeline: timeline === null ? null : Object.freeze({ state: timeline.state as "ready" | "unavailable",
+      eventCount: timeline.eventCount as number, latestOccurredAt: timeline.latestOccurredAt as string | null }) });
+  const skillRun = value.skillRun;
+  if (!plainRecord(skillRun) || !onlyKeys(skillRun, ["state", "receipt"])
+    || !["bound", "legacy_not_recorded", "unavailable_not_bound", "missing_or_invalid"].includes(skillRun.state as string)) return null;
+  const receipt = skillRun.receipt;
+  const closedAuthorityKeys = ["canPersist", "canCreateRule", "canDraftPolicy", "canAlterScope", "canPublish", "canApprove", "canExecute", "canWriteMeta"];
+  const receiptRecord = plainRecord(receipt) ? receipt : null;
+  const selectedSkillRows = receiptRecord && Array.isArray(receiptRecord.selectedSkills) ? receiptRecord.selectedSkills : null;
+  const authorityRecord = receiptRecord && plainRecord(receiptRecord.authority) ? receiptRecord.authority : null;
+  const receiptValid = receipt === null || receiptRecord !== null && onlyKeys(receiptRecord, ["receiptRef", "receiptHash", "intent", "selectedSkills", "evidenceAvailability", "outputContract", "authority"])
+    && /^skillrun_[a-f0-9]{32}$/.test(receiptRecord.receiptRef as string) && /^[a-f0-9]{64}$/.test(receiptRecord.receiptHash as string)
+    && ["read", "explain", "compare", "question"].includes(receiptRecord.intent as string)
+    && ["available", "partial", "unavailable"].includes(receiptRecord.evidenceAvailability as string)
+    && receiptRecord.outputContract === "evidence-integrity-facts/1.0.0" && selectedSkillRows !== null
+    && selectedSkillRows.length >= 1 && selectedSkillRows.length <= 3 && authorityRecord !== null
+    && onlyKeys(authorityRecord, closedAuthorityKeys) && closedAuthorityKeys.every((key) => authorityRecord[key] === false)
+    && selectedSkillRows.every((skill) => plainRecord(skill) && onlyKeys(skill, ["name", "version", "outputContract"])
+      && safeSkillName(skill.name) && typeof skill.version === "string" && /^\d+\.\d+\.\d+$/.test(skill.version)
+      && typeof skill.outputContract === "string" && /^[a-z][a-z0-9-]{1,80}$/.test(skill.outputContract));
+  if (!receiptValid || (skillRun.state === "bound" && receipt === null) || (skillRun.state !== "bound" && receipt !== null)) return null;
+  const skillRunEvidence = Object.freeze({ state: skillRun.state as OrchestratorSkillRunSummary["state"], receipt: receipt === null ? null : Object.freeze({
+    receiptRef: receiptRecord!.receiptRef as string, receiptHash: receiptRecord!.receiptHash as string,
+    intent: receiptRecord!.intent as "read" | "explain" | "compare" | "question",
+    selectedSkills: Object.freeze(selectedSkillRows!.map((skill) => {
+      const item = skill as Record<string, unknown>;
+      return Object.freeze({ name: item.name as string, version: item.version as string, outputContract: item.outputContract as string });
+    })),
+    evidenceAvailability: receiptRecord!.evidenceAvailability as "available" | "partial" | "unavailable",
+    outputContract: "evidence-integrity-facts/1.0.0" as const,
+    authority: Object.freeze({ canPersist: false as const, canCreateRule: false as const, canDraftPolicy: false as const,
+      canAlterScope: false as const, canPublish: false as const, canApprove: false as const, canExecute: false as const,
+      canWriteMeta: false as const }) }) });
   const acceptedPlaybooks = playbooks.filter((playbook): playbook is NonNullable<typeof playbook> => playbook !== null);
   const state = value.state as OrchestratorTurnEvidenceSummary["state"];
   if (state === "bound" && (!guide || value.profileLabel === null)) return null;
@@ -180,7 +240,7 @@ function orchestratorEvidenceFromResponse(value: unknown): OrchestratorTurnEvide
   skills: Object.freeze(skills as OrchestratorTurnEvidenceSummary["skills"]),
   playbooks: Object.freeze(acceptedPlaybooks),
   historicalSourceState: value.historicalSourceState as OrchestratorTurnEvidenceSummary["historicalSourceState"],
-  evidenceScope: "page_guidance_and_verified_workspace_playbooks", uncertainty: "agent_inference_no_meta_or_action_authority" });
+  evidenceScope: "page_guidance_and_verified_workspace_playbooks", uncertainty: "agent_inference_no_meta_or_action_authority", readOnlyEvidence, skillRun: skillRunEvidence });
 }
 
 /** Fails closed before a read-only conversation payload reaches the Agent UI. */
@@ -598,6 +658,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
   const contentRef = useRef<HTMLElement>(null);
   const lastContentFocusKeyRef = useRef("");
   const [requestedCampaignRef, setRequestedCampaignRef] = useState<string | null>(initialLocationRef.current.campaignRef);
+  const [requestedApprovalUnitRef, setRequestedApprovalUnitRef] = useState<string | null>(initialLocationRef.current.approvalUnitRef);
   const requestedCampaignRefRef = useRef<string | null>(initialLocationRef.current.campaignRef);
   const campaignContextRequestRef = useRef(0);
   const [requestedCampaignLabel, setRequestedCampaignLabel] = useState("Seçili kampanya");
@@ -648,9 +709,10 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
 
   const dashboardLocation = useMemo<DashboardLocation>(() => ({ view: activeView, manageArea, decisionArea,
     budgetArea, campaignArea, rulesArea, settingsArea,
-    campaignRef: activeView === "manage" && manageArea === "decisions" ? requestedCampaignRef : null }),
-  [activeView, budgetArea, campaignArea, decisionArea, manageArea, requestedCampaignRef, rulesArea, settingsArea]);
-  const contentFocusKey = `${activeView}:${manageArea}:${decisionArea}:${budgetArea}:${campaignArea}:${rulesArea}:${settingsArea}:${requestedCampaignRef ?? ""}`;
+    campaignRef: activeView === "manage" && manageArea === "decisions" ? requestedCampaignRef : null,
+    approvalUnitRef: activeView === "manage" && manageArea === "decisions" && decisionArea === "approvals" ? requestedApprovalUnitRef : null }),
+  [activeView, budgetArea, campaignArea, decisionArea, manageArea, requestedApprovalUnitRef, requestedCampaignRef, rulesArea, settingsArea]);
+  const contentFocusKey = `${activeView}:${manageArea}:${decisionArea}:${budgetArea}:${campaignArea}:${rulesArea}:${settingsArea}:${requestedCampaignRef ?? ""}:${requestedApprovalUnitRef ?? ""}`;
   const applyDashboardLocation = useCallback((location: DashboardLocation) => {
     setActiveView(location.view);
     setManageArea(location.manageArea);
@@ -659,6 +721,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     setCampaignArea(location.campaignArea);
     setRulesArea(location.rulesArea);
     setSettingsArea(location.settingsArea);
+    setRequestedApprovalUnitRef(location.approvalUnitRef);
     const campaignChanged = requestedCampaignRefRef.current !== location.campaignRef;
     if (campaignChanged) {
       // Any response for the previous opaque alias is no longer allowed to
@@ -1118,6 +1181,8 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
               <summary>Kanıt ayrıntısı</summary>
               <p><strong>Kanıt kapsamı:</strong> Sayfa yönlendirmesi + doğrulanmış workspace playbookları</p>
               <p><strong>Belirsizlik:</strong> Agent çıkarımıdır; Meta/action yetkisi yok.</p>
+              <OrchestratorTurnReadOnlyEvidence evidence={message.evidence.readOnlyEvidence} />
+              <OrchestratorTurnSkillRunEvidence evidence={message.evidence.skillRun} />
               {message.evidence.state === "bound" && message.evidence.pageGuide ? <>
                 <dl><div><dt>Sayfa amacı</dt><dd>{message.evidence.pageGuide.purpose}</dd></div><div><dt>Kayıt kapsamı</dt><dd>{message.evidence.pageGuide.scope}</dd></div><div><dt>Skill profili</dt><dd>{message.evidence.profileLabel}</dd></div></dl>
                 <div className={styles.turnEvidenceSkills}><strong>Çekirdek skill’ler</strong><ul>{message.evidence.skills.map((skill) => <li key={`${skill.name}-${skill.version}`}>{skill.name} · {skill.version}</li>)}</ul></div>
@@ -1302,9 +1367,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
   }
 
   function renderBudgets() {
-    if (budgetArea === "pools") return <section className={styles.panel} aria-label="Bütçe havuzları">
-      <span className={styles.kicker}>İLERİ KONTROLLER</span><h2>Bütçe havuzları Faz 1’de gizlidir.</h2><p>Havuz hiyerarşisi Faz 6’da karar kanıtı olarak görünür; bu ekrandan taslak, onay veya Meta değişikliği yapılamaz.</p>
-    </section>;
+    if (budgetArea === "pools") return <BudgetPoolHierarchyPanel />;
     return <BudgetLabPanel />;
   }
 
@@ -1317,7 +1380,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
         { id: "learning", label: "Öğrenim", description: "İnsan onaylı yaklaşımlar" },
       ]} />
       {rulesArea === "guidance" ? <><GuidanceStudioPanel onSessionRequiredChange={setRulesSessionRequired} />
-        {rulesSessionRequired === false ? <><SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /><SliceRuleWorkspacePanel /></> : null}</>
+        {rulesSessionRequired === false ? <><SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /><SliceRuleWorkspacePanel onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} /></> : null}</>
         : rulesArea === "policies" ? <InstructionPolicyStudioPanel />
           : rulesArea === "authority" ? <AutonomyStudioPanel />
             : <PracticeLabPanel />}
@@ -1362,14 +1425,14 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
       ]} />
       {manageArea === "portfolio" ? renderCampaigns()
         : manageArea === "decisions" ? <>
-          <SectionNav<DecisionArea> label="Karar alanları" active={decisionArea} onChange={(area) => commitDashboardLocation({ ...dashboardLocation, decisionArea: area })} items={[
+          <SectionNav<DecisionArea> label="Karar alanları" active={decisionArea} onChange={(area) => commitDashboardLocation({ ...dashboardLocation, decisionArea: area, approvalUnitRef: null })} items={[
             { id: "analysis", label: "Analiz", description: "Kanıt ve sonuçlar" },
             { id: "budgets", label: "Bütçe", description: "Öneriler ve sınırlar" },
             { id: "approvals", label: "Onay kuyruğu", description: "İnsan kararları" },
           ]} />
           {decisionArea === "analysis" ? !campaignContextReady ? renderCampaignContextRecovery() : <DecisionRoomPanel campaignContext={campaignDecisionContext ? { label: campaignDecisionContext.label, campaignRef: campaignDecisionContext.decisionRoomCampaignRef } : null} campaignContextPending={!campaignContextReady} onClearCampaignContext={clearCampaignDecisionContext} />
             : decisionArea === "budgets" ? renderBudgets()
-              : !campaignContextReady ? renderCampaignContextRecovery() : <ApprovalQueuePanel campaignRef={approvalQueueCampaignRef} campaignLabel={campaignDecisionContext?.label ?? null} campaignContextPending={!campaignContextReady} onClearCampaignContext={campaignDecisionContext ? clearCampaignDecisionContext : undefined} />}
+              : !campaignContextReady ? renderCampaignContextRecovery() : <ApprovalQueuePanel campaignRef={approvalQueueCampaignRef} campaignLabel={campaignDecisionContext?.label ?? null} selectedUnitRef={dashboardLocation.approvalUnitRef} campaignContextPending={!campaignContextReady} onClearCampaignContext={campaignDecisionContext ? clearCampaignDecisionContext : undefined} />}
         </> : manageArea === "rules" ? renderRules() : renderSettings()}
     </>;
   }

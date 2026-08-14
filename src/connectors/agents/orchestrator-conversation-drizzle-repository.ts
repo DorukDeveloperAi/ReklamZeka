@@ -10,6 +10,8 @@ import {
 } from "@/application/orchestrator-conversation";
 import { CORE_SKILL_MANIFESTS, coreSkillManifest, SKILL_CATALOG_VERSION } from "@/domain/orchestrator/skill-catalog";
 import { isOfficialGuidanceSourceUrl } from "@/domain/guidance/registry";
+import { orchestratorReadOnlyEvidenceContextHash } from "@/application/orchestrator-readonly-evidence-context";
+import { parseOrchestratorSkillRunReceipt } from "@/application/orchestrator-skill-run";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -19,7 +21,9 @@ type ConversationDatabase = Pick<Database, "execute" | "transaction">;
 type ConversationRow = Readonly<{ conversation_ref: string; created_at: Date | string }>;
 type TurnRow = Readonly<{ provider_thread_ref: string | null; page_guide: unknown }>;
 type EvidenceTurnRow = Readonly<{ turn_ref: string; page_guide: unknown; profile_snapshot: unknown;
-  manifest_snapshots: unknown; playbook_snapshots: unknown; skill_catalog_binding_hash: unknown }>;
+  manifest_snapshots: unknown; playbook_snapshots: unknown; skill_catalog_binding_hash: unknown;
+  evidence_context_snapshot?: unknown; evidence_context_hash?: unknown;
+  skill_run_snapshot?: unknown; skill_run_hash?: unknown }>;
 type MessageRow = Readonly<{ message_ref: string; turn_ref: string; message_number: number;
   role: string; content: string; created_at: Date | string }>;
 
@@ -74,7 +78,69 @@ function exact(value: unknown, keys: readonly string[]): value is Record<string,
 
 function unavailableEvidence(state: Exclude<OrchestratorTurnEvidence["state"], "bound">): OrchestratorTurnEvidence {
   return Object.freeze({ state, pageGuide: null, profileLabel: null, skills: Object.freeze([]), playbooks: Object.freeze([]),
-    historicalSourceState: "not_applicable", evidenceScope: EVIDENCE_SCOPE, uncertainty: UNCERTAINTY });
+    historicalSourceState: "not_applicable", evidenceScope: EVIDENCE_SCOPE, uncertainty: UNCERTAINTY,
+    readOnlyEvidence: Object.freeze({ state: "missing_or_invalid", performance: null, timeline: null }),
+    skillRun: Object.freeze({ state: "missing_or_invalid", receipt: null }) });
+}
+
+function readOnlyEvidence(snapshot: unknown, hash: unknown): OrchestratorTurnEvidence["readOnlyEvidence"] {
+  if (snapshot === undefined && hash === undefined) return Object.freeze({ state: "legacy_not_recorded", performance: null, timeline: null });
+  if (typeof hash !== "string") throw new Error("invalid_evidence_context");
+  if (exact(snapshot, ["version"]) && snapshot.version === "legacy_not_recorded" && hash === "LEGACY_NOT_RECORDED") {
+    return Object.freeze({ state: "legacy_not_recorded", performance: null, timeline: null });
+  }
+  if (exact(snapshot, ["version"]) && snapshot.version === "unavailable_not_bound" && hash === "UNAVAILABLE_NOT_BOUND") {
+    return Object.freeze({ state: "unavailable_not_bound", performance: null, timeline: null });
+  }
+  if (!exact(snapshot, ["version", "performance", "timeline"]) || snapshot.version !== "orchestrator-readonly-evidence-context/1.0.0"
+    || !HASH.test(hash) || orchestratorReadOnlyEvidenceContextHash(snapshot as never) !== hash
+    || !exact(snapshot.performance, ["state", "accountCount", "campaignCount", "windows"])
+    || !["ready", "partial", "unavailable"].includes(snapshot.performance.state as string)
+    || !Number.isSafeInteger(snapshot.performance.accountCount) || !Number.isSafeInteger(snapshot.performance.campaignCount)
+    || (snapshot.performance.accountCount as number) < 0 || (snapshot.performance.accountCount as number) > 100
+    || (snapshot.performance.campaignCount as number) < 0 || (snapshot.performance.campaignCount as number) > 200_000
+    || !Array.isArray(snapshot.performance.windows) || snapshot.performance.windows.length !== 2
+    || !exact(snapshot.timeline, ["state", "eventCount", "latestOccurredAt", "kinds"])
+    || !["ready", "unavailable"].includes(snapshot.timeline.state as string)
+    || !Number.isSafeInteger(snapshot.timeline.eventCount) || (snapshot.timeline.eventCount as number) < 0 || (snapshot.timeline.eventCount as number) > 12
+    || !(snapshot.timeline.latestOccurredAt === null || typeof snapshot.timeline.latestOccurredAt === "string" && Number.isFinite(Date.parse(snapshot.timeline.latestOccurredAt)))
+    || !Array.isArray(snapshot.timeline.kinds) || snapshot.timeline.kinds.length > 8) throw new Error("invalid_evidence_context");
+  const windows = snapshot.performance.windows.map((window) => {
+    if (!exact(window, ["days", "readyCount", "partialCount", "unavailableCount", "latestFreshnessAt"])
+      || (window.days !== 7 && window.days !== 30) || !Number.isSafeInteger(window.readyCount) || !Number.isSafeInteger(window.partialCount)
+      || !Number.isSafeInteger(window.unavailableCount) || (window.readyCount as number) < 0 || (window.partialCount as number) < 0
+      || (window.unavailableCount as number) < 0 || !(window.latestFreshnessAt === null || typeof window.latestFreshnessAt === "string"
+        && Number.isFinite(Date.parse(window.latestFreshnessAt)))) throw new Error("invalid_evidence_context");
+    return window;
+  });
+  if (new Set(windows.map((window) => window.days)).size !== 2) throw new Error("invalid_evidence_context");
+  const kinds = snapshot.timeline.kinds.map((item) => {
+    if (!exact(item, ["kind", "count"]) || typeof item.kind !== "string" || !["slice_rule_draft", "budget_proposal", "budget_selection", "action_preparation", "delivery_alert", "approval_proposed", "approval_decision", "temporal_evaluation"].includes(item.kind)
+      || !Number.isSafeInteger(item.count) || (item.count as number) < 1 || (item.count as number) > 12) throw new Error("invalid_evidence_context");
+    return item;
+  });
+  if (new Set(kinds.map((item) => item.kind)).size !== kinds.length) throw new Error("invalid_evidence_context");
+  if (kinds.reduce((total, item) => total + (item.count as number), 0) !== snapshot.timeline.eventCount) throw new Error("invalid_evidence_context");
+  return Object.freeze({ state: "bound", performance: Object.freeze({ state: snapshot.performance.state as "ready" | "partial" | "unavailable",
+    accountCount: snapshot.performance.accountCount as number, campaignCount: snapshot.performance.campaignCount as number }),
+  timeline: Object.freeze({ state: snapshot.timeline.state as "ready" | "unavailable", eventCount: snapshot.timeline.eventCount as number,
+    latestOccurredAt: snapshot.timeline.latestOccurredAt as string | null }) });
+}
+
+function skillRunEvidence(snapshot: unknown, hash: unknown, evidenceContextHash: unknown): OrchestratorTurnEvidence["skillRun"] {
+  if (snapshot === undefined && hash === undefined) return Object.freeze({ state: "legacy_not_recorded", receipt: null });
+  if (exact(snapshot, ["version"]) && snapshot.version === "unavailable_not_bound" && hash === "UNAVAILABLE_NOT_BOUND") {
+    return Object.freeze({ state: "unavailable_not_bound", receipt: null });
+  }
+  const receipt = parseOrchestratorSkillRunReceipt(snapshot, hash);
+  if (!receipt || receipt.evidenceContextHash !== evidenceContextHash) return Object.freeze({ state: "missing_or_invalid", receipt: null });
+  const selectedSkills = receipt.selectedSkills.map((skill) => {
+    const manifest = coreSkillManifest(skill.ref, skill.version, skill.hash);
+    return Object.freeze({ name: manifest.name, version: manifest.version, outputContract: manifest.outputContract });
+  });
+  return Object.freeze({ state: "bound", receipt: Object.freeze({ receiptRef: receipt.receiptRef, receiptHash: receipt.receiptHash,
+    intent: receipt.intent, selectedSkills: Object.freeze(selectedSkills), evidenceAvailability: receipt.evidence.availability,
+    outputContract: receipt.handler.outputContract, authority: receipt.authority }) });
 }
 
 type HistoricalSourceCitation = Readonly<{ title: string; type: string; url: string | null;
@@ -97,12 +163,14 @@ export function orchestratorTurnEvidenceFromLedger(row: EvidenceTurnRow): Orches
     && Array.isArray(row.manifest_snapshots) && row.manifest_snapshots.length === 0
     && Array.isArray(row.playbook_snapshots) && row.playbook_snapshots.length === 0
     && row.skill_catalog_binding_hash === "LEGACY_NOT_BOUND";
-  if (legacy) return unavailableEvidence("legacy_not_recorded");
+  if (legacy) return Object.freeze({ ...unavailableEvidence("legacy_not_recorded"), readOnlyEvidence: readOnlyEvidence(row.evidence_context_snapshot, row.evidence_context_hash),
+    skillRun: skillRunEvidence(row.skill_run_snapshot, row.skill_run_hash, row.evidence_context_hash) });
   const unavailable = exact(row.profile_snapshot, ["version"]) && row.profile_snapshot.version === "unavailable_not_bound"
     && Array.isArray(row.manifest_snapshots) && row.manifest_snapshots.length === 0
     && Array.isArray(row.playbook_snapshots) && row.playbook_snapshots.length === 0
     && row.skill_catalog_binding_hash === "UNAVAILABLE_NOT_BOUND";
-  if (unavailable) return unavailableEvidence("unavailable_not_bound");
+  if (unavailable) return Object.freeze({ ...unavailableEvidence("unavailable_not_bound"), readOnlyEvidence: readOnlyEvidence(row.evidence_context_snapshot, row.evidence_context_hash),
+    skillRun: skillRunEvidence(row.skill_run_snapshot, row.skill_run_hash, row.evidence_context_hash) });
   try {
     const guide = pageGuide(row.page_guide);
     if (!exact(row.profile_snapshot, ["version", "profileRef", "revision", "profileHash"])
@@ -144,7 +212,9 @@ export function orchestratorTurnEvidenceFromLedger(row: EvidenceTurnRow): Orches
     skills: Object.freeze(manifests.map(({ name, version }) => Object.freeze({ name, version }))),
     playbooks: Object.freeze(playbooks.map((playbook) => Object.freeze({ label: `Doğrulanmış çalışma notu · revizyon ${playbook.revision}`,
       source: playbook.citation }))), historicalSourceState: playbooks.length === 0 ? "not_applicable"
-      : sourceDetailRecorded ? "available" : "detail_not_recorded", evidenceScope: EVIDENCE_SCOPE, uncertainty: UNCERTAINTY });
+      : sourceDetailRecorded ? "available" : "detail_not_recorded", evidenceScope: EVIDENCE_SCOPE, uncertainty: UNCERTAINTY,
+      readOnlyEvidence: readOnlyEvidence(row.evidence_context_snapshot, row.evidence_context_hash),
+      skillRun: skillRunEvidence(row.skill_run_snapshot, row.skill_run_hash, row.evidence_context_hash) });
   } catch { return unavailableEvidence("missing_or_invalid"); }
 }
 
@@ -199,7 +269,8 @@ async function snapshot(executor: Executor, scope: Readonly<{ workspaceId: strin
   `));
   const evidenceRows = rows<EvidenceTurnRow>(await executor.execute(sql`
     select turn.turn_ref, turn.page_guide, turn.profile_snapshot, turn.manifest_snapshots,
-      turn.playbook_snapshots, turn.skill_catalog_binding_hash
+      turn.playbook_snapshots, turn.skill_catalog_binding_hash, turn.evidence_context_snapshot, turn.evidence_context_hash,
+      turn.skill_run_snapshot, turn.skill_run_hash
     from orchestrator_conversation_turns turn
     join orchestrator_conversations conversation on conversation.workspace_id = turn.workspace_id
       and conversation.conversation_ref = turn.conversation_ref
@@ -301,14 +372,16 @@ export class DrizzleOrchestratorConversationRepository implements OrchestratorCo
       await transaction.execute(sql`
         insert into orchestrator_conversation_turns (
           workspace_id, conversation_ref, turn_ref, turn_number, provider, provider_thread_ref,
-          outcome, failure_code, page_guide, profile_snapshot, manifest_snapshots, playbook_snapshots, skill_catalog_binding_hash, created_at
+          outcome, failure_code, page_guide, profile_snapshot, manifest_snapshots, playbook_snapshots, skill_catalog_binding_hash,
+          evidence_context_snapshot, evidence_context_hash, skill_run_snapshot, skill_run_hash, created_at
         ) values (
           ${input.workspaceId}::uuid, ${input.conversationRef}, ${input.turnRef}, ${counters.turn_number},
           'codex_cli', ${input.providerThreadRef}, ${input.outcome}, ${input.failureCode},
           ${JSON.stringify(input.pageGuide)}::jsonb, ${JSON.stringify(input.skillCatalogSnapshot.profile)}::jsonb,
           ${JSON.stringify(input.skillCatalogSnapshot.manifests)}::jsonb,
           ${JSON.stringify(input.skillCatalogSnapshot.playbooks)}::jsonb,
-          ${input.skillCatalogSnapshot.bindingHash}, ${input.createdAt}::timestamptz
+          ${input.skillCatalogSnapshot.bindingHash}, ${JSON.stringify(input.evidenceContextSnapshot)}::jsonb,
+          ${input.evidenceContextHash}, ${JSON.stringify(input.skillRunSnapshot)}::jsonb, ${input.skillRunHash}, ${input.createdAt}::timestamptz
         )
       `);
       await transaction.execute(sql`

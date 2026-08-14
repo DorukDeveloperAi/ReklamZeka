@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { LocalSessionConnector } from "./local-session-connector";
 import styles from "./operating-dashboard.module.css";
 
-type Event = Readonly<{ kind: "slice_rule_draft" | "budget_proposal" | "delivery_alert" | "approval_proposed" | "approval_decision" | "temporal_evaluation";
+type Event = Readonly<{ kind: "slice_rule_draft" | "budget_proposal" | "budget_selection" | "action_preparation" | "delivery_alert" | "approval_proposed" | "approval_decision" | "temporal_evaluation";
   occurredAt: string; title: string; detail: string }>;
 type Result = Readonly<{ contractVersion: "operational-timeline/1.0.0"; items: readonly Event[];
   authority: Readonly<{ readOnly: true; canPublish: false; canApprove: false; canExecute: false;
@@ -13,7 +13,7 @@ type TimelineState =
   | Readonly<{ status: "loading" }>
   | Readonly<{ status: "session_required" | "unavailable" | "error"; message: string }>
   | Readonly<{ status: "ready"; result: Result }>;
-const EVENT_KINDS = new Set<Event["kind"]>(["slice_rule_draft", "budget_proposal", "delivery_alert", "approval_proposed", "approval_decision", "temporal_evaluation"]);
+const EVENT_KINDS = new Set<Event["kind"]>(["slice_rule_draft", "budget_proposal", "budget_selection", "action_preparation", "delivery_alert", "approval_proposed", "approval_decision", "temporal_evaluation"]);
 const PRIVATE_MATERIAL = /(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[a-f0-9-]{12}|[a-f0-9]{64}|EA[A-Za-z0-9]{30,}|Bearer\s+)/i;
 
 function exactObject(value: unknown, keys: readonly string[]): value is Record<string, unknown> {

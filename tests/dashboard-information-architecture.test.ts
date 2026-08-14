@@ -52,4 +52,12 @@ describe("dashboard analysis and decision information architecture", () => {
     expect(budgetPools).not.toContain('hardCapDecimal: "500000"');
     expect(budgetPools).not.toContain('poolRef: "budget_pool_domestic"');
   });
+
+  it("opens the real recommendation-only pool workspace from the approved budget route", () => {
+    expect(dashboard).toContain('import { BudgetPoolHierarchyPanel } from "./budget-pool-hierarchy-panel"');
+    expect(dashboard).toContain('if (budgetArea === "pools") return <BudgetPoolHierarchyPanel />');
+    expect(dashboard).not.toContain("Bütçe havuzları Faz 1’de gizlidir");
+    expect(budgetPools).toContain('import { LocalSessionConnector } from "./local-session-connector"');
+    expect(budgetPools).toContain('"session_required"');
+  });
 });

@@ -5,6 +5,9 @@ import { DrizzleOrchestratorConversationRepository } from
   "@/connectors/agents/orchestrator-conversation-drizzle-repository";
 import { DrizzleWorkspaceSkillCatalogBindingRepository } from
   "@/connectors/orchestrator/workspace-skill-catalog-binding-drizzle-repository";
+import { ReadOnlyEvidenceContextService } from "@/application/orchestrator-readonly-evidence-context";
+import { DrizzleCanonicalPerformanceReadRepository } from "@/connectors/meta/canonical-performance-read-drizzle-repository";
+import { DrizzleOperationalTimelineRepository } from "@/connectors/decisions/operational-timeline-drizzle-repository";
 import * as schema from "@/db/schema";
 import { LocalCodexExecAdapter, localCodexExecConfig } from "@/server/local-codex-exec-adapter";
 import { localDecisionRoomConfig, resolveTrustedLocalSessionIdentity } from
@@ -41,7 +44,10 @@ function handlers() {
     }
     const repository = new DrizzleOrchestratorConversationRepository(database as never);
     const skillCatalog = new DrizzleWorkspaceSkillCatalogBindingRepository(database as never);
-    const service = new OrchestratorConversationService(repository, new LocalCodexExecAdapter(codexConfig), skillCatalog);
+    const evidence = new ReadOnlyEvidenceContextService(new DrizzleCanonicalPerformanceReadRepository(database as never),
+      new DrizzleOperationalTimelineRepository(database as never));
+    const service = new OrchestratorConversationService(repository, new LocalCodexExecAdapter(codexConfig), skillCatalog,
+      undefined, undefined, evidence);
     return createOrchestratorConversationHttpHandlers({ service, config,
       resolveIdentity: (request) => resolveTrustedLocalSessionIdentity({ request,
         database: database!, config, credential: "cookie" }) });

@@ -45,6 +45,18 @@ function event(row: SourceRow): OperationalTimelineEvent {
       detail: `Revizyon ${revision} · ${proposal.alternatives.length} senaryo${row.five === "rule_linked"
         ? " · exact kural kaynağı bağlı" : ""} · uygulama yetkisi yok` });
   }
+  if (kind === "budget_selection") {
+    const direction = text(row.one, 16);
+    if (!["increase", "decrease"].includes(direction)) throw new Error("corrupt_store");
+    return Object.freeze({ kind, occurredAt, title: "Bütçe senaryosu için insan seçimi kaydedildi",
+      detail: `${direction === "increase" ? "Artış" : "Azalış"} önerisi · belirli tahsis seçildi · uygulama yetkisi yok` });
+  }
+  if (kind === "action_preparation") {
+    const action = text(row.one, 32); const risk = text(row.two, 4);
+    if (!["budget_decrease", "budget_increase"].includes(action) || !/^K[0-4]$/.test(risk)) throw new Error("corrupt_store");
+    return Object.freeze({ kind, occurredAt, title: "Seçilen tahsis için ActionUnit hazırlandı",
+      detail: `${action.replaceAll("_", " ")} · ${risk} · insan onayı bekliyor · Meta uygulaması kapalı` });
+  }
   if (kind === "delivery_alert") {
     const level = text(row.one, 16); const status = text(row.two, 24);
     if (!["confirmed", "suspected"].includes(level) || !["open", "investigating", "resolved"].includes(status)) throw new Error("corrupt_store");
@@ -104,6 +116,26 @@ export class DrizzleOperationalTimelineRepository implements OperationalTimeline
           and context.id = proposal.context_id and context.campaign_id = proposal.campaign_id
         where proposal.workspace_id = ${input.workspaceId}::uuid
           and (${input.campaignRef ?? null}::text is null or proposal.campaign_id = (select campaign_id from exact_campaign))
+        union all
+        select 'budget_selection'::text, selection.selected_at,
+          case when selection.after_amount_minor > selection.before_amount_minor then 'increase' else 'decrease' end,
+          null::text, null::text, null::jsonb, null::text
+        from public.slice_rule_scenario_allocation_selections selection
+        join public.slice_rule_allocation_entity_bindings target
+          on target.workspace_id = selection.workspace_id and target.draft_hash = selection.draft_hash
+          and target.allocation_ref = selection.allocation_ref
+        where selection.workspace_id = ${input.workspaceId}::uuid
+          and (${input.campaignRef ?? null}::text is null or target.campaign_id = (select campaign_id from exact_campaign))
+        union all
+        select 'action_preparation'::text, binding.bound_at, unit.action_type, unit.risk,
+          null::text, null::jsonb, null::text
+        from public.slice_rule_budget_action_unit_bindings binding
+        join public.action_proposal_units unit
+          on unit.workspace_id = binding.workspace_id and unit.id = binding.action_proposal_unit_id
+        where binding.workspace_id = ${input.workspaceId}::uuid
+          and (${input.campaignRef ?? null}::text is null or unit.campaign_id = (select campaign_id from exact_campaign)
+            or exists (select 1 from public.meta_ad_sets ad_set where ad_set.workspace_id = unit.workspace_id
+              and ad_set.id = unit.ad_set_id and ad_set.campaign_id = (select campaign_id from exact_campaign)))
         union all
         select 'delivery_alert'::text, occurred_at, evidence_level, status, sequence::text, null::jsonb, null::text
         from public.delivery_health_alert_ledger_records where workspace_id = ${input.workspaceId}::uuid

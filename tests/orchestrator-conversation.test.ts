@@ -14,6 +14,9 @@ import { CORE_SKILL_MANIFESTS, createWorkspaceSkillCatalogBinding } from "@/doma
 import { LocalCodexExecAdapter, localCodexExecConfig, normalizeCodexJsonl } from
   "@/server/local-codex-exec-adapter";
 
+const response = (summary: string) => JSON.stringify({ version: "orchestrator-facilitation-response/1.0.0",
+  summary, evidence: [], gaps: [], questions: [], risks: [], uncertainty: [] });
+
 const workspaceId = "11111111-1111-4111-a111-111111111111";
 const userId = "22222222-2222-4222-a222-222222222222";
 const threadRef = "33333333-3333-4333-a333-333333333333";
@@ -56,7 +59,7 @@ describe("persistent Orchestrator conversation", () => {
   it("keeps one vendor-neutral conversation while each turn freezes its source page guide", async () => {
     const source = memoryRepository();
     const execute = vi.fn(async (input: { providerThreadRef: string | null }) => ({ providerThreadRef: threadRef,
-      finalResponse: input.providerThreadRef ? "Bütçe etkisi ve karar eksikleri" : "İlk analiz" }));
+      finalResponse: response(input.providerThreadRef ? "Bütçe etkisi ve karar eksikleri" : "İlk analiz") }));
     let refCounter = 0;
     const service = new OrchestratorConversationService(source.repository, { execute }, loader(),
       () => new Date("2026-08-13T09:00:00.000Z"), (kind) => `${kind}_${(++refCounter).toString(16).padStart(32, "0")}`);
@@ -72,6 +75,12 @@ describe("persistent Orchestrator conversation", () => {
     expect(execute).toHaveBeenNthCalledWith(2, expect.objectContaining({ providerThreadRef: threadRef }));
     expect(source.appendTurn.mock.calls[1]![0].pageGuide).toEqual(orchestratorPageGuide("budgets"));
     expect(source.appendTurn.mock.calls[1]![0].pageGuide.recordPath).toContain("budget proposal");
+    expect(execute).toHaveBeenNthCalledWith(1, expect.objectContaining({ prompt: expect.stringContaining("SkillRun makbuzu") }));
+    expect(source.appendTurn.mock.calls[0]![0].skillRunSnapshot).toMatchObject({
+      version: "orchestrator-skill-run/1.0.0", handler: { ref: "evidence_integrity_auditor" },
+      authority: { canPersist: false, canCreateRule: false, canDraftPolicy: false, canExecute: false, canWriteMeta: false },
+    });
+    expect(source.appendTurn.mock.calls[0]![0].skillRunHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("accepts the consolidated Settings source guide without widening authority", () => {
@@ -106,7 +115,7 @@ describe("persistent Orchestrator conversation", () => {
     const catalog = loader(binding([{ playbookRef: "playbook_alpha", revision: 3, playbookHash: "b".repeat(64),
       sourceRef: "source_guidance", citation: { sourceTitle: "Meta yardım", sourceType: "official_meta_guidance",
         sourceUrl: "https://www.facebook.com/business/help/learning", freshness: "fresh" }, title: "Dönüşüm notu", body: "İki varyantın kanıtını karşılaştır." }]));
-    const execute = vi.fn(async () => ({ providerThreadRef: threadRef, finalResponse: "Karar alanları açıklandı." }));
+    const execute = vi.fn(async () => ({ providerThreadRef: threadRef, finalResponse: response("Karar alanları açıklandı.") }));
     const service = new OrchestratorConversationService(source.repository, { execute }, catalog);
     await service.send({ workspaceId, userId, conversationRef: null, pageId: "analysis", message: "Kanıtları açıkla" });
     expect(execute).toHaveBeenCalledWith(expect.objectContaining({ prompt: expect.stringContaining("İki varyantın kanıtını karşılaştır.") }));
@@ -145,11 +154,30 @@ describe("persistent Orchestrator conversation", () => {
     const appendTurn = vi.fn(async () => { throw new Error("database_failed"); });
     const repository = { ...source.repository, appendTurn };
     const service = new OrchestratorConversationService(repository, { execute: async () => ({
-      providerThreadRef: threadRef, finalResponse: "Yanıt",
+      providerThreadRef: threadRef, finalResponse: response("Yanıt"),
     }) }, loader());
     await expect(service.send({ workspaceId, userId, conversationRef: null, pageId: "today",
       message: "Durumu açıkla" })).rejects.toThrow("database_failed");
     expect(appendTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed and never persists an assistant message when the provider returns prose or a rule-like envelope", async () => {
+    const source = memoryRepository();
+    const execute = vi.fn(async () => ({ providerThreadRef: threadRef, finalResponse: "Bunu uygula." }));
+    const service = new OrchestratorConversationService(source.repository, { execute }, loader());
+    await expect(service.send({ workspaceId, userId, conversationRef: null, pageId: "rules", message: "Kanıtı incele" }))
+      .rejects.toMatchObject({ code: "invalid_provider_output" });
+    expect(source.appendTurn).toHaveBeenCalledWith(expect.objectContaining({ outcome: "failed", failureCode: "invalid_provider_output",
+      assistantContent: null, assistantMessageRef: null, providerThreadRef: null }));
+    expect(source.snapshot()?.messages).toHaveLength(1);
+
+    const unsafe = memoryRepository();
+    const unsafeService = new OrchestratorConversationService(unsafe.repository, { execute: async () => ({ providerThreadRef: threadRef,
+      finalResponse: JSON.stringify({ version: "orchestrator-facilitation-response/1.0.0", summary: "Kural: bütçeyi artır",
+        evidence: [], gaps: [], questions: [], risks: [], uncertainty: [] }),
+    }) }, loader());
+    await expect(unsafeService.send({ workspaceId, userId, conversationRef: null, pageId: "rules", message: "Kanıtı incele" }))
+      .rejects.toMatchObject({ code: "invalid_provider_output" });
   });
 });
 

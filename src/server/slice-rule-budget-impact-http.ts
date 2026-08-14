@@ -54,7 +54,7 @@ async function body(request: Request): Promise<Omit<SliceRuleBudgetImpactInput, 
 function failure(reason: unknown) {
   if (reason instanceof SliceRuleBudgetImpactError) {
     if (reason.code === "draft_missing") return error(reason.code, "Slice rule taslağı bulunamadı.", 404);
-    if (["stale_draft", "scope_evidence_not_ready", "market_boundary", "scope_mismatch"].includes(reason.code)) {
+    if (["stale_draft", "scope_evidence_not_ready", "market_boundary", "scope_mismatch", "pool_binding_required"].includes(reason.code)) {
       return error(reason.code, "Taslak veya kapsam kanıtı değişti; önizleme üretilmedi.", 409);
     }
     return error(reason.code, reason.code === "invalid_input" ? "Etki önizleme isteği geçersiz."

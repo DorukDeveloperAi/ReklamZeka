@@ -471,6 +471,10 @@ export const orchestratorConversationTurns = pgTable("orchestrator_conversation_
   manifestSnapshots: jsonb("manifest_snapshots").$type<readonly Record<string, unknown>[]>().notNull().default([]),
   playbookSnapshots: jsonb("playbook_snapshots").$type<readonly Record<string, unknown>[]>().notNull().default([]),
   skillCatalogBindingHash: text("skill_catalog_binding_hash").notNull().default("LEGACY_NOT_RECORDED"),
+  evidenceContextSnapshot: jsonb("evidence_context_snapshot").$type<Record<string, unknown>>().notNull().default({ version: "legacy_not_recorded" }),
+  evidenceContextHash: text("evidence_context_hash").notNull().default("LEGACY_NOT_RECORDED"),
+  skillRunSnapshot: jsonb("skill_run_snapshot").$type<Record<string, unknown>>().notNull().default({ version: "legacy_not_recorded" }),
+  skillRunHash: text("skill_run_hash").notNull().default("LEGACY_NOT_RECORDED"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
   uniqueIndex("orchestrator_conversation_turns_workspace_id_unique").on(table.workspaceId, table.id),
@@ -513,6 +517,26 @@ export const orchestratorConversationTurns = pgTable("orchestrator_conversation_
       and jsonb_typeof(${table.manifestSnapshots}) = 'array' and jsonb_array_length(${table.manifestSnapshots}) between 1 and 9
       and jsonb_typeof(${table.playbookSnapshots}) = 'array' and jsonb_array_length(${table.playbookSnapshots}) between 0 and 12
       and ${table.playbookSnapshots}::text !~* '"(body|content|prompt|token|secret|authorization)"[[:space:]]*:')
+  `),
+  check("orchestrator_conversation_turns_evidence_context", sql`
+    (${table.evidenceContextHash} = 'LEGACY_NOT_RECORDED' and ${table.evidenceContextSnapshot} = '{"version":"legacy_not_recorded"}'::jsonb)
+    or (${table.evidenceContextHash} = 'UNAVAILABLE_NOT_BOUND' and ${table.evidenceContextSnapshot} = '{"version":"unavailable_not_bound"}'::jsonb)
+    or (${table.evidenceContextHash} ~ '^[a-f0-9]{64}$'
+      and jsonb_typeof(${table.evidenceContextSnapshot}) = 'object'
+      and ${table.evidenceContextSnapshot} ?& array['version', 'performance', 'timeline']
+      and ${table.evidenceContextSnapshot} - array['version', 'performance', 'timeline'] = '{}'::jsonb
+      and ${table.evidenceContextSnapshot} #>> '{version}' = 'orchestrator-readonly-evidence-context/1.0.0'
+      and ${table.evidenceContextSnapshot}::text !~* '"(name|campaignRef|accountRef|spend|outcome|cpa|title|detail|action|sql|token|secret|authorization)"[[:space:]]*:')
+  `),
+  check("orchestrator_conversation_turns_skill_run", sql`
+    (${table.skillRunHash} = 'LEGACY_NOT_RECORDED' and ${table.skillRunSnapshot} = '{"version":"legacy_not_recorded"}'::jsonb)
+    or (${table.skillRunHash} = 'UNAVAILABLE_NOT_BOUND' and ${table.skillRunSnapshot} = '{"version":"unavailable_not_bound"}'::jsonb)
+    or (${table.skillRunHash} ~ '^[a-f0-9]{64}$'
+      and jsonb_typeof(${table.skillRunSnapshot}) = 'object'
+      and ${table.skillRunSnapshot} ?& array['version', 'receiptRef', 'receiptHash', 'evidenceContextHash', 'intent', 'selectedSkills', 'evidence', 'handler', 'authority']
+      and ${table.skillRunSnapshot} - array['version', 'receiptRef', 'receiptHash', 'evidenceContextHash', 'intent', 'selectedSkills', 'evidence', 'handler', 'authority'] = '{}'::jsonb
+      and ${table.skillRunSnapshot} #>> '{version}' = 'orchestrator-skill-run/1.0.0'
+      and ${table.skillRunSnapshot}::text !~* '"(name|campaignRef|accountRef|spend|outcome|cpa|title|detail|action|sql|token|secret|authorization|prompt|policy|rule)"[[:space:]]*:')
   `),
 ]);
 

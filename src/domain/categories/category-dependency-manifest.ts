@@ -71,6 +71,12 @@ const opaqueCategoryContext = new Set([
   "orchestrator_conversation_turns.profile_snapshot",
   "orchestrator_conversation_turns.manifest_snapshots",
   "orchestrator_conversation_turns.playbook_snapshots",
+  // Turn evidence is a bounded aggregate replay snapshot; it intentionally
+  // contains no mutable category edge for archive evaluation.
+  "orchestrator_conversation_turns.evidence_context_snapshot",
+  // Selected SkillRun receipts bind only aggregate evidence availability and
+  // immutable release manifest hashes; archive never treats them as category edges.
+  "orchestrator_conversation_turns.skill_run_snapshot",
   // A cohort diagnostic is an immutable replay artifact. Its compatibility
   // profile/member hashes are historical commitments, not mutable archive edges.
   "robust_cohort_diagnostic_assets.profile",
@@ -165,6 +171,8 @@ const columns = [
   "orchestrator_conversation_turns.profile_snapshot",
   "orchestrator_conversation_turns.manifest_snapshots",
   "orchestrator_conversation_turns.playbook_snapshots",
+  "orchestrator_conversation_turns.evidence_context_snapshot",
+  "orchestrator_conversation_turns.skill_run_snapshot",
   // Delivery/payment alert records are historical evidence and checklist
   // state, never category or policy selection inputs.
   "delivery_health_alert_ledger_records.checklist_payload",

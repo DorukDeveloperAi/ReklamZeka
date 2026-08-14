@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { LocalSessionConnector } from "./local-session-connector";
 import styles from "./budget-pool-hierarchy-panel.module.css";
 
 type Layer = "market" | "service_family" | "targeting" | "entity" | "named";
@@ -85,19 +86,31 @@ function marketLabel(market: Market) { return market === "domestic" ? "Yerli" : 
 export function BudgetPoolHierarchyPanel() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [nodes, setNodes] = useState<readonly Node[]>(emptyNodes);
-  const [state, setState] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "session_required" | "unavailable">("loading");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setState("loading"); setMessage("");
     try {
-      const response = await request("GET"); if (!response.ok) throw new Error("unavailable");
+      const response = await request("GET");
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as unknown;
+        const code = object(payload) && object(payload.error) && payload.error.code === "local_session_required";
+        setState(code ? "session_required" : "unavailable");
+        setNodes(emptyNodes);
+        setMessage(code
+          ? "Bütçe havuzu kayıtlarını görmek veya taslak kaydetmek için yerel oturum gerekli."
+          : "Kayıt defteri şu anda kaynak nedeniyle okunamıyor. Hiçbir varsayılan havuz kaydedilmedi.");
+        return false;
+      }
       const next = parseBudgetPoolHierarchySnapshot(await response.json());
       setSnapshot(next); setNodes(next.item?.nodes ?? emptyNodes); setState("ready");
+      return true;
     } catch {
       setState("unavailable"); setNodes(emptyNodes);
       setMessage("Kayıt defteri şu anda oturum veya kaynak nedeniyle okunamıyor. Hiçbir varsayılan havuz kaydedilmedi.");
+      return false;
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -142,10 +155,12 @@ export function BudgetPoolHierarchyPanel() {
   return <section className={styles.panel} aria-label="Bütçe havuzu çalışma alanı">
     <div className={styles.header}><div><h2 className={styles.title}>Bütçe Havuzları</h2><p className={styles.hint}>Pazar → hizmet/aile → hedefleme → kampanya/ad set akışını yönetin. Bu ekran yalnız öneri taslağı kaydeder; Meta bütçesi değiştirmez.</p></div><span className={styles.badge}>Recommendation-only</span></div>
     <p className={styles.notice}>Yerli ve yabancı kökler ayrıdır. Alt havuzlar üst tavanı ve tarih aralığını aşamaz; kesin kontrol immutable revizyon kaydedilirken sunucuda yapılır.</p>
-    <div className={styles.roots}>{(["domestic", "international"] as const).map((market) => {
+    {state === "session_required" ? <section className={styles.sessionRequired} role="alert"><strong>YEREL OTURUM GEREKLİ</strong><p>{message}</p><LocalSessionConnector title="Bütçe havuzu çalışma alanını bağlayın" onVerify={load} /></section> : null}
+    {state === "unavailable" ? <section className={styles.sessionRequired} role="alert"><strong>KAYNAK KULLANILAMIYOR</strong><p>{message}</p><button type="button" onClick={() => void load()}>Tekrar dene</button></section> : null}
+    {state === "ready" ? <div className={styles.roots}>{(["domestic", "international"] as const).map((market) => {
       const root = roots[market];
       return <section className={styles.marketColumn} key={market} aria-label={`${marketLabel(market)} havuzları`}><h3>{marketLabel(market)}</h3>{root ? <ol className={styles.tree}>{renderNode(root, 0)}</ol> : <div className={styles.empty}><p>Henüz pazar kökü yok.</p><button type="button" onClick={() => addRoot(market)} disabled={!snapshot?.authority.canSaveDraft || saving}>{marketLabel(market)} kökü ekle</button></div>}</section>;
-    })}</div>
-    <div className={styles.actions}><button type="button" onClick={() => void save()} disabled={!canSave}>{saving ? "Kaydediliyor…" : "Yeni taslak revizyonu kaydet"}</button><button type="button" onClick={() => void load()} disabled={saving}>Yenile</button><span className={draftError || message.includes("reddedildi") ? styles.error : styles.status}>{state === "loading" ? "Yükleniyor…" : message || draftError || "Approval, execute ve Meta write kapalı."}</span></div>
+    })}</div> : null}
+    {state === "ready" ? <div className={styles.actions}><button type="button" onClick={() => void save()} disabled={!canSave}>{saving ? "Kaydediliyor…" : "Yeni taslak revizyonu kaydet"}</button><button type="button" onClick={() => void load()} disabled={saving}>Yenile</button><span className={draftError || message.includes("reddedildi") ? styles.error : styles.status}>{message || draftError || "Approval, execute ve Meta write kapalı."}</span></div> : state === "loading" ? <p className={styles.status} role="status">Bütçe havuzu kayıtları doğrulanıyor…</p> : null}
   </section>;
 }

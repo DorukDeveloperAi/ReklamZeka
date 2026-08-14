@@ -6,6 +6,9 @@ import { orchestratorConversationFromResponse } from "@/app/dashboard/operating-
 import { DrizzleOrchestratorConversationRepository, orchestratorTurnEvidenceFromLedger } from
   "@/connectors/agents/orchestrator-conversation-drizzle-repository";
 import { CORE_SKILL_MANIFESTS } from "@/domain/orchestrator/skill-catalog";
+import { OrchestratorSkillRouter } from "@/application/orchestrator-skill-run";
+import { createWorkspaceSkillCatalogBinding } from "@/domain/orchestrator/skill-catalog";
+import { unavailableOrchestratorReadOnlyEvidenceContext } from "@/application/orchestrator-readonly-evidence-context";
 
 const turnRef = `turn_${"a".repeat(32)}`;
 const messageRef = `message_${"b".repeat(32)}`;
@@ -58,6 +61,20 @@ describe("orchestrator historical turn evidence projection", () => {
     const mutableSourceAfterTurn = { title: "Sonradan değişen başlık", url: "https://example.test/current", freshness: "stale" };
     expect(mutableSourceAfterTurn).not.toEqual(atTurn.playbooks[0]?.source);
     expect(orchestratorTurnEvidenceFromLedger(frozenRow)).toEqual(atTurn);
+  });
+
+  it("projects only the selected, frozen SkillRun receipt rather than the entire current catalog", () => {
+    const catalog = createWorkspaceSkillCatalogBinding({ profile: { profileRef: "profile_workspace", revision: 4,
+      profileHash: "1".repeat(64) }, manifests: CORE_SKILL_MANIFESTS.map(({ ref, version, hash }) => ({ ref, version, hash })), playbooks: [] });
+    const receipt = new OrchestratorSkillRouter().route({ pageId: "analysis", message: "Kohortları karşılaştır",
+      binding: catalog, evidence: unavailableOrchestratorReadOnlyEvidenceContext(), evidenceContextHash: "UNAVAILABLE_NOT_BOUND" });
+    const evidence = orchestratorTurnEvidenceFromLedger(boundLedgerRow({ evidence_context_snapshot: { version: "unavailable_not_bound" },
+      evidence_context_hash: "UNAVAILABLE_NOT_BOUND", skill_run_snapshot: receipt, skill_run_hash: receipt.receiptHash }));
+    expect(evidence.skillRun).toMatchObject({ state: "bound", receipt: { intent: "compare", evidenceAvailability: "unavailable",
+      selectedSkills: [{ name: "EvidenceIntegrityAuditor" }, { name: "CohortComparator" }],
+      authority: { canPersist: false, canCreateRule: false, canDraftPolicy: false, canExecute: false, canWriteMeta: false } } });
+    expect(evidence.skillRun.receipt?.selectedSkills).toHaveLength(2);
+    expect(JSON.stringify(evidence.skillRun)).not.toMatch(/profile_workspace|playbook_alpha|source_guidance|raw|prompt/i);
   });
 
   it("drops malformed evidence before it reaches the dashboard and never accepts a body/source field", () => {

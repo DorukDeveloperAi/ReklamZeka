@@ -6,6 +6,8 @@ import { WORKSPACE_TOMBSTONE_PURGE_TABLES } from
 const migration = readFileSync("drizzle/20260813123350_majestic_george_stacy.sql", "utf8");
 const catalogBindingMigration = readFileSync("drizzle/20260814140114_regular_steve_rogers.sql", "utf8");
 const catalogBindingHardeningMigration = readFileSync("drizzle/20260814140309_mushy_boomerang.sql", "utf8");
+const readOnlyEvidenceMigration = readFileSync("drizzle/20260814144129_orchestrator_readonly_evidence_context.sql", "utf8");
+const skillRunMigration = readFileSync("drizzle/20260814145753_simple_masked_marvel.sql", "utf8");
 const repository = readFileSync("src/connectors/agents/orchestrator-conversation-drizzle-repository.ts", "utf8");
 
 describe("Orchestrator conversation ledger migration", () => {
@@ -43,5 +45,24 @@ describe("Orchestrator conversation ledger migration", () => {
     expect(`${catalogBindingMigration}\n${catalogBindingHardeningMigration}`).not.toMatch(/grant\s+.*(?:anon|authenticated)|disable row level security/i);
     expect(repository).toContain("JSON.stringify(input.skillCatalogSnapshot.playbooks)");
     expect(repository).not.toContain("skillCatalogBinding");
+  });
+
+  it("adds an independent, fail-closed readonly evidence snapshot without weakening RLS or append-only storage", () => {
+    expect(readOnlyEvidenceMigration).toContain('ADD COLUMN "evidence_context_snapshot" jsonb');
+    expect(readOnlyEvidenceMigration).toContain('ADD COLUMN "evidence_context_hash" text');
+    expect(readOnlyEvidenceMigration).toContain("'LEGACY_NOT_RECORDED'");
+    expect(readOnlyEvidenceMigration).toContain("'UNAVAILABLE_NOT_BOUND'");
+    expect(readOnlyEvidenceMigration).toContain('"(name|campaignRef|accountRef|spend|outcome|cpa|title|detail|action|sql|token|secret|authorization)"');
+    expect(readOnlyEvidenceMigration).not.toMatch(/grant\s+.*(?:anon|authenticated)|disable row level security|drop trigger/i);
+  });
+
+  it("adds a selected-skill receipt independently of the mutable workspace catalog", () => {
+    expect(skillRunMigration).toContain('ADD COLUMN "skill_run_snapshot" jsonb');
+    expect(skillRunMigration).toContain('ADD COLUMN "skill_run_hash" text');
+    expect(skillRunMigration).toContain("'receiptRef', 'receiptHash', 'evidenceContextHash', 'intent', 'selectedSkills'");
+    expect(skillRunMigration).toContain('"(name|campaignRef|accountRef|spend|outcome|cpa|title|detail|action|sql|token|secret|authorization|prompt|policy|rule)"');
+    expect(skillRunMigration).not.toMatch(/grant\s+.*(?:anon|authenticated)|disable row level security|drop trigger/i);
+    expect(repository).toContain("JSON.stringify(input.skillRunSnapshot)");
+    expect(repository).not.toContain("loadActive(");
   });
 });

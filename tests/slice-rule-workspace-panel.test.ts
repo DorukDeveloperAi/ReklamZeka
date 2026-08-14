@@ -10,6 +10,7 @@ import {
   parseSliceRuleBudgetImpactResult,
   parseSliceRuleBudgetImpactSavedResult,
   parseSliceRuleWorkspaceSnapshot,
+  parseSliceRuleBudgetPoolBindingSnapshot,
   parseSliceScopeCandidates,
   parseSliceOperationalReadiness,
   parseSliceRuleScenarioSelectionCandidates,
@@ -35,6 +36,11 @@ describe("Slice Rule Workspace panel", () => {
       .toEqual({ visible: true, enabled: false, reason: "server_disabled" });
     expect(() => parseActionPreparationFlag({ actionPreparation: { visible: true, enabled: true, reason: "server_disabled" } }))
       .toThrow("güvenli değil");
+  });
+  it("accepts frozen same-market pool evidence but rejects opened authority", () => {
+    const value = parseSliceRuleBudgetPoolBindingSnapshot({ contractVersion: "slice-rule-budget-pool-binding-http/1.0.0", bindings: [{ draftHash: item.draftHash, hierarchyHash: "c".repeat(64), poolRef: "budget_pool_international", market: "international", boundAt: "2026-08-14T10:00:00.000Z", authority: closed }], hierarchy: { hierarchyHash: "c".repeat(64), nodes: [{ poolRef: "budget_pool_international", parentPoolRef: null, layer: "market", market: "international", currency: "TRY", hardCapDecimal: "100", effectiveFrom: "2026-08-01T00:00:00.000Z", effectiveTo: "2026-09-01T00:00:00.000Z" }], authority: closed }, authority: { canRead: true, canBind: true, ...closed } });
+    expect(value.bindings[0]).toMatchObject({ poolRef: "budget_pool_international", market: "international" });
+    expect(() => parseSliceRuleBudgetPoolBindingSnapshot({ ...value, authority: { ...value.authority, canExecute: true } })).toThrow("güvenli değil");
   });
   it("accepts only a closed, opaque decision trace and rejects opened execution state", () => {
     const trace = parseSliceRuleDecisionTrace({ decisionTrace: { contractVersion: "slice-rule-decision-trace/1.0.0", items: [{

@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { ApprovalQueueReadSurface, recordApprovalDecision } from "@/app/dashboard/approval-queue-panel";
 import type { ApprovalQueueDetailRecord, ApprovalQueueRecord } from "@/application/approval-queue-read-service";
@@ -51,6 +52,14 @@ function ready(selected: ApprovalQueueRecord | null = null) {
 }
 
 describe("Approval Queue dashboard", () => {
+  it("re-reads a routed ActionUnit only after it is found in the tenant/campaign-scoped list", () => {
+    const source = readFileSync("src/app/dashboard/approval-queue-panel.tsx", "utf8");
+    expect(source).toContain("selectedUnitRef?: string | null");
+    expect(source).toContain("state.result.items.find((item) => item.unitRef === selectedUnitRef)");
+    expect(source).toContain("seçili çalışma alanı veya kampanya kapsamında bulunamadı");
+    expect(source).toContain("void select(summary)");
+  });
+
   it("renders hash-verified source labels and ordered human decision history without execution controls", () => {
     const detail: ApprovalQueueDetailRecord = { ...item, sourceEvidence: [
       { kind: "budget_proposal", label: "Yabancı FTR bütçe tavanı", integrity: "hash_verified" },

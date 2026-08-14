@@ -86,7 +86,7 @@ type DecisionTraceItem = Readonly<{
 }>;
 type ApprovalQueueState = Readonly<{ status: "loading" }>
   | Readonly<{ status: "ready"; selections: readonly ApprovalQueueSelection[]; decisionTrace: readonly DecisionTraceItem[]; actionPreparation: ActionPreparationFlag }>
-  | Readonly<{ status: "queued"; selectionRef: string; persistence: "inserted" | "unchanged" }>
+  | Readonly<{ status: "queued"; selectionRef: string; actionUnitRef: string; persistence: "inserted" | "unchanged" }>
   | Readonly<{ status: "unavailable" | "error"; message: string }>;
 type SelectionCandidate = Readonly<{ candidateRef: string; scenarioLabel: string; beforeAmountMinor: number; afterAmountMinor: number; currency: string;
   status: "selectable" | "blocked"; blockReason: "delivery_hold" | "market_boundary" | "scope_unavailable" | "stale_source" | "already_selected" | null }>;
@@ -106,6 +106,10 @@ type OperationalReadiness = Readonly<{ candidateRef: string; scope: Scope; froze
 type OperationalReadinessState = Readonly<{ status: "loading" }>
   | Readonly<{ status: "ready"; items: readonly OperationalReadiness[] }>
   | Readonly<{ status: "unavailable" }>;
+type PoolBinding = Readonly<{ draftHash: string; hierarchyHash: string; poolRef: string; market: Market; boundAt: string; authority: ClosedAuthority }>;
+type PoolNode = Readonly<{ poolRef: string; parentPoolRef: string | null; layer: "market" | "service_family" | "constraint" | "named"; market: Market; currency: string; hardCapDecimal: string; effectiveFrom: string; effectiveTo: string }>;
+type PoolBindingSnapshot = Readonly<{ contractVersion: "slice-rule-budget-pool-binding-http/1.0.0"; bindings: readonly PoolBinding[]; hierarchy: Readonly<{ hierarchyHash: string; nodes: readonly PoolNode[]; authority: ClosedAuthority }> | null; authority: Readonly<{ canRead: true; canBind: boolean } & ClosedAuthority> }>;
+type PoolBindingState = Readonly<{ status: "loading" }> | Readonly<{ status: "ready"; snapshot: PoolBindingSnapshot; selectedPoolRef: string }> | Readonly<{ status: "saving"; snapshot: PoolBindingSnapshot; selectedPoolRef: string }> | Readonly<{ status: "unavailable" | "error"; message: string }>;
 
 type Form = Readonly<{
   seriesRef: string;
@@ -252,6 +256,29 @@ export function parseSliceRuleWorkspaceSnapshot(value: unknown): SliceRuleWorksp
     throw new Error("Slice Rule Workspace güvenli sözleşmeyi döndürmedi.");
   }
   return value as unknown as SliceRuleWorkspaceSnapshot;
+}
+export function parseSliceRuleBudgetPoolBindingSnapshot(value: unknown): PoolBindingSnapshot {
+  const node = (candidate: unknown): candidate is PoolNode => object(candidate) && Object.keys(candidate).length === 8
+    && /^budget_pool_[a-z0-9][a-z0-9_.:-]{0,119}$/.test(String(candidate.poolRef))
+    && (candidate.parentPoolRef === null || /^budget_pool_[a-z0-9][a-z0-9_.:-]{0,119}$/.test(String(candidate.parentPoolRef)))
+    && ["market", "service_family", "constraint", "named"].includes(String(candidate.layer))
+    && ["domestic", "international"].includes(String(candidate.market)) && /^[A-Z]{3}$/.test(String(candidate.currency))
+    && typeof candidate.hardCapDecimal === "string" && typeof candidate.effectiveFrom === "string" && typeof candidate.effectiveTo === "string";
+  const binding = (candidate: unknown): candidate is PoolBinding => object(candidate) && Object.keys(candidate).length === 6
+    && /^[a-f0-9]{64}$/.test(String(candidate.draftHash)) && /^[a-f0-9]{64}$/.test(String(candidate.hierarchyHash))
+    && /^budget_pool_[a-z0-9][a-z0-9_.:-]{0,119}$/.test(String(candidate.poolRef))
+    && ["domestic", "international"].includes(String(candidate.market)) && typeof candidate.boundAt === "string" && isClosed(candidate.authority);
+  if (!object(value) || value.contractVersion !== "slice-rule-budget-pool-binding-http/1.0.0" || !Array.isArray(value.bindings)
+    || value.bindings.length > 100 || !value.bindings.every(binding) || !(value.hierarchy === null || object(value.hierarchy)
+      && Object.keys(value.hierarchy).length === 3 && /^[a-f0-9]{64}$/.test(String(value.hierarchy.hierarchyHash))
+      && Array.isArray(value.hierarchy.nodes) && value.hierarchy.nodes.length <= 200 && value.hierarchy.nodes.every(node)
+      && isClosed(value.hierarchy.authority)) || !object(value.authority) || Object.keys(value.authority).length !== 7
+    || value.authority.canRead !== true || typeof value.authority.canBind !== "boolean" || value.authority.canPublish !== false
+    || value.authority.canApprove !== false || value.authority.canExecute !== false || value.authority.canWriteMeta !== false
+    || value.authority.canEnableAutomation !== false || !noOpenedAuthority(value)) {
+    throw new Error("Bütçe havuzu bağlama sözleşmesi güvenli değil.");
+  }
+  return value as unknown as PoolBindingSnapshot;
 }
 
 /** Candidate data may only prefill a new local form; it is never budget evidence. */
@@ -473,6 +500,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   state: State;
   onRetry(): void;
   onSaved(): Promise<void>;
+  onApprovalQueueHandoff?(actionUnitRef: string): void;
 }>) {
   const snapshot = props.state.status === "ready" ? props.state.snapshot : null;
   const [form, setForm] = useState<Form>(EMPTY_FORM);
@@ -486,10 +514,15 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   const [temporal, setTemporal] = useState<TemporalState>({ status: "loading" });
   const [scopeCandidates, setScopeCandidates] = useState<ScopeCandidateState>({ status: "loading" });
   const [operationalReadiness, setOperationalReadiness] = useState<OperationalReadinessState>({ status: "loading" });
+  const [poolBinding, setPoolBinding] = useState<PoolBindingState>({ status: "loading" });
   const head = snapshot?.items.find((item) => item.seriesRef === headRef) ?? undefined;
+  const frozenPoolBinding = head && (poolBinding.status === "ready" || poolBinding.status === "saving")
+    ? poolBinding.snapshot.bindings.find((binding) => binding.draftHash === head.draftHash) ?? null : null;
+  const sameMarketPoolNodes = head && (poolBinding.status === "ready" || poolBinding.status === "saving")
+    ? poolBinding.snapshot.hierarchy?.nodes.filter((node) => node.market === head.scope.market) ?? [] : [];
   const editableHead = head === undefined || isEditableRule(head.operatingRule.rule);
   const command = useMemo(() => editableHead ? buildSliceRuleDraftCommand(form, head) : null, [editableHead, form, head]);
-  const impactCommand = useMemo(() => buildSliceRuleBudgetImpactCommand(head, impactRaw), [head, impactRaw]);
+  const impactCommand = useMemo(() => frozenPoolBinding ? buildSliceRuleBudgetImpactCommand(head, impactRaw) : null, [head, impactRaw, frozenPoolBinding]);
   const update = <K extends keyof Form>(key: K, value: Form[K]) => setForm((current) => ({ ...current, [key]: value }));
   const loadSelectionCandidates = useCallback(async () => {
     try {
@@ -537,6 +570,15 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     } catch { setOperationalReadiness({ status: "unavailable" }); }
   }, []);
   useEffect(() => { void loadOperationalReadiness(); }, [loadOperationalReadiness]);
+  const loadPoolBinding = useCallback(async () => {
+    try {
+      const response = await fetch("/api/slice-rule-budget-pool-bindings", { cache: "no-store", credentials: "same-origin", headers: { "X-ReklamZeka-Intent": "slice-rule-budget-pool-binding-read" } });
+      const payload = await response.json(); if (!response.ok) throw new Error(payload?.error?.message ?? "Bütçe havuzu bağları okunamadı.");
+      const parsed = parseSliceRuleBudgetPoolBindingSnapshot(payload);
+      setPoolBinding({ status: "ready", snapshot: parsed, selectedPoolRef: "" });
+    } catch (reason) { setPoolBinding({ status: "unavailable", message: reason instanceof Error ? reason.message : "Bütçe havuzu bağları okunamadı." }); }
+  }, []);
+  useEffect(() => { void loadPoolBinding(); }, [loadPoolBinding]);
   const applyScopeCandidate = (candidate: ScopeCandidate) => {
     setHeadRef(null); setImpactState({ status: "idle" });
     setForm((current) => ({ ...current, market: candidate.scope.market, serviceRef: candidate.scope.serviceRef,
@@ -563,9 +605,12 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
       const response = await fetch("/api/slice-rule-budget-action-units", { method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-budget-action-unit-materialize" },
         body: JSON.stringify({ command: { selectionRef: selection.selectionRef, idempotencyKey: `approval_${selection.selectionRef.slice(-20)}`, proposedAt, expiresAt } }) });
-      const payload = await response.json() as { persistence?: "inserted" | "unchanged"; error?: { message?: string } };
-      if (!response.ok || (payload.persistence !== "inserted" && payload.persistence !== "unchanged")) throw new Error(payload.error?.message ?? "İnsan onay kuyruğu isteği reddedildi.");
-      setApprovalQueue({ status: "queued", selectionRef: selection.selectionRef, persistence: payload.persistence });
+      const payload = await response.json() as { selectionRef?: string; actionUnitRef?: string; persistence?: "inserted" | "unchanged"; error?: { message?: string } };
+      if (!response.ok || payload.selectionRef !== selection.selectionRef || !/^action_unit_[a-f0-9]{20}$/.test(String(payload.actionUnitRef))
+        || (payload.persistence !== "inserted" && payload.persistence !== "unchanged")) throw new Error(payload.error?.message ?? "İnsan onay kuyruğu isteği reddedildi.");
+      const actionUnitRef = String(payload.actionUnitRef);
+      setApprovalQueue({ status: "queued", selectionRef: selection.selectionRef, actionUnitRef, persistence: payload.persistence });
+      props.onApprovalQueueHandoff?.(actionUnitRef);
     } catch (reason) { setApprovalQueue({ status: "error", message: reason instanceof Error ? reason.message : "İnsan onay kuyruğu isteği reddedildi." }); }
   };
   const selectScenario = async (candidate: SelectionCandidate) => {
@@ -580,6 +625,15 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
       setSelection({ status: "selected", selectionRef, persistence: payload.persistence });
       await loadApprovalSelections();
     } catch (reason) { setSelection({ status: "error", message: reason instanceof Error ? reason.message : "Senaryo seçimi reddedildi." }); }
+  };
+  const bindPool = async () => {
+    if (!head || poolBinding.status !== "ready" || !poolBinding.selectedPoolRef || !poolBinding.snapshot.hierarchy) return;
+    setPoolBinding({ ...poolBinding, status: "saving" });
+    try {
+      const response = await fetch("/api/slice-rule-budget-pool-bindings", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-budget-pool-binding-save" }, body: JSON.stringify({ command: { draftHash: head.draftHash, hierarchyHash: poolBinding.snapshot.hierarchy.hierarchyHash, poolRef: poolBinding.selectedPoolRef, market: head.scope.market, idempotencyKey: `pool_binding.${head.draftHash.slice(0, 24)}` } }) });
+      const payload = await response.json(); if (!response.ok) throw new Error(payload?.error?.message ?? "Bütçe havuzu bağlama isteği reddedildi.");
+      await loadPoolBinding();
+    } catch (reason) { setPoolBinding({ status: "error", message: reason instanceof Error ? reason.message : "Bütçe havuzu bağlama isteği reddedildi." }); }
   };
   const save = async () => {
     if (!command || !snapshot?.authority.canSaveDraft) return;
@@ -670,6 +724,17 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
         </fieldset>
         {head && !editableHead ? <p className={styles.impactNotice} role="status"><strong>Bu taslak türü bu ilk editörde değiştirilemez.</strong> Kayıt korunur; yanlışlıkla başka bir kurala dönüştürülemez.</p> : null}
         <div className={styles.safety}><strong>Yetki sınırı</strong><span>Policy yayınlama: kapalı</span><span>Onay: kapalı</span><span>Action/Meta write: kapalı</span><span>Otomasyon: kapalı</span></div>
+        <section className={styles.impact} aria-label="Bütçe havuzu bağlama">
+          <div className={styles.panelTitle}><div><span>IMMUTABLE DRAFT · BUDGET POOL</span><h2>Bütçe havuzu bağı</h2></div><small>Öneri · Meta write kapalı</small></div>
+          {!head ? <p className={styles.impactNotice}>Bir bütçe havuzu seçebilmek için önce kayıtlı, immutable bir kural taslağı seçin.</p> : null}
+          {head && poolBinding.status === "loading" ? <p className={styles.impactNotice}>Mevcut havuz hiyerarşisi ve frozen bağ kanıtı okunuyor…</p> : null}
+          {head && (poolBinding.status === "unavailable" || poolBinding.status === "error") ? <p className={styles.impactFailure} role="alert">{poolBinding.message}</p> : null}
+          {head && frozenPoolBinding ? <div className={styles.impactResult} role="status"><strong>Frozen bütçe havuzu bağı</strong><span>{frozenPoolBinding.market === "domestic" ? "Yerli" : "Yabancı"} · {frozenPoolBinding.poolRef}</span><span>Draft: {frozenPoolBinding.draftHash.slice(0, 16)}… · hiyerarşi: {frozenPoolBinding.hierarchyHash.slice(0, 16)}…</span><span>{date(frozenPoolBinding.boundAt)} · immutable · onay/action/Meta write kapalı</span></div> : null}
+          {head && !frozenPoolBinding && (poolBinding.status === "ready" || poolBinding.status === "saving") ? <div className={styles.impactResult}>
+            {!poolBinding.snapshot.hierarchy ? <span>Kaydedilmiş bütçe havuzu hiyerarşisi yok; bağ oluşturulmadı.</span> : sameMarketPoolNodes.length === 0 ? <span>Bu kuralın pazarıyla aynı pazar havuz düğümü bulunamadı; pazar sınırı aşılmadı.</span> : <><span>Yalnız <strong>{head.scope.market === "domestic" ? "yerli" : "yabancı"}</strong> hiyerarşi düğümü seçilebilir. Tarayıcı kapsam veya tutar göndermez.</span><label>Havuz düğümü<select value={poolBinding.selectedPoolRef} disabled={!poolBinding.snapshot.authority.canBind || poolBinding.status === "saving"} onChange={(event) => setPoolBinding({ ...poolBinding, selectedPoolRef: event.target.value })}><option value="">Havuz seçin</option>{sameMarketPoolNodes.map((node) => <option key={node.poolRef} value={node.poolRef}>{node.poolRef} · {node.layer} · {node.hardCapDecimal} {node.currency}</option>)}</select></label><button className={styles.save} type="button" disabled={!poolBinding.snapshot.authority.canBind || !poolBinding.selectedPoolRef || poolBinding.status === "saving"} onClick={() => void bindPool()}>{poolBinding.status === "saving" ? "Bağ doğrulanıyor…" : "Immutable taslağa havuzu bağla"}</button></>}
+          </div> : null}
+          <small>Bu bağ yalnız kullanıcı tarafından kaydedilmiş taslağın bütçe kapsamı kanıtıdır; policy üretmez, onaylamaz, action açmaz ve Meta’da değişiklik yapmaz.</small>
+        </section>
         <section className={styles.impact} aria-label="Operasyon uygunluğu">
           <div className={styles.panelTitle}><div><span>FROZEN CONTEXT · READINESS</span><h2>Operasyon uygunluğu</h2></div><small>Salt-okur</small></div>
           {operationalReadiness.status === "loading" ? <p className={styles.impactNotice}>Frozen context uygunluğu okunuyor…</p> : null}
@@ -687,6 +752,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
         <section className={styles.impact} aria-labelledby="slice-rule-impact-heading">
           <div className={styles.panelTitle}><div><span>BUDGET LAB · ÖNİZLEME / TASLAK</span><h2 id="slice-rule-impact-heading">Kayıtlı taslağın bütçe etkisi</h2></div><small>Onay · action · Meta write kapalı</small></div>
           {!head ? <p className={styles.impactNotice}>Önizleme için önce kayıt defterindeki güncel bir taslağı seçin. Kaydedilmemiş form kapsamı kullanılmaz.</p> : null}
+          {head && head.operatingRule.rule.kind !== "delivery_guardrail" && !frozenPoolBinding ? <p className={styles.impactNotice} role="status"><strong>Önizleme kapalı.</strong> Bu bütçeyi etkileyen taslak için önce aynı pazar içindeki immutable bütçe havuzu bağını kaydedin.</p> : null}
           {head?.operatingRule.rule.kind === "delivery_guardrail" ? <p className={styles.impactNotice} role="status"><strong>Desteklenmiyor.</strong> Teslimat koruması doğrudan bütçe senaryosu değildir; otomatik bir bütçe etkisi varsayılmaz.</p> : null}
           {head && head.operatingRule.rule.kind !== "delivery_guardrail" ? <>
             <label className={styles.impactInput}>Exact Budget Lab dry-run komutu
@@ -734,7 +800,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
               <span>Seçim: {selection.selectionRef.slice(0, 20)}… · {date(selection.selectedAt)}</span>
               <button className={styles.save} type="button" onClick={() => void sendToApprovalQueue(selection)}>İnsan onay kuyruğuna gönder</button>
             </div>) : null}
-            {approvalQueue.status === "queued" ? <span>Seçim onay kuyruğuna eklendi ({approvalQueue.persistence}). Onay, execute ve Meta write hâlâ kapalıdır.</span> : null}
+            {approvalQueue.status === "queued" ? <span>Seçim onay kuyruğuna eklendi ({approvalQueue.persistence}). Onay kaydı için Onay Kuyruğu açıldı; execute ve Meta write hâlâ kapalıdır.</span> : null}
             {(approvalQueue.status === "unavailable" || approvalQueue.status === "error") ? <span role="alert">{approvalQueue.message}</span> : null}
           </div>
           <div className={styles.impactResult} aria-label="Karar izi">
@@ -769,7 +835,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   </div>;
 }
 
-export function SliceRuleWorkspacePanel() {
+export function SliceRuleWorkspacePanel({ onApprovalQueueHandoff }: Readonly<{ onApprovalQueueHandoff?(actionUnitRef: string): void }>) {
   const [state, setState] = useState<State>({ status: "loading" });
   const load = useCallback(async () => {
     setState({ status: "loading" });
@@ -785,7 +851,7 @@ export function SliceRuleWorkspacePanel() {
     } catch { setState({ status: "error", message: "Slice Rule Workspace bağlantısı kurulamadı." }); }
   }, []);
   useEffect(() => { void load(); }, [load]);
-  return <SliceRuleWorkspaceSurface state={state} onRetry={() => void load()} onSaved={load} />;
+  return <SliceRuleWorkspaceSurface state={state} onRetry={() => void load()} onSaved={load} onApprovalQueueHandoff={onApprovalQueueHandoff} />;
 }
 
 export { CLOSED as SLICE_RULE_CLOSED_AUTHORITY, EMPTY_FORM as EMPTY_SLICE_RULE_FORM };

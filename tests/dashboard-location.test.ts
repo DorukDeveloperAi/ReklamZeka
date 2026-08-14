@@ -28,6 +28,15 @@ describe("dashboard URL and history location contract", () => {
     expect(dashboardLocationFromSearch(new URLSearchParams("view=approvals&campaign=campaign_private"))).toMatchObject({ campaignRef: null });
   });
 
+  it("allowlists an exact ActionUnit only on the human approval detail route", () => {
+    const unitRef = "action_unit_aaaaaaaaaaaaaaaaaaaa";
+    const location = dashboardLocationFromSearch(new URLSearchParams(`view=manage&area=decisions&tab=approvals&unit=${unitRef}`));
+    expect(location).toMatchObject({ view: "manage", manageArea: "decisions", decisionArea: "approvals", approvalUnitRef: unitRef });
+    expect(dashboardLocationHref(location)).toBe(`/dashboard?view=manage&area=decisions&tab=approvals&unit=${unitRef}`);
+    expect(dashboardLocationFromSearch(new URLSearchParams(`view=manage&area=decisions&tab=budgets&unit=${unitRef}`))).toMatchObject({ approvalUnitRef: null });
+    expect(dashboardLocationFromSearch(new URLSearchParams("view=manage&area=decisions&tab=approvals&unit=unit_private"))).toMatchObject({ approvalUnitRef: null });
+  });
+
   it("normalizes legacy entry points into the approved parent context", () => {
     expect(dashboardLocationFromSearch(new URLSearchParams("view=strict-policies")))
       .toMatchObject({ view: "manage", manageArea: "rules", rulesArea: "policies" });

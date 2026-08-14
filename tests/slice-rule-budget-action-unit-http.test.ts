@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { createSliceRuleBudgetActionUnitHttpHandlers, selectionRef } from "@/server/slice-rule-budget-action-unit-http";
 
@@ -13,6 +14,13 @@ function reader(rows: unknown[], traceRows: unknown[] = []) { return {
 }; }
 
 describe("Slice Rule budget ActionUnit HTTP boundary", () => {
+  it("returns the server-resolved public ActionUnit ref with the original selection ref", () => {
+    const source = readFileSync("src/server/slice-rule-budget-action-unit-http.ts", "utf8");
+    expect(source).toContain("selectionRef: parsed.selectionRef");
+    expect(source).toContain("actionUnitRef: result.actionUnitRef");
+    expect(source).not.toContain("actionUnitRef: parsed.");
+  });
+
   it("projects selected scenarios through a public evidence-hash reference, never the internal UUID", async () => {
     const database = reader([{ id: "33333333-3333-4333-8333-333333333333", selectionEvidenceHash: evidenceHash, selectedAt: new Date("2026-08-13T12:00:00.000Z") }], [{
       selection_id: "33333333-3333-4333-8333-333333333333", selection_evidence_hash: evidenceHash, selected_at: "2026-08-13T12:00:00.000Z",

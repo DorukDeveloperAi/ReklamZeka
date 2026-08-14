@@ -55,7 +55,9 @@ export function createSliceRuleBudgetActionUnitHttpHandlers(input: Readonly<{
       const rows = await input.database.select({ id: schema.sliceRuleScenarioAllocationSelections.id }).from(schema.sliceRuleScenarioAllocationSelections).where(and(eq(schema.sliceRuleScenarioAllocationSelections.workspaceId, principal.workspaceId), eq(schema.sliceRuleScenarioAllocationSelections.selectionEvidenceHash, parsed.selectionRef.slice("selection_".length)))).limit(2);
       if (rows.length !== 1) return response(rows.length ? "selection_ambiguous" : "selection_not_found", "Seçilmiş bütçe senaryosu bulunamadı veya tekil değil.", 404);
       const result = await new DrizzleSliceRuleBudgetActionUnitMaterializer(input.database).materialize({ workspaceId: principal.workspaceId, selectionId: rows[0]!.id, actorId: principal.actor.userId, idempotencyKey: parsed.idempotencyKey, proposedAt: parsed.proposedAt, expiresAt: parsed.expiresAt });
-      return NextResponse.json({ contractVersion: "slice-rule-budget-action-unit-http/1.0.0", selectionRef: parsed.selectionRef, queueState: "queued", persistence: result.outcome, authority: AUTHORITY }, { status: result.outcome === "inserted" ? 201 : 200, headers: HEADERS });
+      return NextResponse.json({ contractVersion: "slice-rule-budget-action-unit-http/1.0.0", selectionRef: parsed.selectionRef,
+        actionUnitRef: result.actionUnitRef, queueState: "queued", persistence: result.outcome, authority: AUTHORITY },
+      { status: result.outcome === "inserted" ? 201 : 200, headers: HEADERS });
     } catch (reason) { if (reason instanceof SliceRuleBudgetActionUnitMaterializerError) return response(reason.code, "Senaryo insan onay kuyruğuna güvenli biçimde gönderilemedi.", reason.code === "role_denied" || reason.code === "membership_required" ? 403 : 409); if (reason instanceof SyntaxError || reason instanceof Error && reason.message === "invalid_input") return response("invalid_input", "İnsan onay kuyruğu isteği geçersiz.", 400); return response("unavailable", "İnsan onay kuyruğu şu anda kullanılamıyor.", 503); }
     },
   });

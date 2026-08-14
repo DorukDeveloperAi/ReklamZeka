@@ -23,6 +23,8 @@ export type DashboardLocation = Readonly<{
   settingsArea: SettingsArea;
   /** Public mirror alias only; it is revalidated against frozen context client-side. */
   campaignRef: string | null;
+  /** Public ActionUnit alias. It can only open the human approval detail surface. */
+  approvalUnitRef: string | null;
 }>;
 
 type SearchRecord = Readonly<Record<string, string | readonly string[] | undefined>>;
@@ -37,6 +39,7 @@ const defaultLocation = Object.freeze({
   rulesArea: "guidance",
   settingsArea: "meta",
   campaignRef: null,
+  approvalUnitRef: null,
 } satisfies DashboardLocation);
 
 const dashboardViews = new Set<DashboardViewId>([
@@ -87,6 +90,7 @@ export function dashboardLocationFromSearch(search: SearchRecord | SearchReader)
   const area = searchValue(search, "area");
   const tab = searchValue(search, "tab");
   const requestedCampaignRef = searchValue(search, "campaign");
+  const requestedApprovalUnitRef = searchValue(search, "unit");
   const isDecisionContext = normalized.manageArea === "decisions" || (legacyView === "manage" && area === "decisions");
   const campaignRef = normalized.view === "manage" && isDecisionContext
     && requestedCampaignRef !== null && /^ref_[a-f0-9]{12}$/.test(requestedCampaignRef) ? requestedCampaignRef : null;
@@ -107,10 +111,14 @@ export function dashboardLocationFromSearch(search: SearchRecord | SearchReader)
   const manageArea = area && manageAreas.has(area as ManageArea) ? area as ManageArea : normalized.manageArea;
   if (manageArea === "portfolio") return { ...location, manageArea,
     campaignArea: tab && campaignAreas.has(tab as CampaignArea) ? tab as CampaignArea : normalized.campaignArea };
-  if (manageArea === "decisions") return { ...location, manageArea,
-    decisionArea: tab && decisionAreas.has(tab as DecisionArea) ? tab as DecisionArea : normalized.decisionArea,
+  if (manageArea === "decisions") {
+    const decisionArea = tab && decisionAreas.has(tab as DecisionArea) ? tab as DecisionArea : normalized.decisionArea;
+    const approvalUnitRef = decisionArea === "approvals" && requestedApprovalUnitRef !== null
+      && /^action_unit_[a-f0-9]{20}$/.test(requestedApprovalUnitRef) ? requestedApprovalUnitRef : null;
+    return { ...location, manageArea, decisionArea, approvalUnitRef,
     budgetArea: tab === "budgets" && searchValue(search, "detail") && budgetAreas.has(searchValue(search, "detail") as BudgetArea)
       ? searchValue(search, "detail") as BudgetArea : normalized.budgetArea };
+  }
   if (manageArea === "rules") return { ...location, manageArea,
     rulesArea: tab && rulesAreas.has(tab as RulesArea) ? tab as RulesArea : normalized.rulesArea };
   return { ...location, manageArea: "settings",
@@ -129,6 +137,7 @@ export function dashboardLocationHref(location: DashboardLocation): string {
     if (location.manageArea === "rules" && location.rulesArea !== "guidance") search.set("tab", location.rulesArea);
     if (location.manageArea === "settings" && location.settingsArea !== "meta") search.set("tab", location.settingsArea);
     if (location.manageArea === "decisions" && location.campaignRef) search.set("campaign", location.campaignRef);
+    if (location.manageArea === "decisions" && location.decisionArea === "approvals" && location.approvalUnitRef) search.set("unit", location.approvalUnitRef);
   }
   const query = search.toString();
   return query ? `/dashboard?${query}` : "/dashboard";

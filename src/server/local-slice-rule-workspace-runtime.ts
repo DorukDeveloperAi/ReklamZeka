@@ -6,6 +6,7 @@ import { SliceRuleWorkspaceService } from "@/application/slice-rule-workspace-se
 import { DrizzleBudgetProposalRepository } from "@/connectors/budget/budget-proposal-drizzle-repository";
 import { FrozenContextBudgetImpactScopeResolver } from "@/connectors/campaigns/frozen-context-budget-impact-scope-resolver";
 import { DrizzleSliceRuleWorkspaceRepository } from "@/connectors/campaigns/slice-rule-workspace-drizzle-repository";
+import { DrizzleSliceRuleBudgetPoolBindingRepository } from "@/connectors/campaigns/slice-rule-budget-pool-binding-drizzle-repository";
 import * as schema from "@/db/schema";
 import {
   LocalDecisionRoomBoundaryError,
@@ -36,7 +37,8 @@ export function createLocalSliceRuleWorkspaceHandlers(input: Readonly<{
         const rules = new DrizzleSliceRuleWorkspaceRepository(input.database as never);
         const budgets = new DrizzleBudgetProposalRepository(input.database as never);
         const service = new SliceRuleBudgetImpactService(rules,
-          new FrozenContextBudgetImpactScopeResolver(budgets), new BudgetLabDraftService(budgets, budgets));
+          new FrozenContextBudgetImpactScopeResolver(budgets), new BudgetLabDraftService(budgets, budgets),
+          new DrizzleSliceRuleBudgetPoolBindingRepository(input.database as never));
         return createSliceRuleBudgetImpactHttpHandler({ service,
           resolvePrincipal: async () => bound.principal })(request);
       }
