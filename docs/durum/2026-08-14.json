@@ -1,0 +1,188 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "0b287b002",
+      "tarih": "2026-08-14",
+      "konu": "aide türevlerini merge=ours ile beyan et — boot'u öldüren çakışmanın kök nedeni",
+      "tur": "is",
+      "kapsam": []
+    },
+    {
+      "hash": "add0d55b4",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): wire private analysis context composer",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4c85d52ad",
+      "tarih": "2026-08-10",
+      "konu": "docs(a10): record ready source bundle evidence",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "ec66e64c6",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): assemble ready analysis source bundles",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4fcf60ffe",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): bind authority to source snapshots",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "fe302fdfd",
+      "tarih": "2026-08-10",
+      "konu": "test(a10): cover guidance selection revisions",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "b8adfacd0",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): compose selected guidance snapshots",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7a23913f7",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): compose categories in source snapshots",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e0ddf6972",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): bind guidance selections to campaigns",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ede8d665f",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): validate reviewed guidance manifests",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "695003a0e",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): share cadence snapshot reads",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "59c51bc78",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): validate current Meta hierarchy config",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "20cef249d",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): add current source snapshot seam",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "62daebfec",
+      "tarih": "2026-08-10",
+      "konu": "fix(a10): harden current cadence reader",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "f64d77c3c",
+      "tarih": "2026-08-10",
+      "konu": "feat(a10): compose evidence-bound analysis contexts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "feat",
+      "adet": 43
+    },
+    {
+      "kapsam": "fix",
+      "adet": 6
+    },
+    {
+      "kapsam": "docs",
+      "adet": 5
+    },
+    {
+      "kapsam": "chore",
+      "adet": 3
+    },
+    {
+      "kapsam": "test",
+      "adet": 2
+    },
+    {
+      "kapsam": "?",
+      "adet": 1
+    }
+  ],
+  "isSayisi": 176,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-14",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "d6adf7e15f89"
+}
