@@ -76,6 +76,10 @@ describe("Slice Rule Workspace panel", () => {
     expect(html).toContain("Kanıtlı kapsam adayları");
     expect(html).toContain("Frozen context, bütçe etkisi, policy ve action yetkisi üretmez");
     expect(html).toContain("Karar izi");
+    expect(html).toContain("SLICE &amp; KURAL ÇALIŞMA TABLOSU");
+    expect(html).toContain("Kural / bütçe yaklaşımı");
+    expect(html).toContain("Takip yaklaşımı");
+    expect(html).toContain("Kuralı gözden geçir");
   });
 
   it("accepts candidates only as form-prefill data with frozen budget evidence still required", () => {
