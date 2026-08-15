@@ -29,7 +29,7 @@ export function sourceStatePresentation(source: PublicSource | null, sessionRequ
 }> {
   if (sessionRequired) return Object.freeze({
     label: "Yerel oturum gerekli",
-    detail: "Bu çalışma alanını görmek için yerel oturum gerekli.",
+    detail: "Bu çalışma alanında veri gösterilmez. Yerel oturum bağlandıktan sonra sayfayı yenileyin.",
     tone: "warning",
     retryable: false,
   });

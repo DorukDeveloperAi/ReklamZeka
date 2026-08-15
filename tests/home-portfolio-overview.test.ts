@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { portfolioSourceGuidance } from "@/app/dashboard/canonical-campaign-portfolio-panel";
 
 const surface = readFileSync("src/app/dashboard/home-portfolio-overview.tsx", "utf8");
 
@@ -19,5 +20,11 @@ describe("home portfolio overview", () => {
     expect(surface).not.toContain("Meta’da yaz");
     expect(surface).not.toContain("Kural oluştur");
     expect(surface).not.toContain("Policy oluştur");
+  });
+
+  it("states the impact and next step for a partial or empty portfolio source", () => {
+    expect(portfolioSourceGuidance("partial")).toContain("kesin sonuç çıkarmayın");
+    expect(portfolioSourceGuidance("empty")).toContain("başka bir portföyü tahmin etmemektir");
+    expect(portfolioSourceGuidance("ready")).toBeNull();
   });
 });

@@ -132,6 +132,17 @@ describe("Slice Rule Workspace panel", () => {
     expect(source).toContain("Kategori kayıtları eksikse sistem kapsam veya kural tahmin etmez.");
   });
 
+  it("keeps a session-required library empty and explains the safe recovery in place", () => {
+    const html = renderToStaticMarkup(createElement(SliceRuleWorkspaceSurface, {
+      state: { status: "session_required", message: "Yerel oturum gerekli." }, onRetry: vi.fn(),
+      onSaved: vi.fn(async () => undefined), onConnect: vi.fn(async () => true),
+    }));
+    expect(html).toContain("Yerel oturum gerekli");
+    expect(html).toContain("kural, slice veya karar kaydı gösterilmez");
+    expect(html).toContain("Kural Kütüphanesini bağlayın");
+    expect(html).not.toContain("slice_rule.ftr.ar");
+  });
+
   it("renders only explanatory frozen-context readiness with no opened authority", () => {
     const items = parseSliceOperationalReadiness({ version: "slice-operational-readiness/1.0.0", items: [{ candidateRef: "category_entity_ready", scope: { market: "international", serviceRef: "service_physical_therapy", campaignFamilyRef: "campaign_family_intensive_ftr" }, frozenContext: "ready", budgetImpact: "eligible" }], authority: { canSave: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false } });
     expect(items[0]).toMatchObject({ frozenContext: "ready", budgetImpact: "eligible" });

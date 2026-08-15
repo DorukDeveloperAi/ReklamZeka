@@ -1213,7 +1213,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     return <>
       <section className={styles.pageHero}>
         <div><span className={styles.kicker}>ANA SAYFA · GENEL BAKIŞ</span><h1>Portföyde bugün nerede inceleme gerektiğini görün.</h1><p>Hesaplar ve slice’lar üstü görünüm, veri sağlığı ve öncelikleri gösterir. Eksik veri sıfır veya örnek değer olarak gösterilmez. Ayrıntılı işletim için ilgili kapsamı Portföy / Slice çalışma masasında açın.</p></div>
-        <button className={styles.primaryButton} onClick={() => openAgentContext("portfolio_current", "Bugün · kanonik portföy")}><span>✦</span> Asistanla çalış</button>
+        <button className={styles.primaryButton} onClick={() => openAgentContext("portfolio_current", "Bugün · kanonik portföy")}><span>✦</span> Asistanla aç</button>
       </section>
 
       <section className={styles.signalStrip} aria-label="Kanonik kaynak durumu">
@@ -1285,8 +1285,8 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
           <header><div><span className={styles.agentMark}>✦</span><div><strong>Agent çalışma alanı</strong><small>Kaynak ekran: {sourceTitle} · konuşma sayfalar arasında korunur</small></div></div><button onClick={() => void refreshOrchestratorConversation()}>Sohbeti yenile</button></header>
           {skillCatalogState === "ready" || skillCatalogState === "legacy" ? <SkillCatalogContextStrip context={skillCatalogContext} onOpenSetup={openSkillSetup} setupClassName={styles.skillSetupHint} />
             : skillCatalogState === "loading" ? <p role="status">Skill bağlamı güvenli projeksiyondan okunuyor…</p>
-              : skillCatalogState === "session_required" ? <p role="status">Skill bağlamı için yerel oturum gerekli; kayıt veya seçim gösterilmez.</p>
-                : skillCatalogState === "unavailable" ? <p role="status">Skill bağlamı kullanılamıyor; kayıt veya seçim gösterilmez.</p> : null}
+              : skillCatalogState === "session_required" ? <p role="status">Skill bağlamı için yerel oturum gerekli; kayıt veya seçim gösterilmez. Oturum bağlandıktan sonra sohbet ve skill bağlamı birlikte yenilenir.</p>
+                : skillCatalogState === "unavailable" ? <p role="status">Skill bağlamı kullanılamıyor; kayıt veya seçim gösterilmez. Sonraki adım, kaynak düzeldikten sonra sohbeti yenilemektir.</p> : null}
           <div className={styles.chatMessages}>
             {orchestratorState === "loading" ? <p role="status">Kalıcı konuşma kaynağı doğrulanıyor…</p> : null}
             {orchestratorState === "session_required" ? <LocalSessionConnector title="Orchestrator konuşmasını bağlayın" onVerify={verifyOrchestratorWorkspace} /> : null}
@@ -1505,7 +1505,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
       ]} />
       {rulesArea === "guidance" ? <><GuidanceStudioPanel onSessionRequiredChange={setRulesSessionRequired} />
         {rulesSessionRequired === false ? <><SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /></> : null}</>
-        : rulesArea === "slices" ? <SliceRuleWorkspacePanel requestedScopeCampaignRef={classificationScopeCampaignRef} selectedRuleRef={selectedRuleRef} selectedRuleRevision={selectedRuleRevision} onOpenCanonicalRule={openCanonicalRule} onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} onOpenRuleSession={openRuleSession} onOpenCategorySetup={() => openSettings("categories")} />
+        : rulesArea === "slices" ? <SliceRuleWorkspacePanel requestedScopeCampaignRef={classificationScopeCampaignRef} selectedRuleRef={selectedRuleRef} selectedRuleRevision={selectedRuleRevision} onOpenCanonicalRule={openCanonicalRule} onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} onOpenRuleSession={openRuleSession} onOpenCategorySetup={() => openSettings("categories")} onConnect={verifyAndRefreshLocalSession} />
         : rulesArea === "policies" ? <InstructionPolicyStudioPanel />
           : rulesArea === "authority" ? <AutonomyStudioPanel />
             : <PracticeLabPanel />}
