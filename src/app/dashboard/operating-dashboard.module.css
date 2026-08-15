@@ -312,6 +312,16 @@
 .copyPreview summary { display: grid; gap: 5px; cursor: pointer; list-style: none; }
 .copyPreview summary::-webkit-details-marker { display: none; }
 .copyPreview summary small { color: var(--rz-muted); font-size: .57rem; line-height: 1.45; }
+.sliceScopePanel { margin: 0 18px 18px; overflow: hidden; border: 1px solid var(--rz-line); border-radius: 10px; background: color-mix(in srgb, var(--rz-blue) 4%, var(--rz-surface)); }
+.sliceScopePanel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 13px 14px 10px; border-bottom: 1px solid var(--rz-line); }
+.sliceScopePanel h3 { margin: 6px 0 0; font-size: .76rem; }
+.sliceScopePanel > p { margin: 0; padding: 10px 14px; color: var(--rz-muted); font-size: .58rem; line-height: 1.5; border-bottom: 1px solid var(--rz-line); }
+.sliceScopeList { display: grid; }
+.sliceScopeList article { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--rz-line); }
+.sliceScopeList article:last-child { border-bottom: 0; }
+.sliceScopeList article > div:first-child { display: grid; gap: 5px; min-width: 0; }
+.sliceScopeList strong { font-size: .63rem; line-height: 1.4; }
+.sliceScopeList small { color: var(--rz-muted); font-size: .55rem; line-height: 1.45; }
 
 
 .budgetHero { display: grid; grid-template-columns: 1fr 280px; gap: 10px; margin-bottom: 10px; }
@@ -1122,6 +1132,7 @@
   .detailHeader { display: grid; gap: 13px; }
   .detailHeader .agentActions { flex-wrap: wrap; }
   .detailHeader .agentActions button { flex: 1 1 132px; }
+  .sliceScopeList article { align-items: flex-start; flex-direction: column; }
   .contextTabs { display: flex; overflow-x: auto; scrollbar-width: none; }
   .contextTabs button { flex: 0 0 170px; }
   .managementGlossary { align-items: flex-start; gap: 10px 14px; }
