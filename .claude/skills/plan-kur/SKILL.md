@@ -89,7 +89,12 @@ dosyalara döker**, kullanıcıya `/goal` komutlarını verir. Ana loop kendi ba
   (kapsam sınırı, sertlik/kanıt seviyesi, tempo, bütçe). Koddan çözülebilecek şeyi sorma.
 - **KÜNYEYİ belirle (kategori · üst · kritiklik · aciliyet · hacim · hedef):** kategori
   (proje·özellik·altyapı·süreç·araştırma) görevden çıkarılabiliyorsa çıkar; Üst dalı mevcut
-  ağaçtan oku (`node ~/.claude/skills/plan-organizatoru/scripts/agac.mjs --durum`). Kritiklik
+  ağaçtan oku (`node ~/.claude/skills/plan-organizatoru/scripts/agac.mjs --durum`).
+  **BAĞLANMA açık karardır (2026-08-14):** görev roadmap'in/ana planın bariz parçasıysa
+  `Üst: proje` (ya da ilgili dal); açıkça tek-seferlik/koş-ve-bitir işiyse `Üst: —`
+  (bağımsız); **gri alanda 1-tur soruya DAHİL ET** — sezgiyle master'a bağlama. Çağıran
+  akış (`/planla-kos`) `bağlanma=` kararı taşıyorsa sorgusuz onu uygula. Fark davranışsaldır:
+  bağlı plan rota/PM/INDEX önceliğine girer, bağımsız plan yalnız koşulur. Kritiklik
   ve aciliyet **kullanıcıya ait kararlardır** — koddan çıkarsanamaz; belirsizse 1-tur soruya
   DAHİL ET (mevcut sırayı `--kunye` ile göster ki kullanıcı yeni planı ona göre konumlasın).
   Hacim Faz B/C efor notlarından türer (küçük: tek aşama · orta: 2-4 · büyük: 5-8 · epik: 9+). **Yeni plan mı revizyon mu** şüphesi varsa /plan-organizatoru
@@ -174,8 +179,9 @@ Kurallar:
   yeni-mi-revizyon-mu double-check + Kategori/Üst doğrulaması + INDEX türetimi (makine katmanı:
   proje kökünde `node ~/.claude/skills/plan-organizatoru/scripts/agac.mjs`, ardından `--gate` PASS).
   Plan böylece kaptan/PM dashboard'una girer (INDEX.json → readPlans → PM.json "Planlar").
-  Not: proje ana planı (`proje` slug'ı) varsa yeni planların `Üst:`ü çoğunlukla `proje`dir;
-  ana plan sonradan doğarsa mevcut planlar organizatör intake'iyle yeniden ebeveynlenir.
+  Not: `Üst:` Faz A bağlanma kararından gelir — "çoğunlukla proje" varsayımı YOK (2026-08-14:
+  /goal ile ateşle-unut koşulacak iş roadmap'e dikilmesin diye kaldırıldı); ana plan sonradan
+  doğarsa mevcut planlar organizatör intake'iyle yeniden ebeveynlenir.
 - Son çıktı olarak kullanıcıya, aşama başına yapıştırılmaya hazır komut listesi bas:
   `/goal plans/<slug>/v1/asama-NN-<ad>.md planını uygula; bitince aynı klasördeki STATE.md ve CHECKLIST.md'yi güncelle; kanıt yollarını STATE.md'ye yaz`
 

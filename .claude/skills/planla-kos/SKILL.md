@@ -46,7 +46,7 @@ alternatifi elendi: Fable fan-out'lu planlama dakikalar sürer, ikinci tur kulla
 ortasında ikinci kez masaya çağırır. Kaçış kapısı: kapsam sorusunda "planı görünce karar
 veririm" → yalnız o seçilirse plan bitince mini ikinci tur açılır (opt-in iki-tur).
 
-Tek AskUserQuestion çağrısı, en fazla 4 soru:
+Tek AskUserQuestion çağrısı, en fazla 4 soru (tool tavanı 4 — taşma kuralı aşağıda):
 
 1. **(koşullu — Faz 0 aday plan bulduysa)** "Mevcut plan: `<slug>` (v<N>, aşama k/t). Ne
    yapalım?" → `Revize et (v N+1)` / `Yeni plan aç` / `Planlamayı atla — mevcut plandan direkt koş`
@@ -59,15 +59,21 @@ Tek AskUserQuestion çağrısı, en fazla 4 soru:
 4. **Otonomi** → `Sorarak ilerle` (açıklamaya uyarı: koşu bağımsız tmux penceresinde sorar —
    soru geldiğinde `tmux attach` ile girip yanıtlaman gerekir; uzaktan takip istiyorsan
    Ateşle-unut seç) / `Kapılarda dur` / `Ateşle-unut`
+5. **Bağlanma (2026-08-14)** → `Bağımsız plan (Üst: —)` (önerilen İLK seçenek — planla-kos
+   işi tipik koş-ve-bitir'dir, roadmap'e dikilmez) / `Master ağaca bağla (Üst: proje)` /
+   `Şu dalın altına` (Other ile slug). **Taşma kuralı:** koşullu 1. soru da masadaysa toplam
+   5 > tool tavanı 4 → bağlanma sorusu DÜŞER, varsayılan `Üst: —` uygulanır ve dispatch
+   özetinde İLAN edilir ("bağımsız kuruldu; master'a bağlamak: organizatör intake").
 
 Cevaplar `/plan-kur` çağrısına **girdi olarak taşınır** ("kullanıcı kararları verildi"
-bloğu) — plan-kur'un kendi 1-tur hakkı saklıdır: görev-özgü bir kullanıcı kararı görürse
+bloğu, `bağlanma=bağımsız|proje|<slug>` dahil — plan-kur bunu sorgusuz uygular) —
+plan-kur'un kendi 1-tur hakkı saklıdır: görev-özgü bir kullanıcı kararı görürse
 sorabilir (meşru; toplam tur normalde 1'dir).
 
 ### Faz B — Planlama (delege)
 
 - Yeni plan: Skill invocation → `/plan-kur <ana görev tarifi> — [kararlar: titizlik=…,
-  kapsam-politikası=…; mevcut ağaç özeti: <Faz 0 --durum çıktısı>]`
+  kapsam-politikası=…, bağlanma=…; mevcut ağaç özeti: <Faz 0 --durum çıktısı>]`
 - Revizyon: `/plan-kur revize <slug> <talimat>`
 - "Planlamayı atla" seçildiyse bu faz atlanır.
 - plan-kur'un Faz D'si `/plan-organizatoru kaydet` + `agac.mjs` + `--gate`'i ZATEN zorunlu

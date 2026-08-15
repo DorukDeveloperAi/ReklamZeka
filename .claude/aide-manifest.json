@@ -44,7 +44,7 @@
       "pkg": "skill:zamanla"
     },
     ".claude/skills/plan-kur/SKILL.md": {
-      "hash": "47e9d1f70438b96d",
+      "hash": "05cd0c5ffff79051",
       "pkg": "skill:plan-kur"
     },
     ".claude/skills/plan-kur/sablonlar/MASTER.md": {
@@ -72,7 +72,7 @@
       "pkg": "skill:plan-kur"
     },
     ".claude/skills/plan-organizatoru/SKILL.md": {
-      "hash": "69b35156bdc0d167",
+      "hash": "5c516e24978bf9be",
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/plan-organizatoru/scripts/agac.mjs": {
@@ -100,7 +100,7 @@
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/planla-kos/SKILL.md": {
-      "hash": "7b0fdf5e31401595",
+      "hash": "bb236f357e3bc674",
       "pkg": "skill:planla-kos"
     },
     ".claude/skills/planla-kos/scripts/hazirla.mjs": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-08-14T11:26:24.915Z",
+  "updatedAt": "2026-08-15T08:29:01.318Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",
