@@ -14,8 +14,11 @@ describe("SkillCatalogPanel Yönet → Kurallar surface", () => {
     expect(panel).toContain('credentials: "same-origin"');
     expect(panel).toContain('method: "POST"');
     expect(panel).toContain("const refreshed = await reload()");
-    expect(panel).toContain("SOURCE_REF");
-    expect(panel).toContain("Yalnız mevcut GuidanceSource referansı kabul edilir");
+    expect(panel).toContain("SOURCE_OPTION");
+    expect(panel).toContain("Resmî kaynak");
+    expect(panel).toContain("sourceOptionId");
+    expect(panel).not.toContain('placeholder="source_…"');
+    expect(panel).toContain("Yönet → Rehberler");
   });
 
   it("keeps profile, create, and tombstone changes explicitly user initiated", () => {
@@ -35,7 +38,7 @@ describe("SkillCatalogPanel Yönet → Kurallar surface", () => {
       'name="rule"', 'name="policy"', 'name="scope"', 'name="action"',
     ]) expect(panel, forbidden).not.toContain(forbidden);
     expect(panel).toContain("Playbook metni");
-    expect(panel).toContain("Yayınlanmış kaynak referansı");
+    expect(panel).toContain("Resmî kaynak");
   });
 
   it("explains where each user-owned working-language item is used without widening Agent authority", () => {

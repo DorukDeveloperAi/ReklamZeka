@@ -10,6 +10,7 @@ const safeProjection = {
   contractVersion: "skill-catalog-ui/1.0.0",
   activeProfile: { kind: "profile", ref: "profile_private", revision: 4, state: "active" },
   playbooks: [{ kind: "playbook", ref: "playbook_private", revision: 2, state: "active", title: "Görünmemeli", url: "https://example.test/source", freshness: "current" }],
+  sources: [],
   skills: [{ ref: "rule_coach", name: "RuleCoach", version: "1.0.0", lifecycle: "released", citationRequired: true, negativeCapabilities: ["create_rule"] }],
   authority: {
     canSelectProfile: true, canCreatePlaybookRevision: true, canTombstonePlaybook: true,

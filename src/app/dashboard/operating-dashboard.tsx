@@ -302,9 +302,9 @@ export function skillCatalogContextFromResponse(value: unknown): SkillCatalogCon
   const activeProfile = value.activeProfile;
   const skillsProjection = value.skills;
   const playbooks = value.playbooks;
-  if (!onlyKeys(value, ["contractVersion", "activeProfile", "playbooks", "skills", "authority"])
+  if (!onlyKeys(value, ["contractVersion", "activeProfile", "playbooks", "skills", "sources", "authority"])
     || value.contractVersion !== "skill-catalog-ui/1.0.0" || !Array.isArray(skillsProjection)
-    || !Array.isArray(playbooks) || !authority
+    || !Array.isArray(playbooks) || !Array.isArray(value.sources) || value.sources.length !== 0 || !authority
     || !onlyKeys(authority, ["canSelectProfile", "canCreatePlaybookRevision", "canTombstonePlaybook", "canPersist", "canCreateRule", "canDraftPolicy", "canAlterScope", "canPublish", "canApprove", "canExecute", "canWriteMeta"])
     || !["canSelectProfile", "canCreatePlaybookRevision", "canTombstonePlaybook"].every((key) => typeof authority[key] === "boolean")
     || !["canPersist", "canCreateRule", "canDraftPolicy", "canAlterScope", "canPublish", "canApprove", "canExecute", "canWriteMeta"].every((key) => authority[key] === false)

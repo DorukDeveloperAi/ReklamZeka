@@ -26,14 +26,14 @@ describe("Skill catalog append-only playbook repository", () => {
   it("creates revision +1 from the locked canonical head and never updates the old row", async () => {
     const fixture = database([[], [head()], [{ id: sourceId }], [{ revision: 4 }]]);
     const result = await new DrizzleSkillCatalogRepository(fixture.db as never).appendPlaybookRevision({ workspaceId, actorId,
-      playbookRef, expectedRevision: 3, title: "Yeni", body: "Kullanıcı snippet'i", sourceRef: "source_guidance" });
+      playbookRef, expectedRevision: 3, title: "Yeni", body: "Kullanıcı snippet'i", sourceOptionId: sourceId });
     expect(result).toMatchObject({ kind: "playbook", ref: playbookRef, revision: 4, title: "Yeni", body: "Kullanıcı snippet'i" });
     const sql = fixture.queries.map((query) => query.sql).join("\n");
     expect(sql).toContain("pg_advisory_xact_lock");
     expect(sql).toContain("limit 1 for update");
     expect(sql).toContain("revision, previous_hash, playbook_hash");
     expect(sql).not.toMatch(/\bupdate\s+orchestrator_playbook_revisions|\bdelete\s+from\s+orchestrator_playbook_revisions/i);
-    expect(sql).toContain("source_ref = $2 and status = 'published'");
+    expect(sql).toContain("id::text = $2 and source_type = 'official_meta_guidance'");
     expect(JSON.stringify(result)).not.toContain(hash);
   });
 
@@ -46,7 +46,7 @@ describe("Skill catalog append-only playbook repository", () => {
   ])("fails closed for %s", async (_label, results, patch, code) => {
     const fixture = database(results as readonly unknown[][]);
     await expect(new DrizzleSkillCatalogRepository(fixture.db as never).appendPlaybookRevision({ workspaceId, actorId, playbookRef,
-      expectedRevision: 3, title: "Yeni", body: "Snippet", sourceRef: "source_guidance", ...patch })).rejects.toThrow(code);
+      expectedRevision: 3, title: "Yeni", body: "Snippet", sourceOptionId: sourceId, ...patch })).rejects.toThrow(code);
   });
 
   it("does not list an older active revision after a tombstone head", async () => {

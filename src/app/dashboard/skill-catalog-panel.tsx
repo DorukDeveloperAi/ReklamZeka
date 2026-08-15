@@ -17,6 +17,7 @@ type Skill = Readonly<{
   citationRequired: true;
   negativeCapabilities: readonly string[];
 }>;
+type Source = Readonly<{ optionId: string; title: string; url: string; freshness: "fresh" }>;
 type Playbook = Readonly<{
   kind: "playbook";
   ref: string;
@@ -24,7 +25,7 @@ type Playbook = Readonly<{
   state: "active";
   title: string;
   body: string;
-  sourceRef: string;
+  sourceOptionId: string;
   url?: string | null;
   freshness?: "current" | "stale" | "not_scheduled";
 }>;
@@ -32,12 +33,13 @@ type Catalog = Readonly<{
   activeProfile: Readonly<{ kind: "profile"; revision: number; state: "active" }> | null;
   skills: readonly Skill[];
   playbooks: readonly Playbook[];
+  sources: readonly Source[];
   authority: Authority;
 }>;
 type LoadState = "loading" | "ready" | "session_required" | "unavailable";
 type Mutation = "profile" | "create" | "revise" | "tombstone" | null;
 
-const SOURCE_REF = /^source_[a-z0-9_.:-]+$/;
+const SOURCE_OPTION = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CLOSED_AUTHORITY_FIELDS = ["canPersist", "canCreateRule", "canDraftPolicy", "canAlterScope", "canPublish", "canApprove", "canExecute", "canWriteMeta"] as const;
 const PRIVATE_IDENTIFIER = /\b(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[a-f0-9]{64})\b/i;
 
@@ -51,7 +53,7 @@ function publicPlaybookText(value: unknown, maximum: number): value is string {
 
 function catalogFromResponse(value: unknown): Catalog | null {
   if (!record(value) || value.contractVersion !== "skill-catalog-ui/1.0.0"
-    || !Array.isArray(value.skills) || !Array.isArray(value.playbooks) || !record(value.authority)) return null;
+    || !Array.isArray(value.skills) || !Array.isArray(value.playbooks) || !Array.isArray(value.sources) || !record(value.authority)) return null;
   const authority = value.authority;
   if (!["canSelectProfile", "canCreatePlaybookRevision", "canTombstonePlaybook"].every((key) => typeof authority[key] === "boolean")
     || CLOSED_AUTHORITY_FIELDS.some((key) => authority[key] !== false)) return null;
@@ -69,18 +71,25 @@ function catalogFromResponse(value: unknown): Catalog | null {
   const playbooks = value.playbooks.map((item) => {
     if (!record(item) || item.kind !== "playbook" || typeof item.ref !== "string" || !/^playbook_[a-z0-9][a-z0-9_-]{0,86}$/.test(item.ref) || typeof item.revision !== "number"
       || !Number.isSafeInteger(item.revision) || item.revision < 1 || item.state !== "active" || !publicPlaybookText(item.title, 240)
-      || !publicPlaybookText(item.body, 16_000) || typeof item.sourceRef !== "string" || !SOURCE_REF.test(item.sourceRef)
+      || !publicPlaybookText(item.body, 16_000) || !SOURCE_OPTION.test(item.sourceOptionId as string)
       || !(item.url === undefined || item.url === null || typeof item.url === "string")
       || !(item.freshness === undefined || item.freshness === "current" || item.freshness === "stale" || item.freshness === "not_scheduled")) return null;
     return Object.freeze({ kind: "playbook" as const, ref: item.ref, revision: item.revision, state: "active" as const,
-      title: item.title as string, body: item.body as string, sourceRef: item.sourceRef as string, url: item.url as string | null | undefined,
+      title: item.title as string, body: item.body as string, sourceOptionId: item.sourceOptionId as string, url: item.url as string | null | undefined,
       freshness: item.freshness as Playbook["freshness"] });
   });
-  if (skills.some((item) => item === null) || playbooks.some((item) => item === null)) return null;
+  const sources = value.sources.map((item) => {
+    if (!record(item) || !SOURCE_OPTION.test(item.optionId as string) || !publicPlaybookText(item.title, 300)
+      || !publicPlaybookText(item.url, 2_000) || item.freshness !== "fresh") return null;
+    try { if (new URL(item.url as string).protocol !== "https:") return null; } catch { return null; }
+    return Object.freeze({ optionId: item.optionId as string, title: item.title as string, url: item.url as string, freshness: "fresh" as const });
+  });
+  if (skills.some((item) => item === null) || playbooks.some((item) => item === null) || sources.some((item) => item === null)) return null;
   return Object.freeze({
     activeProfile: activeProfile === null ? null : Object.freeze({ kind: "profile", revision: activeProfile.revision as number, state: "active" }),
     skills: Object.freeze(skills as Skill[]),
     playbooks: Object.freeze(playbooks as Playbook[]),
+    sources: Object.freeze(sources as Source[]),
     authority: Object.freeze({
       canSelectProfile: authority.canSelectProfile as boolean,
       canCreatePlaybookRevision: authority.canCreatePlaybookRevision as boolean,
@@ -103,12 +112,12 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
   const [mutation, setMutation] = useState<Mutation>(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [sourceRef, setSourceRef] = useState("");
+  const [sourceOptionId, setSourceOptionId] = useState("");
   const [pendingTombstone, setPendingTombstone] = useState<Playbook | null>(null);
   const [editingPlaybook, setEditingPlaybook] = useState<Playbook | null>(null);
   const [revisionTitle, setRevisionTitle] = useState("");
   const [revisionBody, setRevisionBody] = useState("");
-  const [pendingRevision, setPendingRevision] = useState<Readonly<{ playbookRef: string; expectedRevision: number; title: string; body: string; sourceRef: string }> | null>(null);
+  const [pendingRevision, setPendingRevision] = useState<Readonly<{ playbookRef: string; expectedRevision: number; title: string; body: string; sourceOptionId: string }> | null>(null);
 
   const reload = useCallback(async () => {
     setState("loading");
@@ -131,6 +140,7 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
         return false;
       }
       setCatalog(next);
+      setSourceOptionId((current) => next.sources.some((source) => source.optionId === current) ? current : next.sources[0]?.optionId ?? "");
       setState("ready");
       onSessionRequiredChange?.(false);
       return true;
@@ -173,12 +183,12 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
 
   async function createPlaybook(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!catalog?.authority.canCreatePlaybookRevision || !title.trim() || !body.trim() || !SOURCE_REF.test(sourceRef.trim())) return;
-    const saved = await mutate("skill-playbook-create", { title: title.trim(), body: body.trim(), sourceRef: sourceRef.trim() }, "create");
+    if (!catalog?.authority.canCreatePlaybookRevision || !title.trim() || !body.trim() || !SOURCE_OPTION.test(sourceOptionId)) return;
+    const saved = await mutate("skill-playbook-create", { title: title.trim(), body: body.trim(), sourceOptionId }, "create");
     if (saved) {
       setTitle("");
       setBody("");
-      setSourceRef("");
+      setSourceOptionId(catalog.sources[0]?.optionId ?? "");
     }
   }
 
@@ -192,6 +202,7 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
     setEditingPlaybook(playbook);
     setRevisionTitle(playbook.title);
     setRevisionBody(playbook.body);
+    setSourceOptionId(playbook.sourceOptionId);
     setPendingRevision(null);
   }
 
@@ -199,7 +210,7 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
     event.preventDefault();
     if (!editingPlaybook || !catalog?.authority.canCreatePlaybookRevision || !revisionTitle.trim() || !revisionBody.trim()) return;
     setPendingRevision({ playbookRef: editingPlaybook.ref, expectedRevision: editingPlaybook.revision,
-      title: revisionTitle.trim(), body: revisionBody.trim(), sourceRef: editingPlaybook.sourceRef });
+      title: revisionTitle.trim(), body: revisionBody.trim(), sourceOptionId });
   }
 
   async function saveRevision() {
@@ -229,9 +240,9 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
       <h3>Playbook ekle</h3><p>Metni siz yazarsınız. Resmî kaynak, Agent bağlamında hangi playbook’un kullanılacağını ve tazeliğini açıklar; sunucu doğrulamadan kayıt oluşturulmaz.</p>
       <label><span>Başlık</span><input value={title} maxLength={240} disabled={!canCreate} onChange={(event) => setTitle(event.target.value)} /></label>
       <label><span>Playbook metni</span><textarea value={body} maxLength={16_000} disabled={!canCreate} onChange={(event) => setBody(event.target.value)} /></label>
-      <label><span>Yayınlanmış kaynak referansı</span><input value={sourceRef} placeholder="source_…" pattern="source_[a-z0-9_.:-]+" aria-describedby="skill-catalog-source-note" disabled={!canCreate} onChange={(event) => setSourceRef(event.target.value)} /></label>
-      <small id="skill-catalog-source-note">Yalnız mevcut GuidanceSource referansı kabul edilir; seçenek listesi oluşturulmaz.</small>
-      <button type="submit" disabled={!canCreate || !title.trim() || !body.trim() || !SOURCE_REF.test(sourceRef.trim())}>{mutation === "create" ? "Kaydediliyor…" : "Playbook’u kaydet"}</button>
+      <label><span>Resmî kaynak</span><select value={sourceOptionId} disabled={!canCreate || !catalog.sources.length} onChange={(event) => setSourceOptionId(event.target.value)}><option value="">Kaynak seçin</option>{catalog.sources.map((source) => <option key={source.optionId} value={source.optionId}>{source.title} · güncel</option>)}</select></label>
+      {catalog.sources.length ? <small id="skill-catalog-source-note">Seçili resmî kaynak yalnız bu playbook’un Agent bağlamını ve turn makbuzundaki tazeliği belirler.</small> : <p id="skill-catalog-source-note" className={styles.permission}>Playbook kaydetmek için önce <a href="?view=manage&amp;manageArea=rules&amp;rulesArea=guidance">Yönet → Rehberler</a> alanında güncel resmî kaynak hazırlayın.</p>}
+      <button type="submit" disabled={!canCreate || !title.trim() || !body.trim() || !SOURCE_OPTION.test(sourceOptionId)}>{mutation === "create" ? "Kaydediliyor…" : "Playbook’u kaydet"}</button>
       {!catalog.authority.canCreatePlaybookRevision ? <p className={styles.permission}>Bu rol playbook kaydı oluşturamaz.</p> : null}
     </form>
 
@@ -241,8 +252,8 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
       <h3>Playbook revizyonu</h3><p>Mevcut metni siz düzenlersiniz. Yeni kayıt aynı playbook zincirine append-only olarak eklenir.</p>
       <label><span>Başlık</span><input value={revisionTitle} maxLength={240} disabled={!canCreate} onChange={(event) => setRevisionTitle(event.target.value)} /></label>
       <label><span>Playbook metni</span><textarea value={revisionBody} maxLength={16_000} disabled={!canCreate} onChange={(event) => setRevisionBody(event.target.value)} /></label>
-      <label><span>Yayınlanmış kaynak referansı</span><input value={editingPlaybook.sourceRef} disabled readOnly /></label>
-      <small>Kaynak, güncel playbook ile aynı olmalıdır; sunucu revision head ve kaynak eşleşmesini yeniden doğrular.</small>
+      <label><span>Resmî kaynak</span><select value={sourceOptionId} disabled={!canCreate || !catalog.sources.length} onChange={(event) => setSourceOptionId(event.target.value)}>{catalog.sources.map((source) => <option key={source.optionId} value={source.optionId}>{source.title} · güncel</option>)}</select></label>
+      <small>Kaynak, güncel playbook ile aynı kalmalıdır; sunucu revision head ve güvenli kaynak eşleşmesini yeniden doğrular.</small>
       <div className={styles.playbookActions}><button type="button" disabled={mutation !== null} onClick={() => { setEditingPlaybook(null); setPendingRevision(null); }}>Vazgeç</button><button type="submit" disabled={!canCreate || !revisionTitle.trim() || !revisionBody.trim()}>Yeni revizyonu kaydet</button></div>
     </form> : null}
 

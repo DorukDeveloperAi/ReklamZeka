@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { catalogHash, newRef, type CatalogItem, type SkillCatalogRepository } from "@/application/skill-catalog-service";
+import type { OfficialSourceOption } from "@/application/interview-kit-service";
 import * as schema from "@/db/schema";
 
 type DB = NodePgDatabase<typeof schema>;
@@ -17,18 +18,19 @@ const rows = <T>(value: unknown): readonly T[] => {
 const one = <T>(value: readonly T[], code: string): T => { if (value.length !== 1) throw new Error(code); return value[0]!; };
 
 type Head = Readonly<{ revision: number; playbook_hash: string; source_id: string; state: string; payload: unknown }>;
-type Source = Readonly<{ id: string }>;
+type Source = Readonly<{ id: string; option_id?: string; title?: string; url?: string }>;
 type Inserted = Readonly<{ revision: number }>;
 
-function item(input: Readonly<{ ref: string; revision: number; state: string; title: string; body: string; sourceRef: string }>): CatalogItem {
+function item(input: Readonly<{ ref: string; revision: number; state: string; title: string; body: string; sourceOptionId: string }>): CatalogItem {
   return Object.freeze({ kind: "playbook", ref: input.ref, revision: input.revision, state: input.state,
-    title: input.title, body: input.body, sourceRef: input.sourceRef });
+    title: input.title, body: input.body, sourceOptionId: input.sourceOptionId });
 }
 
-async function source(executor: Executor, workspaceId: string, sourceRef: string): Promise<Source> {
+async function source(executor: Executor, workspaceId: string, sourceOptionId: string): Promise<Source> {
   return one(rows<Source>(await executor.execute(sql`
     select id from guidance_sources
-    where workspace_id = ${workspaceId}::uuid and source_ref = ${sourceRef} and status = 'published'
+    where workspace_id = ${workspaceId}::uuid and id::text = ${sourceOptionId} and source_type = 'official_meta_guidance'
+      and status = 'published' and review_by > now() and source_url is not null
     limit 2
   `)), "source_not_found");
 }
@@ -59,7 +61,7 @@ export class DrizzleSkillCatalogRepository implements SkillCatalogRepository {
     `));
     const playbooks = rows<CatalogItem>(await this.db.execute(sql`
       select 'playbook' kind, current.playbook_ref ref, current.revision, current.state,
-        current.payload ->> 'title' title, current.payload ->> 'body' body, source.source_ref "sourceRef",
+        current.payload ->> 'title' title, current.payload ->> 'body' body, source.id::text "sourceOptionId",
         source.source_url url, case when source.review_by is null then 'not_scheduled'
           when source.review_by <= now() then 'stale' else 'current' end freshness
       from (
@@ -75,6 +77,18 @@ export class DrizzleSkillCatalogRepository implements SkillCatalogRepository {
     return Object.freeze([...profile, ...playbooks]);
   }
 
+  async sources(workspaceId: string): Promise<readonly OfficialSourceOption[]> {
+    const result = rows<Required<Source>>(await this.db.execute(sql`
+      select id::text option_id, title, source_url url
+      from (select distinct on (source_key) * from guidance_sources where workspace_id = ${workspaceId}::uuid
+        order by source_key, version desc) source
+      where source_type = 'official_meta_guidance' and status = 'published' and review_by > now() and source_url is not null
+      order by title limit 50
+    `));
+    return Object.freeze(result.map((source) => Object.freeze({ optionId: source.option_id, title: source.title,
+      url: source.url, freshness: "fresh" as const })));
+  }
+
   async appendProfile(input: Readonly<{ workspaceId: string; actorId: string; pack: unknown }>) {
     const payload = { corePack: input.pack };
     return one(rows<CatalogItem>(await this.db.execute(sql`
@@ -84,9 +98,9 @@ export class DrizzleSkillCatalogRepository implements SkillCatalogRepository {
     `)), "write_conflict");
   }
 
-  async appendPlaybook(input: Readonly<{ workspaceId: string; actorId: string; title: string; body: string; sourceRef: string }>) {
+  async appendPlaybook(input: Readonly<{ workspaceId: string; actorId: string; title: string; body: string; sourceOptionId: string }>) {
     return this.db.transaction(async (transaction) => {
-      const linkedSource = await source(transaction, input.workspaceId, input.sourceRef);
+      const linkedSource = await source(transaction, input.workspaceId, input.sourceOptionId);
       const payload = { title: input.title, body: input.body };
       const ref = newRef();
       const inserted = one(rows<Inserted>(await transaction.execute(sql`
@@ -94,16 +108,16 @@ export class DrizzleSkillCatalogRepository implements SkillCatalogRepository {
         values(${input.workspaceId}::uuid, ${ref}, 1, 'GENESIS', ${catalogHash(payload)}, 'active', ${linkedSource.id}::uuid, ${JSON.stringify(payload)}::jsonb, ${input.actorId}::uuid)
         returning revision
       `)), "write_conflict");
-      return item({ ref, revision: inserted.revision, state: "active", title: input.title, body: input.body, sourceRef: input.sourceRef });
+      return item({ ref, revision: inserted.revision, state: "active", title: input.title, body: input.body, sourceOptionId: input.sourceOptionId });
     });
   }
 
-  async appendPlaybookRevision(input: Readonly<{ workspaceId: string; actorId: string; playbookRef: string; expectedRevision: number; title: string; body: string; sourceRef: string }>) {
+  async appendPlaybookRevision(input: Readonly<{ workspaceId: string; actorId: string; playbookRef: string; expectedRevision: number; title: string; body: string; sourceOptionId: string }>) {
     return this.db.transaction(async (transaction) => {
       await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`playbook:${input.workspaceId}:${input.playbookRef}`}, 0))`);
       const current = await head(transaction, input.workspaceId, input.playbookRef);
       if (current.revision !== input.expectedRevision) throw new Error("stale_head");
-      const linkedSource = await source(transaction, input.workspaceId, input.sourceRef);
+      const linkedSource = await source(transaction, input.workspaceId, input.sourceOptionId);
       if (linkedSource.id !== current.source_id) throw new Error("source_mismatch");
       const payload = { title: input.title, body: input.body };
       if (catalogHash(payload) === current.playbook_hash) throw new Error("duplicate_revision");
@@ -112,7 +126,7 @@ export class DrizzleSkillCatalogRepository implements SkillCatalogRepository {
         values(${input.workspaceId}::uuid, ${input.playbookRef}, ${current.revision + 1}, ${current.playbook_hash}, ${catalogHash(payload)}, 'active', ${linkedSource.id}::uuid, ${JSON.stringify(payload)}::jsonb, ${input.actorId}::uuid)
         returning revision
       `)), "write_conflict");
-      return item({ ref: input.playbookRef, revision: inserted.revision, state: "active", title: input.title, body: input.body, sourceRef: input.sourceRef });
+      return item({ ref: input.playbookRef, revision: inserted.revision, state: "active", title: input.title, body: input.body, sourceOptionId: input.sourceOptionId });
     });
   }
 

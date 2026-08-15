@@ -39,7 +39,7 @@ export function createSkillCatalogHttpHandlers(input: Readonly<{
         const intent = request.headers.get("x-reklamzeka-intent");
         if (!readIntents.includes(intent as typeof readIntents[number]) || !valid(request, "GET", intent!)) return fail(400, "invalid_input");
         const catalog = await input.service.list(await input.resolve(request, "read") as never);
-        const projection = intent === "skill-catalog-agent-read" ? { ...catalog,
+        const projection = intent === "skill-catalog-agent-read" ? { ...catalog, sources: [],
           playbooks: catalog.playbooks.map(({ kind, ref, revision, state, title, url, freshness }) => ({ kind, ref, revision, state, title, url, freshness })) } : catalog;
         return NextResponse.json(projection, { headers });
       } catch { return fail(401, "local_session_required"); }
@@ -52,9 +52,9 @@ export function createSkillCatalogHttpHandlers(input: Readonly<{
         const body = await request.json() as unknown;
         const result = intent === "skill-profile-select" && exact(body, ["corePack"])
           ? await input.service.select(principal, body.corePack as never)
-          : intent === "skill-playbook-create" && exact(body, ["title", "body", "sourceRef"])
+          : intent === "skill-playbook-create" && exact(body, ["title", "body", "sourceOptionId"])
             ? await input.service.create(principal, body as never)
-            : intent === "skill-playbook-revise" && exact(body, ["playbookRef", "expectedRevision", "title", "body", "sourceRef", "confirmed"]) && body.confirmed === true
+            : intent === "skill-playbook-revise" && exact(body, ["playbookRef", "expectedRevision", "title", "body", "sourceOptionId", "confirmed"]) && body.confirmed === true
               ? await input.service.revise(principal, body as never)
               : intent === "skill-playbook-tombstone" && exact(body, ["playbookRef"])
                 ? await input.service.tombstone(principal, body.playbookRef as string)
