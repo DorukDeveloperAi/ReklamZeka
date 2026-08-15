@@ -1200,7 +1200,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
           <div className={styles.agentActions}>{metaReadMirrorState === "session_required" ? null : <button className={styles.primaryButton} onClick={() => void refreshMetaReadMirror(true)}>Tekrar dene</button>}<button onClick={() => openSettings("meta")}>Kaynak ayarları</button></div>
         </section> : campaignArea === "classification" ? <CampaignClassificationReviewPanel onPrepareAssignment={(handoff) => {
           setCategoryAssignmentHandoff(handoff); openSettings("categories");
-        }} />
+        }} onOpenCategorySetup={() => openSettings("categories")} />
           : campaignArea === "promotion" ? <PromotionPreflightPanel embedded />
             : <OperationalTimelinePanel embedded />}
     </>;
