@@ -95,6 +95,16 @@ describe("local session bootstrap HTTP boundary", () => {
     expect((await handler(request(session))).status).toBe(403);
   });
 
+  it("classifies an authentic proof missing from this server's checkout without minting a cookie", async () => {
+    const response = await createLocalSessionBootstrapHandler({ config, clock: () => now + 1 })(request(bootstrapToken()));
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: {
+      code: "local_session_proof_not_registered",
+      message: expect.any(String),
+    } });
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
   it("accepts an explicitly zero-length body stream from a real route adapter", async () => {
     const consume = vi.fn(async () => undefined);
     const response = await createLocalSessionBootstrapHandler({ config, clock: () => now + 1, consume })(zeroLengthStreamRequest(bootstrapToken()));

@@ -5,7 +5,7 @@ import styles from "./operating-dashboard.module.css";
 
 export type LocalSessionConnectionResult =
   | Readonly<{ status: "connected" }>
-  | Readonly<{ status: "invalid_input" | "rejected" | "not_configured" | "verification_failed" | "unavailable" }>;
+  | Readonly<{ status: "invalid_input" | "rejected" | "proof_not_registered" | "not_configured" | "verification_failed" | "unavailable" }>;
 
 type Requester = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -31,6 +31,7 @@ export async function connectLocalDashboardSession(input: Readonly<{
       credentials: "same-origin",
     });
     if (response.status === 503) return Object.freeze({ status: "not_configured" });
+    if (response.status === 409) return Object.freeze({ status: "proof_not_registered" });
     if (!response.ok) return Object.freeze({ status: "rejected" });
     return Object.freeze({ status: await input.verify() ? "connected" : "verification_failed" });
   } catch {
@@ -41,6 +42,7 @@ export async function connectLocalDashboardSession(input: Readonly<{
 const ERROR_MESSAGES: Readonly<Record<Exclude<LocalSessionConnectionResult["status"], "connected">, string>> = {
   invalid_input: "Tek kullanımlık proof boş veya kabul edilen uzunlukta değil.",
   rejected: "Proof reddedildi, daha önce kullanıldı veya 90 saniyelik süresi doldu. Terminal çıktısındaki yalnız son capability satırını yapıştırın; yerel server yeni yapılandırmadan sonra açıldıysa önce yeniden başlatın.",
+  proof_not_registered: "Bu proof bu yerel serverda bulunamadı. Dashboard’u yapılandırmanın uygulandığı aynı proje kökünden yeniden başlatın; ardından yeni proof üretip 90 saniye içinde yalnız bir kez yapıştırın.",
   not_configured: "Yerel oturum server tarafında yapılandırılmamış. Önce local workspace kurulumunu tamamlayın.",
   verification_failed: "Cookie üretildi ancak kanonik kaynak doğrulanamadı. Uygulamayı http://localhost origin'inde açtığınızdan emin olun.",
   unavailable: "Yerel oturum servisine ulaşılamadı. Uygulama ve bağlantı durumunu kontrol edin.",

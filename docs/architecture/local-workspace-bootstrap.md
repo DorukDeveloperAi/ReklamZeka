@@ -56,13 +56,14 @@ Meta, HTTP, or other network calls beyond the configured PostgreSQL connection.
 
 ## Dashboard'da manuel oturum ve onay akışı
 
-Yerel Dashboard yalnız yapılandırılmış `http://localhost` origin'inde çalıştırılır:
+Yerel Dashboard, yapılandırmanın uygulandığı aynı proje kökünde ve yalnız yapılandırılmış `http://localhost` origin'inde çalıştırılır. `.env.local` binding’ini değiştirdiyseniz önce çalışan dev server’ı durdurun; sonra bu sırayla yeniden başlatın:
 
 ```sh
+npm run local-session:configure -- --apply
 npm run dev -- --hostname localhost
 ```
 
-Ardından, aynı işletim sistemi kullanıcısı tek-kullanımlık proof'u üretir ve 90 saniye
+Server hazır olduktan sonra, aynı işletim sistemi kullanıcısı tek-kullanımlık proof'u üretir ve 90 saniye
 içinde Dashboard > Decision Room > **Yerel oturumu bağla** alanına yapıştırır:
 
 ```sh
@@ -71,6 +72,8 @@ npm run local-session:mint
 
 Proof bir kimlik bilgisi sayılır; terminal geçmişine, ekran kaydına veya başka kişiye
 aktarılmaz. Agent ya da browser otomasyonu proof üretmez ve cookie mint etmez.
+
+Dashboard “proof bu yerel serverda bulunamadı” derse proof’u tekrar yapıştırmayın. Bu, proof’un kullanıldığı ya da mint komutu ile Dashboard’un farklı proje kökleri/çalışan yapılandırmaları kullandığı anlamına gelir. Dashboard’u yukarıdaki komutla yapılandırmanın uygulandığı proje kökünden yeniden başlatın, sonra yeni bir proof üretin.
 
 Oturum bağlandıktan sonra güvenli manuel akış şöyledir:
 

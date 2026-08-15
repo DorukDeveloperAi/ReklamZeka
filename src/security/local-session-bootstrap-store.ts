@@ -13,15 +13,27 @@ type RecordShape = Readonly<{
   osUid: number;
 }>;
 
+// This is response-classification state only; file removal remains the
+// cross-process single-use authority. Keeping the short-lived marker lets the
+// serving process preserve the generic rejection for an immediate replay.
+const consumedNonces = new Map<string, number>();
+
+function recentlyConsumed(nonce: string, now: number): boolean {
+  for (const [candidate, expiresAt] of consumedNonces) {
+    if (expiresAt <= now) consumedNonces.delete(candidate);
+  }
+  return (consumedNonces.get(nonce) ?? 0) > now;
+}
+
 export class LocalSessionBootstrapStoreError extends Error {
-  constructor() {
+  constructor(readonly code: "proof_not_registered" | "proof_rejected" = "proof_rejected") {
     super("Local session bootstrap proof rejected");
     this.name = "LocalSessionBootstrapStoreError";
   }
 }
 
-function fail(): never {
-  throw new LocalSessionBootstrapStoreError();
+function fail(code?: "proof_not_registered" | "proof_rejected"): never {
+  throw new LocalSessionBootstrapStoreError(code);
 }
 
 function root(baseDirectory: string): string {
@@ -91,7 +103,11 @@ export async function consumeLocalSessionBootstrap(
   try {
     await rename(source, consuming);
   } catch {
-    fail();
+    // An authentic, in-window proof that has no record in this checkout is
+    // safe to distinguish from a malformed proof: it cannot bootstrap a
+    // session either way, but lets the operator recover from a server/mint
+    // working-directory mismatch without exposing proof material.
+    fail(recentlyConsumed(claims.nonce, now) ? "proof_rejected" : "proof_not_registered");
   }
   try {
     const stat = await lstat(consuming);
@@ -106,6 +122,7 @@ export async function consumeLocalSessionBootstrap(
     if (value.version !== 1 || value.sessionRef !== claims.sessionRef || value.nonce !== claims.nonce
       || value.expiresAt !== claims.expiresAt || value.osUid !== claims.osUid || claims.expiresAt <= now
       || storedHash.byteLength !== actualHash.byteLength || !timingSafeEqual(storedHash, actualHash)) fail();
+    consumedNonces.set(claims.nonce, claims.expiresAt);
   } catch {
     fail();
   } finally {

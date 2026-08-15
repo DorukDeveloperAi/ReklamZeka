@@ -35,12 +35,14 @@ describe("local dashboard session connector", () => {
     expect(verify).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps rejection, missing config and failed post-cookie verification distinct", async () => {
+  it("keeps rejection, a server/check-out mismatch, missing config and failed post-cookie verification distinct", async () => {
     const verify = vi.fn(async () => true);
     await expect(connectLocalDashboardSession({ capability: "proof", verify,
       request: async () => new Response(null, { status: 403 }) })).resolves.toEqual({ status: "rejected" });
     await expect(connectLocalDashboardSession({ capability: "proof", verify,
       request: async () => new Response(null, { status: 503 }) })).resolves.toEqual({ status: "not_configured" });
+    await expect(connectLocalDashboardSession({ capability: "proof", verify,
+      request: async () => new Response(null, { status: 409 }) })).resolves.toEqual({ status: "proof_not_registered" });
     await expect(connectLocalDashboardSession({ capability: "proof", verify: async () => false,
       request: async () => new Response(null, { status: 204 }) })).resolves.toEqual({ status: "verification_failed" });
     expect(verify).not.toHaveBeenCalled();

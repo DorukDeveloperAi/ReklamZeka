@@ -6,7 +6,10 @@ import {
   verifyLocalSessionCapability,
   type LocalSessionClaims,
 } from "@/security/local-session-capability";
-import { consumeLocalSessionBootstrap } from "@/security/local-session-bootstrap-store";
+import {
+  LocalSessionBootstrapStoreError,
+  consumeLocalSessionBootstrap,
+} from "@/security/local-session-bootstrap-store";
 import {
   LocalDecisionRoomBoundaryError,
   assertTrustedLocalDecisionRoomRequest,
@@ -25,6 +28,13 @@ function rejected() {
   return NextResponse.json({ error: { code: "local_session_rejected", message: "Yerel oturum kanıtı reddedildi." } }, {
     status: 403, headers: HEADERS,
   });
+}
+
+function proofNotRegistered() {
+  return NextResponse.json({ error: {
+    code: "local_session_proof_not_registered",
+    message: "Proof bu yerel serverda bulunamadı. Kullanılmış olabilir veya dashboard ile proof farklı proje köklerinde çalışıyor. Dashboard’u yapılandırmanın uygulandığı proje kökünden yeniden başlatın; ardından yeni bir proof üretin.",
+  } }, { status: 409, headers: HEADERS });
 }
 
 export function createLocalSessionBootstrapHandler(input: Readonly<{
@@ -84,7 +94,10 @@ export function createLocalSessionBootstrapHandler(input: Readonly<{
         maxAge: 28_800,
       });
       return response;
-    } catch {
+    } catch (error) {
+      if (error instanceof LocalSessionBootstrapStoreError && error.code === "proof_not_registered") {
+        return proofNotRegistered();
+      }
       return rejected();
     }
   };
