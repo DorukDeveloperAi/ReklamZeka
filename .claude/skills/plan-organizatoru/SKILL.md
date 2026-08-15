@@ -138,7 +138,10 @@ Damga koşulludur: bir aşama `kosum:` beyan ediyorsa frontmatter bloğu içerik
 3. MASTER.md üst bloğuna `Kategori:` ve `Üst:` yaz (yoksa). Kategori seçimi:
    proje=projenin tamamını anlatan tek plan · özellik=ürün yüzeyi · altyapı=araç/CI/
    sistem · süreç=işleyiş/protokol · araştırma=karar öncesi keşif. `Üst:` planın
-   mantıksal ebeveyni (çoğu plan için `proje`; bağımsızsa `—`).
+   mantıksal ebeveyni — **BAĞLANMA açık karardır (2026-08-14, "çoğu plan proje" bias'ı
+   kaldırıldı):** roadmap'in bariz parçası → `proje`/ilgili dal; tek-seferlik/koş-ve-bitir
+   (tipik /planla-kos çıktısı) → `—`; **gri alanda TEK soru sor** (AskUserQuestion —
+   adım 2 emsali). Kaynak akış kararı zaten taşıyorsa (`bağlanma=…`) sorgusuz uygula.
 4. **`Kapatır` bağını doğrula (genel TODO):** MASTER `> Kapatır: td:…` satırı taşıyorsa her
    ref'i `agac.mjs --todo --json` çıktısına karşı kontrol et. Bilinmeyen/biçimsiz ref kaydı
    **DURDURMAZ** — `onar:` önerisini uygula (ref'i düzelt ya da satırdan çıkar) ve ADVISORY'yi
