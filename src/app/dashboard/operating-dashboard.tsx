@@ -13,7 +13,7 @@ import { ApprovalQueuePanel } from "./approval-queue-panel";
 import { PromotionPreflightPanel, PromotionTemplateAuthoringPanel } from "./promotion-preflight-panel";
 import { AutonomyStudioPanel } from "./autonomy-studio-panel";
 import { GuidanceStudioPanel } from "./guidance-studio-panel";
-import { SliceRuleWorkspacePanel } from "./slice-rule-workspace-panel";
+import { SliceRuleWorkspacePanel, type SliceRuleSessionSeed } from "./slice-rule-workspace-panel";
 import { OperationalTimelinePanel } from "./operational-timeline-panel";
 import { DeliveryHealthAlertPanel } from "./delivery-health-alert-panel";
 import { CategoryInventoryPanel, type CategoryAssignmentHandoff } from "./category-inventory-panel";
@@ -1107,6 +1107,17 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     commitDashboardLocation({ ...dashboardLocation, view: "manage", manageArea: "rules", rulesArea: "guidance", campaignRef: null });
   }
 
+  function openRuleSession(seed: SliceRuleSessionSeed) {
+    setAgentSourceView("manage");
+    setAgentEntityRef("rule_session");
+    setAgentEntityLabel(seed.label);
+    setAgentHandoff(null);
+    // This is a locally editable draft only. No turn or product record exists
+    // until the user explicitly sends it from the Agent workspace.
+    setOrchestratorInput(seed.prompt);
+    commitDashboardLocation({ ...dashboardLocation, view: "agent", campaignRef: null });
+  }
+
   function openAgentContext(entityRef: string, label: string) {
     setAgentSourceView(activeView);
     setAgentEntityRef(entityRef);
@@ -1419,7 +1430,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
         { id: "learning", label: "Öğrenim", description: "İnsan onaylı yaklaşımlar" },
       ]} />
       {rulesArea === "guidance" ? <><GuidanceStudioPanel onSessionRequiredChange={setRulesSessionRequired} />
-        {rulesSessionRequired === false ? <><SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /><SliceRuleWorkspacePanel onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} /></> : null}</>
+        {rulesSessionRequired === false ? <><SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /><SliceRuleWorkspacePanel onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} onOpenRuleSession={openRuleSession} /></> : null}</>
         : rulesArea === "policies" ? <InstructionPolicyStudioPanel />
           : rulesArea === "authority" ? <AutonomyStudioPanel />
             : <PracticeLabPanel />}

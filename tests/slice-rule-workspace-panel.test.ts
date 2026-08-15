@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -82,6 +83,16 @@ describe("Slice Rule Workspace panel", () => {
     expect(html).toContain("Kuralı gözden geçir");
     expect(html).toContain("Kuralsız kanıtlı slice adayları");
     expect(html).toContain("Kural otomatik oluşturulmaz.");
+  });
+
+  it("opens an editable Agent rule-session draft without creating or revising the rule", () => {
+    const html = renderToStaticMarkup(createElement(SliceRuleWorkspaceSurface, { state: { status: "ready",
+      snapshot: parseSliceRuleWorkspaceSnapshot(snapshot) }, onRetry: vi.fn(), onSaved: vi.fn(async () => undefined),
+      onOpenRuleSession: vi.fn() }));
+    const source = readFileSync("src/app/dashboard/slice-rule-workspace-panel.tsx", "utf8");
+    expect(source).toContain("Agent ile kuralı gözden geçir");
+    expect(source).toContain("Bu kuralı benim yerime yazmayın veya değiştirmeyin");
+    expect(source).toContain("onOpenRuleSession?(seed: SliceRuleSessionSeed)");
   });
 
   it("accepts candidates only as form-prefill data with frozen budget evidence still required", () => {

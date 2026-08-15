@@ -461,6 +461,15 @@ function followUpLabel(item: SliceRuleWorkspaceItem): string {
   return `${verification.metric.replaceAll("_", " ")} · ${verification.reviewCadence} · öncelik ${item.operatingRule.priority}`;
 }
 
+export type SliceRuleSessionSeed = Readonly<{ label: string; prompt: string }>;
+
+function ruleSessionSeed(item: SliceRuleWorkspaceItem): SliceRuleSessionSeed {
+  return Object.freeze({
+    label: `Kural oturumu · ${item.seriesRef} · r${item.revision}`,
+    prompt: `Kural oturumu: ${item.seriesRef} · revizyon ${item.revision}. Kapsam: ${scopeLabel(item.scope)}. Mevcut yaklaşım: ${ruleLabel(item.operatingRule.rule)}. Takip: ${followUpLabel(item)}. Bu kuralı benim yerime yazmayın veya değiştirmeyin; kapsam çelişkileri, kanıt eksikleri, ölçüm penceresi ve geri alma koşulu için açık soruları listeleyin.`,
+  });
+}
+
 function percent(basisPoints: number): string {
   return String(basisPoints / 100);
 }
@@ -498,6 +507,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   onRetry(): void;
   onSaved(): Promise<void>;
   onApprovalQueueHandoff?(actionUnitRef: string): void;
+  onOpenRuleSession?(seed: SliceRuleSessionSeed): void;
 }>) {
   const snapshot = props.state.status === "ready" ? props.state.snapshot : null;
   const [form, setForm] = useState<Form>(EMPTY_FORM);
@@ -709,7 +719,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
         <section className={styles.unruledSlices} aria-label="Kuralsız kanıtlı slice adayları"><strong>Kuralsız kanıtlı slice adayları</strong><span>Bu satırlar gerçek kategori kanıtından gelir; yalnız henüz aynı kapsamda kayıtlı bir kullanıcı kuralı yoktur. Kural otomatik oluşturulmaz.</span>{scopeCandidates.status === "loading" ? <small>Aday slice’lar okunuyor…</small> : null}{scopeCandidates.status === "unavailable" ? <small>Aday slice’lar kullanılamıyor; formda tahmin veya fallback yok.</small> : null}{scopeCandidates.status === "ready" ? (() => { const unruled = scopeCandidates.candidates.filter((candidate) => !snapshot.items.some((item) => sameScope(item.scope, candidate.scope))).slice(0, 25); return unruled.length ? <div className={styles.unruledList}>{unruled.map((candidate) => <div key={candidate.campaignRef}><span>{scopeLabel(candidate.scope)}</span><button type="button" disabled={!snapshot.authority.canSaveDraft} onClick={() => applyScopeCandidate(candidate)}>Bu slice ile yeni kural yaz</button></div>)}</div> : <small>Mevcut kanıtlı slice’ların her biri en az bir güncel kural serisiyle eşleşiyor.</small>; })() : null}</section>
         <button className={styles.newButton} type="button" onClick={() => { setHeadRef(null); setImpactState({ status: "idle" }); setForm(EMPTY_FORM); }}>+ Yeni seri</button>
       </section>
-      <section className={styles.panel}><div className={styles.panelTitle}><div><span>{head ? `REVİZYON ${head.revision + 1}` : "YENİ TASLAK"}</span><h2>{head ? "Kuralı pekiştir veya yeni revizyon yaz" : "Kapsam ve kural"}</h2></div><small>{snapshot.authority.canSaveDraft ? "Owner · Admin · Analyst" : "Viewer · salt okunur"}</small></div>
+      <section className={styles.panel}><div className={styles.panelTitle}><div><span>{head ? `REVİZYON ${head.revision + 1}` : "YENİ TASLAK"}</span><h2>{head ? "Kuralı pekiştir veya yeni revizyon yaz" : "Kapsam ve kural"}</h2></div><div className={styles.panelActions}>{head && props.onOpenRuleSession ? <button type="button" onClick={() => props.onOpenRuleSession?.(ruleSessionSeed(head))}>Agent ile kuralı gözden geçir</button> : null}<small>{snapshot.authority.canSaveDraft ? "Owner · Admin · Analyst" : "Viewer · salt okunur"}</small></div></div>
         {!head ? <section className={styles.impactResult} aria-label="Kanıtlı slice kapsam adayları"><strong>Kanıtlı kapsam adayları</strong><span>Yalnız tekil ve tutarlı mevcut kategori anahtarları yeni formu doldurur. Frozen context, bütçe etkisi, policy ve action yetkisi üretmez.</span>
           {scopeCandidates.status === "loading" ? <span>Kapsam adayları okunuyor…</span> : null}
           {scopeCandidates.status === "ready" && scopeCandidates.candidates.length === 0 ? <span>Tekil zorunlu kapsam kanıtı olan kampanya yok.</span> : null}
@@ -851,7 +861,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   </div>;
 }
 
-export function SliceRuleWorkspacePanel({ onApprovalQueueHandoff }: Readonly<{ onApprovalQueueHandoff?(actionUnitRef: string): void }>) {
+export function SliceRuleWorkspacePanel({ onApprovalQueueHandoff, onOpenRuleSession }: Readonly<{ onApprovalQueueHandoff?(actionUnitRef: string): void; onOpenRuleSession?(seed: SliceRuleSessionSeed): void }>) {
   const [state, setState] = useState<State>({ status: "loading" });
   const load = useCallback(async () => {
     setState({ status: "loading" });
@@ -867,7 +877,7 @@ export function SliceRuleWorkspacePanel({ onApprovalQueueHandoff }: Readonly<{ o
     } catch { setState({ status: "error", message: "Slice Rule Workspace bağlantısı kurulamadı." }); }
   }, []);
   useEffect(() => { void load(); }, [load]);
-  return <SliceRuleWorkspaceSurface state={state} onRetry={() => void load()} onSaved={load} onApprovalQueueHandoff={onApprovalQueueHandoff} />;
+  return <SliceRuleWorkspaceSurface state={state} onRetry={() => void load()} onSaved={load} onApprovalQueueHandoff={onApprovalQueueHandoff} onOpenRuleSession={onOpenRuleSession} />;
 }
 
 export { CLOSED as SLICE_RULE_CLOSED_AUTHORITY, EMPTY_FORM as EMPTY_SLICE_RULE_FORM };

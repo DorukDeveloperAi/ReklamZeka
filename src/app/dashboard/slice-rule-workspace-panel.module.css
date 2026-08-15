@@ -9,6 +9,9 @@
 .panelTitle { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding-bottom: 15px; border-bottom: 1px solid var(--rz-line); }
 .panelTitle h2 { margin: 5px 0 0; font-size: 20px; }
 .panelTitle small { color: var(--rz-muted); }
+.panelActions { display: grid; justify-items: end; gap: 7px; }
+.panelActions button { min-height: 30px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--rz-blue) 42%, var(--rz-line)); border-radius: 7px; color: var(--rz-blue); background: transparent; font-size: .56rem; font-weight: 760; cursor: pointer; }
+.panelActions button:hover { color: #fff; background: var(--rz-blue); }
 .workspaceTablePanel { grid-column: 1 / -1; }
 .tableScroll { overflow-x: auto; margin: 14px 0; border: 1px solid var(--rz-line); border-radius: 12px; }
 .workspaceTable { width: 100%; min-width: 880px; border-collapse: collapse; text-align: left; }
