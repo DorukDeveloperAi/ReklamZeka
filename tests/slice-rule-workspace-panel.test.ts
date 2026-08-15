@@ -13,6 +13,7 @@ import {
   parseSliceRuleBudgetPoolBindingSnapshot,
   parseSliceScopeCandidates,
   parseSliceOperationalReadiness,
+  parseSliceRuleScenarioSelectionCandidates,
   SliceRuleWorkspaceSurface,
 } from "@/app/dashboard/slice-rule-workspace-panel";
 
@@ -61,12 +62,23 @@ describe("Slice Rule Workspace panel", () => {
     expect(source).not.toContain("frozenPoolBinding.draftHash.slice");
     expect(source).not.toContain("frozenPoolBinding.hierarchyHash.slice");
     expect(source).not.toContain("candidate.campaignRef} · {candidate.currentBudgetDecimal");
-    expect(source).not.toContain("slice-rule-scenario-select");
-    expect(source).not.toContain("slice-rule-budget-action-unit-materialize");
-    expect(source).toContain("kaydedilemez, seçilemez, onaya veya action kuyruğuna gönderilemez");
+    expect(source).toContain("İnsan onayına hazırlık");
+    expect(source).toContain("slice-rule-scenario-select");
+    expect(source).toContain("slice-rule-budget-action-unit-materialize");
+    expect(source).toContain("Meta write ve execute kapalıdır");
     expect(source).not.toContain("node.poolRef} · {node.layer}");
     expect(source).toContain("Doğrulanmış bağlam {index + 1}");
     expect(source).toContain("Kalıcı kayıt: yok");
+  });
+
+  it("accepts only opaque, authority-closed preparation candidates", () => {
+    const candidateRef = `selection_candidate_${"a".repeat(64)}`;
+    expect(parseSliceRuleScenarioSelectionCandidates({ contractVersion: "slice-rule-scenario-selection/1.0.0", candidates: [{ candidateRef,
+      scenarioLabel: "scenario.keep", beforeAmountMinor: 100, afterAmountMinor: 120, currency: "TRY", status: "blocked", blockReason: "delivery_hold" }],
+      authority: { canSelect: false, canApprove: false, canExecute: false, canWriteMeta: false, canEnableAutomation: false } })[0]).toMatchObject({ candidateRef, status: "blocked" });
+    expect(() => parseSliceRuleScenarioSelectionCandidates({ contractVersion: "slice-rule-scenario-selection/1.0.0", candidates: [{ candidateRef,
+      scenarioLabel: "scenario.keep", beforeAmountMinor: 100, afterAmountMinor: 120, currency: "TRY", status: "selectable", blockReason: null }],
+      authority: { canSelect: false, canApprove: true, canExecute: false, canWriteMeta: false, canEnableAutomation: false } })).toThrow("güvenli değil");
   });
 
   it("opens an editable Agent rule-session draft without creating or revising the rule", () => {
