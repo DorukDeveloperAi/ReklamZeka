@@ -64,4 +64,9 @@ describe("StarterCategoryAdoption dashboard", () => {
     expect(css).not.toContain("rgba(15,23,42");
     expect(css).not.toContain("#0e7490");
   });
+
+  it("places the safe starter plan ahead of raw category authoring for an empty workspace", () => {
+    const source = readFileSync("src/app/dashboard/category-inventory-panel.tsx", "utf8");
+    expect(source.indexOf("<StarterCategoryAdoption />")).toBeLessThan(source.indexOf('aria-label="Kategori authoring"'));
+  });
 });
