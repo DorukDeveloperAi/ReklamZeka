@@ -232,6 +232,7 @@
 .selectorList > button > span { display: grid; gap: 5px; }
 .selectorList strong { font-size: .7rem; }
 .selectorList small { color: var(--rz-muted); font-size: .57rem; }
+.selectorList i { overflow: hidden; color: var(--rz-dim); font: .5rem ui-monospace, monospace; text-overflow: ellipsis; white-space: nowrap; }
 .canonicalPortfolioFilters { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, .8fr); gap: 8px; padding: 10px; border-bottom: 1px solid var(--rz-line); }
 .canonicalPortfolioFilters label { display: grid; gap: 5px; color: var(--rz-muted); font-size: .55rem; }
 .canonicalPortfolioFilters input, .canonicalPortfolioFilters select { width: 100%; min-height: 32px; border: 1px solid var(--rz-line); border-radius: 7px; background: var(--rz-surface-2); color: var(--rz-text); padding: 0 8px; font: inherit; }
@@ -296,6 +297,9 @@
 .copyPreview h3 { margin: 11px 0 7px; max-width: 660px; font-size: 1rem; }
 .copyPreview p { margin: 0; color: var(--rz-muted); font-size: .63rem; }
 .copyPreview footer { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+.copyPreview summary { display: grid; gap: 5px; cursor: pointer; list-style: none; }
+.copyPreview summary::-webkit-details-marker { display: none; }
+.copyPreview summary small { color: var(--rz-muted); font-size: .57rem; line-height: 1.45; }
 
 
 .budgetHero { display: grid; grid-template-columns: 1fr 280px; gap: 10px; margin-bottom: 10px; }

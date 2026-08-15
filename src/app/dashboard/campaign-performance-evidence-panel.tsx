@@ -116,8 +116,8 @@ export function CampaignPerformanceEvidencePanel({ campaignRef }: Readonly<{ cam
   const evidence = useMemo(() => selectedCampaignPerformanceEvidence(projection, campaignRef), [campaignRef, projection]);
   const selectedWindow = evidence?.windows.find((item) => item.days === days) ?? null;
   const ready = state === "ready" && selectedWindow?.state === "ready";
-  return <details className={styles.copyPreview}>
-    <summary><span className={styles.kicker}>KANONİK PERFORMANS KANITI · SALT-OKUNUR</span><strong>Seçili kampanya için {days} günlük kapsamı incele</strong></summary>
+  return <details className={styles.copyPreview} open>
+    <summary><span className={styles.kicker}>KANONİK PERFORMANS KANITI · SALT-OKUNUR</span><strong>Seçili kampanya · {days} günlük kapsam</strong><small>Kaynak ve freshness, mirror hiyerarşisinden ayrı doğrulanır.</small></summary>
     <section aria-label="Seçili kampanya performans kanıtı">
       <div className={styles.agentActions}><button type="button" aria-pressed={days === 7} onClick={() => setDays(7)}>7 gün</button><button type="button" aria-pressed={days === 30} onClick={() => setDays(30)}>30 gün</button><button type="button" onClick={() => void load()}>Yenile</button></div>
       {state === "loading" ? <p role="status">Kanonik performans kanıtı okunuyor…</p> : null}

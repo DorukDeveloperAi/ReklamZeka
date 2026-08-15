@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { campaignPerformanceEvidenceFromResponse, selectedCampaignPerformanceEvidence } from "@/app/dashboard/campaign-performance-evidence-panel";
 
 const campaignRef = "campaign_aaaaaaaaaaaaaaaaaaaaaaaa";
@@ -39,5 +40,12 @@ describe("campaign performance evidence panel contract", () => {
     const invalid = payload("ready");
     invalid.source.state = "partial";
     expect(campaignPerformanceEvidenceFromResponse(invalid)).toBeNull();
+  });
+
+  it("keeps the selected campaign's canonical evidence visible by default without upgrading partial windows", () => {
+    const source = readFileSync("src/app/dashboard/campaign-performance-evidence-panel.tsx", "utf8");
+    expect(source).toContain("<details className={styles.copyPreview} open>");
+    expect(source).toContain("state === \"ready\" && selectedWindow?.state === \"ready\"");
+    expect(source).toContain("Bu pencerenin metrikleri gösterilmez");
   });
 });

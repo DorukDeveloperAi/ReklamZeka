@@ -7,15 +7,15 @@ import {
 } from "@/app/dashboard/canonical-campaign-portfolio-panel";
 import type { MetaReadMirrorProjection } from "@/domain/meta/read-mirror-projection";
 
-const projection = { connections: [{ accounts: [{ name: "TR", currency: "TRY", campaigns: [
+const projection = { connections: [{ accounts: [{ accountRef: "account_tr", name: "TR", currency: "TRY", campaigns: [
   { campaignRef: "campaign_b", name: "Beta", objective: "OUTCOME_LEADS", status: "ACTIVE" },
   { campaignRef: "campaign_a", name: "Alfa", objective: null, status: null },
-] }] }, { accounts: [{ name: "GCC", currency: "AED", campaigns: [{ campaignRef: "campaign_c", name: "Çam", objective: "OUTCOME_AWARENESS", status: "PAUSED" }] }] }] } as unknown as MetaReadMirrorProjection;
+] }] }, { accounts: [{ accountRef: "account_gcc", name: "GCC", currency: "AED", campaigns: [{ campaignRef: "campaign_c", name: "Çam", objective: "OUTCOME_AWARENESS", status: "PAUSED" }] }] }] } as unknown as MetaReadMirrorProjection;
 
 describe("canonical campaign portfolio", () => {
-  it("uses only already-validated mirror entries and keeps account/currency provenance", () => {
-    expect(canonicalCampaignPortfolio(projection).map(({ campaignRef, accountName, currency }) => [campaignRef, accountName, currency])).toEqual([
-      ["campaign_a", "TR", "TRY"], ["campaign_b", "TR", "TRY"], ["campaign_c", "GCC", "AED"],
+  it("uses only already-validated mirror entries and keeps account identity/currency provenance", () => {
+    expect(canonicalCampaignPortfolio(projection).map(({ campaignRef, accountRef, accountName, currency }) => [campaignRef, accountRef, accountName, currency])).toEqual([
+      ["campaign_a", "account_tr", "TR", "TRY"], ["campaign_b", "account_tr", "TR", "TRY"], ["campaign_c", "account_gcc", "GCC", "AED"],
     ]);
   });
 
@@ -25,6 +25,8 @@ describe("canonical campaign portfolio", () => {
     expect(source).toContain("focusDetailAfterSelectionRef.current = true");
     expect(source).toContain("ref={detailHeadingRef} tabIndex={-1}");
     expect(source).toContain("<CampaignPerformanceEvidencePanel campaignRef={selected.campaignRef} />");
+    expect(source).toContain("Hiyerarşi gözlemi; performans freshness’i değildir");
+    expect(source).toContain("Hesap kaynak durumu");
   });
 
   it("filters only canonical entries by an explicit account, status, or case-insensitive search", () => {
