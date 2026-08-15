@@ -227,6 +227,12 @@ function sameScope(left: Scope, right: Scope): boolean {
   const stable = (value: Scope) => Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)));
   return JSON.stringify(stable(left)) === JSON.stringify(stable(right));
 }
+function poolLayerLabel(layer: PoolNode["layer"]): string {
+  return ({ market: "Pazar üst havuzu", service_family: "Hizmet ailesi havuzu", constraint: "Kısıt havuzu", named: "Adlandırılmış havuz" })[layer];
+}
+function closedExecutionLabel(trace: DecisionTraceItem["execution"]): string {
+  return trace.closure === "admission_closed" ? "Uygulama kapısı kapalı" : "Uygulamaya alınmadı";
+}
 function isItem(value: unknown): value is SliceRuleWorkspaceItem {
   return object(value) && value.schemaVersion === "public-slice-rule-workspace-draft/1.0.0"
     && typeof value.seriesRef === "string" && Number.isInteger(value.revision) && Number(value.revision) > 0
@@ -726,7 +732,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
         {!head ? <section className={styles.impactResult} aria-label="Kanıtlı slice kapsam adayları"><strong>Kanıtlı kapsam adayları</strong><span>Yalnız tekil ve tutarlı mevcut kategori anahtarları yeni formu doldurur. Frozen context, bütçe etkisi, policy ve action yetkisi üretmez.</span>
           {scopeCandidates.status === "loading" ? <span>Kapsam adayları okunuyor…</span> : null}
           {scopeCandidates.status === "ready" && scopeCandidates.candidates.length === 0 ? <span>Tekil zorunlu kapsam kanıtı olan kampanya yok.</span> : null}
-          {scopeCandidates.status === "ready" ? scopeCandidates.candidates.slice(0, 50).map((candidate) => <div className={styles.row} key={candidate.campaignRef}><span>{candidate.campaignRef.slice(0, 18)}… · {candidate.scope.market} · {candidate.scope.serviceRef} · {candidate.scope.campaignFamilyRef}</span><button type="button" className={styles.preview} disabled={!snapshot.authority.canSaveDraft} onClick={() => applyScopeCandidate(candidate)}>Formu doldur</button></div>) : null}
+          {scopeCandidates.status === "ready" ? scopeCandidates.candidates.slice(0, 50).map((candidate) => <div className={styles.row} key={candidate.campaignRef}><span>{scopeLabel(candidate.scope)}</span><button type="button" className={styles.preview} disabled={!snapshot.authority.canSaveDraft} onClick={() => applyScopeCandidate(candidate)}>Formu doldur</button></div>) : null}
           {scopeCandidates.status === "unavailable" ? <span>Kapsam adayları şu an kullanılamıyor; formda hiçbir fallback uygulanmadı.</span> : null}
         </section> : null}
         <fieldset disabled={!snapshot.authority.canSaveDraft || saving} className={styles.form}>
@@ -752,9 +758,9 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
           {!head ? <p className={styles.impactNotice}>Bir bütçe havuzu seçebilmek için önce kayıtlı, immutable bir kural taslağı seçin.</p> : null}
           {head && poolBinding.status === "loading" ? <p className={styles.impactNotice}>Mevcut havuz hiyerarşisi ve frozen bağ kanıtı okunuyor…</p> : null}
           {head && (poolBinding.status === "unavailable" || poolBinding.status === "error") ? <p className={styles.impactFailure} role="alert">{poolBinding.message}</p> : null}
-          {head && frozenPoolBinding ? <div className={styles.impactResult} role="status"><strong>Frozen bütçe havuzu bağı</strong><span>{frozenPoolBinding.market === "domestic" ? "Yerli" : "Yabancı"} · {frozenPoolBinding.poolRef}</span><span>Draft: {frozenPoolBinding.draftHash.slice(0, 16)}… · hiyerarşi: {frozenPoolBinding.hierarchyHash.slice(0, 16)}…</span><span>{date(frozenPoolBinding.boundAt)} · immutable · onay/action/Meta write kapalı</span></div> : null}
+          {head && frozenPoolBinding ? <div className={styles.impactResult} role="status"><strong>Frozen bütçe havuzu bağı</strong><span>{frozenPoolBinding.market === "domestic" ? "Yerli" : "Yabancı"} pazar havuzu doğrulandı.</span><span>{date(frozenPoolBinding.boundAt)} · değiştirilemez bağ · onay/action/Meta write kapalı</span></div> : null}
           {head && !frozenPoolBinding && (poolBinding.status === "ready" || poolBinding.status === "saving") ? <div className={styles.impactResult}>
-            {!poolBinding.snapshot.hierarchy ? <span>Kaydedilmiş bütçe havuzu hiyerarşisi yok; bağ oluşturulmadı.</span> : sameMarketPoolNodes.length === 0 ? <span>Bu kuralın pazarıyla aynı pazar havuz düğümü bulunamadı; pazar sınırı aşılmadı.</span> : <><span>Yalnız <strong>{head.scope.market === "domestic" ? "yerli" : "yabancı"}</strong> hiyerarşi düğümü seçilebilir. Tarayıcı kapsam veya tutar göndermez.</span><label>Havuz düğümü<select value={poolBinding.selectedPoolRef} disabled={!poolBinding.snapshot.authority.canBind || poolBinding.status === "saving"} onChange={(event) => setPoolBinding({ ...poolBinding, selectedPoolRef: event.target.value })}><option value="">Havuz seçin</option>{sameMarketPoolNodes.map((node) => <option key={node.poolRef} value={node.poolRef}>{node.poolRef} · {node.layer} · {node.hardCapDecimal} {node.currency}</option>)}</select></label><button className={styles.save} type="button" disabled={!poolBinding.snapshot.authority.canBind || !poolBinding.selectedPoolRef || poolBinding.status === "saving"} onClick={() => void bindPool()}>{poolBinding.status === "saving" ? "Bağ doğrulanıyor…" : "Immutable taslağa havuzu bağla"}</button></>}
+            {!poolBinding.snapshot.hierarchy ? <span>Kaydedilmiş bütçe havuzu hiyerarşisi yok; bağ oluşturulmadı.</span> : sameMarketPoolNodes.length === 0 ? <span>Bu kuralın pazarıyla aynı pazar havuz düğümü bulunamadı; pazar sınırı aşılmadı.</span> : <><span>Yalnız <strong>{head.scope.market === "domestic" ? "yerli" : "yabancı"}</strong> pazarındaki havuzlar seçilebilir. Tarayıcı kapsam veya tutar göndermez.</span><label>Bütçe havuzu<select value={poolBinding.selectedPoolRef} disabled={!poolBinding.snapshot.authority.canBind || poolBinding.status === "saving"} onChange={(event) => setPoolBinding({ ...poolBinding, selectedPoolRef: event.target.value })}><option value="">Havuz seçin</option>{sameMarketPoolNodes.map((node) => <option key={node.poolRef} value={node.poolRef}>{poolLayerLabel(node.layer)} · üst sınır {node.hardCapDecimal} {node.currency}</option>)}</select></label><button className={styles.save} type="button" disabled={!poolBinding.snapshot.authority.canBind || !poolBinding.selectedPoolRef || poolBinding.status === "saving"} onClick={() => void bindPool()}>{poolBinding.status === "saving" ? "Bağ doğrulanıyor…" : "Değiştirilemez taslağa havuzu bağla"}</button></>}
           </div> : null}
           <small>Bu bağ yalnız kullanıcı tarafından kaydedilmiş taslağın bütçe kapsamı kanıtıdır; policy üretmez, onaylamaz, action açmaz ve Meta’da değişiklik yapmaz.</small>
         </section>
@@ -784,7 +790,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
               {impactContexts.status === "loading" ? <span>Uygun bağlamlar doğrulanıyor…</span> : null}
               {impactContexts.status === "unavailable" ? <span role="alert">{impactContexts.message}</span> : null}
               {impactContexts.status === "ready" && impactContexts.candidates.length === 0 ? <span>Bu immutable kapsam ve havuz için hazır bağlam yok.</span> : null}
-              {impactContexts.status === "ready" && impactContexts.candidates.length > 0 ? <label>Bağlam<select value={impactContexts.selectedRef} onChange={(event) => { setImpactContexts({ ...impactContexts, selectedRef: event.target.value }); setImpactState({ status: "idle" }); }}><option value="">Frozen bağlam seçin</option>{impactContexts.candidates.map((candidate) => <option key={candidate.candidateRef} value={candidate.candidateRef}>{candidate.campaignRef} · {candidate.currentBudgetDecimal} {candidate.currency} · {date(candidate.capturedAt)}</option>)}</select></label> : null}
+              {impactContexts.status === "ready" && impactContexts.candidates.length > 0 ? <label>Bağlam<select value={impactContexts.selectedRef} onChange={(event) => { setImpactContexts({ ...impactContexts, selectedRef: event.target.value }); setImpactState({ status: "idle" }); }}><option value="">Frozen bağlam seçin</option>{impactContexts.candidates.map((candidate, index) => <option key={candidate.candidateRef} value={candidate.candidateRef}>Doğrulanmış bağlam {index + 1} · {candidate.currentBudgetDecimal} {candidate.currency} · {date(candidate.capturedAt)}</option>)}</select></label> : null}
             </div>
             <fieldset className={styles.impactInput}><legend>Kullanıcının bütçe senaryosu</legend><small>Bu form yalnız senaryo girdisini taşır. Kural, policy, onay, action veya Meta write üretmez.</small>
               <div className={styles.fields}><label>Senaryo etiketi<input value={scenarioForm.label} onChange={(event) => setScenarioForm({ ...scenarioForm, label: event.target.value })} /></label><label>Mod<select value={scenarioForm.mode} onChange={(event) => setScenarioForm({ ...scenarioForm, mode: event.target.value as TypedScenarioForm["mode"] })}><option value="keep">Mevcutu koru</option><option value="conservative">Temkinli</option></select></label><label>İstenen bütçe<input inputMode="decimal" value={scenarioForm.requestedBudgetDecimal} onChange={(event) => setScenarioForm({ ...scenarioForm, requestedBudgetDecimal: event.target.value })} /></label><label>Dönem başlangıcı<input type="date" value={scenarioForm.startDate} onChange={(event) => setScenarioForm({ ...scenarioForm, startDate: event.target.value })} /></label><label>Dönem bitişi<input type="date" value={scenarioForm.endDate} onChange={(event) => setScenarioForm({ ...scenarioForm, endDate: event.target.value })} /></label></div><small>Mevcut bütçe, allocation, kategori/geo, zaman damgası ve pacing kanıtı yalnız seçili frozen bağlamdan sunucuda türetilir; eksikse önizleme üretilemez.</small></fieldset>
@@ -795,7 +801,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
             ? <p className={styles.impactFailure} role="alert"><strong>Önizleme kapalı.</strong> {"message" in impactState ? impactState.message : ""}</p> : null}
           {impactState.status === "ready" ? <div className={styles.impactResult} role="status">
             <strong>Exact draft ve frozen kapsam doğrulandı</strong>
-            <span>{impactState.result.binding.seriesRef} · {impactState.result.binding.ruleKind}</span>
+            <span>Kural ve frozen kapsam birlikte doğrulandı.</span>
             <span>{impactState.result.binding.evidenceRefs.length} kapsam kanıtı · {impactState.result.budgetPreview.proposal.alternatives.length} senaryo</span>
             <span>Kalıcı kayıt: yok · write operation: 0 · onay/execute/Meta write: kapalı</span>
             <button className={styles.save} type="button" disabled={!impactCommand}
@@ -816,7 +822,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
               <span>{candidate.scenarioLabel} · {candidate.beforeAmountMinor} → {candidate.afterAmountMinor} {candidate.currency}{candidate.blockReason ? ` · ${candidate.blockReason.replaceAll("_", " ")}` : ""}</span>
               <button className={styles.save} type="button" disabled={candidate.status !== "selectable"} onClick={() => void selectScenario(candidate)}>{candidate.status === "selectable" ? "Bu senaryoyu seç" : "Seçim kapalı"}</button>
             </div>) : null}
-            {selection.status === "selected" ? <span>Seçim kaydedildi: {selection.selectionRef.slice(0, 20)}… · {selection.persistence}. Approval, action ve Meta write kapalıdır.</span> : null}
+            {selection.status === "selected" ? <span>Senaryo seçimi kaydedildi ({selection.persistence}). Onay, action ve Meta write kapalıdır.</span> : null}
             {(selection.status === "unavailable" || selection.status === "error") ? <span role="alert">{selection.message}</span> : null}
           </div>
           <div className={styles.impactResult} aria-label="İnsan onay kuyruğu">
@@ -826,7 +832,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
             {approvalQueue.status === "loading" ? <span>Seçilmiş senaryolar okunuyor…</span> : null}
             {approvalQueue.status === "ready" && approvalQueue.selections.length === 0 ? <span>Onaya gönderilecek seçilmiş senaryo yok.</span> : null}
             {approvalQueue.status === "ready" ? approvalQueue.selections.map((selection) => <div className={styles.row} key={selection.selectionRef}>
-              <span>Seçim: {selection.selectionRef.slice(0, 20)}… · {date(selection.selectedAt)}</span>
+              <span>Seçilmiş senaryo · {date(selection.selectedAt)}</span>
               <button className={styles.save} type="button" onClick={() => void sendToApprovalQueue(selection)}>İnsan onay kuyruğuna gönder</button>
             </div>) : null}
             {approvalQueue.status === "queued" ? <span>Seçim onay kuyruğuna eklendi ({approvalQueue.persistence}). Onay kaydı için Onay Kuyruğu açıldı; execute ve Meta write hâlâ kapalıdır.</span> : null}
@@ -838,10 +844,10 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
             {approvalQueue.status === "loading" ? <span>Karar izi doğrulanıyor…</span> : null}
             {approvalQueue.status === "ready" && approvalQueue.decisionTrace.length === 0 ? <span>Gösterilebilecek doğrulanmış karar izi yok.</span> : null}
             {approvalQueue.status === "ready" ? approvalQueue.decisionTrace.map((trace) => <div className={styles.row} key={trace.selectionRef}>
-              <span>Seçim: {trace.selectionRef.slice(0, 20)}… · {date(trace.selectedAt)}</span>
+              <span>Seçilmiş senaryo · {date(trace.selectedAt)}</span>
               <span>ActionUnit: {trace.actionUnit.presence ? trace.actionUnit.status.replaceAll("_", " ") : "hazırlanmadı"}</span>
               <span>Kararlar: {trace.decisionHistory.length ? trace.decisionHistory.map((event) => `${event.decision.replaceAll("_", " ")} · ${date(event.occurredAt)}${event.reasonCode ? ` · ${event.reasonCode}` : ""}`).join(" | ") : "henüz yok"}</span>
-              <span>Execution: {trace.execution.safetyState} · {trace.execution.closure.replaceAll("_", " ")}</span>
+              <span>Uygulama: kapalı · {closedExecutionLabel(trace.execution)}</span>
             </div>) : null}
             {(approvalQueue.status === "unavailable" || approvalQueue.status === "error") ? <span role="alert">Karar izi güvenli biçimde okunamadı.</span> : null}
           </div>
@@ -852,7 +858,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
             {temporal.status === "ready" && temporal.result ? <span role="status">{temporal.result}</span> : null}
             {temporal.status === "ready" && temporal.candidates.length === 0 ? <span>Şu anda değerlendirilebilir, hazır bir zaman penceresi yok.</span> : null}
             {temporal.status === "ready" ? temporal.candidates.map((candidate) => <div className={styles.row} key={candidate.candidateRef}>
-              <span>{candidate.ruleSeriesRef} · {candidate.reviewCadence} · frozen pencere · {date(candidate.capturedAt)}</span>
+              <span>{candidate.reviewCadence} · frozen pencere · {date(candidate.capturedAt)}</span>
               <button className={styles.save} type="button" onClick={() => void evaluateTemporal(candidate)}>Salt-okur değerlendir</button>
             </div>) : null}
             {(temporal.status === "unavailable" || temporal.status === "error") ? <span role="alert">{temporal.message}</span> : null}

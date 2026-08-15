@@ -85,6 +85,17 @@ describe("Slice Rule Workspace panel", () => {
     expect(html).toContain("Kural otomatik oluşturulmaz.");
   });
 
+  it("keeps private pool, frozen-context and decision identifiers out of the operator surface", () => {
+    const source = readFileSync("src/app/dashboard/slice-rule-workspace-panel.tsx", "utf8");
+    expect(source).not.toContain("frozenPoolBinding.draftHash.slice");
+    expect(source).not.toContain("frozenPoolBinding.hierarchyHash.slice");
+    expect(source).not.toContain("candidate.campaignRef} · {candidate.currentBudgetDecimal");
+    expect(source).not.toContain("trace.selectionRef.slice");
+    expect(source).not.toContain("node.poolRef} · {node.layer}");
+    expect(source).toContain("Doğrulanmış bağlam {index + 1}");
+    expect(source).toContain("Uygulama: kapalı");
+  });
+
   it("opens an editable Agent rule-session draft without creating or revising the rule", () => {
     const html = renderToStaticMarkup(createElement(SliceRuleWorkspaceSurface, { state: { status: "ready",
       snapshot: parseSliceRuleWorkspaceSnapshot(snapshot) }, onRetry: vi.fn(), onSaved: vi.fn(async () => undefined),
