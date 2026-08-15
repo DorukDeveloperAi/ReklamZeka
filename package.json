@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Çok kanallı, açıklanabilir reklam karar destek ürünü",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname localhost --port 3000",
     "build": "META_ACCESS_TOKEN= REKLAMZEKA_LOCAL_SESSION_SIGNING_KEY= next build && npm run check:secret-artifacts",
     "start": "next start",
     "check:foundation": "node scripts/check-project-foundation.mjs",

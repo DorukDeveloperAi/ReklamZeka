@@ -60,8 +60,14 @@ Yerel Dashboard, yapılandırmanın uygulandığı aynı proje kökünde ve yaln
 
 ```sh
 npm run local-session:configure -- --apply
-npm run dev -- --hostname localhost
+npm run dev
 ```
+
+`npm run dev` is deliberately bound to `http://localhost:3000`, the exact
+configured origin. It fails rather than moving to another port; stop the
+process holding port 3000 before continuing. A different development port is
+not interchangeable with the configured local-session origin and is rejected
+before a proof can be consumed.
 
 Server hazır olduktan sonra, aynı işletim sistemi kullanıcısı tek-kullanımlık proof'u üretir ve 90 saniye
 içinde Dashboard > Decision Room > **Yerel oturumu bağla** alanına yapıştırır:
