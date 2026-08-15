@@ -1103,6 +1103,10 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     commitDashboardLocation({ ...dashboardLocation, view: "manage", manageArea: "settings", settingsArea: area, campaignRef: null });
   }
 
+  function openSkillSetup() {
+    commitDashboardLocation({ ...dashboardLocation, view: "manage", manageArea: "rules", rulesArea: "guidance", campaignRef: null });
+  }
+
   function openAgentContext(entityRef: string, label: string) {
     setAgentSourceView(activeView);
     setAgentEntityRef(entityRef);
@@ -1202,7 +1206,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     return <div className={`${styles.agentWorkspace} ${orchestratorState === "ready" ? "" : styles.agentWorkspaceSingle}`}>
         <section className={styles.agentChat}>
           <header><div><span className={styles.agentMark}>✦</span><div><strong>Agent çalışma alanı</strong><small>Kaynak ekran: {sourceTitle} · konuşma sayfalar arasında korunur</small></div></div><button onClick={() => void refreshOrchestratorConversation()}>Sohbeti yenile</button></header>
-          {skillCatalogState === "ready" || skillCatalogState === "legacy" ? <SkillCatalogContextStrip context={skillCatalogContext} />
+          {skillCatalogState === "ready" || skillCatalogState === "legacy" ? <SkillCatalogContextStrip context={skillCatalogContext} onOpenSetup={openSkillSetup} setupClassName={styles.skillSetupHint} />
             : skillCatalogState === "loading" ? <p role="status">Skill bağlamı güvenli projeksiyondan okunuyor…</p>
               : skillCatalogState === "session_required" ? <p role="status">Skill bağlamı için yerel oturum gerekli; kayıt veya seçim gösterilmez.</p>
                 : skillCatalogState === "unavailable" ? <p role="status">Skill bağlamı kullanılamıyor; kayıt veya seçim gösterilmez.</p> : null}

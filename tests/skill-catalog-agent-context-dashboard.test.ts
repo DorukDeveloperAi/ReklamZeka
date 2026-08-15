@@ -1,7 +1,10 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { skillCatalogContextFromResponse, skillCatalogLoadState } from "@/app/dashboard/operating-dashboard";
+import { SkillCatalogContextStrip } from "@/app/dashboard/skill-catalog-context-strip";
 
 const safeProjection = {
   contractVersion: "skill-catalog-ui/1.0.0",
@@ -48,5 +51,14 @@ describe("Agent skill catalog context strip", () => {
     expect(source).toContain("Henüz çalışma alanına ait bir skill profili seçilmedi.");
     expect(source).toContain("Agent kural veya policy üretmez.");
     expect(source).not.toContain("Skill snapshot not recorded.");
+  });
+
+  it("offers navigation to user-owned skill setup without selecting a profile from Agent", () => {
+    const html = renderToStaticMarkup(createElement(SkillCatalogContextStrip, {
+      context: { profileLabel: "", skills: [], legacy: true }, onOpenSetup: () => undefined,
+    }));
+    expect(html).toContain("Skill çalışma dilini aç");
+    expect(readFileSync("src/app/dashboard/operating-dashboard.tsx", "utf8")).toContain("function openSkillSetup()");
+    expect(readFileSync("src/app/dashboard/skill-catalog-context-strip.tsx", "utf8")).toContain("Navigation only: profile selection stays an explicit action");
   });
 });

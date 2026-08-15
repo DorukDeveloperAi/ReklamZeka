@@ -194,6 +194,12 @@
 .agentCard blockquote { margin: 14px 0; padding: 0 0 0 12px; border-left: 2px solid var(--rz-green); color: #d6e0ec; font-size: .69rem; line-height: 1.55; }
 .agentActions { display: flex; gap: 7px; }
 .agentActions button { min-height: 34px; padding: 0 11px; border: 1px solid var(--rz-line); border-radius: 8px; background: transparent; color: var(--rz-muted); font-size: .62rem; cursor: pointer; }
+.skillSetupHint { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; padding: 11px 13px; border: 1px solid var(--rz-line); border-radius: 9px; background: rgba(120,174,254,.055); }
+.skillSetupHint p { margin: 0; color: var(--rz-muted); font-size: .61rem; line-height: 1.45; }
+.skillSetupHint button { flex: none; min-height: 31px; padding: 0 10px; border: 1px solid rgba(120,174,254,.35); border-radius: 7px; color: var(--rz-blue); background: transparent; font-size: .59rem; font-weight: 760; cursor: pointer; }
+.skillSetupHint button:hover { color: #f5f8ff; background: var(--rz-blue); }
+.appShell[data-theme="light"] .skillSetupHint { background: rgba(24,119,242,.055); }
+.appShell[data-theme="light"] .skillSetupHint button:hover { color: #fff; }
 
 .campaignTable { overflow-x: auto; }
 .tableHead, .tableRow { display: grid; grid-template-columns: minmax(330px, 1.65fr) repeat(5, minmax(90px, .55fr)); align-items: center; min-width: 970px; }
