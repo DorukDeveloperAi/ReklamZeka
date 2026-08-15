@@ -22,7 +22,7 @@ import { InstructionPolicyStudioPanel } from "./instruction-policy-studio-panel"
 import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel";
 import { NormalizationWorkbenchPanel } from "./normalization-workbench-panel";
 import { MetaTrustReadinessPanel } from "./meta-trust-readiness-panel";
-import { CanonicalPerformancePanel } from "./canonical-performance-panel";
+import { HomePortfolioOverview } from "./home-portfolio-overview";
 import { CanonicalCampaignPortfolioPanel } from "./canonical-campaign-portfolio-panel";
 import { campaignContextBridge } from "./campaign-planning-brief-panel";
 import { LocalSessionConnector } from "./local-session-connector";
@@ -1222,7 +1222,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
         <button onClick={() => void refreshMetaReadMirror(true)}>Kaynağı yenile <span>→</span></button>
       </section>
 
-      <CanonicalPerformancePanel key={localSessionGeneration} />
+      <HomePortfolioOverview key={localSessionGeneration} onOpenPortfolio={() => commitDashboardLocation({ ...dashboardLocation, view: "manage", manageArea: "portfolio" })} />
 
       <div className={`${styles.dashboardColumns} ${styles.dashboardColumnsSingle}`}>
         <section className={styles.panel} aria-labelledby="portfolio-summary-title">
@@ -1239,7 +1239,6 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
 
       </div>
 
-      {metaReadMirrorState === "ready" ? <DeliveryHealthAlertPanel embedded /> : null}
     </>;
   }
 
