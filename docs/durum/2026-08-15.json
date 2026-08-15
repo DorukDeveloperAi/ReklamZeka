@@ -4,149 +4,149 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "ff84f4b9b",
+      "hash": "4d04fdec0",
       "tarih": "2026-08-15",
-      "konu": "Clarify canonical portfolio source scope",
+      "konu": "feat: hand off canonical portfolio scope to rules",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "cc24afe71",
+      "tarih": "2026-08-15",
+      "konu": "test: lock Meta write closed approval chain",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "4dbf9c6f4",
+      "tarih": "2026-08-15",
+      "konu": "fix(analysis): classify cohort scope evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "49edf96b2",
+      "tarih": "2026-08-15",
+      "konu": "feat: bind cohort receipts to explicit scope proof",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "930a93dc8",
+      "tarih": "2026-08-15",
+      "konu": "Add fail-closed temporal cohort skill receipt",
       "tur": "is",
       "kapsam": []
     },
     {
-      "hash": "81052bb38",
+      "hash": "531f00072",
       "tarih": "2026-08-15",
-      "konu": "fix(dashboard): guide read-first session states",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "c826e3631",
-      "tarih": "2026-08-15",
-      "konu": "fix(dashboard): retain evidence and decision guardrails",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "9aae0b2d4",
-      "tarih": "2026-08-15",
-      "konu": "fix(agent): select published playbook sources",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "ed7c048fa",
-      "tarih": "2026-08-15",
-      "konu": "feat(agent): surface working language receipts",
+      "konu": "feat: show proven slice links in portfolio",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "5240dba03",
+      "hash": "48963502b",
       "tarih": "2026-08-15",
-      "konu": "docs(product): bind final philosophy to active goal",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "3315b6bb1",
-      "tarih": "2026-08-15",
-      "konu": "feat: gate slice handoff on classification evidence",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "86f7e0f56",
-      "tarih": "2026-08-15",
-      "konu": "feat: bind slice rule decision journey",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "9b492d771",
-      "tarih": "2026-08-15",
-      "konu": "feat(portfolio): clarify time and cohort evidence boundary",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "46e089dac",
-      "tarih": "2026-08-15",
-      "konu": "fix: classify local session checkout mismatch",
+      "konu": "fix(ui): retain contextual help menu",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "1ce85802b",
+      "hash": "adccc6862",
       "tarih": "2026-08-15",
-      "konu": "Simplify home portfolio overview",
+      "konu": "refine dashboard theme system",
       "tur": "is",
       "kapsam": []
     },
     {
-      "hash": "24cb05d0a",
+      "hash": "324bf0668",
       "tarih": "2026-08-15",
-      "konu": "feat(portfolio): surface user slice context",
+      "konu": "fix(local-session): pin development origin binding",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "668d6dffb",
+      "tarih": "2026-08-15",
+      "konu": "feat: unify portfolio slice operation table",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "415109e1c",
+      "hash": "69f503736",
       "tarih": "2026-08-15",
-      "konu": "docs(product): bind workspace philosophy to delivery",
+      "konu": "test(agent): require fresh official turn citations",
       "tur": "is",
       "kapsam": [
-        "docs"
+        "test"
       ]
     },
     {
-      "hash": "dbffc7706",
+      "hash": "0b6dddb15",
       "tarih": "2026-08-15",
-      "konu": "feat(dashboard): clarify workspace shell",
+      "konu": "feat(orchestrator): freeze official turn receipts",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "dff2bbf4f",
+      "hash": "be2441b72",
       "tarih": "2026-08-15",
-      "konu": "feat: centralize user-authored rule library",
+      "konu": "fix(ui): restore slice rule decision trace",
       "tur": "is",
       "kapsam": [
-        "feat"
+        "fix"
+      ]
+    },
+    {
+      "hash": "20332e892",
+      "tarih": "2026-08-15",
+      "konu": "fix(ui): restore human approval preparation",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "7b8dbf1f1",
+      "tarih": "2026-08-15",
+      "konu": "fix(ui): keep slice budget impact dry-run only",
+      "tur": "is",
+      "kapsam": [
+        "fix"
       ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 39
+      "adet": 33
     },
     {
       "kapsam": "fix",
-      "adet": 9
+      "adet": 14
     },
     {
       "kapsam": "?",
-      "adet": 3
+      "adet": 4
     },
     {
       "kapsam": "docs",
@@ -161,7 +161,7 @@
       "adet": 3
     }
   ],
-  "isSayisi": 511,
+  "isSayisi": 526,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-15",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "bdd4c035983e"
+  "damga": "c70d1873cc66"
 }
