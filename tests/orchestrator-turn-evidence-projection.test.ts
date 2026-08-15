@@ -9,6 +9,9 @@ import { CORE_SKILL_MANIFESTS } from "@/domain/orchestrator/skill-catalog";
 import { OrchestratorSkillRouter } from "@/application/orchestrator-skill-run";
 import { createWorkspaceSkillCatalogBinding } from "@/domain/orchestrator/skill-catalog";
 import { unavailableOrchestratorReadOnlyEvidenceContext } from "@/application/orchestrator-readonly-evidence-context";
+import { OrchestratorTurnReceiptSummary } from "@/app/dashboard/orchestrator-turn-evidence";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createElement } from "react";
 
 const turnRef = `turn_${"a".repeat(32)}`;
 const messageRef = `message_${"b".repeat(32)}`;
@@ -75,6 +78,21 @@ describe("orchestrator historical turn evidence projection", () => {
       authority: { canPersist: false, canCreateRule: false, canDraftPolicy: false, canExecute: false, canWriteMeta: false } } });
     expect(evidence.skillRun.receipt?.selectedSkills).toHaveLength(2);
     expect(JSON.stringify(evidence.skillRun)).not.toMatch(/profile_workspace|playbook_alpha|source_guidance|raw|prompt/i);
+  });
+
+  it("keeps selected skills, source freshness and uncertainty visible without private receipt identifiers", () => {
+    const evidence = { skillRun: { state: "bound" as const, receipt: { receiptRef: `skillrun_${"a".repeat(32)}`,
+      receiptHash: "b".repeat(64), intent: "explain" as const, selectedSkills: [{ name: "EvidenceIntegrityAuditor", version: "1.0.0", outputContract: "facts" }],
+      evidenceAvailability: "partial" as const, outputContract: "evidence-integrity-facts/1.0.0" as const,
+      authority: { canPersist: false as const, canCreateRule: false as const, canDraftPolicy: false as const, canAlterScope: false as const,
+        canPublish: false as const, canApprove: false as const, canExecute: false as const, canWriteMeta: false as const } } },
+      playbooks: [{ label: "Doğrulanmış çalışma notu", source: { freshness: "fresh" as const } }],
+      interviewKits: { state: "bound" as const, kits: [] } };
+    const html = renderToStaticMarkup(createElement(OrchestratorTurnReceiptSummary, { evidence }));
+    expect(html).toContain("EvidenceIntegrityAuditor");
+    expect(html).toContain("kaynak güncel");
+    expect(html).toContain("belirsizlik: Agent çıkarımı, yetki yok");
+    expect(html).not.toMatch(/skillrun_|[a-f0-9]{64}|source_guidance|playbook_alpha/);
   });
 
   it("projects only an immutable source-bound user interview kit and rejects tampering", () => {

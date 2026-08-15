@@ -38,6 +38,13 @@ describe("SkillCatalogPanel Yönet → Kurallar surface", () => {
     expect(panel).toContain("Yayınlanmış kaynak referansı");
   });
 
+  it("explains where each user-owned working-language item is used without widening Agent authority", () => {
+    expect(panel).toContain("Çalışma dili kullanım özeti");
+    expect(panel).toContain("Her turn’de sunucu seçer");
+    expect(panel).toContain("makbuzda kaynak tazeliği görünür");
+    expect(panel).toContain("kural veya policy metni değildir");
+  });
+
   it("mounts only in Yönet → Kurallar after the shared session gate is ready", () => {
     expect(dashboard).toContain('import { SkillCatalogPanel } from "./skill-catalog-panel"');
     expect(dashboard).toContain('<SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} />');

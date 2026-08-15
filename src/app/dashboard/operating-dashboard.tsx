@@ -29,7 +29,7 @@ import { LocalSessionConnector } from "./local-session-connector";
 import { SkillCatalogContextStrip, type SkillCatalogContext } from "./skill-catalog-context-strip";
 import { SkillCatalogPanel } from "./skill-catalog-panel";
 import { ContextualHelp } from "./contextual-help";
-import { OrchestratorTurnReadOnlyEvidence, OrchestratorTurnSkillRunEvidence, OrchestratorTurnInterviewKitEvidence, type OrchestratorReadOnlyEvidenceSummary,
+import { OrchestratorTurnReadOnlyEvidence, OrchestratorTurnSkillRunEvidence, OrchestratorTurnInterviewKitEvidence, OrchestratorTurnReceiptSummary, type OrchestratorReadOnlyEvidenceSummary,
   type OrchestratorSkillRunSummary, type OrchestratorInterviewKitSummary } from "./orchestrator-turn-evidence";
 import {
   dashboardLocationFromSearch,
@@ -1292,7 +1292,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
             {orchestratorState === "session_required" ? <LocalSessionConnector title="Orchestrator konuşmasını bağlayın" onVerify={verifyOrchestratorWorkspace} /> : null}
             {orchestratorState === "unavailable" ? <p role="alert">{orchestratorError ?? "Kalıcı Orchestrator konuşması kullanılamıyor."} Manuel Codex aktarımı kullanılabilir.</p> : null}
             {orchestratorState === "ready" && !visibleMessages.length ? <p>Kalıcı konuşma bağlı; henüz mesaj yok.</p> : null}
-            {visibleMessages.map((message) => <div key={message.key} data-from={message.from}><span>{message.from === "agent" ? "RZ" : "Siz"}</span><div className={styles.chatMessageBody}><p>{message.text}</p>{message.evidence ? <details className={styles.turnEvidence}>
+            {visibleMessages.map((message) => <div key={message.key} data-from={message.from}><span>{message.from === "agent" ? "RZ" : "Siz"}</span><div className={styles.chatMessageBody}><p>{message.text}</p>{message.evidence ? <><div className={styles.turnReceipt}><OrchestratorTurnReceiptSummary evidence={message.evidence} /></div><details className={styles.turnEvidence}>
               <summary>Kanıt makbuzu</summary>
               <p><strong>Kanıt kapsamı:</strong> Sayfa yönlendirmesi + doğrulanmış workspace playbookları</p>
               <p><strong>Belirsizlik:</strong> Agent çıkarımıdır; Meta/action yetkisi yok.</p>
@@ -1305,7 +1305,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
                 <div className={styles.turnEvidenceSkills}><strong>Kullanıcı playbook snapshotları</strong>{message.evidence.playbooks.length ? <ul>{message.evidence.playbooks.map((playbook) => <li key={playbook.label}><span>{playbook.label}</span>{playbook.source ? <small>{playbook.source.url ? <a href={playbook.source.url} target="_blank" rel="noreferrer">{playbook.source.title}</a> : playbook.source.title} · {playbook.source.type} · {playbook.source.freshness}</small> : <small>Tarihsel kaynak ayrıntısı kaydedilmedi.</small>}</li>)}</ul> : <small>Bu turn için doğrulanmış workspace playbook’u bağlı değildi.</small>}</div>
                 {message.evidence.historicalSourceState === "detail_not_recorded" ? <small>Tarihsel kaynak başlığı, bağlantısı ve freshness bu eski snapshot’ta kaydedilmedi; güncel kaynakla birleştirilmedi.</small> : null}
               </> : <p className={styles.turnEvidenceUnavailable}>{message.evidence.state === "legacy_not_recorded" ? "Bu eski turn için kanıt snapshot’ı kaydedilmedi; güncel kaynak durumu tarihsel kanıt gibi gösterilmez." : message.evidence.state === "unavailable_not_bound" ? "Bu turn’de workspace skill/playbook kanıtı çözümlenemedi; model çalıştırılmadı." : "Kanıt snapshot’ı eksik veya doğrulanamadı; güncel kaynak durumu kullanılmadı."}</p>}
-            </details> : null}</div></div>)}
+            </details></> : null}</div></div>)}
           </div>
           {orchestratorError && orchestratorState === "ready" ? <p className={styles.agentChatError} role="alert">{orchestratorError}</p> : null}
           {codexManualTask ? <div className={styles.codexManualTask}><header><strong>Codex için hazır görev</strong><button onClick={() => void navigator.clipboard.writeText(codexManualTask).then(() => setToast("Görev yeniden kopyalandı."), () => setToast("Kopyalama kullanılamadı; metni seçip kopyalayın."))}>Tekrar kopyala</button></header><textarea aria-label="Codex görevi" readOnly value={codexManualTask} /><small>Bu manuel aktarım Meta veya policy işlemi başlatmaz.</small></div> : null}

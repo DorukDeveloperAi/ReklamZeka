@@ -531,6 +531,7 @@
 .chatMessageBody { display: grid; gap: 7px; min-width: 0; }
 .chatMessageBody > p { margin: 0; padding: 12px 14px; border: 1px solid var(--rz-line); border-radius: 3px 11px 11px 11px; background: rgba(255,255,255,.025); color: #d4deea; font-size: .72rem; line-height: 1.6; white-space: pre-wrap; }
 .chatMessages > div[data-from="user"] .chatMessageBody > p { background: rgba(120, 174, 254,.09); }
+.turnReceipt { padding: 7px 10px; border-left: 2px solid rgba(116, 200, 160,.5); border-radius: 0 7px 7px 0; background: rgba(116, 200, 160,.035); color: var(--rz-muted); font-size: .56rem; line-height: 1.5; }.turnReceipt section { display: inline; }.turnReceipt strong { color: var(--rz-green); }.turnReceipt small { color: var(--rz-dim); }
 .turnEvidence { border: 1px solid rgba(116, 200, 160,.2); border-radius: 8px; background: rgba(116, 200, 160,.035); color: var(--rz-muted); font-size: .57rem; }
 .turnEvidence summary { padding: 8px 10px; color: var(--rz-green); font-weight: 800; cursor: pointer; }
 .turnEvidence > p, .turnEvidence > small, .turnEvidence > dl, .turnEvidenceSkills { display: block; margin: 0 10px 9px; line-height: 1.55; }

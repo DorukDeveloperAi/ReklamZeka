@@ -208,13 +208,15 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
     if (saved) { setPendingRevision(null); setEditingPlaybook(null); setRevisionTitle(""); setRevisionBody(""); }
   }
 
-  if (state === "loading" && !catalog) return <section className={styles.panel} aria-busy="true"><h2>Skill profili ve playbooklar</h2><p>Yayınlanmış kaynaklar doğrulanıyor…</p></section>;
+  if (state === "loading" && !catalog) return <section className={styles.panel} aria-busy="true"><h2>Agent çalışma dili</h2><p>Yayınlanmış skill ve kaynaklar doğrulanıyor…</p></section>;
   if (state === "session_required") return null;
-  if (state === "unavailable" || !catalog) return <section className={styles.panel} role="alert"><h2>Skill profili ve playbooklar kullanılamıyor</h2><p>{message ?? "Katalog kaynağı doğrulanamadı."}</p><button type="button" onClick={() => void reload()}>Tekrar dene</button></section>;
+  if (state === "unavailable" || !catalog) return <section className={styles.panel} role="alert"><h2>Agent çalışma dili kullanılamıyor</h2><p>{message ?? "Katalog kaynağı doğrulanamadı."}</p><button type="button" onClick={() => void reload()}>Tekrar dene</button></section>;
 
   const canCreate = catalog.authority.canCreatePlaybookRevision && mutation === null;
   return <><section className={styles.panel} aria-labelledby="skill-catalog-title">
-    <header className={styles.header}><div><span>YÖNETİM · KURALLAR</span><h2 id="skill-catalog-title">Skill profili ve playbooklar</h2><p>Profil ve playbook kayıtları yalnız siz açıkça seçtiğinizde veya kaydettiğinizde değişir.</p></div><button type="button" onClick={() => void reload()} disabled={mutation !== null}>Yenile</button></header>
+    <header className={styles.header}><div><span>YÖNETİM · AGENT ÇALIŞMA DİLİ</span><h2 id="skill-catalog-title">Agent çalışma dili</h2><p>Skill seçimi yayınlanmış ve salt-okurdur. Playbook ile soru seti metnini yalnız siz açıkça yazıp kaydedersiniz.</p></div><button type="button" onClick={() => void reload()} disabled={mutation !== null}>Yenile</button></header>
+
+    <section className={styles.usage} aria-label="Çalışma dili kullanım özeti"><div><strong>Skill’ler</strong><small>Her turn’de sunucu seçer; sürüm, test ve yetki sınırı sabittir.</small></div><div><strong>Playbook’lar</strong><small>Yalnız bağlı resmî kaynakla Agent bağlamına girer; makbuzda kaynak tazeliği görünür.</small></div><div><strong>Soru setleri</strong><small>Agent’ın soracağı denetim sorularıdır; kural veya policy metni değildir.</small></div></section>
 
     <section className={styles.profile} aria-label="Skill profili">
       <div><strong>{catalog.activeProfile ? `Etkin profil · revizyon ${catalog.activeProfile.revision}` : "Profil seçilmedi"}</strong><small>Temel profil dokuz yayınlanmış skill içerir; kaynak, kanıt ve sınırlamalar görünür kalır.</small></div>
@@ -224,7 +226,7 @@ export function SkillCatalogPanel({ onSessionRequiredChange }: Readonly<{
     <section className={styles.skills} aria-label="Temel skilller"><h3>Temel skilller</h3><ul>{catalog.skills.map((skill) => <li key={skill.ref}><strong>{skill.name}</strong><span>sürüm {skill.version}</span><small>Yalnız okuma ve açıklama</small></li>)}</ul></section>
 
     <form className={styles.form} onSubmit={(event) => void createPlaybook(event)}>
-      <h3>Playbook ekle</h3><p>Metni siz yazarsınız. Yayınlanmış kaynak referansı sunucuda doğrulanmadan kayıt oluşturulmaz.</p>
+      <h3>Playbook ekle</h3><p>Metni siz yazarsınız. Resmî kaynak, Agent bağlamında hangi playbook’un kullanılacağını ve tazeliğini açıklar; sunucu doğrulamadan kayıt oluşturulmaz.</p>
       <label><span>Başlık</span><input value={title} maxLength={240} disabled={!canCreate} onChange={(event) => setTitle(event.target.value)} /></label>
       <label><span>Playbook metni</span><textarea value={body} maxLength={16_000} disabled={!canCreate} onChange={(event) => setBody(event.target.value)} /></label>
       <label><span>Yayınlanmış kaynak referansı</span><input value={sourceRef} placeholder="source_…" pattern="source_[a-z0-9_.:-]+" aria-describedby="skill-catalog-source-note" disabled={!canCreate} onChange={(event) => setSourceRef(event.target.value)} /></label>

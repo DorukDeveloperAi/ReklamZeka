@@ -29,6 +29,26 @@ export type OrchestratorInterviewKitSummary = Readonly<{
   }>>;
 }>;
 
+type TurnReceiptEvidence = Readonly<{
+  skillRun: OrchestratorSkillRunSummary;
+  playbooks: readonly Readonly<{ label: string; source: Readonly<{ freshness: "fresh" | "stale" | "not_scheduled" }> | null }>[];
+  interviewKits: OrchestratorInterviewKitSummary;
+}>;
+
+/** Always visible, public-safe turn receipt: it intentionally omits refs, hashes and prompt bodies. */
+export function OrchestratorTurnReceiptSummary({ evidence }: Readonly<{ evidence: TurnReceiptEvidence }>) {
+  const receipt = evidence.skillRun.state === "bound" ? evidence.skillRun.receipt : null;
+  const skills = receipt?.selectedSkills.map((skill) => `${skill.name} · ${skill.version}`).join("; ")
+    ?? "Skill makbuzu kullanılamıyor";
+  const sourceStates = evidence.playbooks.map((playbook) => playbook.source?.freshness)
+    .filter((state): state is "fresh" | "stale" | "not_scheduled" => Boolean(state));
+  const source = sourceStates.length
+    ? sourceStates.includes("stale") ? "kaynak eski" : sourceStates.includes("not_scheduled") ? "güncellik planlanmadı" : "kaynak güncel"
+    : evidence.interviewKits.state === "bound" && evidence.interviewKits.kits.length ? "soru seti kaynağı bağlı" : "bağlı resmî kaynak yok";
+  const availability = receipt ? `kanıt ${receipt.evidenceAvailability}` : "kanıt doğrulanamadı";
+  return <section aria-label="Turn makbuzu"><strong>Bu turn</strong><span> · {skills}</span><small> · {source} · {availability} · belirsizlik: Agent çıkarımı, yetki yok</small></section>;
+}
+
 /** Small, identifier-free turn evidence surface. The parent Agent drawer owns placement and styling. */
 export function OrchestratorTurnReadOnlyEvidence({ evidence }: Readonly<{ evidence: OrchestratorReadOnlyEvidenceSummary }>) {
   if (evidence.state === "legacy_not_recorded") return <p>Bu eski turn için operasyon kanıt özeti kaydedilmemiş.</p>;
