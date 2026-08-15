@@ -1,0 +1,190 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "6cc0c97c0",
+      "tarih": "2026-08-15",
+      "konu": "feat(agent): guide users to skill setup",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "0c9687f07",
+      "tarih": "2026-08-15",
+      "konu": "feat(dashboard): add soft Meta light theme",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "42f0364f0",
+      "tarih": "2026-08-14",
+      "konu": "feat(agent): expose frozen turn evidence",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "a483e4e3b",
+      "tarih": "2026-08-14",
+      "konu": "feat(agent): bind workspace playbooks to turns",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "653f647a8",
+      "tarih": "2026-08-14",
+      "konu": "fix(agent): enforce user-authored rule boundaries",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "40bcb182e",
+      "tarih": "2026-08-14",
+      "konu": "feat(budget): guide pool hierarchy drafts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ad6044644",
+      "tarih": "2026-08-14",
+      "konu": "feat(skills): revise user playbooks safely",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "3996b7e91",
+      "tarih": "2026-08-14",
+      "konu": "feat(slice-rules): show read-only decision trace",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "04d011008",
+      "tarih": "2026-08-14",
+      "konu": "fix(tombstone): retain operational audit coverage",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "92a7ddf3d",
+      "tarih": "2026-08-14",
+      "konu": "feat(actions): add unified preparation gate",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4fe3836ce",
+      "tarih": "2026-08-14",
+      "konu": "feat(dashboard): manage skill catalog in rules",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "3bd1ca607",
+      "tarih": "2026-08-14",
+      "konu": "feat(agent): show safe skill catalog context",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "d79562e58",
+      "tarih": "2026-08-14",
+      "konu": "feat(slice-rule): add guarded scenario selection",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c27504ecd",
+      "tarih": "2026-08-14",
+      "konu": "feat: add private skill catalog route acceptance",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "aed4290b8",
+      "tarih": "2026-08-14",
+      "konu": "feat: add skill catalog repository and panel",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "feat",
+      "adet": 24
+    },
+    {
+      "kapsam": "fix",
+      "adet": 14
+    },
+    {
+      "kapsam": "test",
+      "adet": 12
+    },
+    {
+      "kapsam": "docs",
+      "adet": 7
+    },
+    {
+      "kapsam": "?",
+      "adet": 2
+    },
+    {
+      "kapsam": "refactor",
+      "adet": 1
+    }
+  ],
+  "isSayisi": 473,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-15",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "09ec6ba64e5e"
+}

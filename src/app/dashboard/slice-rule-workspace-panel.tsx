@@ -451,6 +451,16 @@ function ruleLabel(rule: SliceRule): string {
   return rule.kind;
 }
 
+function scopeLabel(scope: Scope): string {
+  return [scope.market === "domestic" ? "Yerli" : "Yabancı", scope.serviceRef, scope.campaignFamilyRef,
+    scope.countryOrRegion, scope.audienceStrategy, scope.platform, scope.conversionRoute].filter(Boolean).join(" · ");
+}
+
+function followUpLabel(item: SliceRuleWorkspaceItem): string {
+  const verification = item.operatingRule.verification;
+  return `${verification.metric.replaceAll("_", " ")} · ${verification.reviewCadence} · öncelik ${item.operatingRule.priority}`;
+}
+
 function percent(basisPoints: number): string {
   return String(basisPoints / 100);
 }
@@ -690,15 +700,15 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     }
   };
   return <div className={styles.workspace}>
-    <header className={styles.hero}><div><span>SLICE RULE WORKSPACE</span><h2>Kanıtlı kapsam için işletim kuralı taslağı</h2><p>Pazar, hizmet ve kampanya ailesi açıkça seçilir. Bu alan yalnız öneri taslağı kaydeder.</p></div><strong>RECOMMENDATION ONLY · AUTHORITY NONE</strong></header>
+    <header className={styles.hero}><div><span>SLICE RULE WORKSPACE</span><h2>Slice, kural ve takip yaklaşımını aynı çalışma tablosunda görün.</h2><p>Her satır bir kullanıcı yazarlı scope ve kural serisidir: analiz/bütçe yaklaşımını, değerlendirme ritmini ve geri alma koşulunu birlikte önizlersiniz. Agent yalnız kanıt ve eksik sorularla yardımcı olur.</p></div><strong>RECOMMENDATION ONLY · AUTHORITY NONE</strong></header>
     {props.state.status === "loading" ? <section className={styles.state} role="status">Taslak kayıt defteri doğrulanıyor…</section> : null}
     {props.state.status === "unavailable" || props.state.status === "error" ? <section className={styles.state} role="alert"><h2>{props.state.status === "unavailable" ? "Kaynak bağlı değil" : "Çalışma alanı okunamadı"}</h2><p>{props.state.message}</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
     {snapshot ? <div className={styles.grid}>
-      <section className={styles.panel}><div className={styles.panelTitle}><div><span>MEVCUT TASLAKLAR</span><h2>{snapshot.items.length} güncel seri</h2></div><small>Append-only</small></div>
-        <div className={styles.list}>{snapshot.items.length === 0 ? <p>Henüz kayıtlı slice rule taslağı yok.</p> : snapshot.items.map((item) => <button key={item.draftRef} type="button" data-active={headRef === item.seriesRef} onClick={() => { setHeadRef(item.seriesRef); setImpactState({ status: "idle" }); setForm(formFromItem(item)); }}><strong>{item.seriesRef} · r{item.revision}</strong><span>{item.scope.market === "domestic" ? "Yerli" : "Yabancı"} · {item.scope.serviceRef} · {item.scope.campaignFamilyRef}</span><small>{ruleLabel(item.operatingRule.rule)} · {date(item.createdAt)}</small></button>)}</div>
+      <section className={`${styles.panel} ${styles.workspaceTablePanel}`}><div className={styles.panelTitle}><div><span>SLICE & KURAL ÇALIŞMA TABLOSU</span><h2>{snapshot.items.length} güncel seri</h2></div><small>Append-only · kullanıcı yazarlı</small></div>
+        {snapshot.items.length === 0 ? <p>Henüz kayıtlı slice rule taslağı yok. Önce kanıtlı bir scope seçin, ardından kendi kuralınızı yazın.</p> : <div className={styles.tableScroll}><table className={styles.workspaceTable}><caption>Her satırın kapsamı, kuralı ve takip yaklaşımı birlikte önizlenir.</caption><thead><tr><th scope="col">Slice</th><th scope="col">Kural / bütçe yaklaşımı</th><th scope="col">Takip yaklaşımı</th><th scope="col">Durum</th></tr></thead><tbody>{snapshot.items.map((item) => <tr key={item.draftRef} data-active={headRef === item.seriesRef}><td><strong>{item.seriesRef} · r{item.revision}</strong><span>{scopeLabel(item.scope)}</span></td><td><strong>{ruleLabel(item.operatingRule.rule)}</strong><span>{item.operatingMode === "recommendation_only" ? "Öneri ve insan incelemesi" : "—"}</span></td><td><strong>{followUpLabel(item)}</strong><span>{item.operatingRule.verification.rollbackWhen}</span></td><td><button type="button" onClick={() => { setHeadRef(item.seriesRef); setImpactState({ status: "idle" }); setForm(formFromItem(item)); }}>{headRef === item.seriesRef ? "Açık" : "Kuralı gözden geçir"}</button><small>{date(item.createdAt)}</small></td></tr>)}</tbody></table></div>}
         <button className={styles.newButton} type="button" onClick={() => { setHeadRef(null); setImpactState({ status: "idle" }); setForm(EMPTY_FORM); }}>+ Yeni seri</button>
       </section>
-      <section className={styles.panel}><div className={styles.panelTitle}><div><span>{head ? `REVİZYON ${head.revision + 1}` : "YENİ TASLAK"}</span><h2>Kapsam ve kural</h2></div><small>{snapshot.authority.canSaveDraft ? "Owner · Admin · Analyst" : "Viewer · salt okunur"}</small></div>
+      <section className={styles.panel}><div className={styles.panelTitle}><div><span>{head ? `REVİZYON ${head.revision + 1}` : "YENİ TASLAK"}</span><h2>{head ? "Kuralı pekiştir veya yeni revizyon yaz" : "Kapsam ve kural"}</h2></div><small>{snapshot.authority.canSaveDraft ? "Owner · Admin · Analyst" : "Viewer · salt okunur"}</small></div>
         {!head ? <section className={styles.impactResult} aria-label="Kanıtlı slice kapsam adayları"><strong>Kanıtlı kapsam adayları</strong><span>Yalnız tekil ve tutarlı mevcut kategori anahtarları yeni formu doldurur. Frozen context, bütçe etkisi, policy ve action yetkisi üretmez.</span>
           {scopeCandidates.status === "loading" ? <span>Kapsam adayları okunuyor…</span> : null}
           {scopeCandidates.status === "ready" && scopeCandidates.candidates.length === 0 ? <span>Tekil zorunlu kapsam kanıtı olan kampanya yok.</span> : null}

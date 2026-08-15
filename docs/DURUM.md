@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 26197ef43b84 -->
+<!-- durum-damga: 09ec6ba64e5e -->
 
 ## Künye
 
@@ -14,13 +14,15 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 471 |
-| ilk / son iş | 2026-08-06 / 2026-08-14 |
+| iş commit'i (tüm geçmiş) | 473 |
+| ilk / son iş | 2026-08-06 / 2026-08-15 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-15 | `feat` | guide users to skill setup | `6cc0c97c0` |
+| 2026-08-15 | `feat` | add soft Meta light theme | `0c9687f07` |
 | 2026-08-14 | `feat` | expose frozen turn evidence | `42f0364f0` |
 | 2026-08-14 | `feat` | bind workspace playbooks to turns | `a483e4e3b` |
 | 2026-08-14 | `fix` | enforce user-authored rule boundaries | `653f647a8` |
@@ -34,14 +36,12 @@
 | 2026-08-14 | `feat` | add guarded scenario selection | `d79562e58` |
 | 2026-08-14 | `feat` | add private skill catalog route acceptance | `c27504ecd` |
 | 2026-08-14 | `feat` | add skill catalog repository and panel | `aed4290b8` |
-| 2026-08-14 | `feat` | add read-only skill catalog context strip | `fba099714` |
-| 2026-08-14 | `feat` | add skill catalog application service | `dd816b584` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 23
-- `fix         ` ███████████████ 14
-- `test        ` ██████████████ 13
+- `feat        ` ████████████████████████ 24
+- `fix         ` ██████████████ 14
+- `test        ` ████████████ 12
 - `docs        ` ███████ 7
 - `?           ` ██ 2
 - `refactor    ` █ 1
