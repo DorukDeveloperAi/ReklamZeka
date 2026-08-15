@@ -69,7 +69,7 @@ describe("Slice Rule Workspace panel", () => {
       snapshot: parseSliceRuleWorkspaceSnapshot(snapshot) }, onRetry: vi.fn(), onSaved: vi.fn(async () => undefined) }));
     for (const label of ["Pazar", "Hizmet referansı", "Kampanya ailesi referansı", "Ülke / bölge (opsiyonel)",
       "Hedefleme stratejisi (opsiyonel)", "Platform (opsiyonel)", "Sonuç rotası (opsiyonel)"]) expect(html).toContain(label);
-    expect(html).toContain("RECOMMENDATION ONLY · AUTHORITY NONE");
+    expect(html).toContain("SADECE ÖNERİ · UYGULAMA YETKİSİ YOK");
     expect(html).toContain("Policy yayınlama: kapalı");
     expect(html).toContain("Action/Meta write: kapalı");
     expect(html).toContain("Kayıtlı taslağın bütçe etkisi");

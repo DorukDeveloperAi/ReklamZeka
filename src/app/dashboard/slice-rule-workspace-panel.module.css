@@ -12,6 +12,12 @@
 .panelActions { display: grid; justify-items: end; gap: 7px; }
 .panelActions button { min-height: 30px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--rz-blue) 42%, var(--rz-line)); border-radius: 7px; color: var(--rz-blue); background: transparent; font-size: .56rem; font-weight: 760; cursor: pointer; }
 .panelActions button:hover { color: #fff; background: var(--rz-blue); }
+.operationSteps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 0; padding: 0; border-bottom: 1px solid var(--rz-line); list-style: none; }
+.operationSteps li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; min-width: 0; padding: 12px 13px; border-right: 1px solid var(--rz-line); }
+.operationSteps li:last-child { border-right: 0; }
+.operationSteps strong { display: grid; width: 19px; height: 19px; place-items: center; border: 1px solid color-mix(in srgb, var(--rz-blue) 42%, var(--rz-line)); border-radius: 50%; color: var(--rz-blue); font-size: .58rem; }
+.operationSteps span { display: grid; gap: 2px; color: var(--rz-muted); font-size: .56rem; line-height: 1.35; }
+.operationSteps b { color: var(--rz-text); font-size: .6rem; }
 .workspaceTablePanel { grid-column: 1 / -1; }
 .tableScroll { overflow-x: auto; margin: 14px 0; border: 1px solid var(--rz-line); border-radius: 12px; }
 .workspaceTable { width: 100%; min-width: 880px; border-collapse: collapse; text-align: left; }
@@ -62,4 +68,5 @@
 .impactResult strong { color: var(--rz-text); }
 .state h2 { margin: 0 0 8px; }
 .state p { color: var(--rz-muted); }
-@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .hero { flex-direction: column; } }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .hero { flex-direction: column; } .operationSteps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .operationSteps li:nth-child(2) { border-right: 0; } .operationSteps li:nth-child(-n + 2) { border-bottom: 1px solid var(--rz-line); } }
+@media (max-width: 520px) { .operationSteps { grid-template-columns: 1fr; } .operationSteps li, .operationSteps li:nth-child(2) { border-right: 0; border-bottom: 1px solid var(--rz-line); } .operationSteps li:last-child { border-bottom: 0; } }

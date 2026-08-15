@@ -26,4 +26,12 @@ describe("ContextualHelp", () => {
     expect(dashboard).toContain('props.area === "rules"');
     expect(dashboard).toContain('<ManagementFlowGuide area={manageArea} />');
   });
+
+  it("keeps the slice workspace divided into a readable four-step operation", () => {
+    const workspace = readFileSync("src/app/dashboard/slice-rule-workspace-panel.tsx", "utf8");
+    expect(workspace).toContain('aria-label="Kural çalışma sırası"');
+    expect(workspace).toContain("Kanıtlı slice’ı seçin.");
+    expect(workspace).toContain("Aynı pazar bütçe sınırını bağlayın.");
+    expect(workspace).toContain("SADECE ÖNERİ · UYGULAMA YETKİSİ YOK");
+  });
 });
