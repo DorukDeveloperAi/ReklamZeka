@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 09ec6ba64e5e -->
+<!-- durum-damga: 4e0a258ed47a -->
 
 ## Künye
 
@@ -14,37 +14,37 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 473 |
+| iş commit'i (tüm geçmiş) | 490 |
 | ilk / son iş | 2026-08-06 / 2026-08-15 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
-| 2026-08-15 | `feat` | guide users to skill setup | `6cc0c97c0` |
-| 2026-08-15 | `feat` | add soft Meta light theme | `0c9687f07` |
-| 2026-08-14 | `feat` | expose frozen turn evidence | `42f0364f0` |
-| 2026-08-14 | `feat` | bind workspace playbooks to turns | `a483e4e3b` |
-| 2026-08-14 | `fix` | enforce user-authored rule boundaries | `653f647a8` |
-| 2026-08-14 | `feat` | guide pool hierarchy drafts | `40bcb182e` |
-| 2026-08-14 | `feat` | revise user playbooks safely | `ad6044644` |
-| 2026-08-14 | `feat` | show read-only decision trace | `3996b7e91` |
-| 2026-08-14 | `fix` | retain operational audit coverage | `04d011008` |
-| 2026-08-14 | `feat` | add unified preparation gate | `92a7ddf3d` |
-| 2026-08-14 | `feat` | manage skill catalog in rules | `4fe3836ce` |
-| 2026-08-14 | `feat` | show safe skill catalog context | `3bd1ca607` |
-| 2026-08-14 | `feat` | add guarded scenario selection | `d79562e58` |
-| 2026-08-14 | `feat` | add private skill catalog route acceptance | `c27504ecd` |
-| 2026-08-14 | `feat` | add skill catalog repository and panel | `aed4290b8` |
+| 2026-08-15 | `feat` | guide management workflows | `57cc7a3b6` |
+| 2026-08-15 | `feat` | add contextual management terminology help | `80a9d41eb` |
+| 2026-08-15 | `feat` | prioritize starter setup path | `37ed01801` |
+| 2026-08-15 | `style` | align starter plan with dashboard theme | `f8f053c18` |
+| 2026-08-15 | `feat` | guide empty slice scopes to category setup | `1e7b48482` |
+| 2026-08-15 | `feat` | separate slice operations workspace | `a15d86cca` |
+| 2026-08-15 | `feat` | paginate classification review queue | `4b89804ee` |
+| 2026-08-15 | `feat` | seed strict market boundary | `6c0dd365d` |
+| 2026-08-15 | `feat` | guide empty review queues to setup | `5e41951ed` |
+| 2026-08-15 | `style` | adapt slice workspace to theme tokens | `58d5e625e` |
+| 2026-08-15 | `fix` | read canonical mirror timestamps | `30939be4c` |
+| 2026-08-15 | `feat` | manage interview kit revisions | `0caf6000d` |
+| 2026-08-15 | `feat` | add campaign search and pagination | `9fafcb9c7` |
+| 2026-08-15 | `feat` | open facilitated rule sessions | `341128461` |
+| 2026-08-15 | `test` | cover slice workspace table | `29469d538` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 24
-- `fix         ` ██████████████ 14
-- `test        ` ████████████ 12
-- `docs        ` ███████ 7
+- `feat        ` ████████████████████████ 29
+- `fix         ` ███████████ 13
+- `test        ` █████████ 11
+- `style       ` ██ 3
 - `?           ` ██ 2
-- `refactor    ` █ 1
+- `docs        ` ██ 2
 
 ## Planlar
 

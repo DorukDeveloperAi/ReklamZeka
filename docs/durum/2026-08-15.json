@@ -4,168 +4,168 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "6cc0c97c0",
+      "hash": "57cc7a3b6",
       "tarih": "2026-08-15",
-      "konu": "feat(agent): guide users to skill setup",
+      "konu": "feat(dashboard): guide management workflows",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "0c9687f07",
+      "hash": "80a9d41eb",
       "tarih": "2026-08-15",
-      "konu": "feat(dashboard): add soft Meta light theme",
+      "konu": "feat(dashboard): add contextual management terminology help",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "42f0364f0",
-      "tarih": "2026-08-14",
-      "konu": "feat(agent): expose frozen turn evidence",
+      "hash": "37ed01801",
+      "tarih": "2026-08-15",
+      "konu": "feat(categories): prioritize starter setup path",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "a483e4e3b",
-      "tarih": "2026-08-14",
-      "konu": "feat(agent): bind workspace playbooks to turns",
+      "hash": "f8f053c18",
+      "tarih": "2026-08-15",
+      "konu": "style(categories): align starter plan with dashboard theme",
+      "tur": "is",
+      "kapsam": [
+        "style"
+      ]
+    },
+    {
+      "hash": "1e7b48482",
+      "tarih": "2026-08-15",
+      "konu": "feat(rules): guide empty slice scopes to category setup",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "653f647a8",
-      "tarih": "2026-08-14",
-      "konu": "fix(agent): enforce user-authored rule boundaries",
+      "hash": "a15d86cca",
+      "tarih": "2026-08-15",
+      "konu": "feat(rules): separate slice operations workspace",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4b89804ee",
+      "tarih": "2026-08-15",
+      "konu": "feat(categories): paginate classification review queue",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "6c0dd365d",
+      "tarih": "2026-08-15",
+      "konu": "feat(categories): seed strict market boundary",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "5e41951ed",
+      "tarih": "2026-08-15",
+      "konu": "feat(categories): guide empty review queues to setup",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "58d5e625e",
+      "tarih": "2026-08-15",
+      "konu": "style(rules): adapt slice workspace to theme tokens",
+      "tur": "is",
+      "kapsam": [
+        "style"
+      ]
+    },
+    {
+      "hash": "30939be4c",
+      "tarih": "2026-08-15",
+      "konu": "fix(categories): read canonical mirror timestamps",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "40bcb182e",
-      "tarih": "2026-08-14",
-      "konu": "feat(budget): guide pool hierarchy drafts",
+      "hash": "0caf6000d",
+      "tarih": "2026-08-15",
+      "konu": "feat(agent): manage interview kit revisions",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "ad6044644",
-      "tarih": "2026-08-14",
-      "konu": "feat(skills): revise user playbooks safely",
+      "hash": "9fafcb9c7",
+      "tarih": "2026-08-15",
+      "konu": "feat(portfolio): add campaign search and pagination",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "3996b7e91",
-      "tarih": "2026-08-14",
-      "konu": "feat(slice-rules): show read-only decision trace",
+      "hash": "341128461",
+      "tarih": "2026-08-15",
+      "konu": "feat(rules): open facilitated rule sessions",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "04d011008",
-      "tarih": "2026-08-14",
-      "konu": "fix(tombstone): retain operational audit coverage",
+      "hash": "29469d538",
+      "tarih": "2026-08-15",
+      "konu": "test(dashboard): cover slice workspace table",
       "tur": "is",
       "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "92a7ddf3d",
-      "tarih": "2026-08-14",
-      "konu": "feat(actions): add unified preparation gate",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "4fe3836ce",
-      "tarih": "2026-08-14",
-      "konu": "feat(dashboard): manage skill catalog in rules",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "3bd1ca607",
-      "tarih": "2026-08-14",
-      "konu": "feat(agent): show safe skill catalog context",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "d79562e58",
-      "tarih": "2026-08-14",
-      "konu": "feat(slice-rule): add guarded scenario selection",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "c27504ecd",
-      "tarih": "2026-08-14",
-      "konu": "feat: add private skill catalog route acceptance",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "aed4290b8",
-      "tarih": "2026-08-14",
-      "konu": "feat: add skill catalog repository and panel",
-      "tur": "is",
-      "kapsam": [
-        "feat"
+        "test"
       ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 24
+      "adet": 29
     },
     {
       "kapsam": "fix",
-      "adet": 14
+      "adet": 13
     },
     {
       "kapsam": "test",
-      "adet": 12
+      "adet": 11
     },
     {
-      "kapsam": "docs",
-      "adet": 7
+      "kapsam": "style",
+      "adet": 3
     },
     {
       "kapsam": "?",
       "adet": 2
     },
     {
-      "kapsam": "refactor",
-      "adet": 1
+      "kapsam": "docs",
+      "adet": 2
     }
   ],
-  "isSayisi": 473,
+  "isSayisi": 490,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-15",
   "planlar": [
@@ -186,5 +186,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "09ec6ba64e5e"
+  "damga": "4e0a258ed47a"
 }
