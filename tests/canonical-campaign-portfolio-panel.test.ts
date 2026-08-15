@@ -30,6 +30,10 @@ describe("canonical campaign portfolio", () => {
     expect(source).toContain("Hesap kaynak durumu");
     expect(source).toContain("Operasyon tablosu");
     expect(source).toContain("Bağlı kural yok");
+    expect(source).toContain("slice-rule-portfolio-links-read");
+    expect(source).toContain("Frozen kanıt bağında");
+    expect(source).toContain("Fail-closed: kural atanmadı.");
+    expect(source).toContain("Meta yazma yetkisi yok.");
     expect(source).toContain("isimle slice'a bağlanmaz");
     for (const action of ["İncele", "Kuralı aç", "Asistanla aç", "Kararlarda incele"]) expect(source).toContain(action);
   });
