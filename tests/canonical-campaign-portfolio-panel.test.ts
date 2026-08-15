@@ -22,12 +22,16 @@ describe("canonical campaign portfolio", () => {
 
   it("exposes the selected campaign and its detail heading to assistive technology", () => {
     const source = readFileSync("src/app/dashboard/canonical-campaign-portfolio-panel.tsx", "utf8");
-    expect(source).toContain("aria-pressed={selected.campaignRef === entry.campaignRef}");
+    expect(source).toContain('data-active={selected.campaignRef === entry.campaignRef}');
     expect(source).toContain("focusDetailAfterSelectionRef.current = true");
     expect(source).toContain("ref={detailHeadingRef} tabIndex={-1}");
     expect(source).toContain("<CampaignPerformanceEvidencePanel campaignRef={selected.campaignRef} />");
     expect(source).toContain("Hiyerarşi gözlemi; performans freshness’i değildir");
     expect(source).toContain("Hesap kaynak durumu");
+    expect(source).toContain("Operasyon tablosu");
+    expect(source).toContain("Bağlı kural yok");
+    expect(source).toContain("isimle slice'a bağlanmaz");
+    for (const action of ["İncele", "Kuralı aç", "Asistanla aç", "Kararlarda incele"]) expect(source).toContain(action);
   });
 
   it("filters only canonical entries by an explicit account ref, status, or case-insensitive search", () => {

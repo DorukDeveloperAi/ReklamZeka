@@ -237,6 +237,20 @@
 .rowProgress b { display: block; height: 100%; border-radius: inherit; background: var(--rz-green); }
 
 .splitWorkspace { display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 10px; }
+.portfolioWorkbench { display: grid; gap: 10px; }
+.portfolioOperationTable { overflow-x: auto; border-top: 1px solid var(--rz-line); }
+.portfolioOperationTable table { width: 100%; min-width: 1160px; border-collapse: collapse; }
+.portfolioOperationTable caption { padding: 11px 14px; color: var(--rz-muted); font-size: .57rem; line-height: 1.45; text-align: left; }
+.portfolioOperationTable th { padding: 9px 11px; border-top: 1px solid var(--rz-line); border-bottom: 1px solid var(--rz-line); color: var(--rz-dim); font-size: .52rem; font-weight: 800; letter-spacing: .05em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.portfolioOperationTable td { min-width: 132px; padding: 11px; border-bottom: 1px solid var(--rz-line); vertical-align: top; }
+.portfolioOperationTable tr[data-active="true"] { background: color-mix(in srgb, var(--rz-blue) 8%, transparent); }
+.portfolioOperationTable tr[data-kind="slice"] { background: color-mix(in srgb, var(--rz-green) 4%, transparent); }
+.portfolioOperationTable td > strong, .portfolioOperationTable td > span { display: block; }
+.portfolioOperationTable td > strong { font-size: .61rem; line-height: 1.4; }
+.portfolioOperationTable td > span { margin-top: 5px; color: var(--rz-muted); font-size: .53rem; line-height: 1.45; }
+.operationRowActions { display: flex; flex-wrap: wrap; gap: 5px; min-width: 154px; }
+.operationRowActions button { min-height: 29px; padding: 0 8px; border: 1px solid var(--rz-line); border-radius: 7px; background: transparent; color: var(--rz-muted); cursor: pointer; font-size: .53rem; white-space: nowrap; }
+.operationRowActions button:hover, .operationRowActions button:focus-visible { border-color: var(--rz-line-strong); color: var(--rz-text); background: var(--rz-surface-3); outline: 0; }
 .selectorList { display: grid; padding: 6px; }
 .selectorList > button { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 62px; padding: 11px 12px; border: 1px solid transparent; border-radius: 9px; background: transparent; cursor: pointer; text-align: left; }
 .selectorList > button:hover { background: rgba(255,255,255,.025); }
@@ -1236,7 +1250,7 @@
   .contextGrid > div { border-right: 0; border-bottom: 1px solid var(--rz-line); }
   .briefControls, .briefPlan { grid-template-columns: 1fr; }
   .canonicalHierarchyDrilldown > header { display: grid; }.canonicalHierarchyDrilldown summary { grid-template-columns: 69px minmax(0, 1fr); padding-right: 10px; }.canonicalHierarchyDrilldown summary small { grid-column: 2; text-align: left; }.canonicalCreativeLeaf { grid-template-columns: 69px minmax(0, 1fr); }
-  .portfolioOverview > header { display: grid; }.portfolioFilters, .canonicalPortfolioFilters, .classificationFilters { grid-template-columns: 1fr; }.portfolioFilters small, .classificationFilters small { grid-column: auto; }
+  .portfolioOverview > header { display: grid; }.portfolioFilters, .canonicalPortfolioFilters, .classificationFilters { grid-template-columns: 1fr; }.portfolioFilters small, .classificationFilters small { grid-column: auto; }.portfolioOperationTable { margin-inline: -1px; }
   .campaignDecisionTimeline ol { grid-template-columns: 1fr; }
   .campaignDecisionTimeline li, .campaignDecisionTimeline li:nth-child(2) { min-height: 0; border-right: 0; border-bottom: 1px solid var(--rz-line); }
   .campaignDecisionTimeline li:last-child { border-bottom: 0; }
