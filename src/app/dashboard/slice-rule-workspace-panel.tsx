@@ -508,6 +508,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   onSaved(): Promise<void>;
   onApprovalQueueHandoff?(actionUnitRef: string): void;
   onOpenRuleSession?(seed: SliceRuleSessionSeed): void;
+  onOpenCategorySetup?(): void;
 }>) {
   const snapshot = props.state.status === "ready" ? props.state.snapshot : null;
   const [form, setForm] = useState<Form>(EMPTY_FORM);
@@ -716,7 +717,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     {snapshot ? <div className={styles.grid}>
       <section className={`${styles.panel} ${styles.workspaceTablePanel}`}><div className={styles.panelTitle}><div><span>SLICE & KURAL ÇALIŞMA TABLOSU</span><h2>{snapshot.items.length} güncel seri</h2></div><small>Append-only · kullanıcı yazarlı</small></div>
         {snapshot.items.length === 0 ? <p>Henüz kayıtlı slice rule taslağı yok. Önce kanıtlı bir scope seçin, ardından kendi kuralınızı yazın.</p> : <div className={styles.tableScroll}><table className={styles.workspaceTable}><caption>Her satırın kapsamı, kuralı ve takip yaklaşımı birlikte önizlenir.</caption><thead><tr><th scope="col">Slice</th><th scope="col">Kural / bütçe yaklaşımı</th><th scope="col">Takip yaklaşımı</th><th scope="col">Durum</th></tr></thead><tbody>{snapshot.items.map((item) => <tr key={item.draftRef} data-active={headRef === item.seriesRef}><td><strong>{item.seriesRef} · r{item.revision}</strong><span>{scopeLabel(item.scope)}</span></td><td><strong>{ruleLabel(item.operatingRule.rule)}</strong><span>{item.operatingMode === "recommendation_only" ? "Öneri ve insan incelemesi" : "—"}</span></td><td><strong>{followUpLabel(item)}</strong><span>{item.operatingRule.verification.rollbackWhen}</span></td><td><button type="button" onClick={() => { setHeadRef(item.seriesRef); setImpactState({ status: "idle" }); setForm(formFromItem(item)); }}>{headRef === item.seriesRef ? "Açık" : "Kuralı gözden geçir"}</button><small>{date(item.createdAt)}</small></td></tr>)}</tbody></table></div>}
-        <section className={styles.unruledSlices} aria-label="Kuralsız kanıtlı slice adayları"><strong>Kuralsız kanıtlı slice adayları</strong><span>Bu satırlar gerçek kategori kanıtından gelir; yalnız henüz aynı kapsamda kayıtlı bir kullanıcı kuralı yoktur. Kural otomatik oluşturulmaz.</span>{scopeCandidates.status === "loading" ? <small>Aday slice’lar okunuyor…</small> : null}{scopeCandidates.status === "unavailable" ? <small>Aday slice’lar kullanılamıyor; formda tahmin veya fallback yok.</small> : null}{scopeCandidates.status === "ready" ? (() => { const unruled = scopeCandidates.candidates.filter((candidate) => !snapshot.items.some((item) => sameScope(item.scope, candidate.scope))).slice(0, 25); return unruled.length ? <div className={styles.unruledList}>{unruled.map((candidate) => <div key={candidate.campaignRef}><span>{scopeLabel(candidate.scope)}</span><button type="button" disabled={!snapshot.authority.canSaveDraft} onClick={() => applyScopeCandidate(candidate)}>Bu slice ile yeni kural yaz</button></div>)}</div> : <small>Mevcut kanıtlı slice’ların her biri en az bir güncel kural serisiyle eşleşiyor.</small>; })() : null}</section>
+        <section className={styles.unruledSlices} aria-label="Kuralsız kanıtlı slice adayları"><strong>Kuralsız kanıtlı slice adayları</strong><span>Bu satırlar gerçek kategori kanıtından gelir; yalnız henüz aynı kapsamda kayıtlı bir kullanıcı kuralı yoktur. Kural otomatik oluşturulmaz.</span>{scopeCandidates.status === "loading" ? <small>Aday slice’lar okunuyor…</small> : null}{scopeCandidates.status === "unavailable" ? <small>Aday slice’lar kullanılamıyor; formda tahmin veya fallback yok.</small> : null}{scopeCandidates.status === "ready" ? (() => { const unruled = scopeCandidates.candidates.filter((candidate) => !snapshot.items.some((item) => sameScope(item.scope, candidate.scope))).slice(0, 25); return unruled.length ? <div className={styles.unruledList}>{unruled.map((candidate) => <div key={candidate.campaignRef}><span>{scopeLabel(candidate.scope)}</span><button type="button" disabled={!snapshot.authority.canSaveDraft} onClick={() => applyScopeCandidate(candidate)}>Bu slice ile yeni kural yaz</button></div>)}</div> : <div className={styles.unruledList}><span>Henüz tekil ve tutarlı slice kapsamı yok. Kategori kayıtları eksikse sistem kapsam veya kural tahmin etmez.</span>{props.onOpenCategorySetup ? <button type="button" onClick={props.onOpenCategorySetup}>Kategori inceleme ve başlangıç planını aç</button> : null}</div>; })() : null}</section>
         <button className={styles.newButton} type="button" onClick={() => { setHeadRef(null); setImpactState({ status: "idle" }); setForm(EMPTY_FORM); }}>+ Yeni seri</button>
       </section>
       <section className={styles.panel}><div className={styles.panelTitle}><div><span>{head ? `REVİZYON ${head.revision + 1}` : "YENİ TASLAK"}</span><h2>{head ? "Kuralı pekiştir veya yeni revizyon yaz" : "Kapsam ve kural"}</h2></div><div className={styles.panelActions}>{head && props.onOpenRuleSession ? <button type="button" onClick={() => props.onOpenRuleSession?.(ruleSessionSeed(head))}>Agent ile kuralı gözden geçir</button> : null}<small>{snapshot.authority.canSaveDraft ? "Owner · Admin · Analyst" : "Viewer · salt okunur"}</small></div></div>
@@ -861,7 +862,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   </div>;
 }
 
-export function SliceRuleWorkspacePanel({ onApprovalQueueHandoff, onOpenRuleSession }: Readonly<{ onApprovalQueueHandoff?(actionUnitRef: string): void; onOpenRuleSession?(seed: SliceRuleSessionSeed): void }>) {
+export function SliceRuleWorkspacePanel({ onApprovalQueueHandoff, onOpenRuleSession, onOpenCategorySetup }: Readonly<{ onApprovalQueueHandoff?(actionUnitRef: string): void; onOpenRuleSession?(seed: SliceRuleSessionSeed): void; onOpenCategorySetup?(): void }>) {
   const [state, setState] = useState<State>({ status: "loading" });
   const load = useCallback(async () => {
     setState({ status: "loading" });
@@ -877,7 +878,7 @@ export function SliceRuleWorkspacePanel({ onApprovalQueueHandoff, onOpenRuleSess
     } catch { setState({ status: "error", message: "Slice Rule Workspace bağlantısı kurulamadı." }); }
   }, []);
   useEffect(() => { void load(); }, [load]);
-  return <SliceRuleWorkspaceSurface state={state} onRetry={() => void load()} onSaved={load} onApprovalQueueHandoff={onApprovalQueueHandoff} onOpenRuleSession={onOpenRuleSession} />;
+  return <SliceRuleWorkspaceSurface state={state} onRetry={() => void load()} onSaved={load} onApprovalQueueHandoff={onApprovalQueueHandoff} onOpenRuleSession={onOpenRuleSession} onOpenCategorySetup={onOpenCategorySetup} />;
 }
 
 export { CLOSED as SLICE_RULE_CLOSED_AUTHORITY, EMPTY_FORM as EMPTY_SLICE_RULE_FORM };

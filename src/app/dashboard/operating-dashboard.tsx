@@ -1432,7 +1432,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
       ]} />
       {rulesArea === "guidance" ? <><GuidanceStudioPanel onSessionRequiredChange={setRulesSessionRequired} />
         {rulesSessionRequired === false ? <><SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /></> : null}</>
-        : rulesArea === "slices" ? <SliceRuleWorkspacePanel onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} onOpenRuleSession={openRuleSession} />
+        : rulesArea === "slices" ? <SliceRuleWorkspacePanel onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} onOpenRuleSession={openRuleSession} onOpenCategorySetup={() => openSettings("categories")} />
         : rulesArea === "policies" ? <InstructionPolicyStudioPanel />
           : rulesArea === "authority" ? <AutonomyStudioPanel />
             : <PracticeLabPanel />}

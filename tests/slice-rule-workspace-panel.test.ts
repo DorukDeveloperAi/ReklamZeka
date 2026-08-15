@@ -101,6 +101,14 @@ describe("Slice Rule Workspace panel", () => {
     expect(() => parseSliceScopeCandidates({ version: "slice-scope-candidates/1.0.0", candidates: [{ campaignRef: "campaign-1", scope: { market: "international", serviceRef: "service_physical_therapy", campaignFamilyRef: "campaign_family_intensive_ftr" }, requiresFrozenContext: false, budgetImpactReady: true }], authority: { canSave: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false } })).toThrow("güvenli değil");
   });
 
+  it("guides an empty canonical scope list to category review without inventing a slice", () => {
+    const source = readFileSync("src/app/dashboard/slice-rule-workspace-panel.tsx", "utf8");
+    expect(source).toContain("Henüz tekil ve tutarlı slice kapsamı yok");
+    expect(source).toContain("Kategori inceleme ve başlangıç planını aç");
+    expect(source).toContain("onOpenCategorySetup?(): void");
+    expect(source).toContain("Kategori kayıtları eksikse sistem kapsam veya kural tahmin etmez.");
+  });
+
   it("renders only explanatory frozen-context readiness with no opened authority", () => {
     const items = parseSliceOperationalReadiness({ version: "slice-operational-readiness/1.0.0", items: [{ candidateRef: "category_entity_ready", scope: { market: "international", serviceRef: "service_physical_therapy", campaignFamilyRef: "campaign_family_intensive_ftr" }, frozenContext: "ready", budgetImpact: "eligible" }], authority: { canSave: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false } });
     expect(items[0]).toMatchObject({ frozenContext: "ready", budgetImpact: "eligible" });
