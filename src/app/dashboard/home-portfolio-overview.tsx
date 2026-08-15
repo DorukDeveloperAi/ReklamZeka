@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { canonicalPerformancePanelProjection, type CanonicalPerformancePanelProjection } from "./canonical-performance-panel";
+import { canonicalPerformancePanelProjection, canonicalPerformanceSourceState, type CanonicalPerformancePanelProjection } from "./canonical-performance-panel";
 import { parseDeliveryHealthAlertList, type DeliveryHealthAlertList } from "./delivery-health-alert-panel";
 import styles from "./operating-dashboard.module.css";
 
@@ -22,8 +22,10 @@ function reason(codes: readonly string[]): string {
 function performanceState(state: LoadState, projection: CanonicalPerformancePanelProjection | null): string {
   if (state === "loading") return "Kanonik performans okunuyor";
   if (state === "session_required") return "Yerel oturum gerekli";
-  if (!projection || projection.source.state === "unavailable") return "Kanonik performans kullanılamıyor";
-  return projection.source.state === "partial" ? "Kanonik performans kısmi" : "Kanonik performans hazır";
+  const sourceState = canonicalPerformanceSourceState(projection);
+  return sourceState === "unavailable" ? "Kanonik performans kullanılamıyor"
+    : sourceState === "empty" ? "Kanonik performans boş"
+      : sourceState === "partial" ? "Kanonik performans kısmi" : "Kanonik performans hazır";
 }
 
 /**
@@ -69,10 +71,10 @@ export function HomePortfolioOverview({ onOpenPortfolio }: Readonly<{ onOpenPort
 
   return <div className={styles.dashboardColumns}>
     <section className={styles.panel} aria-labelledby="home-performance-title">
-      <header className={styles.panelHeader}><div><span className={styles.kicker}>PERFORMANS · HESAP BAZINDA</span><h2 id="home-performance-title">Son 7 gün</h2></div><span className={styles.statusPill} data-tone={performance?.source.state === "ready" ? "good" : "warning"}>{performanceState(performanceStateValue, performance)}</span></header>
+      <header className={styles.panelHeader}><div><span className={styles.kicker}>PERFORMANS · HESAP BAZINDA</span><h2 id="home-performance-title">Son 7 gün</h2></div><span className={styles.statusPill} data-tone={canonicalPerformanceSourceState(performance) === "ready" ? "good" : "warning"}>{performanceState(performanceStateValue, performance)}</span></header>
       {performanceStateValue === "ready" && readyWindows.length ? <div className={styles.decisionList}>{readyWindows.map(({ account, window }) => <article className={styles.decisionRow} key={account.accountRef}>
         <div className={styles.decisionIndex}>7G</div><div className={styles.decisionBody}><div><span>{account.name}</span><span>{window!.observedDays}/7 gün · {window!.attribution ?? "Attribution bilinmiyor"}</span></div><h3>{amount(window!.spend, window!.currency)} harcama · {window!.outcome?.valueDecimal ?? "—"} exact lead · {amount(window!.cpa, window!.currency)} CPA</h3><p>Hesaplar ayrı gösterilir; portföy toplamı hesaplanmaz.</p></div><div className={styles.decisionAction}><button type="button" onClick={onOpenPortfolio}>Portföyü aç</button></div>
-      </article>)}</div> : <p className={styles.metaAccountEmpty}>{performanceStateValue === "loading" ? "Kanonik performans kaynağı doğrulanıyor; metrik gösterilmiyor." : performanceStateValue === "session_required" ? "Performans için yerel oturum gerekli; metrik gösterilmez. Oturum bağlandıktan sonra Portföy / Slice çalışma masasında ilgili kapsamı açın." : "Gösterilebilir 7 günlük hesap performansı yok. Kısmi veya kullanılamayan pencereler toplam metrik üretmez."}</p>}
+      </article>)}</div> : <p className={styles.metaAccountEmpty}>{performanceStateValue === "loading" ? "Kanonik performans kaynağı doğrulanıyor; metrik gösterilmiyor." : performanceStateValue === "session_required" ? "Performans için yerel oturum gerekli; metrik gösterilmez. Oturum bağlandıktan sonra Portföy / Slice çalışma masasında ilgili kapsamı açın." : canonicalPerformanceSourceState(performance) === "empty" ? "Doğrulanmış kanonik okumada hesap yok; portföy toplamı veya örnek metrik gösterilmez." : "Gösterilebilir 7 günlük hesap performansı yok. Kısmi veya kullanılamayan pencereler toplam metrik üretmez."}</p>}
       {performanceStateValue === "ready" && windows.some((item) => item.window?.state !== "ready") ? <p className={styles.metaAccountEmpty}>Kısmi hesap pencereleri: {windows.filter((item) => item.window?.state !== "ready").map((item) => `${item.account.name} (${reason(item.window?.reasonCodes ?? performance?.source.reasonCodes ?? [])})`).join(" · ")}</p> : null}
       {performanceStateValue !== "ready" || !readyWindows.length ? <p className={styles.metaAccountEmpty}>Canlı outcome metriği olmadan CPA gösterilmez.</p> : null}
     </section>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalPerformancePanelProjection } from "@/app/dashboard/canonical-performance-panel";
+import { canonicalPerformancePanelProjection, canonicalPerformanceSourceState } from "@/app/dashboard/canonical-performance-panel";
 
 const readyWindow = {
   days: 7, state: "ready", observedDays: 7, missingDays: [], freshnessAt: "2026-08-14T10:00:00.000Z",
@@ -15,6 +15,11 @@ describe("canonical performance dashboard projection", () => {
     expect(result).toMatchObject({ source: { state: "partial", reasonCodes: ["coverage_incomplete"] }, accounts: [{ name: "Hazır hesap" }, { name: "Kısmi hesap" }] });
     expect(result?.accounts[0]?.windows.find((window) => window.days === 7)?.state).toBe("ready");
     expect(result?.accounts[1]?.windows.find((window) => window.days === 7)?.state).toBe("partial");
+  });
+
+  it("identifies a successful zero-account response as empty without inventing a total", () => {
+    const result = canonicalPerformancePanelProjection(payload({ state: "ready", accounts: [], source: { ...payload().source, state: "ready", reasonCodes: [] } }));
+    expect(canonicalPerformanceSourceState(result)).toBe("empty");
   });
 
   it("fails closed if public source provenance is missing, mismatched or claims write authority", () => {

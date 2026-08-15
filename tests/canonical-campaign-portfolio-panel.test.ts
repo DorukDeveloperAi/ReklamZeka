@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   CANONICAL_PORTFOLIO_PAGE_SIZE,
+  canonicalAccountSourceState,
   canonicalCampaignPortfolio,
   filterCanonicalCampaignPortfolio,
 } from "@/app/dashboard/canonical-campaign-portfolio-panel";
@@ -29,12 +30,22 @@ describe("canonical campaign portfolio", () => {
     expect(source).toContain("Hesap kaynak durumu");
   });
 
-  it("filters only canonical entries by an explicit account, status, or case-insensitive search", () => {
+  it("filters only canonical entries by an explicit account ref, status, or case-insensitive search", () => {
     const entries = canonicalCampaignPortfolio(projection);
-    expect(filterCanonicalCampaignPortfolio(entries, { query: "", accountName: "TR", status: "" }).map((entry) => entry.campaignRef)).toEqual(["campaign_a", "campaign_b"]);
-    expect(filterCanonicalCampaignPortfolio(entries, { query: "", accountName: "", status: "PAUSED" }).map((entry) => entry.campaignRef)).toEqual(["campaign_c"]);
-    expect(filterCanonicalCampaignPortfolio(entries, { query: "ÇAM", accountName: "", status: "" }).map((entry) => entry.campaignRef)).toEqual(["campaign_c"]);
+    expect(filterCanonicalCampaignPortfolio(entries, { query: "", accountRef: "account_tr", status: "" }).map((entry) => entry.campaignRef)).toEqual(["campaign_a", "campaign_b"]);
+    expect(filterCanonicalCampaignPortfolio(entries, { query: "", accountRef: "", status: "PAUSED" }).map((entry) => entry.campaignRef)).toEqual(["campaign_c"]);
+    expect(filterCanonicalCampaignPortfolio(entries, { query: "ÇAM", accountRef: "", status: "" }).map((entry) => entry.campaignRef)).toEqual(["campaign_c"]);
     expect(CANONICAL_PORTFOLIO_PAGE_SIZE).toBe(24);
+  });
+
+  it("does not use duplicate account names as the filter identity and exposes empty account scope", () => {
+    const duplicateNames = canonicalCampaignPortfolio({ connections: [{ accounts: [
+      { ...projection.connections[0]!.accounts[0]!, accountRef: "account_same_a", name: "Aynı ad" },
+      { ...projection.connections[1]!.accounts[0]!, accountRef: "account_same_b", name: "Aynı ad" },
+    ] }] } as unknown as MetaReadMirrorProjection);
+    expect(filterCanonicalCampaignPortfolio(duplicateNames, { query: "", accountRef: "account_same_a", status: "" }).map((entry) => entry.campaignRef)).toEqual(["campaign_a", "campaign_b"]);
+    const emptyAccount = { ...projection.connections[0]!.accounts[0]!, freshness: { inventoryStatus: "completed", creativeStatus: "completed", insightStatus: "completed", insightObservedAt: null, insightCanonicalRowCount: 0, latestObservedAt: null } as const, campaigns: [] };
+    expect(canonicalAccountSourceState(emptyAccount)).toBe("empty");
   });
 
   it("keeps the client list bounded and offers accessible page controls", () => {

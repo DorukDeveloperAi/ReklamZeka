@@ -8,6 +8,14 @@ type Window = Readonly<{ days: 7 | 30; state: "ready" | "partial" | "unavailable
 type Account = Readonly<{ accountRef: string; name: string; currency: string | null; windows: readonly Window[] }>;
 type Source = Readonly<{ contractVersion: "public-source/1.0.0"; kind: "canonical_performance"; state: "ready" | "partial" | "unavailable"; observedAt: string | null; freshnessAt: string | null; freshnessThresholdMinutes: number | null; reasonCodes: readonly string[] }>;
 export type CanonicalPerformancePanelProjection = Readonly<{ accounts: readonly Account[]; source: Source }>;
+export type CanonicalPerformanceSourceState = "ready" | "partial" | "empty" | "unavailable";
+
+/** Empty is a successful, queryless canonical read with no account scope. */
+export function canonicalPerformanceSourceState(projection: CanonicalPerformancePanelProjection | null): CanonicalPerformanceSourceState {
+  if (!projection || projection.source.state === "unavailable") return "unavailable";
+  if (projection.accounts.length === 0) return "empty";
+  return projection.source.state;
+}
 
 function validDate(value: unknown): value is string | null { return value === null || typeof value === "string" && Number.isFinite(Date.parse(value)); }
 function parseMetric(value: unknown): Metric | null {
@@ -44,7 +52,11 @@ export function canonicalPerformancePanelProjection(value: unknown): CanonicalPe
   return Object.freeze({ accounts: Object.freeze(accounts), source: Object.freeze({ contractVersion: source.contractVersion as Source["contractVersion"], kind: source.kind as Source["kind"], state: source.state as Source["state"], observedAt: source.observedAt as string | null, freshnessAt: source.freshnessAt as string | null, freshnessThresholdMinutes: source.freshnessThresholdMinutes as number | null, reasonCodes: Object.freeze([...source.reasonCodes] as string[]) }) });
 }
 function amount(metric: Metric | null, currency: string | null) { if (!metric) return "—"; const value = Number(metric.valueDecimal); if (!Number.isFinite(value)) return "—"; const unit = metric.currency ?? currency; return unit ? new Intl.NumberFormat("tr-TR", { style: "currency", currency: unit, maximumFractionDigits: 2 }).format(value / 100) : metric.valueDecimal; }
-function sourceLabel(source: Source): string { return source.state === "ready" ? "Portföy kapsamı hazır" : source.state === "partial" ? "Portföy kapsamı kısmi" : "Portföy kapsamı kullanılamıyor"; }
+function sourceLabel(source: Source, accountCount: number): string {
+  if (source.state === "unavailable") return "Portföy kapsamı kullanılamıyor";
+  if (accountCount === 0) return "Portföy kapsamı boş";
+  return source.state === "ready" ? "Portföy kapsamı hazır" : "Portföy kapsamı kısmi";
+}
 function reasons(window: Window | null, source: Source | null): string { const codes = window?.reasonCodes.length ? window.reasonCodes : source?.reasonCodes ?? []; return codes.length ? codes.join(" · ") : "Yeterli canonical performans kaynağı bekleniyor."; }
 
 export function CanonicalPerformancePanel() {
@@ -59,10 +71,11 @@ export function CanonicalPerformancePanel() {
   // stay visible in the source strip, but it must not hide a selected account's
   // independently complete, single-currency seven-day window.
   const ready = state === "ready" && window?.state === "ready";
-  const waiting = state === "loading" ? "Kanonik insight okunuyor" : state === "session_required" ? "Yerel oturum gerekli" : projection?.source ? sourceLabel(projection.source) : "Kapsam yetersiz";
+  const waiting = state === "loading" ? "Kanonik insight okunuyor" : state === "session_required" ? "Yerel oturum gerekli" : projection?.source ? sourceLabel(projection.source, projection.accounts.length) : "Kapsam yetersiz";
   const sourceDetail = projection?.source.freshnessAt ? `Son kaynak: ${new Date(projection.source.freshnessAt).toLocaleString("tr-TR")}` : reasons(window, projection?.source ?? null);
   return <section aria-label="Canlı performans durumu">
-    {projection?.accounts.length ? <div className={styles.panel} style={{ padding: "12px 16px", marginBottom: 10 }}><label htmlFor="canonical-performance-account"><span>Performans hesabı · {sourceLabel(projection.source)}</span><select id="canonical-performance-account" value={selectedAccountRef} onChange={(event) => setSelectedAccountRef(event.target.value)}>{projection.accounts.map((account) => <option key={account.accountRef} value={account.accountRef}>{account.name}{account.currency ? ` · ${account.currency}` : ""}</option>)}</select></label><small>{projection.source.state === "partial" ? `Hesap bazında inceleyin; portföy toplamı gösterilmez. ${reasons(null, projection.source)}` : sourceDetail}</small></div> : null}
+    {projection?.accounts.length ? <div className={styles.panel} style={{ padding: "12px 16px", marginBottom: 10 }}><label htmlFor="canonical-performance-account"><span>Performans hesabı · {sourceLabel(projection.source, projection.accounts.length)}</span><select id="canonical-performance-account" value={selectedAccountRef} onChange={(event) => setSelectedAccountRef(event.target.value)}>{projection.accounts.map((account) => <option key={account.accountRef} value={account.accountRef}>{account.name}{account.currency ? ` · ${account.currency}` : ""}</option>)}</select></label><small>{projection.source.state === "partial" ? `Hesap bazında inceleyin; portföy toplamı gösterilmez. ${reasons(null, projection.source)}` : sourceDetail}</small></div> : null}
+    {state === "ready" && projection && projection.accounts.length === 0 ? <div className={styles.panel} style={{ padding: "12px 16px", marginBottom: 10 }} role="status"><strong>Portföy kapsamı boş</strong><small>Doğrulanmış kanonik okumada hesap yok; başka bir kaynakla toplam veya örnek metrik oluşturulmaz.</small></div> : null}
     <div className={styles.metricGrid}>{ready ? <><article className={styles.metricCard}><div><span>7 günlük harcama</span><em>Canonical ready</em></div><strong>{amount(window!.spend, window!.currency)}</strong><footer><span>{selectedAccount!.name} · {window!.observedDays}/7 gün</span></footer></article><article className={styles.metricCard}><div><span>Sonuç · exact lead</span><em>Canonical ready</em></div><strong>{window!.outcome?.valueDecimal ?? "—"}</strong><footer><span>{window!.attribution ?? "Attribution bilinmiyor"}</span></footer></article><article className={styles.metricCard}><div><span>Lead başı maliyet</span><em>Canonical ready</em></div><strong>{amount(window!.cpa, window!.currency)}</strong><footer><span>Exact actions:lead · yeterli kapsam</span></footer></article><article className={styles.metricCard}><div><span>Veri kapsamı</span><em>Salt-okunur</em></div><strong>{window!.observedDays}/7</strong><footer><span>{sourceDetail}</span></footer></article></> : <><article className={styles.metricCard}><div><span>7 günlük harcama</span><em>{waiting}</em></div><strong>—</strong><footer><span>{reasons(window, projection?.source ?? null)}</span></footer></article><article className={styles.metricCard}><div><span>Sonuç</span><em>{waiting}</em></div><strong>—</strong><footer><span>Canlı outcome metriği olmadan CPA gösterilmez.</span></footer></article><article className={styles.metricCard}><div><span>Lead başı maliyet</span><em>{waiting}</em></div><strong>—</strong><footer><span>Karışık para birimi veya eksik günlerde gizlenir.</span></footer></article><article className={styles.metricCard}><div><span>Veri kapsamı</span><em>Salt-okunur</em></div><strong>{window ? `${window.observedDays}/7` : "—"}</strong><footer><span>{sourceDetail}</span></footer></article></>}</div>
   </section>;
 }
