@@ -14,6 +14,8 @@ import {
   parseSliceScopeCandidates,
   parseSliceOperationalReadiness,
   parseSliceRuleScenarioSelectionCandidates,
+  parseSliceRuleDecisionTrace,
+  decisionJourneyForRule,
   SliceRuleWorkspaceSurface,
 } from "@/app/dashboard/slice-rule-workspace-panel";
 
@@ -79,6 +81,17 @@ describe("Slice Rule Workspace panel", () => {
     expect(() => parseSliceRuleScenarioSelectionCandidates({ contractVersion: "slice-rule-scenario-selection/1.0.0", candidates: [{ candidateRef,
       scenarioLabel: "scenario.keep", beforeAmountMinor: 100, afterAmountMinor: 120, currency: "TRY", status: "selectable", blockReason: null }],
       authority: { canSelect: false, canApprove: true, canExecute: false, canWriteMeta: false, canEnableAutomation: false } })).toThrow("güvenli değil");
+  });
+
+  it("keeps canonical decision trace read-only and rejects an opened execution state", () => {
+    const trace = parseSliceRuleDecisionTrace({ decisionTrace: { contractVersion: "slice-rule-decision-trace/1.0.0", items: [{
+      ruleSeriesRef: item.seriesRef, ruleRevision: item.revision, selectionRef: `selection_${"a".repeat(64)}`, selectedAt: "2026-08-14T10:00:00.000Z",
+      actionUnit: { presence: true, status: "awaiting_approval" }, decisionHistory: [{ decision: "proposed", occurredAt: "2026-08-14T10:01:00.000Z", reasonCode: null }],
+      execution: { safetyState: "server_disabled", closure: "admission_closed" },
+    }] } });
+    expect(trace[0]?.execution.safetyState).toBe("server_disabled");
+    expect(() => parseSliceRuleDecisionTrace({ decisionTrace: { contractVersion: "slice-rule-decision-trace/1.0.0", items: [{ ...trace[0], execution: { safetyState: "enabled", closure: "admission_closed" } }] } })).toThrow("güvenli değil");
+    expect(decisionJourneyForRule(item, { status: "ready", candidates: [], evaluations: [], result: null }, { status: "ready", traces: trace })[3]).toMatchObject({ label: "İnsan onayı", status: "waiting" });
   });
 
   it("opens an editable Agent rule-session draft without creating or revising the rule", () => {
