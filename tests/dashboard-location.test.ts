@@ -14,6 +14,8 @@ describe("dashboard URL and history location contract", () => {
       .toMatchObject({ view: "manage", manageArea: "rules", rulesArea: "authority" });
     expect(dashboardLocationFromSearch(new URLSearchParams("view=manage&area=rules&tab=slices")))
       .toMatchObject({ view: "manage", manageArea: "rules", rulesArea: "slices" });
+    expect(dashboardLocationFromSearch(new URLSearchParams("view=manage&area=rules&tab=slices&rule=slice_rule.ftr.ar&revision=2")))
+      .toMatchObject({ ruleRef: "slice_rule.ftr.ar", ruleRevision: 2 });
     expect(dashboardLocationFromSearch(new URLSearchParams("view=manage&area=decisions&tab=budgets&detail=pools")))
       .toMatchObject({ view: "manage", manageArea: "decisions", decisionArea: "budgets", budgetArea: "pools" });
     expect(dashboardLocationFromSearch(new URLSearchParams("view=manage&area=decisions&campaign=ref_abcdef012345")))
@@ -61,6 +63,8 @@ describe("dashboard URL and history location contract", () => {
       .toEqual(location);
     expect(dashboardLocationHref({ ...normalizeDashboardLocation("rules"), rulesArea: "slices" }))
       .toBe("/dashboard?view=manage&area=rules&tab=slices");
+    expect(dashboardLocationHref({ ...normalizeDashboardLocation("rules"), rulesArea: "slices", ruleRef: "slice_rule.ftr.ar", ruleRevision: 2 }))
+      .toBe("/dashboard?view=manage&area=rules&tab=slices&rule=slice_rule.ftr.ar&revision=2");
     expect(dashboardLocationHref(normalizeDashboardLocation("monitor"))).toBe("/dashboard");
   });
 });

@@ -459,7 +459,7 @@ function ruleLabel(rule: SliceRule): string {
 }
 
 function scopeLabel(scope: Scope): string {
-  return [scope.market === "domestic" ? "Yerli" : "Yabancı", scope.serviceRef, scope.campaignFamilyRef,
+  return [scope.market === "domestic" ? "Yerli" : "Yabancı", "Hizmet kapsamı", "Kampanya ailesi",
     scope.countryOrRegion, scope.audienceStrategy, scope.platform, scope.conversionRoute].filter(Boolean).join(" · ");
 }
 
@@ -516,6 +516,9 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   onApprovalQueueHandoff?(actionUnitRef: string): void;
   onOpenRuleSession?(seed: SliceRuleSessionSeed): void;
   onOpenCategorySetup?(): void;
+  selectedRuleRef?: string | null;
+  selectedRuleRevision?: number | null;
+  onOpenCanonicalRule?(ruleRef: string, revision: number): void;
 }>) {
   const snapshot = props.state.status === "ready" ? props.state.snapshot : null;
   const [form, setForm] = useState<Form>(EMPTY_FORM);
@@ -532,6 +535,14 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   const [operationalReadiness, setOperationalReadiness] = useState<OperationalReadinessState>({ status: "loading" });
   const [poolBinding, setPoolBinding] = useState<PoolBindingState>({ status: "loading" });
   const head = snapshot?.items.find((item) => item.seriesRef === headRef) ?? undefined;
+  useEffect(() => {
+    if (!snapshot || !props.selectedRuleRef || !props.selectedRuleRevision) return;
+    const selected = snapshot.items.find((item) => item.seriesRef === props.selectedRuleRef && item.revision === props.selectedRuleRevision);
+    if (!selected) return;
+    setHeadRef(selected.seriesRef);
+    setForm(formFromItem(selected));
+    setImpactState({ status: "idle" });
+  }, [props.selectedRuleRef, props.selectedRuleRevision, snapshot]);
   const frozenPoolBinding = head && (poolBinding.status === "ready" || poolBinding.status === "saving")
     ? poolBinding.snapshot.bindings.find((binding) => binding.draftHash === head.draftHash) ?? null : null;
   const sameMarketPoolNodes = head && (poolBinding.status === "ready" || poolBinding.status === "saving")
@@ -718,12 +729,12 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     }
   };
   return <div className={styles.workspace}>
-    <header className={styles.hero}><div><span>SLICE & KURAL ÇALIŞMA ALANI</span><h2><ContextualHelp term="Slice, kural ve takip yaklaşımı" explanation="Önce kanıtı tutarlı kapsamı seçin; ardından sizin yazdığınız kuralı, bütçe sınırını ve takip penceresini aynı satırda bağlayın.">Slice, kural ve takip yaklaşımını</ContextualHelp> aynı çalışma tablosunda görün.</h2><p>Her satır bir kullanıcı yazarlı kapsam ve kural serisidir: analiz/bütçe yaklaşımını, değerlendirme ritmini ve geri alma koşulunu birlikte önizlersiniz. Agent yalnız kanıt ve eksik sorularla yardımcı olur; önizleme yalnız doğrulanmış <ContextualHelp term="frozen bağlam" explanation="Kapsam ve kaynakların o anki doğrulanmış, değiştirilemez özetidir. Eski veya eksik bağlamla önizleme yapılmaz.">frozen bağlamla</ContextualHelp> çalışır.</p></div><strong>SADECE ÖNERİ · UYGULAMA YETKİSİ YOK</strong></header>
+    <header className={styles.hero}><div><span>KURAL KÜTÜPHANESİ</span><h2><ContextualHelp term="Slice, kural ve takip yaklaşımı" explanation="Önce kanıtı tutarlı kapsamı seçin; ardından sizin yazdığınız kuralı, bütçe sınırını ve takip penceresini aynı satırda bağlayın.">Kullanıcı yazarlı kuralları</ContextualHelp> bağlı slice'larıyla aynı yerde görün.</h2><p>Her satır tek bir kanonik kullanıcı kuralıdır. Slice içindeki “Kuralı aç” aynı kaydı ve revizyonu açar; Agent yalnız kanıt ve eksik sorularla yardımcı olur, kural metnini yazmaz veya değiştirmez.</p></div><strong>SADECE ÖNERİ · UYGULAMA YETKİSİ YOK</strong></header>
     {props.state.status === "loading" ? <section className={styles.state} role="status">Taslak kayıt defteri doğrulanıyor…</section> : null}
     {props.state.status === "unavailable" || props.state.status === "error" ? <section className={styles.state} role="alert"><h2>{props.state.status === "unavailable" ? "Kaynak bağlı değil" : "Çalışma alanı okunamadı"}</h2><p>{props.state.message}</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
     {snapshot ? <div className={styles.grid}>
-      <section className={`${styles.panel} ${styles.workspaceTablePanel}`}><div className={styles.panelTitle}><div><span>SLICE & KURAL ÇALIŞMA TABLOSU</span><h2>{snapshot.items.length} güncel seri</h2></div><small>Değiştirilemez kayıt · kullanıcı yazarlı</small></div>
-        {snapshot.items.length === 0 ? <p>Henüz kayıtlı slice rule taslağı yok. Önce kanıtlı bir scope seçin, ardından kendi kuralınızı yazın.</p> : <div className={styles.tableScroll}><table className={styles.workspaceTable}><caption>Her satırın kapsamı, kuralı ve takip yaklaşımı birlikte önizlenir.</caption><thead><tr><th scope="col">Slice</th><th scope="col">Kural / bütçe yaklaşımı</th><th scope="col">Takip yaklaşımı</th><th scope="col">Durum</th></tr></thead><tbody>{snapshot.items.map((item) => <tr key={item.draftRef} data-active={headRef === item.seriesRef}><td><strong>{item.seriesRef} · r{item.revision}</strong><span>{scopeLabel(item.scope)}</span></td><td><strong>{ruleLabel(item.operatingRule.rule)}</strong><span>{item.operatingMode === "recommendation_only" ? "Öneri ve insan incelemesi" : "—"}</span></td><td><strong>{followUpLabel(item)}</strong><span>{item.operatingRule.verification.rollbackWhen}</span></td><td><button type="button" onClick={() => { setHeadRef(item.seriesRef); setImpactState({ status: "idle" }); setForm(formFromItem(item)); }}>{headRef === item.seriesRef ? "Açık" : "Kuralı gözden geçir"}</button><small>{date(item.createdAt)}</small></td></tr>)}</tbody></table></div>}
+      <section className={`${styles.panel} ${styles.workspaceTablePanel}`}><div className={styles.panelTitle}><div><span>KURAL KÜTÜPHANESİ</span><h2>{snapshot.items.length} güncel kullanıcı kuralı</h2></div><small>Tek kayıt · değiştirilemez revizyon</small></div>
+        {snapshot.items.length === 0 ? <p>Henüz kayıtlı kullanıcı kuralı yok. Önce kanıtlı bir scope seçin, ardından kendi kuralınızı yazın.</p> : <div className={styles.tableScroll}><table className={styles.workspaceTable}><caption>Her satır tek kanonik kuralı, bağlı slice kapsamını ve takip yaklaşımını gösterir.</caption><thead><tr><th scope="col">Bağlı slice</th><th scope="col">Kullanıcı kuralı</th><th scope="col">Takip yaklaşımı</th><th scope="col">İşlem</th></tr></thead><tbody>{snapshot.items.map((item, index) => <tr key={item.draftRef} data-active={headRef === item.seriesRef}><td><strong>Slice {index + 1} · revizyon {item.revision}</strong><span>{scopeLabel(item.scope)}</span></td><td><strong>{ruleLabel(item.operatingRule.rule)}</strong><span>{item.operatingMode === "recommendation_only" ? "Öneri ve insan incelemesi" : "—"}</span></td><td><strong>{followUpLabel(item)}</strong><span>{item.operatingRule.verification.rollbackWhen}</span></td><td><button type="button" onClick={() => { props.onOpenCanonicalRule?.(item.seriesRef, item.revision); setHeadRef(item.seriesRef); setImpactState({ status: "idle" }); setForm(formFromItem(item)); }}>{headRef === item.seriesRef ? "Açık" : "Kuralı aç"}</button><small>{date(item.createdAt)}</small></td></tr>)}</tbody></table></div>}
         <section className={styles.unruledSlices} aria-label="Kuralsız kanıtlı slice adayları"><strong>Kuralsız kanıtlı slice adayları</strong><span>Bu satırlar gerçek kategori kanıtından gelir; yalnız henüz aynı kapsamda kayıtlı bir kullanıcı kuralı yoktur. Kural otomatik oluşturulmaz.</span>{scopeCandidates.status === "loading" ? <small>Aday slice’lar okunuyor…</small> : null}{scopeCandidates.status === "unavailable" ? <small>Aday slice’lar kullanılamıyor; formda tahmin veya fallback yok.</small> : null}{scopeCandidates.status === "ready" ? (() => { const unruled = scopeCandidates.candidates.filter((candidate) => !snapshot.items.some((item) => sameScope(item.scope, candidate.scope))).slice(0, 25); return unruled.length ? <div className={styles.unruledList}>{unruled.map((candidate) => <div key={candidate.campaignRef}><span>{scopeLabel(candidate.scope)}</span><button type="button" disabled={!snapshot.authority.canSaveDraft} onClick={() => applyScopeCandidate(candidate)}>Bu slice ile yeni kural yaz</button></div>)}</div> : <div className={styles.unruledList}><span>Henüz tekil ve tutarlı slice kapsamı yok. Kategori kayıtları eksikse sistem kapsam veya kural tahmin etmez.</span>{props.onOpenCategorySetup ? <button type="button" onClick={props.onOpenCategorySetup}>Kategori inceleme ve başlangıç planını aç</button> : null}</div>; })() : null}</section>
         <button className={styles.newButton} type="button" onClick={() => { setHeadRef(null); setImpactState({ status: "idle" }); setForm(EMPTY_FORM); }}>+ Yeni kural serisi</button>
       </section>
@@ -870,7 +881,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   </div>;
 }
 
-export function SliceRuleWorkspacePanel({ onApprovalQueueHandoff, onOpenRuleSession, onOpenCategorySetup }: Readonly<{ onApprovalQueueHandoff?(actionUnitRef: string): void; onOpenRuleSession?(seed: SliceRuleSessionSeed): void; onOpenCategorySetup?(): void }>) {
+export function SliceRuleWorkspacePanel({ onApprovalQueueHandoff, onOpenRuleSession, onOpenCategorySetup, selectedRuleRef, selectedRuleRevision, onOpenCanonicalRule }: Readonly<{ onApprovalQueueHandoff?(actionUnitRef: string): void; onOpenRuleSession?(seed: SliceRuleSessionSeed): void; onOpenCategorySetup?(): void; selectedRuleRef?: string | null; selectedRuleRevision?: number | null; onOpenCanonicalRule?(ruleRef: string, revision: number): void }>) {
   const [state, setState] = useState<State>({ status: "loading" });
   const load = useCallback(async () => {
     setState({ status: "loading" });
@@ -886,7 +897,7 @@ export function SliceRuleWorkspacePanel({ onApprovalQueueHandoff, onOpenRuleSess
     } catch { setState({ status: "error", message: "Slice Rule Workspace bağlantısı kurulamadı." }); }
   }, []);
   useEffect(() => { void load(); }, [load]);
-  return <SliceRuleWorkspaceSurface state={state} onRetry={() => void load()} onSaved={load} onApprovalQueueHandoff={onApprovalQueueHandoff} onOpenRuleSession={onOpenRuleSession} onOpenCategorySetup={onOpenCategorySetup} />;
+  return <SliceRuleWorkspaceSurface state={state} onRetry={() => void load()} onSaved={load} onApprovalQueueHandoff={onApprovalQueueHandoff} onOpenRuleSession={onOpenRuleSession} onOpenCategorySetup={onOpenCategorySetup} selectedRuleRef={selectedRuleRef} selectedRuleRevision={selectedRuleRevision} onOpenCanonicalRule={onOpenCanonicalRule} />;
 }
 
 export { CLOSED as SLICE_RULE_CLOSED_AUTHORITY, EMPTY_FORM as EMPTY_SLICE_RULE_FORM };

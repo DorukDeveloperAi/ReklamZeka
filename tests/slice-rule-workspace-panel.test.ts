@@ -77,12 +77,14 @@ describe("Slice Rule Workspace panel", () => {
     expect(html).toContain("Kanıtlı kapsam adayları");
     expect(html).toContain("Frozen context, bütçe etkisi, policy ve action yetkisi üretmez");
     expect(html).toContain("Karar izi");
-    expect(html).toContain("SLICE &amp; KURAL ÇALIŞMA TABLOSU");
-    expect(html).toContain("Kural / bütçe yaklaşımı");
+    expect(html).toContain("KURAL KÜTÜPHANESİ");
+    expect(html).toContain("Kullanıcı kuralı");
     expect(html).toContain("Takip yaklaşımı");
-    expect(html).toContain("Kuralı gözden geçir");
+    expect(html).toContain("Kuralı aç");
     expect(html).toContain("Kuralsız kanıtlı slice adayları");
     expect(html).toContain("Kural otomatik oluşturulmaz.");
+    expect(html).toContain("tek kanonik kuralı");
+    expect(html).toContain("Kuralı aç");
   });
 
   it("keeps private pool, frozen-context and decision identifiers out of the operator surface", () => {

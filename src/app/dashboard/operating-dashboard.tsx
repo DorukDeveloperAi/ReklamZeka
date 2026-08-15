@@ -710,6 +710,8 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
   const [campaignArea, setCampaignArea] = useState<CampaignArea>(initialLocationRef.current.campaignArea);
   const [rulesArea, setRulesArea] = useState<RulesArea>(initialLocationRef.current.rulesArea);
   const [settingsArea, setSettingsArea] = useState<SettingsArea>(initialLocationRef.current.settingsArea);
+  const [selectedRuleRef, setSelectedRuleRef] = useState<string | null>(initialLocationRef.current.ruleRef);
+  const [selectedRuleRevision, setSelectedRuleRevision] = useState<number | null>(initialLocationRef.current.ruleRevision);
   const contentRef = useRef<HTMLElement>(null);
   const lastContentFocusKeyRef = useRef("");
   const [requestedCampaignRef, setRequestedCampaignRef] = useState<string | null>(initialLocationRef.current.campaignRef);
@@ -778,9 +780,11 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
 
   const dashboardLocation = useMemo<DashboardLocation>(() => ({ view: activeView, manageArea, decisionArea,
     budgetArea, campaignArea, rulesArea, settingsArea,
+    ruleRef: activeView === "manage" && manageArea === "rules" ? selectedRuleRef : null,
+    ruleRevision: activeView === "manage" && manageArea === "rules" ? selectedRuleRevision : null,
     campaignRef: activeView === "manage" && manageArea === "decisions" ? requestedCampaignRef : null,
     approvalUnitRef: activeView === "manage" && manageArea === "decisions" && decisionArea === "approvals" ? requestedApprovalUnitRef : null }),
-  [activeView, budgetArea, campaignArea, decisionArea, manageArea, requestedApprovalUnitRef, requestedCampaignRef, rulesArea, settingsArea]);
+  [activeView, budgetArea, campaignArea, decisionArea, manageArea, requestedApprovalUnitRef, requestedCampaignRef, rulesArea, selectedRuleRef, selectedRuleRevision, settingsArea]);
   const contentFocusKey = `${activeView}:${manageArea}:${decisionArea}:${budgetArea}:${campaignArea}:${rulesArea}:${settingsArea}:${requestedCampaignRef ?? ""}:${requestedApprovalUnitRef ?? ""}`;
   const applyDashboardLocation = useCallback((location: DashboardLocation) => {
     setActiveView(location.view);
@@ -789,6 +793,8 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     setBudgetArea(location.budgetArea);
     setCampaignArea(location.campaignArea);
     setRulesArea(location.rulesArea);
+    setSelectedRuleRef(location.ruleRef);
+    setSelectedRuleRevision(location.ruleRevision);
     setSettingsArea(location.settingsArea);
     setRequestedApprovalUnitRef(location.approvalUnitRef);
     const campaignChanged = requestedCampaignRefRef.current !== location.campaignRef;
@@ -1153,6 +1159,11 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     commitDashboardLocation({ ...dashboardLocation, view: "agent", campaignRef: null });
   }
 
+  function openCanonicalRule(ruleRef: string, ruleRevision: number) {
+    commitDashboardLocation({ ...dashboardLocation, view: "manage", manageArea: "rules", rulesArea: "slices",
+      ruleRef, ruleRevision, campaignRef: null });
+  }
+
   function openAgentContext(entityRef: string, label: string) {
     setAgentSourceView(activeView);
     setAgentEntityRef(entityRef);
@@ -1467,14 +1478,14 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
       </section>
       <SectionNav<RulesArea> label="Kurallar ve yetkiler" active={rulesArea} onChange={(area) => commitDashboardLocation({ ...dashboardLocation, rulesArea: area })} items={[
         { id: "guidance", label: "Rehberler & çalışma dili", description: "Talimat, kaynak ve agent dili" },
-        { id: "slices", label: "Slice & kurallar", description: "Kapsam, kural ve takip tablosu" },
+        { id: "slices", label: "Kural Kütüphanesi", description: "Bağlı slice, kural ve takip" },
         { id: "policies", label: "Bağlayıcı politikalar", description: "Yaşam döngüsü ve etki" },
         { id: "authority", label: "Yetki & onay", description: "Yetki sınırları ve onay politikaları" },
         { id: "learning", label: "Öğrenim", description: "İnsan onaylı yaklaşımlar" },
       ]} />
       {rulesArea === "guidance" ? <><GuidanceStudioPanel onSessionRequiredChange={setRulesSessionRequired} />
         {rulesSessionRequired === false ? <><SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /></> : null}</>
-        : rulesArea === "slices" ? <SliceRuleWorkspacePanel onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} onOpenRuleSession={openRuleSession} onOpenCategorySetup={() => openSettings("categories")} />
+        : rulesArea === "slices" ? <SliceRuleWorkspacePanel selectedRuleRef={selectedRuleRef} selectedRuleRevision={selectedRuleRevision} onOpenCanonicalRule={openCanonicalRule} onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} onOpenRuleSession={openRuleSession} onOpenCategorySetup={() => openSettings("categories")} />
         : rulesArea === "policies" ? <InstructionPolicyStudioPanel />
           : rulesArea === "authority" ? <AutonomyStudioPanel />
             : <PracticeLabPanel />}

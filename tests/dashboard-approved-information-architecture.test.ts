@@ -86,7 +86,8 @@ describe("approved dashboard information architecture", () => {
     expect(dashboardSource).toContain("Canlı Graph envanteri bu sürümde kapalıdır.");
     expect(dashboardSource).toContain("kural/policy metni üretmez, alanlara kopyalamaz veya kayıt oluşturmaz");
     expect(sliceRuleSource).not.toContain("<h1>Kanıtlı kapsam için işletim kuralı taslağı</h1>");
-    expect(sliceRuleSource).toContain("<h2>Slice, kural ve takip yaklaşımını aynı çalışma tablosunda görün.</h2>");
+    expect(sliceRuleSource).toContain("Kullanıcı yazarlı kuralları");
+    expect(sliceRuleSource).toContain("KURAL KÜTÜPHANESİ");
     expect(sliceRuleStyles).toContain(".hero h2");
     expect(dashboardSource).not.toContain("<i>⌄</i>");
   });

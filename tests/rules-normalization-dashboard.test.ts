@@ -27,7 +27,7 @@ describe("Rules normalization dashboard integration", () => {
   it("opens the Slice Rule table without mounting the unrelated guidance editor", () => {
     const html = renderToStaticMarkup(createElement(OperatingDashboard, { model,
       initialLocation: { ...normalizeDashboardLocation("rules"), rulesArea: "slices" } }));
-    expect(html).toContain("SLICE RULE WORKSPACE");
+    expect(html).toContain("KURAL KÜTÜPHANESİ");
     expect(html).not.toContain("TALİMAT STUDIO");
     expect(html).not.toContain("DRAFT-ONLY NORMALIZATION");
   });
