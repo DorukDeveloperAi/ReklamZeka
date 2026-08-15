@@ -167,6 +167,11 @@
 .contextTabs small { color: var(--rz-dim); font-size: .55rem; line-height: 1.35; }
 .managementGlossary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin: 0 0 12px; padding: 11px 13px; border: 1px solid var(--rz-line); border-radius: 12px; background: color-mix(in srgb, var(--rz-blue) 4%, var(--rz-surface)); color: var(--rz-muted); font-size: .67rem; line-height: 1.45; }
 .managementGlossary > span:first-child { color: var(--rz-dim); font-size: .58rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.managementFlowGuide { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: -10px 0 18px; padding: 12px 14px; border: 1px solid var(--rz-line); border-radius: 12px; background: var(--rz-surface-2); }
+.managementFlowGuide > div:first-child { min-width: 0; }
+.managementFlowGuide > div:first-child > span { color: var(--rz-blue); font-size: .56rem; font-weight: 800; letter-spacing: .09em; }
+.managementFlowGuide p { max-width: 720px; margin: 4px 0 0; color: var(--rz-muted); font-size: .66rem; line-height: 1.5; }
+.managementTerms { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; gap: 10px 16px; color: var(--rz-text); font-size: .66rem; font-weight: 730; }
 .panelHeader { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 17px 18px 14px; border-bottom: 1px solid var(--rz-line); }
 .panelHeader h2 { margin: 6px 0 0; font-size: 1rem; letter-spacing: -.025em; }
 .panelHeader button, .detailHeader button, .copyPreview button { border: 0; background: transparent; color: var(--rz-muted); font-size: .64rem; cursor: pointer; }
@@ -1101,6 +1106,8 @@
   .contextTabs { display: flex; overflow-x: auto; scrollbar-width: none; }
   .contextTabs button { flex: 0 0 170px; }
   .managementGlossary { align-items: flex-start; gap: 10px 14px; }
+  .managementFlowGuide { align-items: flex-start; flex-direction: column; gap: 10px; margin-top: -10px; }
+  .managementTerms { justify-content: flex-start; }
   .assistantDrawer { width: calc(100% - 18px); }
   .assistantDrawerHeader { padding: 17px; }
   .assistantDrawerHeader p, .assistantDrawerHeader .statusPill { display: none; }

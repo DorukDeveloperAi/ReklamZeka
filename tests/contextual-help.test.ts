@@ -17,4 +17,13 @@ describe("ContextualHelp", () => {
     expect(dashboard).toContain('term="Kullanıcı kuralı"');
     expect(dashboard).toContain('term="İnsan onayı"');
   });
+
+  it("gives every management area a short, operationally scoped explanation", () => {
+    const dashboard = readFileSync("src/app/dashboard/operating-dashboard.tsx", "utf8");
+    expect(dashboard).toContain("function ManagementFlowGuide");
+    expect(dashboard).toContain('props.area === "portfolio"');
+    expect(dashboard).toContain('props.area === "decisions"');
+    expect(dashboard).toContain('props.area === "rules"');
+    expect(dashboard).toContain('<ManagementFlowGuide area={manageArea} />');
+  });
 });

@@ -572,6 +572,29 @@ function SectionNav<T extends string>(props: Readonly<{
     onClick={() => props.onChange(item.id)}><strong>{item.label}</strong><small>{item.description}</small></button>)}</nav>;
 }
 
+/** Keeps each management area scoped to its immediate operational question. */
+function ManagementFlowGuide(props: Readonly<{ area: ManageArea }>) {
+  const guide = props.area === "portfolio"
+    ? { label: "Portföy", purpose: "Gerçek Meta hiyerarşisini inceleyin; sınıflama veya kural yazımı sonraki aşamadadır.",
+      terms: [{ term: "Kanonik ayna", explanation: "Meta’dan salt-okunur biçimde aynalanan hesap, kampanya, ad set, reklam ve kreatif bilgisidir. Kaynak kısmi veya eskiyse bu açıkça gösterilir." },
+        { term: "Künye", explanation: "Kampanya adını; gerçek kurulum, hedefleme, platform, geo, sonuç rotası ve içerik kanıtıyla birlikte açıklayan insan onaylı sınıflamadır." }] }
+    : props.area === "decisions"
+      ? { label: "Kararlar", purpose: "Kanıtı, öneriyi ve insan kararını ayırarak takip edin; uygulama yetkisi bu görünümde kapalıdır.",
+        terms: [{ term: "Öneri", explanation: "Kanıt ve kullanıcı kuralı altında üretilen, henüz uygulanmayan değerlendirmedir." },
+          { term: "Onay kuyruğu", explanation: "İnsan kararına sunulmuş typed action adaylarının kaydıdır. Onay Meta write veya otomatik uygulama değildir." }] }
+      : props.area === "rules"
+        ? { label: "Kurallar", purpose: "Önce kapsamı doğrulayın; kullanıcı yazarlı kuralı ve bütçe sınırını yalnız ardından bağlayın.",
+          terms: [{ term: "Slice", explanation: "Aynı pazar sınırındaki, kanıtı tutarlı operasyon kapsamıdır. Yerli ve yabancı kesinlikle birleşmez." },
+            { term: "Kullanıcı kuralı", explanation: "Kapsam, limit, pencere ve geri alma koşulunu sizin yazdığınız kayıttır; agent bunu yazmaz veya kaydetmez." }] }
+        : { label: "Ayarlar", purpose: "Bağlantı ve kayıt sözleşmelerini hazırlayın; bunlar tek başına bütçe veya Meta uygulama yetkisi vermez.",
+          terms: [{ term: "Kategori registry", explanation: "Künye boyutları, tanımlar, profiller ve insan onaylı atamaların kanonik kaydıdır." },
+            { term: "Kaynak hazırlığı", explanation: "Bağlantının ve aynanın okunabilirlik durumudur. Hazırlık tamamlanmadan eksik bilgi varsayımla doldurulmaz." }] };
+  return <section className={styles.managementFlowGuide} aria-label={`${guide.label} alanı çalışma rehberi`}>
+    <div><span>{guide.label.toUpperCase()} · ÇALIŞMA REHBERİ</span><p>{guide.purpose}</p></div>
+    <div className={styles.managementTerms}>{guide.terms.map((item) => <ContextualHelp key={item.term} term={item.term} explanation={item.explanation} />)}</div>
+  </section>;
+}
+
 function formatMetaTime(value: string | null) {
   if (!value) return "Bilinmiyor";
   return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(value));
@@ -1483,6 +1506,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
         { id: "rules", label: "Kurallar", description: "Kullanıcı yazarlı kurallar" },
         { id: "settings", label: "Ayarlar", description: "Bağlantı ve kayıt yönetimi" },
       ]} />
+      <ManagementFlowGuide area={manageArea} />
       {manageArea === "portfolio" ? renderCampaigns()
         : manageArea === "decisions" ? <>
           <SectionNav<DecisionArea> label="Karar alanları" active={decisionArea} onChange={(area) => commitDashboardLocation({ ...dashboardLocation, decisionArea: area, approvalUnitRef: null })} items={[
