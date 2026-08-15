@@ -31,6 +31,7 @@ export function ContextualHelp(props: Readonly<{
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}
+      onClick={togglePinned}
       onContextMenu={(event) => { event.preventDefault(); togglePinned(); }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -41,7 +42,7 @@ export function ContextualHelp(props: Readonly<{
       }}
     >{props.children ?? props.term}<span aria-hidden="true" className={styles.icon}>i</span></span>
     {open ? <span id={tooltipId} role="tooltip" className={styles.tooltip}>
-      <strong>{props.term}</strong><span>{props.explanation}</span><small>Üzerine gelin; sağ tık veya Enter ile açıklamayı sabitleyin.</small>
+      <strong>{props.term}</strong><span>{props.explanation}</span><small>Dokunun veya Enter ile açıklamayı sabitleyin; masaüstünde sağ tık da kullanabilirsiniz.</small>
     </span> : null}
   </span>;
 }

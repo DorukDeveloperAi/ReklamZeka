@@ -16,7 +16,7 @@ describe("Rules normalization dashboard integration", () => {
     const html = renderToStaticMarkup(createElement(OperatingDashboard, { model, initialView: "rules" }));
     const guidance = html.indexOf("Talimatlar yükleniyor");
     const normalization = html.indexOf("Owner talimatını yapılandırılmış taslak olarak değerlendir");
-    const sliceRule = html.indexOf("SLICE RULE WORKSPACE");
+    const sliceRule = html.indexOf("SLICE &amp; KURAL ÇALIŞMA ALANI");
 
     expect(guidance).toBeGreaterThanOrEqual(0);
     expect(normalization).toBe(-1);

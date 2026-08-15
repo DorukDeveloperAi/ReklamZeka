@@ -500,8 +500,8 @@ export function portfolioCapabilityFromResponse(value: unknown): PortfolioCapabi
 
 const navGroups: ReadonlyArray<Readonly<{ label: string; items: ReadonlyArray<Readonly<{ id: ViewId; label: string; icon: string; badge?: string }>> }>> = [
   { label: "Çalışma", items: [
-    { id: "monitor", label: "İzle", icon: "⌂" },
-    { id: "manage", label: "Yönet", icon: "◫" },
+    { id: "monitor", label: "Ana Sayfa", icon: "⌂" },
+    { id: "manage", label: "Portföy / Slice", icon: "◫" },
     { id: "agent", label: "Agent", icon: "✦" },
   ] },
 ];
@@ -603,6 +603,26 @@ function ManagementFlowGuide(props: Readonly<{ area: ManageArea }>) {
   return <section className={styles.managementFlowGuide} aria-label={`${guide.label} alanı çalışma rehberi`}>
     <div><span>{guide.label.toUpperCase()} · ÇALIŞMA REHBERİ</span><p>{guide.purpose}</p></div>
     <div className={styles.managementTerms}>{guide.terms.map((item) => <ContextualHelp key={item.term} term={item.term} explanation={item.explanation} />)}</div>
+  </section>;
+}
+
+/** Shared orientation only: it never changes the selected scope or source. */
+function WorkspaceContextBar(props: Readonly<{
+  surface: "overview" | "workspace" | "assistant";
+  source: string;
+  sourceState: MetaReadMirrorLoadState;
+}>) {
+  const copy = props.surface === "overview"
+    ? { label: "ANA SAYFA · GENEL BAKIŞ", detail: "Portföy genelinde önceliği görün; ayrıntıyı seçili kapsamda çalışın." }
+    : props.surface === "workspace"
+      ? { label: "PORTFÖY / SLICE · ÇALIŞMA MASASI", detail: "Seçili kapsamı inceleyin; kural ve Agent bağlamı aynı kayda bağlı kalır." }
+      : { label: "AGENT · YARDIMCI KATMAN", detail: "Tek konuşmaya yalnız güvenli sayfa ve kapsam özeti eklenir." };
+  const sourceLabel = props.sourceState === "ready" ? "Kaynak hazır"
+    : props.sourceState === "loading" ? "Kaynak okunuyor"
+      : props.sourceState === "session_required" ? "Oturum gerekli" : "Kaynak kullanılamıyor";
+  return <section className={styles.workspaceContext} aria-label="Çalışma bağlamı">
+    <div><span>{copy.label}</span><p>{copy.detail}</p></div>
+    <div className={styles.workspaceContextMeta}><StatusPill tone={props.sourceState === "ready" ? "stable" : props.sourceState === "loading" ? "info" : "warning"}>{sourceLabel}</StatusPill><small>{props.source}</small></div>
   </section>;
 }
 
@@ -846,7 +866,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     return () => window.cancelAnimationFrame(frame);
   }, [contentFocusKey]);
 
-  const activeTitle = useMemo(() => navGroups.flatMap((group) => group.items).find((item) => item.id === activeView)?.label ?? "İzle", [activeView]);
+  const activeTitle = useMemo(() => navGroups.flatMap((group) => group.items).find((item) => item.id === activeView)?.label ?? "Ana Sayfa", [activeView]);
 
   const refreshRequestedCampaignContext = useCallback(async (): Promise<boolean> => {
     const requestId = campaignContextRequestRef.current + 1;
@@ -1191,7 +1211,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
 
     return <>
       <section className={styles.pageHero}>
-        <div><span className={styles.kicker}>GÜNLÜK OPERASYON · KANONİK KAYNAK</span><h1>Bugün neye güvenebileceğinizi tek bakışta görün.</h1><p>Hesap ve kampanya sayıları yalnız bu çalışma alanına bağlı Meta aynasından; performans yalnız yeterli günlük veri kapsamından gelir. Eksik veri sıfır veya örnek değer olarak gösterilmez.</p></div>
+        <div><span className={styles.kicker}>ANA SAYFA · GENEL BAKIŞ</span><h1>Portföyde bugün nerede inceleme gerektiğini görün.</h1><p>Hesaplar ve slice’lar üstü görünüm, veri sağlığı ve öncelikleri gösterir. Eksik veri sıfır veya örnek değer olarak gösterilmez. Ayrıntılı işletim için ilgili kapsamı Portföy / Slice çalışma masasında açın.</p></div>
         <button className={styles.primaryButton} onClick={() => openAgentContext("portfolio_current", "Bugün · kanonik portföy")}><span>✦</span> Asistanla çalış</button>
       </section>
 
@@ -1230,7 +1250,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
       : metaReadMirrorState === "session_required" ? "Kampanyalar için yerel oturum gerekli"
         : "Kanonik kampanya kaynağı kullanılamıyor";
     return <>
-      <section className={styles.pageHero}><div><span className={styles.kicker}>KAMPANYA ÇALIŞMA ALANI · KANONİK BAĞLAM</span><h1>Kampanyayı bulun, sınıflandırın ve ilgili operasyonu aynı bağlamda yürütün.</h1><p>Portföy, künye incelemesi, mevcut gönderi ön kontrolü ve operasyon geçmişi birbirinden kopuk sayfalar değildir. Her işlev yalnız gerçek kaynağı ve kendi yetki sınırı hazır olduğunda açılır.</p></div>{campaignArea === "portfolio" ? <button className={styles.primaryButton} onClick={() => void refreshMetaReadMirror(true)}>Kaynağı yenile</button> : null}</section>
+      <section className={styles.pageHero}><div><span className={styles.kicker}>PORTFÖY / SLICE · ÇALIŞMA MASASI</span><h1>Seçili kapsamı aynı bağlamda inceleyin ve işletin.</h1><p>Gerçek Meta hiyerarşisini ayrıntıda okuyun; inceleme, kullanıcı kuralı ve Agent yardımı seçili kapsamdan açılır. Bu yüzey veri veya kuralın ikinci bir kaydını oluşturmaz.</p></div>{campaignArea === "portfolio" ? <button className={styles.primaryButton} onClick={() => void refreshMetaReadMirror(true)}>Kaynağı yenile</button> : null}</section>
       <SectionNav<CampaignArea> label="Kampanya çalışma alanı" active={campaignArea} onChange={(area) => commitDashboardLocation({ ...dashboardLocation, campaignArea: area })} items={[
         { id: "portfolio", label: "Portföy", description: "Kampanya → kreatif" },
         { id: "classification", label: "Künye inceleme", description: "Eksik ve çelişkili sınıflar" },
@@ -1576,7 +1596,10 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     <section className={styles.workspace}>
       <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button type="button" className={styles.workspacePicker} aria-label={`${workspaceName} kaynak ayarlarını aç`} onClick={() => openSettings("meta")}><span className={styles.avatar}>RZ</span><span><strong>{workspaceName}</strong><small>{workspaceSource}</small></span><i aria-hidden="true">Ayarlar</i></button><div className={styles.topActions}><button type="button" className={styles.themeToggle} aria-pressed={theme === "light"} aria-label={theme === "dark" ? "Açık temaya geç" : "Koyu temaya geç"} onClick={toggleTheme}>{theme === "dark" ? "☀ Açık" : "◐ Koyu"}</button><button type="button" className={styles.codexTransferButton} disabled={agentHandoffLoading} onClick={() => void transferCurrentContextToCodex()}>{agentHandoffLoading ? "Hazırlanıyor…" : "Codex'e aktar"}</button></div></header>
       <nav className={styles.mobileNav} aria-label="Ana navigasyon">{navGroups.flatMap((group) => group.items).map((item) => <button type="button" key={item.id} data-active={activeView === item.id} aria-current={activeView === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</nav>
-      <main ref={contentRef} className={styles.content} tabIndex={-1} aria-label={activeTitle}>{content}</main>
+      <main ref={contentRef} className={styles.content} tabIndex={-1} aria-label={activeTitle}>
+        <WorkspaceContextBar surface={activeView === "monitor" ? "overview" : activeView === "manage" ? "workspace" : "assistant"} source={workspaceSource} sourceState={metaReadMirrorState} />
+        {content}
+      </main>
       <footer className={styles.sourceFooter}><span>{sourceFooter}</span><span>{authorityFooter}</span></footer>
     </section>
     {toast ? <div className={styles.toast} role="status"><span>✓</span><p>{toast}</p><button onClick={() => setToast(null)} aria-label="Bildirimi kapat">×</button></div> : null}

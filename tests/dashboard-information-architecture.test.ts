@@ -11,7 +11,7 @@ const budgetPools = readFileSync("src/app/dashboard/budget-pool-hierarchy-panel.
 
 describe("dashboard analysis and decision information architecture", () => {
   it("keeps one production-backed analysis surface and removes the static duplicate", () => {
-    expect(dashboard).toContain('{ id: "manage", label: "Yönet"');
+    expect(dashboard).toContain('{ id: "manage", label: "Portföy / Slice"');
     expect(dashboard).not.toContain('{ id: "analysis", label: "Analizler"');
     expect(dashboard).not.toContain("const analysisRuns");
     expect(dashboard).not.toContain("4 hesap · 32 kampanya");
@@ -27,7 +27,7 @@ describe("dashboard analysis and decision information architecture", () => {
   });
 
   it("implements the approved three-purpose primary IA and keeps legacy entries contextual", () => {
-    for (const label of ["İzle", "Yönet", "Agent"]) {
+    for (const label of ["Ana Sayfa", "Portföy / Slice", "Agent"]) {
       expect(dashboard).toContain(`label: "${label}"`);
     }
     for (const legacyNav of ["Strict policies", "İç kategoriler", "Autonomy Studio", "Practice Lab", "Meta bağlantısı", "Orchestrator Agent", "Teslimat alarmları", "Gönderi öne çıkarma", "Timeline"]) {

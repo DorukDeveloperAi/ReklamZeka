@@ -49,7 +49,7 @@ if (failures.length === 0) {
   const promotionPreflight = readFileSync(resolve(root, "src/app/dashboard/promotion-preflight-panel.tsx"), "utf8");
   const operationalTimeline = readFileSync(resolve(root, "src/app/dashboard/operational-timeline-panel.tsx"), "utf8");
   const navigationSource = operatingDashboard.slice(operatingDashboard.indexOf("const navGroups"), operatingDashboard.indexOf("export type PortfolioFilters"));
-  for (const boundary of ["GÜNLÜK OPERASYON · KANONİK KAYNAK", "KAMPANYA ÇALIŞMA ALANI · KANONİK BAĞLAM", "Eksik veri sıfır veya örnek değer olarak gösterilmez", "ekran örnek içerikle doldurulmaz"]) {
+  for (const boundary of ["ANA SAYFA · GENEL BAKIŞ", "PORTFÖY / SLICE · ÇALIŞMA MASASI", "Eksik veri sıfır veya örnek değer olarak gösterilmez", "ekran örnek içerikle doldurulmaz"]) {
     if (!operatingDashboard.includes(boundary)) failures.push(`operating dashboard sınırı eksik: ${boundary}`);
   }
   for (const forbidden of ["Demo Marka", "PORTFÖY · DEMO", "KARAR MASASI · DEMO", "OFFLINE ÇALIŞMA KİTABI SNAPSHOT", "7 AĞUSTOS CUMA"]) {
@@ -59,7 +59,7 @@ if (failures.length === 0) {
     if (operatingDashboard.includes(fakeAnalysis)) failures.push(`statik Analizler operasyon içeriği kaldı: ${fakeAnalysis}`);
   }
   if (operatingDashboard.includes('{ id: "analysis", label: "Analizler"')) failures.push("statik Analizler görünümü navigasyonda kaldı");
-  for (const target of ['{ id: "monitor", label: "İzle"', '{ id: "manage", label: "Yönet"', '{ id: "agent", label: "Agent"']) {
+  for (const target of ['{ id: "monitor", label: "Ana Sayfa"', '{ id: "manage", label: "Portföy / Slice"', '{ id: "agent", label: "Agent"']) {
     if (!navigationSource.includes(target)) failures.push(`onaylı primary IA hedefi eksik: ${target}`);
   }
   for (const legacyTarget of ['{ id: "strict-policies", label:', '{ id: "categories", label:',

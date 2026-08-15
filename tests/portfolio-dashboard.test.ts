@@ -13,7 +13,7 @@ const model = {
 describe("portfolio dashboard", () => {
   it("renders only the canonical source boundary while the campaign mirror is loading", () => {
     const html = renderToStaticMarkup(createElement(OperatingDashboard, { model, initialView: "campaigns" }));
-    expect(html).toContain("KAMPANYA ÇALIŞMA ALANI · KANONİK BAĞLAM");
+    expect(html).toContain("PORTFÖY / SLICE · ÇALIŞMA MASASI");
     expect(html).toContain("Kampanya kaynağı okunuyor");
     expect(html).toContain("ekran örnek içerikle doldurulmaz");
     expect(html).not.toContain("OFFLINE ÇALIŞMA KİTABI");

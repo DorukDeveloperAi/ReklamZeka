@@ -9,6 +9,7 @@ describe("ContextualHelp", () => {
     expect(source).toContain('event.key === "Enter"');
     expect(source).toContain('event.key === "Escape"');
     expect(source).toContain("aria-describedby");
+    expect(source).toContain("onClick={togglePinned}");
   });
 
   it("puts clear operational definitions next to the rule workflow", () => {

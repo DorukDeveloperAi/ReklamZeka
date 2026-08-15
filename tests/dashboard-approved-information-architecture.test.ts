@@ -21,8 +21,8 @@ describe("approved dashboard information architecture", () => {
       expect((html.match(/<main/g) ?? []).length, view).toBe(1);
       expect(html, view).toContain('tabindex="-1"');
       expect((html.match(/<nav aria-label="Ana navigasyon"/g) ?? []).length, view).toBe(1);
-      expect(html, view).toContain("İzle");
-      expect(html, view).toContain("Yönet");
+      expect(html, view).toContain("Ana Sayfa");
+      expect(html, view).toContain("Portföy / Slice");
       expect(html, view).toContain("Agent");
       expect(html, view).not.toContain("<strong>Orchestrator Agent</strong>");
       expect(html, view).not.toContain("<strong>Teslimat alarmları</strong>");
@@ -32,15 +32,15 @@ describe("approved dashboard information architecture", () => {
 
   it("routes legacy capability entries into their approved parent context", () => {
     const strict = renderToStaticMarkup(createElement(OperatingDashboard, { initialView: "strict-policies" }));
-    expect(strict).toContain('aria-label="Yönet"');
+    expect(strict).toContain('aria-label="Portföy / Slice"');
     expect(strict).toContain("Bağlayıcı politika kayıtları yükleniyor");
 
     const category = renderToStaticMarkup(createElement(OperatingDashboard, { initialView: "categories" }));
-    expect(category).toContain('aria-label="Yönet"');
+    expect(category).toContain('aria-label="Portföy / Slice"');
     expect(category).toContain("Kategori envanteri yükleniyor");
 
     const promotion = renderToStaticMarkup(createElement(OperatingDashboard, { initialView: "promotions" }));
-    expect(promotion).toContain('aria-label="Yönet"');
+    expect(promotion).toContain('aria-label="Portföy / Slice"');
     expect(promotion).toContain("K4 ön kontrol");
     expect((promotion.match(/<h1/g) ?? []).length).toBe(1);
   });
@@ -88,6 +88,7 @@ describe("approved dashboard information architecture", () => {
     expect(sliceRuleSource).not.toContain("<h1>Kanıtlı kapsam için işletim kuralı taslağı</h1>");
     expect(sliceRuleSource).toContain("Kullanıcı yazarlı kuralları");
     expect(sliceRuleSource).toContain("KURAL KÜTÜPHANESİ");
+    expect(sliceRuleSource).toContain('term="Slice, kural ve takip yaklaşımı"');
     expect(sliceRuleStyles).toContain(".hero h2");
     expect(dashboardSource).not.toContain("<i>⌄</i>");
   });
