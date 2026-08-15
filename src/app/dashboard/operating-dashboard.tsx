@@ -1565,7 +1565,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
 
   function renderAgentSurface() {
     return <>
-      <section className={styles.pageHero}><div><span className={styles.kicker}>AGENT · KANIT VE EKSİKLER</span><h1>Kanıtı açıklayın, kuralı siz yazın.</h1><p>Agent kaynakları açıklar ve eksik alanları gösterir. Kural veya policy metni üretmez, alanlara kopyalamaz ya da kayıt oluşturmaz.</p></div><StatusPill>Salt-okunur yardımcı</StatusPill></section>
+      <section className={styles.pageHero}><div><span className={styles.kicker}>AGENT · KANIT VE EKSİKLER</span><h1>Kanıtı açıklayın, kuralı siz yazın.</h1><p>Agent kaynakları açıklar ve eksik alanları gösterir; kural/policy metni üretmez, alanlara kopyalamaz veya kayıt oluşturmaz.</p></div><StatusPill>Salt-okunur yardımcı</StatusPill></section>
       {renderAgent()}
     </>;
   }
