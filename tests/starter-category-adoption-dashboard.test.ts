@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { parseStarterCategoryAdoptionPlan, parseStarterCategoryAdoptionSuccess, StarterCategoryAdoption } from
@@ -53,5 +54,14 @@ describe("StarterCategoryAdoption dashboard", () => {
     const html = renderToStaticMarkup(createElement(StarterCategoryAdoption));
     expect(html).toContain("15-BOYUTLU BAŞLANGIÇ PLANI"); expect(html).toContain("Plan yükleniyor");
     expect(html).not.toContain("Meta write"); expect(html).not.toContain("Action execute");
+  });
+
+  it("inherits the soft dashboard theme rather than forcing a separate dark palette", () => {
+    const css = readFileSync("src/app/dashboard/starter-category-adoption.module.css", "utf8");
+    for (const token of ["var(--rz-surface)", "var(--rz-surface-2)", "var(--rz-text)", "var(--rz-muted)", "var(--rz-blue)"]) {
+      expect(css).toContain(token);
+    }
+    expect(css).not.toContain("rgba(15,23,42");
+    expect(css).not.toContain("#0e7490");
   });
 });
