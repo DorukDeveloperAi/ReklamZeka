@@ -25,6 +25,7 @@ const HEADERS = Object.freeze({
   "X-Frame-Options": "DENY",
   "X-ReklamZeka-Access-Mode": "decision-record-only",
   "X-ReklamZeka-Action-Authority": "none",
+  "X-ReklamZeka-Meta-Write": "disabled",
 });
 
 type DecisionContext = Readonly<{
