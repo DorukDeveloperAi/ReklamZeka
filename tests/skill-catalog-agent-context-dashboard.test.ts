@@ -19,14 +19,20 @@ const safeProjection = {
 } as const;
 
 describe("Agent skill catalog context strip", () => {
-  it("maps only safe GET projection fields and drops IDs, playbooks, and authority controls", () => {
+  it("maps the user-authored playbook receipt while dropping IDs, source bodies, and authority controls", () => {
     const context = skillCatalogContextFromResponse(safeProjection);
-    expect(context).toEqual({ profileLabel: "Aktif skill profili · revizyon 4", skills: [{ name: "RuleCoach", version: "1.0.0" }] });
-    expect(JSON.stringify(context)).not.toMatch(/profile_private|playbook_private|Görünmemeli|example\.test|canSelectProfile/);
+    expect(context).toEqual({ profileLabel: "Aktif skill profili · revizyon 4", skills: [{ name: "RuleCoach", version: "1.0.0" }],
+      playbooks: [{ title: "Görünmemeli", revision: 2, freshness: "current", url: null }] });
+    expect(JSON.stringify(context)).not.toMatch(/profile_private|playbook_private|example\.test|canSelectProfile/);
+    const html = renderToStaticMarkup(createElement(SkillCatalogContextStrip, { context }));
+    expect(html).toContain("Kullanıcı yazarlı playbooklar");
+    expect(html).toContain("Görünmemeli · revizyon 2 · güncel");
+    expect(html).toContain("Kanıt makbuzu");
+    expect(html).not.toContain("example.test/source");
   });
 
   it("fails closed for an unrecorded legacy turn or a projection carrying a raw body", () => {
-    expect(skillCatalogContextFromResponse({ ...safeProjection, activeProfile: null })).toMatchObject({ legacy: true, skills: [] });
+    expect(skillCatalogContextFromResponse({ ...safeProjection, activeProfile: null })).toMatchObject({ legacy: true, skills: [], playbooks: [] });
     expect(skillCatalogContextFromResponse({ ...safeProjection, activeProfile: { ...safeProjection.activeProfile, body: "raw prompt" } })).toBeNull();
   });
 
@@ -55,7 +61,7 @@ describe("Agent skill catalog context strip", () => {
 
   it("offers navigation to user-owned skill setup without selecting a profile from Agent", () => {
     const html = renderToStaticMarkup(createElement(SkillCatalogContextStrip, {
-      context: { profileLabel: "", skills: [], legacy: true }, onOpenSetup: () => undefined,
+      context: { profileLabel: "", skills: [], playbooks: [], legacy: true }, onOpenSetup: () => undefined,
     }));
     expect(html).toContain("Skill çalışma dilini aç");
     expect(readFileSync("src/app/dashboard/operating-dashboard.tsx", "utf8")).toContain("function openSkillSetup()");

@@ -45,9 +45,10 @@ export function OrchestratorTurnSkillRunEvidence({ evidence }: Readonly<{ eviden
   if (evidence.state === "legacy_not_recorded") return <p>Bu eski turn için kullanılan skill makbuzu kaydedilmemiş.</p>;
   if (evidence.state === "unavailable_not_bound") return <p>Bu turn sırasında SkillRun makbuzu bağlanamadı.</p>;
   if (evidence.state !== "bound" || !evidence.receipt) return <p>SkillRun makbuzu güvenle okunamadı.</p>;
-  return <dl aria-label="Kullanılan salt-okur skilller">
-    <div><dt>Kullanılan skill</dt><dd>{evidence.receipt.selectedSkills.map((skill) => `${skill.name} · ${skill.version}`).join("; ")}</dd></div>
-    <div><dt>İnceleme modu</dt><dd>{evidence.receipt.intent} · kanıt {evidence.receipt.evidenceAvailability}</dd></div>
+  return <dl aria-label="Seçili beceri makbuzu">
+    <div><dt>Seçili beceriler</dt><dd>{evidence.receipt.selectedSkills.map((skill) => `${skill.name} · ${skill.version}`).join("; ")}</dd></div>
+    <div><dt>İnceleme kapsamı</dt><dd>{evidence.receipt.intent} · kanıt {evidence.receipt.evidenceAvailability}</dd></div>
+    <div><dt>Çıktı sınırı</dt><dd>{evidence.receipt.outputContract}</dd></div>
     <div><dt>Yetki</dt><dd>Salt-okunur · kayıt, policy, onay, uygulama ve Meta yazma kapalı</dd></div>
   </dl>;
 }
@@ -59,6 +60,6 @@ export function OrchestratorTurnInterviewKitEvidence({ evidence }: Readonly<{ ev
   if (evidence.state !== "bound") return <p>Kullanıcı soru seti kanıtı güvenle okunamadı.</p>;
   if (!evidence.kits.length) return <p>Bu turn için sayfa/niyetle eşleşen kullanıcı soru seti yoktu.</p>;
   return <dl aria-label="Bu turn için kullanılan kullanıcı soru setleri">
-    {evidence.kits.map((kit) => <div key={`${kit.name}-${kit.revision}`}><dt>{kit.name} · revizyon {kit.revision}</dt><dd><a href={kit.source.url} target="_blank" rel="noreferrer">{kit.source.title}</a> · kaynak revizyonu {kit.source.version} · gözden geçirme {new Date(kit.source.reviewBy).toLocaleDateString("tr-TR")}</dd></div>)}
+    {evidence.kits.map((kit) => <div key={`${kit.name}-${kit.revision}`}><dt>{kit.name} · revizyon {kit.revision}</dt><dd><a href={kit.source.url} target="_blank" rel="noreferrer">{kit.source.title}</a> · kaynak revizyonu {kit.source.version} · gözden geçirme tarihi {new Date(kit.source.reviewBy).toLocaleDateString("tr-TR")}</dd></div>)}
   </dl>;
 }

@@ -295,7 +295,7 @@ export function orchestratorConversationFromResponse(value: unknown): Orchestrat
     messages: Object.freeze(messages as OrchestratorConversationSummary["messages"]) });
 }
 
-/** Maps the catalog's GET projection into the drawer-safe context and drops every identifier and source field. */
+/** Maps the catalog's GET projection into the drawer-safe context and drops private IDs and source bodies. */
 export function skillCatalogContextFromResponse(value: unknown): SkillCatalogContext | null {
   if (!plainRecord(value)) return null;
   const authority = plainRecord(value.authority) ? value.authority : null;
@@ -309,7 +309,7 @@ export function skillCatalogContextFromResponse(value: unknown): SkillCatalogCon
     || !["canSelectProfile", "canCreatePlaybookRevision", "canTombstonePlaybook"].every((key) => typeof authority[key] === "boolean")
     || !["canPersist", "canCreateRule", "canDraftPolicy", "canAlterScope", "canPublish", "canApprove", "canExecute", "canWriteMeta"].every((key) => authority[key] === false)
     || playbooks.some((playbook) => !plainRecord(playbook) || !onlyKeys(playbook, ["kind", "ref", "revision", "state", "title", "url", "freshness"]) || playbook.kind !== "playbook")) return null;
-  if (activeProfile === null) return Object.freeze({ profileLabel: "", skills: Object.freeze([]), legacy: true });
+  if (activeProfile === null) return Object.freeze({ profileLabel: "", skills: Object.freeze([]), playbooks: Object.freeze([]), legacy: true });
   if (!plainRecord(activeProfile) || !onlyKeys(activeProfile, ["kind", "ref", "revision", "state"])
     || activeProfile.kind !== "profile" || typeof activeProfile.ref !== "string" || typeof activeProfile.state !== "string") return null;
   const revision = activeProfile.revision;
@@ -323,9 +323,20 @@ export function skillCatalogContextFromResponse(value: unknown): SkillCatalogCon
     return Object.freeze({ name: candidate.name, version: candidate.version });
   });
   if (skills.some((skill) => skill === null)) return null;
+  const safePlaybooks = playbooks.map((playbook) => {
+    if (!plainRecord(playbook) || !safeEvidenceText(playbook.title, 240)
+      || !Number.isSafeInteger(playbook.revision) || (playbook.revision as number) < 1
+      || playbook.state !== "active" || !["current", "stale", "not_scheduled"].includes(playbook.freshness as string)
+      || !(playbook.url === null || typeof playbook.url === "string")) return null;
+    return Object.freeze({ title: playbook.title as string, revision: playbook.revision as number,
+      freshness: playbook.freshness as "current" | "stale" | "not_scheduled",
+      url: typeof playbook.url === "string" && safeHistoricalSourceUrl(playbook.url) ? playbook.url : null });
+  });
+  if (safePlaybooks.some((playbook) => playbook === null)) return null;
   return Object.freeze({
     profileLabel: `Aktif skill profili · revizyon ${revision}`,
     skills: Object.freeze(skills as SkillCatalogContext["skills"]),
+    playbooks: Object.freeze(safePlaybooks as SkillCatalogContext["playbooks"]),
   });
 }
 
@@ -1251,7 +1262,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
             {orchestratorState === "unavailable" ? <p role="alert">{orchestratorError ?? "Kalıcı Orchestrator konuşması kullanılamıyor."} Manuel Codex aktarımı kullanılabilir.</p> : null}
             {orchestratorState === "ready" && !visibleMessages.length ? <p>Kalıcı konuşma bağlı; henüz mesaj yok.</p> : null}
             {visibleMessages.map((message) => <div key={message.key} data-from={message.from}><span>{message.from === "agent" ? "RZ" : "Siz"}</span><div className={styles.chatMessageBody}><p>{message.text}</p>{message.evidence ? <details className={styles.turnEvidence}>
-              <summary>Kanıt ayrıntısı</summary>
+              <summary>Kanıt makbuzu</summary>
               <p><strong>Kanıt kapsamı:</strong> Sayfa yönlendirmesi + doğrulanmış workspace playbookları</p>
               <p><strong>Belirsizlik:</strong> Agent çıkarımıdır; Meta/action yetkisi yok.</p>
               <OrchestratorTurnReadOnlyEvidence evidence={message.evidence.readOnlyEvidence} />
