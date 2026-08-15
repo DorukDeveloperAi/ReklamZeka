@@ -29,17 +29,16 @@ describe("release-owned Skill Catalog Paket 1", () => {
     expect(binding.manifests).toHaveLength(9);
   });
 
-  it("includes the frozen source citation in the binding hash and rejects an unallowed historical URL", () => {
+  it("freezes only a current official source citation and rejects stale or unallowed URLs", () => {
     const base = { profile: { profileRef: "profile_default", revision: 1, profileHash: "a".repeat(64) },
       manifests: CORE_SKILL_MANIFESTS.map(({ ref, version, hash }) => ({ ref, version, hash })) };
     const playbook = { playbookRef: "playbook_alpha", revision: 1, playbookHash: "b".repeat(64), sourceRef: "source_guidance",
       citation: { sourceTitle: "Meta yardım", sourceType: "official_meta_guidance" as const,
         sourceUrl: "https://www.facebook.com/business/help/learning", freshness: "fresh" as const }, title: "Not", body: "Kanıt" };
     const fresh = createWorkspaceSkillCatalogBinding({ ...base, playbooks: [playbook] });
-    const changedCitation = createWorkspaceSkillCatalogBinding({ ...base, playbooks: [{ ...playbook,
-      citation: { ...playbook.citation, freshness: "not_scheduled" as const } }] });
-    expect(fresh.bindingHash).not.toBe(changedCitation.bindingHash);
     expect(fresh.playbooks[0]?.citation).toEqual(playbook.citation);
+    expect(() => createWorkspaceSkillCatalogBinding({ ...base, playbooks: [{ ...playbook,
+      citation: { ...playbook.citation, freshness: "not_scheduled" as const } }] })).toThrow(WorkspaceSkillCatalogBindingError);
     expect(() => createWorkspaceSkillCatalogBinding({ ...base, playbooks: [{ ...playbook,
       citation: { ...playbook.citation, sourceUrl: "https://example.test/not-allowed" } }] })).toThrow(WorkspaceSkillCatalogBindingError);
   });
