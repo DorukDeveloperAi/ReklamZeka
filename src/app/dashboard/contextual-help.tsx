@@ -6,7 +6,7 @@ import styles from "./contextual-help.module.css";
 
 /**
  * Small, reusable terminology help for operational screens. Hover/focus is
- * transient; right-click or keyboard activation pins the explanation so an
+ * transient; keyboard or pointer activation pins the explanation so an
  * operator can keep reading it while comparing the surrounding evidence.
  */
 export function ContextualHelp(props: Readonly<{
@@ -32,7 +32,6 @@ export function ContextualHelp(props: Readonly<{
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}
       onClick={togglePinned}
-      onContextMenu={(event) => { event.preventDefault(); togglePinned(); }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
@@ -42,7 +41,7 @@ export function ContextualHelp(props: Readonly<{
       }}
     >{props.children ?? props.term}<span aria-hidden="true" className={styles.icon}>i</span></span>
     {open ? <span id={tooltipId} role="tooltip" className={styles.tooltip}>
-      <strong>{props.term}</strong><span>{props.explanation}</span><small>Dokunun veya Enter ile açıklamayı sabitleyin; masaüstünde sağ tık da kullanabilirsiniz.</small>
+      <strong>{props.term}</strong><span>{props.explanation}</span><small>Dokunun, tıklayın veya Enter ile açıklamayı sabitleyin.</small>
     </span> : null}
   </span>;
 }

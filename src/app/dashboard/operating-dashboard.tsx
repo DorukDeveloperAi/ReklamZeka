@@ -111,6 +111,13 @@ type MetaReadMirrorLoadState = "loading" | "ready" | "session_required" | "unava
 export type SkillCatalogLoadState = "idle" | "loading" | "ready" | "session_required" | "unavailable" | "legacy";
 type DashboardTheme = "dark" | "light";
 
+function preferredDashboardTheme(): DashboardTheme {
+  if (typeof window === "undefined") return "dark";
+  const storedTheme = window.localStorage.getItem("reklamzeka.dashboard-theme");
+  if (storedTheme === "dark" || storedTheme === "light") return storedTheme;
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
 function plainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -787,8 +794,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
   const [categoryAssignmentHandoff, setCategoryAssignmentHandoff] = useState<CategoryAssignmentHandoff | null>(null);
 
   useEffect(() => {
-    const storedTheme = window.localStorage.getItem("reklamzeka.dashboard-theme");
-    if (storedTheme === "dark" || storedTheme === "light") setTheme(storedTheme);
+    setTheme(preferredDashboardTheme());
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -1594,7 +1600,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
       <div className={styles.sidebarFooter}><span className={metaReadMirror?.sourceState === "ready" ? styles.liveDot : undefined} /><div><strong>Meta veri aynası</strong><small>{workspaceSource}</small></div><button aria-label="Bağlantı ayarları" onClick={() => openSettings("meta")}>•••</button></div>
     </aside>
     <section className={styles.workspace}>
-      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button type="button" className={styles.workspacePicker} aria-label={`${workspaceName} kaynak ayarlarını aç`} onClick={() => openSettings("meta")}><span className={styles.avatar}>RZ</span><span><strong>{workspaceName}</strong><small>{workspaceSource}</small></span><i aria-hidden="true">Ayarlar</i></button><div className={styles.topActions}><button type="button" className={styles.themeToggle} aria-pressed={theme === "light"} aria-label={theme === "dark" ? "Açık temaya geç" : "Koyu temaya geç"} onClick={toggleTheme}>{theme === "dark" ? "☀ Açık" : "◐ Koyu"}</button><button type="button" className={styles.codexTransferButton} disabled={agentHandoffLoading} onClick={() => void transferCurrentContextToCodex()}>{agentHandoffLoading ? "Hazırlanıyor…" : "Codex'e aktar"}</button></div></header>
+      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button type="button" className={styles.workspacePicker} aria-label={`${workspaceName} kaynak ayarlarını aç`} onClick={() => openSettings("meta")}><span className={styles.avatar}>RZ</span><span><strong>{workspaceName}</strong><small>{workspaceSource}</small></span><i aria-hidden="true">Ayarlar</i></button><div className={styles.topActions}><button type="button" className={styles.themeToggle} aria-pressed={theme === "light"} aria-label={theme === "dark" ? "Açık temaya geç" : "Koyu temaya geç"} title={theme === "dark" ? "Görünüm koyu. Açık temaya geç" : "Görünüm açık. Koyu temaya geç"} onClick={toggleTheme}>{theme === "dark" ? "☀ Açık" : "◐ Koyu"}</button><button type="button" className={styles.codexTransferButton} disabled={agentHandoffLoading} onClick={() => void transferCurrentContextToCodex()}>{agentHandoffLoading ? "Hazırlanıyor…" : "Codex'e aktar"}</button></div></header>
       <nav className={styles.mobileNav} aria-label="Ana navigasyon">{navGroups.flatMap((group) => group.items).map((item) => <button type="button" key={item.id} data-active={activeView === item.id} aria-current={activeView === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</nav>
       <main ref={contentRef} className={styles.content} tabIndex={-1} aria-label={activeTitle}>
         <WorkspaceContextBar surface={activeView === "monitor" ? "overview" : activeView === "manage" ? "workspace" : "assistant"} source={workspaceSource} sourceState={metaReadMirrorState} />
