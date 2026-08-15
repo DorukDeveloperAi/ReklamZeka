@@ -14,6 +14,28 @@ Meta write, otomasyon ve policy yayınlama bu UX kararının parçası değildir
 ancak mevcut ayrı, insan-kapılı capability akışlarında ve feature flag kapalı
 kalacak biçimde görünür.
 
+## Ana sürücü için bağlayıcı ürün felsefesi
+
+Bu belge, ana sürücünün implementation kararlarında şu somut yorumla uygulanır:
+
+- Kullanıcının günlük başlangıç noktası geniş metrikli **Ana Sayfa**dır; bunun
+  görevi karar vermek değil, nereye bakılması gerektiğini dürüstçe göstermektir.
+- Kampanya grubu, ana kampanya ve slice; kullanıcının operasyonel kapsamlarıdır.
+  Her kapsamın sonuç, harcama, bütçe, sağlık ve kullanıcı kuralı aynı çalışma
+  bağlamında incelenebilir.
+- Bir kural, analiz yaklaşımı, bütçe sınırı ve takip penceresi kullanıcıya aittir.
+  Agent bu özü yazmaz; yalnız kapsam, veri eksikliği, çelişki ve kanıt sorularını
+  görünür kılar.
+- Aynı işlevin ana sayfa, çalışma masası veya kural kütüphanesinde erişilebilir
+  olması serbesttir. Ancak görünüm tekrar edebilirken kayıt/ownership tekrar
+  edemez: aynı `ruleRef/revision`, aynı slice, aynı Agent konuşması ve aynı karar
+  izi kullanılır.
+- Analiz ile uygulama ayrı katmanlardır. Belirsiz/kısmi kanıt “pahalı”,
+  “kazanan” ya da “başarısız” hükmüne; öneri ise Meta aksiyonuna dönüşmez.
+- Arayüz önce sade, insan-dili açıklamasını sunar. Teknik ref/hash/DSL yalnız
+  gerekirse kanıt ayrıntısında kalır. Renkler sınırlı, soft ve durumun tek
+  göstergesi değildir.
+
 ## Tek kayıt, çok görünüm
 
 Aynı bilgi birden fazla ekranda görünebilir; fakat ikinci bir kayıt ya da ikinci
