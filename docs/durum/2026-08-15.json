@@ -4,168 +4,164 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "57cc7a3b6",
+      "hash": "ff84f4b9b",
       "tarih": "2026-08-15",
-      "konu": "feat(dashboard): guide management workflows",
+      "konu": "Clarify canonical portfolio source scope",
       "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
+      "kapsam": []
     },
     {
-      "hash": "80a9d41eb",
+      "hash": "81052bb38",
       "tarih": "2026-08-15",
-      "konu": "feat(dashboard): add contextual management terminology help",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "37ed01801",
-      "tarih": "2026-08-15",
-      "konu": "feat(categories): prioritize starter setup path",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "f8f053c18",
-      "tarih": "2026-08-15",
-      "konu": "style(categories): align starter plan with dashboard theme",
-      "tur": "is",
-      "kapsam": [
-        "style"
-      ]
-    },
-    {
-      "hash": "1e7b48482",
-      "tarih": "2026-08-15",
-      "konu": "feat(rules): guide empty slice scopes to category setup",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "a15d86cca",
-      "tarih": "2026-08-15",
-      "konu": "feat(rules): separate slice operations workspace",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "4b89804ee",
-      "tarih": "2026-08-15",
-      "konu": "feat(categories): paginate classification review queue",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "6c0dd365d",
-      "tarih": "2026-08-15",
-      "konu": "feat(categories): seed strict market boundary",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "5e41951ed",
-      "tarih": "2026-08-15",
-      "konu": "feat(categories): guide empty review queues to setup",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "58d5e625e",
-      "tarih": "2026-08-15",
-      "konu": "style(rules): adapt slice workspace to theme tokens",
-      "tur": "is",
-      "kapsam": [
-        "style"
-      ]
-    },
-    {
-      "hash": "30939be4c",
-      "tarih": "2026-08-15",
-      "konu": "fix(categories): read canonical mirror timestamps",
+      "konu": "fix(dashboard): guide read-first session states",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "0caf6000d",
+      "hash": "c826e3631",
       "tarih": "2026-08-15",
-      "konu": "feat(agent): manage interview kit revisions",
+      "konu": "fix(dashboard): retain evidence and decision guardrails",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "9aae0b2d4",
+      "tarih": "2026-08-15",
+      "konu": "fix(agent): select published playbook sources",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "ed7c048fa",
+      "tarih": "2026-08-15",
+      "konu": "feat(agent): surface working language receipts",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "9fafcb9c7",
+      "hash": "5240dba03",
       "tarih": "2026-08-15",
-      "konu": "feat(portfolio): add campaign search and pagination",
+      "konu": "docs(product): bind final philosophy to active goal",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "3315b6bb1",
+      "tarih": "2026-08-15",
+      "konu": "feat: gate slice handoff on classification evidence",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "341128461",
+      "hash": "86f7e0f56",
       "tarih": "2026-08-15",
-      "konu": "feat(rules): open facilitated rule sessions",
+      "konu": "feat: bind slice rule decision journey",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "29469d538",
+      "hash": "9b492d771",
       "tarih": "2026-08-15",
-      "konu": "test(dashboard): cover slice workspace table",
+      "konu": "feat(portfolio): clarify time and cohort evidence boundary",
       "tur": "is",
       "kapsam": [
-        "test"
+        "feat"
+      ]
+    },
+    {
+      "hash": "46e089dac",
+      "tarih": "2026-08-15",
+      "konu": "fix: classify local session checkout mismatch",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "1ce85802b",
+      "tarih": "2026-08-15",
+      "konu": "Simplify home portfolio overview",
+      "tur": "is",
+      "kapsam": []
+    },
+    {
+      "hash": "24cb05d0a",
+      "tarih": "2026-08-15",
+      "konu": "feat(portfolio): surface user slice context",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "415109e1c",
+      "tarih": "2026-08-15",
+      "konu": "docs(product): bind workspace philosophy to delivery",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "dbffc7706",
+      "tarih": "2026-08-15",
+      "konu": "feat(dashboard): clarify workspace shell",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "dff2bbf4f",
+      "tarih": "2026-08-15",
+      "konu": "feat: centralize user-authored rule library",
+      "tur": "is",
+      "kapsam": [
+        "feat"
       ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 29
+      "adet": 39
     },
     {
       "kapsam": "fix",
-      "adet": 13
+      "adet": 9
     },
     {
-      "kapsam": "test",
-      "adet": 11
+      "kapsam": "?",
+      "adet": 3
+    },
+    {
+      "kapsam": "docs",
+      "adet": 3
     },
     {
       "kapsam": "style",
       "adet": 3
     },
     {
-      "kapsam": "?",
-      "adet": 2
-    },
-    {
-      "kapsam": "docs",
-      "adet": 2
+      "kapsam": "test",
+      "adet": 3
     }
   ],
-  "isSayisi": 490,
+  "isSayisi": 511,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-15",
   "planlar": [
@@ -186,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "4e0a258ed47a"
+  "damga": "bdd4c035983e"
 }

@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 4e0a258ed47a -->
+<!-- durum-damga: bdd4c035983e -->
 
 ## Künye
 
@@ -14,37 +14,37 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 490 |
+| iş commit'i (tüm geçmiş) | 511 |
 | ilk / son iş | 2026-08-06 / 2026-08-15 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
-| 2026-08-15 | `feat` | guide management workflows | `57cc7a3b6` |
-| 2026-08-15 | `feat` | add contextual management terminology help | `80a9d41eb` |
-| 2026-08-15 | `feat` | prioritize starter setup path | `37ed01801` |
-| 2026-08-15 | `style` | align starter plan with dashboard theme | `f8f053c18` |
-| 2026-08-15 | `feat` | guide empty slice scopes to category setup | `1e7b48482` |
-| 2026-08-15 | `feat` | separate slice operations workspace | `a15d86cca` |
-| 2026-08-15 | `feat` | paginate classification review queue | `4b89804ee` |
-| 2026-08-15 | `feat` | seed strict market boundary | `6c0dd365d` |
-| 2026-08-15 | `feat` | guide empty review queues to setup | `5e41951ed` |
-| 2026-08-15 | `style` | adapt slice workspace to theme tokens | `58d5e625e` |
-| 2026-08-15 | `fix` | read canonical mirror timestamps | `30939be4c` |
-| 2026-08-15 | `feat` | manage interview kit revisions | `0caf6000d` |
-| 2026-08-15 | `feat` | add campaign search and pagination | `9fafcb9c7` |
-| 2026-08-15 | `feat` | open facilitated rule sessions | `341128461` |
-| 2026-08-15 | `test` | cover slice workspace table | `29469d538` |
+| 2026-08-15 | `—` | Clarify canonical portfolio source scope | `ff84f4b9b` |
+| 2026-08-15 | `fix` | guide read-first session states | `81052bb38` |
+| 2026-08-15 | `fix` | retain evidence and decision guardrails | `c826e3631` |
+| 2026-08-15 | `fix` | select published playbook sources | `9aae0b2d4` |
+| 2026-08-15 | `feat` | surface working language receipts | `ed7c048fa` |
+| 2026-08-15 | `docs` | bind final philosophy to active goal | `5240dba03` |
+| 2026-08-15 | `feat` | gate slice handoff on classification evidence | `3315b6bb1` |
+| 2026-08-15 | `feat` | bind slice rule decision journey | `86f7e0f56` |
+| 2026-08-15 | `feat` | clarify time and cohort evidence boundary | `9b492d771` |
+| 2026-08-15 | `fix` | classify local session checkout mismatch | `46e089dac` |
+| 2026-08-15 | `—` | Simplify home portfolio overview | `1ce85802b` |
+| 2026-08-15 | `feat` | surface user slice context | `24cb05d0a` |
+| 2026-08-15 | `docs` | bind workspace philosophy to delivery | `415109e1c` |
+| 2026-08-15 | `feat` | clarify workspace shell | `dbffc7706` |
+| 2026-08-15 | `feat` | centralize user-authored rule library | `dff2bbf4f` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 29
-- `fix         ` ███████████ 13
-- `test        ` █████████ 11
+- `feat        ` ████████████████████████ 39
+- `fix         ` ██████ 9
+- `?           ` ██ 3
+- `docs        ` ██ 3
 - `style       ` ██ 3
-- `?           ` ██ 2
-- `docs        ` ██ 2
+- `test        ` ██ 3
 
 ## Planlar
 
