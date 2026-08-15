@@ -40,7 +40,7 @@ export async function connectLocalDashboardSession(input: Readonly<{
 
 const ERROR_MESSAGES: Readonly<Record<Exclude<LocalSessionConnectionResult["status"], "connected">, string>> = {
   invalid_input: "Tek kullanımlık proof boş veya kabul edilen uzunlukta değil.",
-  rejected: "Proof reddedildi, daha önce kullanıldı veya 90 saniyelik süresi doldu. Terminalde yenisini üretin.",
+  rejected: "Proof reddedildi, daha önce kullanıldı veya 90 saniyelik süresi doldu. Terminal çıktısındaki yalnız son capability satırını yapıştırın; yerel server yeni yapılandırmadan sonra açıldıysa önce yeniden başlatın.",
   not_configured: "Yerel oturum server tarafında yapılandırılmamış. Önce local workspace kurulumunu tamamlayın.",
   verification_failed: "Cookie üretildi ancak kanonik kaynak doğrulanamadı. Uygulamayı http://localhost origin'inde açtığınızdan emin olun.",
   unavailable: "Yerel oturum servisine ulaşılamadı. Uygulama ve bağlantı durumunu kontrol edin.",
@@ -72,7 +72,7 @@ export function LocalSessionConnector(props: Readonly<{
     <div className={styles.localSessionInstructions}>
       <span>YEREL OTURUM · TEK SEFERLİK BAĞLANTI</span>
       <strong>{props.title ?? "Gerçek çalışma alanını bağlayın"}</strong>
-      <p>Terminalde aşağıdaki komutu çalıştırın; üretilen proof’u 90 saniye içinde buraya yapıştırın. Proof yalnız bu OS kullanıcısı ve localhost için geçerlidir.</p>
+      <p>Terminalde aşağıdaki komutu çalıştırın; yalnız son capability satırını 90 saniye içinde buraya yapıştırın. Proof yalnız bu OS kullanıcısı ve localhost için geçerlidir.</p>
       <code>npm run local-session:mint</code>
     </div>
     <div className={styles.localSessionFields}>
