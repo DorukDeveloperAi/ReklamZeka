@@ -10,7 +10,8 @@ export type ManageArea = "portfolio" | "decisions" | "rules" | "settings";
 export type DecisionArea = "analysis" | "budgets" | "approvals";
 export type BudgetArea = "proposals" | "pools";
 export type CampaignArea = "portfolio" | "classification" | "promotion" | "timeline";
-export type RulesArea = "guidance" | "policies" | "authority" | "learning";
+/** Keep user-authored Slice Rules distinct from guidance, policy and authority tooling. */
+export type RulesArea = "guidance" | "slices" | "policies" | "authority" | "learning";
 export type SettingsArea = "meta" | "categories" | "promotion-templates";
 
 export type DashboardLocation = Readonly<{
@@ -50,7 +51,7 @@ const manageAreas = new Set<ManageArea>(["portfolio", "decisions", "rules", "set
 const decisionAreas = new Set<DecisionArea>(["analysis", "budgets", "approvals"]);
 const budgetAreas = new Set<BudgetArea>(["proposals", "pools"]);
 const campaignAreas = new Set<CampaignArea>(["portfolio", "classification", "promotion", "timeline"]);
-const rulesAreas = new Set<RulesArea>(["guidance", "policies", "authority", "learning"]);
+const rulesAreas = new Set<RulesArea>(["guidance", "slices", "policies", "authority", "learning"]);
 const settingsAreas = new Set<SettingsArea>(["meta", "categories", "promotion-templates"]);
 
 function searchValue(search: SearchRecord | SearchReader, name: string): string | null {

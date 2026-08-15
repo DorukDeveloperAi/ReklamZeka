@@ -1424,13 +1424,15 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
   function renderRules() {
     return <>
       <SectionNav<RulesArea> label="Kurallar ve yetkiler" active={rulesArea} onChange={(area) => commitDashboardLocation({ ...dashboardLocation, rulesArea: area })} items={[
-        { id: "guidance", label: "Rehberler & kurallar", description: "Talimat → normalize kural" },
+        { id: "guidance", label: "Rehberler & çalışma dili", description: "Talimat, kaynak ve agent dili" },
+        { id: "slices", label: "Slice & kurallar", description: "Kapsam, kural ve takip tablosu" },
         { id: "policies", label: "Bağlayıcı politikalar", description: "Yaşam döngüsü ve etki" },
         { id: "authority", label: "Yetki & onay", description: "Yetki sınırları ve onay politikaları" },
         { id: "learning", label: "Öğrenim", description: "İnsan onaylı yaklaşımlar" },
       ]} />
       {rulesArea === "guidance" ? <><GuidanceStudioPanel onSessionRequiredChange={setRulesSessionRequired} />
-        {rulesSessionRequired === false ? <><SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /><SliceRuleWorkspacePanel onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} onOpenRuleSession={openRuleSession} /></> : null}</>
+        {rulesSessionRequired === false ? <><SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /></> : null}</>
+        : rulesArea === "slices" ? <SliceRuleWorkspacePanel onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} onOpenRuleSession={openRuleSession} />
         : rulesArea === "policies" ? <InstructionPolicyStudioPanel />
           : rulesArea === "authority" ? <AutonomyStudioPanel />
             : <PracticeLabPanel />}
