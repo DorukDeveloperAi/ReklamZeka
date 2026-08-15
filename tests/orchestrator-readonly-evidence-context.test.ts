@@ -26,4 +26,13 @@ describe("Orchestrator readonly evidence context", () => {
     } });
     await expect(service.load({ workspaceId })).resolves.toMatchObject({ performance: { state: "unavailable" }, timeline: { eventCount: 0 } });
   });
+
+  it("rejects a claimed ready cohort unless market equivalence, delivery, and freshness are all proven", () => {
+    const input = { performance: buildCanonicalPerformanceReadModel([]), timeline: [] };
+    expect(() => createOrchestratorReadOnlyEvidenceContext({ ...input,
+      temporalCohort: { state: "ready", equivalence: "mixed_market", delivery: "clear", freshness: "fresh" } })).toThrow();
+    expect(createOrchestratorReadOnlyEvidenceContext({ ...input,
+      temporalCohort: { state: "insufficient", equivalence: "equivalent", delivery: "open_alert", freshness: "fresh" } }).temporalCohort)
+      .toEqual({ state: "insufficient", equivalence: "equivalent", delivery: "open_alert", freshness: "fresh" });
+  });
 });

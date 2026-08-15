@@ -9,6 +9,7 @@ export type OrchestratorReadOnlyEvidenceContext = Readonly<{
     windows: readonly Readonly<{ days: 7 | 30; readyCount: number; partialCount: number; unavailableCount: number; latestFreshnessAt: string | null }>[] }>;
   timeline: Readonly<{ state: "ready" | "unavailable"; eventCount: number; latestOccurredAt: string | null;
     kinds: readonly Readonly<{ kind: OperationalTimelineEvent["kind"]; count: number }>[] }>;
+  temporalCohort: TemporalCohortAvailability;
 }>;
 export type OrchestratorReadOnlyEvidenceContextSnapshot = OrchestratorReadOnlyEvidenceContext;
 export type UnavailableOrchestratorReadOnlyEvidenceContextSnapshot = Readonly<{ version: "unavailable_not_bound" }>;
@@ -19,6 +20,13 @@ export class OrchestratorReadOnlyEvidenceContextError extends Error {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const KINDS: readonly OperationalTimelineEvent["kind"][] = ["slice_rule_draft", "budget_proposal", "budget_selection", "action_preparation", "delivery_alert", "approval_proposed", "approval_decision", "temporal_evaluation"];
+export type TemporalCohortAvailability = Readonly<{
+  state: "ready" | "insufficient" | "unavailable";
+  equivalence: "equivalent" | "mixed_market" | "unproven";
+  delivery: "clear" | "open_alert" | "unavailable";
+  freshness: "fresh" | "stale" | "unavailable";
+}>;
+export type TemporalCohortAvailabilityLoader = Readonly<{ load(scope: Readonly<{ workspaceId: string }>): Promise<TemporalCohortAvailability> }>;
 
 function fail(): never { throw new OrchestratorReadOnlyEvidenceContextError(); }
 function iso(value: string | null): string | null {
@@ -26,11 +34,25 @@ function iso(value: string | null): string | null {
   const date = new Date(value); if (!Number.isFinite(date.valueOf())) fail();
   return date.toISOString();
 }
+function temporal(value: TemporalCohortAvailability): TemporalCohortAvailability {
+  if (!value || typeof value !== "object" || Object.keys(value).length !== 4
+    || !["ready", "insufficient", "unavailable"].includes(value.state)
+    || !["equivalent", "mixed_market", "unproven"].includes(value.equivalence)
+    || !["clear", "open_alert", "unavailable"].includes(value.delivery)
+    || !["fresh", "stale", "unavailable"].includes(value.freshness)
+    || (value.state === "ready" && (value.equivalence !== "equivalent" || value.delivery !== "clear" || value.freshness !== "fresh"))
+    || (value.state === "unavailable" && (value.equivalence !== "unproven" || value.delivery !== "unavailable" || value.freshness !== "unavailable"))) fail();
+  return Object.freeze({ ...value });
+}
+export function unavailableTemporalCohortAvailability(): TemporalCohortAvailability {
+  return Object.freeze({ state: "unavailable", equivalence: "unproven", delivery: "unavailable", freshness: "unavailable" });
+}
 
 /** Builds a bounded aggregate. It never carries account/campaign identifiers, names, metrics, event titles, details, actions or SQL. */
 export function createOrchestratorReadOnlyEvidenceContext(input: Readonly<{
   performance: Awaited<ReturnType<CanonicalPerformanceReadService["read"]>>;
   timeline: readonly OperationalTimelineEvent[];
+  temporalCohort?: TemporalCohortAvailability;
 }>): OrchestratorReadOnlyEvidenceContext {
   const performance = input.performance;
   if (!performance || performance.version !== "canonical-performance-read/1.0.0"
@@ -60,7 +82,8 @@ export function createOrchestratorReadOnlyEvidenceContext(input: Readonly<{
     performance: Object.freeze({ state: performance.state, accountCount: performance.accounts.length, campaignCount,
       windows: Object.freeze(windows) }), timeline: Object.freeze({ state: "ready", eventCount: input.timeline.length,
       latestOccurredAt, kinds: Object.freeze([...counts.entries()].sort(([left], [right]) => left.localeCompare(right))
-        .map(([kind, count]) => Object.freeze({ kind, count }))) }) });
+        .map(([kind, count]) => Object.freeze({ kind, count }))) }),
+    temporalCohort: temporal(input.temporalCohort ?? unavailableTemporalCohortAvailability()) });
 }
 
 export function orchestratorReadOnlyEvidenceContextHash(snapshot: OrchestratorReadOnlyEvidenceContextSnapshot | UnavailableOrchestratorReadOnlyEvidenceContextSnapshot): string {
@@ -74,15 +97,17 @@ export type OrchestratorReadOnlyEvidenceContextLoader = Readonly<{ load(scope: R
 
 /** Server-private bridge over existing public-safe read models. It does not create, alter, approve or execute any record. */
 export class ReadOnlyEvidenceContextService implements OrchestratorReadOnlyEvidenceContextLoader {
-  constructor(private readonly performance: CanonicalPerformanceReadRepository, private readonly timeline: OperationalTimelineRepository) {}
+  constructor(private readonly performance: CanonicalPerformanceReadRepository, private readonly timeline: OperationalTimelineRepository,
+    private readonly temporalCohort: TemporalCohortAvailabilityLoader | null = null) {}
   async load(scope: Readonly<{ workspaceId: string }>): Promise<OrchestratorReadOnlyEvidenceContext> {
     if (!UUID.test(scope.workspaceId)) fail();
     try {
-      const [performance, timeline] = await Promise.all([
+      const [performance, timeline, temporalCohort] = await Promise.all([
         new CanonicalPerformanceReadService(this.performance).read(scope.workspaceId),
         this.timeline.list({ workspaceId: scope.workspaceId, limit: 12 }),
+        this.temporalCohort ? this.temporalCohort.load({ workspaceId: scope.workspaceId }) : Promise.resolve(unavailableTemporalCohortAvailability()),
       ]);
-      return createOrchestratorReadOnlyEvidenceContext({ performance, timeline });
+      return createOrchestratorReadOnlyEvidenceContext({ performance, timeline, temporalCohort });
     } catch (reason) { if (reason instanceof OrchestratorReadOnlyEvidenceContextError) throw reason; fail(); }
   }
 }

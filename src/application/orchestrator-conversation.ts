@@ -216,6 +216,8 @@ export function orchestratorFacilitationPrompt(guide: OrchestratorPageGuide, mes
       ...context.performance.windows.map((window) => `${window.days}g pencere: hazır ${window.readyCount}, kısmi ${window.partialCount}, kullanılamıyor ${window.unavailableCount}; son freshness: ${window.latestFreshnessAt ?? "yok"}.`),
       `Operasyon izi: ${context.timeline.state}; olay: ${context.timeline.eventCount}; son olay: ${context.timeline.latestOccurredAt ?? "yok"}.`,
       context.timeline.kinds.length ? `Olay türü adetleri: ${context.timeline.kinds.map((item) => `${item.kind}=${item.count}`).join(", ")}.` : "Bu zaman penceresinde kayıtlı operasyon olayı yok.",
+      `Zamansal/kohort kanıt kapısı: ${context.temporalCohort.state}; eşdeğerlik: ${context.temporalCohort.equivalence}; teslimat: ${context.temporalCohort.delivery}; freshness: ${context.temporalCohort.freshness}.`,
+      "Yalnız kapı ready + equivalent + clear + fresh ise kanıt yeterliğini söyle; diğer bütün durumlarda observe veya insufficient de. Kazanan, pahalı veya kesin hüküm verme.",
     ]),
     ...(skillRun === null ? ["Bu turn için SkillRun kanıt makbuzu kullanılamıyor; skill sonucu varmış gibi davranma."] : [
       `Bu turnün yalnız salt-okur SkillRun makbuzu: ${skillRun.handler.ref} · ${skillRun.handler.outputContract}.`,
@@ -225,6 +227,10 @@ export function orchestratorFacilitationPrompt(guide: OrchestratorPageGuide, mes
         ...skillRun.handler.facts.performance.windows.map((window) => `SkillRun ${window.days}g freshness: ${window.latestFreshnessAt ?? "yok"}; hazır ${window.readyCount}, kısmi ${window.partialCount}, kullanılamıyor ${window.unavailableCount}.`),
       ]),
       ...(skillRun.handler.facts.timeline === null ? [] : [`SkillRun operasyon izi: ${skillRun.handler.facts.timeline.state}; olay ${skillRun.handler.facts.timeline.eventCount}; son olay ${skillRun.handler.facts.timeline.latestOccurredAt ?? "yok"}.`]),
+      ...(skillRun.handler.facts.temporalCohort === null ? ["SkillRun zamansal/kohort kapısı kullanılamıyor; observe veya insufficient dışında hüküm verme."] : [
+        `SkillRun zamansal/kohort kapısı: ${skillRun.handler.facts.temporalCohort.state}; eşdeğerlik ${skillRun.handler.facts.temporalCohort.equivalence}; teslimat ${skillRun.handler.facts.temporalCohort.delivery}; freshness ${skillRun.handler.facts.temporalCohort.freshness}.`,
+        "Bu kapı ready + equivalent + clear + fresh değilse yalnız observe veya insufficient kullan; kazanan/pahalı veya kesin sonuç üretme.",
+      ]),
       "SkillRun yalnız mevcut dondurulmuş kanıtın kullanılabilirliğini değerlendirir; performans kararı, kural, policy, action veya Meta çağrısı üretmez.",
     ]),
     ...workingGuidance,

@@ -18,6 +18,8 @@ type SkillRunFacts = Readonly<{
   performance: Readonly<{ state: "ready" | "partial" | "unavailable"; accountCount: number; campaignCount: number;
     windows: readonly Readonly<{ days: 7 | 30; readyCount: number; partialCount: number; unavailableCount: number; latestFreshnessAt: string | null }>[] }> | null;
   timeline: Readonly<{ state: "ready" | "unavailable"; eventCount: number; latestOccurredAt: string | null }> | null;
+  temporalCohort: Readonly<{ state: "ready" | "insufficient" | "unavailable"; equivalence: "equivalent" | "mixed_market" | "unproven";
+    delivery: "clear" | "open_alert" | "unavailable"; freshness: "fresh" | "stale" | "unavailable" }> | null;
 }>;
 
 export type OrchestratorSkillRunReceipt = Readonly<{
@@ -55,14 +57,15 @@ export function safeOrchestratorSkillIntent(message: string): OrchestratorSkillI
 }
 
 function availability(context: Evidence): SkillRunFacts {
-  if (context.version === "unavailable_not_bound") return Object.freeze({ availability: "unavailable", performance: null, timeline: null });
+  if (context.version === "unavailable_not_bound") return Object.freeze({ availability: "unavailable", performance: null, timeline: null, temporalCohort: null });
   const result: SkillRunEvidenceAvailability = context.performance.state === "ready" && context.timeline.state === "ready"
     ? "available" : context.performance.state === "unavailable" && context.timeline.state === "unavailable" ? "unavailable" : "partial";
   return Object.freeze({ availability: result,
     performance: Object.freeze({ state: context.performance.state, accountCount: context.performance.accountCount,
       campaignCount: context.performance.campaignCount, windows: Object.freeze(context.performance.windows.map((window) => Object.freeze({ ...window }))) }),
     timeline: Object.freeze({ state: context.timeline.state, eventCount: context.timeline.eventCount,
-      latestOccurredAt: context.timeline.latestOccurredAt }) });
+      latestOccurredAt: context.timeline.latestOccurredAt }),
+    temporalCohort: Object.freeze({ ...context.temporalCohort }) });
 }
 
 function selectedRefs(pageId: string, intent: OrchestratorSkillIntent): readonly string[] {
@@ -142,11 +145,12 @@ export function parseOrchestratorSkillRunReceipt(value: unknown, expectedHash: u
 }
 
 function parseFacts(value: unknown): SkillRunFacts {
-  if (!exact(value, ["availability", "performance", "timeline"])
+  if (!exact(value, ["availability", "performance", "timeline", "temporalCohort"])
     || !["available", "partial", "unavailable"].includes(value.availability as string)) unavailable();
   const performance = value.performance;
   const timeline = value.timeline;
-  if (value.availability === "unavailable" && (performance !== null || timeline !== null)) unavailable();
+  const temporalCohort = value.temporalCohort;
+  if (value.availability === "unavailable" && (performance !== null || timeline !== null || temporalCohort !== null)) unavailable();
   if (value.availability !== "unavailable" && (!exact(performance, ["state", "accountCount", "campaignCount", "windows"])
     || !["ready", "partial", "unavailable"].includes(performance.state as string) || !Number.isSafeInteger(performance.accountCount)
     || !Number.isSafeInteger(performance.campaignCount) || (performance.accountCount as number) < 0 || (performance.accountCount as number) > 100
@@ -155,9 +159,16 @@ function parseFacts(value: unknown): SkillRunFacts {
     || !["ready", "unavailable"].includes(timeline.state as string) || !Number.isSafeInteger(timeline.eventCount)
     || (timeline.eventCount as number) < 0 || (timeline.eventCount as number) > 12
     || !(timeline.latestOccurredAt === null || typeof timeline.latestOccurredAt === "string" && Number.isFinite(Date.parse(timeline.latestOccurredAt))))) unavailable();
-  if (value.availability === "unavailable") return Object.freeze({ availability: "unavailable", performance: null, timeline: null });
+  if (value.availability === "unavailable") return Object.freeze({ availability: "unavailable", performance: null, timeline: null, temporalCohort: null });
   const validPerformance = performance as Record<string, unknown>;
   const validTimeline = timeline as Record<string, unknown>;
+  if (!exact(temporalCohort, ["state", "equivalence", "delivery", "freshness"])
+    || !["ready", "insufficient", "unavailable"].includes(temporalCohort.state as string)
+    || !["equivalent", "mixed_market", "unproven"].includes(temporalCohort.equivalence as string)
+    || !["clear", "open_alert", "unavailable"].includes(temporalCohort.delivery as string)
+    || !["fresh", "stale", "unavailable"].includes(temporalCohort.freshness as string)
+    || (temporalCohort.state === "ready" && (temporalCohort.equivalence !== "equivalent" || temporalCohort.delivery !== "clear" || temporalCohort.freshness !== "fresh"))
+    || (temporalCohort.state === "unavailable" && (temporalCohort.equivalence !== "unproven" || temporalCohort.delivery !== "unavailable" || temporalCohort.freshness !== "unavailable"))) unavailable();
   const windows = (validPerformance.windows as unknown[]).map((window) => {
     if (!exact(window, ["days", "readyCount", "partialCount", "unavailableCount", "latestFreshnessAt"])
       || (window.days !== 7 && window.days !== 30) || !Number.isSafeInteger(window.readyCount) || !Number.isSafeInteger(window.partialCount)
@@ -173,5 +184,9 @@ function parseFacts(value: unknown): SkillRunFacts {
     state: validPerformance.state as "ready" | "partial" | "unavailable", accountCount: validPerformance.accountCount as number,
     campaignCount: validPerformance.campaignCount as number, windows: Object.freeze(windows) }), timeline: Object.freeze({
     state: validTimeline.state as "ready" | "unavailable", eventCount: validTimeline.eventCount as number,
-    latestOccurredAt: validTimeline.latestOccurredAt as string | null }) });
+    latestOccurredAt: validTimeline.latestOccurredAt as string | null }), temporalCohort: Object.freeze({
+      state: temporalCohort.state as "ready" | "insufficient" | "unavailable",
+      equivalence: temporalCohort.equivalence as "equivalent" | "mixed_market" | "unproven",
+      delivery: temporalCohort.delivery as "clear" | "open_alert" | "unavailable",
+      freshness: temporalCohort.freshness as "fresh" | "stale" | "unavailable" }) });
 }

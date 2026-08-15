@@ -46,9 +46,22 @@ describe("orchestrator SkillRun v1", () => {
     expect(unavailable).toEqual({ version: "unavailable_not_bound" });
     const context = evidence(); const receipt = new OrchestratorSkillRouter().route({ pageId: "rules", message: "Kanıtı açıkla",
       binding: binding(), evidence: unavailableOrchestratorReadOnlyEvidenceContext(), evidenceContextHash: "UNAVAILABLE_NOT_BOUND" });
-    expect(receipt.handler.facts).toEqual({ availability: "unavailable", performance: null, timeline: null });
+    expect(receipt.handler.facts).toEqual({ availability: "unavailable", performance: null, timeline: null, temporalCohort: null });
     expect(parseOrchestratorSkillRunReceipt({ ...receipt, intent: "write" }, receipt.receiptHash)).toBeNull();
     expect(parseOrchestratorSkillRunReceipt(receipt, "b".repeat(64))).toBeNull();
+    expect(parseOrchestratorSkillRunReceipt({ ...receipt, evidence: { ...receipt.evidence, temporalCohort: { state: "ready", equivalence: "unproven", delivery: "clear", freshness: "fresh" } } }, receipt.receiptHash)).toBeNull();
     expect(context.version).toBe("orchestrator-readonly-evidence-context/1.0.0");
+  });
+
+  it("permits temporal certainty only for fresh, clear, explicitly equivalent server facts", () => {
+    const base = evidence(); const hash = orchestratorReadOnlyEvidenceContextHash(base);
+    const ready = { ...base, temporalCohort: { state: "ready" as const, equivalence: "equivalent" as const, delivery: "clear" as const, freshness: "fresh" as const } };
+    const receipt = new OrchestratorSkillRouter().route({ pageId: "analysis", message: "Kohortları karşılaştır", binding: binding(), evidence: ready, evidenceContextHash: hash });
+    expect(receipt.handler.facts.temporalCohort).toEqual(ready.temporalCohort);
+    for (const temporalCohort of [
+      { state: "insufficient" as const, equivalence: "mixed_market" as const, delivery: "clear" as const, freshness: "fresh" as const },
+      { state: "insufficient" as const, equivalence: "equivalent" as const, delivery: "clear" as const, freshness: "stale" as const },
+      { state: "insufficient" as const, equivalence: "equivalent" as const, delivery: "open_alert" as const, freshness: "fresh" as const },
+    ]) expect(new OrchestratorSkillRouter().route({ pageId: "analysis", message: "Kohortları karşılaştır", binding: binding(), evidence: { ...base, temporalCohort }, evidenceContextHash: hash }).handler.facts.temporalCohort?.state).toBe("insufficient");
   });
 });

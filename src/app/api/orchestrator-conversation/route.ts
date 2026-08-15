@@ -8,6 +8,7 @@ import { DrizzleWorkspaceSkillCatalogBindingRepository } from
 import { ReadOnlyEvidenceContextService } from "@/application/orchestrator-readonly-evidence-context";
 import { DrizzleCanonicalPerformanceReadRepository } from "@/connectors/meta/canonical-performance-read-drizzle-repository";
 import { DrizzleOperationalTimelineRepository } from "@/connectors/decisions/operational-timeline-drizzle-repository";
+import { DrizzleTemporalCohortAvailabilityRepository } from "@/connectors/analyses/temporal-cohort-availability-drizzle-repository";
 import * as schema from "@/db/schema";
 import { LocalCodexExecAdapter, localCodexExecConfig } from "@/server/local-codex-exec-adapter";
 import { localDecisionRoomConfig, resolveTrustedLocalSessionIdentity } from
@@ -45,7 +46,7 @@ function handlers() {
     const repository = new DrizzleOrchestratorConversationRepository(database as never);
     const skillCatalog = new DrizzleWorkspaceSkillCatalogBindingRepository(database as never);
     const evidence = new ReadOnlyEvidenceContextService(new DrizzleCanonicalPerformanceReadRepository(database as never),
-      new DrizzleOperationalTimelineRepository(database as never));
+      new DrizzleOperationalTimelineRepository(database as never), new DrizzleTemporalCohortAvailabilityRepository(database as never));
     const service = new OrchestratorConversationService(repository, new LocalCodexExecAdapter(codexConfig), skillCatalog,
       undefined, undefined, evidence);
     return createOrchestratorConversationHttpHandlers({ service, config,
