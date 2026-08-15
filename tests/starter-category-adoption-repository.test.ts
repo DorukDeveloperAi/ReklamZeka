@@ -121,25 +121,25 @@ function spies(mode: "create" | "replay" | "partial" = "create") {
 }
 
 describe("DrizzleStarterCategoryAdoptionRepository", () => {
-  it("locks, rechecks membership and atomically creates the 14+7+7 core batch with one exact audit", async () => {
+  it("locks, rechecks membership and atomically creates the 15+9+9 core batch with one exact audit", async () => {
     const fake = fixture(); const mocked = spies();
     try {
       const result = await new DrizzleStarterCategoryAdoptionRepository(fake.db as never).adopt({ workspaceId,
         workspaceRef, actorId, actorRef: "actor_starter", role: "owner",
         occurredAt: "2026-08-10T10:00:00.000Z", command });
-      expect(result).toMatchObject({ outcome: "inserted", dimensionsCreated: 14, definitionsCreated: 7,
-        profileDraftsCreated: 7, auditAppended: true, categoryInvalidationsAppended: 0,
+      expect(result).toMatchObject({ outcome: "inserted", dimensionsCreated: 15, definitionsCreated: 9,
+        profileDraftsCreated: 9, auditAppended: true, categoryInvalidationsAppended: 0,
         profileInvalidationsAppended: 0 });
-      expect(mocked.createDimension).toHaveBeenCalledTimes(14);
-      expect(mocked.createDefinition).toHaveBeenCalledTimes(7); expect(mocked.append).toHaveBeenCalledTimes(7);
+      expect(mocked.createDimension).toHaveBeenCalledTimes(15);
+      expect(mocked.createDefinition).toHaveBeenCalledTimes(9); expect(mocked.append).toHaveBeenCalledTimes(9);
       expect(fake.statements[0]).toContain("for update");
-      expect(fake.auditMetadata).toMatchObject({ planHash: initialPlan.planHash, targetRefCount: 28,
+      expect(fake.auditMetadata).toMatchObject({ planHash: initialPlan.planHash, targetRefCount: 33,
         catalogVersion: initialPlan.catalogVersion, catalogHash: initialPlan.catalogHash,
-        proposalManifestHash: starterCategoryAdoptionDigest(initialPlan.profileProposals), proposalCount: 42,
+        proposalManifestHash: starterCategoryAdoptionDigest(initialPlan.profileProposals), proposalCount: 54,
         profileDraftManifestHash: starterCategoryProfileDraftManifestDigest(initialPlan.profileDrafts),
-        profileDraftCount: 7,
-        pendingOwnerConfigurationAcknowledged: true, dimensionsCreated: 14, definitionsCreated: 7,
-        profileDraftsCreated: 7, categoryInvalidationsAppended: 0, profileInvalidationsAppended: 0 });
+        profileDraftCount: 9,
+        pendingOwnerConfigurationAcknowledged: true, dimensionsCreated: 15, definitionsCreated: 9,
+        profileDraftsCreated: 9, categoryInvalidationsAppended: 0, profileInvalidationsAppended: 0 });
       expect(fake.db.transaction).toHaveBeenCalledTimes(1);
     } finally { mocked.restore(); }
   });
@@ -150,12 +150,12 @@ describe("DrizzleStarterCategoryAdoptionRepository", () => {
       const result = await new DrizzleStarterCategoryAdoptionRepository(fake.db as never).adopt({ workspaceId,
         workspaceRef, actorId, actorRef: "actor_starter", role: "owner",
         occurredAt: "2026-08-10T10:00:30.000Z", command: partialCommand });
-      expect(result).toMatchObject({ outcome: "inserted", dimensionsCreated: 13, definitionsCreated: 7,
-        profileDraftsCreated: 7, categoryInvalidationsAppended: 1 });
+      expect(result).toMatchObject({ outcome: "inserted", dimensionsCreated: 14, definitionsCreated: 9,
+        profileDraftsCreated: 9, categoryInvalidationsAppended: 1 });
       expect(fake.auditMetadata).toMatchObject({ categoryInvalidationsAppended: 1,
-        proposalManifestHash: starterCategoryAdoptionDigest(partialPlan.profileProposals), proposalCount: 42,
+        proposalManifestHash: starterCategoryAdoptionDigest(partialPlan.profileProposals), proposalCount: 54,
         profileDraftManifestHash: starterCategoryProfileDraftManifestDigest(partialPlan.profileDrafts),
-        profileDraftCount: 7 });
+        profileDraftCount: 9 });
       expect(fake.statements.some((statement) => statement.includes("effective_campaign_context_components"))).toBe(true);
       expect(fake.statements.some((statement) => statement.includes("insert into effective_campaign_context_invalidations")))
         .toBe(true);
@@ -195,7 +195,7 @@ describe("DrizzleStarterCategoryAdoptionRepository", () => {
       await expect(new DrizzleStarterCategoryAdoptionRepository(fake.db as never).adopt({ workspaceId,
         workspaceRef, actorId, actorRef: "actor_starter", role: "owner",
         occurredAt: "2026-08-10T10:03:00.000Z", command: partialCommand })).rejects.toThrow("audit_failed");
-      expect(mocked.append).toHaveBeenCalledTimes(7); expect(fake.rolledBack).toBe(true);
+      expect(mocked.append).toHaveBeenCalledTimes(9); expect(fake.rolledBack).toBe(true);
       expect(fake.statements.some((statement) => statement.includes("insert into effective_campaign_context_invalidations")))
         .toBe(true);
     } finally { mocked.restore(); }

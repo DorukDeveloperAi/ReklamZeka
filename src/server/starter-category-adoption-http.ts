@@ -35,7 +35,7 @@ async function body(request: Request) {
   if (typeof parsed.planHash !== "string" || !/^[a-f0-9]{64}$/.test(parsed.planHash)
     || typeof parsed.expectedRegistryHash !== "string" || !/^[a-f0-9]{64}$/.test(parsed.expectedRegistryHash)
     || typeof parsed.expectedProfileRegistryHash !== "string" || !/^[a-f0-9]{64}$/.test(parsed.expectedProfileRegistryHash)
-    || !Array.isArray(parsed.targetRefs) || parsed.targetRefs.length < 1 || parsed.targetRefs.length > 32
+    || !Array.isArray(parsed.targetRefs) || parsed.targetRefs.length < 1 || parsed.targetRefs.length > 48
     || parsed.targetRefs.some((ref) => typeof ref !== "string" || !/^[a-z][a-z0-9_.:-]{1,158}$/.test(ref))
     || new Set(parsed.targetRefs).size !== parsed.targetRefs.length
     || JSON.stringify(parsed.targetRefs) !== JSON.stringify([...parsed.targetRefs].sort())
