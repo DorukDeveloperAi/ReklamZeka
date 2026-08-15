@@ -165,6 +165,8 @@
 .contextTabs button[data-active="true"] { color: var(--rz-text); border-color: rgba(116, 200, 160,.26); background: rgba(116, 200, 160,.065); }
 .contextTabs strong { font-size: .68rem; }
 .contextTabs small { color: var(--rz-dim); font-size: .55rem; line-height: 1.35; }
+.managementGlossary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin: 0 0 12px; padding: 11px 13px; border: 1px solid var(--rz-line); border-radius: 12px; background: color-mix(in srgb, var(--rz-blue) 4%, var(--rz-surface)); color: var(--rz-muted); font-size: .67rem; line-height: 1.45; }
+.managementGlossary > span:first-child { color: var(--rz-dim); font-size: .58rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .panelHeader { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 17px 18px 14px; border-bottom: 1px solid var(--rz-line); }
 .panelHeader h2 { margin: 6px 0 0; font-size: 1rem; letter-spacing: -.025em; }
 .panelHeader button, .detailHeader button, .copyPreview button { border: 0; background: transparent; color: var(--rz-muted); font-size: .64rem; cursor: pointer; }
@@ -1098,6 +1100,7 @@
   .detailHeader .agentActions button { flex: 1 1 132px; }
   .contextTabs { display: flex; overflow-x: auto; scrollbar-width: none; }
   .contextTabs button { flex: 0 0 170px; }
+  .managementGlossary { align-items: flex-start; gap: 10px 14px; }
   .assistantDrawer { width: calc(100% - 18px); }
   .assistantDrawerHeader { padding: 17px; }
   .assistantDrawerHeader p, .assistantDrawerHeader .statusPill { display: none; }

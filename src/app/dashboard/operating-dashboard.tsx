@@ -28,6 +28,7 @@ import { campaignContextBridge } from "./campaign-planning-brief-panel";
 import { LocalSessionConnector } from "./local-session-connector";
 import { SkillCatalogContextStrip, type SkillCatalogContext } from "./skill-catalog-context-strip";
 import { SkillCatalogPanel } from "./skill-catalog-panel";
+import { ContextualHelp } from "./contextual-help";
 import { OrchestratorTurnReadOnlyEvidence, OrchestratorTurnSkillRunEvidence, OrchestratorTurnInterviewKitEvidence, type OrchestratorReadOnlyEvidenceSummary,
   type OrchestratorSkillRunSummary, type OrchestratorInterviewKitSummary } from "./orchestrator-turn-evidence";
 import {
@@ -1423,6 +1424,13 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
 
   function renderRules() {
     return <>
+      <section className={styles.managementGlossary} aria-label="Kurallar alanı kavram yardımı">
+        <span>Bu alanın çalışma sırası:</span>
+        <ContextualHelp term="Slice" explanation="Aynı pazar sınırında, kanıtı tutarlı kampanya kapsamıdır. Yerli ve yabancı aynı slice, bütçe havuzu veya kohortta birleşmez." />
+        <ContextualHelp term="Kullanıcı kuralı" explanation="Kapsamı, limiti, değerlendirme penceresini ve geri alma koşulunu siz yazarsınız. Agent bu metni üretmez veya değiştirmez." />
+        <ContextualHelp term="Frozen context" explanation="Önizleme ve değerlendirmeyi bağlayan, o an doğrulanmış değiştirilemez kaynak özetidir." />
+        <ContextualHelp term="İnsan onayı" explanation="Bir ActionUnit için verilen insan kararıdır. Onay tek başına Meta uygulaması veya Meta write değildir." />
+      </section>
       <SectionNav<RulesArea> label="Kurallar ve yetkiler" active={rulesArea} onChange={(area) => commitDashboardLocation({ ...dashboardLocation, rulesArea: area })} items={[
         { id: "guidance", label: "Rehberler & çalışma dili", description: "Talimat, kaynak ve agent dili" },
         { id: "slices", label: "Slice & kurallar", description: "Kapsam, kural ve takip tablosu" },

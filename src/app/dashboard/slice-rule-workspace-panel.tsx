@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { BudgetLabDraftResult } from "@/application/budget-lab-draft-service";
 import type { UserBudgetScenarioCommand } from "@/application/slice-rule-budget-impact-context-candidate-service";
 import type { SliceRule } from "@/domain/campaigns/slice-operating-rule";
+import { ContextualHelp } from "./contextual-help";
 import styles from "./slice-rule-workspace-panel.module.css";
 
 type Market = "domestic" | "international";
@@ -711,7 +712,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     }
   };
   return <div className={styles.workspace}>
-    <header className={styles.hero}><div><span>SLICE RULE WORKSPACE</span><h2>Slice, kural ve takip yaklaşımını aynı çalışma tablosunda görün.</h2><p>Her satır bir kullanıcı yazarlı scope ve kural serisidir: analiz/bütçe yaklaşımını, değerlendirme ritmini ve geri alma koşulunu birlikte önizlersiniz. Agent yalnız kanıt ve eksik sorularla yardımcı olur.</p></div><strong>RECOMMENDATION ONLY · AUTHORITY NONE</strong></header>
+    <header className={styles.hero}><div><span>SLICE RULE WORKSPACE</span><h2><ContextualHelp term="Slice, kural ve takip yaklaşımı" explanation="Önce kanıtı tutarlı kapsamı seçin; ardından sizin yazdığınız kuralı, bütçe sınırını ve takip penceresini aynı satırda bağlayın.">Slice, kural ve takip yaklaşımını</ContextualHelp> aynı çalışma tablosunda görün.</h2><p>Her satır bir kullanıcı yazarlı scope ve kural serisidir: analiz/bütçe yaklaşımını, değerlendirme ritmini ve geri alma koşulunu birlikte önizlersiniz. Agent yalnız kanıt ve eksik sorularla yardımcı olur; önizleme yalnız doğrulanmış <ContextualHelp term="frozen bağlam" explanation="Kapsam ve kaynakların o anki doğrulanmış, değiştirilemez özetidir. Eski veya eksik bağlamla önizleme yapılmaz.">frozen bağlamla</ContextualHelp> çalışır.</p></div><strong>RECOMMENDATION ONLY · AUTHORITY NONE</strong></header>
     {props.state.status === "loading" ? <section className={styles.state} role="status">Taslak kayıt defteri doğrulanıyor…</section> : null}
     {props.state.status === "unavailable" || props.state.status === "error" ? <section className={styles.state} role="alert"><h2>{props.state.status === "unavailable" ? "Kaynak bağlı değil" : "Çalışma alanı okunamadı"}</h2><p>{props.state.message}</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
     {snapshot ? <div className={styles.grid}>
