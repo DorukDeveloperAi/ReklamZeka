@@ -158,3 +158,31 @@ günlük çalışma yüzeyinin dışında tutulur.
 - Agent konuşması sayfa başına ayrışmaz; yalnız görünür güvenli bağlam değişir.
 - Eksik/kısmi kaynakta sahte performans, otomatik kategori veya action oluşmaz.
 - Hiçbir yüzey Meta write, policy publish/approval veya otomasyon yetkisi açmaz.
+
+## Ana hedef yürütme sözleşmesi
+
+Bu belge, aktif ana hedefin ürün yorumudur. Teslimler aşağıdaki felsefeye
+uygun olmadıkça tamamlanmış sayılmaz:
+
+- ReklamZeka, Meta'yı kendiliğinden yöneten bir kara kutu değil; kanıt-temelli,
+  insan liderliğinde ve agent destekli bir operasyon masasıdır.
+- Döngü `Meta aynası + içerik + zaman → künye/slice → analiz → kullanıcı
+  kuralı → öneri → insan kararı → kontrollü uygulama → sonuç/audit`tir.
+- Kullanıcı kuralın, playbook'un ve policy taslağının yazarıdır. Agent yalnız
+  kanıtı, eksikleri, belirsizliği, eşdeğer kohort sınırını ve sorulması gereken
+  soruları görünür kılar; kural/policy/action metni üretmez veya kalıcılaştırmaz.
+- Yerli ve yabancı kesin olarak ayrıdır. İsim; Meta kurulumu, hedefleme,
+  platform, geo, sonuç rotası ve creative içeriğinden güçlü bir kanıt değildir;
+  kanıtlar çatışıyorsa inceleme kuyruğu açılır.
+- ``Pahalı``, ``kazanan`` veya ``başarısız`` gibi kesin dil, yeterli zaman
+  penceresi ve eşdeğer kohort olmadan kullanılmaz. Sistem bunun yerine
+  `belirsiz`, `yetersiz veri` veya `izlemeye devam` der.
+- Ana Sayfa geniş yön bulma yüzeyidir; Portföy/Slice masası derin çalışmadır;
+  Kural Kütüphanesi tek kanonik kullanıcı kaydıdır; Agent tek kalıcı
+  konuşmadır. Görünümler bağlamsal olarak tekrar edebilir ama sahiplik/kayıt
+  çoğaltılamaz.
+- Arayüz Türkçe, sade, soft Meta tonlarında light/dark, progressive disclosure
+  ilkeli ve teknik ayrıntıları varsayılan olarak gizleyen bir çalışma aracıdır.
+- Meta write altyapısı ancak ileride pilot için hazırlanır; bu hedef kapsamında
+  feature flag kapalı kalır. Her teslim zero-Meta-write, tenant isolation,
+  kaynak durumu ve insan onayı sınırlarını korur.
