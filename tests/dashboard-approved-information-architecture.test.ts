@@ -77,6 +77,8 @@ describe("approved dashboard information architecture", () => {
     expect(dashboardSource).toContain("const campaignContextReady = requestedCampaignRef === null");
     expect(dashboardSource).toContain("campaignContextRequestRef.current !== requestId");
     expect(dashboardSource).toContain("campaignContextPending={!campaignContextReady}");
+    expect(dashboardSource).toContain("function openSlicePreparation(campaignRef: string)");
+    expect(dashboardSource).toContain("onOpenSliceWorkspace={openSlicePreparation}");
     expect(readFileSync("src/app/dashboard/approval-queue-panel.tsx", "utf8")).toContain("detailRequestEpoch.current !== requestEpoch");
     expect(readFileSync("src/app/dashboard/decision-room-panel.tsx", "utf8")).toContain("requestEpoch.current !== epoch");
     expect(dashboardSource).toContain("Kampanya bağlamı için yerel oturum gerekli");

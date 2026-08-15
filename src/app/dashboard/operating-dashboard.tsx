@@ -1191,6 +1191,12 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
       ruleRef, ruleRevision, campaignRef: null });
   }
 
+  /** A Portfolio handoff supplies identity only; the Slice workspace revalidates eligible scope candidates. */
+  function openSlicePreparation(campaignRef: string) {
+    setClassificationScopeCampaignRef(campaignRef);
+    commitDashboardLocation({ ...dashboardLocation, view: "manage", manageArea: "rules", rulesArea: "slices", campaignRef: null });
+  }
+
   function openAgentContext(entityRef: string, label: string) {
     setAgentSourceView(activeView);
     setAgentEntityRef(entityRef);
@@ -1264,7 +1270,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
         { id: "timeline", label: "Geçmiş", description: "Kural, alarm ve karar izi" },
       ]} />
       {campaignArea === "portfolio" && hasCanonicalCampaignSource && metaReadMirror
-        ? <CanonicalCampaignPortfolioPanel projection={metaReadMirror} onOpenAgentContext={openAgentContext} onOpenDecisionContext={(campaignRef, label) => void openCampaignDecisionContext(campaignRef, label)} onOpenCanonicalRule={openCanonicalRule} />
+        ? <CanonicalCampaignPortfolioPanel projection={metaReadMirror} onOpenAgentContext={openAgentContext} onOpenDecisionContext={(campaignRef, label) => void openCampaignDecisionContext(campaignRef, label)} onOpenCanonicalRule={openCanonicalRule} onOpenSliceWorkspace={openSlicePreparation} />
         : campaignArea === "portfolio" ? <section className={styles.panel} aria-labelledby="campaign-source-state-title">
           <header className={styles.panelHeader}><div><span className={styles.kicker}>KAYNAK DURUMU</span><h2 id="campaign-source-state-title">{unavailableTitle}</h2></div><StatusPill tone={metaReadMirrorState === "unavailable" ? "warning" : "neutral"}>{metaReadMirrorState}</StatusPill></header>
           <p>{metaReadMirrorState === "session_required" ? "Çalışma alanına bağlı kampanya aynası yerel oturum olmadan okunamaz. Bu sınır aşılmadan kampanya adı, bütçe, performans veya hiyerarşi gösterilmez." : metaReadMirrorState === "loading" ? "Kanonik ayna doğrulanıyor. Sonuç gelene kadar ekran örnek içerikle doldurulmaz." : metaReadMirrorError ?? "Kanonik ayna beklenen salt-okunur sözleşmeyle doğrulanamadı."}</p>
@@ -1272,7 +1278,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
           <div className={styles.agentActions}>{metaReadMirrorState === "session_required" ? null : <button className={styles.primaryButton} onClick={() => void refreshMetaReadMirror(true)}>Tekrar dene</button>}<button onClick={() => openSettings("meta")}>Kaynak ayarları</button></div>
         </section> : campaignArea === "classification" ? <CampaignClassificationReviewPanel onPrepareAssignment={(handoff) => {
           setCategoryAssignmentHandoff(handoff); openSettings("categories");
-        }} onOpenSlicePreparation={(campaignRef) => { setClassificationScopeCampaignRef(campaignRef); commitDashboardLocation({ ...dashboardLocation, view: "manage", manageArea: "rules", rulesArea: "slices", campaignRef: null }); }} onOpenCategorySetup={() => openSettings("categories")} />
+        }} onOpenSlicePreparation={openSlicePreparation} onOpenCategorySetup={() => openSettings("categories")} />
           : campaignArea === "promotion" ? <PromotionPreflightPanel embedded />
             : <OperationalTimelinePanel embedded />}
     </>;
