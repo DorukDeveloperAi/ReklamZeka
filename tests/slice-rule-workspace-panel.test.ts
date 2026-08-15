@@ -80,6 +80,8 @@ describe("Slice Rule Workspace panel", () => {
     expect(html).toContain("Kural / bütçe yaklaşımı");
     expect(html).toContain("Takip yaklaşımı");
     expect(html).toContain("Kuralı gözden geçir");
+    expect(html).toContain("Kuralsız kanıtlı slice adayları");
+    expect(html).toContain("Kural otomatik oluşturulmaz.");
   });
 
   it("accepts candidates only as form-prefill data with frozen budget evidence still required", () => {

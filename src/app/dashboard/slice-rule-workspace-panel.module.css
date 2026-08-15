@@ -22,6 +22,15 @@
 .workspaceTable td > span, .workspaceTable td > small { margin-top: 4px; color: var(--rz-muted); font-size: .57rem; line-height: 1.45; overflow-wrap: anywhere; }
 .workspaceTable td button { min-height: 30px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--rz-blue) 42%, var(--rz-line)); border-radius: 7px; color: var(--rz-blue); background: transparent; font-size: .56rem; font-weight: 760; cursor: pointer; }
 .workspaceTable td button:hover { color: #fff; background: var(--rz-blue); }
+.unruledSlices { display: grid; gap: 7px; margin: 14px 0; padding: 12px; border: 1px dashed var(--rz-line-strong); border-radius: 11px; background: color-mix(in srgb, var(--rz-blue) 4%, transparent); }
+.unruledSlices > strong { font-size: .65rem; }
+.unruledSlices > span, .unruledSlices > small { color: var(--rz-muted); font-size: .57rem; line-height: 1.45; }
+.unruledList { display: grid; gap: 6px; }
+.unruledList > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 7px; border-top: 1px solid var(--rz-line); }
+.unruledList > div > span { color: var(--rz-muted); font-size: .56rem; line-height: 1.4; }
+.unruledList button { flex: none; min-height: 28px; padding: 0 8px; border: 1px solid color-mix(in srgb, var(--rz-blue) 42%, var(--rz-line)); border-radius: 7px; color: var(--rz-blue); background: transparent; font-size: .54rem; font-weight: 760; cursor: pointer; }
+.unruledList button:hover { color: #fff; background: var(--rz-blue); }
+.unruledList button:disabled { opacity: .45; cursor: not-allowed; }
 .list { display: grid; gap: 9px; margin: 14px 0; }
 .list button { display: grid; gap: 5px; width: 100%; padding: 13px; border: 1px solid #293b44; border-radius: 12px; background: #142129; color: inherit; text-align: left; cursor: pointer; }
 .list button[data-active="true"] { border-color: #59b9a7; background: #18302f; }
