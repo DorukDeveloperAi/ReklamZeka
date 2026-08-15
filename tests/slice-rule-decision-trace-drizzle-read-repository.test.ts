@@ -12,6 +12,7 @@ const evidenceHash = "a".repeat(64);
 
 function row(patch: Record<string, unknown> = {}) {
   return {
+    rule_series_ref: "slice_rule.demo", rule_revision: 2,
     selection_id: selectionId, selection_evidence_hash: evidenceHash, selected_at: "2026-08-14T10:00:00.000Z",
     binding_id: bindingId, action_proposal_unit_id: unitId, action_unit_id: unitId, bundle_id: bundleId,
     unit_ref: "action_unit_bbbbbbbbbbbbbbbbbbbb", proposed_at: "2026-08-14T10:01:00.000Z",
@@ -33,6 +34,7 @@ describe("Slice Rule decision trace Drizzle reader", () => {
     const fixture = database([row()]);
     const result = await new DrizzleSliceRuleDecisionTraceReadRepository(fixture.db as never).list(workspaceId);
     expect(result).toEqual([{
+      ruleSeriesRef: "slice_rule.demo", ruleRevision: 2,
       selectionRef: `selection_${evidenceHash}`, selectedAt: "2026-08-14T10:00:00.000Z",
       actionUnit: { presence: true, status: "approved" },
       decisionHistory: [{ decision: "proposed", occurredAt: "2026-08-14T10:01:00.000Z", reasonCode: null },
@@ -42,6 +44,7 @@ describe("Slice Rule decision trace Drizzle reader", () => {
     const serialized = JSON.stringify(result);
     for (const value of [workspaceId, selectionId, bindingId, unitId, bundleId, "action_unit_bbbbbbbbbbbbbbbbbbbb"]) expect(serialized).not.toContain(value);
     expect(fixture.queries[0]?.sql).toContain("binding.workspace_id = selection.workspace_id and binding.selection_id = selection.id");
+    expect(fixture.queries[0]?.sql).toContain("draft.workspace_id = selection.workspace_id and draft.draft_hash = selection.draft_hash");
     expect(fixture.queries[0]?.sql).toContain("attempt.admission_payload #>> '{capabilities,canWriteMeta}' = 'false'");
     expect(fixture.queries[0]?.params).toEqual([workspaceId]);
   });

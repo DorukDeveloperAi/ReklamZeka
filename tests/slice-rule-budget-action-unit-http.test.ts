@@ -23,6 +23,7 @@ describe("Slice Rule budget ActionUnit HTTP boundary", () => {
 
   it("projects selected scenarios through a public evidence-hash reference, never the internal UUID", async () => {
     const database = reader([{ id: "33333333-3333-4333-8333-333333333333", selectionEvidenceHash: evidenceHash, selectedAt: new Date("2026-08-13T12:00:00.000Z") }], [{
+      rule_series_ref: "slice_rule.demo", rule_revision: 1,
       selection_id: "33333333-3333-4333-8333-333333333333", selection_evidence_hash: evidenceHash, selected_at: "2026-08-13T12:00:00.000Z",
       binding_id: null, action_proposal_unit_id: null, action_unit_id: null, bundle_id: null, unit_ref: null, proposed_at: null,
       decision_events: [], execution_attempt_count: 0, execution_safe_count: 0,
@@ -33,6 +34,7 @@ describe("Slice Rule budget ActionUnit HTTP boundary", () => {
     const payload = await response.json();
     expect(payload.selections).toEqual([{ selectionRef: selectionRef(evidenceHash), selectedAt: "2026-08-13T12:00:00.000Z" }]);
     expect(payload.decisionTrace).toEqual({ contractVersion: "slice-rule-decision-trace/1.0.0", items: [{
+      ruleSeriesRef: "slice_rule.demo", ruleRevision: 1,
       selectionRef: selectionRef(evidenceHash), selectedAt: "2026-08-13T12:00:00.000Z",
       actionUnit: { presence: false, status: "not_materialized" }, decisionHistory: [],
       execution: { safetyState: "server_disabled", closure: "not_admitted" },

@@ -12,7 +12,7 @@ export type TemporalRecommendationExactCommand = Readonly<{ frozenContextRef: st
 export type TemporalRecommendationCandidateCommand = Readonly<{ candidateRef: string }>;
 export type TemporalRecommendationCommand = TemporalRecommendationExactCommand | TemporalRecommendationCandidateCommand;
 export type TemporalRecommendationCandidate = Readonly<{ candidateRef: string; ruleSeriesRef: string; reviewCadence: "daily" | "weekly" | "monthly"; windowRef: string; capturedAt: string }>;
-export type TemporalRecommendationReadItem = Readonly<{ evaluationRef: string; occurredAt: string; outcome: "recommendation" | "no_change"; reason: string; windowRef: string }>;
+export type TemporalRecommendationReadItem = Readonly<{ evaluationRef: string; ruleSeriesRef: string; occurredAt: string; outcome: "recommendation" | "no_change"; reason: string; windowRef: string }>;
 export type TemporalRecommendationHttpService = Readonly<{
   list(): Promise<readonly TemporalRecommendationReadItem[]>;
   listCandidates?(): Promise<readonly TemporalRecommendationCandidate[]>;

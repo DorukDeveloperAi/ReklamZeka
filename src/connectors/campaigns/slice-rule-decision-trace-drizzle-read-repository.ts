@@ -13,6 +13,8 @@ const CODE = /^[a-z][a-z0-9_.:-]{0,127}$/;
 export const SLICE_RULE_DECISION_TRACE_VERSION = "slice-rule-decision-trace/1.0.0" as const;
 
 export type SliceRuleDecisionTraceItem = Readonly<{
+  ruleSeriesRef: string;
+  ruleRevision: number;
   selectionRef: string;
   selectedAt: string;
   actionUnit: Readonly<{ presence: boolean; status: "not_materialized" | "awaiting_approval" | "approved" | "rejected" | "changes_requested" }>;
@@ -21,6 +23,8 @@ export type SliceRuleDecisionTraceItem = Readonly<{
 }>;
 
 type SourceRow = Readonly<{
+  rule_series_ref: unknown;
+  rule_revision: unknown;
   selection_id: unknown;
   selection_evidence_hash: unknown;
   selected_at: unknown;
@@ -81,9 +85,11 @@ function decisionHistory(value: unknown, proposedAt: string): readonly SliceRule
 }
 
 function project(row: SourceRow): Readonly<{ selectionId: string; item: SliceRuleDecisionTraceItem }> | null {
+  const ruleSeriesRef = typeof row.rule_series_ref === "string" && CODE.test(row.rule_series_ref) ? row.rule_series_ref : null;
+  const ruleRevision = Number(row.rule_revision);
   const selectionId = uuid(row.selection_id);
   const selectedAt = instant(row.selected_at);
-  if (!selectionId || typeof row.selection_evidence_hash !== "string" || !HASH.test(row.selection_evidence_hash) || !selectedAt) return null;
+  if (!ruleSeriesRef || !Number.isInteger(ruleRevision) || ruleRevision < 1 || !selectionId || typeof row.selection_evidence_hash !== "string" || !HASH.test(row.selection_evidence_hash) || !selectedAt) return null;
   const selectionRef = `selection_${row.selection_evidence_hash}`;
   const bindingId = row.binding_id === null ? null : uuid(row.binding_id);
   const bindingUnitId = row.action_proposal_unit_id === null ? null : uuid(row.action_proposal_unit_id);
@@ -95,7 +101,7 @@ function project(row: SourceRow): Readonly<{ selectionId: string; item: SliceRul
 
   if (bindingId === null && bindingUnitId === null && unitId === null && bundleId === null && row.unit_ref === null && row.proposed_at === null) {
     if (!Array.isArray(row.decision_events) || row.decision_events.length !== 0 || attemptCount !== 0) return null;
-    return Object.freeze({ selectionId, item: Object.freeze({ selectionRef, selectedAt,
+    return Object.freeze({ selectionId, item: Object.freeze({ ruleSeriesRef, ruleRevision, selectionRef, selectedAt,
       actionUnit: Object.freeze({ presence: false, status: "not_materialized" }), decisionHistory: Object.freeze([]),
       execution: Object.freeze({ safetyState: "server_disabled", closure: "not_admitted" }),
     }) });
@@ -109,7 +115,7 @@ function project(row: SourceRow): Readonly<{ selectionId: string; item: SliceRul
   const last = history.at(-1);
   const status = last?.decision === "proposed" ? "awaiting_approval" : last?.decision;
   if (!status) return null;
-  return Object.freeze({ selectionId, item: Object.freeze({ selectionRef, selectedAt,
+  return Object.freeze({ selectionId, item: Object.freeze({ ruleSeriesRef, ruleRevision, selectionRef, selectedAt,
     actionUnit: Object.freeze({ presence: true, status }), decisionHistory: history,
     execution: Object.freeze({ safetyState: "server_disabled", closure: attemptCount === 0 ? "not_admitted" : "admission_closed" }),
   }) });
@@ -122,13 +128,16 @@ export class DrizzleSliceRuleDecisionTraceReadRepository {
   async list(workspaceId: string): Promise<readonly SliceRuleDecisionTraceItem[]> {
     if (typeof workspaceId !== "string" || !UUID.test(workspaceId)) throw new Error("invalid_input");
     const rows = resultRows(await this.database.execute(sql`
-      select selection.id as selection_id, selection.selection_evidence_hash, selection.selected_at,
+      select draft.series_ref as rule_series_ref, draft.revision as rule_revision,
+        selection.id as selection_id, selection.selection_evidence_hash, selection.selected_at,
         binding.id as binding_id, binding.action_proposal_unit_id,
         unit.id as action_unit_id, unit.bundle_id, unit.unit_ref, unit.proposed_at,
         coalesce(decisions.events, '[]'::jsonb) as decision_events,
         coalesce(execution.attempt_count, 0)::int as execution_attempt_count,
         coalesce(execution.safe_count, 0)::int as execution_safe_count
       from slice_rule_scenario_allocation_selections selection
+      join slice_rule_workspace_drafts draft
+        on draft.workspace_id = selection.workspace_id and draft.draft_hash = selection.draft_hash
       left join slice_rule_budget_action_unit_bindings binding
         on binding.workspace_id = selection.workspace_id and binding.selection_id = selection.id
       left join action_proposal_units unit

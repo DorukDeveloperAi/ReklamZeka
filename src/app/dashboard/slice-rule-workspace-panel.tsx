@@ -80,6 +80,8 @@ type ImpactState = Readonly<{ status: "idle" | "loading" }>
 type ApprovalQueueSelection = Readonly<{ selectionRef: string; selectedAt: string }>;
 type ActionPreparationFlag = Readonly<{ visible: true; enabled: false; reason: "server_disabled" }>;
 type DecisionTraceItem = Readonly<{
+  ruleSeriesRef: string;
+  ruleRevision: number;
   selectionRef: string;
   selectedAt: string;
   actionUnit: Readonly<{ presence: boolean; status: "not_materialized" | "awaiting_approval" | "approved" | "rejected" | "changes_requested" }>;
@@ -97,8 +99,9 @@ type SelectionState = Readonly<{ status: "loading" }>
   | Readonly<{ status: "selected"; selectionRef: string; persistence: "inserted" | "unchanged" }>
   | Readonly<{ status: "unavailable" | "error"; message: string }>;
 type TemporalCandidate = Readonly<{ candidateRef: string; ruleSeriesRef: string; reviewCadence: "daily" | "weekly" | "monthly"; windowRef: string; capturedAt: string }>;
+type TemporalEvaluation = Readonly<{ ruleSeriesRef: string; occurredAt: string; outcome: "recommendation" | "no_change"; reason: "window_ready" | "window_unsettled" | "window_too_short" | "open_delivery_alert" }>;
 type TemporalState = Readonly<{ status: "loading" }>
-  | Readonly<{ status: "ready"; candidates: readonly TemporalCandidate[]; result: string | null }>
+  | Readonly<{ status: "ready"; candidates: readonly TemporalCandidate[]; evaluations: readonly TemporalEvaluation[]; result: string | null }>
   | Readonly<{ status: "unavailable" | "error"; message: string }>;
 type ScopeCandidate = Readonly<{ campaignRef: string; scope: Scope; requiresFrozenContext: true; budgetImpactReady: false }>;
 type ScopeCandidateState = Readonly<{ status: "loading" }>
@@ -185,7 +188,9 @@ export function parseActionPreparationFlag(value: unknown): ActionPreparationFla
 export function parseSliceRuleDecisionTrace(value: unknown): readonly DecisionTraceItem[] {
   if (!object(value) || !object(value.decisionTrace) || value.decisionTrace.contractVersion !== "slice-rule-decision-trace/1.0.0"
     || !Array.isArray(value.decisionTrace.items) || value.decisionTrace.items.length > 100
-    || !value.decisionTrace.items.every((item) => object(item) && Object.keys(item).length === 5
+    || !value.decisionTrace.items.every((item) => object(item) && Object.keys(item).length === 7
+      && typeof item.ruleSeriesRef === "string" && /^[a-z][a-z0-9_.:-]{0,127}$/.test(item.ruleSeriesRef)
+      && Number.isInteger(item.ruleRevision) && Number(item.ruleRevision) > 0
       && typeof item.selectionRef === "string" && /^selection_[a-f0-9]{64}$/.test(item.selectionRef)
       && typeof item.selectedAt === "string" && Number.isFinite(Date.parse(item.selectedAt))
       && object(item.actionUnit) && Object.keys(item.actionUnit).length === 2 && typeof item.actionUnit.presence === "boolean"
@@ -304,19 +309,45 @@ export function parseSliceOperationalReadiness(value: unknown): readonly Operati
 }
 
 /** The panel accepts only opaque candidate references discovered by the server. */
-export function parseTemporalEvaluationCandidates(value: unknown): readonly TemporalCandidate[] {
-  if (!object(value) || value.contractVersion !== "temporal-recommendation-read/1.0.0" || !Array.isArray(value.candidates)
+export function parseTemporalEvaluationSnapshot(value: unknown): Readonly<{ candidates: readonly TemporalCandidate[]; evaluations: readonly TemporalEvaluation[] }> {
+  if (!object(value) || value.contractVersion !== "temporal-recommendation-read/1.0.0" || !Array.isArray(value.items) || !Array.isArray(value.candidates)
     || value.candidates.length > 50 || !value.candidates.every((candidate) => object(candidate)
       && /^temporal_candidate_[a-f0-9]{24}$/.test(String(candidate.candidateRef))
       && /^[a-z][a-z0-9_.:-]{0,127}$/.test(String(candidate.ruleSeriesRef))
       && ["daily", "weekly", "monthly"].includes(String(candidate.reviewCadence))
       && /^window_[a-f0-9]{24}$/.test(String(candidate.windowRef))
       && typeof candidate.capturedAt === "string" && Number.isFinite(Date.parse(candidate.capturedAt)))
+    || value.items.length > 100 || !value.items.every((item) => object(item) && Object.keys(item).length === 6
+      && /^temporal_evaluation_[a-f0-9]{64}$/.test(String(item.evaluationRef))
+      && /^[a-z][a-z0-9_.:-]{0,127}$/.test(String(item.ruleSeriesRef))
+      && typeof item.occurredAt === "string" && Number.isFinite(Date.parse(item.occurredAt))
+      && ["recommendation", "no_change"].includes(String(item.outcome))
+      && ["window_ready", "window_unsettled", "window_too_short", "open_delivery_alert"].includes(String(item.reason))
+      && /^window_[a-z0-9_.:-]{1,127}$/.test(String(item.windowRef)))
     || !object(value.authority) || value.authority.canPublish !== false || value.authority.canApprove !== false
     || value.authority.canExecute !== false || value.authority.canWriteMeta !== false || !noOpenedAuthority(value)) {
     throw new Error("Zamansal değerlendirme aday sözleşmesi güvenli değil.");
   }
-  return value.candidates as TemporalCandidate[];
+  return Object.freeze({ candidates: value.candidates as TemporalCandidate[], evaluations: value.items as TemporalEvaluation[] });
+}
+export function parseTemporalEvaluationCandidates(value: unknown): readonly TemporalCandidate[] { return parseTemporalEvaluationSnapshot(value).candidates; }
+
+type DecisionJourneyStep = Readonly<{ label: string; status: "ready" | "waiting" | "hold" | "complete" | "unavailable"; detail: string }>;
+/** Joins only explicit canonical links; missing links stay visibly absent rather than inferred. */
+export function decisionJourneyForRule(rule: SliceRuleWorkspaceItem | undefined, temporal: TemporalState, approval: ApprovalQueueState): readonly DecisionJourneyStep[] {
+  if (!rule) return [];
+  const temporalReady = temporal.status === "ready" ? temporal : null;
+  const observations = temporalReady?.candidates.filter((candidate) => candidate.ruleSeriesRef === rule.seriesRef) ?? [];
+  const evaluation = temporalReady?.evaluations.filter((item) => item.ruleSeriesRef === rule.seriesRef).at(0);
+  const trace = approval.status === "ready" ? approval.decisionTrace.filter((item) => item.ruleSeriesRef === rule.seriesRef && item.ruleRevision === rule.revision).at(0) : undefined;
+  const latestDecision = trace?.decisionHistory.at(-1);
+  return Object.freeze([
+    Object.freeze({ label: "Kural", status: "ready", detail: `Revizyon ${rule.revision} kaydı seçili kapsamda bağlı.` }),
+    Object.freeze(observations.length ? { label: "Gözlem", status: "ready", detail: "Doğrulanmış zaman penceresi incelemeye hazır." } : { label: "Gözlem", status: "unavailable", detail: "Bu kural için bağlı, doğrulanmış zaman penceresi yok." }),
+    Object.freeze(evaluation ? { label: "Öneri / hold", status: evaluation.outcome === "recommendation" ? "ready" : "hold", detail: evaluation.outcome === "recommendation" ? "Kanıt öneriyi destekliyor; uygulama yetkisi yok." : "Değişiklik hold’da; kanıt yeni bir öneriyi desteklemiyor." } : { label: "Öneri / hold", status: "waiting", detail: observations.length ? "Zamansal değerlendirme henüz kaydedilmedi." : "Bağlı gözlem olmadan öneri oluşturulmaz." }),
+    Object.freeze(trace ? { label: "İnsan onayı", status: latestDecision?.decision === "approved" || latestDecision?.decision === "rejected" || latestDecision?.decision === "changes_requested" ? "complete" : "waiting", detail: latestDecision?.decision === "approved" ? "İnsan kararı kaydedildi; uygulama kapalı." : latestDecision?.decision === "rejected" ? "İnsan öneriyi reddetti; uygulama kapalı." : latestDecision?.decision === "changes_requested" ? "İnsan değişiklik istedi; uygulama kapalı." : "İnsan kararı bekleniyor." } : { label: "İnsan onayı", status: "unavailable", detail: "Bu kural revizyonuna bağlı insan kararı yok." }),
+    Object.freeze({ label: "Sonuç", status: "unavailable", detail: "Bağlı teslimat sonucu kanıtı yok; sonuç uydurulmaz." }),
+  ]);
 }
 
 /** Converts only decision-relevant user input. Mirror/pacing/allocation proof stays server-only. */
@@ -535,6 +566,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   const [operationalReadiness, setOperationalReadiness] = useState<OperationalReadinessState>({ status: "loading" });
   const [poolBinding, setPoolBinding] = useState<PoolBindingState>({ status: "loading" });
   const head = snapshot?.items.find((item) => item.seriesRef === headRef) ?? undefined;
+  const decisionJourney = decisionJourneyForRule(head, temporal, approvalQueue);
   useEffect(() => {
     if (!snapshot || !props.selectedRuleRef || !props.selectedRuleRevision) return;
     const selected = snapshot.items.find((item) => item.seriesRef === props.selectedRuleRef && item.revision === props.selectedRuleRevision);
@@ -576,7 +608,8 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
       const response = await fetch("/api/temporal-recommendations", { cache: "no-store", credentials: "same-origin" });
       const payload = await response.json();
       if (!response.ok) throw new Error("Zamansal adaylar okunamadı.");
-      setTemporal({ status: "ready", candidates: parseTemporalEvaluationCandidates(payload), result });
+      const parsed = parseTemporalEvaluationSnapshot(payload);
+      setTemporal({ status: "ready", ...parsed, result });
     } catch (reason) { setTemporal({ status: "unavailable", message: reason instanceof Error ? reason.message : "Zamansal adaylar okunamadı." }); }
   }, []);
   useEffect(() => { void loadTemporalCandidates(); }, [loadTemporalCandidates]);
@@ -849,12 +882,18 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
             {approvalQueue.status === "queued" ? <span>Seçim onay kuyruğuna eklendi ({approvalQueue.persistence}). Onay kaydı için Onay Kuyruğu açıldı; execute ve Meta write hâlâ kapalıdır.</span> : null}
             {(approvalQueue.status === "unavailable" || approvalQueue.status === "error") ? <span role="alert">{approvalQueue.message}</span> : null}
           </div>
-          <div className={styles.impactResult} aria-label="Karar izi">
+          <div className={styles.decisionJourney} aria-label="Karar izi">
             <strong>Karar izi</strong>
-            <span>Selection → ActionUnit → insan kararı → execution closure zinciri salt okunurdur. Meta write kapalıdır.</span>
+            <span>Seçili kuralın yalnız kanonik ve açıkça bağlı kayıtları gösterilir. Eksik bağ, olay gibi gösterilmez.</span>
+            {head ? <ol>{decisionJourney.map((step) => <li key={step.label} data-status={step.status}><b>{step.label}</b><span>{step.detail}</span></li>)}</ol> : <span>İzi görmek için bir kural seçin.</span>}
+            <small>Salt-okunur · uygulama, policy yayınlama ve Meta write kapalı</small>
+          </div>
+          <div className={styles.impactResult} aria-label="Bağlı insan kararları">
+            <strong>Bağlı insan kararları</strong>
+            <span>Bu liste yalnız seçili kural revizyonuna kanonik olarak bağlı seçimleri gösterir.</span>
             {approvalQueue.status === "loading" ? <span>Karar izi doğrulanıyor…</span> : null}
-            {approvalQueue.status === "ready" && approvalQueue.decisionTrace.length === 0 ? <span>Gösterilebilecek doğrulanmış karar izi yok.</span> : null}
-            {approvalQueue.status === "ready" ? approvalQueue.decisionTrace.map((trace) => <div className={styles.row} key={trace.selectionRef}>
+            {approvalQueue.status === "ready" && head && approvalQueue.decisionTrace.filter((trace) => trace.ruleSeriesRef === head.seriesRef && trace.ruleRevision === head.revision).length === 0 ? <span>Bu kural revizyonuna bağlı doğrulanmış insan kararı yok.</span> : null}
+            {approvalQueue.status === "ready" && head ? approvalQueue.decisionTrace.filter((trace) => trace.ruleSeriesRef === head.seriesRef && trace.ruleRevision === head.revision).map((trace) => <div className={styles.row} key={trace.selectionRef}>
               <span>Seçilmiş senaryo · {date(trace.selectedAt)}</span>
               <span>ActionUnit: {trace.actionUnit.presence ? trace.actionUnit.status.replaceAll("_", " ") : "hazırlanmadı"}</span>
               <span>Kararlar: {trace.decisionHistory.length ? trace.decisionHistory.map((event) => `${event.decision.replaceAll("_", " ")} · ${date(event.occurredAt)}${event.reasonCode ? ` · ${event.reasonCode}` : ""}`).join(" | ") : "henüz yok"}</span>

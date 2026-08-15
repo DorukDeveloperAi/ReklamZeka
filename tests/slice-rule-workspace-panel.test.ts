@@ -16,6 +16,7 @@ import {
   parseSliceOperationalReadiness,
   parseSliceRuleScenarioSelectionCandidates,
   parseActionPreparationFlag,
+  decisionJourneyForRule,
   parseSliceRuleDecisionTrace,
   SliceRuleWorkspaceSurface,
 } from "@/app/dashboard/slice-rule-workspace-panel";
@@ -45,6 +46,7 @@ describe("Slice Rule Workspace panel", () => {
   });
   it("accepts only a closed, opaque decision trace and rejects opened execution state", () => {
     const trace = parseSliceRuleDecisionTrace({ decisionTrace: { contractVersion: "slice-rule-decision-trace/1.0.0", items: [{
+      ruleSeriesRef: item.seriesRef, ruleRevision: item.revision,
       selectionRef: `selection_${"a".repeat(64)}`, selectedAt: "2026-08-14T10:00:00.000Z",
       actionUnit: { presence: true, status: "approved" },
       decisionHistory: [{ decision: "proposed", occurredAt: "2026-08-14T10:01:00.000Z", reasonCode: null },
@@ -54,6 +56,14 @@ describe("Slice Rule Workspace panel", () => {
     expect(trace[0]).toMatchObject({ actionUnit: { status: "approved" }, execution: { safetyState: "server_disabled" } });
     expect(() => parseSliceRuleDecisionTrace({ decisionTrace: { contractVersion: "slice-rule-decision-trace/1.0.0", items: [{ ...trace[0],
       execution: { safetyState: "executor_enabled", closure: "admission_closed" } }] } })).toThrow("güvenli değil");
+  });
+  it("keeps the selected rule journey evidence-bound and names missing result evidence", () => {
+    const temporal = { status: "ready", candidates: [{ candidateRef: `temporal_candidate_${"a".repeat(24)}`, ruleSeriesRef: item.seriesRef, reviewCadence: "weekly", windowRef: `window_${"b".repeat(24)}`, capturedAt: "2026-08-14T10:00:00.000Z" }], evaluations: [{ ruleSeriesRef: item.seriesRef, occurredAt: "2026-08-14T11:00:00.000Z", outcome: "no_change", reason: "open_delivery_alert" }], result: null } as const;
+    const approval = { status: "ready", selections: [], actionPreparation: { visible: true, enabled: false, reason: "server_disabled" }, decisionTrace: [] } as const;
+    expect(decisionJourneyForRule(item, temporal, approval)).toMatchObject([
+      { label: "Kural", status: "ready" }, { label: "Gözlem", status: "ready" }, { label: "Öneri / hold", status: "hold" },
+      { label: "İnsan onayı", status: "unavailable" }, { label: "Sonuç", detail: "Bağlı teslimat sonucu kanıtı yok; sonuç uydurulmaz." },
+    ]);
   });
   it("accepts only opaque, authority-closed scenario candidates and keeps delivery holds blocked", () => {
     const candidateRef = `selection_candidate_${"a".repeat(64)}`;
