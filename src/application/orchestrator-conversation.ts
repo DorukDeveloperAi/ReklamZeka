@@ -308,7 +308,8 @@ export class OrchestratorConversationService {
       }
       const skillRunSnapshot = this.skillRouter.route({ pageId: guide.pageId, message, binding: skillCatalogBinding,
         evidence: contextSnapshot, evidenceContextHash });
-      const matchingInterviewKits = skillCatalogBinding.interviewKits.filter((kit) => kit.pages.includes(guide.pageId) && kit.intents.includes("question"));
+      const matchingInterviewKits = skillCatalogBinding.interviewKits.filter((kit) =>
+        kit.pages.includes(guide.pageId) && kit.intents.includes(skillRunSnapshot.intent));
       const interviewKitSnapshots = Object.freeze(matchingInterviewKits.map(({ kitRef, revision, kitHash, name, source }) =>
         Object.freeze({ kitRef, revision, kitHash, name, source })));
       const interviewKitBindingHash = orchestratorInterviewKitSnapshotHash(interviewKitSnapshots);

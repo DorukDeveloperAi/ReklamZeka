@@ -89,9 +89,6 @@ const PLAYBOOK_REF = /^playbook_[a-z0-9][a-z0-9_-]{0,86}$/;
 const SOURCE_REF = /^source_[a-z0-9_.:-]{1,127}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
-const SOURCE_TYPES = new Set<WorkspacePlaybookSourceCitation["sourceType"]>([
-  "owner_statement", "official_meta_guidance", "business_strategy", "observed_result", "experiment_outcome", "operating_note",
-]);
 export const MAX_ACTIVE_PLAYBOOKS = 12;
 export const MAX_PLAYBOOK_GUIDANCE_BYTES = 48 * 1024;
 
@@ -128,10 +125,10 @@ export function createWorkspaceSkillCatalogBinding(input: Readonly<{
       || !exact(playbook.citation, ["sourceTitle", "sourceType", "sourceUrl", "freshness"])
       || typeof playbook.citation.sourceTitle !== "string" || !playbook.citation.sourceTitle.trim()
       || playbook.citation.sourceTitle.length > 160 || CONTROL.test(playbook.citation.sourceTitle)
-      || typeof playbook.citation.sourceType !== "string" || !SOURCE_TYPES.has(playbook.citation.sourceType as WorkspacePlaybookSourceCitation["sourceType"])
-      || !["fresh", "stale", "not_scheduled"].includes(playbook.citation.freshness as string)
-      || !(playbook.citation.sourceUrl === null || typeof playbook.citation.sourceUrl === "string"
-        && playbook.citation.sourceType === "official_meta_guidance" && isOfficialGuidanceSourceUrl(playbook.citation.sourceUrl))) bindingFail();
+      || playbook.citation.sourceType !== "official_meta_guidance"
+      || playbook.citation.freshness !== "fresh"
+      || typeof playbook.citation.sourceUrl !== "string"
+      || !isOfficialGuidanceSourceUrl(playbook.citation.sourceUrl)) bindingFail();
     return Object.freeze({ playbookRef: playbook.playbookRef, revision: playbook.revision,
       playbookHash: playbook.playbookHash, sourceRef: playbook.sourceRef, citation: Object.freeze({
         sourceTitle: playbook.citation.sourceTitle.trim(), sourceType: playbook.citation.sourceType as WorkspacePlaybookSourceCitation["sourceType"],

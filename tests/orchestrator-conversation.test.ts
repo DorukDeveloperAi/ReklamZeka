@@ -126,6 +126,22 @@ describe("persistent Orchestrator conversation", () => {
     expect(turn.skillCatalogSnapshot.bindingHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it("selects only the user-authored interview kit matching the resolved turn intent and freezes that revision", async () => {
+    const source = memoryRepository();
+    const kit = { kitRef: `interview_kit_${"a".repeat(32)}`, revision: 2, kitHash: "c".repeat(64),
+      name: "Kohort kontrolü", explanation: "Eksik karşılaştırma bağlamını sorar.", questions: ["Eşdeğer kohort kanıtı var mı?"],
+      pages: ["analysis"], intents: ["compare"], source: { title: "Meta yardım", url: "https://www.facebook.com/business/help/learning",
+        version: 3, recordHash: "d".repeat(64), reviewBy: "2050-01-01T00:00:00.000Z" } };
+    const execute = vi.fn(async () => ({ providerThreadRef: threadRef, finalResponse: response("Karşılaştırma kapsamı açıklandı.") }));
+    const service = new OrchestratorConversationService(source.repository, { execute }, loader(createWorkspaceSkillCatalogBinding({
+      profile: { profileRef: "profile_default", revision: 1, profileHash: "a".repeat(64) },
+      manifests: CORE_SKILL_MANIFESTS.map(({ ref, version, hash }) => ({ ref, version, hash })), playbooks: [], interviewKits: [kit],
+    })));
+    await service.send({ workspaceId, userId, conversationRef: null, pageId: "analysis", message: "Kohortları karşılaştır" });
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ prompt: expect.stringContaining("Eşdeğer kohort kanıtı var mı?") }));
+    expect(source.appendTurn.mock.calls[0]![0].interviewKitSnapshots).toMatchObject([{ revision: 2, name: "Kohort kontrolü" }]);
+  });
+
   it("fails closed with an honest ledger receipt when the workspace catalog cannot be resolved", async () => {
     const source = memoryRepository(); const execute = vi.fn();
     const service = new OrchestratorConversationService(source.repository, { execute }, { loadActive: async () => { throw new Error("stale"); } });

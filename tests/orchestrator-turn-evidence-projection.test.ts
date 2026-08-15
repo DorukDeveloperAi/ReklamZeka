@@ -95,6 +95,14 @@ describe("orchestrator historical turn evidence projection", () => {
     expect(html).not.toMatch(/skillrun_|[a-f0-9]{64}|source_guidance|playbook_alpha/);
   });
 
+  it("shows an explicit, identifier-free sentinel for legacy or unavailable receipt detail", () => {
+    const evidence = { skillRun: { state: "legacy_not_recorded" as const, receipt: null }, playbooks: [],
+      interviewKits: { state: "unavailable_not_bound" as const, kits: [] } };
+    const html = renderToStaticMarkup(createElement(OrchestratorTurnReceiptSummary, { evidence }));
+    expect(html).toContain("eski kayıt: makbuz ayrıntısı yok");
+    expect(html).not.toMatch(/skillrun_|[a-f0-9]{64}|interview_kit_/);
+  });
+
   it("projects only an immutable source-bound user interview kit and rejects tampering", () => {
     const snapshots = [{ kitRef: `interview_kit_${"d".repeat(32)}`, revision: 3, kitHash: "4".repeat(64), name: "Kampanya durum kontrolü",
       source: { title: "Meta yardım", url: "https://www.facebook.com/business/help/learning", version: 7,

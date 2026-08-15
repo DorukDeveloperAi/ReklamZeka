@@ -39,7 +39,6 @@ const SOURCE_REF = /^source_[a-z0-9_.:-]{1,127}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const EVIDENCE_SCOPE = "page_guidance_and_verified_workspace_playbooks" as const;
 const UNCERTAINTY = "agent_inference_no_meta_or_action_authority" as const;
-const SOURCE_TYPES = new Set(["owner_statement", "official_meta_guidance", "business_strategy", "observed_result", "experiment_outcome", "operating_note"]);
 
 export class OrchestratorConversationRepositoryError extends Error {
   constructor(readonly code: "invalid_input" | "corrupt_store" | "conversation_unavailable") {
@@ -181,12 +180,9 @@ type HistoricalSourceCitation = Readonly<{ title: string; type: string; url: str
 function historicalSourceCitation(value: unknown): HistoricalSourceCitation {
   if (!exact(value, ["sourceTitle", "sourceType", "sourceUrl", "freshness"])
     || typeof value.sourceTitle !== "string" || !value.sourceTitle.trim() || value.sourceTitle.length > 160
-    || /[\u0000-\u001f\u007f]/.test(value.sourceTitle) || typeof value.sourceType !== "string"
-    || !SOURCE_TYPES.has(value.sourceType) || !["fresh", "stale", "not_scheduled"].includes(value.freshness as string)
-    || !(value.sourceUrl === null || typeof value.sourceUrl === "string"
-      && value.sourceType === "official_meta_guidance" && isOfficialGuidanceSourceUrl(value.sourceUrl))) throw new Error("invalid_citation");
-  return Object.freeze({ title: value.sourceTitle.trim(), type: value.sourceType, url: value.sourceUrl,
-    freshness: value.freshness as HistoricalSourceCitation["freshness"] });
+    || /[\u0000-\u001f\u007f]/.test(value.sourceTitle) || value.sourceType !== "official_meta_guidance"
+    || value.freshness !== "fresh" || typeof value.sourceUrl !== "string" || !isOfficialGuidanceSourceUrl(value.sourceUrl)) throw new Error("invalid_citation");
+  return Object.freeze({ title: value.sourceTitle.trim(), type: value.sourceType, url: value.sourceUrl, freshness: "fresh" });
 }
 
 /** Never joins mutable sources: this read projection reports only ledger-frozen evidence. */

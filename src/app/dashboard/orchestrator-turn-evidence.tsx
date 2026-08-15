@@ -46,7 +46,13 @@ export function OrchestratorTurnReceiptSummary({ evidence }: Readonly<{ evidence
     ? sourceStates.includes("stale") ? "kaynak eski" : sourceStates.includes("not_scheduled") ? "güncellik planlanmadı" : "kaynak güncel"
     : evidence.interviewKits.state === "bound" && evidence.interviewKits.kits.length ? "soru seti kaynağı bağlı" : "bağlı resmî kaynak yok";
   const availability = receipt ? `kanıt ${receipt.evidenceAvailability}` : "kanıt doğrulanamadı";
-  return <section aria-label="Turn makbuzu"><strong>Bu turn</strong><span> · {skills}</span><small> · {source} · {availability} · belirsizlik: Agent çıkarımı, yetki yok</small></section>;
+  const sentinel = [evidence.skillRun.state, evidence.interviewKits.state].includes("legacy_not_recorded")
+    ? " · eski kayıt: makbuz ayrıntısı yok"
+    : [evidence.skillRun.state, evidence.interviewKits.state].includes("unavailable_not_bound")
+      ? " · makbuz bu turn sırasında bağlanamadı"
+      : [evidence.skillRun.state, evidence.interviewKits.state].includes("missing_or_invalid")
+        ? " · makbuz doğrulanamadı" : "";
+  return <section aria-label="Turn makbuzu"><strong>Bu turn</strong><span> · {skills}</span><small> · {source} · {availability}{sentinel} · belirsizlik: Agent çıkarımı, yetki yok</small></section>;
 }
 
 /** Small, identifier-free turn evidence surface. The parent Agent drawer owns placement and styling. */

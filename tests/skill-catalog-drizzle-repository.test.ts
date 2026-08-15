@@ -9,6 +9,7 @@ const actorId = "00000000-0000-4000-8000-000000000002";
 const sourceId = "00000000-0000-4000-8000-000000000003";
 const playbookRef = "playbook_alpha";
 const hash = "a".repeat(64);
+const officialSource = { id: sourceId, url: "https://www.facebook.com/business/help/learning" };
 
 function database(results: readonly unknown[][]) {
   const dialect = new PgDialect(); const queue = [...results]; const queries: ReturnType<PgDialect["sqlToQuery"]>[] = [];
@@ -24,7 +25,7 @@ function head(patch: Record<string, unknown> = {}) {
 
 describe("Skill catalog append-only playbook repository", () => {
   it("creates revision +1 from the locked canonical head and never updates the old row", async () => {
-    const fixture = database([[], [head()], [{ id: sourceId }], [{ revision: 4 }]]);
+    const fixture = database([[], [head()], [officialSource], [{ revision: 4 }]]);
     const result = await new DrizzleSkillCatalogRepository(fixture.db as never).appendPlaybookRevision({ workspaceId, actorId,
       playbookRef, expectedRevision: 3, title: "Yeni", body: "Kullanıcı snippet'i", sourceOptionId: sourceId });
     expect(result).toMatchObject({ kind: "playbook", ref: playbookRef, revision: 4, title: "Yeni", body: "Kullanıcı snippet'i" });
@@ -40,9 +41,10 @@ describe("Skill catalog append-only playbook repository", () => {
   it.each([
     ["stale expected revision", [[], [head()],], { expectedRevision: 2 }, "stale_head"],
     ["source missing", [[], [head()], []], {}, "source_not_found"],
-    ["source mismatch", [[], [head()], [{ id: "00000000-0000-4000-8000-000000000004" }]], {}, "source_mismatch"],
-    ["duplicate immutable payload", [[], [head({ playbook_hash: catalogHash({ title: "Yeni", body: "Snippet" }) })], [{ id: sourceId }]], {}, "duplicate_revision"],
-    ["duplicate insert conflict", [[], [head()], [{ id: sourceId }], []], {}, "write_conflict"],
+    ["source mismatch", [[], [head()], [{ id: "00000000-0000-4000-8000-000000000004", url: officialSource.url }]], {}, "source_mismatch"],
+    ["unapproved official URL", [[], [head()], [{ id: sourceId, url: "https://example.test/not-meta" }]], {}, "source_not_found"],
+    ["duplicate immutable payload", [[], [head({ playbook_hash: catalogHash({ title: "Yeni", body: "Snippet" }) })], [officialSource]], {}, "duplicate_revision"],
+    ["duplicate insert conflict", [[], [head()], [officialSource], []], {}, "write_conflict"],
   ])("fails closed for %s", async (_label, results, patch, code) => {
     const fixture = database(results as readonly unknown[][]);
     await expect(new DrizzleSkillCatalogRepository(fixture.db as never).appendPlaybookRevision({ workspaceId, actorId, playbookRef,

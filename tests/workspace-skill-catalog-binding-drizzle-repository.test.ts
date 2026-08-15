@@ -48,6 +48,8 @@ describe("workspace skill catalog turn binding loader", () => {
     ["ambiguous active profile", [[profile, profile], []]],
     ["unpublished source", [[profile], [{ ...playbook, source_status: "archived" }]]],
     ["stale source", [[profile], [{ ...playbook, review_by: "2020-01-01T00:00:00.000Z" }]]],
+    ["non-official source", [[profile], [{ ...playbook, source_type: "owner_statement" }]]],
+    ["unapproved official URL", [[profile], [{ ...playbook, source_url: "https://example.test/not-meta" }]]],
     ["corrupt playbook", [[profile], [{ ...playbook, playbook_hash: "f".repeat(64) }]]],
   ])("fails closed for %s", async (_label, results) => {
     const fixture = database(results as readonly unknown[][]);

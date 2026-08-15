@@ -37,7 +37,7 @@ function exact(value: unknown, keys: readonly string[]): value is Record<string,
 }
 function digest(value: unknown) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 function fresh(value: Date | string | null, evaluatedAt: number) {
-  if (value === null) return true;
+  if (value === null) return false;
   const reviewBy = value instanceof Date ? value.valueOf() : Date.parse(value);
   return Number.isFinite(reviewBy) && reviewBy > evaluatedAt;
 }
@@ -107,8 +107,9 @@ export class DrizzleWorkspaceSkillCatalogBindingRepository implements WorkspaceS
         || !exact(playbook.payload, ["title", "body"]) || typeof playbook.payload.title !== "string"
         || typeof playbook.payload.body !== "string" || digest(playbook.payload) !== playbook.playbook_hash) unavailable();
       const title = sourceTitle(playbook.source_title); const type = sourceType(playbook.source_type);
-      const sourceUrl = type === "official_meta_guidance" && typeof playbook.source_url === "string"
-        && isOfficialGuidanceSourceUrl(playbook.source_url) ? playbook.source_url : null;
+      if (type !== "official_meta_guidance" || typeof playbook.source_url !== "string"
+        || !isOfficialGuidanceSourceUrl(playbook.source_url)) unavailable();
+      const sourceUrl = playbook.source_url;
       return Object.freeze({ playbookRef: playbook.playbook_ref, revision: playbook.revision,
         playbookHash: playbook.playbook_hash, sourceRef: playbook.source_ref,
         citation: Object.freeze({ sourceTitle: title, sourceType: type, sourceUrl, freshness: evaluatedFreshness }),

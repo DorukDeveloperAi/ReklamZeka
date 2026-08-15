@@ -3,6 +3,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { catalogHash, newRef, type CatalogItem, type SkillCatalogRepository } from "@/application/skill-catalog-service";
 import type { OfficialSourceOption } from "@/application/interview-kit-service";
+import { isOfficialGuidanceSourceUrl } from "@/domain/guidance/registry";
 import * as schema from "@/db/schema";
 
 type DB = NodePgDatabase<typeof schema>;
@@ -27,12 +28,14 @@ function item(input: Readonly<{ ref: string; revision: number; state: string; ti
 }
 
 async function source(executor: Executor, workspaceId: string, sourceOptionId: string): Promise<Source> {
-  return one(rows<Source>(await executor.execute(sql`
-    select id from guidance_sources
+  const selected = one(rows<Source>(await executor.execute(sql`
+    select id, source_url url from guidance_sources
     where workspace_id = ${workspaceId}::uuid and id::text = ${sourceOptionId} and source_type = 'official_meta_guidance'
       and status = 'published' and review_by > now() and source_url is not null
     limit 2
   `)), "source_not_found");
+  if (typeof selected.url !== "string" || !isOfficialGuidanceSourceUrl(selected.url)) throw new Error("source_not_found");
+  return selected;
 }
 
 async function head(executor: Executor, workspaceId: string, playbookRef: string): Promise<Head> {
