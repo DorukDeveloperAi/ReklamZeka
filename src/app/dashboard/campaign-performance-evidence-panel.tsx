@@ -90,6 +90,25 @@ export function selectedCampaignPerformanceEvidence(projection: CampaignPerforma
   return projection.campaigns.find((campaign) => campaign.campaignRef === campaignRef) ?? null;
 }
 
+export type TimeCohortEvidenceBoundary = Readonly<{
+  temporalState: "ready" | "partial" | "unavailable";
+  cohortState: "not_bound";
+}>;
+
+/**
+ * Canonical performance proves a campaign's individual windows, but deliberately
+ * carries neither frozen scope dimensions nor alert-ledger bindings.  Keeping the
+ * cohort closed here prevents a name, market, or metric from becoming a proxy.
+ */
+export function timeCohortEvidenceBoundary(evidence: CampaignPerformanceEvidence | null): TimeCohortEvidenceBoundary {
+  const sevenDay = evidence?.windows.find((item) => item.days === 7) ?? null;
+  const thirtyDay = evidence?.windows.find((item) => item.days === 30) ?? null;
+  const temporalState = sevenDay?.state === "ready" && thirtyDay?.state === "ready" ? "ready"
+    : sevenDay?.state === "unavailable" || thirtyDay?.state === "unavailable" || !sevenDay || !thirtyDay ? "unavailable"
+      : "partial";
+  return Object.freeze({ temporalState, cohortState: "not_bound" });
+}
+
 function amount(value: Metric | null, currency: string | null): string {
   if (!value) return "—";
   const parsed = Number(value.valueDecimal); const unit = value.currency ?? currency;
@@ -116,6 +135,9 @@ export function CampaignPerformanceEvidencePanel({ campaignRef }: Readonly<{ cam
   const evidence = useMemo(() => selectedCampaignPerformanceEvidence(projection, campaignRef), [campaignRef, projection]);
   const selectedWindow = evidence?.windows.find((item) => item.days === days) ?? null;
   const ready = state === "ready" && selectedWindow?.state === "ready";
+  const boundary = useMemo(() => timeCohortEvidenceBoundary(evidence), [evidence]);
+  const sevenDayWindow = evidence?.windows.find((item) => item.days === 7) ?? null;
+  const thirtyDayWindow = evidence?.windows.find((item) => item.days === 30) ?? null;
   return <details className={styles.copyPreview} open>
     <summary><span className={styles.kicker}>KANONİK PERFORMANS KANITI · SALT-OKUNUR</span><strong>Seçili kampanya · {days} günlük kapsam</strong><small>Kaynak ve freshness, mirror hiyerarşisinden ayrı doğrulanır.</small></summary>
     <section aria-label="Seçili kampanya performans kanıtı">
@@ -127,6 +149,16 @@ export function CampaignPerformanceEvidencePanel({ campaignRef }: Readonly<{ cam
       {state === "ready" && evidence && selectedWindow ? <><div className={styles.contextGrid}><div><span>Kaynak</span><strong>{sourceLabel(projection!.source)}</strong><small>Gözlem: {timestamp(projection!.source.observedAt)}</small></div><div><span>Pencere</span><strong>{selectedWindow.startDate ?? "—"} → {selectedWindow.endDate ?? "—"}</strong><small>{selectedWindow.observedDays}/{days} gün gözlendi</small></div><div><span>Son freshness</span><strong>{timestamp(selectedWindow.freshnessAt)}</strong><small>{selectedWindow.attribution ?? "Attribution bilinmiyor"}</small></div><div><span>Eksik gün</span><strong>{selectedWindow.missingDays.length}</strong><small>{selectedWindow.missingDays.join(", ") || "Yok"}</small></div></div>
         {ready ? <div className={styles.metricGrid}><article className={styles.metricCard}><div><span>Harcama</span><em>Exact campaign · hazır</em></div><strong>{amount(selectedWindow.spend, selectedWindow.currency)}</strong></article><article className={styles.metricCard}><div><span>Sonuç · exact lead</span><em>Exact campaign · hazır</em></div><strong>{selectedWindow.outcome?.valueDecimal ?? "—"}</strong></article><article className={styles.metricCard}><div><span>Lead başı maliyet</span><em>Exact campaign · hazır</em></div><strong>{amount(selectedWindow.cpa, selectedWindow.currency)}</strong></article></div> : <p>Bu pencerenin metrikleri gösterilmez: {reasonText(selectedWindow, projection!.source)}</p>}
         <small>{selectedWindow.reasonCodes.length ? `Kanıt notu: ${reasonText(selectedWindow, projection!.source)}` : "Yalnız kanıt görünümü; öneri, kohort, action ve Meta write yok."}</small>
+        <section className={styles.copyPreview} aria-label="Zaman ve eşdeğer kohort kanıt sınırı">
+          <span className={styles.kicker}>ZAMAN VE EŞDEĞER KOHORT · KANIT SINIRI</span>
+          <h3>{boundary.temporalState === "ready" ? "Zaman pencereleri ayrı ayrı doğrulandı" : boundary.temporalState === "partial" ? "Zaman penceresi kısmi" : "Zaman penceresi doğrulanamadı"}</h3>
+          <div className={styles.contextGrid}>
+            <div><span>7 günlük pencere</span><strong>{sevenDayWindow?.state === "ready" ? "hazır" : sevenDayWindow?.state === "partial" ? "kısmi" : "kullanılamıyor"}</strong><small>{sevenDayWindow ? `${sevenDayWindow.observedDays}/7 gün · ${sevenDayWindow.startDate ?? "—"} → ${sevenDayWindow.endDate ?? "—"}` : "Kanonik pencerede yok"}</small></div>
+            <div><span>30 günlük pencere</span><strong>{thirtyDayWindow?.state === "ready" ? "hazır" : thirtyDayWindow?.state === "partial" ? "kısmi" : "kullanılamıyor"}</strong><small>{thirtyDayWindow ? `${thirtyDayWindow.observedDays}/30 gün · ${thirtyDayWindow.startDate ?? "—"} → ${thirtyDayWindow.endDate ?? "—"}` : "Kanonik pencerede yok"}</small></div>
+            <div><span>Eşdeğer kohort</span><strong>Gösterilemez</strong><small>Frozen kapsam eşleşmesi bu kampanyaya güvenli bağlanmış değil.</small></div>
+          </div>
+          <p>Bu kanonik okuma; pazar, hizmet, dönüşüm yolu ve açık teslimat uyarısını eşdeğer kohort için doğrulamaz. Bu nedenle kampanyalar sıralanmaz; “kazanan/kaybeden” hükmü, öneri veya eylem üretilmez.</p>
+        </section>
       </> : null}
     </section>
   </details>;

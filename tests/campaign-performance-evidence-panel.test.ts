@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { campaignPerformanceEvidenceFromResponse, selectedCampaignPerformanceEvidence } from "@/app/dashboard/campaign-performance-evidence-panel";
+import { campaignPerformanceEvidenceFromResponse, selectedCampaignPerformanceEvidence, timeCohortEvidenceBoundary } from "@/app/dashboard/campaign-performance-evidence-panel";
 
 const campaignRef = "campaign_aaaaaaaaaaaaaaaaaaaaaaaa";
 const secondCampaignRef = "campaign_bbbbbbbbbbbbbbbbbbbbbbbb";
@@ -42,10 +42,20 @@ describe("campaign performance evidence panel contract", () => {
     expect(campaignPerformanceEvidenceFromResponse(invalid)).toBeNull();
   });
 
+  it("keeps equivalent-cohort comparison closed without a frozen scope binding", () => {
+    const ready = selectedCampaignPerformanceEvidence(campaignPerformanceEvidenceFromResponse(payload()), campaignRef);
+    const partial = selectedCampaignPerformanceEvidence(campaignPerformanceEvidenceFromResponse(payload("partial")), campaignRef);
+    expect(timeCohortEvidenceBoundary(ready)).toEqual({ temporalState: "ready", cohortState: "not_bound" });
+    expect(timeCohortEvidenceBoundary(partial)).toEqual({ temporalState: "partial", cohortState: "not_bound" });
+    expect(timeCohortEvidenceBoundary(null)).toEqual({ temporalState: "unavailable", cohortState: "not_bound" });
+  });
+
   it("keeps the selected campaign's canonical evidence visible by default without upgrading partial windows", () => {
     const source = readFileSync("src/app/dashboard/campaign-performance-evidence-panel.tsx", "utf8");
     expect(source).toContain("<details className={styles.copyPreview} open>");
     expect(source).toContain("state === \"ready\" && selectedWindow?.state === \"ready\"");
     expect(source).toContain("Bu pencerenin metrikleri gösterilmez");
+    expect(source).toContain("ZAMAN VE EŞDEĞER KOHORT · KANIT SINIRI");
+    expect(source).toContain("kampanyalar sıralanmaz");
   });
 });
