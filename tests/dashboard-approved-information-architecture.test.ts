@@ -53,6 +53,14 @@ describe("approved dashboard information architecture", () => {
     expect((html.match(/<h1/g) ?? []).length).toBe(1);
   });
 
+  it("offers a persistent, accessible light-theme preference without changing the information architecture", () => {
+    const html = renderToStaticMarkup(createElement(OperatingDashboard, { initialView: "monitor" }));
+    expect(html).toContain('data-theme="dark"');
+    expect(html).toContain('aria-label="Açık temaya geç"');
+    expect(dashboardSource).toContain('window.localStorage.setItem("reklamzeka.dashboard-theme", nextTheme)');
+    expect(readFileSync("src/app/dashboard/operating-dashboard.module.css", "utf8")).toContain('.appShell[data-theme="light"]');
+  });
+
   it("keeps one page heading while a selected campaign context is being recovered", () => {
     const html = renderToStaticMarkup(createElement(OperatingDashboard, {
       initialLocation: { ...normalizeDashboardLocation("decision-room"), campaignRef: "ref_abcdef012345" },

@@ -108,6 +108,7 @@ type PortfolioCapabilitySummary = Readonly<{
 
 type MetaReadMirrorLoadState = "loading" | "ready" | "session_required" | "unavailable";
 export type SkillCatalogLoadState = "idle" | "loading" | "ready" | "session_required" | "unavailable" | "legacy";
+type DashboardTheme = "dark" | "light";
 
 function plainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -700,6 +701,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
   const [metaReadMirrorSource, setMetaReadMirrorSource] = useState<PublicSource | null>(null);
   const [metaReadMirrorState, setMetaReadMirrorState] = useState<MetaReadMirrorLoadState>("loading");
   const [metaReadMirrorError, setMetaReadMirrorError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<DashboardTheme>("dark");
   const [localSessionGeneration, setLocalSessionGeneration] = useState(0);
   const [metaBootstrapPreflight, setMetaBootstrapPreflight] = useState<MetaBootstrapPreflight | null>(null);
   const [selectedMirrorAccountRef, setSelectedMirrorAccountRef] = useState("");
@@ -725,6 +727,19 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
   const [draftPolicyTemplate, setDraftPolicyTemplate] = useState<CampaignIntentTemplateRef>("");
   const [rulesSessionRequired, setRulesSessionRequired] = useState<boolean | null>(null);
   const [categoryAssignmentHandoff, setCategoryAssignmentHandoff] = useState<CategoryAssignmentHandoff | null>(null);
+
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem("reklamzeka.dashboard-theme");
+    if (storedTheme === "dark" || storedTheme === "light") setTheme(storedTheme);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((currentTheme) => {
+      const nextTheme: DashboardTheme = currentTheme === "dark" ? "light" : "dark";
+      window.localStorage.setItem("reklamzeka.dashboard-theme", nextTheme);
+      return nextTheme;
+    });
+  }, []);
 
   const dashboardLocation = useMemo<DashboardLocation>(() => ({ view: activeView, manageArea, decisionArea,
     budgetArea, campaignArea, rulesArea, settingsArea,
@@ -1481,14 +1496,14 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     ? "Agent kural/policy metni üretmez, kopyalamaz veya kaydetmez · Meta write yok"
     : SOURCE_AUTHORITY_COPY;
 
-  return <div className={styles.appShell}>
+  return <div className={styles.appShell} data-theme={theme}>
     <aside className={styles.sidebar}>
       <div className={styles.brand}><span>RZ</span><div><strong>ReklamZeka</strong><small>Operating System</small></div></div>
       <nav aria-label="Ana navigasyon">{navGroups.map((group) => <div key={group.label}><span>{group.label}</span>{group.items.map((item) => <button type="button" key={item.id} data-active={activeView === item.id} aria-current={activeView === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><Icon name={item.icon} /><strong>{item.label}</strong>{item.badge ? <i data-live={item.badge === "●"}>{item.badge}</i> : null}</button>)}</div>)}</nav>
       <div className={styles.sidebarFooter}><span className={metaReadMirror?.sourceState === "ready" ? styles.liveDot : undefined} /><div><strong>Meta veri aynası</strong><small>{workspaceSource}</small></div><button aria-label="Bağlantı ayarları" onClick={() => openSettings("meta")}>•••</button></div>
     </aside>
     <section className={styles.workspace}>
-      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button type="button" className={styles.workspacePicker} aria-label={`${workspaceName} kaynak ayarlarını aç`} onClick={() => openSettings("meta")}><span className={styles.avatar}>RZ</span><span><strong>{workspaceName}</strong><small>{workspaceSource}</small></span><i aria-hidden="true">Ayarlar</i></button><div className={styles.topActions}><button type="button" className={styles.codexTransferButton} disabled={agentHandoffLoading} onClick={() => void transferCurrentContextToCodex()}>{agentHandoffLoading ? "Hazırlanıyor…" : "Codex'e aktar"}</button></div></header>
+      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button type="button" className={styles.workspacePicker} aria-label={`${workspaceName} kaynak ayarlarını aç`} onClick={() => openSettings("meta")}><span className={styles.avatar}>RZ</span><span><strong>{workspaceName}</strong><small>{workspaceSource}</small></span><i aria-hidden="true">Ayarlar</i></button><div className={styles.topActions}><button type="button" className={styles.themeToggle} aria-pressed={theme === "light"} aria-label={theme === "dark" ? "Açık temaya geç" : "Koyu temaya geç"} onClick={toggleTheme}>{theme === "dark" ? "☀ Açık" : "◐ Koyu"}</button><button type="button" className={styles.codexTransferButton} disabled={agentHandoffLoading} onClick={() => void transferCurrentContextToCodex()}>{agentHandoffLoading ? "Hazırlanıyor…" : "Codex'e aktar"}</button></div></header>
       <nav className={styles.mobileNav} aria-label="Ana navigasyon">{navGroups.flatMap((group) => group.items).map((item) => <button type="button" key={item.id} data-active={activeView === item.id} aria-current={activeView === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</nav>
       <main ref={contentRef} className={styles.content} tabIndex={-1} aria-label={activeTitle}>{content}</main>
       <footer className={styles.sourceFooter}><span>{sourceFooter}</span><span>{authorityFooter}</span></footer>

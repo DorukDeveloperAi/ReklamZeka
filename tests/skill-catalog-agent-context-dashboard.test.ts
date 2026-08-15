@@ -42,4 +42,11 @@ describe("Agent skill catalog context strip", () => {
     expect(catalogSlice).not.toContain("POST");
     expect(catalogSlice).not.toMatch(/skill-profile-select|skill-playbook|tombstone/);
   });
+
+  it("explains an unselected profile as setup work rather than a technical snapshot error", () => {
+    const source = readFileSync("src/app/dashboard/skill-catalog-context-strip.tsx", "utf8");
+    expect(source).toContain("Henüz çalışma alanına ait bir skill profili seçilmedi.");
+    expect(source).toContain("Agent kural veya policy üretmez.");
+    expect(source).not.toContain("Skill snapshot not recorded.");
+  });
 });
