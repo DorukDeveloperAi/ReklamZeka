@@ -732,6 +732,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
   const [settingsArea, setSettingsArea] = useState<SettingsArea>(initialLocationRef.current.settingsArea);
   const [selectedRuleRef, setSelectedRuleRef] = useState<string | null>(initialLocationRef.current.ruleRef);
   const [selectedRuleRevision, setSelectedRuleRevision] = useState<number | null>(initialLocationRef.current.ruleRevision);
+  const [classificationScopeCampaignRef, setClassificationScopeCampaignRef] = useState<string | null>(null);
   const contentRef = useRef<HTMLElement>(null);
   const lastContentFocusKeyRef = useRef("");
   const [requestedCampaignRef, setRequestedCampaignRef] = useState<string | null>(initialLocationRef.current.campaignRef);
@@ -1265,7 +1266,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
           <div className={styles.agentActions}>{metaReadMirrorState === "session_required" ? null : <button className={styles.primaryButton} onClick={() => void refreshMetaReadMirror(true)}>Tekrar dene</button>}<button onClick={() => openSettings("meta")}>Kaynak ayarları</button></div>
         </section> : campaignArea === "classification" ? <CampaignClassificationReviewPanel onPrepareAssignment={(handoff) => {
           setCategoryAssignmentHandoff(handoff); openSettings("categories");
-        }} onOpenCategorySetup={() => openSettings("categories")} />
+        }} onOpenSlicePreparation={(campaignRef) => { setClassificationScopeCampaignRef(campaignRef); commitDashboardLocation({ ...dashboardLocation, view: "manage", manageArea: "rules", rulesArea: "slices", campaignRef: null }); }} onOpenCategorySetup={() => openSettings("categories")} />
           : campaignArea === "promotion" ? <PromotionPreflightPanel embedded />
             : <OperationalTimelinePanel embedded />}
     </>;
@@ -1504,7 +1505,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
       ]} />
       {rulesArea === "guidance" ? <><GuidanceStudioPanel onSessionRequiredChange={setRulesSessionRequired} />
         {rulesSessionRequired === false ? <><SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /></> : null}</>
-        : rulesArea === "slices" ? <SliceRuleWorkspacePanel selectedRuleRef={selectedRuleRef} selectedRuleRevision={selectedRuleRevision} onOpenCanonicalRule={openCanonicalRule} onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} onOpenRuleSession={openRuleSession} onOpenCategorySetup={() => openSettings("categories")} />
+        : rulesArea === "slices" ? <SliceRuleWorkspacePanel requestedScopeCampaignRef={classificationScopeCampaignRef} selectedRuleRef={selectedRuleRef} selectedRuleRevision={selectedRuleRevision} onOpenCanonicalRule={openCanonicalRule} onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} onOpenRuleSession={openRuleSession} onOpenCategorySetup={() => openSettings("categories")} />
         : rulesArea === "policies" ? <InstructionPolicyStudioPanel />
           : rulesArea === "authority" ? <AutonomyStudioPanel />
             : <PracticeLabPanel />}

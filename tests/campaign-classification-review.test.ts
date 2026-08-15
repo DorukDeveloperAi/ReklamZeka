@@ -13,6 +13,7 @@ describe("campaign classification review", () => {
     expect(service).toMatchObject({ state: "assigned", values: ["Fizik tedavi"], evidenceCount: 1 });
     expect(result.entries[0]!.facets.find((facet) => facet.facet === "platform")!).toMatchObject({ state: "not_configured", reasonCodes: ["dimension_not_configured"] });
     expect(result.entries[0]!.reviewRequired).toBe(true);
+    expect(result.entries[0]!.sliceCandidate).toBe("review_required");
     expect(result.entries[0]!.campaignRef).toBe(`category_entity_${"a".repeat(24)}`);
     expect(JSON.stringify(result)).not.toContain('"campaign"');
   });

@@ -258,6 +258,10 @@
 .classificationPagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px; border-top: 1px solid var(--rz-line); color: var(--rz-muted); font-size: .56rem; }
 .classificationPagination button { min-height: 30px; padding: 0 9px; border: 1px solid var(--rz-line); border-radius: 7px; background: transparent; color: var(--rz-text); cursor: pointer; font: inherit; }
 .classificationPagination button:disabled { cursor: default; opacity: .45; }
+.classificationHandoff { display: grid; gap: 5px; margin-top: 10px; padding: 9px; border: 1px solid color-mix(in srgb, var(--rz-info) 38%, var(--rz-line)); border-radius: 8px; background: color-mix(in srgb, var(--rz-info) 7%, transparent); }
+.classificationHandoff strong { font-size: .65rem; }
+.classificationHandoff small { color: var(--rz-muted); font-size: .56rem; line-height: 1.45; }
+.classificationHandoff button { justify-self: start; min-height: 30px; border: 1px solid var(--rz-line); border-radius: 7px; background: var(--rz-surface-2); color: var(--rz-text); padding: 0 9px; cursor: pointer; font: inherit; }
 .detailHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 20px; border-bottom: 1px solid var(--rz-line); }
 .detailHeader h2 { margin: 7px 0 5px; font-size: 1.3rem; }
 .detailHeader p { margin: 0; color: var(--rz-muted); font-size: .65rem; }

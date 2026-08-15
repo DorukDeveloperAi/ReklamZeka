@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createCampaignClassificationReviewHttpHandler } from "@/server/campaign-classification-review-http";
 const principal = { workspaceId: "workspace", actor: { id: "user", role: "owner" } } as any;
-const projection = { version: "campaign-classification-review/1.0.0", entries: [], summary: { campaigns: 0, reviewRequired: 0 }, authority: { canAssign: false, canPublish: false, canAuthorizeAction: false, canWriteMeta: false } };
+const projection = { version: "campaign-classification-review/1.0.0", entries: [], summary: { campaigns: 0, reviewRequired: 0, sliceCandidates: 0 }, authority: { canAssign: false, canPublish: false, canAuthorizeAction: false, canWriteMeta: false } };
 describe("campaign classification review HTTP", () => {
   it("is queryless, session-bound GET-only and declares no action authority", async () => {
     const list = vi.fn().mockResolvedValue(projection); const handler = createCampaignClassificationReviewHttpHandler({ service: { list }, resolvePrincipal: vi.fn().mockResolvedValue(principal) });
