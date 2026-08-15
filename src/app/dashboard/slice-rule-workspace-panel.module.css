@@ -66,6 +66,9 @@
 .impactFailure { border: 1px solid color-mix(in srgb, var(--rz-red) 52%, var(--rz-line)); background: color-mix(in srgb, var(--rz-red) 9%, var(--rz-surface)); color: var(--rz-red); }
 .impactResult { display: grid; gap: 5px; border: 1px solid color-mix(in srgb, var(--rz-green) 48%, var(--rz-line)); background: color-mix(in srgb, var(--rz-green) 8%, var(--rz-surface)); color: var(--rz-text); }
 .impactResult strong { color: var(--rz-text); }
+.scenarioExplanation { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
+.scenarioCard { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--rz-line); border-radius: 8px; background: var(--rz-surface); }
+.scenarioCard span, .scenarioCard small { color: var(--rz-muted); font-size: .62rem; line-height: 1.45; }
 .decisionJourney { display: grid; gap: 7px; margin: 0; padding: 14px; border: 1px solid color-mix(in srgb, var(--rz-blue) 42%, var(--rz-line)); border-radius: 10px; background: color-mix(in srgb, var(--rz-blue) 6%, var(--rz-surface)); color: var(--rz-text); }
 .decisionJourney > span, .decisionJourney small { color: var(--rz-muted); font-size: .62rem; line-height: 1.45; }
 .decisionJourney ol { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; margin: 4px 0; padding: 0; list-style: none; }
