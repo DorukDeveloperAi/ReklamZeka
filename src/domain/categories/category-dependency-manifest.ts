@@ -83,6 +83,7 @@ const opaqueCategoryContext = new Set([
   // A cohort diagnostic is an immutable replay artifact. Its compatibility
   // profile/member hashes are historical commitments, not mutable archive edges.
   "robust_cohort_diagnostic_assets.profile",
+  "robust_cohort_diagnostic_assets.equivalence_scope",
   "robust_cohort_diagnostic_assets.member_evidence_refs",
   "robust_cohort_diagnostic_assets.result_payload",
   "robust_cohort_diagnostic_assets.capabilities",
@@ -208,6 +209,7 @@ const columns = [
   "frozen_diagnostic_evidence.source_refs",
   "frozen_diagnostic_evidence.capabilities",
   "robust_cohort_diagnostic_assets.profile",
+  "robust_cohort_diagnostic_assets.equivalence_scope",
   "robust_cohort_diagnostic_assets.member_evidence_refs",
   "robust_cohort_diagnostic_assets.result_payload",
   "robust_cohort_diagnostic_assets.capabilities",
