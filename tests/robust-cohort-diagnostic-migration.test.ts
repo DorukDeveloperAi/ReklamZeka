@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { WORKSPACE_TOMBSTONE_PURGE_TABLES } from "@/connectors/meta/workspace-tombstone-purge-drizzle-adapter";
 
 const migration = readFileSync("drizzle/20260811161831_little_dexter_bennett.sql", "utf8");
+const equivalenceMigration = readFileSync("drizzle/20260815110452_steady_scarlet_spider.sql", "utf8");
 
 describe("robust cohort diagnostic asset migration", () => {
   it("is tenant-bound, private, append-only and structurally advisory-only", () => {
@@ -14,6 +15,14 @@ describe("robust cohort diagnostic asset migration", () => {
     expect(migration).toContain("robust_cohort_diagnostic_asset_append_only");
     expect(migration).toContain("lifecycle_state = 'tombstoning'");
     expect(migration).toContain('"canAccessNetwork":false');
+  });
+
+  it("adds an optional, structurally constrained scope proof without rewriting historical assets", () => {
+    expect(equivalenceMigration).toContain('ADD COLUMN "equivalence_scope" jsonb');
+    expect(equivalenceMigration).toContain("'market' in ('domestic', 'international')");
+    expect(equivalenceMigration).toContain("'serviceHash' ~ '^[a-f0-9]{64}$'");
+    expect(equivalenceMigration).not.toContain("UPDATE \"robust_cohort_diagnostic_assets\"");
+    expect(equivalenceMigration).not.toContain("GRANT ");
   });
 
   it("is purged before its frozen-evidence parent", () => {

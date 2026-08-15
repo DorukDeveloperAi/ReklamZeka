@@ -2594,6 +2594,7 @@ export const robustCohortDiagnosticAssets = pgTable("robust_cohort_diagnostic_as
   cohortRef: text("cohort_ref").notNull(),
   cohortHash: text("cohort_hash").notNull(),
   profile: jsonb("profile").$type<Record<string, unknown>>().notNull(),
+  equivalenceScope: jsonb("equivalence_scope").$type<Record<string, unknown> | null>(),
   memberEvidenceRefs: jsonb("member_evidence_refs").$type<readonly Readonly<{ evidenceRef: string; evidenceHash: string; featureRef: string; featureHash: string }>[]>().notNull(),
   resultPayload: jsonb("result_payload").$type<Record<string, unknown>>().notNull(),
   capabilities: jsonb("capabilities").$type<Record<string, false>>().notNull(),
@@ -2605,7 +2606,7 @@ export const robustCohortDiagnosticAssets = pgTable("robust_cohort_diagnostic_as
   uniqueIndex("robust_cohort_diagnostic_assets_hash_unique").on(table.workspaceId, table.cohortHash),
   index("robust_cohort_diagnostic_assets_target_idx").on(table.workspaceId, table.targetEvidenceId, table.occurredAt),
   check("robust_cohort_diagnostic_assets_hashes", sql`${table.cohortHash} ~ '^[a-f0-9]{64}$'`),
-  check("robust_cohort_diagnostic_assets_shape", sql`jsonb_typeof(${table.profile}) = 'object' and jsonb_typeof(${table.memberEvidenceRefs}) = 'array' and jsonb_array_length(${table.memberEvidenceRefs}) >= 1 and jsonb_array_length(${table.memberEvidenceRefs}) <= 100 and jsonb_typeof(${table.resultPayload}) = 'object'`),
+  check("robust_cohort_diagnostic_assets_shape", sql`jsonb_typeof(${table.profile}) = 'object' and (${table.equivalenceScope} is null or (jsonb_typeof(${table.equivalenceScope}) = 'object' and ${table.equivalenceScope} ?& array['version', 'market', 'serviceHash', 'funnel', 'optimizationEvent', 'audienceHash', 'platformHash'] and ${table.equivalenceScope} - array['version', 'market', 'serviceHash', 'funnel', 'optimizationEvent', 'audienceHash', 'platformHash'] = '{}'::jsonb and ${table.equivalenceScope}->>'version' = 'cohort-equivalence-scope/1.0.0' and ${table.equivalenceScope}->>'market' in ('domestic', 'international') and ${table.equivalenceScope}->>'serviceHash' ~ '^[a-f0-9]{64}$' and ${table.equivalenceScope}->>'funnel' in ('awareness', 'consideration', 'conversion') and ${table.equivalenceScope}->>'optimizationEvent' ~ '^[a-z][a-z0-9_]{0,63}$' and ${table.equivalenceScope}->>'audienceHash' ~ '^[a-f0-9]{64}$' and ${table.equivalenceScope}->>'platformHash' ~ '^[a-f0-9]{64}$')) and jsonb_typeof(${table.memberEvidenceRefs}) = 'array' and jsonb_array_length(${table.memberEvidenceRefs}) >= 1 and jsonb_array_length(${table.memberEvidenceRefs}) <= 100 and jsonb_typeof(${table.resultPayload}) = 'object'`),
   check("robust_cohort_diagnostic_assets_advisory_only", sql`${table.capabilities} = '{"canAuthorizeAction":false,"canExecuteWrite":false,"canWriteMeta":false,"canPublish":false,"canApprove":false,"canExecute":false,"canAccessNetwork":false}'::jsonb`),
 ]);
 

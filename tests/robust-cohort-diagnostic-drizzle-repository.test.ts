@@ -11,11 +11,18 @@ function feature(entityRef: string, value: number) {
   const row = normalizeMetaDailyInsight({ schemaVersion: 1, workspaceId: "workspace", metaConnectionId: "connection", adAccountId: "account", entityLevel: "campaign", externalEntityId: entityRef, dateStart: "2026-08-01", dateStop: "2026-08-01", attributionLabel: "default", currency: "TRY", timezone: "Europe/Istanbul", sourceRevision: "1", sourcePayloadHash: `hash-${entityRef}`, metricProvenance: {}, metrics: [{ metricKey: "spend", aggregation: "additive", valueMinor: value, currency: "TRY", provenance: {} }] });
   return buildDeterministicFeatureSnapshot({ scope: { workspaceId, metaConnectionId: "00000000-0000-4000-8000-000000000103", adAccountId: "00000000-0000-4000-8000-000000000104", entityLevel: "campaign", externalEntityId: entityRef }, observation: { observationRef: `observation_${entityRef}`, role: "primary", startDate: "2026-08-01", endDate: "2026-08-01", timezone: "Europe/Istanbul", sampleSize: 10, settled: true, qualityStatus: "ready", qualityReasonCodes: [], metricResult: aggregateMetaMetrics({ rows: [row], metrics: ["spendMinor"] }), snapshotRefs: [`snapshot_${entityRef}`] } });
 }
+function contextPayload(market: "domestic" | "international" = "domestic") {
+  const category = (key: string, definition: string, hash: string) => ({
+    dimension: { key, version: 1, cardinality: "single" }, effectiveDefinitions: [{ key: definition, version: 1 }],
+    profileBindings: [{ categoryRef: `category_${key}_${definition}`, profileRef: `profile_${key}`, profileVersion: 1, profileHash: hash.repeat(64) }],
+  });
+  return { categories: [category("market", market, "a"), category("service", "lead", "b"), category("audience_strategy", "prospecting", "c"), category("publisher_platform", "instagram", "d")] };
+}
 const input = Object.freeze({ workspaceId, targetEvidenceId, metricKey: "spendMinor" as const, funnel: "conversion" as const, direction: "lower_is_better" as const, minimumSampleSize: 5, findingThresholdRobustZ: 2.5, occurredAt: "2026-08-11T12:00:00.000Z" });
 function candidate(entityRef: string, value: number, evidenceId = `00000000-0000-4000-8000-0000000001${entityRef.at(-1)}`) {
   const frozen = feature(entityRef, value);
   const marker = ({ campaign_alpha: "a", campaign_beta: "b", campaign_gamma: "c", campaign_delta: "d" } as Record<string, string>)[entityRef]!;
-  return { evidence_id: evidenceId, evidence_hash: marker.repeat(64), entity_ref: entityRef, feature_ref: frozen.featureRef, feature_hash: frozen.featureHash, feature_payload: frozen };
+  return { evidence_id: evidenceId, evidence_hash: marker.repeat(64), entity_ref: entityRef, context_payload: contextPayload(), feature_ref: frozen.featureRef, feature_hash: frozen.featureHash, feature_payload: frozen };
 }
 
 describe("DrizzleRobustCohortDiagnosticRepository", () => {
@@ -37,6 +44,7 @@ describe("DrizzleRobustCohortDiagnosticRepository", () => {
     expect(calls[1]).toContain("category_cohort_profile_hash");
     expect(calls[1]).toContain("policy_set_hash");
     expect(calls[3]).toContain("insert into robust_cohort_diagnostic_assets");
+    expect(calls[3]).toContain("equivalence_scope");
     expect(calls[3]).toContain("on conflict (workspace_id, cohort_hash) do nothing");
   });
 
@@ -51,5 +59,14 @@ describe("DrizzleRobustCohortDiagnosticRepository", () => {
     const source = DrizzleRobustCohortDiagnosticRepository.prototype.materialize.toString();
     expect(source).toContain("join target");
     expect(source).toContain("minimumMemberCount: 4");
+  });
+
+  it("refuses a cohort whose immutable category contexts mix markets", async () => {
+    const selected = [candidate("campaign_alpha", 10, targetEvidenceId), { ...candidate("campaign_beta", 11, "00000000-0000-4000-8000-000000000106"), context_payload: contextPayload("international") }, candidate("campaign_gamma", 12, "00000000-0000-4000-8000-000000000107"), candidate("campaign_delta", 30, "00000000-0000-4000-8000-000000000108")];
+    let calls = 0; const database = { transaction: vi.fn(async (work) => work(database)), execute: vi.fn(async () => {
+      calls += 1; if (calls === 1) return { rows: [{ id: workspaceId }] }; if (calls === 2) return { rows: selected };
+      return { rows: [{ objective: "sales", funnel: "conversion", optimization_event: "purchase", category_cohort_profile_hash: "a".repeat(64), policy_set_hash: "b".repeat(64) }] };
+    }) };
+    await expect(new DrizzleRobustCohortDiagnosticRepository(database as never).materialize(input)).rejects.toMatchObject({ code: "insufficient_evidence" });
   });
 });
