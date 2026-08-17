@@ -1,4 +1,8 @@
 .operationTable { display: grid; gap: 14px; }
+.help { border: 1px solid var(--rz-line); border-radius: 8px; background: var(--rz-surface-2); color: var(--rz-muted); font-size: .78rem; }
+.help summary { padding: 9px 12px; color: var(--rz-text); cursor: pointer; font-weight: 650; }
+.help p { margin: 0; padding: 0 12px 10px; line-height: 1.5; }
+.help summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--rz-blue) 55%, transparent); outline-offset: 2px; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .toolbar button, .loadMore { min-height: 36px; padding: 0 12px; border: 1px solid var(--rz-line); border-radius: 8px; background: var(--rz-surface-2); color: var(--rz-text); cursor: pointer; }
 .toolbar button[aria-pressed="true"] { border-color: var(--rz-blue); background: color-mix(in srgb, var(--rz-blue) 14%, var(--rz-surface-2)); font-weight: 700; }

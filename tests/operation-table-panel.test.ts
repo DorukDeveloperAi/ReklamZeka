@@ -29,6 +29,10 @@ describe("operation table panel", () => {
     expect(html).toContain("Eksik gün: 2026-08-17");
     expect(html).toContain("Daha fazlasını yükle");
     expect(html).toContain("Meta yazma yetkisi yok");
+    expect(html).toContain("Bütçe sahibi");
+    expect(html).toContain("Para birimi doğrulanmadı");
+    expect(html).not.toContain("Kılavuz / son karar");
+    expect(html).not.toContain("TRY");
     expect(html).not.toContain("demo");
     const source = require("node:fs").readFileSync("src/app/dashboard/operation-table-panel.module.css", "utf8");
     expect(source).toContain("@media (max-width: 480px)");
