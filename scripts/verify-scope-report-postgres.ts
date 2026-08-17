@@ -19,6 +19,15 @@ const expectedDays = ["2026-08-01", "2026-08-02"] as const;
 const publicOnly = (value: unknown) => !/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(JSON.stringify(value));
 
 await client.connect();
+const transactionSmoke = new pg.Client({ connectionString });
+await transactionSmoke.connect();
+let actualRepeatableRead = false, actualReadOnly = false;
+try {
+  await transactionSmoke.query("begin isolation level repeatable read read only");
+  actualRepeatableRead = (await transactionSmoke.query("show transaction_isolation")).rows[0]?.transaction_isolation === "repeatable read";
+  actualReadOnly = (await transactionSmoke.query("show transaction_read_only")).rows[0]?.transaction_read_only === "on";
+  await transactionSmoke.query("rollback");
+} finally { await transactionSmoke.end(); }
 try {
   await q("begin");
   const ws = randomUUID(), user = randomUUID(), connection = randomUUID(), source = randomUUID(), account = randomUUID();
@@ -62,18 +71,18 @@ try {
   await insight("ad_set", adSetExternal, "2026-08-01", "7d_click", [{ key: "spend", minor: "40" }, { key: "actions", action: "lead", decimal: "2" }]);
 
   const base = drizzle(client);
-  const observed = { repeatableRead: 0, readOnly: 0 };
-  const tx = new Proxy(base, { get(target, key) { if (key !== "execute") return Reflect.get(target, key); return async (statement: { queryChunks?: readonly { value?: readonly string[] }[] }) => { const text = statement.queryChunks?.flatMap((part) => part.value ?? []).join("").toLowerCase() ?? ""; if (text.includes("transaction isolation level repeatable read")) { observed.repeatableRead++; return { rows: [] }; } if (text.includes("transaction read only")) { observed.readOnly++; return { rows: [] }; } return target.execute(statement as never); }; } });
+  const observed = { repeatableRead: 0, readOnly: 0, dml: 0 };
+  const tx = new Proxy(base, { get(target, key) { if (key !== "execute") return Reflect.get(target, key); return async (statement: { queryChunks?: readonly { value?: readonly string[] }[] }) => { const text = statement.queryChunks?.flatMap((part) => part.value ?? []).join("").toLowerCase() ?? ""; if (/^\s*(insert|update|delete|merge)\b/.test(text)) observed.dml++; if (text.includes("transaction isolation level repeatable read")) { observed.repeatableRead++; return { rows: [] }; } if (text.includes("transaction read only")) { observed.readOnly++; return { rows: [] }; } return target.execute(statement as never); }; } });
   const database = { transaction: async <T>(work: (transaction: typeof tx) => Promise<T>) => { await q("savepoint scope_report_read"); try { const result = await work(tx); await q("release savepoint scope_report_read"); return result; } catch (error) { await q("rollback to savepoint scope_report_read"); await q("release savepoint scope_report_read"); throw error; } } };
   const repository = new DrizzleOperationReadRepository(database as never);
   const service = new ScopeReportReadService(repository);
   const baseInput = { slice: revision.sliceRef, start: "2026-08-01", end: "2026-08-02" };
   const loaded = await repository.currentScopeReport(ws, revision.sliceRef, { startDate: baseInput.start, endDate: baseInput.end }, null);
   const project = (options: Parameters<typeof buildScopeReport>[2]) => buildScopeReport(loaded.evidence, loaded.metrics, options);
-  const day = project({ granularity: "day", startDate: baseInput.start, endDate: baseInput.end, actionType: "lead" });
+  const day = await service.read(ws, { ...baseInput, granularity: "day", action: "lead" });
   const week = project({ granularity: "week", startDate: baseInput.start, endDate: baseInput.end, actionType: "lead" });
   const month = project({ granularity: "month", startDate: baseInput.start, endDate: baseInput.end, actionType: "lead" });
-  const purchase = project({ granularity: "day", startDate: baseInput.start, endDate: baseInput.end, actionType: "purchase" });
+  const purchase = await service.read(ws, { ...baseInput, granularity: "day", action: "purchase" });
   const filtered = project({ granularity: "day", startDate: baseInput.start, endDate: baseInput.end, entityLevel: "campaign", metricKey: "actions", actionType: "lead", sort: "metric", direction: "desc" });
   const deterministicA = project({ granularity: "day", startDate: baseInput.start, endDate: baseInput.end, actionType: "lead", sort: "entity", direction: "desc" });
   const deterministicB = project({ granularity: "day", startDate: baseInput.start, endDate: baseInput.end, actionType: "lead", sort: "entity", direction: "desc" });
@@ -81,21 +90,25 @@ try {
   const campaignRef = day.rows.find((row) => row.entityLevel === "campaign" && row.membership === "included")?.entityRef;
   const campaignPivot = day.pivot.find((row) => row.entityRef === campaignRef && row.bucket === "2026-08-01");
   const leadCoverage = day.coverage.find((coverage) => coverage.entityRef === campaignRef && coverage.actionType === "lead");
-  const purchaseCoverage = purchase.coverage.find((coverage) => coverage.entityRef === campaignRef && coverage.actionType === "purchase");
+  const purchaseCoverage = purchase.coverage.find((coverage) => coverage.entityLevel === "ad_set" && coverage.actionType === "purchase");
+  let unknownSelectorRejected = false;
+  try { await service.read(ws, { ...baseInput, granularity: "day", action: "unknown_action" }); } catch (error) { unknownSelectorRejected = error instanceof Error && error.message === "scope report rejected: selector"; }
   const flags = {
     dayWeekMonthBuckets: day.pivot.some((row) => row.bucket === "2026-08-01") && week.pivot.some((row) => row.bucket === "2026-07-27") && month.pivot.some((row) => row.bucket === "2026-08-01"),
     leadAndPurchaseSelector: day.rawMetrics.every((metric) => metric.metricKey !== "actions" || metric.actionType === "lead") && purchase.rawMetrics.every((metric) => metric.metricKey !== "actions" || metric.actionType === "purchase"),
-    zeroRowUnavailableCoverage: purchaseCoverage?.sourceState === "partial" && purchaseCoverage.missingDays.includes("2026-08-02"),
+    zeroRowUnavailableCoverage: purchaseCoverage?.sourceState === "unavailable" && purchaseCoverage.observedDays.length === 0,
     missingDayAvailability: leadCoverage?.sourceState === "unavailable" && leadCoverage.missingDays.includes("2026-08-02") && leadCoverage.reasonCodes.includes("action_unavailable"),
     exactLargeDecimalRational: campaignPivot?.ratios.spendPerAction?.numeratorMinor === "9223372036854775807" && campaignPivot.ratios.spendPerAction.denominatorAction === "0.0000000001",
-    excludedMarketConflicting: day.rows.some((row) => row.reason === "excluded_market_conflicting"),
+    excludedMarketConflicting: day.rows.some((row) => row.reason === "excluded_market_conflicting" && row.marketEvidenceRefs.length >= 2 && row.marketEvidenceRefs.every((ref) => /^assignment_[a-f0-9]{24}$/.test(ref))),
     levelMetricActionFilters: filtered.rawMetrics.length > 0 && filtered.rawMetrics.every((metric) => metric.entityLevel === "campaign" && metric.metricKey === "actions" && metric.actionType === "lead"),
     requestedSortDirection: filtered.appliedFilters.sort === "metric" && filtered.appliedFilters.direction === "desc" && deterministicA.appliedFilters.sort === "entity" && deterministicA.appliedFilters.direction === "desc",
-    subtotalRatioDrill: campaignPivot?.subtotal.metricCount === 3 && campaignPivot.drill.entityRef === campaignRef && campaignPivot.ratios.spendPerAction !== null,
+    subtotalRatioDrill: campaignPivot?.subtotal.metricCount === 2 && campaignPivot.drill.entityRef === campaignRef && campaignPivot.ratios.spendPerAction !== null,
     deterministicOrder: JSON.stringify(deterministicA.rawMetrics) === JSON.stringify(deterministicB.rawMetrics) && deterministicA.rawMetrics.every((row, index, values) => index === 0 || values[index - 1]!.entityRef >= row.entityRef),
     publicRefsNoUuid: publicOnly(day) && day.rows.every((row) => /^(campaign|ad_set|organization_campaign)_[a-f0-9]{24}$/.test(row.entityRef)),
-    rrReadOnly: observed.repeatableRead >= 8 && observed.readOnly >= 8,
-    writeOperations: 0 as const,
+    serviceCatalogSelectors: unknownSelectorRejected,
+    rrReadOnly: actualRepeatableRead && actualReadOnly && observed.repeatableRead >= 3 && observed.readOnly >= 3,
+    readDmlZero: observed.dml === 0,
+    writeOperationsZero: day.authority.canWriteMeta === false && day.authority.canExecute === false && day.authority.canApprove === false,
   };
   await q("savepoint scope_report_mixed");
   await insight("campaign", campaignExternal, "2026-08-01", "1d_view", [{ key: "actions", action: "lead", decimal: "1" }]);
@@ -103,7 +116,7 @@ try {
   const attributionMixed = buildScopeReport(attributionLoaded.evidence, attributionLoaded.metrics, { granularity: "day", startDate: baseInput.start, endDate: baseInput.end, actionType: "lead" });
   await q("rollback to savepoint scope_report_mixed"); await q("release savepoint scope_report_mixed");
   await q("savepoint scope_report_currency");
-  await insight("campaign", campaignExternal, "2026-08-01", "7d_click", [{ key: "spend_extra", minor: "1", currency: "USD" }]);
+  await insight("campaign", campaignExternal, "2026-08-01", "1d_view", [{ key: "spend", minor: "1", currency: "USD" }]);
   const currencyLoaded = await repository.currentScopeReport(ws, revision.sliceRef, { startDate: baseInput.start, endDate: baseInput.end }, null);
   const currencyMixed = buildScopeReport(currencyLoaded.evidence, currencyLoaded.metrics, { granularity: "day", startDate: baseInput.start, endDate: baseInput.end, actionType: "lead" });
   await q("rollback to savepoint scope_report_currency"); await q("release savepoint scope_report_currency");
@@ -127,12 +140,12 @@ try {
   const limitPlusOneSql = readFileSync("src/connectors/operations/operation-read-drizzle-repository.ts", "utf8").includes("limit ${MAX_SCOPE_REPORT_METRICS + 1}");
   const ratioNull = (report: typeof day) => report.pivot.find((row) => row.entityRef === campaignRef && row.bucket === "2026-08-01")?.ratios.spendPerAction === null;
   const mixedCurrencyAndAttributionNull = ratioNull(attributionMixed) && ratioNull(currencyMixed);
-  if (!Object.values(flags).every(Boolean) || !mixedCurrencyAndAttributionNull || !capRejected || !limitPlusOneSql) throw new Error(JSON.stringify({ flags, mixedCurrencyAndAttributionNull, capRejected, limitPlusOneSql, day, week, month, purchase, filtered }));
+  if (!Object.values(flags).every((value) => value !== false) || !mixedCurrencyAndAttributionNull || !capRejected || !limitPlusOneSql) throw new Error(JSON.stringify({ flags, mixedCurrencyAndAttributionNull, capRejected, limitPlusOneSql, day, week, month, purchase, filtered }));
   throw rollback;
 } catch (error) {
   await q("rollback");
   if (error !== rollback) throw error;
   const residue = await q("select count(*)::int n from workspaces where name='scope report verifier'");
   if (Number(residue.rows[0]?.n) !== 0) throw new Error("fixture_residue");
-  console.log(JSON.stringify({ ok: true, mode: "outer_rollback", dayWeekMonthBuckets: true, leadAndPurchaseSelector: true, zeroRowUnavailableCoverage: true, missingDayAvailability: true, exactLargeDecimalRational: true, mixedCurrencyAndAttributionNull: true, excludedMarketConflicting: true, levelMetricActionFilters: true, requestedSortDirection: true, subtotalRatioDrill: true, deterministicOrder: true, limitPlusOneCapRejected: true, publicRefsNoUuid: true, repeatableRead: true, readOnly: true, writeOperations: 0, fixtureWritesRolledBack: true }));
+  console.log(JSON.stringify({ ok: true, mode: "outer_rollback", dayWeekMonthBuckets: true, leadAndPurchaseSelector: true, zeroRowUnavailableCoverage: true, missingDayAvailability: true, exactLargeDecimalRational: true, mixedCurrencyAndAttributionNull: true, excludedMarketConflicting: true, levelMetricActionFilters: true, requestedSortDirection: true, subtotalRatioDrill: true, deterministicOrder: true, limitPlusOneCapRejected: true, publicRefsNoUuid: true, serviceCatalogSelectors: true, repeatableRead: true, readOnly: true, writeOperations: 0, fixtureWritesRolledBack: true }));
 } finally { await client.end(); }

@@ -4,6 +4,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import type { GuideRunArtifact, GuideRunArtifactPort, GuideRunStorePort } from "@/application/guide-run-orchestration-service";
 import { verifyAnyGuideRun, type AnyGuideRun } from "@/domain/guides/guide-run";
+import { canonicalGuideWorkspaceRef } from "@/domain/guides/guide-revision";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -13,6 +14,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const HASH = /^[a-f0-9]{64}$/;
 const closed = Object.freeze({ canMutateGuide: false as const, canApprove: false as const, canExecute: false as const, canWriteMeta: false as const });
 const EVENT_JSON_MAX = 16_000;
+const SCOPE_JSON_MAX = 4_160_000;
 const HEAD_JSON_MAX = 1_040_000;
 
 export class GuideRunDrizzleRepositoryError extends Error {
@@ -45,18 +47,18 @@ function persistedRun(value: unknown): AnyGuideRun {
 export class DrizzleGuideRunRepository implements GuideRunStorePort, GuideRunArtifactPort {
   constructor(private readonly database: Pick<Database, "execute" | "transaction">) {}
   async findByIdempotencyKey(input: Readonly<{ workspaceRef: string; idempotencyKey: string }>): Promise<AnyGuideRun | null> {
-    const result = one(rows(await this.database.execute(sql`select h.run_payload from guide_runs r join guide_run_heads h on h.workspace_id=r.workspace_id and h.run_id=r.id where r.idempotency_key=${input.idempotencyKey} and h.run_payload->>'workspaceRef'=${input.workspaceRef} limit 2`)));
+    const result = one(rows(await this.database.execute(sql`select h.run_payload from guide_runs r join guide_run_heads h on h.workspace_id=r.workspace_id and h.run_id=r.id join guide_heads gh on gh.workspace_id=r.workspace_id and gh.guide_id=r.guide_id and gh.current_active_revision_id=r.guide_revision_id join guides g on g.workspace_id=r.workspace_id and g.id=r.guide_id and g.tombstoned_at is null join workspaces w on w.id=r.workspace_id and w.lifecycle_state='active' where r.idempotency_key=${input.idempotencyKey} and h.run_payload->>'workspaceRef'=${input.workspaceRef} limit 2`)));
     return result ? persistedRun(result.run_payload) : null;
   }
   async insertIfAbsent(input: AnyGuideRun): Promise<AnyGuideRun> {
     if (!verifyAnyGuideRun(input) || input.version !== "guide-run/1.2.0") fail("invalid_input");
     jsonWithin(input, HEAD_JSON_MAX, "invalid_input"); jsonWithin(input.trigger, EVENT_JSON_MAX, "invalid_input"); input.events.forEach((event) => jsonWithin(event, EVENT_JSON_MAX, "invalid_input"));
     return this.database.transaction(async tx => {
-      const existing = one(rows(await tx.execute(sql`select h.run_payload from guide_runs r join guide_run_heads h on h.workspace_id=r.workspace_id and h.run_id=r.id where r.idempotency_key=${input.idempotencyKey} and h.run_payload->>'workspaceRef'=${input.workspaceRef} for update limit 2`)));
+      const existing = one(rows(await tx.execute(sql`select h.run_payload from guide_runs r join guide_run_heads h on h.workspace_id=r.workspace_id and h.run_id=r.id join guide_heads gh on gh.workspace_id=r.workspace_id and gh.guide_id=r.guide_id and gh.current_active_revision_id=r.guide_revision_id join guides g on g.workspace_id=r.workspace_id and g.id=r.guide_id and g.tombstoned_at is null join workspaces w on w.id=r.workspace_id and w.lifecycle_state='active' where r.idempotency_key=${input.idempotencyKey} and h.run_payload->>'workspaceRef'=${input.workspaceRef} for update of h,gh,g,w limit 2`)));
       if (existing) return persistedRun(existing.run_payload);
-      const revision = one(rows(await tx.execute(sql`select r.id::text revision_id,r.guide_id::text guide_id,r.workspace_id::text workspace_id from guide_revisions r join guides g on g.workspace_id=r.workspace_id and g.id=r.guide_id and g.tombstoned_at is null join guide_heads h on h.workspace_id=r.workspace_id and h.guide_id=r.guide_id and h.current_active_revision_id=r.id join workspaces w on w.id=r.workspace_id and w.lifecycle_state='active' where r.guide_ref=${input.guideRef} and r.revision_hash=${input.guideRevisionHash} limit 2`)));
+      const revision = one(rows(await tx.execute(sql`select r.id::text revision_id,r.guide_id::text guide_id,r.workspace_id::text workspace_id from guide_revisions r join guides g on g.workspace_id=r.workspace_id and g.id=r.guide_id and g.tombstoned_at is null join guide_heads h on h.workspace_id=r.workspace_id and h.guide_id=r.guide_id and h.current_active_revision_id=r.id join workspaces w on w.id=r.workspace_id and w.lifecycle_state='active' where r.guide_ref=${input.guideRef} and r.revision_hash=${input.guideRevisionHash} for update of r,g,h,w limit 2`)));
       if (!revision || typeof revision.revision_id !== "string" || typeof revision.guide_id !== "string") fail("not_found");
-      if (typeof revision.workspace_id !== "string" || `workspace_${createHash("sha256").update(revision.workspace_id).digest("hex").slice(0, 24)}` !== input.workspaceRef) fail("not_found");
+      if (typeof revision.workspace_id !== "string" || canonicalGuideWorkspaceRef(revision.workspace_id) !== input.workspaceRef) fail("not_found");
       const created = one(rows(await tx.execute(sql`insert into guide_runs(workspace_id,guide_id,guide_revision_id,run_ref,guide_revision_hash,idempotency_key,run_version,trigger_payload,created_at) values(${revision.workspace_id}::uuid,${revision.guide_id}::uuid,${revision.revision_id}::uuid,${input.runRef},${input.guideRevisionHash},${input.idempotencyKey},${input.version},${JSON.stringify(input.trigger)}::jsonb,${input.events[0]!.occurredAt}::timestamptz) on conflict(workspace_id,idempotency_key) do nothing returning id::text,workspace_id::text`)));
       if (!created) { const won = one(rows(await tx.execute(sql`select h.run_payload from guide_runs r join guide_run_heads h on h.workspace_id=r.workspace_id and h.run_id=r.id where r.workspace_id=${revision.workspace_id}::uuid and r.idempotency_key=${input.idempotencyKey} for update limit 2`))); if (!won) fail("conflict"); return persistedRun(won.run_payload); }
       if (!created || typeof created.id !== "string" || typeof created.workspace_id !== "string") fail("corrupt_store");
@@ -69,7 +71,7 @@ export class DrizzleGuideRunRepository implements GuideRunStorePort, GuideRunArt
     if (!verifyAnyGuideRun(input.run) || input.run.version !== "guide-run/1.2.0" || !HASH.test(input.expectedHeadHash) || input.run.events.length < 2) fail("invalid_input");
     jsonWithin(input.run, HEAD_JSON_MAX, "invalid_input"); input.run.events.forEach((event) => jsonWithin(event, EVENT_JSON_MAX, "invalid_input"));
     return this.database.transaction(async tx => {
-      const current = one(rows(await tx.execute(sql`select r.id::text run_id,r.workspace_id::text workspace_id from guide_runs r join guide_run_heads h on h.workspace_id=r.workspace_id and h.run_id=r.id where r.run_ref=${input.run.runRef} and h.head_event_hash=${input.expectedHeadHash} for update limit 2`)));
+      const current = one(rows(await tx.execute(sql`select r.id::text run_id,r.workspace_id::text workspace_id from guide_runs r join guide_run_heads h on h.workspace_id=r.workspace_id and h.run_id=r.id join guide_heads gh on gh.workspace_id=r.workspace_id and gh.guide_id=r.guide_id and gh.current_active_revision_id=r.guide_revision_id join guides g on g.workspace_id=r.workspace_id and g.id=r.guide_id and g.tombstoned_at is null join workspaces w on w.id=r.workspace_id and w.lifecycle_state='active' where r.run_ref=${input.run.runRef} and h.head_event_hash=${input.expectedHeadHash} for update of h,gh,g,w limit 2`)));
       if (!current || typeof current.run_id !== "string" || typeof current.workspace_id !== "string") return null;
       const event = input.run.events.at(-1)!; await this.event(tx, current.workspace_id, current.run_id, event);
       const lease = input.run.lease;
@@ -79,7 +81,7 @@ export class DrizzleGuideRunRepository implements GuideRunStorePort, GuideRunArt
   }
   async fence(input: Readonly<{ runRef: string; expectedHeadHash: string; leaseToken: string; leaseEpoch: number; now: string }>): Promise<AnyGuideRun | null> {
     if (!HASH.test(input.expectedHeadHash) || !UUID.test(input.leaseToken) || !Number.isSafeInteger(input.leaseEpoch) || input.leaseEpoch < 1) fail("invalid_input");
-    const found = one(rows(await this.database.execute(sql`select h.run_payload from guide_runs r join guide_run_heads h on h.workspace_id=r.workspace_id and h.run_id=r.id where r.run_ref=${input.runRef} and h.head_event_hash=${input.expectedHeadHash} and h.lease_token=${input.leaseToken}::uuid and h.lease_epoch=${input.leaseEpoch} and h.lease_expires_at>${at(input.now)}::timestamptz limit 2`)));
+    const found = one(rows(await this.database.execute(sql`select h.run_payload from guide_runs r join guide_run_heads h on h.workspace_id=r.workspace_id and h.run_id=r.id join guide_heads gh on gh.workspace_id=r.workspace_id and gh.guide_id=r.guide_id and gh.current_active_revision_id=r.guide_revision_id join guides g on g.workspace_id=r.workspace_id and g.id=r.guide_id and g.tombstoned_at is null join workspaces w on w.id=r.workspace_id and w.lifecycle_state='active' where r.run_ref=${input.runRef} and h.head_event_hash=${input.expectedHeadHash} and h.lease_token=${input.leaseToken}::uuid and h.lease_epoch=${input.leaseEpoch} and h.lease_expires_at>${at(input.now)}::timestamptz limit 2`)));
     return found ? persistedRun(found.run_payload) : null;
   }
   async list(runRef: string): Promise<readonly GuideRunArtifact[]> {
@@ -89,9 +91,9 @@ export class DrizzleGuideRunRepository implements GuideRunStorePort, GuideRunArt
   }
   async append(input: GuideRunArtifact): Promise<void> {
     if (!input.immutable || digest(input.authority) !== closedHash || !HASH.test(input.payloadHash) || input.payloadHash !== digest(input.payload)) fail("invalid_input");
-    jsonWithin(input.payload, EVENT_JSON_MAX, "invalid_input");
+    jsonWithin(input.payload, input.kind === "scope_snapshot" ? SCOPE_JSON_MAX : EVENT_JSON_MAX, "invalid_input");
     await this.database.transaction(async tx => {
-      const target = one(rows(await tx.execute(sql`select id::text,workspace_id::text from guide_runs where run_ref=${input.runRef} for update limit 2`)));
+      const target = one(rows(await tx.execute(sql`select r.id::text,r.workspace_id::text from guide_runs r join guide_heads gh on gh.workspace_id=r.workspace_id and gh.guide_id=r.guide_id and gh.current_active_revision_id=r.guide_revision_id join guides g on g.workspace_id=r.workspace_id and g.id=r.guide_id and g.tombstoned_at is null join workspaces w on w.id=r.workspace_id and w.lifecycle_state='active' where r.run_ref=${input.runRef} for update of gh,g,w limit 2`)));
       if (!target || typeof target.id !== "string" || typeof target.workspace_id !== "string") fail("not_found");
       const inserted = rows(await tx.execute(sql`insert into guide_run_artifacts(workspace_id,run_id,artifact_ref,kind,payload_hash,payload,occurred_at,authority) values(${target.workspace_id}::uuid,${target.id}::uuid,${input.artifactRef},${input.kind},${input.payloadHash},${JSON.stringify(input.payload)}::jsonb,${input.occurredAt}::timestamptz,${JSON.stringify(closed)}::jsonb) on conflict(workspace_id,artifact_ref) do nothing returning id`));
       if (!inserted.length) { const existing = one(rows(await tx.execute(sql`select kind,payload_hash,payload,occurred_at::text,authority from guide_run_artifacts where workspace_id=${target.workspace_id}::uuid and artifact_ref=${input.artifactRef} limit 2`))); if (!existing || existing.kind !== input.kind || existing.payload_hash !== input.payloadHash || digest(existing.payload) !== digest(input.payload) || digest(existing.authority) !== closedHash || new Date(String(existing.occurred_at)).toISOString() !== input.occurredAt) fail("conflict"); }
@@ -101,7 +103,7 @@ export class DrizzleGuideRunRepository implements GuideRunStorePort, GuideRunArt
   async recordScheduleReceipt(input: Readonly<{ workspaceId: string; guideRevisionId: string; scheduledFor: string; missedFrom: string | null; missedTo: string | null; missedCount: number; runRef: string | null; createdAt: string }>): Promise<void> {
     if (!UUID.test(input.workspaceId) || !UUID.test(input.guideRevisionId) || (input.missedFrom === null) !== (input.missedTo === null)) fail("invalid_input");
     const scheduledFor = at(input.scheduledFor), missedFrom = input.missedFrom === null ? null : at(input.missedFrom), missedTo = input.missedTo === null ? null : at(input.missedTo), createdAt = at(input.createdAt);
-    if (!Number.isSafeInteger(input.missedCount) || input.missedCount < 0 || input.missedCount > 1_000_000 || missedFrom && (!missedTo || input.missedCount < 1 || Date.parse(missedFrom) > Date.parse(missedTo) || Date.parse(missedTo) > Date.parse(scheduledFor)) || !missedFrom && input.missedCount !== 0) fail("invalid_input");
+    if (!Number.isSafeInteger(input.missedCount) || input.missedCount < 0 || input.missedCount > 4_000_000 || missedFrom && (!missedTo || input.missedCount < 1 || Date.parse(missedFrom) > Date.parse(missedTo) || Date.parse(missedTo) > Date.parse(scheduledFor)) || !missedFrom && input.missedCount !== 0) fail("invalid_input");
     const fireRef = `guide_fire_${digest({ workspaceId: input.workspaceId, guideRevisionId: input.guideRevisionId, scheduledFor }).slice(0, 64)}`;
     const receiptHash = digest({ version: "guide-run-schedule-receipt/1.0.0", fireRef, guideRevisionId: input.guideRevisionId, scheduledFor, missedFrom, missedTo, missedCount: input.missedCount, runRef: input.runRef });
     await this.database.transaction(async tx => {

@@ -851,7 +851,10 @@ export class DrizzleOperationReadRepository implements OperationReadRepository {
         evidenceRefs: string[];
       }[]
     >();
-    const parkedMarketConflicts = new Set<string>();
+    /** Parked single-cardinality market conflicts cannot become a normal
+     * dimension value, but their public assignment evidence is still part of
+     * the canonical resolver explanation. */
+    const parkedMarketConflicts = new Map<string, readonly string[]>();
     const adSetCampaign = new Map(
       candidateRows
         .filter((row) => row.entity_level === "ad_set")
@@ -897,7 +900,14 @@ export class DrizzleOperationReadRepository implements OperationReadRepository {
       });
       if (inspected.state === "parked_conflict") {
         if (dimension.key === marketDimensionKey)
-          parkedMarketConflicts.add(`${level}\u0000${id}`);
+          parkedMarketConflicts.set(
+            `${level}\u0000${id}`,
+            unique(
+              currentAssignments.map((assignment) =>
+                categoryAssignmentPublicRef(workspaceId, assignment.id),
+              ),
+            ),
+          );
         continue;
       }
       if (inspected.state !== "applied") continue;
@@ -959,7 +969,7 @@ export class DrizzleOperationReadRepository implements OperationReadRepository {
               evidenceRefs: [organizationCampaignPublicRef(workspaceId, id)],
             }
           : parkedMarketConflicts.has(`${level}\u0000${id}`)
-            ? { state: "conflicting" as const, evidenceRefs: unique(marketAssignments.flatMap((item) => item.evidenceRefs)) }
+            ? { state: "conflicting" as const, evidenceRefs: parkedMarketConflicts.get(`${level}\u0000${id}`)! }
           : marketAssignments.length === 0
             ? { state: "missing" as const, evidenceRefs: [] }
             : marketAssignments.length !== 1 ||

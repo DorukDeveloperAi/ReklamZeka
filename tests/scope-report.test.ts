@@ -42,7 +42,7 @@ describe("Kapsam Raporu", () => {
     const report = buildScopeReport(evidence, metrics, { granularity: "week", startDate: "2026-08-01", endDate: "2026-08-03", actionType: "lead" });
     expect(report.rawMetrics).toHaveLength(2);
     expect(report.rawMetrics.map((metric) => metric.actionType)).toEqual([null, "lead"]);
-    expect(report.pivot).toEqual([expect.objectContaining({ bucket: "2026-07-27", subtotal: { metricCount: 2, availableMetricCount: 2 }, ratios: { spendPerAction: { numeratorMinor: "100", denominatorAction: "2" } }, drill: { entityRef: "campaign_in", bucket: "2026-07-27" } })]);
+    expect(report.pivot).toEqual([expect.objectContaining({ bucket: "2026-07-27", subtotal: { metricCount: 2, availableMetricCount: 2 }, ratios: { spendPerAction: null }, drill: { entityRef: "campaign_in", bucket: "2026-07-27" } })]);
     expect(report.coverage).toEqual([expect.objectContaining({ actionType: "lead", expectedDays: ["2026-08-01", "2026-08-02", "2026-08-03"], observedDays: ["2026-08-02"], missingDays: ["2026-08-01", "2026-08-03"], sourceState: "partial", reasonCodes: ["coverage_incomplete"] })]);
     expect(buildScopeReport(evidence, metrics, { granularity: "day", entityLevel: "campaign", metricKey: "actions", sort: "metric", direction: "desc" }).rawMetrics)
       .toEqual(expect.arrayContaining([expect.objectContaining({ actionType: "lead" }), expect.objectContaining({ actionType: "purchase" })]));
@@ -58,6 +58,22 @@ describe("Kapsam Raporu", () => {
       .toEqual({ numeratorMinor: "99999999999999999999999999999999999999", denominatorAction: "0.000000000000000001" });
     expect(buildScopeReport(evidence, [{ ...base[1]!, attribution: "1d_view" }, base[0]!], { granularity: "day", actionType: "lead" }).pivot[0]?.ratios.spendPerAction).toBeNull();
     expect(buildScopeReport(evidence, [{ ...base[0]!, currency: "USD" }, base[0]!, base[1]!], { granularity: "day", actionType: "lead" }).pivot[0]?.ratios.spendPerAction).toBeNull();
+  });
+
+  it("keeps selector coverage independent from display filters and nulls incomplete day/week/month ratios", () => {
+    const metrics = [
+      { entityRef: "campaign_in", entityLevel: "campaign" as const, date: "2026-08-01", attribution: "7d_click", metricKey: "spend", actionType: null, valueDecimal: null, valueMinor: "100", currency: "TRY", availability: "available" as const },
+      { entityRef: "campaign_in", entityLevel: "campaign" as const, date: "2026-08-01", attribution: "7d_click", metricKey: "actions", actionType: "lead", valueDecimal: "2", valueMinor: null, currency: "TRY", availability: "available" as const },
+      { entityRef: "campaign_in", entityLevel: "campaign" as const, date: "2026-08-02", attribution: "7d_click", metricKey: "spend", actionType: null, valueDecimal: null, valueMinor: "100", currency: "TRY", availability: "available" as const },
+      { entityRef: "campaign_in", entityLevel: "campaign" as const, date: "2026-08-02", attribution: "7d_click", metricKey: "actions", actionType: "lead", valueDecimal: "1", valueMinor: null, currency: "TRY", availability: "unavailable" as const },
+    ];
+    const options = { startDate: "2026-08-01", endDate: "2026-08-02", actionType: "lead" as const };
+    const day = buildScopeReport(evidence, metrics, { ...options, granularity: "day", metricKey: "spend" });
+    expect(day.coverage).toEqual(expect.arrayContaining([expect.objectContaining({ entityRef: "campaign_in", sourceState: "unavailable", reasonCodes: ["coverage_incomplete", "action_unavailable"] })]));
+    expect(day.pivot.find((row) => row.bucket === "2026-08-01")?.ratios.spendPerAction).toBeNull();
+    expect(day.pivot.find((row) => row.bucket === "2026-08-02")?.ratios.spendPerAction).toBeNull();
+    expect(buildScopeReport(evidence, metrics, { ...options, granularity: "week" }).pivot[0]?.ratios.spendPerAction).toBeNull();
+    expect(buildScopeReport(evidence, metrics, { ...options, granularity: "month" }).pivot[0]?.ratios.spendPerAction).toBeNull();
   });
 
   it("rejects global/no-published-slice evidence instead of inventing a report scope", () => {

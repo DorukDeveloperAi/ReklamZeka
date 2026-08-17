@@ -117,13 +117,18 @@ export function buildScopeReport(evidence: ScopeReportEvidence, metrics: readonl
     matchedDimensionEvidenceRefs: Object.freeze([...membership.matchedDimensionEvidenceRefs]),
   })));
   const filters = Object.freeze({ entityLevel: options.entityLevel ?? null, metricKey: options.metricKey ?? null, actionType: options.actionType ?? null, sort: options.sort ?? "bucket", direction: options.direction ?? "asc" });
-  const rawMetrics = Object.freeze(metrics.filter((metric) => (filters.entityLevel === null || metric.entityLevel === filters.entityLevel)
-    && (filters.metricKey === null || metric.metricKey === filters.metricKey) && (filters.actionType === null || metric.metricKey !== "actions" || metric.actionType === filters.actionType)).map((metric) => Object.freeze({ ...metric, bucket: bucket(metric.date, options.granularity) }))
+  /** Coverage is selector evidence, not a rendering artifact.  In particular a
+   * metric column filter must never make an action look unavailable (or vice
+   * versa) merely because it is hidden from the long-form display. */
+  const selectorMetrics = metrics.filter((metric) => (filters.entityLevel === null || metric.entityLevel === filters.entityLevel)
+    && (filters.actionType === null || metric.metricKey !== "actions" || metric.actionType === filters.actionType));
+  const rawMetrics = Object.freeze(selectorMetrics.filter((metric) => filters.metricKey === null || metric.metricKey === filters.metricKey).map((metric) => Object.freeze({ ...metric, bucket: bucket(metric.date, options.granularity) }))
     .sort((left, right) => {
       const field = filters.sort === "entity" ? "entityRef" : filters.sort === "metric" ? "metricKey" : "bucket";
       const compared = left[field].localeCompare(right[field]);
       return filters.direction === "asc" ? compared : -compared;
     }));
+  const expectedDays = dates(options.startDate, options.endDate);
   const pivotGroups = new Map<string, ScopeReportMetric[]>();
   for (const metric of rawMetrics) {
     const key = `${metric.entityRef}\u0000${metric.entityLevel}\u0000${metric.bucket}`;
@@ -142,7 +147,16 @@ export function buildScopeReport(evidence: ScopeReportEvidence, metrics: readonl
     const spendTotal = spend.every((value) => value !== null) ? spend.reduce<bigint>((sum, value) => sum + value!.coefficient, 0n) : null;
     const commonScale = actions.every((value) => value !== null) ? Math.max(...actions.map((value) => value!.scale), 0) : 0;
     const actionTotal = actions.every((value) => value !== null) ? actions.reduce<bigint>((sum, value) => sum + value!.coefficient * 10n ** BigInt(commonScale - value!.scale), 0n) : null;
-    const ratio = filters.actionType !== null && spendTotal !== null && actionTotal !== null && actionTotal > 0n && currencies.size === 1 && !currencies.has(null) && attributions.size === 1 && actionTypes.size === 1 && actionTypes.has(filters.actionType)
+    const bucketDays = expectedDays.filter((day) => bucket(day, options.granularity) === first.bucket);
+    // Pure domain callers may intentionally omit a period; in that case the
+    // supplied bucket is the only bounded evidence available.
+    const requiredDays = bucketDays.length ? bucketDays : [...new Set(selectorMetrics.filter((metric) => metric.entityRef === first.entityRef && metric.entityLevel === first.entityLevel && bucket(metric.date, options.granularity) === first.bucket).map((metric) => metric.date))];
+    const complete = (metricKey: "spend" | "actions") => requiredDays.length > 0 && requiredDays.every((day) => {
+      const matching = selectorMetrics.filter((metric) => metric.entityRef === first.entityRef && metric.entityLevel === first.entityLevel && metric.date === day && metric.metricKey === metricKey
+        && (metricKey !== "actions" || metric.actionType === filters.actionType));
+      return matching.length > 0 && matching.every((metric) => metric.availability === "available");
+    });
+    const ratio = filters.actionType !== null && complete("spend") && complete("actions") && spendTotal !== null && actionTotal !== null && actionTotal > 0n && currencies.size === 1 && !currencies.has(null) && attributions.size === 1 && actionTypes.size === 1 && actionTypes.has(filters.actionType)
       ? Object.freeze({ numeratorMinor: spendTotal.toString(), denominatorAction: canonicalDecimal({ coefficient: actionTotal, scale: commonScale }) }) : null;
     return Object.freeze({ entityRef: first.entityRef, entityLevel: first.entityLevel, bucket: first.bucket,
       subtotal: Object.freeze({ metricCount: items.length, availableMetricCount: available.length }),
@@ -154,11 +168,10 @@ export function buildScopeReport(evidence: ScopeReportEvidence, metrics: readonl
     const compared = left[field].localeCompare(right[field]) || left.bucket.localeCompare(right.bucket) || left.entityRef.localeCompare(right.entityRef);
     return filters.direction === "asc" ? compared : -compared;
   }));
-  const expectedDays = dates(options.startDate, options.endDate);
-  const observedCoverage = [...new Map(rawMetrics.filter((metric) => metric.metricKey === "actions" && metric.actionType !== null)
+  const observedCoverage = [...new Map(selectorMetrics.filter((metric) => metric.metricKey === "actions" && metric.actionType !== null)
     .map((metric) => [`${metric.entityRef}\u0000${metric.entityLevel}\u0000${metric.actionType}`, metric] as const)).entries()].map(([key, first]) => {
       const [entityRef, entityLevel, actionType] = key.split("\u0000") as [string, "campaign" | "ad_set", string];
-      const actions = rawMetrics.filter((metric) => metric.entityRef === entityRef && metric.entityLevel === entityLevel && metric.metricKey === "actions" && metric.actionType === actionType);
+      const actions = selectorMetrics.filter((metric) => metric.entityRef === entityRef && metric.entityLevel === entityLevel && metric.metricKey === "actions" && metric.actionType === actionType);
       const observedDays = Object.freeze([...new Set(actions.filter((metric) => metric.availability === "available").map((metric) => metric.date))].sort());
       const missingDays = Object.freeze(expectedDays.filter((day) => !observedDays.includes(day)));
       const unavailable = actions.some((metric) => metric.availability !== "available");
@@ -166,7 +179,7 @@ export function buildScopeReport(evidence: ScopeReportEvidence, metrics: readonl
       return Object.freeze({ entityRef, entityLevel, actionType, expectedDays, observedDays, missingDays,
         sourceState: unavailable ? "unavailable" as const : missingDays.length ? "partial" as const : "ready" as const, reasonCodes });
     });
-  const requestedCoverage = filters.actionType === null ? [] : rows.filter((row): row is ScopeReportRow & Readonly<{ entityLevel: "campaign" | "ad_set" }> => row.membership === "included" && (row.entityLevel === "campaign" || row.entityLevel === "ad_set"))
+  const requestedCoverage = filters.actionType === null ? [] : rows.filter((row): row is ScopeReportRow & Readonly<{ entityLevel: "campaign" | "ad_set" }> => row.membership === "included" && (row.entityLevel === "campaign" || row.entityLevel === "ad_set") && (filters.entityLevel === null || row.entityLevel === filters.entityLevel))
     .filter((row) => !observedCoverage.some((coverage) => coverage.entityRef === row.entityRef && coverage.actionType === filters.actionType))
     .map((row) => Object.freeze({ entityRef: row.entityRef, entityLevel: row.entityLevel, actionType: filters.actionType!, expectedDays, observedDays: Object.freeze([]), missingDays: expectedDays,
       sourceState: "unavailable" as const, reasonCodes: Object.freeze(["coverage_incomplete" as const, "action_unavailable" as const]) }));

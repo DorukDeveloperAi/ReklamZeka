@@ -41,12 +41,15 @@ export class DrizzleGuideRunP01LedgerProjector {
         and a.kind in ('finding_observation','development_log_intent')
       order by a.occurred_at,a.artifact_ref limit 10002`));
     if (found.length === 0) return Object.freeze([]);
-    if (found.length < 2 || found.length > 10_001) throw new Error("guide run ledger artifact set unavailable");
+    if (found.length > 10_001) throw new Error("guide run ledger artifact set unavailable");
     for (const row of found) {
       if (!HASH.test(row.payload_hash) || row.payload_hash !== hash(row.payload) || hash(row.authority) !== CLOSED_HASH) throw new Error("guide run ledger corrupt artifact");
     }
     const logs = found.filter((row) => row.kind === "development_log_intent");
     const observations = found.filter((row) => row.kind === "finding_observation");
+    // A valid no_change run persists one proposed DevLog intent but no finding.
+    // It must not manufacture a P01 finding merely to make projection happen.
+    if (logs.length === 1 && observations.length === 0) return Object.freeze([]);
     if (logs.length !== 1 || observations.length < 1) throw new Error("guide run ledger artifact set unavailable");
     const developmentLog = artifactIntent(logs[0]!.payload, "development_log_intent") as DevelopmentLogIntent;
     return Promise.all(observations.map(async (row) => this.projectArtifactBound({ workspaceId: input.workspaceId, runRef: input.runRef, occurredAt: new Date(row.occurred_at).toISOString(), observation: artifactIntent(row.payload, "finding_observation") as FindingObservationIntent, developmentLog })));
