@@ -65,6 +65,13 @@ try {
       await client.query("insert into guide_heads(workspace_id,guide_id,latest_revision_id,current_active_revision_id,version,updated_at) values($1,$2,$3,$3,1,now())", [workspaceId, guideId, revisionId]);
       await client.query("set local session_replication_role=origin");
       const db = drizzle(client, { schema });
+      // All repositories below are deliberately given a transaction facade.
+      // Their normal nested transaction callbacks therefore stay inside this
+      // verifier's one outer BEGIN and can never commit its PRE-only DDL.
+      const outerDb: any = {
+        execute: db.execute.bind(db), select: db.select.bind(db), insert: db.insert.bind(db),
+        transaction: async (work: (tx: unknown) => Promise<unknown>) => await work(outerDb),
+      };
       await db.insert(schema.metaConnections).values({ id: connectionId, workspaceId, externalConnectionKey: "p06-binding", displayName: "P06", graphApiVersion: "v23.0", fieldCatalogVersion: "p06" });
       await db.insert(schema.dataSources).values({ id: sourceId, workspaceId, metaConnectionId: connectionId, platform: "meta_ads", externalAccountId: "act_12345", displayName: "P06" });
       await db.insert(schema.adAccounts).values({ id: accountId, workspaceId, dataSourceId: sourceId, externalAccountId: "act_12345", name: "P06", currency: "TRY", timezone: "Europe/Istanbul" });
@@ -76,10 +83,10 @@ try {
       const action = { kind: "status_change" as const, entity: { level: "campaign" as const, ref: "campaign_12345" }, fromStatus: "ACTIVE" as const, toStatus: "PAUSED" as const };
       const actionPlan = buildActionPlan(action, { workspaceRef, accountGroupRef: null, accountRef: "act_12345", internalCategoryRefs: [], campaignRef: "campaign_12345", entity: action.entity, evaluatedAt: "2026-08-17T00:00:00.000Z", rules: [rule], budgetLimits: null, protection: { protectedInternalCategoryRefs: [], affectedGeoRefs: [], protectedGeoRefs: [], changeDisposition: "allowed", policyRefs: [] }, frozenContextHash: contextHash });
       const staged = new ActionProposalStagingService({ version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_p06", revision: 1, autonomyMode: "approval_only", requesterRoles: ["operator"], approverRoles: [{ risk: "K2", roles: ["owner"] }], grantConsumerRoles: ["owner"], separationOfDutiesRisks: [], maximumProtectionEvidenceAgeSeconds: 3600, maximumProposalLifetimeSeconds: 86400, maximumGrantLifetimeSeconds: 300 }).stage({ plan: { planRef: "plan_p06", revision: 1, planHash: "f".repeat(64) }, workspaceRef, accountRef: "act_12345", requester: { actorRef: "actor_p06", role: "operator" }, proposedAt: "2026-08-17T00:01:00.000Z", expiresAt: "2026-08-18T00:01:00.000Z", units: [{ unitKey: "unit_p06_pause", plan: { planRef: "plan_p06", revision: 1, planHash: "f".repeat(64) }, actionPlan, workspaceRef, accountRef: "act_12345", entityRef: "campaign_12345", actionType: actionPlan.actionType, risk: actionPlan.risk, actionHash: digest(actionPlan.action), dependencies: [], summary: { safety: "public_safe", before: { label: "Önce", value: "Aktif" }, after: { label: "Sonra", value: "Duraklat" }, evidence: [{ evidenceRef: "evidence_p06", label: "Kanıt" }] } }] });
-      const queue = new DrizzleActionProposalQueueRepository(db as never, workspaceId);
+      const queue = new DrizzleActionProposalQueueRepository(outerDb, workspaceId);
       evidence.actionQueuePersisted = (await queue.appendInitial(staged)).outcome === "inserted" && (await queue.appendInitial(staged)).outcome === "unchanged";
       const unit = staged.bundle.units[0]!;
-      const runs = new DrizzleGuideRunRepository({ execute: db.execute.bind(db), transaction: async (work: (tx: typeof db) => Promise<unknown>) => await work(db) } as never);
+      const runs = new DrizzleGuideRunRepository(outerDb);
       const makeCompleted = async (requestRef: string, token: string) => {
         let run = createGuideRunV12({ workspaceRef, guideRef, guideRevisionHash: revisionHash, trigger: { kind: "manual", requestRef }, occurredAt: "2026-08-17T00:00:00.000Z" });
         await runs.insertIfAbsent(run);
@@ -93,7 +100,7 @@ try {
       };
       const first = await makeCompleted("request_p06_first", "11111111-1111-4111-8111-111111111111");
       evidence.completedRun = first.state === "completed";
-      const binding = new DrizzleGuideRunActionBindingRepository({ execute: db.execute.bind(db), transaction: async (work: (tx: typeof db) => Promise<unknown>) => await work(db) } as never);
+      const binding = new DrizzleGuideRunActionBindingRepository(outerDb);
       const saved = await binding.bind({ workspaceId, runRef: first.runRef }); const replay = await binding.bind({ workspaceId, runRef: first.runRef });
       evidence.materialized = saved.replay === false; evidence.replay = replay.replay === true && replay.bindingId === saved.bindingId;
       const second = await makeCompleted("request_p06_second", "22222222-2222-4222-8222-222222222222");
@@ -109,7 +116,7 @@ try {
       try { await binding.bind({ workspaceId, runRef: first.runRef }); } catch { evidence.staleGuideHeadRejected = true; }
       await client.query("update guide_heads set current_active_revision_id=$1::uuid where workspace_id=$2::uuid and guide_id=$3::uuid", [revisionId, workspaceId, guideId]);
       const purge = new DrizzleWorkspaceTombstonePurgePort(); await client.query("update workspaces set lifecycle_state='tombstoning' where id=$1::uuid", [workspaceId]);
-      const inspection = await purge.inspect(db as never, workspaceId); await purge.purge(db as never, { workspaceId, expectedRevision: inspection.revision });
+      const inspection = await purge.inspect(outerDb, workspaceId); await purge.purge(outerDb, { workspaceId, expectedRevision: inspection.revision });
       const remaining = await client.query<{ n: string }>("select ((select count(*) from guide_run_action_bindings where workspace_id=$1::uuid)+(select count(*) from guide_runs where workspace_id=$1::uuid)+(select count(*) from guide_run_artifacts where workspace_id=$1::uuid))::text n", [workspaceId]);
       evidence.tombstonePurge = remaining.rows[0]?.n === "0";
       throw rollback;
