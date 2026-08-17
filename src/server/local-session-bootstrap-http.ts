@@ -23,6 +23,37 @@ const HEADERS = Object.freeze({
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
 });
+const EMPTY_BODY_CHUNK_LIMIT = 8;
+const EMPTY_BODY_DEADLINE_MS = 250;
+
+async function assertExactEmptyBody(body: ReadableStream<Uint8Array> | null): Promise<void> {
+  if (body === null) return;
+  const reader = body.getReader();
+  const deadline = Date.now() + EMPTY_BODY_DEADLINE_MS;
+  try {
+    for (let chunks = 0; chunks < EMPTY_BODY_CHUNK_LIMIT; chunks += 1) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new LocalDecisionRoomBoundaryError("untrusted_request");
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const next = await new Promise<ReadableStreamReadResult<Uint8Array>>((resolve, reject) => {
+          timeout = setTimeout(() => reject(new LocalDecisionRoomBoundaryError("untrusted_request")), remaining);
+          void reader.read().then(resolve, reject);
+        });
+        if (next.done) return;
+        if (next.value.byteLength !== 0) throw new LocalDecisionRoomBoundaryError("untrusted_request");
+      } finally {
+        if (timeout !== undefined) clearTimeout(timeout);
+      }
+    }
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+}
 
 function rejected() {
   return NextResponse.json({ error: { code: "local_session_rejected", message: "Yerel oturum kanıtı reddedildi." } }, {
@@ -52,16 +83,10 @@ export function createLocalSessionBootstrapHandler(input: Readonly<{
         || (contentLength !== null && contentLength !== "0")) {
         throw new LocalDecisionRoomBoundaryError("untrusted_request");
       }
-      // Exact empty body. Next's Route Handler adapter can expose a readable
-      // stream even when a browser sends POST with Content-Length: 0, so a
-      // non-null stream alone is not evidence of a payload. We still reject
-      // unknown-length/chunked streams before reading them, and consume only
-      // an explicitly zero-length stream to prove it is empty.
-      if (request.body !== null) {
-        if (contentLength !== "0" || (await request.text()).length !== 0) {
-          throw new LocalDecisionRoomBoundaryError("untrusted_request");
-        }
-      }
+      // A Next route can expose an empty fetch POST as a readable stream with
+      // no Content-Length. It is accepted only after a bounded, zero-byte-only
+      // read; payloads are neither accumulated nor parsed.
+      await assertExactEmptyBody(request.body);
       const token = bearerToken(request);
       if (!token) throw new LocalDecisionRoomBoundaryError("untrusted_request");
       const osUid = typeof process.getuid === "function" ? process.getuid() : -1;
