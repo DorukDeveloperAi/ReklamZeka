@@ -29,4 +29,12 @@ describe("operation read HTTP boundary", () => {
     expect(response.status).toBe(503);
     expect((await response.json()).error.code).toBe("source_unavailable");
   });
+
+  it("maps a fail-closed primary-result binding integrity rejection to unavailable", async () => {
+    const handler = createOperationReadHttpHandler({ service: { read: vi.fn().mockRejectedValue(new Error("operation read rejected: primary_result_binding")) } as never,
+      workspaceId: async () => workspaceId });
+    const response = await handler(request());
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe("source_unavailable");
+  });
 });

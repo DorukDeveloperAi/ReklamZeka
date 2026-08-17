@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "70648005e",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): orchestrate recoverable guide runs",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "6f85dd8dd",
       "tarih": "2026-08-17",
       "konu": "feat(operations): persist primary result bindings",
@@ -128,21 +137,12 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "3a2bf9c53",
-      "tarih": "2026-08-17",
-      "konu": "feat(operations): add current slice resolver adapter",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 30
+      "adet": 31
     },
     {
       "kapsam": "docs",
@@ -155,13 +155,9 @@
     {
       "kapsam": "test",
       "adet": 7
-    },
-    {
-      "kapsam": "?",
-      "adet": 1
     }
   ],
-  "isSayisi": 581,
+  "isSayisi": 582,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-17",
   "planlar": [
@@ -182,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "6e5e5e005973"
+  "damga": "575b158528ce"
 }

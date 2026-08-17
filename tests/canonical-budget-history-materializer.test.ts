@@ -30,7 +30,7 @@ function result(updatedAt = "2026-08-17T10:00:00.000Z"): MetaSyncResult {
 describe("completed normal inventory evidence", () => {
   it("uses the terminal durable cursor only", () => {
     expect(completedNormalInventoryEvidence({ result: result(), plan: inventory, mode: "normal", recovery: false }))
-      .toEqual({ workspaceId, connectionId, accounts: [{ externalAccountId: accountId, capturedAt: "2026-08-17T10:00:00.000Z" }] });
+      .toEqual({ workspaceId, connectionId, parentRunRef: "normal", accounts: [{ externalAccountId: accountId, capturedAt: "2026-08-17T10:00:00.000Z" }] });
   });
 
   it("rejects missing level/cursor, recovery and insight bootstrap rather than fabricating a delta", () => {

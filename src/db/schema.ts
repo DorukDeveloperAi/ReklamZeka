@@ -953,6 +953,31 @@ export const guideRevisionActions = pgTable("guide_revision_actions", {
 export const guideRevisionBudgetRefs = pgTable("guide_revision_budget_refs", {
   id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), guideRevisionId: uuid("guide_revision_id").notNull(), budgetRef: text("budget_ref").notNull(), scopeKind: text("scope_kind").notNull(), ordinal: integer("ordinal").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("guide_revision_budget_refs_workspace_unique").on(table.workspaceId, table.guideRevisionId, table.budgetRef), uniqueIndex("guide_revision_budget_refs_ordinal_unique").on(table.workspaceId, table.guideRevisionId, table.ordinal), index("guide_revision_budget_refs_workspace_revision_idx").on(table.workspaceId, table.guideRevisionId), foreignKey({ columns: [table.workspaceId, table.guideRevisionId], foreignColumns: [guideRevisions.workspaceId, guideRevisions.id], name: "guide_revision_budget_refs_revision_scope_fk" }).onDelete("cascade"), check("guide_revision_budget_refs_contract", sql`${table.budgetRef} ~ '^limit_[a-z0-9][a-z0-9_.:-]{0,190}$' and ${table.scopeKind} in ('market', 'organization_campaign', 'geo_targeting_platform', 'campaign_ad_set') and ${table.ordinal} >= 1`)]);
+/**
+ * Additive v2 budget interpretation. A v1 strict_payload remains the source
+ * for historical revisions; this receipt is required only by the v2 reader.
+ */
+export const guideBudgetContracts = pgTable("guide_budget_contracts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  guideRevisionId: uuid("guide_revision_id").notNull(),
+  guideRevisionHash: text("guide_revision_hash").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  contractHash: text("contract_hash").notNull(),
+  marketKey: text("market_key").notNull(),
+  currency: text("currency").notNull(),
+  targetScopeRef: text("target_scope_ref").notNull(),
+  contractPayload: jsonb("contract_payload").$type<Record<string, unknown>>().notNull(),
+  maximumEvidenceAgeSeconds: integer("maximum_evidence_age_seconds").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("guide_budget_contracts_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("guide_budget_contracts_workspace_revision_unique").on(table.workspaceId, table.guideRevisionId),
+  uniqueIndex("guide_budget_contracts_workspace_hash_unique").on(table.workspaceId, table.contractHash),
+  index("guide_budget_contracts_workspace_revision_fk_idx").on(table.workspaceId, table.guideRevisionId),
+  foreignKey({ columns: [table.workspaceId, table.guideRevisionId], foreignColumns: [guideRevisions.workspaceId, guideRevisions.id], name: "guide_budget_contracts_revision_scope_fk" }).onDelete("restrict"),
+  check("guide_budget_contracts_identity", sql`${table.schemaVersion} = 'guide-budget-contract/2.0.0' and ${table.guideRevisionHash} ~ '^[a-f0-9]{64}$' and ${table.contractHash} ~ '^[a-f0-9]{64}$' and ${table.marketKey} in ('yerli','yabanci') and ${table.currency} = 'TRY' and ${table.targetScopeRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.maximumEvidenceAgeSeconds} between 1 and 31536000`),
+]);
 export const guideInterpretationAcceptances = pgTable("guide_interpretation_acceptances", {
   id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), guideRevisionId: uuid("guide_revision_id").notNull(), interpretationHash: text("interpretation_hash").notNull(), acceptedByActorId: uuid("accepted_by_actor_id").notNull(), acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull(),
 }, (table) => [uniqueIndex("guide_interpretation_acceptances_exact_unique").on(table.workspaceId, table.guideRevisionId, table.interpretationHash), index("guide_interpretation_acceptances_workspace_revision_idx").on(table.workspaceId, table.guideRevisionId), index("guide_interpretation_acceptances_workspace_actor_fk_idx").on(table.workspaceId, table.acceptedByActorId), foreignKey({ columns: [table.workspaceId, table.guideRevisionId], foreignColumns: [guideRevisions.workspaceId, guideRevisions.id], name: "guide_interpretation_acceptances_revision_scope_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.acceptedByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "guide_interpretation_acceptances_actor_scope_fk" }).onDelete("restrict"), check("guide_interpretation_acceptances_hash", sql`${table.interpretationHash} ~ '^[a-f0-9]{64}$'`)]);
@@ -1310,6 +1335,15 @@ export const metaChangeSnapshots = pgTable("meta_change_snapshots", {
   // the full 32-char content-hash prefix. Both are immutable public aliases.
   check("meta_change_snapshots_public_ref_format", sql`${table.publicRef} ~ '^snapshot_[a-f0-9]{20}([a-f0-9]{12})?$'`),
   check("meta_change_snapshots_schema_version_positive", sql`${table.schemaVersion} >= 1`),
+]);
+/** Completion proof is separate from a snapshot: historical rows are never inferred/backfilled. */
+export const metaCompleteSnapshotReceipts = pgTable("meta_complete_snapshot_receipts", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  metaConnectionId: uuid("meta_connection_id").notNull(), adAccountId: uuid("ad_account_id").notNull(), snapshotId: uuid("snapshot_id").notNull(), snapshotHash: text("snapshot_hash").notNull(), capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(), parentRunRef: text("parent_run_ref").notNull(), compositionEvidenceHash: text("composition_evidence_hash").notNull(), lane: text("lane").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("meta_complete_snapshot_receipts_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("meta_complete_snapshot_receipts_snapshot_unique").on(table.workspaceId, table.snapshotId), uniqueIndex("meta_complete_snapshot_receipts_replay_unique").on(table.workspaceId, table.adAccountId, table.snapshotHash, table.parentRunRef), index("meta_complete_snapshot_receipts_workspace_account_captured_idx").on(table.workspaceId, table.adAccountId, table.capturedAt), index("meta_complete_snapshot_receipts_workspace_snapshot_fk_idx").on(table.workspaceId, table.snapshotId, table.metaConnectionId, table.adAccountId),
+  foreignKey({ columns: [table.workspaceId, table.snapshotId, table.metaConnectionId, table.adAccountId], foreignColumns: [metaChangeSnapshots.workspaceId, metaChangeSnapshots.id, metaChangeSnapshots.metaConnectionId, metaChangeSnapshots.adAccountId], name: "meta_complete_snapshot_receipts_snapshot_scope_fk" }).onDelete("restrict"),
+  check("meta_complete_snapshot_receipts_contract", sql`${table.snapshotHash} ~ '^[a-f0-9]{64}$' and ${table.compositionEvidenceHash} ~ '^[a-f0-9]{64}$' and ${table.parentRunRef} ~ '^[a-zA-Z0-9_.:-]{1,190}$' and ${table.lane}='normal_inventory_complete'`),
 ]);
 
 /** Privacy-safe, idempotent timeline events derived from two authentic snapshots. */

@@ -33,7 +33,9 @@ export function operationReadRequestInput(request: Request): OperationReadInput 
 }
 
 function isRejectedInput(reason: unknown): boolean {
-  return reason instanceof Error && reason.message.startsWith("operation read rejected:");
+  return reason instanceof Error
+    && reason.message.startsWith("operation read rejected:")
+    && reason.message !== "operation read rejected: primary_result_binding";
 }
 
 export function createOperationReadHttpHandler(input: Readonly<{
