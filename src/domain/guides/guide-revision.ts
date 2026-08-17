@@ -10,6 +10,8 @@ export const GUIDE_ACTIONS = Object.freeze([
 export type GuideMode = typeof GUIDE_MODES[number];
 export type GuideAction = typeof GUIDE_ACTIONS[number];
 export type GuideMarket = "yerli" | "yabanci";
+export type GuideBudgetScope = "market" | "organization_campaign" | "geo_targeting_platform" | "campaign_ad_set";
+export type GuideBudgetRef = Readonly<{ limitRef: string; scopeKind: GuideBudgetScope }>;
 export type GuideSchedule =
   | Readonly<{ frequency: "daily"; timezone: string; localTime: string }>
   | Readonly<{ frequency: "weekly"; timezone: string; localTime: string; dayOfWeek: number }>
@@ -44,7 +46,7 @@ export type GuideRevisionDraft = Readonly<{
   sliceRef: string;
   market: GuideMarket;
   freeText: string;
-  strict: Readonly<{ limitRefs: readonly string[]; rollbackConditions: readonly string[]; budgetInterpretation: GuideBudgetInterpretation | null }>;
+  strict: Readonly<{ budgetRefs: readonly GuideBudgetRef[]; rollbackConditions: readonly string[]; budgetInterpretation: GuideBudgetInterpretation | null }>;
   schedule: GuideSchedule;
   mode: GuideMode;
   actionAllowlist: readonly GuideAction[];
@@ -59,6 +61,8 @@ export type GuideRevision = Readonly<GuideRevisionDraft & {
     canWriteMeta: false;
     canActivateRevision: false;
   }>;
+  /** Exact user-reviewed interpretation of the whole persisted revision, never optional. */
+  interpretationHash: string;
   revisionHash: string;
 }>;
 
@@ -78,6 +82,17 @@ function digest(value: unknown): string { return createHash("sha256").update(JSO
 function text(value: unknown, maximum = 10_000, code: GuideRevisionError["code"] = "invalid_input"): string { if (typeof value !== "string") fail(code); const normalized = value.trim(); if (!normalized || normalized.length > maximum || CONTROL.test(normalized)) fail(code); return normalized; }
 function ref(value: unknown, prefix: string, code: GuideRevisionError["code"] = "invalid_input"): string { const normalized = text(value, 159, code); if (!REF.test(normalized) || !normalized.startsWith(prefix)) fail(code); return normalized; }
 function refs(value: unknown, prefix: string, maximum: number, code: GuideRevisionError["code"] = "invalid_input"): readonly string[] { if (!Array.isArray(value) || value.length > maximum) fail(code); const normalized = value.map((item) => ref(item, prefix, code)).sort(); if (new Set(normalized).size !== normalized.length) fail(code); return Object.freeze(normalized); }
+function budgetRefs(value: unknown): readonly GuideBudgetRef[] {
+  if (!Array.isArray(value) || value.length > 64) fail("invalid_input");
+  const normalized = value.map((item) => {
+    exact(item, ["limitRef", "scopeKind"]);
+    const scopeKind = (item as Record<string, unknown>).scopeKind;
+    if (scopeKind !== "market" && scopeKind !== "organization_campaign" && scopeKind !== "geo_targeting_platform" && scopeKind !== "campaign_ad_set") fail("invalid_input");
+    return Object.freeze({ limitRef: ref((item as Record<string, unknown>).limitRef, "limit_"), scopeKind });
+  }).sort((a, b) => a.limitRef.localeCompare(b.limitRef));
+  if (new Set(normalized.map((item) => item.limitRef)).size !== normalized.length) fail("invalid_input");
+  return Object.freeze(normalized);
+}
 function strings(value: unknown, maximum: number, code: GuideRevisionError["code"] = "invalid_input"): readonly string[] { if (!Array.isArray(value) || value.length > maximum) fail(code); const normalized = value.map((item) => text(item, 500, code)).sort(); if (new Set(normalized).size !== normalized.length) fail(code); return Object.freeze(normalized); }
 function timezone(value: unknown): string { const zone = text(value, 128, "invalid_schedule"); try { new Intl.DateTimeFormat("en-CA", { timeZone: zone }).format(new Date(0)); return zone; } catch { return fail("invalid_schedule"); } }
 function localTime(value: unknown): string { if (typeof value !== "string" || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) fail("invalid_schedule"); return value; }
@@ -144,7 +159,7 @@ export function createGuideRevision(value: GuideRevisionDraft): GuideRevision {
   if (value.market !== "yerli" && value.market !== "yabanci" || !GUIDE_MODES.includes(value.mode)) fail("invalid_input");
   if (!Array.isArray(value.actionAllowlist) || value.actionAllowlist.length > GUIDE_ACTIONS.length) fail("invalid_input"); const actions = [...value.actionAllowlist].sort(); if (new Set(actions).size !== actions.length || actions.some((action) => !GUIDE_ACTIONS.includes(action))) fail("invalid_input");
   if ((value.mode === "prepare_human_approval" || value.mode === "limited_autonomy") && actions.length === 0) fail("invalid_input");
-  exact(value.strict, ["limitRefs", "rollbackConditions", "budgetInterpretation"]);
+  exact(value.strict, ["budgetRefs", "rollbackConditions", "budgetInterpretation"]);
   const budgetInterpretation = value.strict.budgetInterpretation === null ? null : interpretGuideBudget({
     sourceText: value.strict.budgetInterpretation.sourceText,
     expression: value.strict.budgetInterpretation.expression,
@@ -152,9 +167,10 @@ export function createGuideRevision(value: GuideRevisionDraft): GuideRevision {
     currentExample: value.strict.budgetInterpretation.currentExample,
     risks: value.strict.budgetInterpretation.risks,
   });
-  const normalized: GuideRevisionDraft = Object.freeze({ workspaceRef: ref(value.workspaceRef, "workspace_"), guideRef: ref(value.guideRef, "guide_"), revision: value.revision, previousRevisionHash: value.previousRevisionHash, sliceRef: ref(value.sliceRef, "slice_"), market: value.market, freeText: text(value.freeText), strict: Object.freeze({ limitRefs: refs(value.strict.limitRefs, "limit_", 64), rollbackConditions: strings(value.strict.rollbackConditions, 64), budgetInterpretation }), schedule: validateGuideSchedule(value.schedule), mode: value.mode, actionAllowlist: Object.freeze(actions) });
+  const normalized: GuideRevisionDraft = Object.freeze({ workspaceRef: ref(value.workspaceRef, "workspace_"), guideRef: ref(value.guideRef, "guide_"), revision: value.revision, previousRevisionHash: value.previousRevisionHash, sliceRef: ref(value.sliceRef, "slice_"), market: value.market, freeText: text(value.freeText), strict: Object.freeze({ budgetRefs: budgetRefs(value.strict.budgetRefs), rollbackConditions: strings(value.strict.rollbackConditions, 64), budgetInterpretation }), schedule: validateGuideSchedule(value.schedule), mode: value.mode, actionAllowlist: Object.freeze(actions) });
   const authority = guideAuthority(normalized.mode, normalized.actionAllowlist);
-  return Object.freeze({ ...normalized, schemaVersion: GUIDE_REVISION_VERSION, authority, revisionHash: digest({ ...normalized, schemaVersion: GUIDE_REVISION_VERSION, authority }) });
+  const interpretationHash = digest({ sliceRef: normalized.sliceRef, market: normalized.market, freeText: normalized.freeText, strict: normalized.strict, schedule: normalized.schedule, mode: normalized.mode, actionAllowlist: normalized.actionAllowlist });
+  return Object.freeze({ ...normalized, schemaVersion: GUIDE_REVISION_VERSION, authority, interpretationHash, revisionHash: digest({ ...normalized, schemaVersion: GUIDE_REVISION_VERSION, authority, interpretationHash }) });
 }
 
 type Local = Readonly<{ year: number; month: number; day: number; hour: number; minute: number }>;

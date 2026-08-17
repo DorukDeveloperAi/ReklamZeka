@@ -24,6 +24,11 @@ type DeleteCountRow = Readonly<{ count: number | string }>;
  * It intentionally excludes workspaces, audit_events, users and meta_connections.
  */
 export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
+  // P04 canonical Kılavuz immutable children, then P03 slice evidence.
+  "guide_activation_outbox", "guide_lifecycle_events", "guide_interpretation_acceptances",
+  "guide_revision_actions", "guide_revision_budget_refs", "guide_heads", "guide_revisions", "guides",
+  "slice_resolution_snapshot_members", "slice_resolution_snapshots", "slice_revision_predicate_values",
+  "slice_revision_overrides", "slice_revision_predicates", "slice_revisions", "slices",
   "orchestrator_conversation_messages",
   "orchestrator_conversation_tombstones",
   "orchestrator_conversation_turns",
@@ -207,7 +212,22 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     if (!workspaceId) throw new WorkspaceTombstoneError("invalid_input");
 
     const inspected = resultRows<InspectionRow>(await executor.execute(sql`
-      select 'memberships' as table_name, count(*)::int as row_count,
+      select 'guide_activation_outbox' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from guide_activation_outbox where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_lifecycle_events', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_lifecycle_events where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_interpretation_acceptances', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_interpretation_acceptances where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_revision_actions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_revision_actions where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_revision_budget_refs', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_revision_budget_refs where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_heads', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_heads where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'guides', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guides where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_resolution_snapshot_members', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slice_resolution_snapshot_members where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_resolution_snapshots', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slice_resolution_snapshots where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_revision_predicate_values', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slice_revision_predicate_values where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_revision_overrides', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slice_revision_overrides where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_revision_predicates', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slice_revision_predicates where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slice_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'slices', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slices where workspace_id = ${workspaceId}::uuid
+      union all select 'memberships' as table_name, count(*)::int as row_count,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision
       from memberships where workspace_id = ${workspaceId}::uuid
       union all select 'data_sources', count(*)::int,
@@ -744,6 +764,41 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from effective_campaign_policy_compositions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_context_components where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_contexts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    // P04 Guide evidence must be purged child-first. Revisions use a self
+    // RESTRICT source link, so delete only bounded newest leaves.
+    await remove(sql`with removed as (delete from guide_activation_outbox where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_lifecycle_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_interpretation_acceptances where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_revision_actions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_revision_budget_refs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    const deleteRevisionLeaves = async (removeLeaves: () => Promise<number>, remainingRows: () => Promise<number>) => {
+      const cap = before.candidateCount + 1;
+      for (let attempt = 0; attempt < cap; attempt += 1) {
+        const removed = await removeLeaves();
+        if (await remainingRows() === 0) return;
+        if (removed === 0) throw new WorkspaceTombstoneError("workspace_unavailable");
+      }
+      throw new WorkspaceTombstoneError("workspace_unavailable");
+    };
+    await deleteRevisionLeaves(
+      () => remove(sql`with removed as (delete from guide_revisions parent where parent.workspace_id=${input.workspaceId}::uuid and not exists (select 1 from guide_revisions child where child.workspace_id=parent.workspace_id and child.source_revision_id=parent.id) returning 1) select count(*)::int as count from removed`),
+      async () => safeCount(resultRows<{ count: number | string }>(await executor.execute(sql`select count(*)::int as count from guide_revisions where workspace_id=${input.workspaceId}::uuid`))[0]?.count),
+    );
+    await remove(sql`with removed as (delete from guides where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    // P03 Slice evidence and definition graph. The forward migration allows
+    // only a tombstoning workspace to clear the immutable published head.
+    await remove(sql`with removed as (delete from slice_resolution_snapshot_members where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_resolution_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_revision_predicate_values where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_revision_overrides where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_revision_predicates where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await executor.execute(sql`update slices set current_published_revision_id=null where workspace_id=${input.workspaceId}::uuid and current_published_revision_id is not null`);
+    await deleteRevisionLeaves(
+      () => remove(sql`with removed as (delete from slice_revisions parent where parent.workspace_id=${input.workspaceId}::uuid and not exists (select 1 from slice_revisions child where child.workspace_id=parent.workspace_id and child.source_revision_id=parent.id) returning 1) select count(*)::int as count from removed`),
+      async () => safeCount(resultRows<{ count: number | string }>(await executor.execute(sql`select count(*)::int as count from slice_revisions where workspace_id=${input.workspaceId}::uuid`))[0]?.count),
+    );
+    await remove(sql`with removed as (delete from slices where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from organization_campaign_meta_memberships where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from organization_campaigns where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_assignments where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

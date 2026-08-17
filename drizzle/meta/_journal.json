@@ -764,6 +764,20 @@
       "when": 1786963700000,
       "tag": "20260817134500_slice_registry_guard_fix",
       "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1786977000000,
+      "tag": "20260817143000_canonical_guide_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1786978800000,
+      "tag": "20260817150000_workspace_tombstone_slice_head_release",
+      "breakpoints": true
     }
   ]
 }

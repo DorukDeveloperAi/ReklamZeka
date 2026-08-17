@@ -4,135 +4,135 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "17c839f71",
+      "hash": "3a2bf9c53",
       "tarih": "2026-08-17",
-      "konu": "feat(guides): add immutable guide revision domain",
+      "konu": "feat(operations): add current slice resolver adapter",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "42511e907",
+      "hash": "21c63dff1",
       "tarih": "2026-08-17",
-      "konu": "docs(plan): record unified Meta read fire",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "c524e70f2",
-      "tarih": "2026-08-17",
-      "konu": "feat(meta): unify six-hour and manual read sync leases",
+      "konu": "feat(guides): resolve restrictive overlap authority",
       "tur": "is",
       "kapsam": [
         "feat"
       ]
     },
     {
-      "hash": "463862587",
+      "hash": "9ef530049",
       "tarih": "2026-08-17",
-      "konu": "docs(plan): record initial v3 implementation chain",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "e23efb1b2",
-      "tarih": "2026-08-17",
-      "konu": "feat(slices): add deterministic canonical resolver",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "7da9499df",
-      "tarih": "2026-08-17",
-      "konu": "feat(campaigns): add canonical organization campaign foundation",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "327cf0079",
-      "tarih": "2026-08-17",
-      "konu": "docs(plan): accept M00 evidence pack",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "4fdb381e6",
-      "tarih": "2026-08-17",
-      "konu": "docs(plan): establish ReklamZeka v3 canonical chain",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "b6364b57c",
-      "tarih": "2026-08-17",
-      "konu": "fix(session): accept bounded empty bootstrap streams",
+      "konu": "fix(operations): require canonical account timezone",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "94a789d2f",
+      "hash": "182930db4",
       "tarih": "2026-08-17",
-      "konu": "test(ui): align dashboard copy with operations shell",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "2c947a402",
-      "tarih": "2026-08-17",
-      "konu": "feat(ui): establish five-area operations shell",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "4d04fdec0",
-      "tarih": "2026-08-15",
-      "konu": "feat: hand off canonical portfolio scope to rules",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "cc24afe71",
-      "tarih": "2026-08-15",
-      "konu": "test: lock Meta write closed approval chain",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "4dbf9c6f4",
-      "tarih": "2026-08-15",
-      "konu": "fix(analysis): classify cohort scope evidence",
+      "konu": "fix(operations): preserve hierarchy pagination and ownership",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "49edf96b2",
-      "tarih": "2026-08-15",
-      "konu": "feat: bind cohort receipts to explicit scope proof",
+      "hash": "38ebc5aec",
+      "tarih": "2026-08-17",
+      "konu": "feat(meta): gate actions on canonical data health",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "d0c4323a2",
+      "tarih": "2026-08-17",
+      "konu": "feat(operations): complete canonical read aggregation",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "1cce3fcd4",
+      "tarih": "2026-08-17",
+      "konu": "fix(meta): bind health reports to workspace",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "f63c4e0f6",
+      "tarih": "2026-08-17",
+      "konu": "feat(operations): filter canonical current slice coverage",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "a68f621fa",
+      "tarih": "2026-08-17",
+      "konu": "feat(operations): add session-bound read route",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c56e13e1c",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): separate policy and daily agents",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "76a9f9e60",
+      "tarih": "2026-08-17",
+      "konu": "feat(operations): add guarded read service contract",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "3dd58e054",
+      "tarih": "2026-08-17",
+      "konu": "fix(operations): harden read model evidence contract",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "fec0b8ff9",
+      "tarih": "2026-08-17",
+      "konu": "docs(plan): track accepted v3 subtasks",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "ea0d4fcbe",
+      "tarih": "2026-08-17",
+      "konu": "feat(campaigns): add safe naming template domain",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "6dc250628",
+      "tarih": "2026-08-17",
+      "konu": "feat(meta): add unified data health domain",
       "tur": "is",
       "kapsam": [
         "feat"
@@ -142,30 +142,26 @@
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 30
+      "adet": 24
     },
     {
       "kapsam": "fix",
-      "adet": 14
+      "adet": 16
     },
     {
       "kapsam": "docs",
+      "adet": 10
+    },
+    {
+      "kapsam": "test",
       "adet": 7
     },
     {
       "kapsam": "?",
-      "adet": 4
-    },
-    {
-      "kapsam": "test",
       "adet": 3
-    },
-    {
-      "kapsam": "style",
-      "adet": 2
     }
   ],
-  "isSayisi": 537,
+  "isSayisi": 567,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-17",
   "planlar": [
@@ -186,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "c2aee213372c"
+  "damga": "10d69b31e94d"
 }

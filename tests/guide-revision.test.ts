@@ -15,16 +15,17 @@ const budget = () => interpretGuideBudget({
 const draft = (overrides: Partial<GuideRevisionDraft> = {}): GuideRevisionDraft => ({
   workspaceRef: "workspace_main", guideRef: "guide_main", revision: 1, previousRevisionHash: null,
   sliceRef: "slice_main", market: "yerli", freeText: "Günlük gözlem; belirsizlikte işlem önerme.",
-  strict: { limitRefs: [], rollbackConditions: [], budgetInterpretation: budget() },
+  strict: { budgetRefs: [], rollbackConditions: [], budgetInterpretation: budget() },
   schedule: { frequency: "daily", timezone: "Europe/Istanbul", localTime: "09:00" }, mode: "recommend", actionAllowlist: [], ...overrides,
 });
 
 describe("guide revision", () => {
   it("hashes the same exact revision independently of object insertion order", () => {
     const first = createGuideRevision(draft());
-    const second = createGuideRevision({ ...draft(), strict: { budgetInterpretation: budget(), rollbackConditions: [], limitRefs: [] } });
+    const second = createGuideRevision({ ...draft(), strict: { budgetInterpretation: budget(), rollbackConditions: [], budgetRefs: [] } });
     expect(first.revisionHash).toBe(second.revisionHash);
     expect(first.authority).toMatchObject({ actionAuthority: "none", canWriteMeta: false, canActivateRevision: false });
+    expect(first.interpretationHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("keeps action authority closed and makes rename human-only", () => {
@@ -59,5 +60,11 @@ describe("guide revision", () => {
     const one = createGuideRevision(draft());
     const two = createGuideRevision(draft({ freeText: "Günlük gözlem; belirsizlikte işlem öner." }));
     expect(two.revisionHash).not.toBe(one.revisionHash);
+    expect(two.interpretationHash).not.toBe(one.interpretationHash);
+  });
+
+  it("requires an explicit scope for every persisted budget reference", () => {
+    expect(() => createGuideRevision(draft({ strict: { budgetRefs: [{ limitRef: "limit_budget" } as never], rollbackConditions: [], budgetInterpretation: null } }))).toThrow(GuideRevisionError);
+    expect(createGuideRevision(draft({ strict: { budgetRefs: [{ limitRef: "limit_budget", scopeKind: "organization_campaign" }], rollbackConditions: [], budgetInterpretation: null } })).strict.budgetRefs).toEqual([{ limitRef: "limit_budget", scopeKind: "organization_campaign" }]);
   });
 });

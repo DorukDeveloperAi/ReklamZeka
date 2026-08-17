@@ -34,6 +34,20 @@ function fixture() {
 }
 
 describe("workspace tombstone boundary", () => {
+  it("resumes only an evidenced tombstoning workspace and consumes its plan", async () => {
+    const { store, approvals, setRevision } = fixture(); setRevision("resume-r");
+    (store.inspect as ReturnType<typeof vi.fn>).mockResolvedValue({ state:"tombstoning", generation:3, revision:"resume-r", purgeRevision:"purge-r", candidateCount:4, connectionCount:0 });
+    const service=new WorkspaceTombstoneService(store,approvals,"lifecycle-actor",60_000);
+    await expect(service.dryRun("workspace-a","2026-08-07T12:00:00Z")).rejects.toMatchObject({code:"workspace_unavailable"});
+    await expect(service.resumeTombstoning("workspace-a","wrong",4,"2026-08-07T12:00:00Z")).rejects.toMatchObject({code:"revision_changed"});
+    const plan=await service.resumeTombstoning("workspace-a","resume-r",4,"2026-08-07T12:00:00Z");
+    approvals.authorize.mockResolvedValue(false);
+    await expect(service.execute({planRef:plan.planRef,approvalRef:"no",now:"2026-08-07T12:00:01Z"})).rejects.toMatchObject({code:"approval_required"});
+    approvals.authorize.mockResolvedValue(true);
+    await service.execute({planRef:plan.planRef,approvalRef:"yes",now:"2026-08-07T12:00:02Z"});
+    expect(store.execute).toHaveBeenCalledWith(expect.objectContaining({resume:true,expectedRevision:"resume-r"}));
+    await expect(service.execute({planRef:plan.planRef,approvalRef:"yes",now:"2026-08-07T12:00:03Z"})).rejects.toMatchObject({code:"plan_consumed"});
+  });
   it("returns masked aggregate evidence and requires an application approval verifier", async () => {
     const { store, approvals } = fixture();
     approvals.authorize.mockResolvedValue(false);
