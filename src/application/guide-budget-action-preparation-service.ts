@@ -29,6 +29,12 @@ export type GuideBudgetActionRuntimeContext = Readonly<{
   workspaceRef: string;
   accountGroupRef: string | null;
   accountRef: string;
+  /** Tenant-safe alias used solely to bind the Guide dry-run owner evidence. */
+  ownerPublicRef: string;
+  /** Canonical Meta-writable entity ref. Never a browser/public alias. */
+  ownerEntityExternalRef: string;
+  /** Canonical Meta-writable account ref. */
+  accountExternalRef: string;
   internalCategoryRefs: readonly string[];
   campaignRef: string;
   rules: ActionValveContext["rules"];
@@ -36,6 +42,8 @@ export type GuideBudgetActionRuntimeContext = Readonly<{
   frozenContextHash: string;
   /** Derived by the canonical data-health reader; caller input must not infer it. */
   dataHealthReady: boolean;
+  /** Immutable canonical report identity; readiness alone is not an authority binding. */
+  dataHealthReportHash: string;
 }>;
 
 /** Server-only resolver; HTTP/browser commands never carry this context. */
@@ -119,9 +127,10 @@ function uniqueReasons(reasons: readonly string[]): readonly string[] {
 }
 function validRuntime(value: GuideBudgetActionRuntimeContext): boolean {
   return !!value && REF.test(value.workspaceRef) && (value.accountGroupRef === null || REF.test(value.accountGroupRef))
-    && REF.test(value.accountRef) && REF.test(value.campaignRef) && Array.isArray(value.internalCategoryRefs)
+    && REF.test(value.accountRef) && REF.test(value.ownerPublicRef) && REF.test(value.ownerEntityExternalRef)
+    && REF.test(value.accountExternalRef) && value.accountRef === value.accountExternalRef && REF.test(value.campaignRef) && Array.isArray(value.internalCategoryRefs)
     && value.internalCategoryRefs.every((ref) => REF.test(ref)) && Array.isArray(value.rules)
-    && !!value.protection && HASH.test(value.frozenContextHash) && typeof value.dataHealthReady === "boolean";
+    && !!value.protection && HASH.test(value.frozenContextHash) && HASH.test(value.dataHealthReportHash) && typeof value.dataHealthReady === "boolean";
 }
 function validInput(value: GuideBudgetActionPrepareInput): boolean {
   return !!value && UUID.test(value.workspaceId) && UUID.test(value.guideRevisionId) && !!value.requester
@@ -154,7 +163,13 @@ export class GuideBudgetActionPreparationService {
     if (dryRun.status !== "ready") return hold(dryRun, dryRun.holdReasons);
     let trusted: Awaited<ReturnType<GuideBudgetActionTrustedContextReadPort["load"]>>;
     try { trusted = await this.contexts.load({ workspaceId: input.workspaceId, guideRevisionId: input.guideRevisionId, dryRun, evaluatedAt: input.proposedAt }); }
-    catch (reason) { if (reason && typeof reason === "object" && "code" in reason && reason.code === "parent_ceiling_unavailable") return hold(dryRun, ["parent_ceiling_unavailable"]); throw new GuideBudgetActionPreparationError("evidence_unavailable"); }
+    catch (reason) {
+      if (reason && typeof reason === "object" && "code" in reason && typeof reason.code === "string") {
+        const heldContextReasons = new Set(["parent_ceiling_unavailable", "data_health_hold", "context_unavailable", "policy_unavailable", "autonomy_unavailable", "protection_unavailable", "owner_missing", "owner_ambiguous"]);
+        if (heldContextReasons.has(reason.code)) return hold(dryRun, [reason.code]);
+      }
+      throw new GuideBudgetActionPreparationError("evidence_unavailable");
+    }
     const runtime = trusted.runtime;
     if (!validRuntime(runtime)) throw new GuideBudgetActionPreparationError("evidence_unavailable");
     if (!runtime.dataHealthReady) return hold(dryRun, ["data_health_hold"]);
@@ -169,13 +184,16 @@ export class GuideBudgetActionPreparationService {
     const owner = dryRun.effectiveBudgetOwner;
     // CBO is emitted against its campaign owner; ABO is emitted against its
     // exact ad set owner. A target slice is never substituted for the owner.
-    if (owner.budgetOwnerKind === "campaign" && runtime.campaignRef !== owner.budgetOwnerRef) {
+    if (runtime.ownerPublicRef !== owner.budgetOwnerRef) {
+      return hold(dryRun, ["budget_owner_public_alias_mismatch"]);
+    }
+    if (owner.budgetOwnerKind === "campaign" && runtime.campaignRef !== runtime.ownerEntityExternalRef) {
       return hold(dryRun, ["cbo_campaign_owner_mismatch"]);
     }
-    const entity = Object.freeze({ level: owner.budgetOwnerKind === "campaign" ? "campaign" as const : "adset" as const, ref: owner.budgetOwnerRef });
+    const entity = Object.freeze({ level: owner.budgetOwnerKind === "campaign" ? "campaign" as const : "adset" as const, ref: runtime.ownerEntityExternalRef });
     const intent: Extract<TypedActionIntent, { kind: "budget_change" }> = Object.freeze({ kind: "budget_change", entity,
       budgetKind: dryRun.effectiveBudgetKind!, currency: dryRun.currency, beforeDecimal: dryRun.currentBudgetDecimal,
-      afterDecimal: dryRun.evaluatedBudgetDecimal, budgetOwnerRef: owner.budgetOwnerRef });
+      afterDecimal: dryRun.evaluatedBudgetDecimal, budgetOwnerRef: runtime.ownerEntityExternalRef });
     const actionPlan = buildActionPlan(intent, {
       workspaceRef: runtime.workspaceRef, accountGroupRef: runtime.accountGroupRef,
       accountRef: runtime.accountRef, internalCategoryRefs: runtime.internalCategoryRefs,
@@ -184,7 +202,8 @@ export class GuideBudgetActionPreparationService {
         currency: dryRun.currency, maximumAbsoluteDeltaDecimal: dryRun.effectiveMaximumAbsoluteDeltaDecimal,
         maximumRelativeDeltaBasisPoints: dryRun.effectiveMaximumRelativeDeltaBasisPoints,
         limitRefs: ["guide_budget_dry_run"],
-      }, protection: runtime.protection, frozenContextHash: runtime.frozenContextHash,
+      }, protection: runtime.protection,
+      frozenContextHash: digest({ effectiveContextHash: runtime.frozenContextHash, dataHealthReportHash: runtime.dataHealthReportHash }),
     });
     // A Guide never converts a limited-autonomy candidate into a queue item.
     // Every staged P04 budget action retains the existing single-human path.

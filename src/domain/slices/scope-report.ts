@@ -25,7 +25,9 @@ export type ScopeReport = Readonly<{
   rawMetrics: readonly ScopeReportMetric[];
   pivot: readonly ScopeReportPivotRow[];
   coverage: readonly ScopeReportCoverage[];
-  appliedFilters: Readonly<{ entityLevel: "campaign" | "ad_set" | null; metricKey: string | null; actionType: string | null; sort: "bucket" | "entity" | "metric"; direction: "asc" | "desc" }>;
+  /** The exact bounded projection context.  A report with no rows still has a
+   * distinct, replayable period and granularity. */
+  appliedFilters: Readonly<{ granularity: "day" | "week" | "month"; startDate: string | null; endDate: string | null; entityLevel: "campaign" | "ad_set" | null; metricKey: string | null; actionType: string | null; sort: "bucket" | "entity" | "metric"; direction: "asc" | "desc" }>;
   counts: Readonly<{ included: number; excluded: number; missingMarket: number; ambiguousMarket: number }>;
   authority: Readonly<{ canWriteMeta: false; canExecute: false; canApprove: false }>;
 }>;
@@ -116,7 +118,8 @@ export function buildScopeReport(evidence: ScopeReportEvidence, metrics: readonl
     matchedDimensionRefs: Object.freeze([...membership.matchedDimensionIds]),
     matchedDimensionEvidenceRefs: Object.freeze([...membership.matchedDimensionEvidenceRefs]),
   })));
-  const filters = Object.freeze({ entityLevel: options.entityLevel ?? null, metricKey: options.metricKey ?? null, actionType: options.actionType ?? null, sort: options.sort ?? "bucket", direction: options.direction ?? "asc" });
+  const filters = Object.freeze({ granularity: options.granularity, startDate: options.startDate ?? null, endDate: options.endDate ?? null,
+    entityLevel: options.entityLevel ?? null, metricKey: options.metricKey ?? null, actionType: options.actionType ?? null, sort: options.sort ?? "bucket", direction: options.direction ?? "asc" });
   /** Coverage is selector evidence, not a rendering artifact.  In particular a
    * metric column filter must never make an action look unavailable (or vice
    * versa) merely because it is hidden from the long-form display. */

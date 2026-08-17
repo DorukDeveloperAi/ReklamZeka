@@ -286,6 +286,24 @@ export class DrizzleMetaAffectedGeoSnapshotRepository {
   }
 
   async resolveExact(input: MetaAffectedGeoSnapshotExactScope): Promise<CanonicalAffectedGeoCountrySnapshot> {
+    this.assertExactInput(input);
+    return this.database.transaction(async (transaction) => {
+      await lockWorkspace(transaction, this.workspaceId, "share");
+      return this.resolveExactReadOnlyInTransaction(transaction, input);
+    });
+  }
+
+  /**
+   * Caller-owned RR/READ ONLY path. It deliberately avoids the workspace
+   * share lock used by the general repository method, while preserving the
+   * same exact identity, child reconstruction and canonical hash validation.
+   */
+  async resolveExactReadOnly(input: MetaAffectedGeoSnapshotExactScope): Promise<CanonicalAffectedGeoCountrySnapshot> {
+    this.assertExactInput(input);
+    return this.resolveExactReadOnlyInTransaction(this.database, input);
+  }
+
+  private assertExactInput(input: MetaAffectedGeoSnapshotExactScope): void {
     if (!exact(input, ["workspaceId", "workspaceRef", "adAccountId", "accountRef", "campaignId", "campaignRef", "adSetId",
       "adSetRef", "capturedAt", "sourceGraphVersion", "fieldCatalogVersion", "rawPayloadHash", "sourceGeoSubtreeHash", "snapshotHash"])
       || !validUuid(input.workspaceId) || !validUuid(input.adAccountId) || !validUuid(input.campaignId) || !validUuid(input.adSetId)
@@ -294,9 +312,10 @@ export class DrizzleMetaAffectedGeoSnapshotRepository {
       || canonicalInstant(input.capturedAt) === null || input.sourceGraphVersion !== "v23.0" || !VERSION.test(input.fieldCatalogVersion)
       || !HASH.test(input.rawPayloadHash) || !HASH.test(input.sourceGeoSubtreeHash) || !HASH.test(input.snapshotHash)) fail("invalid_input");
     if (input.workspaceId.toLowerCase() !== this.workspaceId) fail("workspace_scope_mismatch");
-    return this.database.transaction(async (transaction) => {
-      await lockWorkspace(transaction, this.workspaceId, "share");
-      const found = rows<SnapshotRow>(await transaction.execute(sql`
+  }
+
+  private async resolveExactReadOnlyInTransaction(database: Pick<Database, "execute">, input: MetaAffectedGeoSnapshotExactScope): Promise<CanonicalAffectedGeoCountrySnapshot> {
+      const found = rows<SnapshotRow>(await database.execute(sql`
         select ${SELECT_COLUMNS} from meta_affected_geo_snapshots
         where workspace_id = ${this.workspaceId}::uuid and workspace_ref = ${input.workspaceRef}
           and ad_account_id = ${input.adAccountId}::uuid and account_ref = ${input.accountRef}
@@ -312,8 +331,7 @@ export class DrizzleMetaAffectedGeoSnapshotRepository {
       const row = found[0]!;
       if (row.workspace_id.toLowerCase() !== this.workspaceId || row.ad_account_id !== input.adAccountId
         || row.campaign_id !== input.campaignId || row.ad_set_id !== input.adSetId) fail("corrupt_store");
-      return this.loadChildren(transaction, row);
-    });
+      return this.loadChildren(database, row);
   }
 
   private async loadChildren(database: Pick<Database, "execute">, row: SnapshotRow): Promise<CanonicalAffectedGeoCountrySnapshot> {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { ScopeReportReadService } from "@/application/scope-report-read-service";
 import type { ScopeReport } from "@/domain/slices/scope-report";
+import { scopeReportXlsx } from "@/server/scope-report-xlsx";
 
 const headers = Object.freeze({
   "Cache-Control": "private, no-store",
@@ -19,7 +20,7 @@ export const scopeReportForbidden = () => error(403, "forbidden");
 export const scopeReportInvalidInput = () => error(400, "invalid_input");
 
 type Input = Readonly<{ slice?: string; start?: string; end?: string; granularity?: "day" | "week" | "month"; level?: "campaign" | "ad_set"; metric?: string; action?: string; sort?: "bucket" | "entity" | "metric"; direction?: "asc" | "desc" }>;
-type Format = "json" | "csv";
+type Format = "json" | "csv" | "xlsx";
 const SLICE = /^slice_[a-z0-9][a-z0-9_.:-]{0,190}$/;
 export function scopeReportRequestInput(request: Request): Readonly<{ input: Input; format: Format }> | null {
   let url: URL;
@@ -33,7 +34,7 @@ export function scopeReportRequestInput(request: Request): Readonly<{ input: Inp
   const slice = url.searchParams.get("slice");
   const start = url.searchParams.get("start"), end = url.searchParams.get("end"), granularity = url.searchParams.get("granularity") ?? "day";
   const level = url.searchParams.get("level"), metric = url.searchParams.get("metric"), action = url.searchParams.get("action"), sort = url.searchParams.get("sort") ?? "bucket", direction = url.searchParams.get("direction") ?? "asc";
-  return (format === "json" || format === "csv") && slice !== null && SLICE.test(slice)
+  return (format === "json" || format === "csv" || format === "xlsx") && slice !== null && SLICE.test(slice)
     && /^\d{4}-\d{2}-\d{2}$/.test(start ?? "") && /^\d{4}-\d{2}-\d{2}$/.test(end ?? "") && start! <= end!
     && (granularity === "day" || granularity === "week" || granularity === "month")
     && (level === null || level === "campaign" || level === "ad_set") && (metric === null || /^[a-z][a-z0-9_:-]{0,80}$/.test(metric)) && (action === null || /^[a-z][a-z0-9_:-]{0,80}$/.test(action))
@@ -48,12 +49,14 @@ function csvCell(value: string | number): string {
   return `"${escaped.replaceAll('"', '""')}"`;
 }
 export function scopeReportCsv(report: ScopeReport): string {
-  const header = ["row_type", "entity_ref", "entity_level", "bucket", "date", "attribution", "metric_key", "action_type", "value_decimal", "value_minor", "currency", "availability", "membership", "reason", "market_evidence_refs", "matched_dimension_refs", "matched_dimension_evidence_refs"];
-  const memberships = report.rows.map((row) => ["membership", row.entityRef, row.entityLevel, "", "", "", "", "", "", "", "", "", row.membership, row.reason,
+  const header = ["row_type", "context_key", "context_value", "entity_ref", "entity_level", "bucket", "date", "attribution", "metric_key", "action_type", "value_decimal", "value_minor", "currency", "availability", "membership", "reason", "market_evidence_refs", "matched_dimension_refs", "matched_dimension_evidence_refs"];
+  const context = [["version", report.version], ["slice_ref", report.scope.sliceRef], ["revision_ref", report.scope.revisionRef], ["granularity", report.appliedFilters.granularity], ["start_date", report.appliedFilters.startDate ?? ""], ["end_date", report.appliedFilters.endDate ?? ""]]
+    .map(([key, value]) => ["context", key ?? "", value ?? "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].map(csvCell).join(","));
+  const memberships = report.rows.map((row) => ["membership", "", "", row.entityRef, row.entityLevel, "", "", "", "", "", "", "", "", "", row.membership, row.reason,
     row.marketEvidenceRefs.join(" "), row.matchedDimensionRefs.join(" "), row.matchedDimensionEvidenceRefs.join(" ")]
     .map(csvCell).join(","));
-  const metrics = report.rawMetrics.map((row) => ["metric", row.entityRef, row.entityLevel, row.bucket, row.date, row.attribution, row.metricKey, row.actionType ?? "", row.valueDecimal ?? "", row.valueMinor ?? "", row.currency ?? "", row.availability, "", "", "", "", ""].map(csvCell).join(","));
-  const body = [...memberships, ...metrics];
+  const metrics = report.rawMetrics.map((row) => ["metric", "", "", row.entityRef, row.entityLevel, row.bucket, row.date, row.attribution, row.metricKey, row.actionType ?? "", row.valueDecimal ?? "", row.valueMinor ?? "", row.currency ?? "", row.availability, "", "", "", "", ""].map(csvCell).join(","));
+  const body = [...context, ...memberships, ...metrics];
   return `${header.map(csvCell).join(",")}\r\n${body.join("\r\n")}${body.length ? "\r\n" : ""}`;
 }
 function rejected(reason: unknown): boolean {
@@ -73,6 +76,8 @@ export function createScopeReportHttpHandler(input: Readonly<{
       const report = await input.service.read(workspaceId, parsed.input);
       return parsed.format === "csv"
         ? new NextResponse(scopeReportCsv(report), { headers: { ...headers, "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=scope-report.csv" } })
+        : parsed.format === "xlsx"
+          ? new NextResponse(scopeReportXlsx(report).buffer as ArrayBuffer, { headers: { ...headers, "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": "attachment; filename=scope-report.xlsx" } })
         : NextResponse.json(report, { headers });
     } catch (reason) {
       return rejected(reason) ? scopeReportInvalidInput() : scopeReportUnavailable();

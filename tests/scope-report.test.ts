@@ -33,6 +33,16 @@ describe("Kapsam Raporu", () => {
     ]);
   });
 
+  it("binds empty output to the exact requested period and granularity", () => {
+    const day = buildScopeReport(evidence, [], { granularity: "day", startDate: "2026-08-01", endDate: "2026-08-01" });
+    const month = buildScopeReport(evidence, [], { granularity: "month", startDate: "2026-08-01", endDate: "2026-08-31" });
+    expect(day.rawMetrics).toEqual([]);
+    expect(month.rawMetrics).toEqual([]);
+    expect(day.appliedFilters).toMatchObject({ granularity: "day", startDate: "2026-08-01", endDate: "2026-08-01" });
+    expect(month.appliedFilters).toMatchObject({ granularity: "month", startDate: "2026-08-01", endDate: "2026-08-31" });
+    expect(day.appliedFilters).not.toEqual(month.appliedFilters);
+  });
+
   it("keeps every raw action attribution and produces deterministic day/week/month pivot buckets", () => {
     const metrics = [
       { entityRef: "campaign_in", entityLevel: "campaign" as const, date: "2026-08-02", attribution: "7d_click", metricKey: "spend", actionType: null, valueDecimal: null, valueMinor: "100", currency: "TRY", availability: "available" as const },

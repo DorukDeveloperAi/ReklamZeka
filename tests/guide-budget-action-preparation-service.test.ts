@@ -29,7 +29,7 @@ function bundle(overrides: Partial<GuideBudgetEvidenceBundle> = {}): GuideBudget
   ], ...overrides };
 }
 function port(current: () => GuideBudgetEvidenceBundle): GuideBudgetEvidenceReadPort { return { load: async () => current() }; }
-function contexts(overrides: Record<string, unknown> = {}): GuideBudgetActionTrustedContextReadPort { return { load: async () => ({ runtime: { workspaceRef: "workspace_main", accountGroupRef: null, accountRef: "account_main", internalCategoryRefs: [], campaignRef: "campaign_main", rules: [rule()], protection: { protectedInternalCategoryRefs: [], affectedGeoRefs: [], protectedGeoRefs: [], changeDisposition: "allowed" as const, policyRefs: [] }, frozenContextHash: "c".repeat(64), dataHealthReady: true, ...overrides }, approvalPolicy: policy }) }; }
+function contexts(overrides: Record<string, unknown> = {}): GuideBudgetActionTrustedContextReadPort { return { load: async () => ({ runtime: { workspaceRef: "workspace_main", accountGroupRef: null, accountRef: "account_main", accountExternalRef: "account_main", ownerPublicRef: "campaign_main", ownerEntityExternalRef: "campaign_main", internalCategoryRefs: [], campaignRef: "campaign_main", rules: [rule()], protection: { protectedInternalCategoryRefs: [], affectedGeoRefs: [], protectedGeoRefs: [], changeDisposition: "allowed" as const, policyRefs: [] }, frozenContextHash: "c".repeat(64), dataHealthReady: true, dataHealthReportHash: "d".repeat(64), ...overrides }, approvalPolicy: policy }) }; }
 function input(overrides: Record<string, unknown> = {}) { return { workspaceId, guideRevisionId: revisionId, requester: { actorRef: "actor_owner", role: "owner" as const }, proposedAt: at, expiresAt: "2026-08-17T07:00:00.000Z",
   ...overrides }; }
 
@@ -44,7 +44,7 @@ describe("GuideBudgetActionPreparationService", () => {
   });
 
   it("ABO lifetime owner'ını campaign'e dönüştürmeden exact adset intent olarak taşır", async () => {
-    const service = new GuideBudgetActionPreparationService(port(() => bundle({ scopeEvidence: bundle().scopeEvidence.map((row) => ({ ...row, budgetOwnerRef: "adset_main", budgetOwnerKind: "adset" as const, budgetKind: "lifetime" as const })) })), contexts());
+    const service = new GuideBudgetActionPreparationService(port(() => bundle({ scopeEvidence: bundle().scopeEvidence.map((row) => ({ ...row, budgetOwnerRef: "adset_main", budgetOwnerKind: "adset" as const, budgetKind: "lifetime" as const })) })), contexts({ ownerPublicRef: "adset_main", ownerEntityExternalRef: "adset_main" }));
     const result = await service.prepare(input());
     expect(result).toMatchObject({ disposition: "staged", intent: { entity: { level: "adset", ref: "adset_main" }, budgetOwnerRef: "adset_main", budgetKind: "lifetime" } });
   });
@@ -58,6 +58,8 @@ describe("GuideBudgetActionPreparationService", () => {
     await expect(autonomy.prepare(input())).resolves.toMatchObject({ disposition: "held", holdReasons: expect.arrayContaining(["mode_or_autonomy_hold"]) });
     const ceiling = new GuideBudgetActionPreparationService(port(() => bundle({ constraints: bundle().constraints.map((row) => ({ ...row, parentCeilingDecimal: null })) })), contexts());
     await expect(ceiling.prepare(input())).resolves.toMatchObject({ disposition: "held", holdReasons: ["parent_ceiling_unavailable"] });
+    const aliasMismatch = new GuideBudgetActionPreparationService(port(() => bundle()), contexts({ ownerPublicRef: "campaign_other" }));
+    await expect(aliasMismatch.prepare(input())).resolves.toMatchObject({ disposition: "held", holdReasons: ["budget_owner_public_alias_mismatch"] });
   });
 
   it("admission öncesinde fresh active guide/evidence yeniden hesaplanır; hash veya unit değişirse fail-closed olur", async () => {
@@ -79,8 +81,8 @@ describe("GuideBudgetActionPreparationService", () => {
     let activePolicy = policy;
     const dynamicContexts: GuideBudgetActionTrustedContextReadPort = { load: async () => ({
       runtime: { workspaceRef: "workspace_main", accountGroupRef: null, accountRef: "account_main", internalCategoryRefs: [], campaignRef: "campaign_main",
-        rules: [rule()], protection: { protectedInternalCategoryRefs: [], affectedGeoRefs: [], protectedGeoRefs: [], changeDisposition: "allowed" as const, policyRefs: [] },
-        frozenContextHash: "c".repeat(64), dataHealthReady: true, ...runtime }, approvalPolicy: activePolicy,
+        ownerPublicRef: "campaign_main", ownerEntityExternalRef: "campaign_main", accountExternalRef: "account_main", rules: [rule()], protection: { protectedInternalCategoryRefs: [], affectedGeoRefs: [], protectedGeoRefs: [], changeDisposition: "allowed" as const, policyRefs: [] },
+        frozenContextHash: "c".repeat(64), dataHealthReady: true, dataHealthReportHash: "d".repeat(64), ...runtime }, approvalPolicy: activePolicy,
     }) };
     const service = new GuideBudgetActionPreparationService(port(() => current), dynamicContexts);
     const staged = await service.prepare(input());
@@ -104,6 +106,8 @@ describe("GuideBudgetActionPreparationService", () => {
     runtime = { rules: [{ ...rule(), killSwitch: true }] };
     await expect(probe()).resolves.toBe(false);
     runtime = { protection: { protectedInternalCategoryRefs: [], affectedGeoRefs: [], protectedGeoRefs: [], changeDisposition: "denied", policyRefs: ["policy_protection"] } };
+    await expect(probe()).resolves.toBe(false);
+    runtime = { dataHealthReportHash: "e".repeat(64) };
     await expect(probe()).resolves.toBe(false);
   });
 });

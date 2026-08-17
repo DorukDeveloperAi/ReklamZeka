@@ -257,10 +257,13 @@ export function createDrizzleAuthenticAffectedGeoEvidenceAdapter(input: Readonly
   database: Pick<Database, "execute" | "transaction">;
   workspaceId: string;
   workspaceRef: string;
+  /** Caller already owns an RR/READ ONLY transaction; no nested lock path. */
+  readOnlyTransaction?: boolean;
 }>): AuthenticAffectedGeoEvidencePort {
+  const snapshots = new DrizzleMetaAffectedGeoSnapshotRepository(input.database, input.workspaceId);
   return new AuthenticAffectedGeoEvidenceAdapter(
     new DrizzleMetaAffectedGeoEvidenceScopeResolver(input.database, input.workspaceId, input.workspaceRef),
-    new DrizzleMetaAffectedGeoSnapshotRepository(input.database, input.workspaceId),
+    input.readOnlyTransaction ? Object.freeze({ resolveExact: (scope: MetaAffectedGeoSnapshotExactScope) => snapshots.resolveExactReadOnly(scope) }) : snapshots,
     input.workspaceId,
     input.workspaceRef,
   );

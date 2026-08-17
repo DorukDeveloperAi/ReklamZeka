@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 8b5d9621adaa -->
+<!-- durum-damga: 76d3ffd8c1a3 -->
 
 ## Künye
 
@@ -14,13 +14,14 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 583 |
+| iş commit'i (tüm geçmiş) | 584 |
 | ilk / son iş | 2026-08-06 / 2026-08-17 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-17 | `feat` | persist guide runs and bind execution contracts | `ce6b86f7a` |
 | 2026-08-17 | `docs` | record budget evidence acceptance | `c4ec16b17` |
 | 2026-08-17 | `feat` | orchestrate recoverable guide runs | `70648005e` |
 | 2026-08-17 | `feat` | persist primary result bindings | `6f85dd8dd` |
@@ -35,14 +36,13 @@
 | 2026-08-17 | `docs` | record operation and health ledger gates | `e2e808189` |
 | 2026-08-17 | `fix` | expose local session boundary | `68c445484` |
 | 2026-08-17 | `feat` | persist canonical lifecycle | `a8f5be677` |
-| 2026-08-17 | `feat` | resolve canonical current slices | `d4e3e7078` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 30
+- `feat        ` ████████████████████████ 31
 - `docs        ` ███████████ 14
-- `fix         ` ███████ 9
-- `test        ` ██████ 7
+- `fix         ` ██████ 8
+- `test        ` █████ 7
 
 ## Planlar
 
