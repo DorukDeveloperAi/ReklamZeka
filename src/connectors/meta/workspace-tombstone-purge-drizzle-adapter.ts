@@ -24,6 +24,8 @@ type DeleteCountRow = Readonly<{ count: number | string }>;
  * It intentionally excludes workspaces, audit_events, users and meta_connections.
  */
 export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
+  // P03 primary-result heads point at immutable user selections.
+  "primary_result_binding_heads", "primary_result_binding_revisions",
   // P01 data-quality ledger heads must go before their immutable evidence.
   "development_log_heads", "development_log_events", "finding_heads", "finding_lifecycle_events",
   // P04 canonical Kılavuz immutable children, then P03 slice evidence.
@@ -214,6 +216,9 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     if (!workspaceId) throw new WorkspaceTombstoneError("invalid_input");
 
     const inspected = resultRows<InspectionRow>(await executor.execute(sql`
+      select 'primary_result_binding_heads' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from primary_result_binding_heads where workspace_id = ${workspaceId}::uuid
+      union all select 'primary_result_binding_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from primary_result_binding_revisions where workspace_id = ${workspaceId}::uuid
+      union all
       select 'development_log_heads' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from development_log_heads where workspace_id = ${workspaceId}::uuid
       union all select 'development_log_events', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from development_log_events where workspace_id = ${workspaceId}::uuid
       union all select 'finding_heads', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from finding_heads where workspace_id = ${workspaceId}::uuid
@@ -771,6 +776,9 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from effective_campaign_policy_compositions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_context_components where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_contexts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    // P03 primary-result heads must be released before immutable revisions.
+    await remove(sql`with removed as (delete from primary_result_binding_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from primary_result_binding_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     // P01 derived heads are purged before their immutable observations.
     await remove(sql`with removed as (delete from development_log_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from development_log_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

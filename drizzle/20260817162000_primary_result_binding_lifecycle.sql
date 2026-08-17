@@ -34,15 +34,21 @@ CREATE TABLE IF NOT EXISTS public.primary_result_binding_heads (
 CREATE UNIQUE INDEX IF NOT EXISTS primary_result_binding_revisions_workspace_row_unique ON public.primary_result_binding_revisions(workspace_id,id);
 CREATE UNIQUE INDEX IF NOT EXISTS primary_result_binding_revisions_workspace_hash_unique ON public.primary_result_binding_revisions(workspace_id,revision_hash);
 CREATE UNIQUE INDEX IF NOT EXISTS primary_result_binding_revisions_workspace_binding_number_unique ON public.primary_result_binding_revisions(workspace_id,binding_id,revision_number);
-CREATE UNIQUE INDEX IF NOT EXISTS primary_result_binding_revisions_workspace_subject_number_unique ON public.primary_result_binding_revisions(workspace_id,subject_kind,organization_campaign_id,slice_id,revision_number) NULLS NOT DISTINCT;
-CREATE UNIQUE INDEX IF NOT EXISTS primary_result_binding_revisions_workspace_subject_row_unique ON public.primary_result_binding_revisions(workspace_id,id,subject_kind,organization_campaign_id,slice_id,binding_id) NULLS NOT DISTINCT;
 CREATE INDEX IF NOT EXISTS primary_result_binding_revisions_workspace_subject_idx ON public.primary_result_binding_revisions(workspace_id,subject_kind,organization_campaign_id,slice_id,revision_number);
 CREATE INDEX IF NOT EXISTS primary_result_binding_revisions_workspace_actor_fk_idx ON public.primary_result_binding_revisions(workspace_id,created_by_actor_id);
-CREATE UNIQUE INDEX IF NOT EXISTS primary_result_binding_heads_workspace_subject_unique ON public.primary_result_binding_heads(workspace_id,subject_kind,organization_campaign_id,slice_id) NULLS NOT DISTINCT;
+CREATE INDEX IF NOT EXISTS primary_result_binding_revisions_workspace_org_market_fk_idx ON public.primary_result_binding_revisions(workspace_id,organization_campaign_id,market_definition_id);
+CREATE INDEX IF NOT EXISTS primary_result_binding_revisions_workspace_slice_market_fk_idx ON public.primary_result_binding_revisions(workspace_id,slice_id,market_definition_id);
+CREATE INDEX IF NOT EXISTS primary_result_binding_revisions_workspace_market_fk_idx ON public.primary_result_binding_revisions(workspace_id,market_definition_id);
 CREATE UNIQUE INDEX IF NOT EXISTS primary_result_binding_heads_workspace_row_unique ON public.primary_result_binding_heads(workspace_id,id);
 CREATE INDEX IF NOT EXISTS primary_result_binding_heads_workspace_latest_fk_idx ON public.primary_result_binding_heads(workspace_id,latest_revision_id);
+CREATE INDEX IF NOT EXISTS primary_result_binding_heads_workspace_org_market_fk_idx ON public.primary_result_binding_heads(workspace_id,organization_campaign_id,market_definition_id);
+CREATE INDEX IF NOT EXISTS primary_result_binding_heads_workspace_slice_market_fk_idx ON public.primary_result_binding_heads(workspace_id,slice_id,market_definition_id);
+CREATE INDEX IF NOT EXISTS primary_result_binding_heads_workspace_market_fk_idx ON public.primary_result_binding_heads(workspace_id,market_definition_id);
 
 DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='primary_result_binding_revisions_subject_number_uq') THEN ALTER TABLE public.primary_result_binding_revisions ADD CONSTRAINT primary_result_binding_revisions_subject_number_uq UNIQUE NULLS NOT DISTINCT (workspace_id,subject_kind,organization_campaign_id,slice_id,revision_number); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='primary_result_binding_revisions_workspace_subject_row_unique') THEN ALTER TABLE public.primary_result_binding_revisions ADD CONSTRAINT primary_result_binding_revisions_workspace_subject_row_unique UNIQUE NULLS NOT DISTINCT (workspace_id,id,subject_kind,organization_campaign_id,slice_id,binding_id); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='primary_result_binding_heads_workspace_subject_unique') THEN ALTER TABLE public.primary_result_binding_heads ADD CONSTRAINT primary_result_binding_heads_workspace_subject_unique UNIQUE NULLS NOT DISTINCT (workspace_id,subject_kind,organization_campaign_id,slice_id); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='primary_result_binding_revisions_org_market_scope_fk') THEN ALTER TABLE public.primary_result_binding_revisions ADD CONSTRAINT primary_result_binding_revisions_org_market_scope_fk FOREIGN KEY(workspace_id,organization_campaign_id,market_definition_id) REFERENCES public.organization_campaigns(workspace_id,id,market_definition_id) ON DELETE RESTRICT; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='primary_result_binding_revisions_slice_market_scope_fk') THEN ALTER TABLE public.primary_result_binding_revisions ADD CONSTRAINT primary_result_binding_revisions_slice_market_scope_fk FOREIGN KEY(workspace_id,slice_id,market_definition_id) REFERENCES public.slices(workspace_id,id,market_definition_id) ON DELETE RESTRICT; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='primary_result_binding_revisions_market_scope_fk') THEN ALTER TABLE public.primary_result_binding_revisions ADD CONSTRAINT primary_result_binding_revisions_market_scope_fk FOREIGN KEY(workspace_id,market_definition_id) REFERENCES public.category_definitions(workspace_id,id) ON DELETE RESTRICT; END IF;
@@ -86,5 +92,5 @@ ALTER TABLE public.primary_result_binding_revisions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.primary_result_binding_revisions FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.primary_result_binding_heads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.primary_result_binding_heads FORCE ROW LEVEL SECURITY;
-REVOKE ALL ON public.primary_result_binding_revisions,public.primary_result_binding_heads FROM anon,authenticated;
+REVOKE ALL PRIVILEGES ON TABLE public.primary_result_binding_revisions,public.primary_result_binding_heads FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL PRIVILEGES ON FUNCTION public.primary_result_binding_revision_append_only_guard(),public.primary_result_binding_head_exact_advance_guard() FROM PUBLIC,anon,authenticated,service_role;

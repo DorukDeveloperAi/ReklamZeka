@@ -32,7 +32,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P03-A-slice-registry | Kabul edildi / arşivlenebilir |
 | + P03-B-operation-read-model | Kabul edildi / arşivlenebilir |
 | + P03-Ca-primary-result-domain | Kabul edildi — `evidence/P03-Ca-primary-result-domain-20260817.md`; arşivlenebilir |
-| P03-Cb-primary-result-persistence | DEVAM — immutable binding head/revision, Operasyon 2.0 projection ve UI sırada |
+| + P03-Cb-primary-result-persistence | Kabul edildi — `evidence/P03-Cb-primary-result-persistence-20260817.md`; Operasyon 2.0 projection/UI P03-Cc olarak açık |
 | + P04-A-guide-domain | Kabul edildi / arşivlenebilir |
 | + P04-B-guide-persistence | Kabul edildi / arşivlenebilir |
 | + P04-Ca-budget-dry-run-domain | Kabul edildi — `evidence/P04-Ca-budget-dry-run-domain-20260817.md`; arşivlenebilir |
@@ -70,3 +70,4 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 - `+ P01-E data-health ledger`: yedi kritik pre-apply inceleme turundan sonra generic Finding/Development Log event/head zinciri, kullanıcı triage, scoped historical-head selection, workspace-once normal/partial sync ve bounded cardinality kabul edildi. Migration ledger `id=129`/journal `idx=112`; hash `1c728e...55a02`. POST verifier gerçek ikinci-client row lock, lifecycle, tamper/CAS/cross-tenant, RLS/FORCE/revoke/policy/index ve zero-residue kanıtıyla geçti. P01-A…F tamamlandığı için P01 paketi `+` aldı.
 - P03-C primary result tasarımı: kullanıcı yalnız kanonik `actions/<action_type>` selector'ünü Kurum Kampanyası veya slice'a bağlar; slice-bound org binding'i geçersiz kılar, slice-unbound org fallback'i geri getirir. Bilinen sıfır sonuç gösterilir fakat maliyet null'dır; eksik metrik sıfır sayılmaz. Immutable revision/OCC persistence ve `operation-read/2.0.0` projection, P01-E schema sahipliği kapandıktan sonra ayrı migrationla uygulanacaktır.
 - `+ P03-Ca primary result domain`: canonical action selector, scope resolution, decimal ratio-of-sums ve zero/missing semantiği kabul edildi. Trusted katalog yalnız server-only tenant Drizzle adapterının RR/read-only canonical insight sorgusundan mint edilir; public registrar/structural port yoktur ve recomputed clone runtime kimliğinden geçmez. Persistence/projection/UI P03-Cb olarak açık kalır.
+- `+ P03-Cb primary result persistence`: organization campaign/slice subject XOR, immutable bound/unbound revision, OCC head, trusted action catalog, tenant+market composite FK ve tombstone-safe server role sınırı canlı PostgreSQL'de kabul edildi. Migration ledger `id=130`, journal `idx=113`, hash `6f5f1c56...ff865cd`; gerçek iki-client yarışta bir advance/bir conflict ve normal tombstone cleanup kanıtlandı. Operasyon 2.0 metric projection/UI P03-Cc olarak açık kalır.
