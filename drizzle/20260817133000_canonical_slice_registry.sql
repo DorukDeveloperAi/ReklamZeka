@@ -146,3 +146,86 @@ ALTER TABLE "slice_revision_overrides" ENABLE ROW LEVEL SECURITY; ALTER TABLE "s
 ALTER TABLE "slice_resolution_snapshots" ENABLE ROW LEVEL SECURITY; ALTER TABLE "slice_resolution_snapshots" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "slice_resolution_snapshot_members" ENABLE ROW LEVEL SECURITY; ALTER TABLE "slice_resolution_snapshot_members" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
 REVOKE ALL PRIVILEGES ON TABLE "slices", "slice_revisions", "slice_revision_predicates", "slice_revision_predicate_values", "slice_revision_overrides", "slice_resolution_snapshots", "slice_resolution_snapshot_members" FROM PUBLIC, anon, authenticated, service_role;
+--> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.slice_canonical_market_guard()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path = public AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM category_definitions value JOIN category_dimensions dimension
+    ON dimension.id = value.dimension_id AND dimension.workspace_id = value.workspace_id
+    WHERE value.workspace_id = NEW.workspace_id AND value.id = NEW.market_definition_id
+      AND value.archived_at IS NULL AND dimension.archived_at IS NULL
+      AND dimension.key = 'market' AND value.key IN ('yerli', 'yabanci')) THEN
+    RAISE EXCEPTION 'slice market must be an active canonical yerli/yabanci definition';
+  END IF;
+  IF TG_OP = 'INSERT' THEN RETURN NEW; END IF;
+  IF OLD.tombstoned_at IS NULL AND NEW.tombstoned_at IS NOT NULL
+    AND NEW.id = OLD.id AND NEW.workspace_id = OLD.workspace_id AND NEW.label = OLD.label
+    AND NEW.market_definition_id = OLD.market_definition_id AND NEW.created_by_actor_id = OLD.created_by_actor_id
+    AND NEW.current_published_revision_id IS NOT DISTINCT FROM OLD.current_published_revision_id
+    AND NEW.created_at = OLD.created_at THEN RETURN NEW; END IF;
+  IF NEW.id = OLD.id AND NEW.workspace_id = OLD.workspace_id AND NEW.label = OLD.label
+    AND NEW.market_definition_id = OLD.market_definition_id AND NEW.created_by_actor_id = OLD.created_by_actor_id
+    AND NEW.tombstoned_at IS NOT DISTINCT FROM OLD.tombstoned_at AND NEW.created_at = OLD.created_at
+    AND NEW.current_published_revision_id IS DISTINCT FROM OLD.current_published_revision_id
+    AND NEW.current_published_revision_id IS NOT NULL
+    AND EXISTS (SELECT 1 FROM slice_revisions revision WHERE revision.id = NEW.current_published_revision_id
+      AND revision.workspace_id = NEW.workspace_id AND revision.slice_id = NEW.id AND revision.lifecycle = 'published'
+      AND revision.market_definition_id = NEW.market_definition_id) THEN RETURN NEW; END IF;
+  IF TG_OP = 'DELETE' AND EXISTS (SELECT 1 FROM workspaces WHERE id = OLD.workspace_id AND lifecycle_state = 'tombstoning') THEN RETURN OLD; END IF;
+  RAISE EXCEPTION 'slices are append-only; only head advancement and tombstoning are allowed';
+END;
+$$;--> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.slice_append_only_guard()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path = public AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NOT EXISTS (SELECT 1 FROM slices slice WHERE slice.id = NEW.slice_id AND slice.workspace_id = NEW.workspace_id
+      AND slice.tombstoned_at IS NULL AND slice.market_definition_id = NEW.market_definition_id) THEN
+      RAISE EXCEPTION 'slice revision must belong to an active same-market slice';
+    END IF;
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'DELETE' AND EXISTS (SELECT 1 FROM workspaces WHERE id = OLD.workspace_id AND lifecycle_state = 'tombstoning') THEN RETURN OLD; END IF;
+  RAISE EXCEPTION 'slice revision evidence is append-only';
+END;
+$$;--> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.slice_child_append_only_guard()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path = public AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN RETURN NEW; END IF;
+  IF TG_OP = 'DELETE' AND EXISTS (SELECT 1 FROM workspaces WHERE id = OLD.workspace_id AND lifecycle_state = 'tombstoning') THEN RETURN OLD; END IF;
+  RAISE EXCEPTION 'slice evidence is append-only';
+END;
+$$;--> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.slice_predicate_guard()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path = public AS $$
+BEGIN
+  IF TG_OP = 'INSERT' AND EXISTS (SELECT 1 FROM slice_revisions revision JOIN category_definitions market ON market.id = revision.market_definition_id
+    WHERE revision.id = NEW.slice_revision_id AND revision.workspace_id = NEW.workspace_id AND market.dimension_id = NEW.dimension_id) THEN
+    RAISE EXCEPTION 'canonical market cannot be duplicated as a slice predicate';
+  END IF;
+  RETURN NEW;
+END;
+$$;--> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.slice_predicate_value_guard()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path = public AS $$
+BEGIN
+  IF TG_OP = 'INSERT' AND NOT EXISTS (SELECT 1 FROM slice_revision_predicates predicate JOIN category_definitions value
+      ON value.id = NEW.definition_id AND value.workspace_id = NEW.workspace_id
+    WHERE predicate.id = NEW.predicate_id AND predicate.workspace_id = NEW.workspace_id
+      AND value.dimension_id = predicate.dimension_id AND value.archived_at IS NULL) THEN
+    RAISE EXCEPTION 'slice predicate value must be an active value of the selected dimension';
+  END IF;
+  RETURN NEW;
+END;
+$$;--> statement-breakpoint
+CREATE TRIGGER slices_append_only BEFORE INSERT OR UPDATE OR DELETE ON "slices" FOR EACH ROW EXECUTE FUNCTION public.slice_canonical_market_guard();--> statement-breakpoint
+CREATE TRIGGER slice_revisions_append_only BEFORE INSERT OR UPDATE OR DELETE ON "slice_revisions" FOR EACH ROW EXECUTE FUNCTION public.slice_append_only_guard();--> statement-breakpoint
+CREATE TRIGGER slice_revision_predicates_append_only BEFORE INSERT OR UPDATE OR DELETE ON "slice_revision_predicates" FOR EACH ROW EXECUTE FUNCTION public.slice_child_append_only_guard();--> statement-breakpoint
+CREATE TRIGGER slice_revision_predicate_values_append_only BEFORE INSERT OR UPDATE OR DELETE ON "slice_revision_predicate_values" FOR EACH ROW EXECUTE FUNCTION public.slice_child_append_only_guard();--> statement-breakpoint
+CREATE TRIGGER slice_revision_overrides_append_only BEFORE INSERT OR UPDATE OR DELETE ON "slice_revision_overrides" FOR EACH ROW EXECUTE FUNCTION public.slice_child_append_only_guard();--> statement-breakpoint
+CREATE TRIGGER slice_resolution_snapshots_append_only BEFORE INSERT OR UPDATE OR DELETE ON "slice_resolution_snapshots" FOR EACH ROW EXECUTE FUNCTION public.slice_child_append_only_guard();--> statement-breakpoint
+CREATE TRIGGER slice_resolution_snapshot_members_append_only BEFORE INSERT OR UPDATE OR DELETE ON "slice_resolution_snapshot_members" FOR EACH ROW EXECUTE FUNCTION public.slice_child_append_only_guard();--> statement-breakpoint
+CREATE TRIGGER slice_revision_predicates_market_guard BEFORE INSERT ON "slice_revision_predicates" FOR EACH ROW EXECUTE FUNCTION public.slice_predicate_guard();--> statement-breakpoint
+CREATE TRIGGER slice_revision_predicate_values_dimension_guard BEFORE INSERT ON "slice_revision_predicate_values" FOR EACH ROW EXECUTE FUNCTION public.slice_predicate_value_guard();--> statement-breakpoint
+REVOKE ALL PRIVILEGES ON FUNCTION public.slice_canonical_market_guard(), public.slice_append_only_guard(), public.slice_child_append_only_guard(), public.slice_predicate_guard(), public.slice_predicate_value_guard() FROM PUBLIC, anon, authenticated, service_role;
