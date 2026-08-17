@@ -13,4 +13,11 @@ describe("current operation slice resolver", () => {
   it("fails closed when persisted definition hash has been tampered", () => {
     expect(() => resolveCurrentOperationSlice({ revision: { ...revision, definitionHash: "0".repeat(64) }, resolvedAt: "2026-08-17T00:00:00.000Z", candidates: [candidate("campaign_dynamic", "campaign")] })).toThrow("slice definition");
   });
+  it("admits an inherited-only ad-set candidate when its canonical path supplied campaign evidence", () => {
+    expect(resolveCurrentOperationSlice({ revision, resolvedAt: "2026-08-17T00:00:00.000Z", candidates: [candidate("adset_inherited", "ad_set")] })).toEqual(["adset_inherited"]);
+  });
+  it("keeps child explicit exclusion and foreign market ahead of a parent include", () => {
+    const parentRevision = createSliceRevision({ sliceRef: revision.sliceRef, revisionRef: revision.revisionRef, revisionNumber: revision.revisionNumber, market: revision.market, predicates: revision.predicates, explicitIncludeEntityRefs: ["org_parent"], explicitExcludeEntityRefs: ["campaign_child"] });
+    expect(resolveCurrentOperationSlice({ revision: parentRevision, resolvedAt: "2026-08-17T00:00:00.000Z", candidates: [candidate("org_parent", "organization_campaign"), candidate("campaign_child", "campaign"), candidate("adset_foreign", "ad_set", "definition_yabanci")] })).toEqual(["org_parent"]);
+  });
 });
