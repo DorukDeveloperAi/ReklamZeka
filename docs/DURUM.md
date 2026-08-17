@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: c70d1873cc66 -->
+<!-- durum-damga: c2aee213372c -->
 
 ## Künye
 
@@ -14,37 +14,37 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 526 |
-| ilk / son iş | 2026-08-06 / 2026-08-15 |
+| iş commit'i (tüm geçmiş) | 537 |
+| ilk / son iş | 2026-08-06 / 2026-08-17 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-17 | `feat` | add immutable guide revision domain | `17c839f71` |
+| 2026-08-17 | `docs` | record unified Meta read fire | `42511e907` |
+| 2026-08-17 | `feat` | unify six-hour and manual read sync leases | `c524e70f2` |
+| 2026-08-17 | `docs` | record initial v3 implementation chain | `463862587` |
+| 2026-08-17 | `feat` | add deterministic canonical resolver | `e23efb1b2` |
+| 2026-08-17 | `feat` | add canonical organization campaign foundation | `7da9499df` |
+| 2026-08-17 | `docs` | accept M00 evidence pack | `327cf0079` |
+| 2026-08-17 | `docs` | establish ReklamZeka v3 canonical chain | `4fdb381e6` |
+| 2026-08-17 | `fix` | accept bounded empty bootstrap streams | `b6364b57c` |
+| 2026-08-17 | `test` | align dashboard copy with operations shell | `94a789d2f` |
+| 2026-08-17 | `feat` | establish five-area operations shell | `2c947a402` |
 | 2026-08-15 | `feat` | hand off canonical portfolio scope to rules | `4d04fdec0` |
 | 2026-08-15 | `test` | lock Meta write closed approval chain | `cc24afe71` |
 | 2026-08-15 | `fix` | classify cohort scope evidence | `4dbf9c6f4` |
 | 2026-08-15 | `feat` | bind cohort receipts to explicit scope proof | `49edf96b2` |
-| 2026-08-15 | `—` | Add fail-closed temporal cohort skill receipt | `930a93dc8` |
-| 2026-08-15 | `feat` | show proven slice links in portfolio | `531f00072` |
-| 2026-08-15 | `fix` | retain contextual help menu | `48963502b` |
-| 2026-08-15 | `—` | refine dashboard theme system | `adccc6862` |
-| 2026-08-15 | `fix` | pin development origin binding | `324bf0668` |
-| 2026-08-15 | `feat` | unify portfolio slice operation table | `668d6dffb` |
-| 2026-08-15 | `test` | require fresh official turn citations | `69f503736` |
-| 2026-08-15 | `feat` | freeze official turn receipts | `0b6dddb15` |
-| 2026-08-15 | `fix` | restore slice rule decision trace | `be2441b72` |
-| 2026-08-15 | `fix` | restore human approval preparation | `20332e892` |
-| 2026-08-15 | `fix` | keep slice budget impact dry-run only | `7b8dbf1f1` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 33
-- `fix         ` ██████████ 14
+- `feat        ` ████████████████████████ 30
+- `fix         ` ███████████ 14
+- `docs        ` ██████ 7
 - `?           ` ███ 4
-- `docs        ` ██ 3
-- `style       ` ██ 3
 - `test        ` ██ 3
+- `style       ` ██ 2
 
 ## Planlar
 

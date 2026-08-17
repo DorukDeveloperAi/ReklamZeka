@@ -760,6 +760,151 @@ export const organizationCampaignMetaMemberships = pgTable("organization_campaig
   check("organization_campaign_meta_memberships_effective_range", sql`${table.effectiveTo} is null or ${table.effectiveTo} > ${table.effectiveFrom}`),
 ]);
 
+/**
+ * Canonical, user-owned saved scope. A Slice is deliberately only a scope: it
+ * carries no Guide, schedule, budget, action or Meta-write authority.
+ */
+export const slices = pgTable("slices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  marketDefinitionId: uuid("market_definition_id").notNull(),
+  createdByActorId: uuid("created_by_actor_id").notNull(),
+  currentPublishedRevisionId: uuid("current_published_revision_id"),
+  tombstonedAt: timestamp("tombstoned_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("slices_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slices_workspace_market_row_unique").on(table.workspaceId, table.id, table.marketDefinitionId),
+  index("slices_workspace_current_idx").on(table.workspaceId, table.tombstonedAt, table.createdAt),
+  foreignKey({ columns: [table.workspaceId, table.marketDefinitionId], foreignColumns: [categoryDefinitions.workspaceId, categoryDefinitions.id], name: "slices_market_definition_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.createdByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "slices_creator_scope_fk" }).onDelete("restrict"),
+  check("slices_label_nonempty", sql`length(btrim(${table.label})) between 1 and 160`),
+]);
+
+/** Each persisted revision is immutable. Publishing moves the Slice head only. */
+export const sliceRevisions = pgTable("slice_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  sliceId: uuid("slice_id").notNull(),
+  revisionNumber: integer("revision_number").notNull(),
+  revisionRef: text("revision_ref").notNull(),
+  definitionHash: text("definition_hash").notNull(),
+  marketDefinitionId: uuid("market_definition_id").notNull(),
+  lifecycle: text("lifecycle").notNull(),
+  sourceRevisionId: uuid("source_revision_id"),
+  createdByActorId: uuid("created_by_actor_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("slice_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slice_revisions_workspace_slice_number_unique").on(table.workspaceId, table.sliceId, table.revisionNumber),
+  uniqueIndex("slice_revisions_workspace_ref_unique").on(table.workspaceId, table.revisionRef),
+  uniqueIndex("slice_revisions_workspace_hash_unique").on(table.workspaceId, table.definitionHash),
+  index("slice_revisions_workspace_slice_lifecycle_idx").on(table.workspaceId, table.sliceId, table.lifecycle, table.revisionNumber),
+  foreignKey({ columns: [table.workspaceId, table.sliceId, table.marketDefinitionId], foreignColumns: [slices.workspaceId, slices.id, slices.marketDefinitionId], name: "slice_revisions_slice_market_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.marketDefinitionId], foreignColumns: [categoryDefinitions.workspaceId, categoryDefinitions.id], name: "slice_revisions_market_definition_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.sourceRevisionId], foreignColumns: [table.workspaceId, table.id], name: "slice_revisions_source_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.createdByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "slice_revisions_creator_scope_fk" }).onDelete("restrict"),
+  check("slice_revisions_identity", sql`${table.revisionNumber} >= 1 and ${table.revisionRef} ~ '^slice_revision_[a-z0-9][a-z0-9_.:-]{0,190}$' and ${table.definitionHash} ~ '^[a-f0-9]{64}$' and ${table.lifecycle} in ('draft', 'published', 'archived')`),
+]);
+
+export const sliceRevisionPredicates = pgTable("slice_revision_predicates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  sliceRevisionId: uuid("slice_revision_id").notNull(),
+  dimensionId: uuid("dimension_id").notNull(),
+  position: integer("position").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("slice_revision_predicates_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slice_revision_predicates_dimension_unique").on(table.workspaceId, table.sliceRevisionId, table.dimensionId),
+  uniqueIndex("slice_revision_predicates_position_unique").on(table.workspaceId, table.sliceRevisionId, table.position),
+  index("slice_revision_predicates_workspace_revision_idx").on(table.workspaceId, table.sliceRevisionId, table.position),
+  foreignKey({ columns: [table.workspaceId, table.sliceRevisionId], foreignColumns: [sliceRevisions.workspaceId, sliceRevisions.id], name: "slice_revision_predicates_revision_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.dimensionId], foreignColumns: [categoryDimensions.workspaceId, categoryDimensions.id], name: "slice_revision_predicates_dimension_scope_fk" }).onDelete("restrict"),
+  check("slice_revision_predicates_position_positive", sql`${table.position} >= 1`),
+]);
+
+export const sliceRevisionPredicateValues = pgTable("slice_revision_predicate_values", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  predicateId: uuid("predicate_id").notNull(),
+  definitionId: uuid("definition_id").notNull(),
+  position: integer("position").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("slice_revision_predicate_values_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slice_revision_predicate_values_definition_unique").on(table.workspaceId, table.predicateId, table.definitionId),
+  uniqueIndex("slice_revision_predicate_values_position_unique").on(table.workspaceId, table.predicateId, table.position),
+  index("slice_revision_predicate_values_workspace_predicate_idx").on(table.workspaceId, table.predicateId, table.position),
+  foreignKey({ columns: [table.workspaceId, table.predicateId], foreignColumns: [sliceRevisionPredicates.workspaceId, sliceRevisionPredicates.id], name: "slice_revision_predicate_values_predicate_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.definitionId], foreignColumns: [categoryDefinitions.workspaceId, categoryDefinitions.id], name: "slice_revision_predicate_values_definition_scope_fk" }).onDelete("restrict"),
+  check("slice_revision_predicate_values_position_positive", sql`${table.position} >= 1`),
+]);
+
+/** Explicit membership always identifies exactly one allowed entity target. */
+export const sliceRevisionOverrides = pgTable("slice_revision_overrides", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  sliceRevisionId: uuid("slice_revision_id").notNull(),
+  operation: text("operation").notNull(),
+  entityLevel: text("entity_level").notNull(),
+  organizationCampaignId: uuid("organization_campaign_id"),
+  campaignId: uuid("campaign_id"),
+  adSetId: uuid("ad_set_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("slice_revision_overrides_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slice_revision_overrides_exact_target_unique").on(table.workspaceId, table.sliceRevisionId, table.operation, table.entityLevel, table.organizationCampaignId, table.campaignId, table.adSetId),
+  index("slice_revision_overrides_workspace_revision_idx").on(table.workspaceId, table.sliceRevisionId, table.operation),
+  foreignKey({ columns: [table.workspaceId, table.sliceRevisionId], foreignColumns: [sliceRevisions.workspaceId, sliceRevisions.id], name: "slice_revision_overrides_revision_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.organizationCampaignId], foreignColumns: [organizationCampaigns.workspaceId, organizationCampaigns.id], name: "slice_revision_overrides_org_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.campaignId], foreignColumns: [adCampaigns.workspaceId, adCampaigns.id], name: "slice_revision_overrides_campaign_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.adSetId], foreignColumns: [metaAdSets.workspaceId, metaAdSets.id], name: "slice_revision_overrides_ad_set_scope_fk" }).onDelete("restrict"),
+  check("slice_revision_overrides_target", sql`${table.operation} in ('include', 'exclude') and (((${table.entityLevel} = 'organization_campaign') and ${table.organizationCampaignId} is not null and ${table.campaignId} is null and ${table.adSetId} is null) or ((${table.entityLevel} = 'campaign') and ${table.organizationCampaignId} is null and ${table.campaignId} is not null and ${table.adSetId} is null) or ((${table.entityLevel} = 'ad_set') and ${table.organizationCampaignId} is null and ${table.campaignId} is null and ${table.adSetId} is not null))`),
+]);
+
+/** Immutable resolution receipt. Its member evidence is frozen for later run replay. */
+export const sliceResolutionSnapshots = pgTable("slice_resolution_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  sliceRevisionId: uuid("slice_revision_id").notNull(),
+  snapshotHash: text("snapshot_hash").notNull(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("slice_resolution_snapshots_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slice_resolution_snapshots_workspace_hash_unique").on(table.workspaceId, table.snapshotHash),
+  index("slice_resolution_snapshots_workspace_revision_idx").on(table.workspaceId, table.sliceRevisionId, table.resolvedAt),
+  foreignKey({ columns: [table.workspaceId, table.sliceRevisionId], foreignColumns: [sliceRevisions.workspaceId, sliceRevisions.id], name: "slice_resolution_snapshots_revision_scope_fk" }).onDelete("restrict"),
+  check("slice_resolution_snapshots_hash", sql`${table.snapshotHash} ~ '^[a-f0-9]{64}$'`),
+]);
+
+export const sliceResolutionSnapshotMembers = pgTable("slice_resolution_snapshot_members", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  snapshotId: uuid("snapshot_id").notNull(),
+  ordinal: integer("ordinal").notNull(),
+  entityLevel: text("entity_level").notNull(),
+  organizationCampaignId: uuid("organization_campaign_id"),
+  campaignId: uuid("campaign_id"),
+  adSetId: uuid("ad_set_id"),
+  reason: text("reason").notNull(),
+  marketEvidenceRefs: jsonb("market_evidence_refs").$type<readonly string[]>().notNull(),
+  matchedDimensionIds: jsonb("matched_dimension_ids").$type<readonly string[]>().notNull(),
+  matchedDimensionEvidenceRefs: jsonb("matched_dimension_evidence_refs").$type<readonly string[]>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("slice_resolution_snapshot_members_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slice_resolution_snapshot_members_ordinal_unique").on(table.workspaceId, table.snapshotId, table.ordinal),
+  index("slice_resolution_snapshot_members_workspace_snapshot_idx").on(table.workspaceId, table.snapshotId, table.ordinal),
+  foreignKey({ columns: [table.workspaceId, table.snapshotId], foreignColumns: [sliceResolutionSnapshots.workspaceId, sliceResolutionSnapshots.id], name: "slice_resolution_snapshot_members_snapshot_scope_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.organizationCampaignId], foreignColumns: [organizationCampaigns.workspaceId, organizationCampaigns.id], name: "slice_resolution_snapshot_members_org_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.campaignId], foreignColumns: [adCampaigns.workspaceId, adCampaigns.id], name: "slice_resolution_snapshot_members_campaign_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.adSetId], foreignColumns: [metaAdSets.workspaceId, metaAdSets.id], name: "slice_resolution_snapshot_members_ad_set_scope_fk" }).onDelete("restrict"),
+  check("slice_resolution_snapshot_members_target", sql`${table.ordinal} >= 1 and ${table.reason} in ('dynamic_filter', 'explicit_include') and (((${table.entityLevel} = 'organization_campaign') and ${table.organizationCampaignId} is not null and ${table.campaignId} is null and ${table.adSetId} is null) or ((${table.entityLevel} = 'campaign') and ${table.organizationCampaignId} is null and ${table.campaignId} is not null and ${table.adSetId} is null) or ((${table.entityLevel} = 'ad_set') and ${table.organizationCampaignId} is null and ${table.campaignId} is null and ${table.adSetId} is not null))`),
+]);
+
 export const metaAdSets = pgTable("meta_ad_sets", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),

@@ -1,0 +1,190 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "17c839f71",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): add immutable guide revision domain",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "42511e907",
+      "tarih": "2026-08-17",
+      "konu": "docs(plan): record unified Meta read fire",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "c524e70f2",
+      "tarih": "2026-08-17",
+      "konu": "feat(meta): unify six-hour and manual read sync leases",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "463862587",
+      "tarih": "2026-08-17",
+      "konu": "docs(plan): record initial v3 implementation chain",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "e23efb1b2",
+      "tarih": "2026-08-17",
+      "konu": "feat(slices): add deterministic canonical resolver",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7da9499df",
+      "tarih": "2026-08-17",
+      "konu": "feat(campaigns): add canonical organization campaign foundation",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "327cf0079",
+      "tarih": "2026-08-17",
+      "konu": "docs(plan): accept M00 evidence pack",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "4fdb381e6",
+      "tarih": "2026-08-17",
+      "konu": "docs(plan): establish ReklamZeka v3 canonical chain",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "b6364b57c",
+      "tarih": "2026-08-17",
+      "konu": "fix(session): accept bounded empty bootstrap streams",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "94a789d2f",
+      "tarih": "2026-08-17",
+      "konu": "test(ui): align dashboard copy with operations shell",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "2c947a402",
+      "tarih": "2026-08-17",
+      "konu": "feat(ui): establish five-area operations shell",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4d04fdec0",
+      "tarih": "2026-08-15",
+      "konu": "feat: hand off canonical portfolio scope to rules",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "cc24afe71",
+      "tarih": "2026-08-15",
+      "konu": "test: lock Meta write closed approval chain",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "4dbf9c6f4",
+      "tarih": "2026-08-15",
+      "konu": "fix(analysis): classify cohort scope evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "49edf96b2",
+      "tarih": "2026-08-15",
+      "konu": "feat: bind cohort receipts to explicit scope proof",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "feat",
+      "adet": 30
+    },
+    {
+      "kapsam": "fix",
+      "adet": 14
+    },
+    {
+      "kapsam": "docs",
+      "adet": 7
+    },
+    {
+      "kapsam": "?",
+      "adet": 4
+    },
+    {
+      "kapsam": "test",
+      "adet": 3
+    },
+    {
+      "kapsam": "style",
+      "adet": 2
+    }
+  ],
+  "isSayisi": 537,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-17",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "c2aee213372c"
+}

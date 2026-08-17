@@ -22,6 +22,10 @@ CREATE TABLE "organization_campaigns" (
 	CONSTRAINT "organization_campaigns_label_nonempty" CHECK (length(btrim("organization_campaigns"."label")) between 1 and 160)
 );
 --> statement-breakpoint
+-- PostgreSQL requires the referenced composite uniqueness to exist before the
+-- membership FK is added. Keep these indexes ahead of the ALTER TABLE block.
+CREATE UNIQUE INDEX "organization_campaigns_workspace_row_unique" ON "organization_campaigns" USING btree ("workspace_id","id");--> statement-breakpoint
+CREATE UNIQUE INDEX "organization_campaigns_workspace_market_row_unique" ON "organization_campaigns" USING btree ("workspace_id","id","market_definition_id");--> statement-breakpoint
 ALTER TABLE "organization_campaign_meta_memberships" ADD CONSTRAINT "organization_campaign_meta_memberships_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "organization_campaign_meta_memberships" ADD CONSTRAINT "organization_campaign_meta_memberships_org_market_scope_fk" FOREIGN KEY ("workspace_id","organization_campaign_id","market_definition_id") REFERENCES "public"."organization_campaigns"("workspace_id","id","market_definition_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "organization_campaign_meta_memberships" ADD CONSTRAINT "organization_campaign_meta_memberships_market_definition_scope_fk" FOREIGN KEY ("workspace_id","market_definition_id") REFERENCES "public"."category_definitions"("workspace_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
@@ -33,8 +37,6 @@ ALTER TABLE "organization_campaigns" ADD CONSTRAINT "organization_campaigns_mark
 CREATE UNIQUE INDEX "organization_campaign_meta_memberships_workspace_row_unique" ON "organization_campaign_meta_memberships" USING btree ("workspace_id","id");--> statement-breakpoint
 CREATE INDEX "organization_campaign_meta_memberships_campaign_temporal_idx" ON "organization_campaign_meta_memberships" USING btree ("workspace_id","campaign_id","effective_from");--> statement-breakpoint
 CREATE INDEX "organization_campaign_meta_memberships_org_temporal_idx" ON "organization_campaign_meta_memberships" USING btree ("workspace_id","organization_campaign_id","effective_from");--> statement-breakpoint
-CREATE UNIQUE INDEX "organization_campaigns_workspace_row_unique" ON "organization_campaigns" USING btree ("workspace_id","id");--> statement-breakpoint
-CREATE UNIQUE INDEX "organization_campaigns_workspace_market_row_unique" ON "organization_campaigns" USING btree ("workspace_id","id","market_definition_id");--> statement-breakpoint
 CREATE INDEX "organization_campaigns_workspace_active_idx" ON "organization_campaigns" USING btree ("workspace_id","tombstoned_at","created_at");--> statement-breakpoint
 
 -- A Meta campaign may have at most one live Kurum Kampanyası at a time.
