@@ -23,6 +23,7 @@ import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel"
 import { NormalizationWorkbenchPanel } from "./normalization-workbench-panel";
 import { MetaTrustReadinessPanel } from "./meta-trust-readiness-panel";
 import { OperationTablePanel } from "./operation-table-panel";
+import { ScopeReportPanel } from "./scope-report-panel";
 import { campaignContextBridge } from "./campaign-planning-brief-panel";
 import { LocalSessionConnector } from "./local-session-connector";
 import { SkillCatalogContextStrip, type SkillCatalogContext } from "./skill-catalog-context-strip";
@@ -1195,6 +1196,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
         <div><span className={styles.kicker}>OPERASYON</span><h1>Portföy</h1><p>Hesap, Kurum Kampanyası, Meta kampanyası ve reklam setini tek kanonik tabloda inceleyin.</p></div>
       </section>
       <OperationTablePanel onConnect={verifyAndRefreshLocalSession} />
+      <ScopeReportPanel onConnect={verifyAndRefreshLocalSession} />
     </>;
   }
 
@@ -1202,6 +1204,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     if (campaignArea === "portfolio") return <>
       <section className={styles.surfaceHeading}><div><span className={styles.kicker}>OPERASYON</span><h1>Portföy</h1><p>Dashboard ile aynı kanonik işletim tablosu; görünüm veya kaynak kaydı çoğaltılmaz.</p></div></section>
       <OperationTablePanel onConnect={verifyAndRefreshLocalSession} />
+      <ScopeReportPanel onConnect={verifyAndRefreshLocalSession} />
     </>;
     return <>
       <section className={styles.surfaceHeading}><div><span className={styles.kicker}>OPERASYON · AYRINTI</span><h1>{campaignArea === "classification" ? "Künye inceleme" : campaignArea === "promotion" ? "Gönderi öne çıkarma · K4 ön kontrol" : "Geçmiş"}</h1><p>Bu doğrudan bağlantı ayrı bir çalışma yüzeyi açar; ana işletim tablosu kanonik Operasyon alanında kalır.</p></div><button className={styles.secondaryButton} onClick={() => commitDashboardLocation({ ...dashboardLocation, view: "monitor" })}>Operasyona dön</button></section>
@@ -1501,6 +1504,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     : SOURCE_AUTHORITY_COPY;
 
   return <div className={styles.appShell} data-theme={theme}>
+    <a className={styles.skipLink} href="#dashboard-content">Ana içeriğe geç</a>
     <aside className={styles.sidebar}>
       <div className={styles.brand}><span>RZ</span><div><strong>ReklamZeka</strong><small>Reklam operasyon çalışma alanı</small></div></div>
       <nav aria-label="Ana alanlar"><div><span>Çalışma alanları</span>{primaryNavigation.map((item) => <button type="button" key={item.id} data-active={activePrimaryNavigationArea === item.id} aria-current={activePrimaryNavigationArea === item.id ? "page" : undefined} title={item.description} onClick={() => navigatePrimaryArea(item)}><Icon name={item.icon} /><strong>{item.label}</strong></button>)}</div></nav>
@@ -1509,7 +1513,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     <section className={styles.workspace}>
       <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button type="button" className={styles.workspacePicker} aria-label={`${workspaceName} kaynak ayarlarını aç`} onClick={() => openSettings("meta")}><span className={styles.avatar}>RZ</span><span><strong>{workspaceName}</strong><small>{workspaceSource}</small></span><i aria-hidden="true">Sistem</i></button><div className={styles.topActions}><button type="button" className={styles.themeToggle} aria-pressed={theme === "light"} aria-label={theme === "dark" ? "Açık temaya geç" : "Koyu temaya geç"} title={theme === "dark" ? "Görünüm koyu. Açık temaya geç" : "Görünüm açık. Koyu temaya geç"} onClick={toggleTheme}>{theme === "dark" ? "☀ Açık" : "◐ Koyu"}</button><button type="button" className={styles.agentShortcut} onClick={() => openAgentContext("portfolio_current", "Agent çalışma alanı")}><strong>Agent</strong></button><button type="button" className={styles.codexTransferButton} disabled={agentHandoffLoading} onClick={() => void transferCurrentContextToCodex()}>{agentHandoffLoading ? "Hazırlanıyor…" : "Codex'e aktar"}</button></div></header>
       <nav className={styles.mobileNav} aria-label="Ana alanlar (mobil)">{primaryNavigation.map((item) => <button type="button" key={item.id} data-active={activePrimaryNavigationArea === item.id} aria-current={activePrimaryNavigationArea === item.id ? "page" : undefined} onClick={() => navigatePrimaryArea(item)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</nav>
-      <main ref={contentRef} className={styles.content} tabIndex={-1} aria-label={activeTitle}>
+      <main id="dashboard-content" ref={contentRef} className={styles.content} tabIndex={-1} aria-label={activeTitle}>
         <WorkspaceContextBar surface={activeView === "monitor" ? "overview" : activeView === "manage" ? "workspace" : "assistant"} source={workspaceSource} sourceState={metaReadMirrorState} />
         {content}
       </main>

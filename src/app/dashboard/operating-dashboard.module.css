@@ -57,6 +57,8 @@
 .appShell button, .appShell select, .appShell textarea { font: inherit; }
 .appShell button { color: inherit; }
 .appShell button:focus-visible, .appShell select:focus-visible, .appShell textarea:focus-visible { outline: 3px solid var(--rz-focus); outline-offset: 3px; }
+.skipLink { position: fixed; top: 8px; left: 8px; z-index: 100; transform: translateY(-160%); padding: 9px 12px; border-radius: 8px; color: var(--rz-bg); background: var(--rz-text); font-size: .78rem; font-weight: 750; text-decoration: none; }
+.skipLink:focus { transform: translateY(0); outline: 3px solid var(--rz-focus); outline-offset: 3px; }
 
 .sidebar { position: sticky; top: 0; display: flex; flex-direction: column; height: 100vh; padding: 22px 14px 16px; border-right: 1px solid var(--rz-line); background: var(--rz-sidebar); z-index: 20; }
 .brand { display: flex; align-items: center; gap: 11px; padding: 0 8px 24px; }
@@ -1097,6 +1099,10 @@
 .assistantDrawerBody { min-height: 0; padding: 16px; overflow: auto; }
 .assistantDrawer .agentChat { min-height: calc(100vh - 146px); }
 .sourceFooter { display: flex; justify-content: space-between; gap: 20px; padding: 13px 36px 22px; color: var(--rz-dim); font-size: .54rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .appShell *, .appShell *::before, .appShell *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
 .toast { position: fixed; right: 24px; bottom: 24px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: min(440px, calc(100% - 32px)); padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--rz-green) 38%, var(--rz-line)); border-radius: 11px; background: var(--rz-surface-2); box-shadow: 0 18px 60px rgba(0,0,0,.28); z-index: 50; }
 .toast > span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 99px; color: #111; background: var(--rz-green); font-weight: 900; }
 .toast p { margin: 0; color: #d4dbd1; font-size: .65rem; line-height: 1.4; }

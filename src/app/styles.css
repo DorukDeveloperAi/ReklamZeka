@@ -11,6 +11,8 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; color: var(--ink); background: radial-gradient(circle at 78% 6%, #263018 0, #0e100d 38rem); }
+.skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; transform: translateY(-160%); padding: 9px 12px; border-radius: 8px; color: #10120d; background: var(--lime); font-weight: 750; text-decoration: none; }
+.skip-link:focus { transform: translateY(0); outline: 3px solid var(--ink); outline-offset: 3px; }
 main { min-height: 100vh; width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding: 10vh 0 64px; }
 .hero { max-width: 850px; }
 .eyebrow { color: var(--lime); font-size: 0.76rem; font-weight: 750; letter-spacing: 0.18em; }
@@ -28,6 +30,7 @@ h2 { margin: 0 0 56px; font-size: 1rem; }
 article p { margin: 0; color: var(--muted); line-height: 1.55; }
 @media (max-width: 760px) { main { padding-top: 64px; } .principles { grid-template-columns: 1fr; } article { min-height: 170px; } }
 @media (prefers-reduced-motion: no-preference) { .pulse { animation: breathe 1.8s ease-in-out infinite; } @keyframes breathe { 50% { opacity: .35; } } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
 
 .dashboard-shell { padding-top: 56px; }
 .dashboard-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }

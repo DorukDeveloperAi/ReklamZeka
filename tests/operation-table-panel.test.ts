@@ -31,12 +31,21 @@ describe("operation table panel", () => {
     expect(html).toContain("Meta yazma yetkisi yok");
     expect(html).toContain("Bütçe sahibi");
     expect(html).toContain("Para birimi doğrulanmadı");
+    expect(html).toContain('role="region"');
+    expect(html).toContain('aria-label="Hiyerarşik operasyon tablosu"');
+    expect(html).toContain('scope="col"');
+    expect(html).toContain('scope="row"');
+    expect(html).toContain('aria-live="polite"');
     expect(html).not.toContain("Kılavuz / son karar");
     expect(html).not.toContain("TRY");
     expect(html).not.toContain("demo");
     const source = require("node:fs").readFileSync("src/app/dashboard/operation-table-panel.module.css", "utf8");
     expect(source).toContain("@media (max-width: 480px)");
     expect(source).toContain(".mobileCards { display: grid");
+    expect(source).toContain(".card { display: grid; gap: 8px; min-width: 0");
+    expect(source).toContain(".card h3, .card p, .card small, .card dl, .card dl div, .card dd { min-width: 0; overflow-wrap: anywhere; }");
+    expect(source).toContain(".table th[scope=\"row\"]");
+    expect(source).toContain(".scroll:focus-visible");
   });
 
   it("keeps ad-set-only scopes as ad-set facts and uses stable canonical hierarchy keys", () => {

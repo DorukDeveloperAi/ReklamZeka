@@ -51,11 +51,15 @@ const ERROR_MESSAGES: Readonly<Record<Exclude<LocalSessionConnectionResult["stat
 export function LocalSessionConnector(props: Readonly<{
   onVerify: () => Promise<boolean>;
   title?: string;
+  /** Multiple independent read panels may request a session on one screen. */
+  idPrefix?: string;
 }>) {
   const [capability, setCapability] = useState("");
   const [state, setState] = useState<"idle" | "connecting" | "connected" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
 
+  const inputId = `${props.idPrefix ?? "local-session"}-capability`;
+  const safetyId = `${props.idPrefix ?? "local-session"}-safety`;
   return <form className={styles.localSessionConnector} onSubmit={async (event) => {
     event.preventDefault();
     const submitted = capability.trim();
@@ -78,13 +82,13 @@ export function LocalSessionConnector(props: Readonly<{
       <code>npm run local-session:mint</code>
     </div>
     <div className={styles.localSessionFields}>
-      <label htmlFor="local-session-capability">Tek kullanımlık yerel oturum capability</label>
-      <div><input id="local-session-capability" type="password" autoComplete="off" spellCheck={false}
+      <label htmlFor={inputId}>Tek kullanımlık yerel oturum capability</label>
+      <div><input id={inputId} type="password" autoComplete="off" spellCheck={false}
         maxLength={4096} value={capability} disabled={state === "connecting"}
-        aria-describedby="local-session-safety"
+        aria-describedby={safetyId}
         onChange={(event) => setCapability(event.target.value)} />
       <button type="submit" disabled={state === "connecting" || !capability.trim()}>{state === "connecting" ? "Doğrulanıyor…" : "Oturumu bağla"}</button></div>
-      <small id="local-session-safety">Proof ekranda geri gösterilmez, saklanmaz ve cookie değeri olarak yeniden kullanılmaz.</small>
+      <small id={safetyId}>Proof ekranda geri gösterilmez, saklanmaz ve cookie değeri olarak yeniden kullanılmaz.</small>
       {message ? <p className={styles.localSessionFeedback} role={state === "error" ? "alert" : "status"} data-state={state}>{message}</p> : null}
     </div>
   </form>;
