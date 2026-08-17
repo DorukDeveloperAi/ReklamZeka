@@ -31,6 +31,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P02-B-naming-template-domain | Kabul edildi / arşivlenebilir |
 | + P03-A-slice-registry | Kabul edildi / arşivlenebilir |
 | + P03-B-operation-read-model | Kabul edildi / arşivlenebilir |
+| P03-C-primary-result-binding | DEVAM — kanonik selector/revision domain temeli; persistence ve Operasyon projection sırada |
 | + P04-A-guide-domain | Kabul edildi / arşivlenebilir |
 | + P04-B-guide-persistence | Kabul edildi / arşivlenebilir |
 | + P05-A-guide-run-domain | Kabul edildi / arşivlenebilir |
@@ -60,3 +61,4 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 - `+ P04-B guide persistence`: immutable Kılavuz revisions, exact predecessor/current published slice bağı, interpretation acceptance, old-active/new-draft, tek-insan activation, lifecycle/outbox idempotency ve pause/reactivate occurrence zinciri canlı outer-rollback repository verifier ile kanıtlandı. Migration ledger/file hash eşleşti; 8/8 RLS+FORCE, role grant 0, 13 tenant-leftmost FK indeksi ve zero residue doğrulandı. Budget resolver, Agent transfer ve compatibility alt paketleri açık olduğundan P04 paketi henüz `+` değildir.
 - P07-B Operasyon tablosu: gerçek `/api/operations` kaynağı, 1/7/30 gün, campaign/ad-set hiyerarşisi, ad-set-only kapsam, güvenli pagination/dedupe, source-state ve 320 px taşmasız mobil görünüm kod kabulünden geçti. Oturumsuz canlı sınır `401 local_session_required` olarak doğrulandı; gerçek satırlı browser kabulü kullanıcı capability'yi açık yerel ekrana girene kadar `+` alamaz.
 - P01-E ilk migration preflight'ı uygulanmadan reddedildi: composite FK sırası PostgreSQL'de derlenmiyor; generic finding/Development Log zinciri, active-workspace delete guard, bounded/redacted JSON, occurrence authenticity, transaction/advisory-lock concurrency ve normal-sync production wiring eksikleri kapatılmadan journal/apply yapılmayacak.
+- P03-C primary result tasarımı: kullanıcı yalnız kanonik `actions/<action_type>` selector'ünü Kurum Kampanyası veya slice'a bağlar; slice-bound org binding'i geçersiz kılar, slice-unbound org fallback'i geri getirir. Bilinen sıfır sonuç gösterilir fakat maliyet null'dır; eksik metrik sıfır sayılmaz. Immutable revision/OCC persistence ve `operation-read/2.0.0` projection, P01-E schema sahipliği kapandıktan sonra ayrı migrationla uygulanacaktır.
