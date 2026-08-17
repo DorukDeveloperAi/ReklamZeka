@@ -33,6 +33,8 @@ export type MetaReadMirrorFact = Readonly<{
   adSetStatus: string | null;
   optimizationGoal: string | null;
   targetingSummary: Record<string, unknown> | null;
+  /** Internal integrity companion; not copied into the public projection. */
+  targetingSignature: string | null;
   adSetDailyBudgetMinor: number | null;
   adSetLifetimeBudgetMinor: number | null;
   adSetFetchedAt: string | null;

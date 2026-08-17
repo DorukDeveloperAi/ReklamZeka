@@ -4,6 +4,7 @@ import {
   normalizeMetaCampaignObjective,
   type CanonicalMetaObjective,
 } from "@/domain/meta/objective-mapping";
+import { normalizeMetaTargetingEvidence, type CanonicalMetaTargetingSummary } from "./targeting-evidence";
 
 export const META_INVENTORY_MATERIALIZATION_VERSION = "meta-inventory-materialization/1.0.0" as const;
 export const META_INVENTORY_FIELD_CATALOG_VERSION = "meta-inventory-field-catalog/2.0.0" as const;
@@ -75,6 +76,8 @@ export type CanonicalMetaInventoryAdSet = CommonRecord & Readonly<{
   lifetimeBudgetMinor: number | null;
   attributionSpec: readonly Readonly<Record<string, unknown>>[] | null;
   promotedObject: Readonly<Record<string, unknown>> | null;
+  targetingSummary: CanonicalMetaTargetingSummary;
+  targetingSignature: string;
 }>;
 
 export type CanonicalMetaInventoryAd = CommonRecord & Readonly<{
@@ -305,10 +308,18 @@ function parseRecord(input: ParseMetaInventoryPageInput, rawValue: unknown): Can
     const lifetimeBudgetMinor = amount(raw, "lifetime_budget", unsupported);
     const attributionSpec = objectArray(raw, "attribution_spec", unsupported);
     const promotedObject = objectField(raw, "promoted_object", unsupported);
+    let targetingEvidence;
+    try {
+      targetingEvidence = normalizeMetaTargetingEvidence({ fieldPresent: Object.hasOwn(raw, "targeting"), targeting: raw.targeting,
+        scope: { workspaceId: input.workspaceId, externalAccountId: input.externalAccountId } });
+    } catch {
+      throw new MetaInventoryMaterializationError("invalid_page", "Ad set targeting kanıtı güvenli biçimde normalize edilemedi");
+    }
     return Object.freeze({
       ...base, level: "ad_set", unsupportedFields: Object.freeze(unsupported),
       externalCampaignId, optimizationGoal, billingEvent, bidStrategy,
       bidAmountMinor, dailyBudgetMinor, lifetimeBudgetMinor, attributionSpec, promotedObject,
+      targetingSummary: targetingEvidence.summary, targetingSignature: targetingEvidence.signature,
     });
   }
   const unsupported = [...base.unsupportedFields];
