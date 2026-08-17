@@ -19,6 +19,14 @@ describe("operation read HTTP boundary", () => {
     expect((await handler(request("http://localhost/api/operations?unknown=x"))).status).toBe(400);
     expect((await handler(request("http://localhost/api/operations", { "sec-fetch-site": "cross-site" }))).status).toBe(400);
     expect((await handler(request("http://localhost/api/operations", { authorization: "Bearer no" }))).status).toBe(400);
-    expect((await handler(request())).status).toBe(401);
+    expect((await handler(request())).status).toBe(403);
+  });
+
+  it("returns a source failure without mislabeling it as invalid input", async () => {
+    const handler = createOperationReadHttpHandler({ service: { read: vi.fn().mockRejectedValue(new Error("database offline")) } as never,
+      workspaceId: async () => workspaceId });
+    const response = await handler(request());
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe("source_unavailable");
   });
 });
