@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { normalizeDashboardLocation } from "@/app/dashboard/operating-dashboard";
+import { normalizeDashboardLocation, primaryNavigationAreaForLocation } from "@/app/dashboard/operating-dashboard";
 
 const dashboard = readFileSync("src/app/dashboard/operating-dashboard.tsx", "utf8");
 const decisionRoom = readFileSync("src/app/dashboard/decision-room-panel.tsx", "utf8");
@@ -11,7 +11,7 @@ const budgetPools = readFileSync("src/app/dashboard/budget-pool-hierarchy-panel.
 
 describe("dashboard analysis and decision information architecture", () => {
   it("keeps one production-backed analysis surface and removes the static duplicate", () => {
-    expect(dashboard).toContain('{ id: "manage", label: "Portföy / Slice"');
+    expect(dashboard).toContain('id: "analysis", label: "Analiz"');
     expect(dashboard).not.toContain('{ id: "analysis", label: "Analizler"');
     expect(dashboard).not.toContain("const analysisRuns");
     expect(dashboard).not.toContain("4 hesap · 32 kampanya");
@@ -26,8 +26,8 @@ describe("dashboard analysis and decision information architecture", () => {
     expect(dashboard).not.toContain("function renderAnalysis()");
   });
 
-  it("implements the approved three-purpose primary IA and keeps legacy entries contextual", () => {
-    for (const label of ["Ana Sayfa", "Portföy / Slice", "Agent"]) {
+  it("implements five operator areas while mapping legacy routes into their contextual surfaces", () => {
+    for (const label of ["Operasyon", "Kılavuzlar", "Analiz", "Kararlar", "Sistem"]) {
       expect(dashboard).toContain(`label: "${label}"`);
     }
     for (const legacyNav of ["Strict policies", "İç kategoriler", "Autonomy Studio", "Practice Lab", "Meta bağlantısı", "Orchestrator Agent", "Teslimat alarmları", "Gönderi öne çıkarma", "Timeline"]) {
@@ -40,6 +40,12 @@ describe("dashboard analysis and decision information architecture", () => {
     expect(normalizeDashboardLocation("promotions")).toMatchObject({ view: "manage", manageArea: "portfolio", campaignArea: "promotion" });
     expect(normalizeDashboardLocation("timeline")).toMatchObject({ view: "manage", manageArea: "portfolio", campaignArea: "timeline" });
     expect(normalizeDashboardLocation("agent")).toMatchObject({ view: "agent" });
+    expect(primaryNavigationAreaForLocation(normalizeDashboardLocation("campaigns"))).toBe("operations");
+    expect(primaryNavigationAreaForLocation(normalizeDashboardLocation("rules"))).toBe("guides");
+    expect(primaryNavigationAreaForLocation(normalizeDashboardLocation("analysis"))).toBe("analysis");
+    expect(primaryNavigationAreaForLocation(normalizeDashboardLocation("approvals"))).toBe("decisions");
+    expect(primaryNavigationAreaForLocation(normalizeDashboardLocation("settings"))).toBe("system");
+    expect(primaryNavigationAreaForLocation(normalizeDashboardLocation("agent"))).toBeNull();
   });
 
   it("keeps session recovery inside each operational context without seeded frontend budgets", () => {

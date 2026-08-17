@@ -505,13 +505,25 @@ export function portfolioCapabilityFromResponse(value: unknown): PortfolioCapabi
   return Object.freeze({ connections: Object.freeze(validConnections), accounts: Object.freeze(validAccounts) });
 }
 
-const navGroups: ReadonlyArray<Readonly<{ label: string; items: ReadonlyArray<Readonly<{ id: ViewId; label: string; icon: string; badge?: string }>> }>> = [
-  { label: "Çalışma", items: [
-    { id: "monitor", label: "Ana Sayfa", icon: "⌂" },
-    { id: "manage", label: "Portföy / Slice", icon: "◫" },
-    { id: "agent", label: "Agent", icon: "✦" },
-  ] },
-];
+/** Five stable operator areas map onto the existing route model; no capability is discarded. */
+type PrimaryNavigationArea = "operations" | "guides" | "analysis" | "decisions" | "system";
+type PrimaryNavigationItem = Readonly<{ id: PrimaryNavigationArea; label: string; description: string; icon: string; location: DashboardLocation }>;
+const primaryNavigation: readonly PrimaryNavigationItem[] = Object.freeze([
+  Object.freeze({ id: "operations", label: "Operasyon", description: "Portföy, teslimat ve günlük görünüm", icon: "○", location: normalizeDashboardLocation("monitor") }),
+  Object.freeze({ id: "guides", label: "Kılavuzlar", description: "Çalışma dili, kaynaklar ve kurallar", icon: "⌁", location: normalizeDashboardLocation("rules") }),
+  Object.freeze({ id: "analysis", label: "Analiz", description: "Kanıt, zaman ve inceleme", icon: "⌕", location: normalizeDashboardLocation("analysis") }),
+  Object.freeze({ id: "decisions", label: "Kararlar", description: "Bütçe önerileri ve insan onayı", icon: "✓", location: normalizeDashboardLocation("approvals") }),
+  Object.freeze({ id: "system", label: "Sistem", description: "Bağlantılar ve kayıt yönetimi", icon: "□", location: normalizeDashboardLocation("settings") }),
+]);
+
+export function primaryNavigationAreaForLocation(location: Pick<DashboardLocation, "view" | "manageArea" | "decisionArea">): PrimaryNavigationArea | null {
+  if (location.view === "monitor") return "operations";
+  if (location.view !== "manage") return null;
+  if (location.manageArea === "portfolio") return "operations";
+  if (location.manageArea === "rules") return "guides";
+  if (location.manageArea === "settings") return "system";
+  return location.decisionArea === "analysis" ? "analysis" : "decisions";
+}
 
 export type PortfolioFilters = Readonly<{
   objective: string;
@@ -620,9 +632,9 @@ function WorkspaceContextBar(props: Readonly<{
   sourceState: MetaReadMirrorLoadState;
 }>) {
   const copy = props.surface === "overview"
-    ? { label: "ANA SAYFA · GENEL BAKIŞ", detail: "Portföy genelinde önceliği görün; ayrıntıyı seçili kapsamda çalışın." }
+    ? { label: "OPERASYON · GENEL BAKIŞ", detail: "Portföy genelinde önceliği görün; ayrıntıyı seçili kapsamda çalışın." }
     : props.surface === "workspace"
-      ? { label: "PORTFÖY / SLICE · ÇALIŞMA MASASI", detail: "Seçili kapsamı inceleyin; kural ve Agent bağlamı aynı kayda bağlı kalır." }
+      ? { label: "OPERASYON · PORTFÖY ÇALIŞMASI", detail: "Seçili kapsamı inceleyin; kural ve Agent bağlamı aynı kayda bağlı kalır." }
       : { label: "AGENT · YARDIMCI KATMAN", detail: "Tek konuşmaya yalnız güvenli sayfa ve kapsam özeti eklenir." };
   const sourceLabel = props.sourceState === "ready" ? "Kaynak hazır"
     : props.sourceState === "loading" ? "Kaynak okunuyor"
@@ -873,7 +885,8 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     return () => window.cancelAnimationFrame(frame);
   }, [contentFocusKey]);
 
-  const activeTitle = useMemo(() => navGroups.flatMap((group) => group.items).find((item) => item.id === activeView)?.label ?? "Ana Sayfa", [activeView]);
+  const activePrimaryNavigationArea = primaryNavigationAreaForLocation({ view: activeView, manageArea, decisionArea });
+  const activeTitle = useMemo(() => activeView === "agent" ? "Agent" : primaryNavigation.find((item) => item.id === activePrimaryNavigationArea)?.label ?? "Operasyon", [activePrimaryNavigationArea, activeView]);
 
   const refreshRequestedCampaignContext = useCallback(async (): Promise<boolean> => {
     const requestId = campaignContextRequestRef.current + 1;
@@ -1160,11 +1173,8 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     commitDashboardLocation({ ...dashboardLocation, view: "agent" });
   }, [activeTitle, activeView, commitDashboardLocation, dashboardLocation]);
 
-  function navigate(view: ViewId) {
-    if (view === "agent") setAgentSourceView(activeView);
-    commitDashboardLocation({ ...dashboardLocation, view,
-      manageArea: view === "manage" ? "portfolio" : dashboardLocation.manageArea,
-      campaignRef: null });
+  function navigatePrimaryArea(item: PrimaryNavigationItem) {
+    commitDashboardLocation({ ...item.location, campaignRef: null, approvalUnitRef: null, ruleRef: null, ruleRevision: null });
   }
 
   function openSettings(area: SettingsArea = "meta") {
@@ -1224,7 +1234,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
 
     return <>
       <section className={styles.pageHero}>
-        <div><span className={styles.kicker}>ANA SAYFA · GENEL BAKIŞ</span><h1>Portföyde bugün nerede inceleme gerektiğini görün.</h1><p>Hesaplar ve slice’lar üstü görünüm, veri sağlığı ve öncelikleri gösterir. Eksik veri sıfır veya örnek değer olarak gösterilmez. Ayrıntılı işletim için ilgili kapsamı Portföy / Slice çalışma masasında açın.</p></div>
+        <div><span className={styles.kicker}>OPERASYON · GENEL BAKIŞ</span><h1>Portföyde bugün nerede inceleme gerektiğini görün.</h1><p>Hesaplar ve slice’lar üstü görünüm, veri sağlığı ve öncelikleri gösterir. Eksik veri sıfır veya örnek değer olarak gösterilmez. Ayrıntılı işletim için Operasyon alanında ilgili kapsamı açın.</p></div>
         <button className={styles.primaryButton} onClick={() => openAgentContext("portfolio_current", "Bugün · kanonik portföy")}><span>✦</span> Asistanla aç</button>
       </section>
 
@@ -1262,7 +1272,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
       : metaReadMirrorState === "session_required" ? "Kampanyalar için yerel oturum gerekli"
         : "Kanonik kampanya kaynağı kullanılamıyor";
     return <>
-      <section className={styles.pageHero}><div><span className={styles.kicker}>PORTFÖY / SLICE · ÇALIŞMA MASASI</span><h1>Seçili kapsamı aynı bağlamda inceleyin ve işletin.</h1><p>Gerçek Meta hiyerarşisini ayrıntıda okuyun; inceleme, kullanıcı kuralı ve Agent yardımı seçili kapsamdan açılır. Bu yüzey veri veya kuralın ikinci bir kaydını oluşturmaz.</p></div>{campaignArea === "portfolio" ? <button className={styles.primaryButton} onClick={() => void refreshMetaReadMirror(true)}>Kaynağı yenile</button> : null}</section>
+      <section className={styles.pageHero}><div><span className={styles.kicker}>OPERASYON · PORTFÖY ÇALIŞMASI</span><h1>Seçili kapsamı aynı bağlamda inceleyin ve işletin.</h1><p>Gerçek Meta hiyerarşisini ayrıntıda okuyun; inceleme, kullanıcı kuralı ve Agent yardımı seçili kapsamdan açılır. Bu yüzey veri veya kuralın ikinci bir kaydını oluşturmaz.</p></div>{campaignArea === "portfolio" ? <button className={styles.primaryButton} onClick={() => void refreshMetaReadMirror(true)}>Kaynağı yenile</button> : null}</section>
       <SectionNav<CampaignArea> label="Kampanya çalışma alanı" active={campaignArea} onChange={(area) => commitDashboardLocation({ ...dashboardLocation, campaignArea: area })} items={[
         { id: "portfolio", label: "Portföy", description: "Kampanya → kreatif" },
         { id: "classification", label: "Künye inceleme", description: "Eksik ve çelişkili sınıflar" },
@@ -1285,8 +1295,8 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
   }
 
   function renderAgent() {
-    const sourceTitle = navGroups.flatMap((group) => group.items)
-      .find((item) => item.id === agentSourceView)?.label ?? "İzle";
+    const sourceTitle = agentSourceView === "agent" ? "Agent"
+      : primaryNavigation.find((item) => item.id === primaryNavigationAreaForLocation(normalizeDashboardLocation(agentSourceView)))?.label ?? "Operasyon";
     const visibleMessages = orchestratorState === "ready"
       ? (orchestratorConversation?.messages.map((message) => ({ key: message.messageRef,
           from: message.role === "assistant" ? "agent" as const : "user" as const, text: message.content,
@@ -1601,13 +1611,13 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
 
   return <div className={styles.appShell} data-theme={theme}>
     <aside className={styles.sidebar}>
-      <div className={styles.brand}><span>RZ</span><div><strong>ReklamZeka</strong><small>Operating System</small></div></div>
-      <nav aria-label="Ana navigasyon">{navGroups.map((group) => <div key={group.label}><span>{group.label}</span>{group.items.map((item) => <button type="button" key={item.id} data-active={activeView === item.id} aria-current={activeView === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><Icon name={item.icon} /><strong>{item.label}</strong>{item.badge ? <i data-live={item.badge === "●"}>{item.badge}</i> : null}</button>)}</div>)}</nav>
+      <div className={styles.brand}><span>RZ</span><div><strong>ReklamZeka</strong><small>Reklam operasyon çalışma alanı</small></div></div>
+      <nav aria-label="Ana alanlar"><div><span>Çalışma alanları</span>{primaryNavigation.map((item) => <button type="button" key={item.id} data-active={activePrimaryNavigationArea === item.id} aria-current={activePrimaryNavigationArea === item.id ? "page" : undefined} title={item.description} onClick={() => navigatePrimaryArea(item)}><Icon name={item.icon} /><strong>{item.label}</strong></button>)}</div></nav>
       <div className={styles.sidebarFooter}><span className={metaReadMirror?.sourceState === "ready" ? styles.liveDot : undefined} /><div><strong>Meta veri aynası</strong><small>{workspaceSource}</small></div><button aria-label="Bağlantı ayarları" onClick={() => openSettings("meta")}>•••</button></div>
     </aside>
     <section className={styles.workspace}>
-      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button type="button" className={styles.workspacePicker} aria-label={`${workspaceName} kaynak ayarlarını aç`} onClick={() => openSettings("meta")}><span className={styles.avatar}>RZ</span><span><strong>{workspaceName}</strong><small>{workspaceSource}</small></span><i aria-hidden="true">Ayarlar</i></button><div className={styles.topActions}><button type="button" className={styles.themeToggle} aria-pressed={theme === "light"} aria-label={theme === "dark" ? "Açık temaya geç" : "Koyu temaya geç"} title={theme === "dark" ? "Görünüm koyu. Açık temaya geç" : "Görünüm açık. Koyu temaya geç"} onClick={toggleTheme}>{theme === "dark" ? "☀ Açık" : "◐ Koyu"}</button><button type="button" className={styles.codexTransferButton} disabled={agentHandoffLoading} onClick={() => void transferCurrentContextToCodex()}>{agentHandoffLoading ? "Hazırlanıyor…" : "Codex'e aktar"}</button></div></header>
-      <nav className={styles.mobileNav} aria-label="Ana navigasyon">{navGroups.flatMap((group) => group.items).map((item) => <button type="button" key={item.id} data-active={activeView === item.id} aria-current={activeView === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</nav>
+      <header className={styles.topbar}><div className={styles.mobileBrand}><span>RZ</span><strong>ReklamZeka</strong></div><button type="button" className={styles.workspacePicker} aria-label={`${workspaceName} kaynak ayarlarını aç`} onClick={() => openSettings("meta")}><span className={styles.avatar}>RZ</span><span><strong>{workspaceName}</strong><small>{workspaceSource}</small></span><i aria-hidden="true">Sistem</i></button><div className={styles.topActions}><button type="button" className={styles.themeToggle} aria-pressed={theme === "light"} aria-label={theme === "dark" ? "Açık temaya geç" : "Koyu temaya geç"} title={theme === "dark" ? "Görünüm koyu. Açık temaya geç" : "Görünüm açık. Koyu temaya geç"} onClick={toggleTheme}>{theme === "dark" ? "☀ Açık" : "◐ Koyu"}</button><button type="button" className={styles.agentShortcut} onClick={() => openAgentContext("portfolio_current", "Agent çalışma alanı")}><strong>Agent</strong></button><button type="button" className={styles.codexTransferButton} disabled={agentHandoffLoading} onClick={() => void transferCurrentContextToCodex()}>{agentHandoffLoading ? "Hazırlanıyor…" : "Codex'e aktar"}</button></div></header>
+      <nav className={styles.mobileNav} aria-label="Ana alanlar (mobil)">{primaryNavigation.map((item) => <button type="button" key={item.id} data-active={activePrimaryNavigationArea === item.id} aria-current={activePrimaryNavigationArea === item.id ? "page" : undefined} onClick={() => navigatePrimaryArea(item)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</nav>
       <main ref={contentRef} className={styles.content} tabIndex={-1} aria-label={activeTitle}>
         <WorkspaceContextBar surface={activeView === "monitor" ? "overview" : activeView === "manage" ? "workspace" : "assistant"} source={workspaceSource} sourceState={metaReadMirrorState} />
         {content}

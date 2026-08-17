@@ -48,8 +48,8 @@ if (failures.length === 0) {
   const deliveryAlerts = readFileSync(resolve(root, "src/app/dashboard/delivery-health-alert-panel.tsx"), "utf8");
   const promotionPreflight = readFileSync(resolve(root, "src/app/dashboard/promotion-preflight-panel.tsx"), "utf8");
   const operationalTimeline = readFileSync(resolve(root, "src/app/dashboard/operational-timeline-panel.tsx"), "utf8");
-  const navigationSource = operatingDashboard.slice(operatingDashboard.indexOf("const navGroups"), operatingDashboard.indexOf("export type PortfolioFilters"));
-  for (const boundary of ["ANA SAYFA · GENEL BAKIŞ", "PORTFÖY / SLICE · ÇALIŞMA MASASI", "Eksik veri sıfır veya örnek değer olarak gösterilmez", "ekran örnek içerikle doldurulmaz"]) {
+  const navigationSource = operatingDashboard.slice(operatingDashboard.indexOf("const primaryNavigation"), operatingDashboard.indexOf("export type PortfolioFilters"));
+  for (const boundary of ["OPERASYON · GENEL BAKIŞ", "OPERASYON · PORTFÖY ÇALIŞMASI", "Eksik veri sıfır veya örnek değer olarak gösterilmez", "ekran örnek içerikle doldurulmaz"]) {
     if (!operatingDashboard.includes(boundary)) failures.push(`operating dashboard sınırı eksik: ${boundary}`);
   }
   for (const forbidden of ["Demo Marka", "PORTFÖY · DEMO", "KARAR MASASI · DEMO", "OFFLINE ÇALIŞMA KİTABI SNAPSHOT", "7 AĞUSTOS CUMA"]) {
@@ -59,7 +59,7 @@ if (failures.length === 0) {
     if (operatingDashboard.includes(fakeAnalysis)) failures.push(`statik Analizler operasyon içeriği kaldı: ${fakeAnalysis}`);
   }
   if (operatingDashboard.includes('{ id: "analysis", label: "Analizler"')) failures.push("statik Analizler görünümü navigasyonda kaldı");
-  for (const target of ['{ id: "monitor", label: "Ana Sayfa"', '{ id: "manage", label: "Portföy / Slice"', '{ id: "agent", label: "Agent"']) {
+  for (const target of ['id: "operations", label: "Operasyon"', 'id: "guides", label: "Kılavuzlar"', 'id: "analysis", label: "Analiz"', 'id: "decisions", label: "Kararlar"', 'id: "system", label: "Sistem"']) {
     if (!navigationSource.includes(target)) failures.push(`onaylı primary IA hedefi eksik: ${target}`);
   }
   for (const legacyTarget of ['{ id: "strict-policies", label:', '{ id: "categories", label:',
@@ -67,8 +67,8 @@ if (failures.length === 0) {
     '{ id: "alerts", label:', '{ id: "promotions", label:', '{ id: "timeline", label:']) {
     if (navigationSource.includes(legacyTarget)) failures.push(`legacy teknik hedef primary nav'da kaldı: ${legacyTarget}`);
   }
-  for (const boundary of ["Kararlar", "Onay kuyruğu", "Canlı Graph envanteri bu sürümde kapalıdır.", "kural/policy metni üretmez, alanlara kopyalamaz veya kayıt oluşturmaz"]) {
-    if (!operatingDashboard.includes(boundary)) failures.push(`üç alanlı dashboard sınırı eksik: ${boundary}`);
+  for (const boundary of ["Operasyon", "Kılavuzlar", "Analiz", "Kararlar", "Sistem", "Onay kuyruğu", "Canlı Graph envanteri bu sürümde kapalıdır.", "kural/policy metni üretmez, alanlara kopyalamaz veya kayıt oluşturmaz"]) {
+    if (!operatingDashboard.includes(boundary)) failures.push(`beş alanlı dashboard sınırı eksik: ${boundary}`);
   }
   if (operatingDashboard.includes('fetch("/api/meta/inventory"')) failures.push("kapalı Graph capability için canlı envanter çağrısı kaldı");
   for (const legacyDependency of ["dashboardResponse", "fixture-state", "DEMO_METRICS"]) {
@@ -147,4 +147,4 @@ if (failures.length > 0) {
   failures.forEach((failure) => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log("EXPERIENCE PASS — üç alanlı IA, kaynak sınırları ve mevcut session/campaign güvenlik kanıtları bağlı");
+console.log("EXPERIENCE PASS — beş alanlı IA, kaynak sınırları ve mevcut session/campaign güvenlik kanıtları bağlı");
