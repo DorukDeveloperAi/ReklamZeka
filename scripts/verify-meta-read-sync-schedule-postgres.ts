@@ -29,6 +29,10 @@ let wrongTokenRejected = false;
 let completed = false;
 let cursorAdvanced = false;
 let duplicateCompleted = false;
+let manualBlockedByAutomatic = false;
+let manualCompleted = false;
+let manualCursorUnchanged = false;
+let manualReplayCompleted = false;
 let rollbackClean = false;
 
 try {
@@ -72,6 +76,17 @@ try {
       dateStart: candidate.dateStart, dateStop: candidate.dateStop, now, leaseUntil });
     if (first.status !== "claimed") throw new Error("Schedule lease claim başarısız");
     claimed = first.attempt === 1;
+    const manualAt = "2026-08-08T04:01:00.000Z";
+    const manualCandidate = await registry.resolveManual(workspaceId, manualAt);
+    if (!manualCandidate) throw new Error("Manual candidate üretilemedi");
+    const manualFireHashWhileAutomatic = digest([META_READ_SYNC_SCHEDULE_WORKER_VERSION, manualCandidate.triggerKind,
+      manualCandidate.scheduledFor, manualCandidate.workspaceId, manualCandidate.connectionId,
+      manualCandidate.scopeRevision, manualCandidate.dateStart, manualCandidate.dateStop]);
+    const blockedManual = await lease.claim({ idempotencyKey: `syncfire_${manualFireHashWhileAutomatic}`, scopeKey,
+      workspaceId, connectionId, scopeRevision: manualCandidate.scopeRevision, triggerKind: "manual",
+      scheduledFor: manualCandidate.scheduledFor, dateStart: manualCandidate.dateStart,
+      dateStop: manualCandidate.dateStop, now: manualAt, leaseUntil: "2026-08-08T04:06:00.000Z" });
+    manualBlockedByAutomatic = blockedManual.status === "duplicate_in_progress";
     wrongTokenRejected = !(await lease.complete({
       idempotencyKey,
       leaseToken: `lease_${"f".repeat(32)}`,
@@ -90,7 +105,33 @@ try {
       dateStart: candidate.dateStart, dateStop: candidate.dateStop, now, leaseUntil });
     duplicateCompleted = replay.status === "duplicate_completed" && replay.attempt === 1;
 
-    if (!dueDerived || !claimed || !wrongTokenRejected || !completed || !cursorAdvanced || !duplicateCompleted) {
+    const manualAfterAt = "2026-08-08T04:10:00.000Z";
+    const manualAfter = await registry.resolveManual(workspaceId, manualAfterAt);
+    if (!manualAfter || manualAfter.scopeRevision !== 2) throw new Error("Manual post-schedule candidate üretilemedi");
+    const manualFireHash = digest([META_READ_SYNC_SCHEDULE_WORKER_VERSION, manualAfter.triggerKind,
+      manualAfter.scheduledFor, manualAfter.workspaceId, manualAfter.connectionId, manualAfter.scopeRevision,
+      manualAfter.dateStart, manualAfter.dateStop]);
+    const manualKey = `syncfire_${manualFireHash}`;
+    const manualLease = await lease.claim({ idempotencyKey: manualKey, scopeKey, workspaceId, connectionId,
+      scopeRevision: manualAfter.scopeRevision, triggerKind: "manual", scheduledFor: manualAfter.scheduledFor,
+      dateStart: manualAfter.dateStart, dateStop: manualAfter.dateStop, now: manualAfterAt,
+      leaseUntil: "2026-08-08T04:15:00.000Z" });
+    if (manualLease.status !== "claimed") throw new Error("Manual lease claim başarısız");
+    manualCompleted = await lease.complete({ idempotencyKey: manualKey, leaseToken: manualLease.leaseToken,
+      completedAt: manualAfterAt });
+    const afterManual = await transaction.select({ revision: schema.metaReadSyncSchedules.revision,
+      nextDueAt: schema.metaReadSyncSchedules.nextDueAt }).from(schema.metaReadSyncSchedules).where(and(
+      eq(schema.metaReadSyncSchedules.workspaceId, workspaceId), eq(schema.metaReadSyncSchedules.id, scheduleId)));
+    manualCursorUnchanged = afterManual[0]?.revision === 2
+      && afterManual[0]?.nextDueAt.toISOString() === "2026-08-08T09:00:00.000Z";
+    const manualReplay = await lease.claim({ idempotencyKey: manualKey, scopeKey, workspaceId, connectionId,
+      scopeRevision: manualAfter.scopeRevision, triggerKind: "manual", scheduledFor: manualAfter.scheduledFor,
+      dateStart: manualAfter.dateStart, dateStop: manualAfter.dateStop, now: manualAfterAt,
+      leaseUntil: "2026-08-08T04:15:00.000Z" });
+    manualReplayCompleted = manualReplay.status === "duplicate_completed" && manualReplay.attempt === 1;
+
+    if (!dueDerived || !claimed || !manualBlockedByAutomatic || !wrongTokenRejected || !completed || !cursorAdvanced
+      || !duplicateCompleted || !manualCompleted || !manualCursorUnchanged || !manualReplayCompleted) {
       throw new Error("Meta read-sync schedule PostgreSQL acceptance failed");
     }
     throw rollback;
@@ -119,6 +160,10 @@ console.log(JSON.stringify({
   completed,
   cursorAdvanced,
   duplicateCompleted,
+  manualBlockedByAutomatic,
+  manualCompleted,
+  manualCursorUnchanged,
+  manualReplayCompleted,
   rollbackClean,
   temporaryRowsCommitted: false,
   cronActivated: false,
