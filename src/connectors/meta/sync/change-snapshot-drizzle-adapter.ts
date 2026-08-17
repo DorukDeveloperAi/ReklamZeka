@@ -95,11 +95,28 @@ export interface MetaChangeSnapshotReadStore {
 
 export class MetaChangeSnapshotScopeError extends Error {
   constructor(
-    readonly code: "invalid_scope" | "scope_mismatch" | "orphan_parent" | "duplicate_identity",
+    readonly code: "invalid_scope" | "scope_mismatch" | "orphan_parent" | "duplicate_identity" | "collection_overflow",
     message: string,
   ) {
     super(message);
     this.name = "MetaChangeSnapshotScopeError";
+  }
+}
+
+export const META_CHANGE_SNAPSHOT_COLLECTION_CAPS = Object.freeze({
+  campaigns: 10_000,
+  adSets: 50_000,
+  ads: 100_000,
+  creatives: 100_000,
+  bindings: 100_000,
+});
+
+export function assertMetaChangeSnapshotCollectionBound(
+  collection: keyof typeof META_CHANGE_SNAPSHOT_COLLECTION_CAPS,
+  count: number,
+): void {
+  if (!Number.isSafeInteger(count) || count < 0 || count > META_CHANGE_SNAPSHOT_COLLECTION_CAPS[collection]) {
+    throw new MetaChangeSnapshotScopeError("collection_overflow", `${collection} snapshot sınırını aştı`);
   }
 }
 
@@ -316,8 +333,10 @@ export class DrizzleMetaChangeSnapshotStore implements MetaChangeSnapshotReadSto
         eq(schema.dataSources.workspaceId, scope.workspaceId),
         eq(schema.metaConnections.workspaceId, scope.workspaceId),
         eq(schema.metaConnections.id, scope.connectionId),
+        eq(schema.dataSources.externalAccountId, scope.externalAccountId),
         eq(schema.adAccounts.externalAccountId, scope.externalAccountId),
-      ));
+        isNull(schema.adAccounts.disappearedAt),
+      )).limit(2);
     if (accountRows.length !== 1) return [];
     const account = accountRows[0]!;
 
@@ -334,7 +353,10 @@ export class DrizzleMetaChangeSnapshotStore implements MetaChangeSnapshotReadSto
         lifetimeBudgetMinor: schema.adCampaigns.lifetimeBudgetMinor,
         unsupportedFields: schema.adCampaigns.unsupportedFields,
         provenance: schema.adCampaigns.provenance,
-      }).from(schema.adCampaigns).where(eq(schema.adCampaigns.adAccountId, account.internalAccountId)),
+      }).from(schema.adCampaigns).where(and(
+        eq(schema.adCampaigns.adAccountId, account.internalAccountId),
+        isNull(schema.adCampaigns.disappearedAt),
+      )).limit(META_CHANGE_SNAPSHOT_COLLECTION_CAPS.campaigns + 1),
       this.database.select({
         workspaceId: schema.metaAdSets.workspaceId,
         internalAdAccountId: schema.metaAdSets.adAccountId,
@@ -348,7 +370,10 @@ export class DrizzleMetaChangeSnapshotStore implements MetaChangeSnapshotReadSto
         targetingSignature: schema.metaAdSets.targetingSignature,
         unsupportedFields: schema.metaAdSets.unsupportedFields,
         provenance: schema.metaAdSets.provenance,
-      }).from(schema.metaAdSets).where(eq(schema.metaAdSets.adAccountId, account.internalAccountId)),
+      }).from(schema.metaAdSets).where(and(
+        eq(schema.metaAdSets.adAccountId, account.internalAccountId),
+        isNull(schema.metaAdSets.disappearedAt),
+      )).limit(META_CHANGE_SNAPSHOT_COLLECTION_CAPS.adSets + 1),
       this.database.select({
         workspaceId: schema.metaAds.workspaceId,
         internalAdAccountId: schema.metaAds.adAccountId,
@@ -360,14 +385,25 @@ export class DrizzleMetaChangeSnapshotStore implements MetaChangeSnapshotReadSto
         effectiveStatus: schema.metaAds.effectiveStatus,
         unsupportedFields: schema.metaAds.unsupportedFields,
         provenance: schema.metaAds.provenance,
-      }).from(schema.metaAds).where(eq(schema.metaAds.adAccountId, account.internalAccountId)),
+      }).from(schema.metaAds).where(and(
+        eq(schema.metaAds.adAccountId, account.internalAccountId),
+        isNull(schema.metaAds.disappearedAt),
+      )).limit(META_CHANGE_SNAPSHOT_COLLECTION_CAPS.ads + 1),
       this.database.select({
         workspaceId: schema.metaCreatives.workspaceId,
         internalAdAccountId: schema.metaCreatives.adAccountId,
         internalCreativeId: schema.metaCreatives.id,
         externalCreativeId: schema.metaCreatives.externalCreativeId,
-      }).from(schema.metaCreatives).where(eq(schema.metaCreatives.adAccountId, account.internalAccountId)),
+      }).from(schema.metaCreatives).where(and(
+        eq(schema.metaCreatives.adAccountId, account.internalAccountId),
+        isNull(schema.metaCreatives.disappearedAt),
+      )).limit(META_CHANGE_SNAPSHOT_COLLECTION_CAPS.creatives + 1),
     ]);
+
+    assertMetaChangeSnapshotCollectionBound("campaigns", campaigns.length);
+    assertMetaChangeSnapshotCollectionBound("adSets", adSets.length);
+    assertMetaChangeSnapshotCollectionBound("ads", ads.length);
+    assertMetaChangeSnapshotCollectionBound("creatives", creatives.length);
 
     const bindings = ads.length === 0 ? [] : await this.database.select({
       workspaceId: schema.metaAdCreativeBindings.workspaceId,
@@ -387,7 +423,11 @@ export class DrizzleMetaChangeSnapshotStore implements MetaChangeSnapshotReadSto
       .where(and(
         eq(schema.metaAds.adAccountId, account.internalAccountId),
         isNull(schema.metaAdCreativeBindings.disappearedAt),
-      ));
+        isNull(schema.metaAds.disappearedAt),
+        isNull(schema.metaCreatives.disappearedAt),
+        isNull(schema.metaPosts.disappearedAt),
+      )).limit(META_CHANGE_SNAPSHOT_COLLECTION_CAPS.bindings + 1);
+    assertMetaChangeSnapshotCollectionBound("bindings", bindings.length);
 
     return [{
       workspaceId: account.workspaceId,

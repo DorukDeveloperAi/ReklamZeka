@@ -4,6 +4,7 @@ import type { MetaConnection } from "@/connectors/meta/connection-types";
 import type { MetaInventoryPagePersistencePort } from "@/connectors/meta/sync/inventory-materialization";
 import type { MetaSyncDurablePersistence } from "@/connectors/meta/sync/persistence-adapter";
 import type { MetaCreativeSourcePagePersistencePort } from "@/connectors/meta/sync/creative-content-runtime-persistence";
+import type { CanonicalBudgetHistoryMaterializer } from "@/connectors/meta/sync/canonical-budget-history-materializer";
 import type { MetaPartialReadSyncRuntime, MetaSyncResult, MetaSyncRuntimeOptions } from "@/connectors/meta/sync/runtime";
 import {
   ProductionMetaReadSyncError,
@@ -55,6 +56,8 @@ function fixture(overrides: Readonly<{
   recoveryLaneId?: "inventory_ad_set_v1" | "creative_ad_v1" | "creative_ad_v2" | "insights_ad_v1";
   creativePagePersistence?: MetaCreativeSourcePagePersistencePort;
   insightBootstrapAccountSelector?: (input: Readonly<{ accountIds: readonly string[] }>) => Promise<readonly string[]>;
+  budgetHistoryMaterializer?: CanonicalBudgetHistoryMaterializer;
+  runtimeResult?: (input: Parameters<MetaPartialReadSyncRuntime["run"]>[0]) => MetaSyncResult;
 }> = {}) {
   const inventoryPagePersistence: MetaInventoryPagePersistencePort = {
     writePage: vi.fn(async (page) => ({ inserted: 0, updated: 0, unchanged: 0, stale: 0, disappeared: 0, pageHash: page.pageHash })),
@@ -64,7 +67,7 @@ function fixture(overrides: Readonly<{
     persist: vi.fn(async () => undefined),
   };
   let wiredOptions: MetaSyncRuntimeOptions | undefined;
-  const runtimeRun = vi.fn(async (_input: Parameters<MetaPartialReadSyncRuntime["run"]>[0]) => result());
+  const runtimeRun = vi.fn(async (input: Parameters<MetaPartialReadSyncRuntime["run"]>[0]) => overrides.runtimeResult?.(input) ?? result());
   const connectionFind = vi.fn(async () => connection);
   const secretResolve = vi.fn(overrides.resolveSecret ?? (async () => token));
   const accountResolve = vi.fn(async () => overrides.accountIds ?? ["act_123456"]);
@@ -89,6 +92,7 @@ function fixture(overrides: Readonly<{
     ...(overrides.insightBootstrapAccountSelector === undefined ? {} : {
       insightBootstrapAccountSelector: async (input) => overrides.insightBootstrapAccountSelector!({ accountIds: input.accountIds }),
     }),
+    ...(overrides.budgetHistoryMaterializer === undefined ? {} : { budgetHistoryMaterializer: overrides.budgetHistoryMaterializer }),
     runtimeFactory: (options) => {
       wiredOptions = options;
       return { run: runtimeRun };
@@ -136,11 +140,50 @@ describe("production Meta read sync composition", () => {
       unchanged: 3,
       writeNetworkCalls: 0,
       affectedGeoMaterialization: "completed",
+      postProcess: "not_applicable",
+      postProcessRetryable: false,
     });
     expect(JSON.stringify(response)).not.toContain(token);
     expect(JSON.stringify(response)).not.toContain(workspaceId);
     expect(JSON.stringify(response)).not.toContain(connectionId);
     expect(JSON.stringify(response)).not.toContain("act_123456");
+  });
+
+  it("materializes budget/config history only after all normal inventory cursors are durably complete", async () => {
+    const materialize = vi.fn(async () => ({ accountCount: 1, baselineCount: 1, replayCount: 0, externalChangeCount: 0, staleSkipCount: 0 }));
+    const setup = fixture({
+      budgetHistoryMaterializer: { materialize },
+      runtimeResult: (runtimeInput) => {
+        const inventory = runtimeInput.plan.filter((slice) => slice.stream === "inventory");
+        return {
+          ...result(),
+          streamRuns: [{ id: "private-stream", parentRunId: "run_daily", stream: "inventory", accountId: "act_123456",
+            status: "completed", completedSliceIds: inventory.map((slice) => slice.id),
+            cursorBySlice: Object.fromEntries(inventory.map((slice) => [slice.id, {
+              cursor: null, cursorId: `cursor-${slice.entityLevel}`, updatedAt: "2026-08-17T10:00:00.000Z",
+            }])), error: null }],
+        };
+      },
+    });
+    const response = await setup.service.run({ parentRunId: "run_daily", dateStart: "2026-08-01", dateStop: "2026-08-07" });
+    expect(materialize).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId, connectionId, accounts: [{ externalAccountId: "act_123456", capturedAt: "2026-08-17T10:00:00.000Z" }],
+    }));
+    expect(response).toMatchObject({ status: "completed", postProcess: "completed", postProcessRetryable: false });
+  });
+
+  it("keeps a post-run history failure redacted and retryable as partial_result", async () => {
+    const setup = fixture({
+      budgetHistoryMaterializer: { materialize: vi.fn(async () => { throw new Error("private database detail"); }) },
+      runtimeResult: (runtimeInput) => {
+        const inventory = runtimeInput.plan.filter((slice) => slice.stream === "inventory");
+        return { ...result(), streamRuns: [{ id: "private-stream", parentRunId: "run_daily", stream: "inventory", accountId: "act_123456",
+          status: "completed", completedSliceIds: inventory.map((slice) => slice.id),
+          cursorBySlice: Object.fromEntries(inventory.map((slice) => [slice.id, { cursor: null, cursorId: "cursor", updatedAt: "2026-08-17T10:00:00.000Z" }])), error: null }] };
+      },
+    });
+    await expect(setup.service.run({ parentRunId: "run_daily", dateStart: "2026-08-01", dateStop: "2026-08-07" }))
+      .resolves.toMatchObject({ status: "partial", postProcess: "partial_result", postProcessRetryable: true });
   });
 
   it("injects the server-bound canonical creative/Page/Instagram persistence port", async () => {

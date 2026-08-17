@@ -102,6 +102,24 @@ function scope(adAccountId = accountAId): MetaChangePersistenceScope {
 }
 
 describe("Meta change timeline persistence", () => {
+  it("records an initial baseline without fabricating a change event", async () => {
+    const store = new MemoryStore();
+    const service = new MetaChangeTimelinePersistenceService(store);
+    const current = normalizeMetaChangeSnapshot(input(externalAccountA, "2026-08-07T10:00:00.000Z", "ACTIVE"));
+    const baseline = await service.persist({
+      scope: scope(), previous: current, current,
+      timeline: diffMetaChangeSnapshots({ previous: current, current }),
+      detectedAt: "2026-08-07T10:00:00.000Z",
+    });
+    expect(baseline).toMatchObject({ insertedSnapshots: 1, insertedEvents: 0, eventCount: 0, externalChangeCount: 0, replay: false });
+    const replay = await service.persist({
+      scope: scope(), previous: current, current,
+      timeline: diffMetaChangeSnapshots({ previous: current, current }),
+      detectedAt: "2026-08-07T10:00:00.000Z",
+    });
+    expect(replay).toMatchObject({ insertedSnapshots: 0, insertedEvents: 0, replay: true });
+  });
+
   it("atomically persists safe canonical evidence, classifies external change and replays idempotently", async () => {
     const store = new MemoryStore();
     const service = new MetaChangeTimelinePersistenceService(store);
