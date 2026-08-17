@@ -4,6 +4,60 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "4db71800e",
+      "tarih": "2026-08-17",
+      "konu": "test(dashboard): lock table-first information architecture",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "6fb2817e0",
+      "tarih": "2026-08-17",
+      "konu": "docs(plan): record table-first browser checkpoint",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "a178e25f4",
+      "tarih": "2026-08-17",
+      "konu": "feat(dashboard): make operations table first",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "8d5bc5616",
+      "tarih": "2026-08-17",
+      "konu": "docs(plan): open primary result binding vertical",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "e2e808189",
+      "tarih": "2026-08-17",
+      "konu": "docs(plan): record operation and health ledger gates",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "68c445484",
+      "tarih": "2026-08-17",
+      "konu": "fix(operations): expose local session boundary",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
       "hash": "a8f5be677",
       "tarih": "2026-08-17",
       "konu": "feat(guides): persist canonical lifecycle",
@@ -83,60 +137,6 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "1cce3fcd4",
-      "tarih": "2026-08-17",
-      "konu": "fix(meta): bind health reports to workspace",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "f63c4e0f6",
-      "tarih": "2026-08-17",
-      "konu": "feat(operations): filter canonical current slice coverage",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "a68f621fa",
-      "tarih": "2026-08-17",
-      "konu": "feat(operations): add session-bound read route",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "c56e13e1c",
-      "tarih": "2026-08-17",
-      "konu": "feat(guides): separate policy and daily agents",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "76a9f9e60",
-      "tarih": "2026-08-17",
-      "konu": "feat(operations): add guarded read service contract",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "3dd58e054",
-      "tarih": "2026-08-17",
-      "konu": "fix(operations): harden read model evidence contract",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -145,12 +145,12 @@
       "adet": 27
     },
     {
-      "kapsam": "fix",
+      "kapsam": "docs",
       "adet": 13
     },
     {
-      "kapsam": "docs",
-      "adet": 10
+      "kapsam": "fix",
+      "adet": 11
     },
     {
       "kapsam": "test",
@@ -158,10 +158,10 @@
     },
     {
       "kapsam": "?",
-      "adet": 3
+      "adet": 2
     }
   ],
-  "isSayisi": 570,
+  "isSayisi": 576,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-17",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "9b42ded0be53"
+  "damga": "76ecbb2cbdb1"
 }

@@ -22,6 +22,7 @@ import {
   DrizzleCanonicalBudgetHistoryMaterializer,
   type CanonicalBudgetHistoryMaterializer,
 } from "@/connectors/meta/sync/canonical-budget-history-materializer";
+import { DrizzleCanonicalDataHealthPostSyncMaterializer, type CanonicalDataHealthPostSyncMaterializer } from "@/connectors/meta/data-health-post-sync-materializer";
 import { planMetaInsightQuery } from "@/domain/meta/insights/capability-catalog";
 import * as schema from "@/db/schema";
 
@@ -115,6 +116,8 @@ type ProductionMetaReadSyncDependencies = Readonly<{
   recoveryLane?: ServerOwnedMetaRecoveryLane;
   /** Post-run canonical budget/config history; only normal full inventory may call it. */
   budgetHistoryMaterializer?: CanonicalBudgetHistoryMaterializer;
+  /** Derived canonical health/finding ledger; normal full reads only, never recovery/bootstrap. */
+  dataHealthMaterializer?: CanonicalDataHealthPostSyncMaterializer;
   /**
    * Optional only for deterministic tests. The production composition installs
    * the fixed GET-only capability selector below; no request can provide it.
@@ -345,17 +348,30 @@ export class ProductionMetaReadSyncService {
         mode,
         recovery: recoveryLane !== null,
       });
-      if (inventoryEvidence && this.dependencies.budgetHistoryMaterializer) {
+      const shouldMaterializeDataHealth = mode === "normal" && recoveryLane === null && this.dependencies.dataHealthMaterializer !== undefined;
+      if ((inventoryEvidence && this.dependencies.budgetHistoryMaterializer) || shouldMaterializeDataHealth) {
         try {
-          await this.dependencies.budgetHistoryMaterializer.materialize(inventoryEvidence);
-          return summarize(metaResult, this.dependencies.affectedGeoMaterialization ?? "completed", "completed");
-        } catch {
+          // Derived lanes are independent. A recoverable budget-history failure
+          // must not suppress the missing/stale health observation for this same
+          // normal full read.
+          let derivedFailure = false;
+          try { if (inventoryEvidence && this.dependencies.budgetHistoryMaterializer) await this.dependencies.budgetHistoryMaterializer.materialize(inventoryEvidence); } catch { derivedFailure = true; }
+          try { if (shouldMaterializeDataHealth) await this.dependencies.dataHealthMaterializer!.materialize({
+            workspaceId: scope.workspaceId,
+            externalAccountIds: accountIds,
+            // A partial normal run is still valuable evidence: it produces
+            // current health alerts, but must not resolve accounts the run did
+            // not fully evaluate.  Recovery/bootstrap lanes never enter here.
+            resolveAbsent: inventoryEvidence !== null,
+            occurredAt: inventoryEvidence?.accounts.map(account => account.capturedAt).sort().at(-1) ?? new Date().toISOString(),
+          }); } catch { derivedFailure = true; }
+          if (!derivedFailure) return summarize(metaResult, this.dependencies.affectedGeoMaterialization ?? "completed", "completed");
           // The source GET/mirror is complete. This derived timeline can be
           // retried on the next normal inventory run and must never be turned
           // into a non-retryable sync_failed response.
           return summarize({ ...metaResult, parentRun: { ...metaResult.parentRun, status: "partial" } },
             this.dependencies.affectedGeoMaterialization ?? "completed", "partial_result");
-        }
+        } catch { throw new ProductionMetaReadSyncError("sync_failed"); }
       }
       return summarize(metaResult, this.dependencies.affectedGeoMaterialization ?? "completed", "not_applicable");
     } catch (error) {
@@ -385,7 +401,8 @@ export class DrizzleMetaSyncAccountScopeResolver implements MetaSyncAccountScope
         eq(schema.dataSources.metaConnectionId, scope.connectionId),
         eq(schema.dataSources.platform, "meta_ads"),
         isNull(schema.adAccounts.disappearedAt),
-      )).limit(1_001);
+      )).limit(251);
+    if (rows.length > 250) throw new ProductionMetaReadSyncError("account_scope_unavailable");
     return Object.freeze(rows.map((row) => row.externalAccountId));
   }
 }
@@ -444,5 +461,6 @@ export function createDrizzleProductionMetaReadSyncService(input: Readonly<{
     fetchImpl: input.fetchImpl,
     recoveryLane,
     budgetHistoryMaterializer: new DrizzleCanonicalBudgetHistoryMaterializer(input.database),
+    dataHealthMaterializer: new DrizzleCanonicalDataHealthPostSyncMaterializer(input.database),
   });
 }

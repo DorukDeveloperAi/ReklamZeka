@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 9b42ded0be53 -->
+<!-- durum-damga: 76ecbb2cbdb1 -->
 
 ## Künye
 
@@ -14,13 +14,19 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 570 |
+| iş commit'i (tüm geçmiş) | 576 |
 | ilk / son iş | 2026-08-06 / 2026-08-17 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-17 | `test` | lock table-first information architecture | `4db71800e` |
+| 2026-08-17 | `docs` | record table-first browser checkpoint | `6fb2817e0` |
+| 2026-08-17 | `feat` | make operations table first | `a178e25f4` |
+| 2026-08-17 | `docs` | open primary result binding vertical | `8d5bc5616` |
+| 2026-08-17 | `docs` | record operation and health ledger gates | `e2e808189` |
+| 2026-08-17 | `fix` | expose local session boundary | `68c445484` |
 | 2026-08-17 | `feat` | persist canonical lifecycle | `a8f5be677` |
 | 2026-08-17 | `feat` | resolve canonical current slices | `d4e3e7078` |
 | 2026-08-17 | `feat` | persist canonical budget history | `9158181bd` |
@@ -30,20 +36,14 @@
 | 2026-08-17 | `fix` | preserve hierarchy pagination and ownership | `182930db4` |
 | 2026-08-17 | `feat` | gate actions on canonical data health | `38ebc5aec` |
 | 2026-08-17 | `feat` | complete canonical read aggregation | `d0c4323a2` |
-| 2026-08-17 | `fix` | bind health reports to workspace | `1cce3fcd4` |
-| 2026-08-17 | `feat` | filter canonical current slice coverage | `f63c4e0f6` |
-| 2026-08-17 | `feat` | add session-bound read route | `a68f621fa` |
-| 2026-08-17 | `feat` | separate policy and daily agents | `c56e13e1c` |
-| 2026-08-17 | `feat` | add guarded read service contract | `76a9f9e60` |
-| 2026-08-17 | `fix` | harden read model evidence contract | `3dd58e054` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
 - `feat        ` ████████████████████████ 27
-- `fix         ` ████████████ 13
-- `docs        ` █████████ 10
+- `docs        ` ████████████ 13
+- `fix         ` ██████████ 11
 - `test        ` ██████ 7
-- `?           ` ███ 3
+- `?           ` ██ 2
 
 ## Planlar
 

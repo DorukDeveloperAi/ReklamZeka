@@ -5,6 +5,7 @@ import type { MetaInventoryPagePersistencePort } from "@/connectors/meta/sync/in
 import type { MetaSyncDurablePersistence } from "@/connectors/meta/sync/persistence-adapter";
 import type { MetaCreativeSourcePagePersistencePort } from "@/connectors/meta/sync/creative-content-runtime-persistence";
 import type { CanonicalBudgetHistoryMaterializer } from "@/connectors/meta/sync/canonical-budget-history-materializer";
+import type { CanonicalDataHealthPostSyncMaterializer } from "@/connectors/meta/data-health-post-sync-materializer";
 import type { MetaPartialReadSyncRuntime, MetaSyncResult, MetaSyncRuntimeOptions } from "@/connectors/meta/sync/runtime";
 import {
   ProductionMetaReadSyncError,
@@ -57,6 +58,7 @@ function fixture(overrides: Readonly<{
   creativePagePersistence?: MetaCreativeSourcePagePersistencePort;
   insightBootstrapAccountSelector?: (input: Readonly<{ accountIds: readonly string[] }>) => Promise<readonly string[]>;
   budgetHistoryMaterializer?: CanonicalBudgetHistoryMaterializer;
+  dataHealthMaterializer?: CanonicalDataHealthPostSyncMaterializer;
   runtimeResult?: (input: Parameters<MetaPartialReadSyncRuntime["run"]>[0]) => MetaSyncResult;
 }> = {}) {
   const inventoryPagePersistence: MetaInventoryPagePersistencePort = {
@@ -93,6 +95,7 @@ function fixture(overrides: Readonly<{
       insightBootstrapAccountSelector: async (input) => overrides.insightBootstrapAccountSelector!({ accountIds: input.accountIds }),
     }),
     ...(overrides.budgetHistoryMaterializer === undefined ? {} : { budgetHistoryMaterializer: overrides.budgetHistoryMaterializer }),
+    ...(overrides.dataHealthMaterializer === undefined ? {} : { dataHealthMaterializer: overrides.dataHealthMaterializer }),
     runtimeFactory: (options) => {
       wiredOptions = options;
       return { run: runtimeRun };
@@ -184,6 +187,15 @@ describe("production Meta read sync composition", () => {
     });
     await expect(setup.service.run({ parentRunId: "run_daily", dateStart: "2026-08-01", dateStop: "2026-08-07" }))
       .resolves.toMatchObject({ status: "partial", postProcess: "partial_result", postProcessRetryable: true });
+  });
+
+  it("materializes one workspace health report for a partial normal run without resolving absent evidence", async () => {
+    const materialize = vi.fn(async () => undefined);
+    const setup = fixture({ dataHealthMaterializer: { materialize } });
+    await expect(setup.service.run({ parentRunId: "run_daily", dateStart: "2026-08-01", dateStop: "2026-08-07" }))
+      .resolves.toMatchObject({ postProcess: "completed" });
+    expect(materialize).toHaveBeenCalledTimes(1);
+    expect(materialize).toHaveBeenCalledWith(expect.objectContaining({ workspaceId, externalAccountIds: ["act_123456"], resolveAbsent: false }));
   });
 
   it("injects the server-bound canonical creative/Page/Instagram persistence port", async () => {
