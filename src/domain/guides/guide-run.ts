@@ -8,6 +8,9 @@ export const GUIDE_RUN_VERSION = "guide-run/1.1.0" as const;
 export const GUIDE_RUN_EVENT_VERSION = "guide-run-event/1.1.0" as const;
 export const GUIDE_RUN_V1_LEGACY_VERSION = "guide-run/1.0.0" as const;
 export const GUIDE_RUN_EVENT_V1_LEGACY_VERSION = "guide-run-event/1.0.0" as const;
+/** Recovery-capable evidence.  v1.1 remains immutable/read-only; never upcast it. */
+export const GUIDE_RUN_V12_VERSION = "guide-run/1.2.0" as const;
+export const GUIDE_RUN_EVENT_V12_VERSION = "guide-run-event/1.2.0" as const;
 
 export const GUIDE_RUN_STATES = Object.freeze([
   "due", "claimed", "scope_frozen", "analyzing", "recorded",
@@ -50,6 +53,15 @@ export type GuideRun = Readonly<{
   events: readonly GuideRunEvent[];
   authority: Readonly<{ canApprove: false; canExecute: false; canWriteMeta: false }>;
 }>;
+
+export type GuideRunEventV12 = Readonly<Omit<GuideRunEvent, "version"> & {
+  version: typeof GUIDE_RUN_EVENT_V12_VERSION;
+}>;
+export type GuideRunV12 = Readonly<Omit<GuideRun, "version" | "events"> & {
+  version: typeof GUIDE_RUN_V12_VERSION;
+  events: readonly GuideRunEventV12[];
+}>;
+export type AnyGuideRun = GuideRun | GuideRunV12;
 
 export type GuideRunDisposition = Readonly<{
   state: "held" | "staged" | "no_action";
@@ -166,6 +178,15 @@ function initialEvent(runRef: string, occurredAt: string): GuideRunEvent {
     runRef, fromState: null, toState: "due", occurredAt, leaseToken: null, leaseUntil: null, leaseEpoch: null, reasonCode: null });
 }
 
+function identifyEventV12(value: Omit<GuideRunEventV12, "eventRef" | "eventHash">): GuideRunEventV12 {
+  const eventHash = digest(value);
+  return Object.freeze({ ...value, eventRef: `guide_run_event_${eventHash.slice(0, 24)}`, eventHash });
+}
+function initialEventV12(runRef: string, occurredAt: string): GuideRunEventV12 {
+  return identifyEventV12({ version: GUIDE_RUN_EVENT_V12_VERSION, sequence: 1, previousEventHash: "GENESIS",
+    runRef, fromState: null, toState: "due", occurredAt, leaseToken: null, leaseUntil: null, leaseEpoch: null, reasonCode: null });
+}
+
 export function createGuideRun(input: Readonly<{
   workspaceRef: string;
   guideRef: string;
@@ -192,6 +213,26 @@ export function createGuideRun(input: Readonly<{
     events: Object.freeze([event]), authority: AUTHORITY });
 }
 
+/** Creates new recovery-capable evidence; callers must choose it explicitly. */
+export function createGuideRunV12(input: Readonly<{
+  workspaceRef: string; guideRef: string; guideRevisionHash: string; trigger: GuideRunTrigger; occurredAt: string;
+}>): GuideRunV12 {
+  exact(input, ["workspaceRef", "guideRef", "guideRevisionHash", "trigger", "occurredAt"]);
+  const workspaceRef = ref(input.workspaceRef, "workspace_");
+  const guideRef = ref(input.guideRef, "guide_");
+  if (!HASH.test(input.guideRevisionHash)) fail("invalid_input");
+  const trigger = normalizedTrigger(input.trigger); const occurredAt = instant(input.occurredAt);
+  if (trigger.kind === "scheduled" && Date.parse(occurredAt) < Date.parse(trigger.scheduledFor)) fail("invalid_input");
+  const idempotencyKey = trigger.kind === "scheduled"
+    ? scheduledGuideRunIdempotencyKey(input.guideRevisionHash, trigger.scheduledFor)
+    : manualGuideRunIdempotencyKey(input.guideRevisionHash, trigger.requestRef);
+  const runRef = `guide_run_${digest({ workspaceRef, guideRef, guideRevisionHash: input.guideRevisionHash, trigger, idempotencyKey }).slice(0, 24)}`;
+  const event = initialEventV12(runRef, occurredAt);
+  return Object.freeze({ version: GUIDE_RUN_V12_VERSION, runRef, workspaceRef, guideRef,
+    guideRevisionHash: input.guideRevisionHash, trigger, idempotencyKey, state: "due", sequence: 1,
+    headEventHash: event.eventHash, lease: null, events: Object.freeze([event]), authority: AUTHORITY });
+}
+
 const NEXT = Object.freeze({
   due: Object.freeze(["claimed", "missed", "failed"] as const),
   claimed: Object.freeze(["claimed", "scope_frozen", "failed"] as const),
@@ -208,7 +249,7 @@ const LEGACY_NEXT = Object.freeze({
   scope_frozen: Object.freeze(["analyzing", "failed"] as const), analyzing: Object.freeze(["recorded", "failed"] as const),
 }) satisfies Readonly<Record<GuideRunState, readonly GuideRunState[]>>;
 
-export function appendGuideRunTransition(run: GuideRun, input: Readonly<{
+function appendGuideRunTransitionFor<T extends AnyGuideRun>(run: T, input: Readonly<{
   expectedHeadHash: string;
   toState: Exclude<GuideRunState, "due">;
   occurredAt: string;
@@ -216,14 +257,15 @@ export function appendGuideRunTransition(run: GuideRun, input: Readonly<{
   leaseUntil?: string;
   leaseEpoch?: number;
   reasonCode?: string | null;
-}>): GuideRun {
-  if (!verifyGuideRun(run)) fail("invalid_chain");
+}>, profile: Readonly<{ eventVersion: typeof GUIDE_RUN_EVENT_VERSION | typeof GUIDE_RUN_EVENT_V12_VERSION; selfLeaseStates: readonly GuideRunState[]; verify: (value: T) => boolean }>): T {
+  if (!profile.verify(run)) fail("invalid_chain");
   const transitionKeys = ["expectedHeadHash", "toState", "occurredAt", "leaseToken", "leaseUntil", "leaseEpoch", "reasonCode"] as const;
   if (!input || typeof input !== "object" || Array.isArray(input)
     || !Object.hasOwn(input, "expectedHeadHash") || !Object.hasOwn(input, "toState") || !Object.hasOwn(input, "occurredAt")
     || Object.keys(input).some((key) => !transitionKeys.includes(key as typeof transitionKeys[number]))) fail("invalid_input");
   if (input.expectedHeadHash !== run.headEventHash) fail("head_conflict");
-  if (!GUIDE_RUN_STATES.includes(input.toState) || !(NEXT[run.state] as readonly GuideRunState[]).includes(input.toState)) {
+  if (!GUIDE_RUN_STATES.includes(input.toState) || (!(NEXT[run.state] as readonly GuideRunState[]).includes(input.toState)
+    && !(input.toState === run.state && profile.selfLeaseStates.includes(run.state)))) {
     fail("invalid_transition");
   }
   const occurredAt = instant(input.occurredAt);
@@ -250,7 +292,7 @@ export function appendGuideRunTransition(run: GuideRun, input: Readonly<{
       eventLeaseEpoch = run.lease.epoch + 1;
     }
     nextLease = Object.freeze({ token: eventLeaseToken, expiresAt: eventLeaseUntil, epoch: eventLeaseEpoch });
-  } else if (input.toState === run.state && ["scope_frozen", "analyzing"].includes(run.state)) {
+  } else if (input.toState === run.state && profile.selfLeaseStates.includes(run.state)) {
     if (!run.lease || input.leaseUntil === undefined) fail("lease_required");
     eventLeaseToken = leaseToken(input.leaseToken);
     eventLeaseUntil = instant(input.leaseUntil);
@@ -270,26 +312,48 @@ export function appendGuideRunTransition(run: GuideRun, input: Readonly<{
     eventLeaseEpoch = run.lease.epoch;
   } else if (input.leaseToken !== undefined || input.leaseUntil !== undefined || input.leaseEpoch !== undefined) fail("lease_required");
   if (["completed", "failed", "missed"].includes(input.toState)) nextLease = null;
-  const event = identifyEvent({ version: GUIDE_RUN_EVENT_VERSION, sequence: run.sequence + 1,
+  const eventBody = { version: profile.eventVersion, sequence: run.sequence + 1,
     previousEventHash: run.headEventHash, fromState: run.state, toState: input.toState, occurredAt,
     runRef: run.runRef, leaseToken: eventLeaseToken, leaseUntil: eventLeaseUntil, leaseEpoch: eventLeaseEpoch,
-    reasonCode: reason(input.reasonCode ?? null) });
+    reasonCode: reason(input.reasonCode ?? null) };
+  const event = profile.eventVersion === GUIDE_RUN_EVENT_VERSION
+    ? identifyEvent(eventBody as Omit<GuideRunEvent, "eventRef" | "eventHash">)
+    : identifyEventV12(eventBody as Omit<GuideRunEventV12, "eventRef" | "eventHash">);
   return Object.freeze({ ...run, state: input.toState, sequence: event.sequence, headEventHash: event.eventHash,
-    lease: nextLease, events: Object.freeze([...run.events, event]) });
+    lease: nextLease, events: Object.freeze([...run.events, event]) }) as T;
 }
 
-function expectedEventIdentity(event: GuideRunEvent): Readonly<{ eventRef: string; eventHash: string }> {
+export function appendGuideRunTransition(run: GuideRun, input: Readonly<{
+  expectedHeadHash: string; toState: Exclude<GuideRunState, "due">; occurredAt: string;
+  leaseToken?: string; leaseUntil?: string; leaseEpoch?: number; reasonCode?: string | null;
+}>): GuideRun {
+  return appendGuideRunTransitionFor(run, input, { eventVersion: GUIDE_RUN_EVENT_VERSION,
+    selfLeaseStates: ["scope_frozen", "analyzing"], verify: verifyGuideRun });
+}
+
+/** v1.2 permits renewal/reclaim after analysis, never a changed main state. */
+export function appendGuideRunTransitionV12(run: GuideRunV12, input: Readonly<{
+  expectedHeadHash: string; toState: Exclude<GuideRunState, "due">; occurredAt: string;
+  leaseToken?: string; leaseUntil?: string; leaseEpoch?: number; reasonCode?: string | null;
+}>): GuideRunV12 {
+  return appendGuideRunTransitionFor(run, input, { eventVersion: GUIDE_RUN_EVENT_V12_VERSION,
+    selfLeaseStates: ["scope_frozen", "analyzing", "recorded", "held", "staged", "no_action"], verify: verifyGuideRunV12 });
+}
+
+function expectedEventIdentity(event: GuideRunEvent | GuideRunEventV12): Readonly<{ eventRef: string; eventHash: string }> {
   const { eventRef: _eventRef, eventHash: _eventHash, ...body } = event;
-  const rebuilt = identifyEvent(body);
+  const rebuilt = event.version === GUIDE_RUN_EVENT_VERSION
+    ? identifyEvent(body as Omit<GuideRunEvent, "eventRef" | "eventHash">)
+    : identifyEventV12(body as Omit<GuideRunEventV12, "eventRef" | "eventHash">);
   return Object.freeze({ eventRef: rebuilt.eventRef, eventHash: rebuilt.eventHash });
 }
 
-export function verifyGuideRun(run: GuideRun): boolean {
+function verifyGuideRunFor<T extends AnyGuideRun>(run: T, profile: Readonly<{ runVersion: T["version"]; eventVersion: T["events"][number]["version"]; selfLeaseStates: readonly GuideRunState[] }>): boolean {
   try {
     if (!hasExactKeys(run, ["version", "runRef", "workspaceRef", "guideRef", "guideRevisionHash", "trigger", "idempotencyKey",
       "state", "sequence", "headEventHash", "lease", "events", "authority"])
       || !hasExactKeys(run.authority, ["canApprove", "canExecute", "canWriteMeta"])
-      || run.version !== GUIDE_RUN_VERSION || !REF.test(run.runRef) || !REF.test(run.workspaceRef)
+      || run.version !== profile.runVersion || !REF.test(run.runRef) || !REF.test(run.workspaceRef)
       || !REF.test(run.guideRef) || !HASH.test(run.guideRevisionHash) || !Array.isArray(run.events)
       || !GUIDE_RUN_STATES.includes(run.state) || run.events.length !== run.sequence
       || run.authority.canApprove !== false || run.authority.canExecute !== false || run.authority.canWriteMeta !== false) return false;
@@ -315,13 +379,14 @@ export function verifyGuideRun(run: GuideRun): boolean {
         || event.reasonCode !== null && !CODE.test(event.reasonCode)
         || !GUIDE_RUN_STATES.includes(event.toState)
         || event.fromState !== null && !GUIDE_RUN_STATES.includes(event.fromState) || event.runRef !== run.runRef
-        || event.version !== GUIDE_RUN_EVENT_VERSION || event.sequence !== index + 1 || event.previousEventHash !== previousHash
+        || event.version !== profile.eventVersion || event.sequence !== index + 1 || event.previousEventHash !== previousHash
         || event.fromState !== state || expectedEventIdentity(event).eventRef !== event.eventRef
         || expectedEventIdentity(event).eventHash !== event.eventHash) return false;
       if (state === null) {
         if (event.toState !== "due" || event.leaseToken !== null || event.leaseUntil !== null || event.leaseEpoch !== null) return false;
       } else {
-        if (!(NEXT[state] as readonly GuideRunState[]).includes(event.toState)) return false;
+        if (!(NEXT[state] as readonly GuideRunState[]).includes(event.toState)
+          && !(event.toState === state && profile.selfLeaseStates.includes(state))) return false;
         if (event.toState === "claimed") {
           if (!event.leaseToken || leaseToken(event.leaseToken) !== event.leaseToken || !event.leaseUntil
             || instant(event.leaseUntil) !== event.leaseUntil || epoch(event.leaseEpoch) !== event.leaseEpoch
@@ -335,7 +400,7 @@ export function verifyGuideRun(run: GuideRun): boolean {
               || Date.parse(event.occurredAt) < Date.parse(lease.expiresAt) && Date.parse(event.leaseUntil) <= Date.parse(lease.expiresAt)) return false;
           }
           lease = Object.freeze({ token: event.leaseToken, expiresAt: event.leaseUntil, epoch: event.leaseEpoch });
-        } else if (event.toState === state && ["scope_frozen", "analyzing"].includes(state)) {
+        } else if (event.toState === state && profile.selfLeaseStates.includes(state)) {
           if (!lease || !event.leaseToken || leaseToken(event.leaseToken) !== event.leaseToken || !event.leaseUntil
             || instant(event.leaseUntil) !== event.leaseUntil || epoch(event.leaseEpoch) !== event.leaseEpoch
             || event.leaseEpoch !== lease.epoch + 1 || Date.parse(event.leaseUntil) <= Date.parse(event.occurredAt)
@@ -356,6 +421,21 @@ export function verifyGuideRun(run: GuideRun): boolean {
     return state === run.state && previousHash === run.headEventHash
       && (lease === null ? run.lease === null : run.lease?.token === lease.token && run.lease.expiresAt === lease.expiresAt && run.lease.epoch === lease.epoch);
   } catch { return false; }
+}
+
+export function verifyGuideRun(run: GuideRun): boolean {
+  return verifyGuideRunFor(run, { runVersion: GUIDE_RUN_VERSION, eventVersion: GUIDE_RUN_EVENT_VERSION,
+    selfLeaseStates: ["scope_frozen", "analyzing"] });
+}
+
+export function verifyGuideRunV12(run: GuideRunV12): boolean {
+  return verifyGuideRunFor(run, { runVersion: GUIDE_RUN_V12_VERSION, eventVersion: GUIDE_RUN_EVENT_V12_VERSION,
+    selfLeaseStates: ["scope_frozen", "analyzing", "recorded", "held", "staged", "no_action"] });
+}
+
+/** Version dispatch for storage/orchestration boundaries. */
+export function verifyAnyGuideRun(run: AnyGuideRun): boolean {
+  return run.version === GUIDE_RUN_VERSION ? verifyGuideRun(run) : run.version === GUIDE_RUN_V12_VERSION && verifyGuideRunV12(run);
 }
 
 /** Read-only verifier for evidence created before run-bound event hashes were introduced. */

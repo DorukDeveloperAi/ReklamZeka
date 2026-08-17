@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 
 import {
   GuideRunError, appendGuideRunTransition, createGuideRun, manualGuideRunIdempotencyKey,
-  resolveGuideRunDisposition, scheduledGuideRunIdempotencyKey, verifyGuideRun, verifyGuideRunV1Legacy,
+  appendGuideRunTransitionV12, createGuideRunV12, resolveGuideRunDisposition, scheduledGuideRunIdempotencyKey,
+  verifyGuideRun, verifyGuideRunV12, verifyGuideRunV1Legacy,
 } from "@/domain/guides/guide-run";
 
 const revisionHash = "a".repeat(64);
@@ -136,6 +137,32 @@ describe("canonical Guide run", () => {
       occurredAt: "2026-08-17T06:03:00.000Z", leaseToken, leaseUntil: "2026-08-17T06:30:00.000Z", leaseEpoch: 3 });
     expect(analyzingRenewed.lease).toMatchObject({ epoch: 3, expiresAt: "2026-08-17T06:30:00.000Z" });
     expect(verifyGuideRun(analyzingRenewed)).toBe(true);
+  });
+
+  it("keeps v1.2 recovery events run-bound and allows only same-state post-analysis lease recovery", () => {
+    let run = createGuideRunV12({ workspaceRef: "workspace_main", guideRef: "guide_main", guideRevisionHash: revisionHash,
+      trigger: { kind: "scheduled", scheduledFor: "2026-08-17T06:00:00.000Z" }, occurredAt: "2026-08-17T06:00:01.000Z" });
+    const advance = (toState: Exclude<typeof run.state, "due">, occurredAt: string, extra: Record<string, unknown> = {}) =>
+      appendGuideRunTransitionV12(run, { expectedHeadHash: run.headEventHash, toState, occurredAt, ...(toState === "claimed"
+        ? { leaseToken, leaseUntil: "2026-08-17T06:10:00.000Z" } : { leaseToken }), ...extra });
+    run = advance("claimed", "2026-08-17T06:00:02.000Z");
+    run = advance("scope_frozen", "2026-08-17T06:00:03.000Z");
+    run = advance("analyzing", "2026-08-17T06:00:04.000Z");
+    run = advance("recorded", "2026-08-17T06:00:05.000Z");
+    const replacement = "223e4567-e89b-42d3-a456-426614174000";
+    run = appendGuideRunTransitionV12(run, { expectedHeadHash: run.headEventHash, toState: "recorded",
+      occurredAt: "2026-08-17T06:10:00.000Z", leaseToken: replacement, leaseUntil: "2026-08-17T06:20:00.000Z", leaseEpoch: 2 });
+    expect(run.lease).toMatchObject({ token: replacement, epoch: 2 });
+    expect(verifyGuideRunV12(run)).toBe(true);
+    expect(() => appendGuideRunTransitionV12(run, { expectedHeadHash: run.headEventHash, toState: "recorded",
+      occurredAt: "2026-08-17T06:11:00.000Z", leaseToken, leaseUntil: "2026-08-17T06:30:00.000Z", leaseEpoch: 3 }))
+      .toThrowError(expect.objectContaining({ code: "lease_required" }));
+    const staged = appendGuideRunTransitionV12(run, { expectedHeadHash: run.headEventHash, toState: "staged",
+      occurredAt: "2026-08-17T06:11:00.000Z", leaseToken: replacement, reasonCode: "candidate_ready" });
+    const recovered = appendGuideRunTransitionV12(staged, { expectedHeadHash: staged.headEventHash, toState: "staged",
+      occurredAt: "2026-08-17T06:12:00.000Z", leaseToken: replacement, leaseUntil: "2026-08-17T06:30:00.000Z", leaseEpoch: 3 });
+    expect(verifyGuideRunV12(recovered)).toBe(true);
+    expect(verifyGuideRun(recovered as never)).toBe(false);
   });
 
   it("gates recommendation and authority-free candidates by mode and data quality", () => {
