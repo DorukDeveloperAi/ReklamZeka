@@ -56,6 +56,7 @@ function invalid(): never { throw new ApprovalDecisionError("invalid_input"); }
 function kindForIntent(intent: string | null): ApprovalDecisionKind {
   if (intent === "approval-queue-approve") return "approve";
   if (intent === "approval-queue-reject") return "reject";
+  if (intent === "approval-queue-defer") return "defer";
   if (intent === "approval-queue-request-changes") return "request_changes";
   return invalid();
 }
@@ -111,7 +112,7 @@ async function challengeBody(request: Request): Promise<Readonly<{ unitRef: stri
     || Object.keys(value).length !== 2 || Object.keys(value).some((key) => !["unitRef", "action"].includes(key))) invalid();
   const candidate = value as Record<string, unknown>;
   if (typeof candidate.unitRef !== "string" || !UNIT_REF.test(candidate.unitRef)
-    || typeof candidate.action !== "string" || !["approve", "reject", "request_changes"].includes(candidate.action)) invalid();
+    || typeof candidate.action !== "string" || !["approve", "reject", "defer", "request_changes"].includes(candidate.action)) invalid();
   return Object.freeze({ unitRef: candidate.unitRef, action: candidate.action as ApprovalDecisionKind });
 }
 

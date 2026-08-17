@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: df55cdf2019f -->
+<!-- durum-damga: bbb291c0a678 -->
 
 ## Künye
 
@@ -14,13 +14,14 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 586 |
+| iş commit'i (tüm geçmiş) | 587 |
 | ilk / son iş | 2026-08-06 / 2026-08-18 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-18 | `feat` | bind guide run status candidates | `a0621d103` |
 | 2026-08-18 | `feat` | add accessible scope report interface | `12c1da0cb` |
 | 2026-08-18 | `docs` | record xlsx and trusted context acceptance | `e0dfbe770` |
 | 2026-08-17 | `feat` | persist guide runs and bind execution contracts | `ce6b86f7a` |
@@ -35,7 +36,6 @@
 | 2026-08-17 | `docs` | record table-first browser checkpoint | `6fb2817e0` |
 | 2026-08-17 | `feat` | make operations table first | `a178e25f4` |
 | 2026-08-17 | `docs` | open primary result binding vertical | `8d5bc5616` |
-| 2026-08-17 | `docs` | record operation and health ledger gates | `e2e808189` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 

@@ -220,7 +220,7 @@ function dependencies(value: unknown): ApprovalQueueRecord["dependencies"] {
     exact(raw, ["unit_ref", "status"]);
     const dependency = raw as DependencySource;
     if (typeof dependency.unit_ref !== "string" || !UNIT_REF.test(dependency.unit_ref) || seen.has(dependency.unit_ref)
-      || !["awaiting_approval", "approved", "rejected", "changes_requested", "expired", "stale",
+      || !["awaiting_approval", "approved", "rejected", "deferred", "changes_requested", "expired", "stale",
         "superseded", "dependency_failed"].includes(dependency.status as string)) fail("corrupt_store");
     seen.add(dependency.unit_ref);
     return Object.freeze({ unitRef: dependency.unit_ref, status: dependency.status as ApprovalQueueRecord["status"] });
@@ -232,6 +232,7 @@ function currentStatus(eventType: unknown): ApprovalQueueRecord["status"] {
   const statuses: Readonly<Record<string, ApprovalQueueRecord["status"]>> = Object.freeze({
     unit_approved: "approved",
     unit_rejected: "rejected",
+    unit_deferred: "deferred",
     unit_changes_requested: "changes_requested",
     unit_expired: "expired",
     unit_stale: "stale",
@@ -324,8 +325,8 @@ function detailRow(row: SourceRow, workspaceId: string): ApprovalQueueDetailReco
   let previousAt = Date.parse(base.createdAt);
   const decisions = row.decision_timeline.map((candidate) => {
     exact(candidate, ["event_type", "occurred_at", "reason_code"]);
-    const kind: Record<string, "approved" | "rejected" | "changes_requested"> = {
-      unit_approved: "approved", unit_rejected: "rejected", unit_changes_requested: "changes_requested",
+    const kind: Record<string, "approved" | "rejected" | "deferred" | "changes_requested"> = {
+      unit_approved: "approved", unit_rejected: "rejected", unit_deferred: "deferred", unit_changes_requested: "changes_requested",
     };
     if (typeof candidate.event_type !== "string" || !Object.hasOwn(kind, candidate.event_type)
       || candidate.reason_code !== null && (typeof candidate.reason_code !== "string" || !CODE.test(candidate.reason_code))) fail("corrupt_store");
@@ -379,7 +380,7 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
         coalesce((
           select jsonb_agg(jsonb_build_object('unit_ref', edge.dependency_unit_ref, 'status',
             case dependency_event.event_type
-              when 'unit_approved' then 'approved' when 'unit_rejected' then 'rejected'
+              when 'unit_approved' then 'approved' when 'unit_rejected' then 'rejected' when 'unit_deferred' then 'deferred'
               when 'unit_changes_requested' then 'changes_requested' when 'unit_expired' then 'expired'
               when 'unit_stale' then 'stale' when 'unit_superseded' then 'superseded'
               when 'unit_dependency_failed' then 'dependency_failed' else dependency.initial_state end)
@@ -444,12 +445,12 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
           cross join lateral jsonb_array_elements(decision.event_payloads) event(value)
           where decision.workspace_id = unit.workspace_id and decision.bundle_id = unit.bundle_id
             and event.value ->> 'unitRef' = unit.unit_ref
-            and event.value ->> 'eventType' in ('unit_approved', 'unit_rejected', 'unit_changes_requested')
+            and event.value ->> 'eventType' in ('unit_approved', 'unit_rejected', 'unit_deferred', 'unit_changes_requested')
         ), '[]'::jsonb) as decision_timeline,
         coalesce((
           select jsonb_agg(jsonb_build_object('unit_ref', edge.dependency_unit_ref, 'status',
             case dependency_event.event_type
-              when 'unit_approved' then 'approved' when 'unit_rejected' then 'rejected'
+              when 'unit_approved' then 'approved' when 'unit_rejected' then 'rejected' when 'unit_deferred' then 'deferred'
               when 'unit_changes_requested' then 'changes_requested' when 'unit_expired' then 'expired'
               when 'unit_stale' then 'stale' when 'unit_superseded' then 'superseded'
               when 'unit_dependency_failed' then 'dependency_failed' else dependency.initial_state end)

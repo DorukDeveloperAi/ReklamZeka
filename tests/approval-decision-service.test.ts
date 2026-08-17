@@ -77,7 +77,7 @@ function atomicRepository(initial = lifecycle()): ApprovalDecisionRepository & {
   return repository;
 }
 
-function issued(store: SingleUseHumanPresenceChallengeStore, action: "approve" | "reject" | "request_changes" = "approve") {
+function issued(store: SingleUseHumanPresenceChallengeStore, action: "approve" | "reject" | "defer" | "request_changes" = "approve") {
   return store.issue({ workspaceId, actorRef: "actor_owner", unitRef, action, now: "2026-08-07T19:00:00.000Z" }).proof;
 }
 
@@ -90,6 +90,7 @@ describe("ApprovalDecisionService", () => {
   it.each([
     ["approve", "approved"],
     ["reject", "rejected"],
+    ["defer", "deferred"],
     ["request_changes", "changes_requested"],
   ] as const)("records exactly one %s decision without execution or Meta authority", async (kind, state) => {
     const repository = atomicRepository();

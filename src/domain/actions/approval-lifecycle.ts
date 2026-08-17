@@ -13,6 +13,7 @@ export type ActionUnitApprovalState =
   | "awaiting_approval"
   | "approved"
   | "rejected"
+  | "deferred"
   | "changes_requested"
   | "expired"
   | "stale"
@@ -128,6 +129,7 @@ export type ApprovalAuditEventIntent = Readonly<{
     | "unit_approved"
     | "unit_rejected"
     | "unit_changes_requested"
+    | "unit_deferred"
     | "unit_expired"
     | "unit_stale"
     | "unit_superseded"
@@ -177,7 +179,7 @@ export type ApprovalDecisionCommand =
     grantRef: string;
   }>
   | Readonly<{
-    kind: "reject" | "request_changes";
+    kind: "reject" | "defer" | "request_changes";
     commandRef: string;
     unitRef: string;
     actor: ActionActor;
@@ -495,7 +497,7 @@ function validateLifecycle(candidate: ApprovalLifecycle): ApprovalLifecycle {
     exact(unit, ["unitRef", "unitHash", "state", "decisionRef", "decisionActor", "decidedAt", "reasonCode", "grant"]);
     const definition = definitions.get(unit.unitRef);
     if (!definition || definition.unitHash !== unit.unitHash || seen.has(unit.unitRef)
-      || !["awaiting_approval", "approved", "rejected", "changes_requested", "expired", "stale", "superseded", "dependency_failed"].includes(unit.state)) {
+      || !["awaiting_approval", "approved", "rejected", "deferred", "changes_requested", "expired", "stale", "superseded", "dependency_failed"].includes(unit.state)) {
       fail("invalid_input");
     }
     seen.add(unit.unitRef);
@@ -508,7 +510,7 @@ function validateLifecycle(candidate: ApprovalLifecycle): ApprovalLifecycle {
       if (hasDecisionActor || hasDecisionRef || hasDecidedAt || unit.reasonCode !== null || unit.grant !== null) {
         fail("invalid_input");
       }
-    } else if (unit.state === "approved" || unit.state === "rejected" || unit.state === "changes_requested") {
+    } else if (unit.state === "approved" || unit.state === "rejected" || unit.state === "deferred" || unit.state === "changes_requested") {
       if (!hasCompleteDecision || unit.reasonCode === null) fail("invalid_input");
     } else if ((hasDecisionActor || hasDecisionRef || hasDecidedAt) && !hasCompleteDecision) {
       fail("invalid_input");
@@ -636,7 +638,7 @@ function invalidate(
   }>;
   const states = new Map(mutable.map((state) => [state.unitRef, state]));
   const changes: Array<{ unitRef: string; state: ActionUnitApprovalState; reason: string }> = [];
-  const closed = new Set<ActionUnitApprovalState>(["rejected", "changes_requested", "expired", "stale", "superseded", "dependency_failed"]);
+  const closed = new Set<ActionUnitApprovalState>(["rejected", "deferred", "changes_requested", "expired", "stale", "superseded", "dependency_failed"]);
   for (const state of mutable) {
     if (closed.has(state.state)) continue;
     const next = derivedState(definitions.get(state.unitRef)!, fresh.get(state.unitRef)!, checkedAt);
@@ -727,7 +729,7 @@ export function decideActionUnit(lifecycleInput: ApprovalLifecycle, command: App
   const lifecycle = validateLifecycle(lifecycleInput);
   const common = ["kind", "commandRef", "unitRef", "actor", "decidedAt", "reasonCode", "freshness"];
   exact(command, command.kind === "approve" ? [...common, "authorization", "grantRef"] : common);
-  if (!["approve", "reject", "request_changes"].includes(command.kind)) fail("invalid_input");
+  if (!["approve", "reject", "defer", "request_changes"].includes(command.kind)) fail("invalid_input");
   const commandRef = ref(command.commandRef);
   const unitRef = ref(command.unitRef);
   const decidedAt = instant(command.decidedAt);
@@ -751,7 +753,7 @@ export function decideActionUnit(lifecycleInput: ApprovalLifecycle, command: App
     && decisionActor.actorRef === definition.requester.actorRef) fail("separation_of_duties");
   const reasonCode = code(command.reasonCode);
   const nextState: ActionUnitApprovalState = command.kind === "approve" ? "approved"
-    : command.kind === "reject" ? "rejected" : "changes_requested";
+    : command.kind === "reject" ? "rejected" : command.kind === "defer" ? "deferred" : "changes_requested";
   const approvalGrant = command.kind === "approve"
     ? grant(working, definition, decisionActor, decidedAt, command.grantRef,
       authorization(command.authorization, definition, decisionActor, decidedAt))
@@ -762,7 +764,7 @@ export function decideActionUnit(lifecycleInput: ApprovalLifecycle, command: App
   const event = appendEvent(working, {
     eventRef: commandRef,
     eventType: command.kind === "approve" ? "unit_approved"
-      : command.kind === "reject" ? "unit_rejected" : "unit_changes_requested",
+      : command.kind === "reject" ? "unit_rejected" : command.kind === "defer" ? "unit_deferred" : "unit_changes_requested",
     bundleRef: working.bundle.bundleRef, unitRef, unitHash: definition.unitHash,
     actorRef: decisionActor.actorRef, occurredAt: decidedAt, reasonCode,
   });

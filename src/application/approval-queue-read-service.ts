@@ -9,7 +9,7 @@ const BUNDLE_REF = /^action_bundle_[a-f0-9]{20}$/;
 const PUBLIC_REF = /^(?:account|entity|autonomy)_[a-f0-9]{16}$/;
 const CODE = /^[a-z][a-z0-9_.:-]{0,127}$/;
 
-export type ApprovalQueueStatus = "proposed" | "awaiting_approval" | "approved" | "rejected" | "changes_requested"
+export type ApprovalQueueStatus = "proposed" | "awaiting_approval" | "approved" | "rejected" | "deferred" | "changes_requested"
   | "expired" | "stale" | "suppressed" | "parked" | "executing" | "verified" | "failed" | "dependency_failed"
   | "rollback_proposed" | "rolled_back" | "superseded";
 export type ApprovalRisk = "K0" | "K1" | "K2" | "K3" | "K4";
@@ -50,7 +50,7 @@ export type ApprovalQueueDetailRecord = ApprovalQueueRecord & Readonly<{
   }>[];
   /** Chronological, append-only human decisions for this exact ActionUnit. */
   decisionHistory: readonly Readonly<{
-    decision: "proposed" | "approved" | "rejected" | "changes_requested";
+    decision: "proposed" | "approved" | "rejected" | "deferred" | "changes_requested";
     occurredAt: string;
     reasonCode: string | null;
   }>[];
@@ -113,7 +113,7 @@ function validate(record: ApprovalQueueRecord): ApprovalQueueRecord {
     || Date.parse(record.expiresAt) <= Date.parse(record.createdAt) || record.dependencies.length > 50 || record.autonomy.trace.length < 1 || record.autonomy.trace.length > 20) {
     throw new ApprovalQueueReadError("unsafe_source");
   }
-  const statuses: readonly string[] = ["proposed", "awaiting_approval", "approved", "rejected", "changes_requested", "expired", "stale", "suppressed", "parked", "executing", "verified", "failed", "dependency_failed", "rollback_proposed", "rolled_back", "superseded"];
+  const statuses: readonly string[] = ["proposed", "awaiting_approval", "approved", "rejected", "deferred", "changes_requested", "expired", "stale", "suppressed", "parked", "executing", "verified", "failed", "dependency_failed", "rollback_proposed", "rolled_back", "superseded"];
   if (!statuses.includes(record.status) || !["manual", "approval_required", "policy_limited"].includes(record.autonomy.decision)) throw new ApprovalQueueReadError("unsafe_source");
   exact(record.beforeAfter, record.beforeAfter.field === "configured_status" ? ["field", "before", "after"] : ["field", "beforeMinor", "afterMinor", "currency"]);
   if (record.beforeAfter.field === "configured_status") {
@@ -163,7 +163,7 @@ function validateDetail(record: ApprovalQueueDetailRecord): ApprovalQueueDetailR
   const history = rawHistory.map((entry, index) => {
     exact(entry, ["decision", "occurredAt", "reasonCode"]);
     const candidate = entry as Readonly<{ decision: unknown; occurredAt: unknown; reasonCode: unknown }>;
-    if (typeof candidate.decision !== "string" || !["proposed", "approved", "rejected", "changes_requested"].includes(candidate.decision)
+    if (typeof candidate.decision !== "string" || !["proposed", "approved", "rejected", "deferred", "changes_requested"].includes(candidate.decision)
       || typeof candidate.occurredAt !== "string" || !Number.isFinite(Date.parse(candidate.occurredAt)) || candidate.reasonCode !== null && (typeof candidate.reasonCode !== "string" || !CODE.test(candidate.reasonCode))
       || index === 0 && (candidate.decision !== "proposed" || candidate.reasonCode !== null)
       || index > 0 && candidate.decision === "proposed") throw new ApprovalQueueReadError("unsafe_source");

@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "a0621d103",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): bind guide run status candidates",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "12c1da0cb",
       "tarih": "2026-08-18",
       "konu": "feat(reports): add accessible scope report interface",
@@ -128,15 +137,6 @@
       "kapsam": [
         "docs"
       ]
-    },
-    {
-      "hash": "e2e808189",
-      "tarih": "2026-08-17",
-      "konu": "docs(plan): record operation and health ledger gates",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -157,7 +157,7 @@
       "adet": 6
     }
   ],
-  "isSayisi": 586,
+  "isSayisi": 587,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-18",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "df55cdf2019f"
+  "damga": "bbb291c0a678"
 }

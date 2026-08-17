@@ -14,7 +14,7 @@ import type { WorkspaceMembership } from "@/security/authorization";
 
 export const APPROVAL_DECISION_SERVICE_VERSION = "approval-decision-service/1.0.0" as const;
 
-export type ApprovalDecisionKind = "approve" | "reject" | "request_changes";
+export type ApprovalDecisionKind = "approve" | "reject" | "defer" | "request_changes";
 
 export type ApprovalDecisionSnapshot = Readonly<{
   lifecycle: ApprovalLifecycle;
@@ -59,7 +59,7 @@ export type ApprovalDecisionResult = Readonly<{
   version: typeof APPROVAL_DECISION_SERVICE_VERSION;
   decision: Readonly<{
     unitRef: string;
-    state: "approved" | "rejected" | "changes_requested";
+    state: "approved" | "rejected" | "deferred" | "changes_requested";
     reasonCode: string;
     decidedAt: string;
   }>;
@@ -112,13 +112,13 @@ function actorRole(role: WorkspaceMembership["role"]): ActionActor["role"] {
 
 function publicResult(lifecycle: ApprovalLifecycle, unitRef: string): ApprovalDecisionResult {
   const unit = lifecycle.units.find((candidate) => candidate.unitRef === unitRef);
-  if (!unit || !["approved", "rejected", "changes_requested"].includes(unit.state)
+  if (!unit || !["approved", "rejected", "deferred", "changes_requested"].includes(unit.state)
     || unit.decidedAt === null || unit.reasonCode === null) fail("source_unavailable");
   return Object.freeze({
     version: APPROVAL_DECISION_SERVICE_VERSION,
     decision: Object.freeze({
       unitRef,
-      state: unit.state as "approved" | "rejected" | "changes_requested",
+      state: unit.state as "approved" | "rejected" | "deferred" | "changes_requested",
       reasonCode: unit.reasonCode,
       decidedAt: unit.decidedAt,
     }),
@@ -160,7 +160,7 @@ export class ApprovalDecisionService {
       || input.membership.workspaceId !== input.principal.workspaceId
       || input.membership.userId !== input.principal.actor.userId
       || !REF.test(input.principal.workspaceRef) || !REF.test(input.principal.readerRef)
-      || !UNIT_REF.test(input.unitRef) || !["approve", "reject", "request_changes"].includes(input.kind)
+      || !UNIT_REF.test(input.unitRef) || !["approve", "reject", "defer", "request_changes"].includes(input.kind)
       || !CODE.test(input.reasonCode) || !PROOF.test(input.humanPresenceProof)) fail("invalid_input");
 
     const actor: ActionActor = Object.freeze({ actorRef: input.principal.readerRef, role: actorRole(input.membership.role) });

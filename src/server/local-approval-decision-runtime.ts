@@ -23,7 +23,7 @@ export type TrustedHumanPresenceCeremony = Readonly<{
     workspaceId: string;
     actorRef: string;
     unitRef: string;
-    action: "approve" | "reject" | "request_changes";
+    action: "approve" | "reject" | "defer" | "request_changes";
   }>): Promise<boolean>;
 }>;
 

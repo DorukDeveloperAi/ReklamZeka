@@ -20,7 +20,7 @@ export type ApprovalQueueDashboardState =
 
 type Envelope<T> = Readonly<{ result: T }>;
 type ErrorEnvelope = Readonly<{ error?: Readonly<{ code?: string; message?: string }> }>;
-type DecisionKind = "approve" | "reject" | "request_changes";
+type DecisionKind = "approve" | "reject" | "defer" | "request_changes";
 type DecisionControl = Readonly<{
   busy: boolean;
   confirmed: boolean;
@@ -42,6 +42,7 @@ const STATUS_LABELS: Readonly<Record<ApprovalQueueRecord["status"], string>> = {
   awaiting_approval: "Onay bekliyor",
   approved: "Onaylandı",
   rejected: "Reddedildi",
+  deferred: "Ertelendi",
   changes_requested: "Değişiklik istendi",
   expired: "Süresi doldu",
   stale: "Güncelliğini yitirdi",
@@ -86,9 +87,9 @@ export async function recordApprovalDecision(
   input: Readonly<{ unitRef: string; kind: DecisionKind }>,
 ): Promise<Readonly<{ state: string }>> {
   const intent = input.kind === "approve" ? "approval-queue-approve"
-    : input.kind === "reject" ? "approval-queue-reject" : "approval-queue-request-changes";
+    : input.kind === "reject" ? "approval-queue-reject" : input.kind === "defer" ? "approval-queue-defer" : "approval-queue-request-changes";
   const reasonCode = input.kind === "approve" ? "human.confirmed"
-    : input.kind === "reject" ? "human.rejected" : "human.changes_requested";
+    : input.kind === "reject" ? "human.rejected" : input.kind === "defer" ? "human.deferred" : "human.changes_requested";
   const challengeResponse = await fetcher("/api/approval-queue", {
     method: "POST",
     cache: "no-store",
@@ -195,7 +196,7 @@ function ApprovalQueueDetail({ item, loading, decision, detailHeadingRef }: Read
       </label>
       {decision.error ? <p role="alert">{decision.error}</p> : null}
       {decision.notice ? <p role="status">{decision.notice}</p> : null}
-      <div><button disabled={!decision.confirmed || decision.busy} onClick={() => decision.decide("reject")}>Reddet</button><button disabled={!decision.confirmed || decision.busy} onClick={() => decision.decide("request_changes")}>Değişiklik iste</button><button className={styles.primaryButton} disabled={!decision.confirmed || decision.busy} onClick={() => decision.decide("approve")}>{decision.busy ? "Sistem onayı bekleniyor…" : "Onayla"}</button></div>
+      <div><button disabled={!decision.confirmed || decision.busy} onClick={() => decision.decide("reject")}>Reddet</button><button disabled={!decision.confirmed || decision.busy} onClick={() => decision.decide("defer")}>Ertele</button><button disabled={!decision.confirmed || decision.busy} onClick={() => decision.decide("request_changes")}>Değişiklik iste</button><button className={styles.primaryButton} disabled={!decision.confirmed || decision.busy} onClick={() => decision.decide("approve")}>{decision.busy ? "Sistem onayı bekleniyor…" : "Onayla"}</button></div>
     </section> : null}
     <footer><span>Onay yalnız approval evidence kaydıdır</span><span>Meta çağrısı yapılmaz</span></footer>
   </section>;

@@ -59,6 +59,7 @@ describe("Approval decision local HTTP boundary", () => {
   it.each([
     ["approval-queue-approve", "approve"],
     ["approval-queue-reject", "reject"],
+    ["approval-queue-defer", "defer"],
     ["approval-queue-request-changes", "request_changes"],
   ] as const)("binds %s to only %s", async (intent, kind) => {
     const decide = vi.fn(async () => success());

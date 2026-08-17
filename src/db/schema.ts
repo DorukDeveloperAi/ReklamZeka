@@ -5783,7 +5783,7 @@ export const actionApprovalDecisionEvents = pgTable("action_approval_decision_ev
     and ${table.actorRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
     and ${table.actorRole} in ('owner', 'admin', 'operator')
     and ${table.reasonCode} ~ '^[a-z][a-z0-9_.:-]{0,127}$'
-    and ${table.commandKind} in ('approve', 'reject', 'request_changes')
+    and ${table.commandKind} in ('approve', 'reject', 'defer', 'request_changes')
   `),
   check("action_approval_decision_events_hash_formats", sql`
     ${table.unitHash} ~ '^[a-f0-9]{64}$'
@@ -5813,7 +5813,7 @@ export const actionApprovalDecisionEvents = pgTable("action_approval_decision_ev
       and ${table.commandPayload} #>> '{authorization,humanPresence}' = 'true'
       and ${table.commandPayload} #>> '{authorization,canExecute}' = 'false'
       and ${table.commandPayload} ? 'grantRef')
-    or (${table.commandKind} in ('reject', 'request_changes')
+    or (${table.commandKind} in ('reject', 'defer', 'request_changes')
       and not (${table.commandPayload} ? 'authorization')
       and not (${table.commandPayload} ? 'grantRef'))
   `),
