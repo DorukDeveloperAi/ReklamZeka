@@ -778,6 +778,7 @@
       "when": 1786978800000,
       "tag": "20260817150000_workspace_tombstone_slice_head_release",
       "breakpoints": true
-    }
+    },
+    {"idx":111,"version":"7","when":1786979400000,"tag":"20260817151000_guide_lifecycle_integrity_forward","breakpoints":true}
   ]
 }

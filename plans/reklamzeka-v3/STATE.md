@@ -32,7 +32,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P03-A-slice-registry | Kabul edildi / arşivlenebilir |
 | + P03-B-operation-read-model | Kabul edildi / arşivlenebilir |
 | + P04-A-guide-domain | Kabul edildi / arşivlenebilir |
-| P04-B-guide-persistence | DEVAM |
+| + P04-B-guide-persistence | Kabul edildi / arşivlenebilir |
 | + P05-A-guide-run-domain | Kabul edildi / arşivlenebilir |
 | + P05-B-two-agent-boundary | Kabul edildi / arşivlenebilir |
 | + P07-A-five-area-shell | Kabul edildi / arşivlenebilir |
@@ -56,3 +56,4 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 - `+ P06-A effective Guide overlap`: aynı entity üzerindeki aktif Kılavuzlar için closed action allowlist kesişimi, en kısıtlayıcı mode, deny/manual-lock/protection birleşimi ve en düşük numeric cap input-order bağımsız çözülür. Rename daima insan onaylıdır; unresolved constraint veya active-head conflict hold/fail-closed olur. Çıktı yalnız karar hazırlama kanıtıdır; approve/execute/Meta write yetkileri sıfırdır. Persistence, action bundle/admission/executor/rollback açık olduğundan P06 paketi henüz `+` değildir.
 - `+ P01-F budget/config history`: yalnız eksiksiz normal inventory koşumları durable cursor zamanıyla kanonik budget/config snapshot geçmişi üretir. Baseline sıfır olaylı, replay idempotent, stale yazısız ve aynı-zaman/farklı-hash fail-closed'dur. CBO/ABO sahipliği ekonomik değişimi çift saymaz; belirsiz veya non-owner ham config anomalisi korunur. Post-process arızası redacted/retryable partial sonuçtur. P01-E generic Finding/Development Log ledger açık olduğundan P01 paketi henüz `+` değildir.
 - `+ P03-B operation read model`: güncel published slice, current category evidence ve kanonik resolver üzerinden aynı RR/read-only transaction'da çözülür; frozen snapshot güncel görünümde kullanılmaz. Campaign/ad-set own-level market/exclude sınırı, campaign→ad-set inheritance, stable keyset, dönem coverage ve CBO/ABO owner de-dup canlı outer-rollback fixture ile kanıtlandı. Primary result binding, saved views, Kapsam Raporu/export ve UI açık olduğundan P03 paketi henüz `+` değildir.
+- `+ P04-B guide persistence`: immutable Kılavuz revisions, exact predecessor/current published slice bağı, interpretation acceptance, old-active/new-draft, tek-insan activation, lifecycle/outbox idempotency ve pause/reactivate occurrence zinciri canlı outer-rollback repository verifier ile kanıtlandı. Migration ledger/file hash eşleşti; 8/8 RLS+FORCE, role grant 0, 13 tenant-leftmost FK indeksi ve zero residue doğrulandı. Budget resolver, Agent transfer ve compatibility alt paketleri açık olduğundan P04 paketi henüz `+` değildir.

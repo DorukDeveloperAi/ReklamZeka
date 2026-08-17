@@ -71,6 +71,7 @@ export class GuideRevisionError extends Error {
 }
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const HASH = /^[a-f0-9]{64}$/;
+const WORKSPACE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 function fail(code: GuideRevisionError["code"]): never { throw new GuideRevisionError(code); }
@@ -81,6 +82,11 @@ function stable(value: unknown): unknown { if (Array.isArray(value)) return valu
 function digest(value: unknown): string { return createHash("sha256").update(JSON.stringify(stable(value))).digest("hex"); }
 function text(value: unknown, maximum = 10_000, code: GuideRevisionError["code"] = "invalid_input"): string { if (typeof value !== "string") fail(code); const normalized = value.trim(); if (!normalized || normalized.length > maximum || CONTROL.test(normalized)) fail(code); return normalized; }
 function ref(value: unknown, prefix: string, code: GuideRevisionError["code"] = "invalid_input"): string { const normalized = text(value, 159, code); if (!REF.test(normalized) || !normalized.startsWith(prefix)) fail(code); return normalized; }
+/** Server-derived semantic reference; client input is never trusted as a workspace binding. */
+export function canonicalGuideWorkspaceRef(workspaceId: string): string {
+  if (typeof workspaceId !== "string" || !WORKSPACE_ID.test(workspaceId)) fail("invalid_input");
+  return `workspace_${createHash("sha256").update(workspaceId).digest("hex").slice(0, 16)}`;
+}
 function refs(value: unknown, prefix: string, maximum: number, code: GuideRevisionError["code"] = "invalid_input"): readonly string[] { if (!Array.isArray(value) || value.length > maximum) fail(code); const normalized = value.map((item) => ref(item, prefix, code)).sort(); if (new Set(normalized).size !== normalized.length) fail(code); return Object.freeze(normalized); }
 function budgetRefs(value: unknown): readonly GuideBudgetRef[] {
   if (!Array.isArray(value) || value.length > 64) fail("invalid_input");

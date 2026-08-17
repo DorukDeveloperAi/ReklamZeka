@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { createGuideRevision, type GuideRevision, type GuideRevisionDraft } from "@/domain/guides/guide-revision";
+import { canonicalGuideWorkspaceRef, createGuideRevision, type GuideRevision, type GuideRevisionDraft } from "@/domain/guides/guide-revision";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -12,6 +12,17 @@ type InputRole = HumanRole | "analyst" | "viewer";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const key = (prefix: "guide_event" | "guide_activation", ...parts: string[]) => `${prefix}_${createHash("sha256").update(parts.join(":")).digest("hex")}`;
+const workspaceRef = canonicalGuideWorkspaceRef;
+/** jsonb object key order is not part of the idempotency contract. */
+export const canonicalGuideLifecycleJson = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map(canonicalGuideLifecycleJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.entries(value as Record<string, unknown>)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, child]) => `${JSON.stringify(name)}:${canonicalGuideLifecycleJson(child)}`).join(",")}}`;
+  if (value === undefined || typeof value === "function" || typeof value === "symbol") throw new GuideLifecycleRepositoryError("corrupt_store");
+  return JSON.stringify(value);
+};
+const stableJson = canonicalGuideLifecycleJson;
 function rows(value: unknown): readonly Row[] { if (!value || typeof value !== "object" || !("rows" in value) || !Array.isArray(value.rows)) throw new GuideLifecycleRepositoryError("corrupt_store"); return value.rows as readonly Row[]; }
 function only(value: readonly Row[]): Row { if (value.length !== 1) throw new GuideLifecycleRepositoryError(value.length ? "corrupt_store" : "not_found"); return value[0]!; }
 function id(row: Row, field = "id"): string { const value = row[field]; if (typeof value !== "string" || !UUID.test(value)) throw new GuideLifecycleRepositoryError("corrupt_store"); return value; }
@@ -23,7 +34,7 @@ function canonical(value: GuideRevision): GuideRevision {
   if (Object.keys(value as object).length !== allowed.length || Object.keys(value as object).some((entry) => !allowed.includes(entry))) throw new GuideLifecycleRepositoryError("invalid_input");
   const draft: GuideRevisionDraft = { workspaceRef: value.workspaceRef, guideRef: value.guideRef, revision: value.revision, previousRevisionHash: value.previousRevisionHash, sliceRef: value.sliceRef, market: value.market, freeText: value.freeText, strict: value.strict, schedule: value.schedule, mode: value.mode, actionAllowlist: value.actionAllowlist };
   const result = createGuideRevision(draft);
-  if (result.revisionHash !== value.revisionHash || result.interpretationHash !== value.interpretationHash || JSON.stringify(result.authority) !== JSON.stringify(value.authority) || JSON.stringify(result.strict) !== JSON.stringify(value.strict)) throw new GuideLifecycleRepositoryError("invalid_input");
+  if (result.revisionHash !== value.revisionHash || result.interpretationHash !== value.interpretationHash || stableJson(result.authority) !== stableJson(value.authority) || stableJson(result.strict) !== stableJson(value.strict)) throw new GuideLifecycleRepositoryError("invalid_input");
   return result;
 }
 export class GuideLifecycleRepositoryError extends Error { constructor(readonly code: "invalid_input" | "not_found" | "forbidden" | "conflict" | "corrupt_store") { super(`guide lifecycle rejected: ${code}`); this.name = "GuideLifecycleRepositoryError"; } }
@@ -32,9 +43,26 @@ export class GuideLifecycleRepositoryError extends Error { constructor(readonly 
 export class DrizzleGuideLifecycleRepository {
   constructor(private readonly database: Pick<Database, "transaction">) {}
 
+  async loadCanonicalRevision(input: Readonly<{ workspaceId: string; guideId: string; revisionId: string }>): Promise<GuideRevision> {
+    [input.workspaceId,input.guideId,input.revisionId].forEach(validUuid);
+    return this.database.transaction(async tx => {
+      const row=only(rows(await tx.execute(sql`select guide_ref,revision_number,previous_revision_hash,slice_ref,market_key,free_text,strict_payload,schedule_payload,mode,revision_hash,interpretation_hash from guide_revisions where workspace_id=${input.workspaceId}::uuid and guide_id=${input.guideId}::uuid and id=${input.revisionId}::uuid`)));
+      const actions=rows(await tx.execute(sql`select action,authority from guide_revision_actions where workspace_id=${input.workspaceId}::uuid and guide_revision_id=${input.revisionId}::uuid order by action limit 8`));
+      const budgets=rows(await tx.execute(sql`select budget_ref,scope_kind,ordinal from guide_revision_budget_refs where workspace_id=${input.workspaceId}::uuid and guide_revision_id=${input.revisionId}::uuid order by ordinal limit 65`));
+      if(actions.length>7||budgets.length>64||new Set(actions.map(x=>x.action)).size!==actions.length||new Set(budgets.map(x=>x.budget_ref)).size!==budgets.length||budgets.some((x,i)=>Number(x.ordinal)!==i+1))throw new GuideLifecycleRepositoryError("corrupt_store");
+      const persistedStrict=row.strict_payload;
+      if (!persistedStrict || typeof persistedStrict!=="object" || Array.isArray(persistedStrict) || stableJson((persistedStrict as Record<string, unknown>).budgetRefs)!==stableJson(budgets.map(x=>({limitRef:x.budget_ref,scopeKind:x.scope_kind})))) throw new GuideLifecycleRepositoryError("corrupt_store");
+      const strict={...(persistedStrict as Record<string,unknown>),budgetRefs:budgets.map(x=>({limitRef:x.budget_ref,scopeKind:x.scope_kind}))} as unknown as GuideRevisionDraft["strict"];
+      let value: GuideRevision;
+      try { value=createGuideRevision({workspaceRef:workspaceRef(input.workspaceId),guideRef:row.guide_ref as string,revision:Number(row.revision_number),previousRevisionHash:(row.previous_revision_hash ?? null) as string|null,sliceRef:row.slice_ref as string,market:row.market_key as "yerli"|"yabanci",freeText:row.free_text as string,strict,schedule:row.schedule_payload as GuideRevisionDraft["schedule"],mode:row.mode as GuideRevisionDraft["mode"],actionAllowlist:actions.map(x=>x.action) as GuideRevisionDraft["actionAllowlist"]}); } catch { throw new GuideLifecycleRepositoryError("corrupt_store"); }
+      const expectedAuthority=new Map<string, string>(value.actionAllowlist.map(action=>[action,value.authority.autonomousActions.includes(action)?"limited_autonomy":value.authority.humanApprovalActions.includes(action)?"human_approval":"none"]));
+      if(actions.some(action=>typeof action.action!=="string"||action.authority!==expectedAuthority.get(action.action))||value.revisionHash!==row.revision_hash||value.interpretationHash!==row.interpretation_hash)throw new GuideLifecycleRepositoryError("corrupt_store"); return value;
+    });
+  }
+
   async createDraft(input: Readonly<{ workspaceId: string; actorId: string; role: InputRole; label: string; guide: GuideRevision; sliceId: string; sliceRevisionId: string; marketDefinitionId: string; occurredAt: string }>) {
     [input.workspaceId, input.actorId, input.sliceId, input.sliceRevisionId, input.marketDefinitionId].forEach(validUuid); validDate(input.occurredAt); human(input.role);
-    const role = input.role; human(role); const guide = canonical(input.guide); if (guide.revision !== 1 || guide.previousRevisionHash !== null || !input.label.trim() || input.label.trim().length > 160) throw new GuideLifecycleRepositoryError("invalid_input");
+    const role = input.role; human(role); const guide = canonical(input.guide); if (guide.workspaceRef !== workspaceRef(input.workspaceId) || guide.revision !== 1 || guide.previousRevisionHash !== null || !input.label.trim() || input.label.trim().length > 160) throw new GuideLifecycleRepositoryError("invalid_input");
     return this.database.transaction(async (tx) => {
       await this.assertHuman(tx, input.workspaceId, input.actorId, role);
       const guideId = id(only(rows(await tx.execute(sql`insert into guides (workspace_id, guide_ref, label, slice_id, market_definition_id, created_by_actor_id) values (${input.workspaceId}::uuid, ${guide.guideRef}, ${input.label.trim()}, ${input.sliceId}::uuid, ${input.marketDefinitionId}::uuid, ${input.actorId}::uuid) returning id::text`))));
@@ -47,7 +75,7 @@ export class DrizzleGuideLifecycleRepository {
 
   async createNextDraft(input: Readonly<{ workspaceId: string; actorId: string; role: InputRole; guideId: string; expectedHeadVersion: number; expectedLatestRevisionId: string; expectedLatestRevisionHash: string; guide: GuideRevision; sliceRevisionId: string; marketDefinitionId: string; occurredAt: string }>) {
     [input.workspaceId, input.actorId, input.guideId, input.expectedLatestRevisionId, input.sliceRevisionId, input.marketDefinitionId].forEach(validUuid); validDate(input.occurredAt); human(input.role);
-    const role = input.role; human(role); if (!Number.isInteger(input.expectedHeadVersion) || input.expectedHeadVersion < 0 || !HASH.test(input.expectedLatestRevisionHash)) throw new GuideLifecycleRepositoryError("invalid_input"); const guide = canonical(input.guide);
+    const role = input.role; human(role); if (!Number.isInteger(input.expectedHeadVersion) || input.expectedHeadVersion < 0 || !HASH.test(input.expectedLatestRevisionHash)) throw new GuideLifecycleRepositoryError("invalid_input"); const guide = canonical(input.guide); if (guide.workspaceRef !== workspaceRef(input.workspaceId)) throw new GuideLifecycleRepositoryError("invalid_input");
     return this.database.transaction(async (tx) => {
       await this.assertHuman(tx, input.workspaceId, input.actorId, role);
       const head = only(rows(await tx.execute(sql`select latest_revision_id::text,current_active_revision_id::text,version from guide_heads where workspace_id=${input.workspaceId}::uuid and guide_id=${input.guideId}::uuid for update`)));
@@ -69,6 +97,7 @@ export class DrizzleGuideLifecycleRepository {
       const revision = only(rows(await tx.execute(sql`select interpretation_hash from guide_revisions where workspace_id=${input.workspaceId}::uuid and id=${input.revisionId}::uuid and guide_id=${input.guideId}::uuid for update`)));
       if (revision.interpretation_hash !== input.interpretationHash) throw new GuideLifecycleRepositoryError("conflict");
       const inserted = rows(await tx.execute(sql`insert into guide_interpretation_acceptances (workspace_id,guide_revision_id,interpretation_hash,accepted_by_actor_id,accepted_at) values (${input.workspaceId}::uuid,${input.revisionId}::uuid,${input.interpretationHash},${input.actorId}::uuid,${input.occurredAt}::timestamptz) on conflict (workspace_id,guide_revision_id,interpretation_hash) do nothing returning id`));
+      if (inserted.length === 0) { const existing=only(rows(await tx.execute(sql`select accepted_by_actor_id::text,accepted_at::text from guide_interpretation_acceptances where workspace_id=${input.workspaceId}::uuid and guide_revision_id=${input.revisionId}::uuid and interpretation_hash=${input.interpretationHash}`))); if(existing.accepted_by_actor_id!==input.actorId||new Date(String(existing.accepted_at)).toISOString()!==input.occurredAt) throw new GuideLifecycleRepositoryError("conflict"); }
       if (inserted.length === 1) await this.event(tx, input.workspaceId, input.guideId, input.revisionId, "interpretation_accepted", input.actorId, input.occurredAt, { interpretationHash: input.interpretationHash });
       return Object.freeze({ accepted: true as const, created: inserted.length === 1 });
     });
@@ -81,7 +110,11 @@ export class DrizzleGuideLifecycleRepository {
       await this.assertHuman(tx, input.workspaceId, input.actorId, role);
       const head = only(rows(await tx.execute(sql`select latest_revision_id::text,current_active_revision_id::text,version from guide_heads where workspace_id=${input.workspaceId}::uuid and guide_id=${input.guideId}::uuid for update`)));
       if (head.latest_revision_id !== input.revisionId || Number(head.version) !== input.expectedHeadVersion || (head.current_active_revision_id ?? null) !== input.expectedCurrentRevisionId) {
-        if (head.latest_revision_id === input.revisionId && head.current_active_revision_id === input.revisionId) return Object.freeze({ activated: true as const, idempotent: true as const, activationKey: await this.existingActivationKey(tx, input.workspaceId, input.revisionId) });
+        if (head.latest_revision_id === input.revisionId && head.current_active_revision_id === input.revisionId && Number(head.version) === input.expectedHeadVersion + 1) {
+          const activationKey = await this.existingActivation(tx, input);
+          await this.existingEvent(tx, input.workspaceId, input.guideId, input.revisionId, "activated", input.actorId, input.occurredAt, { activationKey, previousRevisionId: input.expectedCurrentRevisionId });
+          return Object.freeze({ activated: true as const, idempotent: true as const, activationKey });
+        }
         throw new GuideLifecycleRepositoryError("conflict");
       }
       const revision = only(rows(await tx.execute(sql`select revision_hash,interpretation_hash from guide_revisions where workspace_id=${input.workspaceId}::uuid and id=${input.revisionId}::uuid and guide_id=${input.guideId}::uuid for update`)));
@@ -89,7 +122,8 @@ export class DrizzleGuideLifecycleRepository {
       if (typeof revision.interpretation_hash !== "string" || !HASH.test(revision.interpretation_hash) || rows(await tx.execute(sql`select id from guide_interpretation_acceptances where workspace_id=${input.workspaceId}::uuid and guide_revision_id=${input.revisionId}::uuid and interpretation_hash=${revision.interpretation_hash} limit 2`)).length !== 1) throw new GuideLifecycleRepositoryError("conflict");
       const advanced = rows(await tx.execute(sql`update guide_heads set current_active_revision_id=${input.revisionId}::uuid,version=version+1,updated_at=${input.occurredAt}::timestamptz where workspace_id=${input.workspaceId}::uuid and guide_id=${input.guideId}::uuid and version=${input.expectedHeadVersion} and latest_revision_id=${input.revisionId}::uuid returning version`));
       if (advanced.length !== 1) throw new GuideLifecycleRepositoryError("conflict"); const activationKey = key("guide_activation", input.workspaceId, input.guideId, revision.revision_hash, String(input.expectedHeadVersion));
-      await tx.execute(sql`insert into guide_activation_outbox (workspace_id,guide_id,guide_revision_id,activation_key,created_at) values (${input.workspaceId}::uuid,${input.guideId}::uuid,${input.revisionId}::uuid,${activationKey},${input.occurredAt}::timestamptz) on conflict (workspace_id,activation_key) do nothing`);
+      const outbox=rows(await tx.execute(sql`insert into guide_activation_outbox (workspace_id,guide_id,guide_revision_id,activation_key,created_at) values (${input.workspaceId}::uuid,${input.guideId}::uuid,${input.revisionId}::uuid,${activationKey},${input.occurredAt}::timestamptz) on conflict (workspace_id,activation_key) do nothing returning id`));
+      if(outbox.length===0){const existing=only(rows(await tx.execute(sql`select guide_id::text,guide_revision_id::text,created_at::text from guide_activation_outbox where workspace_id=${input.workspaceId}::uuid and activation_key=${activationKey}`)));if(existing.guide_id!==input.guideId||existing.guide_revision_id!==input.revisionId||new Date(String(existing.created_at)).toISOString()!==input.occurredAt)throw new GuideLifecycleRepositoryError("conflict");}
       if (input.expectedCurrentRevisionId !== null) await this.event(tx, input.workspaceId, input.guideId, input.expectedCurrentRevisionId, "superseded", input.actorId, input.occurredAt, { replacementRevisionId: input.revisionId, activationKey });
       await this.event(tx, input.workspaceId, input.guideId, input.revisionId, "activated", input.actorId, input.occurredAt, { activationKey, previousRevisionId: input.expectedCurrentRevisionId });
       return Object.freeze({ activated: true as const, idempotent: false as const, activationKey, headVersion: Number(advanced[0]!.version) });
@@ -100,7 +134,7 @@ export class DrizzleGuideLifecycleRepository {
     [input.workspaceId, input.actorId, input.guideId, input.expectedCurrentRevisionId].forEach(validUuid); validDate(input.occurredAt); const role = input.role; human(role); if (!Number.isInteger(input.expectedHeadVersion) || input.expectedHeadVersion < 0) throw new GuideLifecycleRepositoryError("invalid_input");
     return this.database.transaction(async (tx) => { await this.assertHuman(tx, input.workspaceId, input.actorId, role);
       const updated = rows(await tx.execute(sql`update guide_heads set current_active_revision_id=null,version=version+1,updated_at=${input.occurredAt}::timestamptz where workspace_id=${input.workspaceId}::uuid and guide_id=${input.guideId}::uuid and version=${input.expectedHeadVersion} and current_active_revision_id=${input.expectedCurrentRevisionId}::uuid returning latest_revision_id::text,version`));
-      if (updated.length !== 1) throw new GuideLifecycleRepositoryError("conflict"); await this.event(tx, input.workspaceId, input.guideId, input.expectedCurrentRevisionId, "paused", input.actorId, input.occurredAt, { latestRevisionId: updated[0]!.latest_revision_id }); return Object.freeze({ paused: true as const, headVersion: Number(updated[0]!.version) });
+      if (updated.length !== 1) throw new GuideLifecycleRepositoryError("conflict"); await this.event(tx, input.workspaceId, input.guideId, input.expectedCurrentRevisionId, "paused", input.actorId, input.occurredAt, { latestRevisionId: updated[0]!.latest_revision_id, occurrence: String(updated[0]!.version) }); return Object.freeze({ paused: true as const, headVersion: Number(updated[0]!.version) });
     });
   }
 
@@ -115,9 +149,22 @@ export class DrizzleGuideLifecycleRepository {
   }
 
   private async assertHuman(tx: Transaction, workspaceId: string, actorId: string, role: HumanRole) { const member = only(rows(await tx.execute(sql`select role::text from memberships where workspace_id=${workspaceId}::uuid and user_id=${actorId}::uuid for update`))); if (member.role !== role) throw new GuideLifecycleRepositoryError("forbidden"); }
-  private async existingActivationKey(tx: Transaction, workspaceId: string, revisionId: string) { const row = only(rows(await tx.execute(sql`select activation_key from guide_activation_outbox where workspace_id=${workspaceId}::uuid and guide_revision_id=${revisionId}::uuid`))); if (typeof row.activation_key !== "string") throw new GuideLifecycleRepositoryError("corrupt_store"); return row.activation_key; }
-  private async event(tx: Transaction, workspaceId: string, guideId: string, revisionId: string, eventType: "draft_created" | "interpretation_accepted" | "activated" | "superseded" | "paused" | "archived", actorId: string, occurredAt: string, payload: Record<string, unknown>) { const discriminator = eventType === "draft_created" ? String(payload.revisionHash) : eventType === "interpretation_accepted" ? String(payload.interpretationHash) : eventType === "activated" || eventType === "superseded" ? String(payload.activationKey) : eventType; const eventKey = key("guide_event", workspaceId, guideId, revisionId, eventType, discriminator); await tx.execute(sql`insert into guide_lifecycle_events (workspace_id,guide_id,guide_revision_id,event_key,event_type,actor_id,occurred_at,payload) values (${workspaceId}::uuid,${guideId}::uuid,${revisionId}::uuid,${eventKey},${eventType},${actorId}::uuid,${occurredAt}::timestamptz,${JSON.stringify(payload)}::jsonb) on conflict (workspace_id,event_key) do nothing`); }
-  private async insertRevision(tx: Transaction, input: Readonly<{ workspaceId: string; actorId: string; guideId: string; guide: GuideRevision; sliceRevisionId: string; marketDefinitionId: string; sourceRevisionId: string | null }>) { const revisionId = id(only(rows(await tx.execute(sql`insert into guide_revisions (workspace_id,guide_id,guide_ref,revision_number,revision_hash,source_revision_id,slice_revision_id,slice_ref,market_definition_id,free_text,strict_payload,schedule_payload,mode,interpretation_hash,created_by_actor_id) values (${input.workspaceId}::uuid,${input.guideId}::uuid,${input.guide.guideRef},${input.guide.revision},${input.guide.revisionHash},${input.sourceRevisionId}::uuid,${input.sliceRevisionId}::uuid,${input.guide.sliceRef},${input.marketDefinitionId}::uuid,${input.guide.freeText},${JSON.stringify(input.guide.strict)}::jsonb,${JSON.stringify(input.guide.schedule)}::jsonb,${input.guide.mode},${input.guide.interpretationHash},${input.actorId}::uuid) returning id::text`))));
+  private async existingActivation(tx: Transaction, input: Readonly<{ workspaceId: string; guideId: string; revisionId: string; expectedHeadVersion: number; occurredAt: string }>) {
+    const revision = only(rows(await tx.execute(sql`select revision_hash from guide_revisions where workspace_id=${input.workspaceId}::uuid and id=${input.revisionId}::uuid and guide_id=${input.guideId}::uuid`)));
+    if (typeof revision.revision_hash !== "string" || !HASH.test(revision.revision_hash)) throw new GuideLifecycleRepositoryError("corrupt_store");
+    const activationKey = key("guide_activation", input.workspaceId, input.guideId, revision.revision_hash, String(input.expectedHeadVersion));
+    const row = only(rows(await tx.execute(sql`select guide_id::text,guide_revision_id::text,created_at::text from guide_activation_outbox where workspace_id=${input.workspaceId}::uuid and activation_key=${activationKey}`)));
+    if (row.guide_id !== input.guideId || row.guide_revision_id !== input.revisionId || new Date(String(row.created_at)).toISOString() !== input.occurredAt) throw new GuideLifecycleRepositoryError("conflict");
+    return activationKey;
+  }
+  private async existingEvent(tx: Transaction, workspaceId: string, guideId: string, revisionId: string, eventType: "draft_created" | "interpretation_accepted" | "activated" | "superseded" | "paused" | "archived", actorId: string, occurredAt: string, payload: Record<string, unknown>) {
+    const discriminator = eventType === "draft_created" ? String(payload.revisionHash) : eventType === "interpretation_accepted" ? String(payload.interpretationHash) : eventType === "activated" || eventType === "superseded" ? String(payload.activationKey) : String(payload.occurrence ?? eventType);
+    const eventKey = key("guide_event", workspaceId, guideId, revisionId, eventType, discriminator);
+    const existing = only(rows(await tx.execute(sql`select guide_id::text,guide_revision_id::text,event_type,actor_id::text,occurred_at::text,payload from guide_lifecycle_events where workspace_id=${workspaceId}::uuid and event_key=${eventKey}`)));
+    if (existing.guide_id !== guideId || existing.guide_revision_id !== revisionId || existing.event_type !== eventType || existing.actor_id !== actorId || new Date(String(existing.occurred_at)).toISOString() !== occurredAt || stableJson(existing.payload) !== stableJson(payload)) throw new GuideLifecycleRepositoryError("conflict");
+  }
+  private async event(tx: Transaction, workspaceId: string, guideId: string, revisionId: string, eventType: "draft_created" | "interpretation_accepted" | "activated" | "superseded" | "paused" | "archived", actorId: string, occurredAt: string, payload: Record<string, unknown>) { const discriminator = eventType === "draft_created" ? String(payload.revisionHash) : eventType === "interpretation_accepted" ? String(payload.interpretationHash) : eventType === "activated" || eventType === "superseded" ? String(payload.activationKey) : String(payload.occurrence ?? eventType); const eventKey = key("guide_event", workspaceId, guideId, revisionId, eventType, discriminator); const inserted=rows(await tx.execute(sql`insert into guide_lifecycle_events (workspace_id,guide_id,guide_revision_id,event_key,event_type,actor_id,occurred_at,payload) values (${workspaceId}::uuid,${guideId}::uuid,${revisionId}::uuid,${eventKey},${eventType},${actorId}::uuid,${occurredAt}::timestamptz,${JSON.stringify(payload)}::jsonb) on conflict (workspace_id,event_key) do nothing returning id`)); if(inserted.length===0){const existing=only(rows(await tx.execute(sql`select guide_id::text,guide_revision_id::text,event_type,actor_id::text,occurred_at::text,payload from guide_lifecycle_events where workspace_id=${workspaceId}::uuid and event_key=${eventKey}`)));if(existing.guide_id!==guideId||existing.guide_revision_id!==revisionId||existing.event_type!==eventType||existing.actor_id!==actorId||new Date(String(existing.occurred_at)).toISOString()!==occurredAt||stableJson(existing.payload)!==stableJson(payload))throw new GuideLifecycleRepositoryError("conflict");} }
+  private async insertRevision(tx: Transaction, input: Readonly<{ workspaceId: string; actorId: string; guideId: string; guide: GuideRevision; sliceRevisionId: string; marketDefinitionId: string; sourceRevisionId: string | null }>) { const revisionId = id(only(rows(await tx.execute(sql`insert into guide_revisions (workspace_id,guide_id,guide_ref,revision_number,revision_hash,previous_revision_hash,source_revision_id,slice_revision_id,slice_ref,market_definition_id,market_key,free_text,strict_payload,schedule_payload,mode,interpretation_hash,created_by_actor_id) values (${input.workspaceId}::uuid,${input.guideId}::uuid,${input.guide.guideRef},${input.guide.revision},${input.guide.revisionHash},${input.guide.previousRevisionHash},${input.sourceRevisionId}::uuid,${input.sliceRevisionId}::uuid,${input.guide.sliceRef},${input.marketDefinitionId}::uuid,${input.guide.market},${input.guide.freeText},${JSON.stringify(input.guide.strict)}::jsonb,${JSON.stringify(input.guide.schedule)}::jsonb,${input.guide.mode},${input.guide.interpretationHash},${input.actorId}::uuid) returning id::text`))));
     for (const action of input.guide.actionAllowlist) { const authority = input.guide.authority.autonomousActions.includes(action) ? "limited_autonomy" : input.guide.authority.humanApprovalActions.includes(action) ? "human_approval" : "none"; await tx.execute(sql`insert into guide_revision_actions (workspace_id,guide_revision_id,action,authority) values (${input.workspaceId}::uuid,${revisionId}::uuid,${action},${authority})`); }
     for (const [ordinal, budget] of input.guide.strict.budgetRefs.entries()) await tx.execute(sql`insert into guide_revision_budget_refs (workspace_id,guide_revision_id,budget_ref,scope_kind,ordinal) values (${input.workspaceId}::uuid,${revisionId}::uuid,${budget.limitRef},${budget.scopeKind},${ordinal + 1})`); return revisionId;
   }
