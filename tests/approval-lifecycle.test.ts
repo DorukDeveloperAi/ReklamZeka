@@ -191,7 +191,7 @@ describe("ActionUnit approval lifecycle", () => {
       .toThrowError(expect.objectContaining({ code: "invalid_input" }));
   });
 
-  it("cascades rejected and changes-requested dependencies without affecting independent units", () => {
+  it("cascades rejected, deferred, and changes-requested dependencies without affecting independent units", () => {
     const initial = start();
     const rejected = decideActionUnit(initial, {
       kind: "reject", commandRef: "reject_parent", unitRef: "unit_parent", actor: admin,
@@ -210,6 +210,15 @@ describe("ActionUnit approval lifecycle", () => {
     });
     expect(changed.lifecycle.units.find((entry) => entry.unitRef === "unit_parent")?.state).toBe("changes_requested");
     expect(changed.lifecycle.units.find((entry) => entry.unitRef === "unit_child")?.state).toBe("dependency_failed");
+
+    const deferredInitial = start();
+    const deferred = decideActionUnit(deferredInitial, {
+      kind: "defer", commandRef: "defer_parent", unitRef: "unit_parent", actor: owner,
+      decidedAt: "2026-08-07T10:02:00Z", reasonCode: "human.deferred",
+      freshness: freshness(deferredInitial.bundle),
+    });
+    expect(deferred.lifecycle.units.find((entry) => entry.unitRef === "unit_parent")?.state).toBe("deferred");
+    expect(deferred.lifecycle.units.find((entry) => entry.unitRef === "unit_child")?.state).toBe("dependency_failed");
   });
 
   it("rejects bundle-wide approval and approve-plus-execute injection", () => {

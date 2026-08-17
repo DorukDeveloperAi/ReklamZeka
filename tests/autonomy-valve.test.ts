@@ -129,10 +129,12 @@ describe("typed action risk classification", () => {
       legacyContext)).toThrowError(expect.objectContaining({ code: "invalid_contract" }));
   });
 
-  it("ad-level budget ve raw Graph action biçimini şema sınırında reddeder", () => {
+  it("ad-level budget ile raw veya create action biçimlerini şema sınırında reddeder", () => {
     expect(() => buildActionPlan({ ...budget(), entity: { level: "ad", ref: "ad_one" } } as never, context({ entity: { level: "ad", ref: "ad_one" } })))
       .toThrowError(expect.objectContaining({ code: "invalid_action" }));
     expect(() => buildActionPlan({ kind: "raw_graph", path: "/act_x/campaigns", field: "daily_budget" } as never, context()))
+      .toThrowError(expect.objectContaining({ code: "invalid_action" }));
+    expect(() => buildActionPlan({ kind: "campaign_create", entity: { level: "campaign", ref: "campaign_new" }, name: "Yeni kampanya" } as never, context()))
       .toThrowError(expect.objectContaining({ code: "invalid_action" }));
     expect(() => buildActionPlan({ ...budget(), budgetOwnerRef: "campaign_other" } as never, context({ budgetLimits })))
       .toThrowError(expect.objectContaining({ code: "invalid_action" }));
