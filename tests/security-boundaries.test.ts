@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   AuthorizationError,
@@ -25,6 +26,16 @@ const memberships: readonly WorkspaceMembership[] = [
   { userId: "viewer-a", workspaceId: "workspace-a", role: "viewer" },
   { userId: "owner-b", workspaceId: "workspace-b", role: "owner" },
 ];
+
+describe("Supabase routine grant audit", () => {
+  it("excludes extension-owned routines but still audits every application-owned public routine", () => {
+    const source = readFileSync("scripts/verify-supabase-security.ts", "utf8");
+    expect(source).toContain("information_schema.routine_privileges");
+    expect(source).toContain("dependency.classid = 'pg_proc'::regclass");
+    expect(source).toContain("dependency.deptype = 'e'");
+    expect(source).toContain("privilege.grantee in ('PUBLIC', 'anon', 'authenticated')");
+  });
+});
 
 describe("workspace authorization boundary", () => {
   it("enforces the role/action matrix", () => {

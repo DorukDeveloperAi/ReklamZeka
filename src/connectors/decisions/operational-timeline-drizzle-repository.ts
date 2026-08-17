@@ -70,7 +70,7 @@ function event(row: SourceRow): OperationalTimelineEvent {
   }
   if (kind === "approval_decision") {
     const decision = text(row.one, 32); const reason = text(row.two, 128);
-    if (!["approve", "reject", "request_changes"].includes(decision) || !/^[a-z][a-z0-9_.:-]{0,127}$/.test(reason)) throw new Error("corrupt_store");
+    if (!["approve", "reject", "defer", "request_changes"].includes(decision) || !/^[a-z][a-z0-9_.:-]{0,127}$/.test(reason)) throw new Error("corrupt_store");
     return Object.freeze({ kind, occurredAt, title: "İnsan kararı kaydedildi", detail: `${decision.replaceAll("_", " ")} · ${reason.replaceAll("_", " ")}` });
   }
   if (kind === "temporal_evaluation") {

@@ -785,6 +785,7 @@
     {"idx":114,"version":"7","when":1786983600000,"tag":"20260817170000_guide_budget_contract_v2","breakpoints":true},
     {"idx":115,"version":"7","when":1786987200000,"tag":"20260817180000_guide_run_persistence","breakpoints":true},
     {"idx":116,"version":"7","when":1787000400000,"tag":"20260817210000_p06_action_bindings","breakpoints":true},
-    {"idx":117,"version":"7","when":1787011260000,"tag":"20260818000100_p06_agent_action_requester","breakpoints":true}
+    {"idx":117,"version":"7","when":1787011260000,"tag":"20260818000100_p06_agent_action_requester","breakpoints":true},
+    {"idx":118,"version":"7","when":1787011320000,"tag":"20260818000200_p06_approval_decision_defer","breakpoints":true}
   ]
 }

@@ -107,6 +107,41 @@ describe("ApprovalDecisionService", () => {
     expect(JSON.stringify(result)).not.toMatch(/grantRef|authorizationRef|unitHash|scopeHash/);
   });
 
+  it("requires single-use human presence for defer without persisting approval authorization or a grant", async () => {
+    const initial = lifecycle();
+    const store = new SingleUseHumanPresenceChallengeStore();
+    let captured: unknown = null;
+    const repository: ApprovalDecisionRepository = {
+      loadForDecision: async () => ({ lifecycle: initial, freshness: freshness(initial) }),
+      decideAtomically: async (input) => {
+        captured = await input.buildCommand({ lifecycle: initial, freshness: freshness(initial) });
+        const transition = decideActionUnit(initial, captured as Parameters<typeof decideActionUnit>[1]);
+        return { outcome: "inserted", lifecycle: transition.lifecycle, executionAuthority: "none", executionPerformed: false };
+      },
+    };
+    await service(repository, store).decide({
+      principal, membership: owner, unitRef, kind: "defer", reasonCode: "human_deferred",
+      humanPresenceProof: issued(store, "defer"),
+    });
+    expect(captured).toMatchObject({ kind: "defer", actor: { role: "owner" } });
+    expect(captured).not.toHaveProperty("authorization");
+    expect(captured).not.toHaveProperty("grantRef");
+    await expect(service(repository, store).decide({
+      principal, membership: owner, unitRef, kind: "defer", reasonCode: "human_deferred",
+      humanPresenceProof: "presence_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    })).rejects.toEqual(expect.objectContaining({ code: "human_presence_rejected" }));
+  });
+
+  it.each(["campaign_create", "raw_graph"])("rejects unsupported %s decisions before repository or proof use", async (kind) => {
+    const repository = atomicRepository();
+    const store = new SingleUseHumanPresenceChallengeStore();
+    await expect(service(repository, store).decide({
+      principal, membership: owner, unitRef, kind, reasonCode: "unsupported_action",
+      humanPresenceProof: "presence_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    } as never)).rejects.toEqual(expect.objectContaining({ code: "invalid_input" }));
+    expect(repository.calls).toBe(0);
+  });
+
   it("denies analyst/viewer and caller identity mismatches before reading or consuming proof", async () => {
     for (const membership of [
       { ...owner, role: "analyst" as const },

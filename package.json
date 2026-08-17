@@ -89,6 +89,8 @@
     "verify:delivery-health-alert-ledger-db": "tsx scripts/verify-delivery-health-alert-ledger-postgres.ts",
     "verify:action-proposal-queue-db": "tsx scripts/verify-action-proposal-queue-postgres.ts",
     "verify:authentic-approval-chain-db": "tsx scripts/verify-authentic-approval-chain-postgres.ts",
+    "verify:p06-approval-decision-defer-db": "tsx scripts/verify-p06-approval-decision-defer-postgres.ts",
+    "verify:p06-approval-decision-defer-db:post": "P06_DEFER_POST_APPROVED=true tsx scripts/verify-p06-approval-decision-defer-postgres.ts",
     "verify:action-guardrail-db": "tsx scripts/verify-action-guardrail-policy-postgres.ts",
     "verify:meta-affected-geo-db": "tsx scripts/verify-meta-affected-geo-postgres.ts",
     "verify:meta-affected-geo-live-db": "tsx scripts/verify-meta-affected-geo-live-postgres.ts",

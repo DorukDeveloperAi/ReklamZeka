@@ -17,8 +17,8 @@ export type SliceRuleDecisionTraceItem = Readonly<{
   ruleRevision: number;
   selectionRef: string;
   selectedAt: string;
-  actionUnit: Readonly<{ presence: boolean; status: "not_materialized" | "awaiting_approval" | "approved" | "rejected" | "changes_requested" }>;
-  decisionHistory: readonly Readonly<{ decision: "proposed" | "approved" | "rejected" | "changes_requested"; occurredAt: string; reasonCode: string | null }>[];
+  actionUnit: Readonly<{ presence: boolean; status: "not_materialized" | "awaiting_approval" | "approved" | "rejected" | "deferred" | "changes_requested" }>;
+  decisionHistory: readonly Readonly<{ decision: "proposed" | "approved" | "rejected" | "deferred" | "changes_requested"; occurredAt: string; reasonCode: string | null }>[];
   execution: Readonly<{ safetyState: "server_disabled"; closure: "not_admitted" | "admission_closed" }>;
 }>;
 
@@ -73,12 +73,13 @@ function decisionHistory(value: unknown, proposedAt: string): readonly SliceRule
   for (const raw of value) {
     if (!exact(raw, ["command_kind", "decided_at", "reason_code", "execution_authority", "execution_performed"])
       || raw.execution_authority !== "none" || raw.execution_performed !== false
-      || typeof raw.command_kind !== "string" || !["approve", "reject", "request_changes"].includes(raw.command_kind)
+      || typeof raw.command_kind !== "string" || !["approve", "reject", "defer", "request_changes"].includes(raw.command_kind)
       || typeof raw.reason_code !== "string" || !CODE.test(raw.reason_code)) return null;
     const occurredAt = instant(raw.decided_at);
     if (!occurredAt || Date.parse(occurredAt) < previousAt) return null;
     previousAt = Date.parse(occurredAt);
-    const decision = raw.command_kind === "approve" ? "approved" : raw.command_kind === "reject" ? "rejected" : "changes_requested";
+    const decision = raw.command_kind === "approve" ? "approved" : raw.command_kind === "reject" ? "rejected"
+      : raw.command_kind === "defer" ? "deferred" : "changes_requested";
     history.push(Object.freeze({ decision, occurredAt, reasonCode: raw.reason_code }));
   }
   return Object.freeze(history);

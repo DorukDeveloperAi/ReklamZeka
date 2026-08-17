@@ -47,10 +47,19 @@ try {
   `);
   const routineGrants = await pool.query<{ grant_count: number }>(`
     select count(*)::int as grant_count
-    from information_schema.routine_privileges
-    where routine_schema = 'public'
-      and grantee in ('PUBLIC', 'anon', 'authenticated')
-      and privilege_type = 'EXECUTE'
+    from information_schema.routine_privileges privilege
+    join pg_proc routine
+      on privilege.specific_name = routine.proname || '_' || routine.oid::text
+    join pg_namespace namespace on namespace.oid = routine.pronamespace
+    where privilege.routine_schema = 'public'
+      and privilege.grantee in ('PUBLIC', 'anon', 'authenticated')
+      and privilege.privilege_type = 'EXECUTE'
+      and not exists (
+        select 1 from pg_depend dependency
+        where dependency.classid = 'pg_proc'::regclass
+          and dependency.objid = routine.oid
+          and dependency.deptype = 'e'
+      )
   `);
   const instructionPolicyTables = await pool.query<{ total: number; force_rls: number }>(`
     select count(*)::int as total,
