@@ -840,26 +840,36 @@ try {
         actions: ["budget_decrease"],
       },
     );
-    await q("savepoint target_discriminator_tamper");
-    await q("set local session_replication_role='replica'");
-    // The production CHECK independently prevents this write. Drop it only
-    // inside the outer rollback fixture to prove the reader still rejects a
-    // superuser-style payload/column discriminator forgery.
-    await q(
-      "alter table guide_budget_contracts drop constraint guide_budget_contracts_identity",
-    );
-    await q(
-      "update guide_budget_contracts set target_scope_ref=$1,contract_payload=$2::jsonb where workspace_id=$3 and guide_revision_id=$4",
-      [
-        forgedTargetContract.targetScopeRef,
-        JSON.stringify(forgedTargetContract),
-        ws,
-        guideRevisionTwoId,
-      ],
-    );
-    const targetDiscriminatorTamperRejected = await rejected(execute);
-    await q("rollback to savepoint target_discriminator_tamper");
-    await q("release savepoint target_discriminator_tamper");
+    const forgedTargetMutation =
+      "update guide_budget_contracts set target_scope_ref=$1,contract_payload=$2::jsonb where workspace_id=$3 and guide_revision_id=$4";
+    const forgedTargetValues = [
+      forgedTargetContract.targetScopeRef,
+      JSON.stringify(forgedTargetContract),
+      ws,
+      guideRevisionTwoId,
+    ];
+    let targetDiscriminatorTamperRejected: boolean;
+    if (verifyMode === "pre") {
+      await q("savepoint target_discriminator_tamper");
+      await q("set local session_replication_role='replica'");
+      // The production CHECK independently prevents this write. Drop it only
+      // in PRE's outer-rollback fixture to prove the reader rejects a
+      // superuser-style payload/column discriminator forgery.
+      await q(
+        "alter table guide_budget_contracts drop constraint guide_budget_contracts_identity",
+      );
+      await q(forgedTargetMutation, forgedTargetValues);
+      targetDiscriminatorTamperRejected = await rejected(execute);
+      await q("rollback to savepoint target_discriminator_tamper");
+      await q("release savepoint target_discriminator_tamper");
+    } else {
+      // POST never changes schema; the applied CHECK must reject this write.
+      targetDiscriminatorTamperRejected = await rejectedSql(
+        "target_discriminator_tamper",
+        forgedTargetMutation,
+        forgedTargetValues,
+      );
+    }
     const crossTenantDirectRejected = await rejectedSql(
       "cross_tenant",
       "insert into guide_budget_contracts(workspace_id,guide_revision_id,guide_revision_hash,schema_version,contract_hash,market_key,currency,target_scope_ref,contract_payload,maximum_evidence_age_seconds) values($1,$2,$3,$4,$5,'yerli','TRY',$6,$7::jsonb,3600)",
