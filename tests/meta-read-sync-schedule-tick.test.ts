@@ -11,7 +11,7 @@ const workspaceId = "11111111-1111-4111-8111-111111111111";
 const connectionId = "22222222-2222-4222-8222-222222222222";
 const now = "2026-08-08T04:00:00.000Z";
 const due: MetaReadSyncScheduleCandidate = Object.freeze({ workspaceId, connectionId, scopeRevision: 3,
-  triggerKind: "daily", scheduledFor: "2026-08-08T03:00:00.000Z",
+  triggerKind: "interval_6h", scheduledFor: "2026-08-08T03:00:00.000Z",
   dateStart: "2026-08-07", dateStop: "2026-08-07" });
 const database = Object.freeze({ execute: vi.fn(), transaction: vi.fn() });
 

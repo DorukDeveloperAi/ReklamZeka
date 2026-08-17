@@ -213,12 +213,12 @@ export const metaConnections = pgTable("meta_connections", {
   `),
 ]);
 
-/** Private daily read-sync cursor. Rows are provisioned separately; this slice creates no schedule seed. */
+/** Private six-hour read-sync cursor. Rows are provisioned separately; this slice creates no schedule seed. */
 export const metaReadSyncSchedules = pgTable("meta_read_sync_schedules", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   connectionId: uuid("connection_id").notNull(),
-  triggerKind: text("trigger_kind").notNull().default("daily"),
+  triggerKind: text("trigger_kind").notNull().default("interval_6h"),
   revision: integer("revision").notNull().default(1),
   workspaceLifecycleGeneration: integer("workspace_lifecycle_generation").notNull(),
   connectionLifecycleGeneration: integer("connection_lifecycle_generation").notNull(),
@@ -239,7 +239,7 @@ export const metaReadSyncSchedules = pgTable("meta_read_sync_schedules", {
     name: "meta_read_sync_schedules_workspace_connection_fk",
   }).onDelete("cascade"),
   check("meta_read_sync_schedules_contract", sql`
-    ${table.triggerKind} = 'daily'
+    ${table.triggerKind} = 'interval_6h'
     and ${table.revision} between 1 and 1000000
     and ${table.workspaceLifecycleGeneration} >= 1
     and ${table.connectionLifecycleGeneration} >= 1
@@ -247,7 +247,7 @@ export const metaReadSyncSchedules = pgTable("meta_read_sync_schedules", {
   `),
 ]);
 
-/** Atomic lease and terminal run state for one deterministic logical daily fire. */
+/** Atomic lease and terminal run state for one deterministic scheduled or manual read fire. */
 export const metaReadSyncScheduleRuns = pgTable("meta_read_sync_schedule_runs", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
@@ -287,7 +287,7 @@ export const metaReadSyncScheduleRuns = pgTable("meta_read_sync_schedule_runs", 
     ${table.scheduleRevision} between 1 and 1000000
     and ${table.idempotencyKey} ~ '^syncfire_[a-f0-9]{64}$'
     and ${table.scopeKey} ~ '^[a-f0-9]{64}$'
-    and ${table.triggerKind} = 'daily'
+    and ${table.triggerKind} in ('interval_6h', 'manual')
     and ${table.dateStart} <= ${table.dateStop}
     and ${table.attempt} between 1 and 5
   `),

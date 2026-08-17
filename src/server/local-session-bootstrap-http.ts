@@ -26,7 +26,8 @@ const HEADERS = Object.freeze({
 const EMPTY_BODY_CHUNK_LIMIT = 8;
 const EMPTY_BODY_DEADLINE_MS = 250;
 
-async function assertExactEmptyBody(body: ReadableStream<Uint8Array> | null): Promise<void> {
+/** Shared bounded validator for browser/Next empty POST streams. */
+export async function assertExactEmptyBody(body: ReadableStream<Uint8Array> | null): Promise<void> {
   if (body === null) return;
   const reader = body.getReader();
   const deadline = Date.now() + EMPTY_BODY_DEADLINE_MS;

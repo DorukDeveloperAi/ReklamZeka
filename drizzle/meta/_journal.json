@@ -743,6 +743,13 @@
       "when": 1786960912542,
       "tag": "20260817100152_next_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1786963500000,
+      "tag": "20260817114500_meta_read_sync_six_hour_manual_fire",
+      "breakpoints": true
     }
   ]
 }

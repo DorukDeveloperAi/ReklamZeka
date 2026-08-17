@@ -14,23 +14,25 @@ const scheduleId = "33333333-3333-4333-a333-333333333333";
 const runId = "44444444-4444-4444-a444-444444444444";
 const now = "2026-08-08T04:00:00.000Z";
 const leaseUntil = "2026-08-08T04:05:00.000Z";
-const candidate = Object.freeze({ workspaceId, connectionId, scopeRevision: 7, triggerKind: "daily" as const,
+const candidate = Object.freeze({ workspaceId, connectionId, scopeRevision: 7, triggerKind: "interval_6h" as const,
   scheduledFor: "2026-08-08T03:00:00.000Z", dateStart: "2026-08-07", dateStop: "2026-08-07" });
 const scheduleRow = Object.freeze({ id: scheduleId, workspace_id: workspaceId, connection_id: connectionId,
-  revision: 7, trigger_kind: "daily" as const, timeframe_days: 1, next_due_at: candidate.scheduledFor });
+  revision: 7, trigger_kind: "interval_6h" as const, timeframe_days: 1, next_due_at: candidate.scheduledFor });
 function digest(value: unknown) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 const scopeKey = digest(["scope", workspaceId, connectionId]);
-const idempotencyKey = `syncfire_${digest([META_READ_SYNC_SCHEDULE_WORKER_VERSION, "daily", candidate.scheduledFor,
+const idempotencyKey = `syncfire_${digest([META_READ_SYNC_SCHEDULE_WORKER_VERSION, "interval_6h", candidate.scheduledFor,
   workspaceId, connectionId, 7, candidate.dateStart, candidate.dateStop])}`;
 const token = `lease_${"a".repeat(32)}`;
 function runRow(patch: Record<string, unknown> = {}) {
   return { id: runId, workspace_id: workspaceId, schedule_id: scheduleId, connection_id: connectionId,
-    schedule_revision: 7, idempotency_key: idempotencyKey, scope_key: scopeKey, trigger_kind: "daily",
+    schedule_revision: 7, idempotency_key: idempotencyKey, scope_key: scopeKey, trigger_kind: "interval_6h",
     scheduled_for: candidate.scheduledFor, date_start: candidate.dateStart, date_stop: candidate.dateStop,
     state: "running", lease_token: token, lease_until: leaseUntil, attempt: 1, retryable: null, ...patch };
 }
 function claimInput(patch: Record<string, unknown> = {}) {
-  return { idempotencyKey, scopeKey, workspaceId, connectionId, scopeRevision: 7, now, leaseUntil, ...patch };
+  return { idempotencyKey, scopeKey, workspaceId, connectionId, scopeRevision: 7,
+    triggerKind: "interval_6h" as const, scheduledFor: candidate.scheduledFor,
+    dateStart: candidate.dateStart, dateStop: candidate.dateStop, now, leaseUntil, ...patch };
 }
 function database(results: readonly unknown[]) {
   const execute = vi.fn();
@@ -69,7 +71,7 @@ describe("Drizzle Meta read-sync schedule registry", () => {
 
 describe("Drizzle Meta read-sync atomic lease", () => {
   it("re-derives logical identity under a schedule row lock before first claim", async () => {
-    const db = database([{ rows: [scheduleRow] }, { rows: [] }, { rows: [{ id: runId }] }]);
+    const db = database([{ rows: [scheduleRow] }, { rows: [] }, { rows: [] }, { rows: [{ id: runId }] }]);
     await expect(new DrizzleMetaReadSyncLease(db as never).claim(claimInput())).resolves.toMatchObject({
       status: "claimed", leaseToken: expect.stringMatching(/^lease_[a-f0-9]{32}$/), attempt: 1,
     });
@@ -79,7 +81,7 @@ describe("Drizzle Meta read-sync atomic lease", () => {
   });
 
   it("returns duplicate states, retries expired/retryable work, and caps attempts", async () => {
-    const completed = database([{ rows: [{ ...scheduleRow, revision: 8, next_due_at: "2026-08-09T03:00:00.000Z" }] },
+    const completed = database([{ rows: [{ ...scheduleRow, revision: 8, next_due_at: "2026-08-08T09:00:00.000Z" }] },
       { rows: [runRow({ state: "completed", lease_token: null,
       lease_until: null, attempt: 2 })] }]);
     await expect(new DrizzleMetaReadSyncLease(completed as never).claim(claimInput()))
@@ -88,15 +90,25 @@ describe("Drizzle Meta read-sync atomic lease", () => {
     await expect(new DrizzleMetaReadSyncLease(inProgress as never).claim(claimInput()))
       .resolves.toEqual({ status: "duplicate_in_progress", attempt: 1 });
     const expired = database([{ rows: [scheduleRow] }, { rows: [runRow({ lease_until: "2026-08-08T03:59:00.000Z" })] },
-      { rows: [{ id: runId }] }]);
+      { rows: [] }, { rows: [{ id: runId }] }]);
     await expect(new DrizzleMetaReadSyncLease(expired as never).claim(claimInput())).resolves.toMatchObject({ status: "claimed", attempt: 2 });
     const retryable = database([{ rows: [scheduleRow] }, { rows: [runRow({ state: "failed", lease_token: null,
-      lease_until: null, retryable: true, attempt: 2 })] }, { rows: [{ id: runId }] }]);
+      lease_until: null, retryable: true, attempt: 2 })] }, { rows: [] }, { rows: [{ id: runId }] }]);
     await expect(new DrizzleMetaReadSyncLease(retryable as never).claim(claimInput())).resolves.toMatchObject({ status: "claimed", attempt: 3 });
     const capped = database([{ rows: [scheduleRow] }, { rows: [runRow({ state: "failed", lease_token: null,
       lease_until: null, retryable: true, attempt: 5 })] }]);
     await expect(new DrizzleMetaReadSyncLease(capped as never).claim(claimInput()))
       .resolves.toEqual({ status: "duplicate_in_progress", attempt: 5 });
+  });
+
+  it("refuses a different fire while an active lease owns the same workspace/connection scope", async () => {
+    const other = runRow({ idempotency_key: `syncfire_${"b".repeat(64)}`, scope_key: scopeKey, attempt: 2 });
+    const db = database([{ rows: [scheduleRow] }, { rows: [] }, { rows: [other] }]);
+    await expect(new DrizzleMetaReadSyncLease(db as never).claim(claimInput()))
+      .resolves.toEqual({ status: "duplicate_in_progress", attempt: 2 });
+    const sql = new PgDialect().sqlToQuery(db.execute.mock.calls[2]![0]).sql;
+    expect(sql).toContain("idempotency_key <>");
+    expect(sql).toContain("lease_until >");
   });
 
   it("fails closed on changed scope revision, forged identity and cross-tenant stored run", async () => {
@@ -112,7 +124,7 @@ describe("Drizzle Meta read-sync atomic lease", () => {
       .rejects.toMatchObject({ code: "corrupt_store" });
   });
 
-  it("completes token-bound work and advances the exact daily cursor atomically", async () => {
+  it("completes token-bound work and advances the exact six-hour cursor atomically", async () => {
     const db = database([{ rows: [runRow()] }, { rows: [{ id: scheduleId }] }, { rows: [runRow()] },
       { rows: [{ id: scheduleId }] }, { rows: [{ id: runId }] }]);
     await expect(new DrizzleMetaReadSyncLease(db as never).complete({ idempotencyKey, leaseToken: token, completedAt: now }))
@@ -120,7 +132,19 @@ describe("Drizzle Meta read-sync atomic lease", () => {
     const dialect = new PgDialect();
     const statements = db.execute.mock.calls.map((call) => dialect.sqlToQuery(call[0]).sql).join("\n");
     expect(statements).toContain("revision = revision + 1");
-    expect(statements).toContain("next_due_at = next_due_at + interval '1 day'");
+    expect(statements).toContain("next_due_at = next_due_at + interval '6 hours'");
+    expect(statements).toContain("state = 'completed'");
+  });
+
+  it("completes a manual fire without advancing the scheduled cursor", async () => {
+    const manualKey = `syncfire_${digest([META_READ_SYNC_SCHEDULE_WORKER_VERSION, "manual", now,
+      workspaceId, connectionId, 7, candidate.dateStart, candidate.dateStop])}`;
+    const manualRun = runRow({ idempotency_key: manualKey, trigger_kind: "manual", scheduled_for: now });
+    const db = database([{ rows: [manualRun] }, { rows: [{ id: scheduleId }] }, { rows: [manualRun] }, { rows: [{ id: runId }] }]);
+    await expect(new DrizzleMetaReadSyncLease(db as never).complete({ idempotencyKey: manualKey,
+      leaseToken: token, completedAt: now })).resolves.toBe(true);
+    const statements = db.execute.mock.calls.map((call) => new PgDialect().sqlToQuery(call[0]).sql).join("\n");
+    expect(statements).not.toContain("update meta_read_sync_schedules set revision = revision + 1");
     expect(statements).toContain("state = 'completed'");
   });
 
@@ -136,7 +160,7 @@ describe("Drizzle Meta read-sync atomic lease", () => {
     await expect(new DrizzleMetaReadSyncLease(terminal as never).fail({ idempotencyKey, leaseToken: token,
       failedAt: now, reason: "rate_limited", retryable: true })).resolves.toBe(true);
     const terminalSql = terminal.execute.mock.calls.map((call) => new PgDialect().sqlToQuery(call[0]).sql).join("\n");
-    expect(terminalSql).toContain("next_due_at = next_due_at + interval '1 day'");
+    expect(terminalSql).toContain("next_due_at = next_due_at + interval '6 hours'");
     const bad = database([]);
     await expect(new DrizzleMetaReadSyncLease(bad as never).fail({ idempotencyKey, leaseToken: token,
       failedAt: now, reason: "token leaked" as never, retryable: true })).rejects.toMatchObject({ code: "invalid_input" });
@@ -144,7 +168,7 @@ describe("Drizzle Meta read-sync atomic lease", () => {
 
   it("exposes only the exact registry and lease port methods", () => {
     expect(Object.getOwnPropertyNames(DrizzleMetaReadSyncScheduleRegistry.prototype).sort())
-      .toEqual(["constructor", "listDue", "revalidate"]);
+      .toEqual(["constructor", "listDue", "resolveManual", "revalidate"]);
     expect(Object.getOwnPropertyNames(DrizzleMetaReadSyncLease.prototype).sort())
       .toEqual(["claim", "complete", "constructor", "fail"]);
   });

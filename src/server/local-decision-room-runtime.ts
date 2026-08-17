@@ -176,7 +176,7 @@ export function assertTrustedLocalDecisionRoomRequest(
     "guidance-set-create", "guidance-set-revise", "instruction-policy-mutate",
     "practice-lab-propose-standardization", "promotion-template-lifecycle-draft", "slice-rule-workspace-save", "slice-rule-budget-impact-save",
     "slice-rule-budget-action-unit-materialize", "slice-rule-scenario-select",
-    "progressive-formalization-mutate", "delivery-health-alert-transition"].includes(
+    "progressive-formalization-mutate", "delivery-health-alert-transition", "meta-read-sync-manual"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if (operation === "decide" && ![
@@ -355,6 +355,24 @@ export async function resolveTrustedLocalDecisionRoomDryRunPrincipal(input: Read
   verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
     now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
     requiredScope: "decision_room:dry_run", expected: input.config });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
+/** Cookie-only manual Meta read trigger. It can refresh a server-bound scope, never supply one. */
+export async function resolveTrustedLocalMetaReadSyncPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null
+    || input.request.headers.get("x-reklamzeka-intent") !== "meta-read-sync-manual") {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: "meta_sync:trigger", expected: input.config });
   assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", "cookie");
   return bindPrincipal(input.database, input.config);
 }

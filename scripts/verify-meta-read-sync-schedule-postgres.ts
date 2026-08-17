@@ -67,7 +67,9 @@ try {
     const fireHash = digest([META_READ_SYNC_SCHEDULE_WORKER_VERSION, candidate.triggerKind, candidate.scheduledFor,
       candidate.workspaceId, candidate.connectionId, candidate.scopeRevision, candidate.dateStart, candidate.dateStop]);
     const idempotencyKey = `syncfire_${fireHash}`;
-    const first = await lease.claim({ idempotencyKey, scopeKey, workspaceId, connectionId, scopeRevision: 1, now, leaseUntil });
+    const first = await lease.claim({ idempotencyKey, scopeKey, workspaceId, connectionId, scopeRevision: 1,
+      triggerKind: candidate.triggerKind, scheduledFor: candidate.scheduledFor,
+      dateStart: candidate.dateStart, dateStop: candidate.dateStop, now, leaseUntil });
     if (first.status !== "claimed") throw new Error("Schedule lease claim başarısız");
     claimed = first.attempt === 1;
     wrongTokenRejected = !(await lease.complete({
@@ -82,9 +84,10 @@ try {
       eq(schema.metaReadSyncSchedules.id, scheduleId),
     ));
     cursorAdvanced = scheduleRows[0]?.revision === 2
-      && scheduleRows[0]?.nextDueAt.toISOString() === "2026-08-09T03:00:00.000Z";
+      && scheduleRows[0]?.nextDueAt.toISOString() === "2026-08-08T09:00:00.000Z";
     const replay = await lease.claim({ idempotencyKey, scopeKey, workspaceId, connectionId,
-      scopeRevision: 1, now, leaseUntil });
+      scopeRevision: 1, triggerKind: candidate.triggerKind, scheduledFor: candidate.scheduledFor,
+      dateStart: candidate.dateStart, dateStop: candidate.dateStop, now, leaseUntil });
     duplicateCompleted = replay.status === "duplicate_completed" && replay.attempt === 1;
 
     if (!dueDerived || !claimed || !wrongTokenRejected || !completed || !cursorAdvanced || !duplicateCompleted) {
