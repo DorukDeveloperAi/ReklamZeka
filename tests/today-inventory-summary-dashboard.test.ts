@@ -100,7 +100,7 @@ describe("Today inventory summary", () => {
 
   it("renders an honest loading state without demo decisions, brands or portfolio rows", () => {
     const html = renderToStaticMarkup(createElement(OperatingDashboard, { model }));
-    expect(html).toContain("ANA SAYFA · GENEL BAKIŞ");
+    expect(html).toContain("OPERASYON · GENEL BAKIŞ");
     expect(html).toContain("Kanonik ayna okunuyor");
     expect(html).toContain("Kampanya sayısı kullanılamıyor");
     expect(html).toContain("Eksik veri sıfır veya örnek değer olarak gösterilmez.");
