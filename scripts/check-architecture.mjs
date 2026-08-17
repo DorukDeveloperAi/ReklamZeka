@@ -74,13 +74,21 @@ export function checkArchitecture(rootInput = DEFAULT_ROOT) {
     const domain = readFileSync(primaryResultDomain, "utf8");
     const authority = readFileSync(primaryResultAuthority, "utf8");
     const adapter = readFileSync(primaryResultAdapter, "utf8");
-    if (/export\s+(function|const)\s+registerCanonicalPrimaryResultCatalog/.test(domain)
+    if (/export\s+(function|const)\s+(registerCanonicalPrimaryResultCatalog|materializeTrustedPrimaryResultCatalog)/.test(domain)
+      || /export\s+(function|const)\s+materializeTrustedPrimaryResultCatalog/.test(authority)
       || /CanonicalActionCatalogReadPort|loadTrustedPrimaryResultCatalog/.test(authority)) {
       failures.push("primary-result yapısal katalog/registrar girişi yasak");
     }
-    if (!authority.includes("new WeakSet<object>()") || !adapter.includes("meta_daily_insights")
-      || !adapter.includes("meta_daily_insight_metrics") || !adapter.includes("metric.metric_key = 'actions'")) {
+    if (!authority.includes("new WeakSet<object>()") || !authority.includes("meta_daily_insights")
+      || !authority.includes("meta_daily_insight_metrics") || !authority.includes("metric.metric_key = 'actions'")
+      || !adapter.includes("DrizzlePrimaryResultActionCatalogAdapter")) {
       failures.push("primary-result kanonik Meta katalog kanıtı eksik");
+    }
+    for (const relative of filesBelow(root, "src")) {
+      if (relative === "src/domain/operations/internal/trusted-primary-result-catalog.ts") continue;
+      if (readFileSync(resolve(root, relative), "utf8").includes("materializeTrustedPrimaryResultCatalog")) {
+        failures.push(`primary-result private materializer dışarı aktarılamaz: ${relative}`);
+      }
     }
   }
   const readmePath = resolve(root, "README.md");

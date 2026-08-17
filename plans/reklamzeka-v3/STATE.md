@@ -31,7 +31,8 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P02-B-naming-template-domain | Kabul edildi / arşivlenebilir |
 | + P03-A-slice-registry | Kabul edildi / arşivlenebilir |
 | + P03-B-operation-read-model | Kabul edildi / arşivlenebilir |
-| P03-C-primary-result-binding | DEVAM — kanonik selector/revision domain temeli; persistence ve Operasyon projection sırada |
+| + P03-Ca-primary-result-domain | Kabul edildi — `evidence/P03-Ca-primary-result-domain-20260817.md`; arşivlenebilir |
+| P03-Cb-primary-result-persistence | DEVAM — immutable binding head/revision, Operasyon 2.0 projection ve UI sırada |
 | + P04-A-guide-domain | Kabul edildi / arşivlenebilir |
 | + P04-B-guide-persistence | Kabul edildi / arşivlenebilir |
 | + P05-A-guide-run-domain | Kabul edildi / arşivlenebilir |
@@ -63,3 +64,4 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 - P07-B table-first konsolidasyon `a178e25`: ikinci Yönet navigasyonu, yinelenen hero/rehber/sekme katmanları kaldırıldı; `/dashboard` ve `?view=manage` aynı kanonik Operasyon tablosuna açılıyor, legacy leaf rotaları “Operasyona dön” ile korunuyor. Browser DOM kabulünde varsayılan görünüm tek ana navigasyon + tablo-first; 320×800 ölçümünde `scrollWidth=320`, yatay taşma yok. Oturumlu gerçek satır kabulü açık kaldı.
 - P01-E ilk migration preflight'ı uygulanmadan reddedildi: composite FK sırası PostgreSQL'de derlenmiyor; generic finding/Development Log zinciri, active-workspace delete guard, bounded/redacted JSON, occurrence authenticity, transaction/advisory-lock concurrency ve normal-sync production wiring eksikleri kapatılmadan journal/apply yapılmayacak.
 - P03-C primary result tasarımı: kullanıcı yalnız kanonik `actions/<action_type>` selector'ünü Kurum Kampanyası veya slice'a bağlar; slice-bound org binding'i geçersiz kılar, slice-unbound org fallback'i geri getirir. Bilinen sıfır sonuç gösterilir fakat maliyet null'dır; eksik metrik sıfır sayılmaz. Immutable revision/OCC persistence ve `operation-read/2.0.0` projection, P01-E schema sahipliği kapandıktan sonra ayrı migrationla uygulanacaktır.
+- `+ P03-Ca primary result domain`: canonical action selector, scope resolution, decimal ratio-of-sums ve zero/missing semantiği kabul edildi. Trusted katalog yalnız server-only tenant Drizzle adapterının RR/read-only canonical insight sorgusundan mint edilir; public registrar/structural port yoktur ve recomputed clone runtime kimliğinden geçmez. Persistence/projection/UI P03-Cb olarak açık kalır.
