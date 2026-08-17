@@ -30,9 +30,11 @@ describe("guide revision", () => {
   it("keeps action authority closed and makes rename human-only", () => {
     expect(() => createGuideRevision(draft({ mode: "limited_autonomy", actionAllowlist: [] }))).toThrow(GuideRevisionError);
     const autonomous = createGuideRevision(draft({ mode: "limited_autonomy", actionAllowlist: ["budget_increase", "campaign_rename"] }));
-    expect(autonomous.authority).toEqual({ actionAuthority: "limited_autonomy", renameRequiresHumanApproval: true, canWriteMeta: false, canActivateRevision: false });
+    expect(autonomous.authority).toEqual({ actionAuthority: "limited_autonomy", autonomousActions: ["budget_increase"],
+      humanApprovalActions: ["campaign_rename"], renameRequiresHumanApproval: true, canWriteMeta: false, canActivateRevision: false });
     const renameOnly = createGuideRevision(draft({ mode: "limited_autonomy", actionAllowlist: ["campaign_rename"] }));
-    expect(renameOnly.authority.actionAuthority).toBe("none");
+    expect(renameOnly.authority).toMatchObject({ actionAuthority: "human_approval", autonomousActions: [],
+      humanApprovalActions: ["campaign_rename"] });
   });
 
   it("has deterministic DST, month-end clamp, and N-day slots", () => {
@@ -42,6 +44,8 @@ describe("guide revision", () => {
       .toBe("2026-02-28T09:00:00.000Z");
     expect(nextGuideScheduledAt({ frequency: "custom_days", timezone: "UTC", localTime: "00:00", anchorDate: "2026-01-01", intervalDays: 7 }, "2026-01-08T00:00:00.000Z"))
       .toBe("2026-01-15T00:00:00.000Z");
+    expect(() => nextGuideScheduledAt({ frequency: "custom_days", timezone: "UTC", localTime: "00:00", anchorDate: "2026-02-31", intervalDays: 7 }, "2026-01-08T00:00:00.000Z"))
+      .toThrow(GuideRevisionError);
   });
 
   it("does not guess missing budget references and records an exact review diff", () => {

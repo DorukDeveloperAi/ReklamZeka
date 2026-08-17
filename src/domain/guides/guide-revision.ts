@@ -51,7 +51,14 @@ export type GuideRevisionDraft = Readonly<{
 }>;
 export type GuideRevision = Readonly<GuideRevisionDraft & {
   schemaVersion: typeof GUIDE_REVISION_VERSION;
-  authority: Readonly<{ actionAuthority: "none" | "human_approval" | "limited_autonomy"; renameRequiresHumanApproval: true; canWriteMeta: false; canActivateRevision: false }>;
+  authority: Readonly<{
+    actionAuthority: "none" | "human_approval" | "limited_autonomy";
+    autonomousActions: readonly GuideAction[];
+    humanApprovalActions: readonly GuideAction[];
+    renameRequiresHumanApproval: true;
+    canWriteMeta: false;
+    canActivateRevision: false;
+  }>;
   revisionHash: string;
 }>;
 
@@ -74,7 +81,11 @@ function refs(value: unknown, prefix: string, maximum: number, code: GuideRevisi
 function strings(value: unknown, maximum: number, code: GuideRevisionError["code"] = "invalid_input"): readonly string[] { if (!Array.isArray(value) || value.length > maximum) fail(code); const normalized = value.map((item) => text(item, 500, code)).sort(); if (new Set(normalized).size !== normalized.length) fail(code); return Object.freeze(normalized); }
 function timezone(value: unknown): string { const zone = text(value, 128, "invalid_schedule"); try { new Intl.DateTimeFormat("en-CA", { timeZone: zone }).format(new Date(0)); return zone; } catch { return fail("invalid_schedule"); } }
 function localTime(value: unknown): string { if (typeof value !== "string" || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) fail("invalid_schedule"); return value; }
-function validDate(value: unknown): string { if (typeof value !== "string" || !DATE.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00.000Z`))) fail("invalid_schedule"); return value; }
+function validDate(value: unknown): string {
+  if (typeof value !== "string" || !DATE.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00.000Z`))
+    || new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) !== value) fail("invalid_schedule");
+  return value;
+}
 
 export function validateGuideSchedule(value: GuideSchedule): GuideSchedule {
   if (!value || typeof value !== "object" || Array.isArray(value)) fail("invalid_schedule");
@@ -117,8 +128,15 @@ export function interpretGuideBudget(value: GuideBudgetInterpretationDraft): Gui
 }
 
 export function guideAuthority(mode: GuideMode, actions: readonly GuideAction[]): GuideRevision["authority"] {
-  const actionAuthority = mode === "limited_autonomy" && actions.some((action) => !action.endsWith("_rename")) ? "limited_autonomy" : mode === "prepare_human_approval" ? "human_approval" : "none";
-  return Object.freeze({ actionAuthority, renameRequiresHumanApproval: true, canWriteMeta: false, canActivateRevision: false });
+  const rename = actions.filter((action) => action.endsWith("_rename"));
+  const autonomousActions = mode === "limited_autonomy" ? actions.filter((action) => !action.endsWith("_rename")) : [];
+  const humanApprovalActions = mode === "prepare_human_approval" ? [...actions]
+    : mode === "limited_autonomy" ? rename : [];
+  const actionAuthority = autonomousActions.length > 0 ? "limited_autonomy"
+    : humanApprovalActions.length > 0 ? "human_approval" : "none";
+  return Object.freeze({ actionAuthority, autonomousActions: Object.freeze(autonomousActions),
+    humanApprovalActions: Object.freeze(humanApprovalActions), renameRequiresHumanApproval: true,
+    canWriteMeta: false, canActivateRevision: false });
 }
 export function createGuideRevision(value: GuideRevisionDraft): GuideRevision {
   exact(value, ["workspaceRef", "guideRef", "revision", "previousRevisionHash", "sliceRef", "market", "freeText", "strict", "schedule", "mode", "actionAllowlist"]);
