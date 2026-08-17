@@ -24,7 +24,8 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P01-A-unified-sync-fire | Kabul edildi / arşivlenebilir |
 | + P01-B-targeting-evidence | Kabul edildi / arşivlenebilir |
 | + P01-C-data-health-domain | Kabul edildi / arşivlenebilir |
-| P01-D-data-health-wiring | DEVAM |
+| + P01-D-data-health-read-and-action-hold | Kabul edildi / arşivlenebilir |
+| P01-E-data-health-ledger-persistence | DEVAM — yeni tenant-bound append-only Finding/Development Log şeması gerekli |
 | + P02-A-organization-campaign-foundation | Kabul edildi / arşivlenebilir |
 | + P02-B-naming-template-domain | Kabul edildi / arşivlenebilir |
 | + P03-A-slice-registry | Kabul edildi / arşivlenebilir |
@@ -49,3 +50,4 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 - P01-C unified data-health domain: mirror/performance/trust, exact tarih/alan kapsamı ve workspace currency tek deterministic raporda birleşir. Analiz kaydı hiçbir veri eksikliğinde yok olmaz; stable `data_quality` finding ve proposed Development Log observation üretilir. Ready olmayan veya currency dışı kanıt action staging/dispatch data-health kapısını kapatır. Persistence ve production action-gate bağlantısı açık olduğundan P01 henüz `+` değildir.
 - P02-B naming-template domain: account-scoped campaign/ad-set şablonları structured token + canonical objective/optimization/geo/targeting/platform/creative/CTA/destination kanıtıyla deterministic öneri üretir. İlk revision taslaktır, publish ayrı immutable geçiştir; isim tek başına atama yapamaz ve manual lock üstündür. Persistence, kullanıcı preview/publish ve explicit category assignment bağlantısı açık olduğundan P02 henüz `+` değildir.
 - P05-B two-agent boundary: `guide_policy` ve `daily_analysis` ayrı conversation identity ve capability zarfına ayrıldı. Kılavuz Agentı yalnız ephemeral öneri/explicit user preview; Günlük Agent yalnız run-owned analiz/finding ve mode+data-gated öneri/candidate üretir. Guide save/activation, approval, execute ve Meta write ikisi için de kapalıdır. Transcript/runtime persistence açık olduğundan P05 henüz `+` değildir.
+- `+ P01-D data-health read/action hold`: canonical mirror, son yedi tamamlanmış günlük insight, stream trust, tam targeting/creative coverage ve workspace currency kanıtı server-side salt-okunur adapterda birleşir. Ready olmayan kanıt ActionUnit materialization'da typed `data_health_hold` üretir ve execution admission'da yeniden değerlendirilerek dispatch'i kapatır; analiz kaydı kaybolmaz. Stable observation lifecycle projector aynı fingerprint için immutable observed/resolved/reopened eventleri ve yalnız `proposed` Development Log çıktısı üretir. Generic Finding/Development Log concrete ledger şeması P01-E olarak açık kaldığından P01 paketi henüz `+` değildir.

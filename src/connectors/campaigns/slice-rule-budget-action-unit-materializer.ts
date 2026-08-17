@@ -27,9 +27,13 @@ const REF = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const ACTION_UNIT_REF = /^action_unit_[a-f0-9]{20}$/;
 
 export class SliceRuleBudgetActionUnitMaterializerError extends Error {
-  constructor(readonly code: "invalid_input" | "membership_required" | "role_denied" | "source_missing" | "source_ambiguous" | "stale_source" | "scope_mismatch" | "market_boundary" | "delivery_hold" | "ad_set_owner_unsupported" | "budget_mismatch" | "policy_unavailable" | "guardrail_category_unavailable" | "guardrail_geo_unavailable" | "guardrail_rejected" | "queue_rejected" | "corrupt_store") {
+  constructor(readonly code: "invalid_input" | "membership_required" | "role_denied" | "source_missing" | "source_ambiguous" | "stale_source" | "scope_mismatch" | "market_boundary" | "delivery_hold" | "data_health_hold" | "ad_set_owner_unsupported" | "budget_mismatch" | "policy_unavailable" | "guardrail_category_unavailable" | "guardrail_geo_unavailable" | "guardrail_rejected" | "queue_rejected" | "corrupt_store") {
     super("Bütçe ActionUnit taslağı güvenli biçimde oluşturulamadı");
   }
+}
+
+export function assertActionDataHealthReady(dataHealthReady: boolean): void {
+  if (dataHealthReady !== true) throw new SliceRuleBudgetActionUnitMaterializerError("data_health_hold");
 }
 
 /** No amount, target entity, policy, approval, or Meta control may cross this boundary. */
@@ -216,6 +220,11 @@ export class DrizzleSliceRuleBudgetActionUnitMaterializer {
       } catch (error) {
         if (error instanceof UnifiedActionPreparationGateError) throw new SliceRuleBudgetActionUnitMaterializerError(error.code);
         throw error;
+      }
+      if (!preparationGate.dataHealthReady) {
+        await appendActionPreparationGateSnapshot(tx, { workspaceId: input.workspaceId, selectionId: s.id,
+          actionProposalUnitId: null, result: preparationGate, evaluatedAt: input.proposedAt });
+        assertActionDataHealthReady(preparationGate.dataHealthReady);
       }
       const applicability = s.afterAmountMinor > s.beforeAmountMinor
         ? Object.freeze({ actionType: "budget_increase" as const, risk: "K3" as const })

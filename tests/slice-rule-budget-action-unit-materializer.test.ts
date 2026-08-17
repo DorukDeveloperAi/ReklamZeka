@@ -15,6 +15,7 @@ import {
   resolveSliceRuleBudgetActionApprovalPolicy,
   resolveSliceRuleBudgetActionGuardrails,
   publicSliceRuleBudgetProvenance,
+  assertActionDataHealthReady,
 } from "@/connectors/campaigns/slice-rule-budget-action-unit-materializer";
 
 function budgetPolicy(): ApprovalPolicy {
@@ -51,6 +52,13 @@ function published(workspaceRef = "workspace_alpha") {
 }
 
 describe("slice-rule budget ActionUnit policy resolution", () => {
+  it("stops action staging with a typed data-health hold", () => {
+    expect(() => assertActionDataHealthReady(false)).toThrowError(expect.objectContaining({ code: "data_health_hold" }));
+    expect(() => assertActionDataHealthReady(true)).not.toThrow();
+    const source = readFileSync("src/connectors/campaigns/slice-rule-budget-action-unit-materializer.ts", "utf8");
+    expect(source).toContain("assertActionDataHealthReady(preparationGate.dataHealthReady)");
+    expect(source).toContain("appendActionPreparationGateSnapshot");
+  });
   it("builds only bounded public labels from already-verified immutable provenance", () => {
     const evidence = publicSliceRuleBudgetProvenance({ seriesRef: "slice_rule.ftr.ar", revision: 2,
       proposalSeriesRef: "budget.ftr.ar", proposalRevision: 3, market: "international", hasSameMarketPool: true,

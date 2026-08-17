@@ -6,7 +6,10 @@ import { verifyBudgetProposal, type BudgetProposal } from "@/application/budget-
 import { verifySliceRuleWorkspaceDraft } from "@/application/slice-rule-workspace-service";
 import { DrizzleBudgetProposalRepository } from "@/connectors/budget/budget-proposal-drizzle-repository";
 import { FrozenContextBudgetImpactScopeResolver } from "@/connectors/campaigns/frozen-context-budget-impact-scope-resolver";
+import { DrizzleMetaDataHealthAdapter } from "@/connectors/meta/data-health-drizzle-adapter";
 import { ACTION_PREPARATION_FLAG } from "@/domain/actions/action-preparation-flag";
+import { buildMetaDataHealthReport, type MetaDataHealthReport } from "@/domain/meta/data-health";
+import { metaPublicReference } from "@/domain/meta/public-reference";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -26,6 +29,10 @@ export type UnifiedActionPreparationGateResult = Readonly<{
   frozenContextHash: string;
   market: "domestic" | "international";
   deliveryHold: false;
+  dataHealthReady: boolean;
+  dataHealthHold: boolean;
+  dataHealthTargetAccountRef: string;
+  dataHealthReport: MetaDataHealthReport;
   admissionEnabled: false;
   evaluationHash: string;
 }>;
@@ -70,12 +77,26 @@ export async function evaluateUnifiedActionPreparationGate(database: ActionPrepa
   const alerts = await database.execute(sql`select 1 from delivery_health_alert_ledger_records h where h.workspace_id=${input.workspaceId}::uuid and h.account_ref=${contexts[0]!.accountRef} and h.status <> 'resolved' and not exists (select 1 from delivery_health_alert_ledger_records n where n.workspace_id=h.workspace_id and n.alert_ref=h.alert_ref and n.sequence>h.sequence) limit 1`);
   if (!alerts || typeof alerts !== "object" || !("rows" in alerts) || !Array.isArray(alerts.rows)) fail("corrupt_store");
   if (alerts.rows.length) fail("delivery_hold");
+  let health: Readonly<{ targetAccountRef: string; report: MetaDataHealthReport }>;
+  try {
+    health = await new DrizzleMetaDataHealthAdapter(database).evaluate({ workspaceId: input.workspaceId,
+      targetAdAccountId: entities[0]!.adAccountId, evaluatedAt: input.evaluatedAt });
+  } catch {
+    const workspaceRef = `workspace_${createHash("sha256").update(input.workspaceId).digest("hex").slice(0, 24)}`;
+    health = Object.freeze({ targetAccountRef: metaPublicReference("account", input.workspaceId, entities[0]!.adAccountId),
+      report: buildMetaDataHealthReport({ workspaceRef, workspaceCurrency: null, evaluatedAt: input.evaluatedAt, accounts: [] }) });
+  }
+  const dataHealthReady = health.report.state === "ready"
+    && health.report.monetaryAggregationAccountRefs.includes(health.targetAccountRef);
   const core = Object.freeze({ version: "unified-action-preparation-gate/1.0.0", stage: input.stage,
     draftHash: input.draftHash, proposalHash: input.proposalHash, allocationRef: input.allocationRef,
     frozenContextHash: proposal.scope.contextHash, market: resolved.scope.market, deliveryHold: false as const,
-    actionPreparation: ACTION_PREPARATION_FLAG });
+    dataHealthReportHash: health.report.reportHash, dataHealthTargetAccountRef: health.targetAccountRef,
+    dataHealthReady, actionPreparation: ACTION_PREPARATION_FLAG });
   return Object.freeze({ stage: input.stage, frozenContextHash: proposal.scope.contextHash, market: resolved.scope.market,
-    deliveryHold: false as const, admissionEnabled: ACTION_PREPARATION_FLAG.enabled, evaluationHash: digest(core) });
+    deliveryHold: false as const, dataHealthReady, dataHealthHold: !dataHealthReady,
+    dataHealthTargetAccountRef: health.targetAccountRef, dataHealthReport: health.report,
+    admissionEnabled: ACTION_PREPARATION_FLAG.enabled && dataHealthReady, evaluationHash: digest(core) });
 }
 
 /** Resolves the immutable selection edge again for approval and admission. */
@@ -100,9 +121,17 @@ export async function evaluateUnifiedActionPreparationGateForUnit(database: Acti
 export async function appendActionPreparationGateSnapshot(database: ActionPreparationGateDatabase, input: Readonly<{
   workspaceId: string; selectionId: string | null; actionProposalUnitId: string | null; result: UnifiedActionPreparationGateResult; evaluatedAt: string;
 }>): Promise<void> {
+  if (input.result.dataHealthReport.observations.length > 2_001
+    || input.result.dataHealthReport.observations.some((observation) => observation.expectedDates.length > 366
+      || observation.observedDates.length > 366 || observation.missingDates.length > 366
+      || observation.missingFields.length > 128)) fail("corrupt_store");
   const payload = Object.freeze({ version: "action-preparation-gate-snapshot/1.0.0", stage: input.result.stage,
     evaluationHash: input.result.evaluationHash, frozenContextHash: input.result.frozenContextHash, market: input.result.market,
-    deliveryHold: false as const, actionPreparation: ACTION_PREPARATION_FLAG,
+    deliveryHold: false as const, dataHealth: Object.freeze({ ready: input.result.dataHealthReady,
+      hold: input.result.dataHealthHold, targetAccountRef: input.result.dataHealthTargetAccountRef,
+      reportHash: input.result.dataHealthReport.reportHash, state: input.result.dataHealthReport.state,
+      evaluatedAt: input.result.dataHealthReport.evaluatedAt,
+      observations: input.result.dataHealthReport.observations }), actionPreparation: ACTION_PREPARATION_FLAG,
     authority: Object.freeze({ canExecute: false as const, canDispatchNetwork: false as const, canWriteMeta: false as const }) });
   await database.insert(schema.actionPreparationGateSnapshots).values({ workspaceId: input.workspaceId,
     selectionId: input.selectionId, actionProposalUnitId: input.actionProposalUnitId, stage: input.result.stage,

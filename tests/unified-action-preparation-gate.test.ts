@@ -17,6 +17,10 @@ describe("unified action preparation gate", () => {
     const admission = readFileSync("src/connectors/actions/action-execution-admission-drizzle-repository.ts", "utf8");
     expect(gate).toContain("FrozenContextBudgetImpactScopeResolver");
     expect(gate).toContain("delivery_health_alert_ledger_records");
+    expect(gate).toContain("DrizzleMetaDataHealthAdapter");
+    expect(gate).toContain("dataHealthReportHash");
+    expect(gate).toContain("observations: input.result.dataHealthReport.observations");
+    expect(gate).toContain("observations.length > 2_001");
     expect(selection).toContain('stage: "selection"');
     expect(materializer).toContain('stage: "materialization"');
     expect(approval).toContain('stage: "approval"');
@@ -29,7 +33,7 @@ describe("unified action preparation gate", () => {
     const admission = readFileSync("src/connectors/actions/action-execution-admission-drizzle-repository.ts", "utf8");
     expect(materializer).not.toContain("admissionEnabled");
     expect(approval).not.toContain("admissionEnabled");
-    expect(admission).toContain("if (!gate.admissionEnabled)");
+    expect(admission).toContain("if (!gate.dataHealthReady || !gate.admissionEnabled)");
     expect(admission).toContain('outcome: "blocked" as const');
   });
 

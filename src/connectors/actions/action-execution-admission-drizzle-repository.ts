@@ -222,7 +222,7 @@ export class DrizzleActionExecutionAdmissionRepository {
           });
           await appendActionPreparationGateSnapshot(transaction as never, { workspaceId: this.workspaceId,
             selectionId: null, actionProposalUnitId: source.unit_id, result: gate, evaluatedAt });
-          if (!gate.admissionEnabled) {
+          if (!gate.dataHealthReady || !gate.admissionEnabled) {
             return Object.freeze({ outcome: "blocked" as const, executionRef: `action_execution_${"0".repeat(20)}`,
               admissionHash: input.admission.admissionHash,
               capabilities: Object.freeze({ canExecute: false as const, canWriteMeta: false as const, canDispatchNetwork: false as const }) });
