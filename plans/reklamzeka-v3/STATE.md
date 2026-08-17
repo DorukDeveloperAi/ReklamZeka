@@ -14,6 +14,26 @@
 
 `PASS` yalnız ilgili R3 evidence-pack, functional/browser test ve P08 gate kanıtıyla yazılır.
 
+## Alt task arşivi ve aktif işler
+
+Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; paket satırı ancak bütün requirement'ları kapandığında `+` alır.
+
+| Alt task | Durum |
+|---|---|
+| + M00-plan-materialization | Kabul edildi / arşivlenebilir |
+| + P01-A-unified-sync-fire | Kabul edildi / arşivlenebilir |
+| + P01-B-targeting-evidence | Kabul edildi / arşivlenebilir |
+| + P01-C-data-health-domain | Kabul edildi / arşivlenebilir |
+| P01-D-data-health-wiring | DEVAM |
+| + P02-A-organization-campaign-foundation | Kabul edildi / arşivlenebilir |
+| + P02-B-naming-template-domain | Kabul edildi / arşivlenebilir |
+| + P03-A-slice-registry | Kabul edildi / arşivlenebilir |
+| P03-B-operation-read-model | DEVAM |
+| + P04-A-guide-domain | Kabul edildi / arşivlenebilir |
+| P04-B-guide-persistence | DEVAM |
+| + P05-A-guide-run-domain | Kabul edildi / arşivlenebilir |
+| + P07-A-five-area-shell | Kabul edildi / arşivlenebilir |
+
 ## 2026-08-17 — ilk uygulama zinciri
 
 - P02 için tenant-bound Kurum Kampanyası ve temporal Meta campaign üyeliği temeli `7da9499` ile eklendi. Yerli/yabancı kanonik kategori kanıtına bağlıdır; canlı migration ve tam PostgreSQL kabulü tamamlanmadan paket kabul edilmez.
