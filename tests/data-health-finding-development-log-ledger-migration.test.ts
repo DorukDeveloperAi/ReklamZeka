@@ -48,7 +48,9 @@ describe("P01-E data-health Finding and Development Log ledger preflight", () =>
   });
 
   it("purges derived heads before immutable evidence only during the existing workspace tombstone flow", () => {
-    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES.slice(0, 4)).toEqual([
+    const start = WORKSPACE_TOMBSTONE_PURGE_TABLES.indexOf("development_log_heads");
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES.slice(start, start + 4)).toEqual([
       "development_log_heads", "development_log_events", "finding_heads", "finding_lifecycle_events",
     ]);
     expect(migration).toContain("lifecycle_state='tombstoning'");

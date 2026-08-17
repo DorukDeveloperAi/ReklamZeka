@@ -294,6 +294,23 @@ const columns = [
   "approval_policy_definition_revisions.policy_payload",
   "approval_policy_definition_revisions.artifact_payload",
   "meta_compatibility_artifact_revisions.artifact_payload",
+  // Immutable finding, slice, Guide and Guide Run envelopes may carry public
+  // evidence references. They are historical context, never mutable category
+  // authority for archive-impact decisions.
+  "finding_lifecycle_events.observation_payload",
+  "development_log_events.payload",
+  "slice_resolution_snapshot_members.market_evidence_refs",
+  "slice_resolution_snapshot_members.matched_dimension_ids",
+  "slice_resolution_snapshot_members.matched_dimension_evidence_refs",
+  "guide_revisions.strict_payload",
+  "guide_revisions.schedule_payload",
+  "guide_budget_contracts.contract_payload",
+  "guide_lifecycle_events.payload",
+  "guide_runs.trigger_payload",
+  "guide_run_events.payload",
+  "guide_run_heads.run_payload",
+  "guide_run_artifacts.payload",
+  "guide_run_artifacts.authority",
 ] as const;
 
 export const CATEGORY_JSONB_MANIFEST: readonly CategoryJsonbManifestEntry[] = Object.freeze(columns.map((key) => {

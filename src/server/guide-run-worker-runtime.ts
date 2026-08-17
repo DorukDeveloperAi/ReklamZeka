@@ -1,7 +1,17 @@
-import { GuideRunOrchestrationService, type GuideRunDailyAgentPort, type GuideRunFrozenScopePort, type GuideRunHolisticAgentPort, type GuideRunTrustedDataHealthPort } from "@/application/guide-run-orchestration-service";
+import {
+  GuideRunOrchestrationService,
+  type GuideRunDailyAgentPort,
+  type GuideRunFrozenScopePort,
+  type GuideRunHolisticAgentPort,
+  type GuideRunTrustedDataHealthPort,
+} from "@/application/guide-run-orchestration-service";
 import { DrizzleGuideRunRepository } from "@/connectors/guides/guide-run-drizzle-repository";
 import { DrizzleGuideRunP01LedgerProjector } from "@/connectors/guides/guide-run-p01-ledger-projector";
-import { DrizzleGuideRunActionBindingRepository, type GuideRunCandidateActionStagingPort } from "@/connectors/guides/guide-run-action-binding-drizzle-repository";
+import {
+  DrizzleGuideRunActionBindingRepository,
+  type GuideRunCandidateActionStagingPort,
+} from "@/connectors/guides/guide-run-action-binding-drizzle-repository";
+import { DrizzleGuideRunFrozenScopeRepository } from "@/connectors/guides/guide-run-frozen-scope-drizzle-repository";
 import { DrizzleGuideLifecycleRepository } from "@/connectors/guides/guide-lifecycle-drizzle-repository";
 import { planScheduledGuideRuns } from "@/domain/guides/guide-run-scheduler";
 import type { GuideRevision } from "@/domain/guides/guide-revision";
@@ -20,13 +30,17 @@ export type ActiveGuideSchedule = Readonly<{
   lastScheduledFor: string | null;
 }>;
 export interface GuideRunActiveSchedulePort {
-  listActiveSchedules(input: Readonly<{ now: string }>): Promise<readonly ActiveGuideSchedule[]>;
+  listActiveSchedules(
+    input: Readonly<{ now: string }>,
+  ): Promise<readonly ActiveGuideSchedule[]>;
 }
 
 /** Production loader: only a non-tombstoned Guide whose exact revision is the
  * current active head in an active workspace can reach the scheduler. */
 export class DrizzleGuideRunActiveSchedulePort implements GuideRunActiveSchedulePort {
-  constructor(private readonly database: Pick<Database, "execute" | "transaction">) {}
+  constructor(
+    private readonly database: Pick<Database, "execute" | "transaction">,
+  ) {}
   async listActiveSchedules(): Promise<readonly ActiveGuideSchedule[]> {
     const result = await this.database.execute(sql`
       select r.workspace_id::text workspace_id,r.id::text revision_id,r.guide_id::text guide_id,
@@ -40,28 +54,70 @@ export class DrizzleGuideRunActiveSchedulePort implements GuideRunActiveSchedule
     const rows = result.rows as Array<Record<string, unknown>>;
     if (rows.length > 1000) throw new Error("guide schedule set exceeds bound");
     const lifecycle = new DrizzleGuideLifecycleRepository(this.database);
-    return Object.freeze(await Promise.all(rows.map(async (row) => {
-      if (typeof row.workspace_id !== "string" || typeof row.guide_id !== "string" || typeof row.revision_id !== "string" || typeof row.activated_at !== "string") throw new Error("guide schedule corrupt store");
-      const guide = await lifecycle.loadCanonicalRevision({ workspaceId: row.workspace_id, guideId: row.guide_id, revisionId: row.revision_id });
-      return Object.freeze({ workspaceId: row.workspace_id, guideRevisionId: row.revision_id, guide, activatedAt: new Date(row.activated_at).toISOString(), lastScheduledFor: row.last_scheduled_for === null ? null : new Date(String(row.last_scheduled_for)).toISOString() });
-    })));
+    return Object.freeze(
+      await Promise.all(
+        rows.map(async (row) => {
+          if (
+            typeof row.workspace_id !== "string" ||
+            typeof row.guide_id !== "string" ||
+            typeof row.revision_id !== "string" ||
+            typeof row.activated_at !== "string"
+          )
+            throw new Error("guide schedule corrupt store");
+          const guide = await lifecycle.loadCanonicalRevision({
+            workspaceId: row.workspace_id,
+            guideId: row.guide_id,
+            revisionId: row.revision_id,
+          });
+          return Object.freeze({
+            workspaceId: row.workspace_id,
+            guideRevisionId: row.revision_id,
+            guide,
+            activatedAt: new Date(row.activated_at).toISOString(),
+            lastScheduledFor:
+              row.last_scheduled_for === null
+                ? null
+                : new Date(String(row.last_scheduled_for)).toISOString(),
+          });
+        }),
+      ),
+    );
   }
 }
 
 /** Composition-only server boundary: its ports have no approval, execution, guide-edit, or Meta-write capability. */
-export function createGuideRunWorker(input: Readonly<{
-  database: Pick<Database, "execute" | "transaction">;
-  frozenScopes: GuideRunFrozenScopePort;
-  dailyAnalysis: GuideRunDailyAgentPort;
-  holisticAnalysis: GuideRunHolisticAgentPort;
-  dataHealth: GuideRunTrustedDataHealthPort;
-  /** Optional until the server installs the canonical P06 staging composition.
-   * Its absence is fail-closed: no action binding is materialized. */
-  candidateActionStaging?: GuideRunCandidateActionStagingPort;
-}>) {
+export function createGuideRunWorker(
+  input: Readonly<{
+    database: Pick<Database, "execute" | "transaction">;
+    frozenScopes: GuideRunFrozenScopePort;
+    dailyAnalysis: GuideRunDailyAgentPort;
+    holisticAnalysis: GuideRunHolisticAgentPort;
+    dataHealth: GuideRunTrustedDataHealthPort;
+    /** Optional until the server installs the canonical P06 staging composition.
+     * Its absence is fail-closed: no action binding is materialized. */
+    candidateActionStaging?: GuideRunCandidateActionStagingPort;
+  }>,
+) {
   const persistence = new DrizzleGuideRunRepository(input.database);
-  const service = new GuideRunOrchestrationService(persistence, input.frozenScopes, input.dailyAnalysis, input.holisticAnalysis, input.dataHealth, persistence);
-  return Object.freeze({ service, persistence, ledger: new DrizzleGuideRunP01LedgerProjector(input.database), actionBindings: input.candidateActionStaging ? new DrizzleGuideRunActionBindingRepository(input.database, input.candidateActionStaging) : null });
+  const service = new GuideRunOrchestrationService(
+    persistence,
+    input.frozenScopes,
+    input.dailyAnalysis,
+    input.holisticAnalysis,
+    input.dataHealth,
+    persistence,
+  );
+  return Object.freeze({
+    service,
+    persistence,
+    ledger: new DrizzleGuideRunP01LedgerProjector(input.database),
+    actionBindings: input.candidateActionStaging
+      ? new DrizzleGuideRunActionBindingRepository(
+          input.database,
+          input.candidateActionStaging,
+        )
+      : null,
+  });
 }
 
 /**
@@ -69,16 +125,25 @@ export function createGuideRunWorker(input: Readonly<{
  * the worker reachable from a server scheduler without giving a transport
  * caller a way to substitute client-provided schedule state.
  */
-export function createGuideRunSchedulerWorker(input: Readonly<{
-  database: Pick<Database, "execute" | "transaction">;
-  frozenScopes: GuideRunFrozenScopePort;
-  dailyAnalysis: GuideRunDailyAgentPort;
-  holisticAnalysis: GuideRunHolisticAgentPort;
-  dataHealth: GuideRunTrustedDataHealthPort;
-  candidateActionStaging?: GuideRunCandidateActionStagingPort;
-}>): GuideRunSchedulerWorker {
-  const worker = createGuideRunWorker(input);
-  return new GuideRunSchedulerWorker(worker, new DrizzleGuideRunActiveSchedulePort(input.database));
+export function createGuideRunSchedulerWorker(
+  input: Readonly<{
+    database: Pick<Database, "execute" | "transaction">;
+    dailyAnalysis: GuideRunDailyAgentPort;
+    holisticAnalysis: GuideRunHolisticAgentPort;
+    dataHealth: GuideRunTrustedDataHealthPort;
+    candidateActionStaging?: GuideRunCandidateActionStagingPort;
+  }>,
+): GuideRunSchedulerWorker {
+  // Scheduler runs span tenants; scope identity is therefore derived from the
+  // persisted run/revision chain, never from an injected fixed-workspace port.
+  const worker = createGuideRunWorker({
+    ...input,
+    frozenScopes: new DrizzleGuideRunFrozenScopeRepository(input.database),
+  });
+  return new GuideRunSchedulerWorker(
+    worker,
+    new DrizzleGuideRunActiveSchedulePort(input.database),
+  );
 }
 
 /**
@@ -87,35 +152,118 @@ export function createGuideRunSchedulerWorker(input: Readonly<{
  * and resumed from immutable artifacts. It owns neither Meta nor approvals.
  */
 export class GuideRunSchedulerWorker {
-  constructor(private readonly worker: ReturnType<typeof createGuideRunWorker>, private readonly schedules: GuideRunActiveSchedulePort) {}
-  async tick(input: Readonly<{ now: string; leaseToken: string; leaseUntil: string }>) {
+  constructor(
+    private readonly worker: ReturnType<typeof createGuideRunWorker>,
+    private readonly schedules: GuideRunActiveSchedulePort,
+  ) {}
+  async tick(
+    input: Readonly<{ now: string; leaseToken: string; leaseUntil: string }>,
+  ) {
     const outputs: Array<Readonly<{ runRef: string; state: string }>> = [];
-    for (const entry of await this.schedules.listActiveSchedules({ now: input.now })) {
-      const plan = planScheduledGuideRuns({ guide: { guideRef: entry.guide.guideRef, revisionHash: entry.guide.revisionHash, schedule: entry.guide.schedule, active: true }, head: { activatedAt: entry.activatedAt, lastScheduledFor: entry.lastScheduledFor }, now: input.now });
-      if (plan.missed) await this.worker.persistence.recordScheduleReceipt({ workspaceId: entry.workspaceId, guideRevisionId: entry.guideRevisionId, scheduledFor: plan.missed.lastScheduledFor, missedFrom: plan.missed.firstScheduledFor, missedTo: plan.missed.lastScheduledFor, missedCount: plan.missed.count, runRef: null, createdAt: input.now });
+    for (const entry of await this.schedules.listActiveSchedules({
+      now: input.now,
+    })) {
+      const plan = planScheduledGuideRuns({
+        guide: {
+          guideRef: entry.guide.guideRef,
+          revisionHash: entry.guide.revisionHash,
+          schedule: entry.guide.schedule,
+          active: true,
+        },
+        head: {
+          activatedAt: entry.activatedAt,
+          lastScheduledFor: entry.lastScheduledFor,
+        },
+        now: input.now,
+      });
+      if (plan.missed)
+        await this.worker.persistence.recordScheduleReceipt({
+          workspaceId: entry.workspaceId,
+          guideRevisionId: entry.guideRevisionId,
+          scheduledFor: plan.missed.lastScheduledFor,
+          missedFrom: plan.missed.firstScheduledFor,
+          missedTo: plan.missed.lastScheduledFor,
+          missedCount: plan.missed.count,
+          runRef: null,
+          createdAt: input.now,
+        });
       if (!plan.claim) continue;
-      const due = await this.worker.service.fire({ guide: entry.guide, trigger: { kind: "scheduled", scheduledFor: plan.claim.scheduledFor }, occurredAt: input.now });
-      await this.worker.persistence.recordScheduleReceipt({ workspaceId: entry.workspaceId, guideRevisionId: entry.guideRevisionId, scheduledFor: plan.claim.scheduledFor, missedFrom: null, missedTo: null, missedCount: 0, runRef: due.runRef, createdAt: input.now });
+      const due = await this.worker.service.fire({
+        guide: entry.guide,
+        trigger: { kind: "scheduled", scheduledFor: plan.claim.scheduledFor },
+        occurredAt: input.now,
+      });
+      await this.worker.persistence.recordScheduleReceipt({
+        workspaceId: entry.workspaceId,
+        guideRevisionId: entry.guideRevisionId,
+        scheduledFor: plan.claim.scheduledFor,
+        missedFrom: null,
+        missedTo: null,
+        missedCount: 0,
+        runRef: due.runRef,
+        createdAt: input.now,
+      });
       // A retry after a successful execution has no more agent work to do, but
       // still replays the immutable P01 projection (crash-after-completion).
-      if (due.state === "completed") { await this.worker.ledger.projectPersisted({ workspaceId: entry.workspaceId, runRef: due.runRef }); outputs.push(Object.freeze({ runRef: due.runRef, state: due.state })); continue; }
+      if (due.state === "completed") {
+        await this.worker.ledger.projectPersisted({
+          workspaceId: entry.workspaceId,
+          runRef: due.runRef,
+        });
+        outputs.push(Object.freeze({ runRef: due.runRef, state: due.state }));
+        continue;
+      }
       let claimed = due;
-      if (due.state === "due") claimed = await this.worker.service.claim(due, { leaseToken: input.leaseToken, leaseUntil: input.leaseUntil, occurredAt: input.now });
-      else if (due.lease && Date.parse(due.lease.expiresAt) <= Date.parse(input.now)) claimed = await this.worker.service.reclaim(due, { leaseToken: input.leaseToken, leaseUntil: input.leaseUntil, occurredAt: input.now });
+      if (due.state === "due")
+        claimed = await this.worker.service.claim(due, {
+          leaseToken: input.leaseToken,
+          leaseUntil: input.leaseUntil,
+          occurredAt: input.now,
+        });
+      else if (
+        due.lease &&
+        Date.parse(due.lease.expiresAt) <= Date.parse(input.now)
+      )
+        claimed = await this.worker.service.reclaim(due, {
+          leaseToken: input.leaseToken,
+          leaseUntil: input.leaseUntil,
+          occurredAt: input.now,
+        });
       else if (due.lease?.token === input.leaseToken) {
         // A retry under the still-valid same fence executes/resumes directly.
         // Renew only when the requested expiry strictly advances the lease.
-        if (Date.parse(input.leaseUntil) > Date.parse(due.lease.expiresAt)) claimed = await this.worker.service.renew(due, { leaseToken: input.leaseToken, leaseUntil: input.leaseUntil, occurredAt: input.now });
-      }
-      else continue; // another live worker owns the fence
-      const complete = await this.worker.service.execute({ run: claimed, guide: entry.guide, leaseToken: input.leaseToken, occurredAt: input.now });
+        if (Date.parse(input.leaseUntil) > Date.parse(due.lease.expiresAt))
+          claimed = await this.worker.service.renew(due, {
+            leaseToken: input.leaseToken,
+            leaseUntil: input.leaseUntil,
+            occurredAt: input.now,
+          });
+      } else continue; // another live worker owns the fence
+      const complete = await this.worker.service.execute({
+        run: claimed,
+        guide: entry.guide,
+        leaseToken: input.leaseToken,
+        occurredAt: input.now,
+      });
       // The projector itself reads/decodes immutable records and is a no-op for
       // runs without finding artifacts; callers never provide agent payloads.
-      await this.worker.ledger.projectPersisted({ workspaceId: entry.workspaceId, runRef: complete.run.runRef });
+      await this.worker.ledger.projectPersisted({
+        workspaceId: entry.workspaceId,
+        runRef: complete.run.runRef,
+      });
       // Materialization is post-disposition only. The repository re-reads the
       // immutable artifact and refuses legacy/non-stageable candidates.
-      if (this.worker.actionBindings && complete.disposition.state === "staged") await this.worker.actionBindings.bind({ workspaceId: entry.workspaceId, runRef: complete.run.runRef });
-      outputs.push(Object.freeze({ runRef: complete.run.runRef, state: complete.run.state }));
+      if (this.worker.actionBindings && complete.disposition.state === "staged")
+        await this.worker.actionBindings.bind({
+          workspaceId: entry.workspaceId,
+          runRef: complete.run.runRef,
+        });
+      outputs.push(
+        Object.freeze({
+          runRef: complete.run.runRef,
+          state: complete.run.state,
+        }),
+      );
     }
     return Object.freeze(outputs);
   }

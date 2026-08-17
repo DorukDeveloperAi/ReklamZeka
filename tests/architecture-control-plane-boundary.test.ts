@@ -13,6 +13,9 @@ const required = [
   "tests/schema.test.ts", "tests/data-platform.test.ts", "src/domain/ads/canonical.ts",
   "src/connectors/contract.ts", "src/connectors/csv.ts", "src/ingest/run-ingest.ts",
   ".github/workflows/ci.yml", "drizzle.config.ts",
+  "src/domain/operations/primary-result.ts",
+  "src/domain/operations/internal/trusted-primary-result-catalog.ts",
+  "src/connectors/operations/primary-result-action-catalog-drizzle-adapter.ts",
 ];
 const headings = ["## Bağlam", "## Karar", "## Gerekçe", "## Alternatifler", "## Sonuçlar"].join("\n");
 
@@ -25,6 +28,10 @@ async function fixture() {
     const path = join(root, relative); await mkdir(dirname(path), { recursive: true });
     await writeFile(path, relative.startsWith("docs/ADR/") ? headings : "safe\n");
   }));
+  await writeFile(join(root, "src/domain/operations/internal/trusted-primary-result-catalog.ts"),
+    "const trusted = new WeakSet<object>(); const sources = ['meta_daily_insights','meta_daily_insight_metrics']; const predicate = \"metric.metric_key = 'actions'\";\n");
+  await writeFile(join(root, "src/connectors/operations/primary-result-action-catalog-drizzle-adapter.ts"),
+    "export class DrizzlePrimaryResultActionCatalogAdapter {}\n");
   await mkdir(join(root, "drizzle"), { recursive: true });
   await writeFile(join(root, "README.md"), ["plans/proje/v2/MASTER.md", "plans/proje/v2/STATE.md",
     "plans/proje/v2/CHECKLIST.md", "plans/proje/v2/REQUIREMENTS.md"].join("\n"));

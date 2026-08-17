@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { ActionProposalStagingService } from "@/application/action-proposal-staging-service";
@@ -10,6 +10,7 @@ import type { CurrentSliceEvidence, OperationReadTransaction } from "@/connector
 import { buildActionPlan, type TypedActionIntent } from "@/domain/actions/autonomy-valve";
 import * as schema from "@/db/schema";
 import { metaPublicReference } from "@/domain/meta/public-reference";
+import { guideRunMembershipEvidenceHash } from "@/domain/guides/guide-run-membership-evidence";
 
 type Database = NodePgDatabase<typeof schema>;
 const HASH = /^[a-f0-9]{64}$/;
@@ -62,6 +63,10 @@ export class DrizzleGuideRunStatusActionStager implements GuideRunCandidateActio
       || !REF.test(input.dispositionArtifactRef) || !REF.test(input.candidateRef) || !HASH.test(input.candidateHash)
       || !REF.test(input.memberRef) || !HASH.test(input.membershipHash) || !REF.test(input.sliceRef) || !iso(input.dispositionOccurredAt)) fail("invalid_input");
     const intent = parseGuideRunStatusCandidate(input);
+    const clock = await transaction.execute(sql`select to_char(transaction_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') now`);
+    const authorizationAt = (clock.rows as Array<{ now?: unknown }>)[0]?.now;
+    if (!iso(authorizationAt)) fail("context_rejected");
+    const authorizedAt = authorizationAt as string;
     const action = intent.toStatus === "PAUSED" ? "status_pause" as const : "status_activate" as const;
     let loadedScope: CurrentSliceEvidence | null = null;
     try { loadedScope = await this.scopes.currentSliceEvidenceInTransaction(transaction as OperationReadTransaction, input.workspaceId, input.sliceRef); }
@@ -81,23 +86,27 @@ export class DrizzleGuideRunStatusActionStager implements GuideRunCandidateActio
       : await database.select({ id: schema.metaAdSets.id, entityRef: schema.metaAdSets.externalAdSetId }).from(schema.metaAdSets).where(and(eq(schema.metaAdSets.workspaceId, input.workspaceId), eq(schema.metaAdSets.id, resolvedMemberId))).limit(2);
     if (membership.length !== 1 || membership[0]!.id !== memberId || !REF.test(membership[0]!.entityRef)) fail("context_rejected");
     const entityRef = membership[0]!.entityRef;
-    const membershipEvidenceHash = digest({ sliceRef: input.sliceRef, revisionRef: scope.revisionRef, revisionNumber: scope.revisionNumber,
-      definitionHash: scope.definitionHash, entityId: membership[0]!.id, entityLevel: intent.entity.level, market: input.market });
+    const externalIntent = Object.freeze({ ...intent, entity: Object.freeze({ level: intent.entity.level, ref: entityRef }) });
+    const externalActionHash = digest(externalIntent);
+    const evaluation=scope.resolution?.included.find(item=>item.entityRef===input.memberRef && item.entityLevel===(intent.entity.level==="adset"?"ad_set":intent.entity.level));
+    if(!evaluation || scope.revisionRef===null || scope.definitionHash===null) fail("context_rejected");
+    const membershipEvidenceHash = guideRunMembershipEvidenceHash({sliceRef:input.sliceRef,revisionRef:scope.revisionRef as string,definitionHash:scope.definitionHash as string,membership:evaluation as NonNullable<typeof evaluation>});
+    if(membershipEvidenceHash!==input.membershipHash) fail("context_rejected");
     let loaded: Context | null = null;
     try {
-      loaded = await this.contexts.loadInTransaction(transaction as Database, { workspaceId: input.workspaceId, guideRevisionId: input.guideRevisionId, entityRef,
-        sliceRef: input.sliceRef, market: input.market, action, at: input.dispositionOccurredAt });
+      loaded = await this.contexts.loadInTransaction(transaction as Database, { workspaceId: input.workspaceId, guideRevisionId: input.guideRevisionId, entityRef, actionHash: externalActionHash,
+        sliceRef: input.sliceRef, market: input.market, action, at: authorizedAt });
     } catch { fail("context_rejected"); }
     if (!loaded) fail("context_rejected");
     const context = loaded as Context;
-    if (context.entityRef !== entityRef || context.authority.canApprove || context.authority.canExecute || context.authority.canWriteMeta) fail("context_rejected");
-    const externalIntent = Object.freeze({ ...intent, entity: Object.freeze({ level: intent.entity.level, ref: entityRef }) });
+    if (context.entityRef !== entityRef || context.currentStatus !== intent.fromStatus || context.authority.canApprove || context.authority.canExecute || context.authority.canWriteMeta) fail("context_rejected");
     const maximumLifetime = context.approvalPolicy.maximumProposalLifetimeSeconds;
     if (!Number.isSafeInteger(maximumLifetime) || maximumLifetime < 1 || maximumLifetime > 604_800) fail("context_rejected");
     const expiresAt = new Date(Date.parse(input.dispositionOccurredAt) + maximumLifetime * 1_000).toISOString();
+    if (expiresAt <= authorizedAt) fail("context_rejected");
     const actionPlan = buildActionPlan(externalIntent, {
       workspaceRef: context.workspaceRef, accountGroupRef: null, accountRef: context.accountRef,
-      internalCategoryRefs: context.protection.protectedInternalCategoryRefs, campaignRef: context.campaignRef, entity: externalIntent.entity, evaluatedAt: input.dispositionOccurredAt, rules: context.rules, budgetLimits: null,
+      internalCategoryRefs: context.protection.protectedInternalCategoryRefs, campaignRef: context.campaignRef, entity: externalIntent.entity, evaluatedAt: authorizedAt, rules: context.rules, budgetLimits: null,
       protection: context.protection,
       frozenContextHash: context.contextHash,
     });
@@ -110,7 +119,7 @@ export class DrizzleGuideRunStatusActionStager implements GuideRunCandidateActio
       planHash: digest({ version: "guide-run-status-action-stager/1.0.0", runRef: input.runRef,
         dispositionArtifactRef: input.dispositionArtifactRef, candidateRef: input.candidateRef, candidateHash: input.candidateHash,
         actionPlanHash: actionPlan.planHash, contextHash: context.contextHash, effectiveGuideSetHash: context.effectiveGuideSetHash,
-        resolutionHash: context.resolutionHash, currentSliceMembershipHash: membershipEvidenceHash, dataHealthReportHash: context.dataHealthReportHash,
+        resolutionHash: context.resolutionHash, currentSliceMembershipHash: membershipEvidenceHash, dataHealthReportHash: context.dataHealthReportHash, authorizationAt: authorizedAt, dispositionOccurredAt: input.dispositionOccurredAt,
         policyRef: context.approvalPolicy.policyRef, policyRevision: context.approvalPolicy.revision, policyHash: context.approvalPolicyHash }) });
     const before = intent.fromStatus === "ACTIVE" ? "Aktif" : "Duraklatılmış";
     const after = intent.toStatus === "ACTIVE" ? "Aktif" : "Duraklatılmış";

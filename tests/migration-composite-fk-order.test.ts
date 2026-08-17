@@ -17,7 +17,9 @@ function normalizeColumns(value: string) {
 }
 
 function keyFor(table: string, columns: string[]) {
-  return `${normalizeIdentifier(table)}(${columns.join(",")})`;
+  // PostgreSQL accepts a non-partial UNIQUE index over the same referenced
+  // column set even when its declaration orders those columns differently.
+  return `${normalizeIdentifier(table)}(${[...columns].sort().join(",")})`;
 }
 
 function journalStatements(): OrderedStatement[] {
@@ -57,19 +59,21 @@ function referencedCompositeKeys(statement: OrderedStatement) {
 
 function targetKeysCreatedBy(statement: OrderedStatement) {
   const keys: string[] = [];
-  const createTable = statement.sql.match(new RegExp(`CREATE\\s+TABLE\\s+(?:${identifier}\\s*\\.\\s*)?(${identifier})`, "i"));
-  const alteredTable = statement.sql.match(new RegExp(`ALTER\\s+TABLE\\s+(?:${identifier}\\s*\\.\\s*)?(${identifier})`, "i"));
-  const table = createTable?.[1] ?? alteredTable?.[1];
-
-  if (table) {
-    for (const match of statement.sql.matchAll(/(?:PRIMARY\s+KEY|\bUNIQUE)\s*\(([^)]+)\)/gi)) {
+  for (const tableStatement of statement.sql.matchAll(new RegExp(
+    `(?:CREATE\\s+TABLE(?:\\s+IF\\s+NOT\\s+EXISTS)?|ALTER\\s+TABLE(?:\\s+IF\\s+EXISTS)?)\\s+(?:${identifier}\\s*\\.\\s*)?(${identifier})([\\s\\S]*?)(?=;|$)`,
+    "gi",
+  ))) {
+    const table = tableStatement[1];
+    const body = tableStatement[2] ?? "";
+    if (!table) continue;
+    for (const match of body.matchAll(/(?:PRIMARY\s+KEY|\bUNIQUE(?:\s+NULLS\s+NOT\s+DISTINCT)?)\s*\(([^)]+)\)/gi)) {
       const columns = match[1] ? normalizeColumns(match[1]) : [];
       if (columns.length > 1) keys.push(keyFor(table, columns));
     }
   }
 
   for (const match of statement.sql.matchAll(new RegExp(
-    `CREATE\\s+UNIQUE\\s+INDEX\\s+${identifier}\\s+ON\\s+(?:${identifier}\\s*\\.\\s*)?(${identifier})(?:\\s+USING\\s+\\w+)?\\s*\\(([^)]+)\\)`,
+    `CREATE\\s+UNIQUE\\s+INDEX(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+${identifier}\\s+ON\\s+(?:${identifier}\\s*\\.\\s*)?(${identifier})(?:\\s+USING\\s+\\w+)?\\s*\\(([^)]+)\\)`,
     "gi",
   ))) {
     const table = match[1];
@@ -81,18 +85,18 @@ function targetKeysCreatedBy(statement: OrderedStatement) {
 }
 
 describe("Drizzle composite foreign-key ordering", () => {
-  it("creates every referenced ordered composite PK or UNIQUE key before its foreign key in journal order", () => {
+  it("creates every referenced composite PK or UNIQUE column set before its foreign key in journal order", () => {
     const keys = new Set<string>();
     const inversions: string[] = [];
 
     for (const statement of journalStatements()) {
+      for (const key of targetKeysCreatedBy(statement)) keys.add(key);
       for (const reference of referencedCompositeKeys(statement)) {
         const target = keyFor(reference.table, reference.columns);
         if (!keys.has(target)) {
           inversions.push(`${statement.migration}: ${target}`);
         }
       }
-      for (const key of targetKeysCreatedBy(statement)) keys.add(key);
     }
 
     expect(inversions, "composite FK target keys must precede their FK statements").toEqual([]);

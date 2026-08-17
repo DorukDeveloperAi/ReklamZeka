@@ -26,6 +26,7 @@ import { OperationTablePanel } from "./operation-table-panel";
 import { ScopeReportPanel } from "./scope-report-panel";
 import { campaignContextBridge } from "./campaign-planning-brief-panel";
 import { LocalSessionConnector } from "./local-session-connector";
+import { ContextualHelp } from "./contextual-help";
 import { SkillCatalogContextStrip, type SkillCatalogContext } from "./skill-catalog-context-strip";
 import { SkillCatalogPanel } from "./skill-catalog-panel";
 import { OrchestratorTurnReadOnlyEvidence, OrchestratorTurnSkillRunEvidence, OrchestratorTurnInterviewKitEvidence, OrchestratorTurnReceiptSummary, type OrchestratorReadOnlyEvidenceSummary,
@@ -587,6 +588,33 @@ function Icon({ name }: { name: string }) {
 
 function StatusPill({ children, tone = "neutral" }: { children: React.ReactNode; tone?: string }) {
   return <span className={styles.statusPill} data-tone={tone}>{children}</span>;
+}
+
+/** Keeps each management area scoped to its immediate operational question. */
+function ManagementFlowGuide(props: Readonly<{ area: ManageArea }>) {
+  const guide = props.area === "portfolio"
+    ? { label: "Portföy", purpose: "Gerçek Meta hiyerarşisini inceleyin; sınıflama veya kural yazımı sonraki aşamadadır.", terms: [
+      { term: "Kanonik ayna", explanation: "Meta’dan salt-okunur aynalanan hesap, kampanya, ad set, reklam ve kreatif bilgisidir." },
+      { term: "Künye", explanation: "Kampanyayı gerçek kurulum ve insan onaylı sınıflama kanıtıyla açıklar." },
+    ] }
+    : props.area === "decisions"
+      ? { label: "Kararlar", purpose: "Kanıtı, öneriyi ve insan kararını ayırın; uygulama yetkisi bu görünümde kapalıdır.", terms: [
+        { term: "Öneri", explanation: "Henüz uygulanmayan, kanıt ve kullanıcı kuralına bağlı değerlendirmedir." },
+        { term: "Onay kuyruğu", explanation: "İnsan kararına sunulmuş typed action kaydıdır; Meta write değildir." },
+      ] }
+      : props.area === "rules"
+        ? { label: "Kurallar", purpose: "Önce kapsamı doğrulayın; kullanıcı yazarlı kuralı ve bütçe sınırını ardından bağlayın.", terms: [
+          { term: "Slice", explanation: "Aynı pazar sınırındaki kanıtı tutarlı operasyon kapsamıdır." },
+          { term: "Kullanıcı kuralı", explanation: "Kapsam, limit, pencere ve geri alma koşulunu sizin yazdığınız kayıttır." },
+        ] }
+        : { label: "Ayarlar", purpose: "Bağlantı ve kayıt sözleşmelerini hazırlayın; bunlar Meta uygulama yetkisi vermez.", terms: [
+          { term: "Kategori registry", explanation: "Künye boyutları, tanımlar ve insan onaylı atamaların kanonik kaydıdır." },
+          { term: "Kaynak hazırlığı", explanation: "Bağlantının ve aynanın doğrulanmış okunabilirlik durumudur." },
+        ] };
+  return <section className={styles.managementFlowGuide} aria-label={`${guide.label} alanı çalışma rehberi`}>
+    <div><span>{guide.label.toUpperCase()} · ÇALIŞMA REHBERİ</span><p>{guide.purpose}</p></div>
+    <div className={styles.managementTerms}>{guide.terms.map((item) => <ContextualHelp key={item.term} term={item.term} explanation={item.explanation} />)}</div>
+  </section>;
 }
 
 /** Shared orientation only: it never changes the selected scope or source. */
@@ -1433,6 +1461,11 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
 
   function renderRules() {
     return <>
+      <section className={styles.managementGlossary} aria-label="Kurallar alanı kavram yardımı">
+        <span>Bu alanın çalışma sırası:</span>
+        <ContextualHelp term="Kullanıcı kuralı" explanation="Kapsamı, limiti, değerlendirme penceresini ve geri alma koşulunu siz yazarsınız." />
+        <ContextualHelp term="İnsan onayı" explanation="Bir ActionUnit için verilen insan kararıdır; tek başına Meta write değildir." />
+      </section>
       {rulesArea !== "guidance" ? <button className={styles.compactReturn} onClick={() => commitDashboardLocation({ ...dashboardLocation, view: "manage", manageArea: "rules", rulesArea: "guidance" })}>Kılavuzlara dön</button> : null}
       {rulesArea === "guidance" ? <><GuidanceStudioPanel onSessionRequiredChange={setRulesSessionRequired} />
         {rulesSessionRequired === false ? <><SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /></> : null}</>
@@ -1469,6 +1502,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     && campaignDecisionContext?.sourceCampaignRef === requestedCampaignRef);
   function renderManage() {
     return <>
+      <ManagementFlowGuide area={manageArea} />
       {manageArea === "portfolio" ? renderCampaigns()
         : manageArea === "decisions" ? <>
           {decisionArea !== "analysis" ? <button className={styles.compactReturn} onClick={() => commitDashboardLocation({ ...dashboardLocation, view: "manage", manageArea: "decisions", decisionArea: "analysis", approvalUnitRef: null })}>Analize dön</button> : null}

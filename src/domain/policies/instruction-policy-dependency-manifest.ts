@@ -57,6 +57,17 @@ const opaquePolicyContext = new Set([
   "creative_fatigue_config_diagnostic_assets.result_payload",
   "creative_fatigue_config_diagnostic_assets.capabilities",
   "frozen_diagnostic_evidence.capabilities",
+  "finding_lifecycle_events.observation_payload",
+  "development_log_events.payload",
+  "guide_revisions.strict_payload",
+  "guide_revisions.schedule_payload",
+  "guide_budget_contracts.contract_payload",
+  "guide_lifecycle_events.payload",
+  "guide_runs.trigger_payload",
+  "guide_run_events.payload",
+  "guide_run_heads.run_payload",
+  "guide_run_artifacts.payload",
+  "guide_run_artifacts.authority",
 ]);
 
 const policyAuthorityJsonbColumns = Object.freeze([...policyContract]

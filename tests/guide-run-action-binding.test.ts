@@ -18,8 +18,9 @@ describe("P06 guide-run action binding", () => {
     expect(migration).toContain("a.payload_hash IS DISTINCT FROM public.guide_run_sha256(a.payload)");
     expect(migration).toContain("candidate ?& ARRAY['candidateRef','candidateHash','action','routing','stageable']");
     expect(migration).toContain("candidate->>'routing' NOT IN ('human_approval','limited_autonomy_review')");
-    expect(migration).toContain("b.plan_ref IS DISTINCT FROM 'guide_candidate_'||candidate->>'candidateHash'");
-    expect(migration).toContain("u.source_hash IS DISTINCT FROM b.plan_hash");
+    expect(migration).toContain("b.plan_ref IS DISTINCT FROM ('guide_candidate_' || (candidate->>'candidateHash'))");
+    expect(migration).toContain("u.action_plan_payload->>'planHash' IS DISTINCT FROM u.source_hash");
+    expect(migration).not.toContain("u.source_hash IS DISTINCT FROM b.plan_hash");
     expect(migration).toContain("ENABLE ROW LEVEL SECURITY"); expect(migration).toContain("FORCE ROW LEVEL SECURITY");
     expect(migration).toContain("REVOKE ALL PRIVILEGES ON TABLE guide_run_action_bindings FROM PUBLIC,anon,authenticated,service_role");
     expect(WORKSPACE_TOMBSTONE_PURGE_TABLES.indexOf("guide_run_action_bindings")).toBeLessThan(WORKSPACE_TOMBSTONE_PURGE_TABLES.indexOf("guide_runs"));

@@ -46,7 +46,10 @@ describe("P03-Cb primary-result binding persistence preflight", () => {
     expect(migration).toContain("primary_result_binding_head_exact_advance_guard");
     expect(migration).toContain("lifecycle_state='tombstoning'");
     expect(migration).toContain("REVOKE ALL PRIVILEGES ON TABLE public.primary_result_binding_revisions,public.primary_result_binding_heads FROM PUBLIC,anon,authenticated,service_role");
-    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES.slice(0, 2)).toEqual(["primary_result_binding_heads", "primary_result_binding_revisions"]);
+    const head = WORKSPACE_TOMBSTONE_PURGE_TABLES.indexOf("primary_result_binding_heads");
+    const revisions = WORKSPACE_TOMBSTONE_PURGE_TABLES.indexOf("primary_result_binding_revisions");
+    expect(head).toBeGreaterThanOrEqual(0);
+    expect(revisions).toBe(head + 1);
   });
 
   it("has server-only exact-idempotent CAS persistence and a bounded current-head reader", () => {
