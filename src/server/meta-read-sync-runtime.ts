@@ -23,6 +23,7 @@ import {
   type CanonicalBudgetHistoryMaterializer,
 } from "@/connectors/meta/sync/canonical-budget-history-materializer";
 import { DrizzleCanonicalDataHealthPostSyncMaterializer, type CanonicalDataHealthPostSyncMaterializer } from "@/connectors/meta/data-health-post-sync-materializer";
+import { META_DATA_HEALTH_MAX_ACCOUNTS } from "@/domain/meta/data-health";
 import { planMetaInsightQuery } from "@/domain/meta/insights/capability-catalog";
 import * as schema from "@/db/schema";
 
@@ -197,6 +198,14 @@ function summarize(
   });
 }
 
+/** Uses only durable cursor timestamps, never request wall-clock time. */
+function durableHealthOccurredAt(result: MetaSyncResult): string | null {
+  const candidates = result.streamRuns.flatMap(run => Object.values(run.cursorBySlice).map(cursor => cursor.updatedAt))
+    .filter((value): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value)
+    .sort();
+  return candidates.at(-1) ?? null;
+}
+
 /**
  * Server-only orchestration. The run caller cannot supply workspace, connection,
  * account IDs, a token or a transport. Canonical inventory pages are written by
@@ -278,7 +287,7 @@ export class ProductionMetaReadSyncService {
       }
 
       const accountIds = [...new Set(await this.dependencies.accounts.resolve(scope))].sort();
-      if (!accountIds.length || accountIds.length > 1_000 || accountIds.some((id) => !META_ACCOUNT.test(id))) {
+      if (!accountIds.length || accountIds.length > META_DATA_HEALTH_MAX_ACCOUNTS || accountIds.some((id) => !META_ACCOUNT.test(id))) {
         throw new ProductionMetaReadSyncError("account_scope_unavailable");
       }
       if (recoveryLane && !accountIds.includes(recoveryLane.accountId)) {
@@ -356,15 +365,17 @@ export class ProductionMetaReadSyncService {
           // normal full read.
           let derivedFailure = false;
           try { if (inventoryEvidence && this.dependencies.budgetHistoryMaterializer) await this.dependencies.budgetHistoryMaterializer.materialize(inventoryEvidence); } catch { derivedFailure = true; }
-          try { if (shouldMaterializeDataHealth) await this.dependencies.dataHealthMaterializer!.materialize({
+          let healthOutcome: "materialized" | "partial_without_ledger" = "materialized";
+          try { if (shouldMaterializeDataHealth) healthOutcome = (await this.dependencies.dataHealthMaterializer!.materialize({
             workspaceId: scope.workspaceId,
             externalAccountIds: accountIds,
             // A partial normal run is still valuable evidence: it produces
             // current health alerts, but must not resolve accounts the run did
             // not fully evaluate.  Recovery/bootstrap lanes never enter here.
             resolveAbsent: inventoryEvidence !== null,
-            occurredAt: inventoryEvidence?.accounts.map(account => account.capturedAt).sort().at(-1) ?? new Date().toISOString(),
-          }); } catch { derivedFailure = true; }
+            occurredAt: inventoryEvidence?.accounts.map(account => account.capturedAt).sort().at(-1) ?? durableHealthOccurredAt(metaResult),
+          })).outcome; } catch { derivedFailure = true; }
+          if (healthOutcome === "partial_without_ledger") derivedFailure = true;
           if (!derivedFailure) return summarize(metaResult, this.dependencies.affectedGeoMaterialization ?? "completed", "completed");
           // The source GET/mirror is complete. This derived timeline can be
           // retried on the next normal inventory run and must never be turned
@@ -401,8 +412,8 @@ export class DrizzleMetaSyncAccountScopeResolver implements MetaSyncAccountScope
         eq(schema.dataSources.metaConnectionId, scope.connectionId),
         eq(schema.dataSources.platform, "meta_ads"),
         isNull(schema.adAccounts.disappearedAt),
-      )).limit(251);
-    if (rows.length > 250) throw new ProductionMetaReadSyncError("account_scope_unavailable");
+      )).limit(META_DATA_HEALTH_MAX_ACCOUNTS + 1);
+    if (rows.length > META_DATA_HEALTH_MAX_ACCOUNTS) throw new ProductionMetaReadSyncError("account_scope_unavailable");
     return Object.freeze(rows.map((row) => row.externalAccountId));
   }
 }

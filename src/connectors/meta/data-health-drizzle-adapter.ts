@@ -1,14 +1,14 @@
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 
-import { buildMetaDataHealthReport, type MetaDataHealthReport } from "@/domain/meta/data-health";
+import { buildMetaDataHealthReport, META_DATA_HEALTH_MAX_ACCOUNTS, type MetaDataHealthReport } from "@/domain/meta/data-health";
 import { metaPublicReference } from "@/domain/meta/public-reference";
 import { publicSource, type PublicSource, type PublicSourceState } from "@/domain/source/public-source";
 
 export const META_DATA_HEALTH_ADAPTER_VERSION = "meta-data-health-adapter/1.0.0" as const;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_AGE_MINUTES = 24 * 60;
-const MAX_ACCOUNTS = 250;
+const MAX_ACCOUNTS = META_DATA_HEALTH_MAX_ACCOUNTS;
 const REQUIRED_FIELDS = Object.freeze(["account", "campaign", "ad_set", "targeting", "creative_content"]);
 const REQUIRED_STREAMS = Object.freeze(["creative", "insights", "inventory"]);
 

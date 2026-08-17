@@ -3,7 +3,7 @@
 | Paket | Durum | Dependency |
 |---|---|---|
 | + M00 | TAMAMLANDI — `evidence/M00-20260817.md`, `4fdb381` | — |
-| P01 meta-veri-sagligi | DEVAM — ortak 6 saatlik automatic/manual fire ve scope lease kabulde | M00 |
+| + P01 meta-veri-sagligi | TAMAMLANDI — P01-A…F kabul edildi; `evidence/P01-E-data-health-ledger-20260817.md` | M00 |
 | P02 kurum-kampanyasi-kunye | DEVAM — Kurum Kampanyası temeli hazır; canlı migration/DB acceptance açık | P01 |
 | P03 slice-operasyon-rapor | DEVAM — `+ P03-A` resolver/registry/frozen replay kabul edildi; Operasyon read-model, saved view ve Kapsam Raporu açık | P02 |
 | P04 kilavuz-butce | BEKLİYOR | P03 |
@@ -25,7 +25,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P01-B-targeting-evidence | Kabul edildi / arşivlenebilir |
 | + P01-C-data-health-domain | Kabul edildi / arşivlenebilir |
 | + P01-D-data-health-read-and-action-hold | Kabul edildi / arşivlenebilir |
-| P01-E-data-health-ledger-persistence | DEVAM — ilk preflight kritik incelemede reddedildi; migration uygulanmadı, FK/chain/concurrency/wiring düzeltmeleri sürüyor |
+| + P01-E-data-health-ledger-persistence | Kabul edildi — canlı POST verifier + `evidence/P01-E-data-health-ledger-20260817.md`; arşivlenebilir |
 | + P01-F-budget-config-history | Kabul edildi / arşivlenebilir |
 | + P02-A-organization-campaign-foundation | Kabul edildi / arşivlenebilir |
 | + P02-B-naming-template-domain | Kabul edildi / arşivlenebilir |
@@ -63,5 +63,6 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 - P07-B Operasyon tablosu: gerçek `/api/operations` kaynağı, 1/7/30 gün, campaign/ad-set hiyerarşisi, ad-set-only kapsam, güvenli pagination/dedupe, source-state ve 320 px taşmasız mobil görünüm kod kabulünden geçti. Oturumsuz canlı sınır `401 local_session_required` olarak doğrulandı; gerçek satırlı browser kabulü kullanıcı capability'yi açık yerel ekrana girene kadar `+` alamaz.
 - P07-B table-first konsolidasyon `a178e25`: ikinci Yönet navigasyonu, yinelenen hero/rehber/sekme katmanları kaldırıldı; `/dashboard` ve `?view=manage` aynı kanonik Operasyon tablosuna açılıyor, legacy leaf rotaları “Operasyona dön” ile korunuyor. Browser DOM kabulünde varsayılan görünüm tek ana navigasyon + tablo-first; 320×800 ölçümünde `scrollWidth=320`, yatay taşma yok. Oturumlu gerçek satır kabulü açık kaldı.
 - P01-E ilk migration preflight'ı uygulanmadan reddedildi: composite FK sırası PostgreSQL'de derlenmiyor; generic finding/Development Log zinciri, active-workspace delete guard, bounded/redacted JSON, occurrence authenticity, transaction/advisory-lock concurrency ve normal-sync production wiring eksikleri kapatılmadan journal/apply yapılmayacak.
+- `+ P01-E data-health ledger`: yedi kritik pre-apply inceleme turundan sonra generic Finding/Development Log event/head zinciri, kullanıcı triage, scoped historical-head selection, workspace-once normal/partial sync ve bounded cardinality kabul edildi. Migration ledger `id=129`/journal `idx=112`; hash `1c728e...55a02`. POST verifier gerçek ikinci-client row lock, lifecycle, tamper/CAS/cross-tenant, RLS/FORCE/revoke/policy/index ve zero-residue kanıtıyla geçti. P01-A…F tamamlandığı için P01 paketi `+` aldı.
 - P03-C primary result tasarımı: kullanıcı yalnız kanonik `actions/<action_type>` selector'ünü Kurum Kampanyası veya slice'a bağlar; slice-bound org binding'i geçersiz kılar, slice-unbound org fallback'i geri getirir. Bilinen sıfır sonuç gösterilir fakat maliyet null'dır; eksik metrik sıfır sayılmaz. Immutable revision/OCC persistence ve `operation-read/2.0.0` projection, P01-E schema sahipliği kapandıktan sonra ayrı migrationla uygulanacaktır.
 - `+ P03-Ca primary result domain`: canonical action selector, scope resolution, decimal ratio-of-sums ve zero/missing semantiği kabul edildi. Trusted katalog yalnız server-only tenant Drizzle adapterının RR/read-only canonical insight sorgusundan mint edilir; public registrar/structural port yoktur ve recomputed clone runtime kimliğinden geçmez. Persistence/projection/UI P03-Cb olarak açık kalır.

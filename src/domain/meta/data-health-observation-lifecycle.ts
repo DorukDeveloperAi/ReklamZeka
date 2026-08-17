@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { MetaDataHealthObservation, MetaDataHealthReport } from "@/domain/meta/data-health";
+import { META_DATA_HEALTH_MAX_CURRENT_OBSERVATIONS, META_DATA_HEALTH_MAX_RETAINED_FINDING_HEADS, type MetaDataHealthObservation, type MetaDataHealthReport } from "@/domain/meta/data-health";
 
 export const META_DATA_HEALTH_OBSERVATION_EVENT_VERSION = "meta-data-health-observation-event/1.0.0" as const;
 export type MetaDataHealthObservationHead = Readonly<{
@@ -44,9 +44,9 @@ export function projectMetaDataHealthObservationEvents(input: Readonly<{
   if (!WORKSPACE.test(input.workspaceRef) || input.report.workspaceRef !== input.workspaceRef
     || input.report.version !== "meta-data-health/1.0.0" || !HASH.test(reportHash) || digest(reportCore) !== reportHash
     || !Number.isFinite(occurred) || new Date(occurred).toISOString() !== input.occurredAt
-    || !Array.isArray(input.previousHeads) || input.previousHeads.length > 1_000) fail("invalid_input");
+    || !Array.isArray(input.previousHeads) || input.previousHeads.length > META_DATA_HEALTH_MAX_RETAINED_FINDING_HEADS) fail("invalid_input");
   if (input.report.accounts.some((account) => !ACCOUNT.test(account.accountRef))
-    || input.report.observations.length > 2_000 || input.report.observations.some((observation) =>
+    || input.report.observations.length > META_DATA_HEALTH_MAX_CURRENT_OBSERVATIONS || input.report.observations.some((observation) =>
       !FINGERPRINT.test(observation.fingerprint) || !HASH.test(observation.evidenceHash)
       || observation.accountRef !== null && !ACCOUNT.test(observation.accountRef))) fail("invalid_input");
   const heads = new Map<string, MetaDataHealthObservationHead>();

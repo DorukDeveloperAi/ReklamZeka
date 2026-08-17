@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMetaDataHealthReport, type MetaDataHealthAccountEvidence } from "@/domain/meta/data-health";
+import { buildMetaDataHealthReport, META_DATA_HEALTH_MAX_CURRENT_OBSERVATIONS, META_DATA_HEALTH_MAX_PROJECTED_EVENTS, META_DATA_HEALTH_MAX_RETAINED_FINDING_HEADS, type MetaDataHealthAccountEvidence } from "@/domain/meta/data-health";
 import { projectMetaDataHealthObservationEvents } from "@/domain/meta/data-health-observation-lifecycle";
+import { eligibleDataHealthScopeRefs } from "@/connectors/meta/data-health-finding-development-log-drizzle-repository";
 import { publicSource } from "@/domain/source/public-source";
 
 const workspaceRef = `workspace_${"a".repeat(24)}`; const accountRef = `account_${"b".repeat(24)}`;
@@ -16,6 +17,21 @@ function report(healthy: boolean) {
 }
 function head(event: ReturnType<typeof projectMetaDataHealthObservationEvents>[number]) { return { workspaceRef: event.workspaceRef,
   fingerprint: event.fingerprint, sequence: event.sequence, state: event.state, evidenceHash: event.evidenceHash, eventHash: event.eventHash }; }
+function denseReport(state: "partial" | "stale", occurredAt: string, accountOffset = 0) {
+  const source = (kind: "canonical_meta_mirror" | "canonical_performance" | "derived_trust") => publicSource({ kind,
+    state, observedAt: occurredAt, freshnessAt: occurredAt, freshnessThresholdMinutes: 1440, reasonCodes: [`${kind}_${state}`] });
+  const accounts = Array.from({ length: 250 }, (_, index): MetaDataHealthAccountEvidence => ({
+    accountRef: `account_${(index + accountOffset).toString(16).padStart(24, "0")}`, currency: null,
+    sources: { mirror: source("canonical_meta_mirror"), performance: source("canonical_performance"), trust: source("derived_trust") },
+    requiredDates: ["2026-08-16"], observedDates: [], requiredFields: ["campaign"], observedFields: [],
+  }));
+  return buildMetaDataHealthReport({ workspaceRef, workspaceCurrency: "TRY", evaluatedAt: occurredAt, accounts });
+}
+function apply(events: readonly ReturnType<typeof projectMetaDataHealthObservationEvents>[number][], previous: readonly ReturnType<typeof head>[]) {
+  const next = new Map(previous.map(item => [item.fingerprint, item]));
+  for (const event of events) next.set(event.fingerprint, head(event));
+  return [...next.values()];
+}
 
 describe("Meta data health observation lifecycle", () => {
   it("appends same-fingerprint observations idempotently and resolves then reopens", () => {
@@ -42,5 +58,68 @@ describe("Meta data health observation lifecycle", () => {
       previousHeads: [], occurredAt: now })).toThrowError(expect.objectContaining({ code: "invalid_input" }));
     expect(() => projectMetaDataHealthObservationEvents({ workspaceRef: `workspace_${"c".repeat(24)}`, report: report(false),
       previousHeads: [], occurredAt: now })).toThrowError(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  it("retains source-state history beyond current observations while keeping the next 250-account projection bounded", () => {
+    const firstAt = "2026-08-17T12:00:00.000Z";
+    const first = projectMetaDataHealthObservationEvents({ workspaceRef, report: denseReport("partial", firstAt), previousHeads: [], occurredAt: firstAt });
+    expect(first).toHaveLength(META_DATA_HEALTH_MAX_CURRENT_OBSERVATIONS - 1);
+    const firstHeads = apply(first, []);
+    const staleAt = "2026-08-18T12:00:00.000Z";
+    const second = projectMetaDataHealthObservationEvents({ workspaceRef, report: denseReport("stale", staleAt), previousHeads: firstHeads, occurredAt: staleAt });
+    expect(second).toHaveLength(2_250);
+    const retained = apply(second, firstHeads);
+    expect(retained).toHaveLength(2_250);
+    const third = projectMetaDataHealthObservationEvents({ workspaceRef, report: denseReport("stale", "2026-08-19T12:00:00.000Z"), previousHeads: retained, occurredAt: "2026-08-19T12:00:00.000Z" });
+    expect(third).toHaveLength(META_DATA_HEALTH_MAX_CURRENT_OBSERVATIONS - 1);
+    expect(META_DATA_HEALTH_MAX_RETAINED_FINDING_HEADS).toBe(4_751);
+    expect(META_DATA_HEALTH_MAX_PROJECTED_EVENTS).toBe(6_252);
+    const tooManyHeads = Array.from({ length: META_DATA_HEALTH_MAX_RETAINED_FINDING_HEADS + 1 }, (_, index) => ({
+      workspaceRef, fingerprint: `data_quality_${index.toString(16).padStart(32, "0")}`, sequence: 1, state: "open" as const,
+      evidenceHash: "a".repeat(64), eventHash: "b".repeat(64),
+    }));
+    expect(() => projectMetaDataHealthObservationEvents({ workspaceRef, report: report(false), previousHeads: tooManyHeads, occurredAt: now }))
+      .toThrowError(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  it("does not load or resolve retained heads from an unrelated rotating account cohort", () => {
+    // This represents a ledger which has reached its bounded, retained history
+    // capacity for a *different* 250-account cohort.  The account observations
+    // need not be currently open for the storage selection invariant: a later
+    // report may only load its workspace head and its own account scopes.
+    const retained = [
+      {
+        workspaceRef,
+        scopeRef: workspaceRef,
+        fingerprint: `data_quality_${"f".repeat(32)}`,
+        sequence: 1,
+        state: "resolved" as const,
+        evidenceHash: "a".repeat(64),
+        eventHash: "b".repeat(64),
+      },
+      ...Array.from({ length: 250 * 19 }, (_, index) => ({
+        workspaceRef,
+        scopeRef: `account_${Math.floor(index / 19).toString(16).padStart(24, "0")}`,
+        fingerprint: `data_quality_${index.toString(16).padStart(32, "0")}`,
+        sequence: 1,
+        state: "resolved" as const,
+        evidenceHash: "a".repeat(64),
+        eventHash: "b".repeat(64),
+      })),
+    ];
+    expect(retained).toHaveLength(META_DATA_HEALTH_MAX_RETAINED_FINDING_HEADS);
+    const secondReport = denseReport("partial", "2026-08-18T12:00:00.000Z", 250);
+    const currentScopes = new Set(eligibleDataHealthScopeRefs(secondReport, workspaceRef));
+    const eligible = retained.filter(item => currentScopes.has(item.scopeRef));
+    // The workspace scope is always eligible; as it is already resolved and
+    // absent from this report it must remain untouched.  None of the 4,750
+    // historical account heads is loaded or resolved by this cohort.
+    expect(eligible).toHaveLength(1);
+    const secondEvents = projectMetaDataHealthObservationEvents({ workspaceRef, report: secondReport, previousHeads: eligible, occurredAt: "2026-08-18T12:00:00.000Z" });
+    expect(secondEvents).toHaveLength(1_500);
+    expect(retained).toHaveLength(META_DATA_HEALTH_MAX_RETAINED_FINDING_HEADS);
+    const secondHeads = apply(secondEvents, []);
+    const third = projectMetaDataHealthObservationEvents({ workspaceRef, report: secondReport, previousHeads: secondHeads, occurredAt: "2026-08-19T12:00:00.000Z" });
+    expect(third).toHaveLength(1_500);
   });
 });

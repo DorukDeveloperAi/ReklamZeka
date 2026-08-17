@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { projectMetaDataHealthObservationEvents, type MetaDataHealthObservationHead, type MetaDataHealthObservationSink } from "@/domain/meta/data-health-observation-lifecycle";
-import type { MetaDataHealthReport } from "@/domain/meta/data-health";
+import { META_DATA_HEALTH_MAX_PROJECTED_EVENTS, META_DATA_HEALTH_MAX_RETAINED_FINDING_HEADS, type MetaDataHealthReport } from "@/domain/meta/data-health";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -16,10 +16,9 @@ type LedgerDatabase = Pick<Database, "execute" | "transaction">;
  */
 export type DataHealthLedgerExecutionContext = Executor;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-// The domain report accepts at most 2,000 observations; persistence uses the
-// same bound for every read and write so a valid canonical report is never
-// silently truncated between projection and its ledger evidence.
-const HASH = /^[a-f0-9]{64}$/; const LIMIT = 2_000; const ZERO = "0".repeat(64);
+// Current reports cap at 1,501, retained distinct state fingerprints at 4,751,
+// and a lifecycle projection at their exact sum: 6,252 events.
+const HASH = /^[a-f0-9]{64}$/; const HEAD_LIMIT = META_DATA_HEALTH_MAX_RETAINED_FINDING_HEADS; const EVENT_LIMIT = META_DATA_HEALTH_MAX_PROJECTED_EVENTS; const ZERO = "0".repeat(64);
 export class DataHealthFindingLedgerRepositoryError extends Error { constructor(readonly code: "invalid_input" | "workspace_scope_mismatch" | "corrupt_store" | "bound_exceeded" | "write_conflict") { super(`Data health finding ledger rejected: ${code}`); this.name = "DataHealthFindingLedgerRepositoryError"; } }
 function fail(code: DataHealthFindingLedgerRepositoryError["code"]): never { throw new DataHealthFindingLedgerRepositoryError(code); }
 function rows<T>(v: unknown): readonly T[] { if (!v || typeof v !== "object" || !("rows" in v) || !Array.isArray(v.rows)) fail("corrupt_store"); return v.rows as readonly T[]; }
@@ -27,8 +26,16 @@ function stable(v: unknown): unknown { if (Array.isArray(v)) return v.map(stable
 function digest(v: unknown): string { return createHash("sha256").update(JSON.stringify(stable(v))).digest("hex"); }
 function workspaceRef(id: string): string { return `workspace_${createHash("sha256").update(id).digest("hex").slice(0, 24)}`; }
 function instant(v: string) { return Number.isFinite(Date.parse(v)) && new Date(v).toISOString() === v; }
-type FindingHead = { fingerprint: string; sequence: number | string; state: "open" | "resolved"; evidence_hash: string; event_hash: string };
+type FindingHead = { scope_ref: string; fingerprint: string; sequence: number | string; state: "open" | "resolved"; evidence_hash: string; event_hash: string };
 type LogHead = { fingerprint: string; sequence: number | string; state: string; event_hash: string; latest_event_id: string };
+
+/** Current report scopes are the only historical heads eligible for resolution. */
+export function eligibleDataHealthScopeRefs(report: MetaDataHealthReport, reference: string): readonly string[] {
+  const scopes = [reference, ...report.accounts.map(account => account.accountRef)];
+  if (!/^(workspace)_[a-f0-9]{24}$/.test(reference) || new Set(scopes).size !== scopes.length
+    || scopes.some(scope => !/^(workspace|account)_[a-f0-9]{24}$/.test(scope))) fail("invalid_input");
+  return Object.freeze(scopes);
+}
 
 /** Server-only ledger adapter. It obtains the transaction lock before validating report/occurrence/head state. */
 export class DrizzleDataHealthFindingDevelopmentLogRepository implements MetaDataHealthObservationSink {
@@ -37,7 +44,7 @@ export class DrizzleDataHealthFindingDevelopmentLogRepository implements MetaDat
     return context ? work(context) : this.database.transaction(transaction => work(transaction as Executor));
   }
   async append(input: Readonly<{ workspaceId: string; events: ReturnType<typeof projectMetaDataHealthObservationEvents>; reportHash?: string }>, context?: DataHealthLedgerExecutionContext) {
-    if (!UUID.test(input.workspaceId) || !Array.isArray(input.events) || input.events.length > LIMIT || (input.reportHash && !HASH.test(input.reportHash))) fail("invalid_input");
+    if (!UUID.test(input.workspaceId) || !Array.isArray(input.events) || input.events.length > EVENT_LIMIT || (input.reportHash && !HASH.test(input.reportHash))) fail("invalid_input");
     if (!input.events.length) return Object.freeze({ outcome: "unchanged" as const, eventHashes: Object.freeze([]) });
     const ref = workspaceRef(input.workspaceId);
     if (input.events.some(e => e.workspaceRef !== ref || !/^data_quality_[a-f0-9]{32}$/.test(e.fingerprint) || !HASH.test(e.evidenceHash) || !HASH.test(e.previousEventHash) || !HASH.test(e.eventHash) || !instant(e.occurredAt) || !Number.isSafeInteger(e.sequence) || e.sequence < 1 || (e.observation !== null && new TextEncoder().encode(JSON.stringify(e.observation)).byteLength > 16878) || !["opened","observed","resolved","reopened"].includes(e.event) || !["open","resolved"].includes(e.state) || digest({ version:e.version,workspaceRef:e.workspaceRef,fingerprint:e.fingerprint,sequence:e.sequence,event:e.event,state:e.state,evidenceHash:e.evidenceHash,previousEventHash:e.previousEventHash,occurredAt:e.occurredAt,observation:e.observation,developmentLog:e.developmentLog }) !== e.eventHash)) fail("workspace_scope_mismatch");
@@ -54,20 +61,28 @@ export class DrizzleDataHealthFindingDevelopmentLogRepository implements MetaDat
       // A report hash is an occurrence identity, not merely event metadata.  Check
       // it before deriving from the current heads: a second identical run would
       // otherwise turn the original `opened` projection into an `observed` one.
-      const alreadyMaterialized = rows<{ event_hash: string }>(await exec.execute(sql`select event_hash from finding_lifecycle_events where workspace_id=${input.workspaceId}::uuid and namespace='meta_data_health' and resolution_scope=${ref} and report_hash=${input.report.reportHash} order by event_hash limit ${LIMIT + 1}`));
-      if (alreadyMaterialized.length > LIMIT) fail("bound_exceeded");
+      const alreadyMaterialized = rows<{ event_hash: string }>(await exec.execute(sql`select event_hash from finding_lifecycle_events where workspace_id=${input.workspaceId}::uuid and namespace='meta_data_health' and resolution_scope=${ref} and report_hash=${input.report.reportHash} order by event_hash limit ${EVENT_LIMIT + 1}`));
+      if (alreadyMaterialized.length > EVENT_LIMIT) fail("bound_exceeded");
       if (alreadyMaterialized.length) return Object.freeze({ outcome: "unchanged" as const, eventHashes: Object.freeze(alreadyMaterialized.map(row => row.event_hash)) });
       // Canonical report validation occurs after the lock and before any projection/write.
-      const allStored = rows<FindingHead>(await exec.execute(sql`select fingerprint,sequence,state,evidence_hash,event_hash from finding_heads where workspace_id=${input.workspaceId}::uuid and namespace='meta_data_health' and resolution_scope=${ref} order by fingerprint limit ${LIMIT + 1}`));
+      // Retained heads from absent historical accounts stay immutable in the
+      // ledger. Only the workspace finding plus current report account scopes
+      // can participate in this materialization (and therefore be resolved).
+      const eligibleScopeRefs = eligibleDataHealthScopeRefs(input.report, ref);
+      const eligibleValues = sql.join(eligibleScopeRefs.map(scope => sql`${scope}`), sql`, `);
+      const allStored = rows<FindingHead>(await exec.execute(sql`select scope_ref,fingerprint,sequence,state,evidence_hash,event_hash from finding_heads where workspace_id=${input.workspaceId}::uuid and namespace='meta_data_health' and resolution_scope=${ref} and scope_ref in (${eligibleValues}) order by fingerprint limit ${HEAD_LIMIT + 1}`));
       const stored = input.resolveAbsent === false
         ? allStored.filter(head => input.report.observations.some(observation => observation.fingerprint === head.fingerprint))
         : allStored;
-      if (stored.length > LIMIT) fail("bound_exceeded");
+      if (allStored.length > HEAD_LIMIT || stored.length > HEAD_LIMIT) fail("bound_exceeded");
       const previousHeads: MetaDataHealthObservationHead[] = stored.map(h => {
         const sequence = Number(h.sequence); if (!Number.isSafeInteger(sequence) || sequence < 1 || !HASH.test(h.evidence_hash) || !HASH.test(h.event_hash)) fail("corrupt_store");
+        if (!/^(workspace|account)_[a-f0-9]{24}$/.test(h.scope_ref)) fail("corrupt_store");
         return { workspaceRef: ref, fingerprint: h.fingerprint, sequence, state: h.state, evidenceHash: h.evidence_hash, eventHash: h.event_hash };
       });
       const events = projectMetaDataHealthObservationEvents({ workspaceRef: ref, report: input.report, previousHeads, occurredAt: input.occurredAt });
+      if (events.length > EVENT_LIMIT) fail("bound_exceeded");
+      if (!events.length) return Object.freeze({ outcome: "unchanged" as const, eventHashes: Object.freeze([]) });
       return this.persist(exec, input.workspaceId, ref, events, input.report.reportHash, true);
     });
   }
@@ -93,22 +108,24 @@ export class DrizzleDataHealthFindingDevelopmentLogRepository implements MetaDat
     // Deliberate bound + scalar placeholders: no driver-specific ANY(array)
     // coercion and no untrusted SQL construction.
     const occurrenceValues = sql.join(occurrence.map(value => sql`${value}`), sql`, `);
-    const existing = rows<{ source_occurrence_hash: string; event_hash: string }>(await tx.execute(sql`select source_occurrence_hash,event_hash from finding_lifecycle_events where workspace_id=${workspaceId}::uuid and source_occurrence_hash in (${occurrenceValues}) limit ${LIMIT + 1}`));
-    if (existing.length > LIMIT) fail("bound_exceeded"); const replay = new Map(existing.map(x => [x.source_occurrence_hash, x.event_hash]));
+    const existing = rows<{ source_occurrence_hash: string; event_hash: string }>(await tx.execute(sql`select source_occurrence_hash,event_hash from finding_lifecycle_events where workspace_id=${workspaceId}::uuid and source_occurrence_hash in (${occurrenceValues}) limit ${EVENT_LIMIT + 1}`));
+    if (existing.length > EVENT_LIMIT) fail("bound_exceeded"); const replay = new Map(existing.map(x => [x.source_occurrence_hash, x.event_hash]));
     for (let i=0; i<events.length; i++) {
       const event = events[i]!; const source = occurrence[i]!;
       if (replay.has(source)) { if (replay.get(source) !== event.eventHash) fail("corrupt_store"); continue; }
       // Exact expected predecessor prevents stale projection from winning even if a caller bypasses the advisory lock.
-      const heads = rows<FindingHead>(await tx.execute(sql`select fingerprint,sequence,state,evidence_hash,event_hash from finding_heads where workspace_id=${workspaceId}::uuid and namespace='meta_data_health' and resolution_scope=${ref} and fingerprint=${event.fingerprint} for update limit 2`));
+      const heads = rows<FindingHead>(await tx.execute(sql`select scope_ref,fingerprint,sequence,state,evidence_hash,event_hash from finding_heads where workspace_id=${workspaceId}::uuid and namespace='meta_data_health' and resolution_scope=${ref} and fingerprint=${event.fingerprint} for update limit 2`));
       if (heads.length > 1) fail("corrupt_store"); const head = heads[0];
       if ((head?.event_hash ?? ZERO) !== event.previousEventHash || (Number(head?.sequence ?? 0) + 1) !== event.sequence) fail("write_conflict");
-      await tx.execute(sql`insert into finding_lifecycle_events(workspace_id,namespace,resolution_scope,fingerprint,sequence,event_type,state,evidence_hash,previous_event_hash,event_hash,source_occurrence_hash,report_hash,occurred_at,observation_payload) values(${workspaceId}::uuid,'meta_data_health',${ref},${event.fingerprint},${event.sequence},${event.event},${event.state},${event.evidenceHash},${event.previousEventHash},${event.eventHash},${source},${reportHash},${event.occurredAt}::timestamptz,${event.observation === null ? null : JSON.stringify(event.observation)}::jsonb)`);
+      const scopeRef = event.observation?.accountRef ?? head?.scope_ref ?? ref;
+      if (!/^(workspace|account)_[a-f0-9]{24}$/.test(scopeRef)) fail("corrupt_store");
+      await tx.execute(sql`insert into finding_lifecycle_events(workspace_id,namespace,resolution_scope,scope_ref,fingerprint,sequence,event_type,state,evidence_hash,previous_event_hash,event_hash,source_occurrence_hash,report_hash,occurred_at,observation_payload) values(${workspaceId}::uuid,'meta_data_health',${ref},${scopeRef},${event.fingerprint},${event.sequence},${event.event},${event.state},${event.evidenceHash},${event.previousEventHash},${event.eventHash},${source},${reportHash},${event.occurredAt}::timestamptz,${event.observation === null ? null : JSON.stringify(event.observation)}::jsonb)`);
       // Do not use INSERT .. ON CONFLICT for guarded append-only heads: PostgreSQL
       // runs the BEFORE INSERT trigger before conflict resolution, so it would
       // see a non-genesis update as an invalid genesis insert.
       const advancedFinding = head
-        ? rows<{ id: string }>(await tx.execute(sql`update finding_heads set sequence=${event.sequence},state=${event.state},evidence_hash=${event.evidenceHash},event_hash=${event.eventHash},updated_at=${event.occurredAt}::timestamptz where workspace_id=${workspaceId}::uuid and namespace='meta_data_health' and resolution_scope=${ref} and fingerprint=${event.fingerprint} and event_hash=${event.previousEventHash} returning id`))
-        : rows<{ id: string }>(await tx.execute(sql`insert into finding_heads(workspace_id,namespace,resolution_scope,fingerprint,sequence,state,evidence_hash,event_hash,updated_at) values(${workspaceId}::uuid,'meta_data_health',${ref},${event.fingerprint},${event.sequence},${event.state},${event.evidenceHash},${event.eventHash},${event.occurredAt}::timestamptz) returning id`));
+        ? rows<{ id: string }>(await tx.execute(sql`update finding_heads set sequence=${event.sequence},state=${event.state},evidence_hash=${event.evidenceHash},event_hash=${event.eventHash},updated_at=${event.occurredAt}::timestamptz where workspace_id=${workspaceId}::uuid and namespace='meta_data_health' and resolution_scope=${ref} and scope_ref=${scopeRef} and fingerprint=${event.fingerprint} and event_hash=${event.previousEventHash} returning id`))
+        : rows<{ id: string }>(await tx.execute(sql`insert into finding_heads(workspace_id,namespace,resolution_scope,scope_ref,fingerprint,sequence,state,evidence_hash,event_hash,updated_at) values(${workspaceId}::uuid,'meta_data_health',${ref},${scopeRef},${event.fingerprint},${event.sequence},${event.state},${event.evidenceHash},${event.eventHash},${event.occurredAt}::timestamptz) returning id`));
       if (advancedFinding.length !== 1) fail("write_conflict");
       const logSource = digest({ version: "development-log-occurrence/1", source, findingEventHash: event.eventHash });
       const logHeads = rows<LogHead>(await tx.execute(sql`select fingerprint,sequence,state,event_hash,latest_event_id from development_log_heads where workspace_id=${workspaceId}::uuid and namespace='meta_data_health' and resolution_scope=${ref} and fingerprint=${event.fingerprint} for update limit 2`));

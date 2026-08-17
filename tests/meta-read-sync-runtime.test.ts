@@ -189,13 +189,27 @@ describe("production Meta read sync composition", () => {
       .resolves.toMatchObject({ status: "partial", postProcess: "partial_result", postProcessRetryable: true });
   });
 
-  it("materializes one workspace health report for a partial normal run without resolving absent evidence", async () => {
-    const materialize = vi.fn(async () => undefined);
+  it("does not fabricate a wall-clock health occurrence for a partial normal run", async () => {
+    const materialize = vi.fn(async () => ({ outcome: "partial_without_ledger" as const }));
     const setup = fixture({ dataHealthMaterializer: { materialize } });
     await expect(setup.service.run({ parentRunId: "run_daily", dateStart: "2026-08-01", dateStop: "2026-08-07" }))
-      .resolves.toMatchObject({ postProcess: "completed" });
+      .resolves.toMatchObject({ status: "partial", postProcess: "partial_result", postProcessRetryable: true });
     expect(materialize).toHaveBeenCalledTimes(1);
-    expect(materialize).toHaveBeenCalledWith(expect.objectContaining({ workspaceId, externalAccountIds: ["act_123456"], resolveAbsent: false }));
+    expect(materialize).toHaveBeenCalledWith(expect.objectContaining({ workspaceId, externalAccountIds: ["act_123456"], resolveAbsent: false, occurredAt: null }));
+  });
+
+  it("uses the durable partial checkpoint time on every retry", async () => {
+    const materialize = vi.fn(async () => ({ outcome: "materialized" as const }));
+    const durablePartial = {
+      ...result(), streamRuns: [{ id: "private-stream", parentRunId: "run_daily", stream: "inventory" as const, accountId: "act_123456",
+        status: "partial" as const, completedSliceIds: [], cursorBySlice: { slice: { cursor: "next", cursorId: "cursor", updatedAt: "2026-08-17T10:00:00.000Z" } }, error: null }],
+    };
+    const setup = fixture({ dataHealthMaterializer: { materialize }, runtimeResult: () => durablePartial });
+    await setup.service.run({ parentRunId: "run_daily", dateStart: "2026-08-01", dateStop: "2026-08-07" });
+    await setup.service.run({ parentRunId: "run_daily", dateStart: "2026-08-01", dateStop: "2026-08-07" });
+    expect(materialize).toHaveBeenCalledTimes(2);
+    const healthCalls = materialize.mock.calls as unknown as readonly [Readonly<{ occurredAt: string | null }>][];
+    expect(healthCalls.map(([input]) => input.occurredAt)).toEqual(["2026-08-17T10:00:00.000Z", "2026-08-17T10:00:00.000Z"]);
   });
 
   it("injects the server-bound canonical creative/Page/Instagram persistence port", async () => {

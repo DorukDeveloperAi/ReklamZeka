@@ -3,6 +3,22 @@ import { createHash } from "node:crypto";
 import { publicSource, type PublicSource } from "@/domain/source/public-source";
 
 export const META_DATA_HEALTH_VERSION = "meta-data-health/1.0.0" as const;
+/** One workspace-level currency issue plus at most six current account issues. */
+export const META_DATA_HEALTH_MAX_ACCOUNTS = 250;
+export const META_DATA_HEALTH_MAX_OBSERVATIONS_PER_ACCOUNT = 6;
+export const META_DATA_HEALTH_MAX_WORKSPACE_OBSERVATIONS = 1;
+export const META_DATA_HEALTH_MAX_CURRENT_OBSERVATIONS = META_DATA_HEALTH_MAX_WORKSPACE_OBSERVATIONS
+  + META_DATA_HEALTH_MAX_ACCOUNTS * META_DATA_HEALTH_MAX_OBSERVATIONS_PER_ACCOUNT;
+/**
+ * History retains distinct fingerprints after source state changes. Each
+ * account can accumulate 19 finding fingerprints (15 source-state variants,
+ * required dates/fields, and two currency variants) plus one workspace issue.
+ */
+export const META_DATA_HEALTH_MAX_RETAINED_FINDING_HEADS = 1 + META_DATA_HEALTH_MAX_ACCOUNTS * 19;
+export const META_DATA_HEALTH_MAX_PROJECTED_EVENTS = META_DATA_HEALTH_MAX_CURRENT_OBSERVATIONS
+  + META_DATA_HEALTH_MAX_RETAINED_FINDING_HEADS;
+/** @deprecated Use CURRENT/RETAINED constants to avoid conflating the two. */
+export const META_DATA_HEALTH_MAX_OBSERVATIONS = META_DATA_HEALTH_MAX_CURRENT_OBSERVATIONS;
 
 export type MetaDataHealthIssueCode =
   | "source_partial"
@@ -198,7 +214,7 @@ export function buildMetaDataHealthReport(input: Readonly<{
   exact(input, ["workspaceRef", "workspaceCurrency", "evaluatedAt", "accounts"]);
   if (!/^workspace_[a-f0-9]{24}$/.test(input.workspaceRef)
     || input.workspaceCurrency !== null && !CURRENCY.test(input.workspaceCurrency)
-    || !Array.isArray(input.accounts) || input.accounts.length > 250) fail("invalid_input");
+    || !Array.isArray(input.accounts) || input.accounts.length > META_DATA_HEALTH_MAX_ACCOUNTS) fail("invalid_input");
   const evaluatedAt = instant(input.evaluatedAt);
   const accountRefs = input.accounts.map((account) => account.accountRef);
   if (new Set(accountRefs).size !== accountRefs.length) fail("duplicate_account");
@@ -260,6 +276,9 @@ export function buildMetaDataHealthReport(input: Readonly<{
   }
   accounts.sort((left, right) => compare(left.accountRef, right.accountRef));
   observations.sort((left, right) => compare(left.fingerprint, right.fingerprint));
+  // 1 workspace issue + 250 × 6 account issues = 1,501 observations. Keeping
+  // history at the same bound caps one full lifecycle projection at 3,002.
+  if (observations.length > META_DATA_HEALTH_MAX_CURRENT_OBSERVATIONS) fail("invalid_input");
   const state: MetaDataHealthReport["state"] = accounts.length === 0 ? "empty"
     : accounts.every((account) => account.state === "unavailable") ? "unavailable"
       : accounts.every((account) => account.state === "empty") ? "empty"

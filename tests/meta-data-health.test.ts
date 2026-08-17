@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMetaDataHealthReport, MetaDataHealthError, type MetaDataHealthAccountEvidence } from "@/domain/meta/data-health";
+import { buildMetaDataHealthReport, META_DATA_HEALTH_MAX_ACCOUNTS, META_DATA_HEALTH_MAX_OBSERVATIONS, MetaDataHealthError, type MetaDataHealthAccountEvidence } from "@/domain/meta/data-health";
 import { publicSource, type PublicSource } from "@/domain/source/public-source";
 
 const workspaceRef = `workspace_${"a".repeat(24)}`;
@@ -97,5 +97,16 @@ describe("canonical Meta data health", () => {
       .toThrowError(expect.objectContaining<Partial<MetaDataHealthError>>({ code: "source_mismatch" }));
     expect(() => buildMetaDataHealthReport({ workspaceRef, workspaceCurrency: "TRY", evaluatedAt: now,
       accounts: [account({ observedDates: ["2026-08-14"] })] })).toThrowError(MetaDataHealthError);
+  });
+
+  it("bounds the actual 250-account worst-case report at its documented 1,501 observations", () => {
+    const accounts = Array.from({ length: META_DATA_HEALTH_MAX_ACCOUNTS }, (_, index) => account({
+      accountRef: `account_${index.toString(16).padStart(24, "0")}`, currency: null,
+      sources: { mirror: source("canonical_meta_mirror", "partial"), performance: source("canonical_performance", "partial"), trust: source("derived_trust", "partial") },
+      observedDates: [], observedFields: [],
+    }));
+    const worstCase = buildMetaDataHealthReport({ workspaceRef, workspaceCurrency: null, evaluatedAt: now, accounts });
+    expect(worstCase.observations).toHaveLength(META_DATA_HEALTH_MAX_OBSERVATIONS);
+    expect(META_DATA_HEALTH_MAX_OBSERVATIONS).toBe(1_501);
   });
 });
