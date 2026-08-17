@@ -16,13 +16,16 @@ describe("P06 guide-run action binding", () => {
     expect(migration).toContain("h.state IS DISTINCT FROM 'completed'");
     expect(migration).toContain("gh.current_active_revision_id IS DISTINCT FROM r.guide_revision_id");
     expect(migration).toContain("a.payload_hash IS DISTINCT FROM public.guide_run_sha256(a.payload)");
-    expect(migration).toContain("cardinality(ARRAY(SELECT jsonb_object_keys(candidate)))<>4");
+    expect(migration).toContain("candidate ?& ARRAY['candidateRef','candidateHash','action','routing','stageable']");
     expect(migration).toContain("candidate->>'routing' NOT IN ('human_approval','limited_autonomy_review')");
-    expect(migration).toContain("u.source_hash IS DISTINCT FROM candidate->>'candidateHash'");
+    expect(migration).toContain("b.plan_ref IS DISTINCT FROM 'guide_candidate_'||candidate->>'candidateHash'");
+    expect(migration).toContain("u.source_hash IS DISTINCT FROM b.plan_hash");
     expect(migration).toContain("ENABLE ROW LEVEL SECURITY"); expect(migration).toContain("FORCE ROW LEVEL SECURITY");
     expect(migration).toContain("REVOKE ALL PRIVILEGES ON TABLE guide_run_action_bindings FROM PUBLIC,anon,authenticated,service_role");
     expect(WORKSPACE_TOMBSTONE_PURGE_TABLES.indexOf("guide_run_action_bindings")).toBeLessThan(WORKSPACE_TOMBSTONE_PURGE_TABLES.indexOf("guide_runs"));
     expect(WORKSPACE_TOMBSTONE_PURGE_TABLES.indexOf("guide_run_action_bindings")).toBeLessThan(WORKSPACE_TOMBSTONE_PURGE_TABLES.indexOf("action_proposal_units"));
+    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES.indexOf("action_proposal_unit_frozen_contexts")).toBeLessThan(WORKSPACE_TOMBSTONE_PURGE_TABLES.indexOf("action_proposal_units"));
+    expect(WORKSPACE_TOMBSTONE_PURGE_TABLES.indexOf("slice_rule_budget_action_unit_bindings")).toBeLessThan(WORKSPACE_TOMBSTONE_PURGE_TABLES.indexOf("action_proposal_units"));
   });
 
   it("rejects malformed binding input before any repository query", async () => {
@@ -36,6 +39,7 @@ describe("P06 guide-run action binding", () => {
     expect(source).not.toMatch(/executeMeta|graph\.facebook|fetch\(/i);
     expect(source).toContain("h.state='completed'");
     expect(source).toContain("current_active_revision_id=r.guide_revision_id");
-    expect(source).toContain("u.source_hash=a.payload->'disposition'->'candidate'->>'candidateHash'");
+    expect(source).toContain("GuideRunCandidateActionStagingPort");
+    expect(source).not.toContain("join action_proposal_units u on u.source_hash");
   });
 });

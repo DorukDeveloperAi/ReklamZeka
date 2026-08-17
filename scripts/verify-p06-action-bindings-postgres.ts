@@ -33,6 +33,7 @@ const evidence = {
   candidateTamperRejected: false, refHashAuthorityTamperRejected: false, wrongScopeRejected: false, crossTenantRejected: false,
   appendDeleteGuard: false, tombstonePurge: false, zeroResidue: false,
 };
+const mark = (stage: string) => console.log(JSON.stringify({ p06PreStage: stage }));
 function transition(run: GuideRunV12, toState: Parameters<typeof appendGuideRunTransitionV12>[1]["toState"], occurredAt: string, token: string): GuideRunV12 {
   return appendGuideRunTransitionV12(run, { expectedHeadHash: run.headEventHash, toState, occurredAt, leaseToken: token, leaseUntil: "2026-08-17T00:10:00.000Z" });
 }
@@ -50,6 +51,7 @@ try {
       evidence.p05Prerequisite = prerequisite.rows[0]?.exists === true;
       if (!evidence.p05Prerequisite) throw new Error("P05 prerequisite is not applied");
       await client.query(readFileSync("drizzle/20260817210000_p06_action_bindings.sql", "utf8"));
+      mark("migration_installed_outer_rollback");
       const shape = await client.query<{ force: boolean }>("select relforcerowsecurity force from pg_class where oid='public.guide_run_action_bindings'::regclass");
       evidence.p06AppliedOuterRollback = shape.rows.length === 1;
       evidence.rlsForced = shape.rows[0]?.force === true;
@@ -85,6 +87,7 @@ try {
       const staged = new ActionProposalStagingService({ version: ACTION_APPROVAL_POLICY_VERSION, policyRef: "policy_p06", revision: 1, autonomyMode: "approval_only", requesterRoles: ["operator"], approverRoles: [{ risk: "K2", roles: ["owner"] }], grantConsumerRoles: ["owner"], separationOfDutiesRisks: [], maximumProtectionEvidenceAgeSeconds: 3600, maximumProposalLifetimeSeconds: 86400, maximumGrantLifetimeSeconds: 300 }).stage({ plan: { planRef: "plan_p06", revision: 1, planHash: "f".repeat(64) }, workspaceRef, accountRef: "act_12345", requester: { actorRef: "actor_p06", role: "operator" }, proposedAt: "2026-08-17T00:01:00.000Z", expiresAt: "2026-08-18T00:01:00.000Z", units: [{ unitKey: "unit_p06_pause", plan: { planRef: "plan_p06", revision: 1, planHash: "f".repeat(64) }, actionPlan, workspaceRef, accountRef: "act_12345", entityRef: "campaign_12345", actionType: actionPlan.actionType, risk: actionPlan.risk, actionHash: digest(actionPlan.action), dependencies: [], summary: { safety: "public_safe", before: { label: "Önce", value: "Aktif" }, after: { label: "Sonra", value: "Duraklat" }, evidence: [{ evidenceRef: "evidence_p06", label: "Kanıt" }] } }] });
       const queue = new DrizzleActionProposalQueueRepository(outerDb, workspaceId);
       evidence.actionQueuePersisted = (await queue.appendInitial(staged)).outcome === "inserted" && (await queue.appendInitial(staged)).outcome === "unchanged";
+      mark("canonical_action_bundle_persisted");
       const unit = staged.bundle.units[0]!;
       const runs = new DrizzleGuideRunRepository(outerDb);
       const makeCompleted = async (requestRef: string, token: string) => {
@@ -94,35 +97,46 @@ try {
           run = transition(run, state, at, token); if (!await runs.compareAndSet({ run, expectedHeadHash: run.events.at(-2)!.eventHash })) throw new Error("run_cas_failed");
         }
         const candidate = { candidateRef: "candidate_p06_fixture", candidateHash: unit.sourceHash, action: unit.scope.actionType as "status_pause", routing: "human_approval" as const };
-        const payload = { disposition: { state: "staged", reason: "candidate_ready", recommendationRef: "recommendation_p06_fixture", candidate, authority: { canApprove: false, canExecute: false, canWriteMeta: false, canEnableAutomation: false } }, trusted: { dataQuality: "ready", evidenceHash: "1".repeat(64) }, analysisOutcome: "candidate_ready", guideRevisionHash: revisionHash, mode: "observe_analyze", actionAllowlist: [unit.scope.actionType] } as const;
+        const payload = { disposition: { state: "staged", reason: "candidate_ready", recommendationRef: "recommendation_p06_fixture", candidate, authority: { canApprove: false, canExecute: false, canWriteMeta: false, canEnableAutomation: false } }, trusted: { dataQuality: "ready", evidenceHash: "1".repeat(64) }, analysisOutcome: "no_change", guideRevisionHash: revisionHash, mode: "observe_analyze", actionAllowlist: [candidate.action] } as const;
         await runs.append({ artifactRef: `guide_run_artifact_${digest({ runRef: run.runRef, kind: "disposition", payload }).slice(0, 24)}`, runRef: run.runRef, kind: "disposition", payload, payloadHash: digest(payload), occurredAt: "2026-08-17T00:00:07.000Z", authority: closed, immutable: true });
         return run;
       };
       const first = await makeCompleted("request_p06_first", "11111111-1111-4111-8111-111111111111");
+      mark("completed_run_and_disposition_artifact_persisted");
       evidence.completedRun = first.state === "completed";
       const binding = new DrizzleGuideRunActionBindingRepository(outerDb);
       const saved = await binding.bind({ workspaceId, runRef: first.runRef }); const replay = await binding.bind({ workspaceId, runRef: first.runRef });
       evidence.materialized = saved.replay === false; evidence.replay = replay.replay === true && replay.bindingId === saved.bindingId;
+      mark("materializer_and_replay_verified");
       const second = await makeCompleted("request_p06_second", "22222222-2222-4222-8222-222222222222");
+      mark("second_completed_run_for_negative_matrix_persisted");
       const base = rows(await db.execute(sql`select b.id::text binding_id,a.id::text artifact_id from guide_run_action_bindings b join guide_run_artifacts a on a.workspace_id=b.workspace_id and a.id=b.disposition_artifact_id where b.workspace_id=${workspaceId}::uuid and b.run_id=(select id from guide_runs where workspace_id=${workspaceId}::uuid and run_ref=${first.runRef})`))[0]!;
       evidence.candidateTamperRejected = await rejected(client, () => client.query("update guide_run_artifacts set payload=jsonb_set(payload,'{disposition,candidate,candidateHash}','\\\"0\\\"'::jsonb) where id=$1::uuid", [base.artifact_id]));
       evidence.refHashAuthorityTamperRejected = await rejected(client, () => client.query("update guide_run_artifacts set authority='{}'::jsonb where id=$1::uuid", [base.artifact_id]));
+      mark("artifact_candidate_ref_hash_authority_tamper_rejected");
       const secondIds = rows(await db.execute(sql`select r.id::text run_id,r.guide_revision_id::text revision_id,a.id::text artifact_id,u.id::text unit_id,p.id::text proposal_id from guide_runs r join guide_run_artifacts a on a.workspace_id=r.workspace_id and a.run_id=r.id join action_proposal_units u on u.workspace_id=r.workspace_id and u.unit_ref=${unit.unitRef} join action_proposal_bundles p on p.workspace_id=u.workspace_id and p.id=u.bundle_id where r.workspace_id=${workspaceId}::uuid and r.run_ref=${second.runRef}`))[0]!;
       const insert = (o: Record<string, string> = {}, tenant = workspaceId) => client.query("insert into guide_run_action_bindings(workspace_id,run_id,guide_revision_id,disposition_artifact_id,action_unit_id,proposal_bundle_id,action_unit_ref,action_unit_hash,proposal_ref,proposal_hash,entity_ref,slice_ref,market_key,effective_guide_set_hash,resolution_hash) values($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8,$9,$10,$11,$12,$13,$14,$15)", [tenant, secondIds.run_id, secondIds.revision_id, secondIds.artifact_id, secondIds.unit_id, secondIds.proposal_id, o.unitRef ?? unit.unitRef, o.unitHash ?? unit.unitHash, o.proposalRef ?? staged.bundle.bundleRef, o.proposalHash ?? staged.bundle.bundleHash, o.entityRef ?? "campaign_12345", o.sliceRef ?? "slice_p06_fixture", o.marketKey ?? "yerli", o.guideHash ?? digest({ guideRef, guideRevisionHash: revisionHash, sliceRef: "slice_p06_fixture", market: "yerli" }), o.resolutionHash ?? digest({ guideRevisionHash: revisionHash, candidateHash: unit.sourceHash, actionUnitHash: unit.unitHash, proposalHash: staged.bundle.bundleHash })]);
       evidence.wrongScopeRejected = (await rejected(client, () => insert({ entityRef: "campaign_wrong" }))) && (await rejected(client, () => insert({ sliceRef: "slice_wrong" }))) && (await rejected(client, () => insert({ marketKey: "yabanci" })));
       evidence.crossTenantRejected = await rejected(client, () => insert({}, foreignWorkspaceId));
+      mark("scope_and_cross_tenant_rejected");
       evidence.appendDeleteGuard = (await rejected(client, () => client.query("update guide_run_action_bindings set decision='approved' where id=$1::uuid", [base.binding_id]))) && (await rejected(client, () => client.query("delete from guide_run_action_bindings where id=$1::uuid", [base.binding_id])));
+      await client.query("savepoint p06_stale_guide_head");
+      await client.query("set local session_replication_role=replica");
       await client.query("update guide_heads set current_active_revision_id=null where workspace_id=$1::uuid and guide_id=$2::uuid", [workspaceId, guideId]);
+      await client.query("set local session_replication_role=origin");
       try { await binding.bind({ workspaceId, runRef: first.runRef }); } catch { evidence.staleGuideHeadRejected = true; }
-      await client.query("update guide_heads set current_active_revision_id=$1::uuid where workspace_id=$2::uuid and guide_id=$3::uuid", [revisionId, workspaceId, guideId]);
+      await client.query("rollback to savepoint p06_stale_guide_head");
       const purge = new DrizzleWorkspaceTombstonePurgePort(); await client.query("update workspaces set lifecycle_state='tombstoning' where id=$1::uuid", [workspaceId]);
       const inspection = await purge.inspect(outerDb, workspaceId); await purge.purge(outerDb, { workspaceId, expectedRevision: inspection.revision });
       const remaining = await client.query<{ n: string }>("select ((select count(*) from guide_run_action_bindings where workspace_id=$1::uuid)+(select count(*) from guide_runs where workspace_id=$1::uuid)+(select count(*) from guide_run_artifacts where workspace_id=$1::uuid))::text n", [workspaceId]);
       evidence.tombstonePurge = remaining.rows[0]?.n === "0";
+      mark("tombstone_purge_verified");
       throw rollback;
+    } catch (error) {
+      if (error !== rollback) throw error;
     } finally { await client.query("rollback").catch(() => undefined); }
   } finally { client.release(); }
-  const residue = await pool.query<{ n: string }>("select count(*)::text n from pg_class where oid='public.guide_run_action_bindings'::regclass");
+  const residue = await pool.query<{ n: string }>("select count(*)::text n from pg_class where oid=to_regclass('public.guide_run_action_bindings')");
   evidence.zeroResidue = residue.rows[0]?.n === "0";
   if (!Object.values(evidence).filter((x) => typeof x === "boolean").every(Boolean)) throw new Error(JSON.stringify(evidence));
   console.log(JSON.stringify(evidence));

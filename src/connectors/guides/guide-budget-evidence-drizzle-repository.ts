@@ -79,7 +79,7 @@ export class DrizzleGuideBudgetEvidenceRepository implements GuideBudgetEvidence
       guideRevisionId: string;
       at: string;
     }>,
-  ): Promise<GuideBudgetEvidenceBundle> {
+  ): Promise<GuideBudgetEvidenceBundle & Readonly<{ effectiveGuideOverlap: ReturnType<typeof resolveEffectiveGuideOverlap>; targetScopeRef: string }>> {
     if (!UUID.test(input.workspaceId) || !UUID.test(input.guideRevisionId))
       failure("scope");
     return this.database.transaction(async (tx) => {
@@ -203,6 +203,9 @@ export class DrizzleGuideBudgetEvidenceRepository implements GuideBudgetEvidence
       );
       return Object.freeze({
         contract,
+        /** Server-only shared P04/P06 canonical overlap evidence. */
+        effectiveGuideOverlap: effective,
+        targetScopeRef: contract.targetScopeRef,
         targetCurrentBudgetDecimal: evidence.current,
         scopeEvidence: evidence.scopes,
         constraints,

@@ -338,7 +338,7 @@ function validateActionPlan(value: ActionPlan): ActionPlan {
 
 function normalizeRequester(value: ActionActor): ActionActor {
   exact(value, ["actorRef", "role"]);
-  if (!["owner", "admin", "operator", "analyst"].includes(value.role)) fail("invalid_input");
+  if (!["owner", "admin", "operator", "analyst", "agent"].includes(value.role)) fail("invalid_input");
   return freeze({ actorRef: ref(value.actorRef), role: value.role });
 }
 

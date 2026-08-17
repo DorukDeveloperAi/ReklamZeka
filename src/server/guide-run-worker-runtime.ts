@@ -1,6 +1,7 @@
 import { GuideRunOrchestrationService, type GuideRunDailyAgentPort, type GuideRunFrozenScopePort, type GuideRunHolisticAgentPort, type GuideRunTrustedDataHealthPort } from "@/application/guide-run-orchestration-service";
 import { DrizzleGuideRunRepository } from "@/connectors/guides/guide-run-drizzle-repository";
 import { DrizzleGuideRunP01LedgerProjector } from "@/connectors/guides/guide-run-p01-ledger-projector";
+import { DrizzleGuideRunActionBindingRepository, type GuideRunCandidateActionStagingPort } from "@/connectors/guides/guide-run-action-binding-drizzle-repository";
 import { DrizzleGuideLifecycleRepository } from "@/connectors/guides/guide-lifecycle-drizzle-repository";
 import { planScheduledGuideRuns } from "@/domain/guides/guide-run-scheduler";
 import type { GuideRevision } from "@/domain/guides/guide-revision";
@@ -54,10 +55,13 @@ export function createGuideRunWorker(input: Readonly<{
   dailyAnalysis: GuideRunDailyAgentPort;
   holisticAnalysis: GuideRunHolisticAgentPort;
   dataHealth: GuideRunTrustedDataHealthPort;
+  /** Optional until the server installs the canonical P06 staging composition.
+   * Its absence is fail-closed: no action binding is materialized. */
+  candidateActionStaging?: GuideRunCandidateActionStagingPort;
 }>) {
   const persistence = new DrizzleGuideRunRepository(input.database);
   const service = new GuideRunOrchestrationService(persistence, input.frozenScopes, input.dailyAnalysis, input.holisticAnalysis, input.dataHealth, persistence);
-  return Object.freeze({ service, persistence, ledger: new DrizzleGuideRunP01LedgerProjector(input.database) });
+  return Object.freeze({ service, persistence, ledger: new DrizzleGuideRunP01LedgerProjector(input.database), actionBindings: input.candidateActionStaging ? new DrizzleGuideRunActionBindingRepository(input.database, input.candidateActionStaging) : null });
 }
 
 /**
@@ -71,6 +75,7 @@ export function createGuideRunSchedulerWorker(input: Readonly<{
   dailyAnalysis: GuideRunDailyAgentPort;
   holisticAnalysis: GuideRunHolisticAgentPort;
   dataHealth: GuideRunTrustedDataHealthPort;
+  candidateActionStaging?: GuideRunCandidateActionStagingPort;
 }>): GuideRunSchedulerWorker {
   const worker = createGuideRunWorker(input);
   return new GuideRunSchedulerWorker(worker, new DrizzleGuideRunActiveSchedulePort(input.database));
@@ -107,6 +112,9 @@ export class GuideRunSchedulerWorker {
       // The projector itself reads/decodes immutable records and is a no-op for
       // runs without finding artifacts; callers never provide agent payloads.
       await this.worker.ledger.projectPersisted({ workspaceId: entry.workspaceId, runRef: complete.run.runRef });
+      // Materialization is post-disposition only. The repository re-reads the
+      // immutable artifact and refuses legacy/non-stageable candidates.
+      if (this.worker.actionBindings && complete.disposition.state === "staged") await this.worker.actionBindings.bind({ workspaceId: entry.workspaceId, runRef: complete.run.runRef });
       outputs.push(Object.freeze({ runRef: complete.run.runRef, state: complete.run.state }));
     }
     return Object.freeze(outputs);

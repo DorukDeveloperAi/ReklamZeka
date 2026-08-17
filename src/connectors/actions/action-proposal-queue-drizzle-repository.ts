@@ -264,6 +264,16 @@ function trustedApplicability(lifecycle: ApprovalLifecycle): ApprovalPolicyAppli
     if (unit.scope.actionType === "budget_increase" && unit.risk === "K3") {
       return [Object.freeze({ actionType: "budget_increase", risk: "K3" })];
     }
+    // Status policy definitions became a trusted source requirement with the
+    // P06 agent requester path.  Historical owner/operator status bundles were
+    // intentionally persisted without such a source and remain readable and
+    // exactly replayable; only newly server-proposed agent units require it.
+    if (unit.requester.role === "agent" && unit.scope.actionType === "status_pause" && unit.risk === "K2") {
+      return [Object.freeze({ actionType: "status_pause", risk: "K2" })];
+    }
+    if (unit.requester.role === "agent" && unit.scope.actionType === "status_activate" && unit.risk === "K3") {
+      return [Object.freeze({ actionType: "status_activate", risk: "K3" })];
+    }
     return [];
   });
   if (applicable.length === 0) return null;

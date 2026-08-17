@@ -4,6 +4,24 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "12c1da0cb",
+      "tarih": "2026-08-18",
+      "konu": "feat(reports): add accessible scope report interface",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e0dfbe770",
+      "tarih": "2026-08-18",
+      "konu": "docs(reports): record xlsx and trusted context acceptance",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
       "hash": "ce6b86f7a",
       "tarih": "2026-08-17",
       "konu": "feat(guides): persist guide runs and bind execution contracts",
@@ -119,24 +137,6 @@
       "kapsam": [
         "docs"
       ]
-    },
-    {
-      "hash": "68c445484",
-      "tarih": "2026-08-17",
-      "konu": "fix(operations): expose local session boundary",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "a8f5be677",
-      "tarih": "2026-08-17",
-      "konu": "feat(guides): persist canonical lifecycle",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
@@ -146,7 +146,7 @@
     },
     {
       "kapsam": "docs",
-      "adet": 14
+      "adet": 15
     },
     {
       "kapsam": "fix",
@@ -154,12 +154,12 @@
     },
     {
       "kapsam": "test",
-      "adet": 7
+      "adet": 6
     }
   ],
-  "isSayisi": 584,
+  "isSayisi": 586,
   "ilkIsTarihi": "2026-08-06",
-  "sonIsTarihi": "2026-08-17",
+  "sonIsTarihi": "2026-08-18",
   "planlar": [
     {
       "slug": "proje",
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "76d3ffd8c1a3"
+  "damga": "df55cdf2019f"
 }

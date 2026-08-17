@@ -72,6 +72,8 @@ export type GuideRunDisposition = Readonly<{
     candidateHash: string;
     action: GuideAction;
     routing: "human_approval" | "limited_autonomy_review";
+    /** v1.1 candidate evidence. Old v1.0 candidates remain display-only. */
+    stageable?: Readonly<{ version: "candidate/1.1"; entityRef: string; entityLevel: "campaign" | "adset" | "ad"; membershipHash: string; sliceRef: string; market: "yerli" | "yabanci"; typedAction: Record<string, unknown> }> | null;
   }> | null;
   authority: Readonly<{
     canApprove: false;
@@ -499,7 +501,7 @@ export function resolveGuideRunDisposition(input: Readonly<{
   dataQuality: "ready" | "missing" | "stale";
   analysisOutcome: "finding" | "no_change";
   recommendationRef: string | null;
-  candidate: Readonly<{ candidateRef: string; candidateHash: string; action: GuideAction }> | null;
+  candidate: Readonly<{ candidateRef: string; candidateHash: string; action: GuideAction; stageable?: Readonly<{ version: "candidate/1.1"; entityRef: string; entityLevel: "campaign" | "adset" | "ad"; membershipHash: string; sliceRef: string; market: "yerli" | "yabanci"; typedAction: Record<string, unknown> }> }> | null;
 }>): GuideRunDisposition {
   exact(input, ["mode", "actionAllowlist", "dataQuality", "analysisOutcome", "recommendationRef", "candidate"]);
   if (!GUIDE_MODES.includes(input.mode) || !["ready", "missing", "stale"].includes(input.dataQuality)
@@ -509,14 +511,25 @@ export function resolveGuideRunDisposition(input: Readonly<{
   const recommendationRef = input.recommendationRef === null ? null : ref(input.recommendationRef, "recommendation_");
   let candidate: GuideRunDisposition["candidate"] = null;
   if (input.candidate !== null) {
-    exact(input.candidate, ["candidateRef", "candidateHash", "action"]);
+    const stageableKeys = ["candidateRef", "candidateHash", "action", "stageable"];
+    if (!hasExactKeys(input.candidate, ["candidateRef", "candidateHash", "action"]) && !hasExactKeys(input.candidate, stageableKeys)) fail("invalid_input");
     if (!GUIDE_ACTIONS.includes(input.candidate.action) || !input.actionAllowlist.includes(input.candidate.action)
       || !HASH.test(input.candidate.candidateHash)) fail("mode_violation");
     const authority = guideAuthority(input.mode, input.actionAllowlist);
+    let stageable: GuideRunDisposition["candidate"] extends infer T ? T extends { stageable: infer S } ? S : never : never = undefined as never;
+    if (input.candidate.stageable !== undefined) {
+      const value = input.candidate.stageable;
+      if (!value || typeof value !== "object" || !hasExactKeys(value, ["version","entityRef","entityLevel","membershipHash","sliceRef","market","typedAction"])
+        || value.version !== "candidate/1.1" || !REF.test(value.entityRef) || !["campaign","adset","ad"].includes(value.entityLevel)
+        || !HASH.test(value.membershipHash) || !REF.test(value.sliceRef) || !["yerli","yabanci"].includes(value.market)
+        || !value.typedAction || typeof value.typedAction !== "object" || Array.isArray(value.typedAction)
+        || input.candidate.candidateHash !== digest({ candidateRef: input.candidate.candidateRef, action: input.candidate.action, ...value })) fail("mode_violation");
+      stageable = Object.freeze({ ...value }) as never;
+    }
     candidate = Object.freeze({ candidateRef: ref(input.candidate.candidateRef, "candidate_"),
       candidateHash: input.candidate.candidateHash, action: input.candidate.action,
       routing: authority.humanApprovalActions.includes(input.candidate.action)
-        ? "human_approval" : "limited_autonomy_review" });
+        ? "human_approval" : "limited_autonomy_review", ...(stageable ? { stageable } : {}) });
   }
   if (input.mode === "observe_analyze" && (recommendationRef !== null || candidate !== null)) fail("mode_violation");
   if (input.mode === "recommend" && candidate !== null) fail("mode_violation");

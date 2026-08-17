@@ -6,8 +6,9 @@ export const ACTION_APPROVAL_POLICY_VERSION = "action-approval-policy/1.0.0" as 
 export const ACTION_APPROVAL_GRANT_VERSION = "action-approval-grant/1.0.0" as const;
 
 export type ActionRisk = "K0" | "K1" | "K2" | "K3" | "K4";
-export type ActionActorRole = "owner" | "admin" | "operator" | "analyst";
-export type ActionApprovalRole = Exclude<ActionActorRole, "analyst">;
+export type ActionActorRole = "owner" | "admin" | "operator" | "analyst" | "agent";
+/** Agents can propose only; they can never approve or consume a grant. */
+export type ActionApprovalRole = Exclude<ActionActorRole, "analyst" | "agent">;
 export type ActionUnitApprovalState =
   | "awaiting_approval"
   | "approved"
@@ -215,7 +216,7 @@ const HASH = /^[a-f0-9]{64}$/;
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const CODE = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const RISKS: readonly ActionRisk[] = ["K0", "K1", "K2", "K3", "K4"];
-const ROLES: readonly ActionActorRole[] = ["owner", "admin", "operator", "analyst"];
+const ROLES: readonly ActionActorRole[] = ["owner", "admin", "operator", "analyst", "agent"];
 const APPROVER_ROLES: readonly ActionApprovalRole[] = ["owner", "admin", "operator"];
 const ZERO_HASH = "0".repeat(64);
 
@@ -517,7 +518,7 @@ function validateLifecycle(candidate: ApprovalLifecycle): ApprovalLifecycle {
       ref(unit.decisionRef);
       instant(unit.decidedAt);
       normalizedDecisionActor = actor(unit.decisionActor);
-      if (normalizedDecisionActor.role === "analyst"
+      if (normalizedDecisionActor.role === "analyst" || normalizedDecisionActor.role === "agent"
         || !policyRoles(candidate, definition.risk).includes(normalizedDecisionActor.role)
         || (candidate.policy.separationOfDutiesRisks.includes(definition.risk)
           && normalizedDecisionActor.actorRef === definition.requester.actorRef)) fail("invalid_input");
@@ -544,7 +545,7 @@ function validateLifecycle(candidate: ApprovalLifecycle): ApprovalLifecycle {
         || !Number.isSafeInteger(unit.grant.planRevision) || unit.grant.planRevision < 1
         || unit.grant.planHash !== definition.plan.planHash || unit.grant.singleUse !== true
         || unit.grant.capability !== "approval_evidence_only" || unit.grant.canExecute !== false
-        || approver.role === "analyst" || !policyRoles(candidate, definition.risk).includes(approver.role)
+        || approver.role === "analyst" || approver.role === "agent" || !policyRoles(candidate, definition.risk).includes(approver.role)
         || (candidate.policy.separationOfDutiesRisks.includes(definition.risk)
           && approver.actorRef === definition.requester.actorRef)
         || !normalizedDecisionActor || unit.decisionRef === null || unit.decidedAt === null
@@ -555,7 +556,7 @@ function validateLifecycle(candidate: ApprovalLifecycle): ApprovalLifecycle {
         || (consumedAt === null) !== (consumedBy === null)
         || (consumedAt !== null && (Date.parse(consumedAt) < Date.parse(approvedAt)
           || Date.parse(consumedAt) >= Date.parse(expiresAt)))
-        || (consumedBy !== null && (consumedBy.role === "analyst"
+        || (consumedBy !== null && (consumedBy.role === "analyst" || consumedBy.role === "agent"
           || !candidate.policy.grantConsumerRoles.includes(consumedBy.role)))
         || digest(grantCore) !== grantHash) fail("invalid_input");
       grantRefs.add(grantRef);
@@ -743,7 +744,7 @@ export function decideActionUnit(lifecycleInput: ApprovalLifecycle, command: App
     if (current?.state === "dependency_failed") fail("dependency_failed");
     fail("invalid_transition");
   }
-  if (decisionActor.role === "analyst" || !policyRoles(working, definition.risk).includes(decisionActor.role)) {
+  if (decisionActor.role === "analyst" || decisionActor.role === "agent" || !policyRoles(working, definition.risk).includes(decisionActor.role)) {
     fail("policy_denied");
   }
   if (working.policy.separationOfDutiesRisks.includes(definition.risk)
@@ -824,7 +825,7 @@ export function consumeApprovalGrant(input: Readonly<{
   const state = lifecycle.units.find((unit) => unit.unitRef === unitRef);
   const consumer = actor(input.consumer);
   if (!definition || !state || state.state !== "approved" || !state.grant) fail("invalid_transition");
-  if (consumer.role === "analyst" || !lifecycle.policy.grantConsumerRoles.includes(consumer.role)) fail("policy_denied");
+  if (consumer.role === "analyst" || consumer.role === "agent" || !lifecycle.policy.grantConsumerRoles.includes(consumer.role)) fail("policy_denied");
   if (state.grant.consumedAt !== null) fail("grant_used");
   if (Date.parse(consumedAt) >= Date.parse(state.grant.expiresAt)) fail("grant_expired");
   if (ref(input.grantRef) !== state.grant.grantRef || hash(input.unitHash) !== definition.unitHash
