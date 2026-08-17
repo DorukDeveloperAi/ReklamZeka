@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 5cf6495803ee -->
+<!-- durum-damga: 6e5e5e005973 -->
 
 ## Künye
 
@@ -14,13 +14,16 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 578 |
+| iş commit'i (tüm geçmiş) | 581 |
 | ilk / son iş | 2026-08-06 / 2026-08-17 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-17 | `feat` | persist primary result bindings | `6f85dd8dd` |
+| 2026-08-17 | `feat` | harden run scheduling chain | `78b0a16eb` |
+| 2026-08-17 | `feat` | add safe budget dry run | `205f88c98` |
 | 2026-08-17 | `feat` | persist data health lifecycle | `53186edf9` |
 | 2026-08-17 | `feat` | trust canonical primary result catalog | `25dfa99e6` |
 | 2026-08-17 | `test` | lock table-first information architecture | `4db71800e` |
@@ -33,17 +36,14 @@
 | 2026-08-17 | `feat` | resolve canonical current slices | `d4e3e7078` |
 | 2026-08-17 | `feat` | persist canonical budget history | `9158181bd` |
 | 2026-08-17 | `feat` | add current slice resolver adapter | `3a2bf9c53` |
-| 2026-08-17 | `feat` | resolve restrictive overlap authority | `21c63dff1` |
-| 2026-08-17 | `fix` | require canonical account timezone | `9ef530049` |
-| 2026-08-17 | `fix` | preserve hierarchy pagination and ownership | `182930db4` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 28
-- `docs        ` ███████████ 13
-- `fix         ` █████████ 10
+- `feat        ` ████████████████████████ 30
+- `docs        ` ██████████ 13
+- `fix         ` ███████ 9
 - `test        ` ██████ 7
-- `?           ` ██ 2
+- `?           ` █ 1
 
 ## Planlar
 

@@ -4,6 +4,33 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "6f85dd8dd",
+      "tarih": "2026-08-17",
+      "konu": "feat(operations): persist primary result bindings",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "78b0a16eb",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): harden run scheduling chain",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "205f88c98",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): add safe budget dry run",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "53186edf9",
       "tarih": "2026-08-17",
       "konu": "feat(meta): persist data health lifecycle",
@@ -110,39 +137,12 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "21c63dff1",
-      "tarih": "2026-08-17",
-      "konu": "feat(guides): resolve restrictive overlap authority",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "9ef530049",
-      "tarih": "2026-08-17",
-      "konu": "fix(operations): require canonical account timezone",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "182930db4",
-      "tarih": "2026-08-17",
-      "konu": "fix(operations): preserve hierarchy pagination and ownership",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 28
+      "adet": 30
     },
     {
       "kapsam": "docs",
@@ -150,7 +150,7 @@
     },
     {
       "kapsam": "fix",
-      "adet": 10
+      "adet": 9
     },
     {
       "kapsam": "test",
@@ -158,10 +158,10 @@
     },
     {
       "kapsam": "?",
-      "adet": 2
+      "adet": 1
     }
   ],
-  "isSayisi": 578,
+  "isSayisi": 581,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-17",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "5cf6495803ee"
+  "damga": "6e5e5e005973"
 }
