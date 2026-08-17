@@ -85,6 +85,7 @@
     "verify:meta-affected-geo-db": "tsx scripts/verify-meta-affected-geo-postgres.ts",
     "verify:meta-affected-geo-live-db": "tsx scripts/verify-meta-affected-geo-live-postgres.ts",
     "verify:meta-read-sync-schedule-db": "tsx scripts/verify-meta-read-sync-schedule-postgres.ts",
+    "verify:slice-registry-db": "tsx scripts/verify-slice-registry-postgres.ts",
     "run:meta-read-sync-schedule": "tsx scripts/run-meta-read-sync-schedule-tick.ts",
     "verify:decision-room-persistence-db": "tsx scripts/verify-decision-room-persistence-postgres.ts",
     "verify:finding-observation-read-db": "tsx scripts/verify-finding-observation-read-postgres.ts",
