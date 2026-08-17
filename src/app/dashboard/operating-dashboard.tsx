@@ -24,6 +24,7 @@ import { NormalizationWorkbenchPanel } from "./normalization-workbench-panel";
 import { MetaTrustReadinessPanel } from "./meta-trust-readiness-panel";
 import { HomePortfolioOverview } from "./home-portfolio-overview";
 import { CanonicalCampaignPortfolioPanel } from "./canonical-campaign-portfolio-panel";
+import { OperationTablePanel } from "./operation-table-panel";
 import { campaignContextBridge } from "./campaign-planning-brief-panel";
 import { LocalSessionConnector } from "./local-session-connector";
 import { SkillCatalogContextStrip, type SkillCatalogContext } from "./skill-catalog-context-strip";
@@ -1272,21 +1273,15 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
       : metaReadMirrorState === "session_required" ? "Kampanyalar için yerel oturum gerekli"
         : "Kanonik kampanya kaynağı kullanılamıyor";
     return <>
-      <section className={styles.pageHero}><div><span className={styles.kicker}>OPERASYON · PORTFÖY ÇALIŞMASI</span><h1>Seçili kapsamı aynı bağlamda inceleyin ve işletin.</h1><p>Gerçek Meta hiyerarşisini ayrıntıda okuyun; inceleme, kullanıcı kuralı ve Agent yardımı seçili kapsamdan açılır. Bu yüzey veri veya kuralın ikinci bir kaydını oluşturmaz.</p></div>{campaignArea === "portfolio" ? <button className={styles.primaryButton} onClick={() => void refreshMetaReadMirror(true)}>Kaynağı yenile</button> : null}</section>
+      <section className={styles.pageHero}><div><span className={styles.kicker}>OPERASYON · PORTFÖY ÇALIŞMASI</span><h1>Seçili kapsamı aynı bağlamda inceleyin ve işletin.</h1><p>Gerçek Meta hiyerarşisini ayrıntıda okuyun; inceleme, kullanıcı kuralı ve Agent yardımı seçili kapsamdan açılır. Bu yüzey veri veya kuralın ikinci bir kaydını oluşturmaz. Kaynak doğrulanana kadar ekran örnek içerikle doldurulmaz.</p></div>{campaignArea === "portfolio" ? <button className={styles.primaryButton} onClick={() => void refreshMetaReadMirror(true)}>Kaynağı yenile</button> : null}</section>
       <SectionNav<CampaignArea> label="Kampanya çalışma alanı" active={campaignArea} onChange={(area) => commitDashboardLocation({ ...dashboardLocation, campaignArea: area })} items={[
         { id: "portfolio", label: "Portföy", description: "Kampanya → kreatif" },
         { id: "classification", label: "Künye inceleme", description: "Eksik ve çelişkili sınıflar" },
         { id: "promotion", label: "Gönderi öne çıkarma", description: "K4 ön kontrol" },
         { id: "timeline", label: "Geçmiş", description: "Kural, alarm ve karar izi" },
       ]} />
-      {campaignArea === "portfolio" && hasCanonicalCampaignSource && metaReadMirror
-        ? <CanonicalCampaignPortfolioPanel projection={metaReadMirror} onOpenAgentContext={openAgentContext} onOpenDecisionContext={(campaignRef, label) => void openCampaignDecisionContext(campaignRef, label)} onOpenCanonicalRule={openCanonicalRule} onOpenSliceWorkspace={openSlicePreparation} />
-        : campaignArea === "portfolio" ? <section className={styles.panel} aria-labelledby="campaign-source-state-title">
-          <header className={styles.panelHeader}><div><span className={styles.kicker}>KAYNAK DURUMU</span><h2 id="campaign-source-state-title">{unavailableTitle}</h2></div><StatusPill tone={metaReadMirrorState === "unavailable" ? "warning" : "neutral"}>{metaReadMirrorState}</StatusPill></header>
-          <p>{metaReadMirrorState === "session_required" ? "Çalışma alanına bağlı kampanya aynası yerel oturum olmadan okunamaz. Bu sınır aşılmadan kampanya adı, bütçe, performans veya hiyerarşi gösterilmez." : metaReadMirrorState === "loading" ? "Kanonik ayna doğrulanıyor. Sonuç gelene kadar ekran örnek içerikle doldurulmaz." : metaReadMirrorError ?? "Kanonik ayna beklenen salt-okunur sözleşmeyle doğrulanamadı."}</p>
-          {metaReadMirrorState === "session_required" ? <LocalSessionConnector title="Kanonik kampanya kaynağını bağlayın" onVerify={verifyAndRefreshLocalSession} /> : null}
-          <div className={styles.agentActions}>{metaReadMirrorState === "session_required" ? null : <button className={styles.primaryButton} onClick={() => void refreshMetaReadMirror(true)}>Tekrar dene</button>}<button onClick={() => openSettings("meta")}>Kaynak ayarları</button></div>
-        </section> : campaignArea === "classification" ? <CampaignClassificationReviewPanel onPrepareAssignment={(handoff) => {
+      {campaignArea === "portfolio" ? <OperationTablePanel onConnect={verifyAndRefreshLocalSession} />
+        : campaignArea === "classification" ? <CampaignClassificationReviewPanel onPrepareAssignment={(handoff) => {
           setCategoryAssignmentHandoff(handoff); openSettings("categories");
         }} onOpenSlicePreparation={openSlicePreparation} onOpenCategorySetup={() => openSettings("categories")} />
           : campaignArea === "promotion" ? <PromotionPreflightPanel embedded />

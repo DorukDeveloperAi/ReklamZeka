@@ -4,6 +4,33 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "a8f5be677",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): persist canonical lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "d4e3e7078",
+      "tarih": "2026-08-17",
+      "konu": "feat(operations): resolve canonical current slices",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "9158181bd",
+      "tarih": "2026-08-17",
+      "konu": "feat(meta): persist canonical budget history",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "3a2bf9c53",
       "tarih": "2026-08-17",
       "konu": "feat(operations): add current slice resolver adapter",
@@ -110,43 +137,16 @@
       "kapsam": [
         "fix"
       ]
-    },
-    {
-      "hash": "fec0b8ff9",
-      "tarih": "2026-08-17",
-      "konu": "docs(plan): track accepted v3 subtasks",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
-    },
-    {
-      "hash": "ea0d4fcbe",
-      "tarih": "2026-08-17",
-      "konu": "feat(campaigns): add safe naming template domain",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "6dc250628",
-      "tarih": "2026-08-17",
-      "konu": "feat(meta): add unified data health domain",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 24
+      "adet": 27
     },
     {
       "kapsam": "fix",
-      "adet": 16
+      "adet": 13
     },
     {
       "kapsam": "docs",
@@ -161,7 +161,7 @@
       "adet": 3
     }
   ],
-  "isSayisi": 567,
+  "isSayisi": 570,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-17",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "10d69b31e94d"
+  "damga": "9b42ded0be53"
 }
