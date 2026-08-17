@@ -41,6 +41,9 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "slice_rule_scenario_allocation_selections",
   "slice_rule_budget_action_unit_bindings",
   "slice_rule_budget_proposal_bindings",
+  // Temporal links precede their Kurum Kampanyası and Meta/category parents.
+  "organization_campaign_meta_memberships",
+  "organization_campaigns",
   "delivery_health_alert_ledger_records",
   "local_agent_handoffs",
   "local_agent_sessions",
@@ -583,6 +586,12 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'operational_events', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from operational_events where workspace_id = ${workspaceId}::uuid
+      union all select 'organization_campaign_meta_memberships', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from organization_campaign_meta_memberships where workspace_id = ${workspaceId}::uuid
+      union all select 'organization_campaigns', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from organization_campaigns where workspace_id = ${workspaceId}::uuid
       order by table_name
     `));
 
@@ -735,6 +744,8 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from effective_campaign_policy_compositions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_context_components where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_contexts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from organization_campaign_meta_memberships where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from organization_campaigns where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_assignments where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_profile_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_definitions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

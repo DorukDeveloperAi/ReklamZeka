@@ -188,7 +188,7 @@ export function assertTrustedLocalDecisionRoomRequest(
     "policy-bundle-confirm-human-presence", "policy-bundle-publish-approval-policy",
     "policy-bundle-publish-guardrail-policy", "guidance-studio-publish", "guidance-studio-archive",
     "guidance-set-review", "guidance-set-archive",
-    "category-authoring-mutate", "category-profile-mutate", "starter-category-adoption-confirm",
+    "category-authoring-mutate", "category-profile-mutate", "starter-category-adoption-confirm", "organization-campaign-mutate",
     "instruction-policy-mutate", "practice-lab-standardize", "promotion-template-lifecycle-publish",
     "progressive-formalization-mutate", "decision-cadence-publish", "experiment-record-mutate", "business-outcome-record",
   ].includes(request.headers.get("x-reklamzeka-intent") ?? "")) throw new LocalDecisionRoomBoundaryError("untrusted_request");

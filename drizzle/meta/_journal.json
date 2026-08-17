@@ -736,6 +736,13 @@
       "when": 1786791892314,
       "tag": "20260815110452_steady_scarlet_spider",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1786960912542,
+      "tag": "20260817100152_next_goblin_queen",
+      "breakpoints": true
     }
   ]
 }

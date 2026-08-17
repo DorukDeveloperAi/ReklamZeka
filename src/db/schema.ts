@@ -119,7 +119,6 @@ export const categoryAssignmentSource = pgEnum("category_assignment_source", [
   "agent",
   "deterministic",
 ]);
-
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull(),
@@ -712,6 +711,53 @@ export const adCampaigns = pgTable("ad_campaigns", {
   uniqueIndex("ad_campaigns_id_workspace_unique").on(table.id, table.workspaceId),
   uniqueIndex("ad_campaigns_workspace_id_unique").on(table.workspaceId, table.id),
   index("ad_campaigns_workspace_idx").on(table.workspaceId),
+]);
+
+/**
+ * A user-owned operational campaign. It is not a mirror of a Meta campaign:
+ * a Kurum Kampanyası can have zero or many time-bounded Meta memberships.
+ */
+export const organizationCampaigns = pgTable("organization_campaigns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  marketDefinitionId: uuid("market_definition_id").notNull(),
+  createdByActorId: uuid("created_by_actor_id").notNull(),
+  tombstonedAt: timestamp("tombstoned_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("organization_campaigns_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("organization_campaigns_workspace_market_row_unique").on(table.workspaceId, table.id, table.marketDefinitionId),
+  index("organization_campaigns_workspace_active_idx").on(table.workspaceId, table.tombstonedAt, table.createdAt),
+  foreignKey({ columns: [table.workspaceId, table.createdByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "organization_campaigns_creator_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.marketDefinitionId], foreignColumns: [categoryDefinitions.workspaceId, categoryDefinitions.id], name: "organization_campaigns_market_definition_scope_fk" }).onDelete("restrict"),
+  check("organization_campaigns_label_nonempty", sql`length(btrim(${table.label})) between 1 and 160`),
+]);
+
+/**
+ * Immutable temporal link to the canonical Meta mirror. The exclusion rule is
+ * installed in SQL because Drizzle has no portable range-exclusion builder.
+ * Unassigned campaigns intentionally have no row and are projected on read.
+ */
+export const organizationCampaignMetaMemberships = pgTable("organization_campaign_meta_memberships", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  organizationCampaignId: uuid("organization_campaign_id").notNull(),
+  campaignId: uuid("campaign_id").notNull(),
+  marketDefinitionId: uuid("market_definition_id").notNull(),
+  effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull(),
+  effectiveTo: timestamp("effective_to", { withTimezone: true }),
+  assignedByActorId: uuid("assigned_by_actor_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("organization_campaign_meta_memberships_workspace_row_unique").on(table.workspaceId, table.id),
+  index("organization_campaign_meta_memberships_campaign_temporal_idx").on(table.workspaceId, table.campaignId, table.effectiveFrom),
+  index("organization_campaign_meta_memberships_org_temporal_idx").on(table.workspaceId, table.organizationCampaignId, table.effectiveFrom),
+  foreignKey({ columns: [table.workspaceId, table.organizationCampaignId, table.marketDefinitionId], foreignColumns: [organizationCampaigns.workspaceId, organizationCampaigns.id, organizationCampaigns.marketDefinitionId], name: "organization_campaign_meta_memberships_org_market_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.marketDefinitionId], foreignColumns: [categoryDefinitions.workspaceId, categoryDefinitions.id], name: "organization_campaign_meta_memberships_market_definition_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.campaignId], foreignColumns: [adCampaigns.workspaceId, adCampaigns.id], name: "organization_campaign_meta_memberships_campaign_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.assignedByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "organization_campaign_meta_memberships_actor_scope_fk" }).onDelete("restrict"),
+  check("organization_campaign_meta_memberships_effective_range", sql`${table.effectiveTo} is null or ${table.effectiveTo} > ${table.effectiveFrom}`),
 ]);
 
 export const metaAdSets = pgTable("meta_ad_sets", {
