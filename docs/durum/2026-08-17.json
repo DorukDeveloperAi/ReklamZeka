@@ -4,6 +4,24 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "53186edf9",
+      "tarih": "2026-08-17",
+      "konu": "feat(meta): persist data health lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "25dfa99e6",
+      "tarih": "2026-08-17",
+      "konu": "feat(operations): trust canonical primary result catalog",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "4db71800e",
       "tarih": "2026-08-17",
       "konu": "test(dashboard): lock table-first information architecture",
@@ -119,30 +137,12 @@
       "kapsam": [
         "fix"
       ]
-    },
-    {
-      "hash": "38ebc5aec",
-      "tarih": "2026-08-17",
-      "konu": "feat(meta): gate actions on canonical data health",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "d0c4323a2",
-      "tarih": "2026-08-17",
-      "konu": "feat(operations): complete canonical read aggregation",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 27
+      "adet": 28
     },
     {
       "kapsam": "docs",
@@ -150,7 +150,7 @@
     },
     {
       "kapsam": "fix",
-      "adet": 11
+      "adet": 10
     },
     {
       "kapsam": "test",
@@ -161,7 +161,7 @@
       "adet": 2
     }
   ],
-  "isSayisi": 576,
+  "isSayisi": 578,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-17",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "76ecbb2cbdb1"
+  "damga": "5cf6495803ee"
 }

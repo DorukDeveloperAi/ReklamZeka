@@ -965,6 +965,65 @@ export const guideActivationOutbox = pgTable("guide_activation_outbox", {
   id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), guideId: uuid("guide_id").notNull(), guideRevisionId: uuid("guide_revision_id").notNull(), activationKey: text("activation_key").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [uniqueIndex("guide_activation_outbox_key_unique").on(table.workspaceId, table.activationKey), index("guide_activation_outbox_workspace_revision_idx").on(table.workspaceId, table.guideRevisionId, table.createdAt), index("guide_activation_outbox_workspace_guide_fk_idx").on(table.workspaceId, table.guideId), index("guide_activation_outbox_workspace_revision_fk_idx").on(table.workspaceId, table.guideRevisionId, table.guideId), foreignKey({ columns: [table.workspaceId, table.guideId], foreignColumns: [guides.workspaceId, guides.id], name: "guide_activation_outbox_guide_scope_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.guideRevisionId, table.guideId], foreignColumns: [guideRevisions.workspaceId, guideRevisions.id, guideRevisions.guideId], name: "guide_activation_outbox_revision_scope_fk" }).onDelete("restrict"), check("guide_activation_outbox_key", sql`${table.activationKey} ~ '^guide_activation_[a-f0-9]{64}$'`)]);
 
+/**
+ * User-selected primary result. The polymorphic target is deliberately
+ * expressed as two nullable, tenant-scoped FKs plus a closed XOR discriminator:
+ * a binding can never silently point across a workspace or market boundary.
+ */
+export const primaryResultBindingRevisions = pgTable("primary_result_binding_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  bindingId: uuid("binding_id").notNull(),
+  subjectKind: text("subject_kind").notNull(),
+  organizationCampaignId: uuid("organization_campaign_id"),
+  sliceId: uuid("slice_id"),
+  marketDefinitionId: uuid("market_definition_id").notNull(),
+  revisionNumber: integer("revision_number").notNull(),
+  revisionHash: text("revision_hash").notNull(),
+  previousRevisionHash: text("previous_revision_hash"),
+  state: text("state").notNull(),
+  selector: text("selector"),
+  actionCatalogHash: text("action_catalog_hash"),
+  createdByActorId: uuid("created_by_actor_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  uniqueIndex("primary_result_binding_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("primary_result_binding_revisions_workspace_hash_unique").on(table.workspaceId, table.revisionHash),
+  uniqueIndex("primary_result_binding_revisions_workspace_binding_number_unique").on(table.workspaceId, table.bindingId, table.revisionNumber),
+  uniqueIndex("primary_result_binding_revisions_workspace_subject_number_unique").on(table.workspaceId, table.subjectKind, table.organizationCampaignId, table.sliceId, table.revisionNumber),
+  uniqueIndex("primary_result_binding_revisions_workspace_subject_row_unique").on(table.workspaceId, table.id, table.subjectKind, table.organizationCampaignId, table.sliceId, table.bindingId),
+  index("primary_result_binding_revisions_workspace_subject_idx").on(table.workspaceId, table.subjectKind, table.organizationCampaignId, table.sliceId, table.revisionNumber),
+  index("primary_result_binding_revisions_workspace_actor_fk_idx").on(table.workspaceId, table.createdByActorId),
+  foreignKey({ columns: [table.workspaceId, table.organizationCampaignId, table.marketDefinitionId], foreignColumns: [organizationCampaigns.workspaceId, organizationCampaigns.id, organizationCampaigns.marketDefinitionId], name: "primary_result_binding_revisions_org_market_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.sliceId, table.marketDefinitionId], foreignColumns: [slices.workspaceId, slices.id, slices.marketDefinitionId], name: "primary_result_binding_revisions_slice_market_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.marketDefinitionId], foreignColumns: [categoryDefinitions.workspaceId, categoryDefinitions.id], name: "primary_result_binding_revisions_market_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.createdByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "primary_result_binding_revisions_actor_scope_fk" }).onDelete("restrict"),
+  check("primary_result_binding_revisions_contract", sql`${table.revisionNumber} >= 1 and ${table.revisionHash} ~ '^[a-f0-9]{64}$' and (${table.previousRevisionHash} is null or ${table.previousRevisionHash} ~ '^[a-f0-9]{64}$') and ((${table.subjectKind}='organization_campaign' and ${table.organizationCampaignId} is not null and ${table.sliceId} is null) or (${table.subjectKind}='slice' and ${table.sliceId} is not null and ${table.organizationCampaignId} is null)) and ((${table.state}='bound' and ${table.selector} ~ '^actions/[a-z][a-z0-9_.:-]{0,120}$' and ${table.actionCatalogHash} ~ '^[a-f0-9]{64}$') or (${table.state}='unbound' and ${table.selector} is null and ${table.actionCatalogHash} is null))`),
+]);
+
+/** OCC pointer; a trigger admits only the next immutable revision of this exact subject. */
+export const primaryResultBindingHeads = pgTable("primary_result_binding_heads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  bindingId: uuid("binding_id").notNull(),
+  subjectKind: text("subject_kind").notNull(),
+  organizationCampaignId: uuid("organization_campaign_id"),
+  sliceId: uuid("slice_id"),
+  marketDefinitionId: uuid("market_definition_id").notNull(),
+  latestRevisionId: uuid("latest_revision_id").notNull(),
+  version: integer("version").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  uniqueIndex("primary_result_binding_heads_workspace_subject_unique").on(table.workspaceId, table.subjectKind, table.organizationCampaignId, table.sliceId),
+  uniqueIndex("primary_result_binding_heads_workspace_row_unique").on(table.workspaceId, table.id),
+  index("primary_result_binding_heads_workspace_latest_fk_idx").on(table.workspaceId, table.latestRevisionId),
+  foreignKey({ columns: [table.workspaceId, table.organizationCampaignId, table.marketDefinitionId], foreignColumns: [organizationCampaigns.workspaceId, organizationCampaigns.id, organizationCampaigns.marketDefinitionId], name: "primary_result_binding_heads_org_market_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.sliceId, table.marketDefinitionId], foreignColumns: [slices.workspaceId, slices.id, slices.marketDefinitionId], name: "primary_result_binding_heads_slice_market_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.marketDefinitionId], foreignColumns: [categoryDefinitions.workspaceId, categoryDefinitions.id], name: "primary_result_binding_heads_market_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.latestRevisionId], foreignColumns: [primaryResultBindingRevisions.workspaceId, primaryResultBindingRevisions.id], name: "primary_result_binding_heads_latest_revision_scope_fk" }).onDelete("restrict"),
+  check("primary_result_binding_heads_contract", sql`${table.version} >= 1 and ((${table.subjectKind}='organization_campaign' and ${table.organizationCampaignId} is not null and ${table.sliceId} is null) or (${table.subjectKind}='slice' and ${table.sliceId} is not null and ${table.organizationCampaignId} is null))`),
+]);
+
 export const metaAdSets = pgTable("meta_ad_sets", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),

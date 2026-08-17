@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 76ecbb2cbdb1 -->
+<!-- durum-damga: 5cf6495803ee -->
 
 ## Künye
 
@@ -14,13 +14,15 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 576 |
+| iş commit'i (tüm geçmiş) | 578 |
 | ilk / son iş | 2026-08-06 / 2026-08-17 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-17 | `feat` | persist data health lifecycle | `53186edf9` |
+| 2026-08-17 | `feat` | trust canonical primary result catalog | `25dfa99e6` |
 | 2026-08-17 | `test` | lock table-first information architecture | `4db71800e` |
 | 2026-08-17 | `docs` | record table-first browser checkpoint | `6fb2817e0` |
 | 2026-08-17 | `feat` | make operations table first | `a178e25f4` |
@@ -34,14 +36,12 @@
 | 2026-08-17 | `feat` | resolve restrictive overlap authority | `21c63dff1` |
 | 2026-08-17 | `fix` | require canonical account timezone | `9ef530049` |
 | 2026-08-17 | `fix` | preserve hierarchy pagination and ownership | `182930db4` |
-| 2026-08-17 | `feat` | gate actions on canonical data health | `38ebc5aec` |
-| 2026-08-17 | `feat` | complete canonical read aggregation | `d0c4323a2` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 27
-- `docs        ` ████████████ 13
-- `fix         ` ██████████ 11
+- `feat        ` ████████████████████████ 28
+- `docs        ` ███████████ 13
+- `fix         ` █████████ 10
 - `test        ` ██████ 7
 - `?           ` ██ 2
 
