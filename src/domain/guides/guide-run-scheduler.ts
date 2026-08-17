@@ -1,13 +1,16 @@
+import { createHash } from "node:crypto";
+
 import { nextGuideScheduledAt, validateGuideSchedule, type GuideSchedule } from "@/domain/guides/guide-revision";
 import { manualGuideRunIdempotencyKey, scheduledGuideRunIdempotencyKey } from "@/domain/guides/guide-run";
 
-export const GUIDE_RUN_SCHEDULER_VERSION = "guide-run-scheduler/1.0.0" as const;
+export const GUIDE_RUN_SCHEDULER_VERSION = "guide-run-scheduler/1.1.0" as const;
 
 export type GuideRunSchedulePlan = Readonly<{
   version: typeof GUIDE_RUN_SCHEDULER_VERSION;
   guideRef: string;
   guideRevisionHash: string;
-  missed: readonly Readonly<{ scheduledFor: string; idempotencyKey: string; state: "missed" }> [];
+  /** One durable range receipt: scheduler downtime never expands into an unbounded run array. */
+  missed: Readonly<{ state: "missed"; firstScheduledFor: string; lastScheduledFor: string; count: number; idempotencyKey: string }> | null;
   claim: Readonly<{ scheduledFor: string; idempotencyKey: string; state: "due" }> | null;
   cursor: Readonly<{ previousScheduledFor: string | null; advanceTo: string | null }>;
   nextScheduledAt: string;
@@ -15,7 +18,7 @@ export type GuideRunSchedulePlan = Readonly<{
 }>;
 
 export class GuideRunSchedulerError extends Error {
-  constructor(readonly code: "invalid_input" | "inactive_guide" | "backlog_exceeded") {
+  constructor(readonly code: "invalid_input" | "inactive_guide" | "count_overflow") {
     super(`Guide run scheduler rejected: ${code}`);
     this.name = "GuideRunSchedulerError";
   }
@@ -30,8 +33,61 @@ function exact(value: unknown, keys: readonly string[]): asserts value is Record
     || Object.keys(value).some((key) => !keys.includes(key))) fail("invalid_input");
 }
 function instant(value: unknown): string {
-  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) fail("invalid_input");
-  return new Date(value).toISOString();
+  if (typeof value !== "string" || !/^\d{4}-\d\d-\d\dT/.test(value) || !Number.isFinite(Date.parse(value))) fail("invalid_input");
+  const normalized = new Date(value).toISOString();
+  // A persisted schedule needs a full 366-day internal lookback/lookahead without Date.UTC's 0–99 remap.
+  if (!/^\d{4}-/.test(normalized) || Number(normalized.slice(0, 4)) < 102 || Number(normalized.slice(0, 4)) > 9996) fail("invalid_input");
+  return normalized;
+}
+function calendarInstant(value: string): string {
+  if (!/^\d{4}-\d\d-\d\dT/.test(value) || !Number.isFinite(Date.parse(value))) fail("invalid_input");
+  const normalized = new Date(value).toISOString();
+  if (!/^\d{4}-/.test(normalized) || Number(normalized.slice(0, 4)) < 100 || Number(normalized.slice(0, 4)) > 9998) fail("invalid_input");
+  return normalized;
+}
+function missedRangeIdempotencyKey(guideRevisionHash: string, firstScheduledFor: string, lastScheduledFor: string, count: number): string {
+  return `guide_missed_range_${createHash("sha256").update(JSON.stringify({ guideRevisionHash, firstScheduledFor, lastScheduledFor, count })).digest("hex")}`;
+}
+function nextSafeGuideScheduledAt(schedule: GuideSchedule, after: string): string {
+  return calendarInstant(nextGuideScheduledAt(schedule, after));
+}
+function localDate(value: string, timezone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" })
+    .formatToParts(new Date(value));
+  const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return `${String(values.year).padStart(4, "0")}-${values.month}-${values.day}`;
+}
+function utcDays(left: string, right: string): number {
+  return Math.round((Date.parse(`${right}T00:00:00.000Z`) - Date.parse(`${left}T00:00:00.000Z`)) / 86_400_000);
+}
+function slotCount(schedule: GuideSchedule, first: string, last: string): number {
+  const firstDate = localDate(first, schedule.timezone);
+  const lastDate = localDate(last, schedule.timezone);
+  const days = utcDays(firstDate, lastDate);
+  const count = schedule.frequency === "daily" ? days + 1
+    : schedule.frequency === "weekly" ? Math.floor(days / 7) + 1
+      : schedule.frequency === "custom_days" ? Math.floor(days / schedule.intervalDays) + 1
+        : (Number(lastDate.slice(0, 4)) * 12 + Number(lastDate.slice(5, 7))) - (Number(firstDate.slice(0, 4)) * 12 + Number(firstDate.slice(5, 7))) + 1;
+  if (!Number.isSafeInteger(count) || count < 1) fail("count_overflow");
+  return count;
+}
+function recentWindowDays(schedule: GuideSchedule): number {
+  if (schedule.frequency === "daily") return 3;
+  if (schedule.frequency === "weekly") return 10;
+  if (schedule.frequency === "monthly") return 42;
+  return schedule.intervalDays + 3;
+}
+/** Bounded search around now. Unlike a backlog walk, calls stay constant for arbitrarily old cursors. */
+function newestDue(schedule: GuideSchedule, now: string): string | null {
+  const probe = new Date(Math.max(Date.parse(now) - recentWindowDays(schedule) * 86_400_000,
+    Date.parse("0100-01-01T00:00:00.000Z"))).toISOString();
+  let candidate = nextSafeGuideScheduledAt(schedule, probe);
+  let newest: string | null = null;
+  for (let index = 0; index < 4 && Date.parse(candidate) <= Date.parse(now); index += 1) {
+    newest = candidate;
+    candidate = nextSafeGuideScheduledAt(schedule, candidate);
+  }
+  return newest;
 }
 
 export function planScheduledGuideRuns(input: Readonly<{
@@ -52,22 +108,19 @@ export function planScheduledGuideRuns(input: Readonly<{
   const lastScheduledFor = input.head.lastScheduledFor === null ? null : instant(input.head.lastScheduledFor);
   if (Date.parse(activatedAt) > Date.parse(now)
     || lastScheduledFor !== null && Date.parse(lastScheduledFor) < Date.parse(activatedAt)) fail("invalid_input");
-  const maximumSlots = input.maximumSlots ?? 100;
-  if (!Number.isSafeInteger(maximumSlots) || maximumSlots < 1 || maximumSlots > 366) fail("invalid_input");
-  const due: string[] = [];
-  let cursor = lastScheduledFor ?? activatedAt;
-  let next = nextGuideScheduledAt(schedule, cursor);
-  while (Date.parse(next) <= Date.parse(now)) {
-    due.push(next);
-    if (due.length > maximumSlots) fail("backlog_exceeded");
-    cursor = next;
-    next = nextGuideScheduledAt(schedule, cursor);
-  }
-  const newest = due.at(-1) ?? null;
-  const missed = Object.freeze(due.slice(0, -1).map((scheduledFor) => Object.freeze({ scheduledFor,
-    idempotencyKey: scheduledGuideRunIdempotencyKey(input.guide.revisionHash, scheduledFor), state: "missed" as const })));
+  if (input.maximumSlots !== undefined && (!Number.isSafeInteger(input.maximumSlots) || input.maximumSlots < 1 || input.maximumSlots > 366)) fail("invalid_input");
+  const after = lastScheduledFor ?? activatedAt;
+  const first = nextSafeGuideScheduledAt(schedule, after);
+  const newest = Date.parse(first) <= Date.parse(now) ? newestDue(schedule, now) : null;
+  if (newest !== null && Date.parse(newest) < Date.parse(first)) fail("invalid_input");
+  const totalDue = newest === null ? 0 : slotCount(schedule, first, newest);
+  const previousNewest = newest === null || totalDue < 2 ? null : newestDue(schedule, new Date(Date.parse(newest) - 1).toISOString());
+  const missed = totalDue > 1 && previousNewest !== null ? Object.freeze({ state: "missed" as const,
+    firstScheduledFor: first, lastScheduledFor: previousNewest, count: totalDue - 1,
+    idempotencyKey: missedRangeIdempotencyKey(input.guide.revisionHash, first, previousNewest, totalDue - 1) }) : null;
   const claim = newest === null ? null : Object.freeze({ scheduledFor: newest,
     idempotencyKey: scheduledGuideRunIdempotencyKey(input.guide.revisionHash, newest), state: "due" as const });
+  const next = newest === null ? first : nextSafeGuideScheduledAt(schedule, newest);
   return Object.freeze({ version: GUIDE_RUN_SCHEDULER_VERSION, guideRef: input.guide.guideRef,
     guideRevisionHash: input.guide.revisionHash, missed, claim,
     cursor: Object.freeze({ previousScheduledFor: lastScheduledFor, advanceTo: newest ?? lastScheduledFor }),

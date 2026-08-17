@@ -4,8 +4,10 @@ import {
   GUIDE_ACTIONS, GUIDE_MODES, guideAuthority, type GuideAction, type GuideMode,
 } from "@/domain/guides/guide-revision";
 
-export const GUIDE_RUN_VERSION = "guide-run/1.0.0" as const;
-export const GUIDE_RUN_EVENT_VERSION = "guide-run-event/1.0.0" as const;
+export const GUIDE_RUN_VERSION = "guide-run/1.1.0" as const;
+export const GUIDE_RUN_EVENT_VERSION = "guide-run-event/1.1.0" as const;
+export const GUIDE_RUN_V1_LEGACY_VERSION = "guide-run/1.0.0" as const;
+export const GUIDE_RUN_EVENT_V1_LEGACY_VERSION = "guide-run-event/1.0.0" as const;
 
 export const GUIDE_RUN_STATES = Object.freeze([
   "due", "claimed", "scope_frozen", "analyzing", "recorded",
@@ -20,6 +22,7 @@ export type GuideRunTrigger =
 export type GuideRunEvent = Readonly<{
   version: typeof GUIDE_RUN_EVENT_VERSION;
   eventRef: string;
+  runRef: string;
   sequence: number;
   previousEventHash: string;
   fromState: GuideRunState | null;
@@ -27,6 +30,7 @@ export type GuideRunEvent = Readonly<{
   occurredAt: string;
   leaseToken: string | null;
   leaseUntil: string | null;
+  leaseEpoch: number | null;
   reasonCode: string | null;
   eventHash: string;
 }>;
@@ -42,7 +46,7 @@ export type GuideRun = Readonly<{
   state: GuideRunState;
   sequence: number;
   headEventHash: string;
-  lease: Readonly<{ token: string; expiresAt: string }> | null;
+  lease: Readonly<{ token: string; expiresAt: string; epoch: number }> | null;
   events: readonly GuideRunEvent[];
   authority: Readonly<{ canApprove: false; canExecute: false; canWriteMeta: false }>;
 }>;
@@ -110,8 +114,19 @@ function ref(value: unknown, prefix?: string): string {
   return value;
 }
 function instant(value: unknown): string {
-  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) fail("invalid_input");
-  return new Date(value).toISOString();
+  if (typeof value !== "string" || !/^\d{4}-\d\d-\d\dT/.test(value) || !Number.isFinite(Date.parse(value))) fail("invalid_input");
+  const normalized = new Date(value).toISOString();
+  // Date.UTC maps years 0–99 into 1900–1999. Keep persisted evidence inside the safe calendar range.
+  if (!/^\d{4}-/.test(normalized) || Number(normalized.slice(0, 4)) < 100 || Number(normalized.slice(0, 4)) > 9998) fail("invalid_input");
+  return normalized;
+}
+function leaseToken(value: unknown): string {
+  if (typeof value !== "string" || !UUID.test(value) || value !== value.toLowerCase()) fail("lease_required");
+  return value;
+}
+function epoch(value: unknown): number {
+  if (!Number.isSafeInteger(value) || Number(value) < 1 || Number(value) > Number.MAX_SAFE_INTEGER) fail("lease_required");
+  return Number(value);
 }
 function reason(value: unknown): string | null {
   if (value === null) return null;
@@ -146,9 +161,9 @@ function identifyEvent(value: Omit<GuideRunEvent, "eventRef" | "eventHash">): Gu
   return Object.freeze({ ...value, eventRef: `guide_run_event_${eventHash.slice(0, 24)}`, eventHash });
 }
 
-function initialEvent(occurredAt: string): GuideRunEvent {
+function initialEvent(runRef: string, occurredAt: string): GuideRunEvent {
   return identifyEvent({ version: GUIDE_RUN_EVENT_VERSION, sequence: 1, previousEventHash: "GENESIS",
-    fromState: null, toState: "due", occurredAt, leaseToken: null, leaseUntil: null, reasonCode: null });
+    runRef, fromState: null, toState: "due", occurredAt, leaseToken: null, leaseUntil: null, leaseEpoch: null, reasonCode: null });
 }
 
 export function createGuideRun(input: Readonly<{
@@ -168,9 +183,10 @@ export function createGuideRun(input: Readonly<{
   const idempotencyKey = trigger.kind === "scheduled"
     ? scheduledGuideRunIdempotencyKey(input.guideRevisionHash, trigger.scheduledFor)
     : manualGuideRunIdempotencyKey(input.guideRevisionHash, trigger.requestRef);
-  const event = initialEvent(occurredAt);
   const runIdentity = digest({ workspaceRef, guideRef, guideRevisionHash: input.guideRevisionHash, trigger, idempotencyKey });
-  return Object.freeze({ version: GUIDE_RUN_VERSION, runRef: `guide_run_${runIdentity.slice(0, 24)}`,
+  const runRef = `guide_run_${runIdentity.slice(0, 24)}`;
+  const event = initialEvent(runRef, occurredAt);
+  return Object.freeze({ version: GUIDE_RUN_VERSION, runRef,
     workspaceRef, guideRef, guideRevisionHash: input.guideRevisionHash, trigger, idempotencyKey,
     state: "due", sequence: 1, headEventHash: event.eventHash, lease: null,
     events: Object.freeze([event]), authority: AUTHORITY });
@@ -178,14 +194,18 @@ export function createGuideRun(input: Readonly<{
 
 const NEXT = Object.freeze({
   due: Object.freeze(["claimed", "missed", "failed"] as const),
-  claimed: Object.freeze(["scope_frozen", "failed"] as const),
-  scope_frozen: Object.freeze(["analyzing", "failed"] as const),
-  analyzing: Object.freeze(["recorded", "failed"] as const),
+  claimed: Object.freeze(["claimed", "scope_frozen", "failed"] as const),
+  scope_frozen: Object.freeze(["scope_frozen", "analyzing", "failed"] as const),
+  analyzing: Object.freeze(["analyzing", "recorded", "failed"] as const),
   recorded: Object.freeze(["held", "staged", "no_action", "failed"] as const),
   held: Object.freeze(["completed", "failed"] as const),
   staged: Object.freeze(["completed", "failed"] as const),
   no_action: Object.freeze(["completed", "failed"] as const),
   completed: Object.freeze([] as const), failed: Object.freeze([] as const), missed: Object.freeze([] as const),
+}) satisfies Readonly<Record<GuideRunState, readonly GuideRunState[]>>;
+const LEGACY_NEXT = Object.freeze({
+  ...NEXT, claimed: Object.freeze(["scope_frozen", "failed"] as const),
+  scope_frozen: Object.freeze(["analyzing", "failed"] as const), analyzing: Object.freeze(["recorded", "failed"] as const),
 }) satisfies Readonly<Record<GuideRunState, readonly GuideRunState[]>>;
 
 export function appendGuideRunTransition(run: GuideRun, input: Readonly<{
@@ -194,10 +214,11 @@ export function appendGuideRunTransition(run: GuideRun, input: Readonly<{
   occurredAt: string;
   leaseToken?: string;
   leaseUntil?: string;
+  leaseEpoch?: number;
   reasonCode?: string | null;
 }>): GuideRun {
   if (!verifyGuideRun(run)) fail("invalid_chain");
-  const transitionKeys = ["expectedHeadHash", "toState", "occurredAt", "leaseToken", "leaseUntil", "reasonCode"] as const;
+  const transitionKeys = ["expectedHeadHash", "toState", "occurredAt", "leaseToken", "leaseUntil", "leaseEpoch", "reasonCode"] as const;
   if (!input || typeof input !== "object" || Array.isArray(input)
     || !Object.hasOwn(input, "expectedHeadHash") || !Object.hasOwn(input, "toState") || !Object.hasOwn(input, "occurredAt")
     || Object.keys(input).some((key) => !transitionKeys.includes(key as typeof transitionKeys[number]))) fail("invalid_input");
@@ -210,24 +231,49 @@ export function appendGuideRunTransition(run: GuideRun, input: Readonly<{
   if (Date.parse(occurredAt) < Date.parse(previous.occurredAt)) fail("invalid_transition");
   let eventLeaseToken: string | null = null;
   let eventLeaseUntil: string | null = null;
+  let eventLeaseEpoch: number | null = null;
   let nextLease = run.lease;
   if (input.toState === "claimed") {
-    if (typeof input.leaseToken !== "string" || !UUID.test(input.leaseToken) || input.leaseUntil === undefined) fail("lease_required");
-    eventLeaseToken = input.leaseToken.toLowerCase();
+    if (input.leaseUntil === undefined) fail("lease_required");
+    eventLeaseToken = leaseToken(input.leaseToken);
     eventLeaseUntil = instant(input.leaseUntil);
     if (Date.parse(eventLeaseUntil) <= Date.parse(occurredAt)) fail("lease_expired");
-    nextLease = Object.freeze({ token: eventLeaseToken, expiresAt: eventLeaseUntil });
+    if (run.state === "due") {
+      if (input.leaseEpoch !== undefined && input.leaseEpoch !== 1) fail("lease_required");
+      eventLeaseEpoch = 1;
+    } else {
+      if (!run.lease) fail("lease_required");
+      const expired = Date.parse(occurredAt) >= Date.parse(run.lease.expiresAt);
+      if (expired ? eventLeaseToken === run.lease.token : eventLeaseToken !== run.lease.token) fail("lease_required");
+      if (!expired && Date.parse(eventLeaseUntil) <= Date.parse(run.lease.expiresAt)) fail("lease_required");
+      if (run.lease.epoch === Number.MAX_SAFE_INTEGER || input.leaseEpoch !== undefined && input.leaseEpoch !== run.lease.epoch + 1) fail("lease_required");
+      eventLeaseEpoch = run.lease.epoch + 1;
+    }
+    nextLease = Object.freeze({ token: eventLeaseToken, expiresAt: eventLeaseUntil, epoch: eventLeaseEpoch });
+  } else if (input.toState === run.state && ["scope_frozen", "analyzing"].includes(run.state)) {
+    if (!run.lease || input.leaseUntil === undefined) fail("lease_required");
+    eventLeaseToken = leaseToken(input.leaseToken);
+    eventLeaseUntil = instant(input.leaseUntil);
+    const expired = Date.parse(occurredAt) >= Date.parse(run.lease.expiresAt);
+    if (expired ? eventLeaseToken === run.lease.token : eventLeaseToken !== run.lease.token) fail("lease_required");
+    if (Date.parse(eventLeaseUntil) <= Date.parse(occurredAt) || !expired && Date.parse(eventLeaseUntil) <= Date.parse(run.lease.expiresAt)) fail("lease_expired");
+    if (run.lease.epoch === Number.MAX_SAFE_INTEGER || input.leaseEpoch !== undefined && input.leaseEpoch !== run.lease.epoch + 1) fail("lease_required");
+    eventLeaseEpoch = run.lease.epoch + 1;
+    nextLease = Object.freeze({ token: eventLeaseToken, expiresAt: eventLeaseUntil, epoch: eventLeaseEpoch });
   } else if (run.state !== "due") {
-    if (!run.lease || input.leaseToken?.toLowerCase() !== run.lease.token) fail("lease_required");
+    if (!run.lease || leaseToken(input.leaseToken) !== run.lease.token) fail("lease_required");
     if (Date.parse(occurredAt) >= Date.parse(run.lease.expiresAt)) fail("lease_expired");
     if (input.leaseUntil !== undefined && instant(input.leaseUntil) !== run.lease.expiresAt) fail("lease_required");
+    if (input.leaseEpoch !== undefined && input.leaseEpoch !== run.lease.epoch) fail("lease_required");
     eventLeaseToken = run.lease.token;
     eventLeaseUntil = run.lease.expiresAt;
-  } else if (input.leaseToken !== undefined || input.leaseUntil !== undefined) fail("lease_required");
+    eventLeaseEpoch = run.lease.epoch;
+  } else if (input.leaseToken !== undefined || input.leaseUntil !== undefined || input.leaseEpoch !== undefined) fail("lease_required");
   if (["completed", "failed", "missed"].includes(input.toState)) nextLease = null;
   const event = identifyEvent({ version: GUIDE_RUN_EVENT_VERSION, sequence: run.sequence + 1,
     previousEventHash: run.headEventHash, fromState: run.state, toState: input.toState, occurredAt,
-    leaseToken: eventLeaseToken, leaseUntil: eventLeaseUntil, reasonCode: reason(input.reasonCode ?? null) });
+    runRef: run.runRef, leaseToken: eventLeaseToken, leaseUntil: eventLeaseUntil, leaseEpoch: eventLeaseEpoch,
+    reasonCode: reason(input.reasonCode ?? null) });
   return Object.freeze({ ...run, state: input.toState, sequence: event.sequence, headEventHash: event.eventHash,
     lease: nextLease, events: Object.freeze([...run.events, event]) });
 }
@@ -247,6 +293,10 @@ export function verifyGuideRun(run: GuideRun): boolean {
       || !REF.test(run.guideRef) || !HASH.test(run.guideRevisionHash) || !Array.isArray(run.events)
       || !GUIDE_RUN_STATES.includes(run.state) || run.events.length !== run.sequence
       || run.authority.canApprove !== false || run.authority.canExecute !== false || run.authority.canWriteMeta !== false) return false;
+    if (run.lease !== null) {
+      if (!hasExactKeys(run.lease, ["token", "expiresAt", "epoch"]) || leaseToken(run.lease.token) !== run.lease.token
+        || instant(run.lease.expiresAt) !== run.lease.expiresAt || epoch(run.lease.epoch) !== run.lease.epoch) return false;
+    }
     const trigger = normalizedTrigger(run.trigger);
     const expectedKey = trigger.kind === "scheduled" ? scheduledGuideRunIdempotencyKey(run.guideRevisionHash, trigger.scheduledFor)
       : manualGuideRunIdempotencyKey(run.guideRevisionHash, trigger.requestRef);
@@ -255,31 +305,48 @@ export function verifyGuideRun(run: GuideRun): boolean {
     if (run.idempotencyKey !== expectedKey || run.runRef !== expectedRunRef) return false;
     let state: GuideRunState | null = null;
     let previousHash = "GENESIS";
-    let lease: Readonly<{ token: string; expiresAt: string }> | null = null;
+    let lease: Readonly<{ token: string; expiresAt: string; epoch: number }> | null = null;
     let previousOccurredAt: string | null = null;
     for (const [index, event] of run.events.entries()) {
-      if (!hasExactKeys(event, ["version", "eventRef", "sequence", "previousEventHash", "fromState", "toState", "occurredAt",
-        "leaseToken", "leaseUntil", "reasonCode", "eventHash"])) return false;
+      if (!hasExactKeys(event, ["version", "eventRef", "runRef", "sequence", "previousEventHash", "fromState", "toState", "occurredAt",
+        "leaseToken", "leaseUntil", "leaseEpoch", "reasonCode", "eventHash"])) return false;
       const occurredAt = instant(event.occurredAt);
       if (occurredAt !== event.occurredAt || previousOccurredAt !== null && Date.parse(occurredAt) < Date.parse(previousOccurredAt)
         || event.reasonCode !== null && !CODE.test(event.reasonCode)
         || !GUIDE_RUN_STATES.includes(event.toState)
-        || event.fromState !== null && !GUIDE_RUN_STATES.includes(event.fromState)
+        || event.fromState !== null && !GUIDE_RUN_STATES.includes(event.fromState) || event.runRef !== run.runRef
         || event.version !== GUIDE_RUN_EVENT_VERSION || event.sequence !== index + 1 || event.previousEventHash !== previousHash
         || event.fromState !== state || expectedEventIdentity(event).eventRef !== event.eventRef
         || expectedEventIdentity(event).eventHash !== event.eventHash) return false;
       if (state === null) {
-        if (event.toState !== "due" || event.leaseToken !== null || event.leaseUntil !== null) return false;
+        if (event.toState !== "due" || event.leaseToken !== null || event.leaseUntil !== null || event.leaseEpoch !== null) return false;
       } else {
         if (!(NEXT[state] as readonly GuideRunState[]).includes(event.toState)) return false;
         if (event.toState === "claimed") {
-          if (!event.leaseToken || !UUID.test(event.leaseToken) || !event.leaseUntil
+          if (!event.leaseToken || leaseToken(event.leaseToken) !== event.leaseToken || !event.leaseUntil
+            || instant(event.leaseUntil) !== event.leaseUntil || epoch(event.leaseEpoch) !== event.leaseEpoch
             || Date.parse(event.leaseUntil) <= Date.parse(event.occurredAt)) return false;
-          lease = Object.freeze({ token: event.leaseToken, expiresAt: event.leaseUntil });
+          if (state === "due") {
+            if (event.leaseEpoch !== 1) return false;
+          } else {
+            if (!lease || event.leaseEpoch !== lease.epoch + 1
+              || Date.parse(event.occurredAt) >= Date.parse(lease.expiresAt) && event.leaseToken === lease.token
+              || Date.parse(event.occurredAt) < Date.parse(lease.expiresAt) && event.leaseToken !== lease.token
+              || Date.parse(event.occurredAt) < Date.parse(lease.expiresAt) && Date.parse(event.leaseUntil) <= Date.parse(lease.expiresAt)) return false;
+          }
+          lease = Object.freeze({ token: event.leaseToken, expiresAt: event.leaseUntil, epoch: event.leaseEpoch });
+        } else if (event.toState === state && ["scope_frozen", "analyzing"].includes(state)) {
+          if (!lease || !event.leaseToken || leaseToken(event.leaseToken) !== event.leaseToken || !event.leaseUntil
+            || instant(event.leaseUntil) !== event.leaseUntil || epoch(event.leaseEpoch) !== event.leaseEpoch
+            || event.leaseEpoch !== lease.epoch + 1 || Date.parse(event.leaseUntil) <= Date.parse(event.occurredAt)
+            || Date.parse(event.occurredAt) >= Date.parse(lease.expiresAt) && event.leaseToken === lease.token
+            || Date.parse(event.occurredAt) < Date.parse(lease.expiresAt) && event.leaseToken !== lease.token
+            || Date.parse(event.occurredAt) < Date.parse(lease.expiresAt) && Date.parse(event.leaseUntil) <= Date.parse(lease.expiresAt)) return false;
+          lease = Object.freeze({ token: event.leaseToken, expiresAt: event.leaseUntil, epoch: event.leaseEpoch });
         } else if (state !== "due") {
           if (!lease || event.leaseToken !== lease.token || event.leaseUntil !== lease.expiresAt
-            || Date.parse(event.occurredAt) >= Date.parse(lease.expiresAt)) return false;
-        } else if (event.leaseToken !== null || event.leaseUntil !== null) return false;
+            || event.leaseEpoch !== lease.epoch || Date.parse(event.occurredAt) >= Date.parse(lease.expiresAt)) return false;
+        } else if (event.leaseToken !== null || event.leaseUntil !== null || event.leaseEpoch !== null) return false;
       }
       state = event.toState;
       previousHash = event.eventHash;
@@ -287,7 +354,62 @@ export function verifyGuideRun(run: GuideRun): boolean {
       if (state === "completed" || state === "failed" || state === "missed") lease = null;
     }
     return state === run.state && previousHash === run.headEventHash
-      && (lease === null ? run.lease === null : run.lease?.token === lease.token && run.lease.expiresAt === lease.expiresAt);
+      && (lease === null ? run.lease === null : run.lease?.token === lease.token && run.lease.expiresAt === lease.expiresAt && run.lease.epoch === lease.epoch);
+  } catch { return false; }
+}
+
+/** Read-only verifier for evidence created before run-bound event hashes were introduced. */
+export function verifyGuideRunV1Legacy(run: unknown): boolean {
+  try {
+    if (!hasExactKeys(run, ["version", "runRef", "workspaceRef", "guideRef", "guideRevisionHash", "trigger", "idempotencyKey",
+      "state", "sequence", "headEventHash", "lease", "events", "authority"])) return false;
+    const candidate = run as Record<string, unknown>;
+    if (candidate.version !== GUIDE_RUN_V1_LEGACY_VERSION || !REF.test(String(candidate.runRef)) || !REF.test(String(candidate.workspaceRef))
+      || !REF.test(String(candidate.guideRef)) || !HASH.test(String(candidate.guideRevisionHash)) || !Array.isArray(candidate.events)
+      || !Number.isSafeInteger(candidate.sequence) || candidate.events.length !== candidate.sequence || !GUIDE_RUN_STATES.includes(candidate.state as GuideRunState)
+      || !hasExactKeys(candidate.authority, ["canApprove", "canExecute", "canWriteMeta"])) return false;
+    const authority = candidate.authority as Record<string, unknown>;
+    if (authority.canApprove !== false || authority.canExecute !== false || authority.canWriteMeta !== false) return false;
+    const trigger = normalizedTrigger(candidate.trigger as GuideRunTrigger);
+    const key = trigger.kind === "scheduled" ? scheduledGuideRunIdempotencyKey(String(candidate.guideRevisionHash), trigger.scheduledFor)
+      : manualGuideRunIdempotencyKey(String(candidate.guideRevisionHash), trigger.requestRef);
+    const expectedRunRef = `guide_run_${digest({ workspaceRef: candidate.workspaceRef, guideRef: candidate.guideRef,
+      guideRevisionHash: candidate.guideRevisionHash, trigger, idempotencyKey: key }).slice(0, 24)}`;
+    if (candidate.idempotencyKey !== key || candidate.runRef !== expectedRunRef) return false;
+    let state: GuideRunState | null = null; let previousHash = "GENESIS"; let previousAt: string | null = null;
+    let lease: Readonly<{ token: string; expiresAt: string }> | null = null;
+    for (const [index, raw] of candidate.events.entries()) {
+      if (!hasExactKeys(raw, ["version", "eventRef", "sequence", "previousEventHash", "fromState", "toState", "occurredAt",
+        "leaseToken", "leaseUntil", "reasonCode", "eventHash"])) return false;
+      const event = raw as Record<string, unknown>;
+      const at = instant(event.occurredAt);
+      if (event.version !== GUIDE_RUN_EVENT_V1_LEGACY_VERSION || event.sequence !== index + 1 || event.previousEventHash !== previousHash
+        || event.fromState !== state || at !== event.occurredAt || previousAt !== null && Date.parse(at) < Date.parse(previousAt)
+        || !GUIDE_RUN_STATES.includes(event.toState as GuideRunState) || event.fromState !== null && !GUIDE_RUN_STATES.includes(event.fromState as GuideRunState)
+        || event.reasonCode !== null && !CODE.test(String(event.reasonCode))) return false;
+      const { eventRef: storedRef, eventHash: storedHash, ...body } = event;
+      const hash = digest(body);
+      if (storedHash !== hash || storedRef !== `guide_run_event_${hash.slice(0, 24)}`) return false;
+      if (state === null) {
+        if (event.toState !== "due" || event.leaseToken !== null || event.leaseUntil !== null) return false;
+      } else if (!(LEGACY_NEXT[state] as readonly GuideRunState[]).includes(event.toState as GuideRunState)) return false;
+      else if (event.toState === "claimed") {
+        if (typeof event.leaseToken !== "string" || leaseToken(event.leaseToken) !== event.leaseToken || typeof event.leaseUntil !== "string"
+          || instant(event.leaseUntil) !== event.leaseUntil || Date.parse(event.leaseUntil) <= Date.parse(at)) return false;
+        lease = Object.freeze({ token: event.leaseToken, expiresAt: event.leaseUntil });
+      } else if (state !== "due") {
+        if (!lease || event.leaseToken !== lease.token || event.leaseUntil !== lease.expiresAt || Date.parse(at) >= Date.parse(lease.expiresAt)) return false;
+      } else if (event.leaseToken !== null || event.leaseUntil !== null) return false;
+      state = event.toState as GuideRunState; previousHash = hash; previousAt = at;
+      if (["completed", "failed", "missed"].includes(state)) lease = null;
+    }
+    const actualLease = candidate.lease;
+    if (actualLease !== null && (!hasExactKeys(actualLease, ["token", "expiresAt"])
+      || leaseToken((actualLease as Record<string, unknown>).token) !== (actualLease as Record<string, unknown>).token
+      || instant((actualLease as Record<string, unknown>).expiresAt) !== (actualLease as Record<string, unknown>).expiresAt)) return false;
+    return state === candidate.state && previousHash === candidate.headEventHash
+      && (lease === null ? actualLease === null : Boolean(actualLease) && typeof actualLease === "object"
+        && (actualLease as { token?: unknown }).token === lease.token && (actualLease as { expiresAt?: unknown }).expiresAt === lease.expiresAt);
   } catch { return false; }
 }
 

@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 
 import {
   GuideRunError, appendGuideRunTransition, createGuideRun, manualGuideRunIdempotencyKey,
-  resolveGuideRunDisposition, scheduledGuideRunIdempotencyKey, verifyGuideRun,
+  resolveGuideRunDisposition, scheduledGuideRunIdempotencyKey, verifyGuideRun, verifyGuideRunV1Legacy,
 } from "@/domain/guides/guide-run";
 
 const revisionHash = "a".repeat(64);
 const leaseToken = "123e4567-e89b-42d3-a456-426614174000";
+function legacyDigest(value: unknown): string {
+  const stable = (child: unknown): unknown => Array.isArray(child) ? child.map(stable)
+    : child && typeof child === "object" ? Object.fromEntries(Object.entries(child as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, stable(v)])) : child;
+  return createHash("sha256").update(JSON.stringify(stable(value))).digest("hex");
+}
 
 function scheduledRun() {
   return createGuideRun({ workspaceRef: "workspace_main", guideRef: "guide_main", guideRevisionHash: revisionHash,
@@ -51,6 +57,24 @@ describe("canonical Guide run", () => {
     expect(() => appendGuideRunTransition(claimed, { expectedHeadHash: claimed.headEventHash, toState: "scope_frozen",
       occurredAt: "2026-08-17T06:10:00.000Z", leaseToken }))
       .toThrowError(expect.objectContaining({ code: "lease_expired" }));
+    expect(() => appendGuideRunTransition(claimed, { expectedHeadHash: claimed.headEventHash, toState: "scope_frozen",
+      occurredAt: "2026-08-17T06:00:03.000Z", leaseToken: 42 as never }))
+      .toThrowError(expect.objectContaining({ name: "GuideRunError", code: "lease_required" }));
+  });
+
+  it("verifies v1.0 evidence read-only with its original pre-runRef hashes", () => {
+    const trigger = { kind: "scheduled" as const, scheduledFor: "2026-08-17T06:00:00.000Z" };
+    const idempotencyKey = scheduledGuideRunIdempotencyKey(revisionHash, trigger.scheduledFor);
+    const runRef = `guide_run_${legacyDigest({ workspaceRef: "workspace_main", guideRef: "guide_main", guideRevisionHash: revisionHash, trigger, idempotencyKey }).slice(0, 24)}`;
+    const body = { version: "guide-run-event/1.0.0", sequence: 1, previousEventHash: "GENESIS", fromState: null,
+      toState: "due", occurredAt: "2026-08-17T06:00:01.000Z", leaseToken: null, leaseUntil: null, reasonCode: null };
+    const eventHash = legacyDigest(body);
+    const legacy = { version: "guide-run/1.0.0", runRef, workspaceRef: "workspace_main", guideRef: "guide_main", guideRevisionHash: revisionHash,
+      trigger, idempotencyKey, state: "due", sequence: 1, headEventHash: eventHash, lease: null,
+      events: [{ ...body, eventRef: `guide_run_event_${eventHash.slice(0, 24)}`, eventHash }],
+      authority: { canApprove: false, canExecute: false, canWriteMeta: false } };
+    expect(verifyGuideRunV1Legacy(legacy)).toBe(true);
+    expect(verifyGuideRun(legacy as never)).toBe(false);
   });
 
   it("makes missed and failed runs terminal", () => {
@@ -76,6 +100,42 @@ describe("canonical Guide run", () => {
     expect(createGuideRun({ workspaceRef: "workspace_main", guideRef: "guide_main", guideRevisionHash: revisionHash,
       trigger: { kind: "manual", requestRef: "request_refresh_one" }, occurredAt: "2026-08-17T06:00:00Z" }).idempotencyKey)
       .toBe(manual);
+  });
+
+  it("binds every genesis and subsequent event to the immutable run identity", () => {
+    const left = scheduledRun();
+    const right = createGuideRun({ workspaceRef: "workspace_main", guideRef: "guide_other", guideRevisionHash: revisionHash,
+      trigger: { kind: "scheduled", scheduledFor: "2026-08-17T06:00:00.000Z" }, occurredAt: "2026-08-17T06:00:01.000Z" });
+    expect(left.events[0]!.eventHash).not.toBe(right.events[0]!.eventHash);
+    expect(verifyGuideRun({ ...left, events: right.events, headEventHash: right.headEventHash })).toBe(false);
+  });
+
+  it("renews and reclaims leases without allowing stale owners to advance scope", () => {
+    const due = scheduledRun();
+    const claimed = next(due, "claimed", "2026-08-17T06:00:02.000Z");
+    const renewed = appendGuideRunTransition(claimed, { expectedHeadHash: claimed.headEventHash, toState: "claimed",
+      occurredAt: "2026-08-17T06:05:00.000Z", leaseToken, leaseUntil: "2026-08-17T06:20:00.000Z", leaseEpoch: 2 });
+    expect(renewed.lease).toMatchObject({ token: leaseToken, epoch: 2, expiresAt: "2026-08-17T06:20:00.000Z" });
+    const replacement = "223e4567-e89b-42d3-a456-426614174000";
+    const reclaimed = appendGuideRunTransition(renewed, { expectedHeadHash: renewed.headEventHash, toState: "claimed",
+      occurredAt: "2026-08-17T06:20:00.000Z", leaseToken: replacement, leaseUntil: "2026-08-17T06:30:00.000Z", leaseEpoch: 3 });
+    expect(verifyGuideRun(reclaimed)).toBe(true);
+    expect(() => appendGuideRunTransition(reclaimed, { expectedHeadHash: reclaimed.headEventHash, toState: "scope_frozen",
+      occurredAt: "2026-08-17T06:21:00.000Z", leaseToken, leaseEpoch: 2 }))
+      .toThrowError(expect.objectContaining({ code: "lease_required" }));
+  });
+
+  it("carries lease epochs through scope-frozen and analyzing renewals", () => {
+    const claimed = next(scheduledRun(), "claimed", "2026-08-17T06:00:02.000Z");
+    const frozen = next(claimed, "scope_frozen", "2026-08-17T06:00:03.000Z");
+    const frozenRenewed = appendGuideRunTransition(frozen, { expectedHeadHash: frozen.headEventHash, toState: "scope_frozen",
+      occurredAt: "2026-08-17T06:01:00.000Z", leaseToken, leaseUntil: "2026-08-17T06:20:00.000Z", leaseEpoch: 2 });
+    const analyzing = appendGuideRunTransition(frozenRenewed, { expectedHeadHash: frozenRenewed.headEventHash, toState: "analyzing",
+      occurredAt: "2026-08-17T06:02:00.000Z", leaseToken, leaseEpoch: 2 });
+    const analyzingRenewed = appendGuideRunTransition(analyzing, { expectedHeadHash: analyzing.headEventHash, toState: "analyzing",
+      occurredAt: "2026-08-17T06:03:00.000Z", leaseToken, leaseUntil: "2026-08-17T06:30:00.000Z", leaseEpoch: 3 });
+    expect(analyzingRenewed.lease).toMatchObject({ epoch: 3, expiresAt: "2026-08-17T06:30:00.000Z" });
+    expect(verifyGuideRun(analyzingRenewed)).toBe(true);
   });
 
   it("gates recommendation and authority-free candidates by mode and data quality", () => {
