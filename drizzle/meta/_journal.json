@@ -750,6 +750,20 @@
       "when": 1786963500000,
       "tag": "20260817114500_meta_read_sync_six_hour_manual_fire",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1786963600000,
+      "tag": "20260817133000_canonical_slice_registry",
+      "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1786963700000,
+      "tag": "20260817134500_slice_registry_guard_fix",
+      "breakpoints": true
     }
   ]
 }

@@ -767,6 +767,7 @@ export const organizationCampaignMetaMemberships = pgTable("organization_campaig
 export const slices = pgTable("slices", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  sliceRef: text("slice_ref").notNull(),
   label: text("label").notNull(),
   marketDefinitionId: uuid("market_definition_id").notNull(),
   createdByActorId: uuid("created_by_actor_id").notNull(),
@@ -775,11 +776,13 @@ export const slices = pgTable("slices", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("slices_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slices_workspace_ref_unique").on(table.workspaceId, table.sliceRef),
   uniqueIndex("slices_workspace_market_row_unique").on(table.workspaceId, table.id, table.marketDefinitionId),
+  uniqueIndex("slices_workspace_identity_market_unique").on(table.workspaceId, table.id, table.sliceRef, table.marketDefinitionId),
   index("slices_workspace_current_idx").on(table.workspaceId, table.tombstonedAt, table.createdAt),
   foreignKey({ columns: [table.workspaceId, table.marketDefinitionId], foreignColumns: [categoryDefinitions.workspaceId, categoryDefinitions.id], name: "slices_market_definition_scope_fk" }).onDelete("restrict"),
   foreignKey({ columns: [table.workspaceId, table.createdByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "slices_creator_scope_fk" }).onDelete("restrict"),
-  check("slices_label_nonempty", sql`length(btrim(${table.label})) between 1 and 160`),
+  check("slices_label_nonempty", sql`length(btrim(${table.label})) between 1 and 160 and ${table.sliceRef} ~ '^slice_[a-z0-9][a-z0-9_.:-]{0,190}$'`),
 ]);
 
 /** Each persisted revision is immutable. Publishing moves the Slice head only. */
@@ -787,6 +790,7 @@ export const sliceRevisions = pgTable("slice_revisions", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   sliceId: uuid("slice_id").notNull(),
+  sliceRef: text("slice_ref").notNull(),
   revisionNumber: integer("revision_number").notNull(),
   revisionRef: text("revision_ref").notNull(),
   definitionHash: text("definition_hash").notNull(),
@@ -797,11 +801,12 @@ export const sliceRevisions = pgTable("slice_revisions", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("slice_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("slice_revisions_workspace_slice_ref_unique").on(table.workspaceId, table.sliceId, table.sliceRef, table.revisionNumber),
   uniqueIndex("slice_revisions_workspace_slice_number_unique").on(table.workspaceId, table.sliceId, table.revisionNumber),
   uniqueIndex("slice_revisions_workspace_ref_unique").on(table.workspaceId, table.revisionRef),
-  uniqueIndex("slice_revisions_workspace_hash_unique").on(table.workspaceId, table.definitionHash),
+  index("slice_revisions_workspace_hash_idx").on(table.workspaceId, table.definitionHash),
   index("slice_revisions_workspace_slice_lifecycle_idx").on(table.workspaceId, table.sliceId, table.lifecycle, table.revisionNumber),
-  foreignKey({ columns: [table.workspaceId, table.sliceId, table.marketDefinitionId], foreignColumns: [slices.workspaceId, slices.id, slices.marketDefinitionId], name: "slice_revisions_slice_market_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.sliceId, table.sliceRef, table.marketDefinitionId], foreignColumns: [slices.workspaceId, slices.id, slices.sliceRef, slices.marketDefinitionId], name: "slice_revisions_slice_market_scope_fk" }).onDelete("restrict"),
   foreignKey({ columns: [table.workspaceId, table.marketDefinitionId], foreignColumns: [categoryDefinitions.workspaceId, categoryDefinitions.id], name: "slice_revisions_market_definition_scope_fk" }).onDelete("restrict"),
   foreignKey({ columns: [table.workspaceId, table.sourceRevisionId], foreignColumns: [table.workspaceId, table.id], name: "slice_revisions_source_scope_fk" }).onDelete("restrict"),
   foreignKey({ columns: [table.workspaceId, table.createdByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "slice_revisions_creator_scope_fk" }).onDelete("restrict"),
