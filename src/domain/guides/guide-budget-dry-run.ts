@@ -155,13 +155,13 @@ function scopeReference(layer: BudgetScopeLayer, value: unknown): string {
   const valid = layer === "market" ? result.startsWith("market_")
     : layer === "organization_campaign" ? result.startsWith("organization_campaign_")
       : layer === "geo_targeting_platform" ? result.startsWith("slice_")
-        : result.startsWith("campaign_") || result.startsWith("adset_");
+        : result.startsWith("campaign_") || result.startsWith("adset_") || result.startsWith("ad_set_");
   if (!valid) fail("invalid_input");
   return result;
 }
 function ownerReference(kind: "campaign" | "adset", value: unknown): string {
   const result = ref(value);
-  if (!result.startsWith(`${kind}_`)) fail("invalid_input");
+  if (kind === "adset" ? !(result.startsWith("adset_") || result.startsWith("ad_set_")) : !result.startsWith("campaign_")) fail("invalid_input");
   return result;
 }
 function deepFreeze<T>(value: T): T {

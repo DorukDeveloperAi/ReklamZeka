@@ -24,6 +24,7 @@ CREATE TABLE guide_budget_contracts (
     -- Persist the complete, hashed v2 envelope; accepting a draft here would
     -- let a direct SQL writer evade the reader's tamper check.
     AND contract_payload ?& array['guideRevisionHash','market','currency','targetScopeRef','expression','maximumEvidenceAgeSeconds','overlapEnvelope','schemaVersion','contractHash']
+    AND contract_payload - array['guideRevisionHash','market','currency','targetScopeRef','expression','maximumEvidenceAgeSeconds','overlapEnvelope','schemaVersion','contractHash'] = '{}'::jsonb
     AND contract_payload->>'guideRevisionHash'=guide_revision_hash
     AND contract_payload->>'market'=market_key
     AND contract_payload->>'currency'=currency
@@ -41,16 +42,16 @@ ALTER TABLE guide_budget_contracts ADD CONSTRAINT guide_budget_contracts_revisio
   FOREIGN KEY(workspace_id,guide_revision_id) REFERENCES guide_revisions(workspace_id,id) ON DELETE RESTRICT;
 
 CREATE OR REPLACE FUNCTION public.guide_budget_contract_guard() RETURNS trigger
-LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
+LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 BEGIN
   IF TG_OP <> 'INSERT' THEN
-    IF TG_OP = 'DELETE' AND EXISTS(SELECT 1 FROM workspaces WHERE id=OLD.workspace_id AND lifecycle_state='tombstoning') THEN RETURN OLD; END IF;
+    IF TG_OP = 'DELETE' AND EXISTS(SELECT 1 FROM public.workspaces WHERE id=OLD.workspace_id AND lifecycle_state='tombstoning') THEN RETURN OLD; END IF;
     RAISE EXCEPTION 'guide budget contracts are append-only';
   END IF;
   IF NOT EXISTS (
-    SELECT 1 FROM guide_revisions r
-    JOIN category_definitions d ON d.workspace_id=r.workspace_id AND d.id=r.market_definition_id
-    JOIN category_dimensions dim ON dim.workspace_id=d.workspace_id AND dim.id=d.dimension_id
+    SELECT 1 FROM public.guide_revisions r
+    JOIN public.category_definitions d ON d.workspace_id=r.workspace_id AND d.id=r.market_definition_id
+    JOIN public.category_dimensions dim ON dim.workspace_id=d.workspace_id AND dim.id=d.dimension_id
     WHERE r.workspace_id=NEW.workspace_id AND r.id=NEW.guide_revision_id
       AND r.revision_hash=NEW.guide_revision_hash AND r.market_key=NEW.market_key
       AND dim.key='market' AND d.key=NEW.market_key
@@ -80,9 +81,9 @@ CREATE UNIQUE INDEX meta_complete_snapshot_receipts_replay_unique ON meta_comple
 CREATE INDEX meta_complete_snapshot_receipts_workspace_account_captured_idx ON meta_complete_snapshot_receipts(workspace_id,ad_account_id,captured_at);
 CREATE INDEX meta_complete_snapshot_receipts_workspace_snapshot_fk_idx ON meta_complete_snapshot_receipts(workspace_id,snapshot_id,meta_connection_id,ad_account_id);
 ALTER TABLE meta_complete_snapshot_receipts ADD CONSTRAINT meta_complete_snapshot_receipts_snapshot_scope_fk FOREIGN KEY(workspace_id,snapshot_id,meta_connection_id,ad_account_id) REFERENCES meta_change_snapshots(workspace_id,id,meta_connection_id,ad_account_id) ON DELETE RESTRICT;
-CREATE OR REPLACE FUNCTION public.meta_complete_snapshot_receipt_guard() RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$ BEGIN
- IF TG_OP<>'INSERT' THEN IF TG_OP='DELETE' AND EXISTS(SELECT 1 FROM workspaces WHERE id=OLD.workspace_id AND lifecycle_state='tombstoning') THEN RETURN OLD; END IF; RAISE EXCEPTION 'complete snapshot receipts are append-only'; END IF;
- IF NOT EXISTS(SELECT 1 FROM meta_change_snapshots s WHERE s.workspace_id=NEW.workspace_id AND s.id=NEW.snapshot_id AND s.meta_connection_id=NEW.meta_connection_id AND s.ad_account_id=NEW.ad_account_id AND s.snapshot_hash=NEW.snapshot_hash AND s.captured_at=NEW.captured_at) THEN RAISE EXCEPTION 'completion receipt must bind exact immutable snapshot'; END IF; RETURN NEW;
+CREATE OR REPLACE FUNCTION public.meta_complete_snapshot_receipt_guard() RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$ BEGIN
+ IF TG_OP<>'INSERT' THEN IF TG_OP='DELETE' AND EXISTS(SELECT 1 FROM public.workspaces WHERE id=OLD.workspace_id AND lifecycle_state='tombstoning') THEN RETURN OLD; END IF; RAISE EXCEPTION 'complete snapshot receipts are append-only'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.meta_change_snapshots s WHERE s.workspace_id=NEW.workspace_id AND s.id=NEW.snapshot_id AND s.meta_connection_id=NEW.meta_connection_id AND s.ad_account_id=NEW.ad_account_id AND s.snapshot_hash=NEW.snapshot_hash AND s.captured_at=NEW.captured_at) THEN RAISE EXCEPTION 'completion receipt must bind exact immutable snapshot'; END IF; RETURN NEW;
 END; $$;
 REVOKE ALL PRIVILEGES ON FUNCTION public.meta_complete_snapshot_receipt_guard() FROM PUBLIC, anon, authenticated, service_role;
 CREATE TRIGGER meta_complete_snapshot_receipt_guard BEFORE INSERT OR UPDATE OR DELETE ON meta_complete_snapshot_receipts FOR EACH ROW EXECUTE FUNCTION public.meta_complete_snapshot_receipt_guard();

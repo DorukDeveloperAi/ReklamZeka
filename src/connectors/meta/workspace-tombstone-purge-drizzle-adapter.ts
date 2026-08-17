@@ -30,7 +30,7 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "development_log_heads", "development_log_events", "finding_heads", "finding_lifecycle_events",
   // P04 canonical Kılavuz immutable children, then P03 slice evidence.
   "guide_activation_outbox", "guide_lifecycle_events", "guide_interpretation_acceptances",
-  "guide_revision_actions", "guide_revision_budget_refs", "guide_heads", "guide_revisions", "guides",
+  "guide_revision_actions", "guide_revision_budget_refs", "guide_budget_contracts", "guide_heads", "guide_revisions", "guides",
   "slice_resolution_snapshot_members", "slice_resolution_snapshots", "slice_revision_predicate_values",
   "slice_revision_overrides", "slice_revision_predicates", "slice_revisions", "slices",
   "orchestrator_conversation_messages",
@@ -151,7 +151,7 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "decision_room_inbox_reads",
   "meta_assets",
   "meta_posts",
-  "meta_change_snapshots",
+  "meta_complete_snapshot_receipts", "meta_change_snapshots",
   "meta_change_events",
   "meta_creatives",
   "meta_ads",
@@ -229,6 +229,7 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'guide_interpretation_acceptances', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_interpretation_acceptances where workspace_id = ${workspaceId}::uuid
       union all select 'guide_revision_actions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_revision_actions where workspace_id = ${workspaceId}::uuid
       union all select 'guide_revision_budget_refs', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_revision_budget_refs where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_budget_contracts', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_budget_contracts where workspace_id = ${workspaceId}::uuid
       union all select 'guide_heads', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_heads where workspace_id = ${workspaceId}::uuid
       union all select 'guide_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_revisions where workspace_id = ${workspaceId}::uuid
       union all select 'guides', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guides where workspace_id = ${workspaceId}::uuid
@@ -484,6 +485,9 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'meta_posts', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from meta_posts where workspace_id = ${workspaceId}::uuid
+      union all select 'meta_complete_snapshot_receipts', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from meta_complete_snapshot_receipts where workspace_id = ${workspaceId}::uuid
       union all select 'meta_change_snapshots', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from meta_change_snapshots where workspace_id = ${workspaceId}::uuid
@@ -703,6 +707,8 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from meta_ads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_creatives where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_change_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    // Receipts pin immutable snapshots with RESTRICT; remove them first.
+    await remove(sql`with removed as (delete from meta_complete_snapshot_receipts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_change_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_posts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_asset_edges where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
@@ -791,6 +797,8 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from guide_interpretation_acceptances where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guide_revision_actions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guide_revision_budget_refs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    // Contract FK is RESTRICT by design; it must leave before its revision.
+    await remove(sql`with removed as (delete from guide_budget_contracts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guide_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     const deleteRevisionLeaves = async (removeLeaves: () => Promise<number>, remainingRows: () => Promise<number>) => {
       const cap = before.candidateCount + 1;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GuideBudgetDryRunService } from "@/application/guide-budget-dry-run-service";
 import { createGuideBudgetContractV2, verifyGuideBudgetContractV2 } from "@/domain/guides/guide-budget-contract-v2";
 
-const contract = () => createGuideBudgetContractV2({ guideRevisionHash: "a".repeat(64), market: "yerli", currency: "TRY", targetScopeRef: "organization_campaign_core", expression: { kind: "money", amountDecimal: "101", currency: "TRY" }, maximumEvidenceAgeSeconds: 60, overlapEnvelope:{restrictionsComplete:true,actionAllowlist:["budget_increase","budget_decrease"],unresolvedConflictRefs:[]} });
+const contract = () => createGuideBudgetContractV2({ guideRevisionHash: "a".repeat(64), market: "yerli", currency: "TRY", targetScopeRef: "organization_campaign_core", expression: { kind: "money", amountDecimal: "101", currency: "TRY" }, maximumEvidenceAgeSeconds: 60, overlapEnvelope:{restrictionsComplete:true,actionAllowlist:["budget_increase","budget_decrease"],restrictions:[],numericCaps:[],unresolvedConflictRefs:[]} });
 const row = (overrides: Record<string, unknown> = {}) => ({ scopeLayer: "organization_campaign" as const, scopeRef: "organization_campaign_core", market: "yerli" as const, currency: "TRY", budgetOwnerRef: "campaign_core", budgetOwnerKind: "campaign" as const, currentBudgetDecimal: "100", freshness: "fresh" as const, observedAt: "2026-08-17T00:00:00.000Z", evidenceHash: "b".repeat(64), ...overrides });
 
 describe("guide budget contract v2", () => {

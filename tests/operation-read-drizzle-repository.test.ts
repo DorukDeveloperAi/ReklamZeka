@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { DrizzleOperationReadRepository } from "@/connectors/operations/operation-read-drizzle-repository";
 import { createSliceRevision } from "@/domain/slices/slice-definition";
 import { categoryDefinitionPublicRef, categoryDimensionPublicRef } from "@/domain/categories/public-reference";
@@ -61,5 +62,12 @@ describe("DrizzleOperationReadRepository", () => {
   it("rejects a malformed cursor before querying canonical facts", async () => {
     const database = { transaction: async (callback: (tx: { execute(): Promise<{ rows: unknown[] }> }) => unknown) => callback({ execute: async () => ({ rows: [] }) }) };
     await expect(new DrizzleOperationReadRepository(database as never).load({ workspaceId, period: { startDate: "2026-08-17", endDate: "2026-08-17" }, sliceRef: null, limit: 1, cursor: "operation_cursor_not-json" })).rejects.toThrow("cursor");
+  });
+
+  it("bounds append-only binding history to one current subject row plus a cardinality sentinel", () => {
+    const source = readFileSync("src/connectors/operations/operation-read-drizzle-repository.ts", "utf8");
+    expect(source).toContain("select distinct on(subject_kind,organization_campaign_id,slice_id,market_definition_id)");
+    expect(source).toContain("revision_number desc limit ${maxRevisionSubjects + 1}");
+    expect(source).toContain("if (revisionSubjects.length > maxRevisionSubjects)");
   });
 });
