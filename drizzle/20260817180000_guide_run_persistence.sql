@@ -72,51 +72,94 @@ CREATE OR REPLACE FUNCTION public.guide_run_artifact_insert_guard() RETURNS trig
  SELECT * INTO r FROM public.guide_runs WHERE workspace_id=NEW.workspace_id AND id=NEW.run_id;
  expected_hash:=public.guide_run_sha256(NEW.payload);
  IF r.id IS NULL OR (NEW.kind='scope_snapshot' AND NEW.payload->>'runRef' IS DISTINCT FROM r.run_ref)
-    OR NEW.authority<>'{"canMutateGuide":false,"canApprove":false,"canExecute":false,"canWriteMeta":false}'::jsonb
+    OR NEW.authority IS DISTINCT FROM '{"canMutateGuide":false,"canApprove":false,"canExecute":false,"canWriteMeta":false}'::jsonb
     OR NEW.payload_hash IS DISTINCT FROM expected_hash OR NEW.artifact_ref IS DISTINCT FROM 'guide_run_artifact_'||substr(public.guide_run_sha256(jsonb_build_object('runRef',r.run_ref,'kind',NEW.kind,'payload',NEW.payload)),1,24)
  THEN RAISE EXCEPTION 'guide run artifact must bind exact closed run'; END IF;
+ RETURN NEW;
+END; $$;
+CREATE OR REPLACE FUNCTION public.guide_run_schedule_receipt_insert_guard() RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$ DECLARE persisted_run_ref text; expected_fire_ref text; expected_receipt_hash text; scheduled_text text; missed_from_text text; missed_to_text text; run_ref_value text; BEGIN
+ SELECT run_ref INTO persisted_run_ref FROM public.guide_runs WHERE workspace_id=NEW.workspace_id AND id=NEW.run_id AND guide_revision_id=NEW.guide_revision_id;
+ IF NEW.run_id IS NOT NULL AND persisted_run_ref IS NULL THEN RAISE EXCEPTION 'guide run schedule receipt run binding invalid'; END IF;
+ scheduled_text:=to_char(NEW.scheduled_for at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+ missed_from_text:=CASE WHEN NEW.missed_from IS NULL THEN NULL ELSE to_char(NEW.missed_from at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END;
+ missed_to_text:=CASE WHEN NEW.missed_to IS NULL THEN NULL ELSE to_char(NEW.missed_to at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END;
+ run_ref_value:=CASE WHEN NEW.run_id IS NULL THEN NULL ELSE persisted_run_ref END;
+ expected_fire_ref:='guide_fire_'||public.guide_run_sha256(jsonb_build_object('workspaceId',NEW.workspace_id::text,'guideRevisionId',NEW.guide_revision_id::text,'scheduledFor',scheduled_text));
+ expected_receipt_hash:=public.guide_run_sha256(jsonb_build_object('version','guide-run-schedule-receipt/1.0.0','fireRef',expected_fire_ref,'guideRevisionId',NEW.guide_revision_id::text,'scheduledFor',scheduled_text,'missedFrom',missed_from_text,'missedTo',missed_to_text,'missedCount',NEW.missed_count,'runRef',run_ref_value));
+ IF NEW.fire_ref IS DISTINCT FROM expected_fire_ref OR NEW.receipt_hash IS DISTINCT FROM expected_receipt_hash OR NEW.created_at<NEW.scheduled_for THEN RAISE EXCEPTION 'guide run schedule receipt must bind canonical fire'; END IF;
  RETURN NEW;
 END; $$;
 CREATE OR REPLACE FUNCTION public.guide_run_head_guard() RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$ DECLARE e public.guide_run_events%ROWTYPE; r public.guide_runs%ROWTYPE; persisted_event jsonb; canonical_workspace_ref text; canonical_run_ref text; canonical_idempotency text; guide_ref_value text; BEGIN
  IF TG_OP='DELETE' THEN IF EXISTS(SELECT 1 FROM public.workspaces WHERE id=OLD.workspace_id AND lifecycle_state='tombstoning') THEN RETURN OLD; END IF; RAISE EXCEPTION 'guide run head is append-only except exact advance'; END IF;
  SELECT * INTO e FROM public.guide_run_events WHERE workspace_id=NEW.workspace_id AND event_hash=NEW.head_event_hash; SELECT * INTO r FROM public.guide_runs WHERE workspace_id=NEW.workspace_id AND id=NEW.run_id; SELECT guide_ref INTO guide_ref_value FROM public.guides WHERE workspace_id=NEW.workspace_id AND id=r.guide_id;
  canonical_workspace_ref:='workspace_'||substr(encode(extensions.digest(convert_to(NEW.workspace_id::text,'UTF8'),'sha256'),'hex'),1,16);
- IF jsonb_typeof(r.trigger_payload)<>'object' OR cardinality(ARRAY(SELECT jsonb_object_keys(r.trigger_payload)))<>2 OR NOT (r.trigger_payload ? 'kind') THEN RAISE EXCEPTION 'guide run trigger malformed'; END IF;
- IF r.trigger_payload->>'kind'='scheduled' AND r.trigger_payload ?& ARRAY['kind','scheduledFor'] THEN canonical_idempotency:='guide_slot_'||public.guide_run_sha256(jsonb_build_object('guideRevisionHash',r.guide_revision_hash,'scheduledFor',r.trigger_payload->>'scheduledFor'));
- ELSIF r.trigger_payload->>'kind'='manual' AND r.trigger_payload ?& ARRAY['kind','requestRef'] THEN canonical_idempotency:='guide_manual_'||public.guide_run_sha256(jsonb_build_object('guideRevisionHash',r.guide_revision_hash,'requestRef',r.trigger_payload->>'requestRef'));
+ -- Validate every scalar before comparisons or integer casts. JSON null must
+ -- reject rather than make a predicate NULL and bypass the guard.
+ IF e.id IS NULL OR r.id IS NULL
+    OR jsonb_typeof(e.payload) IS DISTINCT FROM 'object'
+    OR jsonb_typeof(e.payload->'version') IS DISTINCT FROM 'string' OR jsonb_typeof(e.payload->'eventRef') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(e.payload->'runRef') IS DISTINCT FROM 'string' OR jsonb_typeof(e.payload->'sequence') IS DISTINCT FROM 'number'
+    OR jsonb_typeof(e.payload->'previousEventHash') IS DISTINCT FROM 'string' OR jsonb_typeof(e.payload->'toState') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(e.payload->'occurredAt') IS DISTINCT FROM 'string' OR jsonb_typeof(e.payload->'eventHash') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(e.payload->'fromState') NOT IN ('null','string') OR jsonb_typeof(e.payload->'leaseToken') NOT IN ('null','string')
+    OR jsonb_typeof(e.payload->'leaseUntil') NOT IN ('null','string') OR jsonb_typeof(e.payload->'leaseEpoch') NOT IN ('null','number')
+    OR jsonb_typeof(e.payload->'reasonCode') NOT IN ('null','string')
+    OR jsonb_typeof(NEW.run_payload) IS DISTINCT FROM 'object'
+    OR jsonb_typeof(NEW.run_payload->'version') IS DISTINCT FROM 'string' OR jsonb_typeof(NEW.run_payload->'runRef') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(NEW.run_payload->'workspaceRef') IS DISTINCT FROM 'string' OR jsonb_typeof(NEW.run_payload->'guideRef') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(NEW.run_payload->'guideRevisionHash') IS DISTINCT FROM 'string' OR jsonb_typeof(NEW.run_payload->'idempotencyKey') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(NEW.run_payload->'state') IS DISTINCT FROM 'string' OR jsonb_typeof(NEW.run_payload->'sequence') IS DISTINCT FROM 'number'
+    OR jsonb_typeof(NEW.run_payload->'headEventHash') IS DISTINCT FROM 'string' OR jsonb_typeof(NEW.run_payload->'trigger') IS DISTINCT FROM 'object'
+    OR jsonb_typeof(NEW.run_payload->'events') IS DISTINCT FROM 'array' OR jsonb_typeof(NEW.run_payload->'authority') IS DISTINCT FROM 'object'
+    OR jsonb_typeof(NEW.run_payload->'lease') NOT IN ('null','object')
+ THEN RAISE EXCEPTION 'guide run JSON scalar or shape invalid'; END IF;
+ IF jsonb_typeof(NEW.run_payload->'lease')='object' AND (
+      cardinality(ARRAY(SELECT jsonb_object_keys(NEW.run_payload->'lease')))<>3
+      OR jsonb_typeof(NEW.run_payload->'lease'->'token') IS DISTINCT FROM 'string'
+      OR jsonb_typeof(NEW.run_payload->'lease'->'epoch') IS DISTINCT FROM 'number'
+      OR jsonb_typeof(NEW.run_payload->'lease'->'expiresAt') IS DISTINCT FROM 'string'
+    ) THEN RAISE EXCEPTION 'guide run lease JSON invalid'; END IF;
+ IF NEW.lease_token IS NOT NULL AND (
+      jsonb_typeof(e.payload->'leaseToken') IS DISTINCT FROM 'string'
+      OR jsonb_typeof(e.payload->'leaseEpoch') IS DISTINCT FROM 'number'
+      OR jsonb_typeof(e.payload->'leaseUntil') IS DISTINCT FROM 'string'
+    ) THEN RAISE EXCEPTION 'active guide run event lease JSON invalid'; END IF;
+ IF jsonb_typeof(r.trigger_payload) IS DISTINCT FROM 'object' OR cardinality(ARRAY(SELECT jsonb_object_keys(r.trigger_payload)))<>2 OR NOT (r.trigger_payload ? 'kind') THEN RAISE EXCEPTION 'guide run trigger malformed'; END IF;
+ IF r.trigger_payload->>'kind'='scheduled' AND r.trigger_payload ?& ARRAY['kind','scheduledFor'] AND jsonb_typeof(r.trigger_payload->'scheduledFor')='string' THEN canonical_idempotency:='guide_slot_'||public.guide_run_sha256(jsonb_build_object('guideRevisionHash',r.guide_revision_hash,'scheduledFor',r.trigger_payload->>'scheduledFor'));
+ ELSIF r.trigger_payload->>'kind'='manual' AND r.trigger_payload ?& ARRAY['kind','requestRef'] AND jsonb_typeof(r.trigger_payload->'requestRef')='string' THEN canonical_idempotency:='guide_manual_'||public.guide_run_sha256(jsonb_build_object('guideRevisionHash',r.guide_revision_hash,'requestRef',r.trigger_payload->>'requestRef'));
  ELSE RAISE EXCEPTION 'guide run trigger malformed'; END IF;
  canonical_run_ref:='guide_run_'||substr(public.guide_run_sha256(jsonb_build_object('workspaceRef',canonical_workspace_ref,'guideRef',guide_ref_value,'guideRevisionHash',r.guide_revision_hash,'trigger',r.trigger_payload,'idempotencyKey',canonical_idempotency)),1,24);
- IF e.id IS NULL OR e.run_id<>NEW.run_id OR e.sequence<>NEW.sequence OR e.occurred_at<>NEW.updated_at OR r.id IS NULL
-    OR jsonb_typeof(e.payload)<>'object' OR cardinality(ARRAY(SELECT jsonb_object_keys(e.payload)))<>13 OR NOT (e.payload ?& ARRAY['version','eventRef','runRef','sequence','previousEventHash','fromState','toState','occurredAt','leaseToken','leaseUntil','leaseEpoch','reasonCode','eventHash'])
-    OR e.payload->>'version'<>'guide-run-event/1.2.0' OR e.payload->>'eventRef'<>e.event_ref OR e.payload->>'eventHash'<>e.event_hash OR e.payload->>'runRef'<>r.run_ref
+ IF e.id IS NULL OR e.run_id IS DISTINCT FROM NEW.run_id OR e.sequence IS DISTINCT FROM NEW.sequence OR e.occurred_at IS DISTINCT FROM NEW.updated_at OR r.id IS NULL
+    OR jsonb_typeof(e.payload) IS DISTINCT FROM 'object' OR cardinality(ARRAY(SELECT jsonb_object_keys(e.payload)))<>13 OR NOT (e.payload ?& ARRAY['version','eventRef','runRef','sequence','previousEventHash','fromState','toState','occurredAt','leaseToken','leaseUntil','leaseEpoch','reasonCode','eventHash'])
+    OR e.payload->>'version' IS DISTINCT FROM 'guide-run-event/1.2.0' OR e.payload->>'eventRef' IS DISTINCT FROM e.event_ref OR e.payload->>'eventHash' IS DISTINCT FROM e.event_hash OR e.payload->>'runRef' IS DISTINCT FROM r.run_ref
     OR e.event_hash IS DISTINCT FROM public.guide_run_sha256(e.payload - ARRAY['eventRef','eventHash']) OR e.event_ref IS DISTINCT FROM 'guide_run_event_'||substr(e.event_hash,1,24)
-    OR (e.payload->>'sequence')::integer<>e.sequence OR e.payload->>'previousEventHash'<>e.previous_event_hash
-    OR e.payload->>'toState'<>NEW.state OR e.payload->>'occurredAt'<>to_char(NEW.updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+    OR (e.payload->>'sequence')::integer IS DISTINCT FROM e.sequence OR e.payload->>'previousEventHash' IS DISTINCT FROM e.previous_event_hash
+    OR e.payload->>'toState' IS DISTINCT FROM NEW.state OR e.payload->>'occurredAt' IS DISTINCT FROM to_char(NEW.updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
     OR (NEW.lease_token IS NULL AND NOT (
       (e.payload->'leaseToken'='null'::jsonb AND e.payload->'leaseUntil'='null'::jsonb AND e.payload->'leaseEpoch'='null'::jsonb)
       OR (TG_OP='UPDATE' AND NEW.state IN ('completed','failed','missed') AND OLD.lease_token IS NOT NULL
         AND e.payload->>'leaseToken'=OLD.lease_token::text AND (e.payload->>'leaseEpoch')::integer=OLD.lease_epoch
         AND e.payload->>'leaseUntil'=to_char(OLD.lease_expires_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))))
-    OR (NEW.lease_token IS NOT NULL AND ((e.payload->>'leaseToken')<>NEW.lease_token::text OR (e.payload->>'leaseEpoch')::integer<>NEW.lease_epoch OR (e.payload->>'leaseUntil')<>to_char(NEW.lease_expires_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')))
+    OR (NEW.lease_token IS NOT NULL AND ((e.payload->>'leaseToken') IS DISTINCT FROM NEW.lease_token::text OR (e.payload->>'leaseEpoch')::integer IS DISTINCT FROM NEW.lease_epoch OR (e.payload->>'leaseUntil') IS DISTINCT FROM to_char(NEW.lease_expires_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')))
     OR jsonb_typeof(NEW.run_payload)<>'object' OR cardinality(ARRAY(SELECT jsonb_object_keys(NEW.run_payload)))<>13 OR NOT (NEW.run_payload ?& ARRAY['version','runRef','workspaceRef','guideRef','guideRevisionHash','trigger','idempotencyKey','state','sequence','headEventHash','lease','events','authority'])
-    OR r.run_ref<>canonical_run_ref OR r.idempotency_key<>canonical_idempotency OR NEW.run_payload->>'workspaceRef'<>canonical_workspace_ref OR NEW.run_payload->>'guideRef'<>guide_ref_value
+    OR r.run_ref IS DISTINCT FROM canonical_run_ref OR r.idempotency_key IS DISTINCT FROM canonical_idempotency OR NEW.run_payload->>'workspaceRef' IS DISTINCT FROM canonical_workspace_ref OR NEW.run_payload->>'guideRef' IS DISTINCT FROM guide_ref_value
     OR NEW.run_payload->>'runRef' IS DISTINCT FROM r.run_ref OR NEW.run_payload->>'guideRevisionHash' IS DISTINCT FROM r.guide_revision_hash
-    OR NEW.run_payload->>'idempotencyKey'<>r.idempotency_key OR NEW.run_payload->>'version'<>r.run_version OR NEW.run_payload->'trigger'<>r.trigger_payload
-    OR NEW.run_payload->>'state'<>NEW.state OR (NEW.run_payload->>'sequence')::integer<>NEW.sequence OR NEW.run_payload->>'headEventHash'<>NEW.head_event_hash
-    OR jsonb_typeof(NEW.run_payload->'events')<>'array' OR jsonb_array_length(NEW.run_payload->'events')<>NEW.sequence OR NEW.run_payload->'events'->(NEW.sequence-1)->>'eventHash'<>NEW.head_event_hash
+    OR NEW.run_payload->>'idempotencyKey' IS DISTINCT FROM r.idempotency_key OR NEW.run_payload->>'version' IS DISTINCT FROM r.run_version OR NEW.run_payload->'trigger' IS DISTINCT FROM r.trigger_payload
+    OR NEW.run_payload->>'state' IS DISTINCT FROM NEW.state OR (NEW.run_payload->>'sequence')::integer IS DISTINCT FROM NEW.sequence OR NEW.run_payload->>'headEventHash' IS DISTINCT FROM NEW.head_event_hash
+    OR jsonb_typeof(NEW.run_payload->'events') IS DISTINCT FROM 'array' OR jsonb_array_length(NEW.run_payload->'events') IS DISTINCT FROM NEW.sequence OR NEW.run_payload->'events'->(NEW.sequence-1)->>'eventHash' IS DISTINCT FROM NEW.head_event_hash
     OR EXISTS (SELECT 1 FROM jsonb_array_elements(NEW.run_payload->'events') WITH ORDINALITY payload(event_value,ordinality) LEFT JOIN public.guide_run_events persisted ON persisted.workspace_id=NEW.workspace_id AND persisted.run_id=NEW.run_id AND persisted.sequence=payload.ordinality WHERE persisted.id IS NULL OR persisted.event_hash IS DISTINCT FROM payload.event_value->>'eventHash' OR persisted.payload IS DISTINCT FROM payload.event_value)
-    OR NEW.run_payload->'authority'<>'{"canApprove":false,"canExecute":false,"canWriteMeta":false}'::jsonb
-    OR (NEW.lease_token IS NULL AND NEW.run_payload->'lease' <> 'null'::jsonb) OR (NEW.lease_token IS NOT NULL AND (NEW.run_payload->'lease'->>'token')<>NEW.lease_token::text OR (NEW.run_payload->'lease'->>'epoch')::integer<>NEW.lease_epoch OR (NEW.run_payload->'lease'->>'expiresAt')<>to_char(NEW.lease_expires_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+    OR NEW.run_payload->'authority' IS DISTINCT FROM '{"canApprove":false,"canExecute":false,"canWriteMeta":false}'::jsonb
+    OR (NEW.lease_token IS NULL AND NEW.run_payload->'lease' IS DISTINCT FROM 'null'::jsonb) OR (NEW.lease_token IS NOT NULL AND (NEW.run_payload->'lease'->>'token') IS DISTINCT FROM NEW.lease_token::text OR (NEW.run_payload->'lease'->>'epoch')::integer IS DISTINCT FROM NEW.lease_epoch OR (NEW.run_payload->'lease'->>'expiresAt') IS DISTINCT FROM to_char(NEW.lease_expires_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
  THEN RAISE EXCEPTION 'guide run head must bind exact event and run envelope'; END IF;
  IF TG_OP='INSERT' THEN
-   IF NEW.sequence<>1 OR e.previous_event_hash<>'GENESIS' OR e.payload->'fromState'<>'null'::jsonb OR e.payload->'reasonCode'<>'null'::jsonb OR NEW.state<>'due' OR NEW.lease_token IS NOT NULL THEN RAISE EXCEPTION 'guide run head must begin at due genesis'; END IF;
+   IF NEW.sequence<>1 OR e.previous_event_hash IS DISTINCT FROM 'GENESIS' OR e.payload->'fromState' IS DISTINCT FROM 'null'::jsonb OR e.payload->'reasonCode' IS DISTINCT FROM 'null'::jsonb OR NEW.state IS DISTINCT FROM 'due' OR NEW.lease_token IS NOT NULL THEN RAISE EXCEPTION 'guide run head must begin at due genesis'; END IF;
  ELSE
-   IF NEW.workspace_id<>OLD.workspace_id OR NEW.run_id<>OLD.run_id OR NEW.sequence<>OLD.sequence+1 OR e.previous_event_hash<>OLD.head_event_hash
+   IF NEW.workspace_id IS DISTINCT FROM OLD.workspace_id OR NEW.run_id IS DISTINCT FROM OLD.run_id OR NEW.sequence<>OLD.sequence+1 OR e.previous_event_hash IS DISTINCT FROM OLD.head_event_hash
       OR e.payload->>'fromState' IS DISTINCT FROM OLD.state OR NOT public.guide_run_transition_allowed(OLD.state,NEW.state) THEN RAISE EXCEPTION 'guide run head requires next event CAS'; END IF;
    IF NEW.state IN ('completed','failed','missed') AND (
      NEW.lease_token IS NOT NULL OR NEW.lease_epoch IS NOT NULL OR NEW.lease_expires_at IS NOT NULL
-     OR (OLD.lease_token IS NULL AND (e.payload->'leaseToken'<>'null'::jsonb OR e.payload->'leaseUntil'<>'null'::jsonb OR e.payload->'leaseEpoch'<>'null'::jsonb))
-     OR (OLD.lease_token IS NOT NULL AND (e.payload->>'leaseToken'<>OLD.lease_token::text OR (e.payload->>'leaseEpoch')::integer<>OLD.lease_epoch OR e.payload->>'leaseUntil'<>to_char(OLD.lease_expires_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+     OR (OLD.lease_token IS NULL AND (e.payload->'leaseToken' IS DISTINCT FROM 'null'::jsonb OR e.payload->'leaseUntil' IS DISTINCT FROM 'null'::jsonb OR e.payload->'leaseEpoch' IS DISTINCT FROM 'null'::jsonb))
+        OR (OLD.lease_token IS NOT NULL AND (e.payload->>'leaseToken' IS DISTINCT FROM OLD.lease_token::text OR (e.payload->>'leaseEpoch')::integer IS DISTINCT FROM OLD.lease_epoch OR e.payload->>'leaseUntil' IS DISTINCT FROM to_char(OLD.lease_expires_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
    )) THEN RAISE EXCEPTION 'terminal guide run lease mismatch'; END IF;
    IF NEW.state NOT IN ('completed','failed','missed') AND OLD.lease_token IS NULL
       AND (OLD.state<>'due' OR NEW.state<>'claimed' OR NEW.lease_epoch<>1 OR NEW.lease_token IS NULL OR NEW.lease_expires_at<=NEW.updated_at) THEN RAISE EXCEPTION 'initial guide run lease mismatch'; END IF;
@@ -132,7 +175,8 @@ CREATE TRIGGER guide_run_events_append_only BEFORE UPDATE OR DELETE ON guide_run
 CREATE TRIGGER guide_run_artifacts_append_only BEFORE UPDATE OR DELETE ON guide_run_artifacts FOR EACH ROW EXECUTE FUNCTION public.guide_run_immutable_guard();
 CREATE TRIGGER guide_run_artifacts_exact_insert BEFORE INSERT ON guide_run_artifacts FOR EACH ROW EXECUTE FUNCTION public.guide_run_artifact_insert_guard();
 CREATE TRIGGER guide_run_schedule_receipts_append_only BEFORE UPDATE OR DELETE ON guide_run_schedule_receipts FOR EACH ROW EXECUTE FUNCTION public.guide_run_immutable_guard();
+CREATE TRIGGER guide_run_schedule_receipts_exact_insert BEFORE INSERT ON guide_run_schedule_receipts FOR EACH ROW EXECUTE FUNCTION public.guide_run_schedule_receipt_insert_guard();
 CREATE TRIGGER guide_run_heads_exact_advance BEFORE INSERT OR UPDATE OR DELETE ON guide_run_heads FOR EACH ROW EXECUTE FUNCTION public.guide_run_head_guard();
-REVOKE ALL PRIVILEGES ON FUNCTION public.guide_run_canonical_json(jsonb),public.guide_run_sha256(jsonb),public.guide_run_transition_allowed(text,text),public.guide_run_immutable_guard(),public.guide_run_artifact_insert_guard(),public.guide_run_head_guard() FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL PRIVILEGES ON FUNCTION public.guide_run_canonical_json(jsonb),public.guide_run_sha256(jsonb),public.guide_run_transition_allowed(text,text),public.guide_run_immutable_guard(),public.guide_run_artifact_insert_guard(),public.guide_run_schedule_receipt_insert_guard(),public.guide_run_head_guard() FROM PUBLIC,anon,authenticated,service_role;
 ALTER TABLE guide_runs ENABLE ROW LEVEL SECURITY; ALTER TABLE guide_runs FORCE ROW LEVEL SECURITY; ALTER TABLE guide_run_events ENABLE ROW LEVEL SECURITY; ALTER TABLE guide_run_events FORCE ROW LEVEL SECURITY; ALTER TABLE guide_run_heads ENABLE ROW LEVEL SECURITY; ALTER TABLE guide_run_heads FORCE ROW LEVEL SECURITY; ALTER TABLE guide_run_artifacts ENABLE ROW LEVEL SECURITY; ALTER TABLE guide_run_artifacts FORCE ROW LEVEL SECURITY; ALTER TABLE guide_run_schedule_receipts ENABLE ROW LEVEL SECURITY; ALTER TABLE guide_run_schedule_receipts FORCE ROW LEVEL SECURITY;
 REVOKE ALL PRIVILEGES ON TABLE guide_runs,guide_run_events,guide_run_heads,guide_run_artifacts,guide_run_schedule_receipts FROM PUBLIC,anon,authenticated,service_role;
