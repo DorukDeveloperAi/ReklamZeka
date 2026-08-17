@@ -23,7 +23,7 @@ describe("canonical Meta data health", () => {
   it("allows data-health staging only for complete same-currency canonical evidence", () => {
     const report = buildMetaDataHealthReport({ workspaceRef, workspaceCurrency: "TRY", evaluatedAt: now,
       accounts: [account()] });
-    expect(report).toMatchObject({ state: "ready", monetaryAggregationAccountRefs: [accountRef],
+    expect(report).toMatchObject({ workspaceRef, state: "ready", monetaryAggregationAccountRefs: [accountRef],
       excludedMonetaryAccountRefs: [], observations: [], gate: { analysisMayRecord: true,
         actionStagingAllowed: true, actionDispatchDataHealthReady: true, reasonCodes: [] } });
     expect(report.reportHash).toMatch(/^[a-f0-9]{64}$/);

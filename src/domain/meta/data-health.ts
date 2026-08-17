@@ -48,6 +48,7 @@ export type MetaDataHealthObservation = Readonly<{
 
 export type MetaDataHealthReport = Readonly<{
   version: typeof META_DATA_HEALTH_VERSION;
+  workspaceRef: string;
   evaluatedAt: string;
   state: "ready" | "partial" | "empty" | "unavailable";
   workspaceCurrency: string | null;
@@ -268,7 +269,7 @@ export function buildMetaDataHealthReport(input: Readonly<{
   const reasonCodes = Object.freeze([...new Set(observations.map((item) => item.code))].sort(compare));
   const accountProjection = Object.freeze(accounts.map((account) => Object.freeze({ ...account,
     reasonCodes: Object.freeze(account.reasonCodes) })));
-  const core = Object.freeze({ version: META_DATA_HEALTH_VERSION, evaluatedAt, state,
+  const core = Object.freeze({ version: META_DATA_HEALTH_VERSION, workspaceRef: input.workspaceRef, evaluatedAt, state,
     workspaceCurrency: input.workspaceCurrency, accounts: accountProjection, monetaryAggregationAccountRefs,
     excludedMonetaryAccountRefs, observations: Object.freeze(observations), gate: Object.freeze({
       analysisMayRecord: true as const, actionStagingAllowed: state === "ready",
