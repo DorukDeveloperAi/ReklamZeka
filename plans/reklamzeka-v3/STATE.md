@@ -2,8 +2,8 @@
 
 | Paket | Durum | Dependency |
 |---|---|---|
-| M00 | AÇIK | — |
-| P01 meta-veri-sagligi | BEKLİYOR | M00 |
+| + M00 | TAMAMLANDI — `evidence/M00-20260817.md`, `4fdb381` | — |
+| P01 meta-veri-sagligi | AÇIK | M00 |
 | P02 kurum-kampanyasi-kunye | BEKLİYOR | P01 |
 | P03 slice-operasyon-rapor | BEKLİYOR | P02 |
 | P04 kilavuz-butce | BEKLİYOR | P03 |
