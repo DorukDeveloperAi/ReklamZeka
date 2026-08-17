@@ -10,6 +10,8 @@ import { DrizzleGuideRunCandidateStagingContextRepository } from "@/connectors/g
 import { DrizzleGuideRunEffectiveOverlapRepository } from "@/connectors/guides/guide-run-effective-overlap-drizzle";
 import { DrizzleOperationReadRepository } from "@/connectors/operations/operation-read-drizzle-repository";
 import { DrizzleWorkspaceTombstonePurgePort } from "@/connectors/meta/workspace-tombstone-purge-drizzle-adapter";
+import { DrizzleActionApprovalDecisionRepository } from "@/connectors/actions/action-approval-decision-drizzle-repository";
+import { DrizzleP06ExecutionRepository } from "@/connectors/actions/p06-execution-drizzle-repository";
 import * as schema from "@/db/schema";
 import {
   appendGuideRunTransitionV12,
@@ -31,11 +33,13 @@ import {
   categoryDefinitionPublicRef,
   categoryDimensionPublicRef,
 } from "@/domain/categories/public-reference";
+import type { P06ExecutionV2Step } from "@/domain/actions/p06-execution-v2";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) throw new Error("DATABASE_URL yapılandırılmadı");
 const postMode = process.env.P06_ACTION_BINDINGS_POST_APPROVED === "true";
+const executionPreMode = process.env.P06_EXECUTION_CHAIN_PRE === "true";
 const pool = new Pool({
   connectionString: databaseUrl,
   max: postMode ? 4 : 1,
@@ -72,11 +76,11 @@ const closed = {
   canWriteMeta: false,
 } as const;
 const evidence = {
-  mode: postMode ? "post_applied_two_client" : "pre_outer_rollback",
+  mode: postMode ? "post_applied_two_client" : executionPreMode ? "execution_pre_outer_rollback" : "pre_outer_rollback",
   exactMigrationLedger: !postMode,
   preApplyConcurrencySkipped: !postMode,
-  separateClients: !postMode,
-  concurrentMaterializeAndReplay: !postMode,
+  separateClients: false,
+  concurrentMaterializeAndReplay: false,
   p05Prerequisite: false,
   p06AppliedOuterRollback: false,
   rlsForced: false,
@@ -94,6 +98,11 @@ const evidence = {
   tombstonePurge: false,
   zeroResidue: false,
 };
+const executionEvidence = { migrationInstalled: !executionPreMode, approvedGrantBound: !executionPreMode,
+  identityCreated: !executionPreMode, claimed: !executionPreMode, phasedGates: !executionPreMode,
+  tenStepTrace: !executionPreMode, observations: !executionPreMode, terminalSucceeded: !executionPreMode,
+  immutableRunRejected: !executionPreMode, crossTenantHeadRejected: !executionPreMode,
+  staleFenceRejected: !executionPreMode, forgedEventRejected: !executionPreMode };
 const mark = (stage: string) =>
   console.log(JSON.stringify({ p06PreStage: stage }));
 function transition(
@@ -147,7 +156,7 @@ try {
       );
       const bindingHash = createHash("sha256").update(bindingMigration).digest("hex");
       const requesterHash = createHash("sha256").update(requesterMigration).digest("hex");
-      if (postMode) {
+      if (postMode || executionPreMode) {
         const ledger = await client.query<{ binding_count: number; requester_count: number }>(
           "select count(*) filter(where hash=$1 and created_at=1787000400000)::int binding_count,count(*) filter(where hash=$2 and created_at=1787011260000)::int requester_count from drizzle.__drizzle_migrations",
           [bindingHash, requesterHash],
@@ -157,6 +166,10 @@ try {
       } else {
         await client.query(bindingMigration);
         await client.query(requesterMigration);
+      }
+      if (executionPreMode) {
+        await client.query(readFileSync("drizzle/20260818000300_p06_execution_persistence.sql", "utf8"));
+        executionEvidence.migrationInstalled = true;
       }
       mark(postMode ? "applied_migrations_verified" : "migration_installed_outer_rollback");
       const shape = await client.query<{ force: boolean }>(
@@ -713,6 +726,70 @@ try {
             sql`select count(*)::int count from action_proposal_units where workspace_id=${workspaceId}::uuid`,
           ),
         )[0]?.count === 1;
+      if (executionPreMode) {
+        const unit = rows(await db.execute(sql`select b.action_unit_ref,u.id::text unit_id from guide_run_action_bindings b join action_proposal_units u on u.workspace_id=b.workspace_id and u.id=b.action_unit_id where b.workspace_id=${workspaceId}::uuid and b.id=${saved.bindingId}::uuid`))[0];
+        if (!unit || typeof unit.action_unit_ref !== "string") throw new Error("execution unit missing");
+        const decisions = new DrizzleActionApprovalDecisionRepository(outerDb, workspaceId);
+        const decisionSnapshot = await decisions.loadForDecision({ workspaceId, unitRef: unit.action_unit_ref });
+        if (!decisionSnapshot) throw new Error("execution decision snapshot missing");
+        const baseTime = new Date(); const iso = (seconds: number) => new Date(baseTime.getTime()+seconds*1000).toISOString();
+        const decided = await decisions.decideAtomically({ workspaceId, unitRef: unit.action_unit_ref,
+          expectedTraceHash: decisionSnapshot.lifecycle.traceHash, buildCommand: async (snapshot) => {
+            const approvedUnit = snapshot.lifecycle.bundle.units.find((candidate) => candidate.unitRef===unit.action_unit_ref)!;
+            return { kind: "approve", commandRef: `decision_execution_${digest({ workspaceId })}`,
+              unitRef: unit.action_unit_ref as string, actor: { actorRef: "actor_execution_owner", role: "owner" as const },
+              decidedAt: iso(0), reasonCode: "human.execution_approved", freshness: snapshot.freshness,
+              authorization: { authorizationRef: `presence_${digest({ workspaceId }).slice(0,24)}`, unitRef: unit.action_unit_ref as string,
+                unitHash: approvedUnit.unitHash, scopeHash: approvedUnit.scopeHash,
+                actor: { actorRef: "actor_execution_owner", role: "owner" as const }, issuedAt: iso(-1), expiresAt: iso(120),
+                humanPresence: true as const, canExecute: false as const }, grantRef: `grant_execution_${digest({ workspaceId }).slice(0,24)}` };
+          } });
+        const approval = rows(await db.execute(sql`select d.id::text decision_id,g.id::text grant_id from action_approval_decision_events d join action_approval_evidence_grants g on g.workspace_id=d.workspace_id and g.decision_event_id=d.id where d.workspace_id=${workspaceId}::uuid and d.unit_id=${unit.unit_id}::uuid and d.command_kind='approve'`))[0];
+        if (!approval || typeof approval.decision_id!=="string" || typeof approval.grant_id!=="string") throw new Error("execution approval missing");
+        executionEvidence.approvedGrantBound = decided.lifecycle.units[0]?.state === "approved";
+        const execution = new DrizzleP06ExecutionRepository(outerDb);
+        const gate = (phase: "staging"|"admission"|"post_claim"|"pre_dispatch"|"read_after_write", seconds: number) => ({ phase, enabled: true, allowlistHash: digest({ workspaceId, phase }), capturedAt: iso(seconds), expiresAt: iso(600) });
+        const identity = await execution.createHumanApproved({ workspaceId, guideRunActionBindingId: saved.bindingId,
+          decisionEventId: approval.decision_id, approvalGrantId: approval.grant_id, leaseTokenHash: "3".repeat(64),
+          fenceHash: "4".repeat(64), evaluatedAt: iso(2), gates: [gate("staging",0),gate("admission",1)] });
+        executionEvidence.identityCreated = /^p06_execution_/.test(identity.executionRef);
+        executionEvidence.immutableRunRejected = await rejected(client, () => client.query("update p06_execution_runs set request_hash=$1 where id=$2::uuid",["0".repeat(64),identity.executionRunId]));
+        executionEvidence.crossTenantHeadRejected = await rejected(client, () => client.query("insert into p06_execution_heads(workspace_id,execution_run_id,state,sequence,trace_sequence) values($1::uuid,$2::uuid,'pending',0,0)",[foreignWorkspaceId,identity.executionRunId]));
+        const claim = await execution.claimLease({ executionRef: identity.executionRef, leaseTokenHash: "3".repeat(64),
+          fenceHash: "4".repeat(64), now: iso(3), leaseUntil: iso(600) });
+        executionEvidence.claimed = claim.core.owned;
+        const trace = async (step: P06ExecutionV2Step, outcome: "ok"|"skipped"|"held"|"ambiguous"|"already_applied", receiptCore: Record<string,unknown>, seconds: number) =>
+          await execution.appendTrace({ executionRef: identity.executionRef, leaseTokenHash: "3".repeat(64), fenceHash: "4".repeat(64), step, outcome, receiptCore, occurredAt: iso(seconds) });
+        try { await execution.appendTrace({ executionRef: identity.executionRef, leaseTokenHash: "3".repeat(64), fenceHash: "9".repeat(64), step:"lease", outcome:"ok", receiptCore:claim.core, occurredAt:iso(4) }); }
+        catch { executionEvidence.staleFenceRejected=true; }
+        executionEvidence.forgedEventRejected = await rejected(client, () => client.query("insert into p06_execution_events(workspace_id,execution_run_id,event_ref,event_hash,sequence,event_kind,outcome,previous_hash,receipt_hash,payload,occurred_at) values($1::uuid,$2::uuid,$3,$4,2,'trace','ok',$5,$6,'{}'::jsonb,$7::timestamptz)",[workspaceId,identity.executionRunId,`p06_exec_event_${"8".repeat(24)}`,"8".repeat(64),"7".repeat(64),"6".repeat(64),iso(4)]));
+        await trace("lease","ok",claim.core,4);
+        const idemCore={kind:"fresh",executionRef:identity.executionRef,idempotencyKey:identity.idempotencyKey,fenceHash:"4".repeat(64)};
+        await trace("idempotency","ok",idemCore,5);
+        await execution.appendGate({ executionRef: identity.executionRef, gate: gate("post_claim",6) });
+        const beforeCore={workspaceRef,accountRef:"act_12345",entityRef:"adset_12345",value:{status:"ACTIVE",budgetMinor:null},observedAt:iso(7),rawHash:"5".repeat(64)};
+        const beforeEvent=await trace("current_meta_read","ok",beforeCore,7);
+        const before=await execution.appendObservation({executionRef:identity.executionRef,eventHash:beforeEvent.eventHash,kind:"read_before",metadataHash:digest(beforeCore),rawHash:"5".repeat(64),observedValue:beforeCore.value,observedAt:iso(7)});
+        await trace("expected_before","ok",beforeCore,8);
+        await execution.appendGate({ executionRef: identity.executionRef, gate: gate("pre_dispatch",9) });
+        const writeCore={executionRef:identity.executionRef,idempotencyKey:identity.idempotencyKey,entityRef:"adset_12345",action:"status_pause",kind:"written",rawHash:"6".repeat(64)};
+        const writeEvent=await trace("typed_mutation","ok",writeCore,10);
+        const write=await execution.appendObservation({executionRef:identity.executionRef,eventHash:writeEvent.eventHash,kind:"write_receipt",metadataHash:digest(writeCore),rawHash:"6".repeat(64),observedValue:{status:"PAUSED",budgetMinor:null},observedAt:iso(10)});
+        const afterCore={workspaceRef,accountRef:"act_12345",entityRef:"adset_12345",value:{status:"PAUSED",budgetMinor:null},observedAt:iso(11),rawHash:"7".repeat(64)};
+        const rawCore={beforeRawHash:"5".repeat(64),writeRawHash:"6".repeat(64),afterRawHash:"7".repeat(64),writeReceiptHash:digest(writeCore)};
+        const rawEvent=await trace("raw","ok",rawCore,11);
+        const after=await execution.appendObservation({executionRef:identity.executionRef,eventHash:rawEvent.eventHash,kind:"read_after",metadataHash:digest(afterCore),rawHash:"7".repeat(64),observedValue:afterCore.value,observedAt:iso(11)});
+        await execution.appendGate({ executionRef: identity.executionRef, gate: gate("read_after_write",12) });
+        await trace("already_applied_no_second_write","skipped",{executionRef:identity.executionRef,step:"already_applied_no_second_write",skipped:true},13);
+        await trace("ambiguous_read_before_retry","skipped",{executionRef:identity.executionRef,step:"ambiguous_read_before_retry",skipped:true},14);
+        const terminalCore={executionRef:identity.executionRef,outcome:"written_verified",writeReceiptHash:digest(writeCore),fenceHash:"4".repeat(64)};
+        await trace("immutable_terminal","ok",terminalCore,15);
+        await trace("release","ok",{executionRef:identity.executionRef,leaseTokenHash:"3".repeat(64),fenceHash:"4".repeat(64),released:true},16);
+        const persisted = rows(await db.execute(sql`select h.state,h.trace_sequence,(select count(*)::int from p06_execution_events e where e.workspace_id=h.workspace_id and e.execution_run_id=h.execution_run_id and e.event_kind='trace') traces,(select count(*)::int from p06_execution_gate_snapshots g where g.workspace_id=h.workspace_id and g.execution_run_id=h.execution_run_id) gates,(select count(*)::int from p06_execution_observations o where o.workspace_id=h.workspace_id and o.execution_run_id=h.execution_run_id) observations from p06_execution_heads h join p06_execution_runs r on r.workspace_id=h.workspace_id and r.id=h.execution_run_id where r.execution_ref=${identity.executionRef}`))[0];
+        executionEvidence.phasedGates=persisted?.gates===5; executionEvidence.tenStepTrace=persisted?.traces===10 && persisted?.trace_sequence===10;
+        executionEvidence.observations=persisted?.observations===3 && Boolean(before.observationId&&write.observationId&&after.observationId);
+        executionEvidence.terminalSucceeded=persisted?.state==="succeeded";
+      }
       mark("materializer_and_replay_verified");
       const second = await makeCompleted(
         "request_p06_second",
@@ -874,17 +951,19 @@ try {
   const residue = await pool.query<{ n: string }>(
     "select count(*)::text n from pg_class where oid=to_regclass('public.guide_run_action_bindings')",
   );
-  evidence.zeroResidue = residue.rows[0]?.n === (postMode ? "1" : "0");
+  evidence.zeroResidue = residue.rows[0]?.n === (postMode || executionPreMode ? "1" : "0");
   const required = Object.entries(evidence).filter(
     ([key, value]) =>
-      typeof value === "boolean" && key !== "preApplyConcurrencySkipped",
+      typeof value === "boolean" && key !== "preApplyConcurrencySkipped" &&
+      (postMode || (key !== "separateClients" && key !== "concurrentMaterializeAndReplay")),
   );
   if (
     !required.every(([, value]) => value === true) ||
-    evidence.preApplyConcurrencySkipped !== !postMode
+    evidence.preApplyConcurrencySkipped !== !postMode ||
+    !Object.values(executionEvidence).every(Boolean)
   )
-    throw new Error(JSON.stringify(evidence));
-  console.log(JSON.stringify(evidence));
+    throw new Error(JSON.stringify({ ...evidence, execution: executionEvidence }));
+  console.log(JSON.stringify({ ...evidence, execution: executionEvidence }));
 } finally {
   await pool.end();
 }

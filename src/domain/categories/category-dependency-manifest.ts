@@ -61,6 +61,13 @@ const opaqueCategoryContext = new Set([
   // replay; archive handling must retain it as opaque historical context.
   "action_execution_attempts.admission_payload",
   "action_execution_events.event_payload",
+  // P06 execution-v2 rows are immutable, hash-bound historical evidence.
+  // Category archive must never reinterpret or rewrite their frozen payloads.
+  "p06_execution_runs.request_payload",
+  "p06_execution_events.payload",
+  "p06_execution_observations.observed_value",
+  "p06_execution_gate_snapshots.payload",
+  "p06_rollback_proposals.payload",
   // Private gate audit binds frozen hashes and a server-disabled flag; it is
   // historical evidence, never a mutable category selection source.
   "action_preparation_gate_snapshots.snapshot_payload",
@@ -280,6 +287,11 @@ const columns = [
   "action_approval_evidence_grants.grant_payload",
   "action_execution_attempts.admission_payload",
   "action_execution_events.event_payload",
+  "p06_execution_runs.request_payload",
+  "p06_execution_events.payload",
+  "p06_execution_observations.observed_value",
+  "p06_execution_gate_snapshots.payload",
+  "p06_rollback_proposals.payload",
   "autonomy_rule_revisions.source_guidance_refs",
   "autonomy_rule_revisions.artifact_payload",
   "action_guardrail_policy_revisions.action_types",

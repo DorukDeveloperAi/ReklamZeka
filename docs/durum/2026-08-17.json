@@ -4,6 +4,24 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "14dc65fc8",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): add deferred approval decisions",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7516f34ba",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): harden disabled execution contract",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "a0621d103",
       "tarih": "2026-08-18",
       "konu": "feat(p06): bind guide run status candidates",
@@ -119,30 +137,12 @@
       "kapsam": [
         "docs"
       ]
-    },
-    {
-      "hash": "a178e25f4",
-      "tarih": "2026-08-17",
-      "konu": "feat(dashboard): make operations table first",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "8d5bc5616",
-      "tarih": "2026-08-17",
-      "konu": "docs(plan): open primary result binding vertical",
-      "tur": "is",
-      "kapsam": [
-        "docs"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 31
+      "adet": 33
     },
     {
       "kapsam": "docs",
@@ -150,14 +150,14 @@
     },
     {
       "kapsam": "fix",
-      "adet": 8
+      "adet": 7
     },
     {
       "kapsam": "test",
-      "adet": 6
+      "adet": 5
     }
   ],
-  "isSayisi": 587,
+  "isSayisi": 589,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-18",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "bbb291c0a678"
+  "damga": "8bbff56cae39"
 }

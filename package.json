@@ -91,6 +91,8 @@
     "verify:authentic-approval-chain-db": "tsx scripts/verify-authentic-approval-chain-postgres.ts",
     "verify:p06-approval-decision-defer-db": "tsx scripts/verify-p06-approval-decision-defer-postgres.ts",
     "verify:p06-approval-decision-defer-db:post": "P06_DEFER_POST_APPROVED=true tsx scripts/verify-p06-approval-decision-defer-postgres.ts",
+    "verify:p06-execution-persistence-db": "tsx scripts/verify-p06-execution-persistence-postgres.ts",
+    "verify:p06-execution-persistence-db:behavior": "P06_EXECUTION_CHAIN_PRE=true node --conditions react-server --import tsx scripts/verify-p06-action-bindings-postgres.ts",
     "verify:action-guardrail-db": "tsx scripts/verify-action-guardrail-policy-postgres.ts",
     "verify:meta-affected-geo-db": "tsx scripts/verify-meta-affected-geo-postgres.ts",
     "verify:meta-affected-geo-live-db": "tsx scripts/verify-meta-affected-geo-live-postgres.ts",
