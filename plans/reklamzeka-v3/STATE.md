@@ -35,6 +35,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P05-A-guide-run-domain | Kabul edildi / arşivlenebilir |
 | + P05-B-two-agent-boundary | Kabul edildi / arşivlenebilir |
 | + P07-A-five-area-shell | Kabul edildi / arşivlenebilir |
+| + P06-A-effective-guide-overlap | Kabul edildi / arşivlenebilir |
 
 ## 2026-08-17 — ilk uygulama zinciri
 
@@ -51,3 +52,4 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 - P02-B naming-template domain: account-scoped campaign/ad-set şablonları structured token + canonical objective/optimization/geo/targeting/platform/creative/CTA/destination kanıtıyla deterministic öneri üretir. İlk revision taslaktır, publish ayrı immutable geçiştir; isim tek başına atama yapamaz ve manual lock üstündür. Persistence, kullanıcı preview/publish ve explicit category assignment bağlantısı açık olduğundan P02 henüz `+` değildir.
 - P05-B two-agent boundary: `guide_policy` ve `daily_analysis` ayrı conversation identity ve capability zarfına ayrıldı. Kılavuz Agentı yalnız ephemeral öneri/explicit user preview; Günlük Agent yalnız run-owned analiz/finding ve mode+data-gated öneri/candidate üretir. Guide save/activation, approval, execute ve Meta write ikisi için de kapalıdır. Transcript/runtime persistence açık olduğundan P05 henüz `+` değildir.
 - `+ P01-D data-health read/action hold`: canonical mirror, son yedi tamamlanmış günlük insight, stream trust, tam targeting/creative coverage ve workspace currency kanıtı server-side salt-okunur adapterda birleşir. Ready olmayan kanıt ActionUnit materialization'da typed `data_health_hold` üretir ve execution admission'da yeniden değerlendirilerek dispatch'i kapatır; analiz kaydı kaybolmaz. Stable observation lifecycle projector aynı fingerprint için immutable observed/resolved/reopened eventleri ve yalnız `proposed` Development Log çıktısı üretir. Generic Finding/Development Log concrete ledger şeması P01-E olarak açık kaldığından P01 paketi henüz `+` değildir.
+- `+ P06-A effective Guide overlap`: aynı entity üzerindeki aktif Kılavuzlar için closed action allowlist kesişimi, en kısıtlayıcı mode, deny/manual-lock/protection birleşimi ve en düşük numeric cap input-order bağımsız çözülür. Rename daima insan onaylıdır; unresolved constraint veya active-head conflict hold/fail-closed olur. Çıktı yalnız karar hazırlama kanıtıdır; approve/execute/Meta write yetkileri sıfırdır. Persistence, action bundle/admission/executor/rollback açık olduğundan P06 paketi henüz `+` değildir.
