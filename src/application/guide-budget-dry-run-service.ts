@@ -35,8 +35,8 @@ export class GuideBudgetDryRunService {
     // Empty/unknown overlap is never equivalent to “no restriction”. Until
     // P06 supplies a verified effective overlap, deny both directions.
     const constraints = bundle.constraints.length ? bundle.constraints : [
-      { guideRef: "guide_overlap_unavailable", action: "budget_increase" as const, allowed: false, requiresHumanApproval: true, maximumAbsoluteDeltaDecimal: null, maximumRelativeDeltaBasisPoints: null, parentCeilingDecimal: null },
-      { guideRef: "guide_overlap_unavailable", action: "budget_decrease" as const, allowed: false, requiresHumanApproval: true, maximumAbsoluteDeltaDecimal: null, maximumRelativeDeltaBasisPoints: null, parentCeilingDecimal: null },
+      { guideRef: "guide_overlap_unavailable", action: "budget_increase" as const, allowed: false, requiresHumanApproval: true, maximumAbsoluteDeltaDecimal: null, maximumRelativeDeltaBasisPoints: null, parentCeilingDecimal: null, guideMode: "observe_analyze" as const, actionDisposition: "denied" as const },
+      { guideRef: "guide_overlap_unavailable", action: "budget_decrease" as const, allowed: false, requiresHumanApproval: true, maximumAbsoluteDeltaDecimal: null, maximumRelativeDeltaBasisPoints: null, parentCeilingDecimal: null, guideMode: "observe_analyze" as const, actionDisposition: "denied" as const },
     ];
     return dryRunGuideBudget({ targetScopeRef: contract.targetScopeRef, market: contract.market, currency: contract.currency,
       targetCurrentBudgetDecimal: bundle.targetCurrentBudgetDecimal, expression: contract.expression, scopeEvidence: aged, constraints });

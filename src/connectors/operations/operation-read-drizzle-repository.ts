@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { OperationReadRepository } from "@/application/operation-read-service";
 import type { OperationRowFact } from "@/domain/operations/operation-read-model";
+import type { ScopeReportMetricInput } from "@/domain/slices/scope-report";
 import { organizationCampaignPublicRef } from "@/domain/campaigns/organization-campaign";
 import { metaPublicReference } from "@/domain/meta/public-reference";
 import {
@@ -10,8 +11,9 @@ import {
   categoryDefinitionPublicRef,
   categoryDimensionPublicRef,
 } from "@/domain/categories/public-reference";
-import { resolveCurrentOperationSlice } from "@/connectors/operations/current-slice-resolution";
+import { resolveCurrentOperationSliceResolution } from "@/connectors/operations/current-slice-resolution";
 import type { SliceEntityCandidate } from "@/domain/slices/slice-resolver";
+import type { SliceResolution } from "@/domain/slices/slice-resolver";
 import type {
   SliceDimensionPredicate,
   SliceRevision,
@@ -39,6 +41,17 @@ type Row = Record<string, unknown>;
 type Cursor = Readonly<{ v: 3; c: string; k: 0 | 1; a: string; q: string }>;
 export type CurrentSliceEvidence = Readonly<{
   sliceId: string | null;
+  /** Public-only immutable resolution evidence. Null is the global table scope. */
+  resolution: SliceResolution | null;
+  sliceRef: string | null;
+  revisionRef: string | null;
+  revisionNumber: number | null;
+  definitionHash: string | null;
+  market: Readonly<{
+    dimensionRef: string;
+    valueRef: string;
+    key: "yerli" | "yabanci";
+  }> | null;
   organizationCampaignIds: readonly string[];
   campaignIds: readonly string[];
   adSetIds: readonly string[];
@@ -49,6 +62,7 @@ type ResolvedScope = CurrentSliceEvidence;
 const UUID = /^[0-9a-f-]{36}$/i;
 const PREFIX = "operation_cursor_";
 const MAX_SLICE_CANDIDATES = 20_000;
+const MAX_SCOPE_REPORT_METRICS = 50_000;
 const rows = (result: unknown): readonly Row[] => {
   if (
     !result ||
@@ -197,6 +211,55 @@ export class DrizzleOperationReadRepository implements OperationReadRepository {
     )
       throw new Error("operation read rejected: scope");
     return this.resolveCurrentScope(tx, workspaceId, sliceRef);
+  }
+
+  /** Bounded long-form metric evidence for Kapsam Raporu. Aggregation and
+   * ratios remain in the domain projection so raw actions are never lost. */
+  async currentScopeReport(
+    workspaceId: string,
+    sliceRef: string,
+    period: Readonly<{ startDate: string; endDate: string }>,
+    actionType: string | null = null,
+  ): Promise<Readonly<{ evidence: CurrentSliceEvidence; metrics: readonly ScopeReportMetricInput[] }>> {
+    if (!UUID.test(workspaceId) || !/^slice_[a-z0-9][a-z0-9_.:-]{0,190}$/.test(sliceRef)
+      || !/^\d{4}-\d{2}-\d{2}$/.test(period.startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(period.endDate)
+      || period.startDate > period.endDate) throw new Error("scope report rejected: input");
+    return this.database.transaction(async (tx) => {
+      await tx.execute(sql`set local transaction isolation level repeatable read`);
+      await tx.execute(sql`set local transaction read only`);
+      const evidence = await this.resolveCurrentScope(tx, workspaceId, sliceRef);
+      const catalog = actionType === null ? null : await new DrizzlePrimaryResultActionCatalogAdapter({ transaction: async (callback: (transaction: Transaction) => Promise<unknown>) => callback(tx) } as never).load(workspaceId);
+      if (actionType !== null && (!catalog || !catalog.catalog.actionTypes.includes(actionType))) throw new Error("scope report rejected: selector");
+      const entities = [
+        ...evidence.campaignIds.map((id) => ({ id, level: "campaign", ref: metaPublicReference("campaign", workspaceId, id) })),
+        ...evidence.adSetIds.map((id) => ({ id, level: "ad_set", ref: metaPublicReference("ad_set", workspaceId, id) })),
+      ];
+      const reportEvidence = Object.freeze({ ...evidence, ...(catalog ? { catalogActionTypes: Object.freeze([...catalog.catalog.actionTypes]) } : {}) });
+      if (!entities.length) return Object.freeze({ evidence: reportEvidence, metrics: Object.freeze([]) });
+      const metricRows = rows(await tx.execute(sql`
+        select w.ref entity_ref,w.level entity_level,i.date_start::text date,i.attribution_label attribution,
+          m.metric_key,m.action_type,m.value_decimal::text value_decimal,m.value_minor::text value_minor,m.currency,
+          case when m.availability->>'state'='available' then 'available' else 'unavailable' end availability
+        from jsonb_to_recordset(${JSON.stringify(entities)}::jsonb) as w(id uuid,level text,ref text)
+        join meta_daily_insights i on i.workspace_id=${workspaceId}::uuid
+          and i.entity_level=w.level::meta_insight_entity_level
+          and i.date_start>=${period.startDate}::date and i.date_stop<=${period.endDate}::date
+          and ((w.level='campaign' and i.external_entity_id=(select c.external_campaign_id from ad_campaigns c where c.workspace_id=${workspaceId}::uuid and c.id=w.id))
+            or (w.level='ad_set' and i.external_entity_id=(select a.external_ad_set_id from meta_ad_sets a where a.workspace_id=${workspaceId}::uuid and a.id=w.id)))
+        join meta_daily_insight_metrics m on m.daily_insight_id=i.id
+        order by w.ref,i.date_start,i.attribution_label,m.metric_key,m.action_type,m.id
+        limit ${MAX_SCOPE_REPORT_METRICS + 1}`));
+      if (metricRows.length > MAX_SCOPE_REPORT_METRICS) throw new Error("scope report rejected: metric_cap");
+      const metrics = metricRows.map((row): ScopeReportMetricInput => {
+        const level = string(row, "entity_level");
+        if ((level !== "campaign" && level !== "ad_set") || (row.availability !== "available" && row.availability !== "unavailable")) throw new Error("scope report rejected: metric");
+        return Object.freeze({ entityRef: string(row, "entity_ref"), entityLevel: level, date: string(row, "date"), attribution: string(row, "attribution"),
+          metricKey: string(row, "metric_key"), actionType: typeof row.action_type === "string" && row.action_type ? row.action_type : null,
+          valueDecimal: canonicalDecimal(row.value_decimal), valueMinor: canonicalDecimal(row.value_minor), currency: typeof row.currency === "string" && row.currency ? row.currency : null,
+          availability: row.availability });
+      });
+      return Object.freeze({ evidence: reportEvidence, metrics: Object.freeze(metrics) });
+    });
   }
 
   async load(input: Parameters<OperationReadRepository["load"]>[0]) {
@@ -553,6 +616,12 @@ export class DrizzleOperationReadRepository implements OperationReadRepository {
     if (!isSlice && head.length === 0)
       return Object.freeze({
         sliceId: null,
+        resolution: null,
+        sliceRef: null,
+        revisionRef: null,
+        revisionNumber: null,
+        definitionHash: null,
+        market: null,
         organizationCampaignIds: [],
         campaignIds: [],
         adSetIds: [],
@@ -782,6 +851,7 @@ export class DrizzleOperationReadRepository implements OperationReadRepository {
         evidenceRefs: string[];
       }[]
     >();
+    const parkedMarketConflicts = new Set<string>();
     const adSetCampaign = new Map(
       candidateRows
         .filter((row) => row.entity_level === "ad_set")
@@ -825,6 +895,11 @@ export class DrizzleOperationReadRepository implements OperationReadRepository {
         assignments: currentAssignments,
         path: { workspaceId, nodes: path },
       });
+      if (inspected.state === "parked_conflict") {
+        if (dimension.key === marketDimensionKey)
+          parkedMarketConflicts.add(`${level}\u0000${id}`);
+        continue;
+      }
       if (inspected.state !== "applied") continue;
       const values = inspected.resolution.values;
       if (!values.length) continue;
@@ -883,6 +958,8 @@ export class DrizzleOperationReadRepository implements OperationReadRepository {
               key: row.market_key as "yerli" | "yabanci",
               evidenceRefs: [organizationCampaignPublicRef(workspaceId, id)],
             }
+          : parkedMarketConflicts.has(`${level}\u0000${id}`)
+            ? { state: "conflicting" as const, evidenceRefs: unique(marketAssignments.flatMap((item) => item.evidenceRefs)) }
           : marketAssignments.length === 0
             ? { state: "missing" as const, evidenceRefs: [] }
             : marketAssignments.length !== 1 ||
@@ -924,15 +1001,14 @@ export class DrizzleOperationReadRepository implements OperationReadRepository {
     const candidateByRef = new Map(
       candidates.map((candidate) => [candidate.entityRef, candidate]),
     );
-    const included = isSlice
-      ? new Set(
-          resolveCurrentOperationSlice({
-            revision,
-            candidates,
-            resolvedAt: new Date().toISOString(),
-          }),
-        )
-      : new Set<string>();
+    const resolution = isSlice
+      ? resolveCurrentOperationSliceResolution({
+          revision,
+          candidates,
+          resolvedAt: new Date().toISOString(),
+        })
+      : null;
+    const included = new Set(resolution?.included.map((member) => member.entityRef));
     const campaignMarkets = new Map<string, "yerli" | "yabanci">(),
       adSetMarkets = new Map<string, "yerli" | "yabanci">();
     for (const [id, ref] of campaignById) {
@@ -953,6 +1029,18 @@ export class DrizzleOperationReadRepository implements OperationReadRepository {
     }
     return Object.freeze({
       sliceId: isSlice ? string(head[0]!, "slice_id") : null,
+      resolution,
+      sliceRef: isSlice ? revision.sliceRef : null,
+      revisionRef: isSlice ? revision.revisionRef : null,
+      revisionNumber: isSlice ? revision.revisionNumber : null,
+      definitionHash: isSlice ? revision.definitionHash : null,
+      market: isSlice
+        ? Object.freeze({
+            dimensionRef: revision.market.dimensionId,
+            valueRef: revision.market.valueId,
+            key: revision.market.key,
+          })
+        : null,
       organizationCampaignIds: unique(
         [...orgById].filter(([, ref]) => included.has(ref)).map(([id]) => id),
       ),

@@ -29,6 +29,7 @@ export type BudgetScopeEvidence = Readonly<{
   currency: string;
   budgetOwnerRef: string;
   budgetOwnerKind: "campaign" | "adset";
+  budgetKind: "daily" | "lifetime";
   currentBudgetDecimal: string | null;
   freshness: BudgetFreshness;
   observedAt: string | null;
@@ -43,6 +44,9 @@ export type GuideBudgetDryRunConstraint = Readonly<{
   maximumAbsoluteDeltaDecimal: string | null;
   maximumRelativeDeltaBasisPoints: number | null;
   parentCeilingDecimal: string | null;
+  /** Effective Guide mode after overlap resolution; never inferred by a caller. */
+  guideMode: "observe_analyze" | "recommend" | "prepare_human_approval" | "limited_autonomy";
+  actionDisposition: "denied" | "recommend" | "human_approval" | "limited_autonomy";
 }>;
 
 export type GuideBudgetDryRunInput = Readonly<{
@@ -70,6 +74,9 @@ export type GuideBudgetDryRun = Readonly<{
   effectiveParentCeilingDecimal: string | null;
   effectiveRequiresHumanApproval: boolean;
   effectiveBudgetOwner: Readonly<{ budgetOwnerRef: string; budgetOwnerKind: "campaign" | "adset" }> | null;
+  effectiveBudgetKind: "daily" | "lifetime" | null;
+  effectiveGuideMode: "observe_analyze" | "recommend" | "prepare_human_approval" | "limited_autonomy" | null;
+  effectiveActionDisposition: "denied" | "recommend" | "human_approval" | "limited_autonomy" | null;
   ownerEvidence: readonly Readonly<{
     budgetOwnerRef: string;
     budgetOwnerKind: "campaign" | "adset";
@@ -240,9 +247,9 @@ export function dryRunGuideBudget(input: GuideBudgetDryRunInput): GuideBudgetDry
   if (!Array.isArray(input.scopeEvidence) || !Array.isArray(input.constraints) || input.scopeEvidence.length > 10_000 || input.constraints.length > 1_000) fail("invalid_input");
   const hold = new Set<string>();
   const normalizedEvidence = input.scopeEvidence.map((row) => {
-    exact(row, ["scopeLayer", "scopeRef", "market", "currency", "budgetOwnerRef", "budgetOwnerKind", "currentBudgetDecimal", "freshness", "observedAt", "evidenceHash"]);
+    exact(row, ["scopeLayer", "scopeRef", "market", "currency", "budgetOwnerRef", "budgetOwnerKind", "budgetKind", "currentBudgetDecimal", "freshness", "observedAt", "evidenceHash"]);
     const candidate = row as BudgetScopeEvidence;
-    if (!["market", "organization_campaign", "geo_targeting_platform", "campaign_ad_set"].includes(candidate.scopeLayer) || !["campaign", "adset"].includes(candidate.budgetOwnerKind) || !["fresh", "stale", "missing"].includes(candidate.freshness) || !/^[a-f0-9]{64}$/.test(candidate.evidenceHash)) fail("invalid_input");
+    if (!["market", "organization_campaign", "geo_targeting_platform", "campaign_ad_set"].includes(candidate.scopeLayer) || !["campaign", "adset"].includes(candidate.budgetOwnerKind) || !["daily", "lifetime"].includes(candidate.budgetKind) || !["fresh", "stale", "missing"].includes(candidate.freshness) || !/^[a-f0-9]{64}$/.test(candidate.evidenceHash)) fail("invalid_input");
     if (candidate.market !== "yerli" && candidate.market !== "yabanci") fail("invalid_input");
     if (candidate.observedAt !== null && (typeof candidate.observedAt !== "string" || !Number.isFinite(Date.parse(candidate.observedAt)) || new Date(candidate.observedAt).toISOString() !== candidate.observedAt)) fail("invalid_input");
     const value = candidate.currentBudgetDecimal === null ? null : roundCurrency(decimal(candidate.currentBudgetDecimal), targetCurrency);
@@ -280,6 +287,7 @@ export function dryRunGuideBudget(input: GuideBudgetDryRunInput): GuideBudgetDry
   const effectiveBudgetOwner = targetEvidence.length === 1
     ? Object.freeze({ budgetOwnerRef: targetEvidence[0]!.budgetOwnerRef, budgetOwnerKind: targetEvidence[0]!.budgetOwnerKind })
     : null;
+  const effectiveBudgetKind = targetEvidence.length === 1 ? targetEvidence[0]!.budgetKind : null;
   const relatedOrganizationBudget = trustedEvidence.find((row) => row.scopeLayer === "organization_campaign")?.current ?? null;
   if (currentBudget === null) hold.add("target_current_budget_missing");
   if (targetEvidence.length !== 1 || canonicalOwnerBudget === null || targetEvidence[0]!.freshness !== "fresh") hold.add("target_owner_evidence_missing");
@@ -293,15 +301,21 @@ export function dryRunGuideBudget(input: GuideBudgetDryRunInput): GuideBudgetDry
   const actionDirection: GuideBudgetDryRunConstraint["action"] | null = requestedDelta === null || requestedDelta === 0n ? null
     : requestedDelta > 0n ? "budget_increase" : "budget_decrease";
   const constraints = input.constraints.map((item) => {
-    exact(item, ["guideRef", "action", "allowed", "requiresHumanApproval", "maximumAbsoluteDeltaDecimal", "maximumRelativeDeltaBasisPoints", "parentCeilingDecimal"]);
+    exact(item, ["guideRef", "action", "allowed", "requiresHumanApproval", "maximumAbsoluteDeltaDecimal", "maximumRelativeDeltaBasisPoints", "parentCeilingDecimal", "guideMode", "actionDisposition"]);
     const candidate = item as GuideBudgetDryRunConstraint;
-    if (!REF.test(candidate.guideRef) || !["budget_increase", "budget_decrease"].includes(candidate.action) || typeof candidate.allowed !== "boolean" || typeof candidate.requiresHumanApproval !== "boolean" || candidate.maximumRelativeDeltaBasisPoints !== null && (!Number.isSafeInteger(candidate.maximumRelativeDeltaBasisPoints) || candidate.maximumRelativeDeltaBasisPoints < 0 || candidate.maximumRelativeDeltaBasisPoints > 1_000_000)) fail("invalid_input");
+    if (!REF.test(candidate.guideRef) || !["budget_increase", "budget_decrease"].includes(candidate.action) || typeof candidate.allowed !== "boolean" || typeof candidate.requiresHumanApproval !== "boolean" || !["observe_analyze", "recommend", "prepare_human_approval", "limited_autonomy"].includes(candidate.guideMode) || !["denied", "recommend", "human_approval", "limited_autonomy"].includes(candidate.actionDisposition) || candidate.maximumRelativeDeltaBasisPoints !== null && (!Number.isSafeInteger(candidate.maximumRelativeDeltaBasisPoints) || candidate.maximumRelativeDeltaBasisPoints < 0 || candidate.maximumRelativeDeltaBasisPoints > 1_000_000)) fail("invalid_input");
     const absolute = candidate.maximumAbsoluteDeltaDecimal === null ? null : roundCurrency(decimal(candidate.maximumAbsoluteDeltaDecimal), targetCurrency);
     const ceiling = candidate.parentCeilingDecimal === null ? null : roundCurrency(decimal(candidate.parentCeilingDecimal), targetCurrency);
     return Object.freeze({ ...candidate, maximumAbsolute: absolute, parentCeiling: ceiling });
   }).sort((a, b) => compare(a.guideRef, b.guideRef) || compare(a.action, b.action));
   const effectiveConstraints = actionDirection === null ? [] : constraints.filter((item) => item.action === actionDirection);
   let maxAbsolute: bigint | null = null; let maxRelative: number | null = null; let parentCeiling: bigint | null = null; let human = false;
+  const guideModes = new Set(effectiveConstraints.map((item) => item.guideMode));
+  const actionDispositions = new Set(effectiveConstraints.map((item) => item.actionDisposition));
+  const effectiveGuideMode = guideModes.size === 1 ? [...guideModes][0]! : null;
+  const effectiveActionDisposition = actionDispositions.size === 1 ? [...actionDispositions][0]! : null;
+  if (effectiveConstraints.length > 0 && (effectiveGuideMode === null || effectiveActionDisposition === null)) hold.add("guide_action_disposition_ambiguous");
+  if (effectiveConstraints.length > 0 && effectiveActionDisposition !== "human_approval") hold.add(`guide_action_not_human_approval:${effectiveActionDisposition ?? "ambiguous"}`);
   for (const item of effectiveConstraints) {
     if (!item.allowed) hold.add(`overlap_action_denied:${item.guideRef}`);
     human ||= item.requiresHumanApproval;
@@ -317,6 +331,6 @@ export function dryRunGuideBudget(input: GuideBudgetDryRunInput): GuideBudgetDry
     if (parentCeiling !== null && roundedEvaluated! > parentCeiling) hold.add("parent_ceiling_exceeded");
   }
   const evidenceHash = digest({ targetScopeRef, market, currency: targetCurrency, currentBudget, expression, scopeEvidence: normalizedEvidence.map(({ current, ...row }) => ({ ...row, current })), constraints });
-  const core = { version: GUIDE_BUDGET_DRY_RUN_VERSION, moneyRounding: GUIDE_BUDGET_MONEY_ROUNDING, status: hold.size ? "held" as const : "ready" as const, targetScopeRef, market, currency: targetCurrency, currentBudgetDecimal: roundedCurrent === null ? null : render(roundedCurrent), evaluatedBudgetDecimal: roundedEvaluated === null ? null : render(roundedEvaluated), requestedDeltaDecimal: requestedDelta === null ? null : render(requestedDelta), effectiveMaximumAbsoluteDeltaDecimal: maxAbsolute === null ? null : render(maxAbsolute), effectiveMaximumRelativeDeltaBasisPoints: maxRelative, effectiveParentCeilingDecimal: parentCeiling === null ? null : render(parentCeiling), effectiveRequiresHumanApproval: human, effectiveBudgetOwner, ownerEvidence, holdReasons: Object.freeze([...hold].sort(compare)), evidenceHash, authority: AUTHORITY };
+  const core = { version: GUIDE_BUDGET_DRY_RUN_VERSION, moneyRounding: GUIDE_BUDGET_MONEY_ROUNDING, status: hold.size ? "held" as const : "ready" as const, targetScopeRef, market, currency: targetCurrency, currentBudgetDecimal: roundedCurrent === null ? null : render(roundedCurrent), evaluatedBudgetDecimal: roundedEvaluated === null ? null : render(roundedEvaluated), requestedDeltaDecimal: requestedDelta === null ? null : render(requestedDelta), effectiveMaximumAbsoluteDeltaDecimal: maxAbsolute === null ? null : render(maxAbsolute), effectiveMaximumRelativeDeltaBasisPoints: maxRelative, effectiveParentCeilingDecimal: parentCeiling === null ? null : render(parentCeiling), effectiveRequiresHumanApproval: human, effectiveBudgetOwner, effectiveBudgetKind, effectiveGuideMode, effectiveActionDisposition, ownerEvidence, holdReasons: Object.freeze([...hold].sort(compare)), evidenceHash, authority: AUTHORITY };
   return deepFreeze({ ...core, dryRunHash: digest(core) });
 }

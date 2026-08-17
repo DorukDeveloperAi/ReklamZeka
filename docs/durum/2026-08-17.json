@@ -4,6 +4,15 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "c4ec16b17",
+      "tarih": "2026-08-17",
+      "konu": "docs(guides): record budget evidence acceptance",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
       "hash": "70648005e",
       "tarih": "2026-08-17",
       "konu": "feat(guides): orchestrate recoverable guide runs",
@@ -128,25 +137,16 @@
       "kapsam": [
         "feat"
       ]
-    },
-    {
-      "hash": "9158181bd",
-      "tarih": "2026-08-17",
-      "konu": "feat(meta): persist canonical budget history",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 31
+      "adet": 30
     },
     {
       "kapsam": "docs",
-      "adet": 13
+      "adet": 14
     },
     {
       "kapsam": "fix",
@@ -157,7 +157,7 @@
       "adet": 7
     }
   ],
-  "isSayisi": 582,
+  "isSayisi": 583,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-17",
   "planlar": [
@@ -178,5 +178,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "575b158528ce"
+  "damga": "8b5d9621adaa"
 }

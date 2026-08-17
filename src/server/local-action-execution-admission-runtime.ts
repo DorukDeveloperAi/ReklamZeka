@@ -2,7 +2,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { ActionExecutionAdmissionService } from "@/application/action-execution-admission-service";
 import { DrizzleActionExecutionAdmissionRepository } from "@/connectors/actions/action-execution-admission-drizzle-repository";
-import { DrizzleActionExecutionAdmissionSourceRepository } from "@/connectors/actions/action-execution-admission-source-drizzle-repository";
+import { DrizzleActionExecutionAdmissionSourceRepository, type GuideBudgetActionAdmissionGate } from "@/connectors/actions/action-execution-admission-source-drizzle-repository";
 import * as schema from "@/db/schema";
 import { SingleUseHumanPresenceChallengeStore } from "@/security/human-presence-challenge";
 import type { LocalDecisionRoomConfig } from "@/server/local-decision-room-runtime";
@@ -19,8 +19,10 @@ export function createLocalActionExecutionAdmissionService(input: Readonly<{
   database: LocalDatabase;
   config: LocalDecisionRoomConfig;
   challengeStore?: SingleUseHumanPresenceChallengeStore;
+  /** Required to admit Guide-origin budget ActionUnits; omitted means fail-closed. */
+  guideBudgetGate?: GuideBudgetActionAdmissionGate;
 }>): ActionExecutionAdmissionService {
-  const source = new DrizzleActionExecutionAdmissionSourceRepository(input.database, input.config.workspaceId);
+  const source = new DrizzleActionExecutionAdmissionSourceRepository(input.database, input.config.workspaceId, undefined, input.guideBudgetGate);
   const sink = new DrizzleActionExecutionAdmissionRepository(input.database, input.config.workspaceId);
   return new ActionExecutionAdmissionService(source, input.challengeStore ?? new SingleUseHumanPresenceChallengeStore(), sink);
 }

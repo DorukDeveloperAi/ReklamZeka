@@ -5,7 +5,7 @@ import { dryRunGuideBudget, type BudgetScopeEvidence, type GuideBudgetDryRunInpu
 const hash = "a".repeat(64);
 const evidence = (overrides: Record<string, unknown> = {}) => ({
   scopeLayer: "organization_campaign" as const, scopeRef: "organization_campaign_core", market: "yerli" as const, currency: "TRY",
-  budgetOwnerRef: "campaign_core", budgetOwnerKind: "campaign" as const, currentBudgetDecimal: "1000", freshness: "fresh" as const,
+  budgetOwnerRef: "campaign_core", budgetOwnerKind: "campaign" as const, budgetKind: "daily" as const, currentBudgetDecimal: "1000", freshness: "fresh" as const,
   observedAt: "2026-08-17T00:00:00.000Z", evidenceHash: hash, ...overrides,
 });
 const input = (overrides: Partial<GuideBudgetDryRunInput> = {}): GuideBudgetDryRunInput => ({
@@ -53,8 +53,8 @@ describe("guide budget dry run v2", () => {
       expression: { kind: "money", amountDecimal: "1200", currency: "TRY" },
       scopeEvidence: [evidence({ freshness: "stale" })],
       constraints: [
-        { guideRef: "guide_a", action: "budget_increase", allowed: true, requiresHumanApproval: false, maximumAbsoluteDeltaDecimal: "500", maximumRelativeDeltaBasisPoints: 3000, parentCeilingDecimal: "1100" },
-        { guideRef: "guide_b", action: "budget_increase", allowed: false, requiresHumanApproval: true, maximumAbsoluteDeltaDecimal: "100", maximumRelativeDeltaBasisPoints: 1000, parentCeilingDecimal: "1050" },
+        { guideRef: "guide_a", action: "budget_increase", allowed: true, requiresHumanApproval: false, maximumAbsoluteDeltaDecimal: "500", maximumRelativeDeltaBasisPoints: 3000, parentCeilingDecimal: "1100", guideMode: "prepare_human_approval", actionDisposition: "human_approval" },
+        { guideRef: "guide_b", action: "budget_increase", allowed: false, requiresHumanApproval: true, maximumAbsoluteDeltaDecimal: "100", maximumRelativeDeltaBasisPoints: 1000, parentCeilingDecimal: "1050", guideMode: "prepare_human_approval", actionDisposition: "human_approval" },
       ],
     }));
     expect(result.status).toBe("held");
@@ -78,11 +78,11 @@ describe("guide budget dry run v2", () => {
   it("delta yönüne uymayan overlap kısıtını uygulamaz; sıfır baseline relative cap'i hold eder", () => {
     const decrease = dryRunGuideBudget(input({
       expression: { kind: "money", amountDecimal: "900", currency: "TRY" },
-      constraints: [{ guideRef: "guide_increase_only", action: "budget_increase", allowed: false, requiresHumanApproval: true, maximumAbsoluteDeltaDecimal: "1", maximumRelativeDeltaBasisPoints: 1, parentCeilingDecimal: "1" }],
+      constraints: [{ guideRef: "guide_increase_only", action: "budget_increase", allowed: false, requiresHumanApproval: true, maximumAbsoluteDeltaDecimal: "1", maximumRelativeDeltaBasisPoints: 1, parentCeilingDecimal: "1", guideMode: "prepare_human_approval", actionDisposition: "human_approval" }],
     }));
     expect(decrease.status).toBe("ready");
     expect(decrease.effectiveMaximumAbsoluteDeltaDecimal).toBeNull();
-    const zero = dryRunGuideBudget(input({ targetCurrentBudgetDecimal: "0", expression: { kind: "money", amountDecimal: "1", currency: "TRY" }, constraints: [{ guideRef: "guide_limit", action: "budget_increase", allowed: true, requiresHumanApproval: false, maximumAbsoluteDeltaDecimal: null, maximumRelativeDeltaBasisPoints: 1, parentCeilingDecimal: null }] }));
+    const zero = dryRunGuideBudget(input({ targetCurrentBudgetDecimal: "0", expression: { kind: "money", amountDecimal: "1", currency: "TRY" }, constraints: [{ guideRef: "guide_limit", action: "budget_increase", allowed: true, requiresHumanApproval: false, maximumAbsoluteDeltaDecimal: null, maximumRelativeDeltaBasisPoints: 1, parentCeilingDecimal: null, guideMode: "prepare_human_approval", actionDisposition: "human_approval" }] }));
     expect(zero.holdReasons).toContain("maximum_relative_delta_zero_baseline");
   });
 
@@ -99,6 +99,8 @@ describe("guide budget dry run v2", () => {
         maximumAbsoluteDeltaDecimal: null,
         maximumRelativeDeltaBasisPoints: 1_000_000,
         parentCeilingDecimal: null,
+        guideMode: "prepare_human_approval",
+        actionDisposition: "human_approval",
       }],
     }));
     expect(result.currentBudgetDecimal).toBe("0");

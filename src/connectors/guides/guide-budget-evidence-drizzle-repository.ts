@@ -189,7 +189,15 @@ export class DrizzleGuideBudgetEvidenceRepository implements GuideBudgetEvidence
               ? minor(absolute.value)
               : null,
             maximumRelativeDeltaBasisPoints: relative?.value ?? null,
+            // This reader does not have a canonical durable pool ceiling yet.
+            // A budget-capable Guide with an unresolved ceiling is held instead
+            // of silently treating it as unlimited.
             parentCeilingDecimal: null,
+            guideMode: effective.effectiveMode,
+            actionDisposition: !permitted ? "denied" as const
+              : effective.humanApprovalActions.includes(action) ? "human_approval" as const
+                : effective.recommendationActions.includes(action) ? "recommend" as const
+                  : effective.autonomousActions.includes(action) ? "limited_autonomy" as const : "denied" as const,
           });
         },
       );
@@ -504,6 +512,7 @@ export class DrizzleGuideBudgetEvidenceRepository implements GuideBudgetEvidence
         ownerValue.level === "campaign"
           ? ("campaign" as const)
           : ("adset" as const),
+      budgetKind: ownerValue.budgetType as "daily" | "lifetime",
       currentBudgetDecimal: current,
       freshness: "fresh" as const,
       observedAt,
