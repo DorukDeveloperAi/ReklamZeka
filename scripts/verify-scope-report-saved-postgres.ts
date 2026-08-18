@@ -13,6 +13,7 @@ const sqlText = await readFile(file, "utf8"),
   pool = new Pool({ connectionString: url, max: 1 }),
   client = await pool.connect();
 const flags: Record<string, boolean> = {};
+const postMode = process.env.SCOPE_REPORT_SAVED_POST_APPROVED === "true";
 const id = () => randomUUID();
 async function rejected(work: () => Promise<unknown>) {
   const save = `s_${Math.random().toString(16).slice(2)}`;
@@ -27,8 +28,10 @@ async function rejected(work: () => Promise<unknown>) {
   }
 }
 try {
+  const before = await client.query<{tables:number;ledger:number}>("select (select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname in('scope_report_saved_revisions','scope_report_saved_heads')) tables,(select count(*)::int from drizzle.__drizzle_migrations where hash=$1 and created_at=1787011680000) ledger",[sha]);
+  if (before.rows[0]?.tables !== (postMode?2:0) || before.rows[0]?.ledger !== (postMode?1:0)) throw new Error("saved report migration state exact değil");
   await client.query("begin isolation level serializable");
-  await client.query(sqlText);
+  if (!postMode) await client.query(sqlText);
   flags.migrationInstalled = true;
   const user = id(),
     ws = id(),
@@ -228,20 +231,21 @@ try {
     "select count(*)::int count from drizzle.__drizzle_migrations where hash=$1",
     [sha],
   );
-  flags.unjournaled =
-    !journal.entries.some(
-      (e) => e.tag === "20260818000800_scope_report_saved_reports",
-    ) && ledger.rows[0]?.count === 0;
+  flags.exactMigrationState = postMode
+    ? journal.entries.some((e) => e.tag === "20260818000800_scope_report_saved_reports") && ledger.rows[0]?.count === 1
+    : !journal.entries.some((e) => e.tag === "20260818000800_scope_report_saved_reports") && ledger.rows[0]?.count === 0;
   await client.query("rollback");
   const gone = await client.query(
     "select to_regclass('public.scope_report_saved_revisions') revisions,to_regclass('public.scope_report_saved_heads') heads",
   );
-  flags.zeroResidue =
-    gone.rows[0]?.revisions === null && gone.rows[0]?.heads === null;
+  flags.zeroResidue = postMode
+    ? gone.rows[0]?.revisions === "scope_report_saved_revisions" && gone.rows[0]?.heads === "scope_report_saved_heads"
+      && Number((await client.query("select (select count(*) from scope_report_saved_revisions)+(select count(*) from scope_report_saved_heads) count")).rows[0].count)===0
+    : gone.rows[0]?.revisions === null && gone.rows[0]?.heads === null;
   if (Object.values(flags).some((value) => value !== true))
     throw new Error(JSON.stringify(flags));
   console.log(
-    JSON.stringify({ mode: "pre_outer_rollback", sha256: sha, ...flags }),
+    JSON.stringify({ mode: postMode ? "post_applied_outer_rollback" : "pre_outer_rollback", sha256: sha, ...flags }),
   );
 } catch (error) {
   try {

@@ -60,6 +60,7 @@
     "verify:operation-read-live": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-operation-read-postgres.ts",
     "verify:scope-report-live": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-scope-report-postgres.ts",
     "verify:scope-report-saved-postgres": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-scope-report-saved-postgres.ts",
+    "verify:scope-report-saved-postgres:post": "SCOPE_REPORT_SAVED_POST_APPROVED=true node --conditions react-server --env-file=.env.local --import tsx scripts/verify-scope-report-saved-postgres.ts",
     "verify:naming-template-postgres": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-naming-template-postgres.ts",
     "verify:guide-budget-contract-v2-postgres": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-guide-budget-contract-v2-postgres.ts",
     "verify:guide-lifecycle-postgres": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-guide-lifecycle-postgres.ts",
