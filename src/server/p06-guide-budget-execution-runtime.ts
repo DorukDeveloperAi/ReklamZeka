@@ -67,13 +67,25 @@ export function createP06GuideBudgetExecutionRuntime(input: Readonly<{ database:
     repository: { listRunnable: (limit) => repository.listRunnableByRoute("guide_budget_human_approved", limit) }, worker, now,
   });
   const scheduler = Object.freeze({ async tick(limit = 25) {
+    // A runtime can outlive a rollout/kill-switch change. Do not materialize
+    // another execution identity after that change; a later explicitly-open
+    // tick can reconsider the immutable source through the normal admission
+    // path. This is intentionally stricter than relying on the worker's
+    // downstream dispatch gate alone.
+    const current = inputs(environment);
+    if (!current.enabled) return Object.freeze([] as const);
     const pending = await repository.listUnmaterializedGuideBudgetAttempts(limit);
     for (const source of pending) {
-      const evaluatedAt = now().toISOString(), base = Date.parse(evaluatedAt), current = inputs(environment);
-      await repository.createGuideBudgetHumanApproved({ workspaceId: source.workspaceId, actionExecutionAttemptId: source.attemptId,
-        evaluatedAt, gates: (["staging", "admission"] as const).map((phase, index) => Object.freeze({ phase,
-          enabled: current.enabled, allowlistHash: current.allowlistHash, capturedAt: new Date(base - (2 - index)).toISOString(),
-          expiresAt: new Date(base + 60_000).toISOString() })) });
+      const evaluatedAt = now().toISOString(), base = Date.parse(evaluatedAt);
+      try {
+        await repository.createGuideBudgetHumanApproved({ workspaceId: source.workspaceId, actionExecutionAttemptId: source.attemptId,
+          evaluatedAt, gates: (["staging", "admission"] as const).map((phase, index) => Object.freeze({ phase,
+            enabled: current.enabled, allowlistHash: current.allowlistHash, capturedAt: new Date(base - (2 - index)).toISOString(),
+            expiresAt: new Date(base + 60_000).toISOString() })) });
+      } catch {
+        // A superseded Guide, stale approval, or changed evidence is a closed
+        // hold for this candidate, not a reason to skip later independent ones.
+      }
     }
     return runner.tick(limit);
   } });
