@@ -740,7 +740,7 @@ try {
         limitedAutonomyEvidence.noExecutionAuthority = JSON.stringify(authorityBefore) === JSON.stringify(authorityAfter)
           && (admissionPayload?.authority as Record<string, unknown> | undefined)?.canExecute === false
           && (admissionPayload?.authority as Record<string, unknown> | undefined)?.canWriteMeta === false;
-        if (limitedAutonomyExecutionPreMode) {
+        if (limitedExecutionMode) {
           const executionRepository = new DrizzleP06ExecutionRepository(outerDb);
           const evaluatedAtRow = rows(await db.execute(sql`select to_char(statement_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') evaluated_at`))[0];
           const evaluatedAt = String(evaluatedAtRow?.evaluated_at);
@@ -810,7 +810,7 @@ try {
               member_ref,membership_hash,entity_ref,account_ref,campaign_ref,action_type,expected_status,desired_status,context_hash,effective_guide_set_hash,resolution_hash,
               data_health_report_hash,approval_policy_hash,protection_hash,autonomy_evidence_hash,action_plan_hash,maximum_actions_per_run,1,stale_at,stale_expires,canonical_hash,
               core||jsonb_build_object('admissionHash',canonical_hash) from canonical`, [secondSource!.run_id, secondSource!.artifact_id, saved.admissionId]));
-        if (limitedAutonomyExecutionPreMode) {
+        if (limitedExecutionMode) {
           const secondAdmission = await limitedRepository.reserve({ workspaceId, runRef: second.runRef });
           const secondTime = rows(await db.execute(sql`select to_char(admitted_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') admitted_at
             from p06_limited_autonomy_admissions where workspace_id=${workspaceId}::uuid and id=${secondAdmission.admissionId}::uuid`))[0];
@@ -837,7 +837,7 @@ try {
           disabledAt: new Date().toISOString(),
         });
         await new DrizzleAutonomyRuleRegistryRepository(outerDb, workspaceId, workspaceRef).append(disabledRule);
-        if (limitedAutonomyExecutionPreMode && limitedExecutionForKill) {
+        if (limitedExecutionMode && limitedExecutionForKill) {
           const authorityAfterKill = await new DrizzleP06StatusExecutionDispatchAuthorityRepository(outerDb, contexts).revalidate({
             phase: "pre_dispatch", executionRef: limitedExecutionForKill.executionRef, request: limitedExecutionForKill.request,
           });

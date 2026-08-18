@@ -790,6 +790,7 @@
     {"idx":119,"version":"7","when":1787011380000,"tag":"20260818000300_p06_execution_persistence","breakpoints":true},
     {"idx":120,"version":"7","when":1787011440000,"tag":"20260818000400_p04_budget_ceiling_policies","breakpoints":true},
     {"idx":121,"version":"7","when":1787011500000,"tag":"20260818000500_p06_budget_execution_binding","breakpoints":true},
-    {"idx":122,"version":"7","when":1787011560000,"tag":"20260818000600_p06_limited_autonomy_admissions","breakpoints":true}
+    {"idx":122,"version":"7","when":1787011560000,"tag":"20260818000600_p06_limited_autonomy_admissions","breakpoints":true},
+    {"idx":123,"version":"7","when":1787011620000,"tag":"20260818000700_p06_limited_autonomy_execution","breakpoints":true}
   ]
 }
