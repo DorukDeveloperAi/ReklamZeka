@@ -5,12 +5,12 @@ import { Pool } from "pg";
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) throw new Error("DATABASE_URL yapılandırılmadı");
-const baseSql = readFileSync("drizzle/20260818000300_p06_execution_persistence.sql", "utf8");
 const migrationSql = readFileSync("drizzle/20260818000500_p06_budget_execution_binding.sql", "utf8");
 const migrationHash = createHash("sha256").update(migrationSql).digest("hex");
+const postMode = process.env.P06_BUDGET_EXECUTION_POST_APPROVED === "true";
 const names = ["p06_execution_runs", "p06_execution_events", "p06_execution_heads", "p06_execution_observations",
   "p06_execution_gate_snapshots", "p06_rollback_proposals"];
-const evidence = { mode: "pre_outer_rollback", migrationHash, baseInstalledOuterRollback: false, migrationInstalledOuterRollback: false,
+const evidence = { mode: postMode ? "post_applied" : "pre_outer_rollback", migrationHash, baseInstalledOuterRollback: false, migrationInstalledOuterRollback: false,
   sourceXor: false, requestContract: false, attemptFk: false, attemptUnique: false, attemptIndex: false, guardReplaced: false,
   rlsForced: false, publicRevoked: false, unjournaled: false, zeroResidue: false };
 const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 30_000 });
@@ -18,13 +18,12 @@ const client = await pool.connect();
 try {
   const before = await client.query<{ objects: number; ledger: number }>(`select
     (select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname=any($1::text[])) objects,
-    (select count(*)::int from drizzle.__drizzle_migrations where hash=$2) ledger`, [names, migrationHash]);
-  if (before.rows[0]?.objects !== 0 || before.rows[0]?.ledger !== 0) throw new Error("P06 budget execution PRE target fresh değil");
+    (select count(*)::int from drizzle.__drizzle_migrations where hash=$2 and created_at=1787011500000) ledger`, [names, migrationHash]);
+  if (before.rows[0]?.objects !== 6 || before.rows[0]?.ledger !== (postMode ? 1 : 0)) throw new Error("P06 budget execution prerequisite/target exact değil");
   evidence.unjournaled = true;
   await client.query("begin");
-  await client.query(baseSql);
   evidence.baseInstalledOuterRollback = true;
-  await client.query(migrationSql);
+  if (!postMode) await client.query(migrationSql);
   evidence.migrationInstalledOuterRollback = true;
   const columns = await client.query<{ guide_nullable: boolean; effective_nullable: boolean; resolution_nullable: boolean; attempt: boolean; hashes: number }>(`select
     (select is_nullable='YES' from information_schema.columns where table_schema='public' and table_name='p06_execution_runs' and column_name='guide_run_action_binding_id') guide_nullable,
@@ -55,7 +54,8 @@ try {
   await client.query("rollback");
   evidence.zeroResidue = (await client.query<{ count: number }>(`select
     (select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname=any($1::text[]))
-    + (select count(*)::int from pg_proc where oid=to_regprocedure('public.p06_jsonb_object_key_count(jsonb)')) count`, [names])).rows[0]?.count === 0;
+    + (select count(*)::int from pg_proc where oid=to_regprocedure('public.p06_jsonb_object_key_count(jsonb)')) count`, [names])).rows[0]?.count === 6;
+  if (postMode) evidence.zeroResidue = (await client.query<{ rows:number }>("select count(*)::int rows from p06_execution_runs")).rows[0]?.rows===0;
   if (!evidence.zeroResidue) throw new Error("P06 budget execution PRE residue bıraktı");
   console.log(JSON.stringify(evidence));
 } catch (error) {

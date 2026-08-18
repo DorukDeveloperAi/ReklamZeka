@@ -20,6 +20,7 @@ const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) throw new Error("DATABASE_URL yapılandırılmadı");
 const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 30_000 });
 const database = drizzle(pool, { schema });
+const postMode = process.env.P06_BUDGET_EXECUTION_POST_APPROVED === "true";
 const rollback = Symbol("rollback");
 const workspaceId = randomUUID(), connectionId = randomUUID(), sourceId = randomUUID(), accountId = randomUUID(),
   campaignId = randomUUID(), adSetId = randomUUID(), contextId = randomUUID(), guideRevisionId = randomUUID();
@@ -31,14 +32,13 @@ const stable = (value: unknown): unknown => Array.isArray(value) ? value.map(sta
   : value && typeof value === "object" ? Object.fromEntries(Object.entries(value as Record<string, unknown>)
     .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, child]) => [key, stable(child)])) : value;
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(stable(value))).digest("hex");
-const evidence = { mode: "pre_outer_rollback", canonicalQueue: false, humanApproval: false, canonicalAdmissionAttempt: false,
+const evidence = { mode: postMode ? "post_applied_outer_rollback" : "pre_outer_rollback", canonicalQueue: false, humanApproval: false, canonicalAdmissionAttempt: false,
   budgetRunCreated: false, exactReplay: false, sourceXor: false, forgedDryRunRejected: false, forgedMirrorStatusRejected: false, authorityNone: false,
   dispatchFailClosed: false, zeroResidue: false };
 
 try {
   await database.transaction(async (tx) => {
-    await tx.execute(sql.raw(readFileSync("drizzle/20260818000300_p06_execution_persistence.sql", "utf8")));
-    await tx.execute(sql.raw(readFileSync("drizzle/20260818000500_p06_budget_execution_binding.sql", "utf8")));
+    if (!postMode) await tx.execute(sql.raw(readFileSync("drizzle/20260818000500_p06_budget_execution_binding.sql", "utf8")));
     await tx.insert(schema.workspaces).values({ id: workspaceId, name: "P06 budget execution PRE" });
     await tx.insert(schema.metaConnections).values({ id: connectionId, workspaceId, externalConnectionKey: "p06-budget-pre",
       displayName: "P06 budget PRE", graphApiVersion: "v23.0", fieldCatalogVersion: "p06-budget-pre" });
@@ -205,7 +205,7 @@ try {
   });
 } catch (error) { if (error !== rollback) throw error; }
 evidence.zeroResidue = (await database.execute(sql`select (select count(*)::int from workspaces where id=${workspaceId}::uuid)
-  +(select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname='p06_execution_runs') count`)).rows[0]?.count === 0;
+  +(select count(*)::int from p06_execution_runs where workspace_id=${workspaceId}::uuid) count`)).rows[0]?.count === 0;
 await pool.end();
 if (!evidence.zeroResidue) throw new Error("P06 budget behavior PRE residue bıraktı");
 console.log(JSON.stringify(evidence));
