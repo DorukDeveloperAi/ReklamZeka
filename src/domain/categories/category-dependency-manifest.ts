@@ -50,6 +50,9 @@ const categoryProjection = new Set([
 ]);
 
 const opaqueCategoryContext = new Set([
+  // Naming-template proposals retain category refs as immutable evidence only;
+  // they never establish an assignment authority edge.
+  "naming_template_revisions.template_payload",
   // Immutable historical run snapshot. Category selection is retained for replay,
   // never interpreted as a mutable category dependency by archive operations.
   "decision_room_run_analysis_assets.agenda_payload",
@@ -322,6 +325,7 @@ const columns = [
   // Saved-report payload is an immutable display query only. It contains no
   // category definition authority and is revalidated before use.
   "scope_report_saved_revisions.query_payload",
+  "naming_template_revisions.template_payload",
   "guide_revisions.strict_payload",
   "guide_revisions.schedule_payload",
   "guide_budget_contracts.contract_payload",

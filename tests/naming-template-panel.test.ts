@@ -1,0 +1,4 @@
+import { readFileSync } from "node:fs";
+import { describe,expect,it } from "vitest";
+const source=readFileSync("src/app/dashboard/naming-template-panel.tsx","utf8"),css=readFileSync("src/app/dashboard/naming-template-panel.module.css","utf8");
+describe("naming template panel",()=>{it("shows before/after without assignment or write authority",()=>{expect(source).toContain("ÖNCE");expect(source).toContain("SONRA");expect(source).toContain("Buradan kategori atanmaz ve Meta’ya yazılmaz");expect(source).not.toMatch(/assignCategory|writeMeta|approveAction/);});it("uses same-origin intent requests and accessible async state",()=>{expect(source).toContain('credentials:"same-origin"');expect(source).toContain('"x-reklamzeka-intent"');expect(source).toContain('role="status"');expect(source).toContain('aria-live="polite"');expect(css).toContain("overflow-wrap:anywhere");});});

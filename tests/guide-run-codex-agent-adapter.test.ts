@@ -44,9 +44,9 @@ function model(finalResponse: string): OrchestratorModelAdapter {
 }
 
 describe("CodexGuideRunAgentAdapter", () => {
-  it("derives daily refs and hashes on the server and exposes no authority", async () => {
+  it("keeps an evidence-free daily classification at no-change", async () => {
     const adapter = new CodexGuideRunAgentAdapter(
-      model('{"version":"guide-run-daily-agent/1.0.0","outcome":"finding"}'),
+      model('{"version":"guide-run-daily-agent/1.0.0","outcome":"no_change"}'),
     );
     const result = await adapter.analyze({
       analysisRef: "analysis_daily_member",
@@ -59,10 +59,25 @@ describe("CodexGuideRunAgentAdapter", () => {
       }),
       authority,
     });
-    expect(result).toMatchObject({ outcome: "finding" });
-    expect(result.findingRef).toMatch(/^finding_[a-f0-9]{24}$/);
+    expect(result).toMatchObject({ outcome: "no_change", findingRef: null });
     expect(result.evidenceHash).toMatch(/^[a-f0-9]{64}$/);
     expect(Object.isFrozen(result)).toBe(true);
+  });
+
+  it("rejects a finding classification without ready metric evidence", async () => {
+    const adapter = new CodexGuideRunAgentAdapter(
+      model('{"version":"guide-run-daily-agent/1.0.0","outcome":"finding"}'),
+    );
+    await expect(
+      adapter.analyze({
+        analysisRef: "analysis_daily_member",
+        runRef: "guide_run_abc",
+        guideRevisionHash: hash("a"),
+        sliceSnapshotHash: hash("b"),
+        member: { memberRef: "ad_set_public", membershipHash: hash("c") },
+        authority,
+      }),
+    ).rejects.toThrow("response rejected");
   });
 
   it("binds the daily artifact hash to trusted metric evidence", async () => {
@@ -184,6 +199,96 @@ describe("CodexGuideRunAgentAdapter", () => {
       candidate: null,
     });
     expect(result.recommendationRef).toMatch(/^recommendation_[a-f0-9]{24}$/);
+  });
+
+  it("builds a status candidate only from one server-resolved finding member", async () => {
+    const member = { memberRef: "ad_set_public", membershipHash: hash("c") };
+    const adapter = new CodexGuideRunAgentAdapter(
+      model('{"version":"guide-run-holistic-agent/1.0.0","outcome":"finding"}'),
+      undefined,
+      {
+        async load(input) {
+          expect(input.member).toEqual(member);
+          return {
+            action: "status_pause",
+            stageable: {
+              version: "candidate/1.1",
+              entityRef: member.memberRef,
+              entityLevel: "adset",
+              membershipHash: member.membershipHash,
+              sliceRef: "slice_status",
+              market: "yerli",
+              typedAction: {
+                kind: "status_change",
+                entity: { level: "adset", ref: member.memberRef },
+                fromStatus: "ACTIVE",
+                toStatus: "PAUSED",
+              },
+            },
+          };
+        },
+      },
+    );
+    const result = await adapter.synthesize({
+      analysisRef: "analysis_holistic_run",
+      runRef: "guide_run_abc",
+      guideRevisionHash: hash("a"),
+      sliceSnapshotHash: hash("b"),
+      members: [
+        {
+          member,
+          result: {
+            outcome: "finding",
+            evidenceHash: hash("d"),
+            findingRef: "finding_member",
+          },
+          failureCode: null,
+        },
+      ],
+      authority,
+    });
+    expect(result.dataQuality).toBe("ready");
+    expect(result.candidate).toMatchObject({
+      action: "status_pause",
+      stageable: {
+        entityRef: member.memberRef,
+        typedAction: { fromStatus: "ACTIVE", toStatus: "PAUSED" },
+      },
+    });
+    expect(result.candidate?.candidateHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("fails closed for ambiguous member findings", async () => {
+    let calls = 0;
+    const adapter = new CodexGuideRunAgentAdapter(
+      model('{"version":"guide-run-holistic-agent/1.0.0","outcome":"finding"}'),
+      undefined,
+      {
+        async load() {
+          calls++;
+          return null;
+        },
+      },
+    );
+    const make = (suffix: string) => ({
+      member: { memberRef: `ad_set_${suffix}`, membershipHash: hash(suffix) },
+      result: {
+        outcome: "finding" as const,
+        evidenceHash: hash("d"),
+        findingRef: `finding_${suffix}`,
+      },
+      failureCode: null,
+    });
+    const result = await adapter.synthesize({
+      analysisRef: "analysis_holistic_run",
+      runRef: "guide_run_abc",
+      guideRevisionHash: hash("a"),
+      sliceSnapshotHash: hash("b"),
+      members: [make("a"), make("b")],
+      authority,
+    });
+    expect(calls).toBe(0);
+    expect(result).toMatchObject({ dataQuality: "missing", candidate: null });
   });
 
   it("rejects extra keys, markdown, oversized output, and unsupported versions", async () => {

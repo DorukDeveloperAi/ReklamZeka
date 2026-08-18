@@ -22,9 +22,13 @@ import type { GuideRevision } from "@/domain/guides/guide-revision";
 import { sql } from "drizzle-orm";
 import * as schema from "@/db/schema";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { resolveP08RolloutControl, type P08RolloutEnvironment } from "@/server/p08-rollout-control";
+import {
+  resolveP08RolloutControl,
+  type P08RolloutEnvironment,
+} from "@/server/p08-rollout-control";
 import { createLocalCodexGuideRunAgents } from "@/server/guide-run-codex-agent-adapter";
 import { DrizzleGuideRunMemberMetricEvidenceRepository } from "@/connectors/guides/guide-run-member-metric-evidence-drizzle-repository";
+import { DrizzleGuideRunStageableStatusCandidateRepository } from "@/connectors/guides/guide-run-stageable-status-candidate-drizzle-repository";
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -42,7 +46,16 @@ export interface GuideRunActiveSchedulePort {
   ): Promise<readonly ActiveGuideSchedule[]>;
 }
 export interface GuideRunLimitedAutonomyAdmissionPort {
-  reserve(input: Readonly<{ workspaceId: string; runRef: string }>): Promise<Readonly<{ admissionId: string; admissionHash: string; quotaOrdinal: number; replay: boolean }>>;
+  reserve(
+    input: Readonly<{ workspaceId: string; runRef: string }>,
+  ): Promise<
+    Readonly<{
+      admissionId: string;
+      admissionHash: string;
+      quotaOrdinal: number;
+      replay: boolean;
+    }>
+  >;
 }
 
 /** Production loader: only a non-tombstoned Guide whose exact revision is the
@@ -151,9 +164,17 @@ export function createGuideRunSchedulerWorker(
   // persisted run/revision chain, never from an injected fixed-workspace port.
   const database = input.database as Database;
   const overlap = new DrizzleGuideRunEffectiveOverlapRepository(database);
-  const contexts = new DrizzleGuideRunCandidateStagingContextRepository(database, overlap);
-  const limitedAutonomyAdmissions = input.limitedAutonomyAdmissions
-    ?? new DrizzleP06LimitedAutonomyAdmissionRepository(database, contexts, new DrizzleOperationReadRepository(database));
+  const contexts = new DrizzleGuideRunCandidateStagingContextRepository(
+    database,
+    overlap,
+  );
+  const limitedAutonomyAdmissions =
+    input.limitedAutonomyAdmissions ??
+    new DrizzleP06LimitedAutonomyAdmissionRepository(
+      database,
+      contexts,
+      new DrizzleOperationReadRepository(database),
+    );
   const worker = createGuideRunWorker({
     ...input,
     frozenScopes: new DrizzleGuideRunFrozenScopeRepository(input.database),
@@ -204,12 +225,22 @@ export function createLocalCodexGuideRunSchedulerRuntime(
   const environment = input.environment ?? process.env;
   if (!resolveP08RolloutControl(environment).guideSchedulerEnabled)
     return Object.freeze({ enabled: false as const, scheduler: null });
-  const agents = createLocalCodexGuideRunAgents(environment, input.serverCwd,
-    new DrizzleGuideRunMemberMetricEvidenceRepository(input.database));
-  if (!agents) return Object.freeze({ enabled: false as const, scheduler: null });
-  return createGuideRunSchedulerRuntime({ database: input.database, dataHealth: input.dataHealth,
-    candidateActionStaging: input.candidateActionStaging, limitedAutonomyAdmissions: input.limitedAutonomyAdmissions,
-    environment, ...agents });
+  const agents = createLocalCodexGuideRunAgents(
+    environment,
+    input.serverCwd,
+    new DrizzleGuideRunMemberMetricEvidenceRepository(input.database),
+    new DrizzleGuideRunStageableStatusCandidateRepository(input.database),
+  );
+  if (!agents)
+    return Object.freeze({ enabled: false as const, scheduler: null });
+  return createGuideRunSchedulerRuntime({
+    database: input.database,
+    dataHealth: input.dataHealth,
+    candidateActionStaging: input.candidateActionStaging,
+    limitedAutonomyAdmissions: input.limitedAutonomyAdmissions,
+    environment,
+    ...agents,
+  });
 }
 
 /**
@@ -320,10 +351,23 @@ export class GuideRunSchedulerWorker {
       // Materialization is post-disposition only. The repository re-reads the
       // immutable artifact and refuses legacy/non-stageable candidates.
       if (complete.disposition.state === "staged") {
-        if (complete.disposition.candidate?.routing === "human_approval" && this.worker.actionBindings)
-          await this.worker.actionBindings.bind({ workspaceId: entry.workspaceId, runRef: complete.run.runRef });
-        if (complete.disposition.candidate?.routing === "limited_autonomy_review" && this.worker.limitedAutonomyAdmissions)
-          await this.worker.limitedAutonomyAdmissions.reserve({ workspaceId: entry.workspaceId, runRef: complete.run.runRef });
+        if (
+          complete.disposition.candidate?.routing === "human_approval" &&
+          this.worker.actionBindings
+        )
+          await this.worker.actionBindings.bind({
+            workspaceId: entry.workspaceId,
+            runRef: complete.run.runRef,
+          });
+        if (
+          complete.disposition.candidate?.routing ===
+            "limited_autonomy_review" &&
+          this.worker.limitedAutonomyAdmissions
+        )
+          await this.worker.limitedAutonomyAdmissions.reserve({
+            workspaceId: entry.workspaceId,
+            runRef: complete.run.runRef,
+          });
       }
       outputs.push(
         Object.freeze({

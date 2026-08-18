@@ -8,6 +8,7 @@ import { DrizzleGuideRunRepository } from "@/connectors/guides/guide-run-drizzle
 import { DrizzleGuideRunStatusActionStager } from "@/connectors/guides/guide-run-status-action-stager";
 import { DrizzleGuideRunCandidateStagingContextRepository } from "@/connectors/guides/guide-run-candidate-staging-context-drizzle-repository";
 import { DrizzleGuideRunEffectiveOverlapRepository } from "@/connectors/guides/guide-run-effective-overlap-drizzle";
+import { DrizzleGuideRunStageableStatusCandidateRepository } from "@/connectors/guides/guide-run-stageable-status-candidate-drizzle-repository";
 import { DrizzleOperationReadRepository } from "@/connectors/operations/operation-read-drizzle-repository";
 import { DrizzleWorkspaceTombstonePurgePort } from "@/connectors/meta/workspace-tombstone-purge-drizzle-adapter";
 import { DrizzleActionApprovalDecisionRepository } from "@/connectors/actions/action-approval-decision-drizzle-repository";
@@ -74,6 +75,7 @@ const evidence = {
   publicRevoked: false,
   actionQueuePersisted: false,
   completedRun: false,
+  serverOwnedStatusCandidate: false,
   materialized: false,
   replay: false,
   staleGuideHeadRejected: false,
@@ -283,6 +285,7 @@ try {
         insert: db.insert.bind(db),
         transaction: async (work: (tx: unknown) => Promise<unknown>) => await work(outerDb),
       };
+      const statusCandidates = new DrizzleGuideRunStageableStatusCandidateRepository(outerDb);
       await db.insert(schema.metaConnections).values({
         id: connectionId,
         workspaceId,
@@ -608,6 +611,20 @@ try {
           authority: closed,
           immutable: true,
         });
+        const statusCandidate = await statusCandidates.loadInTransaction(outerDb, {
+          runRef: run.runRef,
+          guideRevisionHash: revisionHash,
+          sliceSnapshotHash: scopePayload.sliceSnapshotHash,
+          member: members[0]!,
+        });
+        if (!statusCandidate) throw new Error("server_owned_status_candidate_missing");
+        evidence.serverOwnedStatusCandidate =
+          statusCandidate.action === "status_pause" &&
+          statusCandidate.stageable.entityRef === memberRef &&
+          statusCandidate.stageable.membershipHash === membershipHash &&
+          statusCandidate.stageable.typedAction.kind === "status_change" &&
+          statusCandidate.stageable.typedAction.fromStatus === "ACTIVE" &&
+          statusCandidate.stageable.typedAction.toStatus === "PAUSED";
         for (const [state, at] of [
           ["scope_frozen", "2026-08-17T00:00:02.000Z"],
           ["analyzing", "2026-08-17T00:00:03.000Z"],
@@ -623,28 +640,15 @@ try {
           )
             throw new Error("run_cas_failed");
         }
-        const stageable = {
-          version: "candidate/1.1" as const,
-          entityRef: memberRef,
-          entityLevel: "adset" as const,
-          membershipHash,
-          sliceRef: "slice_p06_fixture",
-          market: "yerli" as const,
-          typedAction: {
-            kind: "status_change",
-            entity: { level: "adset", ref: memberRef },
-            fromStatus: "ACTIVE",
-            toStatus: "PAUSED",
-          },
-        };
+        const stageable = statusCandidate.stageable;
         const candidate = {
           candidateRef: "candidate_p06_fixture",
           candidateHash: digest({
             candidateRef: "candidate_p06_fixture",
-            action: "status_pause",
+            action: statusCandidate.action,
             ...stageable,
           }),
-          action: "status_pause" as const,
+          action: statusCandidate.action,
           routing: limitedAutonomyPreMode || limitedAutonomyExecutionPreMode ? "limited_autonomy_review" as const : "human_approval" as const,
           stageable,
         };

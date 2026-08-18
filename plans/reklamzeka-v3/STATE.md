@@ -4,7 +4,7 @@
 |---|---|---|
 | + M00 | TAMAMLANDI — `evidence/M00-20260817.md`, `4fdb381` | — |
 | + P01 meta-veri-sagligi | TAMAMLANDI — P01-A…F kabul edildi; `evidence/P01-E-data-health-ledger-20260817.md` | M00 |
-| P02 kurum-kampanyasi-kunye | DEVAM — Kurum Kampanyası temeli hazır; canlı migration/DB acceptance açık | P01 |
+| P02 kurum-kampanyasi-kunye | DEVAM — Kurum Kampanyası temeli hazır; naming-template persistence/preview/UI PRE adayı hazır, bağımsız apply/POST ve authenticated browser açık | P01 |
 | P03 slice-operasyon-rapor | DEVAM — resolver/Operasyon/Kapsam Raporu JSON-CSV-XLSX/UI kabul edildi; saved-report lifecycle PRE adayı hazır, apply ve authenticated browser açık | P02 |
 | P04 kilavuz-butce | BEKLİYOR | P03 |
 | P05 agent-analiz-kosum | DEVAM — Guide Run persistence kabul edildi; default-off yerel Agent taşıyıcı adayı hazır, metrik-temelli runtime açık | P04 |
@@ -29,6 +29,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P01-F-budget-config-history | Kabul edildi / arşivlenebilir |
 | + P02-A-organization-campaign-foundation | Kabul edildi / arşivlenebilir |
 | + P02-B-naming-template-domain | Kabul edildi / arşivlenebilir |
+| P02-C-naming-template-lifecycle | PRE adayı — `evidence/P02-C-naming-template-lifecycle-20260818.md`; bağımsız kritik kabul/apply/POST ve authenticated browser açık |
 | + P03-A-slice-registry | Kabul edildi / arşivlenebilir |
 | + P03-B-operation-read-model | Kabul edildi / arşivlenebilir |
 | + P03-Ca-primary-result-domain | Kabul edildi — `evidence/P03-Ca-primary-result-domain-20260817.md`; arşivlenebilir |
@@ -49,7 +50,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P05-C-guide-run-v1.1-hardening | Kabul edildi — `evidence/P05-C-guide-run-v1.1-hardening-20260817.md`; arşivlenebilir |
 | + P05-D-guide-run-orchestration-v1.2 | Kabul edildi — `evidence/P05-D-guide-run-orchestration-v1.2-20260817.md`; arşivlenebilir |
 | + P05-E-guide-run-persistence | Kabul edildi — `evidence/P05-E-guide-run-persistence-20260817.md`; gerçek Agent sağlayıcıları ve P06 action materialization açık |
-| P05-F-local-codex-agent-transport | PRE/inceleme adayı — `evidence/P05-F-local-codex-agent-transport-20260818.md`; frozen metric/cohort evidence ve bağımsız kritik kabul açık |
+| P05-F-local-codex-agent-transport | İnceleme adayı — `evidence/P05-F-local-codex-agent-transport-20260818.md`; server-owned status candidate→P06 binding canlı POST kanıtlandı, gerçek provider ve bağımsız kritik kabul açık |
 | + P07-A-five-area-shell | Kabul edildi / arşivlenebilir |
 | P07-B-operation-table-ui | DEVAM — `a178e25` table-first konsolidasyon, kaynak sınırı ve 320 px kabul edildi; gerçek oturumlu browser ready/partial kabulü kullanıcı capability girişi bekliyor |
 | + P07-C-static-accessibility-foundation | Kabul edildi — `evidence/P07-C-static-accessibility-foundation-20260818.md`; authenticated browser matrisi açık |

@@ -56,6 +56,86 @@ export interface GuideRunMemberMetricEvidencePort {
     input: Parameters<GuideRunDailyAgentPort["analyze"]>[0],
   ): Promise<GuideRunMemberMetricEvidence>;
 }
+export type GuideRunStageableStatusCandidateEvidence = Readonly<{
+  action: "status_pause" | "status_activate";
+  stageable: Readonly<{
+    version: "candidate/1.1";
+    entityRef: string;
+    entityLevel: "adset";
+    membershipHash: string;
+    sliceRef: string;
+    market: "yerli" | "yabanci";
+    typedAction: Record<string, unknown>;
+  }>;
+}>;
+export interface GuideRunStageableStatusCandidatePort {
+  load(
+    input: Readonly<{
+      runRef: string;
+      guideRevisionHash: string;
+      sliceSnapshotHash: string;
+      member: Readonly<{ memberRef: string; membershipHash: string }>;
+    }>,
+  ): Promise<GuideRunStageableStatusCandidateEvidence | null>;
+}
+
+function canonicalCandidateEvidence(
+  value: GuideRunStageableStatusCandidateEvidence,
+  member: Readonly<{ memberRef: string; membershipHash: string }>,
+): GuideRunStageableStatusCandidateEvidence {
+  exactObject(value, ["action", "stageable"]);
+  const stageable = exactObject(value.stageable, [
+      "version",
+      "entityRef",
+      "entityLevel",
+      "membershipHash",
+      "sliceRef",
+      "market",
+      "typedAction",
+    ]),
+    typed = exactObject(stageable.typedAction, [
+      "kind",
+      "entity",
+      "fromStatus",
+      "toStatus",
+    ]),
+    entity = exactObject(typed.entity, ["level", "ref"]);
+  const pause =
+      value.action === "status_pause" &&
+      typed.fromStatus === "ACTIVE" &&
+      typed.toStatus === "PAUSED",
+    activate =
+      value.action === "status_activate" &&
+      typed.fromStatus === "PAUSED" &&
+      typed.toStatus === "ACTIVE";
+  if (
+    (!pause && !activate) ||
+    stageable.version !== "candidate/1.1" ||
+    stageable.entityRef !== member.memberRef ||
+    stageable.membershipHash !== member.membershipHash ||
+    stageable.entityLevel !== "adset" ||
+    !REF.test(String(stageable.entityRef)) ||
+    !HASH.test(String(stageable.membershipHash)) ||
+    !REF.test(String(stageable.sliceRef)) ||
+    !(stageable.market === "yerli" || stageable.market === "yabanci") ||
+    typed.kind !== "status_change" ||
+    entity.level !== "adset" ||
+    entity.ref !== member.memberRef
+  )
+    throw new Error("guide run candidate evidence rejected");
+  return Object.freeze({
+    action: value.action,
+    stageable: Object.freeze({
+      ...value.stageable,
+      typedAction: Object.freeze({
+        kind: "status_change",
+        entity: Object.freeze({ level: "adset", ref: member.memberRef }),
+        fromStatus: typed.fromStatus,
+        toStatus: typed.toStatus,
+      }),
+    }),
+  }) as GuideRunStageableStatusCandidateEvidence;
+}
 
 function stable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stable);
@@ -262,6 +342,7 @@ export class CodexGuideRunAgentAdapter
   constructor(
     private readonly model: OrchestratorModelAdapter,
     private readonly metrics?: GuideRunMemberMetricEvidencePort,
+    private readonly candidates?: GuideRunStageableStatusCandidatePort,
   ) {}
 
   async analyze(
@@ -289,7 +370,8 @@ export class CodexGuideRunAgentAdapter
     ]);
     if (
       parsed.version !== DAILY_VERSION ||
-      (parsed.outcome !== "no_change" && parsed.outcome !== "finding")
+      (parsed.outcome !== "no_change" && parsed.outcome !== "finding") ||
+      (parsed.outcome === "finding" && metricEvidence?.sourceState !== "ready")
     ) {
       throw new Error("guide run Codex response rejected");
     }
@@ -334,11 +416,48 @@ export class CodexGuideRunAgentAdapter
       throw new Error("guide run Codex response rejected");
     }
     const evidenceHash = digest({ kind: "holistic", evidence });
+    const findings = input.members.filter(
+      (member) =>
+        member.failureCode === null && member.result?.outcome === "finding",
+    );
+    let candidate: HolisticGuideRunResult["candidate"] = null;
+    if (
+      parsed.outcome === "finding" &&
+      findings.length === 1 &&
+      this.candidates
+    ) {
+      let resolved: GuideRunStageableStatusCandidateEvidence | null = null;
+      try {
+        const loaded = await this.candidates.load({
+          runRef: input.runRef,
+          guideRevisionHash: input.guideRevisionHash,
+          sliceSnapshotHash: input.sliceSnapshotHash,
+          member: findings[0]!.member,
+        });
+        resolved = loaded
+          ? canonicalCandidateEvidence(loaded, findings[0]!.member)
+          : null;
+      } catch {
+        resolved = null;
+      }
+      if (resolved) {
+        const candidateRef = `candidate_${digest({ kind: "stageable_candidate", evidenceHash, member: findings[0]!.member, action: resolved.action }).slice(0, 24)}`;
+        candidate = Object.freeze({
+          candidateRef,
+          action: resolved.action,
+          stageable: resolved.stageable,
+          candidateHash: digest({
+            candidateRef,
+            action: resolved.action,
+            ...resolved.stageable,
+          }),
+        });
+      }
+    }
     return Object.freeze({
       outcome: parsed.outcome,
-      // No metric evidence is present in this contract, so the model can never
-      // upgrade trusted data health or make a stageable recommendation.
-      dataQuality: "missing",
+      // The orchestration service independently rechecks trusted data health.
+      dataQuality: candidate ? "ready" : "missing",
       recommendationRef:
         parsed.outcome === "finding"
           ? deterministicRef("recommendation", {
@@ -346,7 +465,7 @@ export class CodexGuideRunAgentAdapter
               analysisRef: input.analysisRef,
             })
           : null,
-      candidate: null,
+      candidate,
       evidenceHash,
     });
   }
@@ -358,6 +477,7 @@ export function createLocalCodexGuideRunAgents(
   environment: GuideRunCodexEnvironment,
   serverCwd = process.cwd(),
   metrics?: GuideRunMemberMetricEvidencePort,
+  candidates?: GuideRunStageableStatusCandidatePort,
 ): Readonly<{
   dailyAnalysis: GuideRunDailyAgentPort;
   holisticAnalysis: GuideRunHolisticAgentPort;
@@ -374,6 +494,7 @@ export function createLocalCodexGuideRunAgents(
   const adapter = new CodexGuideRunAgentAdapter(
     new LocalCodexExecAdapter(config),
     metrics,
+    candidates,
   );
   return Object.freeze({ dailyAnalysis: adapter, holisticAnalysis: adapter });
 }

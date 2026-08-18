@@ -61,7 +61,7 @@ export type SaveNamingTemplateInput = Readonly<{
   proposedAssignments: NamingTemplateRevision["proposedAssignments"];
 }>;
 
-function sameCommand(revision: NamingTemplateRevision, input: SaveNamingTemplateInput): boolean {
+function sameCommand(revision: NamingTemplateRevision, input: SaveNamingTemplateInput, actorId: string): boolean {
   try {
     const expected = createNamingTemplateRevision({
       workspaceRef: revision.workspaceRef, accountRef: input.accountRef, templateRef: input.templateRef,
@@ -69,7 +69,8 @@ function sameCommand(revision: NamingTemplateRevision, input: SaveNamingTemplate
       namingFamily: input.namingFamily, entityLevel: input.entityLevel, nameRules: input.nameRules,
       corroboration: input.corroboration, proposedAssignments: input.proposedAssignments,
     });
-    return expected.revisionHash === revision.revisionHash;
+    return actorId === input.actorId && revision.revision === (input.expectedRevision ?? 0) + 1
+      && expected.revisionHash === revision.revisionHash;
   } catch { return false; }
 }
 
@@ -82,11 +83,11 @@ export class DrizzleNamingTemplateRepository {
       || !(input.expectedRevision === null || Number.isSafeInteger(input.expectedRevision) && input.expectedRevision >= 1)) fail("invalid_input");
     return this.database.transaction(async (tx) => {
       await tx.execute(sql`set local transaction isolation level serializable`);
-      const replayRows = rows(await tx.execute(sql`select r.template_ref,r.revision,r.revision_hash,r.state,r.template_payload,('account_'||substr(encode(digest(convert_to(r.workspace_id::text,'UTF8')||decode('00','hex')||convert_to('account','UTF8')||decode('00','hex')||convert_to(r.ad_account_id::text,'UTF8'),'sha256'),'hex'),1,24)) account_ref from naming_template_revisions r where r.workspace_id=${input.workspaceId}::uuid and r.command_ref=${input.commandRef} limit 2`));
+      const replayRows = rows(await tx.execute(sql`select r.template_ref,r.revision,r.revision_hash,r.state,r.template_payload,r.created_by_actor_id::text actor_id,('account_'||substr(encode(extensions.digest(convert_to(r.workspace_id::text,'UTF8')||decode('00','hex')||convert_to('account','UTF8')||decode('00','hex')||convert_to(r.ad_account_id::text,'UTF8'),'sha256'),'hex'),1,24)) account_ref from naming_template_revisions r where r.workspace_id=${input.workspaceId}::uuid and r.command_ref=${input.commandRef} limit 2`));
       if (replayRows.length) {
         if (replayRows.length !== 1) fail("corrupt_template");
         const revision = decode(replayRows[0]!);
-        if (!sameCommand(revision, input)) fail("invalid_revision");
+        if (!sameCommand(revision, input, text(replayRows[0]!, "actor_id"))) fail("invalid_revision");
         return Object.freeze({ revision, replay: true });
       }
       const accountRows = rows(await tx.execute(sql`select a.id::text from workspaces w join memberships m on m.workspace_id=w.id and m.user_id=${input.actorId}::uuid join ad_accounts a on a.workspace_id=w.id and a.disappeared_at is null where w.id=${input.workspaceId}::uuid and w.lifecycle_state='active' and m.role in('owner','admin','analyst') order by a.id limit 1001 for share of w,m,a`));

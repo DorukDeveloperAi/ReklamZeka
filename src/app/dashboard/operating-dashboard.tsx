@@ -19,6 +19,7 @@ import { OperationalTimelinePanel } from "./operational-timeline-panel";
 import { DeliveryHealthAlertPanel } from "./delivery-health-alert-panel";
 import { CategoryInventoryPanel, type CategoryAssignmentHandoff } from "./category-inventory-panel";
 import { CampaignClassificationReviewPanel } from "./campaign-classification-review-panel";
+import { NamingTemplatePanel } from "./naming-template-panel";
 import { InstructionPolicyStudioPanel } from "./instruction-policy-studio-panel";
 import type { CampaignIntentTemplateRef } from "./normalization-workbench-panel";
 import { NormalizationWorkbenchPanel } from "./normalization-workbench-panel";
@@ -1237,9 +1238,9 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
     </>;
     return <>
       <section className={styles.surfaceHeading}><div><span className={styles.kicker}>OPERASYON · AYRINTI</span><h1>{campaignArea === "classification" ? "Künye inceleme" : campaignArea === "promotion" ? "Gönderi öne çıkarma · K4 ön kontrol" : "Geçmiş"}</h1><p>Bu doğrudan bağlantı ayrı bir çalışma yüzeyi açar; ana işletim tablosu kanonik Operasyon alanında kalır.</p></div><button className={styles.secondaryButton} onClick={() => commitDashboardLocation({ ...dashboardLocation, view: "monitor" })}>Operasyona dön</button></section>
-      {campaignArea === "classification" ? <CampaignClassificationReviewPanel onPrepareAssignment={(handoff) => {
+      {campaignArea === "classification" ? <><NamingTemplatePanel /><CampaignClassificationReviewPanel onPrepareAssignment={(handoff) => {
           setCategoryAssignmentHandoff(handoff); openSettings("categories");
-        }} onOpenSlicePreparation={openSlicePreparation} onOpenCategorySetup={() => openSettings("categories")} />
+        }} onOpenSlicePreparation={openSlicePreparation} onOpenCategorySetup={() => openSettings("categories")} /></>
           : campaignArea === "promotion" ? <PromotionPreflightPanel embedded />
             : <OperationalTimelinePanel embedded />}
     </>;
