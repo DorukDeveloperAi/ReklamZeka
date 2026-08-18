@@ -71,19 +71,24 @@ const fail = (code: P06StatusExecutionWorkerError["code"]): never => {
   throw new P06StatusExecutionWorkerError(code);
 };
 const same = (left: P06ExecutionV2Value, right: P06ExecutionV2Value) =>
-  left.status === right.status && left.budgetMinor === right.budgetMinor;
+  left.status === right.status && left.budgetMinor === right.budgetMinor
+  && (left.name ?? null) === (right.name ?? null);
 const value = (input: unknown): P06ExecutionV2Value => {
   if (!input || typeof input !== "object" || Array.isArray(input))
     fail("corrupt_store");
   const source = input as Record<string, unknown>;
   if (
     (source.status !== "ACTIVE" && source.status !== "PAUSED") ||
-    (source.budgetMinor !== null && (!Number.isSafeInteger(source.budgetMinor) || Number(source.budgetMinor) < 0))
+    (source.budgetMinor !== null && (!Number.isSafeInteger(source.budgetMinor) || Number(source.budgetMinor) < 0)) ||
+    (source.name !== undefined && source.name !== null &&
+      (typeof source.name !== "string" || source.name !== source.name.trim()
+        || source.name.length < 1 || source.name.length > 255 || /[\u0000-\u001f\u007f]/.test(source.name)))
   )
     fail("corrupt_store");
   return Object.freeze({
     status: source.status as "ACTIVE" | "PAUSED",
     budgetMinor: source.budgetMinor === null ? null : Number(source.budgetMinor),
+    name: source.name === undefined || source.name === null ? null : source.name as string,
   });
 };
 const exactRead = (

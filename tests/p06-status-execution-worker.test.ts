@@ -8,6 +8,7 @@ import {
 import type { P06ExecutionWorkerSnapshot } from "@/connectors/actions/p06-execution-drizzle-repository";
 import {
   p06ExecutionV2Digest,
+  type P06ExecutionV2Action,
   type P06ExecutionV2Writer,
 } from "@/domain/actions/p06-execution-v2";
 
@@ -26,13 +27,6 @@ const request = Object.freeze({
   desired: Object.freeze({ status: "PAUSED" as const, budgetMinor: null }),
   evaluatedAt: "2026-08-18T10:00:00.000Z",
 });
-const allowlistHash = p06ExecutionV2Digest({
-  route: "human_approved",
-  workspaceAllowlist: [workspaceRef],
-  accountAllowlist: ["act_12345"],
-  actionAllowlist: ["status_pause"],
-  killSwitch: false,
-});
 const phaseNumber = {
   staging: 1,
   admission: 2,
@@ -40,20 +34,22 @@ const phaseNumber = {
   pre_dispatch: 4,
   read_after_write: 5,
 } as const;
-const gate = (phase: keyof typeof phaseNumber): P06StatusExecutionGate =>
-  Object.freeze({
+const gate = (phase: keyof typeof phaseNumber, action: P06ExecutionV2Action = "status_pause", route = "human_approved"): P06StatusExecutionGate => {
+  const allowlistHash = p06ExecutionV2Digest({ route, workspaceAllowlist: [workspaceRef], accountAllowlist: ["act_12345"], actionAllowlist: [action], killSwitch: false });
+  return Object.freeze({
     phase,
     enabled: true,
     killSwitch: false,
     workspaceAllowlist: [workspaceRef] as const,
     accountAllowlist: ["act_12345"] as const,
-    actionAllowlist: ["status_pause"] as const,
+    actionAllowlist: [action] as const,
     allowlistHash,
     capturedAt: `2026-08-18T10:00:0${phaseNumber[phase]}.000Z`,
     expiresAt: "2026-08-18T11:00:00.000Z",
   });
-const persistedGate = (phase: "staging" | "admission") => {
-  const seed = gate(phase);
+};
+const persistedGate = (phase: "staging" | "admission", action: P06ExecutionV2Action = "status_pause", route = "human_approved") => {
+  const seed = gate(phase, action, route);
   const sequence = phaseNumber[phase];
   const leaseEpoch = 0;
   const core = {
@@ -62,7 +58,7 @@ const persistedGate = (phase: "staging" | "admission") => {
     sequence,
     leaseEpoch,
     enabled: seed.enabled,
-    allowlistHash,
+    allowlistHash: seed.allowlistHash,
     capturedAt: seed.capturedAt,
     expiresAt: seed.expiresAt,
   };
@@ -79,7 +75,7 @@ const persistedGate = (phase: "staging" | "admission") => {
       leaseEpoch,
       snapshotHash,
     }),
-    allowlistHash,
+    allowlistHash: seed.allowlistHash,
     enabled: true,
     capturedAt: seed.capturedAt,
     expiresAt: seed.expiresAt,
@@ -94,6 +90,8 @@ function harness(
       authorityHash: p06ExecutionV2Digest({ phase, allowed: true }),
     })),
   },
+  requestInput: P06ExecutionWorkerSnapshot["request"] = request,
+  route: P06ExecutionWorkerSnapshot["route"] = "human_approved",
 ) {
   const mutable: {
     state: P06ExecutionWorkerSnapshot["head"]["state"];
@@ -110,7 +108,7 @@ function harness(
     terminalHash: null,
     traces: [],
     observations: [],
-    gates: [persistedGate("staging"), persistedGate("admission")],
+    gates: [persistedGate("staging", requestInput.action, route), persistedGate("admission", requestInput.action, route)],
   };
   let leaseTokenHash: string | null = null;
   let fenceHash: string | null = null;
@@ -121,8 +119,8 @@ function harness(
       executionRunId: "00000000-0000-4000-8000-000000000002",
       executionRef,
       idempotencyKey: `p06_exec_idem_${"1".repeat(64)}`,
-      route: "human_approved",
-      request,
+      route,
+      request: requestInput,
       head: Object.freeze({
         state: mutable.state,
         sequence: mutable.sequence,
@@ -305,7 +303,7 @@ function harness(
     repository: repository as never,
     writer,
     authority,
-    gates: { resolve: vi.fn(async ({ phase }) => gate(phase)) },
+    gates: { resolve: vi.fn(async ({ phase }) => gate(phase, requestInput.action, route)) },
     now: () =>
       new Date(`2026-08-18T10:00:${String(tick++).padStart(2, "0")}.000Z`),
   });
@@ -366,6 +364,31 @@ describe("P06StatusExecutionWorker", () => {
     ]);
     expect(writer.write).toHaveBeenCalledTimes(1);
     expect(mutable.observations).toHaveLength(3);
+  });
+
+  it("treats a different rename target name as a mutation, not an already-applied status-only no-op", async () => {
+    const renameRequest = Object.freeze({ ...request, entityRef: "campaign_12345", action: "campaign_rename" as const,
+      expectedBefore: Object.freeze({ status: "ACTIVE" as const, budgetMinor: null, name: "Eski ad" }),
+      desired: Object.freeze({ status: "ACTIVE" as const, budgetMinor: null, name: "Yeni ad" }) });
+    const read = (name: string) => {
+      const core = Object.freeze({ workspaceRef, accountRef: "act_12345", entityRef: "campaign_12345",
+        value: Object.freeze({ status: "ACTIVE" as const, budgetMinor: null, name }),
+        observedAt: "2026-08-18T10:00:20.000Z", rawHash: "a".repeat(64) });
+      return Object.freeze({ core, receiptHash: p06ExecutionV2Digest(core) });
+    };
+    const writer: P06ExecutionV2Writer = {
+      read: vi.fn().mockResolvedValueOnce(read("Eski ad")).mockResolvedValueOnce(read("Yeni ad")),
+      write: vi.fn(async ({ request: current, idempotencyKey }) => {
+        const core = Object.freeze({ executionRef, idempotencyKey, entityRef: current.entityRef, action: current.action,
+          kind: "written" as const, rawHash: "b".repeat(64) });
+        return Object.freeze({ core, receiptHash: p06ExecutionV2Digest(core) });
+      }),
+    };
+    const { worker, mutable } = harness(writer, undefined, renameRequest, "human_rename_approved");
+    const result = await worker.run({ executionRef, leaseTokenHash: "c".repeat(64), fenceHash: "d".repeat(64), leaseUntil: "2026-08-18T11:00:00.000Z" });
+    expect(result.state).toBe("succeeded");
+    expect(writer.write).toHaveBeenCalledTimes(1);
+    expect(mutable.traces.find((entry) => entry.step === "expected_before")?.outcome).toBe("ok");
   });
 
   it("recovers a crash after dispatch by reading Meta and never issuing a second write", async () => {
