@@ -65,6 +65,8 @@
     "verify:guide-run-persistence-postgres:post": "GUIDE_RUN_POST_APPROVED=true node --conditions react-server --env-file=.env.local --import tsx scripts/verify-guide-run-persistence-post.ts",
     "verify:p06-action-bindings-postgres": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-p06-action-bindings-postgres.ts",
     "verify:p06-action-bindings-postgres:post": "P06_ACTION_BINDINGS_POST_APPROVED=true node --conditions react-server --env-file=.env.local --import tsx scripts/verify-p06-action-bindings-postgres.ts",
+    "verify:p06-limited-autonomy-behavior-postgres": "P06_LIMITED_AUTONOMY_PRE=true node --conditions react-server --env-file=.env.local --import tsx scripts/verify-p06-action-bindings-postgres.ts",
+    "verify:p06-limited-autonomy-execution-postgres": "P06_LIMITED_AUTONOMY_EXECUTION_PRE=true node --conditions react-server --env-file=.env.local --import tsx scripts/verify-p06-action-bindings-postgres.ts",
     "verify:instruction-policy-live": "node --import tsx scripts/verify-instruction-policy-lifecycle-postgres.ts",
     "verify:instruction-policy-authority-impact-db": "node --import tsx scripts/verify-instruction-policy-authority-impact-postgres.ts",
     "verify:policy-authority-catalog-db": "node --import tsx scripts/verify-policy-authority-catalog-materialization-postgres.ts",

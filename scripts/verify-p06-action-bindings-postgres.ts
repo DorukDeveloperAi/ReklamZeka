@@ -13,12 +13,15 @@ import { DrizzleWorkspaceTombstonePurgePort } from "@/connectors/meta/workspace-
 import { DrizzleActionApprovalDecisionRepository } from "@/connectors/actions/action-approval-decision-drizzle-repository";
 import { DrizzleP06ExecutionRepository } from "@/connectors/actions/p06-execution-drizzle-repository";
 import { DrizzleP06StatusExecutionDispatchAuthorityRepository } from "@/connectors/actions/p06-status-execution-dispatch-authority-drizzle-repository";
+import { DrizzleP06LimitedAutonomyAdmissionRepository } from "@/connectors/actions/p06-limited-autonomy-admission-drizzle-repository";
+import { DrizzleAutonomyRuleRegistryRepository } from "@/connectors/actions/autonomy-rule-registry-drizzle-repository";
 import * as schema from "@/db/schema";
 import { appendGuideRunTransitionV12, createGuideRunV12, type GuideRunV12 } from "@/domain/guides/guide-run";
 import { canonicalGuideWorkspaceRef, createGuideRevision } from "@/domain/guides/guide-revision";
 import { guideRunMembershipEvidenceHash } from "@/domain/guides/guide-run-membership-evidence";
 import { metaPublicReference } from "@/domain/meta/public-reference";
 import { createApprovalPolicyDraft, publishApprovalPolicy } from "@/domain/actions/approval-policy-registry";
+import { createAutonomyRuleDraft, disableAutonomyRule, publishAutonomyRule } from "@/domain/actions/autonomy-rule-registry";
 import { createSliceRevision } from "@/domain/slices/slice-definition";
 import { categoryDefinitionPublicRef, categoryDimensionPublicRef } from "@/domain/categories/public-reference";
 import type { P06ExecutionV2Step } from "@/domain/actions/p06-execution-v2";
@@ -28,6 +31,8 @@ const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) throw new Error("DATABASE_URL yapılandırılmadı");
 const postMode = process.env.P06_ACTION_BINDINGS_POST_APPROVED === "true";
 const executionPreMode = process.env.P06_EXECUTION_CHAIN_PRE === "true";
+const limitedAutonomyPreMode = process.env.P06_LIMITED_AUTONOMY_PRE === "true";
+const limitedAutonomyExecutionPreMode = process.env.P06_LIMITED_AUTONOMY_EXECUTION_PRE === "true";
 const pool = new Pool({
   connectionString: databaseUrl,
   max: postMode ? 4 : 1,
@@ -58,7 +63,7 @@ const closed = {
   canWriteMeta: false,
 } as const;
 const evidence = {
-  mode: postMode ? "post_applied_two_client" : executionPreMode ? "execution_pre_outer_rollback" : "pre_outer_rollback",
+  mode: postMode ? "post_applied_two_client" : executionPreMode ? "execution_pre_outer_rollback" : limitedAutonomyExecutionPreMode ? "limited_autonomy_execution_pre_outer_rollback" : limitedAutonomyPreMode ? "limited_autonomy_pre_outer_rollback" : "pre_outer_rollback",
   exactMigrationLedger: !postMode,
   preApplyConcurrencySkipped: !postMode,
   separateClients: false,
@@ -79,6 +84,31 @@ const evidence = {
   appendDeleteGuard: false,
   tombstonePurge: false,
   zeroResidue: false,
+};
+const limitedAutonomyEvidence = {
+  migrationInstalled: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
+  canonicalSource: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
+  contextAndPolicy: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
+  firstReservation: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
+  exactReplay: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
+  actionPlanBound: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
+  noExecutionAuthority: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
+  nullForgeryRejected: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
+  disabledRuleHeld: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
+  tombstonePurge: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
+  zeroResidue: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
+};
+const limitedExecutionEvidence = {
+  migrationInstalled: !limitedAutonomyExecutionPreMode,
+  identityCreated: !limitedAutonomyExecutionPreMode,
+  exactReplay: !limitedAutonomyExecutionPreMode,
+  noHumanAuthority: !limitedAutonomyExecutionPreMode,
+  initialGatesBound: !limitedAutonomyExecutionPreMode,
+  runnable: !limitedAutonomyExecutionPreMode,
+  currentAuthority: !limitedAutonomyExecutionPreMode,
+  disabledRuleStopsDispatch: !limitedAutonomyExecutionPreMode,
+  tombstonePurge: !limitedAutonomyExecutionPreMode,
+  zeroResidue: !limitedAutonomyExecutionPreMode,
 };
 const executionEvidence = {
   migrationInstalled: !executionPreMode,
@@ -141,7 +171,7 @@ try {
       const requesterMigration = readFileSync("drizzle/20260818000100_p06_agent_action_requester.sql", "utf8");
       const bindingHash = createHash("sha256").update(bindingMigration).digest("hex");
       const requesterHash = createHash("sha256").update(requesterMigration).digest("hex");
-      if (postMode || executionPreMode) {
+      if (postMode || executionPreMode || limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
         const ledger = await client.query<{
           binding_count: number;
           requester_count: number;
@@ -154,6 +184,17 @@ try {
       if (executionPreMode) {
         await client.query(readFileSync("drizzle/20260818000300_p06_execution_persistence.sql", "utf8"));
         executionEvidence.migrationInstalled = true;
+      }
+      if (limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
+        await client.query(readFileSync("drizzle/20260818000300_p06_execution_persistence.sql", "utf8"));
+        await client.query(readFileSync("drizzle/20260818000400_p04_budget_ceiling_policies.sql", "utf8"));
+        await client.query(readFileSync("drizzle/20260818000500_p06_budget_execution_binding.sql", "utf8"));
+        await client.query(readFileSync("drizzle/20260818000600_p06_limited_autonomy_admissions.sql", "utf8"));
+        if (limitedAutonomyExecutionPreMode) {
+          await client.query(readFileSync("drizzle/20260818000700_p06_limited_autonomy_execution.sql", "utf8"));
+          limitedExecutionEvidence.migrationInstalled = true;
+        }
+        limitedAutonomyEvidence.migrationInstalled = true;
       }
       mark(postMode ? "applied_migrations_verified" : "migration_installed_outer_rollback");
       const shape = await client.query<{ force: boolean }>("select relforcerowsecurity force from pg_class where oid='public.guide_run_action_bindings'::regclass");
@@ -209,7 +250,7 @@ try {
           timezone: "Europe/Istanbul",
           localTime: "09:00",
         },
-        mode: "prepare_human_approval",
+        mode: limitedAutonomyPreMode || limitedAutonomyExecutionPreMode ? "limited_autonomy" : "prepare_human_approval",
         actionAllowlist: ["status_pause"],
       });
       const guideRef = guide.guideRef,
@@ -225,7 +266,7 @@ try {
       await client.query("update slices set current_published_revision_id=$1 where id=$2", [sliceRevisionId, sliceId]);
       await client.query("insert into guides(id,workspace_id,guide_ref,label,slice_id,market_definition_id,created_by_actor_id) values($1,$2,$3,'P06',$4,$5,$6)", [guideId, workspaceId, guideRef, sliceId, marketId, actorId]);
       await client.query("insert into guide_revisions(id,workspace_id,guide_id,guide_ref,revision_number,revision_hash,previous_revision_hash,slice_revision_id,slice_ref,market_definition_id,market_key,free_text,strict_payload,schedule_payload,mode,interpretation_hash,created_by_actor_id) values($1,$2,$3,$4,1,$5,null,$6,$7,$8,'yerli',$9,$10::jsonb,$11::jsonb,$12,$13,$14)", [revisionId, workspaceId, guideId, guideRef, revisionHash, sliceRevisionId, guide.sliceRef, marketId, guide.freeText, JSON.stringify(guide.strict), JSON.stringify(guide.schedule), guide.mode, guide.interpretationHash, actorId]);
-      await client.query("insert into guide_revision_actions(workspace_id,guide_revision_id,action,authority) values($1,$2,'status_pause','human_approval')", [workspaceId, revisionId]);
+      await client.query("insert into guide_revision_actions(workspace_id,guide_revision_id,action,authority) values($1,$2,'status_pause',$3)", [workspaceId, revisionId, limitedAutonomyPreMode || limitedAutonomyExecutionPreMode ? "limited_autonomy" : "human_approval"]);
       await client.query("insert into guide_heads(workspace_id,guide_id,latest_revision_id,current_active_revision_id,version,updated_at) values($1,$2,$3,$3,1,now())", [workspaceId, guideId, revisionId]);
       await client.query("set local session_replication_role=origin");
       const db = drizzle(client, { schema });
@@ -469,6 +510,55 @@ try {
           artifactPayload: artifact,
         });
       }
+      let limitedActionRulePublished: ReturnType<typeof publishAutonomyRule> | null = null;
+      if (limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
+        const ruleEffectiveFrom = new Date(Date.now() - 3_600_000).toISOString();
+        const rulePublishedAt = new Date(Date.parse(ruleEffectiveFrom) + 1_000).toISOString();
+        const autonomyRegistry = new DrizzleAutonomyRuleRegistryRepository(outerDb, workspaceId, workspaceRef);
+        const workspaceRuleDraft = createAutonomyRuleDraft({
+          ruleRef: "autonomy_p06_limited_workspace",
+          revision: 1,
+          workspaceRef,
+          scope: { level: "workspace", ref: workspaceRef },
+          mode: "policy_limited",
+          effectiveFrom: ruleEffectiveFrom,
+          expiresAt: null,
+          killSwitch: false,
+          maximumActionsPerRun: 2,
+          normalizedBy: { actorRef: "actor_p06_autonomy_author", role: "admin" },
+          sourceGuidanceRefs: [],
+        });
+        const workspaceRulePublished = publishAutonomyRule({
+          draft: workspaceRuleDraft,
+          actor: { actorRef: "actor_p06_autonomy_owner", role: "owner" },
+          decisionRef: "decision_p06_autonomy_workspace",
+          reasonRef: "reason_p06_bounded_status_pause",
+          publishedAt: rulePublishedAt,
+        });
+        const actionRuleDraft = createAutonomyRuleDraft({
+          ruleRef: "autonomy_p06_limited_status_pause",
+          revision: 1,
+          workspaceRef,
+          scope: { level: "action_type", actionType: "status_pause" },
+          mode: "policy_limited",
+          effectiveFrom: ruleEffectiveFrom,
+          expiresAt: null,
+          killSwitch: false,
+          maximumActionsPerRun: 1,
+          normalizedBy: { actorRef: "actor_p06_autonomy_author", role: "admin" },
+          sourceGuidanceRefs: [],
+        });
+        limitedActionRulePublished = publishAutonomyRule({
+          draft: actionRuleDraft,
+          actor: { actorRef: "actor_p06_autonomy_owner", role: "owner" },
+          decisionRef: "decision_p06_autonomy_status_pause",
+          reasonRef: "reason_p06_bounded_status_pause",
+          publishedAt: rulePublishedAt,
+        });
+        for (const artifact of [workspaceRuleDraft, workspaceRulePublished, actionRuleDraft, limitedActionRulePublished]) {
+          await autonomyRegistry.append(artifact);
+        }
+      }
       const scopes = scopeReader;
       const contexts = new DrizzleGuideRunCandidateStagingContextRepository(outerDb, new DrizzleGuideRunEffectiveOverlapRepository(outerDb));
       const stager = new DrizzleGuideRunStatusActionStager(contexts, scopes);
@@ -551,7 +641,7 @@ try {
             ...stageable,
           }),
           action: "status_pause" as const,
-          routing: "human_approval" as const,
+          routing: limitedAutonomyPreMode || limitedAutonomyExecutionPreMode ? "limited_autonomy_review" as const : "human_approval" as const,
           stageable,
         };
         const payload = {
@@ -596,6 +686,120 @@ try {
       const first = await makeCompleted("request_p06_first", "11111111-1111-4111-8111-111111111111");
       mark("completed_run_and_disposition_artifact_persisted");
       evidence.completedRun = first.state === "completed";
+      if (limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
+        let limitedExecutionForKill: Awaited<ReturnType<DrizzleP06ExecutionRepository["createLimitedAutonomyStatus"]>> | null = null;
+        limitedAutonomyEvidence.canonicalSource = first.state === "completed" && guide.mode === "limited_autonomy";
+        const authorityBefore = rows(await db.execute(sql`select
+          (select count(*)::int from action_proposal_units where workspace_id=${workspaceId}::uuid) units,
+          (select count(*)::int from guide_run_action_bindings where workspace_id=${workspaceId}::uuid) bindings,
+          (select count(*)::int from action_approval_decision_events where workspace_id=${workspaceId}::uuid) decisions,
+          (select count(*)::int from action_approval_evidence_grants where workspace_id=${workspaceId}::uuid) grants`))[0];
+        const limitedRepository = new DrizzleP06LimitedAutonomyAdmissionRepository(outerDb, contexts, scopes);
+        const saved = await limitedRepository.reserve({ workspaceId, runRef: first.runRef });
+        const replay = await limitedRepository.reserve({ workspaceId, runRef: first.runRef });
+        const admission = rows(await db.execute(sql`select admission_hash,quota_ordinal,maximum_actions_per_run,context_hash,
+          approval_policy_hash,autonomy_evidence_hash,action_plan_hash,admission_payload
+          from p06_limited_autonomy_admissions where workspace_id=${workspaceId}::uuid and id=${saved.admissionId}::uuid`))[0];
+        limitedAutonomyEvidence.firstReservation = saved.replay === false && saved.quotaOrdinal === 1;
+        limitedAutonomyEvidence.exactReplay = replay.replay === true && replay.admissionId === saved.admissionId
+          && replay.admissionHash === saved.admissionHash && replay.quotaOrdinal === 1;
+        limitedAutonomyEvidence.contextAndPolicy = typeof admission?.context_hash === "string"
+          && typeof admission?.approval_policy_hash === "string"
+          && admission.approval_policy_hash === publishedPolicy.policyHash
+          && typeof admission?.autonomy_evidence_hash === "string" && admission.maximum_actions_per_run === 1;
+        const admissionPayload = admission?.admission_payload as Record<string, unknown> | undefined;
+        const embeddedPlan = admissionPayload?.actionPlan as Record<string, unknown> | undefined;
+        limitedAutonomyEvidence.actionPlanBound = admission?.action_plan_hash === embeddedPlan?.planHash
+          && embeddedPlan?.disposition === "policy_limited_candidate"
+          && (embeddedPlan?.capabilities as Record<string, unknown> | undefined)?.canExecute === false;
+        const authorityAfter = rows(await db.execute(sql`select
+          (select count(*)::int from action_proposal_units where workspace_id=${workspaceId}::uuid) units,
+          (select count(*)::int from guide_run_action_bindings where workspace_id=${workspaceId}::uuid) bindings,
+          (select count(*)::int from action_approval_decision_events where workspace_id=${workspaceId}::uuid) decisions,
+          (select count(*)::int from action_approval_evidence_grants where workspace_id=${workspaceId}::uuid) grants`))[0];
+        limitedAutonomyEvidence.noExecutionAuthority = JSON.stringify(authorityBefore) === JSON.stringify(authorityAfter)
+          && (admissionPayload?.authority as Record<string, unknown> | undefined)?.canExecute === false
+          && (admissionPayload?.authority as Record<string, unknown> | undefined)?.canWriteMeta === false;
+        if (limitedAutonomyExecutionPreMode) {
+          const executionRepository = new DrizzleP06ExecutionRepository(outerDb);
+          const evaluatedAtRow = rows(await db.execute(sql`select to_char(statement_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') evaluated_at`))[0];
+          const evaluatedAt = String(evaluatedAtRow?.evaluated_at);
+          const base = Date.parse(evaluatedAt);
+          const gates = ["staging", "admission"].map((phase, index) => ({
+            phase: phase as "staging" | "admission", enabled: true, allowlistHash: digest({ phase, workspaceRef, accountRef: "act_p06_fixture" }),
+            capturedAt: new Date(base - 2 + index).toISOString(), expiresAt: new Date(base + 60_000).toISOString(),
+          }));
+          const execution = await executionRepository.createLimitedAutonomyStatus({ workspaceId, admissionId: saved.admissionId, evaluatedAt, gates });
+          limitedExecutionForKill = execution;
+          const executionReplay = await executionRepository.createLimitedAutonomyStatus({ workspaceId, admissionId: saved.admissionId, evaluatedAt, gates });
+          const executionRow = rows(await db.execute(sql`select route,limited_autonomy_admission_id::text admission_id,
+            proposal_bundle_id,action_unit_id,decision_event_id,approval_grant_id,request_hash,request_payload
+            from p06_execution_runs where workspace_id=${workspaceId}::uuid and id=${execution.executionRunId}::uuid`))[0];
+          limitedExecutionEvidence.identityCreated = execution.request.action === "status_pause"
+            && executionRow?.route === "limited_autonomy_status" && executionRow?.admission_id === saved.admissionId;
+          limitedExecutionEvidence.exactReplay = executionReplay.executionRunId === execution.executionRunId
+            && executionReplay.requestHash === execution.requestHash;
+          limitedExecutionEvidence.noHumanAuthority = executionRow?.proposal_bundle_id === null && executionRow?.action_unit_id === null
+            && executionRow?.decision_event_id === null && executionRow?.approval_grant_id === null;
+          const gateRows = rows(await db.execute(sql`select phase,enabled from p06_execution_gate_snapshots
+            where workspace_id=${workspaceId}::uuid and execution_run_id=${execution.executionRunId}::uuid order by sequence`));
+          limitedExecutionEvidence.initialGatesBound = gateRows.length === 2 && gateRows.every((gate) => gate.enabled === true)
+            && gateRows.map((gate) => gate.phase).join(",") === "staging,admission";
+          const runnable = await executionRepository.listRunnableByRoute("limited_autonomy_status", 10);
+          limitedExecutionEvidence.runnable = runnable.includes(execution.executionRef);
+          const authority = await new DrizzleP06StatusExecutionDispatchAuthorityRepository(outerDb, contexts).revalidate({
+            phase: "pre_dispatch", executionRef: execution.executionRef, request: execution.request,
+          });
+          limitedExecutionEvidence.currentAuthority = authority.allowed;
+        }
+
+        const second = await makeCompleted("request_p06_limited_kill", "22222222-2222-4222-8222-222222222222");
+        const secondSource = rows(await db.execute(sql`select r.id::text run_id,a.id::text artifact_id
+          from guide_runs r join guide_run_artifacts a on a.workspace_id=r.workspace_id and a.run_id=r.id and a.kind='disposition'
+          where r.workspace_id=${workspaceId}::uuid and r.run_ref=${second.runRef}`))[0];
+        limitedAutonomyEvidence.nullForgeryRejected = Boolean(secondSource)
+          && await rejected(client, async () => {
+            await client.query("set local session_replication_role=replica");
+            await client.query(`insert into p06_limited_autonomy_admissions(id,workspace_id,run_id,guide_revision_id,disposition_artifact_id,
+              member_ref,membership_hash,entity_ref,account_ref,campaign_ref,action_type,expected_status,desired_status,context_hash,effective_guide_set_hash,resolution_hash,
+              data_health_report_hash,approval_policy_hash,protection_hash,autonomy_evidence_hash,action_plan_hash,maximum_actions_per_run,quota_ordinal,admitted_at,expires_at,admission_hash,admission_payload,version,created_at)
+              select gen_random_uuid(),workspace_id,$1::uuid,guide_revision_id,$2::uuid,
+              member_ref,membership_hash,entity_ref,account_ref,campaign_ref,action_type,expected_status,desired_status,context_hash,effective_guide_set_hash,resolution_hash,
+              data_health_report_hash,approval_policy_hash,protection_hash,autonomy_evidence_hash,action_plan_hash,maximum_actions_per_run,1,admitted_at,expires_at,admission_hash,
+              jsonb_set(admission_payload,'{entityRef}','null'::jsonb),version,created_at
+              from p06_limited_autonomy_admissions where id=$3::uuid`, [secondSource!.run_id, secondSource!.artifact_id, saved.admissionId]);
+          });
+        const currentActionRule = limitedActionRulePublished;
+        if (!currentActionRule) throw new Error("limited autonomy action rule missing");
+        const disabledRule = disableAutonomyRule({
+          current: currentActionRule,
+          actor: { actorRef: "actor_p06_autonomy_owner", role: "owner" },
+          decisionRef: "decision_p06_disable_status_pause",
+          reasonRef: "reason_p06_kill_switch_drill",
+          disabledAt: new Date().toISOString(),
+        });
+        await new DrizzleAutonomyRuleRegistryRepository(outerDb, workspaceId, workspaceRef).append(disabledRule);
+        if (limitedAutonomyExecutionPreMode && limitedExecutionForKill) {
+          const authorityAfterKill = await new DrizzleP06StatusExecutionDispatchAuthorityRepository(outerDb, contexts).revalidate({
+            phase: "pre_dispatch", executionRef: limitedExecutionForKill.executionRef, request: limitedExecutionForKill.request,
+          });
+          limitedExecutionEvidence.disabledRuleStopsDispatch = !authorityAfterKill.allowed;
+        }
+        try {
+          await limitedRepository.reserve({ workspaceId, runRef: second.runRef });
+        } catch {
+          limitedAutonomyEvidence.disabledRuleHeld = true;
+        }
+
+        const purge = new DrizzleWorkspaceTombstonePurgePort();
+        await client.query("update workspaces set lifecycle_state='tombstoning' where id=$1::uuid", [workspaceId]);
+        const inspection = await purge.inspect(outerDb, workspaceId);
+        await purge.purge(outerDb, { workspaceId, expectedRevision: inspection.revision });
+        const remaining = await client.query<{ n: string }>("select ((select count(*) from p06_limited_autonomy_admissions where workspace_id=$1::uuid)+(select count(*) from p06_execution_runs where workspace_id=$1::uuid)+(select count(*) from p06_execution_heads where workspace_id=$1::uuid)+(select count(*) from p06_execution_gate_snapshots where workspace_id=$1::uuid)+(select count(*) from p06_execution_events where workspace_id=$1::uuid)+(select count(*) from p06_execution_observations where workspace_id=$1::uuid)+(select count(*) from p06_rollback_proposals where workspace_id=$1::uuid)+(select count(*) from guide_runs where workspace_id=$1::uuid)+(select count(*) from guide_run_artifacts where workspace_id=$1::uuid))::text n", [workspaceId]);
+        limitedAutonomyEvidence.tombstonePurge = remaining.rows[0]?.n === "0";
+        limitedExecutionEvidence.tombstonePurge = remaining.rows[0]?.n === "0";
+        throw rollback;
+      }
       const binding = new DrizzleGuideRunActionBindingRepository(outerDb, stager);
       const saved = await binding.bind({ workspaceId, runRef: first.runRef });
       const replay = await binding.bind({ workspaceId, runRef: first.runRef });
@@ -1187,10 +1391,32 @@ try {
     client.release();
   }
   const residue = await pool.query<{ n: string }>("select count(*)::text n from pg_class where oid=to_regclass('public.guide_run_action_bindings')");
-  evidence.zeroResidue = residue.rows[0]?.n === (postMode || executionPreMode ? "1" : "0");
-  const required = Object.entries(evidence).filter(([key, value]) => typeof value === "boolean" && key !== "preApplyConcurrencySkipped" && (postMode || (key !== "separateClients" && key !== "concurrentMaterializeAndReplay")));
-  if (!required.every(([, value]) => value === true) || evidence.preApplyConcurrencySkipped !== !postMode || !Object.values(executionEvidence).every(Boolean)) throw new Error(JSON.stringify({ ...evidence, execution: executionEvidence }));
-  console.log(JSON.stringify({ ...evidence, execution: executionEvidence }));
+  evidence.zeroResidue = residue.rows[0]?.n === (postMode || executionPreMode || limitedAutonomyPreMode || limitedAutonomyExecutionPreMode ? "1" : "0");
+  if (limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
+    const limitedResidue = await pool.query<{ objects: number; rows: number; ledger: number }>(`select
+      (select count(*)::int from pg_class where oid=to_regclass('public.p06_limited_autonomy_admissions')) objects,
+      0::int rows,
+      (select count(*)::int from drizzle.__drizzle_migrations where hash=$1) ledger`, [
+      createHash("sha256").update(readFileSync("drizzle/20260818000600_p06_limited_autonomy_admissions.sql", "utf8")).digest("hex"),
+    ]);
+    limitedAutonomyEvidence.zeroResidue = limitedResidue.rows[0]?.objects === 0 && limitedResidue.rows[0]?.ledger === 0;
+    if (limitedAutonomyExecutionPreMode) {
+      const executionResidue = await pool.query<{ objects: number; ledger: number }>(`select
+        (select count(*)::int from information_schema.columns where table_schema='public' and table_name='p06_execution_runs' and column_name='limited_autonomy_admission_id') objects,
+        (select count(*)::int from drizzle.__drizzle_migrations where hash=$1) ledger`, [
+        createHash("sha256").update(readFileSync("drizzle/20260818000700_p06_limited_autonomy_execution.sql", "utf8")).digest("hex"),
+      ]);
+      limitedExecutionEvidence.zeroResidue = executionResidue.rows[0]?.objects === 0 && executionResidue.rows[0]?.ledger === 0;
+    }
+    if (!Object.values(limitedAutonomyEvidence).every(Boolean) || !Object.values(limitedExecutionEvidence).every(Boolean) || !evidence.exactMigrationLedger || !evidence.zeroResidue) {
+      throw new Error(JSON.stringify({ ...evidence, limitedAutonomy: limitedAutonomyEvidence, limitedExecution: limitedExecutionEvidence }));
+    }
+    console.log(JSON.stringify({ ...evidence, limitedAutonomy: limitedAutonomyEvidence, limitedExecution: limitedExecutionEvidence }));
+  } else {
+    const required = Object.entries(evidence).filter(([key, value]) => typeof value === "boolean" && key !== "preApplyConcurrencySkipped" && (postMode || (key !== "separateClients" && key !== "concurrentMaterializeAndReplay")));
+    if (!required.every(([, value]) => value === true) || evidence.preApplyConcurrencySkipped !== !postMode || !Object.values(executionEvidence).every(Boolean)) throw new Error(JSON.stringify({ ...evidence, execution: executionEvidence }));
+    console.log(JSON.stringify({ ...evidence, execution: executionEvidence }));
+  }
 } finally {
   await pool.end();
 }

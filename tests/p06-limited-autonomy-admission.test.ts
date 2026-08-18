@@ -10,7 +10,7 @@ const plan = Object.freeze({ schemaVersion: "action-plan/1.0.0", actionType: "st
   capabilities: Object.freeze({ canExecute: false, canWriteMeta: false, canGrantApproval: false, canAccessRawGraph: false }), contextHash: hash, planHash: hash }) as ActionPlan;
 const input = { memberRef: "ad_set_public", membershipHash: hash, entityRef: "adset_external", accountRef: "account_external", campaignRef: "campaign_external",
   actionPlan: plan, contextHash: hash, effectiveGuideSetHash: hash, resolutionHash: hash, dataHealthReportHash: hash, protectionHash: hash,
-  autonomyEvidenceHash: hash, maximumActionsPerRun: 2, actionsAlreadyReserved: 0, admittedAt: "2026-08-18T10:00:00.000Z", expiresAt: "2026-08-18T10:05:00.000Z" };
+  approvalPolicyHash: hash, autonomyEvidenceHash: hash, maximumActionsPerRun: 2, actionsAlreadyReserved: 0, admittedAt: "2026-08-18T10:00:00.000Z", expiresAt: "2026-08-18T10:05:00.000Z" };
 
 describe("P06 limited autonomy admission", () => {
   it("creates a frozen authority-none atomic quota reservation intent", () => {

@@ -68,4 +68,25 @@ describe("GuideRunSchedulerWorker", () => {
     expect(output).toEqual([{ runRef: due.runRef, state: "completed" }]);
     expect(projected).toEqual([due.runRef]);
   });
+
+  it("routes limited-autonomy candidates only to the quota admission port", async () => {
+    const limitedGuide=createGuideRevision({workspaceRef:"workspace_main",guideRef:"guide_limited",revision:1,previousRevisionHash:null,
+      sliceRef:"slice_main",market:"yerli",freeText:"sınırlı",strict:{budgetRefs:[],rollbackConditions:[],budgetInterpretation:null},
+      schedule:{frequency:"daily",timezone:"UTC",localTime:"06:00"},mode:"limited_autonomy",actionAllowlist:["status_pause"]});
+    const due=createGuideRunV12({workspaceRef:limitedGuide.workspaceRef,guideRef:limitedGuide.guideRef,guideRevisionHash:limitedGuide.revisionHash,
+      trigger:{kind:"scheduled",scheduledFor:"2026-08-17T06:00:00.000Z"},occurredAt:at});
+    const human:string[]=[], autonomy:string[]=[];
+    const worker=new GuideRunSchedulerWorker({
+      persistence:{async recordScheduleReceipt(){}},
+      service:{async fire(){return due;},async claim(){return {...due,state:"claimed",lease:{token,epoch:1,expiresAt:expires}};},
+        async execute(){return {run:{...due,state:"completed",lease:null},disposition:{state:"staged",candidate:{routing:"limited_autonomy_review"}},partial:false};}},
+      ledger:{async projectPersisted(){}},actionBindings:{async bind(){human.push("human");}},
+      limitedAutonomyAdmissions:{async reserve({runRef}:{runRef:string}){autonomy.push(runRef);return {admissionId:idFor(1),admissionHash:"a".repeat(64),quotaOrdinal:1,replay:false};}},
+    } as never,{async listActiveSchedules(){return [{workspaceId:idFor(2),guideRevisionId:idFor(3),guide:limitedGuide,activatedAt:"2026-08-17T05:59:00.000Z",lastScheduledFor:null}];}});
+    await worker.tick({now:at,leaseToken:token,leaseUntil:expires});
+    expect(human).toEqual([]);
+    expect(autonomy).toEqual([due.runRef]);
+  });
 });
+
+function idFor(value:number){return `00000000-0000-4000-8000-${String(value).padStart(12,"0")}`;}

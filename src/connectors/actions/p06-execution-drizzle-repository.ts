@@ -21,6 +21,7 @@ type Row = Record<string, unknown>;
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH = /^[a-f0-9]{64}$/;
+const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const ISO = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
 const PHASES = [
   "staging",
@@ -727,6 +728,171 @@ export class DrizzleP06ExecutionRepository {
     });
   }
 
+  async createLimitedAutonomyStatus(
+    input: Readonly<{
+      workspaceId: string;
+      admissionId: string;
+      evaluatedAt: string;
+      gates: readonly P06ExecutionGateSeed[];
+    }>,
+  ): Promise<P06ExecutionIdentity> {
+    if (!UUID.test(input.workspaceId) || !UUID.test(input.admissionId))
+      fail("invalid_input");
+    const evaluatedAt = instant(input.evaluatedAt);
+    const { normalized: normalizedGates, gateSetHash } = initialGates(
+      input.gates,
+      evaluatedAt,
+    );
+    if (normalizedGates.some((gate) => !gate.enabled)) fail("invalid_input");
+    return this.database.transaction(async (tx) => {
+      const source = one(
+        rows(
+          await tx.execute(sql`
+            select a.id::text admission_id,a.admission_hash,a.account_ref,a.entity_ref,
+              a.context_hash,a.effective_guide_set_hash,a.resolution_hash,
+              a.approval_policy_hash,a.autonomy_evidence_hash,a.data_health_report_hash,
+              a.protection_hash,a.action_plan_hash,a.expected_status,a.desired_status,
+              h.run_payload->>'workspaceRef' workspace_ref
+            from p06_limited_autonomy_admissions a
+            join guide_run_heads h on h.workspace_id=a.workspace_id and h.run_id=a.run_id
+            join workspaces w on w.id=a.workspace_id and w.lifecycle_state='active'
+              and w.tombstoned_at is null
+            where a.workspace_id=${input.workspaceId}::uuid and a.id=${input.admissionId}::uuid
+              and a.action_type='status_pause' and a.expires_at>${evaluatedAt}::timestamptz
+            for share of a,h,w limit 2
+          `),
+        ),
+      );
+      if (!source) fail("not_found");
+      const expectedStatus = source.expected_status;
+      const desiredStatus = source.desired_status;
+      if (
+        expectedStatus !== "ACTIVE" ||
+        desiredStatus !== "PAUSED" ||
+        typeof source.workspace_ref !== "string" ||
+        !REF.test(source.workspace_ref)
+      )
+        fail("corrupt_store");
+      for (const key of [
+        "admission_hash",
+        "context_hash",
+        "effective_guide_set_hash",
+        "resolution_hash",
+        "approval_policy_hash",
+        "autonomy_evidence_hash",
+        "data_health_report_hash",
+        "protection_hash",
+        "action_plan_hash",
+      ] as const) {
+        if (typeof source[key] !== "string" || !HASH.test(source[key] as string))
+          fail("corrupt_store");
+      }
+      if (
+        typeof source.account_ref !== "string" ||
+        !REF.test(source.account_ref) ||
+        typeof source.entity_ref !== "string" ||
+        !REF.test(source.entity_ref)
+      )
+        fail("corrupt_store");
+      const requestCore = {
+        version: "p06-execution-request/1.0.0",
+        workspaceRef: source.workspace_ref,
+        accountRef: source.account_ref,
+        entityRef: source.entity_ref,
+        action: "status_pause" as const,
+        expectedBefore: { status: "ACTIVE" as const, budgetMinor: null },
+        desired: { status: "PAUSED" as const, budgetMinor: null },
+        evaluatedAt,
+        contextHash: source.context_hash,
+        effectiveGuideSetHash: source.effective_guide_set_hash,
+        resolutionHash: source.resolution_hash,
+        policyHash: source.approval_policy_hash,
+        gateSetHash,
+        admissionHash: source.admission_hash,
+        autonomyEvidenceHash: source.autonomy_evidence_hash,
+        dataHealthReportHash: source.data_health_report_hash,
+        protectionHash: source.protection_hash,
+        actionPlanHash: source.action_plan_hash,
+        route: "limited_autonomy_status" as const,
+      };
+      const requestHash = digest(requestCore);
+      const executionRef = `p06_execution_${requestHash.slice(0, 24)}`;
+      const idempotencyKey = `p06_exec_idem_${digest({ limitedAutonomyAdmissionId: input.admissionId, requestHash })}`;
+      const payload = { ...requestCore, executionRef, idempotencyKey, requestHash };
+      const inserted = one(
+        rows(
+          await tx.execute(sql`
+            insert into p06_execution_runs(
+              workspace_id,limited_autonomy_admission_id,execution_ref,idempotency_key,
+              request_hash,context_hash,effective_guide_set_hash,resolution_hash,policy_hash,
+              gate_set_hash,admission_hash,action_plan_hash,autonomy_evidence_hash,
+              data_health_report_hash,protection_hash,request_payload,route,created_at
+            ) values (
+              ${input.workspaceId}::uuid,${input.admissionId}::uuid,${executionRef},${idempotencyKey},
+              ${requestHash},${source.context_hash},${source.effective_guide_set_hash},${source.resolution_hash},
+              ${source.approval_policy_hash},${gateSetHash},${source.admission_hash},${source.action_plan_hash},
+              ${source.autonomy_evidence_hash},${source.data_health_report_hash},${source.protection_hash},
+              ${JSON.stringify(payload)}::jsonb,'limited_autonomy_status',${evaluatedAt}::timestamptz
+            ) on conflict(workspace_id,idempotency_key) do nothing returning id::text
+          `),
+        ),
+      );
+      let runId = typeof inserted?.id === "string" ? inserted.id : undefined;
+      if (!runId) {
+        const replay = one(
+          rows(
+            await tx.execute(sql`select id::text,request_hash from p06_execution_runs
+              where workspace_id=${input.workspaceId}::uuid and idempotency_key=${idempotencyKey}
+              for update limit 2`),
+          ),
+        );
+        if (!replay || replay.request_hash !== requestHash || typeof replay.id !== "string")
+          fail("conflict");
+        runId = replay.id;
+      } else {
+        await tx.execute(sql`insert into p06_execution_heads(workspace_id,execution_run_id,state,sequence,trace_sequence,updated_at)
+          values(${input.workspaceId}::uuid,${runId}::uuid,'pending',0,0,${evaluatedAt}::timestamptz)`);
+        for (const gate of normalizedGates) {
+          const receiptHash = digest({ executionRef, phase: gate.phase, sequence: gate.sequence, leaseEpoch: 0, snapshotHash: gate.snapshotHash });
+          await tx.execute(sql`insert into p06_execution_gate_snapshots(workspace_id,execution_run_id,phase,sequence,lease_epoch,
+            snapshot_hash,receipt_hash,allowlist_hash,enabled,captured_at,expires_at,payload)
+            values(${input.workspaceId}::uuid,${runId}::uuid,${gate.phase},${gate.sequence},0,${gate.snapshotHash},${receiptHash},
+              ${gate.allowlistHash},true,${gate.capturedAt}::timestamptz,${gate.expiresAt}::timestamptz,
+              ${JSON.stringify({ ...gate, receiptHash })}::jsonb)`);
+        }
+      }
+      const request: Omit<P06ExecutionV2Request, "leaseTokenHash" | "fenceHash"> = Object.freeze({
+        executionRef,
+        workspaceRef: String(source.workspace_ref),
+        accountRef: String(source.account_ref),
+        entityRef: String(source.entity_ref),
+        action: "status_pause",
+        expectedBefore: Object.freeze({ status: "ACTIVE", budgetMinor: null }),
+        desired: Object.freeze({ status: "PAUSED", budgetMinor: null }),
+        evaluatedAt,
+      });
+      return Object.freeze({ workspaceId: input.workspaceId, executionRunId: runId, executionRef, requestHash, idempotencyKey, request });
+    });
+  }
+
+  async listUnmaterializedLimitedAutonomyAdmissions(
+    limit = 25,
+  ): Promise<readonly Readonly<{ workspaceId: string; admissionId: string }>[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100)
+      fail("invalid_input");
+    const candidates = rows(await this.database.execute(sql`
+      select a.workspace_id::text workspace_id,a.id::text admission_id
+      from p06_limited_autonomy_admissions a
+      join workspaces w on w.id=a.workspace_id and w.lifecycle_state='active' and w.tombstoned_at is null
+      left join p06_execution_runs r on r.workspace_id=a.workspace_id and r.limited_autonomy_admission_id=a.id
+      where r.id is null and a.expires_at>statement_timestamp()
+      order by a.admitted_at,a.id limit ${limit}
+    `));
+    if (candidates.some((row) => typeof row.workspace_id !== "string" || !UUID.test(row.workspace_id)
+      || typeof row.admission_id !== "string" || !UUID.test(row.admission_id))) fail("corrupt_store");
+    return Object.freeze(candidates.map((row) => Object.freeze({ workspaceId: String(row.workspace_id), admissionId: String(row.admission_id) })));
+  }
+
   async listRunnable(limit = 25): Promise<readonly string[]> {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100)
       fail("invalid_input");
@@ -757,13 +923,16 @@ export class DrizzleP06ExecutionRepository {
     });
   }
 
-  async listRunnableByRoute(route: "human_approved" | "guide_budget_human_approved", limit = 25): Promise<readonly string[]> {
+  async listRunnableByRoute(route: "human_approved" | "guide_budget_human_approved" | "limited_autonomy_status", limit = 25): Promise<readonly string[]> {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) fail("invalid_input");
     const candidates = rows(await this.database.execute(sql`
       select r.execution_ref from p06_execution_runs r
       join p06_execution_heads h on h.workspace_id=r.workspace_id and h.execution_run_id=r.id
       join workspaces w on w.id=r.workspace_id and w.lifecycle_state='active' and w.tombstoned_at is null
       where r.route=${route} and (h.state='pending' or (h.state in ('claimed','running') and h.lease_expires_at<=statement_timestamp()))
+        and (${route}<>'limited_autonomy_status' or 2=(select count(*) from p06_execution_gate_snapshots gate
+          where gate.workspace_id=r.workspace_id and gate.execution_run_id=r.id and gate.lease_epoch=0
+            and gate.phase in ('staging','admission') and gate.enabled and gate.expires_at>statement_timestamp()))
       order by r.created_at,r.id limit ${limit}
     `));
     if (candidates.some((row) => typeof row.execution_ref !== "string" || !/^p06_execution_[a-f0-9]{24}$/.test(row.execution_ref))) fail("corrupt_store");

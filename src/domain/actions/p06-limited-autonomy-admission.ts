@@ -34,7 +34,7 @@ export type P06LimitedAutonomyAdmission = Readonly<{
 export function createP06LimitedAutonomyAdmission(input: Readonly<{
   memberRef: string; membershipHash: string; entityRef: string; accountRef: string; campaignRef: string;
   actionPlan: ActionPlan; contextHash: string; effectiveGuideSetHash: string; resolutionHash: string;
-  dataHealthReportHash: string; protectionHash: string; autonomyEvidenceHash: string;
+  dataHealthReportHash: string; approvalPolicyHash: string; protectionHash: string; autonomyEvidenceHash: string;
   maximumActionsPerRun: number; actionsAlreadyReserved: number; admittedAt: string; expiresAt: string;
 }>): P06LimitedAutonomyAdmission {
   const admittedAt = instant(input.admittedAt), expiresAt = instant(input.expiresAt);
@@ -59,8 +59,9 @@ export function createP06LimitedAutonomyAdmission(input: Readonly<{
     memberRef: ref(input.memberRef), membershipHash: hash(input.membershipHash), entityRef: ref(input.entityRef),
     accountRef: ref(input.accountRef), campaignRef: ref(input.campaignRef), action, expectedStatus, desiredStatus,
     contextHash: hash(input.contextHash), effectiveGuideSetHash: hash(input.effectiveGuideSetHash), resolutionHash: hash(input.resolutionHash),
-    dataHealthReportHash: hash(input.dataHealthReportHash), protectionHash: hash(input.protectionHash),
+    dataHealthReportHash: hash(input.dataHealthReportHash), approvalPolicyHash: hash(input.approvalPolicyHash), protectionHash: hash(input.protectionHash),
     autonomyEvidenceHash: hash(input.autonomyEvidenceHash), actionPlanHash: hash(input.actionPlan.planHash),
+    actionPlan: freeze(structuredClone(input.actionPlan)),
     maximumActionsPerRun: input.maximumActionsPerRun, quotaOrdinal: input.actionsAlreadyReserved + 1,
     admittedAt, expiresAt, authority,
   };

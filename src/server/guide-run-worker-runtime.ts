@@ -13,6 +13,10 @@ import {
 } from "@/connectors/guides/guide-run-action-binding-drizzle-repository";
 import { DrizzleGuideRunFrozenScopeRepository } from "@/connectors/guides/guide-run-frozen-scope-drizzle-repository";
 import { DrizzleGuideLifecycleRepository } from "@/connectors/guides/guide-lifecycle-drizzle-repository";
+import { DrizzleGuideRunCandidateStagingContextRepository } from "@/connectors/guides/guide-run-candidate-staging-context-drizzle-repository";
+import { DrizzleGuideRunEffectiveOverlapRepository } from "@/connectors/guides/guide-run-effective-overlap-drizzle";
+import { DrizzleOperationReadRepository } from "@/connectors/operations/operation-read-drizzle-repository";
+import { DrizzleP06LimitedAutonomyAdmissionRepository } from "@/connectors/actions/p06-limited-autonomy-admission-drizzle-repository";
 import { planScheduledGuideRuns } from "@/domain/guides/guide-run-scheduler";
 import type { GuideRevision } from "@/domain/guides/guide-revision";
 import { sql } from "drizzle-orm";
@@ -33,6 +37,9 @@ export interface GuideRunActiveSchedulePort {
   listActiveSchedules(
     input: Readonly<{ now: string }>,
   ): Promise<readonly ActiveGuideSchedule[]>;
+}
+export interface GuideRunLimitedAutonomyAdmissionPort {
+  reserve(input: Readonly<{ workspaceId: string; runRef: string }>): Promise<Readonly<{ admissionId: string; admissionHash: string; quotaOrdinal: number; replay: boolean }>>;
 }
 
 /** Production loader: only a non-tombstoned Guide whose exact revision is the
@@ -96,6 +103,7 @@ export function createGuideRunWorker(
     /** Optional until the server installs the canonical P06 staging composition.
      * Its absence is fail-closed: no action binding is materialized. */
     candidateActionStaging?: GuideRunCandidateActionStagingPort;
+    limitedAutonomyAdmissions?: GuideRunLimitedAutonomyAdmissionPort;
   }>,
 ) {
   const persistence = new DrizzleGuideRunRepository(input.database);
@@ -117,6 +125,7 @@ export function createGuideRunWorker(
           input.candidateActionStaging,
         )
       : null,
+    limitedAutonomyAdmissions: input.limitedAutonomyAdmissions ?? null,
   });
 }
 
@@ -132,13 +141,20 @@ export function createGuideRunSchedulerWorker(
     holisticAnalysis: GuideRunHolisticAgentPort;
     dataHealth: GuideRunTrustedDataHealthPort;
     candidateActionStaging?: GuideRunCandidateActionStagingPort;
+    limitedAutonomyAdmissions?: GuideRunLimitedAutonomyAdmissionPort;
   }>,
 ): GuideRunSchedulerWorker {
   // Scheduler runs span tenants; scope identity is therefore derived from the
   // persisted run/revision chain, never from an injected fixed-workspace port.
+  const database = input.database as Database;
+  const overlap = new DrizzleGuideRunEffectiveOverlapRepository(database);
+  const contexts = new DrizzleGuideRunCandidateStagingContextRepository(database, overlap);
+  const limitedAutonomyAdmissions = input.limitedAutonomyAdmissions
+    ?? new DrizzleP06LimitedAutonomyAdmissionRepository(database, contexts, new DrizzleOperationReadRepository(database));
   const worker = createGuideRunWorker({
     ...input,
     frozenScopes: new DrizzleGuideRunFrozenScopeRepository(input.database),
+    limitedAutonomyAdmissions,
   });
   return new GuideRunSchedulerWorker(
     worker,
@@ -253,11 +269,12 @@ export class GuideRunSchedulerWorker {
       });
       // Materialization is post-disposition only. The repository re-reads the
       // immutable artifact and refuses legacy/non-stageable candidates.
-      if (this.worker.actionBindings && complete.disposition.state === "staged")
-        await this.worker.actionBindings.bind({
-          workspaceId: entry.workspaceId,
-          runRef: complete.run.runRef,
-        });
+      if (complete.disposition.state === "staged") {
+        if (complete.disposition.candidate?.routing === "human_approval" && this.worker.actionBindings)
+          await this.worker.actionBindings.bind({ workspaceId: entry.workspaceId, runRef: complete.run.runRef });
+        if (complete.disposition.candidate?.routing === "limited_autonomy_review" && this.worker.limitedAutonomyAdmissions)
+          await this.worker.limitedAutonomyAdmissions.reserve({ workspaceId: entry.workspaceId, runRef: complete.run.runRef });
+      }
       outputs.push(
         Object.freeze({
           runRef: complete.run.runRef,

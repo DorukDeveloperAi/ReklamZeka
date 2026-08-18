@@ -15,8 +15,9 @@ const request = Object.freeze({
 
 describe("P06 status dispatch authority", () => {
   it("admits exactly one current tenant-bound authority row", async () => {
-    const execute = vi.fn(async () => ({
-      rows: [
+    const execute = vi.fn()
+      .mockResolvedValueOnce({ rows: [{ route: "human_approved" }] })
+      .mockResolvedValueOnce({ rows: [
         {
           authorized_at: "2026-08-18T10:05:00.000Z",
           request_hash: "1".repeat(64),
@@ -34,8 +35,7 @@ describe("P06 status dispatch authority", () => {
           grant_hash: "7".repeat(64),
           connection_generation: 2,
         },
-      ],
-    }));
+      ] });
     const repository = new DrizzleP06StatusExecutionDispatchAuthorityRepository({
       transaction: vi.fn(async (work) => work({ execute } as never)),
     } as never, {
@@ -60,7 +60,7 @@ describe("P06 status dispatch authority", () => {
 
     expect(result.allowed).toBe(true);
     expect(result.authorityHash).toMatch(/^[a-f0-9]{64}$/);
-    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 
   it("fails closed for absent, ambiguous, or invalid execution authority", async () => {

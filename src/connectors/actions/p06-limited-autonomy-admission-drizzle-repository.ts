@@ -107,15 +107,16 @@ export class DrizzleP06LimitedAutonomyAdmissionRepository {
       if (!Number.isSafeInteger(reserved) || reserved >= cap) fail("quota_exhausted");
       const admission = createP06LimitedAutonomyAdmission({ memberRef, membershipHash, entityRef, accountRef: context.accountRef, campaignRef: context.campaignRef,
         actionPlan, contextHash: context.contextHash, effectiveGuideSetHash: context.effectiveGuideSetHash, resolutionHash: context.resolutionHash,
-        dataHealthReportHash: context.dataHealthReportHash, protectionHash: digest(context.protection), autonomyEvidenceHash,
+        dataHealthReportHash: context.dataHealthReportHash, approvalPolicyHash: context.approvalPolicyHash,
+        protectionHash: digest(context.protection), autonomyEvidenceHash,
         maximumActionsPerRun: cap, actionsAlreadyReserved: reserved, admittedAt, expiresAt: new Date(Date.parse(admittedAt) + 300_000).toISOString() });
       const payload = admission.payload as Record<string, unknown>;
       const inserted = required(one((await tx.execute(sql`insert into p06_limited_autonomy_admissions(workspace_id,run_id,guide_revision_id,disposition_artifact_id,
         member_ref,membership_hash,entity_ref,account_ref,campaign_ref,action_type,expected_status,desired_status,context_hash,effective_guide_set_hash,resolution_hash,
-        data_health_report_hash,protection_hash,autonomy_evidence_hash,action_plan_hash,maximum_actions_per_run,quota_ordinal,admitted_at,expires_at,admission_hash,admission_payload)
+        data_health_report_hash,approval_policy_hash,protection_hash,autonomy_evidence_hash,action_plan_hash,maximum_actions_per_run,quota_ordinal,admitted_at,expires_at,admission_hash,admission_payload)
         values(${input.workspaceId}::uuid,${text(source,"run_id")}::uuid,${text(source,"guide_revision_id")}::uuid,${text(source,"artifact_id")}::uuid,
           ${memberRef},${membershipHash},${entityRef},${context.accountRef},${context.campaignRef},'status_pause','ACTIVE','PAUSED',${context.contextHash},${context.effectiveGuideSetHash},${context.resolutionHash},
-          ${context.dataHealthReportHash},${digest(context.protection)},${autonomyEvidenceHash},${actionPlan.planHash},${cap},${reserved+1},${admittedAt}::timestamptz,${String(payload.expiresAt)}::timestamptz,
+          ${context.dataHealthReportHash},${context.approvalPolicyHash},${digest(context.protection)},${autonomyEvidenceHash},${actionPlan.planHash},${cap},${reserved+1},${admittedAt}::timestamptz,${String(payload.expiresAt)}::timestamptz,
           ${admission.admissionHash},${JSON.stringify(payload)}::jsonb) returning id::text,admission_hash,quota_ordinal`)).rows as Row[]), "conflict");
       return Object.freeze({ admissionId: text(inserted,"id"), admissionHash: text(inserted,"admission_hash"), quotaOrdinal: Number(inserted.quota_ordinal), replay: false });
     });

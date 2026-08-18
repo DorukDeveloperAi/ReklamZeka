@@ -170,7 +170,33 @@ export function createP06StatusExecutionRuntime(
     writer: new P06MetaStatusWriter(token, fetch, { now }),
   });
   const scheduler = new P06StatusExecutionSchedulerWorker({
-    repository: { listRunnable: (limit) => repository.listRunnableByRoute("human_approved", limit) },
+    repository: { listRunnable: async (limit) => {
+      const boundedLimit = limit ?? 25;
+      const admissions = await repository.listUnmaterializedLimitedAutonomyAdmissions(boundedLimit);
+      for (const admission of admissions) {
+        const evaluatedAt = now().toISOString();
+        const base = Date.parse(evaluatedAt);
+        const gates = [
+          initialGate(environment, "staging", new Date(base - 2).toISOString()),
+          initialGate(environment, "admission", new Date(base - 1).toISOString()),
+        ] as const;
+        if (!gates.every((gate) => gate.enabled)) continue;
+        try {
+          await repository.createLimitedAutonomyStatus({
+            workspaceId: admission.workspaceId,
+            admissionId: admission.admissionId,
+            evaluatedAt,
+            gates,
+          });
+        } catch {
+          // A stale/current-policy/context rejection is a closed hold. The
+          // immutable admission remains inspectable and no execution is made.
+        }
+      }
+      const human = await repository.listRunnableByRoute("human_approved", boundedLimit);
+      const limited = await repository.listRunnableByRoute("limited_autonomy_status", Math.max(1, boundedLimit - human.length));
+      return Object.freeze([...human, ...limited].slice(0, boundedLimit));
+    } },
     worker,
     now,
   });

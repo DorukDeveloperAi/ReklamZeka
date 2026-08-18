@@ -46,6 +46,31 @@ const gates: readonly P06ExecutionGateSeed[] = [
 })) as readonly P06ExecutionGateSeed[];
 
 describe("DrizzleP06ExecutionRepository", () => {
+  it("materializes a limited-autonomy admission without decision, grant, or ActionUnit authority", async () => {
+    const execute = vi.fn()
+      .mockResolvedValueOnce({ rows: [{
+        admission_id: id("11"), admission_hash: "1".repeat(64), account_ref: "act_123",
+        entity_ref: "adset_external_1", context_hash: "2".repeat(64),
+        effective_guide_set_hash: "3".repeat(64), resolution_hash: "4".repeat(64),
+        approval_policy_hash: "5".repeat(64), autonomy_evidence_hash: "6".repeat(64),
+        data_health_report_hash: "7".repeat(64), protection_hash: "8".repeat(64),
+        action_plan_hash: "9".repeat(64), expected_status: "ACTIVE", desired_status: "PAUSED",
+        workspace_ref: "workspace_alpha",
+      }] })
+      .mockResolvedValueOnce({ rows: [{ id: id("12") }] })
+      .mockResolvedValue({ rows: [] });
+    const database = { execute, transaction: async (callback: (tx: { execute: typeof execute }) => Promise<unknown>) => callback({ execute }) };
+    const created = await new DrizzleP06ExecutionRepository(database as never).createLimitedAutonomyStatus({
+      workspaceId: id("10"), admissionId: id("11"), evaluatedAt, gates: gates.slice(0, 2),
+    });
+    expect(created.request).toMatchObject({ action: "status_pause", expectedBefore: { status: "ACTIVE" }, desired: { status: "PAUSED" } });
+    const rendered = execute.mock.calls.map(([query]) => sqlText(query)).join("\n");
+    expect(rendered).toContain("limited_autonomy_status");
+    expect(rendered).toContain("p06_limited_autonomy_admissions");
+    expect(rendered).not.toMatch(/decision_event_id[^,)]*\$|approval_grant_id[^,)]*\$|action_unit_id[^,)]*\$/i);
+    expect(rendered).not.toMatch(/fetch\(|authorization|access_token/i);
+  });
+
   it("materializes a persisted Guide budget admission without accepting caller plan or target data", async () => {
     const unitHash = "9".repeat(64);
     const actionPlan = buildActionPlan({ kind: "budget_change", entity: { level: "adset", ref: "adset_external_1" },

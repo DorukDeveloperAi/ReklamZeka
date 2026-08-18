@@ -13,9 +13,10 @@ const evidence = { mode: "pre_outer_rollback", migrationHash, installedOuterRoll
 const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 30_000 });
 const client = await pool.connect();
 try {
-  const before = await client.query<{ objects: number; ledger: number }>(`select
+  const before = await client.query<{ objects: number; ledger: number; helper: number }>(`select
     (select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname='p06_limited_autonomy_admissions') objects,
-    (select count(*)::int from drizzle.__drizzle_migrations where hash=$1) ledger`, [migrationHash]);
+    (select count(*)::int from drizzle.__drizzle_migrations where hash=$1) ledger,
+    (select count(*)::int from pg_proc where oid=to_regprocedure('public.p06_jsonb_object_key_count(jsonb)')) helper`, [migrationHash]);
   if (before.rows[0]?.objects !== 0 || before.rows[0]?.ledger !== 0) throw new Error("P06 autonomy PRE target fresh değil");
   evidence.unjournaled = true;
   await client.query("begin");
@@ -39,10 +40,11 @@ try {
   if (!Object.entries(evidence).filter(([key]) => !["mode","migrationHash","zeroResidue"].includes(key)).every(([,value]) => value === true))
     throw new Error(`P06 autonomy catalog PRE başarısız: ${JSON.stringify(evidence)}`);
   await client.query("rollback");
-  const residue = await client.query<{ count: number }>(`select
-    (select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname='p06_limited_autonomy_admissions')
-    +(select count(*)::int from pg_proc where oid=to_regprocedure('public.p06_limited_autonomy_admission_guard()')) count`);
-  evidence.zeroResidue = residue.rows[0]?.count === 0;
+  const residue = await client.query<{ objects: number; guard: number; helper: number }>(`select
+    (select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname='p06_limited_autonomy_admissions') objects,
+    (select count(*)::int from pg_proc where oid=to_regprocedure('public.p06_limited_autonomy_admission_guard()')) guard,
+    (select count(*)::int from pg_proc where oid=to_regprocedure('public.p06_jsonb_object_key_count(jsonb)')) helper`);
+  evidence.zeroResidue = residue.rows[0]?.objects === 0 && residue.rows[0]?.guard === 0 && residue.rows[0]?.helper === before.rows[0]?.helper;
   if (!evidence.zeroResidue) throw new Error("P06 autonomy PRE residue bıraktı");
   console.log(JSON.stringify(evidence));
 } catch (error) {

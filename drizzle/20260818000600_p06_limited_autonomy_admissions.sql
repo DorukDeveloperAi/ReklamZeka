@@ -1,6 +1,11 @@
 -- PRE-ONLY. Durable, non-executable limited-autonomy admission and atomic
 -- per-Guide-run quota reservation. This migration grants no Meta authority.
 
+CREATE OR REPLACE FUNCTION public.p06_jsonb_object_key_count(value jsonb) RETURNS integer
+LANGUAGE sql IMMUTABLE STRICT SECURITY INVOKER SET search_path=''
+AS $$ SELECT count(*)::integer FROM jsonb_object_keys(value) $$;
+REVOKE ALL ON FUNCTION public.p06_jsonb_object_key_count(jsonb) FROM PUBLIC,anon,authenticated,service_role;
+
 CREATE TABLE public.p06_limited_autonomy_admissions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id uuid NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
@@ -19,6 +24,7 @@ CREATE TABLE public.p06_limited_autonomy_admissions (
   effective_guide_set_hash text NOT NULL,
   resolution_hash text NOT NULL,
   data_health_report_hash text NOT NULL,
+  approval_policy_hash text NOT NULL,
   protection_hash text NOT NULL,
   autonomy_evidence_hash text NOT NULL,
   action_plan_hash text NOT NULL,
@@ -37,7 +43,7 @@ CREATE TABLE public.p06_limited_autonomy_admissions (
     REFERENCES public.guide_runs(workspace_id,id,guide_revision_id) ON DELETE CASCADE,
   CONSTRAINT p06_limited_autonomy_admissions_artifact_fk FOREIGN KEY(workspace_id,disposition_artifact_id)
     REFERENCES public.guide_run_artifacts(workspace_id,id) ON DELETE RESTRICT,
-  CONSTRAINT p06_limited_autonomy_admissions_contract CHECK (
+  CONSTRAINT p06_limited_autonomy_admissions_contract CHECK ((
     member_ref ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
     AND membership_hash ~ '^[a-f0-9]{64}$'
     AND entity_ref ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
@@ -46,6 +52,7 @@ CREATE TABLE public.p06_limited_autonomy_admissions (
     AND action_type='status_pause' AND expected_status='ACTIVE' AND desired_status='PAUSED'
     AND context_hash ~ '^[a-f0-9]{64}$' AND effective_guide_set_hash ~ '^[a-f0-9]{64}$'
     AND resolution_hash ~ '^[a-f0-9]{64}$' AND data_health_report_hash ~ '^[a-f0-9]{64}$'
+    AND approval_policy_hash ~ '^[a-f0-9]{64}$'
     AND protection_hash ~ '^[a-f0-9]{64}$' AND autonomy_evidence_hash ~ '^[a-f0-9]{64}$'
     AND action_plan_hash ~ '^[a-f0-9]{64}$' AND admission_hash ~ '^[a-f0-9]{64}$'
     AND maximum_actions_per_run BETWEEN 1 AND 1000000
@@ -53,6 +60,10 @@ CREATE TABLE public.p06_limited_autonomy_admissions (
     AND expires_at>admitted_at AND expires_at<=admitted_at+interval '1 hour'
     AND version='p06-limited-autonomy-admission/1.0.0'
     AND jsonb_typeof(admission_payload)='object' AND octet_length(admission_payload::text)<=32768
+    AND public.p06_jsonb_object_key_count(admission_payload)=24
+    AND admission_payload ?& ARRAY['version','memberRef','membershipHash','entityRef','accountRef','campaignRef','action','expectedStatus','desiredStatus',
+      'contextHash','effectiveGuideSetHash','resolutionHash','dataHealthReportHash','approvalPolicyHash','protectionHash','autonomyEvidenceHash','actionPlanHash','actionPlan',
+      'maximumActionsPerRun','quotaOrdinal','admittedAt','expiresAt','authority','admissionHash']
     AND admission_payload::text !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
     AND admission_payload->>'version'=version AND admission_payload->>'admissionHash'=admission_hash
     AND admission_payload->>'action'=action_type AND admission_payload->>'memberRef'=member_ref
@@ -63,9 +74,25 @@ CREATE TABLE public.p06_limited_autonomy_admissions (
     AND admission_payload->>'effectiveGuideSetHash'=effective_guide_set_hash
     AND admission_payload->>'resolutionHash'=resolution_hash
     AND admission_payload->>'dataHealthReportHash'=data_health_report_hash
+    AND admission_payload->>'approvalPolicyHash'=approval_policy_hash
     AND admission_payload->>'protectionHash'=protection_hash
     AND admission_payload->>'autonomyEvidenceHash'=autonomy_evidence_hash
     AND admission_payload->>'actionPlanHash'=action_plan_hash
+    AND jsonb_typeof(admission_payload->'actionPlan')='object'
+    AND admission_payload#>>'{actionPlan,planHash}'=action_plan_hash
+    AND admission_payload#>>'{actionPlan,actionType}'=action_type
+    AND admission_payload#>>'{actionPlan,risk}'='K2'
+    AND admission_payload#>>'{actionPlan,disposition}'='policy_limited_candidate'
+    AND admission_payload#>>'{actionPlan,effectiveAutonomy}'='policy_limited'
+    AND admission_payload#>>'{actionPlan,action,kind}'='status_change'
+    AND admission_payload#>>'{actionPlan,action,entity,level}'='adset'
+    AND admission_payload#>>'{actionPlan,action,entity,ref}'=entity_ref
+    AND admission_payload#>>'{actionPlan,action,fromStatus}'=expected_status
+    AND admission_payload#>>'{actionPlan,action,toStatus}'=desired_status
+    AND admission_payload#>>'{actionPlan,capabilities,canExecute}'='false'
+    AND admission_payload#>>'{actionPlan,capabilities,canWriteMeta}'='false'
+    AND admission_payload#>>'{actionPlan,capabilities,canGrantApproval}'='false'
+    AND admission_payload#>>'{actionPlan,capabilities,canAccessRawGraph}'='false'
     AND (admission_payload->>'maximumActionsPerRun')::integer=maximum_actions_per_run
     AND (admission_payload->>'quotaOrdinal')::integer=quota_ordinal
     AND (admission_payload->>'admittedAt')::timestamptz=admitted_at
@@ -74,7 +101,8 @@ CREATE TABLE public.p06_limited_autonomy_admissions (
     AND admission_payload#>>'{authority,canExecute}'='false'
     AND admission_payload#>>'{authority,canWriteMeta}'='false'
     AND admission_payload#>>'{authority,canDispatchNetwork}'='false'
-  )
+    AND public.p06_jsonb_object_key_count(admission_payload->'authority')=4
+  ) IS TRUE)
 );
 
 CREATE INDEX p06_limited_autonomy_admissions_run_fk_idx ON public.p06_limited_autonomy_admissions(workspace_id,run_id,guide_revision_id);
@@ -142,7 +170,7 @@ BEGIN
   ), exact_rules AS (
     SELECT * FROM latest WHERE state='published' AND mode='policy_limited' AND NOT kill_switch
       AND effective_from<=NEW.admitted_at AND (expires_at IS NULL OR expires_at>NEW.admitted_at)
-      AND ((scope_level='workspace' AND scope_ref=r.run_payload->>'workspaceRef' AND action_type IS NULL)
+      AND ((scope_level='workspace' AND scope_ref=h.run_payload->>'workspaceRef' AND action_type IS NULL)
         OR (scope_level='action_type' AND scope_ref IS NULL AND action_type=NEW.action_type))
   ) SELECT count(*),min(maximum_actions_per_run),public.guide_run_sha256(jsonb_build_object('ruleHashes',jsonb_agg(canonical_hash ORDER BY canonical_hash)))
     INTO rule_count,rule_cap,rule_hash FROM exact_rules;
@@ -152,7 +180,9 @@ BEGIN
 
   SELECT count(*) INTO reserved FROM public.p06_limited_autonomy_admissions WHERE workspace_id=NEW.workspace_id AND run_id=NEW.run_id;
   IF NEW.quota_ordinal IS DISTINCT FROM reserved+1 OR reserved>=rule_cap THEN RAISE EXCEPTION 'limited autonomy quota exhausted'; END IF;
-  IF NEW.admission_hash IS DISTINCT FROM public.guide_run_sha256(NEW.admission_payload-'admissionHash') THEN RAISE EXCEPTION 'limited autonomy admission hash invalid'; END IF;
+  IF NEW.action_plan_hash IS DISTINCT FROM public.guide_run_sha256((NEW.admission_payload->'actionPlan')-'planHash'::text)
+    OR NEW.admission_hash IS DISTINCT FROM public.guide_run_sha256(NEW.admission_payload-'admissionHash'::text)
+  THEN RAISE EXCEPTION 'limited autonomy admission hash invalid'; END IF;
   RETURN NEW;
 END $$;
 
