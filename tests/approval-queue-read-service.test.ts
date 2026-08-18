@@ -116,4 +116,16 @@ describe("Approval Queue public read service", () => {
     expect(Object.isFrozen(result.items[0]!.dependencies)).toBe(true);
     expect(Object.isFrozen(result.items[0]!.dependencies[0])).toBe(true);
   });
+
+  it("projects a human-only rename as an exact public before/after name change", async () => {
+    const source = record({ actionType: "campaign_rename", risk: "K3",
+      beforeAfter: { field: "entity_name", before: "Prospecting | Eski", after: "Prospecting | Yeni" } });
+    await expect(new ApprovalQueueReadService(repository([source])).list({ workspaceId })).resolves.toMatchObject({
+      items: [{ actionType: "campaign_rename", risk: "K3",
+        beforeAfter: { field: "entity_name", before: "Prospecting | Eski", after: "Prospecting | Yeni" } }],
+    });
+    await expect(new ApprovalQueueReadService(repository([{ ...source,
+      beforeAfter: { field: "entity_name", before: "Aynı", after: "Aynı" } }])).list({ workspaceId }))
+      .rejects.toEqual(expect.objectContaining({ code: "unsafe_source" }));
+  });
 });

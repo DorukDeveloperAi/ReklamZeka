@@ -84,6 +84,17 @@ describe("ActionGuardrailPolicy lifecycle", () => {
     const forged = { ...publish(), provenance: { ...publish().provenance, sourceGuidanceRefs: ["guidance_forged"] } };
     expect(() => assertValidActionGuardrailPolicyRevision(forged)).toThrowError(expect.objectContaining({ code: "corrupt_registry" }));
   });
+
+  it("admits rename selectors only as protection evidence and can deny the human proposal", () => {
+    const renameDraft = draft({ selector: selector({ actionTypes: ["campaign_rename"], campaignRefs: ["campaign_leads"] }),
+      clauses: [{ clauseRef: "clause_rename_deny", kind: "deny_action" }] });
+    const rename = publish(renameDraft);
+    const resolved = resolveProtection(input([renameDraft, rename], { action: { actionHash: h("d"), actionType: "campaign_rename",
+      accountRef: "account_doruk", campaignRef: "campaign_leads", entity: { level: "campaign", ref: "campaign_leads" }, budgetChange: null } }));
+    expect(resolved).toMatchObject({ disposition: "denied",
+      policyEvidence: [{ policyRef: rename.policyRef, clauseRefs: ["clause_rename_deny"] }],
+      capabilities: { canApprove: false, canExecute: false, canWriteMeta: false } });
+  });
 });
 
 describe("ProtectionResolver", () => {

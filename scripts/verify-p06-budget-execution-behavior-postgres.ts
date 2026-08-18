@@ -120,7 +120,7 @@ try {
     if (!state.decisionRef || !state.grant) throw new Error("budget approval evidence missing");
     const admission = admitActionExecution({ lifecycle: decided.lifecycle, unitRef: unit.unitRef, actionPlan,
       eligibilitySnapshot: { workspaceRef, accountRef, capturedAt: at, target: { entityLevel: "adset", entityRef,
-        configuredStatus: "ACTIVE", effectiveStatus: "ACTIVE", budgetOwnerRef: entityRef },
+        configuredStatus: "ACTIVE", effectiveStatus: "ACTIVE", budgetOwnerRef: entityRef, currentName: "Verifier Ad Set" },
         ancestors: [{ entityLevel: "campaign", entityRef: campaignRef, configuredStatus: "ACTIVE", effectiveStatus: "ACTIVE" }],
         sourceSnapshotHash: "7".repeat(64) },
       currentFreshness: [{ unitRef: unit.unitRef, planRevision: unit.plan.revision, planHash: unit.plan.planHash,

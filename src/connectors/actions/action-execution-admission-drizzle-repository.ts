@@ -43,10 +43,13 @@ type SourceRow = Readonly<{
   ad_ref: string | null;
   campaign_configured_status: string | null;
   campaign_effective_status: string | null;
+  campaign_name: string | null;
   ad_set_configured_status: string | null;
   ad_set_effective_status: string | null;
+  ad_set_name: string | null;
   target_configured_status: string | null;
   target_effective_status: string | null;
+  target_name: string | null;
   campaign_budget_optimization: boolean | null;
   source_snapshot_hash: string | null;
   source_snapshot_captured_at: string | null;
@@ -107,16 +110,17 @@ function currentMirrorSnapshot(source: SourceRow, spec: ReturnType<typeof create
   if (!source.source_snapshot_hash || !HASH.test(source.source_snapshot_hash) || Date.parse(sourceCapturedAt) > Date.parse(capturedAt)
     || !REF.test(source.account_ref)) throw new ActionExecutionAdmissionRepositoryError("source_corrupt");
   const targetSource = spec.target.entityLevel === "campaign"
-    ? { ref: source.campaign_ref, configuredStatus: source.campaign_configured_status, effectiveStatus: source.campaign_effective_status }
+    ? { ref: source.campaign_ref, configuredStatus: source.campaign_configured_status, effectiveStatus: source.campaign_effective_status, name: source.campaign_name }
     : spec.target.entityLevel === "adset"
-      ? { ref: source.ad_set_ref, configuredStatus: source.ad_set_configured_status, effectiveStatus: source.ad_set_effective_status }
-      : { ref: source.ad_ref, configuredStatus: source.target_configured_status, effectiveStatus: source.target_effective_status };
-  if (targetSource.ref !== source.entity_ref) throw new ActionExecutionAdmissionRepositoryError("source_corrupt");
+      ? { ref: source.ad_set_ref, configuredStatus: source.ad_set_configured_status, effectiveStatus: source.ad_set_effective_status, name: source.ad_set_name }
+      : { ref: source.ad_ref, configuredStatus: source.target_configured_status, effectiveStatus: source.target_effective_status, name: source.target_name };
+  if (targetSource.ref !== source.entity_ref || typeof targetSource.name !== "string") throw new ActionExecutionAdmissionRepositoryError("source_corrupt");
   const target = Object.freeze({
     entityLevel: spec.target.entityLevel,
     entityRef: source.entity_ref,
     configuredStatus: status(targetSource.configuredStatus),
     effectiveStatus: status(targetSource.effectiveStatus),
+    currentName: targetSource.name,
     budgetOwnerRef: spec.target.entityLevel === "campaign"
       ? source.campaign_budget_optimization === true ? source.entity_ref : null
       : spec.target.entityLevel === "adset"
@@ -160,6 +164,7 @@ export class DrizzleActionExecutionAdmissionRepository {
           campaign.external_campaign_id as campaign_ref, ad_set.external_ad_set_id as ad_set_ref, ad.external_ad_id as ad_ref,
           ad.configured_status as target_configured_status, ad.effective_status as target_effective_status,
           campaign.configured_status as campaign_configured_status, campaign.effective_status as campaign_effective_status,
+          campaign.name as campaign_name, ad_set.name as ad_set_name, ad.name as target_name,
           ad_set.configured_status as ad_set_configured_status, ad_set.effective_status as ad_set_effective_status,
           campaign.campaign_budget_optimization, snapshot.snapshot_hash as source_snapshot_hash,
           to_char(snapshot.captured_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as source_snapshot_captured_at,

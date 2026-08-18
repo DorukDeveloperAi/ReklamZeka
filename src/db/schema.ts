@@ -5647,7 +5647,8 @@ export const actionProposalUnits = pgTable("action_proposal_units", {
     and ${table.entityRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
     and ${table.requesterRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
     and ${table.requesterRole} in ('owner', 'admin', 'operator', 'analyst', 'agent')
-    and ${table.actionType} in ('internal_annotation', 'status_pause', 'status_activate', 'budget_decrease', 'budget_increase', 'existing_post_promotion')
+    and ${table.actionType} in ('internal_annotation', 'status_pause', 'status_activate', 'budget_decrease', 'budget_increase', 'existing_post_promotion',
+      'campaign_rename', 'adset_rename', 'ad_rename')
   `),
   check("action_proposal_units_hash_formats", sql`
     ${table.unitHash} ~ '^[a-f0-9]{64}$'
@@ -6739,8 +6740,8 @@ export const actionGuardrailPolicyRevisions = pgTable("action_guardrail_policy_r
         and ${table.disabledAt} is not null and ${table.disabledAt} >= ${table.publishedAt}))
   `),
   check("action_guardrail_policy_revisions_selector_clauses", sql`
-    jsonb_typeof(${table.actionTypes}) = 'array' and jsonb_array_length(${table.actionTypes}) between 1 and 5
-    and not jsonb_path_exists(${table.actionTypes}, '$[*] ? (@ != "status_pause" && @ != "status_activate" && @ != "budget_decrease" && @ != "budget_increase" && @ != "existing_post_promotion")')
+    jsonb_typeof(${table.actionTypes}) = 'array' and jsonb_array_length(${table.actionTypes}) between 1 and 8
+    and not jsonb_path_exists(${table.actionTypes}, '$[*] ? (@ != "status_pause" && @ != "status_activate" && @ != "budget_decrease" && @ != "budget_increase" && @ != "existing_post_promotion" && @ != "campaign_rename" && @ != "adset_rename" && @ != "ad_rename")')
     and jsonb_typeof(${table.accountRefs}) = 'array' and jsonb_array_length(${table.accountRefs}) <= 500
     and jsonb_typeof(${table.campaignRefs}) = 'array' and jsonb_array_length(${table.campaignRefs}) <= 500
     and jsonb_typeof(${table.entities}) = 'array' and jsonb_array_length(${table.entities}) <= 500
@@ -6850,6 +6851,9 @@ export const approvalPolicyDefinitionRevisions = pgTable("approval_policy_defini
     or (${table.actionType} = 'budget_increase' and ${table.risk} = 'K3')
     or (${table.actionType} = 'status_pause' and ${table.risk} = 'K2')
     or (${table.actionType} = 'status_activate' and ${table.risk} = 'K3')
+    or (${table.actionType} = 'campaign_rename' and ${table.risk} = 'K3')
+    or (${table.actionType} = 'adset_rename' and ${table.risk} = 'K3')
+    or (${table.actionType} = 'ad_rename' and ${table.risk} = 'K3')
   `),
   check("approval_policy_definition_revisions_lifecycle", sql`
     ${table.state} in ('draft', 'published', 'disabled')

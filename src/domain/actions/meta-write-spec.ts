@@ -19,14 +19,16 @@ export type MetaWriteSpec = Readonly<{
   unitRef: string;
   unitHash: string;
   actionPlanHash: string;
-  actionType: "status_pause" | "status_activate" | "budget_decrease" | "budget_increase";
+  actionType: "status_pause" | "status_activate" | "budget_decrease" | "budget_increase"
+    | "campaign_rename" | "adset_rename" | "ad_rename";
   target: Readonly<{
     entityLevel: "campaign" | "adset" | "ad";
     entityRef: string;
   }>;
   mutation:
     | Readonly<{ kind: "status"; desiredStatus: "ACTIVE" | "PAUSED" }>
-    | Readonly<{ kind: "budget"; budgetKind: "daily" | "lifetime"; currency: string; desiredDecimal: string }>;
+    | Readonly<{ kind: "budget"; budgetKind: "daily" | "lifetime"; currency: string; desiredDecimal: string }>
+    | Readonly<{ kind: "rename"; previousName: string; desiredName: string; namingEvidenceRef: string }>;
   requiresSeparateExecutionGrant: true;
   capabilities: Readonly<{ canExecute: false; canWriteMeta: false; canAccessRawGraph: false }>;
   specHash: string;
@@ -108,6 +110,15 @@ function mutationFor(actionType: ActionType, action: TypedActionIntent): MetaWri
       || (actionType === "budget_increase" && afterValue <= beforeValue)) fail("invalid_plan");
     return Object.freeze({ kind: "budget", budgetKind: action.budgetKind, currency: action.currency, desiredDecimal: action.afterDecimal });
   }
+  if (actionType === "campaign_rename" || actionType === "adset_rename" || actionType === "ad_rename") {
+    const level = actionType === "campaign_rename" ? "campaign" : actionType === "adset_rename" ? "adset" : "ad";
+    if (action.kind !== "rename" || action.entity.level !== level || action.beforeName === action.afterName
+      || action.beforeName !== action.beforeName.trim() || action.afterName !== action.afterName.trim()
+      || action.beforeName.length < 1 || action.beforeName.length > 255 || action.afterName.length < 1
+      || action.afterName.length > 255 || /[\u0000-\u001f\u007f]/.test(action.beforeName + action.afterName)) fail("invalid_plan");
+    return Object.freeze({ kind: "rename", previousName: action.beforeName, desiredName: action.afterName,
+      namingEvidenceRef: ref(action.namingEvidenceRef, "invalid_plan") });
+  }
   fail("unsupported_action");
 }
 
@@ -121,7 +132,8 @@ export function createMetaWriteSpec(input: Readonly<{ unitRef: string; unitHash:
   const unitRef = ref(input.unitRef, "invalid_input");
   const unitHash = digest(input.unitHash, "invalid_input");
   const actionPlan = validatePlan(input.actionPlan);
-  const supported = ["status_pause", "status_activate", "budget_decrease", "budget_increase"] as const;
+  const supported = ["status_pause", "status_activate", "budget_decrease", "budget_increase",
+    "campaign_rename", "adset_rename", "ad_rename"] as const;
   if (!supported.includes(actionPlan.actionType as (typeof supported)[number])) fail("unsupported_action");
   const actionType = actionPlan.actionType as (typeof supported)[number];
   const target = Object.freeze({ entityLevel: actionPlan.action.entity.level, entityRef: ref(actionPlan.action.entity.ref, "invalid_plan") });

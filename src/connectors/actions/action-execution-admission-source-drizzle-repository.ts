@@ -45,6 +45,11 @@ function text(value: unknown): string {
   if (typeof value !== "string" || !REF.test(value)) throw new ActionExecutionAdmissionSourceRepositoryError("source_corrupt");
   return value;
 }
+function name(value: unknown): string {
+  if (typeof value !== "string" || value !== value.trim() || value.length < 1 || value.length > 255
+    || /[\u0000-\u001f\u007f]/.test(value)) throw new ActionExecutionAdmissionSourceRepositoryError("source_corrupt");
+  return value;
+}
 
 /**
  * Read-only bridge from immutable proposal/approval rows to the current Meta
@@ -73,10 +78,10 @@ export class DrizzleActionExecutionAdmissionSourceRepository implements ActionEx
     if (!unit) throw new ActionExecutionAdmissionSourceRepositoryError("source_corrupt");
     const result = rows(await this.database.execute(sql`
       select u.action_plan_payload, u.action_plan_hash, u.action_hash, u.account_ref, u.entity_ref, u.action_type,
-        campaign.external_campaign_id as campaign_ref, campaign.configured_status as campaign_configured_status,
+        campaign.external_campaign_id as campaign_ref, campaign.name as campaign_name, campaign.configured_status as campaign_configured_status,
         campaign.effective_status as campaign_effective_status, campaign.campaign_budget_optimization,
-        ad_set.external_ad_set_id as ad_set_ref, ad_set.configured_status as ad_set_configured_status,
-        ad_set.effective_status as ad_set_effective_status, ad.external_ad_id as ad_ref,
+        ad_set.external_ad_set_id as ad_set_ref, ad_set.name as ad_set_name, ad_set.configured_status as ad_set_configured_status,
+        ad_set.effective_status as ad_set_effective_status, ad.external_ad_id as ad_ref, ad.name as ad_name,
         ad.configured_status as ad_configured_status, ad.effective_status as ad_effective_status,
         snapshot.snapshot_hash as source_snapshot_hash,
         to_char(snapshot.captured_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as source_snapshot_captured_at,
@@ -142,10 +147,10 @@ export class DrizzleActionExecutionAdmissionSourceRepository implements ActionEx
     }
     const campaignRef = text(row.campaign_ref);
     const target = writeSpec.target.entityLevel === "campaign"
-      ? { ref: campaignRef, configured: row.campaign_configured_status, effective: row.campaign_effective_status }
+      ? { ref: campaignRef, configured: row.campaign_configured_status, effective: row.campaign_effective_status, name: row.campaign_name }
       : writeSpec.target.entityLevel === "adset"
-        ? { ref: text(row.ad_set_ref), configured: row.ad_set_configured_status, effective: row.ad_set_effective_status }
-        : { ref: text(row.ad_ref), configured: row.ad_configured_status, effective: row.ad_effective_status };
+        ? { ref: text(row.ad_set_ref), configured: row.ad_set_configured_status, effective: row.ad_set_effective_status, name: row.ad_set_name }
+        : { ref: text(row.ad_ref), configured: row.ad_configured_status, effective: row.ad_effective_status, name: row.ad_name };
     if (target.ref !== unit.scope.entityRef) throw new ActionExecutionAdmissionSourceRepositoryError("source_corrupt");
     const ancestors = writeSpec.target.entityLevel === "campaign" ? []
       : writeSpec.target.entityLevel === "adset" ? [Object.freeze({ entityLevel: "campaign" as const, entityRef: campaignRef,
@@ -158,6 +163,7 @@ export class DrizzleActionExecutionAdmissionSourceRepository implements ActionEx
       accountRef: unit.scope.accountRef, capturedAt: iso(row.database_now), sourceSnapshotHash,
       target: Object.freeze({ entityLevel: writeSpec.target.entityLevel, entityRef: target.ref,
         configuredStatus: status(target.configured), effectiveStatus: status(target.effective),
+        currentName: name(target.name),
         budgetOwnerRef: writeSpec.target.entityLevel === "campaign"
           ? row.campaign_budget_optimization === true ? campaignRef : null
           : writeSpec.target.entityLevel === "adset"

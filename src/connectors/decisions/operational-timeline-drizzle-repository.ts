@@ -65,7 +65,8 @@ function event(row: SourceRow): OperationalTimelineEvent {
   }
   if (kind === "approval_proposed") {
     const action = text(row.one, 32); const risk = text(row.two, 4);
-    if (!["status_pause", "status_activate", "budget_decrease", "budget_increase"].includes(action) || !/^K[0-4]$/.test(risk)) throw new Error("corrupt_store");
+    if (!["status_pause", "status_activate", "budget_decrease", "budget_increase", "campaign_rename", "adset_rename", "ad_rename"].includes(action)
+      || !/^K[0-4]$/.test(risk)) throw new Error("corrupt_store");
     return Object.freeze({ kind, occurredAt, title: "İnsan onayı için hareket adayı oluşturuldu", detail: `${action.replaceAll("_", " ")} · ${risk}` });
   }
   if (kind === "approval_decision") {

@@ -36,9 +36,9 @@ function approved() {
 
 function row(overrides: Record<string, unknown> = {}) {
   return { action_plan_payload: plan, account_ref: "account_main", entity_ref: "campaign_main", action_type: "status_pause",
-    campaign_ref: "campaign_main", campaign_configured_status: "ACTIVE", campaign_effective_status: "ACTIVE", campaign_budget_optimization: true,
-    ad_set_ref: null, ad_set_configured_status: null, ad_set_effective_status: null,
-    ad_ref: null, ad_configured_status: null, ad_effective_status: null,
+    campaign_ref: "campaign_main", campaign_name: "Campaign Main", campaign_configured_status: "ACTIVE", campaign_effective_status: "ACTIVE", campaign_budget_optimization: true,
+    ad_set_ref: null, ad_set_name: null, ad_set_configured_status: null, ad_set_effective_status: null,
+    ad_ref: null, ad_name: null, ad_configured_status: null, ad_effective_status: null,
     source_snapshot_hash: "3".repeat(64), source_snapshot_captured_at: at, database_now: at, ...overrides };
 }
 
@@ -50,7 +50,7 @@ describe("DrizzleActionExecutionAdmissionSourceRepository", () => {
     const result = await repository.loadForAdmission({ workspaceId, unitRef: input.unitRef });
     expect(result).toMatchObject({ actionPlan: { planHash: plan.planHash }, eligibilitySnapshot: {
       workspaceRef: "workspace_alpha", accountRef: "account_main", sourceSnapshotHash: "3".repeat(64),
-      target: { entityLevel: "campaign", entityRef: "campaign_main", effectiveStatus: "ACTIVE", budgetOwnerRef: "campaign_main" },
+      target: { entityLevel: "campaign", entityRef: "campaign_main", effectiveStatus: "ACTIVE", budgetOwnerRef: "campaign_main", currentName: "Campaign Main" },
     } });
     expect(approval.loadForDecision).toHaveBeenCalledWith({ workspaceId, unitRef: input.unitRef });
     expect(execute).toHaveBeenCalledTimes(1);

@@ -30,7 +30,9 @@ const DECIMAL = /^(0|[1-9]\d{0,29})(?:\.(\d{1,12}))?$/;
 const CODE = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const PRIVATE_REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const PUBLIC_ENTITY_REF = /^entity_[a-f0-9]{16}$/;
-const ACTION_TYPES: readonly ApprovalActionType[] = ["status_pause", "status_activate", "budget_decrease", "budget_increase"];
+const ACTION_TYPES: readonly ApprovalActionType[] = [
+  "status_pause", "status_activate", "budget_decrease", "budget_increase", "campaign_rename", "adset_rename", "ad_rename",
+];
 const UUID_TEXT = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i;
 const FULL_HASH_TEXT = /\b[a-f0-9]{64}\b/i;
 const META_ID_TEXT = /\b(?:act_|campaign_|adset_|ad_)\d{5,}\b/i;
@@ -183,6 +185,17 @@ function beforeAfter(actionType: ApprovalActionType, action: TypedActionIntent):
       || actionType === "status_pause" && action.toStatus !== "PAUSED"
       || actionType === "status_activate" && action.toStatus !== "ACTIVE") fail("corrupt_store");
     return Object.freeze({ field: "configured_status", before: action.fromStatus, after: action.toStatus });
+  }
+  if (actionType === "campaign_rename" || actionType === "adset_rename" || actionType === "ad_rename") {
+    exact(action, ["kind", "entity", "beforeName", "afterName", "namingEvidenceRef"]);
+    exact(action.entity, ["level", "ref"]);
+    const expectedLevel = actionType === "campaign_rename" ? "campaign" : actionType === "adset_rename" ? "adset" : "ad";
+    if (action.kind !== "rename" || action.entity.level !== expectedLevel || !PRIVATE_REF.test(action.entity.ref)
+      || typeof action.beforeName !== "string" || action.beforeName !== action.beforeName.trim() || action.beforeName.length < 1 || action.beforeName.length > 255
+      || typeof action.afterName !== "string" || action.afterName !== action.afterName.trim() || action.afterName.length < 1 || action.afterName.length > 255
+      || /[\u0000-\u001f\u007f]/.test(action.beforeName) || /[\u0000-\u001f\u007f]/.test(action.afterName)
+      || action.beforeName === action.afterName || typeof action.namingEvidenceRef !== "string" || !PRIVATE_REF.test(action.namingEvidenceRef)) fail("corrupt_store");
+    return Object.freeze({ field: "entity_name", before: action.beforeName, after: action.afterName });
   }
   exact(action, ["kind", "entity", "budgetKind", "currency", "beforeDecimal", "afterDecimal", "budgetOwnerRef"]);
   exact(action.entity, ["level", "ref"]);

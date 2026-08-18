@@ -35,6 +35,9 @@ const ACTION_LABELS: Readonly<Record<ApprovalQueueRecord["actionType"], string>>
   status_activate: "Aktifleştirme önerisi",
   budget_decrease: "Bütçe azaltma önerisi",
   budget_increase: "Bütçe artırma önerisi",
+  campaign_rename: "Kampanya adı değiştirme önerisi",
+  adset_rename: "Reklam seti adı değiştirme önerisi",
+  ad_rename: "Reklam adı değiştirme önerisi",
 };
 
 const STATUS_LABELS: Readonly<Record<ApprovalQueueRecord["status"], string>> = {
@@ -72,6 +75,9 @@ function timestamp(value: string) {
 function valuePair(change: ApprovalQueueRecord["beforeAfter"]) {
   if (change.field === "configured_status") {
     return { field: "Yayın durumu", before: change.before, after: change.after };
+  }
+  if (change.field === "entity_name") {
+    return { field: "Ad", before: change.before, after: change.after };
   }
   const format = (minor: number) => new Intl.NumberFormat("tr-TR", {
     style: "currency", currency: change.currency, maximumFractionDigits: 2,

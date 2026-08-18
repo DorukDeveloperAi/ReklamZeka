@@ -20,7 +20,10 @@ export type ApprovalPolicyApplicability =
   | Readonly<{ actionType: "budget_decrease"; risk: "K2" }>
   | Readonly<{ actionType: "budget_increase"; risk: "K3" }>
   | Readonly<{ actionType: "status_pause"; risk: "K2" }>
-  | Readonly<{ actionType: "status_activate"; risk: "K3" }>;
+  | Readonly<{ actionType: "status_activate"; risk: "K3" }>
+  | Readonly<{ actionType: "campaign_rename"; risk: "K3" }>
+  | Readonly<{ actionType: "adset_rename"; risk: "K3" }>
+  | Readonly<{ actionType: "ad_rename"; risk: "K3" }>;
 
 export type ApprovalPolicyDefinitionRevision = Readonly<{
   version: typeof APPROVAL_POLICY_DEFINITION_VERSION;
@@ -136,6 +139,8 @@ function normalizeApplicability(value: unknown): ApprovalPolicyApplicability {
   if (value.actionType === "status_activate" && value.risk === "K3") {
     return Object.freeze({ actionType: "status_activate", risk: "K3" });
   }
+  if ((value.actionType === "campaign_rename" || value.actionType === "adset_rename" || value.actionType === "ad_rename")
+    && value.risk === "K3") return Object.freeze({ actionType: value.actionType, risk: "K3" });
   fail("invalid_input");
 }
 function deepFreeze<T>(value: T): T {

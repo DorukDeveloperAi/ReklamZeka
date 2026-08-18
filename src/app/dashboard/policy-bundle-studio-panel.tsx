@@ -63,11 +63,21 @@ export function createApprovalPolicyDraftBody(form: ApprovalForm): ApprovalPolic
 function applicabilityLabel(value: ApprovalPolicyApplicability): string {
   if (value.actionType === "budget_decrease") return "K2 · bütçe azaltma";
   if (value.actionType === "budget_increase") return "K3 · bütçe artırma";
+  if (value.actionType === "status_pause") return "K2 · duraklatma";
+  if (value.actionType === "status_activate") return "K3 · aktifleştirme";
+  if (value.actionType === "campaign_rename") return "K3 · kampanya adı değiştirme";
+  if (value.actionType === "adset_rename") return "K3 · reklam seti adı değiştirme";
+  if (value.actionType === "ad_rename") return "K3 · reklam adı değiştirme";
   return "K4 · mevcut gönderi öne çıkarma";
 }
 function applicabilityFromValue(value: string): ApprovalPolicyApplicability {
   if (value === "budget_decrease") return { actionType: "budget_decrease", risk: "K2" };
   if (value === "budget_increase") return { actionType: "budget_increase", risk: "K3" };
+  if (value === "status_pause") return { actionType: "status_pause", risk: "K2" };
+  if (value === "status_activate") return { actionType: "status_activate", risk: "K3" };
+  if (value === "campaign_rename") return { actionType: "campaign_rename", risk: "K3" };
+  if (value === "adset_rename") return { actionType: "adset_rename", risk: "K3" };
+  if (value === "ad_rename") return { actionType: "ad_rename", risk: "K3" };
   return { actionType: "existing_post_promotion", risk: "K4" };
 }
 export function createGuardrailPolicyDraftBody(form: GuardrailForm, result: PolicyBundleStudioResult): GuardrailPolicyDraftRequest {
@@ -173,7 +183,7 @@ export function PolicyBundleStudioSurface({ result, onReload }: Readonly<{
     <div className={styles.policyBundleGrid}>
       <section className={`${styles.panel} ${styles.policyDraftForm}`}><header><span className={styles.kicker}>APPROVAL POLICY · EXACT K2/K3/K4</span><h2>Onay yaşam döngüsü taslağı</h2><p>Kural türü açıkça seçilir; K2, K3 ve K4 birbirinin yerine geçmez. Alanlar bilinçli olarak boş.</p></header>
         <div className={styles.policyFields}><label>Policy ref<input value={approval.policyRef} placeholder="approval_policy_…" onChange={(e) => setApproval({ ...approval, policyRef: e.target.value })} /></label>
-          <label>Onay kapsamı<select aria-label="Onay kapsamı" value={selectedApplicability.actionType} onChange={(e) => setApproval({ ...approval, applicability: applicabilityFromValue(e.target.value) })}><option value="existing_post_promotion">K4 · Mevcut gönderi öne çıkarma</option><option value="budget_decrease">K2 · Bütçe azaltma</option><option value="budget_increase">K3 · Bütçe artırma</option></select></label>
+          <label>Onay kapsamı<select aria-label="Onay kapsamı" value={selectedApplicability.actionType} onChange={(e) => setApproval({ ...approval, applicability: applicabilityFromValue(e.target.value) })}><option value="existing_post_promotion">K4 · Mevcut gönderi öne çıkarma</option><option value="status_pause">K2 · Duraklatma</option><option value="status_activate">K3 · Aktifleştirme</option><option value="budget_decrease">K2 · Bütçe azaltma</option><option value="budget_increase">K3 · Bütçe artırma</option><option value="campaign_rename">K3 · Kampanya adı değiştirme</option><option value="adset_rename">K3 · Reklam seti adı değiştirme</option><option value="ad_rename">K3 · Reklam adı değiştirme</option></select></label>
           <RoleChoices legend="Öneri isteyebilen roller" roles={["owner", "admin", "analyst"]} selected={approval.requesterRoles} onToggle={(role) => setApproval({ ...approval, requesterRoles: toggle(approval.requesterRoles, role) })} />
           <RoleChoices legend={`${selectedApplicability.risk} onaylayabilen roller`} roles={["owner", "admin"]} selected={approval.approverRoles} onToggle={(role) => setApproval({ ...approval, approverRoles: toggle(approval.approverRoles, role) })} />
           <RoleChoices legend="Grant tüketebilen roller" roles={["owner", "admin"]} selected={approval.grantConsumerRoles} onToggle={(role) => setApproval({ ...approval, grantConsumerRoles: toggle(approval.grantConsumerRoles, role) })} />

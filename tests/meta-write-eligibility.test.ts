@@ -5,14 +5,15 @@ import { createMetaWriteSpec } from "@/domain/actions/meta-write-spec";
 import { buildActionPlan, type ActionValveContext } from "@/domain/actions/autonomy-valve";
 
 const context: ActionValveContext = { workspaceRef: "workspace_alpha", accountGroupRef: null, accountRef: "account_main", internalCategoryRefs: [], campaignRef: "campaign_main", entity: { level: "ad", ref: "ad_main" }, evaluatedAt: "2026-08-10T12:00:00.000Z", rules: [], budgetLimits: null, protection: { protectedInternalCategoryRefs: [], affectedGeoRefs: [], protectedGeoRefs: [], changeDisposition: "allowed", policyRefs: [] } };
-function spec(kind: "pause" | "activate" | "budget" = "pause") {
+function spec(kind: "pause" | "activate" | "budget" | "rename" = "pause") {
   const action = kind === "budget" ? { kind: "budget_change" as const, entity: { level: "campaign" as const, ref: "campaign_main" }, budgetKind: "daily" as const, currency: "TRY", beforeDecimal: "100", afterDecimal: "90", budgetOwnerRef: "campaign_main" }
+    : kind === "rename" ? { kind: "rename" as const, entity: { level: "ad" as const, ref: "ad_main" }, beforeName: "Ad Main", afterName: "Ad Reviewed", namingEvidenceRef: "naming_evidence_main" }
     : { kind: "status_change" as const, entity: kind === "activate" ? { level: "ad" as const, ref: "ad_main" } : { level: "ad" as const, ref: "ad_main" }, fromStatus: kind === "activate" ? "PAUSED" as const : "ACTIVE" as const, toStatus: kind === "activate" ? "ACTIVE" as const : "PAUSED" as const };
   const plan = buildActionPlan(action, { ...context, entity: action.entity, campaignRef: action.entity.level === "campaign" ? action.entity.ref : "campaign_main",
     budgetLimits: kind === "budget" ? { currency: "TRY", maximumAbsoluteDeltaDecimal: "20", maximumRelativeDeltaBasisPoints: 2_000, limitRefs: ["budget_cap"] } : null });
   return createMetaWriteSpec({ unitRef: "unit_action_one", unitHash: "a".repeat(64), actionPlan: plan });
 }
-function snapshot() { return { workspaceRef: "workspace_alpha", accountRef: "account_main", capturedAt: "2026-08-10T12:00:00.000Z", target: { entityLevel: "ad" as const, entityRef: "ad_main", configuredStatus: "ACTIVE" as const, effectiveStatus: "ACTIVE" as const, budgetOwnerRef: null }, ancestors: [{ entityLevel: "campaign" as const, entityRef: "campaign_main", configuredStatus: "ACTIVE" as const, effectiveStatus: "ACTIVE" as const }, { entityLevel: "adset" as const, entityRef: "adset_main", configuredStatus: "ACTIVE" as const, effectiveStatus: "ACTIVE" as const }], sourceSnapshotHash: "b".repeat(64) }; }
+function snapshot() { return { workspaceRef: "workspace_alpha", accountRef: "account_main", capturedAt: "2026-08-10T12:00:00.000Z", target: { entityLevel: "ad" as const, entityRef: "ad_main", configuredStatus: "ACTIVE" as const, effectiveStatus: "ACTIVE" as const, budgetOwnerRef: null, currentName: "Ad Main" }, ancestors: [{ entityLevel: "campaign" as const, entityRef: "campaign_main", configuredStatus: "ACTIVE" as const, effectiveStatus: "ACTIVE" as const }, { entityLevel: "adset" as const, entityRef: "adset_main", configuredStatus: "ACTIVE" as const, effectiveStatus: "ACTIVE" as const }], sourceSnapshotHash: "b".repeat(64) }; }
 
 describe("Meta write eligibility matrix", () => {
   it("admits only a fully active pause candidate and keeps all write authority false", () => {
@@ -23,8 +24,14 @@ describe("Meta write eligibility matrix", () => {
     expect(assessMetaWriteEligibility({ writeSpec: spec(), snapshot: { ...snapshot(), target: { ...snapshot().target, effectiveStatus: "UNKNOWN" } } }).reasons).toContain("target_state_unknown");
   });
   it("requires the exact active campaign or ad set budget owner", () => {
-    const budgetSnapshot = { ...snapshot(), target: { entityLevel: "campaign" as const, entityRef: "campaign_main", configuredStatus: "ACTIVE" as const, effectiveStatus: "ACTIVE" as const, budgetOwnerRef: "campaign_main" } };
+    const budgetSnapshot = { ...snapshot(), target: { entityLevel: "campaign" as const, entityRef: "campaign_main", configuredStatus: "ACTIVE" as const, effectiveStatus: "ACTIVE" as const, budgetOwnerRef: "campaign_main", currentName: "Campaign Main" } };
     expect(assessMetaWriteEligibility({ writeSpec: spec("budget"), snapshot: budgetSnapshot }).disposition).toBe("eligible_for_separate_human_execution");
     expect(assessMetaWriteEligibility({ writeSpec: spec("budget"), snapshot: { ...budgetSnapshot, target: { ...budgetSnapshot.target, budgetOwnerRef: "campaign_other" } } }).reasons).toContain("budget_owner_mismatch");
+  });
+  it("requires the current mirror name to equal the approved rename before-value", () => {
+    expect(assessMetaWriteEligibility({ writeSpec: spec("rename"), snapshot: snapshot() }).disposition)
+      .toBe("eligible_for_separate_human_execution");
+    expect(assessMetaWriteEligibility({ writeSpec: spec("rename"), snapshot: { ...snapshot(), target: { ...snapshot().target,
+      currentName: "Changed Elsewhere" } } }).reasons).toContain("rename_before_mismatch");
   });
 });

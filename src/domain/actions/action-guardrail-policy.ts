@@ -6,7 +6,8 @@ export const ACTION_GUARDRAIL_POLICY_VERSION = "action-guardrail-policy/1.0.0" a
 export const PROTECTION_RESOLUTION_VERSION = "protection-resolution/1.0.0" as const;
 
 export type GuardrailActionType = Extract<ActionType,
-  "status_pause" | "status_activate" | "budget_decrease" | "budget_increase" | "existing_post_promotion">;
+  "status_pause" | "status_activate" | "budget_decrease" | "budget_increase" | "existing_post_promotion"
+  | "campaign_rename" | "adset_rename" | "ad_rename">;
 export type ActionGuardrailPolicyState = "draft" | "published" | "disabled";
 export type GuardrailAuthorRole = "owner" | "admin" | "analyst";
 export type GuardrailPublisherRole = "owner" | "admin";
@@ -156,6 +157,7 @@ const DECIMAL = /^(0|[1-9]\d{0,29})(?:\.\d{1,12})?$/;
 const CURRENCY = /^[A-Z]{3}$/;
 const ACTION_TYPES: readonly GuardrailActionType[] = [
   "status_pause", "status_activate", "budget_decrease", "budget_increase", "existing_post_promotion",
+  "campaign_rename", "adset_rename", "ad_rename",
 ];
 const BUDGET_ACTIONS: readonly GuardrailActionType[] = ["budget_decrease", "budget_increase"];
 const AUTHORITY = Object.freeze({ canApprove: false as const, canExecute: false as const, canWriteMeta: false as const,

@@ -8,7 +8,7 @@
 | P03 slice-operasyon-rapor | DEVAM — resolver/Operasyon/Kapsam Raporu JSON-CSV-XLSX/UI ve saved-report lifecycle POST kabul edildi; authenticated browser açık | P02 |
 | P04 kilavuz-butce | DEVAM — authoritative ceiling + human-approved budget execution binding POST kabul edildi; protected Meta pilot açık | P03 |
 | P05 agent-analiz-kosum | DEVAM — Guide Run persistence ve server-owned manuel ürün yolu hazır; default-off yerel Agent canlı/authenticated kabulü açık | P04 |
-| P06 karar-otonomi-uygulama | DEVAM — execution-v2, budget binding ve limited-autonomy admission/execution POST kabul edildi; gerçek Meta pilot default-off | P05 |
+| P06 karar-otonomi-uygulama | DEVAM — execution-v2, budget/autonomy ve human-only rename admission foundation POST kabul edildi; gerçek Meta pilot default-off | P05 |
 | P07 ui-ux | BEKLİYOR (paralel) | M00; P01–P06 ile birleşir |
 | P08 kabul-rollout | BEKLİYOR (cross gate) | M00,P01–P07 |
 
@@ -62,6 +62,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P06-C-guide-run-action-binding | Kabul edildi — `evidence/P06-C-guide-run-action-binding-20260818.md`; status ad-set disposition→human-approval ActionUnit binding, executor/Meta write açık |
 | + P06-D-approval-decision-defer | Kabul edildi — `evidence/P06-D-approval-decision-defer-20260818.md`; execution-v2/Meta writer açık |
 | + P06-E-execution-persistence-and-autonomy | Kabul edildi — `evidence/P06-E-execution-pre-candidate-20260818.md`; protected Meta pilot açık |
+| + P06-F-human-rename-foundation | Kabul edildi — `evidence/P06-F-human-rename-foundation-20260818.md`; persisted rename executor/Meta pilot açık |
 | P08-A-default-off-rollout-foundation | DEVAM — `evidence/P08-A-default-off-rollout-foundation-20260818.md`; authenticated browser/protected Meta pilot açık |
 
 ## 2026-08-17 — ilk uygulama zinciri
@@ -109,4 +110,5 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 - P05-G manual Guide run product path: aktif Guide revision için owner/admin aynı cookie-only sınırdan idempotent analiz başlatabilir. Workspace/request/clock/lease/frozen-scope/current health/Agent/staging/P01 projection sunucu sahipliğindedir; completed replay Agentı yeniden çağırmaz ve schedule cursor ilerlemez. 559 dosya/2706 test, build, DB/security ve diff kapıları geçti. Authenticated browser ve kullanıcı onaylı live local-Codex koşusu açık olduğundan P05 tamamlanmış değildir.
 - P08-A default-off rollout foundation: Meta read, Guide scheduler, human execution, limited autonomy ve global Meta write için birbirine bağlı exact env kapıları eklendi; route-specific status/budget runtime her fazda kill/token/workspace/account/action allowlistini yeniden doğrular. Oturumsuz gerçek browser beş alanda sahte veri göstermeden fail-closed kaldı; 320/390/768/1024/1440 px yatay taşmasız ve console temizdir. Capability üretilmedi, write bayrağı açılmadı; authenticated browser ve protected gerçek Meta pilot açık olduğundan P08 henüz kabul edilmedi.
 - `+ P06-E execution persistence/autonomy`: execution-v2 evidence zinciri, authoritative budget ceiling, human-approved budget source XOR'u, limited-autonomy atomic admission kotası ve current-authority/kill-switch execution yolu idx `119–123` olarak POST kabul edildi. Exact hash/ledger tuple'ları `id=136–140`; bütün POST fixture'ları sıfır residue bıraktı. Meta write rollout bayrakları değişmedi ve protected pilot açık kaldı.
+- `+ P06-F human-only rename foundation`: campaign/ad-set/ad rename ActionPlan→ActionUnit→published K3 policy→tek insan onayı→current-name preflight→disabled admission zincirine bağlandı; guardrail deny ve public before/after projection eklendi. Migration `idx=126`, ledger `id=143`, hash `2307b289...6ac3ce`; PRE/POST canonical queue/replay/projection, create/raw absence ve no-autonomy-widening kanıtları sıfır residue ile geçti. Persisted rename execution worker/Meta adapter ve protected pilot açık kaldı.
 - `+ P03-G / + P02-C`: saved Scope Report ve naming-template immutable revision/OCC yaşam döngüleri idx `124/125`, ledger `id=141/142` ile POST kabul edildi. Gerçek repository replay/tamper/list/preview ve RLS/revoke katalogları yeşildir; authenticated browser matrisi açık kaldı.

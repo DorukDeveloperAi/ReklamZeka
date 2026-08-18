@@ -17,6 +17,7 @@ export type MetaWriteEligibilitySnapshot = Readonly<{
     configuredStatus: MetaStatus;
     effectiveStatus: MetaStatus;
     budgetOwnerRef: string | null;
+    currentName: string;
   }>;
   ancestors: readonly Readonly<{
     entityLevel: Exclude<EntityLevel, "ad"> | "adset";
@@ -42,6 +43,7 @@ export type MetaWriteEligibility = Readonly<{
     | "parent_not_effective_active"
     | "budget_owner_mismatch"
     | "budget_target_not_active"
+    | "rename_before_mismatch"
   )[];
   capabilities: Readonly<{ canExecute: false; canWriteMeta: false; canDispatchNetwork: false }>;
 }>;
@@ -79,9 +81,12 @@ function validatedSnapshot(value: MetaWriteEligibilitySnapshot): MetaWriteEligib
   exact(value, ["workspaceRef", "accountRef", "capturedAt", "target", "ancestors", "sourceSnapshotHash"]);
   ref(value.workspaceRef); ref(value.accountRef); hash(value.sourceSnapshotHash);
   if (typeof value.capturedAt !== "string" || !ISO.test(value.capturedAt) || new Date(value.capturedAt).toISOString() !== value.capturedAt) invalid();
-  exact(value.target, ["entityLevel", "entityRef", "configuredStatus", "effectiveStatus", "budgetOwnerRef"]);
+  exact(value.target, ["entityLevel", "entityRef", "configuredStatus", "effectiveStatus", "budgetOwnerRef", "currentName"]);
   if (!levels.includes(value.target.entityLevel)) invalid(); ref(value.target.entityRef); status(value.target.configuredStatus); status(value.target.effectiveStatus);
   if (value.target.budgetOwnerRef !== null) ref(value.target.budgetOwnerRef);
+  if (typeof value.target.currentName !== "string" || value.target.currentName !== value.target.currentName.trim()
+    || value.target.currentName.length < 1 || value.target.currentName.length > 255
+    || /[\u0000-\u001f\u007f]/.test(value.target.currentName)) invalid();
   if (!Array.isArray(value.ancestors) || value.ancestors.length > 2) invalid();
   const seen = new Set<string>(); let previousRank = -1;
   for (const ancestor of value.ancestors) {
@@ -123,6 +128,8 @@ export function assessMetaWriteEligibility(input: Readonly<{ writeSpec: MetaWrit
     if (snapshot.target.budgetOwnerRef !== snapshot.target.entityRef) reasons.push("budget_owner_mismatch");
     if (snapshot.target.effectiveStatus !== "ACTIVE") reasons.push("budget_target_not_active");
   }
+  if (spec.mutation.kind === "rename" && snapshot.target.currentName !== spec.mutation.previousName)
+    reasons.push("rename_before_mismatch");
   const uniqueReasons = Object.freeze([...new Set(reasons)]);
   const core = Object.freeze({ version: META_WRITE_ELIGIBILITY_VERSION, writeSpecHash: spec.specHash,
     snapshotHash: snapshot.sourceSnapshotHash, disposition: uniqueReasons.length ? "blocked" as const : "eligible_for_separate_human_execution" as const,

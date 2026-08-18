@@ -274,6 +274,10 @@ function trustedApplicability(lifecycle: ApprovalLifecycle): ApprovalPolicyAppli
     if (unit.requester.role === "agent" && unit.scope.actionType === "status_activate" && unit.risk === "K3") {
       return [Object.freeze({ actionType: "status_activate", risk: "K3" })];
     }
+    if ((unit.scope.actionType === "campaign_rename" || unit.scope.actionType === "adset_rename"
+      || unit.scope.actionType === "ad_rename") && unit.risk === "K3") {
+      return [Object.freeze({ actionType: unit.scope.actionType, risk: "K3" })];
+    }
     return [];
   });
   if (applicable.length === 0) return null;

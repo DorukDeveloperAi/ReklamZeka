@@ -120,17 +120,21 @@ function safeApprovalItem(value: unknown, campaignRef: string): value is Record<
   const budgetBeforeAfter = exactObject(beforeAfter, ["field", "beforeMinor", "afterMinor", "currency"])
     && ["daily_budget_minor", "lifetime_budget_minor"].includes(String(beforeAfter.field)) && Number.isSafeInteger(beforeAfter.beforeMinor)
     && Number.isSafeInteger(beforeAfter.afterMinor) && typeof beforeAfter.currency === "string" && /^[A-Z]{3}$/.test(beforeAfter.currency);
+  const renameBeforeAfter = exactObject(beforeAfter, ["field", "before", "after"])
+    && beforeAfter.field === "entity_name" && typeof beforeAfter.before === "string" && beforeAfter.before.length >= 1 && beforeAfter.before.length <= 255
+    && typeof beforeAfter.after === "string" && beforeAfter.after.length >= 1 && beforeAfter.after.length <= 255
+    && beforeAfter.before !== beforeAfter.after;
   return exactObject(value, ["unitRef", "bundleRef", "status", "risk", "actionType", "accountRef", "campaignRef", "entity", "beforeAfter", "autonomy", "expiresAt", "createdAt", "dependencies", "summaryCode"])
     && typeof value.unitRef === "string" && /^action_unit_[a-f0-9]{20}$/.test(value.unitRef)
     && (value.bundleRef === null || typeof value.bundleRef === "string" && /^action_bundle_[a-f0-9]{20}$/.test(value.bundleRef))
     && typeof value.status === "string" && APPROVAL_STATUS.has(value.status)
     && ["K0", "K1", "K2", "K3", "K4"].includes(String(value.risk))
-    && ["status_pause", "status_activate", "budget_decrease", "budget_increase"].includes(String(value.actionType))
+    && ["status_pause", "status_activate", "budget_decrease", "budget_increase", "campaign_rename", "adset_rename", "ad_rename"].includes(String(value.actionType))
     && typeof value.accountRef === "string" && /^(?:account|entity|autonomy)_[a-f0-9]{16}$/.test(value.accountRef)
     && value.campaignRef === campaignRef && exactObject(entity, ["type", "ref", "label"])
     && ["campaign", "ad_set", "ad"].includes(String(entity.type)) && typeof entity.ref === "string" && /^(?:account|entity|autonomy)_[a-f0-9]{16}$/.test(entity.ref)
     && (entity.label === null || typeof entity.label === "string" && entity.label.length <= 256)
-    && (statusBeforeAfter || budgetBeforeAfter)
+    && (statusBeforeAfter || budgetBeforeAfter || renameBeforeAfter)
     && exactObject(autonomy, ["profileRef", "decision", "trace"]) && typeof autonomy.profileRef === "string" && /^(?:account|entity|autonomy)_[a-f0-9]{16}$/.test(autonomy.profileRef)
     && ["manual", "approval_required", "policy_limited"].includes(String(autonomy.decision)) && Array.isArray(autonomy.trace) && autonomy.trace.length >= 1 && autonomy.trace.length <= 20
     && autonomy.trace.every((step) => exactObject(step, ["scope", "decision", "reasonCode"]) && ["workspace", "account", "category", "entity", "risk"].includes(String(step.scope))

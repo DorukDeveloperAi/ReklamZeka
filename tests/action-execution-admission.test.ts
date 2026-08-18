@@ -26,7 +26,7 @@ function input() {
   const lifecycle = approved(); const unit = lifecycle.bundle.units[0]!;
   return { lifecycle, unitRef: unit.unitRef, actionPlan: plan,
     eligibilitySnapshot: { workspaceRef: "workspace_alpha", accountRef: "account_main", capturedAt: at,
-      target: { entityLevel: "campaign" as const, entityRef: "campaign_main", configuredStatus: "ACTIVE" as const, effectiveStatus: "ACTIVE" as const, budgetOwnerRef: "campaign_main" }, ancestors: [], sourceSnapshotHash: "d".repeat(64) },
+      target: { entityLevel: "campaign" as const, entityRef: "campaign_main", configuredStatus: "ACTIVE" as const, effectiveStatus: "ACTIVE" as const, budgetOwnerRef: "campaign_main", currentName: "Campaign Main" }, ancestors: [], sourceSnapshotHash: "d".repeat(64) },
     currentFreshness: [{ unitRef: unit.unitRef, planRevision: 1, planHash: unit.plan.planHash, sourceHash: unit.sourceHash, contextHash: unit.contextHash, specHash: unit.specHash }],
     executionPresence: { authorizationRef: "presence_execute", unitRef: unit.unitRef, unitHash: unit.unitHash, scopeHash: unit.scopeHash, actor: { actorRef: "actor_owner", role: "owner" as const }, issuedAt: at, expiresAt: "2026-08-10T12:01:00.000Z", humanPresence: true as const }, evaluatedAt: "2026-08-10T12:00:30.000Z" };
 }
