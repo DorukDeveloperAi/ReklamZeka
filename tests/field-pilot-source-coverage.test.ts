@@ -9,8 +9,8 @@ describe("field-pilot source coverage census", () => {
       freshSync: { workspaceCount: 3, accountCount: 10 },
       feedback: { workspaceCount: 3 },
     });
-    expect(census.sourceBackedCriteriaComplete).toBe(true);
-    expect(census.eligibleForFieldPilotAttestation).toBe(true);
+    expect(census.sourceBackedCriteriaComplete).toBe(false);
+    expect(census.eligibleForFieldPilotAttestation).toBe(false);
     expect(census.families).toEqual(expect.arrayContaining([
       expect.objectContaining({ family: "activation", available: false, missingReason: "dashboard_verified_telemetry_not_persisted_in_postgres" }),
       expect.objectContaining({ family: "security_incidents", available: false }),
@@ -27,6 +27,34 @@ describe("field-pilot source coverage census", () => {
     expect(census.sourceBackedCriteriaComplete).toBe(false);
     expect(census.families.find((family) => family.family === "freshness")).toMatchObject({ available: false });
     expect(census.families.find((family) => family.family === "feedback")).toMatchObject({ available: false });
+  });
+
+  it("only permits attestation after every technical evidence family is complete", () => {
+    const census = evaluateFieldPilotSourceCoverage({
+      accountInventory: { workspaceCount: 3, accountCount: 10 },
+      freshSync: { workspaceCount: 3, accountCount: 10 },
+      feedback: { workspaceCount: 3 },
+      activation: { workspaceCount: 3, accountCount: 10 },
+      securityIncidents: { workspaceCount: 3, openCriticalIncidentCount: 0 },
+    });
+    expect(census.sourceBackedCriteriaComplete).toBe(true);
+    expect(census.eligibleForFieldPilotAttestation).toBe(true);
+    expect(census.families.find((family) => family.family === "activation")).toMatchObject({ available: true });
+    expect(census.families.find((family) => family.family === "security_incidents")).toMatchObject({ available: true });
+  });
+
+  it("distinguishes an unpersisted source from a covered source with an open critical incident", () => {
+    const census = evaluateFieldPilotSourceCoverage({
+      accountInventory: { workspaceCount: 3, accountCount: 10 },
+      freshSync: { workspaceCount: 3, accountCount: 10 },
+      feedback: { workspaceCount: 3 },
+      activation: { workspaceCount: 3, accountCount: 10 },
+      securityIncidents: { workspaceCount: 3, openCriticalIncidentCount: 1 },
+    });
+    expect(census.eligibleForFieldPilotAttestation).toBe(false);
+    expect(census.families.find((family) => family.family === "security_incidents")).toMatchObject({
+      available: false, missingReason: "open_critical_security_incidents_present",
+    });
   });
 
   it("uses one aggregate-only repeatable-read read-only query", () => {
