@@ -1,6 +1,6 @@
 # P02-C — Naming template lifecycle, preview and UI
 
-Status: PRE candidate. Migration is intentionally unapplied and unjournaled pending an independent critical PRE review.
+Status: POST accepted. Migration is applied at idx125 / ledger id142 with exact SHA-256 `0a9946883970dc83d00bb9c4979869691fb12e047385e7e8cef8ee39de476fbb`.
 
 ## Delivered
 
@@ -28,8 +28,8 @@ Current gates:
 - TypeScript, Drizzle `db:check`, architecture/model boundaries, Supabase security audit, and `git diff --check` passed.
 - `npm audit --omit=dev`: zero vulnerabilities. The full dev audit retains four moderate `esbuild` findings through the current Drizzle toolchain; the offered fix is a breaking downgrade and was not applied.
 
-## Explicit open gates
+## POST and open gates
 
-- Independent critical PRE review, controlled apply/journal, and POST ledger/catalog verification.
+- Applied-schema POST repeated create/replay/OCC/preview/tamper/list/catalog and left both tables with zero fixture rows.
 - Authenticated browser acceptance with real tenant mirror rows at 320/390/768/1024/1440 px.
 - Explicit user category-assignment action remains in the existing Category Registry flow; preview does not silently perform it.

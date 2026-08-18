@@ -4,11 +4,11 @@
 |---|---|---|
 | + M00 | TAMAMLANDI — `evidence/M00-20260817.md`, `4fdb381` | — |
 | + P01 meta-veri-sagligi | TAMAMLANDI — P01-A…F kabul edildi; `evidence/P01-E-data-health-ledger-20260817.md` | M00 |
-| P02 kurum-kampanyasi-kunye | DEVAM — Kurum Kampanyası temeli hazır; naming-template persistence/preview/UI PRE adayı hazır, bağımsız apply/POST ve authenticated browser açık | P01 |
-| P03 slice-operasyon-rapor | DEVAM — resolver/Operasyon/Kapsam Raporu JSON-CSV-XLSX/UI kabul edildi; saved-report lifecycle PRE adayı hazır, apply ve authenticated browser açık | P02 |
-| P04 kilavuz-butce | BEKLİYOR | P03 |
+| P02 kurum-kampanyasi-kunye | DEVAM — naming-template persistence/preview/UI POST kabul edildi; authenticated browser açık | P01 |
+| P03 slice-operasyon-rapor | DEVAM — resolver/Operasyon/Kapsam Raporu JSON-CSV-XLSX/UI ve saved-report lifecycle POST kabul edildi; authenticated browser açık | P02 |
+| P04 kilavuz-butce | DEVAM — authoritative ceiling + human-approved budget execution binding POST kabul edildi; protected Meta pilot açık | P03 |
 | P05 agent-analiz-kosum | DEVAM — Guide Run persistence ve server-owned manuel ürün yolu hazır; default-off yerel Agent canlı/authenticated kabulü açık | P04 |
-| P06 karar-otonomi-uygulama | BEKLİYOR | P05 |
+| P06 karar-otonomi-uygulama | DEVAM — execution-v2, budget binding ve limited-autonomy admission/execution POST kabul edildi; gerçek Meta pilot default-off | P05 |
 | P07 ui-ux | BEKLİYOR (paralel) | M00; P01–P06 ile birleşir |
 | P08 kabul-rollout | BEKLİYOR (cross gate) | M00,P01–P07 |
 
@@ -29,7 +29,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P01-F-budget-config-history | Kabul edildi / arşivlenebilir |
 | + P02-A-organization-campaign-foundation | Kabul edildi / arşivlenebilir |
 | + P02-B-naming-template-domain | Kabul edildi / arşivlenebilir |
-| P02-C-naming-template-lifecycle | PRE adayı — `evidence/P02-C-naming-template-lifecycle-20260818.md`; bağımsız kritik kabul/apply/POST ve authenticated browser açık |
+| + P02-C-naming-template-lifecycle | Kabul edildi — `evidence/P02-C-naming-template-lifecycle-20260818.md`; authenticated browser açık |
 | + P03-A-slice-registry | Kabul edildi / arşivlenebilir |
 | + P03-B-operation-read-model | Kabul edildi / arşivlenebilir |
 | + P03-Ca-primary-result-domain | Kabul edildi — `evidence/P03-Ca-primary-result-domain-20260817.md`; arşivlenebilir |
@@ -38,7 +38,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P03-D-scope-report-v1-foundation | Kabul edildi — `evidence/P03-D-scope-report-v1-foundation-20260817.md`; saved report/full UI-browser açık |
 | + P03-E-scope-report-xlsx | Kabul edildi — `evidence/P03-E-scope-report-xlsx-20260817.md`; saved report/full UI-browser açık |
 | + P03-F-scope-report-ui-foundation | Kabul edildi — `evidence/P03-F-scope-report-ui-foundation-20260818.md`; authenticated browser ve saved report açık |
-| P03-G-saved-scope-report-lifecycle | PRE adayı — `evidence/P03-G-saved-scope-report-lifecycle-20260818.md`; migration bağımsız kritik kabul/apply/POST ve authenticated browser açık |
+| + P03-G-saved-scope-report-lifecycle | Kabul edildi — `evidence/P03-G-saved-scope-report-lifecycle-20260818.md`; authenticated browser açık |
 | + P04-A-guide-domain | Kabul edildi / arşivlenebilir |
 | + P04-B-guide-persistence | Kabul edildi / arşivlenebilir |
 | + P04-Ca-budget-dry-run-domain | Kabul edildi — `evidence/P04-Ca-budget-dry-run-domain-20260817.md`; arşivlenebilir |
@@ -60,7 +60,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P06-B-execution-contracts-foundation | Kabul edildi — `evidence/P06-B-execution-contracts-foundation-20260817.md`; şemasız/default-disabled temel, persistence/Meta executor açık |
 | + P06-C-guide-run-action-binding | Kabul edildi — `evidence/P06-C-guide-run-action-binding-20260818.md`; status ad-set disposition→human-approval ActionUnit binding, executor/Meta write açık |
 | + P06-D-approval-decision-defer | Kabul edildi — `evidence/P06-D-approval-decision-defer-20260818.md`; execution-v2/Meta writer açık |
-| P06-E-execution-pre-candidate | PRE adayı — `evidence/P06-E-execution-pre-candidate-20260818.md`; bağımsız APPLY/POST açık |
+| + P06-E-execution-persistence-and-autonomy | Kabul edildi — `evidence/P06-E-execution-pre-candidate-20260818.md`; protected Meta pilot açık |
 | P08-A-default-off-rollout-foundation | DEVAM — `evidence/P08-A-default-off-rollout-foundation-20260818.md`; authenticated browser/protected Meta pilot açık |
 
 ## 2026-08-17 — ilk uygulama zinciri
@@ -106,3 +106,5 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 - `+ P06-D approval decision defer`: `defer` ayrı terminal insan kararı olarak lifecycle, human-presence ceremony, HTTP, Drizzle repository ve read projection zincirine eklendi; authorization/grant üretmez. Migration ledger `id=135`, journal `idx=118`, hash `1b43e119...db2b5671`; PRE/POST verifier, agent/create/raw denial, exact constraint, replay, append-only ve zero-residue kanıtlarıyla kabul edildi. Execution-v2/Meta writer ve protected pilot açık olduğundan P06 tamamlanmış değildir.
 - P05-G manual Guide run product path: aktif Guide revision için owner/admin aynı cookie-only sınırdan idempotent analiz başlatabilir. Workspace/request/clock/lease/frozen-scope/current health/Agent/staging/P01 projection sunucu sahipliğindedir; completed replay Agentı yeniden çağırmaz ve schedule cursor ilerlemez. 559 dosya/2706 test, build, DB/security ve diff kapıları geçti. Authenticated browser ve kullanıcı onaylı live local-Codex koşusu açık olduğundan P05 tamamlanmış değildir.
 - P08-A default-off rollout foundation: Meta read, Guide scheduler, human execution, limited autonomy ve global Meta write için birbirine bağlı exact env kapıları eklendi; route-specific status/budget runtime her fazda kill/token/workspace/account/action allowlistini yeniden doğrular. Oturumsuz gerçek browser beş alanda sahte veri göstermeden fail-closed kaldı; 320/390/768/1024/1440 px yatay taşmasız ve console temizdir. Capability üretilmedi, write bayrağı açılmadı; authenticated browser ve protected gerçek Meta pilot açık olduğundan P08 henüz kabul edilmedi.
+- `+ P06-E execution persistence/autonomy`: execution-v2 evidence zinciri, authoritative budget ceiling, human-approved budget source XOR'u, limited-autonomy atomic admission kotası ve current-authority/kill-switch execution yolu idx `119–123` olarak POST kabul edildi. Exact hash/ledger tuple'ları `id=136–140`; bütün POST fixture'ları sıfır residue bıraktı. Meta write rollout bayrakları değişmedi ve protected pilot açık kaldı.
+- `+ P03-G / + P02-C`: saved Scope Report ve naming-template immutable revision/OCC yaşam döngüleri idx `124/125`, ledger `id=141/142` ile POST kabul edildi. Gerçek repository replay/tamper/list/preview ve RLS/revoke katalogları yeşildir; authenticated browser matrisi açık kaldı.

@@ -1,4 +1,4 @@
-# P03-G — Kayıtlı Kapsam Raporu yaşam döngüsü PRE adayı
+# P03-G — Kayıtlı Kapsam Raporu yaşam döngüsü
 
 ## Teslim
 
@@ -8,7 +8,7 @@
 - `/api/scope-report-saved` cookie-only same-origin boundary’si `scope_report:read` ve `scope_report:save` capability’lerini ayrı doğrular; GET list ve POST save exact intent taşır. Her yanıt no-store ve Meta/approval/execution authority `none/disabled` taşır.
 - Kapsam Raporu paneli mevcut submitted sorguyu kaydeder, kayıtlı active sorguyu forma geri yükleyip kanonik read endpoint’inden yeniden çalıştırır. Kaydedilen şey sonuç snapshot’ı veya aksiyon değil, yalnız sorgu tanımıdır.
 
-## PRE kanıtı
+## PRE/POST kanıtı
 
 `npm run verify:scope-report-saved-postgres` outer rollback altında exit 0:
 
@@ -19,10 +19,8 @@
 - Odak: 8 dosya / 26 test PASS.
 - Full suite: 550 dosya / 2681 test PASS.
 - `typecheck`, `db:check`, architecture, model-provider boundary, security boundaries, `npm audit --omit=dev`, `git diff --check`: PASS.
-- Migration uygulanmadı, journal veya DB migration ledger’a yazılmadı; verifier sonrası iki tablo da yok.
+- Migration idx124 / ledger id141 olarak exact `cff26151...314dd` hash'iyle uygulandı. POST aynı create/replay/OCC/tamper/list matrisini geçti ve iki tabloda fixture satırı bırakmadı.
 
 ## Açık kapılar
 
-- Bağımsız kritik PRE incelemesi olmadan apply/journal yapılmaz.
-- Apply sonrası exact file hash + journal + DB ledger tuple ve iki-client replay/OCC POST kabulü gerekir.
-- Gerçek signed-in browser save/list/reload/320px/a11y kabulü kullanıcı local-session capability’siyle ayrıca çalıştırılmalıdır.
+- Gerçek signed-in browser save/list/reload/320px/a11y kabulü kullanıcı local-session capability'siyle ayrıca çalıştırılmalıdır.

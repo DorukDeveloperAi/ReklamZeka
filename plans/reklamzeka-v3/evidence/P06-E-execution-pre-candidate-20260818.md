@@ -1,16 +1,16 @@
-# P06-E — Execution/ceiling/autonomy PRE candidate
+# P06-E — Execution/ceiling/autonomy POST acceptance
 
-**Karar:** APPLY YOK. 003–007 forward migration zinciri yerel outer-rollback ve davranış kapılarından geçmiştir; exact dosyalar bağımsız kritik PRE kabulü almadan journal/apply/POST yapılmayacaktır.
+**Karar:** KABUL. 003–007 zinciri PRE, kontrollü journal/apply ve uygulanmış-şema POST kapılarından geçmiştir. Rollout/Meta-write bayrakları açılmamıştır.
 
 ## Exact PRE dosyaları
 
 | Migration | SHA-256 | Durum |
 |---|---|---|
-| `20260818000300_p06_execution_persistence.sql` | `f309b81a791025bb6a3fb341a4ebb7c7be78ccae390132cc8ec477cb561521b3` | PRE-only, unjournaled |
-| `20260818000400_p04_budget_ceiling_policies.sql` | `fae39dde58c2793a2cf1b879d44cdc72a5448e28eace66b45e2ea99e15753468` | PRE-only, unjournaled |
-| `20260818000500_p06_budget_execution_binding.sql` | `6fb04c9bde98426fe374813eeb5202b8b041dcfa4784056e3a4d54b500b6e4c6` | PRE-only, unjournaled |
-| `20260818000600_p06_limited_autonomy_admissions.sql` | `bca225d1e82687d845d3fb213a2b1ceacf6ad464184128b8f72bd17b9c5aae25` | PRE-only, unjournaled |
-| `20260818000700_p06_limited_autonomy_execution.sql` | `daeb75865eba3230fc8fce929f7055e8d006f77f1525ceaff7b49edf699b7ea2` | PRE-only, unjournaled |
+| `20260818000300_p06_execution_persistence.sql` | `952d187fdb951642258adbeb4a276787dfca14eab3f3913a5ecc6a5b69ab075b` | idx119 / ledger id136 |
+| `20260818000400_p04_budget_ceiling_policies.sql` | `fae39dde58c2793a2cf1b879d44cdc72a5448e28eace66b45e2ea99e15753468` | idx120 / ledger id137 |
+| `20260818000500_p06_budget_execution_binding.sql` | `6fb04c9bde98426fe374813eeb5202b8b041dcfa4784056e3a4d54b500b6e4c6` | idx121 / ledger id138 |
+| `20260818000600_p06_limited_autonomy_admissions.sql` | `bca225d1e82687d845d3fb213a2b1ceacf6ad464184128b8f72bd17b9c5aae25` | idx122 / ledger id139 |
+| `20260818000700_p06_limited_autonomy_execution.sql` | `daeb75865eba3230fc8fce929f7055e8d006f77f1525ceaff7b49edf699b7ea2` | idx123 / ledger id140 |
 
 ## Bu turda kapanan fail-open sınıfları
 
@@ -32,8 +32,7 @@
 - 003 tablolarında FORCE RLS, zero policies, PUBLIC/anon/authenticated/service_role revoke, validated constraints, FK indexes ve enabled triggers doğrulandı.
 - `npm run db:check`, TypeScript ve `git diff --check` yeşil.
 
-## APPLY öncesi zorunlu sınır
+## Kalan rollout sınırı
 
-- Aynı SHA-256 dosyalar için bağımsız kritik read-only inceleme ve APPLY APPROVE.
-- Onaydan sonra kontrollü journal/apply; exact DB ledger tuple ve ayrı-client POST race/fence/rollback/tombstone doğrulaması.
-- Hiçbir rollout/Meta write bayrağı migration apply ile otomatik açılmayacaktır.
+- Authenticated browser ve protected gerçek Meta pilot, kullanıcı capability girişi ve açık action-time onayı gerektirir.
+- Hiçbir rollout/Meta write bayrağı migration apply ile otomatik açılmamıştır.
