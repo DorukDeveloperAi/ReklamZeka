@@ -258,7 +258,7 @@ export class P06MetaStatusWriter implements P06ExecutionV2Writer {
       throw new ConnectorError("invalid_data", "Meta rename mutation bağlamı geçersiz", false);
     }
     const desired = request.action === "status_pause" ? "PAUSED" : "ACTIVE";
-    const mutation = budgetAction
+    const mutation: Record<string, string> = budgetAction
       ? { [request.budgetKind === "lifetime" ? "lifetime_budget" : "daily_budget"]: String(request.desired.budgetMinor) }
       : renameAction ? { name: request.desired.name! } : { status: desired };
     const ambiguous = (

@@ -30,9 +30,11 @@ export class DrizzleP06StatusExecutionDispatchAuthorityRepository
   async revalidate(
     input: Parameters<P06StatusExecutionDispatchAuthority["revalidate"]>[0],
   ) {
+    const supportedAction = input.request.action === "status_pause" || input.request.action === "status_activate"
+      || input.request.action === "budget_decrease" || input.request.action === "budget_increase";
     if (
       !EXECUTION.test(input.executionRef) ||
-      (input.phase !== "post_claim" && input.phase !== "pre_dispatch")
+      (input.phase !== "post_claim" && input.phase !== "pre_dispatch") || !supportedAction
     ) {
       return Object.freeze({
         allowed: false,
@@ -273,7 +275,7 @@ export class DrizzleP06StatusExecutionDispatchAuthorityRepository
             actionHash: String(row.action_hash),
             sliceRef: String(row.slice_ref),
             market: row.market_key as "yerli" | "yabanci",
-            action: input.request.action,
+            action: input.request.action as "status_pause" | "status_activate" | "budget_decrease" | "budget_increase",
             at: String(row.authorized_at),
           });
         } catch {
