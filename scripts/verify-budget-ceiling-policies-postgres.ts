@@ -15,6 +15,7 @@ if (!url) throw new Error("DIRECT_DATABASE_URL or DATABASE_URL required");
 const migrationPath = new URL("../drizzle/20260818000400_p04_budget_ceiling_policies.sql", import.meta.url);
 const migration = await readFile(migrationPath, "utf8");
 const migrationHash = createHash("sha256").update(migration).digest("hex");
+const postMode = process.env.BUDGET_CEILING_POST_APPROVED === "true";
 const client = new Client({ connectionString: url });
 const ws = randomUUID(), owner = randomUUID();
 const layers: readonly BudgetCeilingLayer[] = ["market", "organization_campaign", "geo_targeting_platform", "campaign_ad_set"];
@@ -31,7 +32,10 @@ const savepointReject = async (name: string, fn: () => Promise<void>) => {
   await client.query(`savepoint ${name}`); try { await fn(); flags[name] = false; } catch { flags[name] = true; } finally { await client.query(`rollback to savepoint ${name}`); }
 };
 try {
-  await client.connect(); await client.query("begin"); await client.query(migration);
+  await client.connect();
+  const before = await client.query<{relation:string|null;ledger:number}>("select to_regclass('public.budget_ceiling_policy_revisions')::text relation,(select count(*)::int from drizzle.__drizzle_migrations where hash=$1 and created_at=1787011440000) ledger",[migrationHash]);
+  if (postMode ? before.rows[0]?.relation!=="budget_ceiling_policy_revisions" || before.rows[0]?.ledger!==1 : before.rows[0]?.relation!==null || before.rows[0]?.ledger!==0) throw new Error("budget ceiling migration state exact değil");
+  await client.query("begin"); if (!postMode) await client.query(migration);
   flags.appliedOuterRollback = true;
   await client.query("set local session_replication_role=replica");
   await client.query("insert into users(id,email) values($1,$2)",[owner,`budget-ceiling-${owner}@invalid.local`]);
@@ -60,9 +64,19 @@ try {
   const catalog = await client.query(`select c.relrowsecurity,c.relforcerowsecurity,(select count(*) from pg_policy p where p.polrelid=c.oid) policies,(select count(*) from information_schema.role_table_grants g where g.table_schema='public' and g.table_name=c.relname and g.grantee in ('PUBLIC','anon','authenticated','service_role')) grants from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='budget_ceiling_policy_revisions'`);
   flags.rlsForced = catalog.rows[0]?.relrowsecurity===true && catalog.rows[0]?.relforcerowsecurity===true;
   flags.publicRevoked = Number(catalog.rows[0]?.policies)===0 && Number(catalog.rows[0]?.grants)===0;
-  flags.migrationHashUnjournaled = Number((await client.query("select count(*) count from drizzle.__drizzle_migrations where hash=$1",[migrationHash])).rows[0].count)===0;
+  flags.constraintsValidated = Number((await client.query("select count(*) filter(where not convalidated) invalid from pg_constraint where conrelid='public.budget_ceiling_policy_revisions'::regclass")).rows[0].invalid)===0;
+  flags.indexesPresent = Number((await client.query("select count(*) count from pg_indexes where schemaname='public' and tablename='budget_ceiling_policy_revisions'")).rows[0].count)===6;
+  flags.triggersEnabled = Number((await client.query("select count(*) count from pg_trigger where tgrelid='public.budget_ceiling_policy_revisions'::regclass and not tgisinternal and tgenabled='O'")).rows[0].count)===2;
+  flags.exactMigrationState = postMode ? before.rows[0]?.ledger===1 : before.rows[0]?.ledger===0;
+  await client.query("savepoint tombstone_delete");
+  await client.query("update workspaces set lifecycle_state='tombstoning' where id=$1",[ws]);
+  await client.query("delete from budget_ceiling_policy_revisions where workspace_id=$1",[ws]);
+  flags.tombstoneDelete = Number((await client.query("select count(*) count from budget_ceiling_policy_revisions where workspace_id=$1",[ws])).rows[0].count)===0;
+  await client.query("rollback to savepoint tombstone_delete");
   await client.query("rollback");
-  flags.zeroResidue = (await client.query("select to_regclass('public.budget_ceiling_policy_revisions') value")).rows[0].value===null;
+  const after = await client.query<{relation:string|null}>("select to_regclass('public.budget_ceiling_policy_revisions')::text relation");
+  const remaining = postMode ? Number((await client.query("select count(*) count from budget_ceiling_policy_revisions")).rows[0].count) : 0;
+  flags.zeroResidue = postMode ? after.rows[0]?.relation==="budget_ceiling_policy_revisions" && remaining===0 : after.rows[0]?.relation===null;
   if (!Object.values(flags).every(Boolean)) throw new Error(JSON.stringify(flags));
-  console.log(JSON.stringify({mode:"pre_outer_rollback",migrationHash,...flags}));
+  console.log(JSON.stringify({mode:postMode?"post_applied_outer_rollback":"pre_outer_rollback",migrationHash,...flags}));
 } finally { try { await client.query("rollback"); } catch {} await client.end(); }

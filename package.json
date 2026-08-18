@@ -104,6 +104,7 @@
     "verify:p06-budget-execution-binding-db:behavior": "node --conditions react-server --import tsx scripts/verify-p06-budget-execution-behavior-postgres.ts",
     "verify:p06-execution-persistence-db:behavior": "P06_EXECUTION_CHAIN_PRE=true node --conditions react-server --import tsx scripts/verify-p06-action-bindings-postgres.ts",
     "verify:budget-ceiling-policies-db": "tsx scripts/verify-budget-ceiling-policies-postgres.ts",
+    "verify:budget-ceiling-policies-db:post": "BUDGET_CEILING_POST_APPROVED=true tsx scripts/verify-budget-ceiling-policies-postgres.ts",
     "verify:action-guardrail-db": "tsx scripts/verify-action-guardrail-policy-postgres.ts",
     "verify:meta-affected-geo-db": "tsx scripts/verify-meta-affected-geo-postgres.ts",
     "verify:meta-affected-geo-live-db": "tsx scripts/verify-meta-affected-geo-live-postgres.ts",
