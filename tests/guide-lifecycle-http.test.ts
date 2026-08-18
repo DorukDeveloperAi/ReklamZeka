@@ -14,9 +14,10 @@ describe("guide lifecycle HTTP", () => {
     expect((await handlers.GET(request("GET", "guide-lifecycle-read"))).status).toBe(200);
     expect((await handlers.POST(request("POST", "guide-lifecycle-create", { label: "K" }))).status).toBe(201);
     expect((await handlers.PATCH(request("PATCH", "guide-lifecycle-accept", { operation: "accept" }))).status).toBe(200);
+    expect((await handlers.PATCH(request("PATCH", "guide-lifecycle-revise", { operation: "revise" }))).status).toBe(200);
     expect((await handlers.PATCH(request("PATCH", "guide-lifecycle-activate", { operation: "activate" }))).status).toBe(200);
-    expect(operations).toEqual(["read", "draft", "draft", "activate"]);
-    expect(service.mutate).toHaveBeenCalledTimes(2);
+    expect(operations).toEqual(["read", "draft", "draft", "draft", "activate"]);
+    expect(service.mutate).toHaveBeenCalledTimes(3);
   });
 
   it("rejects bearer/workspace overrides, cross-origin bodies, mismatched intents and oversized input", async () => {

@@ -7,6 +7,7 @@
 - `/api/guides` cookie-only ve same-origin sınırında ayrı `guide_lifecycle:read|draft|activate` capability kapsamları kullanır; Authorization veya workspace override kabul etmez.
 - Workspace, aktör, iç slice/revision/market UUID’leri yalnız sunucu oturumundan ve current published Slice bağından çözülür. Tarayıcı yalnız public `sliceRef` ve Kılavuz içeriği gönderir.
 - Kılavuzlar paneli immutable `draft → interpretation acceptance → activation` zincirini korur; pause ayrı OCC işlemidir. Taslak üretimi activation yapmaz.
+- Mevcut latest revision public contracttan kapalı doğrulanır; kullanıcı aynı Guide kimliği altında OCC-bound yeni immutable revision taslağı üretir. Eski active revision, yeni taslak kabul edilip ayrıca aktive edilene kadar değişmez.
 - Owner/admin taslak ve aktivasyon yapabilir; analyst/viewer yalnız okuyabilir. API ve UI authority sözleşmesi `canWriteMeta=false`, `canExecute=false` döndürür.
 - P04 bütçe evidence okuyucusu PRE-only ceiling migration uygulanmadan önce `to_regclass` ile tabloyu yoklar; eksik tablo SQL hatası yerine `parent_ceiling_unavailable` fail-closed yolunu korur.
 

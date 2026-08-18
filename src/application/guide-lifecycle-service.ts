@@ -55,7 +55,7 @@ export class GuideLifecycleService {
   async list(principal: TrustedDecisionRoomPrincipal) {
     authorizeWorkspace(principal.actor, principal.workspaceId, "guide_lifecycle:read", this.memberships);
     const found = rows(await this.database.execute(sql`select g.id::text guide_id,g.guide_ref,g.label,h.latest_revision_id::text,h.current_active_revision_id::text,h.version,
-      r.revision_number,r.revision_hash,r.interpretation_hash,r.slice_ref,r.market_key,r.mode,r.free_text,r.schedule_payload,r.strict_payload,r.created_at::text,
+      r.revision_number,r.previous_revision_hash,r.revision_hash,r.interpretation_hash,r.slice_ref,r.market_key,r.mode,r.free_text,r.schedule_payload,r.strict_payload,r.created_at::text,
       coalesce((select jsonb_agg(a.action order by a.action) from guide_revision_actions a where a.workspace_id=g.workspace_id and a.guide_revision_id=r.id),'[]'::jsonb) action_allowlist,
       exists(select 1 from guide_interpretation_acceptances a where a.workspace_id=g.workspace_id and a.guide_revision_id=r.id and a.interpretation_hash=r.interpretation_hash) interpretation_accepted
       from guides g join guide_heads h on h.workspace_id=g.workspace_id and h.guide_id=g.id
@@ -71,11 +71,17 @@ export class GuideLifecycleService {
         || !Array.isArray(row.action_allowlist)) throw new GuideLifecycleServiceError("unavailable");
       const strict = row.strict_payload as Record<string, unknown>;
       if (!Array.isArray(strict.budgetRefs) || !Array.isArray(strict.rollbackConditions)) throw new GuideLifecycleServiceError("unavailable");
+      let canonical;
+      try { canonical = createGuideRevision({ workspaceRef: principal.workspaceRef, guideRef: ref(row.guide_ref, "guide_"), revision: integer(row.revision_number),
+        previousRevisionHash: row.previous_revision_hash === null ? null : String(row.previous_revision_hash), sliceRef: ref(row.slice_ref, "slice_"), market: row.market_key,
+        freeText: row.free_text, strict: strict as never, schedule: row.schedule_payload as GuideSchedule, mode: row.mode as GuideMode, actionAllowlist: row.action_allowlist as readonly GuideAction[] }); }
+      catch { throw new GuideLifecycleServiceError("unavailable"); }
+      if (canonical.revisionHash !== row.revision_hash || canonical.interpretationHash !== row.interpretation_hash) throw new GuideLifecycleServiceError("unavailable");
       return Object.freeze({ guideId, guideRef: ref(row.guide_ref, "guide_"), label: row.label, revisionId,
         activeRevisionId: row.current_active_revision_id === null ? null : uuid(row.current_active_revision_id), headVersion: integer(row.version), revision: integer(row.revision_number),
         revisionHash: row.revision_hash, interpretationHash: row.interpretation_hash, interpretationAccepted: row.interpretation_accepted === true,
-        sliceRef: ref(row.slice_ref, "slice_"), market: row.market_key, mode: row.mode, freeText: row.free_text,
-        schedule: schedule(row.schedule_payload), actionAllowlist: Object.freeze([...row.action_allowlist]), budgetRefs: Object.freeze([...strict.budgetRefs]), rollbackConditions: Object.freeze([...strict.rollbackConditions]), createdAt: new Date(String(row.created_at)).toISOString() });
+        sliceRef: canonical.sliceRef, market: canonical.market, mode: canonical.mode, freeText: canonical.freeText,
+        schedule: schedule(canonical.schedule), actionAllowlist: canonical.actionAllowlist, budgetRefs: canonical.strict.budgetRefs, rollbackConditions: canonical.strict.rollbackConditions, createdAt: new Date(String(row.created_at)).toISOString() });
     });
     return Object.freeze({ contractVersion: "guide-lifecycle-workspace/1.0.0" as const, items: Object.freeze(items), authority: Object.freeze({ canWriteMeta: false as const, canExecute: false as const, canDraft: this.can(principal, "guide_lifecycle:draft"), canActivate: this.can(principal, "guide_lifecycle:activate") }) });
   }
