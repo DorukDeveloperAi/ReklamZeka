@@ -6133,6 +6133,7 @@ export const p06ExecutionRuns = pgTable("p06_execution_runs", {
       and jsonb_typeof(${table.requestPayload})='object'
       and octet_length(${table.requestPayload}::text)<=32768
       and not ${table.requestPayload} ?| array['leaseTokenHash','fenceHash']
+      and ${table.requestPayload}::text !~* '"(token|accessToken|secret|prompt|[^"[:space:]]*raw[_-]?(payload|request|response|json))"[[:space:]]*:'
       and ${table.requestPayload}->>'version'='p06-execution-request/1.0.0'
       and ${table.requestPayload}->>'executionRef'=${table.executionRef}
       and ${table.requestPayload}->>'idempotencyKey'=${table.idempotencyKey}
@@ -6391,7 +6392,7 @@ export const p06RollbackProposals = pgTable("p06_rollback_proposals", {
       foreignColumns: [p06ExecutionObservations.workspaceId, p06ExecutionObservations.id],
       name: "p06_rollback_proposals_write_fk",
     }).onDelete("restrict"),
-    check("p06_rollback_proposals_contract", sql`${table.proposalRef} ~ '^p06_rollback_[a-f0-9]{24}$' and ${table.proposalHash} ~ '^[a-f0-9]{64}$' and ${table.requiresNewHumanApproval}=true and jsonb_typeof(${table.payload})='object' and octet_length(${table.payload}::text)<=16384 and ${table.payload}->>'version'='p06-rollback-proposal/1.0.0' and ${table.payload}->>'proposalRef'=${table.proposalRef} and ${table.payload}->>'proposalHash'=${table.proposalHash} and ${table.payload}->>'requiresNewHumanApproval'='true' and ${table.payload}::text !~* '"(token|accessToken|secret|prompt|[^"[:space:]]*raw[_-]?(payload|request|response|json))"[[:space:]]*:'`),
+    check("p06_rollback_proposals_contract", sql`${table.proposalRef} ~ '^p06_rollback_[a-f0-9]{24}$' and ${table.proposalHash} ~ '^[a-f0-9]{64}$' and ${table.requiresNewHumanApproval}=true and jsonb_typeof(${table.payload})='object' and octet_length(${table.payload}::text)<=16384 and public.p06_jsonb_object_key_count(${table.payload})=15 and ${table.payload} ?& array['version','proposalHash','executionRef','terminalHash','writeReceiptHash','beforeReadReceiptHash','afterReadReceiptHash','previousObserved','postWriteObserved','restoreTo','failedDesired','budgetKind','currency','requiresNewHumanApproval','proposalRef'] and ${table.payload}->>'version'='p06-rollback-proposal/1.0.0' and ${table.payload}->>'proposalRef'=${table.proposalRef} and ${table.payload}->>'proposalHash'=${table.proposalHash} and ${table.payload}->>'requiresNewHumanApproval'='true' and ${table.payload}::text !~* '"(token|accessToken|secret|prompt|[^"[:space:]]*raw[_-]?(payload|request|response|json))"[[:space:]]*:'`),
   ],
 );
 

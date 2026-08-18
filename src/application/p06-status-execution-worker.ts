@@ -41,6 +41,7 @@ export type P06StatusExecutionGateResolver = Readonly<{
     input: Readonly<{
       phase: P06ExecutionV2GatePhase;
       request: P06ExecutionWorkerSnapshot["request"];
+      route: P06ExecutionWorkerSnapshot["route"];
       evaluatedAt: string;
     }>,
   ): Promise<P06StatusExecutionGate>;
@@ -220,9 +221,11 @@ export class P06StatusExecutionWorker {
       const resolved = await this.dependencies.gates.resolve({
         phase,
         request: snapshot.request,
+        route: snapshot.route,
         evaluatedAt: clock(),
       });
       const allowlistHash = p06ExecutionV2Digest({
+        route: snapshot.route,
         workspaceAllowlist: [...resolved.workspaceAllowlist].sort(),
         accountAllowlist: [...resolved.accountAllowlist].sort(),
         actionAllowlist: [...resolved.actionAllowlist].sort(),

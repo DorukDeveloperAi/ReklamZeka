@@ -98,7 +98,10 @@ export class DrizzleP06LimitedAutonomyAdmissionRepository {
       const ruleResult = await tx.execute(sql`with latest as (select distinct on(rule_ref) rule_ref,revision,state,mode,scope_level,scope_ref,action_type,kill_switch,effective_from,expires_at,maximum_actions_per_run,canonical_hash
         from autonomy_rule_revisions where workspace_id=${input.workspaceId}::uuid and state in ('published','disabled') order by rule_ref,revision desc)
         select canonical_hash from latest where state='published' and mode='policy_limited' and not kill_switch and effective_from<=${admittedAt}::timestamptz
-          and (expires_at is null or expires_at>${admittedAt}::timestamptz) order by canonical_hash`);
+          and (expires_at is null or expires_at>${admittedAt}::timestamptz)
+          and ((scope_level='workspace' and scope_ref=${context.workspaceRef} and action_type is null)
+            or (scope_level='action_type' and scope_ref is null and action_type='status_pause'))
+          order by canonical_hash`);
       const ruleRows = ruleResult.rows as Row[];
       if (ruleRows.length !== 2 || ruleRows.some((row) => !HASH.test(text(row,"canonical_hash")))) fail("context_rejected");
       const autonomyEvidenceHash = digest({ ruleHashes: ruleRows.map((row) => text(row,"canonical_hash")) });

@@ -22,6 +22,7 @@ import type { GuideRevision } from "@/domain/guides/guide-revision";
 import { sql } from "drizzle-orm";
 import * as schema from "@/db/schema";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { resolveP08RolloutControl, type P08RolloutEnvironment } from "@/server/p08-rollout-control";
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -160,6 +161,29 @@ export function createGuideRunSchedulerWorker(
     worker,
     new DrizzleGuideRunActiveSchedulePort(input.database),
   );
+}
+
+/** Production rollout entrypoint. The lower-level factory remains injectable
+ * for deterministic tests, while production composition is default-off until
+ * both Meta read and Guide scheduler rollout stages are explicitly enabled. */
+export function createGuideRunSchedulerRuntime(
+  input: Readonly<{
+    database: Pick<Database, "execute" | "transaction">;
+    dailyAnalysis: GuideRunDailyAgentPort;
+    holisticAnalysis: GuideRunHolisticAgentPort;
+    dataHealth: GuideRunTrustedDataHealthPort;
+    candidateActionStaging?: GuideRunCandidateActionStagingPort;
+    limitedAutonomyAdmissions?: GuideRunLimitedAutonomyAdmissionPort;
+    environment?: P08RolloutEnvironment;
+  }>,
+) {
+  if (!resolveP08RolloutControl(input.environment).guideSchedulerEnabled) {
+    return Object.freeze({ enabled: false as const, scheduler: null });
+  }
+  return Object.freeze({
+    enabled: true as const,
+    scheduler: createGuideRunSchedulerWorker(input),
+  });
 }
 
 /**

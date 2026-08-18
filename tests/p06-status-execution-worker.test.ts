@@ -27,6 +27,7 @@ const request = Object.freeze({
   evaluatedAt: "2026-08-18T10:00:00.000Z",
 });
 const allowlistHash = p06ExecutionV2Digest({
+  route: "human_approved",
   workspaceAllowlist: [workspaceRef],
   accountAllowlist: ["act_12345"],
   actionAllowlist: ["status_pause"],
@@ -120,6 +121,7 @@ function harness(
       executionRunId: "00000000-0000-4000-8000-000000000002",
       executionRef,
       idempotencyKey: `p06_exec_idem_${"1".repeat(64)}`,
+      route: "human_approved",
       request,
       head: Object.freeze({
         state: mutable.state,

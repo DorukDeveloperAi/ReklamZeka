@@ -20,6 +20,8 @@ describe("P06 status execution server runtime", () => {
     const runtime = createP06StatusExecutionRuntime({
       database: { execute: vi.fn(), transaction: vi.fn() } as never,
       environment: {
+        META_WRITE_ENABLED: "true",
+        HUMAN_ACTION_EXECUTION_ENABLED: "true",
         P06_META_STATUS_WRITE_ENABLED: "true",
         P06_META_WRITE_ACCESS_TOKEN: "write-token",
         P06_META_WRITE_KILL_SWITCH: "false",
@@ -33,5 +35,30 @@ describe("P06 status execution server runtime", () => {
     expect(runtime.scheduler).not.toBeNull();
     expect(runtime.materializeApproved).toBeTypeOf("function");
     expect(JSON.stringify(runtime)).not.toContain("write-token");
+  });
+
+  it("does not let the legacy P06 flag bypass the global rollout boundary", () => {
+    const runtime = createP06StatusExecutionRuntime({
+      database: { execute: vi.fn(), transaction: vi.fn() } as never,
+      environment: {
+        P06_META_STATUS_WRITE_ENABLED: "true",
+        P06_META_WRITE_ACCESS_TOKEN: "write-token",
+      },
+    });
+    expect(runtime.enabled).toBe(false);
+  });
+
+  it("stays disabled without every bounded allowlist and an open kill switch", () => {
+    const runtime = createP06StatusExecutionRuntime({
+      database: { execute: vi.fn(), transaction: vi.fn() } as never,
+      environment: {
+        META_WRITE_ENABLED: "true",
+        HUMAN_ACTION_EXECUTION_ENABLED: "true",
+        P06_META_STATUS_WRITE_ENABLED: "true",
+        P06_META_WRITE_ACCESS_TOKEN: "write-token",
+        P06_META_WRITE_KILL_SWITCH: "false",
+      },
+    });
+    expect(runtime.enabled).toBe(false);
   });
 });

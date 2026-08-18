@@ -8,6 +8,7 @@ import { DrizzleMetaReadSyncLease, DrizzleMetaReadSyncScheduleRegistry } from
   "@/server/meta-read-sync-schedule-drizzle-adapters";
 import { createDrizzleScheduledMetaReadSyncServiceFactory, ProductionMetaReadSyncRetryClassifier } from
   "@/server/meta-read-sync-schedule-production";
+import { resolveP08RolloutControl } from "@/server/p08-rollout-control";
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -26,7 +27,7 @@ export type DrizzleMetaReadSyncScheduleTickConstruction = Readonly<{
 }>;
 
 export class DrizzleMetaReadSyncScheduleTickError extends Error {
-  constructor(readonly code: "invalid_construction" | "invalid_result") {
+  constructor(readonly code: "invalid_construction" | "invalid_result" | "rollout_disabled") {
     super("Meta scheduled read-sync tick güvenli biçimde çalıştırılamadı");
     this.name = "DrizzleMetaReadSyncScheduleTickError";
   }
@@ -58,6 +59,9 @@ export async function runDrizzleMetaReadSyncScheduleTick(
   dependencies: DrizzleMetaReadSyncScheduleTickConstruction,
 ): Promise<MetaReadSyncScheduleWorkerResult> {
   if (!construction(dependencies)) throw new DrizzleMetaReadSyncScheduleTickError("invalid_construction");
+  if (!resolveP08RolloutControl(dependencies.environment).metaReadEnabled) {
+    throw new DrizzleMetaReadSyncScheduleTickError("rollout_disabled");
+  }
   const result = await runMetaReadSyncScheduleWorker(input, {
     registry: new DrizzleMetaReadSyncScheduleRegistry(dependencies.database),
     leases: new DrizzleMetaReadSyncLease(dependencies.database),
@@ -83,6 +87,9 @@ export async function runDrizzleManualMetaReadSync(
 ): Promise<MetaReadSyncScheduleWorkerResult> {
   if (!input || Object.keys(input).some((key) => !["now", "workspaceId", "leaseMs"].includes(key))
     || !construction(dependencies)) throw new DrizzleMetaReadSyncScheduleTickError("invalid_construction");
+  if (!resolveP08RolloutControl(dependencies.environment).metaReadEnabled) {
+    throw new DrizzleMetaReadSyncScheduleTickError("rollout_disabled");
+  }
   const registry = new DrizzleMetaReadSyncScheduleRegistry(dependencies.database);
   const result = await runMetaReadSyncManualWorker(input, {
     registry,

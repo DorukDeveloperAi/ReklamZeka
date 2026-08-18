@@ -119,7 +119,7 @@ BEGIN
     OR u.bundle_id IS DISTINCT FROM bundle.id
     OR d.command_kind IS DISTINCT FROM 'approve' OR d.bundle_id IS DISTINCT FROM bundle.id OR d.unit_id IS DISTINCT FROM u.id
     OR g.bundle_id IS DISTINCT FROM bundle.id OR g.unit_id IS DISTINCT FROM u.id OR g.decision_event_id IS DISTINCT FROM d.id
-    OR g.expires_at<=NEW.created_at OR g.capability IS DISTINCT FROM 'approval_evidence_only' OR g.can_execute IS DISTINCT FROM false
+    OR g.expires_at<=statement_timestamp() OR g.capability IS DISTINCT FROM 'approval_evidence_only' OR g.can_execute IS DISTINCT FROM false
     OR NEW.action_unit_hash IS DISTINCT FROM u.unit_hash OR NEW.context_hash IS DISTINCT FROM u.context_hash
     OR NEW.policy_hash IS DISTINCT FROM persisted_policy_hash
     OR NEW.request_payload->>'workspaceRef' IS DISTINCT FROM bundle.workspace_ref

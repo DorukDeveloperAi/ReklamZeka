@@ -14,10 +14,11 @@ if (existsSync(".env.local")) process.loadEnvFile(".env.local");
  * successful no-op so merely installing the command cannot start Meta traffic.
  */
 const enabled = process.env.REKLAMZEKA_META_SCHEDULE_RUNNER_ENABLED === "true";
+const rolloutEnabled = process.env.META_READ_ENABLED === "true";
 const rotated = process.env.META_TOKEN_SECURITY_STATUS === "rotated";
 const databaseUrl = process.env.DIRECT_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
 
-if (!enabled || !rotated || !databaseUrl) {
+if (!enabled || !rolloutEnabled || !rotated || !databaseUrl) {
   console.log(JSON.stringify({ status: "disabled", dueCount: 0, actionAuthority: "none",
     writeNetworkCalls: 0, metaWriteCalls: 0 }));
   process.exitCode = 2;

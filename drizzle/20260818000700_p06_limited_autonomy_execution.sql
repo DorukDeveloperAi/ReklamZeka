@@ -116,7 +116,6 @@ DECLARE
   run_head public.guide_run_heads%ROWTYPE;
   current_status text;
   rule_count integer;
-  total_rules integer;
   rule_cap integer;
   rule_hash text;
 BEGIN
@@ -133,13 +132,13 @@ BEGIN
     ORDER BY rule_ref,revision DESC
   ), exact_rules AS (
     SELECT * FROM latest WHERE state='published' AND mode='policy_limited' AND NOT kill_switch
-      AND effective_from<=NEW.created_at AND (expires_at IS NULL OR expires_at>NEW.created_at)
+      AND effective_from<=statement_timestamp() AND (expires_at IS NULL OR expires_at>statement_timestamp())
       AND ((scope_level='workspace' AND scope_ref=run_head.run_payload->>'workspaceRef' AND action_type IS NULL)
         OR (scope_level='action_type' AND scope_ref IS NULL AND action_type='status_pause'))
-  ) SELECT (SELECT count(*) FROM exact_rules),(SELECT count(*) FROM latest),
+  ) SELECT (SELECT count(*) FROM exact_rules),
       (SELECT min(maximum_actions_per_run) FROM exact_rules),
       (SELECT public.guide_run_sha256(jsonb_build_object('ruleHashes',jsonb_agg(canonical_hash ORDER BY canonical_hash))) FROM exact_rules)
-    INTO rule_count,total_rules,rule_cap,rule_hash;
+    INTO rule_count,rule_cap,rule_hash;
 
   SELECT coalesce(ad.effective_status,ad.configured_status) INTO current_status
     FROM public.meta_ad_sets ad
@@ -148,7 +147,7 @@ BEGIN
       AND context.entity_ref=ad.external_ad_set_id
     WHERE ad.workspace_id=NEW.workspace_id AND ad.external_ad_set_id=admission.entity_ref
       AND ad.disappeared_at IS NULL AND context.context_hash=admission.context_hash
-      AND context.account_ref=admission.account_ref AND context.captured_at<=NEW.created_at
+      AND context.account_ref=admission.account_ref AND context.captured_at<=statement_timestamp()
       AND NOT EXISTS(SELECT 1 FROM public.effective_campaign_context_components component
         JOIN public.effective_campaign_context_invalidations invalidation
           ON invalidation.workspace_id=component.workspace_id
@@ -162,9 +161,11 @@ BEGIN
   IF admission.id IS NULL OR run_head.id IS NULL
     OR admission.action_type IS DISTINCT FROM 'status_pause'
     OR admission.expected_status IS DISTINCT FROM 'ACTIVE' OR admission.desired_status IS DISTINCT FROM 'PAUSED'
-    OR admission.expires_at<=NEW.created_at OR admission.admitted_at>NEW.created_at
+    OR admission.expires_at<=statement_timestamp() OR admission.admitted_at>statement_timestamp()
+    OR NEW.created_at<statement_timestamp()-interval '5 seconds'
+    OR NEW.created_at>statement_timestamp()+interval '1 second'
     OR current_status IS DISTINCT FROM admission.expected_status
-    OR rule_count IS DISTINCT FROM 2 OR total_rules IS DISTINCT FROM 2
+    OR rule_count IS DISTINCT FROM 2
     OR rule_cap IS DISTINCT FROM admission.maximum_actions_per_run
     OR rule_hash IS DISTINCT FROM admission.autonomy_evidence_hash
     OR NOT EXISTS(SELECT 1 FROM public.guide_runs r
@@ -180,11 +181,11 @@ BEGIN
     OR NOT EXISTS(SELECT 1 FROM public.approval_policy_definition_revisions policy
       WHERE policy.workspace_id=NEW.workspace_id AND policy.policy_hash=admission.approval_policy_hash
         AND policy.action_type='status_pause' AND policy.risk='K2' AND policy.state='published'
-        AND policy.effective_from<=NEW.created_at AND (policy.expires_at IS NULL OR policy.expires_at>NEW.created_at)
+        AND policy.effective_from<=statement_timestamp() AND (policy.expires_at IS NULL OR policy.expires_at>statement_timestamp())
         AND NOT EXISTS(SELECT 1 FROM public.approval_policy_definition_revisions newer
           WHERE newer.workspace_id=policy.workspace_id AND newer.policy_ref=policy.policy_ref
             AND newer.revision>policy.revision AND newer.state IN ('published','disabled')
-            AND newer.effective_from<=NEW.created_at))
+            AND newer.effective_from<=statement_timestamp()))
     OR NEW.proposal_bundle_id IS NOT NULL OR NEW.action_unit_id IS NOT NULL
     OR NEW.decision_event_id IS NOT NULL OR NEW.approval_grant_id IS NOT NULL
     OR NEW.action_unit_hash IS NOT NULL OR NEW.proposal_hash IS NOT NULL

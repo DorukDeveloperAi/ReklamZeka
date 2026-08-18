@@ -123,6 +123,7 @@ export type P06ExecutionWorkerSnapshot = Readonly<{
   executionRunId: string;
   executionRef: string;
   idempotencyKey: string;
+  route: "human_approved" | "guide_budget_human_approved" | "limited_autonomy_status";
   request: Omit<P06ExecutionV2Request, "leaseTokenHash" | "fenceHash">;
   head: Readonly<{
     state:
@@ -214,7 +215,7 @@ export class DrizzleP06ExecutionRepository {
     return this.database.transaction(async (tx) => {
       const run = one(
         rows(
-          await tx.execute(sql`select r.id::text run_id,r.workspace_id::text,r.execution_ref,r.idempotency_key,r.request_payload,
+          await tx.execute(sql`select r.id::text run_id,r.workspace_id::text,r.execution_ref,r.idempotency_key,r.request_payload,r.route,
         h.state,h.sequence,h.trace_sequence,h.head_event_hash,h.lease_token_hash,h.fence_hash,h.lease_epoch,
         case when h.lease_expires_at is null then null else to_char(h.lease_expires_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') end lease_expires_at,h.terminal_hash
         from p06_execution_runs r join p06_execution_heads h on h.workspace_id=r.workspace_id and h.execution_run_id=r.id
@@ -225,7 +226,8 @@ export class DrizzleP06ExecutionRepository {
         !run ||
         typeof run.run_id !== "string" ||
         typeof run.workspace_id !== "string" ||
-        typeof run.idempotency_key !== "string"
+        typeof run.idempotency_key !== "string" ||
+        !["human_approved", "guide_budget_human_approved", "limited_autonomy_status"].includes(String(run.route))
       )
         fail("not_found");
       const payload = record(run.request_payload);
@@ -390,6 +392,7 @@ export class DrizzleP06ExecutionRepository {
         executionRunId: run.run_id,
         executionRef,
         idempotencyKey: run.idempotency_key,
+        route: run.route as P06ExecutionWorkerSnapshot["route"],
         request,
         head: Object.freeze({
           state: state as P06ExecutionWorkerSnapshot["head"]["state"],

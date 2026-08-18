@@ -94,6 +94,7 @@ const limitedAutonomyEvidence = {
   actionPlanBound: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
   noExecutionAuthority: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
   nullForgeryRejected: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
+  backdatedAdmissionRejected: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
   disabledRuleHeld: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
   tombstonePurge: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
   zeroResidue: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
@@ -106,6 +107,7 @@ const limitedExecutionEvidence = {
   initialGatesBound: !limitedAutonomyExecutionPreMode,
   runnable: !limitedAutonomyExecutionPreMode,
   currentAuthority: !limitedAutonomyExecutionPreMode,
+  backdatedExecutionRejected: !limitedAutonomyExecutionPreMode,
   disabledRuleStopsDispatch: !limitedAutonomyExecutionPreMode,
   tombstonePurge: !limitedAutonomyExecutionPreMode,
   zeroResidue: !limitedAutonomyExecutionPreMode,
@@ -127,10 +129,12 @@ const executionEvidence = {
   immutableRunRejected: !executionPreMode,
   crossTenantHeadRejected: !executionPreMode,
   staleFenceRejected: !executionPreMode,
+  callerTimeCannotReclaim: !executionPreMode,
   forgedEventRejected: !executionPreMode,
   leaseEpochRecheck: !executionPreMode,
   currentDispatchAuthority: !executionPreMode,
   expiredGrantHeld: !executionPreMode,
+  expiredGrantMaterializationRejected: !executionPreMode,
   supersededGuideHeld: !executionPreMode,
 };
 const mark = (stage: string) => console.log(JSON.stringify({ p06PreStage: stage }));
@@ -769,6 +773,44 @@ try {
               jsonb_set(admission_payload,'{entityRef}','null'::jsonb),version,created_at
               from p06_limited_autonomy_admissions where id=$3::uuid`, [secondSource!.run_id, secondSource!.artifact_id, saved.admissionId]);
           });
+        limitedAutonomyEvidence.backdatedAdmissionRejected = Boolean(secondSource)
+          && await rejected(client, () => client.query(`with source as (
+              select admission.*, $1::uuid target_run_id, $2::uuid target_artifact_id,
+                date_trunc('milliseconds',transaction_timestamp()-interval '1 second') stale_at,
+                date_trunc('milliseconds',transaction_timestamp()+interval '4 minutes') stale_expires
+              from p06_limited_autonomy_admissions admission where admission.id=$3::uuid
+            ), payload as (
+              select source.*,
+                jsonb_set(jsonb_set(jsonb_set(admission_payload-'admissionHash','{admittedAt}',
+                  to_jsonb(to_char(stale_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))),'{expiresAt}',
+                  to_jsonb(to_char(stale_expires at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))),'{quotaOrdinal}','1'::jsonb) core
+              from source
+            ), canonical as (
+              select payload.*,public.guide_run_sha256(core) canonical_hash from payload
+            ) insert into p06_limited_autonomy_admissions(workspace_id,run_id,guide_revision_id,disposition_artifact_id,
+              member_ref,membership_hash,entity_ref,account_ref,campaign_ref,action_type,expected_status,desired_status,context_hash,effective_guide_set_hash,resolution_hash,
+              data_health_report_hash,approval_policy_hash,protection_hash,autonomy_evidence_hash,action_plan_hash,maximum_actions_per_run,quota_ordinal,admitted_at,expires_at,admission_hash,admission_payload)
+            select workspace_id,target_run_id,guide_revision_id,target_artifact_id,
+              member_ref,membership_hash,entity_ref,account_ref,campaign_ref,action_type,expected_status,desired_status,context_hash,effective_guide_set_hash,resolution_hash,
+              data_health_report_hash,approval_policy_hash,protection_hash,autonomy_evidence_hash,action_plan_hash,maximum_actions_per_run,1,stale_at,stale_expires,canonical_hash,
+              core||jsonb_build_object('admissionHash',canonical_hash) from canonical`, [secondSource!.run_id, secondSource!.artifact_id, saved.admissionId]));
+        if (limitedAutonomyExecutionPreMode) {
+          const secondAdmission = await limitedRepository.reserve({ workspaceId, runRef: second.runRef });
+          const secondTime = rows(await db.execute(sql`select to_char(admitted_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') admitted_at
+            from p06_limited_autonomy_admissions where workspace_id=${workspaceId}::uuid and id=${secondAdmission.admissionId}::uuid`))[0];
+          const backdatedAt = String(secondTime?.admitted_at);
+          const backdatedBase = Date.parse(backdatedAt);
+          limitedExecutionEvidence.backdatedExecutionRejected = await rejected(client, () =>
+            new DrizzleP06ExecutionRepository(outerDb).createLimitedAutonomyStatus({
+              workspaceId, admissionId: secondAdmission.admissionId, evaluatedAt: backdatedAt,
+              gates: ["staging", "admission"].map((phase, index) => ({
+                phase: phase as "staging" | "admission", enabled: true,
+                allowlistHash: digest({ phase, workspaceRef, accountRef: "act_p06_fixture" }),
+                capturedAt: new Date(backdatedBase - 2 + index).toISOString(),
+                expiresAt: new Date(backdatedBase + 60_000).toISOString(),
+              })),
+            }));
+        }
         const currentActionRule = limitedActionRulePublished;
         if (!currentActionRule) throw new Error("limited autonomy action rule missing");
         const disabledRule = disableAutonomyRule({
@@ -785,8 +827,9 @@ try {
           });
           limitedExecutionEvidence.disabledRuleStopsDispatch = !authorityAfterKill.allowed;
         }
+        const disabledRun = await makeCompleted("request_p06_limited_disabled", "33333333-3333-4333-8333-333333333333");
         try {
-          await limitedRepository.reserve({ workspaceId, runRef: second.runRef });
+          await limitedRepository.reserve({ workspaceId, runRef: disabledRun.runRef });
         } catch {
           limitedAutonomyEvidence.disabledRuleHeld = true;
         }
@@ -1095,6 +1138,21 @@ try {
         });
         const failedApproval = rows(await db.execute(sql`select d.id::text decision_id,g.id::text grant_id from action_approval_decision_events d join action_approval_evidence_grants g on g.workspace_id=d.workspace_id and g.decision_event_id=d.id where d.workspace_id=${workspaceId}::uuid and d.unit_id=${failedUnit.unit_id}::uuid and d.command_kind='approve'`))[0];
         if (!failedApproval || typeof failedApproval.decision_id !== "string" || typeof failedApproval.grant_id !== "string") throw new Error("failed execution approval missing");
+        await client.query("savepoint p06_expired_grant_materialization");
+        await client.query("set local session_replication_role=replica");
+        await client.query("update action_approval_evidence_grants set approved_at=date_trunc('milliseconds',statement_timestamp()-interval '2 seconds'),expires_at=date_trunc('milliseconds',statement_timestamp()-interval '1 second'),grant_payload=jsonb_set(jsonb_set(grant_payload,'{approvedAt}',to_jsonb(to_char((statement_timestamp()-interval '2 seconds') at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'))),'{expiresAt}',to_jsonb(to_char((statement_timestamp()-interval '1 second') at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'))) where id=$1::uuid", [failedApproval.grant_id]);
+        await client.query("set local session_replication_role=origin");
+        try {
+          await execution.materializeHumanApprovedUnit({
+            workspaceId,
+            unitRef: failedUnit.action_unit_ref,
+            evaluatedAt: iso(-10),
+            gates: [gate("staging", -12), gate("admission", -11)],
+          });
+        } catch {
+          executionEvidence.expiredGrantMaterializationRejected = true;
+        }
+        await client.query("rollback to savepoint p06_expired_grant_materialization");
         const failedIdentity = await execution.materializeHumanApprovedUnit({
           workspaceId,
           unitRef: failedUnit.action_unit_ref,
@@ -1103,12 +1161,15 @@ try {
         });
         let failedLeaseTokenHash = "a".repeat(64);
         let failedFenceHash = "b".repeat(64);
+        const failedLeaseClock = rows(await db.execute(sql`select to_char(statement_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') now`))[0];
+        const failedLeaseNow = String(failedLeaseClock?.now);
+        const failedLeaseUntil = new Date(Date.parse(failedLeaseNow) + 15_000).toISOString();
         const failedClaim = await execution.claimLease({
           executionRef: failedIdentity.executionRef,
           leaseTokenHash: failedLeaseTokenHash,
           fenceHash: failedFenceHash,
-          now: iso(21),
-          leaseUntil: iso(27),
+          now: failedLeaseNow,
+          leaseUntil: failedLeaseUntil,
         });
         const failedTrace = async (step: P06ExecutionV2Step, outcome: "ok" | "skipped" | "held" | "ambiguous" | "already_applied", receiptCore: Record<string, unknown>, seconds: number) =>
           await execution.appendTrace({
@@ -1151,14 +1212,28 @@ try {
           observedAt: iso(25),
         });
         await failedTrace("expected_before", "ok", failedBeforeCore, 26);
+        try {
+          await execution.claimLease({
+            executionRef: failedIdentity.executionRef,
+            leaseTokenHash: "1".repeat(64),
+            fenceHash: "2".repeat(64),
+            now: iso(28),
+            leaseUntil: iso(600),
+          });
+        } catch {
+          executionEvidence.callerTimeCannotReclaim = true;
+        }
+        await db.execute(sql`select pg_sleep(15.1)`);
+        const reclaimClock = rows(await db.execute(sql`select to_char(statement_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') now`))[0];
+        const reclaimNow = String(reclaimClock?.now);
         failedLeaseTokenHash = "1".repeat(64);
         failedFenceHash = "2".repeat(64);
         await execution.claimLease({
           executionRef: failedIdentity.executionRef,
           leaseTokenHash: failedLeaseTokenHash,
           fenceHash: failedFenceHash,
-          now: iso(28),
-          leaseUntil: iso(600),
+          now: reclaimNow,
+          leaseUntil: new Date(Date.parse(reclaimNow) + 600_000).toISOString(),
         });
         await execution.appendGate({
           executionRef: failedIdentity.executionRef,

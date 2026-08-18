@@ -8,9 +8,16 @@ import {
 import * as schema from "@/db/schema";
 
 const workspaceId = "00000000-0000-0000-0000-000000000001";
+const optionalForwardTables = new Set([
+  "p06_rollback_proposals", "p06_execution_observations", "p06_execution_gate_snapshots",
+  "p06_execution_heads", "p06_execution_events", "p06_execution_runs",
+  "guide_run_action_bindings", "p06_limited_autonomy_admissions",
+  "budget_ceiling_policy_revisions", "action_preparation_gate_snapshots",
+]);
 
-function inspectionRows(nonEmpty = false) {
+function inspectionRows(nonEmpty = false, includeOptional = true) {
   return [...WORKSPACE_TOMBSTONE_PURGE_TABLES]
+    .filter((table) => includeOptional || !optionalForwardTables.has(table))
     .sort()
     .map((table_name, index) => ({
       table_name,
@@ -19,14 +26,36 @@ function inspectionRows(nonEmpty = false) {
     }));
 }
 
+const availabilityRow = {
+  rollback_proposals: true,
+  execution_observations: true,
+  execution_gate_snapshots: true,
+  execution_heads: true,
+  execution_events: true,
+  execution_runs: true,
+  action_bindings: true,
+  limited_admissions: true,
+  budget_ceiling_policies: true,
+  action_preparation_gates: true,
+};
+
+function optionalInspectionRow(statement: string) {
+  const table = [...optionalForwardTables].find((name) => statement.includes(`select '${name}' as table_name`));
+  return table ? { table_name: table, row_count: 0, row_revision: "empty" } : undefined;
+}
+
 describe("explicit workspace tombstone purge adapter", () => {
   it("inspects the complete non-audit allowlist without catalog-derived table names", async () => {
     const dialect = new PgDialect();
-    let rendered = "";
+    const rendered: string[] = [];
     const executor = {
       execute: vi.fn(async (query: Parameters<PgDialect["sqlToQuery"]>[0]) => {
-        rendered = dialect.sqlToQuery(query).sql;
-        return { rows: inspectionRows(true) };
+        const statement = dialect.sqlToQuery(query).sql;
+        rendered.push(statement);
+        if (statement.includes("to_regclass('public.p06_rollback_proposals')")) return { rows: [availabilityRow] };
+        const optional = optionalInspectionRow(statement);
+        if (optional) return { rows: [optional] };
+        return { rows: inspectionRows(true, false) };
       }),
     };
     const port = new DrizzleWorkspaceTombstonePurgePort();
@@ -41,20 +70,49 @@ describe("explicit workspace tombstone purge adapter", () => {
     expect([...WORKSPACE_TOMBSTONE_PURGE_TABLES].sort()).toEqual(
       allSchemaTables.filter((table) => !protectedTables.includes(table)),
     );
-    for (const table of WORKSPACE_TOMBSTONE_PURGE_TABLES) expect(rendered).toContain(`from ${table}`);
-    expect(rendered).not.toMatch(/pg_catalog|information_schema/);
-    expect(rendered).not.toMatch(/from (?:workspaces|audit_events|users|meta_connections)(?:\s|$)/);
+    const renderedSql = rendered.join("\n");
+    for (const table of WORKSPACE_TOMBSTONE_PURGE_TABLES) expect(renderedSql).toContain(`from ${table}`);
+    expect(renderedSql).not.toMatch(/pg_catalog|information_schema/);
+    expect(renderedSql).not.toMatch(/from (?:workspaces|audit_events|users|meta_connections)(?:\s|$)/);
   });
 
   it("fails closed on a changed revision before issuing any delete", async () => {
-    const executor = { execute: vi.fn(async () => ({ rows: inspectionRows(true) })) };
+    const dialect = new PgDialect();
+    const executor = { execute: vi.fn(async (query: Parameters<PgDialect["sqlToQuery"]>[0]) => {
+      const statement = dialect.sqlToQuery(query).sql;
+      if (statement.includes("to_regclass('public.p06_rollback_proposals')")) return { rows: [availabilityRow] };
+      const optional = optionalInspectionRow(statement);
+      return { rows: optional ? [optional] : inspectionRows(true, false) };
+    }) };
     const port = new DrizzleWorkspaceTombstonePurgePort();
 
     await expect(port.purge(executor as never, {
       workspaceId,
       expectedRevision: "stale",
     })).rejects.toMatchObject({ code: "revision_changed" });
-    expect(executor.execute).toHaveBeenCalledOnce();
+    expect(executor.execute.mock.calls.some(([query]) => dialect.sqlToQuery(query).sql.includes("delete from"))).toBe(false);
+  });
+
+  it("does not parse or delete unapplied forward tables", async () => {
+    const dialect = new PgDialect();
+    const statements: string[] = [];
+    const unavailable = Object.fromEntries(Object.keys(availabilityRow).map((key) => [key, false]));
+    const executor = { execute: vi.fn(async (query: Parameters<PgDialect["sqlToQuery"]>[0]) => {
+      const statement = dialect.sqlToQuery(query).sql;
+      statements.push(statement);
+      if (statement.includes("to_regclass('public.p06_rollback_proposals')")) return { rows: [unavailable] };
+      if (statement.includes("union all select 'data_sources'")) return { rows: inspectionRows(false, false) };
+      return { rows: [{ count: 0 }] };
+    }) };
+    const port = new DrizzleWorkspaceTombstonePurgePort();
+    const evidence = await port.inspect(executor as never, workspaceId);
+    const result = await port.purge(executor as never, { workspaceId, expectedRevision: evidence.revision });
+
+    expect(result).toEqual({ purgedRowCount: 0, membershipCount: 0 });
+    for (const table of optionalForwardTables) {
+      expect(statements.some((statement) => statement.includes(`from ${table}`))).toBe(false);
+      expect(statements.some((statement) => statement.includes(`delete from ${table}`))).toBe(false);
+    }
   });
 
   it("deletes every allowed table in FK-safe order and verifies zero survivors", async () => {
@@ -65,9 +123,12 @@ describe("explicit workspace tombstone purge adapter", () => {
       execute: vi.fn(async (query: Parameters<PgDialect["sqlToQuery"]>[0]) => {
         const statement = dialect.sqlToQuery(query).sql;
         statements.push(statement);
+        if (statement.includes("to_regclass('public.p06_rollback_proposals')")) return { rows: [availabilityRow] };
+        const optional = optionalInspectionRow(statement);
+        if (optional) return { rows: [optional] };
         if (statement.includes("union all select 'data_sources'")) {
           inspectCalls += 1;
-          return { rows: inspectionRows(false) };
+          return { rows: inspectionRows(false, false) };
         }
         return { rows: [{ count: 0 }] };
       }),

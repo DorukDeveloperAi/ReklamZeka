@@ -17,6 +17,7 @@ import {
   p06ExecutionV2Digest,
   type P06ExecutionV2Action,
 } from "@/domain/actions/p06-execution-v2";
+import { resolveP08RolloutControl } from "@/server/p08-rollout-control";
 
 type Database = NodePgDatabase<typeof schema>;
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -55,7 +56,8 @@ function gateResolver(
   now: () => Date,
 ): P06StatusExecutionGateResolver {
   return Object.freeze({
-    async resolve({ phase }) {
+    async resolve({ phase, route }) {
+      const rollout = resolveP08RolloutControl(environment);
       const capturedAt = now().toISOString();
       const workspaceAllowlist = list(
         environment.P06_META_WRITE_WORKSPACE_ALLOWLIST,
@@ -70,11 +72,16 @@ function gateResolver(
       );
       const killSwitch = environment.P06_META_WRITE_KILL_SWITCH !== "false";
       const enabled =
+        rollout.metaWriteEnabled &&
         environment.P06_META_STATUS_WRITE_ENABLED === "true" &&
+        (route === "limited_autonomy_status"
+          ? rollout.limitedAutonomyEnabled
+          : rollout.humanActionExecutionEnabled) &&
         workspaceAllowlist.length > 0 &&
         accountAllowlist.length > 0 &&
         actionAllowlist.length > 0;
       const allowlistHash = p06ExecutionV2Digest({
+        route,
         workspaceAllowlist,
         accountAllowlist,
         actionAllowlist,
@@ -99,7 +106,9 @@ function initialGate(
   environment: Environment,
   phase: "staging" | "admission",
   capturedAt: string,
+  route: "human_approved" | "limited_autonomy_status",
 ) {
+  const rollout = resolveP08RolloutControl(environment);
   const workspaceAllowlist = list(
     environment.P06_META_WRITE_WORKSPACE_ALLOWLIST,
     100,
@@ -111,7 +120,11 @@ function initialGate(
   const actionAllowlist = actions(environment.P06_META_WRITE_ACTION_ALLOWLIST);
   const killSwitch = environment.P06_META_WRITE_KILL_SWITCH !== "false";
   const enabled =
+    rollout.metaWriteEnabled &&
     environment.P06_META_STATUS_WRITE_ENABLED === "true" &&
+    (route === "limited_autonomy_status"
+      ? rollout.limitedAutonomyEnabled
+      : rollout.humanActionExecutionEnabled) &&
     workspaceAllowlist.length > 0 &&
     accountAllowlist.length > 0 &&
     actionAllowlist.length > 0 &&
@@ -120,6 +133,7 @@ function initialGate(
     phase,
     enabled,
     allowlistHash: p06ExecutionV2Digest({
+      route,
       workspaceAllowlist,
       accountAllowlist,
       actionAllowlist,
@@ -146,8 +160,16 @@ export function createP06StatusExecutionRuntime(
   const environment = input.environment ?? process.env;
   const now = input.now ?? (() => new Date());
   const token = environment.P06_META_WRITE_ACCESS_TOKEN?.trim() ?? "";
+  const rollout = resolveP08RolloutControl(environment);
+  const capturedAt = now().toISOString();
+  const humanConfigured = rollout.humanActionExecutionEnabled &&
+    initialGate(environment, "staging", capturedAt, "human_approved").enabled;
+  const limitedConfigured = rollout.limitedAutonomyEnabled &&
+    initialGate(environment, "staging", capturedAt, "limited_autonomy_status").enabled;
   const configured =
-    environment.P06_META_STATUS_WRITE_ENABLED === "true" && token.length > 0;
+    rollout.metaWriteEnabled &&
+    (humanConfigured || limitedConfigured) &&
+    token.length > 0;
   if (!configured)
     return Object.freeze({
       enabled: false as const,
@@ -172,29 +194,36 @@ export function createP06StatusExecutionRuntime(
   const scheduler = new P06StatusExecutionSchedulerWorker({
     repository: { listRunnable: async (limit) => {
       const boundedLimit = limit ?? 25;
-      const admissions = await repository.listUnmaterializedLimitedAutonomyAdmissions(boundedLimit);
-      for (const admission of admissions) {
-        const evaluatedAt = now().toISOString();
-        const base = Date.parse(evaluatedAt);
-        const gates = [
-          initialGate(environment, "staging", new Date(base - 2).toISOString()),
-          initialGate(environment, "admission", new Date(base - 1).toISOString()),
-        ] as const;
-        if (!gates.every((gate) => gate.enabled)) continue;
-        try {
-          await repository.createLimitedAutonomyStatus({
-            workspaceId: admission.workspaceId,
-            admissionId: admission.admissionId,
-            evaluatedAt,
-            gates,
-          });
-        } catch {
-          // A stale/current-policy/context rejection is a closed hold. The
-          // immutable admission remains inspectable and no execution is made.
+      const currentRollout = resolveP08RolloutControl(environment);
+      if (currentRollout.limitedAutonomyEnabled) {
+        const admissions = await repository.listUnmaterializedLimitedAutonomyAdmissions(boundedLimit);
+        for (const admission of admissions) {
+          const evaluatedAt = now().toISOString();
+          const base = Date.parse(evaluatedAt);
+          const gates = [
+            initialGate(environment, "staging", new Date(base - 2).toISOString(), "limited_autonomy_status"),
+            initialGate(environment, "admission", new Date(base - 1).toISOString(), "limited_autonomy_status"),
+          ] as const;
+          if (!gates.every((gate) => gate.enabled)) continue;
+          try {
+            await repository.createLimitedAutonomyStatus({
+              workspaceId: admission.workspaceId,
+              admissionId: admission.admissionId,
+              evaluatedAt,
+              gates,
+            });
+          } catch {
+            // A stale/current-policy/context rejection is a closed hold. The
+            // immutable admission remains inspectable and no execution is made.
+          }
         }
       }
-      const human = await repository.listRunnableByRoute("human_approved", boundedLimit);
-      const limited = await repository.listRunnableByRoute("limited_autonomy_status", Math.max(1, boundedLimit - human.length));
+      const human = currentRollout.humanActionExecutionEnabled
+        ? await repository.listRunnableByRoute("human_approved", boundedLimit)
+        : Object.freeze([] as string[]);
+      const limited = currentRollout.limitedAutonomyEnabled
+        ? await repository.listRunnableByRoute("limited_autonomy_status", Math.max(1, boundedLimit - human.length))
+        : Object.freeze([] as string[]);
       return Object.freeze([...human, ...limited].slice(0, boundedLimit));
     } },
     worker,
@@ -206,7 +235,7 @@ export function createP06StatusExecutionRuntime(
     kind: "approve" | "reject" | "defer" | "request_changes";
     decidedAt: string;
   }>) => {
-    if (approved.kind !== "approve") return;
+    if (approved.kind !== "approve" || !resolveP08RolloutControl(environment).humanActionExecutionEnabled) return;
     const evaluatedAt = now().toISOString();
     const base = Date.parse(evaluatedAt);
     await repository.materializeHumanApprovedUnit({
@@ -214,8 +243,8 @@ export function createP06StatusExecutionRuntime(
       unitRef: approved.unitRef,
       evaluatedAt,
       gates: [
-        initialGate(environment, "staging", new Date(base - 2).toISOString()),
-        initialGate(environment, "admission", new Date(base - 1).toISOString()),
+        initialGate(environment, "staging", new Date(base - 2).toISOString(), "human_approved"),
+        initialGate(environment, "admission", new Date(base - 1).toISOString(), "human_approved"),
       ],
     });
   };

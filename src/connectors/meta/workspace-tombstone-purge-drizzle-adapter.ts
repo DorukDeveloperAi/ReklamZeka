@@ -19,6 +19,35 @@ type InspectionRow = Readonly<{
 
 type DeleteCountRow = Readonly<{ count: number | string }>;
 
+const OPTIONAL_FORWARD_PURGE_TABLES = Object.freeze([
+  "p06_rollback_proposals",
+  "p06_execution_observations",
+  "p06_execution_gate_snapshots",
+  "p06_execution_heads",
+  "p06_execution_events",
+  "p06_execution_runs",
+  "guide_run_action_bindings",
+  "p06_limited_autonomy_admissions",
+  "budget_ceiling_policy_revisions",
+  "action_preparation_gate_snapshots",
+] as const);
+
+type OptionalForwardPurgeTable = (typeof OPTIONAL_FORWARD_PURGE_TABLES)[number];
+type OptionalTableAvailability = Readonly<Record<OptionalForwardPurgeTable, boolean>>;
+
+type AvailabilityRow = Readonly<{
+  rollback_proposals: boolean;
+  execution_observations: boolean;
+  execution_gate_snapshots: boolean;
+  execution_heads: boolean;
+  execution_events: boolean;
+  execution_runs: boolean;
+  action_bindings: boolean;
+  limited_admissions: boolean;
+  budget_ceiling_policies: boolean;
+  action_preparation_gates: boolean;
+}>;
+
 /**
  * Complete, explicit allowlist of workspace-owned rows that may be destroyed.
  * It intentionally excludes workspaces, audit_events, users and meta_connections.
@@ -212,6 +241,59 @@ async function deleteCount(executor: DrizzleExecutor, statement: ReturnType<type
   return safeCount(row?.count);
 }
 
+async function optionalTableAvailability(executor: DrizzleExecutor): Promise<OptionalTableAvailability> {
+  const row = resultRows<AvailabilityRow>(await executor.execute(sql`
+    select
+      to_regclass('public.p06_rollback_proposals') is not null as rollback_proposals,
+      to_regclass('public.p06_execution_observations') is not null as execution_observations,
+      to_regclass('public.p06_execution_gate_snapshots') is not null as execution_gate_snapshots,
+      to_regclass('public.p06_execution_heads') is not null as execution_heads,
+      to_regclass('public.p06_execution_events') is not null as execution_events,
+      to_regclass('public.p06_execution_runs') is not null as execution_runs,
+      to_regclass('public.guide_run_action_bindings') is not null as action_bindings,
+      to_regclass('public.p06_limited_autonomy_admissions') is not null as limited_admissions,
+      to_regclass('public.budget_ceiling_policy_revisions') is not null as budget_ceiling_policies,
+      to_regclass('public.action_preparation_gate_snapshots') is not null as action_preparation_gates
+  `))[0];
+  if (!row) throw new WorkspaceTombstoneError("workspace_unavailable");
+  return Object.freeze({
+    p06_rollback_proposals: row.rollback_proposals === true,
+    p06_execution_observations: row.execution_observations === true,
+    p06_execution_gate_snapshots: row.execution_gate_snapshots === true,
+    p06_execution_heads: row.execution_heads === true,
+    p06_execution_events: row.execution_events === true,
+    p06_execution_runs: row.execution_runs === true,
+    guide_run_action_bindings: row.action_bindings === true,
+    p06_limited_autonomy_admissions: row.limited_admissions === true,
+    budget_ceiling_policy_revisions: row.budget_ceiling_policies === true,
+    action_preparation_gate_snapshots: row.action_preparation_gates === true,
+  });
+}
+
+async function inspectOptionalForwardTables(
+  executor: DrizzleExecutor,
+  workspaceId: string,
+  availability: OptionalTableAvailability,
+): Promise<readonly InspectionRow[]> {
+  const rows: InspectionRow[] = [];
+  const inspect = async (statement: ReturnType<typeof sql>) => {
+    const row = resultRows<InspectionRow>(await executor.execute(statement))[0];
+    if (!row) throw new WorkspaceTombstoneError("workspace_unavailable");
+    rows.push(row);
+  };
+  if (availability.p06_rollback_proposals) await inspect(sql`select 'p06_rollback_proposals' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_rollback_proposals where workspace_id = ${workspaceId}::uuid`);
+  if (availability.p06_execution_observations) await inspect(sql`select 'p06_execution_observations' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_execution_observations where workspace_id = ${workspaceId}::uuid`);
+  if (availability.p06_execution_gate_snapshots) await inspect(sql`select 'p06_execution_gate_snapshots' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_execution_gate_snapshots where workspace_id = ${workspaceId}::uuid`);
+  if (availability.p06_execution_heads) await inspect(sql`select 'p06_execution_heads' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_execution_heads where workspace_id = ${workspaceId}::uuid`);
+  if (availability.p06_execution_events) await inspect(sql`select 'p06_execution_events' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_execution_events where workspace_id = ${workspaceId}::uuid`);
+  if (availability.p06_execution_runs) await inspect(sql`select 'p06_execution_runs' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_execution_runs where workspace_id = ${workspaceId}::uuid`);
+  if (availability.guide_run_action_bindings) await inspect(sql`select 'guide_run_action_bindings' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from guide_run_action_bindings where workspace_id = ${workspaceId}::uuid`);
+  if (availability.p06_limited_autonomy_admissions) await inspect(sql`select 'p06_limited_autonomy_admissions' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_limited_autonomy_admissions where workspace_id = ${workspaceId}::uuid`);
+  if (availability.budget_ceiling_policy_revisions) await inspect(sql`select 'budget_ceiling_policy_revisions' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from budget_ceiling_policy_revisions where workspace_id = ${workspaceId}::uuid`);
+  if (availability.action_preparation_gate_snapshots) await inspect(sql`select 'action_preparation_gate_snapshots' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from action_preparation_gate_snapshots where workspace_id = ${workspaceId}::uuid`);
+  return rows;
+}
+
 /**
  * Destructive implementation used only inside DrizzleWorkspaceTombstoneStore's
  * serializable, locked caller transaction. No table name is catalog-derived.
@@ -222,21 +304,14 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
   async inspect(executor: DrizzleExecutor, workspaceId: string): Promise<WorkspaceTombstonePurgeEvidence> {
     if (!workspaceId) throw new WorkspaceTombstoneError("invalid_input");
 
-    const inspected = resultRows<InspectionRow>(await executor.execute(sql`
-      select 'p06_rollback_proposals' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_rollback_proposals where workspace_id = ${workspaceId}::uuid
-      union all select 'p06_execution_observations', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from p06_execution_observations where workspace_id = ${workspaceId}::uuid
-      union all select 'p06_execution_gate_snapshots', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from p06_execution_gate_snapshots where workspace_id = ${workspaceId}::uuid
-      union all select 'p06_execution_heads', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from p06_execution_heads where workspace_id = ${workspaceId}::uuid
-      union all select 'p06_execution_events', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from p06_execution_events where workspace_id = ${workspaceId}::uuid
-      union all select 'p06_execution_runs', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from p06_execution_runs where workspace_id = ${workspaceId}::uuid
-      union all select 'guide_run_action_bindings' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from guide_run_action_bindings where workspace_id = ${workspaceId}::uuid
-      union all select 'p06_limited_autonomy_admissions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from p06_limited_autonomy_admissions where workspace_id = ${workspaceId}::uuid
-      union all select 'guide_run_schedule_receipts' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from guide_run_schedule_receipts where workspace_id = ${workspaceId}::uuid
+    const availability = await optionalTableAvailability(executor);
+
+    const baseInspected = resultRows<InspectionRow>(await executor.execute(sql`
+      select 'guide_run_schedule_receipts' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from guide_run_schedule_receipts where workspace_id = ${workspaceId}::uuid
       union all select 'guide_run_artifacts', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_run_artifacts where workspace_id = ${workspaceId}::uuid
       union all select 'guide_run_heads', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_run_heads where workspace_id = ${workspaceId}::uuid
       union all select 'guide_run_events', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_run_events where workspace_id = ${workspaceId}::uuid
       union all select 'guide_runs', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_runs where workspace_id = ${workspaceId}::uuid
-      union all select 'budget_ceiling_policy_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from budget_ceiling_policy_revisions where workspace_id = ${workspaceId}::uuid
       union all
       select 'primary_result_binding_heads' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from primary_result_binding_heads where workspace_id = ${workspaceId}::uuid
       union all select 'primary_result_binding_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from primary_result_binding_revisions where workspace_id = ${workspaceId}::uuid
@@ -614,9 +689,6 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'orchestrator_profile_revisions', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from orchestrator_profile_revisions where workspace_id = ${workspaceId}::uuid
-      union all select 'action_preparation_gate_snapshots', count(*)::int,
-        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
-      from action_preparation_gate_snapshots where workspace_id = ${workspaceId}::uuid
       union all select 'slice_rule_workspace_drafts', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from slice_rule_workspace_drafts where workspace_id = ${workspaceId}::uuid
@@ -653,11 +725,17 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       order by table_name
     `));
 
-    if (inspected.length !== WORKSPACE_TOMBSTONE_PURGE_TABLES.length) {
+    const inspected = [...baseInspected, ...(await inspectOptionalForwardTables(executor, workspaceId, availability))]
+      .sort((left, right) => left.table_name.localeCompare(right.table_name));
+
+    const expectedTables = WORKSPACE_TOMBSTONE_PURGE_TABLES.filter(
+      (table) => !OPTIONAL_FORWARD_PURGE_TABLES.includes(table as OptionalForwardPurgeTable) || availability[table as OptionalForwardPurgeTable],
+    );
+    if (inspected.length !== expectedTables.length) {
       throw new WorkspaceTombstoneError("workspace_unavailable");
     }
     const names = new Set(inspected.map((row) => row.table_name));
-    if (WORKSPACE_TOMBSTONE_PURGE_TABLES.some((table) => !names.has(table))) {
+    if (expectedTables.some((table) => !names.has(table))) {
       throw new WorkspaceTombstoneError("workspace_unavailable");
     }
     return Object.freeze({
@@ -686,26 +764,27 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       purgedRowCount += count;
       return count;
     };
+    const availability = await optionalTableAvailability(executor);
 
     // Children first. This ordering is stable to minimize lock-order deadlocks.
     // P05 rows are immutable during normal operation. The P05 SQL guards allow
     // these exact deletes only after WorkspaceTombstoneService marked the
     // workspace tombstoning, so keep this five-table block contiguous.
-    await remove(sql`with removed as (delete from p06_rollback_proposals where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
-    await remove(sql`with removed as (delete from p06_execution_observations where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
-    await remove(sql`with removed as (delete from p06_execution_gate_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
-    await remove(sql`with removed as (delete from p06_execution_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
-    await remove(sql`with removed as (delete from p06_execution_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
-    await remove(sql`with removed as (delete from p06_execution_runs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
-    await remove(sql`with removed as (delete from guide_run_action_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
-    await remove(sql`with removed as (delete from p06_limited_autonomy_admissions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.p06_rollback_proposals) await remove(sql`with removed as (delete from p06_rollback_proposals where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.p06_execution_observations) await remove(sql`with removed as (delete from p06_execution_observations where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.p06_execution_gate_snapshots) await remove(sql`with removed as (delete from p06_execution_gate_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.p06_execution_heads) await remove(sql`with removed as (delete from p06_execution_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.p06_execution_events) await remove(sql`with removed as (delete from p06_execution_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.p06_execution_runs) await remove(sql`with removed as (delete from p06_execution_runs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.guide_run_action_bindings) await remove(sql`with removed as (delete from guide_run_action_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.p06_limited_autonomy_admissions) await remove(sql`with removed as (delete from p06_limited_autonomy_admissions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.budget_ceiling_policy_revisions) await remove(sql`with removed as (delete from budget_ceiling_policy_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.action_preparation_gate_snapshots) await remove(sql`with removed as (delete from action_preparation_gate_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guide_run_schedule_receipts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guide_run_artifacts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guide_run_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guide_run_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guide_runs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
-    await remove(sql`with removed as (delete from budget_ceiling_policy_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
-    await remove(sql`with removed as (delete from action_preparation_gate_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from candidate_preview_binding_invalidations where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from candidate_preview_binding_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from candidate_preview_binding_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

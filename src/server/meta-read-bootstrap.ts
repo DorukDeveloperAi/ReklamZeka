@@ -7,6 +7,7 @@ import { DrizzleMetaConnectionRepository } from "@/connectors/meta/connection-dr
 import { DrizzleEnvironmentMetaSecretRepository } from "@/connectors/meta/environment-secret-drizzle-repository";
 import { MetaGraphClient } from "@/connectors/meta/graph-client";
 import * as schema from "@/db/schema";
+import { resolveP08RolloutControl } from "@/server/p08-rollout-control";
 
 type Database=NodePgDatabase<typeof schema>;
 type Account=Readonly<{id?:string;name?:string;currency?:string;timezone_name?:string;account_status?:number|string}>;
@@ -14,7 +15,9 @@ const ACCOUNT=/^act_[0-9]{1,32}$/;
 export class MetaReadBootstrapError extends Error { constructor(readonly code:"invalid_input"|"connection_unavailable"|"account_unavailable"){super(code);} }
 /** Server-private, GET-only root materializer for a pre-authorized read-only connection. */
 export async function bootstrapMetaReadMirror(input:Readonly<{database:Database;workspaceId:string;actorId:string;connectionId:string;environment?:Record<string,string|undefined>}>) {
-  const environment=input.environment??process.env; const connections=new DrizzleMetaConnectionRepository(input.database); const secrets=new DrizzleEnvironmentMetaSecretRepository(input.database,environment);
+  const environment=input.environment??process.env;
+  if (!resolveP08RolloutControl(environment).metaReadEnabled) throw new MetaReadBootstrapError("connection_unavailable");
+  const connections=new DrizzleMetaConnectionRepository(input.database); const secrets=new DrizzleEnvironmentMetaSecretRepository(input.database,environment);
   const service=new MetaConnectionService({memberships:[{workspaceId:input.workspaceId,userId:input.actorId,role:"owner"}],connections,secrets,audit:new AppendOnlyAuditLog(),tokenSecurityStatus:()=>environment.META_TOKEN_SECURITY_STATUS});
   let connection; try { connection=await service.doctor({userId:input.actorId},input.workspaceId,input.connectionId); } catch { throw new MetaReadBootstrapError("connection_unavailable"); }
   if(connection.status!=="active"||connection.accessMode!=="read_only")throw new MetaReadBootstrapError("connection_unavailable");

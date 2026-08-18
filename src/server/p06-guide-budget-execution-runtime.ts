@@ -10,6 +10,7 @@ import { P06MetaStatusWriter } from "@/connectors/meta/p06-meta-status-writer";
 import * as schema from "@/db/schema";
 import { p06ExecutionV2Digest, type P06ExecutionV2Action } from "@/domain/actions/p06-execution-v2";
 import { createLocalGuideBudgetAdmissionGate } from "@/server/local-guide-budget-action-runtime";
+import { resolveP08RolloutControl } from "@/server/p08-rollout-control";
 
 type Database = NodePgDatabase<typeof schema>;
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -26,14 +27,16 @@ function actions(value: string | undefined) {
     ? Object.freeze(entries as readonly P06ExecutionV2Action[]) : Object.freeze([] as P06ExecutionV2Action[]);
 }
 function inputs(environment: Environment) {
+  const rollout = resolveP08RolloutControl(environment);
   const workspaceAllowlist = list(environment.P06_META_WRITE_WORKSPACE_ALLOWLIST, 100);
   const accountAllowlist = list(environment.P06_META_WRITE_ACCOUNT_ALLOWLIST, 1_000);
   const actionAllowlist = actions(environment.P06_META_BUDGET_WRITE_ACTION_ALLOWLIST);
   const killSwitch = environment.P06_META_WRITE_KILL_SWITCH !== "false";
-  const enabled = environment.P06_META_BUDGET_WRITE_ENABLED === "true" && !killSwitch
+  const enabled = rollout.metaWriteEnabled && rollout.humanActionExecutionEnabled
+    && environment.P06_META_BUDGET_WRITE_ENABLED === "true" && !killSwitch
     && workspaceAllowlist.length > 0 && accountAllowlist.length > 0 && actionAllowlist.length > 0;
   return Object.freeze({ workspaceAllowlist, accountAllowlist, actionAllowlist, killSwitch, enabled,
-    allowlistHash: p06ExecutionV2Digest({ workspaceAllowlist, accountAllowlist, actionAllowlist, killSwitch }) });
+    allowlistHash: p06ExecutionV2Digest({ route: "guide_budget_human_approved", workspaceAllowlist, accountAllowlist, actionAllowlist, killSwitch }) });
 }
 function gateResolver(environment: Environment, now: () => Date): P06StatusExecutionGateResolver {
   return Object.freeze({ async resolve({ phase }) {
@@ -50,7 +53,10 @@ function gateResolver(environment: Environment, now: () => Date): P06StatusExecu
 export function createP06GuideBudgetExecutionRuntime(input: Readonly<{ database: Database; environment?: Environment; now?: () => Date }>) {
   const environment = input.environment ?? process.env, now = input.now ?? (() => new Date());
   const token = environment.P06_META_WRITE_ACCESS_TOKEN?.trim() ?? "";
-  if (environment.P06_META_BUDGET_WRITE_ENABLED !== "true" || token.length === 0) {
+  const rollout = resolveP08RolloutControl(environment);
+  const current = inputs(environment);
+  if (!rollout.metaWriteEnabled || !rollout.humanActionExecutionEnabled
+    || !current.enabled || token.length === 0) {
     return Object.freeze({ enabled: false as const, worker: null, scheduler: null });
   }
   const repository = new DrizzleP06ExecutionRepository(input.database);

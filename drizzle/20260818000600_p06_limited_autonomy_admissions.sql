@@ -124,6 +124,7 @@ BEGIN
   SELECT * INTO gr FROM public.guide_revisions WHERE workspace_id=NEW.workspace_id AND id=NEW.guide_revision_id FOR SHARE;
   candidate:=a.payload->'disposition'->'candidate';
   IF r.id IS NULL OR h.run_id IS NULL OR a.id IS NULL OR gr.id IS NULL OR h.state IS DISTINCT FROM 'completed'
+    OR NEW.admitted_at IS DISTINCT FROM date_trunc('milliseconds',transaction_timestamp())
     OR gr.mode IS DISTINCT FROM 'limited_autonomy' OR a.kind IS DISTINCT FROM 'disposition'
     OR a.payload->'disposition'->>'state' IS DISTINCT FROM 'staged'
     OR candidate->>'routing' IS DISTINCT FROM 'limited_autonomy_review'

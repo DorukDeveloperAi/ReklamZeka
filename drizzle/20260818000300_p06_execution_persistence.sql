@@ -291,7 +291,7 @@ BEGIN
     OR u.bundle_id IS DISTINCT FROM NEW.proposal_bundle_id
     OR d.command_kind IS DISTINCT FROM 'approve' OR d.bundle_id IS DISTINCT FROM NEW.proposal_bundle_id OR d.unit_id IS DISTINCT FROM u.id
     OR g.bundle_id IS DISTINCT FROM NEW.proposal_bundle_id OR g.unit_id IS DISTINCT FROM u.id OR g.decision_event_id IS DISTINCT FROM d.id
-    OR g.expires_at<=NEW.created_at OR g.capability IS DISTINCT FROM 'approval_evidence_only' OR g.can_execute IS DISTINCT FROM false
+    OR g.expires_at<=statement_timestamp() OR g.capability IS DISTINCT FROM 'approval_evidence_only' OR g.can_execute IS DISTINCT FROM false
     OR NEW.action_unit_hash IS DISTINCT FROM u.unit_hash OR NEW.proposal_hash IS DISTINCT FROM b.proposal_hash
     OR NEW.context_hash IS DISTINCT FROM u.context_hash OR NEW.effective_guide_set_hash IS DISTINCT FROM b.effective_guide_set_hash
     OR NEW.resolution_hash IS DISTINCT FROM b.resolution_hash OR NEW.policy_hash IS DISTINCT FROM persisted_policy_hash
@@ -349,16 +349,17 @@ BEGIN
   SELECT * INTO r FROM public.p06_execution_runs WHERE workspace_id=NEW.workspace_id AND id=NEW.execution_run_id;
   IF NEW.workspace_id IS DISTINCT FROM OLD.workspace_id OR NEW.execution_run_id IS DISTINCT FROM OLD.execution_run_id
     OR NEW.sequence<>OLD.sequence+1 OR e.id IS NULL OR e.sequence IS DISTINCT FROM NEW.sequence OR e.previous_hash IS DISTINCT FROM coalesce(OLD.head_event_hash,'GENESIS')
+    OR NEW.updated_at IS DISTINCT FROM e.occurred_at
     OR NEW.trace_sequence IS DISTINCT FROM (CASE WHEN e.event_kind='trace' THEN OLD.trace_sequence+1 ELSE OLD.trace_sequence END)
     OR (e.event_kind='trace' AND e.trace_sequence IS DISTINCT FROM NEW.trace_sequence)
   THEN RAISE EXCEPTION 'p06 execution head requires exact next event CAS'; END IF;
-  IF e.event_kind='lease_claimed' AND (OLD.state<>'pending' OR NEW.state<>'claimed' OR NEW.lease_epoch<>1 OR NEW.lease_token_hash IS NULL OR NEW.fence_hash IS NULL OR NEW.lease_expires_at<=NEW.updated_at) THEN RAISE EXCEPTION 'p06 execution initial lease invalid'; END IF;
-  IF e.event_kind='lease_reclaimed' AND (OLD.state NOT IN ('claimed','running') OR OLD.lease_expires_at>NEW.updated_at OR NEW.state<>'claimed' OR NEW.lease_epoch<>OLD.lease_epoch+1 OR NEW.lease_token_hash IS NULL OR NEW.fence_hash IS NULL OR NEW.lease_expires_at<=NEW.updated_at OR (NEW.lease_token_hash=OLD.lease_token_hash AND NEW.fence_hash=OLD.fence_hash)) THEN RAISE EXCEPTION 'p06 execution reclaim invalid'; END IF;
+  IF e.event_kind='lease_claimed' AND (OLD.state<>'pending' OR NEW.state<>'claimed' OR NEW.lease_epoch<>1 OR NEW.lease_token_hash IS NULL OR NEW.fence_hash IS NULL OR NEW.lease_expires_at<=statement_timestamp()) THEN RAISE EXCEPTION 'p06 execution initial lease invalid'; END IF;
+  IF e.event_kind='lease_reclaimed' AND (OLD.state NOT IN ('claimed','running') OR OLD.lease_expires_at>statement_timestamp() OR NEW.state<>'claimed' OR NEW.lease_epoch<>OLD.lease_epoch+1 OR NEW.lease_token_hash IS NULL OR NEW.fence_hash IS NULL OR NEW.lease_expires_at<=statement_timestamp() OR (NEW.lease_token_hash=OLD.lease_token_hash AND NEW.fence_hash=OLD.fence_hash)) THEN RAISE EXCEPTION 'p06 execution reclaim invalid'; END IF;
   IF e.event_kind IN ('lease_claimed','lease_reclaimed') AND (e.payload->'receiptCore' IS DISTINCT FROM jsonb_build_object('executionRef',r.execution_ref,'leaseTokenHash',NEW.lease_token_hash,'fenceHash',NEW.fence_hash,'owned',true)) THEN RAISE EXCEPTION 'p06 execution lease receipt invalid'; END IF;
-  IF e.event_kind='trace' AND NEW.trace_sequence<10 AND (NEW.state NOT IN ('claimed','running') OR OLD.lease_expires_at<=NEW.updated_at OR NEW.lease_token_hash IS DISTINCT FROM OLD.lease_token_hash OR NEW.fence_hash IS DISTINCT FROM OLD.fence_hash OR NEW.lease_epoch IS DISTINCT FROM OLD.lease_epoch OR NEW.lease_expires_at IS DISTINCT FROM OLD.lease_expires_at) THEN RAISE EXCEPTION 'p06 execution fence drift'; END IF;
+  IF e.event_kind='trace' AND NEW.trace_sequence<10 AND (NEW.state NOT IN ('claimed','running') OR OLD.lease_expires_at<=statement_timestamp() OR NEW.lease_token_hash IS DISTINCT FROM OLD.lease_token_hash OR NEW.fence_hash IS DISTINCT FROM OLD.fence_hash OR NEW.lease_epoch IS DISTINCT FROM OLD.lease_epoch OR NEW.lease_expires_at IS DISTINCT FROM OLD.lease_expires_at) THEN RAISE EXCEPTION 'p06 execution fence drift'; END IF;
   IF e.event_kind='trace' AND NEW.trace_sequence=10 THEN
     SELECT * INTO terminal_event FROM public.p06_execution_events WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND trace_sequence=9;
-    IF e.step<>'release' OR NEW.state NOT IN ('succeeded','verification_failed','held') OR NEW.lease_token_hash IS NOT NULL OR NEW.fence_hash IS NOT NULL OR NEW.lease_expires_at IS NOT NULL OR NEW.terminal_hash IS NULL
+    IF e.step<>'release' OR OLD.lease_expires_at<=statement_timestamp() OR NEW.state NOT IN ('succeeded','verification_failed','held') OR NEW.lease_token_hash IS NOT NULL OR NEW.fence_hash IS NOT NULL OR NEW.lease_expires_at IS NOT NULL OR NEW.terminal_hash IS NULL
       OR (SELECT count(*) FROM public.p06_execution_gate_snapshots WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND lease_epoch=0 AND phase IN ('staging','admission'))<>2
       OR (SELECT count(*) FROM public.p06_execution_gate_snapshots WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND lease_epoch=NEW.lease_epoch AND phase IN ('post_claim','pre_dispatch','read_after_write'))<>3
       OR terminal_event.step IS DISTINCT FROM 'immutable_terminal' OR NEW.terminal_hash IS DISTINCT FROM terminal_event.receipt_hash
@@ -389,7 +390,7 @@ BEGIN
     OR NEW.sequence IS DISTINCT FROM expected_sequence OR NEW.snapshot_hash IS DISTINCT FROM expected_snapshot OR NEW.receipt_hash IS DISTINCT FROM expected_receipt
     OR (expected_sequence>1 AND (prior.id IS NULL OR NEW.captured_at<=prior.captured_at))
     OR (expected_sequence<=2 AND NEW.lease_epoch<>0)
-    OR (expected_sequence>=3 AND (NEW.lease_epoch IS DISTINCT FROM h.lease_epoch OR h.state NOT IN ('claimed','running') OR h.lease_expires_at<=NEW.captured_at))
+    OR (expected_sequence>=3 AND (NEW.lease_epoch IS DISTINCT FROM h.lease_epoch OR h.state NOT IN ('claimed','running') OR h.lease_expires_at<=statement_timestamp()))
     OR NEW.payload->>'version' IS DISTINCT FROM 'p06-execution-gate/1.0.0' OR NEW.payload->>'phase' IS DISTINCT FROM NEW.phase
     OR (NEW.payload->>'sequence')::integer IS DISTINCT FROM NEW.sequence OR (NEW.payload->>'enabled')::boolean IS DISTINCT FROM NEW.enabled
     OR (NEW.payload->>'leaseEpoch')::integer IS DISTINCT FROM NEW.lease_epoch
@@ -427,8 +428,8 @@ BEGIN
   SELECT * INTO after_row FROM public.p06_execution_observations WHERE workspace_id=NEW.workspace_id AND id=NEW.after_observation_id AND execution_run_id=NEW.execution_run_id FOR SHARE;
   SELECT * INTO write_row FROM public.p06_execution_observations WHERE workspace_id=NEW.workspace_id AND id=NEW.write_observation_id AND execution_run_id=NEW.execution_run_id FOR SHARE;
   expected_hash:=public.guide_run_sha256(NEW.payload-ARRAY['proposalRef','proposalHash']);
-  IF r.id IS NULL OR cardinality(ARRAY(SELECT jsonb_object_keys(NEW.payload)))<>13
-    OR NOT (NEW.payload ?& ARRAY['version','proposalHash','executionRef','terminalHash','writeReceiptHash','beforeReadReceiptHash','afterReadReceiptHash','previousObserved','postWriteObserved','restoreTo','failedDesired','requiresNewHumanApproval','proposalRef'])
+  IF r.id IS NULL OR cardinality(ARRAY(SELECT jsonb_object_keys(NEW.payload)))<>15
+    OR NOT (NEW.payload ?& ARRAY['version','proposalHash','executionRef','terminalHash','writeReceiptHash','beforeReadReceiptHash','afterReadReceiptHash','previousObserved','postWriteObserved','restoreTo','failedDesired','budgetKind','currency','requiresNewHumanApproval','proposalRef'])
     OR h.state IS DISTINCT FROM 'verification_failed' OR terminal.step IS DISTINCT FROM 'immutable_terminal'
     OR before_row.kind IS DISTINCT FROM 'read_before' OR after_row.kind IS DISTINCT FROM 'read_after' OR write_row.kind IS DISTINCT FROM 'write_receipt'
     OR NEW.proposal_hash IS DISTINCT FROM expected_hash OR NEW.proposal_ref IS DISTINCT FROM 'p06_rollback_'||substr(expected_hash,1,24)
@@ -437,6 +438,9 @@ BEGIN
     OR NEW.payload->>'writeReceiptHash' IS DISTINCT FROM write_row.metadata_hash
     OR NEW.payload->'previousObserved' IS DISTINCT FROM before_row.observed_value OR NEW.payload->'restoreTo' IS DISTINCT FROM before_row.observed_value
     OR NEW.payload->'postWriteObserved' IS DISTINCT FROM after_row.observed_value
+    OR NEW.payload->'failedDesired' IS DISTINCT FROM r.request_payload->'desired'
+    OR NEW.payload->'budgetKind' IS DISTINCT FROM coalesce(r.request_payload->'budgetKind','null'::jsonb)
+    OR NEW.payload->'currency' IS DISTINCT FROM coalesce(r.request_payload->'currency','null'::jsonb)
   THEN RAISE EXCEPTION 'p06 rollback must bind failed execution observations'; END IF;
   RETURN NEW;
 END; $$;
