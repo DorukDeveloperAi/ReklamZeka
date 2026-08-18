@@ -37,7 +37,9 @@ const executionMode = executionPreMode || executionPostMode;
 const limitedAutonomyPreMode = process.env.P06_LIMITED_AUTONOMY_PRE === "true";
 const limitedAutonomyPostMode = process.env.P06_LIMITED_AUTONOMY_POST_APPROVED === "true";
 const limitedAutonomyExecutionPreMode = process.env.P06_LIMITED_AUTONOMY_EXECUTION_PRE === "true";
-const limitedAutonomyMode = limitedAutonomyPreMode || limitedAutonomyPostMode || limitedAutonomyExecutionPreMode;
+const limitedAutonomyExecutionPostMode = process.env.P06_LIMITED_AUTONOMY_EXECUTION_POST_APPROVED === "true";
+const limitedExecutionMode = limitedAutonomyExecutionPreMode || limitedAutonomyExecutionPostMode;
+const limitedAutonomyMode = limitedAutonomyPreMode || limitedAutonomyPostMode || limitedExecutionMode;
 const pool = new Pool({
   connectionString: databaseUrl,
   max: postMode ? 4 : 1,
@@ -68,7 +70,7 @@ const closed = {
   canWriteMeta: false,
 } as const;
 const evidence = {
-  mode: postMode ? "post_applied_two_client" : executionPreMode ? "execution_pre_outer_rollback" : executionPostMode ? "execution_post_applied_outer_rollback" : limitedAutonomyExecutionPreMode ? "limited_autonomy_execution_pre_outer_rollback" : limitedAutonomyPostMode ? "limited_autonomy_post_applied_outer_rollback" : limitedAutonomyPreMode ? "limited_autonomy_pre_outer_rollback" : "pre_outer_rollback",
+  mode: postMode ? "post_applied_two_client" : executionPreMode ? "execution_pre_outer_rollback" : executionPostMode ? "execution_post_applied_outer_rollback" : limitedAutonomyExecutionPreMode ? "limited_autonomy_execution_pre_outer_rollback" : limitedAutonomyExecutionPostMode ? "limited_autonomy_execution_post_applied_outer_rollback" : limitedAutonomyPostMode ? "limited_autonomy_post_applied_outer_rollback" : limitedAutonomyPreMode ? "limited_autonomy_pre_outer_rollback" : "pre_outer_rollback",
   exactMigrationLedger: !postMode,
   preApplyConcurrencySkipped: !postMode,
   separateClients: false,
@@ -106,17 +108,17 @@ const limitedAutonomyEvidence = {
   zeroResidue: !limitedAutonomyMode,
 };
 const limitedExecutionEvidence = {
-  migrationInstalled: !limitedAutonomyExecutionPreMode,
-  identityCreated: !limitedAutonomyExecutionPreMode,
-  exactReplay: !limitedAutonomyExecutionPreMode,
-  noHumanAuthority: !limitedAutonomyExecutionPreMode,
-  initialGatesBound: !limitedAutonomyExecutionPreMode,
-  runnable: !limitedAutonomyExecutionPreMode,
-  currentAuthority: !limitedAutonomyExecutionPreMode,
-  backdatedExecutionRejected: !limitedAutonomyExecutionPreMode,
-  disabledRuleStopsDispatch: !limitedAutonomyExecutionPreMode,
-  tombstonePurge: !limitedAutonomyExecutionPreMode,
-  zeroResidue: !limitedAutonomyExecutionPreMode,
+  migrationInstalled: !limitedExecutionMode,
+  identityCreated: !limitedExecutionMode,
+  exactReplay: !limitedExecutionMode,
+  noHumanAuthority: !limitedExecutionMode,
+  initialGatesBound: !limitedExecutionMode,
+  runnable: !limitedExecutionMode,
+  currentAuthority: !limitedExecutionMode,
+  backdatedExecutionRejected: !limitedExecutionMode,
+  disabledRuleStopsDispatch: !limitedExecutionMode,
+  tombstonePurge: !limitedExecutionMode,
+  zeroResidue: !limitedExecutionMode,
 };
 const executionEvidence = {
   migrationInstalled: !executionMode,
@@ -205,6 +207,10 @@ try {
       if (limitedAutonomyPostMode) limitedAutonomyEvidence.migrationInstalled = true;
       if (limitedAutonomyExecutionPreMode) {
         await client.query(readFileSync("drizzle/20260818000700_p06_limited_autonomy_execution.sql", "utf8"));
+        limitedAutonomyEvidence.migrationInstalled = true;
+        limitedExecutionEvidence.migrationInstalled = true;
+      }
+      if (limitedAutonomyExecutionPostMode) {
         limitedAutonomyEvidence.migrationInstalled = true;
         limitedExecutionEvidence.migrationInstalled = true;
       }
@@ -1487,21 +1493,23 @@ try {
     const limitedResidue = await pool.query<{ objects: number; rows: number; ledger: number }>(`select
       (select count(*)::int from pg_class where oid=to_regclass('public.p06_limited_autonomy_admissions')) objects,
       0::int rows,
-      (select count(*)::int from drizzle.__drizzle_migrations where hash=$1) ledger`, [
+      (select count(*)::int from drizzle.__drizzle_migrations where hash=$1 and created_at=1787011560000) ledger`, [
       createHash("sha256").update(readFileSync("drizzle/20260818000600_p06_limited_autonomy_admissions.sql", "utf8")).digest("hex"),
     ]);
     limitedAutonomyEvidence.zeroResidue = limitedAutonomyPostMode
       ? limitedResidue.rows[0]?.objects === 1 && limitedResidue.rows[0]?.ledger === 1
-      : limitedAutonomyExecutionPreMode
+        : limitedExecutionMode
         ? limitedResidue.rows[0]?.objects === 1 && limitedResidue.rows[0]?.ledger === 1
         : limitedResidue.rows[0]?.objects === 0 && limitedResidue.rows[0]?.ledger === 0;
-    if (limitedAutonomyExecutionPreMode) {
+    if (limitedExecutionMode) {
       const executionResidue = await pool.query<{ objects: number; ledger: number }>(`select
         (select count(*)::int from information_schema.columns where table_schema='public' and table_name='p06_execution_runs' and column_name='limited_autonomy_admission_id') objects,
-        (select count(*)::int from drizzle.__drizzle_migrations where hash=$1) ledger`, [
+        (select count(*)::int from drizzle.__drizzle_migrations where hash=$1 and created_at=1787011620000) ledger`, [
         createHash("sha256").update(readFileSync("drizzle/20260818000700_p06_limited_autonomy_execution.sql", "utf8")).digest("hex"),
       ]);
-      limitedExecutionEvidence.zeroResidue = executionResidue.rows[0]?.objects === 0 && executionResidue.rows[0]?.ledger === 0;
+      limitedExecutionEvidence.zeroResidue = limitedAutonomyExecutionPostMode
+        ? executionResidue.rows[0]?.objects === 1 && executionResidue.rows[0]?.ledger === 1
+        : executionResidue.rows[0]?.objects === 0 && executionResidue.rows[0]?.ledger === 0;
     }
     if (!Object.values(limitedAutonomyEvidence).every(Boolean) || !Object.values(limitedExecutionEvidence).every(Boolean) || !evidence.exactMigrationLedger || !evidence.zeroResidue) {
       throw new Error(JSON.stringify({ ...evidence, limitedAutonomy: limitedAutonomyEvidence, limitedExecution: limitedExecutionEvidence }));
