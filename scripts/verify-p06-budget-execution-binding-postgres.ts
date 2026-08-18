@@ -12,7 +12,7 @@ const names = ["p06_execution_runs", "p06_execution_events", "p06_execution_head
   "p06_execution_gate_snapshots", "p06_rollback_proposals"];
 const evidence = { mode: postMode ? "post_applied" : "pre_outer_rollback", migrationHash, baseInstalledOuterRollback: false, migrationInstalledOuterRollback: false,
   sourceXor: false, requestContract: false, attemptFk: false, attemptUnique: false, attemptIndex: false, guardReplaced: false,
-  rlsForced: false, publicRevoked: false, unjournaled: false, zeroResidue: false };
+  rlsForced: false, publicRevoked: false, exactMigrationState: false, zeroResidue: false };
 const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 30_000 });
 const client = await pool.connect();
 try {
@@ -20,7 +20,7 @@ try {
     (select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname=any($1::text[])) objects,
     (select count(*)::int from drizzle.__drizzle_migrations where hash=$2 and created_at=1787011500000) ledger`, [names, migrationHash]);
   if (before.rows[0]?.objects !== 6 || before.rows[0]?.ledger !== (postMode ? 1 : 0)) throw new Error("P06 budget execution prerequisite/target exact değil");
-  evidence.unjournaled = true;
+  evidence.exactMigrationState = true;
   await client.query("begin");
   evidence.baseInstalledOuterRollback = true;
   if (!postMode) await client.query(migrationSql);
