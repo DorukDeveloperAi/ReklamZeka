@@ -37,6 +37,8 @@ describe("P06 execution persistence PRE migration", () => {
       expect(migration).toContain(`'${step}'`);
     }
     expect(migration).toContain("'lease_claimed','lease_reclaimed','trace','lease_released'");
+    expect(migration).toContain("WHERE trace_sequence IS NOT NULL");
+    expect(migration).not.toContain("UNIQUE NULLS NOT DISTINCT (workspace_id,execution_run_id,trace_sequence)");
     expect(migration).toContain("p06 execution head requires exact next event CAS");
   });
 

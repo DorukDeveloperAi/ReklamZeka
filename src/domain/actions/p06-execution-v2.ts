@@ -61,7 +61,8 @@ export type P06ExecutionV2WriteCore = Readonly<{
   rawHash: string;
 }>;
 export type P06ExecutionV2Writer = Readonly<{
-  read(input: Readonly<{ workspaceRef: string; accountRef: string; entityRef: string }>): Promise<P06ExecutionV2ReadEvidence>;
+  read(input: Readonly<{ workspaceRef: string; accountRef: string; entityRef: string;
+    action: P06ExecutionV2Action }>): Promise<P06ExecutionV2ReadEvidence>;
   write(input: Readonly<{ request: P06ExecutionV2Request; idempotencyKey: string }>): Promise<P06ExecutionV2Receipt<P06ExecutionV2WriteCore>>;
 }>;
 export type P06ExecutionV2Outcome =
@@ -129,7 +130,16 @@ const HASH = /^[a-f0-9]{64}$/;
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const MAX_ALLOWLIST = 1_000;
-const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+const stable = (value: unknown): unknown => Array.isArray(value)
+  ? value.map(stable)
+  : value && typeof value === "object"
+    ? Object.fromEntries(Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => [key, stable(child)]))
+    : value;
+export const p06ExecutionV2Digest = (value: unknown) =>
+  createHash("sha256").update(JSON.stringify(stable(value))).digest("hex");
+const digest = p06ExecutionV2Digest;
 const sameValue = (left: P06ExecutionV2Value, right: P06ExecutionV2Value) =>
   left.status === right.status && left.budgetMinor === right.budgetMinor;
 const validValue = (value: P06ExecutionV2Value) =>
@@ -273,7 +283,8 @@ export async function runP06ExecutionV2({ request, writer, control }: Readonly<{
   };
 
   if (!(await checkGate("post_claim"))) return finish("expected_before_mismatch");
-  before = await writer.read({ workspaceRef: request.workspaceRef, accountRef: request.accountRef, entityRef: request.entityRef });
+  before = await writer.read({ workspaceRef: request.workspaceRef, accountRef: request.accountRef,
+    entityRef: request.entityRef, action: request.action });
   if (!validEvidence(before, request)) throw new Error("p06 execution v2 invalid read evidence");
   setTrace(trace, "current_meta_read", "ok", before.receiptHash);
   if (sameValue(before.core.value, request.desired)) {
@@ -298,7 +309,8 @@ export async function runP06ExecutionV2({ request, writer, control }: Readonly<{
   writes = 1;
   writeReceiptHash = write.receiptHash;
   setTrace(trace, "typed_mutation", write.core.kind === "ambiguous_transport" ? "ambiguous" : "ok", write.receiptHash);
-  after = await writer.read({ workspaceRef: request.workspaceRef, accountRef: request.accountRef, entityRef: request.entityRef });
+  after = await writer.read({ workspaceRef: request.workspaceRef, accountRef: request.accountRef,
+    entityRef: request.entityRef, action: request.action });
   if (!validEvidence(after, request)) throw new Error(`p06 execution v2 invalid ${write.core.kind === "ambiguous_transport" ? "ambiguous read" : "verification"} evidence`);
   setTrace(trace, "raw", "ok", digest({ beforeRawHash: before.core.rawHash, writeRawHash: write.core.rawHash,
     afterRawHash: after.core.rawHash, writeReceiptHash: write.receiptHash }));

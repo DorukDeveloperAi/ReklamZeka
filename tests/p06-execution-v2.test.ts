@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { createHash } from "node:crypto";
 import {
   P06_EXECUTION_V2_STEPS,
+  p06ExecutionV2Digest,
   runP06ExecutionV2,
   type P06ExecutionV2Control,
   type P06ExecutionV2GatePhase,
@@ -9,7 +9,7 @@ import {
 } from "@/domain/actions/p06-execution-v2";
 
 const hash = (character: string) => character.repeat(64);
-const receipt = <T>(core: T) => ({ core, receiptHash: createHash("sha256").update(JSON.stringify(core)).digest("hex") });
+const receipt = <T>(core: T) => ({ core, receiptHash: p06ExecutionV2Digest(core) });
 const request = {
   executionRef: "execution_main",
   workspaceRef: "workspace_main",

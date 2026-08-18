@@ -53,6 +53,8 @@ CREATE TABLE p06_execution_runs (
     AND version='p06-execution-run/1.0.0'
     AND jsonb_typeof(request_payload)='object'
     AND octet_length(request_payload::text)<=32768
+    AND request_payload ?& ARRAY['version','workspaceRef','accountRef','entityRef','action','expectedBefore','desired','evaluatedAt','actionUnitHash','proposalHash','contextHash','effectiveGuideSetHash','resolutionHash','policyHash','gateSetHash','route','executionRef','idempotencyKey','requestHash']
+    AND NOT request_payload ?| ARRAY['leaseTokenHash','fenceHash']
     AND request_payload->>'version'='p06-execution-request/1.0.0'
     AND request_payload->>'executionRef'=execution_ref
     AND request_payload->>'idempotencyKey'=idempotency_key
@@ -88,7 +90,6 @@ CREATE TABLE p06_execution_events (
   CONSTRAINT p06_execution_events_workspace_row_unique UNIQUE (workspace_id,id),
   CONSTRAINT p06_execution_events_workspace_hash_unique UNIQUE (workspace_id,event_hash),
   CONSTRAINT p06_execution_events_run_sequence_unique UNIQUE (workspace_id,execution_run_id,sequence),
-  CONSTRAINT p06_execution_events_run_trace_unique UNIQUE NULLS NOT DISTINCT (workspace_id,execution_run_id,trace_sequence),
   CONSTRAINT p06_execution_events_run_fk FOREIGN KEY (workspace_id,execution_run_id)
     REFERENCES p06_execution_runs(workspace_id,id) ON DELETE CASCADE,
   CONSTRAINT p06_execution_events_contract CHECK (
@@ -107,6 +108,7 @@ CREATE TABLE p06_execution_events (
     AND payload::text !~* '"[^"[:space:]]*(token|secret|prompt|raw[_-]?(payload|request|response|json))"[[:space:]]*:'
   )
 );
+CREATE UNIQUE INDEX p06_execution_events_run_trace_unique ON p06_execution_events(workspace_id,execution_run_id,trace_sequence) WHERE trace_sequence IS NOT NULL;
 
 CREATE TABLE p06_execution_heads (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -181,6 +183,7 @@ CREATE TABLE p06_execution_gate_snapshots (
   execution_run_id uuid NOT NULL,
   phase text NOT NULL,
   sequence integer NOT NULL,
+  lease_epoch integer NOT NULL,
   snapshot_hash text NOT NULL,
   receipt_hash text NOT NULL,
   allowlist_hash text NOT NULL,
@@ -190,18 +193,20 @@ CREATE TABLE p06_execution_gate_snapshots (
   payload jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
   CONSTRAINT p06_execution_gate_snapshots_workspace_row_unique UNIQUE (workspace_id,id),
-  CONSTRAINT p06_execution_gate_snapshots_run_phase_unique UNIQUE (workspace_id,execution_run_id,phase),
+  CONSTRAINT p06_execution_gate_snapshots_run_phase_epoch_unique UNIQUE (workspace_id,execution_run_id,phase,lease_epoch),
   CONSTRAINT p06_execution_gate_snapshots_run_fk FOREIGN KEY (workspace_id,execution_run_id)
     REFERENCES p06_execution_runs(workspace_id,id) ON DELETE CASCADE,
   CONSTRAINT p06_execution_gate_snapshots_contract CHECK (
     phase IN ('staging','admission','post_claim','pre_dispatch','read_after_write')
     AND sequence BETWEEN 1 AND 5
+    AND lease_epoch BETWEEN 0 AND 1000000
     AND snapshot_hash ~ '^[a-f0-9]{64}$'
     AND receipt_hash ~ '^[a-f0-9]{64}$'
     AND allowlist_hash ~ '^[a-f0-9]{64}$'
     AND captured_at<expires_at
     AND jsonb_typeof(payload)='object'
     AND octet_length(payload::text)<=8192
+    AND payload::text !~* '"(token|accessToken|secret|prompt|[^"[:space:]]*raw[_-]?(payload|request|response|json))"[[:space:]]*:'
   )
 );
 
@@ -241,6 +246,7 @@ CREATE TABLE p06_rollback_proposals (
     AND payload->>'proposalRef'=proposal_ref
     AND payload->>'proposalHash'=proposal_hash
     AND payload->>'requiresNewHumanApproval'='true'
+    AND payload::text !~* '"(token|accessToken|secret|prompt|[^"[:space:]]*raw[_-]?(payload|request|response|json))"[[:space:]]*:'
   )
 );
 
@@ -270,6 +276,11 @@ CREATE OR REPLACE FUNCTION public.p06_execution_run_insert_guard() RETURNS trigg
 LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 DECLARE b public.guide_run_action_bindings%ROWTYPE; u public.action_proposal_units%ROWTYPE; d public.action_approval_decision_events%ROWTYPE; g public.action_approval_evidence_grants%ROWTYPE; persisted_policy_hash text;
 BEGIN
+  IF jsonb_typeof(NEW.request_payload) IS DISTINCT FROM 'object'
+    OR cardinality(ARRAY(SELECT jsonb_object_keys(NEW.request_payload)))<>19
+    OR NOT (NEW.request_payload ?& ARRAY['version','workspaceRef','accountRef','entityRef','action','expectedBefore','desired','evaluatedAt','actionUnitHash','proposalHash','contextHash','effectiveGuideSetHash','resolutionHash','policyHash','gateSetHash','route','executionRef','idempotencyKey','requestHash'])
+    OR NEW.request_payload ?| ARRAY['leaseTokenHash','fenceHash']
+  THEN RAISE EXCEPTION 'p06 execution request JSON shape invalid'; END IF;
   SELECT * INTO b FROM public.guide_run_action_bindings WHERE workspace_id=NEW.workspace_id AND id=NEW.guide_run_action_binding_id FOR SHARE;
   SELECT * INTO u FROM public.action_proposal_units WHERE workspace_id=NEW.workspace_id AND id=NEW.action_unit_id FOR SHARE;
   SELECT * INTO d FROM public.action_approval_decision_events WHERE workspace_id=NEW.workspace_id AND id=NEW.decision_event_id FOR SHARE;
@@ -348,7 +359,8 @@ BEGIN
   IF e.event_kind='trace' AND NEW.trace_sequence=10 THEN
     SELECT * INTO terminal_event FROM public.p06_execution_events WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND trace_sequence=9;
     IF e.step<>'release' OR NEW.state NOT IN ('succeeded','verification_failed','held') OR NEW.lease_token_hash IS NOT NULL OR NEW.fence_hash IS NOT NULL OR NEW.lease_expires_at IS NOT NULL OR NEW.terminal_hash IS NULL
-      OR (SELECT count(*) FROM public.p06_execution_gate_snapshots WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id)<>5
+      OR (SELECT count(*) FROM public.p06_execution_gate_snapshots WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND lease_epoch=0 AND phase IN ('staging','admission'))<>2
+      OR (SELECT count(*) FROM public.p06_execution_gate_snapshots WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND lease_epoch=NEW.lease_epoch AND phase IN ('post_claim','pre_dispatch','read_after_write'))<>3
       OR terminal_event.step IS DISTINCT FROM 'immutable_terminal' OR NEW.terminal_hash IS DISTINCT FROM terminal_event.receipt_hash
       OR (terminal_event.payload->'receiptCore'->>'executionRef') IS DISTINCT FROM r.execution_ref
       OR (NEW.state='succeeded' AND terminal_event.payload->'receiptCore'->>'outcome' NOT IN ('already_applied_no_write','written_verified','ambiguous_resolved'))
@@ -367,14 +379,20 @@ BEGIN
   SELECT * INTO r FROM public.p06_execution_runs WHERE workspace_id=NEW.workspace_id AND id=NEW.execution_run_id FOR SHARE;
   SELECT * INTO h FROM public.p06_execution_heads WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id FOR SHARE;
   expected_sequence:=array_position(ARRAY['staging','admission','post_claim','pre_dispatch','read_after_write'],NEW.phase);
-  IF expected_sequence>1 THEN SELECT * INTO prior FROM public.p06_execution_gate_snapshots WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND sequence=expected_sequence-1 FOR SHARE; END IF;
+  IF expected_sequence=2 THEN SELECT * INTO prior FROM public.p06_execution_gate_snapshots WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND sequence=1 AND lease_epoch=0 FOR SHARE;
+  ELSIF expected_sequence=3 THEN SELECT * INTO prior FROM public.p06_execution_gate_snapshots WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND sequence=2 AND lease_epoch=0 FOR SHARE;
+  ELSIF expected_sequence>3 THEN SELECT * INTO prior FROM public.p06_execution_gate_snapshots WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND sequence=expected_sequence-1 AND lease_epoch=NEW.lease_epoch FOR SHARE; END IF;
   expected_snapshot:=public.guide_run_sha256(NEW.payload-ARRAY['snapshotHash','receiptHash']);
-  expected_receipt:=public.guide_run_sha256(jsonb_build_object('executionRef',r.execution_ref,'phase',NEW.phase,'sequence',NEW.sequence,'snapshotHash',expected_snapshot));
-  IF r.id IS NULL OR h.id IS NULL OR NEW.sequence IS DISTINCT FROM expected_sequence OR NEW.snapshot_hash IS DISTINCT FROM expected_snapshot OR NEW.receipt_hash IS DISTINCT FROM expected_receipt
+  expected_receipt:=public.guide_run_sha256(jsonb_build_object('executionRef',r.execution_ref,'phase',NEW.phase,'sequence',NEW.sequence,'leaseEpoch',NEW.lease_epoch,'snapshotHash',expected_snapshot));
+  IF r.id IS NULL OR h.id IS NULL OR cardinality(ARRAY(SELECT jsonb_object_keys(NEW.payload)))<>10
+    OR NOT (NEW.payload ?& ARRAY['version','phase','sequence','leaseEpoch','enabled','allowlistHash','capturedAt','expiresAt','snapshotHash','receiptHash'])
+    OR NEW.sequence IS DISTINCT FROM expected_sequence OR NEW.snapshot_hash IS DISTINCT FROM expected_snapshot OR NEW.receipt_hash IS DISTINCT FROM expected_receipt
     OR (expected_sequence>1 AND (prior.id IS NULL OR NEW.captured_at<=prior.captured_at))
-    OR (expected_sequence>=3 AND (h.state NOT IN ('claimed','running') OR h.lease_expires_at<=NEW.captured_at))
+    OR (expected_sequence<=2 AND NEW.lease_epoch<>0)
+    OR (expected_sequence>=3 AND (NEW.lease_epoch IS DISTINCT FROM h.lease_epoch OR h.state NOT IN ('claimed','running') OR h.lease_expires_at<=NEW.captured_at))
     OR NEW.payload->>'version' IS DISTINCT FROM 'p06-execution-gate/1.0.0' OR NEW.payload->>'phase' IS DISTINCT FROM NEW.phase
     OR (NEW.payload->>'sequence')::integer IS DISTINCT FROM NEW.sequence OR (NEW.payload->>'enabled')::boolean IS DISTINCT FROM NEW.enabled
+    OR (NEW.payload->>'leaseEpoch')::integer IS DISTINCT FROM NEW.lease_epoch
     OR NEW.payload->>'allowlistHash' IS DISTINCT FROM NEW.allowlist_hash OR NEW.payload->>'capturedAt' IS DISTINCT FROM to_char(NEW.captured_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
     OR NEW.payload->>'expiresAt' IS DISTINCT FROM to_char(NEW.expires_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
     OR NEW.payload->>'snapshotHash' IS DISTINCT FROM NEW.snapshot_hash OR NEW.payload->>'receiptHash' IS DISTINCT FROM NEW.receipt_hash
@@ -409,7 +427,9 @@ BEGIN
   SELECT * INTO after_row FROM public.p06_execution_observations WHERE workspace_id=NEW.workspace_id AND id=NEW.after_observation_id AND execution_run_id=NEW.execution_run_id FOR SHARE;
   SELECT * INTO write_row FROM public.p06_execution_observations WHERE workspace_id=NEW.workspace_id AND id=NEW.write_observation_id AND execution_run_id=NEW.execution_run_id FOR SHARE;
   expected_hash:=public.guide_run_sha256(NEW.payload-ARRAY['proposalRef','proposalHash']);
-  IF r.id IS NULL OR h.state IS DISTINCT FROM 'verification_failed' OR terminal.step IS DISTINCT FROM 'immutable_terminal'
+  IF r.id IS NULL OR cardinality(ARRAY(SELECT jsonb_object_keys(NEW.payload)))<>13
+    OR NOT (NEW.payload ?& ARRAY['version','proposalHash','executionRef','terminalHash','writeReceiptHash','beforeReadReceiptHash','afterReadReceiptHash','previousObserved','postWriteObserved','restoreTo','failedDesired','requiresNewHumanApproval','proposalRef'])
+    OR h.state IS DISTINCT FROM 'verification_failed' OR terminal.step IS DISTINCT FROM 'immutable_terminal'
     OR before_row.kind IS DISTINCT FROM 'read_before' OR after_row.kind IS DISTINCT FROM 'read_after' OR write_row.kind IS DISTINCT FROM 'write_receipt'
     OR NEW.proposal_hash IS DISTINCT FROM expected_hash OR NEW.proposal_ref IS DISTINCT FROM 'p06_rollback_'||substr(expected_hash,1,24)
     OR NEW.payload->>'executionRef' IS DISTINCT FROM r.execution_ref OR NEW.payload->>'terminalHash' IS DISTINCT FROM terminal.receipt_hash

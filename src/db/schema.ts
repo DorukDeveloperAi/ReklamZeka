@@ -145,7 +145,6 @@ export const workspaces = pgTable("workspaces", {
     )
   `),
 ]);
-
 /** Server-private append-only data-quality Finding ledger. */
 export const findingLifecycleEvents = pgTable("finding_lifecycle_events", {
   id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
@@ -5925,33 +5924,265 @@ export const actionApprovalEvidenceGrants = pgTable("action_approval_evidence_gr
 
 /** Durable P06 execution identity. It binds approval evidence but grants no authority by itself. */
 export const p06ExecutionRuns = pgTable("p06_execution_runs", {
-  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), guideRunActionBindingId: uuid("guide_run_action_binding_id").notNull(), proposalBundleId: uuid("proposal_bundle_id").notNull(), actionUnitId: uuid("action_unit_id").notNull(), decisionEventId: uuid("decision_event_id").notNull(), approvalGrantId: uuid("approval_grant_id").notNull(), executionRef: text("execution_ref").notNull(), idempotencyKey: text("idempotency_key").notNull(), requestHash: text("request_hash").notNull(), actionUnitHash: text("action_unit_hash").notNull(), proposalHash: text("proposal_hash").notNull(), contextHash: text("context_hash").notNull(), effectiveGuideSetHash: text("effective_guide_set_hash").notNull(), resolutionHash: text("resolution_hash").notNull(), policyHash: text("policy_hash").notNull(), gateSetHash: text("gate_set_hash").notNull(), requestPayload: jsonb("request_payload").$type<Record<string, unknown>>().notNull(), route: text("route").notNull().default("human_approved"), version: text("version").notNull().default("p06-execution-run/1.0.0"), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("p06_execution_runs_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("p06_execution_runs_workspace_ref_unique").on(table.workspaceId, table.executionRef), uniqueIndex("p06_execution_runs_workspace_binding_unique").on(table.workspaceId, table.guideRunActionBindingId), uniqueIndex("p06_execution_runs_workspace_grant_unique").on(table.workspaceId, table.approvalGrantId), uniqueIndex("p06_execution_runs_workspace_idempotency_unique").on(table.workspaceId, table.idempotencyKey), index("p06_execution_runs_binding_fk_idx").on(table.workspaceId, table.guideRunActionBindingId), index("p06_execution_runs_unit_fk_idx").on(table.workspaceId, table.actionUnitId), index("p06_execution_runs_decision_fk_idx").on(table.workspaceId, table.decisionEventId), index("p06_execution_runs_grant_fk_idx").on(table.workspaceId, table.approvalGrantId), foreignKey({ columns: [table.workspaceId, table.guideRunActionBindingId], foreignColumns: [guideRunActionBindings.workspaceId, guideRunActionBindings.id], name: "p06_execution_runs_binding_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.proposalBundleId], foreignColumns: [actionProposalBundles.workspaceId, actionProposalBundles.id], name: "p06_execution_runs_bundle_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.actionUnitId], foreignColumns: [actionProposalUnits.workspaceId, actionProposalUnits.id], name: "p06_execution_runs_unit_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.decisionEventId], foreignColumns: [actionApprovalDecisionEvents.workspaceId, actionApprovalDecisionEvents.id], name: "p06_execution_runs_decision_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.approvalGrantId], foreignColumns: [actionApprovalEvidenceGrants.workspaceId, actionApprovalEvidenceGrants.id], name: "p06_execution_runs_grant_fk" }).onDelete("restrict"), check("p06_execution_runs_contract", sql`${table.executionRef} ~ '^p06_execution_[a-f0-9]{24}$' and ${table.idempotencyKey} ~ '^p06_exec_idem_[a-f0-9]{64}$' and ${table.requestHash} ~ '^[a-f0-9]{64}$' and ${table.actionUnitHash} ~ '^[a-f0-9]{64}$' and ${table.proposalHash} ~ '^[a-f0-9]{64}$' and ${table.contextHash} ~ '^[a-f0-9]{64}$' and ${table.effectiveGuideSetHash} ~ '^[a-f0-9]{64}$' and ${table.resolutionHash} ~ '^[a-f0-9]{64}$' and ${table.policyHash} ~ '^[a-f0-9]{64}$' and ${table.gateSetHash} ~ '^[a-f0-9]{64}$' and ${table.route}='human_approved' and ${table.version}='p06-execution-run/1.0.0' and jsonb_typeof(${table.requestPayload})='object' and octet_length(${table.requestPayload}::text)<=32768 and ${table.requestPayload}->>'version'='p06-execution-request/1.0.0' and ${table.requestPayload}->>'executionRef'=${table.executionRef} and ${table.requestPayload}->>'idempotencyKey'=${table.idempotencyKey} and ${table.requestPayload}->>'requestHash'=${table.requestHash} and ${table.requestPayload}->>'route'=${table.route} and ${table.requestPayload}->>'actionUnitHash'=${table.actionUnitHash} and ${table.requestPayload}->>'proposalHash'=${table.proposalHash} and ${table.requestPayload}->>'contextHash'=${table.contextHash} and ${table.requestPayload}->>'effectiveGuideSetHash'=${table.effectiveGuideSetHash} and ${table.requestPayload}->>'resolutionHash'=${table.resolutionHash} and ${table.requestPayload}->>'policyHash'=${table.policyHash} and ${table.requestPayload}->>'gateSetHash'=${table.gateSetHash}`)]);
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    guideRunActionBindingId: uuid("guide_run_action_binding_id").notNull(),
+    proposalBundleId: uuid("proposal_bundle_id").notNull(),
+    actionUnitId: uuid("action_unit_id").notNull(),
+    decisionEventId: uuid("decision_event_id").notNull(),
+    approvalGrantId: uuid("approval_grant_id").notNull(),
+    executionRef: text("execution_ref").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    actionUnitHash: text("action_unit_hash").notNull(),
+    proposalHash: text("proposal_hash").notNull(),
+    contextHash: text("context_hash").notNull(),
+    effectiveGuideSetHash: text("effective_guide_set_hash").notNull(),
+    resolutionHash: text("resolution_hash").notNull(),
+    policyHash: text("policy_hash").notNull(),
+    gateSetHash: text("gate_set_hash").notNull(),
+    requestPayload: jsonb("request_payload").$type<Record<string, unknown>>().notNull(),
+    route: text("route").notNull().default("human_approved"),
+    version: text("version").notNull().default("p06-execution-run/1.0.0"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("p06_execution_runs_workspace_row_unique").on(table.workspaceId, table.id),
+    uniqueIndex("p06_execution_runs_workspace_ref_unique").on(table.workspaceId, table.executionRef),
+    uniqueIndex("p06_execution_runs_workspace_binding_unique").on(table.workspaceId, table.guideRunActionBindingId),
+    uniqueIndex("p06_execution_runs_workspace_grant_unique").on(table.workspaceId, table.approvalGrantId),
+    uniqueIndex("p06_execution_runs_workspace_idempotency_unique").on(table.workspaceId, table.idempotencyKey),
+    index("p06_execution_runs_binding_fk_idx").on(table.workspaceId, table.guideRunActionBindingId),
+    index("p06_execution_runs_unit_fk_idx").on(table.workspaceId, table.actionUnitId),
+    index("p06_execution_runs_decision_fk_idx").on(table.workspaceId, table.decisionEventId),
+    index("p06_execution_runs_grant_fk_idx").on(table.workspaceId, table.approvalGrantId),
+    foreignKey({
+      columns: [table.workspaceId, table.guideRunActionBindingId],
+      foreignColumns: [guideRunActionBindings.workspaceId, guideRunActionBindings.id],
+      name: "p06_execution_runs_binding_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.workspaceId, table.proposalBundleId],
+      foreignColumns: [actionProposalBundles.workspaceId, actionProposalBundles.id],
+      name: "p06_execution_runs_bundle_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.workspaceId, table.actionUnitId],
+      foreignColumns: [actionProposalUnits.workspaceId, actionProposalUnits.id],
+      name: "p06_execution_runs_unit_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.workspaceId, table.decisionEventId],
+      foreignColumns: [actionApprovalDecisionEvents.workspaceId, actionApprovalDecisionEvents.id],
+      name: "p06_execution_runs_decision_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.workspaceId, table.approvalGrantId],
+      foreignColumns: [actionApprovalEvidenceGrants.workspaceId, actionApprovalEvidenceGrants.id],
+      name: "p06_execution_runs_grant_fk",
+    }).onDelete("restrict"),
+    check("p06_execution_runs_contract", sql`${table.executionRef} ~ '^p06_execution_[a-f0-9]{24}$' and ${table.idempotencyKey} ~ '^p06_exec_idem_[a-f0-9]{64}$' and ${table.requestHash} ~ '^[a-f0-9]{64}$' and ${table.actionUnitHash} ~ '^[a-f0-9]{64}$' and ${table.proposalHash} ~ '^[a-f0-9]{64}$' and ${table.contextHash} ~ '^[a-f0-9]{64}$' and ${table.effectiveGuideSetHash} ~ '^[a-f0-9]{64}$' and ${table.resolutionHash} ~ '^[a-f0-9]{64}$' and ${table.policyHash} ~ '^[a-f0-9]{64}$' and ${table.gateSetHash} ~ '^[a-f0-9]{64}$' and ${table.route}='human_approved' and ${table.version}='p06-execution-run/1.0.0' and jsonb_typeof(${table.requestPayload})='object' and octet_length(${table.requestPayload}::text)<=32768 and ${table.requestPayload} ?& array['version','workspaceRef','accountRef','entityRef','action','expectedBefore','desired','evaluatedAt','actionUnitHash','proposalHash','contextHash','effectiveGuideSetHash','resolutionHash','policyHash','gateSetHash','route','executionRef','idempotencyKey','requestHash'] and not ${table.requestPayload} ?| array['leaseTokenHash','fenceHash'] and ${table.requestPayload}->>'version'='p06-execution-request/1.0.0' and ${table.requestPayload}->>'executionRef'=${table.executionRef} and ${table.requestPayload}->>'idempotencyKey'=${table.idempotencyKey} and ${table.requestPayload}->>'requestHash'=${table.requestHash} and ${table.requestPayload}->>'route'=${table.route} and ${table.requestPayload}->>'actionUnitHash'=${table.actionUnitHash} and ${table.requestPayload}->>'proposalHash'=${table.proposalHash} and ${table.requestPayload}->>'contextHash'=${table.contextHash} and ${table.requestPayload}->>'effectiveGuideSetHash'=${table.effectiveGuideSetHash} and ${table.requestPayload}->>'resolutionHash'=${table.resolutionHash} and ${table.requestPayload}->>'policyHash'=${table.policyHash} and ${table.requestPayload}->>'gateSetHash'=${table.gateSetHash}`),
+  ],
+);
 
 export const p06ExecutionEvents = pgTable("p06_execution_events", {
-  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), executionRunId: uuid("execution_run_id").notNull(), eventRef: text("event_ref").notNull(), eventHash: text("event_hash").notNull(), sequence: integer("sequence").notNull(), traceSequence: integer("trace_sequence"), eventKind: text("event_kind").notNull(), step: text("step"), outcome: text("outcome").notNull(), previousHash: text("previous_hash").notNull(), receiptHash: text("receipt_hash").notNull(), payload: jsonb("payload").$type<Record<string, unknown>>().notNull(), occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("p06_execution_events_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("p06_execution_events_workspace_hash_unique").on(table.workspaceId, table.eventHash), uniqueIndex("p06_execution_events_run_sequence_unique").on(table.workspaceId, table.executionRunId, table.sequence), unique("p06_execution_events_run_trace_unique").on(table.workspaceId, table.executionRunId, table.traceSequence).nullsNotDistinct(), index("p06_execution_events_run_idx").on(table.workspaceId, table.executionRunId, table.sequence), foreignKey({ columns: [table.workspaceId, table.executionRunId], foreignColumns: [p06ExecutionRuns.workspaceId, p06ExecutionRuns.id], name: "p06_execution_events_run_fk" }).onDelete("cascade"), check("p06_execution_events_contract", sql`${table.eventRef} ~ '^p06_exec_event_[a-f0-9]{24}$' and ${table.eventHash} ~ '^[a-f0-9]{64}$' and ${table.previousHash} ~ '^(GENESIS|[a-f0-9]{64})$' and ${table.receiptHash} ~ '^[a-f0-9]{64}$' and ${table.sequence} between 1 and 1000000 and ${table.eventKind} in ('lease_claimed','lease_reclaimed','trace','lease_released') and ${table.outcome} in ('ok','skipped','held','ambiguous','already_applied') and ((${table.eventKind}='trace' and ${table.traceSequence} between 1 and 10 and ${table.step} in ('lease','idempotency','current_meta_read','expected_before','typed_mutation','raw','already_applied_no_second_write','ambiguous_read_before_retry','immutable_terminal','release')) or (${table.eventKind}<>'trace' and ${table.traceSequence} is null and ${table.step} is null)) and jsonb_typeof(${table.payload})='object' and octet_length(${table.payload}::text)<=16384`)]);
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    executionRunId: uuid("execution_run_id").notNull(),
+    eventRef: text("event_ref").notNull(),
+    eventHash: text("event_hash").notNull(),
+    sequence: integer("sequence").notNull(),
+    traceSequence: integer("trace_sequence"),
+    eventKind: text("event_kind").notNull(),
+    step: text("step"),
+    outcome: text("outcome").notNull(),
+    previousHash: text("previous_hash").notNull(),
+    receiptHash: text("receipt_hash").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("p06_execution_events_workspace_row_unique").on(table.workspaceId, table.id),
+    uniqueIndex("p06_execution_events_workspace_hash_unique").on(table.workspaceId, table.eventHash),
+    uniqueIndex("p06_execution_events_run_sequence_unique").on(table.workspaceId, table.executionRunId, table.sequence),
+    uniqueIndex("p06_execution_events_run_trace_unique").on(table.workspaceId, table.executionRunId, table.traceSequence).where(sql`${table.traceSequence} is not null`),
+    index("p06_execution_events_run_idx").on(table.workspaceId, table.executionRunId, table.sequence),
+    foreignKey({
+      columns: [table.workspaceId, table.executionRunId],
+      foreignColumns: [p06ExecutionRuns.workspaceId, p06ExecutionRuns.id],
+      name: "p06_execution_events_run_fk",
+    }).onDelete("cascade"),
+    check("p06_execution_events_contract", sql`${table.eventRef} ~ '^p06_exec_event_[a-f0-9]{24}$' and ${table.eventHash} ~ '^[a-f0-9]{64}$' and ${table.previousHash} ~ '^(GENESIS|[a-f0-9]{64})$' and ${table.receiptHash} ~ '^[a-f0-9]{64}$' and ${table.sequence} between 1 and 1000000 and ${table.eventKind} in ('lease_claimed','lease_reclaimed','trace','lease_released') and ${table.outcome} in ('ok','skipped','held','ambiguous','already_applied') and ((${table.eventKind}='trace' and ${table.traceSequence} between 1 and 10 and ${table.step} in ('lease','idempotency','current_meta_read','expected_before','typed_mutation','raw','already_applied_no_second_write','ambiguous_read_before_retry','immutable_terminal','release')) or (${table.eventKind}<>'trace' and ${table.traceSequence} is null and ${table.step} is null)) and jsonb_typeof(${table.payload})='object' and octet_length(${table.payload}::text)<=16384`),
+  ],
+);
 
 export const p06ExecutionHeads = pgTable("p06_execution_heads", {
-  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), executionRunId: uuid("execution_run_id").notNull(), state: text("state").notNull(), sequence: integer("sequence").notNull().default(0), traceSequence: integer("trace_sequence").notNull().default(0), headEventHash: text("head_event_hash"), leaseTokenHash: text("lease_token_hash"), fenceHash: text("fence_hash"), leaseEpoch: integer("lease_epoch").notNull().default(0), leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }), terminalHash: text("terminal_hash"), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("p06_execution_heads_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("p06_execution_heads_workspace_run_unique").on(table.workspaceId, table.executionRunId), index("p06_execution_heads_event_fk_idx").on(table.workspaceId, table.headEventHash), index("p06_execution_heads_lease_idx").on(table.workspaceId, table.leaseExpiresAt), foreignKey({ columns: [table.workspaceId, table.executionRunId], foreignColumns: [p06ExecutionRuns.workspaceId, p06ExecutionRuns.id], name: "p06_execution_heads_run_fk" }).onDelete("cascade"), foreignKey({ columns: [table.workspaceId, table.headEventHash], foreignColumns: [p06ExecutionEvents.workspaceId, p06ExecutionEvents.eventHash], name: "p06_execution_heads_event_fk" }).onDelete("restrict"), check("p06_execution_heads_contract", sql`${table.state} in ('pending','claimed','running','succeeded','verification_failed','held') and ${table.sequence} between 0 and 1000000 and ${table.traceSequence} between 0 and 10 and (${table.headEventHash} is null or ${table.headEventHash} ~ '^[a-f0-9]{64}$') and (${table.terminalHash} is null or ${table.terminalHash} ~ '^[a-f0-9]{64}$') and ((${table.state}='pending' and ${table.sequence}=0 and ${table.traceSequence}=0 and ${table.headEventHash} is null and ${table.leaseTokenHash} is null and ${table.fenceHash} is null and ${table.leaseEpoch}=0 and ${table.leaseExpiresAt} is null and ${table.terminalHash} is null) or (${table.state} in ('claimed','running') and ${table.leaseTokenHash} ~ '^[a-f0-9]{64}$' and ${table.fenceHash} ~ '^[a-f0-9]{64}$' and ${table.leaseEpoch}>=1 and ${table.leaseExpiresAt} is not null and ${table.terminalHash} is null) or (${table.state} in ('succeeded','verification_failed','held') and ${table.traceSequence}=10 and ${table.leaseTokenHash} is null and ${table.fenceHash} is null and ${table.leaseExpiresAt} is null and ${table.terminalHash} ~ '^[a-f0-9]{64}$'))`)]);
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    executionRunId: uuid("execution_run_id").notNull(),
+    state: text("state").notNull(),
+    sequence: integer("sequence").notNull().default(0),
+    traceSequence: integer("trace_sequence").notNull().default(0),
+    headEventHash: text("head_event_hash"),
+    leaseTokenHash: text("lease_token_hash"),
+    fenceHash: text("fence_hash"),
+    leaseEpoch: integer("lease_epoch").notNull().default(0),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+    terminalHash: text("terminal_hash"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("p06_execution_heads_workspace_row_unique").on(table.workspaceId, table.id),
+    uniqueIndex("p06_execution_heads_workspace_run_unique").on(table.workspaceId, table.executionRunId),
+    index("p06_execution_heads_event_fk_idx").on(table.workspaceId, table.headEventHash),
+    index("p06_execution_heads_lease_idx").on(table.workspaceId, table.leaseExpiresAt),
+    foreignKey({
+      columns: [table.workspaceId, table.executionRunId],
+      foreignColumns: [p06ExecutionRuns.workspaceId, p06ExecutionRuns.id],
+      name: "p06_execution_heads_run_fk",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.workspaceId, table.headEventHash],
+      foreignColumns: [p06ExecutionEvents.workspaceId, p06ExecutionEvents.eventHash],
+      name: "p06_execution_heads_event_fk",
+    }).onDelete("restrict"),
+    check("p06_execution_heads_contract", sql`${table.state} in ('pending','claimed','running','succeeded','verification_failed','held') and ${table.sequence} between 0 and 1000000 and ${table.traceSequence} between 0 and 10 and (${table.headEventHash} is null or ${table.headEventHash} ~ '^[a-f0-9]{64}$') and (${table.terminalHash} is null or ${table.terminalHash} ~ '^[a-f0-9]{64}$') and ((${table.state}='pending' and ${table.sequence}=0 and ${table.traceSequence}=0 and ${table.headEventHash} is null and ${table.leaseTokenHash} is null and ${table.fenceHash} is null and ${table.leaseEpoch}=0 and ${table.leaseExpiresAt} is null and ${table.terminalHash} is null) or (${table.state} in ('claimed','running') and ${table.leaseTokenHash} ~ '^[a-f0-9]{64}$' and ${table.fenceHash} ~ '^[a-f0-9]{64}$' and ${table.leaseEpoch}>=1 and ${table.leaseExpiresAt} is not null and ${table.terminalHash} is null) or (${table.state} in ('succeeded','verification_failed','held') and ${table.traceSequence}=10 and ${table.leaseTokenHash} is null and ${table.fenceHash} is null and ${table.leaseExpiresAt} is null and ${table.terminalHash} ~ '^[a-f0-9]{64}$'))`),
+  ],
+);
 
 export const p06ExecutionObservations = pgTable("p06_execution_observations", {
-  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), executionRunId: uuid("execution_run_id").notNull(), eventId: uuid("event_id").notNull(), kind: text("kind").notNull(), observationRef: text("observation_ref").notNull(), observationHash: text("observation_hash").notNull(), metadataHash: text("metadata_hash").notNull(), rawHash: text("raw_hash").notNull(), observedValue: jsonb("observed_value").$type<Record<string, unknown>>().notNull(), observedAt: timestamp("observed_at", { withTimezone: true }).notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("p06_execution_observations_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("p06_execution_observations_workspace_ref_unique").on(table.workspaceId, table.observationRef), uniqueIndex("p06_execution_observations_event_kind_unique").on(table.workspaceId, table.eventId, table.kind), index("p06_execution_observations_run_idx").on(table.workspaceId, table.executionRunId, table.observedAt), index("p06_execution_observations_event_fk_idx").on(table.workspaceId, table.eventId), foreignKey({ columns: [table.workspaceId, table.executionRunId], foreignColumns: [p06ExecutionRuns.workspaceId, p06ExecutionRuns.id], name: "p06_execution_observations_run_fk" }).onDelete("cascade"), foreignKey({ columns: [table.workspaceId, table.eventId], foreignColumns: [p06ExecutionEvents.workspaceId, p06ExecutionEvents.id], name: "p06_execution_observations_event_fk" }).onDelete("cascade"), check("p06_execution_observations_contract", sql`${table.kind} in ('read_before','write_receipt','read_after','ambiguous_retry_read') and ${table.observationRef} ~ '^p06_observation_[a-f0-9]{24}$' and ${table.observationHash} ~ '^[a-f0-9]{64}$' and ${table.metadataHash} ~ '^[a-f0-9]{64}$' and ${table.rawHash} ~ '^[a-f0-9]{64}$' and jsonb_typeof(${table.observedValue})='object' and octet_length(${table.observedValue}::text)<=8192`)]);
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    executionRunId: uuid("execution_run_id").notNull(),
+    eventId: uuid("event_id").notNull(),
+    kind: text("kind").notNull(),
+    observationRef: text("observation_ref").notNull(),
+    observationHash: text("observation_hash").notNull(),
+    metadataHash: text("metadata_hash").notNull(),
+    rawHash: text("raw_hash").notNull(),
+    observedValue: jsonb("observed_value").$type<Record<string, unknown>>().notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("p06_execution_observations_workspace_row_unique").on(table.workspaceId, table.id),
+    uniqueIndex("p06_execution_observations_workspace_ref_unique").on(table.workspaceId, table.observationRef),
+    uniqueIndex("p06_execution_observations_event_kind_unique").on(table.workspaceId, table.eventId, table.kind),
+    index("p06_execution_observations_run_idx").on(table.workspaceId, table.executionRunId, table.observedAt),
+    index("p06_execution_observations_event_fk_idx").on(table.workspaceId, table.eventId),
+    foreignKey({
+      columns: [table.workspaceId, table.executionRunId],
+      foreignColumns: [p06ExecutionRuns.workspaceId, p06ExecutionRuns.id],
+      name: "p06_execution_observations_run_fk",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.workspaceId, table.eventId],
+      foreignColumns: [p06ExecutionEvents.workspaceId, p06ExecutionEvents.id],
+      name: "p06_execution_observations_event_fk",
+    }).onDelete("cascade"),
+    check("p06_execution_observations_contract", sql`${table.kind} in ('read_before','write_receipt','read_after','ambiguous_retry_read') and ${table.observationRef} ~ '^p06_observation_[a-f0-9]{24}$' and ${table.observationHash} ~ '^[a-f0-9]{64}$' and ${table.metadataHash} ~ '^[a-f0-9]{64}$' and ${table.rawHash} ~ '^[a-f0-9]{64}$' and jsonb_typeof(${table.observedValue})='object' and octet_length(${table.observedValue}::text)<=8192`),
+  ],
+);
 
 export const p06ExecutionGateSnapshots = pgTable("p06_execution_gate_snapshots", {
-  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), executionRunId: uuid("execution_run_id").notNull(), phase: text("phase").notNull(), sequence: integer("sequence").notNull(), snapshotHash: text("snapshot_hash").notNull(), receiptHash: text("receipt_hash").notNull(), allowlistHash: text("allowlist_hash").notNull(), enabled: boolean("enabled").notNull(), capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(), expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(), payload: jsonb("payload").$type<Record<string, unknown>>().notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("p06_execution_gate_snapshots_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("p06_execution_gate_snapshots_run_phase_unique").on(table.workspaceId, table.executionRunId, table.phase), index("p06_execution_gate_snapshots_run_idx").on(table.workspaceId, table.executionRunId, table.sequence), foreignKey({ columns: [table.workspaceId, table.executionRunId], foreignColumns: [p06ExecutionRuns.workspaceId, p06ExecutionRuns.id], name: "p06_execution_gate_snapshots_run_fk" }).onDelete("cascade"), check("p06_execution_gate_snapshots_contract", sql`${table.phase} in ('staging','admission','post_claim','pre_dispatch','read_after_write') and ${table.sequence} between 1 and 5 and ${table.snapshotHash} ~ '^[a-f0-9]{64}$' and ${table.receiptHash} ~ '^[a-f0-9]{64}$' and ${table.allowlistHash} ~ '^[a-f0-9]{64}$' and ${table.capturedAt}<${table.expiresAt} and jsonb_typeof(${table.payload})='object' and octet_length(${table.payload}::text)<=8192`)]);
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    executionRunId: uuid("execution_run_id").notNull(),
+    phase: text("phase").notNull(),
+    sequence: integer("sequence").notNull(),
+    leaseEpoch: integer("lease_epoch").notNull(),
+    snapshotHash: text("snapshot_hash").notNull(),
+    receiptHash: text("receipt_hash").notNull(),
+    allowlistHash: text("allowlist_hash").notNull(),
+    enabled: boolean("enabled").notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("p06_execution_gate_snapshots_workspace_row_unique").on(table.workspaceId, table.id),
+    uniqueIndex("p06_execution_gate_snapshots_run_phase_epoch_unique").on(table.workspaceId, table.executionRunId, table.phase, table.leaseEpoch),
+    index("p06_execution_gate_snapshots_run_idx").on(table.workspaceId, table.executionRunId, table.sequence),
+    foreignKey({
+      columns: [table.workspaceId, table.executionRunId],
+      foreignColumns: [p06ExecutionRuns.workspaceId, p06ExecutionRuns.id],
+      name: "p06_execution_gate_snapshots_run_fk",
+    }).onDelete("cascade"),
+    check("p06_execution_gate_snapshots_contract", sql`${table.phase} in ('staging','admission','post_claim','pre_dispatch','read_after_write') and ${table.sequence} between 1 and 5 and ${table.leaseEpoch} between 0 and 1000000 and ${table.snapshotHash} ~ '^[a-f0-9]{64}$' and ${table.receiptHash} ~ '^[a-f0-9]{64}$' and ${table.allowlistHash} ~ '^[a-f0-9]{64}$' and ${table.capturedAt}<${table.expiresAt} and jsonb_typeof(${table.payload})='object' and octet_length(${table.payload}::text)<=8192 and ${table.payload}::text !~* '"(token|accessToken|secret|prompt|[^"[:space:]]*raw[_-]?(payload|request|response|json))"[[:space:]]*:'`),
+  ],
+);
 
 export const p06RollbackProposals = pgTable("p06_rollback_proposals", {
-  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), executionRunId: uuid("execution_run_id").notNull(), terminalEventId: uuid("terminal_event_id").notNull(), beforeObservationId: uuid("before_observation_id").notNull(), afterObservationId: uuid("after_observation_id").notNull(), writeObservationId: uuid("write_observation_id").notNull(), proposalRef: text("proposal_ref").notNull(), proposalHash: text("proposal_hash").notNull(), payload: jsonb("payload").$type<Record<string, unknown>>().notNull(), requiresNewHumanApproval: boolean("requires_new_human_approval").notNull().default(true), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("p06_rollback_proposals_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("p06_rollback_proposals_run_unique").on(table.workspaceId, table.executionRunId), uniqueIndex("p06_rollback_proposals_workspace_ref_unique").on(table.workspaceId, table.proposalRef), index("p06_rollback_proposals_terminal_fk_idx").on(table.workspaceId, table.terminalEventId), index("p06_rollback_proposals_before_fk_idx").on(table.workspaceId, table.beforeObservationId), index("p06_rollback_proposals_after_fk_idx").on(table.workspaceId, table.afterObservationId), index("p06_rollback_proposals_write_fk_idx").on(table.workspaceId, table.writeObservationId), foreignKey({ columns: [table.workspaceId, table.executionRunId], foreignColumns: [p06ExecutionRuns.workspaceId, p06ExecutionRuns.id], name: "p06_rollback_proposals_run_fk" }).onDelete("cascade"), foreignKey({ columns: [table.workspaceId, table.terminalEventId], foreignColumns: [p06ExecutionEvents.workspaceId, p06ExecutionEvents.id], name: "p06_rollback_proposals_terminal_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.beforeObservationId], foreignColumns: [p06ExecutionObservations.workspaceId, p06ExecutionObservations.id], name: "p06_rollback_proposals_before_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.afterObservationId], foreignColumns: [p06ExecutionObservations.workspaceId, p06ExecutionObservations.id], name: "p06_rollback_proposals_after_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.writeObservationId], foreignColumns: [p06ExecutionObservations.workspaceId, p06ExecutionObservations.id], name: "p06_rollback_proposals_write_fk" }).onDelete("restrict"), check("p06_rollback_proposals_contract", sql`${table.proposalRef} ~ '^p06_rollback_[a-f0-9]{24}$' and ${table.proposalHash} ~ '^[a-f0-9]{64}$' and ${table.requiresNewHumanApproval}=true and jsonb_typeof(${table.payload})='object' and octet_length(${table.payload}::text)<=16384 and ${table.payload}->>'version'='p06-rollback-proposal/1.0.0' and ${table.payload}->>'proposalRef'=${table.proposalRef} and ${table.payload}->>'proposalHash'=${table.proposalHash} and ${table.payload}->>'requiresNewHumanApproval'='true'`)]);
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    executionRunId: uuid("execution_run_id").notNull(),
+    terminalEventId: uuid("terminal_event_id").notNull(),
+    beforeObservationId: uuid("before_observation_id").notNull(),
+    afterObservationId: uuid("after_observation_id").notNull(),
+    writeObservationId: uuid("write_observation_id").notNull(),
+    proposalRef: text("proposal_ref").notNull(),
+    proposalHash: text("proposal_hash").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    requiresNewHumanApproval: boolean("requires_new_human_approval").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("p06_rollback_proposals_workspace_row_unique").on(table.workspaceId, table.id),
+    uniqueIndex("p06_rollback_proposals_run_unique").on(table.workspaceId, table.executionRunId),
+    uniqueIndex("p06_rollback_proposals_workspace_ref_unique").on(table.workspaceId, table.proposalRef),
+    index("p06_rollback_proposals_terminal_fk_idx").on(table.workspaceId, table.terminalEventId),
+    index("p06_rollback_proposals_before_fk_idx").on(table.workspaceId, table.beforeObservationId),
+    index("p06_rollback_proposals_after_fk_idx").on(table.workspaceId, table.afterObservationId),
+    index("p06_rollback_proposals_write_fk_idx").on(table.workspaceId, table.writeObservationId),
+    foreignKey({
+      columns: [table.workspaceId, table.executionRunId],
+      foreignColumns: [p06ExecutionRuns.workspaceId, p06ExecutionRuns.id],
+      name: "p06_rollback_proposals_run_fk",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.workspaceId, table.terminalEventId],
+      foreignColumns: [p06ExecutionEvents.workspaceId, p06ExecutionEvents.id],
+      name: "p06_rollback_proposals_terminal_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.workspaceId, table.beforeObservationId],
+      foreignColumns: [p06ExecutionObservations.workspaceId, p06ExecutionObservations.id],
+      name: "p06_rollback_proposals_before_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.workspaceId, table.afterObservationId],
+      foreignColumns: [p06ExecutionObservations.workspaceId, p06ExecutionObservations.id],
+      name: "p06_rollback_proposals_after_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.workspaceId, table.writeObservationId],
+      foreignColumns: [p06ExecutionObservations.workspaceId, p06ExecutionObservations.id],
+      name: "p06_rollback_proposals_write_fk",
+    }).onDelete("restrict"),
+    check("p06_rollback_proposals_contract", sql`${table.proposalRef} ~ '^p06_rollback_[a-f0-9]{24}$' and ${table.proposalHash} ~ '^[a-f0-9]{64}$' and ${table.requiresNewHumanApproval}=true and jsonb_typeof(${table.payload})='object' and octet_length(${table.payload}::text)<=16384 and ${table.payload}->>'version'='p06-rollback-proposal/1.0.0' and ${table.payload}->>'proposalRef'=${table.proposalRef} and ${table.payload}->>'proposalHash'=${table.proposalHash} and ${table.payload}->>'requiresNewHumanApproval'='true' and ${table.payload}::text !~* '"(token|accessToken|secret|prompt|[^"[:space:]]*raw[_-]?(payload|request|response|json))"[[:space:]]*:'`),
+  ],
+);
 
 /**
  * One immutable execution identity for one approved ActionUnit decision. This
  * is an admission ledger only: a row cannot itself grant a Meta write.
  */
+
+
 export const actionExecutionAttempts = pgTable("action_execution_attempts", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
