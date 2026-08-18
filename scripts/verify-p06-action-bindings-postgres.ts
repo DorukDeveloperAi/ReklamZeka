@@ -1059,6 +1059,8 @@ try {
           postWriteObserved: failedAfterCore.value,
           restoreTo: failedBeforeCore.value,
           failedDesired: { status: "PAUSED" as const, budgetMinor: null },
+          budgetKind: null,
+          currency: null,
           requiresNewHumanApproval: true as const,
         };
         const rollbackProposal = {

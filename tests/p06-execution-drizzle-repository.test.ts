@@ -3,6 +3,9 @@ import {
   DrizzleP06ExecutionRepository,
   type P06ExecutionGateSeed,
 } from "@/connectors/actions/p06-execution-drizzle-repository";
+import { buildActionPlan } from "@/domain/actions/autonomy-valve";
+import { createMetaWriteSpec } from "@/domain/actions/meta-write-spec";
+import { p06ExecutionV2Digest } from "@/domain/actions/p06-execution-v2";
 
 const id = (suffix: string) =>
   `00000000-0000-4000-8000-${suffix.padStart(12, "0")}`;
@@ -43,6 +46,42 @@ const gates: readonly P06ExecutionGateSeed[] = [
 })) as readonly P06ExecutionGateSeed[];
 
 describe("DrizzleP06ExecutionRepository", () => {
+  it("materializes a persisted Guide budget admission without accepting caller plan or target data", async () => {
+    const unitHash = "9".repeat(64);
+    const actionPlan = buildActionPlan({ kind: "budget_change", entity: { level: "adset", ref: "adset_external_1" },
+      budgetKind: "daily", currency: "TRY", beforeDecimal: "100.50", afterDecimal: "90.25", budgetOwnerRef: "adset_external_1" },
+    { workspaceRef: "workspace_alpha", accountGroupRef: null, accountRef: "act_123", internalCategoryRefs: [],
+      campaignRef: "campaign_external_1", entity: { level: "adset", ref: "adset_external_1" }, evaluatedAt,
+      rules: [], budgetLimits: { currency: "TRY", maximumAbsoluteDeltaDecimal: "20.25", maximumRelativeDeltaBasisPoints: 2000, limitRefs: ["limit_main"] },
+      protection: { protectedInternalCategoryRefs: [], affectedGeoRefs: [], protectedGeoRefs: [], changeDisposition: "allowed", policyRefs: [] } });
+    const writeSpec = createMetaWriteSpec({ unitRef: "action_unit_11111111111111111111", unitHash, actionPlan });
+    const admissionCore = { version: "action-execution-admission/1.0.0" as const, unitRef: writeSpec.unitRef,
+      approvalDecisionRef: "decision_one", approvalGrantRef: "grant_one", executionPresenceRef: "presence_one", writeSpec,
+      eligibilitySnapshotHash: "b".repeat(64), eligibilityHash: "c".repeat(64), dependencyUnitRefs: Object.freeze([]), evaluatedAt,
+      disposition: "admitted_for_disabled_executor" as const,
+      capabilities: Object.freeze({ canExecute: false as const, canWriteMeta: false as const, canDispatchNetwork: false as const }) };
+    const admission = Object.freeze({ ...admissionCore, admissionHash: p06ExecutionV2Digest(admissionCore) });
+    const execute = vi.fn().mockResolvedValueOnce({ rows: [{ attempt_id: id("7"), admission_hash: admission.admissionHash,
+      write_spec_hash: writeSpec.specHash, admission_payload: admission, unit_id: id("3"), unit_hash: unitHash,
+      context_hash: actionPlan.contextHash, action_plan_hash: actionPlan.planHash, action_plan_payload: actionPlan,
+      account_ref: "act_123", entity_ref: "adset_external_1", action_type: "budget_decrease", ad_set_id: id("8"), campaign_id: id("9"),
+      bundle_id: id("2"), workspace_ref: "workspace_alpha",
+      plan_ref: `guide_budget_${id("44").replaceAll("-", "")}_${"d".repeat(64)}`, plan_hash: "e".repeat(64),
+      decision_id: id("5"), grant_id: id("6"), grant_hash: "2".repeat(64), policy_hash: "1".repeat(64), current_status: "ACTIVE" }] })
+      .mockResolvedValueOnce({ rows: [{ configured_status: "ACTIVE" }] })
+      .mockResolvedValueOnce({ rows: [{ id: id("4") }] }).mockResolvedValue({ rows: [] });
+    const database = { execute, transaction: async (callback: (tx: { execute: typeof execute }) => Promise<unknown>) => callback({ execute }) };
+    const created = await new DrizzleP06ExecutionRepository(database as never).createGuideBudgetHumanApproved({
+      workspaceId: id("10"), actionExecutionAttemptId: id("7"), evaluatedAt, gates: gates.slice(0, 2),
+    });
+    expect(created.request).toMatchObject({ action: "budget_decrease", budgetKind: "daily", currency: "TRY",
+      expectedBefore: { status: "ACTIVE", budgetMinor: 10050 }, desired: { status: "ACTIVE", budgetMinor: 9025 } });
+    const rendered = execute.mock.calls.map(([query]) => sqlText(query)).join("\n");
+    expect(rendered).toContain("action_execution_attempts");
+    expect(rendered).toContain("guide_budget_human_approved");
+    expect(rendered).not.toMatch(/fetch\(|authorization|access_token/i);
+  });
+
   it("derives a status request from the persisted binding and writes no network capability", async () => {
     const execute = vi
       .fn()

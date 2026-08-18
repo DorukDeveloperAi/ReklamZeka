@@ -20,18 +20,21 @@ export type P06ExecutionV2Action = Extract<
   "status_pause" | "status_activate" | "budget_decrease" | "budget_increase"
 >;
 export type P06ExecutionV2Value = Readonly<{ status: "ACTIVE" | "PAUSED"; budgetMinor: number | null }>;
-export type P06ExecutionV2Request = Readonly<{
+type P06ExecutionV2RequestCore = Readonly<{
   executionRef: string;
   workspaceRef: string;
   accountRef: string;
   entityRef: string;
-  action: P06ExecutionV2Action;
   expectedBefore: P06ExecutionV2Value;
   desired: P06ExecutionV2Value;
   leaseTokenHash: string;
   fenceHash: string;
   evaluatedAt: string;
 }>;
+export type P06ExecutionV2Request = P06ExecutionV2RequestCore & (
+  | Readonly<{ action: "status_pause" | "status_activate"; budgetKind?: null; currency?: null }>
+  | Readonly<{ action: "budget_decrease" | "budget_increase"; budgetKind: "daily" | "lifetime"; currency: string }>
+);
 export type P06ExecutionV2GatePhase = "staging" | "admission" | "post_claim" | "pre_dispatch" | "read_after_write";
 export type P06ExecutionV2Gate = Readonly<{
   enabled: boolean;
@@ -62,7 +65,7 @@ export type P06ExecutionV2WriteCore = Readonly<{
 }>;
 export type P06ExecutionV2Writer = Readonly<{
   read(input: Readonly<{ workspaceRef: string; accountRef: string; entityRef: string;
-    action: P06ExecutionV2Action }>): Promise<P06ExecutionV2ReadEvidence>;
+    action: P06ExecutionV2Action; budgetKind?: "daily" | "lifetime" | null; currency?: string | null }>): Promise<P06ExecutionV2ReadEvidence>;
   write(input: Readonly<{ request: P06ExecutionV2Request; idempotencyKey: string }>): Promise<P06ExecutionV2Receipt<P06ExecutionV2WriteCore>>;
 }>;
 export type P06ExecutionV2Outcome =
@@ -112,6 +115,8 @@ export type P06ExecutionV2RollbackProposal = Readonly<{
   postWriteObserved: P06ExecutionV2Value;
   restoreTo: P06ExecutionV2Value;
   failedDesired: P06ExecutionV2Value;
+  budgetKind: "daily" | "lifetime" | null;
+  currency: string | null;
   requiresNewHumanApproval: true;
 }>;
 export type P06ExecutionV2Result = Readonly<{
@@ -150,14 +155,15 @@ function coherent(request: P06ExecutionV2Request): boolean {
   if (!validValue(request.expectedBefore) || !validValue(request.desired)) return false;
   if (request.action === "status_pause") {
     return request.expectedBefore.status === "ACTIVE" && request.desired.status === "PAUSED" &&
-      request.expectedBefore.budgetMinor === request.desired.budgetMinor;
+      request.expectedBefore.budgetMinor === request.desired.budgetMinor && request.budgetKind == null && request.currency == null;
   }
   if (request.action === "status_activate") {
     return request.expectedBefore.status === "PAUSED" && request.desired.status === "ACTIVE" &&
-      request.expectedBefore.budgetMinor === request.desired.budgetMinor;
+      request.expectedBefore.budgetMinor === request.desired.budgetMinor && request.budgetKind == null && request.currency == null;
   }
   return request.expectedBefore.status === request.desired.status && request.expectedBefore.budgetMinor !== null &&
-    request.desired.budgetMinor !== null && (request.action === "budget_decrease"
+    request.desired.budgetMinor !== null && (request.budgetKind === "daily" || request.budgetKind === "lifetime")
+    && /^[A-Z]{3}$/.test(request.currency) && (request.action === "budget_decrease"
       ? request.desired.budgetMinor < request.expectedBefore.budgetMinor
       : request.desired.budgetMinor > request.expectedBefore.budgetMinor);
 }
@@ -235,7 +241,8 @@ export async function runP06ExecutionV2({ request, writer, control }: Readonly<{
   setTrace(trace, "lease", "ok", claim.receiptHash);
   const idempotencyKey = digest({ version: P06_EXECUTION_V2_VERSION, executionRef: request.executionRef,
     workspaceRef: request.workspaceRef, accountRef: request.accountRef, entityRef: request.entityRef,
-    action: request.action, expectedBefore: request.expectedBefore, desired: request.desired });
+    action: request.action, budgetKind: request.budgetKind ?? null, currency: request.currency ?? null,
+    expectedBefore: request.expectedBefore, desired: request.desired });
   const replay = await control.idempotency({ executionRef: request.executionRef, idempotencyKey, fenceHash: request.fenceHash });
   if (!validReceipt(replay) || replay.core.executionRef !== request.executionRef ||
     replay.core.idempotencyKey !== idempotencyKey || replay.core.fenceHash !== request.fenceHash) {
@@ -275,7 +282,8 @@ export async function runP06ExecutionV2({ request, writer, control }: Readonly<{
       const core = { version: "p06-rollback-proposal/1.0.0" as const, executionRef: request.executionRef,
         terminalHash: terminal.receiptHash, writeReceiptHash, beforeReadReceiptHash: before.receiptHash,
         afterReadReceiptHash: after.receiptHash, previousObserved: before.core.value, postWriteObserved: after.core.value,
-        restoreTo: before.core.value, failedDesired: request.desired, requiresNewHumanApproval: true as const };
+        restoreTo: before.core.value, failedDesired: request.desired, budgetKind: request.budgetKind ?? null,
+        currency: request.currency ?? null, requiresNewHumanApproval: true as const };
       rollbackProposal = Object.freeze({ ...core, proposalHash: digest(core) });
     }
     return freezeResult({ version: P06_EXECUTION_V2_VERSION, executionRef: request.executionRef, outcome, writes,
@@ -284,7 +292,7 @@ export async function runP06ExecutionV2({ request, writer, control }: Readonly<{
 
   if (!(await checkGate("post_claim"))) return finish("expected_before_mismatch");
   before = await writer.read({ workspaceRef: request.workspaceRef, accountRef: request.accountRef,
-    entityRef: request.entityRef, action: request.action });
+    entityRef: request.entityRef, action: request.action, budgetKind: request.budgetKind, currency: request.currency });
   if (!validEvidence(before, request)) throw new Error("p06 execution v2 invalid read evidence");
   setTrace(trace, "current_meta_read", "ok", before.receiptHash);
   if (sameValue(before.core.value, request.desired)) {
@@ -310,7 +318,7 @@ export async function runP06ExecutionV2({ request, writer, control }: Readonly<{
   writeReceiptHash = write.receiptHash;
   setTrace(trace, "typed_mutation", write.core.kind === "ambiguous_transport" ? "ambiguous" : "ok", write.receiptHash);
   after = await writer.read({ workspaceRef: request.workspaceRef, accountRef: request.accountRef,
-    entityRef: request.entityRef, action: request.action });
+    entityRef: request.entityRef, action: request.action, budgetKind: request.budgetKind, currency: request.currency });
   if (!validEvidence(after, request)) throw new Error(`p06 execution v2 invalid ${write.core.kind === "ambiguous_transport" ? "ambiguous read" : "verification"} evidence`);
   setTrace(trace, "raw", "ok", digest({ beforeRawHash: before.core.rawHash, writeRawHash: write.core.rawHash,
     afterRawHash: after.core.rawHash, writeReceiptHash: write.receiptHash }));

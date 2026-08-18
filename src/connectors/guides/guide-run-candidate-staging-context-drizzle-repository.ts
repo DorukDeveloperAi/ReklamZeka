@@ -47,6 +47,7 @@ export class DrizzleGuideRunCandidateStagingContextRepository {
         | "status_pause"
         | "status_activate";
       at: string;
+      authority?: "human_approval" | "limited_autonomy";
     }>,
   ) {
     return this.database.transaction(async (tx) =>
@@ -68,6 +69,7 @@ export class DrizzleGuideRunCandidateStagingContextRepository {
         | "status_pause"
         | "status_activate";
       at: string;
+      authority?: "human_approval" | "limited_autonomy";
     }>,
   ) {
     if (
@@ -153,9 +155,12 @@ export class DrizzleGuideRunCandidateStagingContextRepository {
       action: input.action,
       at: input.at,
     });
+    const expectedAuthority = input.authority ?? "human_approval";
     if (
       effective.hold.state !== "clear" ||
-      !effective.humanApprovalActions.includes(input.action)
+      (expectedAuthority === "human_approval"
+        ? !effective.humanApprovalActions.includes(input.action)
+        : effective.effectiveMode !== "limited_autonomy" || !effective.autonomousActions.includes(input.action))
     )
       throw new Error("guide overlap denied");
     if (

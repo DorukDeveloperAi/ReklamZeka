@@ -1010,6 +1010,51 @@ export const guideRunActionBindings = pgTable("guide_run_action_bindings", {
   id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), runId: uuid("run_id").notNull(), guideRevisionId: uuid("guide_revision_id").notNull(), dispositionArtifactId: uuid("disposition_artifact_id").notNull(), actionUnitId: uuid("action_unit_id").notNull(), proposalBundleId: uuid("proposal_bundle_id").notNull(), actionUnitRef: text("action_unit_ref").notNull(), actionUnitHash: text("action_unit_hash").notNull(), proposalRef: text("proposal_ref").notNull(), proposalHash: text("proposal_hash").notNull(), entityRef: text("entity_ref").notNull(), memberRef: text("member_ref").notNull(), membershipHash: text("membership_hash").notNull(), sliceRef: text("slice_ref").notNull(), marketKey: text("market_key").notNull(), effectiveGuideSetHash: text("effective_guide_set_hash").notNull(), resolutionHash: text("resolution_hash").notNull(), decision: text("decision").notNull().default("pending"), version: text("version").notNull().default("p06-action-binding/1.0.0"), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("guide_run_action_bindings_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("guide_run_action_bindings_workspace_artifact_unique").on(table.workspaceId, table.dispositionArtifactId), uniqueIndex("guide_run_action_bindings_workspace_unit_unique").on(table.workspaceId, table.runId, table.actionUnitId), uniqueIndex("guide_run_action_bindings_workspace_action_unit_unique").on(table.workspaceId, table.actionUnitId), index("guide_run_action_bindings_workspace_revision_idx").on(table.workspaceId, table.guideRevisionId), index("guide_run_action_bindings_workspace_member_idx").on(table.workspaceId, table.memberRef, table.membershipHash), index("guide_run_action_bindings_workspace_proposal_idx").on(table.workspaceId, table.proposalBundleId), index("guide_run_action_bindings_workspace_unit_fk_idx").on(table.workspaceId, table.actionUnitId), index("guide_run_action_bindings_workspace_proposal_fk_idx").on(table.workspaceId, table.proposalBundleId), foreignKey({ columns: [table.workspaceId, table.runId, table.guideRevisionId], foreignColumns: [guideRuns.workspaceId, guideRuns.id, guideRuns.guideRevisionId], name: "guide_run_action_bindings_run_revision_fk" }).onDelete("cascade"), foreignKey({ columns: [table.workspaceId, table.dispositionArtifactId], foreignColumns: [guideRunArtifacts.workspaceId, guideRunArtifacts.id], name: "guide_run_action_bindings_disposition_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.actionUnitId], foreignColumns: [actionProposalUnits.workspaceId, actionProposalUnits.id], name: "guide_run_action_bindings_unit_fk" }).onDelete("restrict"), foreignKey({ columns: [table.workspaceId, table.proposalBundleId], foreignColumns: [actionProposalBundles.workspaceId, actionProposalBundles.id], name: "guide_run_action_bindings_proposal_fk" }).onDelete("restrict"), check("guide_run_action_bindings_contract", sql`${table.actionUnitRef} ~ '^action_unit_[a-f0-9]{20}$' and ${table.proposalRef} ~ '^action_bundle_[a-f0-9]{20}$' and ${table.actionUnitHash} ~ '^[a-f0-9]{64}$' and ${table.proposalHash} ~ '^[a-f0-9]{64}$' and ${table.entityRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.memberRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$' and ${table.membershipHash} ~ '^[a-f0-9]{64}$' and ${table.sliceRef} ~ '^slice_[a-z0-9][a-z0-9_.:-]{0,190}$' and ${table.marketKey} in ('yerli','yabanci') and ${table.effectiveGuideSetHash} ~ '^[a-f0-9]{64}$' and ${table.resolutionHash} ~ '^[a-f0-9]{64}$' and ${table.decision}='pending' and ${table.version}='p06-action-binding/1.0.0'`)]);
 
+/** Non-executable, append-only limited-autonomy admission plus atomic run quota. */
+export const p06LimitedAutonomyAdmissions = pgTable("p06_limited_autonomy_admissions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  runId: uuid("run_id").notNull(), guideRevisionId: uuid("guide_revision_id").notNull(),
+  dispositionArtifactId: uuid("disposition_artifact_id").notNull(),
+  memberRef: text("member_ref").notNull(), membershipHash: text("membership_hash").notNull(),
+  entityRef: text("entity_ref").notNull(), accountRef: text("account_ref").notNull(), campaignRef: text("campaign_ref").notNull(),
+  actionType: text("action_type").notNull(), expectedStatus: text("expected_status").notNull(), desiredStatus: text("desired_status").notNull(),
+  contextHash: text("context_hash").notNull(), effectiveGuideSetHash: text("effective_guide_set_hash").notNull(),
+  resolutionHash: text("resolution_hash").notNull(), dataHealthReportHash: text("data_health_report_hash").notNull(),
+  protectionHash: text("protection_hash").notNull(), autonomyEvidenceHash: text("autonomy_evidence_hash").notNull(),
+  actionPlanHash: text("action_plan_hash").notNull(), maximumActionsPerRun: integer("maximum_actions_per_run").notNull(),
+  quotaOrdinal: integer("quota_ordinal").notNull(), admittedAt: timestamp("admitted_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(), admissionHash: text("admission_hash").notNull(),
+  admissionPayload: jsonb("admission_payload").$type<Record<string, unknown>>().notNull(),
+  version: text("version").notNull().default("p06-limited-autonomy-admission/1.0.0"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("p06_limited_autonomy_admissions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("p06_limited_autonomy_admissions_workspace_artifact_unique").on(table.workspaceId, table.dispositionArtifactId),
+  uniqueIndex("p06_limited_autonomy_admissions_run_ordinal_unique").on(table.workspaceId, table.runId, table.quotaOrdinal),
+  index("p06_limited_autonomy_admissions_run_fk_idx").on(table.workspaceId, table.runId, table.guideRevisionId),
+  index("p06_limited_autonomy_admissions_artifact_fk_idx").on(table.workspaceId, table.dispositionArtifactId),
+  index("p06_limited_autonomy_admissions_runnable_idx").on(table.workspaceId, table.admittedAt)
+    .where(sql`${table.quotaOrdinal}<=${table.maximumActionsPerRun}`),
+  foreignKey({ columns: [table.workspaceId, table.runId, table.guideRevisionId], foreignColumns: [guideRuns.workspaceId, guideRuns.id, guideRuns.guideRevisionId], name: "p06_limited_autonomy_admissions_run_revision_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [table.workspaceId, table.dispositionArtifactId], foreignColumns: [guideRunArtifacts.workspaceId, guideRunArtifacts.id], name: "p06_limited_autonomy_admissions_artifact_fk" }).onDelete("restrict"),
+  check("p06_limited_autonomy_admissions_contract", sql`
+    ${table.memberRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.membershipHash} ~ '^[a-f0-9]{64}$' and ${table.entityRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.accountRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.campaignRef} ~ '^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$'
+    and ${table.actionType}='status_pause' and ${table.expectedStatus}='ACTIVE' and ${table.desiredStatus}='PAUSED'
+    and ${table.contextHash} ~ '^[a-f0-9]{64}$' and ${table.effectiveGuideSetHash} ~ '^[a-f0-9]{64}$'
+    and ${table.resolutionHash} ~ '^[a-f0-9]{64}$' and ${table.dataHealthReportHash} ~ '^[a-f0-9]{64}$'
+    and ${table.protectionHash} ~ '^[a-f0-9]{64}$' and ${table.autonomyEvidenceHash} ~ '^[a-f0-9]{64}$'
+    and ${table.actionPlanHash} ~ '^[a-f0-9]{64}$' and ${table.admissionHash} ~ '^[a-f0-9]{64}$'
+    and ${table.maximumActionsPerRun} between 1 and 1000000 and ${table.quotaOrdinal} between 1 and ${table.maximumActionsPerRun}
+    and ${table.expiresAt}>${table.admittedAt} and ${table.expiresAt}<=${table.admittedAt}+interval '1 hour'
+    and ${table.version}='p06-limited-autonomy-admission/1.0.0' and jsonb_typeof(${table.admissionPayload})='object'
+    and octet_length(${table.admissionPayload}::text)<=32768
+  `),
+]);
+
 /**
  * User-selected primary result. The polymorphic target is deliberately
  * expressed as two nullable, tenant-scoped FKs plus a closed XOR discriminator:
@@ -5948,7 +5993,8 @@ export const p06ExecutionRuns = pgTable("p06_execution_runs", {
     workspaceId: uuid("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
-    guideRunActionBindingId: uuid("guide_run_action_binding_id").notNull(),
+    guideRunActionBindingId: uuid("guide_run_action_binding_id"),
+    actionExecutionAttemptId: uuid("action_execution_attempt_id"),
     proposalBundleId: uuid("proposal_bundle_id").notNull(),
     actionUnitId: uuid("action_unit_id").notNull(),
     decisionEventId: uuid("decision_event_id").notNull(),
@@ -5959,8 +6005,14 @@ export const p06ExecutionRuns = pgTable("p06_execution_runs", {
     actionUnitHash: text("action_unit_hash").notNull(),
     proposalHash: text("proposal_hash").notNull(),
     contextHash: text("context_hash").notNull(),
-    effectiveGuideSetHash: text("effective_guide_set_hash").notNull(),
-    resolutionHash: text("resolution_hash").notNull(),
+    effectiveGuideSetHash: text("effective_guide_set_hash"),
+    resolutionHash: text("resolution_hash"),
+    admissionHash: text("admission_hash"),
+    writeSpecHash: text("write_spec_hash"),
+    dryRunHash: text("dry_run_hash"),
+    actionPlanHash: text("action_plan_hash"),
+    budgetKind: text("budget_kind"),
+    currency: text("currency"),
     policyHash: text("policy_hash").notNull(),
     gateSetHash: text("gate_set_hash").notNull(),
     requestPayload: jsonb("request_payload").$type<Record<string, unknown>>().notNull(),
@@ -5972,9 +6024,11 @@ export const p06ExecutionRuns = pgTable("p06_execution_runs", {
     uniqueIndex("p06_execution_runs_workspace_row_unique").on(table.workspaceId, table.id),
     uniqueIndex("p06_execution_runs_workspace_ref_unique").on(table.workspaceId, table.executionRef),
     uniqueIndex("p06_execution_runs_workspace_binding_unique").on(table.workspaceId, table.guideRunActionBindingId),
+    uniqueIndex("p06_execution_runs_workspace_attempt_unique").on(table.workspaceId, table.actionExecutionAttemptId),
     uniqueIndex("p06_execution_runs_workspace_grant_unique").on(table.workspaceId, table.approvalGrantId),
     uniqueIndex("p06_execution_runs_workspace_idempotency_unique").on(table.workspaceId, table.idempotencyKey),
     index("p06_execution_runs_binding_fk_idx").on(table.workspaceId, table.guideRunActionBindingId),
+    index("p06_execution_runs_attempt_fk_idx").on(table.workspaceId, table.actionExecutionAttemptId),
     index("p06_execution_runs_unit_fk_idx").on(table.workspaceId, table.actionUnitId),
     index("p06_execution_runs_decision_fk_idx").on(table.workspaceId, table.decisionEventId),
     index("p06_execution_runs_grant_fk_idx").on(table.workspaceId, table.approvalGrantId),
@@ -5982,6 +6036,11 @@ export const p06ExecutionRuns = pgTable("p06_execution_runs", {
       columns: [table.workspaceId, table.guideRunActionBindingId],
       foreignColumns: [guideRunActionBindings.workspaceId, guideRunActionBindings.id],
       name: "p06_execution_runs_binding_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.workspaceId, table.actionExecutionAttemptId],
+      foreignColumns: [actionExecutionAttempts.workspaceId, actionExecutionAttempts.id],
+      name: "p06_execution_runs_attempt_fk",
     }).onDelete("restrict"),
     foreignKey({
       columns: [table.workspaceId, table.proposalBundleId],
@@ -6003,7 +6062,56 @@ export const p06ExecutionRuns = pgTable("p06_execution_runs", {
       foreignColumns: [actionApprovalEvidenceGrants.workspaceId, actionApprovalEvidenceGrants.id],
       name: "p06_execution_runs_grant_fk",
     }).onDelete("restrict"),
-    check("p06_execution_runs_contract", sql`${table.executionRef} ~ '^p06_execution_[a-f0-9]{24}$' and ${table.idempotencyKey} ~ '^p06_exec_idem_[a-f0-9]{64}$' and ${table.requestHash} ~ '^[a-f0-9]{64}$' and ${table.actionUnitHash} ~ '^[a-f0-9]{64}$' and ${table.proposalHash} ~ '^[a-f0-9]{64}$' and ${table.contextHash} ~ '^[a-f0-9]{64}$' and ${table.effectiveGuideSetHash} ~ '^[a-f0-9]{64}$' and ${table.resolutionHash} ~ '^[a-f0-9]{64}$' and ${table.policyHash} ~ '^[a-f0-9]{64}$' and ${table.gateSetHash} ~ '^[a-f0-9]{64}$' and ${table.route}='human_approved' and ${table.version}='p06-execution-run/1.0.0' and jsonb_typeof(${table.requestPayload})='object' and octet_length(${table.requestPayload}::text)<=32768 and ${table.requestPayload} ?& array['version','workspaceRef','accountRef','entityRef','action','expectedBefore','desired','evaluatedAt','actionUnitHash','proposalHash','contextHash','effectiveGuideSetHash','resolutionHash','policyHash','gateSetHash','route','executionRef','idempotencyKey','requestHash'] and not ${table.requestPayload} ?| array['leaseTokenHash','fenceHash'] and ${table.requestPayload}->>'version'='p06-execution-request/1.0.0' and ${table.requestPayload}->>'executionRef'=${table.executionRef} and ${table.requestPayload}->>'idempotencyKey'=${table.idempotencyKey} and ${table.requestPayload}->>'requestHash'=${table.requestHash} and ${table.requestPayload}->>'route'=${table.route} and ${table.requestPayload}->>'actionUnitHash'=${table.actionUnitHash} and ${table.requestPayload}->>'proposalHash'=${table.proposalHash} and ${table.requestPayload}->>'contextHash'=${table.contextHash} and ${table.requestPayload}->>'effectiveGuideSetHash'=${table.effectiveGuideSetHash} and ${table.requestPayload}->>'resolutionHash'=${table.resolutionHash} and ${table.requestPayload}->>'policyHash'=${table.policyHash} and ${table.requestPayload}->>'gateSetHash'=${table.gateSetHash}`),
+    check("p06_execution_runs_contract", sql`
+      ${table.executionRef} ~ '^p06_execution_[a-f0-9]{24}$'
+      and ${table.idempotencyKey} ~ '^p06_exec_idem_[a-f0-9]{64}$'
+      and ${table.requestHash} ~ '^[a-f0-9]{64}$'
+      and ${table.actionUnitHash} ~ '^[a-f0-9]{64}$'
+      and ${table.proposalHash} ~ '^[a-f0-9]{64}$'
+      and ${table.contextHash} ~ '^[a-f0-9]{64}$'
+      and ${table.policyHash} ~ '^[a-f0-9]{64}$'
+      and ${table.gateSetHash} ~ '^[a-f0-9]{64}$'
+      and ${table.version}='p06-execution-run/1.0.0'
+      and jsonb_typeof(${table.requestPayload})='object'
+      and octet_length(${table.requestPayload}::text)<=32768
+      and not ${table.requestPayload} ?| array['leaseTokenHash','fenceHash']
+      and ${table.requestPayload}->>'version'='p06-execution-request/1.0.0'
+      and ${table.requestPayload}->>'executionRef'=${table.executionRef}
+      and ${table.requestPayload}->>'idempotencyKey'=${table.idempotencyKey}
+      and ${table.requestPayload}->>'requestHash'=${table.requestHash}
+      and ${table.requestPayload}->>'route'=${table.route}
+      and ${table.requestPayload}->>'actionUnitHash'=${table.actionUnitHash}
+      and ${table.requestPayload}->>'proposalHash'=${table.proposalHash}
+      and ${table.requestPayload}->>'contextHash'=${table.contextHash}
+      and ${table.requestPayload}->>'policyHash'=${table.policyHash}
+      and ${table.requestPayload}->>'gateSetHash'=${table.gateSetHash}
+      and (
+        (${table.route}='human_approved' and ${table.guideRunActionBindingId} is not null
+          and ${table.actionExecutionAttemptId} is null and ${table.admissionHash} is null
+          and ${table.writeSpecHash} is null and ${table.dryRunHash} is null and ${table.actionPlanHash} is null
+          and ${table.budgetKind} is null and ${table.currency} is null
+          and ${table.effectiveGuideSetHash} ~ '^[a-f0-9]{64}$' and ${table.resolutionHash} ~ '^[a-f0-9]{64}$'
+          and public.p06_jsonb_object_key_count(${table.requestPayload})=19
+          and ${table.requestPayload} ?& array['version','workspaceRef','accountRef','entityRef','action','expectedBefore','desired','evaluatedAt','actionUnitHash','proposalHash','contextHash','effectiveGuideSetHash','resolutionHash','policyHash','gateSetHash','route','executionRef','idempotencyKey','requestHash']
+          and ${table.requestPayload}->>'effectiveGuideSetHash'=${table.effectiveGuideSetHash}
+          and ${table.requestPayload}->>'resolutionHash'=${table.resolutionHash})
+        or (${table.route}='guide_budget_human_approved' and ${table.guideRunActionBindingId} is null
+          and ${table.actionExecutionAttemptId} is not null and ${table.effectiveGuideSetHash} is null and ${table.resolutionHash} is null
+          and ${table.admissionHash} ~ '^[a-f0-9]{64}$' and ${table.writeSpecHash} ~ '^[a-f0-9]{64}$'
+          and ${table.dryRunHash} ~ '^[a-f0-9]{64}$' and ${table.actionPlanHash} ~ '^[a-f0-9]{64}$'
+          and ${table.budgetKind} in ('daily','lifetime') and ${table.currency} ~ '^[A-Z]{3}$'
+          and public.p06_jsonb_object_key_count(${table.requestPayload})=25
+          and ${table.requestPayload} ?& array['version','workspaceRef','accountRef','entityRef','action','budgetKind','currency','expectedBefore','desired','evaluatedAt','actionUnitHash','proposalHash','contextHash','effectiveGuideSetHash','resolutionHash','policyHash','gateSetHash','admissionHash','writeSpecHash','dryRunHash','actionPlanHash','route','executionRef','idempotencyKey','requestHash']
+          and ${table.requestPayload}->>'budgetKind'=${table.budgetKind}
+          and ${table.requestPayload}->>'currency'=${table.currency}
+          and ${table.requestPayload}->>'admissionHash'=${table.admissionHash}
+          and ${table.requestPayload}->>'writeSpecHash'=${table.writeSpecHash}
+          and ${table.requestPayload}->>'dryRunHash'=${table.dryRunHash}
+          and ${table.requestPayload}->>'actionPlanHash'=${table.actionPlanHash}
+          and ${table.requestPayload}->'effectiveGuideSetHash'='null'::jsonb
+          and ${table.requestPayload}->'resolutionHash'='null'::jsonb)
+      )
+    `),
   ],
 );
 

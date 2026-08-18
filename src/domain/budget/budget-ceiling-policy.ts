@@ -162,12 +162,13 @@ export function resolveBudgetCeilingPolicies(input: Readonly<{
       if (rebuilt.policyHash !== revision.policyHash || rebuilt.workspaceRef !== workspaceRef || rebuilt.layer !== layer || (previous ? revision.revision !== previous.revision + 1 || revision.previousPolicyHash !== previous.policyHash : revision.revision !== 1)) fail("invalid_chain");
       previous = revision;
     }
-    const current = revisions.at(-1)!;
+    const current = revisions.filter((revision) => revision.publishedAt <= evaluatedAt && revision.effectiveFrom <= evaluatedAt).at(-1);
+    if (!current) { holds.add(`ceiling_policy_inactive:${limitRef}`); continue; }
+    if (current.effectiveTo <= evaluatedAt) holds.add(`ceiling_policy_inactive:${limitRef}`);
     if (current.state !== "published") holds.add(`ceiling_policy_disabled:${limitRef}`);
     if (current.targetScopeRef !== targetScopeRef) holds.add(`ceiling_target_mismatch:${limitRef}`);
     if (current.market !== input.market) holds.add(`ceiling_market_mismatch:${limitRef}`);
     if (current.currency !== input.currency) holds.add(`ceiling_currency_mismatch:${limitRef}`);
-    if (current.effectiveFrom > evaluatedAt || current.effectiveTo <= evaluatedAt) holds.add(`ceiling_policy_inactive:${limitRef}`);
     selected.push(current);
   }
   for (let index = 0; index < selected.length; index += 1) {

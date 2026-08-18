@@ -170,7 +170,7 @@ export function createP06StatusExecutionRuntime(
     writer: new P06MetaStatusWriter(token, fetch, { now }),
   });
   const scheduler = new P06StatusExecutionSchedulerWorker({
-    repository,
+    repository: { listRunnable: (limit) => repository.listRunnableByRoute("human_approved", limit) },
     worker,
     now,
   });

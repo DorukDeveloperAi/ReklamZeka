@@ -11,6 +11,7 @@ import {
   type P06ExecutionV2GatePhase,
   type P06ExecutionV2ReadCore,
   type P06ExecutionV2ReadEvidence,
+  type P06ExecutionV2Request,
   type P06ExecutionV2RollbackProposal,
   type P06ExecutionV2Value,
   type P06ExecutionV2Writer,
@@ -76,12 +77,12 @@ const value = (input: unknown): P06ExecutionV2Value => {
   const source = input as Record<string, unknown>;
   if (
     (source.status !== "ACTIVE" && source.status !== "PAUSED") ||
-    source.budgetMinor !== null
+    (source.budgetMinor !== null && (!Number.isSafeInteger(source.budgetMinor) || Number(source.budgetMinor) < 0))
   )
     fail("corrupt_store");
   return Object.freeze({
     status: source.status as "ACTIVE" | "PAUSED",
-    budgetMinor: null,
+    budgetMinor: source.budgetMinor === null ? null : Number(source.budgetMinor),
   });
 };
 const exactRead = (
@@ -112,7 +113,7 @@ const exactRead = (
 };
 
 /**
- * Server-private durable status worker. It deliberately never retries a Meta
+ * Server-private durable typed status/budget worker. It deliberately never retries a Meta
  * mutation. When an invocation resumes at the dispatch boundary it reads Meta
  * first; a still-old state is held for human review, while an already-applied
  * state is recorded as an ambiguous resolution.
@@ -390,6 +391,8 @@ export class P06StatusExecutionWorker {
         accountRef: snapshot.request.accountRef,
         entityRef: snapshot.request.entityRef,
         action: snapshot.request.action,
+        budgetKind: snapshot.request.budgetKind,
+        currency: snapshot.request.currency,
       });
       if (read.receiptHash !== p06ExecutionV2Digest(read.core))
         fail("corrupt_store");
@@ -474,6 +477,8 @@ export class P06StatusExecutionWorker {
           accountRef: snapshot.request.accountRef,
           entityRef: snapshot.request.entityRef,
           action: snapshot.request.action,
+          budgetKind: snapshot.request.budgetKind,
+          currency: snapshot.request.currency,
         });
         if (reread.receiptHash !== p06ExecutionV2Digest(reread.core))
           fail("corrupt_store");
@@ -503,7 +508,7 @@ export class P06StatusExecutionWorker {
             ...snapshot.request,
             leaseTokenHash: input.leaseTokenHash,
             fenceHash: input.fenceHash,
-          },
+          } as P06ExecutionV2Request,
           idempotencyKey: snapshot.idempotencyKey,
         });
         if (write.receiptHash !== p06ExecutionV2Digest(write.core))
@@ -528,6 +533,8 @@ export class P06StatusExecutionWorker {
         accountRef: snapshot.request.accountRef,
         entityRef: snapshot.request.entityRef,
         action: snapshot.request.action,
+        budgetKind: snapshot.request.budgetKind,
+        currency: snapshot.request.currency,
       });
       if (after.receiptHash !== p06ExecutionV2Digest(after.core))
         fail("corrupt_store");
@@ -619,6 +626,8 @@ export class P06StatusExecutionWorker {
           postWriteObserved: value(after.observedValue),
           restoreTo: value(before.observedValue),
           failedDesired: snapshot.request.desired,
+          budgetKind: snapshot.request.budgetKind ?? null,
+          currency: snapshot.request.currency ?? null,
           requiresNewHumanApproval: true as const,
         };
         const proposal: P06ExecutionV2RollbackProposal = Object.freeze({

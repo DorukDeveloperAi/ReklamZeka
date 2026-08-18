@@ -8,6 +8,7 @@ import type { PublicSource } from "@/domain/source/public-source";
 import { DecisionRoomPanel } from "./decision-room-panel";
 import { BudgetLabPanel } from "./budget-lab-panel";
 import { BudgetPoolHierarchyPanel } from "./budget-pool-hierarchy-panel";
+import { BudgetCeilingPolicyPanel } from "./budget-ceiling-policy-panel";
 import { PracticeLabPanel } from "./practice-lab-panel";
 import { ApprovalQueuePanel } from "./approval-queue-panel";
 import { PromotionPreflightPanel, PromotionTemplateAuthoringPanel } from "./promotion-preflight-panel";
@@ -1456,7 +1457,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
 
   function renderBudgets() {
     if (budgetArea === "pools") return <BudgetPoolHierarchyPanel />;
-    return <BudgetLabPanel />;
+    return <><BudgetLabPanel /><BudgetCeilingPolicyPanel /></>;
   }
 
   function renderRules() {

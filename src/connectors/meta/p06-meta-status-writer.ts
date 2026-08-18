@@ -15,7 +15,7 @@ import {
 
 const GRAPH_ORIGIN = "https://graph.facebook.com";
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
-const STATUS_TARGET = /^adset_([0-9]{5,32})$/;
+const WRITE_TARGET = /^(?:campaign|adset)_([0-9]{5,32})$/;
 // The pure v2 contract uses the 64-hex digest directly; the durable ledger
 // namespaces the same digest for its database identity.
 const IDEMPOTENCY_KEY = /^(?:p06_exec_idem_)?[a-f0-9]{64}$/;
@@ -24,11 +24,11 @@ const MAX_BODY_BYTES = 1_048_576;
 const digest = p06ExecutionV2Digest;
 
 function targetId(entityRef: string): string {
-  const match = STATUS_TARGET.exec(entityRef);
+  const match = WRITE_TARGET.exec(entityRef);
   if (!match)
     throw new ConnectorError(
       "invalid_data",
-      "Meta status hedefi desteklenmiyor",
+      "Meta yazma hedefi desteklenmiyor",
       false,
     );
   return match[1]!;
@@ -65,7 +65,7 @@ function responseError(response: Response): ConnectorError {
 }
 
 /**
- * Server-private, status-only Meta transport. Mutations are deliberately never
+ * Server-private typed status/budget Meta transport. Mutations are deliberately never
  * retried: once a request may have left the process, transport/5xx/body failures
  * become an ambiguous receipt and the execution state machine must read Meta
  * again before deciding whether another write is permissible.
@@ -164,18 +164,23 @@ export class P06MetaStatusWriter implements P06ExecutionV2Writer {
       !REF.test(input.workspaceRef) ||
       !REF.test(input.accountRef) ||
       !REF.test(input.entityRef) ||
-      (input.action !== "status_pause" && input.action !== "status_activate")
+      !["status_pause", "status_activate", "budget_decrease", "budget_increase"].includes(input.action)
     ) {
       throw new ConnectorError(
         "invalid_data",
-        "Meta status okuma bağlamı geçersiz",
+        "Meta okuma bağlamı geçersiz",
         false,
       );
     }
     const id = targetId(input.entityRef);
     let result: Awaited<ReturnType<P06MetaStatusWriter["request"]>>;
+    const budgetAction = input.action === "budget_decrease" || input.action === "budget_increase";
+    if (budgetAction && ((input.budgetKind !== "daily" && input.budgetKind !== "lifetime") || !/^[A-Z]{3}$/.test(input.currency ?? ""))) {
+      throw new ConnectorError("invalid_data", "Meta bütçe okuma bağlamı geçersiz", false);
+    }
+    const budgetField = input.budgetKind === "lifetime" ? "lifetime_budget" : "daily_budget";
     try {
-      result = await this.request(`${id}?fields=id,status,effective_status`, {
+      result = await this.request(`${id}?fields=id,status,effective_status${budgetAction ? `,${budgetField}` : ""}`, {
         method: "GET",
       });
     } catch (error) {
@@ -205,11 +210,15 @@ export class P06MetaStatusWriter implements P06ExecutionV2Writer {
         "Meta status hedef kimliği uyuşmuyor",
         false,
       );
+    const rawBudget = budgetAction ? body[budgetField] : null;
+    const budgetMinor = budgetAction && (typeof rawBudget === "string" || typeof rawBudget === "number") && /^\d{1,16}$/.test(String(rawBudget))
+      && Number.isSafeInteger(Number(rawBudget)) ? Number(rawBudget) : budgetAction ? null : null;
+    if (budgetAction && budgetMinor === null) throw new ConnectorError("invalid_data", "Meta bütçe yanıtı kanonik değil", false);
     const core = Object.freeze({
       workspaceRef: input.workspaceRef,
       accountRef: input.accountRef,
       entityRef: input.entityRef,
-      value: Object.freeze({ status: status(body.status), budgetMinor: null }),
+      value: Object.freeze({ status: status(body.status), budgetMinor }),
       observedAt: this.now(),
       rawHash: digest(body),
     });
@@ -224,17 +233,24 @@ export class P06MetaStatusWriter implements P06ExecutionV2Writer {
       !REF.test(request.executionRef) ||
       !REF.test(request.entityRef) ||
       !IDEMPOTENCY_KEY.test(idempotencyKey) ||
-      (request.action !== "status_pause" &&
-        request.action !== "status_activate")
+      !["status_pause", "status_activate", "budget_decrease", "budget_increase"].includes(request.action)
     ) {
       throw new ConnectorError(
         "invalid_data",
-        "Meta status mutation bağlamı geçersiz",
+        "Meta mutation bağlamı geçersiz",
         false,
       );
     }
     const id = targetId(request.entityRef);
+    const budgetAction = request.action === "budget_decrease" || request.action === "budget_increase";
+    if (budgetAction && ((request.budgetKind !== "daily" && request.budgetKind !== "lifetime")
+      || !/^[A-Z]{3}$/.test(request.currency) || request.desired.budgetMinor === null)) {
+      throw new ConnectorError("invalid_data", "Meta bütçe mutation bağlamı geçersiz", false);
+    }
     const desired = request.action === "status_pause" ? "PAUSED" : "ACTIVE";
+    const mutation = budgetAction
+      ? { [request.budgetKind === "lifetime" ? "lifetime_budget" : "daily_budget"]: String(request.desired.budgetMinor) }
+      : { status: desired };
     const ambiguous = (
       rawHash: string,
     ): P06ExecutionV2Receipt<P06ExecutionV2WriteCore> => {
@@ -253,7 +269,7 @@ export class P06MetaStatusWriter implements P06ExecutionV2Writer {
       result = await this.request(id, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ status: desired }).toString(),
+        body: new URLSearchParams(mutation).toString(),
       });
     } catch (error) {
       if (

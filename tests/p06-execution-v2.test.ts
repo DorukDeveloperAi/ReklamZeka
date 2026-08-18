@@ -5,6 +5,7 @@ import {
   runP06ExecutionV2,
   type P06ExecutionV2Control,
   type P06ExecutionV2GatePhase,
+  type P06ExecutionV2Request,
   type P06ExecutionV2Value,
 } from "@/domain/actions/p06-execution-v2";
 
@@ -23,14 +24,14 @@ const request = {
   evaluatedAt: "2026-08-18T12:00:00.000Z",
 };
 
-function makeControl(disabledAt?: P06ExecutionV2GatePhase): P06ExecutionV2Control {
+function makeControl(disabledAt?: P06ExecutionV2GatePhase, gateRequest: Pick<P06ExecutionV2Request, "workspaceRef" | "accountRef" | "action"> = request): P06ExecutionV2Control {
   return {
     gate: vi.fn(async ({ phase }) => ({
       enabled: phase !== disabledAt,
       killSwitch: false,
-      workspaceAllowlist: [request.workspaceRef],
-      accountAllowlist: [request.accountRef],
-      actionAllowlist: [request.action],
+      workspaceAllowlist: [gateRequest.workspaceRef],
+      accountAllowlist: [gateRequest.accountRef],
+      actionAllowlist: [gateRequest.action],
       snapshotHash: hash(phase === "staging" ? "1" : phase === "admission" ? "2" : phase === "post_claim" ? "3" : phase === "pre_dispatch" ? "4" : "5"),
       capturedAt: "2026-08-18T12:00:01.000Z",
     })),
@@ -91,9 +92,19 @@ describe("P06 execution v2", () => {
       request: { ...request, desired: { status: "ACTIVE", budgetMinor: 100 } }, writer: writer.port, control,
     })).rejects.toThrow("invalid input");
     await expect(runP06ExecutionV2({
-      request: { ...request, action: "budget_decrease", desired: { status: "ACTIVE", budgetMinor: 100 } },
+      request: { ...request, action: "budget_decrease", budgetKind: "daily", currency: "TRY", desired: { status: "ACTIVE", budgetMinor: 100 } },
       writer: writer.port, control,
     })).rejects.toThrow("invalid input");
+  });
+
+  it("binds budget kind/currency and executes one coherent budget mutation", async () => {
+    const budgetRequest = { ...request, action: "budget_decrease" as const, budgetKind: "lifetime" as const,
+      currency: "TRY", expectedBefore: { status: "ACTIVE" as const, budgetMinor: 10_000 },
+      desired: { status: "ACTIVE" as const, budgetMinor: 9_000 } };
+    const writer = makeWriter([budgetRequest.expectedBefore, budgetRequest.desired]);
+    const result = await runP06ExecutionV2({ request: budgetRequest, writer: writer.port, control: makeControl(undefined, budgetRequest) });
+    expect(result).toMatchObject({ outcome: "written_verified", writes: 1 });
+    expect((writer.port.read as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toMatchObject({ budgetKind: "lifetime", currency: "TRY" });
   });
 
   it("reads first and never writes an already-applied target", async () => {

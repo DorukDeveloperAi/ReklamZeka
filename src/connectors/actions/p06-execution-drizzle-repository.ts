@@ -10,6 +10,9 @@ import {
   type P06ExecutionV2RollbackProposal,
   type P06ExecutionV2TraceEntry,
 } from "@/domain/actions/p06-execution-v2";
+import { createP06BudgetExecutionMaterialization } from "@/domain/actions/p06-budget-execution-materialization";
+import type { ActionExecutionAdmission } from "@/domain/actions/action-execution-admission";
+import type { ActionPlan } from "@/domain/actions/autonomy-valve";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -98,6 +101,21 @@ export type P06ExecutionIdentity = Readonly<{
   idempotencyKey: string;
   request: Omit<P06ExecutionV2Request, "leaseTokenHash" | "fenceHash">;
 }>;
+
+function initialGates(input: readonly P06ExecutionGateSeed[], evaluatedAt: string) {
+  if (input.length !== 2) fail("invalid_input");
+  const normalized = PHASES.slice(0, 2).map((phase, index) => {
+    const gate = input[index];
+    if (!gate || gate.phase !== phase || typeof gate.enabled !== "boolean" || !HASH.test(gate.allowlistHash)
+      || Date.parse(instant(gate.capturedAt)) > Date.parse(evaluatedAt)
+      || Date.parse(instant(gate.expiresAt)) <= Date.parse(evaluatedAt)
+      || index > 0 && Date.parse(gate.capturedAt) <= Date.parse(input[index - 1]!.capturedAt)) fail("invalid_input");
+    const core = { version: "p06-execution-gate/1.0.0", phase, sequence: index + 1, leaseEpoch: 0,
+      enabled: gate.enabled, allowlistHash: gate.allowlistHash, capturedAt: gate.capturedAt, expiresAt: gate.expiresAt };
+    return { ...core, snapshotHash: digest(core) };
+  });
+  return Object.freeze({ normalized: Object.freeze(normalized), gateSetHash: digest(normalized.map((gate) => ({ phase: gate.phase, allowlistHash: gate.allowlistHash }))) });
+}
 
 export type P06ExecutionWorkerSnapshot = Readonly<{
   workspaceId: string;
@@ -212,7 +230,7 @@ export class DrizzleP06ExecutionRepository {
       const payload = record(run.request_payload);
       const action = payload.action;
       if (
-        (action !== "status_pause" && action !== "status_activate") ||
+        !["status_pause", "status_activate", "budget_decrease", "budget_increase"].includes(String(action)) ||
         payload.executionRef !== executionRef ||
         payload.idempotencyKey !== run.idempotency_key ||
         typeof payload.workspaceRef !== "string" ||
@@ -221,12 +239,17 @@ export class DrizzleP06ExecutionRepository {
         typeof payload.evaluatedAt !== "string"
       )
         fail("corrupt_store");
+      const budgetAction = action === "budget_decrease" || action === "budget_increase";
+      if (budgetAction ? (payload.budgetKind !== "daily" && payload.budgetKind !== "lifetime") || typeof payload.currency !== "string" || !/^[A-Z]{3}$/.test(payload.currency)
+        : payload.budgetKind != null || payload.currency != null) fail("corrupt_store");
       const request = Object.freeze({
         executionRef,
         workspaceRef: payload.workspaceRef,
         accountRef: payload.accountRef,
         entityRef: payload.entityRef,
-        action,
+        action: action as P06ExecutionV2Action,
+        ...(budgetAction ? { budgetKind: payload.budgetKind as "daily" | "lifetime", currency: payload.currency as string }
+          : { budgetKind: null, currency: null }),
         expectedBefore: statusValue(payload.expectedBefore),
         desired: statusValue(payload.desired),
         evaluatedAt: instant(payload.evaluatedAt),
@@ -414,43 +437,7 @@ export class DrizzleP06ExecutionRepository {
     )
       fail("invalid_input");
     const evaluatedAt = instant(input.evaluatedAt);
-    const normalizedGates = PHASES.slice(0, 2).map((phase, index) => {
-      const gate = input.gates[index];
-      if (
-        !gate ||
-        gate.phase !== phase ||
-        typeof gate.enabled !== "boolean" ||
-        !HASH.test(gate.allowlistHash) ||
-        Date.parse(instant(gate.capturedAt)) > Date.parse(evaluatedAt) ||
-        Date.parse(instant(gate.expiresAt)) <= Date.parse(evaluatedAt)
-      )
-        fail("invalid_input");
-      if (!gate) fail("invalid_input");
-      if (
-        index > 0 &&
-        Date.parse(gate.capturedAt) <=
-          Date.parse(input.gates[index - 1]!.capturedAt)
-      )
-        fail("invalid_input");
-      const core = {
-        version: "p06-execution-gate/1.0.0",
-        phase,
-        sequence: index + 1,
-        leaseEpoch: 0,
-        enabled: gate.enabled,
-        allowlistHash: gate.allowlistHash,
-        capturedAt: gate.capturedAt,
-        expiresAt: gate.expiresAt,
-      };
-      const snapshotHash = digest(core);
-      return { ...core, snapshotHash };
-    });
-    const gateSetHash = digest(
-      normalizedGates.map((gate) => ({
-        phase: gate.phase,
-        allowlistHash: gate.allowlistHash,
-      })),
-    );
+    const { normalized: normalizedGates, gateSetHash } = initialGates(input.gates, evaluatedAt);
     return this.database.transaction(async (tx) => {
       const source = one(
         rows(
@@ -623,6 +610,123 @@ export class DrizzleP06ExecutionRepository {
     });
   }
 
+  async createGuideBudgetHumanApproved(
+    input: Readonly<{
+      workspaceId: string;
+      actionExecutionAttemptId: string;
+      evaluatedAt: string;
+      gates: readonly P06ExecutionGateSeed[];
+    }>,
+  ): Promise<P06ExecutionIdentity> {
+    if (!UUID.test(input.workspaceId) || !UUID.test(input.actionExecutionAttemptId)) fail("invalid_input");
+    const evaluatedAt = instant(input.evaluatedAt);
+    const { normalized: normalizedGates, gateSetHash } = initialGates(input.gates, evaluatedAt);
+    return this.database.transaction(async (tx) => {
+      const source = one(rows(await tx.execute(sql`
+        select a.id::text attempt_id,a.admission_hash,a.write_spec_hash,a.admission_payload,
+          u.id::text unit_id,u.unit_hash,u.context_hash,u.action_plan_hash,u.action_plan_payload,
+          u.account_ref,u.entity_ref,u.action_type,u.ad_set_id::text,u.campaign_id::text,
+          bundle.id::text bundle_id,bundle.workspace_ref,bundle.plan_ref,bundle.plan_hash,
+          d.id::text decision_id,g.id::text grant_id,g.grant_hash,p.policy_hash,
+          case when u.ad_set_id is not null then ads.configured_status else campaign.configured_status end current_status
+        from action_execution_attempts a
+        join action_proposal_units u on u.workspace_id=a.workspace_id and u.id=a.unit_id and u.bundle_id=a.bundle_id
+        join action_proposal_bundles bundle on bundle.workspace_id=a.workspace_id and bundle.id=a.bundle_id
+        join action_approval_policy_snapshots p on p.workspace_id=bundle.workspace_id and p.id=bundle.policy_snapshot_id
+        join action_approval_decision_events d on d.workspace_id=a.workspace_id and d.id=a.decision_event_id
+          and d.bundle_id=a.bundle_id and d.unit_id=a.unit_id and d.command_kind='approve'
+        join action_approval_evidence_grants g on g.workspace_id=a.workspace_id and g.id=a.approval_grant_id
+          and g.decision_event_id=d.id and g.bundle_id=a.bundle_id and g.unit_id=a.unit_id
+          and g.expires_at>${evaluatedAt}::timestamptz
+        left join meta_ad_sets ads on ads.workspace_id=u.workspace_id and ads.id=u.ad_set_id
+        left join ad_campaigns campaign on campaign.workspace_id=u.workspace_id and campaign.id=u.campaign_id
+        join workspaces w on w.id=a.workspace_id and w.lifecycle_state='active' and w.tombstoned_at is null
+        where a.workspace_id=${input.workspaceId}::uuid and a.id=${input.actionExecutionAttemptId}::uuid
+        for share of a,u,bundle,p,d,g,w limit 2
+      `)));
+      if (!source
+        || typeof source.plan_ref !== "string" || typeof source.plan_hash !== "string"
+        || typeof source.grant_hash !== "string" || typeof source.policy_hash !== "string"
+        || typeof source.unit_id !== "string" || typeof source.bundle_id !== "string"
+        || typeof source.decision_id !== "string" || typeof source.grant_id !== "string") fail("not_found");
+      const mirror = source.ad_set_id
+        ? one(rows(await tx.execute(sql`select configured_status from meta_ad_sets where workspace_id=${input.workspaceId}::uuid
+            and id=${source.ad_set_id}::uuid and disappeared_at is null for share limit 2`)))
+        : one(rows(await tx.execute(sql`select configured_status from ad_campaigns where workspace_id=${input.workspaceId}::uuid
+            and id=${source.campaign_id}::uuid and disappeared_at is null for share limit 2`)));
+      if (!mirror || (mirror.configured_status !== "ACTIVE" && mirror.configured_status !== "PAUSED")) fail("not_found");
+      const materialized = (() => {
+        try {
+          return createP06BudgetExecutionMaterialization({
+            admission: source.admission_payload as ActionExecutionAdmission,
+            actionPlan: source.action_plan_payload as ActionPlan,
+            unitHash: String(source.unit_hash), workspaceRef: String(source.workspace_ref),
+            accountRef: String(source.account_ref), currentStatus: mirror.configured_status,
+          });
+        } catch { return fail("corrupt_store"); }
+      })();
+      const identity = /^guide_budget_[a-f0-9]{32}_([a-f0-9]{64})$/.exec(source.plan_ref);
+      if (!identity || source.admission_hash !== materialized.admissionHash
+        || source.write_spec_hash !== materialized.writeSpecHash
+        || source.action_plan_hash !== materialized.actionPlanHash
+        || source.context_hash !== materialized.contextHash
+        || source.entity_ref !== materialized.entityRef || source.action_type !== materialized.action) fail("corrupt_store");
+      const requestCore = {
+        version: "p06-execution-request/1.0.0", workspaceRef: materialized.workspaceRef,
+        accountRef: materialized.accountRef, entityRef: materialized.entityRef, action: materialized.action,
+        budgetKind: materialized.budgetKind, currency: materialized.currency,
+        expectedBefore: materialized.expectedBefore, desired: materialized.desired, evaluatedAt,
+        actionUnitHash: String(source.unit_hash), proposalHash: source.plan_hash,
+        contextHash: materialized.contextHash, effectiveGuideSetHash: null, resolutionHash: null,
+        policyHash: source.policy_hash, gateSetHash, admissionHash: materialized.admissionHash,
+        writeSpecHash: materialized.writeSpecHash, dryRunHash: identity[1],
+        actionPlanHash: materialized.actionPlanHash, route: "guide_budget_human_approved",
+      } as const;
+      const requestHash = digest(requestCore);
+      const executionRef = `p06_execution_${requestHash.slice(0, 24)}`;
+      const idempotencyKey = `p06_exec_idem_${digest({ attemptId: input.actionExecutionAttemptId, grantHash: source.grant_hash, requestHash })}`;
+      const payload = { ...requestCore, executionRef, idempotencyKey, requestHash };
+      const inserted = one(rows(await tx.execute(sql`
+        insert into p06_execution_runs(
+          workspace_id,guide_run_action_binding_id,action_execution_attempt_id,proposal_bundle_id,action_unit_id,
+          decision_event_id,approval_grant_id,execution_ref,idempotency_key,request_hash,action_unit_hash,proposal_hash,
+          context_hash,effective_guide_set_hash,resolution_hash,policy_hash,gate_set_hash,admission_hash,write_spec_hash,
+          dry_run_hash,action_plan_hash,budget_kind,currency,request_payload,route,created_at
+        ) values (
+          ${input.workspaceId}::uuid,null,${input.actionExecutionAttemptId}::uuid,${source.bundle_id}::uuid,${source.unit_id}::uuid,
+          ${source.decision_id}::uuid,${source.grant_id}::uuid,${executionRef},${idempotencyKey},${requestHash},${source.unit_hash},${source.plan_hash},
+          ${materialized.contextHash},null,null,${source.policy_hash},${gateSetHash},${materialized.admissionHash},${materialized.writeSpecHash},
+          ${identity[1]},${materialized.actionPlanHash},${materialized.budgetKind},${materialized.currency},${JSON.stringify(payload)}::jsonb,
+          'guide_budget_human_approved',${evaluatedAt}::timestamptz
+        ) on conflict(workspace_id,idempotency_key) do nothing returning id::text
+      `)));
+      let runId = typeof inserted?.id === "string" ? inserted.id : undefined;
+      if (!runId) {
+        const replay = one(rows(await tx.execute(sql`select id::text,request_hash from p06_execution_runs
+          where workspace_id=${input.workspaceId}::uuid and idempotency_key=${idempotencyKey} for update limit 2`)));
+        if (!replay || replay.request_hash !== requestHash || typeof replay.id !== "string") fail("conflict");
+        runId = replay.id;
+      } else {
+        await tx.execute(sql`insert into p06_execution_heads(workspace_id,execution_run_id,state,sequence,trace_sequence,updated_at)
+          values(${input.workspaceId}::uuid,${runId}::uuid,'pending',0,0,${evaluatedAt}::timestamptz)`);
+        for (const gate of normalizedGates) {
+          const receiptHash = digest({ executionRef, phase: gate.phase, sequence: gate.sequence, leaseEpoch: 0, snapshotHash: gate.snapshotHash });
+          await tx.execute(sql`insert into p06_execution_gate_snapshots(workspace_id,execution_run_id,phase,sequence,lease_epoch,
+            snapshot_hash,receipt_hash,allowlist_hash,enabled,captured_at,expires_at,payload)
+            values(${input.workspaceId}::uuid,${runId}::uuid,${gate.phase},${gate.sequence},0,${gate.snapshotHash},${receiptHash},
+              ${gate.allowlistHash},${gate.enabled},${gate.capturedAt}::timestamptz,${gate.expiresAt}::timestamptz,
+              ${JSON.stringify({ ...gate, receiptHash })}::jsonb)`);
+        }
+      }
+      const request: Omit<P06ExecutionV2Request, "leaseTokenHash" | "fenceHash"> = Object.freeze({
+        executionRef, workspaceRef: materialized.workspaceRef, accountRef: materialized.accountRef,
+        entityRef: materialized.entityRef, action: materialized.action, budgetKind: materialized.budgetKind,
+        currency: materialized.currency, expectedBefore: materialized.expectedBefore, desired: materialized.desired, evaluatedAt,
+      });
+      return Object.freeze({ workspaceId: input.workspaceId, executionRunId: runId, executionRef, requestHash, idempotencyKey, request });
+    });
+  }
+
   async listRunnable(limit = 25): Promise<readonly string[]> {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100)
       fail("invalid_input");
@@ -651,6 +755,39 @@ export class DrizzleP06ExecutionRepository {
         fail("corrupt_store");
       return Object.freeze(candidates.map((candidate) => String(candidate.execution_ref)));
     });
+  }
+
+  async listRunnableByRoute(route: "human_approved" | "guide_budget_human_approved", limit = 25): Promise<readonly string[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) fail("invalid_input");
+    const candidates = rows(await this.database.execute(sql`
+      select r.execution_ref from p06_execution_runs r
+      join p06_execution_heads h on h.workspace_id=r.workspace_id and h.execution_run_id=r.id
+      join workspaces w on w.id=r.workspace_id and w.lifecycle_state='active' and w.tombstoned_at is null
+      where r.route=${route} and (h.state='pending' or (h.state in ('claimed','running') and h.lease_expires_at<=statement_timestamp()))
+      order by r.created_at,r.id limit ${limit}
+    `));
+    if (candidates.some((row) => typeof row.execution_ref !== "string" || !/^p06_execution_[a-f0-9]{24}$/.test(row.execution_ref))) fail("corrupt_store");
+    return Object.freeze(candidates.map((row) => String(row.execution_ref)));
+  }
+
+  async listUnmaterializedGuideBudgetAttempts(limit = 25): Promise<readonly Readonly<{ workspaceId: string; attemptId: string }>[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) fail("invalid_input");
+    const candidates = rows(await this.database.execute(sql`
+      select a.workspace_id::text workspace_id,a.id::text attempt_id
+      from action_execution_attempts a
+      join workspaces w on w.id=a.workspace_id and w.lifecycle_state='active' and w.tombstoned_at is null
+      join action_proposal_units u on u.workspace_id=a.workspace_id and u.id=a.unit_id
+        and u.action_type in ('budget_decrease','budget_increase') and u.expires_at>statement_timestamp()
+      join action_proposal_bundles bundle on bundle.workspace_id=a.workspace_id and bundle.id=a.bundle_id
+        and bundle.plan_ref ~ '^guide_budget_[a-f0-9]{32}_[a-f0-9]{64}$'
+      join action_approval_evidence_grants g on g.workspace_id=a.workspace_id and g.id=a.approval_grant_id
+        and g.expires_at>statement_timestamp() and g.capability='approval_evidence_only' and g.can_execute=false
+      left join p06_execution_runs r on r.workspace_id=a.workspace_id and r.action_execution_attempt_id=a.id
+      where r.id is null order by a.created_at,a.id limit ${limit}
+    `));
+    if (candidates.some((row) => typeof row.workspace_id !== "string" || !UUID.test(row.workspace_id)
+      || typeof row.attempt_id !== "string" || !UUID.test(row.attempt_id))) fail("corrupt_store");
+    return Object.freeze(candidates.map((row) => Object.freeze({ workspaceId: String(row.workspace_id), attemptId: String(row.attempt_id) })));
   }
 
   async appendGate(

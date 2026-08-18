@@ -64,6 +64,7 @@ const opaqueCategoryContext = new Set([
   // P06 execution-v2 rows are immutable, hash-bound historical evidence.
   // Category archive must never reinterpret or rewrite their frozen payloads.
   "p06_execution_runs.request_payload",
+  "p06_limited_autonomy_admissions.admission_payload",
   "p06_execution_events.payload",
   "p06_execution_observations.observed_value",
   "p06_execution_gate_snapshots.payload",
@@ -291,6 +292,7 @@ const columns = [
   "action_execution_attempts.admission_payload",
   "action_execution_events.event_payload",
   "p06_execution_runs.request_payload",
+  "p06_limited_autonomy_admissions.admission_payload",
   "p06_execution_events.payload",
   "p06_execution_observations.observed_value",
   "p06_execution_gate_snapshots.payload",

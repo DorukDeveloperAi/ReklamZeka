@@ -116,6 +116,21 @@ describe("P06MetaStatusWriter", () => {
     expect(JSON.stringify(receipt)).not.toContain("secret-token");
   });
 
+  it("reads and writes only the authenticated daily or lifetime budget field", async () => {
+    const fetchImpl = vi.fn<MetaFetch>(async (_url, init) => init?.method === "GET"
+      ? new Response(JSON.stringify({ id:"12345", status:"ACTIVE", effective_status:"ACTIVE", lifetime_budget:"10000" }), {status:200})
+      : new Response(JSON.stringify({success:true}), {status:200}));
+    const writer = new P06MetaStatusWriter("secret-token", fetchImpl, {now:()=>fixedNow});
+    const budgetRequest: P06ExecutionV2Request = Object.freeze({ ...request, action:"budget_decrease", budgetKind:"lifetime",
+      currency:"TRY", expectedBefore:Object.freeze({status:"ACTIVE",budgetMinor:10000}), desired:Object.freeze({status:"ACTIVE",budgetMinor:9000}) });
+    const evidence = await writer.read({workspaceRef:budgetRequest.workspaceRef,accountRef:budgetRequest.accountRef,
+      entityRef:budgetRequest.entityRef,action:budgetRequest.action,budgetKind:budgetRequest.budgetKind,currency:budgetRequest.currency});
+    expect(evidence.core.value).toEqual({status:"ACTIVE",budgetMinor:10000});
+    expect(String(fetchImpl.mock.calls[0]?.[0])).toContain("fields=id,status,effective_status,lifetime_budget");
+    await writer.write({request:budgetRequest,idempotencyKey:`p06_exec_idem_${"4".repeat(64)}`});
+    expect(fetchImpl.mock.calls[1]?.[1]?.body).toBe("lifetime_budget=9000");
+  });
+
   it("never retries an ambiguous mutation transport", async () => {
     const fetchImpl = vi.fn<MetaFetch>(async () => {
       throw new Error("socket closed after dispatch secret-token");
@@ -149,13 +164,13 @@ describe("P06MetaStatusWriter", () => {
       writer.read({
         workspaceRef: request.workspaceRef,
         accountRef: request.accountRef,
-        entityRef: "campaign_12345",
+        entityRef: "ad_12345",
         action: request.action,
       }),
     ).rejects.toBeInstanceOf(ConnectorError);
     await expect(
       writer.write({
-        request: { ...request, action: "budget_decrease" },
+        request: { ...request, action: "budget_decrease" } as unknown as P06ExecutionV2Request,
         idempotencyKey: "3".repeat(64),
       }),
     ).rejects.toBeInstanceOf(ConnectorError);

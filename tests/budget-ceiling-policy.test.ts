@@ -49,4 +49,22 @@ describe("published budget ceiling policy", () => {
     const gap = createBudgetCeilingPolicy({ ...draft(first), revision: 3, previousPolicyHash: first.policyHash });
     expect(() => resolveBudgetCeilingPolicies(input({ policies: [first, gap, ...policies().slice(1)] }))).toThrow("invalid_chain");
   });
+
+  it("keeps the current predecessor active until a future revision starts", () => {
+    const base = policies(); const current = base[3]!;
+    const future = createBudgetCeilingPolicy({ ...draft(current), revision: 2, previousPolicyHash: current.policyHash,
+      ceilingDecimal: "600", effectiveFrom: "2026-08-20T08:00:00.000Z", effectiveTo: "2026-09-18T08:00:00.000Z",
+      publishedAt: "2026-08-18T07:30:00.000Z" });
+    expect(resolveBudgetCeilingPolicies(input({ policies: [...base, future] }))).toMatchObject({ status: "ready", effectiveParentCeilingDecimal: "700" });
+    expect(resolveBudgetCeilingPolicies(input({ policies: [...base, future], evaluatedAt: "2026-08-21T09:00:00.000Z" }))).toMatchObject({ status: "ready", effectiveParentCeilingDecimal: "600" });
+  });
+
+  it("never falls back to an older published revision after a newer disable starts", () => {
+    const base = policies(); const current = base[3]!;
+    const disabled = createBudgetCeilingPolicy({ ...draft(current), revision: 2, previousPolicyHash: current.policyHash,
+      state: "disabled", effectiveFrom: "2026-08-20T08:00:00.000Z", effectiveTo: "2026-08-21T08:00:00.000Z",
+      publishedAt: "2026-08-18T07:30:00.000Z" });
+    expect(resolveBudgetCeilingPolicies(input({ policies: [...base, disabled], evaluatedAt: "2026-08-20T09:00:00.000Z" })).holdReasons).toContain(`ceiling_policy_disabled:${current.limitRef}`);
+    expect(resolveBudgetCeilingPolicies(input({ policies: [...base, disabled], evaluatedAt: "2026-08-22T09:00:00.000Z" })).holdReasons).toContain(`ceiling_policy_inactive:${current.limitRef}`);
+  });
 });
