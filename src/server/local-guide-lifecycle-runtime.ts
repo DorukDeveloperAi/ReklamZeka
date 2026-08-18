@@ -18,5 +18,5 @@ export function createLocalGuideLifecycleHandlers(input: Readonly<{ database: Pi
       return reason instanceof LocalDecisionRoomBoundaryError || reason instanceof LocalSessionCapabilityError ? guideLifecycleSessionRequiredResponse() : guideLifecycleNotConfiguredResponse();
     }
   };
-  return Object.freeze({ GET: (request: Request) => execute(request, "read"), POST: (request: Request) => execute(request, "draft"), PATCH: (request: Request) => execute(request, request.headers.get("x-reklamzeka-intent") === "guide-lifecycle-accept" ? "draft" : "activate") });
+  return Object.freeze({ GET: (request: Request) => execute(request, "read"), POST: (request: Request) => execute(request, "draft"), PATCH: (request: Request) => execute(request, ["guide-lifecycle-accept", "guide-lifecycle-revise"].includes(request.headers.get("x-reklamzeka-intent") ?? "") ? "draft" : "activate") });
 }

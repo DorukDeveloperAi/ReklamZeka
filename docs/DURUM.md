@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 8bbff56cae39 -->
+<!-- durum-damga: f779eb769eea -->
 
 ## Künye
 
@@ -14,13 +14,17 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 589 |
+| iş commit'i (tüm geçmiş) | 593 |
 | ilk / son iş | 2026-08-06 / 2026-08-18 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-18 | `feat` | expose canonical guide lifecycle | `40b1288cf` |
+| 2026-08-18 | `fix` | bind saved report replay and head evidence | `3dd0d9acd` |
+| 2026-08-18 | `test` | verify real local Codex guide agents | `3738bf025` |
+| 2026-08-18 | `feat` | add naming lifecycle and trusted status candidates | `3d4e19fe2` |
 | 2026-08-18 | `feat` | add deferred approval decisions | `14dc65fc8` |
 | 2026-08-18 | `feat` | harden disabled execution contract | `7516f34ba` |
 | 2026-08-18 | `feat` | bind guide run status candidates | `a0621d103` |
@@ -32,17 +36,13 @@
 | 2026-08-17 | `feat` | persist primary result bindings | `6f85dd8dd` |
 | 2026-08-17 | `feat` | harden run scheduling chain | `78b0a16eb` |
 | 2026-08-17 | `feat` | add safe budget dry run | `205f88c98` |
-| 2026-08-17 | `feat` | persist data health lifecycle | `53186edf9` |
-| 2026-08-17 | `feat` | trust canonical primary result catalog | `25dfa99e6` |
-| 2026-08-17 | `test` | lock table-first information architecture | `4db71800e` |
-| 2026-08-17 | `docs` | record table-first browser checkpoint | `6fb2817e0` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
 - `feat        ` ████████████████████████ 33
-- `docs        ` ███████████ 15
-- `fix         ` █████ 7
-- `test        ` ████ 5
+- `docs        ` █████████ 13
+- `fix         ` ██████ 8
+- `test        ` ████ 6
 
 ## Planlar
 

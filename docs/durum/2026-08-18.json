@@ -1,0 +1,182 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "40b1288cf",
+      "tarih": "2026-08-18",
+      "konu": "feat(p04): expose canonical guide lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "3dd0d9acd",
+      "tarih": "2026-08-18",
+      "konu": "fix(p03): bind saved report replay and head evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "3738bf025",
+      "tarih": "2026-08-18",
+      "konu": "test(p05): verify real local Codex guide agents",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "3d4e19fe2",
+      "tarih": "2026-08-18",
+      "konu": "feat(p02,p05): add naming lifecycle and trusted status candidates",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "14dc65fc8",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): add deferred approval decisions",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7516f34ba",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): harden disabled execution contract",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "a0621d103",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): bind guide run status candidates",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "12c1da0cb",
+      "tarih": "2026-08-18",
+      "konu": "feat(reports): add accessible scope report interface",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e0dfbe770",
+      "tarih": "2026-08-18",
+      "konu": "docs(reports): record xlsx and trusted context acceptance",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "ce6b86f7a",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): persist guide runs and bind execution contracts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c4ec16b17",
+      "tarih": "2026-08-17",
+      "konu": "docs(guides): record budget evidence acceptance",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "70648005e",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): orchestrate recoverable guide runs",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "6f85dd8dd",
+      "tarih": "2026-08-17",
+      "konu": "feat(operations): persist primary result bindings",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "78b0a16eb",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): harden run scheduling chain",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "205f88c98",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): add safe budget dry run",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "feat",
+      "adet": 33
+    },
+    {
+      "kapsam": "docs",
+      "adet": 13
+    },
+    {
+      "kapsam": "fix",
+      "adet": 8
+    },
+    {
+      "kapsam": "test",
+      "adet": 6
+    }
+  ],
+  "isSayisi": 593,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-18",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "f779eb769eea"
+}

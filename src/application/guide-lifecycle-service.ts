@@ -55,7 +55,8 @@ export class GuideLifecycleService {
   async list(principal: TrustedDecisionRoomPrincipal) {
     authorizeWorkspace(principal.actor, principal.workspaceId, "guide_lifecycle:read", this.memberships);
     const found = rows(await this.database.execute(sql`select g.id::text guide_id,g.guide_ref,g.label,h.latest_revision_id::text,h.current_active_revision_id::text,h.version,
-      r.revision_number,r.revision_hash,r.interpretation_hash,r.slice_ref,r.market_key,r.mode,r.free_text,r.schedule_payload,r.created_at::text,
+      r.revision_number,r.revision_hash,r.interpretation_hash,r.slice_ref,r.market_key,r.mode,r.free_text,r.schedule_payload,r.strict_payload,r.created_at::text,
+      coalesce((select jsonb_agg(a.action order by a.action) from guide_revision_actions a where a.workspace_id=g.workspace_id and a.guide_revision_id=r.id),'[]'::jsonb) action_allowlist,
       exists(select 1 from guide_interpretation_acceptances a where a.workspace_id=g.workspace_id and a.guide_revision_id=r.id and a.interpretation_hash=r.interpretation_hash) interpretation_accepted
       from guides g join guide_heads h on h.workspace_id=g.workspace_id and h.guide_id=g.id
       join guide_revisions r on r.workspace_id=g.workspace_id and r.id=h.latest_revision_id and r.guide_id=g.id
@@ -66,12 +67,15 @@ export class GuideLifecycleService {
       if (typeof row.label !== "string" || !row.label.trim() || row.label.length > 160 || typeof row.revision_hash !== "string" || !HASH.test(row.revision_hash)
         || typeof row.interpretation_hash !== "string" || !HASH.test(row.interpretation_hash) || (row.market_key !== "yerli" && row.market_key !== "yabanci")
         || typeof row.mode !== "string" || !GUIDE_MODES.includes(row.mode as GuideMode) || typeof row.free_text !== "string" || row.free_text.length > 10_000
-        || !row.schedule_payload || typeof row.schedule_payload !== "object" || Array.isArray(row.schedule_payload)) throw new GuideLifecycleServiceError("unavailable");
+        || !row.schedule_payload || typeof row.schedule_payload !== "object" || Array.isArray(row.schedule_payload) || !row.strict_payload || typeof row.strict_payload !== "object" || Array.isArray(row.strict_payload)
+        || !Array.isArray(row.action_allowlist)) throw new GuideLifecycleServiceError("unavailable");
+      const strict = row.strict_payload as Record<string, unknown>;
+      if (!Array.isArray(strict.budgetRefs) || !Array.isArray(strict.rollbackConditions)) throw new GuideLifecycleServiceError("unavailable");
       return Object.freeze({ guideId, guideRef: ref(row.guide_ref, "guide_"), label: row.label, revisionId,
         activeRevisionId: row.current_active_revision_id === null ? null : uuid(row.current_active_revision_id), headVersion: integer(row.version), revision: integer(row.revision_number),
         revisionHash: row.revision_hash, interpretationHash: row.interpretation_hash, interpretationAccepted: row.interpretation_accepted === true,
         sliceRef: ref(row.slice_ref, "slice_"), market: row.market_key, mode: row.mode, freeText: row.free_text,
-        schedule: schedule(row.schedule_payload), createdAt: new Date(String(row.created_at)).toISOString() });
+        schedule: schedule(row.schedule_payload), actionAllowlist: Object.freeze([...row.action_allowlist]), budgetRefs: Object.freeze([...strict.budgetRefs]), rollbackConditions: Object.freeze([...strict.rollbackConditions]), createdAt: new Date(String(row.created_at)).toISOString() });
     });
     return Object.freeze({ contractVersion: "guide-lifecycle-workspace/1.0.0" as const, items: Object.freeze(items), authority: Object.freeze({ canWriteMeta: false as const, canExecute: false as const, canDraft: this.can(principal, "guide_lifecycle:draft"), canActivate: this.can(principal, "guide_lifecycle:activate") }) });
   }
@@ -96,12 +100,31 @@ export class GuideLifecycleService {
 
   async mutate(principal: TrustedDecisionRoomPrincipal, request: Readonly<Record<string, unknown>>) {
     exact(request, request.operation === "accept" ? ["operation", "guideId", "revisionId", "interpretationHash"]
+      : request.operation === "revise" ? ["operation", "guideId", "expectedHeadVersion", "expectedLatestRevisionId", "expectedLatestRevisionHash", "sliceRef", "market", "freeText", "schedule", "mode", "actionAllowlist", "budgetRefs", "rollbackConditions"]
       : request.operation === "activate" ? ["operation", "guideId", "revisionId", "expectedHeadVersion", "expectedCurrentRevisionId"]
         : request.operation === "pause" ? ["operation", "guideId", "expectedHeadVersion", "expectedCurrentRevisionId"] : []);
-    const membership = authorizeWorkspace(principal.actor, principal.workspaceId, request.operation === "accept" ? "guide_lifecycle:draft" : "guide_lifecycle:activate", this.memberships);
+    const membership = authorizeWorkspace(principal.actor, principal.workspaceId, request.operation === "accept" || request.operation === "revise" ? "guide_lifecycle:draft" : "guide_lifecycle:activate", this.memberships);
     const common = { workspaceId: principal.workspaceId, actorId: principal.actor.userId, role: membership.role, guideId: uuid(request.guideId), occurredAt: new Date().toISOString() } as const;
     try {
       if (request.operation === "accept") return await this.repository.acceptInterpretation({ ...common, revisionId: uuid(request.revisionId), interpretationHash: String(request.interpretationHash) });
+      if (request.operation === "revise") {
+        const latestRevisionId = uuid(request.expectedLatestRevisionId); const latestRevisionHash = String(request.expectedLatestRevisionHash);
+        if (!HASH.test(latestRevisionHash)) throw new GuideLifecycleServiceError("invalid_input");
+        const previous = await this.repository.loadCanonicalRevision({ workspaceId: principal.workspaceId, guideId: common.guideId, revisionId: latestRevisionId });
+        if (previous.revisionHash !== latestRevisionHash) throw new GuideLifecycleServiceError("conflict");
+        const sliceRef = ref(request.sliceRef, "slice_");
+        const binding = rows(await this.database.execute(sql`select r.id::text slice_revision_id,r.slice_ref,market.id::text market_definition_id,market.key market_key from slices s
+          join slice_revisions r on r.workspace_id=s.workspace_id and r.id=s.current_published_revision_id and r.lifecycle='published'
+          join category_definitions market on market.workspace_id=r.workspace_id and market.id=r.market_definition_id and market.archived_at is null
+          where s.workspace_id=${principal.workspaceId}::uuid and s.slice_ref=${sliceRef} and s.tombstoned_at is null limit 2`));
+        if (binding.length !== 1 || binding[0]!.slice_ref !== sliceRef || binding[0]!.market_key !== request.market) throw new GuideLifecycleServiceError(binding.length ? "conflict" : "not_found");
+        const guide = createGuideRevision({ workspaceRef: principal.workspaceRef, guideRef: previous.guideRef, revision: previous.revision + 1, previousRevisionHash: previous.revisionHash,
+          sliceRef, market: request.market as GuideMarket, freeText: request.freeText as string,
+          strict: { budgetRefs: request.budgetRefs as GuideDraftRequest["budgetRefs"], rollbackConditions: request.rollbackConditions as readonly string[], budgetInterpretation: null },
+          schedule: request.schedule as GuideSchedule, mode: request.mode as GuideMode, actionAllowlist: request.actionAllowlist as readonly GuideAction[] });
+        return await this.repository.createNextDraft({ ...common, expectedHeadVersion: integer(request.expectedHeadVersion), expectedLatestRevisionId: latestRevisionId,
+          expectedLatestRevisionHash: latestRevisionHash, guide, sliceRevisionId: uuid(binding[0]!.slice_revision_id), marketDefinitionId: uuid(binding[0]!.market_definition_id) });
+      }
       if (request.operation === "activate") return await this.repository.activate({ ...common, revisionId: uuid(request.revisionId), expectedHeadVersion: integer(request.expectedHeadVersion), expectedCurrentRevisionId: request.expectedCurrentRevisionId === null ? null : uuid(request.expectedCurrentRevisionId) });
       if (request.operation === "pause") return await this.repository.pause({ ...common, expectedHeadVersion: integer(request.expectedHeadVersion), expectedCurrentRevisionId: uuid(request.expectedCurrentRevisionId) });
       throw new GuideLifecycleServiceError("invalid_input");
