@@ -32,6 +32,8 @@ const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) throw new Error("DATABASE_URL yapılandırılmadı");
 const postMode = process.env.P06_ACTION_BINDINGS_POST_APPROVED === "true";
 const executionPreMode = process.env.P06_EXECUTION_CHAIN_PRE === "true";
+const executionPostMode = process.env.P06_EXECUTION_CHAIN_POST_APPROVED === "true";
+const executionMode = executionPreMode || executionPostMode;
 const limitedAutonomyPreMode = process.env.P06_LIMITED_AUTONOMY_PRE === "true";
 const limitedAutonomyExecutionPreMode = process.env.P06_LIMITED_AUTONOMY_EXECUTION_PRE === "true";
 const pool = new Pool({
@@ -64,7 +66,7 @@ const closed = {
   canWriteMeta: false,
 } as const;
 const evidence = {
-  mode: postMode ? "post_applied_two_client" : executionPreMode ? "execution_pre_outer_rollback" : limitedAutonomyExecutionPreMode ? "limited_autonomy_execution_pre_outer_rollback" : limitedAutonomyPreMode ? "limited_autonomy_pre_outer_rollback" : "pre_outer_rollback",
+  mode: postMode ? "post_applied_two_client" : executionPreMode ? "execution_pre_outer_rollback" : executionPostMode ? "execution_post_applied_outer_rollback" : limitedAutonomyExecutionPreMode ? "limited_autonomy_execution_pre_outer_rollback" : limitedAutonomyPreMode ? "limited_autonomy_pre_outer_rollback" : "pre_outer_rollback",
   exactMigrationLedger: !postMode,
   preApplyConcurrencySkipped: !postMode,
   separateClients: false,
@@ -115,29 +117,30 @@ const limitedExecutionEvidence = {
   zeroResidue: !limitedAutonomyExecutionPreMode,
 };
 const executionEvidence = {
-  migrationInstalled: !executionPreMode,
-  approvedGrantBound: !executionPreMode,
-  identityCreated: !executionPreMode,
-  pendingScheduled: !executionPreMode,
-  claimed: !executionPreMode,
-  phasedGates: !executionPreMode,
-  tenStepTrace: !executionPreMode,
-  observations: !executionPreMode,
-  terminalSucceeded: !executionPreMode,
-  verificationFailed: !executionPreMode,
-  rollbackPersisted: !executionPreMode,
-  rollbackReplay: !executionPreMode,
-  forgedRollbackRejected: !executionPreMode,
-  immutableRunRejected: !executionPreMode,
-  crossTenantHeadRejected: !executionPreMode,
-  staleFenceRejected: !executionPreMode,
-  callerTimeCannotReclaim: !executionPreMode,
-  forgedEventRejected: !executionPreMode,
-  leaseEpochRecheck: !executionPreMode,
-  currentDispatchAuthority: !executionPreMode,
-  expiredGrantHeld: !executionPreMode,
-  expiredGrantMaterializationRejected: !executionPreMode,
-  supersededGuideHeld: !executionPreMode,
+  migrationInstalled: !executionMode,
+  approvedGrantBound: !executionMode,
+  identityCreated: !executionMode,
+  pendingScheduled: !executionMode,
+  claimed: !executionMode,
+  phasedGates: !executionMode,
+  tenStepTrace: !executionMode,
+  observations: !executionMode,
+  terminalSucceeded: !executionMode,
+  verificationFailed: !executionMode,
+  rollbackPersisted: !executionMode,
+  rollbackReplay: !executionMode,
+  forgedRollbackRejected: !executionMode,
+  immutableRunRejected: !executionMode,
+  crossTenantHeadRejected: !executionMode,
+  staleFenceRejected: !executionMode,
+  callerTimeCannotReclaim: !executionMode,
+  forgedEventRejected: !executionMode,
+  forgedReceiptCoreRejected: !executionMode,
+  leaseEpochRecheck: !executionMode,
+  currentDispatchAuthority: !executionMode,
+  expiredGrantHeld: !executionMode,
+  expiredGrantMaterializationRejected: !executionMode,
+  supersededGuideHeld: !executionMode,
 };
 const mark = (stage: string) => console.log(JSON.stringify({ p06PreStage: stage }));
 function transition(run: GuideRunV12, toState: Parameters<typeof appendGuideRunTransitionV12>[1]["toState"], occurredAt: string, token: string): GuideRunV12 {
@@ -177,12 +180,13 @@ try {
       const requesterMigration = readFileSync("drizzle/20260818000100_p06_agent_action_requester.sql", "utf8");
       const bindingHash = createHash("sha256").update(bindingMigration).digest("hex");
       const requesterHash = createHash("sha256").update(requesterMigration).digest("hex");
-      if (postMode || executionPreMode || limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
+      if (postMode || executionMode || limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
         const ledger = await client.query<{
           binding_count: number;
           requester_count: number;
-        }>("select count(*) filter(where hash=$1 and created_at=1787000400000)::int binding_count,count(*) filter(where hash=$2 and created_at=1787011260000)::int requester_count from drizzle.__drizzle_migrations", [bindingHash, requesterHash]);
-        evidence.exactMigrationLedger = ledger.rows[0]?.binding_count === 1 && ledger.rows[0]?.requester_count === 1;
+          execution_count: number;
+        }>("select count(*) filter(where hash=$1 and created_at=1787000400000)::int binding_count,count(*) filter(where hash=$2 and created_at=1787011260000)::int requester_count,count(*) filter(where hash=$3 and created_at=1787011380000)::int execution_count from drizzle.__drizzle_migrations", [bindingHash, requesterHash, createHash("sha256").update(readFileSync("drizzle/20260818000300_p06_execution_persistence.sql", "utf8")).digest("hex")]);
+        evidence.exactMigrationLedger = ledger.rows[0]?.binding_count === 1 && ledger.rows[0]?.requester_count === 1 && (!executionPostMode || ledger.rows[0]?.execution_count === 1);
       } else {
         await client.query(bindingMigration);
         await client.query(requesterMigration);
@@ -191,6 +195,7 @@ try {
         await client.query(readFileSync("drizzle/20260818000300_p06_execution_persistence.sql", "utf8"));
         executionEvidence.migrationInstalled = true;
       }
+      if (executionPostMode) executionEvidence.migrationInstalled = true;
       if (limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
         await client.query(readFileSync("drizzle/20260818000300_p06_execution_persistence.sql", "utf8"));
         await client.query(readFileSync("drizzle/20260818000400_p04_budget_ceiling_policies.sql", "utf8"));
@@ -854,7 +859,7 @@ try {
       evidence.replay = replay.replay === true && replay.bindingId === saved.bindingId;
       evidence.actionQueuePersisted = rows(await db.execute(sql`select count(*)::int count from action_proposal_units where workspace_id=${workspaceId}::uuid`))[0]?.count === 1;
       const second = await makeCompleted("request_p06_second", "22222222-2222-4222-8222-222222222222");
-      if (executionPreMode) {
+      if (executionMode) {
         const unit = rows(await db.execute(sql`select b.action_unit_ref,u.id::text unit_id from guide_run_action_bindings b join action_proposal_units u on u.workspace_id=b.workspace_id and u.id=b.action_unit_id where b.workspace_id=${workspaceId}::uuid and b.id=${saved.bindingId}::uuid`))[0];
         if (!unit || typeof unit.action_unit_ref !== "string") throw new Error("execution unit missing");
         const decisions = new DrizzleActionApprovalDecisionRepository(outerDb, workspaceId);
@@ -969,6 +974,10 @@ try {
           executionEvidence.staleFenceRejected = true;
         }
         executionEvidence.forgedEventRejected = await rejected(client, () => client.query("insert into p06_execution_events(workspace_id,execution_run_id,event_ref,event_hash,sequence,event_kind,outcome,previous_hash,receipt_hash,payload,occurred_at) values($1::uuid,$2::uuid,$3,$4,2,'trace','ok',$5,$6,'{}'::jsonb,$7::timestamptz)", [workspaceId, identity.executionRunId, `p06_exec_event_${"8".repeat(24)}`, "8".repeat(64), "7".repeat(64), "6".repeat(64), iso(4)]));
+        executionEvidence.forgedReceiptCoreRejected = await rejected(client, () => execution.appendTrace({
+          executionRef: identity.executionRef, leaseTokenHash: "3".repeat(64), fenceHash: "4".repeat(64), step: "lease", outcome: "ok",
+          receiptCore: { executionRef: identity.executionRef, leaseTokenHash: "9".repeat(64), fenceHash: "4".repeat(64), owned: true }, occurredAt: iso(4),
+        }));
         await trace("lease", "ok", claim.core, 4);
         const idemCore = {
           kind: "fresh",
@@ -1035,6 +1044,7 @@ try {
           writeRawHash: "6".repeat(64),
           afterRawHash: "7".repeat(64),
           writeReceiptHash: digest(writeCore),
+          afterRead: afterCore,
         };
         const rawEvent = await trace("raw", "ok", rawCore, 11);
         const after = await execution.appendObservation({
@@ -1278,6 +1288,7 @@ try {
           writeRawHash: "d".repeat(64),
           afterRawHash: "e".repeat(64),
           writeReceiptHash: digest(failedWriteCore),
+          afterRead: failedAfterCore,
         };
         const failedRawEvent = await failedTrace("raw", "ok", failedRawCore, 32);
         const failedAfter = await execution.appendObservation({
@@ -1387,7 +1398,7 @@ try {
         await client.query("rollback to savepoint p06_superseded_execution_authority");
       }
       mark("materializer_and_replay_verified");
-      const negativeRun = executionPreMode ? await makeCompleted("request_p06_negative", "33333333-3333-4333-8333-333333333333") : second;
+      const negativeRun = executionMode ? await makeCompleted("request_p06_negative", "33333333-3333-4333-8333-333333333333") : second;
       mark("second_completed_run_for_negative_matrix_persisted");
       const base = rows(await db.execute(sql`select b.id::text binding_id,a.id::text artifact_id from guide_run_action_bindings b join guide_run_artifacts a on a.workspace_id=b.workspace_id and a.id=b.disposition_artifact_id where b.workspace_id=${workspaceId}::uuid and b.run_id=(select id from guide_runs where workspace_id=${workspaceId}::uuid and run_ref=${first.runRef})`))[0]!;
       const secondIds = rows(await db.execute(sql`select r.id::text run_id,r.guide_revision_id::text revision_id,a.id::text artifact_id,b.action_unit_id::text unit_id,b.proposal_bundle_id::text proposal_id,b.action_unit_ref,b.action_unit_hash,b.proposal_ref,b.proposal_hash,b.entity_ref,b.member_ref,b.membership_hash,b.effective_guide_set_hash,b.resolution_hash from guide_runs r join guide_run_artifacts a on a.workspace_id=r.workspace_id and a.run_id=r.id and a.kind='disposition' cross join lateral (select * from guide_run_action_bindings where workspace_id=${workspaceId}::uuid limit 1) b where r.workspace_id=${workspaceId}::uuid and r.run_ref=${negativeRun.runRef}`))[0]!;
@@ -1470,7 +1481,7 @@ try {
     client.release();
   }
   const residue = await pool.query<{ n: string }>("select count(*)::text n from pg_class where oid=to_regclass('public.guide_run_action_bindings')");
-  evidence.zeroResidue = residue.rows[0]?.n === (postMode || executionPreMode || limitedAutonomyPreMode || limitedAutonomyExecutionPreMode ? "1" : "0");
+  evidence.zeroResidue = residue.rows[0]?.n === (postMode || executionMode || limitedAutonomyPreMode || limitedAutonomyExecutionPreMode ? "1" : "0");
   if (limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
     const limitedResidue = await pool.query<{ objects: number; rows: number; ledger: number }>(`select
       (select count(*)::int from pg_class where oid=to_regclass('public.p06_limited_autonomy_admissions')) objects,

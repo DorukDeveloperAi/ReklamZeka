@@ -9,9 +9,10 @@ const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeout
 const migrationPath = "drizzle/20260818000300_p06_execution_persistence.sql";
 const migrationSql = readFileSync(migrationPath, "utf8");
 const migrationHash = createHash("sha256").update(migrationSql).digest("hex");
+const postMode = process.env.P06_EXECUTION_POST_APPROVED === "true";
 const names = ["p06_execution_runs", "p06_execution_events", "p06_execution_heads", "p06_execution_observations",
   "p06_execution_gate_snapshots", "p06_rollback_proposals"] as const;
-const evidence = { mode: "pre_outer_rollback", migrationHash, migrationInstalled: false, rlsForced: false,
+const evidence = { mode: postMode ? "post_applied" : "pre_outer_rollback", migrationHash, migrationInstalled: false, exactMigrationLedger: !postMode, rlsForced: false,
   publicRevoked: false, zeroPolicies: false, constraintsValidated: false, fkIndexes: false, triggersEnabled: false,
   preApplyUnjournaled: false, zeroResidue: false };
 
@@ -20,10 +21,15 @@ try {
   const before = await client.query<{ objects: number; ledger: number }>(`select
     (select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname=any($1::text[])) objects,
     (select count(*)::int from drizzle.__drizzle_migrations where hash=$2) ledger`, [names, migrationHash]);
-  if (before.rows[0]?.objects !== 0 || before.rows[0]?.ledger !== 0) throw new Error("P06 execution PRE target fresh değil");
-  evidence.preApplyUnjournaled = true;
-  await client.query("begin");
-  await client.query(migrationSql);
+  if (postMode) {
+    if (before.rows[0]?.objects !== 6 || before.rows[0]?.ledger !== 1) throw new Error("P06 execution POST ledger/schema exact değil");
+    evidence.exactMigrationLedger = true;
+  } else {
+    if (before.rows[0]?.objects !== 0 || before.rows[0]?.ledger !== 0) throw new Error("P06 execution PRE target fresh değil");
+    evidence.preApplyUnjournaled = true;
+    await client.query("begin");
+    await client.query(migrationSql);
+  }
   evidence.migrationInstalled = (await client.query<{ count: number }>(`select count(*)::int from pg_class where relnamespace='public'::regnamespace and relkind='r' and relname=any($1::text[])`, [names])).rows[0]?.count === 6;
   evidence.rlsForced = (await client.query<{ count: number }>(`select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname=any($1::text[]) and relrowsecurity and relforcerowsecurity`, [names])).rows[0]?.count === 6;
   evidence.publicRevoked = (await client.query<{ count: number }>(`select count(*)::int from information_schema.role_table_grants where table_schema='public' and table_name=any($1::text[]) and grantee in ('PUBLIC','anon','authenticated','service_role')`, [names])).rows[0]?.count === 0;
@@ -31,10 +37,11 @@ try {
   evidence.constraintsValidated = (await client.query<{ invalid: number; total: number }>(`select count(*) filter(where not convalidated)::int invalid,count(*)::int total from pg_constraint where conrelid=any($1::regclass[])`, [names.map((name) => `public.${name}`)])).rows[0]?.invalid === 0;
   evidence.fkIndexes = (await client.query<{ count: number }>(`select count(*)::int from pg_indexes where schemaname='public' and indexname like 'p06_%_fk_idx'`)).rows[0]?.count === 10;
   evidence.triggersEnabled = (await client.query<{ count: number }>(`select count(*)::int from pg_trigger where tgrelid=any($1::regclass[]) and not tgisinternal and tgenabled='O'`, [names.map((name) => `public.${name}`)])).rows[0]?.count === 11;
-  if (!Object.entries(evidence).filter(([key]) => !["mode", "migrationHash", "zeroResidue"].includes(key)).every(([, value]) => value === true)) throw new Error("P06 execution PRE katalog kapısı başarısız");
-  await client.query("rollback");
+  if (!Object.entries(evidence).filter(([key]) => !["mode", "migrationHash", "zeroResidue", "preApplyUnjournaled"].includes(key)).every(([, value]) => value === true)) throw new Error("P06 execution katalog kapısı başarısız");
+  if (!postMode) await client.query("rollback");
   evidence.zeroResidue = (await client.query<{ count: number }>(`select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname=any($1::text[])`, [names])).rows[0]?.count === 0;
-  if (!evidence.zeroResidue) throw new Error("P06 execution PRE residue bıraktı");
+  if (postMode) evidence.zeroResidue = (await client.query<{ count: number }>(`select count(*)::int from (${names.map((name) => `select id from public.${name}`).join(" union all ")}) residue`)).rows[0]?.count === 0;
+  if (!evidence.zeroResidue) throw new Error("P06 execution residue bıraktı");
   console.log(JSON.stringify(evidence));
 } catch (error) {
   await client.query("rollback").catch(() => undefined);

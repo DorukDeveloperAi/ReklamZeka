@@ -339,6 +339,11 @@ END; $$;
 CREATE OR REPLACE FUNCTION public.p06_execution_head_guard() RETURNS trigger
 LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 DECLARE e public.p06_execution_events%ROWTYPE; terminal_event public.p06_execution_events%ROWTYPE; r public.p06_execution_runs%ROWTYPE;
+  lease_event public.p06_execution_events%ROWTYPE; idempotency_event public.p06_execution_events%ROWTYPE;
+  read_event public.p06_execution_events%ROWTYPE; expected_event public.p06_execution_events%ROWTYPE; write_event public.p06_execution_events%ROWTYPE; raw_event public.p06_execution_events%ROWTYPE;
+  already_event public.p06_execution_events%ROWTYPE; ambiguous_event public.p06_execution_events%ROWTYPE;
+  before_observation public.p06_execution_observations%ROWTYPE; write_observation public.p06_execution_observations%ROWTYPE; after_observation public.p06_execution_observations%ROWTYPE;
+  observation_count integer; terminal_outcome text;
 BEGIN
   IF TG_OP='DELETE' THEN IF EXISTS(SELECT 1 FROM public.workspaces WHERE id=OLD.workspace_id AND lifecycle_state='tombstoning') THEN RETURN OLD; END IF; RAISE EXCEPTION 'p06 execution head cannot be deleted'; END IF;
   IF TG_OP='INSERT' THEN
@@ -357,8 +362,25 @@ BEGIN
   IF e.event_kind='lease_reclaimed' AND (OLD.state NOT IN ('claimed','running') OR OLD.lease_expires_at>statement_timestamp() OR NEW.state<>'claimed' OR NEW.lease_epoch<>OLD.lease_epoch+1 OR NEW.lease_token_hash IS NULL OR NEW.fence_hash IS NULL OR NEW.lease_expires_at<=statement_timestamp() OR (NEW.lease_token_hash=OLD.lease_token_hash AND NEW.fence_hash=OLD.fence_hash)) THEN RAISE EXCEPTION 'p06 execution reclaim invalid'; END IF;
   IF e.event_kind IN ('lease_claimed','lease_reclaimed') AND (e.payload->'receiptCore' IS DISTINCT FROM jsonb_build_object('executionRef',r.execution_ref,'leaseTokenHash',NEW.lease_token_hash,'fenceHash',NEW.fence_hash,'owned',true)) THEN RAISE EXCEPTION 'p06 execution lease receipt invalid'; END IF;
   IF e.event_kind='trace' AND NEW.trace_sequence<10 AND (NEW.state NOT IN ('claimed','running') OR OLD.lease_expires_at<=statement_timestamp() OR NEW.lease_token_hash IS DISTINCT FROM OLD.lease_token_hash OR NEW.fence_hash IS DISTINCT FROM OLD.fence_hash OR NEW.lease_epoch IS DISTINCT FROM OLD.lease_epoch OR NEW.lease_expires_at IS DISTINCT FROM OLD.lease_expires_at) THEN RAISE EXCEPTION 'p06 execution fence drift'; END IF;
+  IF e.event_kind='trace' AND NEW.trace_sequence=1 AND (e.outcome IS DISTINCT FROM 'ok'
+    OR cardinality(ARRAY(SELECT jsonb_object_keys(e.payload->'receiptCore')))<>4
+    OR e.payload->'receiptCore' IS DISTINCT FROM jsonb_build_object('executionRef',r.execution_ref,'leaseTokenHash',OLD.lease_token_hash,'fenceHash',OLD.fence_hash,'owned',true))
+  THEN RAISE EXCEPTION 'p06 execution trace lease receipt invalid'; END IF;
   IF e.event_kind='trace' AND NEW.trace_sequence=10 THEN
     SELECT * INTO terminal_event FROM public.p06_execution_events WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND trace_sequence=9;
+    SELECT * INTO lease_event FROM public.p06_execution_events WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND trace_sequence=1;
+    SELECT * INTO idempotency_event FROM public.p06_execution_events WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND trace_sequence=2;
+    SELECT * INTO read_event FROM public.p06_execution_events WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND trace_sequence=3;
+    SELECT * INTO expected_event FROM public.p06_execution_events WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND trace_sequence=4;
+    SELECT * INTO write_event FROM public.p06_execution_events WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND trace_sequence=5;
+    SELECT * INTO raw_event FROM public.p06_execution_events WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND trace_sequence=6;
+    SELECT * INTO already_event FROM public.p06_execution_events WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND trace_sequence=7;
+    SELECT * INTO ambiguous_event FROM public.p06_execution_events WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND trace_sequence=8;
+    SELECT * INTO before_observation FROM public.p06_execution_observations WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND kind='read_before';
+    SELECT * INTO write_observation FROM public.p06_execution_observations WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND kind='write_receipt';
+    SELECT * INTO after_observation FROM public.p06_execution_observations WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND kind='read_after';
+    SELECT count(*) INTO observation_count FROM public.p06_execution_observations WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id;
+    terminal_outcome:=terminal_event.payload->'receiptCore'->>'outcome';
     IF e.step<>'release' OR OLD.lease_expires_at<=statement_timestamp() OR NEW.state NOT IN ('succeeded','verification_failed','held') OR NEW.lease_token_hash IS NOT NULL OR NEW.fence_hash IS NOT NULL OR NEW.lease_expires_at IS NOT NULL OR NEW.terminal_hash IS NULL
       OR (SELECT count(*) FROM public.p06_execution_gate_snapshots WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND lease_epoch=0 AND phase IN ('staging','admission'))<>2
       OR (SELECT count(*) FROM public.p06_execution_gate_snapshots WHERE workspace_id=NEW.workspace_id AND execution_run_id=NEW.execution_run_id AND lease_epoch=NEW.lease_epoch AND phase IN ('post_claim','pre_dispatch','read_after_write'))<>3
@@ -367,6 +389,42 @@ BEGIN
       OR (NEW.state='succeeded' AND terminal_event.payload->'receiptCore'->>'outcome' NOT IN ('already_applied_no_write','written_verified','ambiguous_resolved'))
       OR (NEW.state='verification_failed' AND terminal_event.payload->'receiptCore'->>'outcome' IS DISTINCT FROM 'verification_failed')
       OR (NEW.state='held' AND terminal_event.payload->'receiptCore'->>'outcome' IS DISTINCT FROM 'expected_before_mismatch')
+      OR cardinality(ARRAY(SELECT jsonb_object_keys(lease_event.payload->'receiptCore')))<>4
+      OR lease_event.payload->'receiptCore'->>'executionRef' IS DISTINCT FROM r.execution_ref OR lease_event.payload->'receiptCore'->>'owned' IS DISTINCT FROM 'true'
+      OR NOT EXISTS(SELECT 1 FROM public.p06_execution_events lease_source WHERE lease_source.workspace_id=NEW.workspace_id AND lease_source.execution_run_id=NEW.execution_run_id
+        AND lease_source.event_kind IN ('lease_claimed','lease_reclaimed') AND lease_source.receipt_hash=lease_event.receipt_hash)
+      OR cardinality(ARRAY(SELECT jsonb_object_keys(idempotency_event.payload->'receiptCore')))<>4
+      OR idempotency_event.payload->'receiptCore'->>'kind' IS DISTINCT FROM 'fresh' OR idempotency_event.payload->'receiptCore'->>'executionRef' IS DISTINCT FROM r.execution_ref
+      OR idempotency_event.payload->'receiptCore'->>'idempotencyKey' IS DISTINCT FROM r.idempotency_key
+      OR NOT EXISTS(SELECT 1 FROM public.p06_execution_events lease_source WHERE lease_source.workspace_id=NEW.workspace_id AND lease_source.execution_run_id=NEW.execution_run_id
+        AND lease_source.event_kind IN ('lease_claimed','lease_reclaimed') AND lease_source.payload->'receiptCore'->>'fenceHash'=idempotency_event.payload->'receiptCore'->>'fenceHash')
+      OR cardinality(ARRAY(SELECT jsonb_object_keys(terminal_event.payload->'receiptCore')))<>4
+      OR terminal_event.payload->'receiptCore' IS DISTINCT FROM jsonb_build_object('executionRef',r.execution_ref,'outcome',terminal_outcome,'writeReceiptHash',CASE WHEN write_observation.id IS NULL THEN NULL ELSE write_event.receipt_hash END,'fenceHash',OLD.fence_hash)
+      OR cardinality(ARRAY(SELECT jsonb_object_keys(e.payload->'receiptCore')))<>4
+      OR e.payload->'receiptCore' IS DISTINCT FROM jsonb_build_object('executionRef',r.execution_ref,'leaseTokenHash',OLD.lease_token_hash,'fenceHash',OLD.fence_hash,'released',true)
+      OR (terminal_outcome IN ('written_verified','ambiguous_resolved','verification_failed') AND (
+        observation_count<>3 OR read_event.outcome IS DISTINCT FROM 'ok' OR expected_event.outcome IS DISTINCT FROM 'ok'
+        OR write_event.outcome NOT IN ('ok','ambiguous') OR raw_event.outcome IS DISTINCT FROM 'ok' OR already_event.outcome IS DISTINCT FROM 'skipped'
+        OR (terminal_outcome='ambiguous_resolved' AND (write_event.outcome IS DISTINCT FROM 'ambiguous' OR ambiguous_event.outcome IS DISTINCT FROM 'ok'))
+        OR (terminal_outcome<>'ambiguous_resolved' AND ambiguous_event.outcome IS DISTINCT FROM 'skipped')
+        OR before_observation.event_id IS DISTINCT FROM read_event.id OR before_observation.metadata_hash IS DISTINCT FROM read_event.receipt_hash
+        OR write_observation.event_id IS DISTINCT FROM write_event.id OR write_observation.metadata_hash IS DISTINCT FROM write_event.receipt_hash
+        OR after_observation.event_id IS DISTINCT FROM raw_event.id
+        OR raw_event.payload->'receiptCore'->>'beforeRawHash' IS DISTINCT FROM before_observation.raw_hash
+        OR raw_event.payload->'receiptCore'->>'writeRawHash' IS DISTINCT FROM write_observation.raw_hash
+        OR raw_event.payload->'receiptCore'->>'afterRawHash' IS DISTINCT FROM after_observation.raw_hash
+        OR raw_event.payload->'receiptCore'->>'writeReceiptHash' IS DISTINCT FROM write_event.receipt_hash
+        OR (terminal_outcome IN ('written_verified','ambiguous_resolved') AND after_observation.observed_value IS DISTINCT FROM r.request_payload->'desired')
+        OR (terminal_outcome='verification_failed' AND after_observation.observed_value IS NOT DISTINCT FROM r.request_payload->'desired')))
+      OR (terminal_outcome='already_applied_no_write' AND (observation_count<>1 OR read_event.outcome IS DISTINCT FROM 'ok'
+        OR expected_event.outcome IS DISTINCT FROM 'skipped' OR write_event.outcome IS DISTINCT FROM 'skipped' OR raw_event.outcome IS DISTINCT FROM 'skipped'
+        OR already_event.outcome IS DISTINCT FROM 'already_applied' OR ambiguous_event.outcome IS DISTINCT FROM 'skipped'
+        OR before_observation.event_id IS DISTINCT FROM read_event.id OR before_observation.observed_value IS DISTINCT FROM r.request_payload->'desired'))
+      OR (terminal_outcome='expected_before_mismatch' AND (observation_count>1 OR write_observation.id IS NOT NULL OR after_observation.id IS NOT NULL
+        OR write_event.outcome NOT IN ('held','skipped') OR raw_event.outcome IS DISTINCT FROM 'skipped'
+        OR already_event.outcome IS DISTINCT FROM 'skipped' OR ambiguous_event.outcome IS DISTINCT FROM 'skipped'
+        OR (read_event.outcome='ok' AND (observation_count<>1 OR before_observation.event_id IS DISTINCT FROM read_event.id))
+        OR (read_event.outcome='skipped' AND observation_count<>0)))
     THEN RAISE EXCEPTION 'p06 execution trace release invalid'; END IF;
   END IF;
   IF e.event_kind='lease_released' AND (OLD.trace_sequence<>10 OR NEW.state NOT IN ('succeeded','verification_failed','held') OR NEW.lease_token_hash IS NOT NULL OR NEW.fence_hash IS NOT NULL OR NEW.lease_expires_at IS NOT NULL OR NEW.terminal_hash IS NULL) THEN RAISE EXCEPTION 'p06 execution release invalid'; END IF;
@@ -413,6 +471,17 @@ BEGIN
     OR (NEW.kind='write_receipt' AND e.step IS DISTINCT FROM 'typed_mutation')
     OR (NEW.kind='read_after' AND e.step IS DISTINCT FROM 'raw')
     OR (NEW.kind='ambiguous_retry_read' AND e.step IS DISTINCT FROM 'ambiguous_read_before_retry')
+    OR (NEW.kind='read_before' AND (NEW.metadata_hash IS DISTINCT FROM e.receipt_hash OR NEW.raw_hash IS DISTINCT FROM e.payload->'receiptCore'->>'rawHash'
+      OR NEW.observed_value IS DISTINCT FROM e.payload->'receiptCore'->'value' OR NEW.observed_at IS DISTINCT FROM (e.payload->'receiptCore'->>'observedAt')::timestamptz
+      OR e.payload->'receiptCore'->>'workspaceRef' IS DISTINCT FROM r.request_payload->>'workspaceRef' OR e.payload->'receiptCore'->>'accountRef' IS DISTINCT FROM r.request_payload->>'accountRef'
+      OR e.payload->'receiptCore'->>'entityRef' IS DISTINCT FROM r.request_payload->>'entityRef'))
+    OR (NEW.kind='write_receipt' AND (NEW.metadata_hash IS DISTINCT FROM e.receipt_hash OR NEW.raw_hash IS DISTINCT FROM e.payload->'receiptCore'->>'rawHash'
+      OR NEW.observed_value IS DISTINCT FROM r.request_payload->'desired' OR e.payload->'receiptCore'->>'executionRef' IS DISTINCT FROM r.execution_ref
+      OR e.payload->'receiptCore'->>'idempotencyKey' IS DISTINCT FROM r.idempotency_key OR e.payload->'receiptCore'->>'entityRef' IS DISTINCT FROM r.request_payload->>'entityRef'
+      OR e.payload->'receiptCore'->>'action' IS DISTINCT FROM r.request_payload->>'action' OR e.payload->'receiptCore'->>'kind' NOT IN ('written','ambiguous_transport')))
+    OR (NEW.kind='read_after' AND (jsonb_typeof(e.payload->'receiptCore'->'afterRead') IS DISTINCT FROM 'object'
+      OR NEW.metadata_hash IS DISTINCT FROM public.guide_run_sha256(e.payload->'receiptCore'->'afterRead') OR NEW.raw_hash IS DISTINCT FROM e.payload->'receiptCore'->>'afterRawHash'
+      OR NEW.observed_value IS DISTINCT FROM e.payload->'receiptCore'->'afterRead'->'value' OR NEW.observed_at IS DISTINCT FROM (e.payload->'receiptCore'->'afterRead'->>'observedAt')::timestamptz))
   THEN RAISE EXCEPTION 'p06 execution observation must bind canonical event'; END IF;
   RETURN NEW;
 END; $$;
