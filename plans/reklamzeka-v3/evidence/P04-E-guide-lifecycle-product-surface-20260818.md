@@ -9,6 +9,7 @@
 - Kılavuzlar paneli immutable `draft → interpretation acceptance → activation` zincirini korur; pause ayrı OCC işlemidir. Taslak üretimi activation yapmaz.
 - Mevcut latest revision public contracttan kapalı doğrulanır; kullanıcı aynı Guide kimliği altında OCC-bound yeni immutable revision taslağı üretir. Eski active revision, yeni taslak kabul edilip ayrıca aktive edilene kadar değişmez.
 - Owner/admin taslak ve aktivasyon yapabilir; analyst/viewer yalnız okuyabilir. API ve UI authority sözleşmesi `canWriteMeta=false`, `canExecute=false` döndürür.
+- Guide Agent boundary eski 24-hex varsayımı yerine `canonicalGuideWorkspaceRef` 16-hex kimliğini doğrular; öneri/explicit form-preview transferi gerçek persisted Guide workspace kimliğiyle çalışabilir, save/activate/approve/execute/Meta yetkileri kapalı kalır.
 - P04 bütçe evidence okuyucusu PRE-only ceiling migration uygulanmadan önce `to_regclass` ile tabloyu yoklar; eksik tablo SQL hatası yerine `parent_ceiling_unavailable` fail-closed yolunu korur.
 
 ## Kanıt

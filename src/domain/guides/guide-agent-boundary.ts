@@ -60,7 +60,7 @@ export class GuideAgentBoundaryError extends Error {
   }
 }
 
-const WORKSPACE_REF = /^workspace_[a-f0-9]{24}$/;
+const WORKSPACE_REF = /^workspace_[a-f0-9]{16}$/;
 const USER_TRANSFER_REF = /^transfer_[a-f0-9]{24,64}$/;
 const AUTHORITY = Object.freeze({ canSaveGuide: false as const, canActivateGuide: false as const,
   canApprove: false as const, canExecute: false as const, canWriteMeta: false as const });

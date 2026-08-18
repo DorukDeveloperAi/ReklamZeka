@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { evaluateGuideAgentOperation, guideAgentConversationRef, GuideAgentBoundaryError } from "@/domain/guides/guide-agent-boundary";
+import { canonicalGuideWorkspaceRef } from "@/domain/guides/guide-revision";
 
-const workspaceRef = `workspace_${"a".repeat(24)}`;
+const workspaceRef = canonicalGuideWorkspaceRef("11111111-1111-4111-a111-111111111111");
 const base = { workspaceRef, guideMode: "recommend" as const, dataQuality: "ready" as const, userTransferRef: null };
 
 describe("two Guide agent boundary", () => {
