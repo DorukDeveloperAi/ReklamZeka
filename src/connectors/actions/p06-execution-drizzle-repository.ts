@@ -1075,7 +1075,7 @@ export class DrizzleP06ExecutionRepository {
     });
   }
 
-  async listRunnableByRoute(route: "human_approved" | "guide_budget_human_approved" | "limited_autonomy_status", limit = 25): Promise<readonly string[]> {
+  async listRunnableByRoute(route: "human_approved" | "guide_budget_human_approved" | "human_rename_approved" | "limited_autonomy_status", limit = 25): Promise<readonly string[]> {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) fail("invalid_input");
     const candidates = rows(await this.database.execute(sql`
       select r.execution_ref from p06_execution_runs r
@@ -1101,6 +1101,26 @@ export class DrizzleP06ExecutionRepository {
         and u.action_type in ('budget_decrease','budget_increase') and u.expires_at>statement_timestamp()
       join action_proposal_bundles bundle on bundle.workspace_id=a.workspace_id and bundle.id=a.bundle_id
         and bundle.plan_ref ~ '^guide_budget_[a-f0-9]{32}_[a-f0-9]{64}$'
+      join action_approval_evidence_grants g on g.workspace_id=a.workspace_id and g.id=a.approval_grant_id
+        and g.expires_at>statement_timestamp() and g.capability='approval_evidence_only' and g.can_execute=false
+      left join p06_execution_runs r on r.workspace_id=a.workspace_id and r.action_execution_attempt_id=a.id
+      where r.id is null order by a.created_at,a.id limit ${limit}
+    `));
+    if (candidates.some((row) => typeof row.workspace_id !== "string" || !UUID.test(row.workspace_id)
+      || typeof row.attempt_id !== "string" || !UUID.test(row.attempt_id))) fail("corrupt_store");
+    return Object.freeze(candidates.map((row) => Object.freeze({ workspaceId: String(row.workspace_id), attemptId: String(row.attempt_id) })));
+  }
+
+  /** Approved rename attempts are materialized only by a server runtime whose
+   * explicit rename rollout gate is open. This query itself grants no write. */
+  async listUnmaterializedHumanRenameAttempts(limit = 25): Promise<readonly Readonly<{ workspaceId: string; attemptId: string }>[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) fail("invalid_input");
+    const candidates = rows(await this.database.execute(sql`
+      select a.workspace_id::text workspace_id,a.id::text attempt_id
+      from action_execution_attempts a
+      join workspaces w on w.id=a.workspace_id and w.lifecycle_state='active' and w.tombstoned_at is null
+      join action_proposal_units u on u.workspace_id=a.workspace_id and u.id=a.unit_id
+        and u.action_type in ('campaign_rename','adset_rename','ad_rename') and u.expires_at>statement_timestamp()
       join action_approval_evidence_grants g on g.workspace_id=a.workspace_id and g.id=a.approval_grant_id
         and g.expires_at>statement_timestamp() and g.capability='approval_evidence_only' and g.can_execute=false
       left join p06_execution_runs r on r.workspace_id=a.workspace_id and r.action_execution_attempt_id=a.id

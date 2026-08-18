@@ -31,7 +31,8 @@ export class DrizzleP06StatusExecutionDispatchAuthorityRepository
     input: Parameters<P06StatusExecutionDispatchAuthority["revalidate"]>[0],
   ) {
     const supportedAction = input.request.action === "status_pause" || input.request.action === "status_activate"
-      || input.request.action === "budget_decrease" || input.request.action === "budget_increase";
+      || input.request.action === "budget_decrease" || input.request.action === "budget_increase"
+      || input.request.action === "campaign_rename" || input.request.action === "adset_rename" || input.request.action === "ad_rename";
     if (
       !EXECUTION.test(input.executionRef) ||
       (input.phase !== "post_claim" && input.phase !== "pre_dispatch") || !supportedAction
@@ -50,6 +51,90 @@ export class DrizzleP06StatusExecutionDispatchAuthorityRepository
     return this.database.transaction(async (tx) => {
       const routeResult = await tx.execute(sql`select route from p06_execution_runs where execution_ref=${input.executionRef} limit 2`);
       const route = routeResult.rows.length === 1 ? (routeResult.rows[0] as Record<string, unknown>).route : null;
+      if (route === "human_rename_approved") {
+        const result = await tx.execute(sql`
+          select to_char(statement_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') authorized_at,
+            r.request_hash,r.context_hash,r.policy_hash,r.admission_hash,r.write_spec_hash,r.action_plan_hash,
+            u.unit_hash,g.grant_hash,connection.lifecycle_generation,
+            case when u.campaign_id is not null then campaign.configured_status
+              when u.ad_set_id is not null then ad_set.configured_status else ad.configured_status end current_status,
+            case when u.campaign_id is not null then campaign.name
+              when u.ad_set_id is not null then ad_set.name else ad.name end current_name
+          from p06_execution_runs r
+          join workspaces w on w.id=r.workspace_id and w.lifecycle_state='active' and w.tombstoned_at is null
+          join action_execution_attempts attempt on attempt.workspace_id=r.workspace_id and attempt.id=r.action_execution_attempt_id
+            and attempt.admission_hash=r.admission_hash and attempt.write_spec_hash=r.write_spec_hash
+          join action_proposal_units u on u.workspace_id=r.workspace_id and u.id=r.action_unit_id
+            and u.id=attempt.unit_id and u.bundle_id=attempt.bundle_id and u.unit_hash=r.action_unit_hash
+            and u.context_hash=r.context_hash and u.action_plan_hash=r.action_plan_hash and u.expires_at>statement_timestamp()
+          join action_proposal_bundles bundle on bundle.workspace_id=r.workspace_id and bundle.id=r.proposal_bundle_id
+            and bundle.id=attempt.bundle_id and bundle.plan_hash=r.proposal_hash
+          join action_approval_decision_events decision on decision.workspace_id=r.workspace_id and decision.id=r.decision_event_id
+            and decision.id=attempt.decision_event_id and decision.bundle_id=bundle.id and decision.unit_id=u.id
+            and decision.command_kind='approve' and decision.unit_hash=u.unit_hash
+          join action_approval_evidence_grants g on g.workspace_id=r.workspace_id and g.id=r.approval_grant_id
+            and g.id=attempt.approval_grant_id and g.decision_event_id=decision.id and g.bundle_id=bundle.id and g.unit_id=u.id
+            and g.unit_hash=u.unit_hash and g.approved_at<=statement_timestamp() and g.expires_at>statement_timestamp()
+            and g.capability='approval_evidence_only' and g.can_execute=false
+          join action_approval_policy_snapshots policy on policy.workspace_id=r.workspace_id and policy.id=bundle.policy_snapshot_id and policy.policy_hash=r.policy_hash
+          join approval_policy_definition_revisions policy_source on policy_source.workspace_id=policy.workspace_id
+            and policy_source.id=policy.source_definition_id and policy_source.canonical_hash=policy.source_definition_canonical_hash
+            and policy_source.policy_hash=policy.policy_hash and policy_source.state='published'
+            and policy_source.action_type=u.action_type and policy_source.risk='K3'
+            and policy_source.effective_from<=statement_timestamp() and (policy_source.expires_at is null or policy_source.expires_at>statement_timestamp())
+          join effective_campaign_contexts context on context.workspace_id=r.workspace_id and context.context_hash=r.context_hash
+            and context.account_ref=r.request_payload->>'accountRef' and context.entity_ref=r.request_payload->>'entityRef'
+            and context.captured_at<=statement_timestamp()
+          join ad_accounts account on account.workspace_id=context.workspace_id and account.id=context.ad_account_id
+            and account.disappeared_at is null and account.external_account_id=r.request_payload->>'accountRef'
+          join data_sources source on source.workspace_id=account.workspace_id and source.id=account.data_source_id and source.platform='meta_ads'
+          join meta_connections connection on connection.workspace_id=source.workspace_id and connection.id=source.meta_connection_id
+            and connection.status='active' and connection.disconnected_at is null and connection.revoked_at is null
+            and connection.secret_disabled_at is null and connection.secret_destroyed_at is null
+            and (connection.token_expires_at is null or connection.token_expires_at>statement_timestamp())
+            and (connection.data_access_expires_at is null or connection.data_access_expires_at>statement_timestamp())
+          left join ad_campaigns campaign on campaign.workspace_id=u.workspace_id and campaign.id=u.campaign_id and campaign.disappeared_at is null
+          left join meta_ad_sets ad_set on ad_set.workspace_id=u.workspace_id and ad_set.id=u.ad_set_id and ad_set.disappeared_at is null
+          left join meta_ads ad on ad.workspace_id=u.workspace_id and ad.id=u.ad_id and ad.disappeared_at is null
+          where r.execution_ref=${input.executionRef}
+            and r.request_payload->>'workspaceRef'=${input.request.workspaceRef}
+            and r.request_payload->>'accountRef'=${input.request.accountRef}
+            and r.request_payload->>'entityRef'=${input.request.entityRef}
+            and r.request_payload->>'action'=${input.request.action}
+            and u.action_type in ('campaign_rename','adset_rename','ad_rename') and u.action_plan_payload#>>'{action,kind}'='rename'
+            and u.action_plan_payload#>>'{action,entity,ref}'=u.entity_ref
+            and u.action_plan_payload#>>'{action,beforeName}'=r.request_payload#>>'{expectedBefore,name}'
+            and u.action_plan_payload#>>'{action,afterName}'=r.request_payload#>>'{desired,name}'
+            and r.request_payload#>>'{expectedBefore,status}'=r.request_payload#>>'{desired,status}'
+            and r.request_payload#>'{expectedBefore,budgetMinor}'='null'::jsonb and r.request_payload#>'{desired,budgetMinor}'='null'::jsonb
+            and ((u.action_type='campaign_rename' and u.campaign_id is not null and u.ad_set_id is null and u.ad_id is null)
+              or (u.action_type='adset_rename' and u.campaign_id is null and u.ad_set_id is not null and u.ad_id is null)
+              or (u.action_type='ad_rename' and u.campaign_id is null and u.ad_set_id is null and u.ad_id is not null))
+            and not exists (select 1 from approval_policy_definition_revisions newer
+              where newer.workspace_id=policy_source.workspace_id and newer.policy_ref=policy_source.policy_ref
+                and newer.revision>policy_source.revision and newer.state in ('published','disabled') and newer.effective_from<=statement_timestamp())
+            and not exists (select 1 from effective_campaign_context_components component
+              join effective_campaign_context_invalidations invalidation on invalidation.workspace_id=component.workspace_id
+                and invalidation.component_type=component.component_type and invalidation.component_ref=component.component_ref
+                and invalidation.component_version=component.component_version
+              where component.workspace_id=context.workspace_id and component.context_id=context.id
+                and (invalidation.entity_type is null or (invalidation.entity_type=context.entity_type and invalidation.entity_ref=context.entity_ref)))
+          limit 2
+        `);
+        const row = result.rows.length === 1 ? result.rows[0] as Record<string, unknown> : null;
+        const allowed = Boolean(row && (row.current_status === "ACTIVE" || row.current_status === "PAUSED")
+          && row.current_status === input.request.expectedBefore.status && row.current_name === input.request.expectedBefore.name
+          && input.request.desired.name !== input.request.expectedBefore.name);
+        return Object.freeze({ allowed, authorityHash: p06ExecutionV2Digest({
+          version: "p06-dispatch-authority/1.0.0", phase: input.phase, executionRef: input.executionRef, allowed,
+          authorizedAt: allowed ? row!.authorized_at : null, requestHash: allowed ? row!.request_hash : null,
+          contextHash: allowed ? row!.context_hash : null, policyHash: allowed ? row!.policy_hash : null,
+          admissionHash: allowed ? row!.admission_hash : null, writeSpecHash: allowed ? row!.write_spec_hash : null,
+          actionPlanHash: allowed ? row!.action_plan_hash : null, unitHash: allowed ? row!.unit_hash : null,
+          grantHash: allowed ? row!.grant_hash : null, currentStatus: allowed ? row!.current_status : null,
+          currentName: allowed ? row!.current_name : null, connectionGeneration: allowed ? Number(row!.lifecycle_generation) : null,
+        }) });
+      }
       if (route === "limited_autonomy_status") {
         const limitedResult = await tx.execute(sql`
           select to_char(statement_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') authorized_at,

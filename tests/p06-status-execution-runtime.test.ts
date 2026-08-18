@@ -13,6 +13,7 @@ describe("P06 status execution server runtime", () => {
       worker: null,
       scheduler: null,
       materializeApproved: null,
+      materializeRenameAttempt: null,
     });
   });
 
@@ -60,5 +61,19 @@ describe("P06 status execution server runtime", () => {
       },
     });
     expect(runtime.enabled).toBe(false);
+  });
+
+  it("requires a separate explicit rename-write switch before exposing the rename materializer", () => {
+    const base = {
+      META_WRITE_ENABLED: "true", HUMAN_ACTION_EXECUTION_ENABLED: "true", P06_META_WRITE_ACCESS_TOKEN: "write-token",
+      P06_META_WRITE_KILL_SWITCH: "false", P06_META_WRITE_WORKSPACE_ALLOWLIST: "workspace_aaaaaaaaaaaaaaaa",
+      P06_META_WRITE_ACCOUNT_ALLOWLIST: "act_12345", P06_META_WRITE_ACTION_ALLOWLIST: "campaign_rename",
+    };
+    const closed = createP06StatusExecutionRuntime({ database: { execute: vi.fn(), transaction: vi.fn() } as never, environment: base });
+    expect(closed.enabled).toBe(false);
+    const opened = createP06StatusExecutionRuntime({ database: { execute: vi.fn(), transaction: vi.fn() } as never,
+      environment: { ...base, P06_META_RENAME_WRITE_ENABLED: "true" } });
+    expect(opened.enabled).toBe(true);
+    expect(opened.materializeRenameAttempt).toBeTypeOf("function");
   });
 });

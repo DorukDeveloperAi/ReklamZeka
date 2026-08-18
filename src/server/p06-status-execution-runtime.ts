@@ -26,6 +26,11 @@ const STATUS_ACTIONS = new Set<P06ExecutionV2Action>([
   "status_pause",
   "status_activate",
 ]);
+const RENAME_ACTIONS = new Set<P06ExecutionV2Action>([
+  "campaign_rename",
+  "adset_rename",
+  "ad_rename",
+]);
 
 function list(value: string | undefined, maximum: number): readonly string[] {
   const entries = (value ?? "")
@@ -42,10 +47,11 @@ function list(value: string | undefined, maximum: number): readonly string[] {
   return Object.freeze([...entries].sort());
 }
 
-function actions(value: string | undefined): readonly P06ExecutionV2Action[] {
+function actions(value: string | undefined, renameEnabled: boolean): readonly P06ExecutionV2Action[] {
   const entries = list(value, 2);
   if (
-    entries.some((entry) => !STATUS_ACTIONS.has(entry as P06ExecutionV2Action))
+    entries.some((entry) => !STATUS_ACTIONS.has(entry as P06ExecutionV2Action)
+      && !(renameEnabled && RENAME_ACTIONS.has(entry as P06ExecutionV2Action)))
   )
     return Object.freeze([]);
   return Object.freeze(entries as P06ExecutionV2Action[]);
@@ -67,13 +73,15 @@ function gateResolver(
         environment.P06_META_WRITE_ACCOUNT_ALLOWLIST,
         1_000,
       );
-      const actionAllowlist = actions(
-        environment.P06_META_WRITE_ACTION_ALLOWLIST,
-      );
+      const actionAllowlist = actions(environment.P06_META_WRITE_ACTION_ALLOWLIST,
+        environment.P06_META_RENAME_WRITE_ENABLED === "true");
       const killSwitch = environment.P06_META_WRITE_KILL_SWITCH !== "false";
+      const routeEnabled = route === "human_rename_approved"
+        ? environment.P06_META_RENAME_WRITE_ENABLED === "true"
+        : environment.P06_META_STATUS_WRITE_ENABLED === "true";
       const enabled =
         rollout.metaWriteEnabled &&
-        environment.P06_META_STATUS_WRITE_ENABLED === "true" &&
+        routeEnabled &&
         (route === "limited_autonomy_status"
           ? rollout.limitedAutonomyEnabled
           : rollout.humanActionExecutionEnabled) &&
@@ -106,7 +114,7 @@ function initialGate(
   environment: Environment,
   phase: "staging" | "admission",
   capturedAt: string,
-  route: "human_approved" | "limited_autonomy_status",
+  route: "human_approved" | "human_rename_approved" | "limited_autonomy_status",
 ) {
   const rollout = resolveP08RolloutControl(environment);
   const workspaceAllowlist = list(
@@ -117,11 +125,15 @@ function initialGate(
     environment.P06_META_WRITE_ACCOUNT_ALLOWLIST,
     1_000,
   );
-  const actionAllowlist = actions(environment.P06_META_WRITE_ACTION_ALLOWLIST);
+  const actionAllowlist = actions(environment.P06_META_WRITE_ACTION_ALLOWLIST,
+    environment.P06_META_RENAME_WRITE_ENABLED === "true");
   const killSwitch = environment.P06_META_WRITE_KILL_SWITCH !== "false";
+  const routeEnabled = route === "human_rename_approved"
+    ? environment.P06_META_RENAME_WRITE_ENABLED === "true"
+    : environment.P06_META_STATUS_WRITE_ENABLED === "true";
   const enabled =
     rollout.metaWriteEnabled &&
-    environment.P06_META_STATUS_WRITE_ENABLED === "true" &&
+    routeEnabled &&
     (route === "limited_autonomy_status"
       ? rollout.limitedAutonomyEnabled
       : rollout.humanActionExecutionEnabled) &&
@@ -164,11 +176,13 @@ export function createP06StatusExecutionRuntime(
   const capturedAt = now().toISOString();
   const humanConfigured = rollout.humanActionExecutionEnabled &&
     initialGate(environment, "staging", capturedAt, "human_approved").enabled;
+  const renameConfigured = rollout.humanActionExecutionEnabled &&
+    initialGate(environment, "staging", capturedAt, "human_rename_approved").enabled;
   const limitedConfigured = rollout.limitedAutonomyEnabled &&
     initialGate(environment, "staging", capturedAt, "limited_autonomy_status").enabled;
   const configured =
     rollout.metaWriteEnabled &&
-    (humanConfigured || limitedConfigured) &&
+    (humanConfigured || renameConfigured || limitedConfigured) &&
     token.length > 0;
   if (!configured)
     return Object.freeze({
@@ -176,6 +190,7 @@ export function createP06StatusExecutionRuntime(
       worker: null,
       scheduler: null,
       materializeApproved: null,
+      materializeRenameAttempt: null,
     });
   const repository = new DrizzleP06ExecutionRepository(input.database);
   const contexts = new DrizzleGuideRunCandidateStagingContextRepository(
@@ -218,13 +233,32 @@ export function createP06StatusExecutionRuntime(
           }
         }
       }
+      if (currentRollout.humanActionExecutionEnabled
+        && initialGate(environment, "staging", now().toISOString(), "human_rename_approved").enabled) {
+        const attempts = await repository.listUnmaterializedHumanRenameAttempts(boundedLimit);
+        for (const attempt of attempts) {
+          const evaluatedAt = now().toISOString();
+          const base = Date.parse(evaluatedAt);
+          const gates = [
+            initialGate(environment, "staging", new Date(base - 2).toISOString(), "human_rename_approved"),
+            initialGate(environment, "admission", new Date(base - 1).toISOString(), "human_rename_approved"),
+          ] as const;
+          if (!gates.every((gate) => gate.enabled)) continue;
+          try { await repository.createHumanRenameApproved({ workspaceId: attempt.workspaceId, actionExecutionAttemptId: attempt.attemptId, evaluatedAt, gates }); }
+          catch { /* stale approval/name/context is a closed hold; no dispatch occurs. */ }
+        }
+      }
       const human = currentRollout.humanActionExecutionEnabled
         ? await repository.listRunnableByRoute("human_approved", boundedLimit)
         : Object.freeze([] as string[]);
-      const limited = currentRollout.limitedAutonomyEnabled
-        ? await repository.listRunnableByRoute("limited_autonomy_status", Math.max(1, boundedLimit - human.length))
+      const renames = currentRollout.humanActionExecutionEnabled
+        && initialGate(environment, "staging", now().toISOString(), "human_rename_approved").enabled
+        ? await repository.listRunnableByRoute("human_rename_approved", Math.max(1, boundedLimit - human.length))
         : Object.freeze([] as string[]);
-      return Object.freeze([...human, ...limited].slice(0, boundedLimit));
+      const limited = currentRollout.limitedAutonomyEnabled
+        ? await repository.listRunnableByRoute("limited_autonomy_status", Math.max(1, boundedLimit - human.length - renames.length))
+        : Object.freeze([] as string[]);
+      return Object.freeze([...human, ...renames, ...limited].slice(0, boundedLimit));
     } },
     worker,
     now,
@@ -248,10 +282,21 @@ export function createP06StatusExecutionRuntime(
       ],
     });
   };
+  const materializeRenameAttempt = async (input: Readonly<{ workspaceId: string; actionExecutionAttemptId: string }>) => {
+    const evaluatedAt = now().toISOString();
+    const base = Date.parse(evaluatedAt);
+    const gates = [
+      initialGate(environment, "staging", new Date(base - 2).toISOString(), "human_rename_approved"),
+      initialGate(environment, "admission", new Date(base - 1).toISOString(), "human_rename_approved"),
+    ] as const;
+    if (!gates.every((gate) => gate.enabled)) return null;
+    return repository.createHumanRenameApproved({ workspaceId: input.workspaceId, actionExecutionAttemptId: input.actionExecutionAttemptId, evaluatedAt, gates });
+  };
   return Object.freeze({
     enabled: true as const,
     worker,
     scheduler,
     materializeApproved,
+    materializeRenameAttempt,
   });
 }

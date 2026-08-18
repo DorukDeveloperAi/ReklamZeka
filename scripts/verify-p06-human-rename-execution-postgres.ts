@@ -33,7 +33,7 @@ const stable = (value: unknown): unknown => Array.isArray(value) ? value.map(sta
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(stable(value))).digest("hex");
 const evidence = { mode: post ? "post_applied_outer_rollback" : "pre_outer_rollback", exactMigrationLedger: false, migrationInstalled: false, exactContract: false,
   canonicalQueue: false, humanApproval: false, canonicalAdmissionAttempt: false, renameRunCreated: false, exactReplay: false,
-  staleNameHeld: false, immutableRunRejected: false, dispatchFailClosed: false, zeroResidue: false };
+  staleNameHeld: false, immutableRunRejected: false, dispatchAuthorityCurrent: false, executionGatesDisabled: false, zeroResidue: false };
 
 const ledger = (await database.execute(sql`select count(*)::int exact_count,count(*) filter(where hash=${migrationHash})::int hash_count,
   count(*) filter(where created_at=${migrationTimestamp})::int timestamp_count from drizzle.__drizzle_migrations
@@ -99,7 +99,8 @@ try {
     const replay = await repository.createHumanRenameApproved({ workspaceId, actionExecutionAttemptId: attemptId, evaluatedAt: at, gates });
     evidence.exactReplay = replay.executionRunId === created.executionRunId && replay.requestHash === created.requestHash;
     const dispatch = await new DrizzleP06StatusExecutionDispatchAuthorityRepository(tx as never, {} as never).revalidate({ phase: "pre_dispatch", executionRef: created.executionRef, request: created.request });
-    evidence.dispatchFailClosed = dispatch.allowed === false && /^[a-f0-9]{64}$/.test(dispatch.authorityHash);
+    evidence.dispatchAuthorityCurrent = dispatch.allowed === true && /^[a-f0-9]{64}$/.test(dispatch.authorityHash);
+    evidence.executionGatesDisabled = gates.every((gate) => gate.enabled === false);
     await tx.execute(sql`update ad_campaigns set name='Prospecting | Başka' where workspace_id=${workspaceId}::uuid and id=${campaignId}::uuid`);
     try { await repository.createHumanRenameApproved({ workspaceId, actionExecutionAttemptId: attemptId, evaluatedAt: at, gates }); } catch (error) { evidence.staleNameHeld = error instanceof Error && error.message.includes("corrupt_store"); }
     try { await tx.execute(sql`update p06_execution_runs set request_hash=${"0".repeat(64)} where workspace_id=${workspaceId}::uuid and id=${created.executionRunId}::uuid`); } catch { evidence.immutableRunRejected = true; }

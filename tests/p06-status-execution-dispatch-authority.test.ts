@@ -85,4 +85,22 @@ describe("P06 status dispatch authority", () => {
       absent.revalidate({ phase: "post_claim", executionRef: "bad", request }),
     ).resolves.toMatchObject({ allowed: false });
   });
+
+  it("revalidates a human-approved rename from the immutable attempt, current name, policy, context, and grant", async () => {
+    const renameRequest = Object.freeze({ ...request, entityRef: "campaign_12345", action: "campaign_rename" as const,
+      expectedBefore: Object.freeze({ status: "ACTIVE" as const, budgetMinor: null, name: "Eski ad" }),
+      desired: Object.freeze({ status: "ACTIVE" as const, budgetMinor: null, name: "Yeni ad" }) });
+    const execute = vi.fn()
+      .mockResolvedValueOnce({ rows: [{ route: "human_rename_approved" }] })
+      .mockResolvedValueOnce({ rows: [{ authorized_at: "2026-08-18T10:05:00.000Z", request_hash: "1".repeat(64),
+        context_hash: "2".repeat(64), policy_hash: "3".repeat(64), admission_hash: "4".repeat(64),
+        write_spec_hash: "5".repeat(64), action_plan_hash: "6".repeat(64), unit_hash: "7".repeat(64),
+        grant_hash: "8".repeat(64), lifecycle_generation: 2, current_status: "ACTIVE", current_name: "Eski ad" }] });
+    const repository = new DrizzleP06StatusExecutionDispatchAuthorityRepository({
+      transaction: vi.fn(async (work) => work({ execute } as never)),
+    } as never, { loadInTransaction: vi.fn() } as never);
+    await expect(repository.revalidate({ phase: "pre_dispatch", executionRef: renameRequest.executionRef, request: renameRequest }))
+      .resolves.toMatchObject({ allowed: true });
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
 });
