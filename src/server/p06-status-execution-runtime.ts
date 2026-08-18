@@ -210,7 +210,19 @@ export function createP06StatusExecutionRuntime(
     repository: { listRunnable: async (limit) => {
       const boundedLimit = limit ?? 25;
       const currentRollout = resolveP08RolloutControl(environment);
-      if (currentRollout.limitedAutonomyEnabled) {
+      const capturedAt = now().toISOString();
+      const humanEnabled = currentRollout.humanActionExecutionEnabled
+        && initialGate(environment, "staging", capturedAt, "human_approved").enabled;
+      const renameEnabled = currentRollout.humanActionExecutionEnabled
+        && initialGate(environment, "staging", capturedAt, "human_rename_approved").enabled;
+      const limitedEnabled = currentRollout.limitedAutonomyEnabled
+        && initialGate(environment, "staging", capturedAt, "limited_autonomy_status").enabled;
+      // A process may outlive a P08/route kill-switch change. Do not even
+      // enumerate a route after it closes; this is stricter than depending on
+      // the final writer gate and avoids fresh execution materialization.
+      if (!humanEnabled && !renameEnabled && !limitedEnabled)
+        return Object.freeze([] as string[]);
+      if (limitedEnabled) {
         const admissions = await repository.listUnmaterializedLimitedAutonomyAdmissions(boundedLimit);
         for (const admission of admissions) {
           const evaluatedAt = now().toISOString();
@@ -233,8 +245,7 @@ export function createP06StatusExecutionRuntime(
           }
         }
       }
-      if (currentRollout.humanActionExecutionEnabled
-        && initialGate(environment, "staging", now().toISOString(), "human_rename_approved").enabled) {
+      if (renameEnabled) {
         const attempts = await repository.listUnmaterializedHumanRenameAttempts(boundedLimit);
         for (const attempt of attempts) {
           const evaluatedAt = now().toISOString();
@@ -248,14 +259,13 @@ export function createP06StatusExecutionRuntime(
           catch { /* stale approval/name/context is a closed hold; no dispatch occurs. */ }
         }
       }
-      const human = currentRollout.humanActionExecutionEnabled
+      const human = humanEnabled
         ? await repository.listRunnableByRoute("human_approved", boundedLimit)
         : Object.freeze([] as string[]);
-      const renames = currentRollout.humanActionExecutionEnabled
-        && initialGate(environment, "staging", now().toISOString(), "human_rename_approved").enabled
+      const renames = renameEnabled
         ? await repository.listRunnableByRoute("human_rename_approved", Math.max(1, boundedLimit - human.length))
         : Object.freeze([] as string[]);
-      const limited = currentRollout.limitedAutonomyEnabled
+      const limited = limitedEnabled
         ? await repository.listRunnableByRoute("limited_autonomy_status", Math.max(1, boundedLimit - human.length - renames.length))
         : Object.freeze([] as string[]);
       return Object.freeze([...human, ...renames, ...limited].slice(0, boundedLimit));
@@ -272,14 +282,16 @@ export function createP06StatusExecutionRuntime(
     if (approved.kind !== "approve" || !resolveP08RolloutControl(environment).humanActionExecutionEnabled) return;
     const evaluatedAt = now().toISOString();
     const base = Date.parse(evaluatedAt);
+    const gates = [
+      initialGate(environment, "staging", new Date(base - 2).toISOString(), "human_approved"),
+      initialGate(environment, "admission", new Date(base - 1).toISOString(), "human_approved"),
+    ] as const;
+    if (!gates.every((gate) => gate.enabled)) return;
     await repository.materializeHumanApprovedUnit({
       workspaceId: approved.workspaceId,
       unitRef: approved.unitRef,
       evaluatedAt,
-      gates: [
-        initialGate(environment, "staging", new Date(base - 2).toISOString(), "human_approved"),
-        initialGate(environment, "admission", new Date(base - 1).toISOString(), "human_approved"),
-      ],
+      gates,
     });
   };
   const materializeRenameAttempt = async (input: Readonly<{ workspaceId: string; actionExecutionAttemptId: string }>) => {

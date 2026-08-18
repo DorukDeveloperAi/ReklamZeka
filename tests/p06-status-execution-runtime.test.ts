@@ -76,4 +76,22 @@ describe("P06 status execution server runtime", () => {
     expect(opened.enabled).toBe(true);
     expect(opened.materializeRenameAttempt).toBeTypeOf("function");
   });
+
+  it("does not enumerate, materialize, or dispatch after its live kill switch closes", async () => {
+    const environment: Record<string, string> = {
+      META_WRITE_ENABLED: "true", HUMAN_ACTION_EXECUTION_ENABLED: "true",
+      P06_META_STATUS_WRITE_ENABLED: "true", P06_META_WRITE_ACCESS_TOKEN: "write-token",
+      P06_META_WRITE_KILL_SWITCH: "false", P06_META_WRITE_WORKSPACE_ALLOWLIST: "workspace_aaaaaaaaaaaaaaaa",
+      P06_META_WRITE_ACCOUNT_ALLOWLIST: "act_12345", P06_META_WRITE_ACTION_ALLOWLIST: "status_pause",
+    };
+    const execute = vi.fn();
+    const runtime = createP06StatusExecutionRuntime({
+      database: { execute, transaction: vi.fn() } as never,
+      environment,
+    });
+    expect(runtime.enabled).toBe(true);
+    environment.P06_META_WRITE_KILL_SWITCH = "true";
+    await expect(runtime.scheduler!.tick()).resolves.toEqual([]);
+    expect(execute).not.toHaveBeenCalled();
+  });
 });
