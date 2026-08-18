@@ -10,7 +10,7 @@ const migrationHash = createHash("sha256").update(migrationSql).digest("hex");
 const postMode = process.env.P06_LIMITED_AUTONOMY_POST_APPROVED === "true";
 const evidence = { mode: postMode ? "post_applied" : "pre_outer_rollback", migrationHash, installedOuterRollback: false, exactSource: false,
   atomicQuota: false, appendOnly: false, rlsForced: false, publicRevoked: false, indexes: false, constraints: false,
-  unjournaled: false, zeroResidue: false };
+  exactMigrationState: false, zeroResidue: false };
 const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 30_000 });
 const client = await pool.connect();
 try {
@@ -19,7 +19,7 @@ try {
     (select count(*)::int from drizzle.__drizzle_migrations where hash=$1 and created_at=1787011560000) ledger,
     (select count(*)::int from pg_proc where oid=to_regprocedure('public.p06_jsonb_object_key_count(jsonb)')) helper`, [migrationHash]);
   if (before.rows[0]?.objects !== (postMode ? 1 : 0) || before.rows[0]?.ledger !== (postMode ? 1 : 0)) throw new Error("P06 autonomy target exact değil");
-  evidence.unjournaled = true;
+  evidence.exactMigrationState = true;
   await client.query("begin");
   if (!postMode) await client.query(migrationSql);
   evidence.installedOuterRollback = true;
