@@ -14,6 +14,7 @@ import { ApprovalQueuePanel } from "./approval-queue-panel";
 import { PromotionPreflightPanel, PromotionTemplateAuthoringPanel } from "./promotion-preflight-panel";
 import { AutonomyStudioPanel } from "./autonomy-studio-panel";
 import { GuidanceStudioPanel } from "./guidance-studio-panel";
+import { GuideLifecyclePanel } from "./guide-lifecycle-panel";
 import { SliceRuleWorkspacePanel, type SliceRuleSessionSeed } from "./slice-rule-workspace-panel";
 import { OperationalTimelinePanel } from "./operational-timeline-panel";
 import { DeliveryHealthAlertPanel } from "./delivery-health-alert-panel";
@@ -1469,7 +1470,7 @@ export function OperatingDashboard({ initialView = "monitor", initialLocation }:
         <ContextualHelp term="İnsan onayı" explanation="Bir ActionUnit için verilen insan kararıdır; tek başına Meta write değildir." />
       </section>
       {rulesArea !== "guidance" ? <button className={styles.compactReturn} onClick={() => commitDashboardLocation({ ...dashboardLocation, view: "manage", manageArea: "rules", rulesArea: "guidance" })}>Kılavuzlara dön</button> : null}
-      {rulesArea === "guidance" ? <><GuidanceStudioPanel onSessionRequiredChange={setRulesSessionRequired} />
+      {rulesArea === "guidance" ? <><GuideLifecyclePanel onSessionRequiredChange={setRulesSessionRequired} /><GuidanceStudioPanel onSessionRequiredChange={setRulesSessionRequired} />
         {rulesSessionRequired === false ? <><SkillCatalogPanel onSessionRequiredChange={setRulesSessionRequired} /><NormalizationWorkbenchPanel initialCampaignIntentTemplate={draftPolicyTemplate} /></> : null}</>
         : rulesArea === "slices" ? <SliceRuleWorkspacePanel requestedScopeCampaignRef={classificationScopeCampaignRef} selectedRuleRef={selectedRuleRef} selectedRuleRevision={selectedRuleRevision} onOpenCanonicalRule={openCanonicalRule} onApprovalQueueHandoff={(approvalUnitRef) => commitDashboardLocation({ ...normalizeDashboardLocation("approvals"), approvalUnitRef })} onOpenRuleSession={openRuleSession} onOpenCategorySetup={() => openSettings("categories")} onConnect={verifyAndRefreshLocalSession} />
         : rulesArea === "policies" ? <InstructionPolicyStudioPanel />

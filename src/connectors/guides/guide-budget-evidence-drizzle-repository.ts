@@ -162,7 +162,10 @@ export class DrizzleGuideBudgetEvidenceRepository implements GuideBudgetEvidence
         guides: bindings,
       });
       if (effective.hold.state !== "clear") failure("overlap_conflict");
-      const ceilingRows = rows(await tx.execute(sql`select policy_payload from budget_ceiling_policy_revisions where workspace_id=${input.workspaceId}::uuid order by limit_ref,revision limit 10001`));
+      const ceilingRelation = rows(await tx.execute(sql`select to_regclass('public.budget_ceiling_policy_revisions')::text as relation`));
+      const ceilingRows = ceilingRelation.length === 1 && typeof ceilingRelation[0]!.relation === "string"
+        ? rows(await tx.execute(sql`select policy_payload from budget_ceiling_policy_revisions where workspace_id=${input.workspaceId}::uuid order by limit_ref,revision limit 10001`))
+        : [];
       if (ceilingRows.length > 10_000) failure("ceiling_policies");
       let ceilingDecimal: string | null = null;
       try {

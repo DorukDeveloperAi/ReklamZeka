@@ -45,6 +45,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P04-Cb-budget-evidence-persistence | Kabul edildi — `evidence/P04-Cb-budget-evidence-persistence-20260817.md`; action consumer/rollback entegrasyonu açık |
 | + P04-Cc-budget-action-fail-closed-foundation | Kabul edildi — `evidence/P04-Cc-budget-action-fail-closed-foundation-20260817.md`; authoritative ceiling/stage happy-path ve P06 executor açık |
 | + P04-Cd-trusted-context-runtime | Kabul edildi — `evidence/P04-Cd-trusted-context-runtime-20260817.md`; authoritative ceiling ve production happy-path hâlâ açık |
+| + P04-E-guide-lifecycle-product-surface | Uygulandı / bağımsız kritik inceleme adayı — `evidence/P04-E-guide-lifecycle-product-surface-20260818.md`; cookie-only draft/accept/activate/pause UI+API, Meta authority kapalı |
 | + P05-A-guide-run-domain | Kabul edildi / arşivlenebilir |
 | + P05-B-two-agent-boundary | Kabul edildi / arşivlenebilir |
 | + P05-C-guide-run-v1.1-hardening | Kabul edildi — `evidence/P05-C-guide-run-v1.1-hardening-20260817.md`; arşivlenebilir |

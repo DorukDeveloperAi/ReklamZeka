@@ -4,6 +4,7 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { canonicalGuideWorkspaceRef, createGuideRevision } from "@/domain/guides/guide-revision";
 import { DrizzleGuideLifecycleRepository, GuideLifecycleRepositoryError } from "@/connectors/guides/guide-lifecycle-drizzle-repository";
+import { GuideLifecycleService } from "@/application/guide-lifecycle-service";
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const connectionString = process.env.DIRECT_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
 if (!connectionString) throw new Error("postgres_connection_not_configured");
@@ -50,6 +51,10 @@ try {
     const drizzleClient=drizzle(client);
     const savepointDatabase={ transaction: async <T>(fn: (tx: typeof drizzleClient) => Promise<T>) => { await client.query("savepoint guide_repository"); try { const result=await fn(drizzleClient); await client.query("release savepoint guide_repository"); return result; } catch (error) { await client.query("rollback to savepoint guide_repository"); await client.query("release savepoint guide_repository"); throw error; } } };
     const repository=new DrizzleGuideLifecycleRepository(savepointDatabase as never);
+    const service=new GuideLifecycleService({execute:drizzleClient.execute.bind(drizzleClient),transaction:savepointDatabase.transaction} as never,[{workspaceId:ws,userId:owner,role:"owner"}]);
+    const serverDraft=await service.create({actor:{userId:owner},workspaceId:ws,workspaceRef:canonicalGuideWorkspaceRef(ws),readerRef:"reader_guide_verify"},{label:"Sunucu Kılavuzu",sliceRef:"slice_guide_verify",market:"yerli",freeText:"Durum değişiklikleri insan onayından geçsin.",schedule:{frequency:"daily",timezone:"Europe/Istanbul",localTime:"10:00"},mode:"prepare_human_approval",actionAllowlist:["status_pause","status_activate"],budgetRefs:[],rollbackConditions:["Kaynak durum değişirse durdur"]});
+    const serverProjection=await service.list({actor:{userId:owner},workspaceId:ws,workspaceRef:canonicalGuideWorkspaceRef(ws),readerRef:"reader_guide_verify"});
+    const serverOwnedLifecycle=serverProjection.items.some(item=>item.guideId===serverDraft.guideId&&item.activeRevisionId===null&&!item.interpretationAccepted&&item.sliceRef==="slice_guide_verify")&&!serverProjection.authority.canWriteMeta&&!serverProjection.authority.canExecute;
     const first=guide(ws,1,null,"Birinci sürüm.");
     const created=await repository.createDraft({workspaceId:ws,actorId:owner,role:"owner",label:"Kılavuz",guide:first,sliceId:slice,sliceRevisionId:sliceRevision,marketDefinitionId:market,occurredAt:now});
     const reloaded=await repository.loadCanonicalRevision({workspaceId:ws,guideId:created.guideId,revisionId:created.revisionId});
@@ -81,7 +86,7 @@ try {
     const eventCount=Number((await client.query("select count(*)::int n from guide_lifecycle_events where workspace_id=$1",[ws])).rows[0]?.n);
     await client.query("rollback");
     const zeroResidue=Number((await client.query("select count(*)::int n from workspaces where id=$1",[ws])).rows[0]?.n)===0;
-    if (!canonicalReloaded||!analystRejected||!missingAcceptanceRejected||!acceptanceIdempotent||headBefore.current_active_revision_id!==null||!active1.activated||!oldActiveSurvives||!staleRejected||!failedActivationKeepsOld||!reactivated.activated||!reactivationRetry.idempotent||!tamperedReactivationRejected||!crossWorkspaceRejected||!crossMarketRejected||!compositeFkRejected||!revoked||!archived.archived||eventCount<10||!zeroResidue) throw new Error(JSON.stringify({ canonicalReloaded,analystRejected,missingAcceptanceRejected,acceptanceIdempotent,headBefore,active1,oldActiveSurvives,staleRejected,failedActivationKeepsOld,reactivated,reactivationRetry,tamperedReactivationRejected,crossWorkspaceRejected,crossMarketRejected,compositeFkRejected,revoked,archived,eventCount,zeroResidue }));
-    console.log(JSON.stringify({ok:true,outerRollback:true,canonicalReloaded,analystRejected,missingAcceptanceRejected,acceptanceIdempotent,oldActiveSurvives,failedActivationKeepsOld,reactivated:reactivated.activated,reactivationRetry:reactivationRetry.idempotent,tamperedReactivationRejected,crossWorkspaceRejected,crossMarketRejected,compositeFkRejected,revoked,archived:archived.archived,eventCount,zeroResidue}));
+    if (!serverOwnedLifecycle||!canonicalReloaded||!analystRejected||!missingAcceptanceRejected||!acceptanceIdempotent||headBefore.current_active_revision_id!==null||!active1.activated||!oldActiveSurvives||!staleRejected||!failedActivationKeepsOld||!reactivated.activated||!reactivationRetry.idempotent||!tamperedReactivationRejected||!crossWorkspaceRejected||!crossMarketRejected||!compositeFkRejected||!revoked||!archived.archived||eventCount<10||!zeroResidue) throw new Error(JSON.stringify({ serverOwnedLifecycle,canonicalReloaded,analystRejected,missingAcceptanceRejected,acceptanceIdempotent,headBefore,active1,oldActiveSurvives,staleRejected,failedActivationKeepsOld,reactivated,reactivationRetry,tamperedReactivationRejected,crossWorkspaceRejected,crossMarketRejected,compositeFkRejected,revoked,archived,eventCount,zeroResidue }));
+    console.log(JSON.stringify({ok:true,outerRollback:true,serverOwnedLifecycle,canonicalReloaded,analystRejected,missingAcceptanceRejected,acceptanceIdempotent,oldActiveSurvives,failedActivationKeepsOld,reactivated:reactivated.activated,reactivationRetry:reactivationRetry.idempotent,tamperedReactivationRejected,crossWorkspaceRejected,crossMarketRejected,compositeFkRejected,revoked,archived:archived.archived,eventCount,zeroResidue}));
   } finally { client.release(); }
 } finally { await pool.end(); }

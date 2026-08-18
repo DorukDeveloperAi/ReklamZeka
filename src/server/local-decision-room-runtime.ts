@@ -490,6 +490,26 @@ export async function resolveTrustedLocalGuidancePrincipal(input: Readonly<{
   return bindPrincipal(input.database, input.config);
 }
 
+/** Cookie-only canonical Guide lifecycle boundary; it never grants Meta execution authority. */
+export async function resolveTrustedLocalGuideLifecyclePrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+  requiredScope: Extract<LocalSessionScope, "guide_lifecycle:read" | "guide_lifecycle:draft" | "guide_lifecycle:activate">;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config", "requiredScope"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null) {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: input.requiredScope, expected: input.config });
+  const operation = input.requiredScope === "guide_lifecycle:read" ? "read"
+    : input.requiredScope === "guide_lifecycle:draft" ? "draft" : "publish";
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, operation, "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
 /** Cookie-only internal category registry visibility; it grants no mutation authority. */
 export async function resolveTrustedLocalCategoryRegistryPrincipal(input: Readonly<{
   request: Request;
