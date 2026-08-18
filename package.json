@@ -102,6 +102,7 @@
     "verify:p06-budget-execution-binding-db": "tsx scripts/verify-p06-budget-execution-binding-postgres.ts",
     "verify:p06-budget-execution-binding-db:post": "P06_BUDGET_EXECUTION_POST_APPROVED=true tsx scripts/verify-p06-budget-execution-binding-postgres.ts && P06_BUDGET_EXECUTION_POST_APPROVED=true node --conditions react-server --import tsx scripts/verify-p06-budget-execution-behavior-postgres.ts",
     "verify:p06-limited-autonomy-admissions-db": "tsx scripts/verify-p06-limited-autonomy-admissions-postgres.ts",
+    "verify:p06-limited-autonomy-admissions-db:post": "P06_LIMITED_AUTONOMY_POST_APPROVED=true tsx scripts/verify-p06-limited-autonomy-admissions-postgres.ts && P06_LIMITED_AUTONOMY_POST_APPROVED=true node --conditions react-server --env-file=.env.local --import tsx scripts/verify-p06-action-bindings-postgres.ts",
     "verify:p06-budget-execution-binding-db:behavior": "node --conditions react-server --import tsx scripts/verify-p06-budget-execution-behavior-postgres.ts",
     "verify:p06-execution-persistence-db:behavior": "P06_EXECUTION_CHAIN_PRE=true node --conditions react-server --import tsx scripts/verify-p06-action-bindings-postgres.ts",
     "verify:budget-ceiling-policies-db": "tsx scripts/verify-budget-ceiling-policies-postgres.ts",

@@ -35,7 +35,9 @@ const executionPreMode = process.env.P06_EXECUTION_CHAIN_PRE === "true";
 const executionPostMode = process.env.P06_EXECUTION_CHAIN_POST_APPROVED === "true";
 const executionMode = executionPreMode || executionPostMode;
 const limitedAutonomyPreMode = process.env.P06_LIMITED_AUTONOMY_PRE === "true";
+const limitedAutonomyPostMode = process.env.P06_LIMITED_AUTONOMY_POST_APPROVED === "true";
 const limitedAutonomyExecutionPreMode = process.env.P06_LIMITED_AUTONOMY_EXECUTION_PRE === "true";
+const limitedAutonomyMode = limitedAutonomyPreMode || limitedAutonomyPostMode || limitedAutonomyExecutionPreMode;
 const pool = new Pool({
   connectionString: databaseUrl,
   max: postMode ? 4 : 1,
@@ -66,7 +68,7 @@ const closed = {
   canWriteMeta: false,
 } as const;
 const evidence = {
-  mode: postMode ? "post_applied_two_client" : executionPreMode ? "execution_pre_outer_rollback" : executionPostMode ? "execution_post_applied_outer_rollback" : limitedAutonomyExecutionPreMode ? "limited_autonomy_execution_pre_outer_rollback" : limitedAutonomyPreMode ? "limited_autonomy_pre_outer_rollback" : "pre_outer_rollback",
+  mode: postMode ? "post_applied_two_client" : executionPreMode ? "execution_pre_outer_rollback" : executionPostMode ? "execution_post_applied_outer_rollback" : limitedAutonomyExecutionPreMode ? "limited_autonomy_execution_pre_outer_rollback" : limitedAutonomyPostMode ? "limited_autonomy_post_applied_outer_rollback" : limitedAutonomyPreMode ? "limited_autonomy_pre_outer_rollback" : "pre_outer_rollback",
   exactMigrationLedger: !postMode,
   preApplyConcurrencySkipped: !postMode,
   separateClients: false,
@@ -90,18 +92,18 @@ const evidence = {
   zeroResidue: false,
 };
 const limitedAutonomyEvidence = {
-  migrationInstalled: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
-  canonicalSource: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
-  contextAndPolicy: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
-  firstReservation: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
-  exactReplay: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
-  actionPlanBound: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
-  noExecutionAuthority: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
-  nullForgeryRejected: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
-  backdatedAdmissionRejected: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
-  disabledRuleHeld: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
-  tombstonePurge: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
-  zeroResidue: !(limitedAutonomyPreMode || limitedAutonomyExecutionPreMode),
+  migrationInstalled: !limitedAutonomyMode,
+  canonicalSource: !limitedAutonomyMode,
+  contextAndPolicy: !limitedAutonomyMode,
+  firstReservation: !limitedAutonomyMode,
+  exactReplay: !limitedAutonomyMode,
+  actionPlanBound: !limitedAutonomyMode,
+  noExecutionAuthority: !limitedAutonomyMode,
+  nullForgeryRejected: !limitedAutonomyMode,
+  backdatedAdmissionRejected: !limitedAutonomyMode,
+  disabledRuleHeld: !limitedAutonomyMode,
+  tombstonePurge: !limitedAutonomyMode,
+  zeroResidue: !limitedAutonomyMode,
 };
 const limitedExecutionEvidence = {
   migrationInstalled: !limitedAutonomyExecutionPreMode,
@@ -180,7 +182,7 @@ try {
       const requesterMigration = readFileSync("drizzle/20260818000100_p06_agent_action_requester.sql", "utf8");
       const bindingHash = createHash("sha256").update(bindingMigration).digest("hex");
       const requesterHash = createHash("sha256").update(requesterMigration).digest("hex");
-      if (postMode || executionMode || limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
+      if (postMode || executionMode || limitedAutonomyMode) {
         const ledger = await client.query<{
           binding_count: number;
           requester_count: number;
@@ -200,6 +202,7 @@ try {
         await client.query(readFileSync("drizzle/20260818000600_p06_limited_autonomy_admissions.sql", "utf8"));
         limitedAutonomyEvidence.migrationInstalled = true;
       }
+      if (limitedAutonomyPostMode) limitedAutonomyEvidence.migrationInstalled = true;
       if (limitedAutonomyExecutionPreMode) {
         await client.query(readFileSync("drizzle/20260818000700_p06_limited_autonomy_execution.sql", "utf8"));
         limitedAutonomyEvidence.migrationInstalled = true;
@@ -259,7 +262,7 @@ try {
           timezone: "Europe/Istanbul",
           localTime: "09:00",
         },
-        mode: limitedAutonomyPreMode || limitedAutonomyExecutionPreMode ? "limited_autonomy" : "prepare_human_approval",
+        mode: limitedAutonomyMode ? "limited_autonomy" : "prepare_human_approval",
         actionAllowlist: ["status_pause"],
       });
       const guideRef = guide.guideRef,
@@ -275,7 +278,7 @@ try {
       await client.query("update slices set current_published_revision_id=$1 where id=$2", [sliceRevisionId, sliceId]);
       await client.query("insert into guides(id,workspace_id,guide_ref,label,slice_id,market_definition_id,created_by_actor_id) values($1,$2,$3,'P06',$4,$5,$6)", [guideId, workspaceId, guideRef, sliceId, marketId, actorId]);
       await client.query("insert into guide_revisions(id,workspace_id,guide_id,guide_ref,revision_number,revision_hash,previous_revision_hash,slice_revision_id,slice_ref,market_definition_id,market_key,free_text,strict_payload,schedule_payload,mode,interpretation_hash,created_by_actor_id) values($1,$2,$3,$4,1,$5,null,$6,$7,$8,'yerli',$9,$10::jsonb,$11::jsonb,$12,$13,$14)", [revisionId, workspaceId, guideId, guideRef, revisionHash, sliceRevisionId, guide.sliceRef, marketId, guide.freeText, JSON.stringify(guide.strict), JSON.stringify(guide.schedule), guide.mode, guide.interpretationHash, actorId]);
-      await client.query("insert into guide_revision_actions(workspace_id,guide_revision_id,action,authority) values($1,$2,'status_pause',$3)", [workspaceId, revisionId, limitedAutonomyPreMode || limitedAutonomyExecutionPreMode ? "limited_autonomy" : "human_approval"]);
+      await client.query("insert into guide_revision_actions(workspace_id,guide_revision_id,action,authority) values($1,$2,'status_pause',$3)", [workspaceId, revisionId, limitedAutonomyMode ? "limited_autonomy" : "human_approval"]);
       await client.query("insert into guide_heads(workspace_id,guide_id,latest_revision_id,current_active_revision_id,version,updated_at) values($1,$2,$3,$3,1,now())", [workspaceId, guideId, revisionId]);
       await client.query("set local session_replication_role=origin");
       const db = drizzle(client, { schema });
@@ -521,7 +524,7 @@ try {
         });
       }
       let limitedActionRulePublished: ReturnType<typeof publishAutonomyRule> | null = null;
-      if (limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
+      if (limitedAutonomyMode) {
         const ruleEffectiveFrom = new Date(Date.now() - 3_600_000).toISOString();
         const rulePublishedAt = new Date(Date.parse(ruleEffectiveFrom) + 1_000).toISOString();
         const autonomyRegistry = new DrizzleAutonomyRuleRegistryRepository(outerDb, workspaceId, workspaceRef);
@@ -652,7 +655,7 @@ try {
             ...stageable,
           }),
           action: statusCandidate.action,
-          routing: limitedAutonomyPreMode || limitedAutonomyExecutionPreMode ? "limited_autonomy_review" as const : "human_approval" as const,
+          routing: limitedAutonomyMode ? "limited_autonomy_review" as const : "human_approval" as const,
           stageable,
         };
         const payload = {
@@ -697,7 +700,7 @@ try {
       const first = await makeCompleted("request_p06_first", "11111111-1111-4111-8111-111111111111");
       mark("completed_run_and_disposition_artifact_persisted");
       evidence.completedRun = first.state === "completed";
-      if (limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
+      if (limitedAutonomyMode) {
         let limitedExecutionForKill: Awaited<ReturnType<DrizzleP06ExecutionRepository["createLimitedAutonomyStatus"]>> | null = null;
         limitedAutonomyEvidence.canonicalSource = first.state === "completed" && guide.mode === "limited_autonomy";
         const authorityBefore = rows(await db.execute(sql`select
@@ -1479,15 +1482,19 @@ try {
     client.release();
   }
   const residue = await pool.query<{ n: string }>("select count(*)::text n from pg_class where oid=to_regclass('public.guide_run_action_bindings')");
-  evidence.zeroResidue = residue.rows[0]?.n === (postMode || executionMode || limitedAutonomyPreMode || limitedAutonomyExecutionPreMode ? "1" : "0");
-  if (limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
+  evidence.zeroResidue = residue.rows[0]?.n === (postMode || executionMode || limitedAutonomyMode ? "1" : "0");
+  if (limitedAutonomyMode) {
     const limitedResidue = await pool.query<{ objects: number; rows: number; ledger: number }>(`select
       (select count(*)::int from pg_class where oid=to_regclass('public.p06_limited_autonomy_admissions')) objects,
       0::int rows,
       (select count(*)::int from drizzle.__drizzle_migrations where hash=$1) ledger`, [
       createHash("sha256").update(readFileSync("drizzle/20260818000600_p06_limited_autonomy_admissions.sql", "utf8")).digest("hex"),
     ]);
-    limitedAutonomyEvidence.zeroResidue = limitedResidue.rows[0]?.objects === 0 && limitedResidue.rows[0]?.ledger === 0;
+    limitedAutonomyEvidence.zeroResidue = limitedAutonomyPostMode
+      ? limitedResidue.rows[0]?.objects === 1 && limitedResidue.rows[0]?.ledger === 1
+      : limitedAutonomyExecutionPreMode
+        ? limitedResidue.rows[0]?.objects === 1 && limitedResidue.rows[0]?.ledger === 1
+        : limitedResidue.rows[0]?.objects === 0 && limitedResidue.rows[0]?.ledger === 0;
     if (limitedAutonomyExecutionPreMode) {
       const executionResidue = await pool.query<{ objects: number; ledger: number }>(`select
         (select count(*)::int from information_schema.columns where table_schema='public' and table_name='p06_execution_runs' and column_name='limited_autonomy_admission_id') objects,

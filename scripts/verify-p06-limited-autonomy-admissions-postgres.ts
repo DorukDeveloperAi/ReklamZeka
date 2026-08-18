@@ -7,7 +7,8 @@ const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) throw new Error("DATABASE_URL yapılandırılmadı");
 const migrationSql = readFileSync("drizzle/20260818000600_p06_limited_autonomy_admissions.sql", "utf8");
 const migrationHash = createHash("sha256").update(migrationSql).digest("hex");
-const evidence = { mode: "pre_outer_rollback", migrationHash, installedOuterRollback: false, exactSource: false,
+const postMode = process.env.P06_LIMITED_AUTONOMY_POST_APPROVED === "true";
+const evidence = { mode: postMode ? "post_applied" : "pre_outer_rollback", migrationHash, installedOuterRollback: false, exactSource: false,
   atomicQuota: false, appendOnly: false, rlsForced: false, publicRevoked: false, indexes: false, constraints: false,
   unjournaled: false, zeroResidue: false };
 const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 30_000 });
@@ -15,12 +16,12 @@ const client = await pool.connect();
 try {
   const before = await client.query<{ objects: number; ledger: number; helper: number }>(`select
     (select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname='p06_limited_autonomy_admissions') objects,
-    (select count(*)::int from drizzle.__drizzle_migrations where hash=$1) ledger,
+    (select count(*)::int from drizzle.__drizzle_migrations where hash=$1 and created_at=1787011560000) ledger,
     (select count(*)::int from pg_proc where oid=to_regprocedure('public.p06_jsonb_object_key_count(jsonb)')) helper`, [migrationHash]);
-  if (before.rows[0]?.objects !== 0 || before.rows[0]?.ledger !== 0) throw new Error("P06 autonomy PRE target fresh değil");
+  if (before.rows[0]?.objects !== (postMode ? 1 : 0) || before.rows[0]?.ledger !== (postMode ? 1 : 0)) throw new Error("P06 autonomy target exact değil");
   evidence.unjournaled = true;
   await client.query("begin");
-  await client.query(migrationSql);
+  if (!postMode) await client.query(migrationSql);
   evidence.installedOuterRollback = true;
   const catalog = await client.query<{ rls: boolean; grants: number; indexes: number; constraints: number; trigger_count: number; guard: string }>(`select
     (select relrowsecurity and relforcerowsecurity from pg_class where oid='public.p06_limited_autonomy_admissions'::regclass) rls,
@@ -44,7 +45,10 @@ try {
     (select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname='p06_limited_autonomy_admissions') objects,
     (select count(*)::int from pg_proc where oid=to_regprocedure('public.p06_limited_autonomy_admission_guard()')) guard,
     (select count(*)::int from pg_proc where oid=to_regprocedure('public.p06_jsonb_object_key_count(jsonb)')) helper`);
-  evidence.zeroResidue = residue.rows[0]?.objects === 0 && residue.rows[0]?.guard === 0 && residue.rows[0]?.helper === before.rows[0]?.helper;
+  evidence.zeroResidue = postMode
+    ? residue.rows[0]?.objects === 1 && residue.rows[0]?.guard === 1 && residue.rows[0]?.helper === before.rows[0]?.helper
+      && (await client.query<{rows:number}>("select count(*)::int rows from p06_limited_autonomy_admissions")).rows[0]?.rows===0
+    : residue.rows[0]?.objects === 0 && residue.rows[0]?.guard === 0 && residue.rows[0]?.helper === before.rows[0]?.helper;
   if (!evidence.zeroResidue) throw new Error("P06 autonomy PRE residue bıraktı");
   console.log(JSON.stringify(evidence));
 } catch (error) {
