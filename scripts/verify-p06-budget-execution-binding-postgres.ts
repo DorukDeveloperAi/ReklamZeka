@@ -41,7 +41,18 @@ try {
     exists(select 1 from pg_constraint where conrelid='public.p06_execution_runs'::regclass and conname='p06_execution_runs_attempt_fk' and contype='f' and convalidated) attempt_fk,
     exists(select 1 from pg_constraint where conrelid='public.p06_execution_runs'::regclass and conname='p06_execution_runs_workspace_attempt_unique' and contype='u' and convalidated) attempt_unique,
     exists(select 1 from pg_indexes where schemaname='public' and indexname='p06_execution_runs_attempt_fk_idx') attempt_index,
-    exists(select 1 from pg_proc where oid='public.p06_execution_run_insert_guard()'::regprocedure and pg_get_functiondef(oid) like '%guide_budget_human_approved%' and pg_get_functiondef(oid) like '%action_execution_attempts%') guard,
+    exists(
+      select 1 from pg_trigger trigger join pg_proc guard on guard.oid=trigger.tgfoid
+      where trigger.tgrelid='public.p06_execution_runs'::regclass
+        and not trigger.tgisinternal
+        -- 20260818001100 split the insert boundary by route. The original
+        -- budget/status guard was renamed deliberately; accept that exact
+        -- forward-compatible attachment, never an arbitrary routine.
+        and trigger.tgname='p06_execution_runs_existing_exact_insert'
+        and guard.proname in ('p06_execution_run_insert_guard','p06_execution_run_insert_guard_existing')
+        and pg_get_functiondef(guard.oid) like '%guide_budget_human_approved%'
+        and pg_get_functiondef(guard.oid) like '%action_execution_attempts%'
+    ) guard,
     exists(select 1 from pg_class where oid='public.p06_execution_runs'::regclass and relrowsecurity and relforcerowsecurity) rls,
     (select count(*)::int from information_schema.role_table_grants where table_schema='public' and table_name='p06_execution_runs' and grantee in ('PUBLIC','anon','authenticated','service_role')) grants`);
   const k = catalog.rows[0];
