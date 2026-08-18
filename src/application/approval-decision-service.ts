@@ -142,6 +142,12 @@ export class ApprovalDecisionService {
     private readonly humanPresence: HumanPresenceAuthorizationPort,
     private readonly clock: () => string = () => new Date().toISOString(),
     private readonly createRef: (prefix: "decision" | "grant") => string = (prefix) => `${prefix}_${randomBytes(16).toString("hex")}`,
+    private readonly onCommitted?: (input: Readonly<{
+      workspaceId: string;
+      unitRef: string;
+      kind: ApprovalDecisionKind;
+      decidedAt: string;
+    }>) => Promise<void>,
   ) {}
 
   async decide(input: Readonly<{
@@ -228,6 +234,19 @@ export class ApprovalDecisionService {
     }
     if (!["inserted", "unchanged"].includes(committed.outcome)
       || committed.executionAuthority !== "none" || committed.executionPerformed !== false) fail("conflict");
-    return publicResult(committed.lifecycle, input.unitRef);
+    const result = publicResult(committed.lifecycle, input.unitRef);
+    if (this.onCommitted) {
+      try {
+        await this.onCommitted({
+          workspaceId: input.principal.workspaceId,
+          unitRef: input.unitRef,
+          kind: input.kind,
+          decidedAt: result.decision.decidedAt,
+        });
+      } catch {
+        fail("source_unavailable");
+      }
+    }
+    return result;
   }
 }

@@ -17,7 +17,8 @@ describe("Guide budget trusted context SQL", () => {
   it("keeps aliases out of action refs and binds health report identity into the runtime", () => {
     expect(source).toContain("a.external_account_id account_external_ref");
     expect(source).toContain("dataHealthReportHash: health.report.reportHash");
-    expect(source).toContain('if (owner.budgetOwnerKind === "campaign") fail("protection_unavailable")');
+    expect(source).toContain("new DrizzleCampaignAffectedGeoEvidenceAdapter");
+    expect(source).toContain('input.dryRun.effectiveParentCeilingDecimal === null');
     expect(source).toContain('fail("parent_ceiling_unavailable")');
   });
 

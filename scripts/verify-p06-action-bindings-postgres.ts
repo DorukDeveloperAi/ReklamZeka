@@ -12,6 +12,7 @@ import { DrizzleOperationReadRepository } from "@/connectors/operations/operatio
 import { DrizzleWorkspaceTombstonePurgePort } from "@/connectors/meta/workspace-tombstone-purge-drizzle-adapter";
 import { DrizzleActionApprovalDecisionRepository } from "@/connectors/actions/action-approval-decision-drizzle-repository";
 import { DrizzleP06ExecutionRepository } from "@/connectors/actions/p06-execution-drizzle-repository";
+import { DrizzleP06StatusExecutionDispatchAuthorityRepository } from "@/connectors/actions/p06-status-execution-dispatch-authority-drizzle-repository";
 import * as schema from "@/db/schema";
 import { appendGuideRunTransitionV12, createGuideRunV12, type GuideRunV12 } from "@/domain/guides/guide-run";
 import { canonicalGuideWorkspaceRef, createGuideRevision } from "@/domain/guides/guide-revision";
@@ -83,6 +84,7 @@ const executionEvidence = {
   migrationInstalled: !executionPreMode,
   approvedGrantBound: !executionPreMode,
   identityCreated: !executionPreMode,
+  pendingScheduled: !executionPreMode,
   claimed: !executionPreMode,
   phasedGates: !executionPreMode,
   tenStepTrace: !executionPreMode,
@@ -97,6 +99,9 @@ const executionEvidence = {
   staleFenceRejected: !executionPreMode,
   forgedEventRejected: !executionPreMode,
   leaseEpochRecheck: !executionPreMode,
+  currentDispatchAuthority: !executionPreMode,
+  expiredGrantHeld: !executionPreMode,
+  supersededGuideHeld: !executionPreMode,
 };
 const mark = (stage: string) => console.log(JSON.stringify({ p06PreStage: stage }));
 function transition(run: GuideRunV12, toState: Parameters<typeof appendGuideRunTransitionV12>[1]["toState"], occurredAt: string, token: string): GuideRunV12 {
@@ -648,6 +653,7 @@ try {
         if (!approval || typeof approval.decision_id !== "string" || typeof approval.grant_id !== "string") throw new Error("execution approval missing");
         executionEvidence.approvedGrantBound = decided.lifecycle.units[0]?.state === "approved";
         const execution = new DrizzleP06ExecutionRepository(outerDb);
+        const dispatchAuthority = new DrizzleP06StatusExecutionDispatchAuthorityRepository(outerDb, contexts);
         const gate = (phase: "staging" | "admission" | "post_claim" | "pre_dispatch" | "read_after_write", seconds: number) => ({
           phase,
           enabled: true,
@@ -655,15 +661,29 @@ try {
           capturedAt: iso(seconds),
           expiresAt: iso(600),
         });
-        const identity = await execution.createHumanApproved({
+        const identity = await execution.materializeHumanApprovedUnit({
           workspaceId,
-          guideRunActionBindingId: saved.bindingId,
-          decisionEventId: approval.decision_id,
-          approvalGrantId: approval.grant_id,
+          unitRef: unit.action_unit_ref,
           evaluatedAt: iso(2),
           gates: [gate("staging", 0), gate("admission", 1)],
         });
         executionEvidence.identityCreated = /^p06_execution_/.test(identity.executionRef);
+        executionEvidence.pendingScheduled = (await execution.listRunnable(10)).includes(identity.executionRef);
+        executionEvidence.currentDispatchAuthority = (await dispatchAuthority.revalidate({
+          phase: "pre_dispatch",
+          executionRef: identity.executionRef,
+          request: identity.request,
+        })).allowed;
+        await client.query("savepoint p06_expired_grant_authority");
+        await client.query("set local session_replication_role=replica");
+        await client.query("update action_approval_evidence_grants set approved_at=date_trunc('milliseconds',statement_timestamp()-interval '2 seconds'),expires_at=date_trunc('milliseconds',statement_timestamp()-interval '1 second'),grant_payload=jsonb_set(jsonb_set(grant_payload,'{approvedAt}',to_jsonb(to_char((statement_timestamp()-interval '2 seconds') at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'))),'{expiresAt}',to_jsonb(to_char((statement_timestamp()-interval '1 second') at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'))) where id=$1::uuid", [approval.grant_id]);
+        await client.query("set local session_replication_role=origin");
+        executionEvidence.expiredGrantHeld = !(await dispatchAuthority.revalidate({
+          phase: "pre_dispatch",
+          executionRef: identity.executionRef,
+          request: identity.request,
+        })).allowed;
+        await client.query("rollback to savepoint p06_expired_grant_authority");
         executionEvidence.immutableRunRejected = await rejected(client, () => client.query("update p06_execution_runs set request_hash=$1 where id=$2::uuid", ["0".repeat(64), identity.executionRunId]));
         executionEvidence.crossTenantHeadRejected = await rejected(client, () => client.query("insert into p06_execution_heads(workspace_id,execution_run_id,state,sequence,trace_sequence) values($1::uuid,$2::uuid,'pending',0,0)", [foreignWorkspaceId, identity.executionRunId]));
         const claim = await execution.claimLease({
@@ -871,11 +891,9 @@ try {
         });
         const failedApproval = rows(await db.execute(sql`select d.id::text decision_id,g.id::text grant_id from action_approval_decision_events d join action_approval_evidence_grants g on g.workspace_id=d.workspace_id and g.decision_event_id=d.id where d.workspace_id=${workspaceId}::uuid and d.unit_id=${failedUnit.unit_id}::uuid and d.command_kind='approve'`))[0];
         if (!failedApproval || typeof failedApproval.decision_id !== "string" || typeof failedApproval.grant_id !== "string") throw new Error("failed execution approval missing");
-        const failedIdentity = await execution.createHumanApproved({
+        const failedIdentity = await execution.materializeHumanApprovedUnit({
           workspaceId,
-          guideRunActionBindingId: failedBinding.bindingId,
-          decisionEventId: failedApproval.decision_id,
-          approvalGrantId: failedApproval.grant_id,
+          unitRef: failedUnit.action_unit_ref,
           evaluatedAt: iso(20),
           gates: [gate("staging", 18), gate("admission", 19)],
         });
@@ -1072,6 +1090,16 @@ try {
         executionEvidence.rollbackPersisted = failedPersisted?.rollbacks === 1 && /^p06_rollback_/.test(rollbackSaved.proposalRef);
         executionEvidence.rollbackReplay = rollbackSaved.rollbackProposalId === rollbackReplay.rollbackProposalId;
         executionEvidence.leaseEpochRecheck = failedPersisted?.lease_epoch === 2 && failedPersisted?.epoch_two_gates === 3;
+        await client.query("savepoint p06_superseded_execution_authority");
+        await client.query("set local session_replication_role=replica");
+        await client.query("update guide_heads set current_active_revision_id=null where workspace_id=$1::uuid and guide_id=$2::uuid", [workspaceId, guideId]);
+        await client.query("set local session_replication_role=origin");
+        executionEvidence.supersededGuideHeld = !(await dispatchAuthority.revalidate({
+          phase: "post_claim",
+          executionRef: failedIdentity.executionRef,
+          request: failedIdentity.request,
+        })).allowed;
+        await client.query("rollback to savepoint p06_superseded_execution_authority");
       }
       mark("materializer_and_replay_verified");
       const negativeRun = executionPreMode ? await makeCompleted("request_p06_negative", "33333333-3333-4333-8333-333333333333") : second;

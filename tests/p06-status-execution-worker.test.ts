@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   P06StatusExecutionWorker,
+  type P06StatusExecutionDispatchAuthority,
   type P06StatusExecutionGate,
 } from "@/application/p06-status-execution-worker";
 import type { P06ExecutionWorkerSnapshot } from "@/connectors/actions/p06-execution-drizzle-repository";
@@ -84,7 +85,15 @@ const persistedGate = (phase: "staging" | "admission") => {
   });
 };
 
-function harness(writer: P06ExecutionV2Writer) {
+function harness(
+  writer: P06ExecutionV2Writer,
+  authority: P06StatusExecutionDispatchAuthority = {
+    revalidate: vi.fn(async ({ phase }) => ({
+      allowed: true,
+      authorityHash: p06ExecutionV2Digest({ phase, allowed: true }),
+    })),
+  },
+) {
   const mutable: {
     state: P06ExecutionWorkerSnapshot["head"]["state"];
     sequence: number;
@@ -293,6 +302,7 @@ function harness(writer: P06ExecutionV2Writer) {
   const worker = new P06StatusExecutionWorker({
     repository: repository as never,
     writer,
+    authority,
     gates: { resolve: vi.fn(async ({ phase }) => gate(phase)) },
     now: () =>
       new Date(`2026-08-18T10:00:${String(tick++).padStart(2, "0")}.000Z`),
@@ -397,5 +407,34 @@ describe("P06StatusExecutionWorker", () => {
         .sort(),
     ).toEqual(["post_claim", "pre_dispatch", "read_after_write"]);
     expect(writes).toBe(1);
+  });
+
+  it("holds before any Meta call when current dispatch authority has expired", async () => {
+    const writer: P06ExecutionV2Writer = {
+      read: vi.fn(),
+      write: vi.fn(),
+    };
+    const authority: P06StatusExecutionDispatchAuthority = {
+      revalidate: vi.fn(async ({ phase }) => ({
+        allowed: phase !== "post_claim",
+        authorityHash: p06ExecutionV2Digest({
+          phase,
+          allowed: phase !== "post_claim",
+        }),
+      })),
+    };
+    const { worker, mutable } = harness(writer, authority);
+
+    const result = await worker.run({
+      executionRef,
+      leaseTokenHash: "c".repeat(64),
+      fenceHash: "d".repeat(64),
+      leaseUntil: "2026-08-18T11:00:00.000Z",
+    });
+
+    expect(result.state).toBe("held");
+    expect(writer.read).not.toHaveBeenCalled();
+    expect(writer.write).not.toHaveBeenCalled();
+    expect(mutable.traces).toHaveLength(10);
   });
 });

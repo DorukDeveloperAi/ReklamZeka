@@ -21,6 +21,9 @@ const policyContract = new Set([
   "candidate_preview_binding_revisions.payload",
   "decision_cadence_profile_revisions.profile_payload",
   "progressive_formalization_revisions.revision_payload",
+  // Human-published ceiling constraints are a closed policy contract. They
+  // carry no execution authority but must remain visible to policy impact.
+  "budget_ceiling_policy_revisions.policy_payload",
 ]);
 const policyProjection = new Set(["effective_campaign_contexts.context_payload"]);
 const opaquePolicyContext = new Set([

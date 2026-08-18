@@ -36,7 +36,7 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "development_log_heads", "development_log_events", "finding_heads", "finding_lifecycle_events",
   // P04 canonical Kılavuz immutable children, then P03 slice evidence.
   "guide_activation_outbox", "guide_lifecycle_events", "guide_interpretation_acceptances",
-  "guide_revision_actions", "guide_revision_budget_refs", "guide_budget_contracts", "guide_heads", "guide_revisions", "guides",
+  "budget_ceiling_policy_revisions", "guide_revision_actions", "guide_revision_budget_refs", "guide_budget_contracts", "guide_heads", "guide_revisions", "guides",
   "slice_resolution_snapshot_members", "slice_resolution_snapshots", "slice_revision_predicate_values",
   "slice_revision_overrides", "slice_revision_predicates", "slice_revisions", "slices",
   "orchestrator_conversation_messages",
@@ -235,6 +235,7 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'guide_run_heads', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_run_heads where workspace_id = ${workspaceId}::uuid
       union all select 'guide_run_events', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_run_events where workspace_id = ${workspaceId}::uuid
       union all select 'guide_runs', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_runs where workspace_id = ${workspaceId}::uuid
+      union all select 'budget_ceiling_policy_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from budget_ceiling_policy_revisions where workspace_id = ${workspaceId}::uuid
       union all
       select 'primary_result_binding_heads' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from primary_result_binding_heads where workspace_id = ${workspaceId}::uuid
       union all select 'primary_result_binding_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from primary_result_binding_revisions where workspace_id = ${workspaceId}::uuid
@@ -701,6 +702,7 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from guide_run_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guide_run_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guide_runs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from budget_ceiling_policy_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_preparation_gate_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from candidate_preview_binding_invalidations where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from candidate_preview_binding_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

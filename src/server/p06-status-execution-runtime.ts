@@ -6,7 +6,11 @@ import {
   P06StatusExecutionWorker,
   type P06StatusExecutionGateResolver,
 } from "@/application/p06-status-execution-worker";
+import { P06StatusExecutionSchedulerWorker } from "@/application/p06-status-execution-scheduler-worker";
 import { DrizzleP06ExecutionRepository } from "@/connectors/actions/p06-execution-drizzle-repository";
+import { DrizzleP06StatusExecutionDispatchAuthorityRepository } from "@/connectors/actions/p06-status-execution-dispatch-authority-drizzle-repository";
+import { DrizzleGuideRunCandidateStagingContextRepository } from "@/connectors/guides/guide-run-candidate-staging-context-drizzle-repository";
+import { DrizzleGuideRunEffectiveOverlapRepository } from "@/connectors/guides/guide-run-effective-overlap-drizzle";
 import { P06MetaStatusWriter } from "@/connectors/meta/p06-meta-status-writer";
 import * as schema from "@/db/schema";
 import {
@@ -91,6 +95,41 @@ function gateResolver(
   });
 }
 
+function initialGate(
+  environment: Environment,
+  phase: "staging" | "admission",
+  capturedAt: string,
+) {
+  const workspaceAllowlist = list(
+    environment.P06_META_WRITE_WORKSPACE_ALLOWLIST,
+    100,
+  );
+  const accountAllowlist = list(
+    environment.P06_META_WRITE_ACCOUNT_ALLOWLIST,
+    1_000,
+  );
+  const actionAllowlist = actions(environment.P06_META_WRITE_ACTION_ALLOWLIST);
+  const killSwitch = environment.P06_META_WRITE_KILL_SWITCH !== "false";
+  const enabled =
+    environment.P06_META_STATUS_WRITE_ENABLED === "true" &&
+    workspaceAllowlist.length > 0 &&
+    accountAllowlist.length > 0 &&
+    actionAllowlist.length > 0 &&
+    !killSwitch;
+  return Object.freeze({
+    phase,
+    enabled,
+    allowlistHash: p06ExecutionV2Digest({
+      workspaceAllowlist,
+      accountAllowlist,
+      actionAllowlist,
+      killSwitch,
+    }),
+    capturedAt,
+    expiresAt: new Date(Date.parse(capturedAt) + 60_000).toISOString(),
+  });
+}
+
 /**
  * Server-only and default-off. It deliberately refuses the generic read token:
  * controlled status writes require a separately provisioned credential plus
@@ -110,12 +149,54 @@ export function createP06StatusExecutionRuntime(
   const configured =
     environment.P06_META_STATUS_WRITE_ENABLED === "true" && token.length > 0;
   if (!configured)
-    return Object.freeze({ enabled: false as const, worker: null });
+    return Object.freeze({
+      enabled: false as const,
+      worker: null,
+      scheduler: null,
+      materializeApproved: null,
+    });
   const repository = new DrizzleP06ExecutionRepository(input.database);
+  const contexts = new DrizzleGuideRunCandidateStagingContextRepository(
+    input.database,
+    new DrizzleGuideRunEffectiveOverlapRepository(input.database),
+  );
   const worker = new P06StatusExecutionWorker({
     repository,
+    authority: new DrizzleP06StatusExecutionDispatchAuthorityRepository(
+      input.database,
+      contexts,
+    ),
     gates: gateResolver(environment, now),
     writer: new P06MetaStatusWriter(token, fetch, { now }),
   });
-  return Object.freeze({ enabled: true as const, worker });
+  const scheduler = new P06StatusExecutionSchedulerWorker({
+    repository,
+    worker,
+    now,
+  });
+  const materializeApproved = async (approved: Readonly<{
+    workspaceId: string;
+    unitRef: string;
+    kind: "approve" | "reject" | "defer" | "request_changes";
+    decidedAt: string;
+  }>) => {
+    if (approved.kind !== "approve") return;
+    const evaluatedAt = now().toISOString();
+    const base = Date.parse(evaluatedAt);
+    await repository.materializeHumanApprovedUnit({
+      workspaceId: approved.workspaceId,
+      unitRef: approved.unitRef,
+      evaluatedAt,
+      gates: [
+        initialGate(environment, "staging", new Date(base - 2).toISOString()),
+        initialGate(environment, "admission", new Date(base - 1).toISOString()),
+      ],
+    });
+  };
+  return Object.freeze({
+    enabled: true as const,
+    worker,
+    scheduler,
+    materializeApproved,
+  });
 }

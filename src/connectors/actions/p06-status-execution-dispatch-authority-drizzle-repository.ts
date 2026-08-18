@@ -1,0 +1,206 @@
+import "server-only";
+
+import { sql } from "drizzle-orm";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+
+import type { P06StatusExecutionDispatchAuthority } from "@/application/p06-status-execution-worker";
+import type { DrizzleGuideRunCandidateStagingContextRepository } from "@/connectors/guides/guide-run-candidate-staging-context-drizzle-repository";
+import * as schema from "@/db/schema";
+import { p06ExecutionV2Digest } from "@/domain/actions/p06-execution-v2";
+
+type Database = NodePgDatabase<typeof schema>;
+const EXECUTION = /^p06_execution_[a-f0-9]{24}$/;
+
+/**
+ * Current dispatch authority is deliberately separate from immutable approval
+ * evidence. Every check uses PostgreSQL's transaction timestamp, and failure
+ * is a normal closed hold rather than permission to reuse stale evidence.
+ */
+export class DrizzleP06StatusExecutionDispatchAuthorityRepository
+  implements P06StatusExecutionDispatchAuthority
+{
+  constructor(
+    private readonly database: Pick<Database, "transaction">,
+    private readonly contexts: Pick<
+      DrizzleGuideRunCandidateStagingContextRepository,
+      "loadInTransaction"
+    >,
+  ) {}
+
+  async revalidate(
+    input: Parameters<P06StatusExecutionDispatchAuthority["revalidate"]>[0],
+  ) {
+    if (
+      !EXECUTION.test(input.executionRef) ||
+      (input.phase !== "post_claim" && input.phase !== "pre_dispatch")
+    ) {
+      return Object.freeze({
+        allowed: false,
+        authorityHash: p06ExecutionV2Digest({
+          version: "p06-dispatch-authority/1.0.0",
+          phase: input.phase,
+          executionRef: input.executionRef,
+          allowed: false,
+          reason: "invalid_identity",
+        }),
+      });
+    }
+    return this.database.transaction(async (tx) => {
+      const result = await tx.execute(sql`
+        select
+          to_char(statement_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') authorized_at,
+          r.request_hash,
+          r.workspace_id::text workspace_id,
+          r.context_hash,
+          r.effective_guide_set_hash,
+          r.resolution_hash,
+          r.policy_hash,
+          b.guide_revision_id::text guide_revision_id,
+          b.slice_ref,
+          b.market_key,
+          u.unit_hash,
+          u.action_hash,
+          g.grant_hash,
+          c.context_hash current_context_hash,
+          connection.lifecycle_generation connection_generation
+        from p06_execution_runs r
+        join workspaces w on w.id=r.workspace_id
+          and w.lifecycle_state='active' and w.tombstoned_at is null
+        join guide_run_action_bindings b on b.workspace_id=r.workspace_id
+          and b.id=r.guide_run_action_binding_id
+        join guide_runs guide_run on guide_run.workspace_id=b.workspace_id
+          and guide_run.id=b.run_id and guide_run.guide_revision_id=b.guide_revision_id
+        join guides guide on guide.workspace_id=guide_run.workspace_id
+          and guide.id=guide_run.guide_id and guide.tombstoned_at is null
+        join guide_heads guide_head on guide_head.workspace_id=guide.workspace_id
+          and guide_head.guide_id=guide.id
+          and guide_head.current_active_revision_id=b.guide_revision_id
+        join action_proposal_units u on u.workspace_id=r.workspace_id
+          and u.id=r.action_unit_id and u.id=b.action_unit_id
+          and u.unit_hash=r.action_unit_hash and u.expires_at>statement_timestamp()
+          and u.account_ref=r.request_payload->>'accountRef'
+          and u.entity_ref=r.request_payload->>'entityRef'
+          and u.action_type=r.request_payload->>'action'
+        join action_proposal_bundles bundle on bundle.workspace_id=r.workspace_id
+          and bundle.id=r.proposal_bundle_id and bundle.id=b.proposal_bundle_id
+          and bundle.bundle_hash=r.proposal_hash
+        join action_approval_decision_events decision on decision.workspace_id=r.workspace_id
+          and decision.id=r.decision_event_id and decision.bundle_id=bundle.id
+          and decision.unit_id=u.id and decision.command_kind='approve'
+          and decision.unit_hash=u.unit_hash
+        join action_approval_evidence_grants g on g.workspace_id=r.workspace_id
+          and g.id=r.approval_grant_id and g.decision_event_id=decision.id
+          and g.bundle_id=bundle.id and g.unit_id=u.id
+          and g.unit_hash=u.unit_hash and g.approved_at<=statement_timestamp()
+          and g.expires_at>statement_timestamp()
+          and g.capability='approval_evidence_only' and g.can_execute=false
+        join action_approval_policy_snapshots policy on policy.workspace_id=r.workspace_id
+          and policy.id=bundle.policy_snapshot_id and policy.policy_hash=r.policy_hash
+        join approval_policy_definition_revisions policy_source
+          on policy_source.workspace_id=policy.workspace_id
+          and policy_source.id=policy.source_definition_id
+          and policy_source.canonical_hash=policy.source_definition_canonical_hash
+          and policy_source.policy_hash=policy.policy_hash
+          and policy_source.state='published'
+          and policy_source.effective_from<=statement_timestamp()
+          and (policy_source.expires_at is null or policy_source.expires_at>statement_timestamp())
+        join effective_campaign_contexts c on c.workspace_id=r.workspace_id
+          and c.context_hash=r.context_hash
+          and c.account_ref=r.request_payload->>'accountRef'
+          and c.entity_ref=r.request_payload->>'entityRef'
+          and c.captured_at<=statement_timestamp()
+        join ad_accounts account on account.workspace_id=r.workspace_id
+          and account.id=c.ad_account_id and account.disappeared_at is null
+          and account.external_account_id=r.request_payload->>'accountRef'
+        join data_sources source on source.workspace_id=account.workspace_id
+          and source.id=account.data_source_id and source.platform='meta_ads'
+        join meta_connections connection on connection.workspace_id=source.workspace_id
+          and connection.id=source.meta_connection_id and connection.status='active'
+          and connection.disconnected_at is null and connection.revoked_at is null
+          and connection.secret_disabled_at is null and connection.secret_destroyed_at is null
+          and (connection.token_expires_at is null or connection.token_expires_at>statement_timestamp())
+          and (connection.data_access_expires_at is null or connection.data_access_expires_at>statement_timestamp())
+        where r.execution_ref=${input.executionRef}
+          and r.request_payload->>'workspaceRef'=${input.request.workspaceRef}
+          and r.request_payload->>'accountRef'=${input.request.accountRef}
+          and r.request_payload->>'entityRef'=${input.request.entityRef}
+          and r.request_payload->>'action'=${input.request.action}
+          and not exists (
+            select 1 from effective_campaign_context_components component
+            join effective_campaign_context_invalidations invalidation
+              on invalidation.workspace_id=component.workspace_id
+             and invalidation.component_type=component.component_type
+             and invalidation.component_ref=component.component_ref
+             and invalidation.component_version=component.component_version
+            where component.workspace_id=c.workspace_id and component.context_id=c.id
+              and (invalidation.entity_type is null
+                or (invalidation.entity_type=c.entity_type and invalidation.entity_ref=c.entity_ref))
+          )
+          and not exists (
+            select 1 from approval_policy_definition_revisions newer
+            where newer.workspace_id=policy_source.workspace_id
+              and newer.policy_ref=policy_source.policy_ref
+              and newer.revision>policy_source.revision
+              and newer.state in ('published','disabled')
+              and newer.effective_from<=statement_timestamp()
+          )
+        for share of r,b,guide_run,guide,guide_head,u,bundle,decision,g,policy,policy_source,c,account,source,connection
+        limit 2
+      `);
+      const row = result.rows.length === 1
+        ? (result.rows[0] as Record<string, unknown>)
+        : null;
+      let current: Awaited<ReturnType<DrizzleGuideRunCandidateStagingContextRepository["loadInTransaction"]>> | null = null;
+      if (row) {
+        try {
+          current = await this.contexts.loadInTransaction(tx, {
+            workspaceId: String(row.workspace_id),
+            guideRevisionId: String(row.guide_revision_id),
+            entityRef: input.request.entityRef,
+            actionHash: String(row.action_hash),
+            sliceRef: String(row.slice_ref),
+            market: row.market_key as "yerli" | "yabanci",
+            action: input.request.action,
+            at: String(row.authorized_at),
+          });
+        } catch {
+          current = null;
+        }
+      }
+      const allowed = Boolean(
+        row &&
+          current &&
+          current.workspaceRef === input.request.workspaceRef &&
+          current.accountRef === input.request.accountRef &&
+          current.entityRef === input.request.entityRef &&
+          current.currentStatus === input.request.expectedBefore.status &&
+          current.contextHash === row.context_hash &&
+          current.approvalPolicyHash === row.policy_hash &&
+          current.effectiveGuideSetHash === row.effective_guide_set_hash &&
+          current.resolutionHash === row.resolution_hash,
+      );
+      const acceptedRow = allowed ? row! : null;
+      const core = {
+        version: "p06-dispatch-authority/1.0.0",
+        phase: input.phase,
+        executionRef: input.executionRef,
+        allowed,
+        authorizedAt: acceptedRow?.authorized_at ?? null,
+        requestHash: acceptedRow?.request_hash ?? null,
+        contextHash: acceptedRow?.current_context_hash ?? null,
+        effectiveGuideSetHash: acceptedRow?.effective_guide_set_hash ?? null,
+        resolutionHash: acceptedRow?.resolution_hash ?? null,
+        policyHash: acceptedRow?.policy_hash ?? null,
+        guideRevisionId: acceptedRow?.guide_revision_id ?? null,
+        unitHash: acceptedRow?.unit_hash ?? null,
+        grantHash: acceptedRow?.grant_hash ?? null,
+        connectionGeneration: acceptedRow ? Number(acceptedRow.connection_generation) : null,
+        dataHealthReportHash: allowed ? current!.dataHealthReportHash : null,
+      };
+      return Object.freeze({
+        allowed,
+        authorityHash: p06ExecutionV2Digest(core),
+      });
+    });
+  }
+}

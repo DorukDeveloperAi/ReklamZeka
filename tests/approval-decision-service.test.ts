@@ -132,6 +132,41 @@ describe("ApprovalDecisionService", () => {
     })).rejects.toEqual(expect.objectContaining({ code: "human_presence_rejected" }));
   });
 
+  it("invokes the server-owned post-commit materializer without granting execution authority", async () => {
+    const repository = atomicRepository();
+    const store = new SingleUseHumanPresenceChallengeStore();
+    const onCommitted = vi.fn(async () => undefined);
+    const subject = new ApprovalDecisionService(
+      repository,
+      store,
+      () => "2026-08-07T19:00:01.000Z",
+      (prefix) => `${prefix}_materializer_test`,
+      onCommitted,
+    );
+
+    const result = await subject.decide({
+      principal,
+      membership: owner,
+      unitRef,
+      kind: "approve",
+      reasonCode: "human_reviewed",
+      humanPresenceProof: issued(store),
+    });
+
+    expect(result.authority).toEqual({
+      approvalRecorded: true,
+      canGrant: false,
+      canExecute: false,
+      canWriteMeta: false,
+    });
+    expect(onCommitted).toHaveBeenCalledWith({
+      workspaceId: principal.workspaceId,
+      unitRef,
+      kind: "approve",
+      decidedAt: "2026-08-07T19:00:01.000Z",
+    });
+  });
+
   it.each(["campaign_create", "raw_graph"])("rejects unsupported %s decisions before repository or proof use", async (kind) => {
     const repository = atomicRepository();
     const store = new SingleUseHumanPresenceChallengeStore();

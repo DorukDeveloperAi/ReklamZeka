@@ -44,6 +44,15 @@ export type P06StatusExecutionGateResolver = Readonly<{
     }>,
   ): Promise<P06StatusExecutionGate>;
 }>;
+export type P06StatusExecutionDispatchAuthority = Readonly<{
+  revalidate(
+    input: Readonly<{
+      phase: "post_claim" | "pre_dispatch";
+      executionRef: string;
+      request: P06ExecutionWorkerSnapshot["request"];
+    }>,
+  ): Promise<Readonly<{ allowed: boolean; authorityHash: string }>>;
+}>;
 
 export class P06StatusExecutionWorkerError extends Error {
   constructor(
@@ -113,6 +122,7 @@ export class P06StatusExecutionWorker {
     private readonly dependencies: Readonly<{
       repository: Repository;
       gates: P06StatusExecutionGateResolver;
+      authority: P06StatusExecutionDispatchAuthority;
       writer: P06ExecutionV2Writer;
       now?: () => Date;
     }>,
@@ -251,6 +261,16 @@ export class P06StatusExecutionWorker {
       }
       return allowed;
     };
+    const authority = async (phase: "post_claim" | "pre_dispatch") => {
+      const result = await this.dependencies.authority.revalidate({
+        phase,
+        executionRef: input.executionRef,
+        request: snapshot.request,
+      });
+      if (typeof result.allowed !== "boolean" || !HASH.test(result.authorityHash))
+        fail("gate_rejected");
+      return result;
+    };
     const ensureLateGates = async () => {
       for (const phase of [
         "post_claim",
@@ -357,6 +377,13 @@ export class P06StatusExecutionWorker {
         return this.result(snapshot, null);
       }
     }
+    if (snapshot.head.traceSequence >= 2 && snapshot.head.traceSequence < 9) {
+      const postClaimAuthority = await authority("post_claim");
+      if (!postClaimAuthority.allowed && invocationStartedAt < 4) {
+        await finishHeld();
+        return this.result(snapshot, null);
+      }
+    }
     if (snapshot.head.traceSequence === 2) {
       const read = await this.dependencies.writer.read({
         workspaceRef: snapshot.request.workspaceRef,
@@ -433,7 +460,11 @@ export class P06StatusExecutionWorker {
       await ensureLateGates();
     } else if (snapshot.head.traceSequence === 4) {
       const preDispatchAllowed = await gate("pre_dispatch");
-      if (!preDispatchAllowed && invocationStartedAt < 4) {
+      const preDispatchAuthority = await authority("pre_dispatch");
+      if (
+        (!preDispatchAllowed || !preDispatchAuthority.allowed) &&
+        invocationStartedAt < 4
+      ) {
         await finishHeld();
         return this.result(snapshot, null);
       }

@@ -575,6 +575,84 @@ export class DrizzleP06ExecutionRepository {
     });
   }
 
+  async materializeHumanApprovedUnit(
+    input: Readonly<{
+      workspaceId: string;
+      unitRef: string;
+      evaluatedAt: string;
+      gates: readonly P06ExecutionGateSeed[];
+    }>,
+  ): Promise<P06ExecutionIdentity> {
+    if (
+      !UUID.test(input.workspaceId) ||
+      !/^action_unit_[a-f0-9]{20}$/.test(input.unitRef)
+    )
+      fail("invalid_input");
+    const source = one(
+      rows(
+        await this.database.execute(sql`
+          select b.id::text binding_id,d.id::text decision_id,g.id::text grant_id
+          from guide_run_action_bindings b
+          join action_proposal_units u on u.workspace_id=b.workspace_id
+            and u.id=b.action_unit_id and u.unit_ref=${input.unitRef}
+          join action_approval_decision_events d on d.workspace_id=b.workspace_id
+            and d.bundle_id=b.proposal_bundle_id and d.unit_id=b.action_unit_id
+            and d.command_kind='approve'
+          join action_approval_evidence_grants g on g.workspace_id=b.workspace_id
+            and g.decision_event_id=d.id and g.bundle_id=b.proposal_bundle_id
+            and g.unit_id=b.action_unit_id
+          where b.workspace_id=${input.workspaceId}::uuid
+          limit 2
+        `),
+      ),
+    );
+    if (
+      !source ||
+      typeof source.binding_id !== "string" ||
+      typeof source.decision_id !== "string" ||
+      typeof source.grant_id !== "string"
+    )
+      fail("not_found");
+    return this.createHumanApproved({
+      workspaceId: input.workspaceId,
+      guideRunActionBindingId: source.binding_id,
+      decisionEventId: source.decision_id,
+      approvalGrantId: source.grant_id,
+      evaluatedAt: input.evaluatedAt,
+      gates: input.gates,
+    });
+  }
+
+  async listRunnable(limit = 25): Promise<readonly string[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100)
+      fail("invalid_input");
+    return this.database.transaction(async (tx) => {
+      const candidates = rows(
+        await tx.execute(sql`
+          select r.execution_ref
+          from p06_execution_runs r
+          join p06_execution_heads h on h.workspace_id=r.workspace_id
+            and h.execution_run_id=r.id
+          join workspaces w on w.id=r.workspace_id
+            and w.lifecycle_state='active' and w.tombstoned_at is null
+          where h.state='pending'
+             or (h.state in ('claimed','running') and h.lease_expires_at<=statement_timestamp())
+          order by r.created_at,r.id
+          limit ${limit}
+        `),
+      );
+      if (
+        candidates.some(
+          (candidate) =>
+            typeof candidate.execution_ref !== "string" ||
+            !/^p06_execution_[a-f0-9]{24}$/.test(candidate.execution_ref),
+        )
+      )
+        fail("corrupt_store");
+      return Object.freeze(candidates.map((candidate) => String(candidate.execution_ref)));
+    });
+  }
+
   async appendGate(
     input: Readonly<{ executionRef: string; gate: P06ExecutionGateSeed }>,
   ): Promise<string> {

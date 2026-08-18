@@ -162,6 +162,9 @@ const columns = [
   // carry no internal category or strict-policy reference that archive impact
   // may interpret as a mutable dependency.
   "budget_pool_hierarchy_revisions.hierarchy_payload",
+  // Published ceiling policies contain only target/pool/currency/cap evidence;
+  // category archive must not reinterpret their closed refs as category edges.
+  "budget_ceiling_policy_revisions.policy_payload",
   "slice_rule_budget_pool_bindings.binding_payload",
   // Entity bindings freeze server-resolved hierarchy and source evidence only;
   // archive impact must not invent a category dependency from this evidence.

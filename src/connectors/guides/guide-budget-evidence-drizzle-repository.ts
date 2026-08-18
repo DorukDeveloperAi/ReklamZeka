@@ -11,6 +11,7 @@ import {
   type OperationReadTransaction,
 } from "@/connectors/operations/operation-read-drizzle-repository";
 import { organizationCampaignPublicRef } from "@/domain/campaigns/organization-campaign";
+import { assertValidBudgetCeilingPolicy, resolveBudgetCeilingPolicies } from "@/domain/budget/budget-ceiling-policy";
 import {
   resolveEffectiveGuideOverlap,
   type EffectiveGuideBinding,
@@ -60,6 +61,11 @@ const minor = (value: number) =>
     /\.00$/,
     "",
   );
+const decimalUnits = (value: string): bigint => {
+  const [whole, fraction = ""] = value.split(".");
+  if (!/^\d{1,30}$/.test(whole ?? "") || !/^\d{0,12}$/.test(fraction)) failure("ceiling_decimal");
+  return BigInt(`${whole}${fraction.padEnd(12, "0")}`);
+};
 const failure = (message: string): never => {
   throw new Error(`budget evidence unavailable: ${message}`);
 };
@@ -156,6 +162,20 @@ export class DrizzleGuideBudgetEvidenceRepository implements GuideBudgetEvidence
         guides: bindings,
       });
       if (effective.hold.state !== "clear") failure("overlap_conflict");
+      const ceilingRows = rows(await tx.execute(sql`select policy_payload from budget_ceiling_policy_revisions where workspace_id=${input.workspaceId}::uuid order by limit_ref,revision limit 10001`));
+      if (ceilingRows.length > 10_000) failure("ceiling_policies");
+      let ceilingDecimal: string | null = null;
+      try {
+        const policies = ceilingRows.map((item) => assertValidBudgetCeilingPolicy(item.policy_payload));
+        const resolutions = active.filter((row) => row.contract_payload !== null && this.contract(row).targetScopeRef === contract.targetScopeRef).map((row) => resolveBudgetCeilingPolicies({
+          workspaceRef: canonicalGuideWorkspaceRef(input.workspaceId), targetScopeRef: contract.targetScopeRef, market: contract.market,
+          currency: contract.currency, evaluatedAt: input.at,
+          guideBudgetRefs: (Array.isArray(row.budgets) ? row.budgets : []).map((budget: Row) => ({ limitRef: String(budget.budget_ref), scopeKind: String(budget.scope_kind) as "market" | "organization_campaign" | "geo_targeting_platform" | "campaign_ad_set" })), policies,
+        }));
+        if (resolutions.length > 0 && resolutions.every((resolution) => resolution.status === "ready" && resolution.effectiveParentCeilingDecimal !== null)) {
+          ceilingDecimal = resolutions.map((resolution) => resolution.effectiveParentCeilingDecimal!).sort((a, b) => decimalUnits(a) < decimalUnits(b) ? -1 : decimalUnits(a) > decimalUnits(b) ? 1 : 0)[0] ?? null;
+        }
+      } catch { ceilingDecimal = null; }
       const evidence = await this.snapshotEvidence(
         tx,
         input.workspaceId,
@@ -189,10 +209,7 @@ export class DrizzleGuideBudgetEvidenceRepository implements GuideBudgetEvidence
               ? minor(absolute.value)
               : null,
             maximumRelativeDeltaBasisPoints: relative?.value ?? null,
-            // This reader does not have a canonical durable pool ceiling yet.
-            // A budget-capable Guide with an unresolved ceiling is held instead
-            // of silently treating it as unlimited.
-            parentCeilingDecimal: null,
+            parentCeilingDecimal: ceilingDecimal,
             guideMode: effective.effectiveMode,
             actionDisposition: !permitted ? "denied" as const
               : effective.humanApprovalActions.includes(action) ? "human_approval" as const

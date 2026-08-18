@@ -5,6 +5,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { GuideBudgetActionTrustedContextReadPort } from "@/application/guide-budget-action-preparation-service";
 import { ExistingPostPromotionProtectionEvidenceMaterializer } from "@/application/existing-post-promotion-protection-evidence-materializer";
 import { createDrizzleAuthenticAffectedGeoEvidenceAdapter } from "@/connectors/actions/authentic-affected-geo-evidence-adapter";
+import { DrizzleCampaignAffectedGeoEvidenceAdapter } from "@/connectors/actions/campaign-affected-geo-evidence-adapter";
 import { createDrizzleAuthenticCategoryEvidenceAdapter } from "@/connectors/actions/authentic-category-evidence-adapter";
 import { DrizzleMetaDataHealthAdapter } from "@/connectors/meta/data-health-drizzle-adapter";
 import { assertValidActionGuardrailPolicyRevision, resolveProtection } from "@/domain/actions/action-guardrail-policy";
@@ -117,15 +118,15 @@ export class DrizzleGuideBudgetActionTrustedContextRepository implements GuideBu
         if (activeGroupRows.length > groupRefs.length) fail("autonomy_unavailable");
         rules = resolveAutonomyRules({ workspaceRef, artifacts: artifacts.filter((artifact) => artifact.scope.level !== "account_group" || activeGroups.has(artifact.scope.ref)) });
       } catch { fail("autonomy_unavailable"); }
-      // A CBO campaign cannot reuse one ad set's geo snapshot as aggregate proof.
-      if (owner.budgetOwnerKind === "campaign") fail("protection_unavailable");
       const notBefore = new Date(Date.parse(input.evaluatedAt) - approvalPolicy.maximumProtectionEvidenceAgeSeconds * 1_000).toISOString();
       let evidence;
       try { evidence = await new ExistingPostPromotionProtectionEvidenceMaterializer(
         createDrizzleAuthenticCategoryEvidenceAdapter({ database: tx as never, workspaceId: input.workspaceId, workspaceRef }),
-        createDrizzleAuthenticAffectedGeoEvidenceAdapter({ database: tx as never, workspaceId: input.workspaceId, workspaceRef, readOnlyTransaction: true }),
+        owner.budgetOwnerKind === "campaign"
+          ? new DrizzleCampaignAffectedGeoEvidenceAdapter(tx as never,input.workspaceId,workspaceRef)
+          : createDrizzleAuthenticAffectedGeoEvidenceAdapter({ database: tx as never, workspaceId: input.workspaceId, workspaceRef, readOnlyTransaction: true }),
       ).resolve(Object.freeze({ workspaceId: input.workspaceId, workspaceRef, accountRef, campaignRef,
-        entity: Object.freeze({ level: "adset" as const, ref: entityRef }), evaluatedAt: input.evaluatedAt, notBefore })); }
+        entity: Object.freeze({ level: owner.budgetOwnerKind === "campaign" ? "campaign" as const : "adset" as const, ref: entityRef }), evaluatedAt: input.evaluatedAt, notBefore })); }
       catch { fail("protection_unavailable"); }
       if (evidence.categoryEvidence.status !== "known" || evidence.affectedGeoEvidence.status !== "known") fail("protection_unavailable");
       let resolved; let guardrailRevisions;
@@ -136,19 +137,19 @@ export class DrizzleGuideBudgetActionTrustedContextRepository implements GuideBu
       } catch { fail("protection_unavailable"); }
       try { resolved = resolveProtection({ workspaceRef, evaluatedAt: input.evaluatedAt,
         action: Object.freeze({ actionHash: digest({ actionType, accountRef, campaignRef, entityRef, dryRunHash: input.dryRun.dryRunHash }), actionType, accountRef, campaignRef,
-          entity: Object.freeze({ level: "adset" as const, ref: entityRef }), budgetChange: Object.freeze({ currency: input.dryRun.currency, absoluteDeltaDecimal: input.dryRun.requestedDeltaDecimal!.replace("-", ""), relativeDeltaBasisPoints: input.dryRun.effectiveMaximumRelativeDeltaBasisPoints }) }),
+          entity: Object.freeze({ level: owner.budgetOwnerKind === "campaign" ? "campaign" as const : "adset" as const, ref: entityRef }), budgetChange: Object.freeze({ currency: input.dryRun.currency, absoluteDeltaDecimal: input.dryRun.requestedDeltaDecimal!.replace("-", ""), relativeDeltaBasisPoints: input.dryRun.effectiveMaximumRelativeDeltaBasisPoints }) }),
         categoryEvidence: evidence.categoryEvidence, affectedGeoEvidence: evidence.affectedGeoEvidence,
         // Plain SELECT stays inside this outer RR/READ ONLY transaction.
         // Registry writer APIs take FOR SHARE locks and are not legal here.
         revisions: guardrailRevisions }); }
       catch { fail("protection_unavailable"); }
       if (resolved.disposition !== "allowed") fail("protection_unavailable");
-      // Preserve a fully authenticated runtime shape for the future ceiling source.
-      void Object.freeze({ runtime: Object.freeze({ workspaceRef, accountGroupRef: null, accountRef, accountExternalRef: accountRef,
+      // The dry-run hash now authenticates the separately human-published,
+      // exact four-layer ceiling chain. Missing/held chains remain closed.
+      if (input.dryRun.effectiveParentCeilingDecimal === null) fail("parent_ceiling_unavailable");
+      return Object.freeze({ runtime: Object.freeze({ workspaceRef, accountGroupRef: null, accountRef, accountExternalRef: accountRef,
         ownerPublicRef: owner.budgetOwnerRef, ownerEntityExternalRef: entityRef, internalCategoryRefs: resolved.protectedInternalCategoryRefs,
         campaignRef, rules, protection: protection(resolved), frozenContextHash: row.context_hash, dataHealthReady: true, dataHealthReportHash: health.report.reportHash }), approvalPolicy });
-      // No canonical parent/pool ceiling exists yet. Never treat this as unlimited.
-      fail("parent_ceiling_unavailable");
     });
   }
 }
