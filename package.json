@@ -95,6 +95,7 @@
     "verify:authentic-approval-chain-db": "tsx scripts/verify-authentic-approval-chain-postgres.ts",
     "verify:p06-approval-decision-defer-db": "tsx scripts/verify-p06-approval-decision-defer-postgres.ts",
     "verify:p06-approval-decision-defer-db:post": "P06_DEFER_POST_APPROVED=true tsx scripts/verify-p06-approval-decision-defer-postgres.ts",
+    "verify:guide-run-codex-live": "REKLAMZEKA_GUIDE_RUN_CODEX_LIVE_APPROVED=true node --conditions react-server --env-file=.env.local --import tsx scripts/verify-guide-run-codex-live.ts",
     "verify:p06-execution-persistence-db": "tsx scripts/verify-p06-execution-persistence-postgres.ts",
     "verify:p06-budget-execution-binding-db": "tsx scripts/verify-p06-budget-execution-binding-postgres.ts",
     "verify:p06-limited-autonomy-admissions-db": "tsx scripts/verify-p06-limited-autonomy-admissions-postgres.ts",

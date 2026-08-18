@@ -17,9 +17,10 @@
 - Focused provider/candidate/worker: 4 dosya / 22 test geçti (önceki Guide Run domain/persistence suite ayrıca korunur).
 - Uygulanmış P06 POST fixture'ı P05 repository çıktısını doğrudan persisted disposition'a besledi; `serverOwnedStatusCandidate`, `completedRun`, `actionQueuePersisted`, `materialized`, `replay`, iki-client concurrency ve `zeroResidue` dahil bütün bayraklar `true`, süreç exit `0` oldu.
 - Bu canlı zincirde candidate public frozen/current üye ref/hash'inden üretildi, typed status `ACTIVE→PAUSED` sunucuda türetildi ve aynı çıktı immutable P05 disposition → P06 ActionUnit materialization/replay yolunda kullanıldı.
+- `npm run verify:guide-run-codex-live` iki gerçek local Codex sürecini sentetik public ref/hash kanıtıyla çalıştırdı: Daily ve Holistic cevapları exact `no_change`, candidate/recommendation yok, bütün authority bayrakları kapalı ve Meta write girdisi yok; exit `0`, `elapsedMs=9686`.
 - `npm run typecheck -- --pretty false`: geçti.
 - `git diff --check`: geçti.
 
 ## Açık sınır
 
-Bu alt dilim gerçek sağlayıcı taşımasını, frozen/current bağlı metrik okumasını ve status ad-set için server-owned typed candidate üretimini kapatır. Model cevabı tek başına ActionUnit girdisi olamaz. PostgreSQL candidate→P06 binding canlı fixture'ı tamamlandı; bağımsız kritik inceleme ve kontrollü gerçek provider kabulü tamamlanmadan bu kayıt kabul statüsü değildir. Campaign/budget candidate yolları açıkça fail-closed kalır.
+Bu alt dilim gerçek sağlayıcı taşımasını, frozen/current bağlı metrik okumasını ve status ad-set için server-owned typed candidate üretimini kapatır. Model cevabı tek başına ActionUnit girdisi olamaz. Gerçek local Codex Daily/Holistic ve PostgreSQL candidate→P06 binding canlı fixture'ları tamamlandı; bağımsız kritik inceleme tamamlanmadan bu kayıt kabul statüsü değildir. Campaign/budget candidate yolları açıkça fail-closed kalır.

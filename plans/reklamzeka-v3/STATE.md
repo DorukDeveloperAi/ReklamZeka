@@ -50,7 +50,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P05-C-guide-run-v1.1-hardening | Kabul edildi — `evidence/P05-C-guide-run-v1.1-hardening-20260817.md`; arşivlenebilir |
 | + P05-D-guide-run-orchestration-v1.2 | Kabul edildi — `evidence/P05-D-guide-run-orchestration-v1.2-20260817.md`; arşivlenebilir |
 | + P05-E-guide-run-persistence | Kabul edildi — `evidence/P05-E-guide-run-persistence-20260817.md`; gerçek Agent sağlayıcıları ve P06 action materialization açık |
-| P05-F-local-codex-agent-transport | İnceleme adayı — `evidence/P05-F-local-codex-agent-transport-20260818.md`; server-owned status candidate→P06 binding canlı POST kanıtlandı, gerçek provider ve bağımsız kritik kabul açık |
+| P05-F-local-codex-agent-transport | İnceleme adayı — `evidence/P05-F-local-codex-agent-transport-20260818.md`; gerçek local Codex Daily/Holistic ve server-owned status candidate→P06 binding canlı kanıtlandı, bağımsız kritik kabul açık |
 | + P07-A-five-area-shell | Kabul edildi / arşivlenebilir |
 | P07-B-operation-table-ui | DEVAM — `a178e25` table-first konsolidasyon, kaynak sınırı ve 320 px kabul edildi; gerçek oturumlu browser ready/partial kabulü kullanıcı capability girişi bekliyor |
 | + P07-C-static-accessibility-foundation | Kabul edildi — `evidence/P07-C-static-accessibility-foundation-20260818.md`; authenticated browser matrisi açık |
