@@ -59,6 +59,8 @@
     "verify:category-profile-live": "node --import tsx scripts/verify-category-profile-postgres.ts",
     "verify:operation-read-live": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-operation-read-postgres.ts",
     "verify:scope-report-live": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-scope-report-postgres.ts",
+    "verify:scope-report-saved-postgres": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-scope-report-saved-postgres.ts",
+    "verify:naming-template-postgres": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-naming-template-postgres.ts",
     "verify:guide-budget-contract-v2-postgres": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-guide-budget-contract-v2-postgres.ts",
     "verify:guide-budget-contract-v2-postgres:post": "GUIDE_BUDGET_CONTRACT_VERIFY_MODE=post node --conditions react-server --env-file=.env.local --import tsx scripts/verify-guide-budget-contract-v2-postgres.ts",
     "verify:guide-run-persistence-postgres": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-guide-run-persistence-postgres.ts",

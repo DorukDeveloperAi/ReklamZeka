@@ -30,6 +30,10 @@ const OPTIONAL_FORWARD_PURGE_TABLES = Object.freeze([
   "p06_limited_autonomy_admissions",
   "budget_ceiling_policy_revisions",
   "action_preparation_gate_snapshots",
+  "scope_report_saved_heads",
+  "scope_report_saved_revisions",
+  "naming_template_heads",
+  "naming_template_revisions",
 ] as const);
 
 type OptionalForwardPurgeTable = (typeof OPTIONAL_FORWARD_PURGE_TABLES)[number];
@@ -46,6 +50,10 @@ type AvailabilityRow = Readonly<{
   limited_admissions: boolean;
   budget_ceiling_policies: boolean;
   action_preparation_gates: boolean;
+  saved_report_heads: boolean;
+  saved_report_revisions: boolean;
+  naming_template_heads: boolean;
+  naming_template_revisions: boolean;
 }>;
 
 /**
@@ -59,6 +67,8 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "guide_run_action_bindings", "p06_limited_autonomy_admissions",
   // P05 run children must be purged before their immutable run and Guide parents.
   "guide_run_schedule_receipts", "guide_run_artifacts", "guide_run_heads", "guide_run_events", "guide_runs",
+  "scope_report_saved_heads", "scope_report_saved_revisions",
+  "naming_template_heads", "naming_template_revisions",
   // P03 primary-result heads point at immutable user selections.
   "primary_result_binding_heads", "primary_result_binding_revisions",
   // P01 data-quality ledger heads must go before their immutable evidence.
@@ -253,7 +263,11 @@ async function optionalTableAvailability(executor: DrizzleExecutor): Promise<Opt
       to_regclass('public.guide_run_action_bindings') is not null as action_bindings,
       to_regclass('public.p06_limited_autonomy_admissions') is not null as limited_admissions,
       to_regclass('public.budget_ceiling_policy_revisions') is not null as budget_ceiling_policies,
-      to_regclass('public.action_preparation_gate_snapshots') is not null as action_preparation_gates
+      to_regclass('public.action_preparation_gate_snapshots') is not null as action_preparation_gates,
+      to_regclass('public.scope_report_saved_heads') is not null as saved_report_heads,
+      to_regclass('public.scope_report_saved_revisions') is not null as saved_report_revisions,
+      to_regclass('public.naming_template_heads') is not null as naming_template_heads,
+      to_regclass('public.naming_template_revisions') is not null as naming_template_revisions
   `))[0];
   if (!row) throw new WorkspaceTombstoneError("workspace_unavailable");
   return Object.freeze({
@@ -267,6 +281,10 @@ async function optionalTableAvailability(executor: DrizzleExecutor): Promise<Opt
     p06_limited_autonomy_admissions: row.limited_admissions === true,
     budget_ceiling_policy_revisions: row.budget_ceiling_policies === true,
     action_preparation_gate_snapshots: row.action_preparation_gates === true,
+    scope_report_saved_heads: row.saved_report_heads === true,
+    scope_report_saved_revisions: row.saved_report_revisions === true,
+    naming_template_heads: row.naming_template_heads === true,
+    naming_template_revisions: row.naming_template_revisions === true,
   });
 }
 
@@ -291,6 +309,10 @@ async function inspectOptionalForwardTables(
   if (availability.p06_limited_autonomy_admissions) await inspect(sql`select 'p06_limited_autonomy_admissions' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_limited_autonomy_admissions where workspace_id = ${workspaceId}::uuid`);
   if (availability.budget_ceiling_policy_revisions) await inspect(sql`select 'budget_ceiling_policy_revisions' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from budget_ceiling_policy_revisions where workspace_id = ${workspaceId}::uuid`);
   if (availability.action_preparation_gate_snapshots) await inspect(sql`select 'action_preparation_gate_snapshots' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from action_preparation_gate_snapshots where workspace_id = ${workspaceId}::uuid`);
+  if (availability.scope_report_saved_heads) await inspect(sql`select 'scope_report_saved_heads' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from scope_report_saved_heads where workspace_id = ${workspaceId}::uuid`);
+  if (availability.scope_report_saved_revisions) await inspect(sql`select 'scope_report_saved_revisions' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from scope_report_saved_revisions where workspace_id = ${workspaceId}::uuid`);
+  if (availability.naming_template_heads) await inspect(sql`select 'naming_template_heads' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from naming_template_heads where workspace_id = ${workspaceId}::uuid`);
+  if (availability.naming_template_revisions) await inspect(sql`select 'naming_template_revisions' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from naming_template_revisions where workspace_id = ${workspaceId}::uuid`);
   return rows;
 }
 
@@ -780,6 +802,10 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     if (availability.p06_limited_autonomy_admissions) await remove(sql`with removed as (delete from p06_limited_autonomy_admissions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     if (availability.budget_ceiling_policy_revisions) await remove(sql`with removed as (delete from budget_ceiling_policy_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     if (availability.action_preparation_gate_snapshots) await remove(sql`with removed as (delete from action_preparation_gate_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.scope_report_saved_heads) await remove(sql`with removed as (delete from scope_report_saved_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.scope_report_saved_revisions) await remove(sql`with removed as (delete from scope_report_saved_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.naming_template_heads) await remove(sql`with removed as (delete from naming_template_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.naming_template_revisions) await remove(sql`with removed as (delete from naming_template_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guide_run_schedule_receipts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guide_run_artifacts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guide_run_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

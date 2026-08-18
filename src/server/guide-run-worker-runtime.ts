@@ -23,6 +23,8 @@ import { sql } from "drizzle-orm";
 import * as schema from "@/db/schema";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { resolveP08RolloutControl, type P08RolloutEnvironment } from "@/server/p08-rollout-control";
+import { createLocalCodexGuideRunAgents } from "@/server/guide-run-codex-agent-adapter";
+import { DrizzleGuideRunMemberMetricEvidenceRepository } from "@/connectors/guides/guide-run-member-metric-evidence-drizzle-repository";
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -184,6 +186,30 @@ export function createGuideRunSchedulerRuntime(
     enabled: true as const,
     scheduler: createGuideRunSchedulerWorker(input),
   });
+}
+
+/** Server-owned local provider composition. Rollout and provider flags are
+ * independent; neither scheduler nor interactive-agent enablement can launch
+ * this provider implicitly. */
+export function createLocalCodexGuideRunSchedulerRuntime(
+  input: Readonly<{
+    database: Pick<Database, "execute" | "transaction">;
+    dataHealth: GuideRunTrustedDataHealthPort;
+    candidateActionStaging?: GuideRunCandidateActionStagingPort;
+    limitedAutonomyAdmissions?: GuideRunLimitedAutonomyAdmissionPort;
+    environment?: P08RolloutEnvironment;
+    serverCwd?: string;
+  }>,
+) {
+  const environment = input.environment ?? process.env;
+  if (!resolveP08RolloutControl(environment).guideSchedulerEnabled)
+    return Object.freeze({ enabled: false as const, scheduler: null });
+  const agents = createLocalCodexGuideRunAgents(environment, input.serverCwd,
+    new DrizzleGuideRunMemberMetricEvidenceRepository(input.database));
+  if (!agents) return Object.freeze({ enabled: false as const, scheduler: null });
+  return createGuideRunSchedulerRuntime({ database: input.database, dataHealth: input.dataHealth,
+    candidateActionStaging: input.candidateActionStaging, limitedAutonomyAdmissions: input.limitedAutonomyAdmissions,
+    environment, ...agents });
 }
 
 /**

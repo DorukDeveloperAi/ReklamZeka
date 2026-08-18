@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createGuideRevision } from "@/domain/guides/guide-revision";
 import { createGuideRunV12 } from "@/domain/guides/guide-run";
-import { createGuideRunSchedulerRuntime, DrizzleGuideRunActiveSchedulePort, GuideRunSchedulerWorker } from "@/server/guide-run-worker-runtime";
+import { createGuideRunSchedulerRuntime, createLocalCodexGuideRunSchedulerRuntime, DrizzleGuideRunActiveSchedulePort, GuideRunSchedulerWorker } from "@/server/guide-run-worker-runtime";
 
 const token = "123e4567-e89b-42d3-a456-426614174000";
 const expires = "2026-08-17T06:10:00.000Z";
@@ -27,6 +27,15 @@ describe("GuideRunSchedulerWorker", () => {
       environment: { GUIDE_SCHEDULER_ENABLED: "true" } }).enabled).toBe(false);
     expect(createGuideRunSchedulerRuntime({ ...dependencies,
       environment: { META_READ_ENABLED: "true", GUIDE_SCHEDULER_ENABLED: "true" } }).enabled).toBe(true);
+    expect(createLocalCodexGuideRunSchedulerRuntime({ database: {} as never, dataHealth: {} as never,
+      environment: { META_READ_ENABLED: "true", GUIDE_SCHEDULER_ENABLED: "true" } }))
+      .toEqual({ enabled: false, scheduler: null });
+    expect(createLocalCodexGuideRunSchedulerRuntime({ database: {} as never, dataHealth: {} as never,
+      environment: { META_READ_ENABLED: "true", GUIDE_SCHEDULER_ENABLED: "true", REKLAMZEKA_GUIDE_RUN_CODEX_ENABLED: "TRUE" } }))
+      .toEqual({ enabled: false, scheduler: null });
+    expect(createLocalCodexGuideRunSchedulerRuntime({ database: {} as never, dataHealth: {} as never,
+      environment: { META_READ_ENABLED: "true", GUIDE_SCHEDULER_ENABLED: "true", REKLAMZEKA_GUIDE_RUN_CODEX_ENABLED: "true",
+        REKLAMZEKA_CODEX_EXECUTABLE: "/tmp/codex", REKLAMZEKA_CODEX_WORKSPACE_ROOT: "/tmp" } }).enabled).toBe(true);
   });
 
   it("uses the concrete active-schedule reader (whose SQL selects the latest activation and receipt cursor) rather than a client schedule payload", async () => {

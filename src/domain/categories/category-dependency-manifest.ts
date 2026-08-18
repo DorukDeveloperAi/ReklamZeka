@@ -319,6 +319,9 @@ const columns = [
   "slice_resolution_snapshot_members.market_evidence_refs",
   "slice_resolution_snapshot_members.matched_dimension_ids",
   "slice_resolution_snapshot_members.matched_dimension_evidence_refs",
+  // Saved-report payload is an immutable display query only. It contains no
+  // category definition authority and is revalidated before use.
+  "scope_report_saved_revisions.query_payload",
   "guide_revisions.strict_payload",
   "guide_revisions.schedule_payload",
   "guide_budget_contracts.contract_payload",

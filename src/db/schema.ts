@@ -780,6 +780,32 @@ export const organizationCampaignMetaMemberships = pgTable("organization_campaig
   check("organization_campaign_meta_memberships_effective_range", sql`${table.effectiveTo} is null or ${table.effectiveTo} > ${table.effectiveFrom}`),
 ]);
 
+/** Immutable advisory naming-template revisions; never assignment or write authority. */
+export const namingTemplateRevisions = pgTable("naming_template_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  adAccountId: uuid("ad_account_id").notNull(), templateRef: text("template_ref").notNull(), commandRef: text("command_ref").notNull(), revision: integer("revision").notNull(),
+  previousRevisionHash: text("previous_revision_hash"), revisionHash: text("revision_hash").notNull(), state: text("state").notNull(), namingFamily: text("naming_family").notNull(),
+  entityLevel: text("entity_level").notNull(), templatePayload: jsonb("template_payload").$type<Record<string, unknown>>().notNull(), createdByActorId: uuid("created_by_actor_id").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  uniqueIndex("naming_template_revisions_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("naming_template_revisions_workspace_template_revision_unique").on(table.workspaceId, table.adAccountId, table.templateRef, table.revision),
+  uniqueIndex("naming_template_revisions_workspace_command_unique").on(table.workspaceId, table.commandRef), uniqueIndex("naming_template_revisions_workspace_hash_unique").on(table.workspaceId, table.revisionHash),
+  index("naming_template_revisions_workspace_account_fk_idx").on(table.workspaceId, table.adAccountId), index("naming_template_revisions_workspace_actor_fk_idx").on(table.workspaceId, table.createdByActorId),
+  foreignKey({ columns: [table.workspaceId, table.adAccountId], foreignColumns: [adAccounts.workspaceId, adAccounts.id], name: "naming_template_revisions_account_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.createdByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "naming_template_revisions_actor_scope_fk" }).onDelete("restrict"),
+  check("naming_template_revisions_identity", sql`${table.templateRef}~'^naming_template_[a-z0-9][a-z0-9_.:-]{0,95}$' and ${table.commandRef}~'^naming_template_command_[a-f0-9]{64}$' and ${table.revision} between 1 and 1000000 and (${table.previousRevisionHash} is null or ${table.previousRevisionHash}~'^[a-f0-9]{64}$') and ${table.revisionHash}~'^[a-f0-9]{64}$' and ${table.state} in('draft','published','disabled') and ${table.namingFamily}~'^[a-z][a-z0-9_.:-]{0,63}$' and ${table.entityLevel} in('campaign','ad_set') and jsonb_typeof(${table.templatePayload})='object' and octet_length(${table.templatePayload}::text)<=32768`),
+]);
+
+export const namingTemplateHeads = pgTable("naming_template_heads", {
+  id: uuid("id").primaryKey().defaultRandom(), workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }), adAccountId: uuid("ad_account_id").notNull(),
+  templateRef: text("template_ref").notNull(), latestRevisionId: uuid("latest_revision_id").notNull(), version: integer("version").notNull(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  uniqueIndex("naming_template_heads_workspace_row_unique").on(table.workspaceId, table.id), uniqueIndex("naming_template_heads_workspace_template_unique").on(table.workspaceId, table.adAccountId, table.templateRef),
+  index("naming_template_heads_workspace_latest_fk_idx").on(table.workspaceId, table.latestRevisionId), index("naming_template_heads_workspace_account_fk_idx").on(table.workspaceId, table.adAccountId),
+  foreignKey({ columns: [table.workspaceId, table.adAccountId], foreignColumns: [adAccounts.workspaceId, adAccounts.id], name: "naming_template_heads_account_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.latestRevisionId], foreignColumns: [namingTemplateRevisions.workspaceId, namingTemplateRevisions.id], name: "naming_template_heads_latest_scope_fk" }).onDelete("restrict"),
+  check("naming_template_heads_identity", sql`${table.templateRef}~'^naming_template_[a-z0-9][a-z0-9_.:-]{0,95}$' and ${table.version} between 1 and 1000000`),
+]);
+
 /**
  * Canonical, user-owned saved scope. A Slice is deliberately only a scope: it
  * carries no Guide, schedule, budget, action or Meta-write authority.
@@ -1109,6 +1135,40 @@ export const p06LimitedAutonomyAdmissions = pgTable("p06_limited_autonomy_admiss
  * expressed as two nullable, tenant-scoped FKs plus a closed XOR discriminator:
  * a binding can never silently point across a workspace or market boundary.
  */
+export const scopeReportSavedRevisions = pgTable("scope_report_saved_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  bindingId: uuid("binding_id").notNull(), reportRef: text("report_ref").notNull(), commandRef: text("command_ref").notNull(),
+  revisionNumber: integer("revision_number").notNull(), previousRevisionHash: text("previous_revision_hash").notNull(), revisionHash: text("revision_hash").notNull(),
+  state: text("state").notNull(), label: text("label").notNull(), sliceRef: text("slice_ref").notNull(), queryPayload: jsonb("query_payload").$type<Record<string, unknown>>().notNull(),
+  createdByActorId: uuid("created_by_actor_id").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  uniqueIndex("scope_report_saved_revisions_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("scope_report_saved_revisions_workspace_report_number_unique").on(table.workspaceId, table.reportRef, table.revisionNumber),
+  uniqueIndex("scope_report_saved_revisions_workspace_command_unique").on(table.workspaceId, table.commandRef),
+  uniqueIndex("scope_report_saved_revisions_workspace_hash_unique").on(table.workspaceId, table.revisionHash),
+  index("scope_report_saved_revisions_workspace_binding_idx").on(table.workspaceId, table.bindingId, table.revisionNumber),
+  index("scope_report_saved_revisions_workspace_slice_fk_idx").on(table.workspaceId, table.sliceRef),
+  index("scope_report_saved_revisions_workspace_actor_fk_idx").on(table.workspaceId, table.createdByActorId),
+  foreignKey({ columns: [table.workspaceId, table.sliceRef], foreignColumns: [slices.workspaceId, slices.sliceRef], name: "scope_report_saved_revisions_slice_scope_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [table.workspaceId, table.createdByActorId], foreignColumns: [memberships.workspaceId, memberships.userId], name: "scope_report_saved_revisions_actor_scope_fk" }).onDelete("restrict"),
+  check("scope_report_saved_revisions_identity", sql`${table.reportRef}~'^scope_report_saved_[a-f0-9]{24}$' and ${table.commandRef}~'^scope_report_save_[a-f0-9]{64}$' and ${table.revisionNumber}>=1 and ${table.previousRevisionHash}~'^(GENESIS|[a-f0-9]{64})$' and ${table.revisionHash}~'^[a-f0-9]{64}$' and ${table.state} in('active','archived') and length(btrim(${table.label})) between 1 and 160 and ${table.label}=btrim(${table.label}) and ${table.sliceRef}~'^slice_[a-z0-9][a-z0-9_.:-]{0,190}$' and jsonb_typeof(${table.queryPayload})='object' and octet_length(${table.queryPayload}::text)<=4096`),
+]);
+
+export const scopeReportSavedHeads = pgTable("scope_report_saved_heads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  bindingId: uuid("binding_id").notNull(), reportRef: text("report_ref").notNull(), latestRevisionId: uuid("latest_revision_id").notNull(),
+  version: integer("version").notNull(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  uniqueIndex("scope_report_saved_heads_workspace_row_unique").on(table.workspaceId, table.id),
+  uniqueIndex("scope_report_saved_heads_workspace_binding_unique").on(table.workspaceId, table.bindingId),
+  uniqueIndex("scope_report_saved_heads_workspace_report_unique").on(table.workspaceId, table.reportRef),
+  index("scope_report_saved_heads_workspace_latest_fk_idx").on(table.workspaceId, table.latestRevisionId),
+  foreignKey({ columns: [table.workspaceId, table.latestRevisionId], foreignColumns: [scopeReportSavedRevisions.workspaceId, scopeReportSavedRevisions.id], name: "scope_report_saved_heads_latest_scope_fk" }).onDelete("restrict"),
+  check("scope_report_saved_heads_identity", sql`${table.reportRef}~'^scope_report_saved_[a-f0-9]{24}$' and ${table.version}>=1`),
+]);
+
 export const primaryResultBindingRevisions = pgTable("primary_result_binding_revisions", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),

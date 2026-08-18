@@ -30,12 +30,12 @@ describe("scope report dashboard panel", () => {
     expect(scopeReportMatchesSubmitted({ ...report, appliedFilters: { ...report.appliedFilters, metricKey: "spend" } }, submitted)).toBe(false);
   });
 
-  it("renders a table-first, keyboard-native request surface without fake data or saved-report claims", () => {
+  it("renders a table-first, keyboard-native request surface without fake data or action authority", () => {
     const html = renderToStaticMarkup(createElement(ScopeReportPanel, { onConnect: vi.fn(async () => true) }));
     expect(html).toContain("Kapsam raporu");
     expect(html).toContain("Slice public ref");
     expect(html).toContain("Raporu getir");
-    expect(html).toContain("Bu yüzey kaydedilmiş rapor oluşturmaz");
+    expect(html).toContain("Kaydetme yalnız sorgu tanımını revizyonlar");
     expect(html).toContain('type="date"');
     expect(html).not.toContain("demo");
   });

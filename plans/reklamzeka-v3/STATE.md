@@ -5,9 +5,9 @@
 | + M00 | TAMAMLANDI — `evidence/M00-20260817.md`, `4fdb381` | — |
 | + P01 meta-veri-sagligi | TAMAMLANDI — P01-A…F kabul edildi; `evidence/P01-E-data-health-ledger-20260817.md` | M00 |
 | P02 kurum-kampanyasi-kunye | DEVAM — Kurum Kampanyası temeli hazır; canlı migration/DB acceptance açık | P01 |
-| P03 slice-operasyon-rapor | DEVAM — resolver/Operasyon/Kapsam Raporu JSON-CSV-XLSX ve UI temeli kabul edildi; saved report ve authenticated browser açık | P02 |
+| P03 slice-operasyon-rapor | DEVAM — resolver/Operasyon/Kapsam Raporu JSON-CSV-XLSX/UI kabul edildi; saved-report lifecycle PRE adayı hazır, apply ve authenticated browser açık | P02 |
 | P04 kilavuz-butce | BEKLİYOR | P03 |
-| P05 agent-analiz-kosum | DEVAM — Guide Run saf state/scheduler çekirdeği kabul edildi; persistence ve iki-Agent runtime açık | P04 |
+| P05 agent-analiz-kosum | DEVAM — Guide Run persistence kabul edildi; default-off yerel Agent taşıyıcı adayı hazır, metrik-temelli runtime açık | P04 |
 | P06 karar-otonomi-uygulama | BEKLİYOR | P05 |
 | P07 ui-ux | BEKLİYOR (paralel) | M00; P01–P06 ile birleşir |
 | P08 kabul-rollout | BEKLİYOR (cross gate) | M00,P01–P07 |
@@ -37,6 +37,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P03-D-scope-report-v1-foundation | Kabul edildi — `evidence/P03-D-scope-report-v1-foundation-20260817.md`; saved report/full UI-browser açık |
 | + P03-E-scope-report-xlsx | Kabul edildi — `evidence/P03-E-scope-report-xlsx-20260817.md`; saved report/full UI-browser açık |
 | + P03-F-scope-report-ui-foundation | Kabul edildi — `evidence/P03-F-scope-report-ui-foundation-20260818.md`; authenticated browser ve saved report açık |
+| P03-G-saved-scope-report-lifecycle | PRE adayı — `evidence/P03-G-saved-scope-report-lifecycle-20260818.md`; migration bağımsız kritik kabul/apply/POST ve authenticated browser açık |
 | + P04-A-guide-domain | Kabul edildi / arşivlenebilir |
 | + P04-B-guide-persistence | Kabul edildi / arşivlenebilir |
 | + P04-Ca-budget-dry-run-domain | Kabul edildi — `evidence/P04-Ca-budget-dry-run-domain-20260817.md`; arşivlenebilir |
@@ -48,6 +49,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P05-C-guide-run-v1.1-hardening | Kabul edildi — `evidence/P05-C-guide-run-v1.1-hardening-20260817.md`; arşivlenebilir |
 | + P05-D-guide-run-orchestration-v1.2 | Kabul edildi — `evidence/P05-D-guide-run-orchestration-v1.2-20260817.md`; arşivlenebilir |
 | + P05-E-guide-run-persistence | Kabul edildi — `evidence/P05-E-guide-run-persistence-20260817.md`; gerçek Agent sağlayıcıları ve P06 action materialization açık |
+| P05-F-local-codex-agent-transport | PRE/inceleme adayı — `evidence/P05-F-local-codex-agent-transport-20260818.md`; frozen metric/cohort evidence ve bağımsız kritik kabul açık |
 | + P07-A-five-area-shell | Kabul edildi / arşivlenebilir |
 | P07-B-operation-table-ui | DEVAM — `a178e25` table-first konsolidasyon, kaynak sınırı ve 320 px kabul edildi; gerçek oturumlu browser ready/partial kabulü kullanıcı capability girişi bekliyor |
 | + P07-C-static-accessibility-foundation | Kabul edildi — `evidence/P07-C-static-accessibility-foundation-20260818.md`; authenticated browser matrisi açık |
@@ -55,6 +57,7 @@ Tamamlanıp ana sürücü tarafından kabul edilen alt tasklar `+` taşır; pake
 | + P06-B-execution-contracts-foundation | Kabul edildi — `evidence/P06-B-execution-contracts-foundation-20260817.md`; şemasız/default-disabled temel, persistence/Meta executor açık |
 | + P06-C-guide-run-action-binding | Kabul edildi — `evidence/P06-C-guide-run-action-binding-20260818.md`; status ad-set disposition→human-approval ActionUnit binding, executor/Meta write açık |
 | + P06-D-approval-decision-defer | Kabul edildi — `evidence/P06-D-approval-decision-defer-20260818.md`; execution-v2/Meta writer açık |
+| P06-E-execution-pre-candidate | PRE adayı — `evidence/P06-E-execution-pre-candidate-20260818.md`; bağımsız APPLY/POST açık |
 | P08-A-default-off-rollout-foundation | DEVAM — `evidence/P08-A-default-off-rollout-foundation-20260818.md`; authenticated browser/protected Meta pilot açık |
 
 ## 2026-08-17 — ilk uygulama zinciri

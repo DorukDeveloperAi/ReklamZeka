@@ -2,7 +2,9 @@
 
 import { useMemo, useRef, useState } from "react";
 import type { ScopeReport } from "@/domain/slices/scope-report";
+import type { SavedScopeReportQuery } from "@/domain/slices/scope-report-saved";
 import { LocalSessionConnector } from "./local-session-connector";
+import { ScopeReportSavedControls } from "./scope-report-saved-controls";
 import styles from "./scope-report-panel.module.css";
 
 type Form = Readonly<{ slice: string; start: string; end: string; granularity: "day" | "week" | "month"; level: "" | "campaign" | "ad_set"; metric: string; action: string; sort: "bucket" | "entity" | "metric"; direction: "asc" | "desc" }>;
@@ -25,6 +27,8 @@ function validForm(form: Form): boolean {
   return slicePattern.test(form.slice) && datePattern.test(form.start) && datePattern.test(form.end) && form.start <= form.end
     && (!form.metric || keyPattern.test(form.metric)) && (!form.action || keyPattern.test(form.action));
 }
+function savedQuery(form: Form): SavedScopeReportQuery { return Object.freeze({ slice: form.slice, start: form.start, end: form.end, granularity: form.granularity, level: form.level || null, metric: form.metric || null, action: form.action || null, sort: form.sort, direction: form.direction }); }
+function savedForm(query: SavedScopeReportQuery): Form { return Object.freeze({ slice: query.slice, start: query.start, end: query.end, granularity: query.granularity, level: query.level ?? "", metric: query.metric ?? "", action: query.action ?? "", sort: query.sort, direction: query.direction }); }
 function record(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
 function exact(recordValue: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(recordValue).length === keys.length && keys.every((key) => key in recordValue); }
 function text(value: unknown, maximum = 256): value is string { return typeof value === "string" && value.length > 0 && value.length <= maximum; }
@@ -91,7 +95,7 @@ export function ScopeReportPanel({ onConnect }: Readonly<{ onConnect: () => Prom
   };
   const membership = useMemo(() => report ? report.rows.filter((row) => row.membership === "included") : [], [report]);
   return <section className={styles.panel} aria-labelledby="scope-report-title">
-    <header><div><span className={styles.kicker}>KANONİK KAPSAM · SALT OKUNUR</span><h2 id="scope-report-title">Kapsam raporu</h2><p>Yayınlanmış Slice kapsamı, kaynak kapsaması ve ham metrik kanıtı; kayıt veya karar oluşturmaz.</p></div><span className={styles.authority}>Meta yazma yok · Onay yok · Çalıştırma yok</span></header>
+    <header><div><span className={styles.kicker}>KANONİK KAPSAM · SALT OKUNUR</span><h2 id="scope-report-title">Kapsam raporu</h2><p>Yayınlanmış Slice kapsamı, kaynak kapsaması ve ham metrik kanıtı; sorgu tanımı ayrıca kaydedilebilir.</p></div><span className={styles.authority}>Meta yazma yok · Onay yok · Çalıştırma yok</span></header>
     <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); void load(); }} aria-label="Kapsam raporu filtreleri">
       <label>Slice public ref<input disabled={state.kind === "loading"} value={form.slice} onChange={(event) => update("slice", event.target.value)} placeholder="slice_yerli" pattern={slicePattern.source} required aria-describedby="scope-report-help" /></label>
       <label>Başlangıç<input disabled={state.kind === "loading"} type="date" value={form.start} onChange={(event) => update("start", event.target.value)} required /></label>
@@ -104,12 +108,13 @@ export function ScopeReportPanel({ onConnect }: Readonly<{ onConnect: () => Prom
       <label>Yön<select disabled={state.kind === "loading"} value={form.direction} onChange={(event) => update("direction", event.target.value as Form["direction"])}><option value="asc">Artan</option><option value="desc">Azalan</option></select></label>
       <button type="submit" disabled={!canSubmit || state.kind === "loading"}>{state.kind === "loading" ? "Yükleniyor…" : "Raporu getir"}</button>
     </form>
-    <p id="scope-report-help" className={styles.help}>Sadece kanonik public Slice ref kabul edilir. Bu yüzey kaydedilmiş rapor oluşturmaz.</p>
+    <p id="scope-report-help" className={styles.help}>Sadece kanonik public Slice ref kabul edilir. Kaydetme yalnız sorgu tanımını revizyonlar; rapor sonucu veya aksiyon yetkisi üretmez.</p>
     {state.kind === "loading" ? <p className={styles.loading} role="status" aria-live="polite">Kanonik kapsam raporu yükleniyor…</p> : null}
     {state.kind === "session_required" ? <LocalSessionConnector idPrefix="scope-report-session" title="Kapsam raporu için yerel oturumu bağlayın" onVerify={onConnect} /> : null}
     {state.kind === "error" ? <p className={styles.error} role="alert">{state.message}</p> : null}
     {state.kind === "ready" && report ? <div className={styles.results}>
       <div className={styles.exports}><strong>{report.scope.sliceRef}</strong><span>Revizyon {report.scope.revisionNumber} · {report.scope.market.key} · {state.submitted!.start} → {state.submitted!.end} · {state.submitted!.granularity}</span><button type="button" disabled={exporting} onClick={() => void exportReport("csv")}>{exporting ? "Hazırlanıyor…" : "CSV indir"}</button><button type="button" disabled={exporting} onClick={() => void exportReport("xlsx")}>XLSX indir</button><button type="button" disabled={exporting} onClick={() => void load(state.submitted)}>JSON’u yenile</button></div>
+      <ScopeReportSavedControls query={savedQuery(state.submitted!)} onLoad={(saved) => { const next = savedForm(saved); setForm(next); void load(next); }} />
       {exportError ? <p className={styles.error} role="alert">{exportError}</p> : null}
       <div className={styles.summary}><span><strong>{report.counts.included}</strong> kapsamda</span><span><strong>{report.counts.excluded}</strong> hariç</span><span><strong>{report.counts.missingMarket + report.counts.ambiguousMarket}</strong> pazar belirsizliği</span><span><strong>{report.coverage.filter((item) => item.sourceState !== "ready").length}</strong> kapsama uyarısı</span></div>
       <details open><summary>Public üyelik kanıtı ({report.rows.length})</summary><div className={styles.scroll} role="region" aria-label="Public üyelik kanıtı tablosu" tabIndex={0}><table><caption>Slice üyeliği ve public kanıt referansları</caption><thead><tr><th scope="col">Varlık</th><th scope="col">Seviye</th><th scope="col">Durum</th><th scope="col">Neden</th><th scope="col">Pazar kanıtı</th></tr></thead><tbody>{report.rows.map((row) => <tr key={`${row.entityRef}:${row.entityLevel}`}><td>{row.entityRef}</td><td>{row.entityLevel}</td><td>{row.membership}</td><td>{row.reason}</td><td>{row.marketEvidenceRefs.join(", ") || "—"}</td></tr>)}</tbody></table></div></details>

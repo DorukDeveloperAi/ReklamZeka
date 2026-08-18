@@ -13,6 +13,8 @@ const optionalForwardTables = new Set([
   "p06_execution_heads", "p06_execution_events", "p06_execution_runs",
   "guide_run_action_bindings", "p06_limited_autonomy_admissions",
   "budget_ceiling_policy_revisions", "action_preparation_gate_snapshots",
+  "scope_report_saved_heads", "scope_report_saved_revisions",
+  "naming_template_heads", "naming_template_revisions",
 ]);
 
 function inspectionRows(nonEmpty = false, includeOptional = true) {
@@ -37,6 +39,10 @@ const availabilityRow = {
   limited_admissions: true,
   budget_ceiling_policies: true,
   action_preparation_gates: true,
+  saved_report_heads: true,
+  saved_report_revisions: true,
+  naming_template_heads: true,
+  naming_template_revisions: true,
 };
 
 function optionalInspectionRow(statement: string) {
@@ -141,6 +147,10 @@ describe("explicit workspace tombstone purge adapter", () => {
     expect(inspectCalls).toBe(3);
     const deletes = statements.filter((statement) => statement.includes("delete from"));
     expect(deletes).toHaveLength(WORKSPACE_TOMBSTONE_PURGE_TABLES.length);
+    expect(deletes.findIndex((statement) => statement.includes("delete from scope_report_saved_heads")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from scope_report_saved_revisions")));
+    expect(deletes.findIndex((statement) => statement.includes("delete from naming_template_heads")))
+      .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from naming_template_revisions")));
     expect(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_invalidations")))
       .toBeLessThan(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_heads")));
     expect(deletes.findIndex((statement) => statement.includes("delete from candidate_preview_binding_heads")))
