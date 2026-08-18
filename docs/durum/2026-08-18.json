@@ -4,6 +4,105 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "7895988be",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): add human-only rename admission foundation",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e5350c745",
+      "tarih": "2026-08-18",
+      "konu": "feat(p03): complete operation saved view controls",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "103922ec7",
+      "tarih": "2026-08-18",
+      "konu": "docs(v3): record migration post acceptance",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "ab9a212a1",
+      "tarih": "2026-08-18",
+      "konu": "chore(db): journal naming template lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
+      "hash": "149ddfc43",
+      "tarih": "2026-08-18",
+      "konu": "test(p07): add naming template post verification",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "718ea01c2",
+      "tarih": "2026-08-18",
+      "konu": "chore(db): journal saved scope reports",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
+      "hash": "caf01a913",
+      "tarih": "2026-08-18",
+      "konu": "test(p03): add saved report post verification",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "85cba40c1",
+      "tarih": "2026-08-18",
+      "konu": "chore(db): journal limited autonomy execution",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
+      "hash": "ddddb23c5",
+      "tarih": "2026-08-18",
+      "konu": "test(p06): add limited execution post verification",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "5861077db",
+      "tarih": "2026-08-18",
+      "konu": "chore(db): journal limited autonomy admissions",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
+      "hash": "f1ea7a87b",
+      "tarih": "2026-08-18",
+      "konu": "test(p06): sequence limited autonomy admission verification",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
       "hash": "bb23ec4ac",
       "tarih": "2026-08-18",
       "konu": "chore(db): journal p06 budget execution binding",
@@ -38,130 +137,31 @@
       "kapsam": [
         "test"
       ]
-    },
-    {
-      "hash": "673fc4d6b",
-      "tarih": "2026-08-18",
-      "konu": "chore(db): journal p06 execution persistence",
-      "tur": "is",
-      "kapsam": [
-        "chore"
-      ]
-    },
-    {
-      "hash": "d73442f16",
-      "tarih": "2026-08-18",
-      "konu": "fix(p06): authenticate execution evidence chain",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "4896e179c",
-      "tarih": "2026-08-18",
-      "konu": "feat(p05): add manual guide run product path",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "1d0b2ce1f",
-      "tarih": "2026-08-18",
-      "konu": "fix(p04): align guide agent workspace identity",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "0dbea2973",
-      "tarih": "2026-08-18",
-      "konu": "feat(p04): add immutable guide revision drafts",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "40b1288cf",
-      "tarih": "2026-08-18",
-      "konu": "feat(p04): expose canonical guide lifecycle",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "3dd0d9acd",
-      "tarih": "2026-08-18",
-      "konu": "fix(p03): bind saved report replay and head evidence",
-      "tur": "is",
-      "kapsam": [
-        "fix"
-      ]
-    },
-    {
-      "hash": "3738bf025",
-      "tarih": "2026-08-18",
-      "konu": "test(p05): verify real local Codex guide agents",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "3d4e19fe2",
-      "tarih": "2026-08-18",
-      "konu": "feat(p02,p05): add naming lifecycle and trusted status candidates",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "14dc65fc8",
-      "tarih": "2026-08-18",
-      "konu": "feat(p06): add deferred approval decisions",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
-    },
-    {
-      "hash": "7516f34ba",
-      "tarih": "2026-08-18",
-      "konu": "feat(p06): harden disabled execution contract",
-      "tur": "is",
-      "kapsam": [
-        "feat"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 32
-    },
-    {
-      "kapsam": "docs",
-      "adet": 9
+      "adet": 30
     },
     {
       "kapsam": "fix",
-      "adet": 9
+      "adet": 8
     },
     {
       "kapsam": "test",
-      "adet": 7
+      "adet": 8
     },
     {
       "kapsam": "chore",
-      "adet": 3
+      "adet": 7
+    },
+    {
+      "kapsam": "docs",
+      "adet": 7
     }
   ],
-  "isSayisi": 602,
+  "isSayisi": 613,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-18",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "70d1ac0bfba9"
+  "damga": "2fd2950593b4"
 }

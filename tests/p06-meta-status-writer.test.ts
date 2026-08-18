@@ -131,6 +131,25 @@ describe("P06MetaStatusWriter", () => {
     expect(fetchImpl.mock.calls[1]?.[1]?.body).toBe("lifetime_budget=9000");
   });
 
+  it("reads and writes a typed ad rename with no second network mutation", async () => {
+    const responses = [
+      new Response(JSON.stringify({ id: "12345", status: "ACTIVE", effective_status: "ACTIVE", name: "Eski ad" }), { status: 200 }),
+      new Response(JSON.stringify({ success: true }), { status: 200 }),
+      new Response(JSON.stringify({ id: "12345", status: "ACTIVE", effective_status: "ACTIVE", name: "Yeni ad" }), { status: 200 }),
+    ];
+    const fetchImpl = vi.fn<MetaFetch>(async () => responses.shift()!);
+    const writer = new P06MetaStatusWriter("secret-token", fetchImpl, { now: () => fixedNow });
+    const renameRequest: P06ExecutionV2Request = Object.freeze({ ...request, entityRef: "ad_12345", action: "ad_rename",
+      budgetKind: null, currency: null,
+      expectedBefore: Object.freeze({ status: "ACTIVE", budgetMinor: null, name: "Eski ad" }),
+      desired: Object.freeze({ status: "ACTIVE", budgetMinor: null, name: "Yeni ad" }) });
+    const result = await runP06ExecutionV2({ request: renameRequest, writer, control });
+    expect(result).toMatchObject({ outcome: "written_verified", writes: 1 });
+    expect(String(fetchImpl.mock.calls[0]?.[0])).toContain("12345?fields=id,status,effective_status,name");
+    expect(fetchImpl.mock.calls[1]?.[1]?.body).toBe("name=Yeni+ad");
+    expect(fetchImpl.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+  });
+
   it("never retries an ambiguous mutation transport", async () => {
     const fetchImpl = vi.fn<MetaFetch>(async () => {
       throw new Error("socket closed after dispatch secret-token");

@@ -18,8 +18,9 @@ export const P06_EXECUTION_V2_STEPS = [
 export type P06ExecutionV2Action = Extract<
   GuideAction,
   "status_pause" | "status_activate" | "budget_decrease" | "budget_increase"
+  | "campaign_rename" | "adset_rename" | "ad_rename"
 >;
-export type P06ExecutionV2Value = Readonly<{ status: "ACTIVE" | "PAUSED"; budgetMinor: number | null }>;
+export type P06ExecutionV2Value = Readonly<{ status: "ACTIVE" | "PAUSED"; budgetMinor: number | null; name?: string | null }>;
 type P06ExecutionV2RequestCore = Readonly<{
   executionRef: string;
   workspaceRef: string;
@@ -34,6 +35,7 @@ type P06ExecutionV2RequestCore = Readonly<{
 export type P06ExecutionV2Request = P06ExecutionV2RequestCore & (
   | Readonly<{ action: "status_pause" | "status_activate"; budgetKind?: null; currency?: null }>
   | Readonly<{ action: "budget_decrease" | "budget_increase"; budgetKind: "daily" | "lifetime"; currency: string }>
+  | Readonly<{ action: "campaign_rename" | "adset_rename" | "ad_rename"; budgetKind?: null; currency?: null }>
 );
 export type P06ExecutionV2GatePhase = "staging" | "admission" | "post_claim" | "pre_dispatch" | "read_after_write";
 export type P06ExecutionV2Gate = Readonly<{
@@ -146,10 +148,12 @@ export const p06ExecutionV2Digest = (value: unknown) =>
   createHash("sha256").update(JSON.stringify(stable(value))).digest("hex");
 const digest = p06ExecutionV2Digest;
 const sameValue = (left: P06ExecutionV2Value, right: P06ExecutionV2Value) =>
-  left.status === right.status && left.budgetMinor === right.budgetMinor;
+  left.status === right.status && left.budgetMinor === right.budgetMinor && (left.name ?? null) === (right.name ?? null);
 const validValue = (value: P06ExecutionV2Value) =>
   (value.status === "ACTIVE" || value.status === "PAUSED") &&
-  (value.budgetMinor === null || (Number.isSafeInteger(value.budgetMinor) && value.budgetMinor >= 0));
+  (value.budgetMinor === null || (Number.isSafeInteger(value.budgetMinor) && value.budgetMinor >= 0)) &&
+  (value.name === undefined || value.name === null || (typeof value.name === "string" && value.name === value.name.trim()
+    && value.name.length >= 1 && value.name.length <= 255 && !/[\u0000-\u001f\u007f]/.test(value.name)));
 
 function coherent(request: P06ExecutionV2Request): boolean {
   if (!validValue(request.expectedBefore) || !validValue(request.desired)) return false;
@@ -160,6 +164,12 @@ function coherent(request: P06ExecutionV2Request): boolean {
   if (request.action === "status_activate") {
     return request.expectedBefore.status === "PAUSED" && request.desired.status === "ACTIVE" &&
       request.expectedBefore.budgetMinor === request.desired.budgetMinor && request.budgetKind == null && request.currency == null;
+  }
+  if (request.action === "campaign_rename" || request.action === "adset_rename" || request.action === "ad_rename") {
+    return request.expectedBefore.status === request.desired.status
+      && request.expectedBefore.budgetMinor === request.desired.budgetMinor
+      && typeof request.expectedBefore.name === "string" && typeof request.desired.name === "string"
+      && request.expectedBefore.name !== request.desired.name && request.budgetKind == null && request.currency == null;
   }
   return request.expectedBefore.status === request.desired.status && request.expectedBefore.budgetMinor !== null &&
     request.desired.budgetMinor !== null && (request.budgetKind === "daily" || request.budgetKind === "lifetime")

@@ -16,6 +16,7 @@ import {
 const GRAPH_ORIGIN = "https://graph.facebook.com";
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const WRITE_TARGET = /^(?:campaign|adset)_([0-9]{5,32})$/;
+const RENAME_TARGET = /^(?:campaign|adset|ad)_([0-9]{5,32})$/;
 // The pure v2 contract uses the 64-hex digest directly; the durable ledger
 // namespaces the same digest for its database identity.
 const IDEMPOTENCY_KEY = /^(?:p06_exec_idem_)?[a-f0-9]{64}$/;
@@ -23,8 +24,8 @@ const MAX_BODY_BYTES = 1_048_576;
 
 const digest = p06ExecutionV2Digest;
 
-function targetId(entityRef: string): string {
-  const match = WRITE_TARGET.exec(entityRef);
+function targetId(entityRef: string, allowAd = false): string {
+  const match = (allowAd ? RENAME_TARGET : WRITE_TARGET).exec(entityRef);
   if (!match)
     throw new ConnectorError(
       "invalid_data",
@@ -164,7 +165,7 @@ export class P06MetaStatusWriter implements P06ExecutionV2Writer {
       !REF.test(input.workspaceRef) ||
       !REF.test(input.accountRef) ||
       !REF.test(input.entityRef) ||
-      !["status_pause", "status_activate", "budget_decrease", "budget_increase"].includes(input.action)
+      !["status_pause", "status_activate", "budget_decrease", "budget_increase", "campaign_rename", "adset_rename", "ad_rename"].includes(input.action)
     ) {
       throw new ConnectorError(
         "invalid_data",
@@ -172,15 +173,16 @@ export class P06MetaStatusWriter implements P06ExecutionV2Writer {
         false,
       );
     }
-    const id = targetId(input.entityRef);
-    let result: Awaited<ReturnType<P06MetaStatusWriter["request"]>>;
     const budgetAction = input.action === "budget_decrease" || input.action === "budget_increase";
+    const renameAction = input.action === "campaign_rename" || input.action === "adset_rename" || input.action === "ad_rename";
+    const id = targetId(input.entityRef, renameAction);
+    let result: Awaited<ReturnType<P06MetaStatusWriter["request"]>>;
     if (budgetAction && ((input.budgetKind !== "daily" && input.budgetKind !== "lifetime") || !/^[A-Z]{3}$/.test(input.currency ?? ""))) {
       throw new ConnectorError("invalid_data", "Meta bütçe okuma bağlamı geçersiz", false);
     }
     const budgetField = input.budgetKind === "lifetime" ? "lifetime_budget" : "daily_budget";
     try {
-      result = await this.request(`${id}?fields=id,status,effective_status${budgetAction ? `,${budgetField}` : ""}`, {
+      result = await this.request(`${id}?fields=id,status,effective_status${budgetAction ? `,${budgetField}` : renameAction ? ",name" : ""}`, {
         method: "GET",
       });
     } catch (error) {
@@ -214,11 +216,14 @@ export class P06MetaStatusWriter implements P06ExecutionV2Writer {
     const budgetMinor = budgetAction && (typeof rawBudget === "string" || typeof rawBudget === "number") && /^\d{1,16}$/.test(String(rawBudget))
       && Number.isSafeInteger(Number(rawBudget)) ? Number(rawBudget) : budgetAction ? null : null;
     if (budgetAction && budgetMinor === null) throw new ConnectorError("invalid_data", "Meta bütçe yanıtı kanonik değil", false);
+    const name = renameAction && typeof body.name === "string" && body.name === body.name.trim() && body.name.length >= 1
+      && body.name.length <= 255 && !/[\u0000-\u001f\u007f]/.test(body.name) ? body.name : null;
+    if (renameAction && name === null) throw new ConnectorError("invalid_data", "Meta ad yanıtı kanonik değil", false);
     const core = Object.freeze({
       workspaceRef: input.workspaceRef,
       accountRef: input.accountRef,
       entityRef: input.entityRef,
-      value: Object.freeze({ status: status(body.status), budgetMinor }),
+      value: Object.freeze({ status: status(body.status), budgetMinor, ...(renameAction ? { name } : {}) }),
       observedAt: this.now(),
       rawHash: digest(body),
     });
@@ -233,7 +238,7 @@ export class P06MetaStatusWriter implements P06ExecutionV2Writer {
       !REF.test(request.executionRef) ||
       !REF.test(request.entityRef) ||
       !IDEMPOTENCY_KEY.test(idempotencyKey) ||
-      !["status_pause", "status_activate", "budget_decrease", "budget_increase"].includes(request.action)
+      !["status_pause", "status_activate", "budget_decrease", "budget_increase", "campaign_rename", "adset_rename", "ad_rename"].includes(request.action)
     ) {
       throw new ConnectorError(
         "invalid_data",
@@ -241,16 +246,21 @@ export class P06MetaStatusWriter implements P06ExecutionV2Writer {
         false,
       );
     }
-    const id = targetId(request.entityRef);
     const budgetAction = request.action === "budget_decrease" || request.action === "budget_increase";
+    const renameAction = request.action === "campaign_rename" || request.action === "adset_rename" || request.action === "ad_rename";
+    const id = targetId(request.entityRef, renameAction);
     if (budgetAction && ((request.budgetKind !== "daily" && request.budgetKind !== "lifetime")
       || !/^[A-Z]{3}$/.test(request.currency) || request.desired.budgetMinor === null)) {
       throw new ConnectorError("invalid_data", "Meta bütçe mutation bağlamı geçersiz", false);
     }
+    if (renameAction && (typeof request.desired.name !== "string" || request.desired.name !== request.desired.name.trim()
+      || request.desired.name.length < 1 || request.desired.name.length > 255 || /[\u0000-\u001f\u007f]/.test(request.desired.name))) {
+      throw new ConnectorError("invalid_data", "Meta rename mutation bağlamı geçersiz", false);
+    }
     const desired = request.action === "status_pause" ? "PAUSED" : "ACTIVE";
     const mutation = budgetAction
       ? { [request.budgetKind === "lifetime" ? "lifetime_budget" : "daily_budget"]: String(request.desired.budgetMinor) }
-      : { status: desired };
+      : renameAction ? { name: request.desired.name! } : { status: desired };
     const ambiguous = (
       rawHash: string,
     ): P06ExecutionV2Receipt<P06ExecutionV2WriteCore> => {

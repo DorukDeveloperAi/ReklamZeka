@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: 70d1ac0bfba9 -->
+<!-- durum-damga: 2fd2950593b4 -->
 
 ## Künye
 
@@ -14,36 +14,36 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 602 |
+| iş commit'i (tüm geçmiş) | 613 |
 | ilk / son iş | 2026-08-06 / 2026-08-18 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-18 | `feat` | add human-only rename admission foundation | `7895988be` |
+| 2026-08-18 | `feat` | complete operation saved view controls | `e5350c745` |
+| 2026-08-18 | `docs` | record migration post acceptance | `103922ec7` |
+| 2026-08-18 | `chore` | journal naming template lifecycle | `ab9a212a1` |
+| 2026-08-18 | `test` | add naming template post verification | `149ddfc43` |
+| 2026-08-18 | `chore` | journal saved scope reports | `718ea01c2` |
+| 2026-08-18 | `test` | add saved report post verification | `caf01a913` |
+| 2026-08-18 | `chore` | journal limited autonomy execution | `85cba40c1` |
+| 2026-08-18 | `test` | add limited execution post verification | `ddddb23c5` |
+| 2026-08-18 | `chore` | journal limited autonomy admissions | `5861077db` |
+| 2026-08-18 | `test` | sequence limited autonomy admission verification | `f1ea7a87b` |
 | 2026-08-18 | `chore` | journal p06 budget execution binding | `bb23ec4ac` |
 | 2026-08-18 | `test` | sequence budget execution verification | `3dfac0829` |
 | 2026-08-18 | `chore` | journal budget ceiling policies | `8946feb5a` |
 | 2026-08-18 | `test` | add ceiling policy post verification | `619d5678b` |
-| 2026-08-18 | `chore` | journal p06 execution persistence | `673fc4d6b` |
-| 2026-08-18 | `fix` | authenticate execution evidence chain | `d73442f16` |
-| 2026-08-18 | `feat` | add manual guide run product path | `4896e179c` |
-| 2026-08-18 | `fix` | align guide agent workspace identity | `1d0b2ce1f` |
-| 2026-08-18 | `feat` | add immutable guide revision drafts | `0dbea2973` |
-| 2026-08-18 | `feat` | expose canonical guide lifecycle | `40b1288cf` |
-| 2026-08-18 | `fix` | bind saved report replay and head evidence | `3dd0d9acd` |
-| 2026-08-18 | `test` | verify real local Codex guide agents | `3738bf025` |
-| 2026-08-18 | `feat` | add naming lifecycle and trusted status candidates | `3d4e19fe2` |
-| 2026-08-18 | `feat` | add deferred approval decisions | `14dc65fc8` |
-| 2026-08-18 | `feat` | harden disabled execution contract | `7516f34ba` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 32
-- `docs        ` ███████ 9
-- `fix         ` ███████ 9
-- `test        ` █████ 7
-- `chore       ` ██ 3
+- `feat        ` ████████████████████████ 30
+- `fix         ` ██████ 8
+- `test        ` ██████ 8
+- `chore       ` ██████ 7
+- `docs        ` ██████ 7
 
 ## Planlar
 

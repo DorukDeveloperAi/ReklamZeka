@@ -107,6 +107,20 @@ describe("P06 execution v2", () => {
     expect((writer.port.read as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toMatchObject({ budgetKind: "lifetime", currency: "TRY" });
   });
 
+  it("executes a coherent human-only rename and rejects same-name or status drift", async () => {
+    const renameRequest: P06ExecutionV2Request = { ...request, action: "adset_rename", budgetKind: null, currency: null,
+      expectedBefore: { status: "ACTIVE", budgetMinor: null, name: "Prospecting | Eski" },
+      desired: { status: "ACTIVE", budgetMinor: null, name: "Prospecting | Yeni" } };
+    const writer = makeWriter([renameRequest.expectedBefore, renameRequest.desired]);
+    await expect(runP06ExecutionV2({ request: renameRequest, writer: writer.port,
+      control: makeControl(undefined, renameRequest) })).resolves.toMatchObject({ outcome: "written_verified", writes: 1 });
+    await expect(runP06ExecutionV2({ request: { ...renameRequest, desired: renameRequest.expectedBefore },
+      writer: writer.port, control: makeControl(undefined, renameRequest) })).rejects.toThrow("invalid input");
+    await expect(runP06ExecutionV2({ request: { ...renameRequest,
+      desired: { ...renameRequest.desired, status: "PAUSED" } }, writer: writer.port,
+      control: makeControl(undefined, renameRequest) })).rejects.toThrow("invalid input");
+  });
+
   it("reads first and never writes an already-applied target", async () => {
     const writer = makeWriter([request.desired]);
     const result = await runP06ExecutionV2({ request, writer: writer.port, control: makeControl() });
