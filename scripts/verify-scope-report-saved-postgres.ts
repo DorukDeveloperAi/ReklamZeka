@@ -133,6 +133,18 @@ try {
   flags.exactReplay =
     replay.replay &&
     replay.revision.revisionHash === first.revision.revisionHash;
+  flags.replayExpectedVersionBound = await rejected(() =>
+    repository.save({
+      workspaceId: ws,
+      actorId: user,
+      commandRef: command,
+      reportRef: first.revision.reportRef,
+      expectedVersion: 99,
+      label: "Haftalık lead",
+      query,
+      state: "active",
+    }),
+  );
   const second = await repository.save({
     workspaceId: ws,
     actorId: user,
@@ -162,6 +174,18 @@ try {
     client.query(
       "insert into scope_report_saved_revisions(workspace_id,binding_id,report_ref,command_ref,revision_number,previous_revision_hash,revision_hash,state,label,slice_ref,query_payload,created_by_actor_id,created_at) select workspace_id,binding_id,report_ref,$2,3,revision_hash,repeat('f',64),'active','tamper',slice_ref,query_payload,created_by_actor_id,date_trunc('milliseconds',transaction_timestamp()) from scope_report_saved_revisions where workspace_id=$1 and revision_number=2",
       [ws, `scope_report_save_${"e".repeat(64)}`],
+    ),
+  );
+  flags.jsonTypeForgeryRejected = await rejected(() =>
+    client.query(
+      "with s as (select *,query_payload||jsonb_build_object('granularity',null) q from scope_report_saved_revisions where workspace_id=$1 and revision_number=2),h as (select *,guide_run_sha256(jsonb_build_object('version','saved-scope-report/1.0.0','workspaceId',workspace_id::text,'reportRef',report_ref,'commandRef',$2::text,'revisionNumber',3,'previousRevisionHash',revision_hash,'state','active','label','type forgery','query',q,'createdByActorId',created_by_actor_id::text)) expected from s) insert into scope_report_saved_revisions(workspace_id,binding_id,report_ref,command_ref,revision_number,previous_revision_hash,revision_hash,state,label,slice_ref,query_payload,created_by_actor_id,created_at) select workspace_id,binding_id,report_ref,$2,3,revision_hash,expected,'active','type forgery',slice_ref,q,created_by_actor_id,date_trunc('milliseconds',transaction_timestamp()) from h",
+      [ws, `scope_report_save_${"f".repeat(64)}`],
+    ),
+  );
+  flags.headTimestampForgeryRejected = await rejected(() =>
+    client.query(
+      "with s as (select *,query_payload q from scope_report_saved_revisions where workspace_id=$1 and revision_number=2),h as (select *,guide_run_sha256(jsonb_build_object('version','saved-scope-report/1.0.0','workspaceId',workspace_id::text,'reportRef',report_ref,'commandRef',$2::text,'revisionNumber',3,'previousRevisionHash',revision_hash,'state','active','label','timestamp forgery','query',q,'createdByActorId',created_by_actor_id::text)) expected from s),ins as (insert into scope_report_saved_revisions(workspace_id,binding_id,report_ref,command_ref,revision_number,previous_revision_hash,revision_hash,state,label,slice_ref,query_payload,created_by_actor_id,created_at) select workspace_id,binding_id,report_ref,$2,3,revision_hash,expected,'active','timestamp forgery',slice_ref,q,created_by_actor_id,date_trunc('milliseconds',transaction_timestamp()) from h returning id,workspace_id,binding_id,report_ref) update scope_report_saved_heads sh set latest_revision_id=ins.id,version=3,updated_at='2000-01-01T00:00:00.000Z' from ins where sh.workspace_id=ins.workspace_id and sh.binding_id=ins.binding_id and sh.report_ref=ins.report_ref",
+      [ws, `scope_report_save_${"1".repeat(64)}`],
     ),
   );
   flags.appendOnly = await rejected(() =>

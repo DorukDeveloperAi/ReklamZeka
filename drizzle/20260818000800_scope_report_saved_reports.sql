@@ -55,7 +55,7 @@ DECLARE r public.scope_report_saved_revisions%ROWTYPE; old_r public.scope_report
 BEGIN
   IF TG_OP='DELETE' THEN IF EXISTS(SELECT 1 FROM public.workspaces WHERE id=OLD.workspace_id AND lifecycle_state='tombstoning') THEN RETURN OLD; END IF; RAISE EXCEPTION 'saved report heads may only be purged by tombstone'; END IF;
   SELECT * INTO r FROM public.scope_report_saved_revisions WHERE workspace_id=NEW.workspace_id AND id=NEW.latest_revision_id FOR KEY SHARE;
-  IF NOT FOUND OR (r.binding_id,r.report_ref) IS DISTINCT FROM (NEW.binding_id,NEW.report_ref) THEN RAISE EXCEPTION 'saved report head identity invalid'; END IF;
+  IF NOT FOUND OR (r.binding_id,r.report_ref,r.revision_number,r.created_at) IS DISTINCT FROM (NEW.binding_id,NEW.report_ref,NEW.version,NEW.updated_at) THEN RAISE EXCEPTION 'saved report head identity invalid'; END IF;
   IF TG_OP='INSERT' THEN IF NEW.version<>1 OR r.revision_number<>1 OR r.previous_revision_hash<>'GENESIS' THEN RAISE EXCEPTION 'saved report head genesis invalid'; END IF;
   ELSE
     IF (NEW.workspace_id,NEW.binding_id,NEW.report_ref) IS DISTINCT FROM (OLD.workspace_id,OLD.binding_id,OLD.report_ref) OR NEW.version<>OLD.version+1 THEN RAISE EXCEPTION 'saved report head OCC invalid'; END IF;

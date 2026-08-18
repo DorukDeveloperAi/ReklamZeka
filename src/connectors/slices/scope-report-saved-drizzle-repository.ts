@@ -82,7 +82,9 @@ function sameCommand(
     found.createdByActorId === input.actorId &&
     found.label === input.label &&
     found.state === input.state &&
-    savedScopeReportDigest(found.query) === savedScopeReportDigest(input.query) &&
+    savedScopeReportDigest(found.query) ===
+      savedScopeReportDigest(input.query) &&
+    found.revisionNumber === (input.expectedVersion ?? 0) + 1 &&
     (input.reportRef === null || found.reportRef === input.reportRef)
   );
 }

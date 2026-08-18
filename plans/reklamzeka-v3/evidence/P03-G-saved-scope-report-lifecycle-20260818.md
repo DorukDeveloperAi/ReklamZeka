@@ -13,7 +13,7 @@
 `npm run verify:scope-report-saved-postgres` outer rollback altında exit 0:
 
 ```json
-{"mode":"pre_outer_rollback","sha256":"cfe2c665d7c1f89c52bc86f7b44a5e62242eeded595ecdd67cdd9b3cda66a8e2","migrationInstalled":true,"created":true,"exactReplay":true,"occAdvance":true,"staleRejected":true,"hashTamperRejected":true,"appendOnly":true,"listCurrent":true,"transactionContracts":true,"catalog":true,"unjournaled":true,"zeroResidue":true}
+{"mode":"pre_outer_rollback","sha256":"cff26151da3ea44fccffe0a85e3ad48596c46a71b4b8a95a455b237c5bb314dd","migrationInstalled":true,"created":true,"exactReplay":true,"replayExpectedVersionBound":true,"occAdvance":true,"staleRejected":true,"hashTamperRejected":true,"jsonTypeForgeryRejected":true,"headTimestampForgeryRejected":true,"appendOnly":true,"listCurrent":true,"transactionContracts":true,"catalog":true,"unjournaled":true,"zeroResidue":true}
 ```
 
 - Odak: 8 dosya / 26 test PASS.

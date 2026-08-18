@@ -21,9 +21,11 @@
 
 ## Yerel gate kanıtı
 
-- Full suite: 544 dosya / 2665 test PASS.
+- Full suite: 554 dosya / 2694 test PASS.
 - Security audit: 0 vulnerability; Supabase 174/174 RLS, API grant/routine 0.
 - Pilot readiness: 12 dosya / 43 test ve DB check PASS.
+- `check:experience` 4/4, `check:pilot-web` 3/3, production `next build` ve secret-artifact taraması PASS.
+- Gerçek local Codex Daily/Holistic read-only kabulü PASS; iki Agent da authority-free `no_change` üretti ve Meta-write girdisi yoktu.
 - TypeScript, experience, pilot-web, build ve diff-check PASS.
 - Yerel env boolean denetiminde beş global rollout bayrağı, write token ve write allowlistleri kapalı/eksik; yalnız local-session altyapısı açıktır.
 
