@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createGuideRevision } from "@/domain/guides/guide-revision";
 import { createGuideRunV12 } from "@/domain/guides/guide-run";
@@ -41,6 +41,25 @@ describe("GuideRunSchedulerWorker", () => {
     expect(createLocalCodexGuideRunManualRuntime({ database: {} as never, dataHealth: {} as never,
       environment: { META_READ_ENABLED: "true", GUIDE_SCHEDULER_ENABLED: "true", REKLAMZEKA_GUIDE_RUN_CODEX_ENABLED: "true",
         REKLAMZEKA_CODEX_EXECUTABLE: "/tmp/codex", REKLAMZEKA_CODEX_WORKSPACE_ROOT: "/tmp" } }).enabled).toBe(true);
+  });
+
+  it("does not enumerate schedules or materialize runs after the live P08 scheduler gate closes", async () => {
+    const environment: Record<string, string> = {
+      META_READ_ENABLED: "true",
+      GUIDE_SCHEDULER_ENABLED: "true",
+    };
+    const execute = vi.fn();
+    const runtime = createGuideRunSchedulerRuntime({
+      database: { execute, transaction: vi.fn() } as never,
+      dailyAnalysis: {} as never,
+      holisticAnalysis: {} as never,
+      dataHealth: {} as never,
+      environment,
+    });
+    expect(runtime.enabled).toBe(true);
+    environment.GUIDE_SCHEDULER_ENABLED = "false";
+    await expect(runtime.scheduler!.tick({ now: at, leaseToken: token, leaseUntil: expires })).resolves.toEqual([]);
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it("uses the concrete active-schedule reader (whose SQL selects the latest activation and receipt cursor) rather than a client schedule payload", async () => {

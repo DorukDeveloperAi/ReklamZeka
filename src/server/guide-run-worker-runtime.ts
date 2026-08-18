@@ -232,12 +232,22 @@ export function createGuideRunSchedulerRuntime(
     environment?: P08RolloutEnvironment;
   }>,
 ) {
-  if (!resolveP08RolloutControl(input.environment).guideSchedulerEnabled) {
+  const environment = input.environment ?? process.env;
+  if (!resolveP08RolloutControl(environment).guideSchedulerEnabled) {
     return Object.freeze({ enabled: false as const, scheduler: null });
   }
+  const scheduler = createGuideRunSchedulerWorker(input);
   return Object.freeze({
     enabled: true as const,
-    scheduler: createGuideRunSchedulerWorker(input),
+    scheduler: Object.freeze({
+      async tick(tick: Readonly<{ now: string; leaseToken: string; leaseUntil: string }>) {
+        // The scheduler process can remain alive after P08 is closed. Never
+        // enumerate schedules, write receipts, or invoke agents in that state.
+        if (!resolveP08RolloutControl(environment).guideSchedulerEnabled)
+          return Object.freeze([] as ReadonlyArray<Readonly<{ runRef: string; state: string }>>);
+        return scheduler.tick(tick);
+      },
+    }),
   });
 }
 
@@ -288,8 +298,17 @@ export function createLocalCodexGuideRunManualRuntime(input: Readonly<{
   if (!agents) return Object.freeze({ enabled: false as const, worker: null });
   const worker = createGuideRunProductionWorker({ ...input, ...agents,
     dataHealth: input.dataHealth ?? new DrizzleGuideRunTrustedDataHealthRepository(input.database) });
+  const manual = new GuideRunManualWorker(worker, new DrizzleGuideRunActiveGuidePort(input.database));
   return Object.freeze({ enabled: true as const,
-    worker: new GuideRunManualWorker(worker, new DrizzleGuideRunActiveGuidePort(input.database)) });
+    worker: Object.freeze({
+      async run(run: Parameters<GuideRunManualWorker["run"]>[0]) {
+        // A local process may outlive rollout closure; do not let its captured
+        // worker materialize a manual run after P08 has been disabled.
+        if (!resolveP08RolloutControl(environment).guideSchedulerEnabled)
+          throw new Error("guide scheduler rollout disabled");
+        return manual.run(run);
+      },
+    }) });
 }
 
 /**
