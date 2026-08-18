@@ -101,6 +101,8 @@
     "verify:p06-approval-decision-defer-db:post": "P06_DEFER_POST_APPROVED=true tsx scripts/verify-p06-approval-decision-defer-postgres.ts",
     "verify:p06-human-rename-foundation-db": "tsx scripts/verify-p06-human-rename-foundation-postgres.ts",
     "verify:p06-human-rename-foundation-db:post": "P06_HUMAN_RENAME_POST_APPROVED=true tsx scripts/verify-p06-human-rename-foundation-postgres.ts",
+    "verify:p06-human-rename-execution-db": "node --conditions react-server --env-file=.env.local --import tsx scripts/verify-p06-human-rename-execution-postgres.ts",
+    "verify:p06-human-rename-execution-db:post": "P06_HUMAN_RENAME_EXECUTION_POST_APPROVED=true node --conditions react-server --env-file=.env.local --import tsx scripts/verify-p06-human-rename-execution-postgres.ts",
     "verify:guide-run-codex-live": "REKLAMZEKA_GUIDE_RUN_CODEX_LIVE_APPROVED=true node --conditions react-server --env-file=.env.local --import tsx scripts/verify-guide-run-codex-live.ts",
     "verify:p06-execution-persistence-db": "tsx scripts/verify-p06-execution-persistence-postgres.ts",
     "verify:p06-execution-persistence-db:post": "P06_EXECUTION_POST_APPROVED=true tsx scripts/verify-p06-execution-persistence-postgres.ts && P06_EXECUTION_CHAIN_POST_APPROVED=true node --conditions react-server --import tsx scripts/verify-p06-action-bindings-postgres.ts",

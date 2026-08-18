@@ -107,6 +107,42 @@ describe("DrizzleP06ExecutionRepository", () => {
     expect(rendered).not.toMatch(/fetch\(|authorization|access_token/i);
   });
 
+  it("materializes a human-approved rename only from the immutable disabled admission attempt", async () => {
+    const actionPlan = buildActionPlan({ kind: "rename", entity: { level: "ad" as const, ref: "ad_external_1" },
+      beforeName: "Creative A", afterName: "Creative B", namingEvidenceRef: "naming_evidence_main" },
+    { workspaceRef: "workspace_alpha", accountGroupRef: null, accountRef: "act_123", internalCategoryRefs: [],
+      campaignRef: "campaign_external_1", entity: { level: "ad" as const, ref: "ad_external_1" }, evaluatedAt,
+      rules: [], budgetLimits: null,
+      protection: { protectedInternalCategoryRefs: [], affectedGeoRefs: [], protectedGeoRefs: [], changeDisposition: "allowed", policyRefs: [] } });
+    const writeSpec = createMetaWriteSpec({ unitRef: "action_unit_11111111111111111111", unitHash: "9".repeat(64), actionPlan });
+    const admissionCore = { version: "action-execution-admission/1.0.0" as const, unitRef: writeSpec.unitRef,
+      approvalDecisionRef: "decision_one", approvalGrantRef: "grant_one", executionPresenceRef: "presence_one", writeSpec,
+      eligibilitySnapshotHash: "b".repeat(64), eligibilityHash: "c".repeat(64), dependencyUnitRefs: Object.freeze([]), evaluatedAt,
+      disposition: "admitted_for_disabled_executor" as const,
+      capabilities: Object.freeze({ canExecute: false as const, canWriteMeta: false as const, canDispatchNetwork: false as const }) };
+    const admission = Object.freeze({ ...admissionCore, admissionHash: p06ExecutionV2Digest(admissionCore) });
+    const execute = vi.fn().mockResolvedValueOnce({ rows: [{
+      attempt_id: id("21"), admission_hash: admission.admissionHash, write_spec_hash: writeSpec.specHash, admission_payload: admission,
+      unit_id: id("22"), unit_ref: writeSpec.unitRef, unit_hash: "9".repeat(64), context_hash: actionPlan.contextHash,
+      action_plan_hash: actionPlan.planHash, action_plan_payload: actionPlan, account_ref: "act_123", entity_ref: "ad_external_1",
+      action_type: "ad_rename", campaign_id: null, ad_set_id: null, ad_id: id("27"), bundle_id: id("23"), workspace_ref: "workspace_alpha", plan_hash: "e".repeat(64),
+      decision_id: id("24"), grant_id: id("25"), grant_hash: "2".repeat(64), policy_hash: "1".repeat(64),
+    }] }).mockResolvedValueOnce({ rows: [{ configured_status: "ACTIVE", name: "Creative A" }] })
+      .mockResolvedValueOnce({ rows: [{ id: id("26") }] }).mockResolvedValue({ rows: [] });
+    const database = { execute, transaction: async (callback: (tx: { execute: typeof execute }) => Promise<unknown>) => callback({ execute }) };
+    const created = await new DrizzleP06ExecutionRepository(database as never).createHumanRenameApproved({
+      workspaceId: id("20"), actionExecutionAttemptId: id("21"), evaluatedAt, gates: gates.slice(0, 2),
+    });
+    expect(created.request).toMatchObject({ action: "ad_rename", budgetKind: null, currency: null,
+      expectedBefore: { status: "ACTIVE", budgetMinor: null, name: "Creative A" },
+      desired: { status: "ACTIVE", budgetMinor: null, name: "Creative B" } });
+    const rendered = execute.mock.calls.map(([query]) => sqlText(query)).join("\n");
+    expect(rendered).toContain("human_rename_approved");
+    expect(rendered).toContain("action_execution_attempts");
+    expect(rendered).toContain("admission_payload");
+    expect(rendered).not.toMatch(/fetch\(|authorization|access_token|meta.*write/i);
+  });
+
   it("derives a status request from the persisted binding and writes no network capability", async () => {
     const execute = vi
       .fn()

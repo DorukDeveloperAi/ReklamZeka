@@ -6242,6 +6242,26 @@ export const p06ExecutionRuns = pgTable("p06_execution_runs", {
           and ${table.requestPayload}->>'actionPlanHash'=${table.actionPlanHash}
           and ${table.requestPayload}->'effectiveGuideSetHash'='null'::jsonb
           and ${table.requestPayload}->'resolutionHash'='null'::jsonb)
+        or (${table.route}='human_rename_approved'
+          and ${table.guideRunActionBindingId} is null and ${table.actionExecutionAttemptId} is not null
+          and ${table.limitedAutonomyAdmissionId} is null
+          and ${table.proposalBundleId} is not null and ${table.actionUnitId} is not null
+          and ${table.decisionEventId} is not null and ${table.approvalGrantId} is not null
+          and ${table.actionUnitHash} ~ '^[a-f0-9]{64}$' and ${table.proposalHash} ~ '^[a-f0-9]{64}$'
+          and ${table.effectiveGuideSetHash} is null and ${table.resolutionHash} is null
+          and ${table.admissionHash} ~ '^[a-f0-9]{64}$' and ${table.writeSpecHash} ~ '^[a-f0-9]{64}$'
+          and ${table.actionPlanHash} ~ '^[a-f0-9]{64}$'
+          and ${table.dryRunHash} is null and ${table.budgetKind} is null and ${table.currency} is null
+          and ${table.autonomyEvidenceHash} is null and ${table.dataHealthReportHash} is null and ${table.protectionHash} is null
+          and public.p06_jsonb_object_key_count(${table.requestPayload})=22
+          and ${table.requestPayload} ?& array['version','workspaceRef','accountRef','entityRef','action','expectedBefore','desired','evaluatedAt','actionUnitHash','proposalHash','contextHash','effectiveGuideSetHash','resolutionHash','policyHash','gateSetHash','admissionHash','writeSpecHash','actionPlanHash','route','executionRef','idempotencyKey','requestHash']
+          and ${table.requestPayload}->>'actionUnitHash'=${table.actionUnitHash}
+          and ${table.requestPayload}->>'proposalHash'=${table.proposalHash}
+          and ${table.requestPayload}->>'admissionHash'=${table.admissionHash}
+          and ${table.requestPayload}->>'writeSpecHash'=${table.writeSpecHash}
+          and ${table.requestPayload}->>'actionPlanHash'=${table.actionPlanHash}
+          and ${table.requestPayload}->'effectiveGuideSetHash'='null'::jsonb
+          and ${table.requestPayload}->'resolutionHash'='null'::jsonb)
         or (${table.route}='limited_autonomy_status'
           and ${table.guideRunActionBindingId} is null and ${table.actionExecutionAttemptId} is null
           and ${table.limitedAutonomyAdmissionId} is not null

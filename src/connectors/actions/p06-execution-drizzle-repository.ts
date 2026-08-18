@@ -123,7 +123,11 @@ export type P06ExecutionWorkerSnapshot = Readonly<{
   executionRunId: string;
   executionRef: string;
   idempotencyKey: string;
-  route: "human_approved" | "guide_budget_human_approved" | "limited_autonomy_status";
+  route:
+    | "human_approved"
+    | "guide_budget_human_approved"
+    | "human_rename_approved"
+    | "limited_autonomy_status";
   request: Omit<P06ExecutionV2Request, "leaseTokenHash" | "fenceHash">;
   head: Readonly<{
     state:
@@ -179,21 +183,25 @@ function record(value: unknown): Record<string, unknown> {
     fail("corrupt_store");
   return value as Record<string, unknown>;
 }
-function statusValue(
+function executionValue(
   value: unknown,
-): Readonly<{ status: "ACTIVE" | "PAUSED"; budgetMinor: number | null }> {
+): Readonly<{ status: "ACTIVE" | "PAUSED"; budgetMinor: number | null; name: string | null }> {
   const source = record(value);
   if (
     (source.status !== "ACTIVE" && source.status !== "PAUSED") ||
     (source.budgetMinor !== null &&
       (!Number.isSafeInteger(source.budgetMinor) ||
-        Number(source.budgetMinor) < 0))
+        Number(source.budgetMinor) < 0)) ||
+    (source.name !== undefined && source.name !== null &&
+      (typeof source.name !== "string" || source.name !== source.name.trim() ||
+        source.name.length < 1 || source.name.length > 255 || /[\u0000-\u001f\u007f]/.test(source.name)))
   )
     fail("corrupt_store");
   return Object.freeze({
     status: source.status,
     budgetMinor:
       source.budgetMinor === null ? null : Number(source.budgetMinor),
+    name: source.name === undefined || source.name === null ? null : source.name,
   });
 }
 
@@ -227,13 +235,13 @@ export class DrizzleP06ExecutionRepository {
         typeof run.run_id !== "string" ||
         typeof run.workspace_id !== "string" ||
         typeof run.idempotency_key !== "string" ||
-        !["human_approved", "guide_budget_human_approved", "limited_autonomy_status"].includes(String(run.route))
+        !["human_approved", "guide_budget_human_approved", "human_rename_approved", "limited_autonomy_status"].includes(String(run.route))
       )
         fail("not_found");
       const payload = record(run.request_payload);
       const action = payload.action;
       if (
-        !["status_pause", "status_activate", "budget_decrease", "budget_increase"].includes(String(action)) ||
+        !["status_pause", "status_activate", "budget_decrease", "budget_increase", "campaign_rename", "adset_rename", "ad_rename"].includes(String(action)) ||
         payload.executionRef !== executionRef ||
         payload.idempotencyKey !== run.idempotency_key ||
         typeof payload.workspaceRef !== "string" ||
@@ -253,8 +261,8 @@ export class DrizzleP06ExecutionRepository {
         action: action as P06ExecutionV2Action,
         ...(budgetAction ? { budgetKind: payload.budgetKind as "daily" | "lifetime", currency: payload.currency as string }
           : { budgetKind: null, currency: null }),
-        expectedBefore: statusValue(payload.expectedBefore),
-        desired: statusValue(payload.desired),
+        expectedBefore: executionValue(payload.expectedBefore),
+        desired: executionValue(payload.desired),
         evaluatedAt: instant(payload.evaluatedAt),
       });
       const traceRows = rows(
@@ -728,6 +736,147 @@ export class DrizzleP06ExecutionRepository {
         currency: materialized.currency, expectedBefore: materialized.expectedBefore, desired: materialized.desired, evaluatedAt,
       });
       return Object.freeze({ workspaceId: input.workspaceId, executionRunId: runId, executionRef, requestHash, idempotencyKey, request });
+    });
+  }
+
+  /**
+   * Creates a disabled execution identity for a rename only from the immutable
+   * admission attempt already tied to one human approval and single-use grant.
+   * Callers supply no target, previous/desired name, or policy evidence.
+   */
+  async createHumanRenameApproved(
+    input: Readonly<{
+      workspaceId: string;
+      actionExecutionAttemptId: string;
+      evaluatedAt: string;
+      gates: readonly P06ExecutionGateSeed[];
+    }>,
+  ): Promise<P06ExecutionIdentity> {
+    if (!UUID.test(input.workspaceId) || !UUID.test(input.actionExecutionAttemptId))
+      fail("invalid_input");
+    const evaluatedAt = instant(input.evaluatedAt);
+    const { normalized: normalizedGates, gateSetHash } = initialGates(input.gates, evaluatedAt);
+    return this.database.transaction(async (tx) => {
+      const source = one(rows(await tx.execute(sql`
+        select a.id::text attempt_id,a.admission_hash,a.write_spec_hash,a.admission_payload,
+          u.id::text unit_id,u.unit_ref,u.unit_hash,u.context_hash,u.action_plan_hash,u.action_plan_payload,
+          u.account_ref,u.entity_ref,u.action_type,u.campaign_id::text,u.ad_set_id::text,u.ad_id::text,
+          bundle.id::text bundle_id,bundle.workspace_ref,bundle.plan_hash,
+          d.id::text decision_id,g.id::text grant_id,g.grant_hash,p.policy_hash
+        from action_execution_attempts a
+        join action_proposal_units u on u.workspace_id=a.workspace_id and u.id=a.unit_id and u.bundle_id=a.bundle_id
+        join action_proposal_bundles bundle on bundle.workspace_id=a.workspace_id and bundle.id=a.bundle_id
+        join action_approval_policy_snapshots p on p.workspace_id=bundle.workspace_id and p.id=bundle.policy_snapshot_id
+        join action_approval_decision_events d on d.workspace_id=a.workspace_id and d.id=a.decision_event_id
+          and d.bundle_id=a.bundle_id and d.unit_id=a.unit_id and d.command_kind='approve'
+        join action_approval_evidence_grants g on g.workspace_id=a.workspace_id and g.id=a.approval_grant_id
+          and g.decision_event_id=d.id and g.bundle_id=a.bundle_id and g.unit_id=a.unit_id
+          and g.expires_at>${evaluatedAt}::timestamptz
+        join workspaces w on w.id=a.workspace_id and w.lifecycle_state='active' and w.tombstoned_at is null
+        where a.workspace_id=${input.workspaceId}::uuid and a.id=${input.actionExecutionAttemptId}::uuid
+        for share of a,u,bundle,p,d,g,w limit 2
+      `)));
+      if (!source
+        || typeof source.attempt_id !== "string" || typeof source.unit_id !== "string"
+        || typeof source.bundle_id !== "string" || typeof source.decision_id !== "string"
+        || typeof source.grant_id !== "string" || typeof source.grant_hash !== "string"
+        || typeof source.unit_ref !== "string" || typeof source.unit_hash !== "string"
+        || typeof source.workspace_ref !== "string" || typeof source.account_ref !== "string"
+        || typeof source.entity_ref !== "string" || typeof source.context_hash !== "string"
+        || typeof source.action_plan_hash !== "string" || typeof source.plan_hash !== "string"
+        || typeof source.policy_hash !== "string") fail("not_found");
+      const action = source.action_type;
+      if (![
+        "campaign_rename", "adset_rename", "ad_rename",
+      ].includes(String(action)) || !HASH.test(source.unit_hash) || !HASH.test(source.context_hash)
+        || !HASH.test(source.action_plan_hash) || !HASH.test(source.plan_hash)
+        || !HASH.test(source.policy_hash) || !HASH.test(source.grant_hash)) fail("corrupt_store");
+      const plan = record(source.action_plan_payload);
+      const planAction = record(plan.action);
+      const admission = record(source.admission_payload);
+      const writeSpec = record(admission.writeSpec);
+      const mutation = record(writeSpec.mutation);
+      const target = record(writeSpec.target);
+      if (plan.actionType !== action || planAction.kind !== "rename"
+        || typeof planAction.beforeName !== "string" || typeof planAction.afterName !== "string"
+        || planAction.beforeName !== planAction.beforeName.trim() || planAction.afterName !== planAction.afterName.trim()
+        || planAction.beforeName.length < 1 || planAction.beforeName.length > 255
+        || planAction.afterName.length < 1 || planAction.afterName.length > 255
+        || /[\u0000-\u001f\u007f]/.test(planAction.beforeName + planAction.afterName)
+        || planAction.beforeName === planAction.afterName
+        || admission.admissionHash !== source.admission_hash || writeSpec.specHash !== source.write_spec_hash
+        || writeSpec.actionPlanHash !== source.action_plan_hash || target.entityRef !== source.entity_ref
+        || mutation.kind !== "rename" || mutation.previousName !== planAction.beforeName || mutation.desiredName !== planAction.afterName
+        || record(admission.capabilities).canExecute !== false || record(admission.capabilities).canWriteMeta !== false
+        || record(admission.capabilities).canDispatchNetwork !== false
+        || (action === "campaign_rename" && planAction.entity && record(planAction.entity).level !== "campaign")
+        || (action === "adset_rename" && planAction.entity && record(planAction.entity).level !== "adset")
+        || (action === "ad_rename" && planAction.entity && record(planAction.entity).level !== "ad")
+        || (action === "campaign_rename" && (typeof source.campaign_id !== "string" || source.ad_set_id !== null || source.ad_id !== null))
+        || (action === "adset_rename" && (source.campaign_id !== null || typeof source.ad_set_id !== "string" || source.ad_id !== null))
+        || (action === "ad_rename" && (source.campaign_id !== null || source.ad_set_id !== null || typeof source.ad_id !== "string"))
+      ) fail("corrupt_store");
+      const mirror = action === "campaign_rename"
+        ? one(rows(await tx.execute(sql`select configured_status,name from ad_campaigns where workspace_id=${input.workspaceId}::uuid
+            and id=${source.campaign_id}::uuid and disappeared_at is null for share limit 2`)))
+        : action === "adset_rename"
+          ? one(rows(await tx.execute(sql`select configured_status,name from meta_ad_sets where workspace_id=${input.workspaceId}::uuid
+              and id=${source.ad_set_id}::uuid and disappeared_at is null for share limit 2`)))
+          : one(rows(await tx.execute(sql`select configured_status,name from meta_ads where workspace_id=${input.workspaceId}::uuid
+              and id=${source.ad_id}::uuid and disappeared_at is null for share limit 2`)));
+      if (!mirror || (mirror.configured_status !== "ACTIVE" && mirror.configured_status !== "PAUSED")
+        || mirror.name !== planAction.beforeName) fail("corrupt_store");
+      const requestCore = {
+        version: "p06-execution-request/1.0.0", workspaceRef: source.workspace_ref,
+        accountRef: source.account_ref, entityRef: source.entity_ref, action: action as P06ExecutionV2Action,
+        expectedBefore: { status: mirror.configured_status, budgetMinor: null, name: planAction.beforeName },
+        desired: { status: mirror.configured_status, budgetMinor: null, name: planAction.afterName }, evaluatedAt,
+        actionUnitHash: source.unit_hash, proposalHash: source.plan_hash, contextHash: source.context_hash,
+        effectiveGuideSetHash: null, resolutionHash: null, policyHash: source.policy_hash, gateSetHash,
+        admissionHash: source.admission_hash, writeSpecHash: source.write_spec_hash,
+        actionPlanHash: source.action_plan_hash, route: "human_rename_approved" as const,
+      };
+      const requestHash = digest(requestCore);
+      const executionRef = `p06_execution_${requestHash.slice(0, 24)}`;
+      const idempotencyKey = `p06_exec_idem_${digest({ attemptId: source.attempt_id, grantHash: source.grant_hash, requestHash })}`;
+      const payload = { ...requestCore, executionRef, idempotencyKey, requestHash };
+      const inserted = one(rows(await tx.execute(sql`
+        insert into p06_execution_runs(
+          workspace_id,guide_run_action_binding_id,action_execution_attempt_id,proposal_bundle_id,action_unit_id,
+          decision_event_id,approval_grant_id,execution_ref,idempotency_key,request_hash,action_unit_hash,proposal_hash,
+          context_hash,effective_guide_set_hash,resolution_hash,policy_hash,gate_set_hash,admission_hash,write_spec_hash,
+          action_plan_hash,budget_kind,currency,request_payload,route,created_at
+        ) values (
+          ${input.workspaceId}::uuid,null,${source.attempt_id}::uuid,${source.bundle_id}::uuid,${source.unit_id}::uuid,
+          ${source.decision_id}::uuid,${source.grant_id}::uuid,${executionRef},${idempotencyKey},${requestHash},${source.unit_hash},${source.plan_hash},
+          ${source.context_hash},null,null,${source.policy_hash},${gateSetHash},${source.admission_hash},${source.write_spec_hash},
+          ${source.action_plan_hash},null,null,${JSON.stringify(payload)}::jsonb,'human_rename_approved',${evaluatedAt}::timestamptz
+        ) on conflict(workspace_id,idempotency_key) do nothing returning id::text
+      `)));
+      let runId = typeof inserted?.id === "string" ? inserted.id : undefined;
+      if (!runId) {
+        const replay = one(rows(await tx.execute(sql`select id::text,request_hash from p06_execution_runs
+          where workspace_id=${input.workspaceId}::uuid and idempotency_key=${idempotencyKey} for update limit 2`)));
+        if (!replay || replay.request_hash !== requestHash || typeof replay.id !== "string") fail("conflict");
+        runId = replay.id;
+      } else {
+        await tx.execute(sql`insert into p06_execution_heads(workspace_id,execution_run_id,state,sequence,trace_sequence,updated_at)
+          values(${input.workspaceId}::uuid,${runId}::uuid,'pending',0,0,${evaluatedAt}::timestamptz)`);
+        for (const gate of normalizedGates) {
+          const receiptHash = digest({ executionRef, phase: gate.phase, sequence: gate.sequence, leaseEpoch: 0, snapshotHash: gate.snapshotHash });
+          await tx.execute(sql`insert into p06_execution_gate_snapshots(workspace_id,execution_run_id,phase,sequence,lease_epoch,
+            snapshot_hash,receipt_hash,allowlist_hash,enabled,captured_at,expires_at,payload)
+            values(${input.workspaceId}::uuid,${runId}::uuid,${gate.phase},${gate.sequence},0,${gate.snapshotHash},${receiptHash},
+              ${gate.allowlistHash},${gate.enabled},${gate.capturedAt}::timestamptz,${gate.expiresAt}::timestamptz,
+              ${JSON.stringify({ ...gate, receiptHash })}::jsonb)`);
+        }
+      }
+      if (!runId) fail("corrupt_store");
+      return Object.freeze({ workspaceId: input.workspaceId, executionRunId: runId, executionRef, requestHash, idempotencyKey,
+        request: Object.freeze({ executionRef, workspaceRef: source.workspace_ref, accountRef: source.account_ref,
+          entityRef: source.entity_ref, action: action as P06ExecutionV2Action, budgetKind: null, currency: null,
+          expectedBefore: Object.freeze({ status: mirror.configured_status as "ACTIVE" | "PAUSED", budgetMinor: null, name: planAction.beforeName }),
+          desired: Object.freeze({ status: mirror.configured_status as "ACTIVE" | "PAUSED", budgetMinor: null, name: planAction.afterName }), evaluatedAt }) });
     });
   }
 
