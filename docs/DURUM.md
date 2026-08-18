@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: f779eb769eea -->
+<!-- durum-damga: 70d1ac0bfba9 -->
 
 ## Künye
 
@@ -14,35 +14,36 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 593 |
+| iş commit'i (tüm geçmiş) | 602 |
 | ilk / son iş | 2026-08-06 / 2026-08-18 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
+| 2026-08-18 | `chore` | journal p06 budget execution binding | `bb23ec4ac` |
+| 2026-08-18 | `test` | sequence budget execution verification | `3dfac0829` |
+| 2026-08-18 | `chore` | journal budget ceiling policies | `8946feb5a` |
+| 2026-08-18 | `test` | add ceiling policy post verification | `619d5678b` |
+| 2026-08-18 | `chore` | journal p06 execution persistence | `673fc4d6b` |
+| 2026-08-18 | `fix` | authenticate execution evidence chain | `d73442f16` |
+| 2026-08-18 | `feat` | add manual guide run product path | `4896e179c` |
+| 2026-08-18 | `fix` | align guide agent workspace identity | `1d0b2ce1f` |
+| 2026-08-18 | `feat` | add immutable guide revision drafts | `0dbea2973` |
 | 2026-08-18 | `feat` | expose canonical guide lifecycle | `40b1288cf` |
 | 2026-08-18 | `fix` | bind saved report replay and head evidence | `3dd0d9acd` |
 | 2026-08-18 | `test` | verify real local Codex guide agents | `3738bf025` |
 | 2026-08-18 | `feat` | add naming lifecycle and trusted status candidates | `3d4e19fe2` |
 | 2026-08-18 | `feat` | add deferred approval decisions | `14dc65fc8` |
 | 2026-08-18 | `feat` | harden disabled execution contract | `7516f34ba` |
-| 2026-08-18 | `feat` | bind guide run status candidates | `a0621d103` |
-| 2026-08-18 | `feat` | add accessible scope report interface | `12c1da0cb` |
-| 2026-08-18 | `docs` | record xlsx and trusted context acceptance | `e0dfbe770` |
-| 2026-08-17 | `feat` | persist guide runs and bind execution contracts | `ce6b86f7a` |
-| 2026-08-17 | `docs` | record budget evidence acceptance | `c4ec16b17` |
-| 2026-08-17 | `feat` | orchestrate recoverable guide runs | `70648005e` |
-| 2026-08-17 | `feat` | persist primary result bindings | `6f85dd8dd` |
-| 2026-08-17 | `feat` | harden run scheduling chain | `78b0a16eb` |
-| 2026-08-17 | `feat` | add safe budget dry run | `205f88c98` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `feat        ` ████████████████████████ 33
-- `docs        ` █████████ 13
-- `fix         ` ██████ 8
-- `test        ` ████ 6
+- `feat        ` ████████████████████████ 32
+- `docs        ` ███████ 9
+- `fix         ` ███████ 9
+- `test        ` █████ 7
+- `chore       ` ██ 3
 
 ## Planlar
 

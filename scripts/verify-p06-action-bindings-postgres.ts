@@ -196,16 +196,14 @@ try {
         executionEvidence.migrationInstalled = true;
       }
       if (executionPostMode) executionEvidence.migrationInstalled = true;
-      if (limitedAutonomyPreMode || limitedAutonomyExecutionPreMode) {
-        await client.query(readFileSync("drizzle/20260818000300_p06_execution_persistence.sql", "utf8"));
-        await client.query(readFileSync("drizzle/20260818000400_p04_budget_ceiling_policies.sql", "utf8"));
-        await client.query(readFileSync("drizzle/20260818000500_p06_budget_execution_binding.sql", "utf8"));
+      if (limitedAutonomyPreMode) {
         await client.query(readFileSync("drizzle/20260818000600_p06_limited_autonomy_admissions.sql", "utf8"));
-        if (limitedAutonomyExecutionPreMode) {
-          await client.query(readFileSync("drizzle/20260818000700_p06_limited_autonomy_execution.sql", "utf8"));
-          limitedExecutionEvidence.migrationInstalled = true;
-        }
         limitedAutonomyEvidence.migrationInstalled = true;
+      }
+      if (limitedAutonomyExecutionPreMode) {
+        await client.query(readFileSync("drizzle/20260818000700_p06_limited_autonomy_execution.sql", "utf8"));
+        limitedAutonomyEvidence.migrationInstalled = true;
+        limitedExecutionEvidence.migrationInstalled = true;
       }
       mark(postMode ? "applied_migrations_verified" : "migration_installed_outer_rollback");
       const shape = await client.query<{ force: boolean }>("select relforcerowsecurity force from pg_class where oid='public.guide_run_action_bindings'::regclass");
