@@ -4,6 +4,87 @@
   "uzak": true,
   "isCommitleri": [
     {
+      "hash": "e80d1b663",
+      "tarih": "2026-08-18",
+      "konu": "fix(p06): accept renamed budget route guard in post verifier",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "ade884e01",
+      "tarih": "2026-08-18",
+      "konu": "fix(p08): recheck guide scheduler rollout on tick",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "11c57ef37",
+      "tarih": "2026-08-18",
+      "konu": "fix(p06): stop status scheduler when rollout closes",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "1dd3b341c",
+      "tarih": "2026-08-18",
+      "konu": "fix(p06): stop budget scheduler when rollout closes",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "59cf70624",
+      "tarih": "2026-08-18",
+      "konu": "fix(p06): tolerate forward route catalog extensions",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "8a62f6749",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): gate human rename execution runtime",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "82e76ea43",
+      "tarih": "2026-08-18",
+      "konu": "fix(p06): compare rename values in execution worker",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "67bed7fb5",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): persist human rename execution identity",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "f6a6fd3b2",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): extend disabled executor contract for rename",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
       "hash": "7895988be",
       "tarih": "2026-08-18",
       "konu": "feat(p06): add human-only rename admission foundation",
@@ -56,97 +137,16 @@
       "kapsam": [
         "chore"
       ]
-    },
-    {
-      "hash": "caf01a913",
-      "tarih": "2026-08-18",
-      "konu": "test(p03): add saved report post verification",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "85cba40c1",
-      "tarih": "2026-08-18",
-      "konu": "chore(db): journal limited autonomy execution",
-      "tur": "is",
-      "kapsam": [
-        "chore"
-      ]
-    },
-    {
-      "hash": "ddddb23c5",
-      "tarih": "2026-08-18",
-      "konu": "test(p06): add limited execution post verification",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "5861077db",
-      "tarih": "2026-08-18",
-      "konu": "chore(db): journal limited autonomy admissions",
-      "tur": "is",
-      "kapsam": [
-        "chore"
-      ]
-    },
-    {
-      "hash": "f1ea7a87b",
-      "tarih": "2026-08-18",
-      "konu": "test(p06): sequence limited autonomy admission verification",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "bb23ec4ac",
-      "tarih": "2026-08-18",
-      "konu": "chore(db): journal p06 budget execution binding",
-      "tur": "is",
-      "kapsam": [
-        "chore"
-      ]
-    },
-    {
-      "hash": "3dfac0829",
-      "tarih": "2026-08-18",
-      "konu": "test(p06): sequence budget execution verification",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "8946feb5a",
-      "tarih": "2026-08-18",
-      "konu": "chore(db): journal budget ceiling policies",
-      "tur": "is",
-      "kapsam": [
-        "chore"
-      ]
-    },
-    {
-      "hash": "619d5678b",
-      "tarih": "2026-08-18",
-      "konu": "test(p04): add ceiling policy post verification",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
     }
   ],
   "kapsamDagilimi": [
     {
       "kapsam": "feat",
-      "adet": 30
+      "adet": 27
     },
     {
       "kapsam": "fix",
-      "adet": 8
+      "adet": 12
     },
     {
       "kapsam": "test",
@@ -158,10 +158,10 @@
     },
     {
       "kapsam": "docs",
-      "adet": 7
+      "adet": 6
     }
   ],
-  "isSayisi": 613,
+  "isSayisi": 622,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-18",
   "planlar": [
@@ -182,5 +182,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "2fd2950593b4"
+  "damga": "4239d5f1feac"
 }
