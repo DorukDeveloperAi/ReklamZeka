@@ -29,6 +29,8 @@ import {
 import { createLocalCodexGuideRunAgents } from "@/server/guide-run-codex-agent-adapter";
 import { DrizzleGuideRunMemberMetricEvidenceRepository } from "@/connectors/guides/guide-run-member-metric-evidence-drizzle-repository";
 import { DrizzleGuideRunStageableStatusCandidateRepository } from "@/connectors/guides/guide-run-stageable-status-candidate-drizzle-repository";
+import { DrizzleGuideRunTrustedDataHealthRepository } from "@/connectors/guides/guide-run-trusted-data-health-drizzle-repository";
+import { DrizzleGuideRunStatusActionStager } from "@/connectors/guides/guide-run-status-action-stager";
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -44,6 +46,9 @@ export interface GuideRunActiveSchedulePort {
   listActiveSchedules(
     input: Readonly<{ now: string }>,
   ): Promise<readonly ActiveGuideSchedule[]>;
+}
+export interface GuideRunActiveGuidePort {
+  loadActive(input: Readonly<{ workspaceId: string; guideId: string; revisionId: string }>): Promise<Readonly<{ workspaceId: string; guideRevisionId: string; guide: GuideRevision }>>;
 }
 export interface GuideRunLimitedAutonomyAdmissionPort {
   reserve(
@@ -108,6 +113,24 @@ export class DrizzleGuideRunActiveSchedulePort implements GuideRunActiveSchedule
   }
 }
 
+/** Exact manual-run source: public refs cannot substitute the active revision or tenant. */
+export class DrizzleGuideRunActiveGuidePort implements GuideRunActiveGuidePort {
+  constructor(private readonly database: Pick<Database, "execute" | "transaction">) {}
+  async loadActive(input: Readonly<{ workspaceId: string; guideId: string; revisionId: string }>) {
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (![input.workspaceId, input.guideId, input.revisionId].every((value) => uuid.test(value))) throw new Error("active guide rejected");
+    const result = await this.database.execute(sql`select r.id::text revision_id from guide_revisions r
+      join guide_heads h on h.workspace_id=r.workspace_id and h.guide_id=r.guide_id and h.current_active_revision_id=r.id
+      join guides g on g.workspace_id=r.workspace_id and g.id=r.guide_id and g.tombstoned_at is null
+      join workspaces w on w.id=r.workspace_id and w.lifecycle_state='active'
+      where r.workspace_id=${input.workspaceId}::uuid and r.guide_id=${input.guideId}::uuid and r.id=${input.revisionId}::uuid limit 2`);
+    const found = result.rows as Array<Record<string, unknown>>;
+    if (found.length !== 1 || found[0]!.revision_id !== input.revisionId) throw new Error("active guide rejected");
+    const guide = await new DrizzleGuideLifecycleRepository(this.database).loadCanonicalRevision(input);
+    return Object.freeze({ workspaceId: input.workspaceId, guideRevisionId: input.revisionId, guide });
+  }
+}
+
 /** Composition-only server boundary: its ports have no approval, execution, guide-edit, or Meta-write capability. */
 export function createGuideRunWorker(
   input: Readonly<{
@@ -150,7 +173,7 @@ export function createGuideRunWorker(
  * the worker reachable from a server scheduler without giving a transport
  * caller a way to substitute client-provided schedule state.
  */
-export function createGuideRunSchedulerWorker(
+function createGuideRunProductionWorker(
   input: Readonly<{
     database: Pick<Database, "execute" | "transaction">;
     dailyAnalysis: GuideRunDailyAgentPort;
@@ -159,7 +182,7 @@ export function createGuideRunSchedulerWorker(
     candidateActionStaging?: GuideRunCandidateActionStagingPort;
     limitedAutonomyAdmissions?: GuideRunLimitedAutonomyAdmissionPort;
   }>,
-): GuideRunSchedulerWorker {
+) {
   // Scheduler runs span tenants; scope identity is therefore derived from the
   // persisted run/revision chain, never from an injected fixed-workspace port.
   const database = input.database as Database;
@@ -168,6 +191,8 @@ export function createGuideRunSchedulerWorker(
     database,
     overlap,
   );
+  const candidateActionStaging = input.candidateActionStaging ?? new DrizzleGuideRunStatusActionStager(
+    contexts, new DrizzleOperationReadRepository(database));
   const limitedAutonomyAdmissions =
     input.limitedAutonomyAdmissions ??
     new DrizzleP06LimitedAutonomyAdmissionRepository(
@@ -177,11 +202,18 @@ export function createGuideRunSchedulerWorker(
     );
   const worker = createGuideRunWorker({
     ...input,
+    candidateActionStaging,
     frozenScopes: new DrizzleGuideRunFrozenScopeRepository(input.database),
     limitedAutonomyAdmissions,
   });
+  return worker;
+}
+
+export function createGuideRunSchedulerWorker(
+  input: Parameters<typeof createGuideRunProductionWorker>[0],
+): GuideRunSchedulerWorker {
   return new GuideRunSchedulerWorker(
-    worker,
+    createGuideRunProductionWorker(input),
     new DrizzleGuideRunActiveSchedulePort(input.database),
   );
 }
@@ -215,7 +247,7 @@ export function createGuideRunSchedulerRuntime(
 export function createLocalCodexGuideRunSchedulerRuntime(
   input: Readonly<{
     database: Pick<Database, "execute" | "transaction">;
-    dataHealth: GuideRunTrustedDataHealthPort;
+    dataHealth?: GuideRunTrustedDataHealthPort;
     candidateActionStaging?: GuideRunCandidateActionStagingPort;
     limitedAutonomyAdmissions?: GuideRunLimitedAutonomyAdmissionPort;
     environment?: P08RolloutEnvironment;
@@ -235,12 +267,29 @@ export function createLocalCodexGuideRunSchedulerRuntime(
     return Object.freeze({ enabled: false as const, scheduler: null });
   return createGuideRunSchedulerRuntime({
     database: input.database,
-    dataHealth: input.dataHealth,
+    dataHealth: input.dataHealth ?? new DrizzleGuideRunTrustedDataHealthRepository(input.database),
     candidateActionStaging: input.candidateActionStaging,
     limitedAutonomyAdmissions: input.limitedAutonomyAdmissions,
     environment,
     ...agents,
   });
+}
+
+/** Default-off manual composition; it shares scheduler evidence but never advances its cursor. */
+export function createLocalCodexGuideRunManualRuntime(input: Readonly<{
+  database: Pick<Database, "execute" | "transaction">; dataHealth?: GuideRunTrustedDataHealthPort;
+  candidateActionStaging?: GuideRunCandidateActionStagingPort; limitedAutonomyAdmissions?: GuideRunLimitedAutonomyAdmissionPort;
+  environment?: P08RolloutEnvironment; serverCwd?: string;
+}>) {
+  const environment = input.environment ?? process.env;
+  if (!resolveP08RolloutControl(environment).guideSchedulerEnabled) return Object.freeze({ enabled: false as const, worker: null });
+  const agents = createLocalCodexGuideRunAgents(environment, input.serverCwd,
+    new DrizzleGuideRunMemberMetricEvidenceRepository(input.database), new DrizzleGuideRunStageableStatusCandidateRepository(input.database));
+  if (!agents) return Object.freeze({ enabled: false as const, worker: null });
+  const worker = createGuideRunProductionWorker({ ...input, ...agents,
+    dataHealth: input.dataHealth ?? new DrizzleGuideRunTrustedDataHealthRepository(input.database) });
+  return Object.freeze({ enabled: true as const,
+    worker: new GuideRunManualWorker(worker, new DrizzleGuideRunActiveGuidePort(input.database)) });
 }
 
 /**
@@ -377,5 +426,26 @@ export class GuideRunSchedulerWorker {
       );
     }
     return Object.freeze(outputs);
+  }
+}
+
+/** One active Guide/manual idempotency transport. It owns no Meta-write port. */
+export class GuideRunManualWorker {
+  constructor(private readonly worker: ReturnType<typeof createGuideRunWorker>, private readonly guides: GuideRunActiveGuidePort) {}
+  async run(input: Readonly<{ workspaceId: string; guideId: string; revisionId: string; requestRef: string; now: string; leaseToken: string; leaseUntil: string }>) {
+    const entry = await this.guides.loadActive(input);
+    let due = await this.worker.service.fire({ guide: entry.guide, trigger: { kind: "manual", requestRef: input.requestRef }, occurredAt: input.now });
+    if (due.state === "completed") { await this.worker.ledger.projectPersisted({ workspaceId: entry.workspaceId, runRef: due.runRef }); return Object.freeze({ runRef: due.runRef, state: due.state, replay: true }); }
+    if (due.state === "due") due = await this.worker.service.claim(due, { leaseToken: input.leaseToken, leaseUntil: input.leaseUntil, occurredAt: input.now });
+    else if (due.lease && Date.parse(due.lease.expiresAt) <= Date.parse(input.now)) due = await this.worker.service.reclaim(due, { leaseToken: input.leaseToken, leaseUntil: input.leaseUntil, occurredAt: input.now });
+    else if (due.lease?.token === input.leaseToken && Date.parse(input.leaseUntil) > Date.parse(due.lease.expiresAt)) due = await this.worker.service.renew(due, { leaseToken: input.leaseToken, leaseUntil: input.leaseUntil, occurredAt: input.now });
+    else if (due.lease?.token !== input.leaseToken) throw new Error("manual Guide run lease unavailable");
+    const complete = await this.worker.service.execute({ run: due, guide: entry.guide, leaseToken: input.leaseToken, occurredAt: input.now });
+    await this.worker.ledger.projectPersisted({ workspaceId: entry.workspaceId, runRef: complete.run.runRef });
+    if (complete.disposition.state === "staged") {
+      if (complete.disposition.candidate?.routing === "human_approval" && this.worker.actionBindings) await this.worker.actionBindings.bind({ workspaceId: entry.workspaceId, runRef: complete.run.runRef });
+      if (complete.disposition.candidate?.routing === "limited_autonomy_review" && this.worker.limitedAutonomyAdmissions) await this.worker.limitedAutonomyAdmissions.reserve({ workspaceId: entry.workspaceId, runRef: complete.run.runRef });
+    }
+    return Object.freeze({ runRef: complete.run.runRef, state: complete.run.state, replay: false });
   }
 }

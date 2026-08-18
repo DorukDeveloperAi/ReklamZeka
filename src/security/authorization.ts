@@ -22,6 +22,7 @@ export type WorkspaceAction =
   | "guide_lifecycle:read"
   | "guide_lifecycle:draft"
   | "guide_lifecycle:activate"
+  | "guide_run:manual"
   | "practice_lab:read"
   | "practice_lab:draft"
   | "practice_lab:standardize"
@@ -46,7 +47,7 @@ const ROLE_ACTIONS: Readonly<Record<WorkspaceRole, ReadonlySet<WorkspaceAction>>
     "sync:run", "insight:feedback", "report:share",
     "budget:draft", "promotion:draft", "category_registry:read", "category_registry:publish",
     "instruction_policy:read", "instruction_policy:draft", "instruction_policy:publish", "autonomy_rules:read", "autonomy_rules:draft",
-    "guidance:read", "guidance:draft", "guidance:publish", "guide_lifecycle:read", "guide_lifecycle:draft", "guide_lifecycle:activate", "practice_lab:read", "practice_lab:draft", "practice_lab:standardize",
+    "guidance:read", "guidance:draft", "guidance:publish", "guide_lifecycle:read", "guide_lifecycle:draft", "guide_lifecycle:activate", "guide_run:manual", "practice_lab:read", "practice_lab:draft", "practice_lab:standardize",
     "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish", "decision_cadence:publish", "experiment_record:mutate", "business_outcome:record", "business_outcome:read",
   ]),
   admin: new Set([
@@ -54,7 +55,7 @@ const ROLE_ACTIONS: Readonly<Record<WorkspaceRole, ReadonlySet<WorkspaceAction>>
     "insight:feedback", "report:share",
     "budget:draft", "promotion:draft", "category_registry:read", "category_registry:publish",
     "instruction_policy:read", "instruction_policy:draft", "instruction_policy:publish", "autonomy_rules:read", "autonomy_rules:draft",
-    "guidance:read", "guidance:draft", "guidance:publish", "guide_lifecycle:read", "guide_lifecycle:draft", "guide_lifecycle:activate", "practice_lab:read", "practice_lab:draft", "practice_lab:standardize",
+    "guidance:read", "guidance:draft", "guidance:publish", "guide_lifecycle:read", "guide_lifecycle:draft", "guide_lifecycle:activate", "guide_run:manual", "practice_lab:read", "practice_lab:draft", "practice_lab:standardize",
     "policy_bundle:read", "policy_bundle:draft", "policy_bundle:publish", "decision_cadence:publish", "experiment_record:mutate", "business_outcome:record", "business_outcome:read",
   ]),
   analyst: new Set(["data:read", "sync:run", "insight:feedback", "report:share", "budget:draft", "promotion:draft", "category_registry:read", "instruction_policy:read", "instruction_policy:draft", "autonomy_rules:read", "autonomy_rules:draft", "guidance:read", "guidance:draft", "guide_lifecycle:read", "practice_lab:read", "practice_lab:draft", "policy_bundle:read", "policy_bundle:draft", "experiment_record:mutate", "business_outcome:record", "business_outcome:read"]),

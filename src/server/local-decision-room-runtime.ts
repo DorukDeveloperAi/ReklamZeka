@@ -176,7 +176,7 @@ export function assertTrustedLocalDecisionRoomRequest(
     "guidance-set-create", "guidance-set-revise", "instruction-policy-mutate",
     "practice-lab-propose-standardization", "promotion-template-lifecycle-draft", "slice-rule-workspace-save", "slice-rule-budget-impact-save",
     "slice-rule-budget-action-unit-materialize", "slice-rule-scenario-select",
-    "progressive-formalization-mutate", "delivery-health-alert-transition", "meta-read-sync-manual"].includes(
+    "progressive-formalization-mutate", "delivery-health-alert-transition", "meta-read-sync-manual", "guide-run-manual"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if (operation === "decide" && ![
@@ -507,6 +507,20 @@ export async function resolveTrustedLocalGuideLifecyclePrincipal(input: Readonly
   const operation = input.requiredScope === "guide_lifecycle:read" ? "read"
     : input.requiredScope === "guide_lifecycle:draft" ? "draft" : "publish";
   assertTrustedLocalDecisionRoomRequest(input.request, input.config, operation, "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
+/** Cookie-only manual Guide analysis. It grants neither approval nor Meta execution. */
+export async function resolveTrustedLocalGuideRunManualPrincipal(input: Readonly<{
+  request: Request; database: Pick<Database, "execute">; config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null
+    || input.request.headers.get("x-reklamzeka-intent") !== "guide-run-manual") throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: "guide_run:manual", expected: input.config });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", "cookie");
   return bindPrincipal(input.database, input.config);
 }
 

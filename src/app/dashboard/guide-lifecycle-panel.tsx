@@ -35,6 +35,7 @@ async function payload(response: Response) { const value: unknown = await respon
 
 export function GuideLifecyclePanel(props: Readonly<{ onSessionRequiredChange?: (required: boolean) => void }>) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); const [sessionRequired, setSessionRequired] = useState(false); const [busy, setBusy] = useState(false);
+  const [runResult, setRunResult] = useState<string | null>(null);
   const [form, setForm] = useState({ label: "", sliceRef: "", market: "yerli" as "yerli" | "yabanci", freeText: "", localTime: "09:00" });
   const [revising, setRevising] = useState<Item | null>(null);
   const refresh = useCallback(async () => { setLoading(true); setError(null); try { const response = await fetch("/api/guides", { cache: "no-store", credentials: "same-origin", headers: { "X-ReklamZeka-Intent": "guide-lifecycle-read" } }); const value = await payload(response); const next = parse(value); setSnapshot(next); setSessionRequired(false); props.onSessionRequiredChange?.(false); return true; } catch (reason) { const required = reason instanceof Error && "code" in reason && reason.code === "local_session_required"; setSessionRequired(required); props.onSessionRequiredChange?.(required); setError(reason instanceof Error ? reason.message : "Kılavuzlar yüklenemedi."); return false; } finally { setLoading(false); } }, [props.onSessionRequiredChange]);
@@ -44,6 +45,14 @@ export function GuideLifecyclePanel(props: Readonly<{ onSessionRequiredChange?: 
     ? { operation: "revise", guideId: revising.guideId, expectedHeadVersion: revising.headVersion, expectedLatestRevisionId: revising.revisionId, expectedLatestRevisionHash: revising.revisionHash, sliceRef: form.sliceRef, market: form.market, freeText: form.freeText, schedule, mode: revising.mode, actionAllowlist: revising.actionAllowlist, budgetRefs: revising.budgetRefs, rollbackConditions: revising.rollbackConditions }
     : { ...form, schedule, mode: "prepare_human_approval", actionAllowlist: ["status_pause", "status_activate"], budgetRefs: [], rollbackConditions: ["Kaynak durum değişirse durdur"] };
     const response = await fetch("/api/guides", { method: revising ? "PATCH" : "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": revising ? "guide-lifecycle-revise" : "guide-lifecycle-create" }, body: JSON.stringify(body) }); await payload(response); setRevising(null); setForm({ label: "", sliceRef: "", market: "yerli", freeText: "", localTime: "09:00" }); await refresh(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Kılavuz taslağı oluşturulamadı."); } finally { setBusy(false); } };
+  const runManual = async (item: Item) => { setBusy(true); setError(null); setRunResult(null); try {
+    const commandRef = `manual_${crypto.randomUUID().replaceAll("-", "")}`;
+    const response = await fetch("/api/guide-runs/manual", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "guide-run-manual" }, body: JSON.stringify({ guideId: item.guideId, revisionId: item.revisionId, commandRef }) });
+    const value = await payload(response); if (!record(value) || !keys(value, ["contractVersion", "runRef", "state", "replay", "authority"]) || value.contractVersion !== "guide-run-manual-result/1.0.0"
+      || typeof value.runRef !== "string" || !/^guide_run_[a-f0-9]{64}$/.test(value.runRef) || !["completed", "failed"].includes(String(value.state)) || typeof value.replay !== "boolean"
+      || !record(value.authority) || !keys(value.authority, ["canApprove", "canExecute", "canWriteMeta"]) || Object.values(value.authority).some((entry) => entry !== false)) throw new Error("unsafe_response");
+    setRunResult(`${value.runRef} · ${value.state}${value.replay ? " · idempotent replay" : ""}`);
+  } catch (reason) { setError(reason instanceof Error ? reason.message : "Manuel Kılavuz koşusu tamamlanamadı."); } finally { setBusy(false); } };
   if (loading && !snapshot) return <section className={`${styles.panel} ${styles.guidanceState}`} aria-busy="true" role="status"><strong>KANONİK KILAVUZ</strong><h2>Kılavuz yaşam döngüsü yükleniyor</h2></section>;
   if (sessionRequired && !snapshot) return <section className={`${styles.panel} ${styles.guidanceState}`}><strong>YEREL OTURUM GEREKLİ</strong><h2>Kılavuz çalışma alanını bağlayın</h2><p>{error}</p><LocalSessionConnector idPrefix="guide-lifecycle-session" title="Kılavuz çalışma alanını bağlayın" onVerify={refresh} /></section>;
   return <section className={styles.panel} aria-label="Kanonik Kılavuz yaşam döngüsü">
@@ -59,6 +68,7 @@ export function GuideLifecyclePanel(props: Readonly<{ onSessionRequiredChange?: 
       <p>Bu işlem yalnız immutable Kılavuz taslağı üretir. Aktivasyon ayrı insan adımıdır; Meta write ve execution yetkisi yoktur.</p>
     </div>
     {error ? <div className={styles.guidanceInlineError} role="alert">{error}</div> : null}
+    {runResult ? <div className={styles.guidanceNotice} role="status">Manuel koşu tamamlandı: {runResult}. Meta write kapalı.</div> : null}
     <div className={styles.guidanceIndex}><div>{snapshot?.items.map((item) => <article className={styles.guidanceEditor} key={item.guideId}>
       <header><div><strong>{item.activeRevisionId === item.revisionId ? "Aktif" : item.interpretationAccepted ? "Kabul edildi" : "Taslak"}</strong><h2>{item.label}</h2><p>{item.guideRef} · sürüm {item.revision} · {item.sliceRef}</p></div><span>{item.mode}</span></header>
       <div className={styles.guidanceFields}><p className={styles.guidanceBodyField}>{item.freeText}</p></div>
@@ -66,6 +76,7 @@ export function GuideLifecyclePanel(props: Readonly<{ onSessionRequiredChange?: 
         <button type="button" disabled={busy || !snapshot.authority.canDraft} onClick={() => { setRevising(item); setForm({ label: item.label, sliceRef: item.sliceRef, market: item.market, freeText: item.freeText, localTime: item.schedule.localTime }); }}>Yeni revision</button>
         {!item.interpretationAccepted ? <button type="button" disabled={busy || !snapshot.authority.canDraft} onClick={() => void mutate({ operation: "accept", guideId: item.guideId, revisionId: item.revisionId, interpretationHash: item.interpretationHash }, "guide-lifecycle-accept")}>Yorumu kabul et</button> : null}
         {item.interpretationAccepted && item.activeRevisionId !== item.revisionId ? <button className={styles.primaryButton} type="button" disabled={busy || !snapshot.authority.canActivate} onClick={() => void mutate({ operation: "activate", guideId: item.guideId, revisionId: item.revisionId, expectedHeadVersion: item.headVersion, expectedCurrentRevisionId: item.activeRevisionId }, "guide-lifecycle-activate")}>Aktifleştir</button> : null}
+        {item.activeRevisionId === item.revisionId ? <button type="button" disabled={busy || !snapshot.authority.canActivate} onClick={() => void runManual(item)}>Manuel analiz çalıştır</button> : null}
         {item.activeRevisionId === item.revisionId ? <button className={styles.guidanceDangerButton} type="button" disabled={busy || !snapshot.authority.canActivate} onClick={() => void mutate({ operation: "pause", guideId: item.guideId, expectedHeadVersion: item.headVersion, expectedCurrentRevisionId: item.revisionId }, "guide-lifecycle-pause")}>Duraklat</button> : null}
       </div></footer>
     </article>)}</div></div>

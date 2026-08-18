@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createGuideRevision } from "@/domain/guides/guide-revision";
 import { createGuideRunV12 } from "@/domain/guides/guide-run";
-import { createGuideRunSchedulerRuntime, createLocalCodexGuideRunSchedulerRuntime, DrizzleGuideRunActiveSchedulePort, GuideRunSchedulerWorker } from "@/server/guide-run-worker-runtime";
+import { createGuideRunSchedulerRuntime, createLocalCodexGuideRunManualRuntime, createLocalCodexGuideRunSchedulerRuntime, DrizzleGuideRunActiveGuidePort, DrizzleGuideRunActiveSchedulePort, GuideRunManualWorker, GuideRunSchedulerWorker } from "@/server/guide-run-worker-runtime";
 
 const token = "123e4567-e89b-42d3-a456-426614174000";
 const expires = "2026-08-17T06:10:00.000Z";
@@ -34,6 +34,11 @@ describe("GuideRunSchedulerWorker", () => {
       environment: { META_READ_ENABLED: "true", GUIDE_SCHEDULER_ENABLED: "true", REKLAMZEKA_GUIDE_RUN_CODEX_ENABLED: "TRUE" } }))
       .toEqual({ enabled: false, scheduler: null });
     expect(createLocalCodexGuideRunSchedulerRuntime({ database: {} as never, dataHealth: {} as never,
+      environment: { META_READ_ENABLED: "true", GUIDE_SCHEDULER_ENABLED: "true", REKLAMZEKA_GUIDE_RUN_CODEX_ENABLED: "true",
+        REKLAMZEKA_CODEX_EXECUTABLE: "/tmp/codex", REKLAMZEKA_CODEX_WORKSPACE_ROOT: "/tmp" } }).enabled).toBe(true);
+    expect(createLocalCodexGuideRunManualRuntime({ database: {} as never, dataHealth: {} as never,
+      environment: { META_READ_ENABLED: "true", GUIDE_SCHEDULER_ENABLED: "true" } })).toEqual({ enabled: false, worker: null });
+    expect(createLocalCodexGuideRunManualRuntime({ database: {} as never, dataHealth: {} as never,
       environment: { META_READ_ENABLED: "true", GUIDE_SCHEDULER_ENABLED: "true", REKLAMZEKA_GUIDE_RUN_CODEX_ENABLED: "true",
         REKLAMZEKA_CODEX_EXECUTABLE: "/tmp/codex", REKLAMZEKA_CODEX_WORKSPACE_ROOT: "/tmp" } }).enabled).toBe(true);
   });
@@ -110,6 +115,28 @@ describe("GuideRunSchedulerWorker", () => {
     await worker.tick({now:at,leaseToken:token,leaseUntil:expires});
     expect(human).toEqual([]);
     expect(autonomy).toEqual([due.runRef]);
+  });
+
+  it("runs one active manual Guide and reconciles completed replay without a second Agent call", async () => {
+    const due=createGuideRunV12({workspaceRef:guide.workspaceRef,guideRef:guide.guideRef,guideRevisionHash:guide.revisionHash,
+      trigger:{kind:"manual",requestRef:"request_manual_one"},occurredAt:at});
+    const claimed={...due,state:"claimed" as const,lease:{token,epoch:1,expiresAt:expires}}; const completed={...due,state:"completed" as const,lease:null};
+    let persisted:typeof due|typeof claimed|typeof completed=due; const calls:string[]=[],projected:string[]=[],bound:string[]=[];
+    const worker=new GuideRunManualWorker({service:{async fire(){calls.push("fire");return persisted as never;},async claim(){calls.push("claim");persisted=claimed;return claimed as never;},
+      async execute(){calls.push("execute");persisted=completed;return {run:completed,disposition:{state:"staged",candidate:{routing:"human_approval"}}};}},
+      ledger:{async projectPersisted({runRef}:{runRef:string}){projected.push(runRef);}},actionBindings:{async bind({runRef}:{runRef:string}){bound.push(runRef);}},limitedAutonomyAdmissions:null} as never,
+      {async loadActive(input){calls.push(`active:${input.workspaceId}`);return {workspaceId:input.workspaceId,guideRevisionId:input.revisionId,guide};}});
+    const input={workspaceId:idFor(2),guideId:idFor(3),revisionId:idFor(4),requestRef:"request_manual_one",now:at,leaseToken:token,leaseUntil:expires};
+    await expect(worker.run(input)).resolves.toEqual({runRef:due.runRef,state:"completed",replay:false});
+    await expect(worker.run(input)).resolves.toEqual({runRef:due.runRef,state:"completed",replay:true});
+    expect(calls).toEqual([`active:${idFor(2)}`,"fire","claim","execute",`active:${idFor(2)}`,"fire"]);
+    expect(projected).toEqual([due.runRef,due.runRef]); expect(bound).toEqual([due.runRef]);
+  });
+
+  it("loads manual runs only from the exact active Guide head", async () => {
+    const calls:string[]=[]; const port=new DrizzleGuideRunActiveGuidePort({async execute(){calls.push("active-head");return {rows:[]};},async transaction(work:never){return await work as never;}} as never);
+    await expect(port.loadActive({workspaceId:idFor(2),guideId:idFor(3),revisionId:idFor(4)})).rejects.toThrow("active guide rejected");
+    expect(calls).toEqual(["active-head"]);
   });
 });
 

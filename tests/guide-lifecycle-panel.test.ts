@@ -7,6 +7,8 @@ describe("Guide lifecycle panel", () => {
     expect(source).toContain("guide-lifecycle-create"); expect(source).toContain("guide-lifecycle-accept");
     expect(source).toContain("guide-lifecycle-revise");
     expect(source).toContain("guide-lifecycle-activate"); expect(source).toContain("guide-lifecycle-pause");
+    expect(source).toContain("guide-run-manual"); expect(source).toContain("Manuel analiz çalıştır");
+    expect(source).toContain("crypto.randomUUID()"); expect(source).toContain("canApprove");
     expect(source).toContain("Meta write kapalı"); expect(source).toContain("canWriteMeta !== false");
     expect(source).toContain('credentials: "same-origin"'); expect(source).not.toContain("x-workspace-id");
   });
