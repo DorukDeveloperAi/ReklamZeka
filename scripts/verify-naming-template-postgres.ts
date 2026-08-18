@@ -13,6 +13,7 @@ const url = process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL required");
 const sqlText = await readFile(file, "utf8");
 const sha = createHash("sha256").update(sqlText).digest("hex");
+const postMode = process.env.NAMING_TEMPLATE_POST_APPROVED === "true";
 const pool = new Pool({ connectionString: url, max: 1 });
 const client = await pool.connect();
 const flags: Record<string, boolean> = {};
@@ -25,8 +26,10 @@ async function rejected(work: () => Promise<unknown>) {
 }
 
 try {
+  const before=await client.query("select (select count(*)::int from pg_class where relnamespace='public'::regnamespace and relname in('naming_template_revisions','naming_template_heads')) tables,(select count(*)::int from drizzle.__drizzle_migrations where hash=$1 and created_at=1787011740000) ledger",[sha]);
+  if(before.rows[0]?.tables!==(postMode?2:0)||before.rows[0]?.ledger!==(postMode?1:0)) throw new Error("naming template migration state exact değil");
   await client.query("begin isolation level serializable");
-  await client.query(sqlText);
+  if(!postMode) await client.query(sqlText);
   flags.migrationInstalled = true;
   const user = id(), ws = id(), source = id(), account = id(), campaign=id(), adSet=id();
   await client.query("set local session_replication_role=replica");
@@ -81,11 +84,15 @@ try {
   const c=catalog.rows[0]; flags.catalog=c.tables===2&&c.rls===2&&c.grants===0&&c.indexes===12&&c.triggers===3&&c.constraints===11;
   const journal=JSON.parse(await readFile("drizzle/meta/_journal.json","utf8")) as {entries:Array<{tag:string}>};
   const ledger=await client.query("select count(*)::int count from drizzle.__drizzle_migrations where hash=$1",[sha]);
-  flags.unjournaled=!journal.entries.some(e=>e.tag==="20260818000900_naming_template_lifecycle")&&ledger.rows[0]?.count===0;
+  flags.exactMigrationState=postMode
+    ? journal.entries.some(e=>e.tag==="20260818000900_naming_template_lifecycle")&&ledger.rows[0]?.count===1
+    : !journal.entries.some(e=>e.tag==="20260818000900_naming_template_lifecycle")&&ledger.rows[0]?.count===0;
   await client.query("rollback");
   const gone=await client.query("select to_regclass('public.naming_template_revisions') revisions,to_regclass('public.naming_template_heads') heads");
-  flags.zeroResidue=gone.rows[0]?.revisions===null&&gone.rows[0]?.heads===null;
+  flags.zeroResidue=postMode
+    ? gone.rows[0]?.revisions==="naming_template_revisions"&&gone.rows[0]?.heads==="naming_template_heads"&&Number((await client.query("select (select count(*) from naming_template_revisions)+(select count(*) from naming_template_heads) count")).rows[0].count)===0
+    : gone.rows[0]?.revisions===null&&gone.rows[0]?.heads===null;
   if(Object.values(flags).some(value=>value!==true)) throw new Error(JSON.stringify(flags));
-  console.log(JSON.stringify({mode:"pre_outer_rollback",sha256:sha,...flags}));
+  console.log(JSON.stringify({mode:postMode?"post_applied_outer_rollback":"pre_outer_rollback",sha256:sha,...flags}));
 } catch(error){try{await client.query("rollback");}catch{} throw error;}
 finally{client.release();await pool.end();}
