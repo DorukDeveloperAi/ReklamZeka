@@ -659,13 +659,13 @@
             "titleBar.inactiveForeground": "#888780",
             "widget.shadow": "#00000010"
         },
-        "titleBar.activeBackground": "#D6E4F5",
+        "titleBar.activeBackground": "#FBDFC0",
         "titleBar.activeForeground": "#1A1917",
-        "titleBar.inactiveBackground": "#D6E4F5",
+        "titleBar.inactiveBackground": "#FBDFC0",
         "titleBar.inactiveForeground": "#1A1917",
-        "activityBarBadge.background": "#D6E4F5",
+        "activityBarBadge.background": "#FBDFC0",
         "activityBarBadge.foreground": "#1A1917",
-        "statusBarItem.remoteBackground": "#D6E4F5",
+        "statusBarItem.remoteBackground": "#FBDFC0",
         "statusBarItem.remoteForeground": "#1A1917"
     }
 }
