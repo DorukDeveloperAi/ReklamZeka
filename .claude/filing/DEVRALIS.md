@@ -1,24 +1,14 @@
 # DEVRALIŞ — ReklamZeka
 
 > **TÜREVDİR, elle düzenlenmez.** Her `aide filing` koşumunda yeniden üretilir.
-> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-19 19:09
+> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-19 21:55
 
 Bu belge bir sonraki Claude hesabının **ilk okuyacağı** dosyadır: neyin yarıda kaldığını
 ve hangi komutla devam edileceğini söyler.
 
 ## Açık oturumlar
 
-1 canlı oturum. Devam etmek için komutu kopyala-yapıştır:
-
-### bu tarz bir mcp sunucu kullanmak mı daha mantıklı yoksa bunu zaetn ai…
-
-- **durum:** `done` · son hareket: 2026-08-19 16:23
-- **ne için açıldı:** bu tarz bir mcp sunucu kullanmak mı daha mantıklı yoksa bunu zaetn ai .ile kodlamak kolay mı ne sunuyor bu bize https://pipeboard.co/guides/claude-code
-- **nerede kaldı:** bu tarz bir mcp sunucu kullanmak mı daha mantıklı yoksa bunu zaetn ai .ile kodlamak kolay mı ne sunuyor bu bize https://pipeboard.co/guides/claude-code
-
-```bash
-cd /Users/ybg/dev/ReklamZeka && claude --resume 0a8377bc-e59b-4b05-8397-716b893f1420
-```
+_Bu projede canlı oturum yok._
 
 ## Kapanmış oturumların devir notları
 
