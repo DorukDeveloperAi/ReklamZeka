@@ -1,0 +1,35 @@
+{
+ "surum": 1,
+ "kisa": "eea002ee",
+ "sessionId": "eea002ee-e2c8-46d2-9380-01f6a08ad82c",
+ "proje": "ReklamZeka",
+ "kok": "/Users/ybg/dev/ReklamZeka",
+ "cwd": "/Users/ybg/dev/ReklamZeka",
+ "baslik": null,
+ "sonAktivite": "2026-08-18T08:16:43.878Z",
+ "yazimAninkiDurum": "idle",
+ "depo": null,
+ "amac": null,
+ "sonIstek": null,
+ "sonZaman": null,
+ "todolar": [],
+ "acikTodo": 0,
+ "compact": null,
+ "kaptanHedefi": null,
+ "planlar": null,
+ "git": null,
+ "kuyruk": [],
+ "kilitler": [],
+ "ilkIs": null,
+ "yenidenBaslat": {
+  "baskaDepo": false,
+  "hard": "aide open eea002ee-e2c8-46d2-9380-01f6a08ad82c --cwd /Users/ybg/dev/ReklamZeka",
+  "ham": "cd /Users/ybg/dev/ReklamZeka && claude --resume eea002ee-e2c8-46d2-9380-01f6a08ad82c",
+  "soft": "cd /Users/ybg/dev/ReklamZeka && claude \"OTURUM KASASI devralması: plans/oturumlar/kasa/eea002ee.md dosyasını OKU ve 'İLK İŞ' bölümünden başla.\"",
+  "brif": "plans/oturumlar/kasa/eea002ee.md"
+ },
+ "uyarilar": [],
+ "olculemedi": [
+  "transcript demeti (topla.mjs çalışmadı)"
+ ]
+}

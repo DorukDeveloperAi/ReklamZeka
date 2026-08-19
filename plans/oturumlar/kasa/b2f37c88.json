@@ -1,0 +1,35 @@
+{
+ "surum": 1,
+ "kisa": "b2f37c88",
+ "sessionId": "b2f37c88-40b3-4dda-8280-074c41d86fcd",
+ "proje": "ReklamZeka",
+ "kok": "/Users/ybg/dev/ReklamZeka",
+ "cwd": "/Users/ybg/dev/ReklamZeka",
+ "baslik": null,
+ "sonAktivite": "2026-08-18T10:44:03.371Z",
+ "yazimAninkiDurum": "idle",
+ "depo": null,
+ "amac": null,
+ "sonIstek": null,
+ "sonZaman": null,
+ "todolar": [],
+ "acikTodo": 0,
+ "compact": null,
+ "kaptanHedefi": null,
+ "planlar": null,
+ "git": null,
+ "kuyruk": [],
+ "kilitler": [],
+ "ilkIs": null,
+ "yenidenBaslat": {
+  "baskaDepo": false,
+  "hard": "aide open b2f37c88-40b3-4dda-8280-074c41d86fcd --cwd /Users/ybg/dev/ReklamZeka",
+  "ham": "cd /Users/ybg/dev/ReklamZeka && claude --resume b2f37c88-40b3-4dda-8280-074c41d86fcd",
+  "soft": "cd /Users/ybg/dev/ReklamZeka && claude \"OTURUM KASASI devralması: plans/oturumlar/kasa/b2f37c88.md dosyasını OKU ve 'İLK İŞ' bölümünden başla.\"",
+  "brif": "plans/oturumlar/kasa/b2f37c88.md"
+ },
+ "uyarilar": [],
+ "olculemedi": [
+  "transcript demeti (topla.mjs çalışmadı)"
+ ]
+}
