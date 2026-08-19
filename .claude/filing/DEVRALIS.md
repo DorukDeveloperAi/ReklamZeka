@@ -1,14 +1,14 @@
 # DEVRALIŞ — ReklamZeka
 
 > **TÜREVDİR, elle düzenlenmez.** Her `aide filing` koşumunda yeniden üretilir.
-> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-19 19:08
+> Kaynak: canlı oturum kayıtları + plan ağacı + kilitler. Üretim: 2026-08-19 19:09
 
 Bu belge bir sonraki Claude hesabının **ilk okuyacağı** dosyadır: neyin yarıda kaldığını
 ve hangi komutla devam edileceğini söyler.
 
 ## Açık oturumlar
 
-2 canlı oturum. Devam etmek için komutu kopyala-yapıştır:
+1 canlı oturum. Devam etmek için komutu kopyala-yapıştır:
 
 ### bu tarz bir mcp sunucu kullanmak mı daha mantıklı yoksa bunu zaetn ai…
 
@@ -18,16 +18,6 @@ ve hangi komutla devam edileceğini söyler.
 
 ```bash
 cd /Users/ybg/dev/ReklamZeka && claude --resume 0a8377bc-e59b-4b05-8397-716b893f1420
-```
-
-### reklamzeka-e9
-
-- **durum:** `idle` · son hareket: 2026-08-06 10:46
-- **ne için açıldı:** # Claude Code'a Verilecek PLANLAMA Promptu > Bu dosyanın içeriğini Claude Code'a **plan modunda** yapıştır. Amaç: sistemi kurmak değil, önce sistemin **detaylı …
-- **nerede kaldı:** yani planı komple hazırla, devasa şekilde, biliyorsun aide sisteminin içerisinde belli başlı aşamalar ve görevler var, yani vizyon, kutup yıldızı, roadmap, plan…
-
-```bash
-cd /Users/ybg/dev/ReklamZeka && claude --resume 35fbdca7-b993-4abb-a8d2-ae41d850f9de
 ```
 
 ## Kapanmış oturumların devir notları
