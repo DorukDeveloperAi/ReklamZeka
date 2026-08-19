@@ -1,0 +1,134 @@
+{
+ "surum": 1,
+ "kisa": "35fbdca7",
+ "sessionId": "35fbdca7-b993-4abb-a8d2-ae41d850f9de",
+ "proje": "ReklamZeka",
+ "kok": "/Users/ybg/dev/ReklamZeka",
+ "cwd": "/Users/ybg/dev/ReklamZeka",
+ "baslik": null,
+ "sonAktivite": "2026-08-19T19:08:31.355Z",
+ "yazimAninkiDurum": "idle",
+ "depo": "/Users/ybg/.claude",
+ "amac": "# Claude Code'a Verilecek PLANLAMA Promptu > Bu dosyanın içeriğini Claude Code'a **plan modunda** yapıştır. Amaç: sistemi kurmak değil, önce sistemin **detaylı planını** ürettirmek. Prompt, Claude Code'a \"kod yazma, plan üret, önce netleştirici soru sor\" talimatını taşır. --- Sen kıdemli bir **çözüm mimarı + AI ajan sistem tasarımcısısın**. Görevin: aşağıda tanımlanan sistemin **uçtan uca uygulama planını** üretmek. **Şu an kod yazmayacaksın.** Plan modunda kal: önce güncel gerçekleri araştır, varsayımlarını açıkça işaretle, netleştirici sorularını sor, sonra yapılandırılmış bir plan sun. Planı onaylamadan yapıya geçme. ## 0) Bu görevin çıktısı Bir **implementasyon planı** üreteceksin. Kod, dosya, repo oluşturma. Planı bitirdiğinde bana şunları vereceksin: (a) kilitlenmiş bir terminoloji sözlüğü, (b) veri modeli, (c) bileşen mimarisi, (d) use-case akışları, (e) fazlı yol haritası, (f) riskler ve (g) bana soracağın açık sorular listesi. Detaylı çıktı formatı §8'de. ## 1) Bağlam - Kullanıcı: Türkiye'de özel bir hastane grubunda (Doruk Sağlık Grubu, Bursa) dijital pazarlama/iş geliştirme sorumlusu. Güçlü teknik altyapı: Python, MCP, Claude Code, tmux çoklu-ajan orkestrasyonu, kalıcı state için Google Sheets kullanımı. - Sektör: sağlık. Bu yüzden **KVKK** ve **Türkiye sağlık reklam mevzuatı (Kasım 2025 Reklam Yönetmeliği dâhil)** birinci sınıf kısıttır. Otomatik yayınlanan reklam metni = hukuki risk. - Mevcut altyapı tercihi: MCP tabanlı çalışma, Google Sheets'i insan-okur state omurgası olarak kullanmak, zamanlanmış işler için cron/tmux, bildirim için Telegram kanalları. ## 2) Sistemin amacı (tek cümle) **Brief-temelli, kontrol-öncelikli, sürekli çalışan bir reklam yardımcı ajanı**: Meta reklam verisini çeker, kullanıcının iç brief'ine göre analiz/değerlendirme yapar, portföy ve bütçe önerileri üretir, ve **her yazma işlemini kullanıcı onayına sunar**. AI vardır ama otonom değildir. **\"Rastgele AI slogan spam'i\" kesinlikle yoktur.** Her öneri belgelenmiş bir brief'e ve bir metriğe bağlı olmak zorundadır; aksi hâlde öneri üretilmez. ## 3) KRİTİK — Terminoloji sözlüğü (İLK teslim, her yerde zorunlu) Kullanıcının konuşma dilinde \"kampanya\" kelimesi **iç/stratejik kampanya** anlamına gelir; Meta'nın da \"campaign\" terimi vardır. Bu iki kavram **asla** aynı kelimeyle anılmayacak. Planın, veri modelinin, ileride yazılacak kodun **değişken adlarına** kadar bu ayrımı uygula. Aşağıdaki sözlüğü kilitle ve tüm belgede kullan: | Kavram (kullanıcının dünyası) | Standart ad | Kod adı | Açıklama | |---|---|---|---| | Kullanıcının stratejik kampanya **ailesi** (Marka Doktor, Satış, …) | **İç Kampanya Ailesi (İKA)** | `internal_campaign_family` | En üst gruplama; birbirinden temelde farklı stratejiler barındırır. Açık uçlu, sonradan eklenebilir | | Aile içindeki farklı stratejili tür/kategori | **İç Kampanya Kategorisi / Şablonu (İKK)** | `internal_campaign_category` / `template` | Attribute + kural + hedef + analiz mantığını tanımlayan yeniden-kullanılabilir şablon. Aileden **miras alır**, override/extend edebilir | | Kullanıcının stratejik kampanya örneği | **İç Kampanya (İK)** | `internal_campaign` | Bir kategoriye ait, fiilen koşan birim | | Amaç kapsamı (bilinirlik/takipçi/lead/satış/hibrit …) | **Amaç Kapsamı** | `goal_scope` | İç hedef taksonomisi (açık uçlu enum + hibrit birleşimler) | | Mecra / yerleşim | **Mecra** | `medium` | Kategoriye göre değişir (ör. IG feed boost, feed/story reklamı, arama vb.) | | Sayfa türü | **Sayfa Türü** | `page_type` | Kategoriye göre değişir (ör. doktor kişisel IG, kurumsal IG, satış açılış sayfası vb.) | | Meta platform nesneleri | **Meta Campaign / Meta Ad Set / Meta Ad** | `meta_campaign` / `meta_ad_set` / `meta_ad` | Her zaman \"Meta\" ön ekiyle, tam nitelenmiş | | Meta platform hedefi | **Meta Objective** | `meta_objective` | Platformun optimizasyon hedefi; kullanıcının Amaç Kapsamı'ndan AYRIDIR | **Kural:** \"kampanya\" kelimesi tek başına yasak. Her kullanımda İç Kampanya Ailesi / İç Kampanya Kategorisi / İç Kampanya ya da Meta Campaign olarak nitelenecek. Bir İK, bir-veya-çok Meta Campaign/Ad Set/boosted post'a eşlenebilir; bu eşleme açık bir **mapping katmanı** ile tutulacak. **Taksonomi ilkesi:** Aile → Kategori → Örnek üç katmanlı ve **açık uçludur**. Attribute, KPI hedefi, kural ve analiz mantığı herhangi bir katmanda tanımlanıp aşağı doğru **miras alınır ve override edilebilir**. Motorda hiçbir dikey (boost, bilinirlik, satış vb.) gömülü olmayacak; bunlar yalnızca birer kategori şablonu **verisi** olarak yaşar. ## 4) İç Kampanya aileleri — sistem çok-aileli ve açık uçlu olmalı **Kritik:** Sistem tek bir dikeye göre tasarlanmayacak. Kullanıcının, her biri **kendi içinde farklı stratejili** birden çok İç Kampanya ailesi ve bu ailelerin kendi alt türleri vardır. Aşağıdakiler **örnektir**; motor bunları hard-code etmeyecek, yalnızca birer kategori şablonu olarak taşıyacak. Yeni aile/kategori kod değişmeden eklenebilmeli. **Örnek Aile A — Marka Doktor:** Kullanıcının adına yönettiği **doktor Instagram sayfalarından** reklam. Tipik strateji: mevcut IG postlarını **boost** etmek. Amaç kapsamı çoğunlukla bilinirlik→takipçi, lead toplama veya hibrit. Ölçüm daha çok üst-huni/etkileşim odaklı. **Örnek Aile B — Satış:** Kendi içinde **farklı bütçe tanımlı, farklı stratejili birden çok tür** barındırır (ör. hizmet/paket satışı, sağlık turizmi satış hunisi, check-up satışı, yurt içi vs. yurt dışı vb. — bunlar kullanıcının iç türleridir). Bu ailenin ölçüm dünyası farklıdır: **dönüşüm/satış hunisi, CPL→CPA→ROAS, atıf**, ve satış çoğu zaman **offline/CRM'de kapandığı için** offline dönüşüm / CRM eşlemesi gerekebilir. Bu yüzden rubrik motoru bilinirlik metriklerine değil, aileye/kategoriye göre türeyen KPI'lara dayanmalı. Bu iki örnek, motorun neden **dikey-agnostik** olması gerektiğini gösterir: attribute'lar, KPI'lar, kurallar ve analiz mantığı tümüyle İç Kampanya taksonomisinden (aile→kategori) türer. **Bir İç Kampanyayı tanımlayan boyutlar** (kategoriye göre değişken üretilir): aile, kategori/şablon, **mecra**, **sayfa türü** (veya satış hedef varlığı), **amaç kapsamı**, bütçe tanımı (örneğe mi kategoriye mi tanımlı), ve şablondan gelen attribute/kural/hedef/analiz mantığı. **AI'nın iki ayrı işi:** 1. **İskelet/şablon üretimi:** Yeni bir aile/kategori/İç Kampanya tanımlandığında; ailenin ve boyutların (mecra, sayfa türü, amaç kapsamı) mantığına göre uygun attribute setini, KPI hedeflerini, kuralları ve analiz mantığını **AI destekli öner** — kullanıcı onaylar/düzenler. Sabit şema yok; **taksonomiye göre değişken üretilen, mirasla çözülen attribute sistemi**. 2. **Değerlendirme:** Tanımlı hedefleri gözeterek analiz — **iki seviyede**: (i) *instance* (tek Meta nesnesi / boosted post / dönüşüm birimi), (ii) *agrega* (bir kategori/ailenin bütçesi veya tanımı tüm örneklere ortaksa, portföy birlikte). Zaman içindeki **tepki/etkileşim/dönüşüm değişimini (delta/trend)** izle. Değerlendirme metrikleri hangi aile/kategoriye ait olduğuna göre değişir (Marka Doktor'da erişim/takipçi, Satış'ta CPA/ROAS gibi). ## 5) Fonksiyonel gereksinimler (katman katman — kapsamlı) Planın aşağıdaki katmanların hepsini karşılamalı. Her katman için: sorumluluk, girdi/çıktı, veri modeli ve teknoloji önerisi ver. 1. **Veri alım katmanı** — Meta Marketing API'den okuma: Meta Campaign/Ad Set/Ad seviyesinde insights, spend, sonuç (objective bazlı), creative metadata, frekans, reach. **Meta API'yi sıfırdan sarma; olgun bir Meta Ads MCP sunucusunu (ör. Pipeboard) altyapı olarak değerlendir** (§7). 2. **Kanonik state / hafıza** — İç Kampanya kayıt defteri, İKK şablon şeması, brief'ler, KPI hedefleri, karar günlüğü. Google Sheets'i insan-okur omurga olarak; gerekiyorsa yerel bir cache DB (SQLite) öner. Hangisi nerede, gerekçelendir. 3. **İç Kampanya taksonomi & şablon motoru** — açık uçlu, **Aile→Kategori→Örnek** hiyerarşisi; attribute/KPI/kural/analiz mantığı herhangi bir katmanda tanımlanıp aşağı **miras/override** ile çözülür. Hiçbir dikey gömülü değil. AI'nın şablon iskeletini önerdiği akış burada. Yeni aile/kategori kod değişmeden konfigürasyonla eklenebilmeli. 4. **Mapping katmanı** — Meta nesneleri ↔ İç Kampanya (+ kategorisi) ilişkilendirmesi. Boost akışının ürettiği Meta Campaign/Ad Set/Ad'i doğru İK'ya bağlama stratejisi (isimlendirme kuralı, etiket, veya manuel eşleme + AI destekli öneri). 5. **Amaç Kapsamı ⇒ Rubrik motoru** — rubrik aile/kategoriden türer; tek dünyaya bağlı değil. Örnek başlangıçlar: *bilinirlik* → reach, CPM, frekans, ThruPlay; *takipçi* → takipçi artışı/harcama, profil ziyareti, takip; *lead* → CPL, lead hacmi, form tamamlama, kalite; *satış* → CPA, ROAS, dönüşüm hacmi, hunide düşüş, ve gerekiyorsa **offline/CRM dönüşüm** eşlemesi; *hibrit* → ağırlıklı bileşik skor. Her rubrik kullanıcının onaylayacağı, düzenlenebilir varsayılan olarak tasarlanır; yeni amaç kapsamı eklenebilmeli. 6. **Değerlendirme/skorlama motoru** — instance + agrega; zaman serisi delta ve trend; her skoru İK brief'ine bağlı gerekçeyle üret. 7. **Bütçe tahsis / optimizasyon danışmanı** — bir İKK içindeki örnekler arasında bütçeyi, kategorinin amaç kapsamını maksimize edecek şekilde ve kullanıcının bütçe tercihleri sınırında yeniden dağıtma önerisi. 2026 Andromeda/Advantage+ konsolidasyonunun granülerliği ad-set seviyesine taşıdığını hesaba kat. 8. **Öneri üretici** — brief + metriğe dayalı, uygulanabilir öneriler (durdur, ölçekle, bütçe kaydır, creative yenile, hedefleme ayarla). Brief'e bağlanamayan öneri üretilmez. 9. **Onay iş akışı (insan-döngüde)** — okuma serbest; **her yazma = önerilen \"diff\"**, kullanıcı onayı → MCP ile uygula (**varsayılan PAUSED**). Tam **karar günlüğü / denetim izi**. Onay tek seferlik ve işlem-bazlı; toplu onay yok. 10. **Creative & uyumluluk modülü** — önce **tanı odaklı** (creative yorgunluğu, CTR düşüşü, frekans). Metin üretilecekse: yalnızca onaylı marka-sesi / mesaj kütüphanesinden, her zaman onay kuyruğuna, **asla otomatik yayın yok**. Türkiye sağlık reklam mevzuatı + KVKK için riskli ifade filtresi/uyarısı. 11. **Cadence / zamanlayıcı** — günlük/haftalık koşu (cron/tmux); özet digest; bekleyen-onay kuyruğu. 12. **Raporlama / dashboard** — İK, İKK, doktor, amaç kapsamı ve zaman ekseninde; trend görünümü. 13. **Bildirim** — Telegram kanalı üzerinden digest + onay istekleri. 14. **Governance / güvenlik** — harcama tavanları, rate limit, dry-run modu, geri alma (rollback), guardrail'ler. 15. **Genişletilebilirlik** — yeni amaç kapsamı, sayfa türü, mecra; kod değil **konfigürasyon** ile eklenebilmeli. ## 6) Kontrol / güvenlik / uyumluluk kısıtları (pazarlık dışı) - Otonom yazma yok; her müdahale kullanıcı onayından geçer. - Meta nesneleri varsayılan PAUSED üretilir; kullanıcı aktive eder. - Otomatik reklam metni yayını yok (sağlık mevzuatı + KVKK). - Her öneri izlenebilir (hangi brief, hangi metrik, hangi eşik). - Terminoloji disiplini kod seviyesine kadar korunur. ## 7) Mimari başlangıç önerisi (değerlendir ve gerekçelendir; kör kabul etme) - **Plumbing:** Pipeboard Meta Ads MCP'yi değerlendir — kaynak-erişilebilir, badged Meta Business Partner, standart Marketing API (gated beta değil), campaign/adset/ad CRUD + creative + insights + budget, **varsayılan PAUSED**. Alternatif olarak Meta'nın kendi resmî MCP'sinin (Nisan 2026, ücretsiz ama çoğu hesapta gated) kullanıcının hesabında açık olup olmadığını kontrol et; açıksa maliyet kıyası yap. Kendi ham API sarma katmanını yazmanın maliyet/faydasını da tartış. - **State:** Google Sheets (insan-okur) + gerekiyorsa yerel cache. - **Orkestrasyon:** Claude Code + tmux + cron; Telegram bildirim. - **Zekâ katmanı:** LLM, Sheets'teki brief/rubrik'i bağlam alıp değerlendirme ve öneri üretir; yazma önerisi diff olarak onaya düşer. Bu yığının artı/eksisini, alternatiflerini ve seçim gerekçeni planda yaz. ## 8) İstediğim plan çıktısının yapısı Planı şu bölümlerle sun: 1. **Terminoloji Sözlüğü** (kilitlenmiş; §3'ü esas al, gerekirse genişlet). 2. **Veri Modeli** — İç Kampanya Ailesi, İç Kampanya Kategorisi/şablon (miras/override ile çözülen esnek attribute sistemi), İç Kampanya, Amaç Kapsamı, Mecra, Sayfa Türü, Meta nesne eşlemesi, karar günlüğü. Taksonominin **açık uçlu** olduğunu göster. Şema + ilişki diyagramı (metin/mermaid). 3. **Bileşen Mimarisi** — §5 katmanları; her biri sorumluluk + teknoloji + veri akışı. 4. **Use-case Akışları** — en az: (a) yeni aile/kategori + AI şablon iskeleti üretimi, (b) instance değerlendirme, (c) kategori/aile agrega değerlendirme + bütçe tahsis, (d) onaylı yazma. Akışları **iki zıt aile** üzerinden örnekle: **Marka Doktor** (boost/bilinirlik-takipçi) ve **Satış** (dönüşüm/ROAS/CRM) — motorun ikisini de hard-code olmadan taşıdığını göster. 5. **Rubrik Tasarımı** — her amaç kapsamı için başlangıç KPI/hedef/mantık (düzenlenebilir varsayılan); en az bilinirlik/takipçi/lead **ve satış** dünyalarını kapsa. 6. **Onay & Denetim** — diff formatı, onay kuyruğu, karar günlüğü, rollback. 7. **Uyumluluk Modülü** — sağlık mevzuatı + KVKK kontrol noktaları. 8. **Fazlı Yol Haritası** — MVP (salt-okuma + değerlendirme + digest, yazma yok) → onaylı yazma → bütçe tahsis → creative tanı → genişletme. Her faz için \"biten\" tanımı. 9. **Riskler & Açık Uçlar** — terminoloji çakışması, İç Kampanya→Meta nesne eşlemesi (boost ve satış nesneleri dâhil), aileler arası farklı ölçüm dünyaları, offline/CRM atıf, Andromeda granülerliği, API rate limit. 10. **Bana Soracağın Sorular** — planı kesinleştirmeden önce netleştirmen gerekenler. ## 9) Çalışma tarzın - Önce **güncel** Meta Marketing API ve Pipeboard (veya muadili MCP) araç yüzeyini araştır; ezberden Meta alan/endpoint uydurma. - **Plan modunda kal, kod yazma.** - Varsayımları açıkça işaretle; emin olmadığın yeri soru olarak §8.10'a taşı. - Terminoloji sözlüğüne sadık kal. - Kapsamı MVP'den başlatacak şekilde önceliklendir; \"önce doğru yargı, sonra yazma yetkisi\" ilkesini koru. Hazır olduğunda §8 yapısında planı sun ve sorularınla bitir.",
+ "sonIstek": "yani planı komple hazırla, devasa şekilde, biliyorsun aide sisteminin içerisinde belli başlı aşamalar ve görevler var, yani vizyon, kutup yıldızı, roadmap, planlar, session vegenel todolar",
+ "sonZaman": "2026-08-06T10:46:23.028Z",
+ "todolar": [
+  {
+   "metin": "Claim'ler + oturum geçişi",
+   "durum": "completed"
+  },
+  {
+   "metin": "utopya/ tamam + doğrulandı (yapı temiz, 32 çıpa)",
+   "durum": "completed"
+  },
+  {
+   "metin": "TODO-ELLE maddeleri + ref dökümü",
+   "durum": "completed"
+  },
+  {
+   "metin": "Çerçeve + 10 aşama ajanı fan-out",
+   "durum": "completed"
+  },
+  {
+   "metin": "v2 dosyaları: MASTER/STATE/CHECKLIST/REQUIREMENTS/10 aşama/REVIZYON",
+   "durum": "completed"
+  },
+  {
+   "metin": "Türetme + gate PASS (DAG aktif) + getirir blokları",
+   "durum": "completed"
+  },
+  {
+   "metin": "Doğrulama + oturum defteri + claim bırakıldı + rapor",
+   "durum": "completed"
+  }
+ ],
+ "acikTodo": 0,
+ "compact": null,
+ "kaptanHedefi": {
+  "title": "devam",
+  "acikTodolar": []
+ },
+ "planlar": null,
+ "git": {
+  "sonCommitler": [
+   "9a1fde8 cp(plan,skill,claude): 34 dosya · +1208/-12",
+   "a9f4dbf cp(claude): 1 dosya · +1/-1",
+   "29507fb cp(docs): 2 dosya · +81/-81",
+   "edd605e Merge remote-tracking branch 'origin/main'",
+   "34ec334 cp(docs): 2 dosya · +18/-20"
+  ],
+  "kirliDosya": 0,
+  "dal": "main"
+ },
+ "kuyruk": [
+  {
+   "role": "assistant",
+   "text": "Lint kendi kaynak dosyalarındaki çıplak kullanımları da yakalayacak — önce onları düzeltiyorum:"
+  },
+  {
+   "role": "assistant",
+   "text": "Faz 0'ın kod ayağı tamamlandı ve doğrulandı: **14 test yeşil, 2 MCP sözleşme testi tasarım gereği token bekliyor (skip), terminoloji lint'i temiz.** Oturum defteri 10/10 hedef kapalı; plan v1 doğal olarak açık (Fazlar 1-5 önde). Kurulan yapı: - **Plan kanonu:** [MASTER.md](plans/reklamzeka-sistemi/v1/MASTER.md) (onaylı plan, künyeli) + [STATE.md](plans/reklamzeka-sistemi/v1/STATE.md) (faz durumu ve senden beklenenler); `agac.mjs` governance kapısı yeşil. - **Motor çekirdeği:** [taxonomy.py](src/"
+  },
+  {
+   "role": "user",
+   "text": "interaktif oturum nedir, diğer bilgiler nedir bunalrı bana açıklayarak sorarak ilerle"
+  },
+  {
+   "role": "assistant",
+   "text": "Tabii — tek tek, sade biçimde açıklayayım; sonra kararları soru olarak önüne koyacağım. (Kısa not: bu oturum Fable 5 ile koşuyor; ana loop kanonun Opus — bilinçli seçimse sorun yok, değilse `/model claude-opus-5[1m]`.) ## Senden beklenen 3 şey, ne anlama geliyor? **1. \"İnteraktif oturum\" ve Meta OAuth ne demek?** Sistem Meta'daki reklam verine erişmek için Meta'nın resmî MCP sunucusuna (`mcp.facebook.com/ads`) bağlanacak. Meta buna izin vermek için **senin Facebook hesabınla bir kez giriş yapıp "
+  },
+  {
+   "role": "user",
+   "text": "bunuı plan olarak incelemeni istiyorum ama"
+  },
+  {
+   "role": "assistant",
+   "text": "Anladım — uygulamayı durduruyorum, önce bu fikri plan gözüyle inceliyorum. ## İncelenen fikir: \"Digest, Telegram'a hapsedilmesin\" Senin cümlenin plan diline çevirisi: **digest bir kanal değil, bir ürün olmalı.** Bugünkü planda (MASTER §3 katman 13) digest Telegram'a gönderilen bir mesaj olarak tanımlı — yani üretimle dağıtım birbirine yapışık. Önerdiğin ayrım şu: 1. **Üretim:** `digest.py` her koşuda tek bir **digest artefaktı** üretir (markdown + yapılandırılmış JSON; SQLite'a ve `docs/digest/`"
+  },
+  {
+   "role": "user",
+   "text": "yani planı komple hazırla, devasa şekilde, biliyorsun aide sisteminin içerisinde belli başlı aşamalar ve görevler var, yani vizyon, kutup yıldızı, roadmap, planlar, session vegenel todolar"
+  },
+  {
+   "role": "assistant",
+   "text": "Anladım — istediğin şey tek bir MASTER.md değil: ReklamZeka'nın aide sistemindeki **tam hiyerarşiye** oturması: `utopya/` (kutup yıldızı/vizyon) → roadmap (plan-kur formatında aşama aşama, checklist + requirements'lı, versiyonlu) → oturum defteri → genel TODO'lar. Plan modundayım; önce mevcut aide yapılarını ve formatlarını keşfedip, sonra bu \"devasa plan\"ın üretim planını çıkaracağım."
+  },
+  {
+   "role": "assistant",
+   "text": "Şablonlar net. Şimdi kutup yıldızını yazıyorum — önce mevcut iskelet dosyalarını okuyayım:"
+  },
+  {
+   "role": "assistant",
+   "text": "10 aşama dosyası da üretildi. Şimdi v2 klasörünü yazıyorum — önce aşama dosyaları:"
+  },
+  {
+   "role": "assistant",
+   "text": "API Error: Connection closed mid-response. The response above may be incomplete."
+  },
+  {
+   "role": "user",
+   "text": "devam"
+  },
+  {
+   "role": "assistant",
+   "text": "Aşama dosyaları tamam. Şimdi çekirdek v2 dosyaları:"
+  },
+  {
+   "role": "assistant",
+   "text": "**Devasa plan hiyerarşisi tamamlandı ve tüm kapılardan geçti.** ReklamZeka artık aide sisteminin dört katmanında da eksiksiz duruyor; hiçbir aşama ateşlenmedi — o karar sende. ## Üretilen hiyerarşi **1. Kutup yıldızı — [utopya/](utopya/KUZEY.md):** \"Amaç ve kapsam\" doldu; 5 şartname bölümü yazıldı ([veri-gercegi](utopya/vizyon/1-veri-gercegi.md), [brief-yargisi](utopya/vizyon/2-brief-yargisi.md), [insan-hakimiyeti](utopya/vizyon/3-insan-hakimiyeti.md), [uyum-guveni](utopya/vizyon/4-uyum-guveni.m"
+  }
+ ],
+ "kilitler": [],
+ "ilkIs": "yani planı komple hazırla, devasa şekilde, biliyorsun aide sisteminin içerisinde belli başlı aşamalar ve görevler var, yani vizyon, kutup yıldızı, roadmap, planlar, session vegenel todolar",
+ "yenidenBaslat": {
+  "baskaDepo": false,
+  "hard": "aide open 35fbdca7-b993-4abb-a8d2-ae41d850f9de --cwd /Users/ybg/dev/ReklamZeka",
+  "ham": "cd /Users/ybg/dev/ReklamZeka && claude --resume 35fbdca7-b993-4abb-a8d2-ae41d850f9de",
+  "soft": "cd /Users/ybg/dev/ReklamZeka && claude \"OTURUM KASASI devralması: plans/oturumlar/kasa/35fbdca7.md dosyasını OKU ve 'İLK İŞ' bölümünden başla.\"",
+  "brif": "plans/oturumlar/kasa/35fbdca7.md"
+ },
+ "uyarilar": [],
+ "olculemedi": [
+  "compact özet (bu oturum henüz context sıfırlamadı — özet YOK, uydurulmaz)"
+ ]
+}

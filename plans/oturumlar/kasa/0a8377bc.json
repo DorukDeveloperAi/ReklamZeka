@@ -5,22 +5,31 @@
  "proje": "ReklamZeka",
  "kok": "/Users/ybg/dev/ReklamZeka",
  "cwd": "/Users/ybg/dev/ReklamZeka",
- "baslik": null,
- "sonAktivite": "2026-08-19T16:23:42.865Z",
- "yazimAninkiDurum": "idle",
- "depo": null,
- "amac": null,
- "sonIstek": null,
- "sonZaman": null,
+ "baslik": "bu tarz bir mcp sunucu kullanmak mı daha mantıklı yoksa bunu zaetn ai…",
+ "sonAktivite": "2026-08-19T16:24:18.501Z",
+ "yazimAninkiDurum": "generating",
+ "depo": "/Users/ybg/.claude",
+ "amac": "bu tarz bir mcp sunucu kullanmak mı daha mantıklı yoksa bunu zaetn ai .ile kodlamak kolay mı ne sunuyor bu bize https://pipeboard.co/guides/claude-code",
+ "sonIstek": "bu tarz bir mcp sunucu kullanmak mı daha mantıklı yoksa bunu zaetn ai .ile kodlamak kolay mı ne sunuyor bu bize https://pipeboard.co/guides/claude-code",
+ "sonZaman": "2026-08-19T16:23:45.604Z",
  "todolar": [],
  "acikTodo": 0,
  "compact": null,
  "kaptanHedefi": null,
  "planlar": null,
  "git": null,
- "kuyruk": [],
+ "kuyruk": [
+  {
+   "role": "user",
+   "text": "bu tarz bir mcp sunucu kullanmak mı daha mantıklı yoksa bunu zaetn ai .ile kodlamak kolay mı ne sunuyor bu bize https://pipeboard.co/guides/claude-code"
+  },
+  {
+   "role": "assistant",
+   "text": "İki şeyi ayırmak gerekiyor: **Meta'ya erişim** (pipeboard'ın sattığı şey) ve **ReklamZeka'nın kendisi** (ambar + rubrik + onay hattı). Pipeboard birincisini çözer, ikincisine dokunmaz — ve işin %90'ı ikincisi. **Ne sunuyor:** hosted HTTP MCP, OAuth ile bağlanıyor (token yok), Meta Ads 67 + Google Ads 50 komut, ayrıca TikTok/Pinterest/LinkedIn/GA/Shopify. Kurulum tek satır: `claude mcp add meta-ads-mcp --transport http https://meta-ads.mcp.pipeboard.co/`. Read **ve** write: kampanya oluştur, rekl"
+  }
+ ],
  "kilitler": [],
- "ilkIs": null,
+ "ilkIs": "bu tarz bir mcp sunucu kullanmak mı daha mantıklı yoksa bunu zaetn ai .ile kodlamak kolay mı ne sunuyor bu bize https://pipeboard.co/guides/claude-code",
  "yenidenBaslat": {
   "baskaDepo": false,
   "hard": "aide open 0a8377bc-e59b-4b05-8397-716b893f1420 --cwd /Users/ybg/dev/ReklamZeka",
@@ -28,8 +37,11 @@
   "soft": "cd /Users/ybg/dev/ReklamZeka && claude \"OTURUM KASASI devralması: plans/oturumlar/kasa/0a8377bc.md dosyasını OKU ve 'İLK İŞ' bölümünden başla.\"",
   "brif": "plans/oturumlar/kasa/0a8377bc.md"
  },
- "uyarilar": [],
+ "uyarilar": [
+  "YALIN mod: plan ağacı · DEVRALIS · git ÖLÇÜLMEDİ (çağıran proje tarafını bir kez ölçer)"
+ ],
  "olculemedi": [
-  "transcript demeti (topla.mjs çalışmadı)"
+  "compact özet (bu oturum henüz context sıfırlamadı — özet YOK, uydurulmaz)",
+  "plan ağacı · DEVRALIS · git (yalın mod — proje tarafı ilk kayıtta)"
  ]
 }

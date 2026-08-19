@@ -4,17 +4,25 @@
 > NE İÇİN: devralan kişi ekranı devralmaz — bu klasörü devralır. Her kayıt bir AÇIK
 > sekmenin fotoğrafı + onu geri açan komuttur. Ölç: `node kasa.mjs list`.
 
-## Kayıtlar (16)
+## Kayıtlar (17)
+
+### 35fbdca7 — (başlıksız)
+
+- durum: CANLI · son aktivite: 2026-08-19T19:08:31.355Z · açık todo: 0/7
+- ilk iş: yani planı komple hazırla, devasa şekilde, biliyorsun aide sisteminin içerisinde belli başlı aşamalar ve görevler var, yani vizyon, kutup yıldızı, roadmap, pla…
+- brif: `plans/oturumlar/kasa/35fbdca7.md`
+- başlat: `aide open 35fbdca7-b993-4abb-a8d2-ae41d850f9de --cwd /Users/ybg/dev/ReklamZeka`
 
 ### b381d5be — (başlıksız)
 
-- durum: CANLI · son aktivite: 2026-08-19T16:25:20.370Z · açık todo: 0/0
+- durum: ÖLÜ → yeniden başlatılabilir · son aktivite: 2026-08-19T16:25:20.370Z · açık todo: 0/0
 - brif: `plans/oturumlar/kasa/b381d5be.md`
 - başlat: `aide open b381d5be-df1b-402c-a84b-5a816f4af181 --cwd /Users/ybg/dev/ReklamZeka`
 
-### 0a8377bc — (başlıksız)
+### 0a8377bc — bu tarz bir mcp sunucu kullanmak mı daha mantıklı yoksa bunu zaetn ai…
 
-- durum: CANLI · son aktivite: 2026-08-19T16:23:42.865Z · açık todo: 0/0
+- durum: CANLI · son aktivite: 2026-08-19T16:24:18.501Z · açık todo: 0/0
+- ilk iş: bu tarz bir mcp sunucu kullanmak mı daha mantıklı yoksa bunu zaetn ai .ile kodlamak kolay mı ne sunuyor bu bize https://pipeboard.co/guides/claude-code
 - brif: `plans/oturumlar/kasa/0a8377bc.md`
 - başlat: `aide open 0a8377bc-e59b-4b05-8397-716b893f1420 --cwd /Users/ybg/dev/ReklamZeka`
 
