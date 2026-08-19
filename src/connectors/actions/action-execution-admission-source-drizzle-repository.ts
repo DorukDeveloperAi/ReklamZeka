@@ -4,6 +4,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { ActionExecutionAdmissionSource } from "@/application/action-execution-admission-service";
 import { DrizzleActionApprovalDecisionRepository } from "@/connectors/actions/action-approval-decision-drizzle-repository";
 import type { ActionPlan } from "@/domain/actions/autonomy-valve";
+import type { GuideBudgetPersistedBinding } from "@/application/guide-budget-action-preparation-service";
 import { createMetaWriteSpec } from "@/domain/actions/meta-write-spec";
 import type { MetaWriteEligibilitySnapshot } from "@/domain/actions/meta-write-eligibility";
 import * as schema from "@/db/schema";
@@ -11,6 +12,9 @@ import * as schema from "@/db/schema";
 type Database = NodePgDatabase<typeof schema>;
 type SourceDatabase = Pick<Database, "execute" | "transaction">;
 type Row = Readonly<Record<string, unknown>>;
+export type GuideBudgetActionAdmissionGate = Readonly<{
+  revalidatePersisted(input: Readonly<{ workspaceId: string; guideRevisionId: string; binding: GuideBudgetPersistedBinding; evaluatedAt: string }>): Promise<boolean>;
+}>;
 
 export class ActionExecutionAdmissionSourceRepositoryError extends Error {
   constructor(readonly code: "invalid_input" | "workspace_scope_mismatch" | "source_missing" | "source_corrupt") {
@@ -41,6 +45,11 @@ function text(value: unknown): string {
   if (typeof value !== "string" || !REF.test(value)) throw new ActionExecutionAdmissionSourceRepositoryError("source_corrupt");
   return value;
 }
+function name(value: unknown): string {
+  if (typeof value !== "string" || value !== value.trim() || value.length < 1 || value.length > 255
+    || /[\u0000-\u001f\u007f]/.test(value)) throw new ActionExecutionAdmissionSourceRepositoryError("source_corrupt");
+  return value;
+}
 
 /**
  * Read-only bridge from immutable proposal/approval rows to the current Meta
@@ -51,7 +60,8 @@ export class DrizzleActionExecutionAdmissionSourceRepository implements ActionEx
   private readonly approval: Pick<DrizzleActionApprovalDecisionRepository, "loadForDecision">;
 
   constructor(private readonly database: SourceDatabase, private readonly workspaceId: string,
-    approval?: Pick<DrizzleActionApprovalDecisionRepository, "loadForDecision">) {
+    approval?: Pick<DrizzleActionApprovalDecisionRepository, "loadForDecision">,
+    private readonly guideBudgetGate?: GuideBudgetActionAdmissionGate) {
     if (!UUID.test(workspaceId)) throw new ActionExecutionAdmissionSourceRepositoryError("invalid_input");
     this.approval = approval ?? new DrizzleActionApprovalDecisionRepository(database, workspaceId);
   }
@@ -67,11 +77,11 @@ export class DrizzleActionExecutionAdmissionSourceRepository implements ActionEx
     const unit = approval.lifecycle.bundle.units.find((candidate) => candidate.unitRef === input.unitRef);
     if (!unit) throw new ActionExecutionAdmissionSourceRepositoryError("source_corrupt");
     const result = rows(await this.database.execute(sql`
-      select u.action_plan_payload, u.account_ref, u.entity_ref, u.action_type,
-        campaign.external_campaign_id as campaign_ref, campaign.configured_status as campaign_configured_status,
+      select u.action_plan_payload, u.action_plan_hash, u.action_hash, u.account_ref, u.entity_ref, u.action_type,
+        campaign.external_campaign_id as campaign_ref, campaign.name as campaign_name, campaign.configured_status as campaign_configured_status,
         campaign.effective_status as campaign_effective_status, campaign.campaign_budget_optimization,
-        ad_set.external_ad_set_id as ad_set_ref, ad_set.configured_status as ad_set_configured_status,
-        ad_set.effective_status as ad_set_effective_status, ad.external_ad_id as ad_ref,
+        ad_set.external_ad_set_id as ad_set_ref, ad_set.name as ad_set_name, ad_set.configured_status as ad_set_configured_status,
+        ad_set.effective_status as ad_set_effective_status, ad.external_ad_id as ad_ref, ad.name as ad_name,
         ad.configured_status as ad_configured_status, ad.effective_status as ad_effective_status,
         snapshot.snapshot_hash as source_snapshot_hash,
         to_char(snapshot.captured_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as source_snapshot_captured_at,
@@ -110,6 +120,26 @@ export class DrizzleActionExecutionAdmissionSourceRepository implements ActionEx
       || row.account_ref !== unit.scope.accountRef || row.entity_ref !== unit.scope.entityRef || row.action_type !== unit.scope.actionType) {
       throw new ActionExecutionAdmissionSourceRepositoryError("source_corrupt");
     }
+    const guidePlan = /^guide_budget_([0-9a-f]{8})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{12})_([a-f0-9]{64})$/.exec(unit.plan.planRef);
+    if (unit.plan.planRef.startsWith("guide_budget_") && !guidePlan) {
+      // A legacy short discriminator cannot recover or bind the complete
+      // Guide evaluation. It must never silently take the generic path.
+      throw new ActionExecutionAdmissionSourceRepositoryError("source_missing");
+    }
+    if (guidePlan) {
+      if (actionPlan.action.kind !== "budget_change" || !this.guideBudgetGate) throw new ActionExecutionAdmissionSourceRepositoryError("source_missing");
+      const guideRevisionId = `${guidePlan[1]}-${guidePlan[2]}-${guidePlan[3]}-${guidePlan[4]}-${guidePlan[5]}`;
+      if (row.action_plan_hash !== actionPlan.planHash || row.action_plan_hash !== unit.sourceHash
+        || typeof row.action_hash !== "string" || !HASH.test(row.action_hash)) {
+        throw new ActionExecutionAdmissionSourceRepositoryError("source_corrupt");
+      }
+      const admitted = await this.guideBudgetGate.revalidatePersisted({ workspaceId: this.workspaceId, guideRevisionId,
+        binding: Object.freeze({ unitRef: unit.unitRef, plan: unit.plan, sourceHash: unit.sourceHash,
+          contextHash: unit.contextHash, actionPlanHash: actionPlan.planHash,
+          actionHash: row.action_hash as string, action: actionPlan.action, expiresAt: unit.expiresAt }),
+        evaluatedAt: iso(row.database_now) });
+      if (admitted !== true) throw new ActionExecutionAdmissionSourceRepositoryError("source_missing");
+    }
     const sourceSnapshotHash = typeof row.source_snapshot_hash === "string" && HASH.test(row.source_snapshot_hash)
       ? row.source_snapshot_hash : (() => { throw new ActionExecutionAdmissionSourceRepositoryError("source_corrupt"); })();
     if (Date.parse(iso(row.source_snapshot_captured_at)) > Date.parse(iso(row.database_now))) {
@@ -117,10 +147,10 @@ export class DrizzleActionExecutionAdmissionSourceRepository implements ActionEx
     }
     const campaignRef = text(row.campaign_ref);
     const target = writeSpec.target.entityLevel === "campaign"
-      ? { ref: campaignRef, configured: row.campaign_configured_status, effective: row.campaign_effective_status }
+      ? { ref: campaignRef, configured: row.campaign_configured_status, effective: row.campaign_effective_status, name: row.campaign_name }
       : writeSpec.target.entityLevel === "adset"
-        ? { ref: text(row.ad_set_ref), configured: row.ad_set_configured_status, effective: row.ad_set_effective_status }
-        : { ref: text(row.ad_ref), configured: row.ad_configured_status, effective: row.ad_effective_status };
+        ? { ref: text(row.ad_set_ref), configured: row.ad_set_configured_status, effective: row.ad_set_effective_status, name: row.ad_set_name }
+        : { ref: text(row.ad_ref), configured: row.ad_configured_status, effective: row.ad_effective_status, name: row.ad_name };
     if (target.ref !== unit.scope.entityRef) throw new ActionExecutionAdmissionSourceRepositoryError("source_corrupt");
     const ancestors = writeSpec.target.entityLevel === "campaign" ? []
       : writeSpec.target.entityLevel === "adset" ? [Object.freeze({ entityLevel: "campaign" as const, entityRef: campaignRef,
@@ -133,6 +163,7 @@ export class DrizzleActionExecutionAdmissionSourceRepository implements ActionEx
       accountRef: unit.scope.accountRef, capturedAt: iso(row.database_now), sourceSnapshotHash,
       target: Object.freeze({ entityLevel: writeSpec.target.entityLevel, entityRef: target.ref,
         configuredStatus: status(target.configured), effectiveStatus: status(target.effective),
+        currentName: name(target.name),
         budgetOwnerRef: writeSpec.target.entityLevel === "campaign"
           ? row.campaign_budget_optimization === true ? campaignRef : null
           : writeSpec.target.entityLevel === "adset"

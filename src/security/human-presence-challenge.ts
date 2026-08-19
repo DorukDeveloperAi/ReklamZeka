@@ -28,7 +28,7 @@ const UNIT_REF = /^(?:action|policy)_unit_[a-f0-9]{20}$/;
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const PROOF = /^presence_[A-Za-z0-9_-]{32,160}$/;
 const ACTIONS = Object.freeze([
-  "approve", "reject", "request_changes", "admit_execution", "publish_approval_policy", "publish_guardrail_policy",
+  "approve", "reject", "defer", "request_changes", "admit_execution", "publish_approval_policy", "publish_guardrail_policy",
 ] as const);
 
 export type HumanPresenceAction = typeof ACTIONS[number];

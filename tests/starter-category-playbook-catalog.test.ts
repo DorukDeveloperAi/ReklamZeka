@@ -37,13 +37,15 @@ describe("starter objective/internal-category playbook catalog", () => {
 
   it("covers the canonical starter examples while keeping owner-defined values explicit", () => {
     expect(STARTER_CATEGORY_PLAYBOOK_CATALOG.dimensions.map((dimension) => dimension.dimensionKey)).toEqual([
-      "service_line", "brand_clinic", "geo_market", "language", "campaign_role", "funnel_intent",
+      "market", "service_line", "brand_clinic", "geo_market", "language", "campaign_role", "funnel_intent",
       "audience_strategy", "destination", "budget_pool", "operating_mode", "lifecycle", "experiment",
       "protection_class", "custom",
     ]);
     expect(new Set(STARTER_CATEGORY_PLAYBOOK_CATALOG.categoryTemplates.map((template) => template.dimensionKey)))
       .toEqual(new Set(STARTER_CATEGORY_PLAYBOOK_CATALOG.dimensions.map((dimension) => dimension.dimensionKey)));
     expect(STARTER_CATEGORY_PLAYBOOK_CATALOG.categoryTemplates.map((template) => template.templateRef)).toEqual([
+      "starter_category_template_market_domestic",
+      "starter_category_template_market_international",
       "starter_category_template_audience_strategy_prospecting",
       "starter_category_template_audience_strategy_retargeting",
       "starter_category_template_campaign_role_promotion",
@@ -85,6 +87,18 @@ describe("starter objective/internal-category playbook catalog", () => {
         canQuerySql: false,
       },
     });
+  });
+
+  it("ships the immutable domestic/international boundary separately from geography", () => {
+    const market = STARTER_CATEGORY_PLAYBOOK_CATALOG.dimensions.find((dimension) => dimension.dimensionKey === "market");
+    expect(market).toMatchObject({ label: "Pazar", suggestedCardinality: "single", suggestedEntityLevels: ["campaign"] });
+    expect(STARTER_CATEGORY_PLAYBOOK_CATALOG.categoryTemplates.filter((template) => template.dimensionKey === "market")
+      .map(({ categoryKey, label, kind }) => ({ categoryKey, label, kind }))).toEqual([
+        { categoryKey: "domestic", label: "Yerli", kind: "concrete_example" },
+        { categoryKey: "international", label: "Yabancı", kind: "concrete_example" },
+      ]);
+    expect(STARTER_CATEGORY_PLAYBOOK_CATALOG.categoryTemplates.some((template) =>
+      template.dimensionKey === "geo_market" && template.kind === "owner_defined_value")).toBe(true);
   });
 
   it.each(CAMPAIGN_OBJECTIVES)("resolves %s only to an owner-review-required CategoryProfile draft shape", (objective) => {

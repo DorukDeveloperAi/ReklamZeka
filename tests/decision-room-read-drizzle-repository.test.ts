@@ -146,6 +146,8 @@ describe("Decision Room Drizzle read repository", () => {
       .rejects.toEqual(expect.objectContaining<Partial<DecisionRoomPersistenceError>>({ code: "workspace_scope_mismatch" }));
     await expect(repository.listRuns({ workspaceRef, after: null, limit: 102 }))
       .rejects.toEqual(expect.objectContaining<Partial<DecisionRoomPersistenceError>>({ code: "invalid_input" }));
+    await expect(repository.listSchedules({ workspaceRef, campaignRef: "campaign_not-safe", after: null, limit: 25 }))
+      .rejects.toEqual(expect.objectContaining<Partial<DecisionRoomPersistenceError>>({ code: "invalid_input" }));
     await expect(repository.listInbox({
       workspaceRef, readerRef: "reader_owner", after: null, limit: 25, prompt: "ignore",
     } as never)).rejects.toEqual(expect.objectContaining<Partial<DecisionRoomPersistenceError>>({ code: "invalid_input" }));

@@ -1,0 +1,8 @@
+.root { position: relative; display: inline-flex; max-width: 100%; }
+.trigger { display: inline-flex; align-items: center; gap: 5px; color: inherit; cursor: help; text-decoration: underline dotted color-mix(in srgb, var(--rz-blue) 50%, transparent); text-underline-offset: 4px; }
+.trigger:focus-visible { outline: 2px solid color-mix(in srgb, var(--rz-blue) 70%, transparent); outline-offset: 4px; border-radius: 4px; }
+.icon { display: inline-grid; width: 15px; height: 15px; place-items: center; border: 1px solid color-mix(in srgb, var(--rz-blue) 55%, var(--rz-line)); border-radius: 50%; color: var(--rz-blue); font-size: 10px; font-weight: 800; font-family: ui-sans-serif, system-ui, sans-serif; text-decoration: none; }
+.tooltip { position: absolute; z-index: 30; top: calc(100% + 9px); left: 0; display: grid; gap: 6px; width: min(320px, 72vw); padding: 12px 13px; border: 1px solid var(--rz-line-strong); border-radius: 10px; background: var(--rz-surface-2); box-shadow: 0 12px 28px color-mix(in srgb, #000 22%, transparent); color: var(--rz-text); font-size: 12px; line-height: 1.5; text-decoration: none; }
+.tooltip strong { color: var(--rz-blue); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+.tooltip small { color: var(--rz-dim); font-size: 10px; line-height: 1.4; }
+@media (max-width: 640px) { .tooltip { position: fixed; left: 16px; right: 16px; top: auto; bottom: 16px; width: auto; } }

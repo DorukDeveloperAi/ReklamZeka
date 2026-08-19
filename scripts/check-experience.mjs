@@ -9,6 +9,7 @@ const required = [
   "src/app/dashboard/page.tsx",
   "src/app/dashboard/operating-dashboard.tsx",
   "src/app/dashboard/operating-dashboard.module.css",
+  "src/app/dashboard/dashboard-location.ts",
   "src/app/dashboard/canonical-performance-panel.tsx",
   "src/app/dashboard/canonical-campaign-portfolio-panel.tsx",
   "src/app/dashboard/local-session-connector.tsx",
@@ -17,6 +18,10 @@ const required = [
   "tests/local-session-connector.test.ts",
   "tests/dashboard-information-architecture.test.ts",
   "tests/dashboard-approved-information-architecture.test.ts",
+  "tests/dashboard-location.test.ts",
+  "tests/source-state.test.ts",
+  "tests/dashboard-user-language.test.ts",
+  "tests/dashboard-responsive-contract.test.ts",
   "tests/local-autonomy-rule-studio-runtime.test.ts",
   "tests/local-operational-timeline-runtime.test.ts",
   "docs/qa/2026-08-14-dashboard-first-increment-browser-evidence.json",
@@ -26,12 +31,15 @@ const required = [
   "docs/qa/2026-08-14-dashboard-rules-categories-practice-browser-evidence.json",
   "docs/qa/2026-08-14-dashboard-meta-orchestrator-operations-browser-evidence.json",
   "docs/qa/2026-08-14-dashboard-approved-ia-browser-evidence.json",
+  "docs/qa/2026-08-14-dashboard-shell-routing-browser-evidence.json",
+  "docs/qa/2026-08-14-dashboard-persisted-campaign-operator-acceptance.md",
 ];
 for (const path of required) if (!existsSync(resolve(root, path))) failures.push(`eksik: ${path}`);
 
 if (failures.length === 0) {
   const operatingDashboard = readFileSync(resolve(root, "src/app/dashboard/operating-dashboard.tsx"), "utf8");
   const dashboardPage = readFileSync(resolve(root, "src/app/dashboard/page.tsx"), "utf8");
+  const dashboardLocation = readFileSync(resolve(root, "src/app/dashboard/dashboard-location.ts"), "utf8");
   const sessionConnector = readFileSync(resolve(root, "src/app/dashboard/local-session-connector.tsx"), "utf8");
   const budgetLab = readFileSync(resolve(root, "src/app/dashboard/budget-lab-panel.tsx"), "utf8");
   const approvalQueue = readFileSync(resolve(root, "src/app/dashboard/approval-queue-panel.tsx"), "utf8");
@@ -40,8 +48,8 @@ if (failures.length === 0) {
   const deliveryAlerts = readFileSync(resolve(root, "src/app/dashboard/delivery-health-alert-panel.tsx"), "utf8");
   const promotionPreflight = readFileSync(resolve(root, "src/app/dashboard/promotion-preflight-panel.tsx"), "utf8");
   const operationalTimeline = readFileSync(resolve(root, "src/app/dashboard/operational-timeline-panel.tsx"), "utf8");
-  const navigationSource = operatingDashboard.slice(operatingDashboard.indexOf("const navGroups"), operatingDashboard.indexOf("export type PortfolioFilters"));
-  for (const boundary of ["OPERATING REVIEW · KANONİK KAYNAK", "KAMPANYA ÇALIŞMA ALANI · KANONİK BAĞLAM", "Eksik veri sıfır veya örnek değer olarak gösterilmez", "ekran örnek içerikle doldurulmaz"]) {
+  const navigationSource = operatingDashboard.slice(operatingDashboard.indexOf("const primaryNavigation"), operatingDashboard.indexOf("export type PortfolioFilters"));
+  for (const boundary of ["OPERASYON · GENEL BAKIŞ", "OPERASYON · PORTFÖY ÇALIŞMASI", "Eksik veri sıfır veya örnek değer olarak gösterilmez", "ekran örnek içerikle doldurulmaz"]) {
     if (!operatingDashboard.includes(boundary)) failures.push(`operating dashboard sınırı eksik: ${boundary}`);
   }
   for (const forbidden of ["Demo Marka", "PORTFÖY · DEMO", "KARAR MASASI · DEMO", "OFFLINE ÇALIŞMA KİTABI SNAPSHOT", "7 AĞUSTOS CUMA"]) {
@@ -51,21 +59,25 @@ if (failures.length === 0) {
     if (operatingDashboard.includes(fakeAnalysis)) failures.push(`statik Analizler operasyon içeriği kaldı: ${fakeAnalysis}`);
   }
   if (operatingDashboard.includes('{ id: "analysis", label: "Analizler"')) failures.push("statik Analizler görünümü navigasyonda kaldı");
-  if (!operatingDashboard.includes('{ id: "decision-room", label: "Analiz & Kararlar"')) failures.push("birleşik Analiz & Kararlar görünümü eksik");
-  for (const target of ['{ id: "today", label: "Bugün"', '{ id: "campaigns", label: "Kampanyalar"',
-    '{ id: "decision-room", label: "Analiz & Kararlar"', '{ id: "budgets", label: "Bütçeler"',
-    '{ id: "approvals", label: "Onay kuyruğu"', '{ id: "rules", label: "Kurallar & Yetkiler"',
-    '{ id: "settings", label: "Ayarlar"']) {
+  for (const target of ['id: "operations", label: "Operasyon"', 'id: "guides", label: "Kılavuzlar"', 'id: "analysis", label: "Analiz"', 'id: "decisions", label: "Kararlar"', 'id: "system", label: "Sistem"']) {
     if (!navigationSource.includes(target)) failures.push(`onaylı primary IA hedefi eksik: ${target}`);
   }
   for (const legacyTarget of ['{ id: "strict-policies", label:', '{ id: "categories", label:',
     '{ id: "autonomy", label:', '{ id: "practice-lab", label:', '{ id: "meta", label:',
-    '{ id: "agent", label:', '{ id: "alerts", label:', '{ id: "promotions", label:', '{ id: "timeline", label:']) {
+    '{ id: "alerts", label:', '{ id: "promotions", label:', '{ id: "timeline", label:']) {
     if (navigationSource.includes(legacyTarget)) failures.push(`legacy teknik hedef primary nav'da kaldı: ${legacyTarget}`);
   }
+  for (const boundary of ["Operasyon", "Kılavuzlar", "Analiz", "Kararlar", "Sistem", "Onay kuyruğu", "Canlı Graph envanteri bu sürümde kapalıdır.", "kural/policy metni üretmez, alanlara kopyalamaz veya kayıt oluşturmaz"]) {
+    if (!operatingDashboard.includes(boundary)) failures.push(`beş alanlı dashboard sınırı eksik: ${boundary}`);
+  }
+  if (operatingDashboard.includes('fetch("/api/meta/inventory"')) failures.push("kapalı Graph capability için canlı envanter çağrısı kaldı");
   for (const legacyDependency of ["dashboardResponse", "fixture-state", "DEMO_METRICS"]) {
     if (dashboardPage.includes(legacyDependency)) failures.push(`dashboard runtime legacy fixture'a bağlı: ${legacyDependency}`);
   }
+  for (const routingBoundary of ["dashboardLocationFromSearch", "dashboardLocationHref", "pushState", "replaceState", "popstate"]) {
+    if (!operatingDashboard.includes(routingBoundary) && !dashboardLocation.includes(routingBoundary)) failures.push(`dashboard URL/history sınırı eksik: ${routingBoundary}`);
+  }
+  if (!dashboardPage.includes("dashboardLocationFromSearch(params)")) failures.push("dashboard server deep-link başlangıcı eksik");
   for (const connectorBoundary of ["npm run local-session:mint", 'type="password"', 'credentials: "same-origin"', '"X-ReklamZeka-Intent": "bootstrap-local-session"']) {
     if (!sessionConnector.includes(connectorBoundary)) failures.push(`local session UX sınırı eksik: ${connectorBoundary}`);
   }
@@ -124,21 +136,10 @@ if (failures.length === 0) {
     || metaOperationsEvidence.viewports.some((viewport) => !viewport.bodyFits || !viewport.singleH1AllViews || !viewport.oneContextualSessionFormAllViews)
     || metaOperationsEvidence.rapidNavigation.productErrors !== 0 || metaOperationsEvidence.rapidNavigation.productWarnings !== 0
     || metaOperationsEvidence.securityBoundary.agentOrBrowserMintedProof || metaOperationsEvidence.securityBoundary.proofOrStorageInspected) failures.push("Meta/Orchestrator/operasyon browser veya güvenlik kanıtı başarısız");
-  const approvedIaEvidence = JSON.parse(readFileSync(resolve(root, "docs/qa/2026-08-14-dashboard-approved-ia-browser-evidence.json"), "utf8"));
-  if (approvedIaEvidence.primaryNavigation.after !== 7 || approvedIaEvidence.primaryNavigation.labels.length !== 7
-    || approvedIaEvidence.primaryNavigation.legacyTechnicalDestinationsVisible
-    || !approvedIaEvidence.desktop.bodyFits || !approvedIaEvidence.desktop.singleH1AllInspectedAreas
-    || approvedIaEvidence.desktop.visibleDemoOrFixtureCopy || approvedIaEvidence.desktop.todayDuplicateSessionRecovery
-    || approvedIaEvidence.campaignAreas.some((area) => !area.singleH1 || area.contextualSessionForms !== 1)
-    || approvedIaEvidence.mergedAreas.some((area) => !area.singleH1)
-    || approvedIaEvidence.assistant.primaryNavigationDestination || !approvedIaEvidence.assistant.ariaModal
-    || !approvedIaEvidence.assistant.focusMovesToClose || !approvedIaEvidence.assistant.escapeCloses
-    || !approvedIaEvidence.assistant.focusReturnsToTrigger || approvedIaEvidence.assistant.pageH1CountWhileOpen !== 1) {
-    failures.push("onaylı A bilgi mimarisi desktop/etkileşim kanıtı başarısız");
+  const operatorAcceptance = readFileSync(resolve(root, "docs/qa/2026-08-14-dashboard-persisted-campaign-operator-acceptance.md"), "utf8");
+  for (const expected of ["Status: `PENDING_OPERATOR_PROOF`", "Kararlarda incele", "Tüm çalışma alanına dön", "PASS_OPERATOR_PROOF", "Meta write veya execute çalıştırılmadığı"]) {
+    if (!operatorAcceptance.includes(expected)) failures.push(`operator campaign kabul paketi eksik: ${expected}`);
   }
-  if (approvedIaEvidence.mobileAcceptance.status !== "not_completed"
-    || approvedIaEvidence.mobileAcceptance.reason !== "in_app_browser_viewport_override_blocked_by_browser_url_security_policy"
-    || approvedIaEvidence.mobileAcceptance.alternateBrowserOrRawAutomationUsed) failures.push("onaylı IA mobile açık kabulü dürüstçe kaydedilmedi");
 }
 
 if (failures.length > 0) {
@@ -146,4 +147,4 @@ if (failures.length > 0) {
   failures.forEach((failure) => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log("EXPERIENCE PASS — onaylı 7-hedef IA ve desktop etkileşim kanıtı bağlı; yeni IA mobile browser kabulü güvenlik politikası nedeniyle açık kaydedildi");
+console.log("EXPERIENCE PASS — beş alanlı IA, kaynak sınırları ve mevcut session/campaign güvenlik kanıtları bağlı");

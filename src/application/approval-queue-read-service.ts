@@ -9,15 +9,17 @@ const BUNDLE_REF = /^action_bundle_[a-f0-9]{20}$/;
 const PUBLIC_REF = /^(?:account|entity|autonomy)_[a-f0-9]{16}$/;
 const CODE = /^[a-z][a-z0-9_.:-]{0,127}$/;
 
-export type ApprovalQueueStatus = "proposed" | "awaiting_approval" | "approved" | "rejected" | "changes_requested"
+export type ApprovalQueueStatus = "proposed" | "awaiting_approval" | "approved" | "rejected" | "deferred" | "changes_requested"
   | "expired" | "stale" | "suppressed" | "parked" | "executing" | "verified" | "failed" | "dependency_failed"
   | "rollback_proposed" | "rolled_back" | "superseded";
 export type ApprovalRisk = "K0" | "K1" | "K2" | "K3" | "K4";
-export type ApprovalActionType = "status_pause" | "status_activate" | "budget_decrease" | "budget_increase";
+export type ApprovalActionType = "status_pause" | "status_activate" | "budget_decrease" | "budget_increase"
+  | "campaign_rename" | "adset_rename" | "ad_rename";
 
 export type ApprovalBeforeAfter =
   | Readonly<{ field: "configured_status"; before: "ACTIVE" | "PAUSED"; after: "ACTIVE" | "PAUSED" }>
-  | Readonly<{ field: "daily_budget_minor" | "lifetime_budget_minor"; beforeMinor: number; afterMinor: number; currency: string }>;
+  | Readonly<{ field: "daily_budget_minor" | "lifetime_budget_minor"; beforeMinor: number; afterMinor: number; currency: string }>
+  | Readonly<{ field: "entity_name"; before: string; after: string }>;
 
 export type ApprovalQueueRecord = Readonly<{
   unitRef: string;
@@ -50,7 +52,7 @@ export type ApprovalQueueDetailRecord = ApprovalQueueRecord & Readonly<{
   }>[];
   /** Chronological, append-only human decisions for this exact ActionUnit. */
   decisionHistory: readonly Readonly<{
-    decision: "proposed" | "approved" | "rejected" | "changes_requested";
+    decision: "proposed" | "approved" | "rejected" | "deferred" | "changes_requested";
     occurredAt: string;
     reasonCode: string | null;
   }>[];
@@ -108,16 +110,20 @@ function validate(record: ApprovalQueueRecord): ApprovalQueueRecord {
     || !["campaign", "ad_set", "ad"].includes(record.entity.type)
     || record.entity.label !== null && !safeText(record.entity.label)
     || !["K0", "K1", "K2", "K3", "K4"].includes(record.risk)
-    || !["status_pause", "status_activate", "budget_decrease", "budget_increase"].includes(record.actionType)
+    || !["status_pause", "status_activate", "budget_decrease", "budget_increase", "campaign_rename", "adset_rename", "ad_rename"].includes(record.actionType)
     || !CODE.test(record.summaryCode) || !Number.isFinite(Date.parse(record.createdAt)) || !Number.isFinite(Date.parse(record.expiresAt))
     || Date.parse(record.expiresAt) <= Date.parse(record.createdAt) || record.dependencies.length > 50 || record.autonomy.trace.length < 1 || record.autonomy.trace.length > 20) {
     throw new ApprovalQueueReadError("unsafe_source");
   }
-  const statuses: readonly string[] = ["proposed", "awaiting_approval", "approved", "rejected", "changes_requested", "expired", "stale", "suppressed", "parked", "executing", "verified", "failed", "dependency_failed", "rollback_proposed", "rolled_back", "superseded"];
+  const statuses: readonly string[] = ["proposed", "awaiting_approval", "approved", "rejected", "deferred", "changes_requested", "expired", "stale", "suppressed", "parked", "executing", "verified", "failed", "dependency_failed", "rollback_proposed", "rolled_back", "superseded"];
   if (!statuses.includes(record.status) || !["manual", "approval_required", "policy_limited"].includes(record.autonomy.decision)) throw new ApprovalQueueReadError("unsafe_source");
-  exact(record.beforeAfter, record.beforeAfter.field === "configured_status" ? ["field", "before", "after"] : ["field", "beforeMinor", "afterMinor", "currency"]);
+  exact(record.beforeAfter, record.beforeAfter.field === "configured_status" || record.beforeAfter.field === "entity_name"
+    ? ["field", "before", "after"] : ["field", "beforeMinor", "afterMinor", "currency"]);
   if (record.beforeAfter.field === "configured_status") {
     if (!["ACTIVE", "PAUSED"].includes(record.beforeAfter.before) || !["ACTIVE", "PAUSED"].includes(record.beforeAfter.after)) throw new ApprovalQueueReadError("unsafe_source");
+  } else if (record.beforeAfter.field === "entity_name") {
+    if (!safeText(record.beforeAfter.before) || !safeText(record.beforeAfter.after)
+      || record.beforeAfter.before === record.beforeAfter.after) throw new ApprovalQueueReadError("unsafe_source");
   } else if (!["daily_budget_minor", "lifetime_budget_minor"].includes(record.beforeAfter.field)
     || !Number.isSafeInteger(record.beforeAfter.beforeMinor) || record.beforeAfter.beforeMinor < 0
     || !Number.isSafeInteger(record.beforeAfter.afterMinor) || record.beforeAfter.afterMinor < 0
@@ -133,10 +139,15 @@ function validate(record: ApprovalQueueRecord): ApprovalQueueRecord {
     if (!["workspace", "account", "category", "entity", "risk"].includes(step.scope)
       || !["manual", "approval_required", "policy_limited"].includes(step.decision) || !CODE.test(step.reasonCode)) throw new ApprovalQueueReadError("unsafe_source");
   }
-  const beforeAfter: ApprovalBeforeAfter = record.beforeAfter.field === "configured_status"
-    ? Object.freeze({ field: record.beforeAfter.field, before: record.beforeAfter.before, after: record.beforeAfter.after })
-    : Object.freeze({ field: record.beforeAfter.field, beforeMinor: record.beforeAfter.beforeMinor,
+  let beforeAfter: ApprovalBeforeAfter;
+  if (record.beforeAfter.field === "configured_status") {
+    beforeAfter = Object.freeze({ field: "configured_status", before: record.beforeAfter.before, after: record.beforeAfter.after });
+  } else if (record.beforeAfter.field === "entity_name") {
+    beforeAfter = Object.freeze({ field: "entity_name", before: record.beforeAfter.before, after: record.beforeAfter.after });
+  } else {
+    beforeAfter = Object.freeze({ field: record.beforeAfter.field, beforeMinor: record.beforeAfter.beforeMinor,
       afterMinor: record.beforeAfter.afterMinor, currency: record.beforeAfter.currency });
+  }
   return Object.freeze({
     ...record,
     entity: Object.freeze({ ...record.entity }),
@@ -163,7 +174,7 @@ function validateDetail(record: ApprovalQueueDetailRecord): ApprovalQueueDetailR
   const history = rawHistory.map((entry, index) => {
     exact(entry, ["decision", "occurredAt", "reasonCode"]);
     const candidate = entry as Readonly<{ decision: unknown; occurredAt: unknown; reasonCode: unknown }>;
-    if (typeof candidate.decision !== "string" || !["proposed", "approved", "rejected", "changes_requested"].includes(candidate.decision)
+    if (typeof candidate.decision !== "string" || !["proposed", "approved", "rejected", "deferred", "changes_requested"].includes(candidate.decision)
       || typeof candidate.occurredAt !== "string" || !Number.isFinite(Date.parse(candidate.occurredAt)) || candidate.reasonCode !== null && (typeof candidate.reasonCode !== "string" || !CODE.test(candidate.reasonCode))
       || index === 0 && (candidate.decision !== "proposed" || candidate.reasonCode !== null)
       || index > 0 && candidate.decision === "proposed") throw new ApprovalQueueReadError("unsafe_source");

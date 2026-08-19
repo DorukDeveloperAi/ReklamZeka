@@ -5,6 +5,7 @@ import * as schema from "@/db/schema";
 import { DrizzleMetaAffectedGeoSnapshotRepository } from "@/connectors/meta/meta-affected-geo-snapshot-drizzle-repository";
 import { appendKnownAffectedGeoForCanonicalAdSetPage, type MetaAffectedGeoAppendPort } from "./affected-geo-page-persistence";
 import { classifyMetaInventoryCanonicalDelta } from "./inventory-materialization";
+import { assertCanonicalMetaTargetingEvidence } from "./targeting-evidence";
 import type {
   CanonicalMetaInventoryAd,
   CanonicalMetaInventoryAdSet,
@@ -76,6 +77,12 @@ function existingVersion(provenance: Record<string, unknown> | null, payloadHash
 
 function appendIssue(issues: readonly MetaInventoryFieldIssue[], field: string, reason: MetaInventoryFieldIssue["reason"]): readonly MetaInventoryFieldIssue[] {
   return Object.freeze([...issues, Object.freeze({ field, reason })]);
+}
+
+/** Fail-closed repository boundary: forged canonical pages cannot persist arbitrary JSON. */
+export function metaAdSetTargetingPersistence(record: Pick<CanonicalMetaInventoryAdSet, "targetingSummary" | "targetingSignature">) {
+  assertCanonicalMetaTargetingEvidence(record.targetingSummary, record.targetingSignature);
+  return Object.freeze({ targetingSummary: record.targetingSummary, targetingSignature: record.targetingSignature });
 }
 
 /**
@@ -221,7 +228,8 @@ export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePer
       optimizationGoal: entry.optimizationGoal, billingEvent: entry.billingEvent, bidStrategy: entry.bidStrategy,
       bidAmountMinor: entry.bidAmountMinor, dailyBudgetMinor: entry.dailyBudgetMinor,
       lifetimeBudgetMinor: entry.lifetimeBudgetMinor, attributionSpec: entry.attributionSpec,
-      promotedObject: entry.promotedObject, sourceUpdatedAt: entry.trace.sourceUpdatedAt ? new Date(entry.trace.sourceUpdatedAt) : null,
+      promotedObject: entry.promotedObject, ...metaAdSetTargetingPersistence(entry),
+      sourceUpdatedAt: entry.trace.sourceUpdatedAt ? new Date(entry.trace.sourceUpdatedAt) : null,
       fetchedAt: observedAt, rawPayloadHash: entry.trace.rawPayloadHash,
       sourceGraphVersion: entry.trace.sourceGraphVersion, fieldCatalogVersion: entry.trace.fieldCatalogVersion,
       provenance: entry.trace.provenance, lastSeenAt: observedAt,
@@ -233,6 +241,7 @@ export class DrizzleMetaInventoryPagePersistence implements MetaInventoryPagePer
         optimizationGoal: sql`excluded.optimization_goal`, billingEvent: sql`excluded.billing_event`, bidStrategy: sql`excluded.bid_strategy`,
         bidAmountMinor: sql`excluded.bid_amount_minor`, dailyBudgetMinor: sql`excluded.daily_budget_minor`, lifetimeBudgetMinor: sql`excluded.lifetime_budget_minor`,
         attributionSpec: sql`excluded.attribution_spec`, promotedObject: sql`excluded.promoted_object`, sourceUpdatedAt: sql`excluded.source_updated_at`,
+        targetingSummary: sql`excluded.targeting_summary`, targetingSignature: sql`excluded.targeting_signature`,
         fetchedAt: sql`excluded.fetched_at`, rawPayloadHash: sql`excluded.raw_payload_hash`, sourceGraphVersion: sql`excluded.source_graph_version`,
         fieldCatalogVersion: sql`excluded.field_catalog_version`, provenance: sql`excluded.provenance`, lastSeenAt: observedAt, disappearedAt: null,
       },

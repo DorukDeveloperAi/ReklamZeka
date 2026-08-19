@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   selectPlannedScenarioAllocation,
+  selectionCandidateRef,
   SliceRuleScenarioAllocationSelectionRepositoryError,
 } from "@/connectors/campaigns/slice-rule-scenario-allocation-selection-drizzle-repository";
 
@@ -16,6 +17,10 @@ const alternative = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("slice rule scenario allocation selection", () => {
+  it("uses an opaque immutable candidate ref rather than accepting entity, amount, scope, or approval input", () => {
+    expect(selectionCandidateRef({ draftHash: "a".repeat(64), proposalHash: "b".repeat(64), scenarioRef: "scenario.keep", allocationRef: "allocation.ftr" }))
+      .toMatch(/^selection_candidate_[a-f0-9]{64}$/);
+  });
   it("selects only one exact composed planned allocation with a consistent before/after delta", () => {
     expect(selectPlannedScenarioAllocation({ alternative: alternative() as never, contextHash: "a".repeat(64), allocationRef: "allocation.ftr" }))
       .toEqual({ beforeAmountMinor: 100, afterAmountMinor: 120 });

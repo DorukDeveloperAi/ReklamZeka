@@ -474,6 +474,7 @@ export function CategoryInventoryPanel(props: Readonly<{
     {authoringError ? <section className={styles.guidanceInlineError} role="alert"><span>{authoringError} Authoring kontrolleri güvenli biçimde kapatıldı.</span><button type="button" onClick={() => void refresh()}>Yeniden doğrula</button></section> : null}
     {mutationError ? <section className={styles.guidanceInlineError} role="alert"><span>{mutationError} Önceki preview geçersizleştirildi; durum yeniden doğrulandı.</span><button type="button" onClick={() => setMutationError(null)}>Kapat</button></section> : null}
     {mutationStatus ? <section className={styles.categoryMutationStatus} role="status"><span>{mutationStatus}</span><button type="button" onClick={() => setMutationStatus(null)}>Kapat</button></section> : null}
+    <StarterCategoryAdoption />
     {authoring?.authority.canCreate ? <section className={`${styles.panel} ${styles.categoryAuthoring}`} aria-label="Kategori authoring">
       <header className={styles.panelHeader}><div><span className={styles.kicker}>GUARDED AUTHORING</span><h2>Boyut ve tanım oluştur</h2></div><span>{authoring.contractVersion}</span></header>
       <div className={styles.categoryAuthoringGrid}>
@@ -546,7 +547,6 @@ export function CategoryInventoryPanel(props: Readonly<{
       </form></div>
       <footer>Kreatif hedefleri exact aktif reklam yolu ile seçilir. Bu işlem action authorization veya Meta write yetkisi vermez.</footer>
     </section> : null}
-    <StarterCategoryAdoption />
     <CategoryProfileStudio />
     <div className={styles.metaMetricGrid}>
       <article><span>Aktif boyut</span><strong>{number(snapshot.summary.dimensions)}</strong><small>Kategori eksenleri</small></article>

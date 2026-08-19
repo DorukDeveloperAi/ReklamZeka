@@ -2,8 +2,10 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { DrizzleSliceRuleBudgetActionUnitMaterializer, SliceRuleBudgetActionUnitMaterializerError } from "@/connectors/campaigns/slice-rule-budget-action-unit-materializer";
+import { DrizzleSliceRuleDecisionTraceReadRepository, SLICE_RULE_DECISION_TRACE_VERSION } from "@/connectors/campaigns/slice-rule-decision-trace-drizzle-read-repository";
 import * as schema from "@/db/schema";
 import type { TrustedDecisionRoomPrincipal } from "@/application/decision-room-agent-contract";
+import { publicActionPreparationFlag } from "@/domain/actions/action-preparation-flag";
 
 const HEADERS = Object.freeze({ "Cache-Control": "private, no-store, max-age=0", "X-Content-Type-Options": "nosniff",
   "X-ReklamZeka-Access-Mode": "human-approval-queue-only", "X-ReklamZeka-Action-Authority": "none", "X-ReklamZeka-Meta-Write": "disabled" });
@@ -36,21 +38,26 @@ async function command(request: Request): Promise<Command> {
 /** Public refs are evidence hashes, never the selection's internal UUID. */
 export function selectionRef(evidenceHash: string) { return `selection_${evidenceHash}`; }
 export function createSliceRuleBudgetActionUnitHttpHandlers(input: Readonly<{
-  database: SelectionReader & ConstructorParameters<typeof DrizzleSliceRuleBudgetActionUnitMaterializer>[0];
+  database: SelectionReader & ConstructorParameters<typeof DrizzleSliceRuleBudgetActionUnitMaterializer>[0]
+    & ConstructorParameters<typeof DrizzleSliceRuleDecisionTraceReadRepository>[0];
   resolvePrincipal(request: Request): Promise<TrustedDecisionRoomPrincipal>;
 }>) {
   const selectionRows = async (workspaceId: string) => input.database.select({ id: schema.sliceRuleScenarioAllocationSelections.id,
     selectionEvidenceHash: schema.sliceRuleScenarioAllocationSelections.selectionEvidenceHash, selectedAt: schema.sliceRuleScenarioAllocationSelections.selectedAt })
     .from(schema.sliceRuleScenarioAllocationSelections).where(eq(schema.sliceRuleScenarioAllocationSelections.workspaceId, workspaceId)).limit(101);
   return Object.freeze({
-    GET: async (request: Request) => { try { requestShape(request, "GET", "slice-rule-budget-action-unit-read"); const principal = await input.resolvePrincipal(request); const rows = await selectionRows(principal.workspaceId);
-      return NextResponse.json({ contractVersion: "slice-rule-budget-action-unit-http/1.0.0", selections: rows.map((row) => ({ selectionRef: selectionRef(row.selectionEvidenceHash), selectedAt: row.selectedAt.toISOString() })), authority: AUTHORITY }, { headers: HEADERS });
+    GET: async (request: Request) => { try { requestShape(request, "GET", "slice-rule-budget-action-unit-read"); const principal = await input.resolvePrincipal(request); const [rows, trace] = await Promise.all([
+      selectionRows(principal.workspaceId), new DrizzleSliceRuleDecisionTraceReadRepository(input.database).list(principal.workspaceId),
+    ]);
+      return NextResponse.json({ contractVersion: "slice-rule-budget-action-unit-http/1.0.0", selections: rows.map((row) => ({ selectionRef: selectionRef(row.selectionEvidenceHash), selectedAt: row.selectedAt.toISOString() })), decisionTrace: { contractVersion: SLICE_RULE_DECISION_TRACE_VERSION, items: trace }, actionPreparation: publicActionPreparationFlag(), authority: AUTHORITY }, { headers: HEADERS });
     } catch { return response("unavailable", "Seçilmiş bütçe senaryoları güvenli biçimde okunamadı.", 503); } },
     POST: async (request: Request) => { try { requestShape(request, "POST", "slice-rule-budget-action-unit-materialize"); const [parsed, principal] = await Promise.all([command(request), input.resolvePrincipal(request)]);
       const rows = await input.database.select({ id: schema.sliceRuleScenarioAllocationSelections.id }).from(schema.sliceRuleScenarioAllocationSelections).where(and(eq(schema.sliceRuleScenarioAllocationSelections.workspaceId, principal.workspaceId), eq(schema.sliceRuleScenarioAllocationSelections.selectionEvidenceHash, parsed.selectionRef.slice("selection_".length)))).limit(2);
       if (rows.length !== 1) return response(rows.length ? "selection_ambiguous" : "selection_not_found", "Seçilmiş bütçe senaryosu bulunamadı veya tekil değil.", 404);
       const result = await new DrizzleSliceRuleBudgetActionUnitMaterializer(input.database).materialize({ workspaceId: principal.workspaceId, selectionId: rows[0]!.id, actorId: principal.actor.userId, idempotencyKey: parsed.idempotencyKey, proposedAt: parsed.proposedAt, expiresAt: parsed.expiresAt });
-      return NextResponse.json({ contractVersion: "slice-rule-budget-action-unit-http/1.0.0", selectionRef: parsed.selectionRef, queueState: "queued", persistence: result.outcome, authority: AUTHORITY }, { status: result.outcome === "inserted" ? 201 : 200, headers: HEADERS });
+      return NextResponse.json({ contractVersion: "slice-rule-budget-action-unit-http/1.0.0", selectionRef: parsed.selectionRef,
+        actionUnitRef: result.actionUnitRef, queueState: "queued", persistence: result.outcome, authority: AUTHORITY },
+      { status: result.outcome === "inserted" ? 201 : 200, headers: HEADERS });
     } catch (reason) { if (reason instanceof SliceRuleBudgetActionUnitMaterializerError) return response(reason.code, "Senaryo insan onay kuyruğuna güvenli biçimde gönderilemedi.", reason.code === "role_denied" || reason.code === "membership_required" ? 403 : 409); if (reason instanceof SyntaxError || reason instanceof Error && reason.message === "invalid_input") return response("invalid_input", "İnsan onay kuyruğu isteği geçersiz.", 400); return response("unavailable", "İnsan onay kuyruğu şu anda kullanılamıyor.", 503); }
     },
   });

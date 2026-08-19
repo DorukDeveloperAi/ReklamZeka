@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { createSliceRuleBudgetActionUnitHttpHandlers, selectionRef } from "@/server/slice-rule-budget-action-unit-http";
 
@@ -7,16 +8,38 @@ const evidenceHash = "a".repeat(64);
 function request(method: "GET" | "POST", body?: unknown, intent = method === "GET" ? "slice-rule-budget-action-unit-read" : "slice-rule-budget-action-unit-materialize") {
   return new Request("https://local.test/api/slice-rule-budget-action-units", { method, headers: { cookie: "rz=local", "sec-fetch-site": "same-origin", "x-reklamzeka-intent": intent, ...(method === "POST" ? { origin: "https://local.test", "content-type": "application/json" } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
-function reader(rows: unknown[]) { return { select: vi.fn(() => ({ from: () => ({ where: () => ({ limit: async () => rows }) }) })) }; }
+function reader(rows: unknown[], traceRows: unknown[] = []) { return {
+  select: vi.fn(() => ({ from: () => ({ where: () => ({ limit: async () => rows }) }) })),
+  execute: vi.fn(async () => ({ rows: traceRows })),
+}; }
 
 describe("Slice Rule budget ActionUnit HTTP boundary", () => {
+  it("returns the server-resolved public ActionUnit ref with the original selection ref", () => {
+    const source = readFileSync("src/server/slice-rule-budget-action-unit-http.ts", "utf8");
+    expect(source).toContain("selectionRef: parsed.selectionRef");
+    expect(source).toContain("actionUnitRef: result.actionUnitRef");
+    expect(source).not.toContain("actionUnitRef: parsed.");
+  });
+
   it("projects selected scenarios through a public evidence-hash reference, never the internal UUID", async () => {
-    const database = reader([{ id: "33333333-3333-4333-8333-333333333333", selectionEvidenceHash: evidenceHash, selectedAt: new Date("2026-08-13T12:00:00.000Z") }]);
+    const database = reader([{ id: "33333333-3333-4333-8333-333333333333", selectionEvidenceHash: evidenceHash, selectedAt: new Date("2026-08-13T12:00:00.000Z") }], [{
+      rule_series_ref: "slice_rule.demo", rule_revision: 1,
+      selection_id: "33333333-3333-4333-8333-333333333333", selection_evidence_hash: evidenceHash, selected_at: "2026-08-13T12:00:00.000Z",
+      binding_id: null, action_proposal_unit_id: null, action_unit_id: null, bundle_id: null, unit_ref: null, proposed_at: null,
+      decision_events: [], execution_attempt_count: 0, execution_safe_count: 0,
+    }]);
     const handlers = createSliceRuleBudgetActionUnitHttpHandlers({ database: database as never, resolvePrincipal: async () => principal });
     const response = await handlers.GET(request("GET"));
     expect(response.status).toBe(200);
     const payload = await response.json();
     expect(payload.selections).toEqual([{ selectionRef: selectionRef(evidenceHash), selectedAt: "2026-08-13T12:00:00.000Z" }]);
+    expect(payload.decisionTrace).toEqual({ contractVersion: "slice-rule-decision-trace/1.0.0", items: [{
+      ruleSeriesRef: "slice_rule.demo", ruleRevision: 1,
+      selectionRef: selectionRef(evidenceHash), selectedAt: "2026-08-13T12:00:00.000Z",
+      actionUnit: { presence: false, status: "not_materialized" }, decisionHistory: [],
+      execution: { safetyState: "server_disabled", closure: "not_admitted" },
+    }] });
+    expect(payload.actionPreparation).toEqual({ visible: true, enabled: false, reason: "server_disabled" });
     expect(JSON.stringify(payload)).not.toContain("33333333-3333-4333-8333-333333333333");
     expect(response.headers.get("X-ReklamZeka-Meta-Write")).toBe("disabled");
   });

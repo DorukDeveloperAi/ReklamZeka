@@ -60,11 +60,11 @@ describe("deterministic insight engine", () => {
     expect(JSON.stringify(runInsightEngine(input))).toBe(JSON.stringify(runInsightEngine(input)));
   });
 
-  it("exposes the same deterministic findings through the API contract", async () => {
+  it("keeps deterministic fixture findings out of the public API", async () => {
     expect(insightsResponse(7, "delayed").map((insight) => insight.ruleId)).toContain("data-delay");
     const response = GET(new Request("http://localhost/api/insights?period=7&state=delayed"));
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ insights: [{ ruleId: "data-delay" }] });
+    expect(response.status).toBe(410);
+    await expect(response.json()).resolves.toMatchObject({ code: "legacy_demo_retired" });
   });
 
   it("rejects insights missing source, confidence or calculation version", () => {

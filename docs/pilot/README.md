@@ -1,14 +1,24 @@
 # Saha pilotu veri girişi
 
-1. Önerilen yol olarak [`field-pilot.telemetry.template.json`](field-pilot.telemetry.template.json)
+1. Önce hiçbir veri yazmayan kaynak census'unu çalıştırın:
+
+```bash
+npm run census:field-pilot-source-db
+```
+
+   Çıktıda `eligibleForFieldPilotAttestation: true` görünmeden attestation veya
+   `field_pilot` raporu üretmeyin. Census, gerçek aktif hesap envanteri,
+   tazelik, geri bildirim, dashboard-doğrulama ve kritik-olay kaynaklarının
+   tamamını arar; insan attestation'ını asla bunlardan türetmez.
+2. Önerilen yol olarak [`field-pilot.telemetry.template.json`](field-pilot.telemetry.template.json)
    dosyasını proje dışında veya `.gitignore` kapsamındaki güvenli bir konuma kopyalayın.
    Manuel aggregate gerekiyorsa [`field-pilot.template.json`](field-pilot.template.json) kullanılabilir.
-2. Gerçek pilot olaylarını aşağıdaki telemetri sözleşmesine göre `events` dizisine aktarın.
+3. Gerçek pilot olaylarını aşağıdaki telemetri sözleşmesine göre `events` dizisine aktarın.
    Token, e-posta, müşteri adı veya kişisel veri eklemeyin; yalnız anonim `a-zA-Z0-9_-`
    kimlikleri kullanın. Dönüştürücü beklenmeyen alanları ve e-posta biçimli kimlikleri reddeder.
-3. Veriyi doğrulayan kişi `attestation` alanlarını doldurup yalnız gerçek hesaplar olduğunu
+4. Veriyi doğrulayan kişi `attestation` alanlarını doldurup yalnız gerçek hesaplar olduğunu
    onayladığında `confirmsRealAccounts` değerini `true` yapar.
-4. Önce hiçbir dosya yazmayan preflight'ı çalıştırın. Yalnız hüküm `pass` olduğunda resmi
+5. Önce hiçbir dosya yazmayan preflight'ı çalıştırın. Yalnız hüküm `pass` olduğunda resmi
    raporu üretin:
 
 ```bash

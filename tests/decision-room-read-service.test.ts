@@ -131,6 +131,19 @@ describe("Decision Room public read service", () => {
     expect(read.items[0]).toMatchObject({ readState: { status: "read", readAt: "2026-08-07T13:00:00.000Z" } });
   });
 
+  it("binds a selected campaign alias only to schedule and run reads", async () => {
+    const repository = new ReadRepositoryFixture();
+    const schedules = vi.spyOn(repository, "listSchedules");
+    const runs = vi.spyOn(repository, "listRuns");
+    const service = new DecisionRoomReadService(repository);
+    await service.read({ workspaceRef, view: "schedules", campaignRef: "campaign_0123456789abcdefabcd" });
+    await service.read({ workspaceRef, view: "runs", campaignRef: "campaign_0123456789abcdefabcd" });
+    expect(schedules).toHaveBeenCalledWith(expect.objectContaining({ campaignRef: "campaign_0123456789abcdefabcd" }));
+    expect(runs).toHaveBeenCalledWith(expect.objectContaining({ campaignRef: "campaign_0123456789abcdefabcd" }));
+    await expect(service.read({ workspaceRef, view: "inbox", readerRef: "reader_owner", campaignRef: "campaign_0123456789abcdefabcd" }))
+      .rejects.toMatchObject({ code: "invalid_input" });
+  });
+
   it("rejects malformed input, cross-view cursors, forbidden material, and unbounded limits", async () => {
     const service = new DecisionRoomReadService(new ReadRepositoryFixture());
     for (const request of [

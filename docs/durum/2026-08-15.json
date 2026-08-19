@@ -1,0 +1,186 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "4d04fdec0",
+      "tarih": "2026-08-15",
+      "konu": "feat: hand off canonical portfolio scope to rules",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "cc24afe71",
+      "tarih": "2026-08-15",
+      "konu": "test: lock Meta write closed approval chain",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "4dbf9c6f4",
+      "tarih": "2026-08-15",
+      "konu": "fix(analysis): classify cohort scope evidence",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "49edf96b2",
+      "tarih": "2026-08-15",
+      "konu": "feat: bind cohort receipts to explicit scope proof",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "930a93dc8",
+      "tarih": "2026-08-15",
+      "konu": "Add fail-closed temporal cohort skill receipt",
+      "tur": "is",
+      "kapsam": []
+    },
+    {
+      "hash": "531f00072",
+      "tarih": "2026-08-15",
+      "konu": "feat: show proven slice links in portfolio",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "48963502b",
+      "tarih": "2026-08-15",
+      "konu": "fix(ui): retain contextual help menu",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "adccc6862",
+      "tarih": "2026-08-15",
+      "konu": "refine dashboard theme system",
+      "tur": "is",
+      "kapsam": []
+    },
+    {
+      "hash": "324bf0668",
+      "tarih": "2026-08-15",
+      "konu": "fix(local-session): pin development origin binding",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "668d6dffb",
+      "tarih": "2026-08-15",
+      "konu": "feat: unify portfolio slice operation table",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "69f503736",
+      "tarih": "2026-08-15",
+      "konu": "test(agent): require fresh official turn citations",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "0b6dddb15",
+      "tarih": "2026-08-15",
+      "konu": "feat(orchestrator): freeze official turn receipts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "be2441b72",
+      "tarih": "2026-08-15",
+      "konu": "fix(ui): restore slice rule decision trace",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "20332e892",
+      "tarih": "2026-08-15",
+      "konu": "fix(ui): restore human approval preparation",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "7b8dbf1f1",
+      "tarih": "2026-08-15",
+      "konu": "fix(ui): keep slice budget impact dry-run only",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "feat",
+      "adet": 33
+    },
+    {
+      "kapsam": "fix",
+      "adet": 14
+    },
+    {
+      "kapsam": "?",
+      "adet": 4
+    },
+    {
+      "kapsam": "docs",
+      "adet": 3
+    },
+    {
+      "kapsam": "style",
+      "adet": 3
+    },
+    {
+      "kapsam": "test",
+      "adet": 3
+    }
+  ],
+  "isSayisi": 526,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-15",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "c70d1873cc66"
+}

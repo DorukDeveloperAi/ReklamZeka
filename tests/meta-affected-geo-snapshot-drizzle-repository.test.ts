@@ -101,6 +101,16 @@ describe("Drizzle canonical Meta affected-geo persistence", () => {
       "source_geo_subtree_hash", "snapshot_hash"]) expect(query).toContain(column);
   });
 
+  it("reconstructs the same exact geo evidence without transaction or share lock for caller-owned RR/read-only snapshots", async () => {
+    const value = snapshot();
+    const db = database([{ rows: [row(value)] }, { rows: itemRows(value) }, { rows: locationRows(value) }]);
+    await expect(new DrizzleMetaAffectedGeoSnapshotRepository(db as never, workspaceId).resolveExactReadOnly(exact(value)))
+      .resolves.toEqual(value);
+    expect(db.transaction).not.toHaveBeenCalled();
+    const statements = db.execute.mock.calls.map((call) => new PgDialect().sqlToQuery(call[0]).sql).join("\n");
+    expect(statements).not.toMatch(/for share|for update/i);
+  });
+
   it("fails closed for missing, ambiguous, partial, corrupt and cross-tenant records", async () => {
     const value = snapshot();
     const missing = database([{ rows: [{ id: workspaceId, lifecycle_state: "active" }] }, { rows: [] }]);
@@ -137,7 +147,7 @@ describe("Drizzle canonical Meta affected-geo persistence", () => {
 
   it("exposes no Meta call, update, delete, policy, approval or execution method", () => {
     expect(Object.getOwnPropertyNames(DrizzleMetaAffectedGeoSnapshotRepository.prototype).sort())
-      .toEqual(["append", "constructor", "loadChildren", "resolveExact"]);
+      .toEqual(["append", "assertExactInput", "constructor", "loadChildren", "resolveExact", "resolveExactReadOnly", "resolveExactReadOnlyInTransaction"]);
     expect(() => new DrizzleMetaAffectedGeoSnapshotRepository({} as never, "invalid"))
       .toThrow(MetaAffectedGeoSnapshotRepositoryError);
   });

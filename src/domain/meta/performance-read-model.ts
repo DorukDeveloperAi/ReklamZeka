@@ -1,12 +1,11 @@
-import { createHash } from "node:crypto";
 import { aggregateMetaMetrics, type MetaAggregatedMetric } from "@/domain/meta/insights/metric-engine";
 import type { CanonicalMetaDailyInsight } from "@/domain/meta/insights/contract";
+import { metaPublicReference } from "@/domain/meta/public-reference";
 
 export const CANONICAL_PERFORMANCE_READ_VERSION = "canonical-performance-read/1.0.0" as const;
 export type PerformanceState = "ready" | "partial" | "unavailable";
 export type PerformanceSource = Readonly<{ accountId: string; accountName: string; campaignId: string; campaignName: string; row: CanonicalMetaDailyInsight }>;
 
-const opaque = (scope: string, value: string) => `${scope}_${createHash("sha256").update(value).digest("hex").slice(0, 24)}`;
 const day = (date: Date) => date.toISOString().slice(0, 10);
 const shift = (date: string, days: number) => day(new Date(new Date(`${date}T00:00:00.000Z`).valueOf() + days * 86_400_000));
 
@@ -56,18 +55,22 @@ function buildWindow(rows: readonly PerformanceSource[], days: 7 | 30): Window {
 }
 
 /** Public, source-backed aggregate. It has no comparison, recommendation or action semantics. */
-export function buildCanonicalPerformanceReadModel(rows: readonly PerformanceSource[]): CanonicalPerformanceReadProjection {
+export function buildCanonicalPerformanceReadModel(rows: readonly PerformanceSource[], workspaceId?: string): CanonicalPerformanceReadProjection {
+  const scopedWorkspaceId = workspaceId ?? rows[0]?.row.workspaceId ?? null;
+  if (rows.length && (!scopedWorkspaceId || rows.some((source) => source.row.workspaceId !== scopedWorkspaceId))) {
+    throw new Error("canonical performance rejected: workspace_scope");
+  }
   const accounts = new Map<string, PerformanceSource[]>();
   for (const source of rows) { const group = accounts.get(source.accountId) ?? []; group.push(source); accounts.set(source.accountId, group); }
   const accountRows = [...accounts.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([accountId, sources]) => {
     const campaigns = new Map<string, PerformanceSource[]>();
     for (const source of sources) { const group = campaigns.get(source.campaignId) ?? []; group.push(source); campaigns.set(source.campaignId, group); }
     const campaignRows = [...campaigns.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([campaignId, campaignSources]) => Object.freeze({
-      campaignRef: opaque("campaign", campaignId), name: campaignSources[0]!.campaignName,
+      campaignRef: metaPublicReference("campaign", scopedWorkspaceId!, campaignId), name: campaignSources[0]!.campaignName,
       windows: Object.freeze([buildWindow(campaignSources, 7), buildWindow(campaignSources, 30)]),
     }));
     const windows = Object.freeze([buildWindow(sources, 7), buildWindow(sources, 30)]);
-    return Object.freeze({ accountRef: opaque("account", accountId), name: sources[0]!.accountName,
+    return Object.freeze({ accountRef: metaPublicReference("account", scopedWorkspaceId!, accountId), name: sources[0]!.accountName,
       currency: new Set(sources.map(({ row }) => row.currency).filter(Boolean)).size === 1 ? sources[0]!.row.currency ?? null : null,
       windows, campaigns: Object.freeze(campaignRows) });
   });

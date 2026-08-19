@@ -14,6 +14,8 @@ import { ACTION_APPROVAL_POLICY_VERSION } from "@/domain/actions/approval-lifecy
 import {
   resolveSliceRuleBudgetActionApprovalPolicy,
   resolveSliceRuleBudgetActionGuardrails,
+  publicSliceRuleBudgetProvenance,
+  assertActionDataHealthReady,
 } from "@/connectors/campaigns/slice-rule-budget-action-unit-materializer";
 
 function budgetPolicy(): ApprovalPolicy {
@@ -50,6 +52,29 @@ function published(workspaceRef = "workspace_alpha") {
 }
 
 describe("slice-rule budget ActionUnit policy resolution", () => {
+  it("stops action staging with a typed data-health hold", () => {
+    expect(() => assertActionDataHealthReady(false)).toThrowError(expect.objectContaining({ code: "data_health_hold" }));
+    expect(() => assertActionDataHealthReady(true)).not.toThrow();
+    const source = readFileSync("src/connectors/campaigns/slice-rule-budget-action-unit-materializer.ts", "utf8");
+    expect(source).toContain("assertActionDataHealthReady(preparationGate.dataHealthReady)");
+    expect(source).toContain("appendActionPreparationGateSnapshot");
+  });
+  it("builds only bounded public labels from already-verified immutable provenance", () => {
+    const evidence = publicSliceRuleBudgetProvenance({ seriesRef: "slice_rule.ftr.ar", revision: 2,
+      proposalSeriesRef: "budget.ftr.ar", proposalRevision: 3, market: "international", hasSameMarketPool: true,
+      approvalPolicyRevision: 4, hasPublishedGuardrail: true });
+    expect(evidence.map((item) => item.label)).toEqual([
+      "İnsan seçimiyle sabitlenen bütçe senaryosu",
+      "Kullanıcı kuralı · slice_rule.ftr.ar · revizyon 2",
+      "Bütçe önerisi · budget.ftr.ar · revizyon 3",
+      "Yabancı bütçe havuzu · aynı pazar bağı doğrulandı",
+      "Onay politikası · yayınlanmış · revizyon 4",
+      "Koruma kuralı · yayınlanmış bütçe limiti doğrulandı",
+    ]);
+    expect(JSON.stringify(evidence)).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/i);
+    expect(JSON.stringify(evidence)).not.toMatch(/[a-f0-9]{64}/i);
+  });
+
   it("binds the queued action plan only to the persisted frozen context resolved server-side", () => {
     const source = readFileSync("src/connectors/campaigns/slice-rule-budget-action-unit-materializer.ts", "utf8");
     expect(source).toContain("frozenContextHash: contexts[0]!.contextHash");

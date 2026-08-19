@@ -20,8 +20,9 @@ export class RobustCohortDiagnosticRepositoryError extends Error {
 }
 
 type CandidateRow = Readonly<{
-  evidence_id: string; evidence_hash: string; entity_ref: string; feature_ref: string; feature_hash: string; feature_payload: unknown;
+  evidence_id: string; evidence_hash: string; entity_ref: string; context_payload: unknown; feature_ref: string; feature_hash: string; feature_payload: unknown;
 }>;
+type EquivalenceScope = Readonly<{ version: "cohort-equivalence-scope/1.0.0"; market: "domestic" | "international"; serviceHash: string; funnel: FunnelStage; optimizationEvent: string; audienceHash: string; platformHash: string }>;
 function fail(code: RobustCohortDiagnosticRepositoryError["code"]): never { throw new RobustCohortDiagnosticRepositoryError(code); }
 function rows<T extends Row>(result: unknown): readonly T[] {
   if (!result || typeof result !== "object" || !("rows" in result) || !Array.isArray(result.rows)) fail("corrupt_store");
@@ -30,6 +31,26 @@ function rows<T extends Row>(result: unknown): readonly T[] {
 function stable(value: unknown): unknown { return Array.isArray(value) ? value.map(stable) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, child]) => [key, stable(child)])) : value; }
 function digest(value: unknown): string { return createHash("sha256").update(JSON.stringify(stable(value))).digest("hex"); }
 function instant(value: string): string { if (!Number.isFinite(Date.parse(value))) fail("invalid_input"); return new Date(value).toISOString(); }
+function scopeHash(payload: unknown, key: string): string {
+  if (!payload || typeof payload !== "object" || !Array.isArray((payload as Record<string, unknown>).categories)) fail("corrupt_store");
+  const categories = (payload as { categories: unknown[] }).categories.filter((item): item is Record<string, unknown> => !!item && typeof item === "object" && ((item as Record<string, unknown>).dimension as Record<string, unknown> | undefined)?.key === key);
+  if (categories.length !== 1) fail("insufficient_evidence");
+  const category = categories[0]!; const dimension = category.dimension as Record<string, unknown>; const definitions = category.effectiveDefinitions; const bindings = category.profileBindings;
+  if (dimension.cardinality !== "single" || !Array.isArray(definitions) || definitions.length !== 1 || !Array.isArray(bindings) || bindings.length !== 1) fail("insufficient_evidence");
+  const definition = definitions[0] as Record<string, unknown> | undefined; const binding = bindings[0] as Record<string, unknown> | undefined;
+  if (!definition || !binding || typeof dimension.version !== "number" || typeof definition.key !== "string" || typeof definition.version !== "number" || typeof binding.categoryRef !== "string" || typeof binding.profileRef !== "string" || typeof binding.profileVersion !== "number" || typeof binding.profileHash !== "string" || !HASH.test(binding.profileHash)) fail("corrupt_store");
+  return digest({ dimension: { key, version: dimension.version, cardinality: dimension.cardinality }, definition: { key: definition.key, version: definition.version }, binding: { categoryRef: binding.categoryRef, profileRef: binding.profileRef, profileVersion: binding.profileVersion, profileHash: binding.profileHash } });
+}
+function equivalenceScope(payload: unknown, funnel: FunnelStage, optimizationEvent: string): EquivalenceScope {
+  if (!payload || typeof payload !== "object" || !Array.isArray((payload as Record<string, unknown>).categories)) fail("corrupt_store");
+  const categories = (payload as { categories: unknown[] }).categories.filter((item): item is Record<string, unknown> => !!item && typeof item === "object" && ((item as Record<string, unknown>).dimension as Record<string, unknown> | undefined)?.key === "market");
+  if (categories.length !== 1) fail("insufficient_evidence");
+  const marketCategory = categories[0]!; const definitions = marketCategory.effectiveDefinitions;
+  if ((marketCategory.dimension as Record<string, unknown>).cardinality !== "single" || !Array.isArray(definitions) || definitions.length !== 1) fail("insufficient_evidence");
+  const market = (definitions[0] as Record<string, unknown> | undefined)?.key;
+  if (market !== "domestic" && market !== "international") fail("insufficient_evidence");
+  return Object.freeze({ version: "cohort-equivalence-scope/1.0.0", market, serviceHash: scopeHash(payload, "service"), funnel, optimizationEvent, audienceHash: scopeHash(payload, "audience_strategy"), platformHash: scopeHash(payload, "publisher_platform") });
+}
 
 /**
  * Server-private A10.5b materializer. The caller can name only its target
@@ -64,7 +85,7 @@ export class DrizzleRobustCohortDiagnosticRepository {
             and not exists (select 1 from effective_campaign_context_invalidations invalidation where invalidation.workspace_id = evidence.workspace_id and invalidation.context_id = evidence.context_id)
           for share
         ), ranked as (
-          select distinct on (evidence.entity_ref) evidence.id, evidence.evidence_hash, evidence.entity_ref, evidence.feature_manifest
+          select distinct on (evidence.entity_ref) evidence.id, evidence.evidence_hash, evidence.entity_ref, evidence.feature_manifest, context.context_payload
           from frozen_diagnostic_evidence evidence
           join effective_campaign_contexts context on context.workspace_id = evidence.workspace_id and context.id = evidence.context_id
           join target on target.workspace_id = evidence.workspace_id and target.ad_account_id = context.ad_account_id
@@ -74,7 +95,7 @@ export class DrizzleRobustCohortDiagnosticRepository {
             and not exists (select 1 from effective_campaign_context_invalidations invalidation where invalidation.workspace_id = evidence.workspace_id and invalidation.context_id = evidence.context_id)
           order by evidence.entity_ref, evidence.captured_at desc, evidence.id desc
         )
-        select ranked.id::text as evidence_id, ranked.evidence_hash, ranked.entity_ref, feature.feature_ref, feature.feature_hash, feature.feature_payload
+        select ranked.id::text as evidence_id, ranked.evidence_hash, ranked.entity_ref, ranked.context_payload, feature.feature_ref, feature.feature_hash, feature.feature_payload
         from ranked
         join lateral jsonb_to_recordset(ranked.feature_manifest) as manifest(ref text, hash text) on true
         join deterministic_feature_snapshots feature on feature.workspace_id = ${input.workspaceId}::uuid and feature.feature_ref = manifest.ref and feature.feature_hash = manifest.hash
@@ -112,13 +133,15 @@ export class DrizzleRobustCohortDiagnosticRepository {
       if (new Set(members.map((member) => member.entityRef)).size !== members.length
         || new Set(members.map((member) => member.evidenceHash)).size !== members.length
         || new Set(members.map((member) => member.featureHash)).size !== members.length) fail("insufficient_evidence");
-      const core = { contractVersion: "robust-cohort-diagnostic-asset/1.0.0", targetEvidenceId: input.targetEvidenceId, profile, direction: input.direction, minimumMemberCount: 4, minimumSampleSize: input.minimumSampleSize, findingThresholdRobustZ: input.findingThresholdRobustZ, members: members.map(({ evidenceId, evidenceHash, featureHash, ...member }) => ({ ...member, evidenceId, evidenceHash, featureHash })), occurredAt };
+      const scopes = selected.map((candidate) => equivalenceScope(candidate.context_payload, input.funnel, profile.optimizationEvent)); const scope = scopes[0];
+      if (!scope || scopes.some((candidate) => JSON.stringify(candidate) !== JSON.stringify(scope))) fail("insufficient_evidence");
+      const core = { contractVersion: "robust-cohort-diagnostic-asset/1.0.0", targetEvidenceId: input.targetEvidenceId, profile, equivalenceScope: scope, direction: input.direction, minimumMemberCount: 4, minimumSampleSize: input.minimumSampleSize, findingThresholdRobustZ: input.findingThresholdRobustZ, members: members.map(({ evidenceId, evidenceHash, featureHash, ...member }) => ({ ...member, evidenceId, evidenceHash, featureHash })), occurredAt };
       const cohortHash = digest(core); const cohortRef = `cohort_${cohortHash.slice(0, 24)}`;
       const result = calculateRobustCohort({ cohortRef, profile, direction: input.direction, minimumMemberCount: 4, minimumSampleSize: input.minimumSampleSize, findingThresholdRobustZ: input.findingThresholdRobustZ, observations: members });
       const memberEvidenceRefs = members.map((member) => ({ evidenceRef: `evidence_${member.evidenceHash.slice(0, 24)}`, evidenceHash: member.evidenceHash, featureRef: member.sourceSnapshotRef, featureHash: member.featureHash }));
       const inserted = rows<Readonly<{ id: string }>>(await tx.execute(sql`
-        insert into robust_cohort_diagnostic_assets (workspace_id, target_evidence_id, cohort_ref, cohort_hash, profile, member_evidence_refs, result_payload, capabilities, occurred_at)
-        values (${input.workspaceId}::uuid, ${input.targetEvidenceId}::uuid, ${cohortRef}, ${cohortHash}, ${JSON.stringify(profile)}::jsonb, ${JSON.stringify(memberEvidenceRefs)}::jsonb, ${JSON.stringify(result)}::jsonb, ${JSON.stringify(CAPABILITIES)}::jsonb, ${occurredAt}::timestamptz)
+        insert into robust_cohort_diagnostic_assets (workspace_id, target_evidence_id, cohort_ref, cohort_hash, profile, equivalence_scope, member_evidence_refs, result_payload, capabilities, occurred_at)
+        values (${input.workspaceId}::uuid, ${input.targetEvidenceId}::uuid, ${cohortRef}, ${cohortHash}, ${JSON.stringify(profile)}::jsonb, ${JSON.stringify(scope)}::jsonb, ${JSON.stringify(memberEvidenceRefs)}::jsonb, ${JSON.stringify(result)}::jsonb, ${JSON.stringify(CAPABILITIES)}::jsonb, ${occurredAt}::timestamptz)
         on conflict (workspace_id, cohort_hash) do nothing returning id::text
       `));
       if (inserted.length > 1) fail("corrupt_store");

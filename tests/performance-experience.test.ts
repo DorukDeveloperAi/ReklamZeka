@@ -20,12 +20,13 @@ describe("performance dashboard contract", () => {
     expect(api.snapshot.freshness).toMatchObject({ status: "fresh", hours: 3.5 });
   });
 
-  it("returns a stable period API and rejects unsupported periods", async () => {
+  it("keeps the fixture-only API retired instead of publishing demo metrics", async () => {
     const response = GET(new Request("http://localhost/api/dashboard?period=7"));
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ snapshot: { periodDays: 7, currency: "TRY" } });
-    const invalid = GET(new Request("http://localhost/api/dashboard?period=14"));
-    expect(invalid.status).toBe(400);
+    expect(response.status).toBe(410);
+    await expect(response.json()).resolves.toEqual({
+      code: "legacy_demo_retired",
+      error: "Bu legacy demo endpoint'i kullanımdan kaldırıldı. Gerçek kaynak için /dashboard kullanın.",
+    });
   });
 
   it("keeps activation, empty, partial, delayed and error states distinct", () => {

@@ -6,6 +6,7 @@ import {
   type MetaReadMirrorFact,
   type MetaReadMirrorProjection,
 } from "@/domain/meta/read-mirror-projection";
+import { assertCanonicalMetaTargetingEvidence } from "@/connectors/meta/sync/targeting-evidence";
 
 type Database = NodePgDatabase<typeof schema>;
 type Row = Readonly<Record<string, unknown>>;
@@ -38,10 +39,11 @@ function count(value: unknown): number {
   if (!Number.isSafeInteger(parsed) || parsed < 0) throw new Error("Meta read mirror rejected: corrupt_store");
   return parsed;
 }
-function object(value: unknown): Record<string, unknown> | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value !== "object" || Array.isArray(value)) throw new Error("Meta read mirror rejected: corrupt_store");
-  return value as Record<string, unknown>;
+export function canonicalTargetingForReadMirror(summary: unknown, signature: unknown): Record<string, unknown> | null {
+  if (summary === null && signature === null) return null;
+  try { assertCanonicalMetaTargetingEvidence(summary, signature); }
+  catch { throw new Error("Meta read mirror rejected: corrupt_store"); }
+  return summary;
 }
 function fact(row: Row): MetaReadMirrorFact {
   return {
@@ -72,7 +74,8 @@ function fact(row: Row): MetaReadMirrorFact {
     adSetName: text(row.ad_set_name),
     adSetStatus: text(row.ad_set_status),
     optimizationGoal: text(row.optimization_goal),
-    targetingSummary: object(row.targeting_summary),
+    targetingSummary: canonicalTargetingForReadMirror(row.targeting_summary, row.targeting_signature),
+    targetingSignature: text(row.targeting_signature),
     adSetDailyBudgetMinor: minor(row.ad_set_daily_budget_minor),
     adSetLifetimeBudgetMinor: minor(row.ad_set_lifetime_budget_minor),
     adSetFetchedAt: timestamp(row.ad_set_fetched_at),
@@ -149,6 +152,7 @@ export class DrizzleMetaReadMirrorRepository {
           coalesce(ad_set.effective_status, ad_set.configured_status) as ad_set_status,
           ad_set.optimization_goal,
           ad_set.targeting_summary,
+          ad_set.targeting_signature,
           ad_set.daily_budget_minor as ad_set_daily_budget_minor,
           ad_set.lifetime_budget_minor as ad_set_lifetime_budget_minor,
           ad_set.fetched_at as ad_set_fetched_at,

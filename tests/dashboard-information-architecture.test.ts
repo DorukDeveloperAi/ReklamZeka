@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { normalizeDashboardLocation } from "@/app/dashboard/operating-dashboard";
+import { normalizeDashboardLocation, primaryNavigationAreaForLocation } from "@/app/dashboard/operating-dashboard";
 
 const dashboard = readFileSync("src/app/dashboard/operating-dashboard.tsx", "utf8");
 const decisionRoom = readFileSync("src/app/dashboard/decision-room-panel.tsx", "utf8");
@@ -11,7 +11,7 @@ const budgetPools = readFileSync("src/app/dashboard/budget-pool-hierarchy-panel.
 
 describe("dashboard analysis and decision information architecture", () => {
   it("keeps one production-backed analysis surface and removes the static duplicate", () => {
-    expect(dashboard).toContain('{ id: "decision-room", label: "Analiz & Kararlar"');
+    expect(dashboard).toContain('id: "analysis", label: "Analiz"');
     expect(dashboard).not.toContain('{ id: "analysis", label: "Analizler"');
     expect(dashboard).not.toContain("const analysisRuns");
     expect(dashboard).not.toContain("4 hesap · 32 kampanya");
@@ -21,25 +21,31 @@ describe("dashboard analysis and decision information architecture", () => {
   });
 
   it("routes the legacy analysis entry point to the canonical Decision Room read model", () => {
-    expect(normalizeDashboardLocation("analysis").view).toBe("decision-room");
+    expect(normalizeDashboardLocation("analysis")).toMatchObject({ view: "manage", manageArea: "decisions", decisionArea: "analysis" });
     expect(dashboard).toContain('componentPath: "src/app/dashboard/decision-room-panel.tsx"');
     expect(dashboard).not.toContain("function renderAnalysis()");
   });
 
-  it("implements the approved seven-purpose primary IA and keeps legacy entries contextual", () => {
-    for (const label of ["Bugün", "Kampanyalar", "Analiz & Kararlar", "Bütçeler", "Onay kuyruğu", "Kurallar & Yetkiler", "Ayarlar"]) {
+  it("implements five operator areas while mapping legacy routes into their contextual surfaces", () => {
+    for (const label of ["Operasyon", "Kılavuzlar", "Analiz", "Kararlar", "Sistem"]) {
       expect(dashboard).toContain(`label: "${label}"`);
     }
     for (const legacyNav of ["Strict policies", "İç kategoriler", "Autonomy Studio", "Practice Lab", "Meta bağlantısı", "Orchestrator Agent", "Teslimat alarmları", "Gönderi öne çıkarma", "Timeline"]) {
       expect(dashboard).not.toContain(`label: "${legacyNav}", icon:`);
     }
-    expect(normalizeDashboardLocation("strict-policies")).toMatchObject({ view: "rules", rulesArea: "policies" });
-    expect(normalizeDashboardLocation("autonomy")).toMatchObject({ view: "rules", rulesArea: "authority" });
-    expect(normalizeDashboardLocation("practice-lab")).toMatchObject({ view: "rules", rulesArea: "learning" });
-    expect(normalizeDashboardLocation("categories")).toMatchObject({ view: "settings", settingsArea: "categories" });
-    expect(normalizeDashboardLocation("promotions")).toMatchObject({ view: "campaigns", campaignArea: "promotion" });
-    expect(normalizeDashboardLocation("timeline")).toMatchObject({ view: "campaigns", campaignArea: "timeline" });
-    expect(normalizeDashboardLocation("agent")).toMatchObject({ view: "today", assistantOpen: true });
+    expect(normalizeDashboardLocation("strict-policies")).toMatchObject({ view: "manage", manageArea: "rules", rulesArea: "policies" });
+    expect(normalizeDashboardLocation("autonomy")).toMatchObject({ view: "manage", manageArea: "rules", rulesArea: "authority" });
+    expect(normalizeDashboardLocation("practice-lab")).toMatchObject({ view: "manage", manageArea: "rules", rulesArea: "learning" });
+    expect(normalizeDashboardLocation("categories")).toMatchObject({ view: "manage", manageArea: "settings", settingsArea: "categories" });
+    expect(normalizeDashboardLocation("promotions")).toMatchObject({ view: "manage", manageArea: "portfolio", campaignArea: "promotion" });
+    expect(normalizeDashboardLocation("timeline")).toMatchObject({ view: "manage", manageArea: "portfolio", campaignArea: "timeline" });
+    expect(normalizeDashboardLocation("agent")).toMatchObject({ view: "agent" });
+    expect(primaryNavigationAreaForLocation(normalizeDashboardLocation("campaigns"))).toBe("operations");
+    expect(primaryNavigationAreaForLocation(normalizeDashboardLocation("rules"))).toBe("guides");
+    expect(primaryNavigationAreaForLocation(normalizeDashboardLocation("analysis"))).toBe("analysis");
+    expect(primaryNavigationAreaForLocation(normalizeDashboardLocation("approvals"))).toBe("decisions");
+    expect(primaryNavigationAreaForLocation(normalizeDashboardLocation("settings"))).toBe("system");
+    expect(primaryNavigationAreaForLocation(normalizeDashboardLocation("agent"))).toBeNull();
   });
 
   it("keeps session recovery inside each operational context without seeded frontend budgets", () => {
@@ -51,5 +57,13 @@ describe("dashboard analysis and decision information architecture", () => {
     expect(budgetPools).toContain("const emptyNodes");
     expect(budgetPools).not.toContain('hardCapDecimal: "500000"');
     expect(budgetPools).not.toContain('poolRef: "budget_pool_domestic"');
+  });
+
+  it("opens the real recommendation-only pool workspace from the approved budget route", () => {
+    expect(dashboard).toContain('import { BudgetPoolHierarchyPanel } from "./budget-pool-hierarchy-panel"');
+    expect(dashboard).toContain('if (budgetArea === "pools") return <BudgetPoolHierarchyPanel />');
+    expect(dashboard).not.toContain("Bütçe havuzları Faz 1’de gizlidir");
+    expect(budgetPools).toContain('import { LocalSessionConnector } from "./local-session-connector"');
+    expect(budgetPools).toContain('"session_required"');
   });
 });

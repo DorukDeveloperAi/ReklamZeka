@@ -8,6 +8,7 @@ const UNIT_REF = /^(?:action|policy)_unit_[a-f0-9]{20}$/;
 const ACTION_LABELS = Object.freeze({
   approve: "ONAYLA",
   reject: "REDDET",
+  defer: "ERTELE",
   request_changes: "DEĞİŞİKLİK İSTE",
   admit_execution: "UYGULAMA ADIMINI HAZIRLA",
   publish_approval_policy: "ONAY POLİTİKASINI YAYINLA",

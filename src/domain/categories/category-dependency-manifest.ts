@@ -50,6 +50,9 @@ const categoryProjection = new Set([
 ]);
 
 const opaqueCategoryContext = new Set([
+  // Naming-template proposals retain category refs as immutable evidence only;
+  // they never establish an assignment authority edge.
+  "naming_template_revisions.template_payload",
   // Immutable historical run snapshot. Category selection is retained for replay,
   // never interpreted as a mutable category dependency by archive operations.
   "decision_room_run_analysis_assets.agenda_payload",
@@ -61,9 +64,37 @@ const opaqueCategoryContext = new Set([
   // replay; archive handling must retain it as opaque historical context.
   "action_execution_attempts.admission_payload",
   "action_execution_events.event_payload",
+  // P06 execution-v2 rows are immutable, hash-bound historical evidence.
+  // Category archive must never reinterpret or rewrite their frozen payloads.
+  "p06_execution_runs.request_payload",
+  "p06_limited_autonomy_admissions.admission_payload",
+  "p06_execution_events.payload",
+  "p06_execution_observations.observed_value",
+  "p06_execution_gate_snapshots.payload",
+  "p06_rollback_proposals.payload",
+  // Private gate audit binds frozen hashes and a server-disabled flag; it is
+  // historical evidence, never a mutable category selection source.
+  "action_preparation_gate_snapshots.snapshot_payload",
+  // Skill catalog revisions and the turn-bound catalog snapshots are immutable
+  // UI/runtime history, not category dependency inputs.
+  "orchestrator_profile_revisions.payload",
+  "orchestrator_playbook_revisions.payload",
+  "orchestrator_interview_kit_revisions.payload",
+  "orchestrator_interview_kit_revisions.source_snapshot",
+  "orchestrator_conversation_turns.profile_snapshot",
+  "orchestrator_conversation_turns.manifest_snapshots",
+  "orchestrator_conversation_turns.playbook_snapshots",
+  "orchestrator_conversation_turns.interview_kit_snapshots",
+  // Turn evidence is a bounded aggregate replay snapshot; it intentionally
+  // contains no mutable category edge for archive evaluation.
+  "orchestrator_conversation_turns.evidence_context_snapshot",
+  // Selected SkillRun receipts bind only aggregate evidence availability and
+  // immutable release manifest hashes; archive never treats them as category edges.
+  "orchestrator_conversation_turns.skill_run_snapshot",
   // A cohort diagnostic is an immutable replay artifact. Its compatibility
   // profile/member hashes are historical commitments, not mutable archive edges.
   "robust_cohort_diagnostic_assets.profile",
+  "robust_cohort_diagnostic_assets.equivalence_scope",
   "robust_cohort_diagnostic_assets.member_evidence_refs",
   "robust_cohort_diagnostic_assets.result_payload",
   "robust_cohort_diagnostic_assets.capabilities",
@@ -135,6 +166,9 @@ const columns = [
   // carry no internal category or strict-policy reference that archive impact
   // may interpret as a mutable dependency.
   "budget_pool_hierarchy_revisions.hierarchy_payload",
+  // Published ceiling policies contain only target/pool/currency/cap evidence;
+  // category archive must not reinterpret their closed refs as category edges.
+  "budget_ceiling_policy_revisions.policy_payload",
   "slice_rule_budget_pool_bindings.binding_payload",
   // Entity bindings freeze server-resolved hierarchy and source evidence only;
   // archive impact must not invent a category dependency from this evidence.
@@ -149,6 +183,17 @@ const columns = [
   "slice_rule_scenario_allocation_selections.selection_evidence",
   "slice_rule_scenario_allocation_selections.selection_payload",
   "slice_rule_budget_action_unit_bindings.binding_payload",
+  "action_preparation_gate_snapshots.snapshot_payload",
+  "orchestrator_profile_revisions.payload",
+  "orchestrator_playbook_revisions.payload",
+  "orchestrator_interview_kit_revisions.payload",
+  "orchestrator_interview_kit_revisions.source_snapshot",
+  "orchestrator_conversation_turns.profile_snapshot",
+  "orchestrator_conversation_turns.manifest_snapshots",
+  "orchestrator_conversation_turns.playbook_snapshots",
+  "orchestrator_conversation_turns.interview_kit_snapshots",
+  "orchestrator_conversation_turns.evidence_context_snapshot",
+  "orchestrator_conversation_turns.skill_run_snapshot",
   // Delivery/payment alert records are historical evidence and checklist
   // state, never category or policy selection inputs.
   "delivery_health_alert_ledger_records.checklist_payload",
@@ -178,6 +223,7 @@ const columns = [
   "frozen_diagnostic_evidence.source_refs",
   "frozen_diagnostic_evidence.capabilities",
   "robust_cohort_diagnostic_assets.profile",
+  "robust_cohort_diagnostic_assets.equivalence_scope",
   "robust_cohort_diagnostic_assets.member_evidence_refs",
   "robust_cohort_diagnostic_assets.result_payload",
   "robust_cohort_diagnostic_assets.capabilities",
@@ -248,6 +294,12 @@ const columns = [
   "action_approval_evidence_grants.grant_payload",
   "action_execution_attempts.admission_payload",
   "action_execution_events.event_payload",
+  "p06_execution_runs.request_payload",
+  "p06_limited_autonomy_admissions.admission_payload",
+  "p06_execution_events.payload",
+  "p06_execution_observations.observed_value",
+  "p06_execution_gate_snapshots.payload",
+  "p06_rollback_proposals.payload",
   "autonomy_rule_revisions.source_guidance_refs",
   "autonomy_rule_revisions.artifact_payload",
   "action_guardrail_policy_revisions.action_types",
@@ -262,6 +314,27 @@ const columns = [
   "approval_policy_definition_revisions.policy_payload",
   "approval_policy_definition_revisions.artifact_payload",
   "meta_compatibility_artifact_revisions.artifact_payload",
+  // Immutable finding, slice, Guide and Guide Run envelopes may carry public
+  // evidence references. They are historical context, never mutable category
+  // authority for archive-impact decisions.
+  "finding_lifecycle_events.observation_payload",
+  "development_log_events.payload",
+  "slice_resolution_snapshot_members.market_evidence_refs",
+  "slice_resolution_snapshot_members.matched_dimension_ids",
+  "slice_resolution_snapshot_members.matched_dimension_evidence_refs",
+  // Saved-report payload is an immutable display query only. It contains no
+  // category definition authority and is revalidated before use.
+  "scope_report_saved_revisions.query_payload",
+  "naming_template_revisions.template_payload",
+  "guide_revisions.strict_payload",
+  "guide_revisions.schedule_payload",
+  "guide_budget_contracts.contract_payload",
+  "guide_lifecycle_events.payload",
+  "guide_runs.trigger_payload",
+  "guide_run_events.payload",
+  "guide_run_heads.run_payload",
+  "guide_run_artifacts.payload",
+  "guide_run_artifacts.authority",
 ] as const;
 
 export const CATEGORY_JSONB_MANIFEST: readonly CategoryJsonbManifestEntry[] = Object.freeze(columns.map((key) => {

@@ -1,0 +1,186 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "e80d1b663",
+      "tarih": "2026-08-18",
+      "konu": "fix(p06): accept renamed budget route guard in post verifier",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "ade884e01",
+      "tarih": "2026-08-18",
+      "konu": "fix(p08): recheck guide scheduler rollout on tick",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "11c57ef37",
+      "tarih": "2026-08-18",
+      "konu": "fix(p06): stop status scheduler when rollout closes",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "1dd3b341c",
+      "tarih": "2026-08-18",
+      "konu": "fix(p06): stop budget scheduler when rollout closes",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "59cf70624",
+      "tarih": "2026-08-18",
+      "konu": "fix(p06): tolerate forward route catalog extensions",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "8a62f6749",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): gate human rename execution runtime",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "82e76ea43",
+      "tarih": "2026-08-18",
+      "konu": "fix(p06): compare rename values in execution worker",
+      "tur": "is",
+      "kapsam": [
+        "fix"
+      ]
+    },
+    {
+      "hash": "67bed7fb5",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): persist human rename execution identity",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "f6a6fd3b2",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): extend disabled executor contract for rename",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7895988be",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): add human-only rename admission foundation",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e5350c745",
+      "tarih": "2026-08-18",
+      "konu": "feat(p03): complete operation saved view controls",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "103922ec7",
+      "tarih": "2026-08-18",
+      "konu": "docs(v3): record migration post acceptance",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "ab9a212a1",
+      "tarih": "2026-08-18",
+      "konu": "chore(db): journal naming template lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    },
+    {
+      "hash": "149ddfc43",
+      "tarih": "2026-08-18",
+      "konu": "test(p07): add naming template post verification",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "718ea01c2",
+      "tarih": "2026-08-18",
+      "konu": "chore(db): journal saved scope reports",
+      "tur": "is",
+      "kapsam": [
+        "chore"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "feat",
+      "adet": 27
+    },
+    {
+      "kapsam": "fix",
+      "adet": 12
+    },
+    {
+      "kapsam": "test",
+      "adet": 8
+    },
+    {
+      "kapsam": "chore",
+      "adet": 7
+    },
+    {
+      "kapsam": "docs",
+      "adet": 6
+    }
+  ],
+  "isSayisi": 622,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-18",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "4239d5f1feac"
+}

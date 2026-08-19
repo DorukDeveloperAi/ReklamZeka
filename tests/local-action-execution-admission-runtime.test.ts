@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { createLocalActionExecutionAdmissionService } from "@/server/local-action-execution-admission-runtime";
 
@@ -9,5 +11,12 @@ describe("local action execution admission runtime", () => {
         userId: "00000000-0000-4000-8000-000000000002", readerRef: "actor_owner", signingKey: Buffer.alloc(32) } });
     expect(typeof service.admit).toBe("function");
     expect(Object.getOwnPropertyNames(Object.getPrototypeOf(service)).sort()).toEqual(["admit", "constructor"]);
+  });
+
+  it("always wires the server-owned Guide gate, while the gate itself remains evidence fail-closed", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/server/local-action-execution-admission-runtime.ts"), "utf8");
+    expect(source).toContain("createLocalGuideBudgetAdmissionGate");
+    expect(source).toContain("createLocalGuideBudgetAdmissionGate(input.database as Database)");
+    expect(source).not.toContain("guideBudgetGate?");
   });
 });

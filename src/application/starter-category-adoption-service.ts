@@ -46,7 +46,7 @@ export type StarterCategoryAdoptionPlan = Readonly<{
   profileRegistryHash: string;
   planHash: string;
   status: "preview_only";
-  summary: Readonly<{ canonicalDimensions: 14; dimensionsToCreate: number; definitionsToCreate: number;
+  summary: Readonly<{ canonicalDimensions: 15; dimensionsToCreate: number; definitionsToCreate: number;
     profileProposals: number; profileDraftsToCreate: number; profileDraftsSatisfied: number;
     satisfied: number; conflicts: number; ownerConfigurationRequired: number }>;
   dimensionCoverage: readonly Readonly<{ dimensionKey: string; disposition: "create" | "satisfied" | "conflict";
@@ -239,12 +239,12 @@ export function buildStarterCategoryAdoptionPlan(workspaceRef: string, state: Ca
     ...concreteTemplates.map((template) => categoryDefinitionPublicRef(template.dimensionKey, template.categoryKey!)),
     ...profileDrafts.map((draft) => draft.profileRef),
   ])].sort());
-  if (targetRefs.length > 32) throw new StarterCategoryAdoptionError("conflict");
+  if (targetRefs.length > 48) throw new StarterCategoryAdoptionError("conflict");
   const core = { contractVersion: STARTER_CATEGORY_ADOPTION_VERSION,
     catalogVersion: STARTER_CATEGORY_PLAYBOOK_CATALOG.schemaVersion,
     catalogHash: STARTER_CATEGORY_PLAYBOOK_CATALOG.catalogHash, registryHash: state.registryHash,
     profileRegistryHash: profileState.registryHash, status: "preview_only" as const,
-    summary: { canonicalDimensions: 14 as const,
+    summary: { canonicalDimensions: 15 as const,
       dimensionsToCreate: categoryCommands.filter((command) => command.operation === "create_dimension").length,
       definitionsToCreate: categoryCommands.filter((command) => command.operation === "create_definition").length,
       profileProposals: profileProposals.length,
@@ -285,7 +285,7 @@ export class StarterCategoryAdoptionService {
     if (membership.role !== "owner" && membership.role !== "admin" || !HASH.test(input.planHash)
       || !HASH.test(input.expectedRegistryHash) || !HASH.test(input.expectedProfileRegistryHash)
       || input.confirmation !== CONFIRMATION || input.acknowledgedPendingOwnerConfiguration !== true
-      || !Array.isArray(input.targetRefs) || input.targetRefs.length > 32
+      || !Array.isArray(input.targetRefs) || input.targetRefs.length > 48
       || input.targetRefs.some((ref) => typeof ref !== "string" || !/^[a-z][a-z0-9_.:-]{1,158}$/.test(ref))
       || new Set(input.targetRefs).size !== input.targetRefs.length
       || !exactTargets(input.targetRefs, [...input.targetRefs].sort())) {

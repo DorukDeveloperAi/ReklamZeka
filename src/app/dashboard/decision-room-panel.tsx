@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   DecisionRoomInboxItem,
   DecisionRoomReadResult,
@@ -37,6 +37,8 @@ export function DecisionRoomReadSurface(props: Readonly<{
   onRetry: () => void;
   onMarkRead: (notificationRef: string) => void;
   onConnect?: () => Promise<boolean>;
+  campaignContext?: Readonly<{ label: string; campaignRef: string }> | null;
+  onClearCampaignContext?: () => void;
 }>) {
   const { state, view } = props;
   return <>
@@ -45,9 +47,10 @@ export function DecisionRoomReadSurface(props: Readonly<{
       <span className={styles.readOnlyBadge}>READ ONLY · AUTHORITY NONE</span>
     </section>
 
-    <section className={styles.decisionRoomTabs} aria-label="Decision Room görünümleri">
-      {(Object.keys(LABELS) as View[]).map((candidate) => <button key={candidate} data-active={candidate === view} onClick={() => props.onView(candidate)}>{LABELS[candidate]}</button>)}
-    </section>
+    {props.campaignContext ? <section className={`${styles.panel} ${styles.decisionRoomState}`} aria-label="Seçili kampanya bağlamı"><strong>SEÇİLİ KAMPANYA BAĞLAMI</strong><h2>{props.campaignContext.label}</h2><p>Rutinler ve koşumlar, frozen bağlamın sunucuda doğruladığı kampanya alias’ıyla süzülür. Sonuçlar tek başına kampanya bağı taşımadığı için bu bağlamda gösterilmez.</p>{props.onClearCampaignContext ? <button onClick={props.onClearCampaignContext}>Tüm çalışma alanına dön</button> : null}</section> : null}
+    <nav className={styles.decisionRoomTabs} aria-label="Decision Room görünümleri">
+      {(Object.keys(LABELS) as View[]).filter((candidate) => !props.campaignContext || candidate !== "inbox").map((candidate) => <button key={candidate} type="button" data-active={candidate === view} aria-current={candidate === view ? "page" : undefined} onClick={() => props.onView(candidate)}>{LABELS[candidate]}</button>)}
+    </nav>
 
     {state.status === "loading" ? <section className={`${styles.panel} ${styles.decisionRoomState}`} role="status"><span className={styles.liveDot} /><h2>Decision Room kaynağı okunuyor</h2><p>Çalışma alanı ve okuyucu kimliği yalnız sunucu oturumundan bağlanır.</p></section> : null}
     {state.status === "unavailable" || state.status === "error" ? <section className={`${styles.panel} ${styles.decisionRoomState}`} role="alert"><strong>{state.status === "unavailable" ? "Kaynak henüz bağlı değil" : "Kaynak okunamadı"}</strong><h2>{state.status === "unavailable" ? "Analiz & Kararlar kaynağı henüz bağlı değil." : "Analiz & Kararlar şu anda okunamıyor."}</h2><p>{state.message}</p><p>Bağlı üretim kaynağı yokken örnek kayıt gösterilmez.</p><button onClick={props.onRetry}>Tekrar kontrol et</button>{state.status === "unavailable" && props.onConnect ? <LocalSessionConnector title="Yerel dashboard oturumunu bağlayın" onVerify={props.onConnect} /> : null}</section> : null}
@@ -69,26 +72,43 @@ function DecisionRoomItems(props: Readonly<{
   return <section className={styles.decisionRoomList}>{(props.result.items as DecisionRoomInboxItem[]).map((item) => <article className={styles.panel} key={item.notificationRef}><header><span>{item.readState.status === "read" ? "OKUNDU" : "YENİ"}</span><strong>{time(item.createdAt)}</strong></header><h2>{item.summaryCode.replaceAll("_", " ")}</h2><p>Analiz sonucu hazır · eylem/onay yetkisi içermez</p><footer>{item.readState.status === "read" ? <small>{time(item.readState.readAt)}</small> : <button onClick={() => props.onMarkRead(item.notificationRef)}>Okundu işaretle</button>}</footer></article>)}</section>;
 }
 
-export function DecisionRoomPanel() {
-  const [view, setView] = useState<View>("inbox");
+export function DecisionRoomPanel({ campaignContext = null, onClearCampaignContext, campaignContextPending = false }: Readonly<{
+  campaignContext?: Readonly<{ label: string; campaignRef: string }> | null;
+  onClearCampaignContext?: () => void;
+  campaignContextPending?: boolean;
+}>) {
+  const [view, setView] = useState<View>(campaignContext ? "runs" : "inbox");
   const [state, setState] = useState<State>({ status: "loading" });
+  const requestEpoch = useRef(0);
+
+  useEffect(() => { if (campaignContext && view === "inbox") setView("runs"); }, [campaignContext, view]);
 
   const load = useCallback(async () => {
+    const epoch = requestEpoch.current + 1;
+    requestEpoch.current = epoch;
+    if (campaignContextPending) {
+      setState({ status: "loading" });
+      return;
+    }
     setState({ status: "loading" });
     try {
-      const response = await fetch(`/api/decision-room?view=${view}&limit=25`, { cache: "no-store" });
+      const query = new URLSearchParams({ view, limit: "25" });
+      if (campaignContext && view !== "inbox") query.set("campaignRef", campaignContext.campaignRef);
+      const response = await fetch(`/api/decision-room?${query}`, { cache: "no-store" });
       const payload = await response.json() as AgentEnvelope | ErrorEnvelope;
+      if (requestEpoch.current !== epoch) return;
       if (!response.ok) {
         const message = "error" in payload ? payload.error?.message : undefined;
         setState({ status: response.status === 503 ? "unavailable" : "error", message: message ?? "Decision Room yanıtı alınamadı." });
         return;
       }
-      if (!("result" in payload) || payload.result.view !== view) throw new Error("invalid_contract");
+      if (!("result" in payload) || payload.result.view !== view
+        || campaignContext && view !== "inbox" && payload.result.items.some((item) => !("campaignRef" in item) || item.campaignRef !== campaignContext.campaignRef)) throw new Error("invalid_contract");
       setState({ status: "ready", result: payload.result });
     } catch {
-      setState({ status: "error", message: "Decision Room bağlantısı şu anda kullanılamıyor." });
+      if (requestEpoch.current === epoch) setState({ status: "error", message: "Decision Room bağlantısı şu anda kullanılamıyor." });
     }
-  }, [view]);
+  }, [campaignContext, campaignContextPending, view]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -128,5 +148,5 @@ export function DecisionRoomPanel() {
     }
   }, []);
 
-  return <DecisionRoomReadSurface view={view} state={state} onView={setView} onRetry={() => void load()} onMarkRead={(ref) => void markRead(ref)} onConnect={verifyConnectedSession} />;
+  return <DecisionRoomReadSurface view={view} state={state} onView={setView} onRetry={() => void load()} onMarkRead={(ref) => void markRead(ref)} onConnect={verifyConnectedSession} campaignContext={campaignContext} onClearCampaignContext={onClearCampaignContext} />;
 }

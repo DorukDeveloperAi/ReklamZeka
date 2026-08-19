@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { DrizzleMetaReadMirrorRepository } from "@/connectors/meta/read-mirror-drizzle-repository";
+import { canonicalTargetingForReadMirror, DrizzleMetaReadMirrorRepository } from "@/connectors/meta/read-mirror-drizzle-repository";
+import { normalizeMetaTargetingEvidence } from "@/connectors/meta/sync/targeting-evidence";
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
 function sqlText(value: unknown): string {
@@ -9,6 +10,17 @@ function sqlText(value: unknown): string {
 }
 
 describe("Drizzle Meta read mirror repository", () => {
+  it("projects only signed canonical targeting summaries and rejects raw or mismatched JSON", () => {
+    const evidence = normalizeMetaTargetingEvidence({ fieldPresent: true,
+      scope: { workspaceId: "workspace_test", externalAccountId: "act_100" },
+      targeting: { geo_locations: { countries: ["TR"], location_types: ["home"] } } });
+    expect(canonicalTargetingForReadMirror(evidence.summary, evidence.signature)).toBe(evidence.summary);
+    expect(canonicalTargetingForReadMirror(null, null)).toBeNull();
+    expect(() => canonicalTargetingForReadMirror({ geo_locations: { countries: ["TR"] } }, "0".repeat(64)))
+      .toThrow("corrupt_store");
+    expect(() => canonicalTargetingForReadMirror(evidence.summary, "0".repeat(64))).toThrow("corrupt_store");
+  });
+
   it("uses one read-only repeatable-read transaction and maps canonical rows", async () => {
     const execute = vi.fn()
       .mockResolvedValueOnce({ rows: [] })
@@ -23,6 +35,7 @@ describe("Drizzle Meta read mirror repository", () => {
         campaign_id: null, campaign_name: null, campaign_status: null, campaign_objective: null,
         campaign_daily_budget_minor: null, campaign_lifetime_budget_minor: null, campaign_fetched_at: null,
         ad_set_id: null, ad_set_name: null, ad_set_status: null, optimization_goal: null, targeting_summary: null,
+        targeting_signature: null,
         ad_set_daily_budget_minor: null, ad_set_lifetime_budget_minor: null, ad_set_fetched_at: null,
         ad_id: null, ad_name: null, ad_status: null, ad_fetched_at: null, creative_id: null, creative_name: null,
         creative_source_type: null, primary_text: null, headline: null, description: null, caption: null,

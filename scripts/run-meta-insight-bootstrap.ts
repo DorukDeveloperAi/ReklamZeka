@@ -4,12 +4,13 @@ import { Pool } from "pg";
 
 import * as schema from "../src/db/schema";
 import { createDrizzleProductionMetaReadSyncService } from "../src/server/meta-read-sync-runtime";
+import { metaTokenSecurityAllowsReadSync } from "../src/connectors/meta/bootstrap-preflight";
 
 process.loadEnvFile(".env.local");
 
 const workspaceId = process.env.REKLAMZEKA_LOCAL_WORKSPACE_ID?.trim();
 const databaseUrl = process.env.DIRECT_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
-if (!workspaceId || !databaseUrl || process.env.META_TOKEN_SECURITY_STATUS !== "rotated") {
+if (!workspaceId || !databaseUrl || !metaTokenSecurityAllowsReadSync(process.env.META_TOKEN_SECURITY_STATUS)) {
   throw new Error("read-only insight bootstrap preflight rejected");
 }
 

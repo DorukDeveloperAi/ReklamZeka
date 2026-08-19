@@ -32,12 +32,12 @@ npm run dev
   açıklanabilir içgörü motoru kanıt kapılarından geçti.
 - Meta/Google fixture adapter'ları ve CSV connector aynı sürümlü günlük metrik modeline
   idempotent akar; MVP connector sınırı salt-okunurdur.
-- `/pilot`, `/dashboard`, `/reports/demo`, `/api/dashboard` ve `/api/insights` üretim derlemesinde çalışır.
-- Yedi adımlı fixture pilot yolculuğu 1280/390 px tarayıcı sürüşünden geçti; bu kanıt
-  gerçek saha pilotu olarak etiketlenmez.
-- Süreli/iptal edilebilir salt-okunur rapor, audit ve operasyon alarm çekirdeği hazırdır.
-- `REPORT_SIGNING_KEY` yapılandırıldığında pilot yüzeyi gerçek HMAC URL üretir; dinamik
-  rapor ve CSV aynı bearer tokenı doğrular, iptal sonrası erişimi reddeder.
+- Kullanıcıya açık tek çalışma yüzeyi `/dashboard`'dır; gerçek kanonik kaynak veya açık
+  `EMPTY` / `UNAVAILABLE` durumu gösterir.
+- Eski fixture pilotu, demo raporları ve `/api/dashboard` / `/api/insights` demo endpoint'leri
+  `410 legacy_demo_retired` döndürür veya dashboard'a yönlenir; sahte operasyon verisi yayınlanmaz.
+- Eski fixture kanıtları yalnız tarihsel test/plan artefaktı olarak tutulur; saha pilotu veya
+  canlı veri kanıtı değildir.
 - A07 teknik pilot hazırlığı PASS; gerçek 3 çalışma alanı/10 hesap `field_pilot` ölçümü
   tamamlanmadan roadmap kapanmaz.
 
@@ -48,20 +48,7 @@ npm ci
 npm run dev
 ```
 
-Uygulama: `http://localhost:3000` · pilot yolculuğu: `http://localhost:3000/pilot` ·
-demo dashboard: `http://localhost:3000/dashboard`
-
-İmzalı demo paylaşımı için `.env.local` içinde standart base64 biçiminde en az 32 byte
-anahtar tanımlayın:
-
-```bash
-openssl rand -base64 32
-```
-
-Üretilen değeri `REPORT_SIGNING_KEY` olarak kaydedin. Aynı deployment'ın tüm replica'ları
-aynı anahtarı kullanmalıdır; anahtar rotasyonu mevcut bağlantıları geçersiz kılar. Demo
-runtime'ındaki iptal listesi süreç-içidir; kalıcı production iptali ADR-0005 uyarınca
-veritabanı kaydı gerektirir.
+Uygulama: `http://localhost:3000/dashboard`
 
 ## Kaynaklar
 

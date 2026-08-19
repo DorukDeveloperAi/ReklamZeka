@@ -6,12 +6,14 @@ export const ACTION_APPROVAL_POLICY_VERSION = "action-approval-policy/1.0.0" as 
 export const ACTION_APPROVAL_GRANT_VERSION = "action-approval-grant/1.0.0" as const;
 
 export type ActionRisk = "K0" | "K1" | "K2" | "K3" | "K4";
-export type ActionActorRole = "owner" | "admin" | "operator" | "analyst";
-export type ActionApprovalRole = Exclude<ActionActorRole, "analyst">;
+export type ActionActorRole = "owner" | "admin" | "operator" | "analyst" | "agent";
+/** Agents can propose only; they can never approve or consume a grant. */
+export type ActionApprovalRole = Exclude<ActionActorRole, "analyst" | "agent">;
 export type ActionUnitApprovalState =
   | "awaiting_approval"
   | "approved"
   | "rejected"
+  | "deferred"
   | "changes_requested"
   | "expired"
   | "stale"
@@ -127,6 +129,7 @@ export type ApprovalAuditEventIntent = Readonly<{
     | "unit_approved"
     | "unit_rejected"
     | "unit_changes_requested"
+    | "unit_deferred"
     | "unit_expired"
     | "unit_stale"
     | "unit_superseded"
@@ -176,7 +179,7 @@ export type ApprovalDecisionCommand =
     grantRef: string;
   }>
   | Readonly<{
-    kind: "reject" | "request_changes";
+    kind: "reject" | "defer" | "request_changes";
     commandRef: string;
     unitRef: string;
     actor: ActionActor;
@@ -215,7 +218,7 @@ const HASH = /^[a-f0-9]{64}$/;
 const REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const CODE = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const RISKS: readonly ActionRisk[] = ["K0", "K1", "K2", "K3", "K4"];
-const ROLES: readonly ActionActorRole[] = ["owner", "admin", "operator", "analyst"];
+const ROLES: readonly ActionActorRole[] = ["owner", "admin", "operator", "analyst", "agent"];
 const APPROVER_ROLES: readonly ActionApprovalRole[] = ["owner", "admin", "operator"];
 const ZERO_HASH = "0".repeat(64);
 
@@ -494,7 +497,7 @@ function validateLifecycle(candidate: ApprovalLifecycle): ApprovalLifecycle {
     exact(unit, ["unitRef", "unitHash", "state", "decisionRef", "decisionActor", "decidedAt", "reasonCode", "grant"]);
     const definition = definitions.get(unit.unitRef);
     if (!definition || definition.unitHash !== unit.unitHash || seen.has(unit.unitRef)
-      || !["awaiting_approval", "approved", "rejected", "changes_requested", "expired", "stale", "superseded", "dependency_failed"].includes(unit.state)) {
+      || !["awaiting_approval", "approved", "rejected", "deferred", "changes_requested", "expired", "stale", "superseded", "dependency_failed"].includes(unit.state)) {
       fail("invalid_input");
     }
     seen.add(unit.unitRef);
@@ -507,7 +510,7 @@ function validateLifecycle(candidate: ApprovalLifecycle): ApprovalLifecycle {
       if (hasDecisionActor || hasDecisionRef || hasDecidedAt || unit.reasonCode !== null || unit.grant !== null) {
         fail("invalid_input");
       }
-    } else if (unit.state === "approved" || unit.state === "rejected" || unit.state === "changes_requested") {
+    } else if (unit.state === "approved" || unit.state === "rejected" || unit.state === "deferred" || unit.state === "changes_requested") {
       if (!hasCompleteDecision || unit.reasonCode === null) fail("invalid_input");
     } else if ((hasDecisionActor || hasDecisionRef || hasDecidedAt) && !hasCompleteDecision) {
       fail("invalid_input");
@@ -517,7 +520,7 @@ function validateLifecycle(candidate: ApprovalLifecycle): ApprovalLifecycle {
       ref(unit.decisionRef);
       instant(unit.decidedAt);
       normalizedDecisionActor = actor(unit.decisionActor);
-      if (normalizedDecisionActor.role === "analyst"
+      if (normalizedDecisionActor.role === "analyst" || normalizedDecisionActor.role === "agent"
         || !policyRoles(candidate, definition.risk).includes(normalizedDecisionActor.role)
         || (candidate.policy.separationOfDutiesRisks.includes(definition.risk)
           && normalizedDecisionActor.actorRef === definition.requester.actorRef)) fail("invalid_input");
@@ -544,7 +547,7 @@ function validateLifecycle(candidate: ApprovalLifecycle): ApprovalLifecycle {
         || !Number.isSafeInteger(unit.grant.planRevision) || unit.grant.planRevision < 1
         || unit.grant.planHash !== definition.plan.planHash || unit.grant.singleUse !== true
         || unit.grant.capability !== "approval_evidence_only" || unit.grant.canExecute !== false
-        || approver.role === "analyst" || !policyRoles(candidate, definition.risk).includes(approver.role)
+        || approver.role === "analyst" || approver.role === "agent" || !policyRoles(candidate, definition.risk).includes(approver.role)
         || (candidate.policy.separationOfDutiesRisks.includes(definition.risk)
           && approver.actorRef === definition.requester.actorRef)
         || !normalizedDecisionActor || unit.decisionRef === null || unit.decidedAt === null
@@ -555,7 +558,7 @@ function validateLifecycle(candidate: ApprovalLifecycle): ApprovalLifecycle {
         || (consumedAt === null) !== (consumedBy === null)
         || (consumedAt !== null && (Date.parse(consumedAt) < Date.parse(approvedAt)
           || Date.parse(consumedAt) >= Date.parse(expiresAt)))
-        || (consumedBy !== null && (consumedBy.role === "analyst"
+        || (consumedBy !== null && (consumedBy.role === "analyst" || consumedBy.role === "agent"
           || !candidate.policy.grantConsumerRoles.includes(consumedBy.role)))
         || digest(grantCore) !== grantHash) fail("invalid_input");
       grantRefs.add(grantRef);
@@ -635,7 +638,7 @@ function invalidate(
   }>;
   const states = new Map(mutable.map((state) => [state.unitRef, state]));
   const changes: Array<{ unitRef: string; state: ActionUnitApprovalState; reason: string }> = [];
-  const closed = new Set<ActionUnitApprovalState>(["rejected", "changes_requested", "expired", "stale", "superseded", "dependency_failed"]);
+  const closed = new Set<ActionUnitApprovalState>(["rejected", "deferred", "changes_requested", "expired", "stale", "superseded", "dependency_failed"]);
   for (const state of mutable) {
     if (closed.has(state.state)) continue;
     const next = derivedState(definitions.get(state.unitRef)!, fresh.get(state.unitRef)!, checkedAt);
@@ -726,7 +729,7 @@ export function decideActionUnit(lifecycleInput: ApprovalLifecycle, command: App
   const lifecycle = validateLifecycle(lifecycleInput);
   const common = ["kind", "commandRef", "unitRef", "actor", "decidedAt", "reasonCode", "freshness"];
   exact(command, command.kind === "approve" ? [...common, "authorization", "grantRef"] : common);
-  if (!["approve", "reject", "request_changes"].includes(command.kind)) fail("invalid_input");
+  if (!["approve", "reject", "defer", "request_changes"].includes(command.kind)) fail("invalid_input");
   const commandRef = ref(command.commandRef);
   const unitRef = ref(command.unitRef);
   const decidedAt = instant(command.decidedAt);
@@ -743,14 +746,14 @@ export function decideActionUnit(lifecycleInput: ApprovalLifecycle, command: App
     if (current?.state === "dependency_failed") fail("dependency_failed");
     fail("invalid_transition");
   }
-  if (decisionActor.role === "analyst" || !policyRoles(working, definition.risk).includes(decisionActor.role)) {
+  if (decisionActor.role === "analyst" || decisionActor.role === "agent" || !policyRoles(working, definition.risk).includes(decisionActor.role)) {
     fail("policy_denied");
   }
   if (working.policy.separationOfDutiesRisks.includes(definition.risk)
     && decisionActor.actorRef === definition.requester.actorRef) fail("separation_of_duties");
   const reasonCode = code(command.reasonCode);
   const nextState: ActionUnitApprovalState = command.kind === "approve" ? "approved"
-    : command.kind === "reject" ? "rejected" : "changes_requested";
+    : command.kind === "reject" ? "rejected" : command.kind === "defer" ? "deferred" : "changes_requested";
   const approvalGrant = command.kind === "approve"
     ? grant(working, definition, decisionActor, decidedAt, command.grantRef,
       authorization(command.authorization, definition, decisionActor, decidedAt))
@@ -761,7 +764,7 @@ export function decideActionUnit(lifecycleInput: ApprovalLifecycle, command: App
   const event = appendEvent(working, {
     eventRef: commandRef,
     eventType: command.kind === "approve" ? "unit_approved"
-      : command.kind === "reject" ? "unit_rejected" : "unit_changes_requested",
+      : command.kind === "reject" ? "unit_rejected" : command.kind === "defer" ? "unit_deferred" : "unit_changes_requested",
     bundleRef: working.bundle.bundleRef, unitRef, unitHash: definition.unitHash,
     actorRef: decisionActor.actorRef, occurredAt: decidedAt, reasonCode,
   });
@@ -824,7 +827,7 @@ export function consumeApprovalGrant(input: Readonly<{
   const state = lifecycle.units.find((unit) => unit.unitRef === unitRef);
   const consumer = actor(input.consumer);
   if (!definition || !state || state.state !== "approved" || !state.grant) fail("invalid_transition");
-  if (consumer.role === "analyst" || !lifecycle.policy.grantConsumerRoles.includes(consumer.role)) fail("policy_denied");
+  if (consumer.role === "analyst" || consumer.role === "agent" || !lifecycle.policy.grantConsumerRoles.includes(consumer.role)) fail("policy_denied");
   if (state.grant.consumedAt !== null) fail("grant_used");
   if (Date.parse(consumedAt) >= Date.parse(state.grant.expiresAt)) fail("grant_expired");
   if (ref(input.grantRef) !== state.grant.grantRef || hash(input.unitHash) !== definition.unitHash

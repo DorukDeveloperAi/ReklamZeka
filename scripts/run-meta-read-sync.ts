@@ -3,13 +3,14 @@ import { Pool } from "pg";
 
 import * as schema from "../src/db/schema";
 import { createDrizzleProductionMetaReadSyncService } from "../src/server/meta-read-sync-runtime";
+import { metaTokenSecurityAllowsReadSync } from "../src/connectors/meta/bootstrap-preflight";
 
 process.loadEnvFile(".env.local");
 const workspaceId = process.env.REKLAMZEKA_LOCAL_WORKSPACE_ID;
 const recoveryAccountId = process.env.REKLAMZEKA_META_RECOVERY_ACCOUNT_ID;
 const recoveryLane = process.env.REKLAMZEKA_META_RECOVERY_LANE ?? "inventory_ad_set_v1";
 if (!workspaceId || !recoveryAccountId || !["inventory_ad_set_v1", "creative_ad_v1", "creative_ad_v2", "insights_ad_v1"].includes(recoveryLane)
-  || process.env.META_TOKEN_SECURITY_STATUS !== "rotated") {
+  || !metaTokenSecurityAllowsReadSync(process.env.META_TOKEN_SECURITY_STATUS)) {
   throw new Error("read-only sync preflight rejected");
 }
 

@@ -40,7 +40,7 @@ function admission() {
       actor: { actorRef: "actor_owner", role: "owner" }, issuedAt: at, expiresAt: "2026-08-10T12:01:00.000Z", humanPresence: true, canExecute: false }, grantRef: "grant_one" }).lifecycle;
   return admitActionExecution({ lifecycle, unitRef: unit.unitRef, actionPlan,
     eligibilitySnapshot: { workspaceRef: "workspace_alpha", accountRef: "account_main", capturedAt: at,
-      target: { entityLevel: "campaign", entityRef: "campaign_main", configuredStatus: "ACTIVE", effectiveStatus: "ACTIVE", budgetOwnerRef: "campaign_main" }, ancestors: [], sourceSnapshotHash: "d".repeat(64) },
+      target: { entityLevel: "campaign", entityRef: "campaign_main", configuredStatus: "ACTIVE", effectiveStatus: "ACTIVE", budgetOwnerRef: "campaign_main", currentName: "Campaign Main" }, ancestors: [], sourceSnapshotHash: "d".repeat(64) },
     currentFreshness: [{ unitRef: unit.unitRef, planRevision: unit.plan.revision, planHash: unit.plan.planHash, sourceHash: unit.sourceHash, contextHash: unit.contextHash, specHash: unit.specHash }],
     executionPresence: { authorizationRef: "presence_execute", unitRef: unit.unitRef, unitHash: unit.unitHash, scopeHash: unit.scopeHash,
       actor: { actorRef: "actor_owner", role: "owner" }, issuedAt: at, expiresAt: "2026-08-10T12:01:00.000Z", humanPresence: true }, evaluatedAt: "2026-08-10T12:00:30.000Z" });
@@ -59,10 +59,12 @@ class Database {
       context_hash: actionPlan.contextHash, action_type: "status_pause", action_plan_payload: actionPlan,
       unit_payload: { scope: { workspaceRef: "workspace_alpha", accountRef: "account_main", entityRef: "campaign_main", actionType: "status_pause" } },
       account_ref: "account_main", campaign_ref: "campaign_main", ad_set_ref: null, ad_ref: null,
-      campaign_configured_status: "ACTIVE", campaign_effective_status: this.campaignEffectiveStatus,
+      campaign_configured_status: "ACTIVE", campaign_effective_status: this.campaignEffectiveStatus, campaign_name: "Campaign Main",
+      ad_set_name: null, target_name: null,
       ad_set_configured_status: null, ad_set_effective_status: null, target_configured_status: null, target_effective_status: null,
       campaign_budget_optimization: true, source_snapshot_hash: "d".repeat(64), source_snapshot_captured_at: at, database_now: at,
       decision_event_id: decisionId, approval_decision_ref: "decision_one", command_kind: "approve", approval_grant_id: grantId, approval_grant_ref: "grant_one" }] };
+    if (statement.includes("from slice_rule_budget_action_unit_bindings")) return { rows: [] };
     if (statement.includes("select execution_ref, admission_hash")) return { rows: this.attempts };
     if (statement.includes("insert into action_execution_attempts")) { this.attempts.push({ execution_ref: `action_execution_${"x".repeat(20)}`, admission_hash: admissionValue.admissionHash, write_spec_hash: admissionValue.writeSpec.specHash }); return { rows: [{ id: attemptId }] }; }
     if (statement.includes("insert into action_execution_events")) { this.events += 1; return { rows: [] }; }

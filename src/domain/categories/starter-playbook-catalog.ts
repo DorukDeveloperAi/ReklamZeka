@@ -15,7 +15,7 @@ import {
 } from "@/domain/categories/public-reference";
 
 export const STARTER_CATEGORY_PLAYBOOK_CATALOG_VERSION =
-  "starter-category-playbooks/1.1.0" as const;
+  "starter-category-playbooks/1.2.0" as const;
 
 const CAMPAIGN_LEVEL = Object.freeze(["campaign"] as const);
 const CAMPAIGN_AD_SET_LEVELS = Object.freeze(["campaign", "ad_set"] as const);
@@ -46,6 +46,7 @@ export type StarterCategoryDimensionKey =
   | "destination"
   | "funnel_intent"
   | "lifecycle"
+  | "market"
   | "operating_mode"
   | "service_line"
   | "protection_class";
@@ -156,6 +157,8 @@ function objectivePlaybookRef(objective: CampaignObjective): StarterObjectivePla
 const OBJECTIVE_REFS = Object.freeze(CAMPAIGN_OBJECTIVES.map(objectivePlaybookRef));
 
 const DIMENSIONS: readonly StarterCategoryDimensionTemplate[] = deepFreeze([
+  { dimensionRef: categoryDimensionPublicRef("market"), dimensionKey: "market",
+    label: "Pazar", suggestedCardinality: "single", suggestedEntityLevels: CAMPAIGN_LEVEL },
   { dimensionRef: categoryDimensionPublicRef("service_line"), dimensionKey: "service_line",
     label: "Hizmet hattı", suggestedCardinality: "multi", suggestedEntityLevels: CAMPAIGN_LEVEL },
   { dimensionRef: categoryDimensionPublicRef("brand_clinic"), dimensionKey: "brand_clinic",
@@ -229,6 +232,10 @@ function ownerDefinedTemplate(input: Readonly<{
 }
 
 const CATEGORIES: readonly StarterCategoryTemplate[] = deepFreeze([
+  categoryTemplate({ dimensionKey: "market", categoryKey: "domestic", label: "Yerli",
+    description: "Yalnız yerli pazar kapsamı. Yabancı pazarla aynı kural, bütçe havuzu veya kohorta girmez.", color: "#1877F2" }),
+  categoryTemplate({ dimensionKey: "market", categoryKey: "international", label: "Yabancı",
+    description: "Yalnız yabancı pazar kapsamı. Yerli pazarla aynı kural, bütçe havuzu veya kohorta girmez.", color: "#6D5CE7" }),
   categoryTemplate({ dimensionKey: "audience_strategy", categoryKey: "prospecting", label: "Yeni kitle",
     description: "Kullanıcının yeni kitle çalışması olarak değerlendirebileceği örnek iç kategori.", color: "#2563EB" }),
   categoryTemplate({ dimensionKey: "audience_strategy", categoryKey: "retargeting", label: "Yeniden erişim",

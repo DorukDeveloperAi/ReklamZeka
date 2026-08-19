@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { BudgetLabDraftCommand, BudgetLabDraftResult } from "@/application/budget-lab-draft-service";
+import type { BudgetLabDraftResult } from "@/application/budget-lab-draft-service";
+import type { UserBudgetScenarioCommand } from "@/application/slice-rule-budget-impact-context-candidate-service";
 import type { SliceRule } from "@/domain/campaigns/slice-operating-rule";
+import { ContextualHelp } from "./contextual-help";
+import { LocalSessionConnector } from "./local-session-connector";
 import styles from "./slice-rule-workspace-panel.module.css";
 
 type Market = "domestic" | "international";
@@ -48,7 +51,7 @@ export type SliceRuleWorkspaceSnapshot = Readonly<{
 }>;
 
 type State = Readonly<{ status: "loading" }>
-  | Readonly<{ status: "unavailable" | "error"; message: string }>
+  | Readonly<{ status: "session_required" | "unavailable" | "error"; message: string }>
   | Readonly<{ status: "ready"; snapshot: SliceRuleWorkspaceSnapshot }>;
 
 type ImpactResult = Readonly<{
@@ -62,27 +65,25 @@ type ImpactResult = Readonly<{
   authority: Readonly<{ recommendationOnly: true; canPublish: false; canApprove: false;
     canCreateProposal: false; canExecute: false; canWriteMeta: false }>;
 }>;
-type SavedImpactResult = Readonly<{
-  contractVersion: "slice-rule-budget-impact/1.0.0";
-  mode: "saved_advisory_draft";
-  binding: ImpactResult["binding"];
-  budgetProposal: BudgetLabDraftResult["proposal"];
-  persistence: "inserted" | "unchanged";
-  provenance: "inserted" | "unchanged";
-  authority: ImpactResult["authority"];
-}>;
+type SavedImpactResult = Readonly<{ contractVersion: "slice-rule-budget-impact/1.0.0"; mode: "saved_advisory_draft";
+  binding: ImpactResult["binding"]; budgetProposal: BudgetLabDraftResult["proposal"]; persistence: "inserted" | "unchanged";
+  provenance: "inserted" | "unchanged"; authority: ImpactResult["authority"] }>;
 type ImpactState = Readonly<{ status: "idle" | "loading" }>
   | Readonly<{ status: "ready"; result: ImpactResult }>
   | Readonly<{ status: "saved"; result: SavedImpactResult }>
   | Readonly<{ status: "unsupported" | "unavailable" | "stale" | "scope" | "error"; message: string }>;
-type ApprovalQueueSelection = Readonly<{ selectionRef: string; selectedAt: string }>;
-type ApprovalQueueState = Readonly<{ status: "loading" }>
-  | Readonly<{ status: "ready"; selections: readonly ApprovalQueueSelection[] }>
-  | Readonly<{ status: "queued"; selectionRef: string; persistence: "inserted" | "unchanged" }>
-  | Readonly<{ status: "unavailable" | "error"; message: string }>;
+type SelectionCandidate = Readonly<{ candidateRef: string; scenarioLabel: string; beforeAmountMinor: number; afterAmountMinor: number; currency: string; status: "selectable" | "blocked"; blockReason: "delivery_hold" | "market_boundary" | "scope_unavailable" | "stale_source" | "already_selected" | null }>;
+type SelectionState = Readonly<{ status: "idle" | "loading" }> | Readonly<{ status: "ready"; candidates: readonly SelectionCandidate[] }> | Readonly<{ status: "selected"; selectionRef: string; persistence: "inserted" | "unchanged" }> | Readonly<{ status: "unavailable" | "error"; message: string }>;
+type PreparationState = Readonly<{ status: "idle" | "loading" }> | Readonly<{ status: "prepared"; actionUnitRef: string; persistence: "inserted" | "unchanged" }> | Readonly<{ status: "unavailable" | "error"; message: string }>;
+type DecisionTraceItem = Readonly<{ ruleSeriesRef: string; ruleRevision: number; selectionRef: string; selectedAt: string;
+  actionUnit: Readonly<{ presence: boolean; status: "not_materialized" | "awaiting_approval" | "approved" | "rejected" | "changes_requested" }>;
+  decisionHistory: readonly Readonly<{ decision: "proposed" | "approved" | "rejected" | "changes_requested"; occurredAt: string; reasonCode: string | null }>[];
+  execution: Readonly<{ safetyState: "server_disabled"; closure: "not_admitted" | "admission_closed" }> }>;
+type ApprovalReadState = Readonly<{ status: "loading" }> | Readonly<{ status: "ready"; traces: readonly DecisionTraceItem[] }> | Readonly<{ status: "unavailable" }>;
 type TemporalCandidate = Readonly<{ candidateRef: string; ruleSeriesRef: string; reviewCadence: "daily" | "weekly" | "monthly"; windowRef: string; capturedAt: string }>;
+type TemporalEvaluation = Readonly<{ ruleSeriesRef: string; occurredAt: string; outcome: "recommendation" | "no_change"; reason: "window_ready" | "window_unsettled" | "window_too_short" | "open_delivery_alert" }>;
 type TemporalState = Readonly<{ status: "loading" }>
-  | Readonly<{ status: "ready"; candidates: readonly TemporalCandidate[]; result: string | null }>
+  | Readonly<{ status: "ready"; candidates: readonly TemporalCandidate[]; evaluations: readonly TemporalEvaluation[]; result: string | null }>
   | Readonly<{ status: "unavailable" | "error"; message: string }>;
 type ScopeCandidate = Readonly<{ campaignRef: string; scope: Scope; requiresFrozenContext: true; budgetImpactReady: false }>;
 type ScopeCandidateState = Readonly<{ status: "loading" }>
@@ -92,6 +93,10 @@ type OperationalReadiness = Readonly<{ candidateRef: string; scope: Scope; froze
 type OperationalReadinessState = Readonly<{ status: "loading" }>
   | Readonly<{ status: "ready"; items: readonly OperationalReadiness[] }>
   | Readonly<{ status: "unavailable" }>;
+type PoolBinding = Readonly<{ draftHash: string; hierarchyHash: string; poolRef: string; market: Market; boundAt: string; authority: ClosedAuthority }>;
+type PoolNode = Readonly<{ poolRef: string; parentPoolRef: string | null; layer: "market" | "service_family" | "constraint" | "named"; market: Market; currency: string; hardCapDecimal: string; effectiveFrom: string; effectiveTo: string }>;
+type PoolBindingSnapshot = Readonly<{ contractVersion: "slice-rule-budget-pool-binding-http/1.0.0"; bindings: readonly PoolBinding[]; hierarchy: Readonly<{ hierarchyHash: string; nodes: readonly PoolNode[]; authority: ClosedAuthority }> | null; authority: Readonly<{ canRead: true; canBind: boolean } & ClosedAuthority> }>;
+type PoolBindingState = Readonly<{ status: "loading" }> | Readonly<{ status: "ready"; snapshot: PoolBindingSnapshot; selectedPoolRef: string }> | Readonly<{ status: "saving"; snapshot: PoolBindingSnapshot; selectedPoolRef: string }> | Readonly<{ status: "unavailable" | "error"; message: string }>;
 
 type Form = Readonly<{
   seriesRef: string;
@@ -125,20 +130,10 @@ const EMPTY_FORM: Form = Object.freeze({ seriesRef: "", market: "international",
   distributionAllocations: "", continuationPercent: "80", evaluationWindowDays: "7",
   condition: "delivery_interrupted", priority: "50", metric: "cost_per_qualified_lead", reviewCadence: "weekly",
   rollbackWhen: "Yeni sonuç kanıtı, teslimat kesintisi veya kapsam değişimi insan incelemesini gerektirirse." });
-const EMPTY_BUDGET_COMMAND = `{
-  "scope": {
-    "adAccountId": "",
-    "campaignId": "",
-    "contextHash": ""
-  },
-  "seriesRef": "budget.preview",
-  "revision": 1,
-  "previousProposalHash": "GENESIS",
-  "idempotencyKey": "budget.preview.r1",
-  "createdAt": "",
-  "scenarios": [],
-  "outcomeProxy": null
-}`;
+type BudgetImpactContextCandidate = Readonly<{ candidateRef: string; campaignRef: string; capturedAt: string; currency: string; currentBudgetDecimal: string; scope: Scope }>;
+type BudgetImpactContextCandidateSnapshot = Readonly<{ contractVersion: "slice-rule-budget-impact-context-candidates/1.0.0"; seriesRef: string; candidates: readonly BudgetImpactContextCandidate[]; authority: Readonly<{ canPreview: false; canSave: false; canApprove: false; canExecute: false; canWriteMeta: false }> }>;
+type TypedScenarioForm = Readonly<{ label: string; mode: "keep" | "conservative"; requestedBudgetDecimal: string; startDate: string; endDate: string }>;
+const EMPTY_TYPED_SCENARIO: TypedScenarioForm = Object.freeze({ label: "keep", mode: "keep", requestedBudgetDecimal: "", startDate: "", endDate: "" });
 
 function object(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -157,13 +152,24 @@ function noOpenedAuthority(value: unknown): boolean {
   }
   return true;
 }
-export function parseSliceRuleBudgetActionSelections(value: unknown): readonly ApprovalQueueSelection[] {
-  if (!object(value) || value.contractVersion !== "slice-rule-budget-action-unit-http/1.0.0" || !Array.isArray(value.selections)
-    || value.selections.length > 100 || !value.selections.every((entry) => object(entry)
-      && typeof entry.selectionRef === "string" && /^selection_[a-f0-9]{64}$/.test(entry.selectionRef)
-      && typeof entry.selectedAt === "string") || !object(value.authority) || value.authority.canApprove !== false
-    || value.authority.canExecute !== false || value.authority.canWriteMeta !== false) throw new Error("Onay kuyruğu seçim sözleşmesi güvenli değil.");
-  return value.selections as ApprovalQueueSelection[];
+export function parseSliceRuleScenarioSelectionCandidates(value: unknown): readonly SelectionCandidate[] {
+  if (!object(value) || value.contractVersion !== "slice-rule-scenario-selection/1.0.0" || !Array.isArray(value.candidates) || !object(value.authority)
+    || value.authority.canSelect !== false || value.authority.canApprove !== false || value.authority.canExecute !== false || value.authority.canWriteMeta !== false || value.authority.canEnableAutomation !== false
+    || !value.candidates.every((candidate) => object(candidate) && Object.keys(candidate).length === 7 && /^selection_candidate_[a-f0-9]{64}$/.test(String(candidate.candidateRef))
+      && typeof candidate.scenarioLabel === "string" && Number.isSafeInteger(candidate.beforeAmountMinor) && Number.isSafeInteger(candidate.afterAmountMinor)
+      && /^[A-Z]{3}$/.test(String(candidate.currency)) && ["selectable", "blocked"].includes(String(candidate.status))
+      && (candidate.blockReason === null || ["delivery_hold", "market_boundary", "scope_unavailable", "stale_source", "already_selected"].includes(String(candidate.blockReason))))) throw new Error("Senaryo hazırlık sözleşmesi güvenli değil.");
+  return value.candidates as SelectionCandidate[];
+}
+export function parseSliceRuleDecisionTrace(value: unknown): readonly DecisionTraceItem[] {
+  if (!object(value) || !object(value.decisionTrace) || value.decisionTrace.contractVersion !== "slice-rule-decision-trace/1.0.0" || !Array.isArray(value.decisionTrace.items)
+    || value.decisionTrace.items.length > 100 || !value.decisionTrace.items.every((item) => object(item) && Object.keys(item).length === 7
+      && typeof item.ruleSeriesRef === "string" && /^[a-z][a-z0-9_.:-]{0,127}$/.test(item.ruleSeriesRef) && Number.isInteger(item.ruleRevision) && Number(item.ruleRevision) > 0
+      && /^selection_[a-f0-9]{64}$/.test(String(item.selectionRef)) && typeof item.selectedAt === "string" && Number.isFinite(Date.parse(item.selectedAt))
+      && object(item.actionUnit) && Object.keys(item.actionUnit).length === 2 && typeof item.actionUnit.presence === "boolean" && ["not_materialized", "awaiting_approval", "approved", "rejected", "changes_requested"].includes(String(item.actionUnit.status))
+      && Array.isArray(item.decisionHistory) && item.decisionHistory.length <= 2 && item.decisionHistory.every((event) => object(event) && Object.keys(event).length === 3 && ["proposed", "approved", "rejected", "changes_requested"].includes(String(event.decision)) && typeof event.occurredAt === "string" && Number.isFinite(Date.parse(event.occurredAt)) && (event.reasonCode === null || typeof event.reasonCode === "string" && /^[a-z][a-z0-9_.:-]{0,127}$/.test(event.reasonCode)))
+      && object(item.execution) && Object.keys(item.execution).length === 2 && item.execution.safetyState === "server_disabled" && ["not_admitted", "admission_closed"].includes(String(item.execution.closure)))) throw new Error("Karar izi sözleşmesi güvenli değil.");
+  return value.decisionTrace.items as DecisionTraceItem[];
 }
 function isScope(value: unknown): value is Scope {
   if (!object(value) || !["domestic", "international"].includes(String(value.market))
@@ -177,6 +183,9 @@ function isScope(value: unknown): value is Scope {
 function sameScope(left: Scope, right: Scope): boolean {
   const stable = (value: Scope) => Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)));
   return JSON.stringify(stable(left)) === JSON.stringify(stable(right));
+}
+function poolLayerLabel(layer: PoolNode["layer"]): string {
+  return ({ market: "Pazar üst havuzu", service_family: "Hizmet ailesi havuzu", constraint: "Kısıt havuzu", named: "Adlandırılmış havuz" })[layer];
 }
 function isItem(value: unknown): value is SliceRuleWorkspaceItem {
   return object(value) && value.schemaVersion === "public-slice-rule-workspace-draft/1.0.0"
@@ -199,6 +208,29 @@ export function parseSliceRuleWorkspaceSnapshot(value: unknown): SliceRuleWorksp
     throw new Error("Slice Rule Workspace güvenli sözleşmeyi döndürmedi.");
   }
   return value as unknown as SliceRuleWorkspaceSnapshot;
+}
+export function parseSliceRuleBudgetPoolBindingSnapshot(value: unknown): PoolBindingSnapshot {
+  const node = (candidate: unknown): candidate is PoolNode => object(candidate) && Object.keys(candidate).length === 8
+    && /^budget_pool_[a-z0-9][a-z0-9_.:-]{0,119}$/.test(String(candidate.poolRef))
+    && (candidate.parentPoolRef === null || /^budget_pool_[a-z0-9][a-z0-9_.:-]{0,119}$/.test(String(candidate.parentPoolRef)))
+    && ["market", "service_family", "constraint", "named"].includes(String(candidate.layer))
+    && ["domestic", "international"].includes(String(candidate.market)) && /^[A-Z]{3}$/.test(String(candidate.currency))
+    && typeof candidate.hardCapDecimal === "string" && typeof candidate.effectiveFrom === "string" && typeof candidate.effectiveTo === "string";
+  const binding = (candidate: unknown): candidate is PoolBinding => object(candidate) && Object.keys(candidate).length === 6
+    && /^[a-f0-9]{64}$/.test(String(candidate.draftHash)) && /^[a-f0-9]{64}$/.test(String(candidate.hierarchyHash))
+    && /^budget_pool_[a-z0-9][a-z0-9_.:-]{0,119}$/.test(String(candidate.poolRef))
+    && ["domestic", "international"].includes(String(candidate.market)) && typeof candidate.boundAt === "string" && isClosed(candidate.authority);
+  if (!object(value) || value.contractVersion !== "slice-rule-budget-pool-binding-http/1.0.0" || !Array.isArray(value.bindings)
+    || value.bindings.length > 100 || !value.bindings.every(binding) || !(value.hierarchy === null || object(value.hierarchy)
+      && Object.keys(value.hierarchy).length === 3 && /^[a-f0-9]{64}$/.test(String(value.hierarchy.hierarchyHash))
+      && Array.isArray(value.hierarchy.nodes) && value.hierarchy.nodes.length <= 200 && value.hierarchy.nodes.every(node)
+      && isClosed(value.hierarchy.authority)) || !object(value.authority) || Object.keys(value.authority).length !== 7
+    || value.authority.canRead !== true || typeof value.authority.canBind !== "boolean" || value.authority.canPublish !== false
+    || value.authority.canApprove !== false || value.authority.canExecute !== false || value.authority.canWriteMeta !== false
+    || value.authority.canEnableAutomation !== false || !noOpenedAuthority(value)) {
+    throw new Error("Bütçe havuzu bağlama sözleşmesi güvenli değil.");
+  }
+  return value as unknown as PoolBindingSnapshot;
 }
 
 /** Candidate data may only prefill a new local form; it is never budget evidence. */
@@ -226,36 +258,57 @@ export function parseSliceOperationalReadiness(value: unknown): readonly Operati
 }
 
 /** The panel accepts only opaque candidate references discovered by the server. */
-export function parseTemporalEvaluationCandidates(value: unknown): readonly TemporalCandidate[] {
-  if (!object(value) || value.contractVersion !== "temporal-recommendation-read/1.0.0" || !Array.isArray(value.candidates)
+export function parseTemporalEvaluationSnapshot(value: unknown): Readonly<{ candidates: readonly TemporalCandidate[]; evaluations: readonly TemporalEvaluation[] }> {
+  if (!object(value) || value.contractVersion !== "temporal-recommendation-read/1.0.0" || !Array.isArray(value.items) || !Array.isArray(value.candidates)
     || value.candidates.length > 50 || !value.candidates.every((candidate) => object(candidate)
       && /^temporal_candidate_[a-f0-9]{24}$/.test(String(candidate.candidateRef))
       && /^[a-z][a-z0-9_.:-]{0,127}$/.test(String(candidate.ruleSeriesRef))
       && ["daily", "weekly", "monthly"].includes(String(candidate.reviewCadence))
       && /^window_[a-f0-9]{24}$/.test(String(candidate.windowRef))
       && typeof candidate.capturedAt === "string" && Number.isFinite(Date.parse(candidate.capturedAt)))
+    || value.items.length > 100 || !value.items.every((item) => object(item) && Object.keys(item).length === 6
+      && /^temporal_evaluation_[a-f0-9]{64}$/.test(String(item.evaluationRef))
+      && /^[a-z][a-z0-9_.:-]{0,127}$/.test(String(item.ruleSeriesRef))
+      && typeof item.occurredAt === "string" && Number.isFinite(Date.parse(item.occurredAt))
+      && ["recommendation", "no_change"].includes(String(item.outcome))
+      && ["window_ready", "window_unsettled", "window_too_short", "open_delivery_alert"].includes(String(item.reason))
+      && /^window_[a-z0-9_.:-]{1,127}$/.test(String(item.windowRef)))
     || !object(value.authority) || value.authority.canPublish !== false || value.authority.canApprove !== false
     || value.authority.canExecute !== false || value.authority.canWriteMeta !== false || !noOpenedAuthority(value)) {
     throw new Error("Zamansal değerlendirme aday sözleşmesi güvenli değil.");
   }
-  return value.candidates as TemporalCandidate[];
+  return Object.freeze({ candidates: value.candidates as TemporalCandidate[], evaluations: value.items as TemporalEvaluation[] });
+}
+export function parseTemporalEvaluationCandidates(value: unknown): readonly TemporalCandidate[] { return parseTemporalEvaluationSnapshot(value).candidates; }
+type DecisionJourneyStep = Readonly<{ label: string; status: "ready" | "waiting" | "hold" | "complete" | "unavailable"; detail: string }>;
+/** Missing canonical links remain absent; the UI never infers a decision or outcome. */
+export function decisionJourneyForRule(rule: SliceRuleWorkspaceItem | undefined, temporal: TemporalState, approvals: ApprovalReadState): readonly DecisionJourneyStep[] {
+  if (!rule) return [];
+  const ready = temporal.status === "ready" ? temporal : null;
+  const observations = ready?.candidates.filter((candidate) => candidate.ruleSeriesRef === rule.seriesRef) ?? [];
+  const evaluation = ready?.evaluations.find((item) => item.ruleSeriesRef === rule.seriesRef);
+  const trace = approvals.status === "ready" ? approvals.traces.find((item) => item.ruleSeriesRef === rule.seriesRef && item.ruleRevision === rule.revision) : undefined;
+  const decision = trace?.decisionHistory.at(-1);
+  return Object.freeze([
+    Object.freeze({ label: "Kural", status: "ready", detail: `Revizyon ${rule.revision} seçili kapsamda bağlı.` }),
+    Object.freeze(observations.length ? { label: "Gözlem", status: "ready", detail: "Doğrulanmış zaman penceresi hazır." } : { label: "Gözlem", status: "unavailable", detail: "Bağlı doğrulanmış zaman penceresi yok." }),
+    Object.freeze(evaluation ? { label: "Öneri / hold", status: evaluation.outcome === "recommendation" ? "ready" : "hold", detail: evaluation.outcome === "recommendation" ? "Kanıt öneriyi destekliyor; uygulama yetkisi yok." : "Değişiklik hold’da." } : { label: "Öneri / hold", status: "waiting", detail: "Bağlı değerlendirme henüz yok." }),
+    Object.freeze(trace ? { label: "İnsan onayı", status: decision && decision.decision !== "proposed" ? "complete" : "waiting", detail: decision ? `İnsan kararı: ${decision.decision.replaceAll("_", " ")}. Uygulama kapalı.` : "İnsan kararı bekleniyor." } : { label: "İnsan onayı", status: "unavailable", detail: "Kanonik bağlı insan kararı yok." }),
+    Object.freeze({ label: "Sonuç", status: "unavailable", detail: "Bağlı teslimat sonucu kanıtı yok; sonuç uydurulmaz." }),
+  ]);
 }
 
-export function buildSliceRuleBudgetImpactCommand(item: SliceRuleWorkspaceItem | undefined, raw: string) {
-  if (!item || item.status !== "draft" || item.operatingMode !== "recommendation_only" || !isClosed(item.authority)
-    || !isClosed(item.operatingRule.authority) || item.operatingRule.rule.kind === "delivery_guardrail") return null;
-  let budgetCommand: unknown;
-  try { budgetCommand = JSON.parse(raw); } catch { return null; }
-  if (!object(budgetCommand) || !noOpenedAuthority(budgetCommand)
-    || Object.keys(budgetCommand).sort().join("|") !== ["createdAt", "idempotencyKey", "outcomeProxy",
-      "previousProposalHash", "revision", "scenarios", "scope", "seriesRef"].sort().join("|")
-    || !object(budgetCommand.scope) || Object.keys(budgetCommand.scope).sort().join("|")
-      !== ["adAccountId", "campaignId", "contextHash"].sort().join("|")
-    || !Array.isArray(budgetCommand.scenarios) || budgetCommand.scenarios.length < 1
-    || budgetCommand.scenarios.length > 3) return null;
-  return Object.freeze({ seriesRef: item.seriesRef, expectedDraftRef: item.draftRef,
-    expectedDraftHash: item.draftHash, expectedScope: item.scope,
-    budgetCommand: budgetCommand as unknown as BudgetLabDraftCommand });
+/** Converts only decision-relevant user input. Mirror/pacing/allocation proof stays server-only. */
+export function buildTypedBudgetImpactCommand(item: SliceRuleWorkspaceItem | undefined, form: TypedScenarioForm): UserBudgetScenarioCommand | null {
+  if (!item || item.operatingRule.rule.kind === "delivery_guardrail" || !isClosed(item.authority)) return null;
+  if (!/^[a-z][a-z0-9_.:-]{0,127}$/.test(form.label) || !["keep", "conservative"].includes(form.mode) || !/^(0|[1-9]\d{0,29})(?:\.\d{1,2})?$/.test(form.requestedBudgetDecimal) || !/^\d{4}-\d{2}-\d{2}$/.test(form.startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(form.endDate) || form.startDate > form.endDate) return null;
+  return Object.freeze({ ...form });
+}
+export function parseBudgetImpactContextCandidates(value: unknown): BudgetImpactContextCandidateSnapshot {
+  if (!object(value) || value.contractVersion !== "slice-rule-budget-impact-context-candidates/1.0.0" || typeof value.seriesRef !== "string" || !Array.isArray(value.candidates)
+    || !object(value.authority) || value.authority.canPreview !== false || value.authority.canSave !== false || value.authority.canApprove !== false || value.authority.canExecute !== false || value.authority.canWriteMeta !== false
+    || !value.candidates.every((candidate) => object(candidate) && Object.keys(candidate).length === 6 && /^budget_impact_context_[a-f0-9]{24}$/.test(String(candidate.candidateRef)) && /^campaign_[a-f0-9]{16}$/.test(String(candidate.campaignRef)) && typeof candidate.capturedAt === "string" && /^[A-Z]{3}$/.test(String(candidate.currency)) && /^(0|[1-9]\d{0,29})(?:\.\d{1,2})?$/.test(String(candidate.currentBudgetDecimal)) && isScope(candidate.scope))) throw new Error("Bütçe etki bağlam aday sözleşmesi güvenli değil.");
+  return value as unknown as BudgetImpactContextCandidateSnapshot;
 }
 
 export function parseSliceRuleBudgetImpactResult(value: unknown, expected: SliceRuleWorkspaceItem): ImpactResult {
@@ -282,27 +335,13 @@ export function parseSliceRuleBudgetImpactResult(value: unknown, expected: Slice
   }
   return value as unknown as ImpactResult;
 }
-
-/** The only writable outcome in this panel is an advisory BudgetProposal draft.
- * It is still explicitly not an approval, action, automation, or Meta write. */
 export function parseSliceRuleBudgetImpactSavedResult(value: unknown, expected: SliceRuleWorkspaceItem): SavedImpactResult {
-  if (!object(value) || value.contractVersion !== "slice-rule-budget-impact/1.0.0"
-    || value.mode !== "saved_advisory_draft" || !object(value.binding)
-    || value.binding.seriesRef !== expected.seriesRef || value.binding.draftRef !== expected.draftRef
-    || value.binding.draftHash !== expected.draftHash || value.binding.ruleKind !== expected.operatingRule.rule.kind
-    || !isScope(value.binding.scope) || !sameScope(value.binding.scope, expected.scope)
-    || !Array.isArray(value.binding.evidenceRefs) || value.binding.evidenceRefs.length < 1
-    || !value.binding.evidenceRefs.every((ref) => typeof ref === "string" && ref.length > 0)
-    || !["inserted", "unchanged"].includes(String(value.persistence))
-    || !["inserted", "unchanged"].includes(String(value.provenance))
-    || !object(value.authority) || value.authority.recommendationOnly !== true
-    || value.authority.canPublish !== false || value.authority.canApprove !== false
-    || value.authority.canCreateProposal !== false || value.authority.canExecute !== false
-    || value.authority.canWriteMeta !== false || !object(value.budgetProposal)
-    || value.budgetProposal.actionAuthority !== "none" || value.budgetProposal.writeOperations !== 0
-    || !noOpenedAuthority(value)) {
-    throw new Error("Kaydedilen bütçe önerisi güvenli sözleşmeyi döndürmedi.");
-  }
+  if (!object(value) || value.contractVersion !== "slice-rule-budget-impact/1.0.0" || value.mode !== "saved_advisory_draft" || !object(value.binding)
+    || value.binding.seriesRef !== expected.seriesRef || value.binding.draftRef !== expected.draftRef || value.binding.draftHash !== expected.draftHash
+    || !["inserted", "unchanged"].includes(String(value.persistence)) || !["inserted", "unchanged"].includes(String(value.provenance))
+    || !object(value.budgetProposal) || value.budgetProposal.actionAuthority !== "none" || value.budgetProposal.writeOperations !== 0
+    || !object(value.authority) || value.authority.recommendationOnly !== true || value.authority.canPublish !== false || value.authority.canApprove !== false
+    || value.authority.canCreateProposal !== false || value.authority.canExecute !== false || value.authority.canWriteMeta !== false || !noOpenedAuthority(value)) throw new Error("Kaydedilen bütçe önerisi güvenli sözleşmeyi döndürmedi.");
   return value as unknown as SavedImpactResult;
 }
 
@@ -384,6 +423,25 @@ function ruleLabel(rule: SliceRule): string {
   return rule.kind;
 }
 
+function scopeLabel(scope: Scope): string {
+  return [scope.market === "domestic" ? "Yerli" : "Yabancı", "Hizmet kapsamı", "Kampanya ailesi",
+    scope.countryOrRegion, scope.audienceStrategy, scope.platform, scope.conversionRoute].filter(Boolean).join(" · ");
+}
+
+function followUpLabel(item: SliceRuleWorkspaceItem): string {
+  const verification = item.operatingRule.verification;
+  return `${verification.metric.replaceAll("_", " ")} · ${verification.reviewCadence} · öncelik ${item.operatingRule.priority}`;
+}
+
+export type SliceRuleSessionSeed = Readonly<{ label: string; prompt: string }>;
+
+function ruleSessionSeed(item: SliceRuleWorkspaceItem): SliceRuleSessionSeed {
+  return Object.freeze({
+    label: `Kural oturumu · ${item.seriesRef} · r${item.revision}`,
+    prompt: `Kural oturumu: ${item.seriesRef} · revizyon ${item.revision}. Kapsam: ${scopeLabel(item.scope)}. Mevcut yaklaşım: ${ruleLabel(item.operatingRule.rule)}. Takip: ${followUpLabel(item)}. Bu kuralı benim yerime yazmayın veya değiştirmeyin; kapsam çelişkileri, kanıt eksikleri, ölçüm penceresi ve geri alma koşulu için açık soruları listeleyin.`,
+  });
+}
+
 function percent(basisPoints: number): string {
   return String(basisPoints / 100);
 }
@@ -415,44 +473,80 @@ function formFromItem(item: SliceRuleWorkspaceItem): Form {
 function date(value: string): string {
   return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(value));
 }
+function money(minor: number, currency: string): string {
+  return new Intl.NumberFormat("tr-TR", { style: "currency", currency, maximumFractionDigits: 2 }).format(minor / 100);
+}
+function explanation(value: string): string {
+  return ({ proposal_ready: "Senaryo kanıt ve kısıt kontrollerinden geçti.",
+    already_at_target: "İstenen bütçe mevcut hedefle aynı.",
+    pacing_suppressed: "Pacing koruması bu değişikliği bastırdı.",
+    satisfied: "Kısıtlar karşılandı.",
+    unsatisfied: "Kısıtlar senaryoyu karşılamadı.",
+  } as Record<string, string>)[value] ?? value.replaceAll("_", " ");
+}
 
 export function SliceRuleWorkspaceSurface(props: Readonly<{
   state: State;
   onRetry(): void;
   onSaved(): Promise<void>;
+  onApprovalQueueHandoff?(actionUnitRef: string): void;
+  onOpenRuleSession?(seed: SliceRuleSessionSeed): void;
+  onOpenCategorySetup?(): void;
+  onConnect?(): Promise<boolean>;
+  requestedScopeCampaignRef?: string | null;
+  selectedRuleRef?: string | null;
+  selectedRuleRevision?: number | null;
+  onOpenCanonicalRule?(ruleRef: string, revision: number): void;
 }>) {
   const snapshot = props.state.status === "ready" ? props.state.snapshot : null;
   const [form, setForm] = useState<Form>(EMPTY_FORM);
   const [headRef, setHeadRef] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [impactRaw, setImpactRaw] = useState(EMPTY_BUDGET_COMMAND);
+  const [scenarioForm, setScenarioForm] = useState<TypedScenarioForm>(EMPTY_TYPED_SCENARIO);
+  const [impactContexts, setImpactContexts] = useState<Readonly<{ status: "idle" | "loading" | "ready" | "unavailable"; candidates: readonly BudgetImpactContextCandidate[]; selectedRef: string; message?: string }>>({ status: "idle", candidates: [], selectedRef: "" });
   const [impactState, setImpactState] = useState<ImpactState>({ status: "idle" });
-  const [approvalQueue, setApprovalQueue] = useState<ApprovalQueueState>({ status: "loading" });
+  const [selection, setSelection] = useState<SelectionState>({ status: "idle" });
+  const [preparation, setPreparation] = useState<PreparationState>({ status: "idle" });
+  const [approvalRead, setApprovalRead] = useState<ApprovalReadState>({ status: "loading" });
   const [temporal, setTemporal] = useState<TemporalState>({ status: "loading" });
   const [scopeCandidates, setScopeCandidates] = useState<ScopeCandidateState>({ status: "loading" });
   const [operationalReadiness, setOperationalReadiness] = useState<OperationalReadinessState>({ status: "loading" });
+  const [poolBinding, setPoolBinding] = useState<PoolBindingState>({ status: "loading" });
   const head = snapshot?.items.find((item) => item.seriesRef === headRef) ?? undefined;
+  const decisionJourney = decisionJourneyForRule(head, temporal, approvalRead);
+  useEffect(() => {
+    if (!snapshot || !props.selectedRuleRef || !props.selectedRuleRevision) return;
+    const selected = snapshot.items.find((item) => item.seriesRef === props.selectedRuleRef && item.revision === props.selectedRuleRevision);
+    if (!selected) return;
+    setHeadRef(selected.seriesRef);
+    setForm(formFromItem(selected));
+    setImpactState({ status: "idle" });
+  }, [props.selectedRuleRef, props.selectedRuleRevision, snapshot]);
+  const frozenPoolBinding = head && (poolBinding.status === "ready" || poolBinding.status === "saving")
+    ? poolBinding.snapshot.bindings.find((binding) => binding.draftHash === head.draftHash) ?? null : null;
+  const sameMarketPoolNodes = head && (poolBinding.status === "ready" || poolBinding.status === "saving")
+    ? poolBinding.snapshot.hierarchy?.nodes.filter((node) => node.market === head.scope.market) ?? [] : [];
   const editableHead = head === undefined || isEditableRule(head.operatingRule.rule);
   const command = useMemo(() => editableHead ? buildSliceRuleDraftCommand(form, head) : null, [editableHead, form, head]);
-  const impactCommand = useMemo(() => buildSliceRuleBudgetImpactCommand(head, impactRaw), [head, impactRaw]);
+  const impactCommand = useMemo(() => frozenPoolBinding ? buildTypedBudgetImpactCommand(head, scenarioForm) : null, [head, scenarioForm, frozenPoolBinding]);
+  const selectedImpactContext = impactContexts.candidates.find((candidate) => candidate.candidateRef === impactContexts.selectedRef) ?? null;
   const update = <K extends keyof Form>(key: K, value: Form[K]) => setForm((current) => ({ ...current, [key]: value }));
-  const loadApprovalSelections = useCallback(async () => {
+  const loadDecisionTrace = useCallback(async () => {
     try {
-      const response = await fetch("/api/slice-rule-budget-action-units", { cache: "no-store", credentials: "same-origin",
-        headers: { "X-ReklamZeka-Intent": "slice-rule-budget-action-unit-read" } });
-      const payload = await response.json();
-      if (!response.ok) throw new Error("Seçilmiş senaryolar okunamadı.");
-      setApprovalQueue({ status: "ready", selections: parseSliceRuleBudgetActionSelections(payload) });
-    } catch (reason) { setApprovalQueue({ status: "unavailable", message: reason instanceof Error ? reason.message : "Seçilmiş senaryolar okunamadı." }); }
+      const response = await fetch("/api/slice-rule-budget-action-units", { cache: "no-store", credentials: "same-origin", headers: { "X-ReklamZeka-Intent": "slice-rule-budget-action-unit-read" } });
+      if (!response.ok) throw new Error("decision_trace_unavailable");
+      setApprovalRead({ status: "ready", traces: parseSliceRuleDecisionTrace(await response.json()) });
+    } catch { setApprovalRead({ status: "unavailable" }); }
   }, []);
-  useEffect(() => { void loadApprovalSelections(); }, [loadApprovalSelections]);
+  useEffect(() => { void loadDecisionTrace(); }, [loadDecisionTrace]);
   const loadTemporalCandidates = useCallback(async (result: string | null = null) => {
     try {
       const response = await fetch("/api/temporal-recommendations", { cache: "no-store", credentials: "same-origin" });
       const payload = await response.json();
       if (!response.ok) throw new Error("Zamansal adaylar okunamadı.");
-      setTemporal({ status: "ready", candidates: parseTemporalEvaluationCandidates(payload), result });
+      const parsed = parseTemporalEvaluationSnapshot(payload);
+      setTemporal({ status: "ready", ...parsed, result });
     } catch (reason) { setTemporal({ status: "unavailable", message: reason instanceof Error ? reason.message : "Zamansal adaylar okunamadı." }); }
   }, []);
   useEffect(() => { void loadTemporalCandidates(); }, [loadTemporalCandidates]);
@@ -474,6 +568,25 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     } catch { setOperationalReadiness({ status: "unavailable" }); }
   }, []);
   useEffect(() => { void loadOperationalReadiness(); }, [loadOperationalReadiness]);
+  const loadPoolBinding = useCallback(async () => {
+    try {
+      const response = await fetch("/api/slice-rule-budget-pool-bindings", { cache: "no-store", credentials: "same-origin", headers: { "X-ReklamZeka-Intent": "slice-rule-budget-pool-binding-read" } });
+      const payload = await response.json(); if (!response.ok) throw new Error(payload?.error?.message ?? "Bütçe havuzu bağları okunamadı.");
+      const parsed = parseSliceRuleBudgetPoolBindingSnapshot(payload);
+      setPoolBinding({ status: "ready", snapshot: parsed, selectedPoolRef: "" });
+    } catch (reason) { setPoolBinding({ status: "unavailable", message: reason instanceof Error ? reason.message : "Bütçe havuzu bağları okunamadı." }); }
+  }, []);
+  useEffect(() => { void loadPoolBinding(); }, [loadPoolBinding]);
+  const loadImpactContexts = useCallback(async (seriesRef: string) => {
+    setImpactContexts({ status: "loading", candidates: [], selectedRef: "" });
+    try {
+      const response = await fetch(`/api/slice-rule-budget-impact-context-candidates?${new URLSearchParams({ seriesRef })}`, { cache: "no-store", credentials: "same-origin", headers: { "X-ReklamZeka-Intent": "slice-rule-budget-impact-context-candidates-read" } });
+      if (!response.ok) throw new Error("Bütçe etki bağlamları okunamadı.");
+      const result = parseBudgetImpactContextCandidates(await response.json());
+      setImpactContexts({ status: "ready", candidates: result.candidates, selectedRef: "" });
+    } catch (reason) { setImpactContexts({ status: "unavailable", candidates: [], selectedRef: "", message: reason instanceof Error ? reason.message : "Bütçe etki bağlamları okunamadı." }); }
+  }, []);
+  useEffect(() => { if (head && frozenPoolBinding && head.operatingRule.rule.kind !== "delivery_guardrail") void loadImpactContexts(head.seriesRef); else setImpactContexts({ status: "idle", candidates: [], selectedRef: "" }); }, [frozenPoolBinding, head, loadImpactContexts]);
   const applyScopeCandidate = (candidate: ScopeCandidate) => {
     setHeadRef(null); setImpactState({ status: "idle" });
     setForm((current) => ({ ...current, market: candidate.scope.market, serviceRef: candidate.scope.serviceRef,
@@ -494,16 +607,14 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
       await loadTemporalCandidates(result);
     } catch (reason) { setTemporal({ status: "error", message: reason instanceof Error ? reason.message : "Zamansal değerlendirme isteği reddedildi." }); }
   };
-  const sendToApprovalQueue = async (selection: ApprovalQueueSelection) => {
-    setApprovalQueue({ status: "loading" }); const proposedAt = new Date().toISOString(); const expiresAt = new Date(Date.now() + 86_400_000).toISOString();
+  const bindPool = async () => {
+    if (!head || poolBinding.status !== "ready" || !poolBinding.selectedPoolRef || !poolBinding.snapshot.hierarchy) return;
+    setPoolBinding({ ...poolBinding, status: "saving" });
     try {
-      const response = await fetch("/api/slice-rule-budget-action-units", { method: "POST", credentials: "same-origin",
-        headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-budget-action-unit-materialize" },
-        body: JSON.stringify({ command: { selectionRef: selection.selectionRef, idempotencyKey: `approval_${selection.selectionRef.slice(-20)}`, proposedAt, expiresAt } }) });
-      const payload = await response.json() as { persistence?: "inserted" | "unchanged"; error?: { message?: string } };
-      if (!response.ok || (payload.persistence !== "inserted" && payload.persistence !== "unchanged")) throw new Error(payload.error?.message ?? "İnsan onay kuyruğu isteği reddedildi.");
-      setApprovalQueue({ status: "queued", selectionRef: selection.selectionRef, persistence: payload.persistence });
-    } catch (reason) { setApprovalQueue({ status: "error", message: reason instanceof Error ? reason.message : "İnsan onay kuyruğu isteği reddedildi." }); }
+      const response = await fetch("/api/slice-rule-budget-pool-bindings", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-budget-pool-binding-save" }, body: JSON.stringify({ command: { draftHash: head.draftHash, hierarchyHash: poolBinding.snapshot.hierarchy.hierarchyHash, poolRef: poolBinding.selectedPoolRef, market: head.scope.market, idempotencyKey: `pool_binding.${head.draftHash.slice(0, 24)}` } }) });
+      const payload = await response.json(); if (!response.ok) throw new Error(payload?.error?.message ?? "Bütçe havuzu bağlama isteği reddedildi.");
+      await loadPoolBinding();
+    } catch (reason) { setPoolBinding({ status: "error", message: reason instanceof Error ? reason.message : "Bütçe havuzu bağlama isteği reddedildi." }); }
   };
   const save = async () => {
     if (!command || !snapshot?.authority.canSaveDraft) return;
@@ -526,8 +637,8 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
       setImpactState({ status: "unsupported", message: "Teslimat koruması bütçe etki önizlemesi üretmez. Bu kural delivery inceleme akışında değerlendirilir." });
       return;
     }
-    if (!impactCommand) {
-      setImpactState({ status: "error", message: "Exact Budget Lab dry-run komutu eksik veya geçersiz. En az bir açık senaryo ve frozen context kimlikleri gerekir." });
+    if (!impactCommand || !selectedImpactContext) {
+      setImpactState({ status: "error", message: "Önizleme için doğrulanmış bir frozen bağlam ve eksiksiz kullanıcı senaryosu gerekir." });
       return;
     }
     const requestedHead = head;
@@ -535,7 +646,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     try {
       const response = await fetch("/api/slice-rule-workspace", { method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-budget-impact-preview" },
-        body: JSON.stringify({ command: impactCommand }) });
+        body: JSON.stringify({ command: { seriesRef: requestedHead.seriesRef, candidateRef: selectedImpactContext?.candidateRef, budgetCommand: impactCommand } }) });
       const payload = await response.json() as { error?: { code?: string } };
       if (!response.ok) { setImpactState(classifySliceRuleBudgetImpactFailure(payload.error?.code, response.status)); return; }
       setImpactState({ status: "ready", result: parseSliceRuleBudgetImpactResult(payload, requestedHead) });
@@ -545,35 +656,60 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
     }
   };
   const saveAdvisoryDraft = async () => {
-    if (!head || impactState.status !== "ready" || !impactCommand) return;
+    if (!head || impactState.status !== "ready" || !impactCommand || !selectedImpactContext) return;
     const requestedHead = head;
     setImpactState({ status: "loading" });
     try {
-      const response = await fetch("/api/slice-rule-workspace", { method: "POST", credentials: "same-origin",
-        headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-budget-impact-save" },
-        body: JSON.stringify({ command: impactCommand }) });
+      const response = await fetch("/api/slice-rule-workspace", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-budget-impact-save" }, body: JSON.stringify({ command: { seriesRef: requestedHead.seriesRef, candidateRef: selectedImpactContext.candidateRef, budgetCommand: impactCommand } }) });
       const payload = await response.json() as { error?: { code?: string } };
       if (!response.ok) { setImpactState(classifySliceRuleBudgetImpactFailure(payload.error?.code, response.status)); return; }
       setImpactState({ status: "saved", result: parseSliceRuleBudgetImpactSavedResult(payload, requestedHead) });
-    } catch (reason) {
-      setImpactState({ status: "unavailable", message: reason instanceof Error
-        ? reason.message : "Öneri taslağı kaydedilemedi; hiçbir action veya Meta write yapılmadı." });
-    }
+    } catch (reason) { setImpactState({ status: "unavailable", message: reason instanceof Error ? reason.message : "Öneri taslağı kaydedilemedi; hiçbir action veya Meta write yapılmadı." }); }
+  };
+  const loadSelectionCandidates = async () => {
+    setSelection({ status: "loading" });
+    try {
+      const response = await fetch("/api/slice-rule-scenario-selections", { cache: "no-store", credentials: "same-origin", headers: { "X-ReklamZeka-Intent": "slice-rule-scenario-selection-read" } });
+      if (!response.ok) throw new Error("Onaya hazırlanabilecek senaryolar okunamadı.");
+      setSelection({ status: "ready", candidates: parseSliceRuleScenarioSelectionCandidates(await response.json()) });
+    } catch (reason) { setSelection({ status: "unavailable", message: reason instanceof Error ? reason.message : "Onaya hazırlanabilecek senaryolar okunamadı." }); }
+  };
+  const selectScenario = async (candidate: SelectionCandidate) => {
+    setSelection({ status: "loading" });
+    try {
+      const response = await fetch("/api/slice-rule-scenario-selections", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-scenario-select" }, body: JSON.stringify({ command: { candidateRef: candidate.candidateRef, idempotencyKey: `selection.${candidate.candidateRef.slice(-20)}` } }) });
+      const payload = await response.json() as { selectionRef?: string; persistence?: "inserted" | "unchanged"; error?: { message?: string } };
+      if (!response.ok || !/^selection_[a-f0-9]{64}$/.test(String(payload.selectionRef)) || !["inserted", "unchanged"].includes(String(payload.persistence))) throw new Error(payload.error?.message ?? "Senaryo seçimi reddedildi.");
+      setSelection({ status: "selected", selectionRef: String(payload.selectionRef), persistence: payload.persistence! });
+    } catch (reason) { setSelection({ status: "error", message: reason instanceof Error ? reason.message : "Senaryo seçimi reddedildi." }); }
+  };
+  const prepareForHumanApproval = async () => {
+    if (selection.status !== "selected") return;
+    setPreparation({ status: "loading" }); const proposedAt = new Date().toISOString(); const expiresAt = new Date(Date.now() + 86_400_000).toISOString();
+    try {
+      const response = await fetch("/api/slice-rule-budget-action-units", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-ReklamZeka-Intent": "slice-rule-budget-action-unit-materialize" }, body: JSON.stringify({ command: { selectionRef: selection.selectionRef, idempotencyKey: `approval_${selection.selectionRef.slice(-20)}`, proposedAt, expiresAt } }) });
+      const payload = await response.json() as { actionUnitRef?: string; persistence?: "inserted" | "unchanged"; error?: { message?: string } };
+      if (!response.ok || !/^action_unit_[a-f0-9]{20}$/.test(String(payload.actionUnitRef)) || !["inserted", "unchanged"].includes(String(payload.persistence))) throw new Error(payload.error?.message ?? "İnsan onayına hazırlık reddedildi.");
+      const actionUnitRef = String(payload.actionUnitRef); setPreparation({ status: "prepared", actionUnitRef, persistence: payload.persistence! }); await loadDecisionTrace(); props.onApprovalQueueHandoff?.(actionUnitRef);
+    } catch (reason) { setPreparation({ status: "error", message: reason instanceof Error ? reason.message : "İnsan onayına hazırlık reddedildi." }); }
   };
   return <div className={styles.workspace}>
-    <header className={styles.hero}><div><span>SLICE RULE WORKSPACE</span><h1>Kanıtlı kapsam için işletim kuralı taslağı</h1><p>Pazar, hizmet ve kampanya ailesi açıkça seçilir. Bu alan yalnız öneri taslağı kaydeder.</p></div><strong>RECOMMENDATION ONLY · AUTHORITY NONE</strong></header>
+    <header className={styles.hero}><div><span>KURAL KÜTÜPHANESİ</span><h2><ContextualHelp term="Slice, kural ve takip yaklaşımı" explanation="Önce kanıtı tutarlı kapsamı seçin; ardından sizin yazdığınız kuralı, bütçe sınırını ve takip penceresini aynı satırda bağlayın.">Kullanıcı yazarlı kuralları</ContextualHelp> bağlı slice'larıyla aynı yerde görün.</h2><p>Her satır tek bir kanonik kullanıcı kuralıdır. Slice içindeki “Kuralı aç” aynı kaydı ve revizyonu açar; Agent yalnız kanıt ve eksik sorularla yardımcı olur, kural metnini yazmaz veya değiştirmez.</p></div><strong>SADECE ÖNERİ · UYGULAMA YETKİSİ YOK</strong></header>
     {props.state.status === "loading" ? <section className={styles.state} role="status">Taslak kayıt defteri doğrulanıyor…</section> : null}
-    {props.state.status === "unavailable" || props.state.status === "error" ? <section className={styles.state} role="alert"><h2>{props.state.status === "unavailable" ? "Kaynak bağlı değil" : "Çalışma alanı okunamadı"}</h2><p>{props.state.message}</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
+    {props.state.status === "session_required" ? <section className={styles.state} role="status"><h2>Yerel oturum gerekli</h2><p>Bu ekranda kural, slice veya karar kaydı gösterilmez. Yerel oturum bağlandıktan sonra aynı Kural Kütüphanesi kaydını yeniden açın.</p>{props.onConnect ? <LocalSessionConnector title="Kural Kütüphanesini bağlayın" onVerify={props.onConnect} /> : null}</section> : null}
+    {props.state.status === "unavailable" || props.state.status === "error" ? <section className={styles.state} role="alert"><h2>{props.state.status === "unavailable" ? "Kaynak şu anda kullanılamıyor" : "Çalışma alanı okunamadı"}</h2><p>{props.state.message}</p><p>Sonraki adım: bağlantı veya kaynak durumu düzeldikten sonra yeniden deneyin; örnek kural ya da sonuç gösterilmez.</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
     {snapshot ? <div className={styles.grid}>
-      <section className={styles.panel}><div className={styles.panelTitle}><div><span>MEVCUT TASLAKLAR</span><h2>{snapshot.items.length} güncel seri</h2></div><small>Append-only</small></div>
-        <div className={styles.list}>{snapshot.items.length === 0 ? <p>Henüz kayıtlı slice rule taslağı yok.</p> : snapshot.items.map((item) => <button key={item.draftRef} type="button" data-active={headRef === item.seriesRef} onClick={() => { setHeadRef(item.seriesRef); setImpactState({ status: "idle" }); setForm(formFromItem(item)); }}><strong>{item.seriesRef} · r{item.revision}</strong><span>{item.scope.market === "domestic" ? "Yerli" : "Yabancı"} · {item.scope.serviceRef} · {item.scope.campaignFamilyRef}</span><small>{ruleLabel(item.operatingRule.rule)} · {date(item.createdAt)}</small></button>)}</div>
-        <button className={styles.newButton} type="button" onClick={() => { setHeadRef(null); setImpactState({ status: "idle" }); setForm(EMPTY_FORM); }}>+ Yeni seri</button>
+      <section className={`${styles.panel} ${styles.workspaceTablePanel}`}><div className={styles.panelTitle}><div><span>KURAL KÜTÜPHANESİ</span><h2>{snapshot.items.length} güncel kullanıcı kuralı</h2></div><small>Tek kayıt · değiştirilemez revizyon</small></div>
+        {snapshot.items.length === 0 ? <p>Henüz kayıtlı kullanıcı kuralı yok. Önce kanıtlı bir scope seçin, ardından kendi kuralınızı yazın.</p> : <div className={styles.tableScroll}><table className={styles.workspaceTable}><caption>Her satır tek kanonik kuralı, bağlı slice kapsamını ve takip yaklaşımını gösterir.</caption><thead><tr><th scope="col">Bağlı slice</th><th scope="col">Kullanıcı kuralı</th><th scope="col">Takip yaklaşımı</th><th scope="col">İşlem</th></tr></thead><tbody>{snapshot.items.map((item, index) => <tr key={item.draftRef} data-active={headRef === item.seriesRef}><td><strong>Slice {index + 1} · revizyon {item.revision}</strong><span>{scopeLabel(item.scope)}</span></td><td><strong>{ruleLabel(item.operatingRule.rule)}</strong><span>{item.operatingMode === "recommendation_only" ? "Öneri ve insan incelemesi" : "—"}</span></td><td><strong>{followUpLabel(item)}</strong><span>{item.operatingRule.verification.rollbackWhen}</span></td><td><button type="button" onClick={() => { props.onOpenCanonicalRule?.(item.seriesRef, item.revision); setHeadRef(item.seriesRef); setImpactState({ status: "idle" }); setForm(formFromItem(item)); }}>{headRef === item.seriesRef ? "Açık" : "Kuralı aç"}</button><small>{date(item.createdAt)}</small></td></tr>)}</tbody></table></div>}
+        <section className={styles.unruledSlices} aria-label="Kuralsız kanıtlı slice adayları"><strong>Kuralsız kanıtlı slice adayları</strong><span>Bu satırlar gerçek kategori kanıtından gelir; yalnız henüz aynı kapsamda kayıtlı bir kullanıcı kuralı yoktur. Kural otomatik oluşturulmaz.</span>{scopeCandidates.status === "loading" ? <small>Aday slice’lar okunuyor…</small> : null}{scopeCandidates.status === "unavailable" ? <small>Aday slice’lar kullanılamıyor; formda tahmin veya fallback yok.</small> : null}{scopeCandidates.status === "ready" ? (() => { const requested = props.requestedScopeCampaignRef ? scopeCandidates.candidates.find((candidate) => candidate.campaignRef === props.requestedScopeCampaignRef) : null; const unruled = scopeCandidates.candidates.filter((candidate) => !snapshot.items.some((item) => sameScope(item.scope, candidate.scope))).slice(0, 25); return <>{requested ? <div className={styles.classificationHandoff} role="status"><strong>Künye incelemesinden gelen doğrulanmış kapsam</strong><small>{scopeLabel(requested.scope)}. Bu aktarım yalnız formu sizin incelemeniz için doldurur; kayıt, kural, policy veya Meta işlemi yapmaz.</small><button type="button" disabled={!snapshot.authority.canSaveDraft} onClick={() => applyScopeCandidate(requested)}>Kapsamı formda incele</button></div> : null}{unruled.length ? <div className={styles.unruledList}>{unruled.map((candidate) => <div key={candidate.campaignRef}><span>{scopeLabel(candidate.scope)}</span><button type="button" disabled={!snapshot.authority.canSaveDraft} onClick={() => applyScopeCandidate(candidate)}>Bu slice ile yeni kural yaz</button></div>)}</div> : <div className={styles.unruledList}><span>Henüz tekil ve tutarlı slice kapsamı yok. Kategori kayıtları eksikse sistem kapsam veya kural tahmin etmez.</span>{props.onOpenCategorySetup ? <button type="button" onClick={props.onOpenCategorySetup}>Kategori inceleme ve başlangıç planını aç</button> : null}</div>}</>; })() : null}</section>
+        <button className={styles.newButton} type="button" onClick={() => { setHeadRef(null); setImpactState({ status: "idle" }); setForm(EMPTY_FORM); }}>+ Yeni kural serisi</button>
       </section>
-      <section className={styles.panel}><div className={styles.panelTitle}><div><span>{head ? `REVİZYON ${head.revision + 1}` : "YENİ TASLAK"}</span><h2>Kapsam ve kural</h2></div><small>{snapshot.authority.canSaveDraft ? "Owner · Admin · Analyst" : "Viewer · salt okunur"}</small></div>
+      <section className={styles.panel}><div className={styles.panelTitle}><div><span>{head ? `REVİZYON ${head.revision + 1}` : "YENİ TASLAK"}</span><h2>{head ? "Kuralı pekiştir veya yeni revizyon yaz" : "Kapsam ve kural"}</h2></div><div className={styles.panelActions}>{head && props.onOpenRuleSession ? <button type="button" onClick={() => props.onOpenRuleSession?.(ruleSessionSeed(head))}>Agent ile kuralı gözden geçir</button> : null}<small>{snapshot.authority.canSaveDraft ? "Owner · Admin · Analyst" : "Viewer · salt okunur"}</small></div></div>
+        <ol className={styles.operationSteps} aria-label="Kural çalışma sırası"><li><strong>1</strong><span><b>Kapsam</b>Kanıtlı slice’ı seçin.</span></li><li><strong>2</strong><span><b>Kural</b>Yaklaşımı ve geri alma koşulunu yazın.</span></li><li><strong>3</strong><span><b>Havuz</b>Aynı pazar bütçe sınırını bağlayın.</span></li><li><strong>4</strong><span><b>Önizleme</b>Senaryoyu yalnız salt-okur inceleyin.</span></li></ol>
         {!head ? <section className={styles.impactResult} aria-label="Kanıtlı slice kapsam adayları"><strong>Kanıtlı kapsam adayları</strong><span>Yalnız tekil ve tutarlı mevcut kategori anahtarları yeni formu doldurur. Frozen context, bütçe etkisi, policy ve action yetkisi üretmez.</span>
           {scopeCandidates.status === "loading" ? <span>Kapsam adayları okunuyor…</span> : null}
           {scopeCandidates.status === "ready" && scopeCandidates.candidates.length === 0 ? <span>Tekil zorunlu kapsam kanıtı olan kampanya yok.</span> : null}
-          {scopeCandidates.status === "ready" ? scopeCandidates.candidates.slice(0, 50).map((candidate) => <div className={styles.row} key={candidate.campaignRef}><span>{candidate.campaignRef.slice(0, 18)}… · {candidate.scope.market} · {candidate.scope.serviceRef} · {candidate.scope.campaignFamilyRef}</span><button type="button" className={styles.preview} disabled={!snapshot.authority.canSaveDraft} onClick={() => applyScopeCandidate(candidate)}>Formu doldur</button></div>) : null}
+          {scopeCandidates.status === "ready" ? scopeCandidates.candidates.slice(0, 50).map((candidate) => <div className={styles.row} key={candidate.campaignRef}><span>{scopeLabel(candidate.scope)}</span><button type="button" className={styles.preview} disabled={!snapshot.authority.canSaveDraft} onClick={() => applyScopeCandidate(candidate)}>Formu doldur</button></div>) : null}
           {scopeCandidates.status === "unavailable" ? <span>Kapsam adayları şu an kullanılamıyor; formda hiçbir fallback uygulanmadı.</span> : null}
         </section> : null}
         <fieldset disabled={!snapshot.authority.canSaveDraft || saving} className={styles.form}>
@@ -594,8 +730,19 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
         </fieldset>
         {head && !editableHead ? <p className={styles.impactNotice} role="status"><strong>Bu taslak türü bu ilk editörde değiştirilemez.</strong> Kayıt korunur; yanlışlıkla başka bir kurala dönüştürülemez.</p> : null}
         <div className={styles.safety}><strong>Yetki sınırı</strong><span>Policy yayınlama: kapalı</span><span>Onay: kapalı</span><span>Action/Meta write: kapalı</span><span>Otomasyon: kapalı</span></div>
+        <section className={styles.impact} aria-label="Bütçe havuzu bağlama">
+          <div className={styles.panelTitle}><div><span>DEĞİŞTİRİLEMEZ TASLAK · BÜTÇE HAVUZU</span><h2><ContextualHelp term="Bütçe havuzu bağı" explanation="Kuralın yalnız aynı pazardaki üst bütçe sınırına bağlı olduğunu kanıtlar. Bu bağ policy, onay veya Meta değişikliği oluşturmaz.">Bütçe havuzu bağı</ContextualHelp></h2></div><small>Öneri · Meta write kapalı</small></div>
+          {!head ? <p className={styles.impactNotice}>Bir bütçe havuzu seçebilmek için önce kayıtlı, immutable bir kural taslağı seçin.</p> : null}
+          {head && poolBinding.status === "loading" ? <p className={styles.impactNotice}>Mevcut havuz hiyerarşisi ve frozen bağ kanıtı okunuyor…</p> : null}
+          {head && (poolBinding.status === "unavailable" || poolBinding.status === "error") ? <p className={styles.impactFailure} role="alert">{poolBinding.message}</p> : null}
+          {head && frozenPoolBinding ? <div className={styles.impactResult} role="status"><strong>Frozen bütçe havuzu bağı</strong><span>{frozenPoolBinding.market === "domestic" ? "Yerli" : "Yabancı"} pazar havuzu doğrulandı.</span><span>{date(frozenPoolBinding.boundAt)} · değiştirilemez bağ · onay/action/Meta write kapalı</span></div> : null}
+          {head && !frozenPoolBinding && (poolBinding.status === "ready" || poolBinding.status === "saving") ? <div className={styles.impactResult}>
+            {!poolBinding.snapshot.hierarchy ? <span>Kaydedilmiş bütçe havuzu hiyerarşisi yok; bağ oluşturulmadı.</span> : sameMarketPoolNodes.length === 0 ? <span>Bu kuralın pazarıyla aynı pazar havuz düğümü bulunamadı; pazar sınırı aşılmadı.</span> : <><span>Yalnız <strong>{head.scope.market === "domestic" ? "yerli" : "yabancı"}</strong> pazarındaki havuzlar seçilebilir. Tarayıcı kapsam veya tutar göndermez.</span><label>Bütçe havuzu<select value={poolBinding.selectedPoolRef} disabled={!poolBinding.snapshot.authority.canBind || poolBinding.status === "saving"} onChange={(event) => setPoolBinding({ ...poolBinding, selectedPoolRef: event.target.value })}><option value="">Havuz seçin</option>{sameMarketPoolNodes.map((node) => <option key={node.poolRef} value={node.poolRef}>{poolLayerLabel(node.layer)} · üst sınır {node.hardCapDecimal} {node.currency}</option>)}</select></label><button className={styles.save} type="button" disabled={!poolBinding.snapshot.authority.canBind || !poolBinding.selectedPoolRef || poolBinding.status === "saving"} onClick={() => void bindPool()}>{poolBinding.status === "saving" ? "Bağ doğrulanıyor…" : "Değiştirilemez taslağa havuzu bağla"}</button></>}
+          </div> : null}
+          <small>Bu bağ yalnız kullanıcı tarafından kaydedilmiş taslağın bütçe kapsamı kanıtıdır; policy üretmez, onaylamaz, action açmaz ve Meta’da değişiklik yapmaz.</small>
+        </section>
         <section className={styles.impact} aria-label="Operasyon uygunluğu">
-          <div className={styles.panelTitle}><div><span>FROZEN CONTEXT · READINESS</span><h2>Operasyon uygunluğu</h2></div><small>Salt-okur</small></div>
+          <div className={styles.panelTitle}><div><span>DONDURULMUŞ BAĞLAM · UYGUNLUK</span><h2>Operasyon uygunluğu</h2></div><small>Salt-okur</small></div>
           {operationalReadiness.status === "loading" ? <p className={styles.impactNotice}>Frozen context uygunluğu okunuyor…</p> : null}
           {operationalReadiness.status === "unavailable" ? <p className={styles.impactNotice}>Uygunluk kaynağı şu anda kullanılamıyor.</p> : null}
           {operationalReadiness.status === "ready" && operationalReadiness.items.length === 0 ? <p className={styles.impactNotice}>Kapsam adayı için henüz frozen context uygunluğu yok.</p> : null}
@@ -609,45 +756,47 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
         {message ? <p className={styles.message} role="status">{message}</p> : null}
         <button className={styles.save} type="button" disabled={!command || !snapshot.authority.canSaveDraft || saving} onClick={() => void save()}>{saving ? "Kaydediliyor…" : head ? "Yeni revizyonu kaydet" : "Taslağı kaydet"}</button>
         <section className={styles.impact} aria-labelledby="slice-rule-impact-heading">
-          <div className={styles.panelTitle}><div><span>BUDGET LAB · ÖNİZLEME / TASLAK</span><h2 id="slice-rule-impact-heading">Kayıtlı taslağın bütçe etkisi</h2></div><small>Onay · action · Meta write kapalı</small></div>
+          <div className={styles.panelTitle}><div><span>BÜTÇE SENARYOSU · SALT-OKUR ÖNİZLEME</span><h2 id="slice-rule-impact-heading">Kayıtlı taslağın bütçe etkisi</h2></div><small>Onay · action · Meta write kapalı</small></div>
           {!head ? <p className={styles.impactNotice}>Önizleme için önce kayıt defterindeki güncel bir taslağı seçin. Kaydedilmemiş form kapsamı kullanılmaz.</p> : null}
+          {head && head.operatingRule.rule.kind !== "delivery_guardrail" && !frozenPoolBinding ? <p className={styles.impactNotice} role="status"><strong>Önizleme kapalı.</strong> Bu bütçeyi etkileyen taslak için önce aynı pazar içindeki immutable bütçe havuzu bağını kaydedin.</p> : null}
           {head?.operatingRule.rule.kind === "delivery_guardrail" ? <p className={styles.impactNotice} role="status"><strong>Desteklenmiyor.</strong> Teslimat koruması doğrudan bütçe senaryosu değildir; otomatik bir bütçe etkisi varsayılmaz.</p> : null}
           {head && head.operatingRule.rule.kind !== "delivery_guardrail" ? <>
-            <label className={styles.impactInput}>Exact Budget Lab dry-run komutu
-              <textarea value={impactRaw} onChange={(event) => { setImpactRaw(event.target.value); setImpactState({ status: "idle" }); }} rows={13} spellCheck={false} />
-              <small>Komut, sunucudaki aynı frozen campaign context ve scope kanıtıyla doğrulanır. UI kapsamı kanıt yerine geçmez.</small>
-            </label>
-            <button className={styles.preview} type="button" disabled={impactState.status === "loading" || !impactCommand}
+            <div className={styles.impactResult} aria-label="Frozen bütçe bağlamı">
+              <strong>Doğrulanmış frozen bağlam</strong>
+              <span>Bağlam yalnız sunucuda çözülür; kampanya UUID’si, hesap UUID’si ve context hash tarayıcıya gelmez.</span>
+              {impactContexts.status === "loading" ? <span>Uygun bağlamlar doğrulanıyor…</span> : null}
+              {impactContexts.status === "unavailable" ? <span role="alert">{impactContexts.message}</span> : null}
+              {impactContexts.status === "ready" && impactContexts.candidates.length === 0 ? <span>Bu immutable kapsam ve havuz için hazır bağlam yok.</span> : null}
+              {impactContexts.status === "ready" && impactContexts.candidates.length > 0 ? <label>Bağlam<select value={impactContexts.selectedRef} onChange={(event) => { setImpactContexts({ ...impactContexts, selectedRef: event.target.value }); setImpactState({ status: "idle" }); }}><option value="">Frozen bağlam seçin</option>{impactContexts.candidates.map((candidate, index) => <option key={candidate.candidateRef} value={candidate.candidateRef}>Doğrulanmış bağlam {index + 1} · {candidate.currentBudgetDecimal} {candidate.currency} · {date(candidate.capturedAt)}</option>)}</select></label> : null}
+            </div>
+            <fieldset className={styles.impactInput}><legend>Kullanıcının bütçe senaryosu</legend><small>Bu form yalnız senaryo girdisini taşır. Kural, policy, onay, action veya Meta write üretmez.</small>
+              <div className={styles.fields}><label>Senaryo etiketi<input value={scenarioForm.label} onChange={(event) => setScenarioForm({ ...scenarioForm, label: event.target.value })} /></label><label>Mod<select value={scenarioForm.mode} onChange={(event) => setScenarioForm({ ...scenarioForm, mode: event.target.value as TypedScenarioForm["mode"] })}><option value="keep">Mevcutu koru</option><option value="conservative">Temkinli</option></select></label><label>İstenen bütçe<input inputMode="decimal" value={scenarioForm.requestedBudgetDecimal} onChange={(event) => setScenarioForm({ ...scenarioForm, requestedBudgetDecimal: event.target.value })} /></label><label>Dönem başlangıcı<input type="date" value={scenarioForm.startDate} onChange={(event) => setScenarioForm({ ...scenarioForm, startDate: event.target.value })} /></label><label>Dönem bitişi<input type="date" value={scenarioForm.endDate} onChange={(event) => setScenarioForm({ ...scenarioForm, endDate: event.target.value })} /></label></div><small>Mevcut bütçe, allocation, kategori/geo, zaman damgası ve pacing kanıtı yalnız seçili frozen bağlamdan sunucuda türetilir; eksikse önizleme üretilemez.</small></fieldset>
+            <button className={styles.preview} type="button" disabled={impactState.status === "loading" || !impactCommand || !selectedImpactContext}
               onClick={() => void previewImpact()}>{impactState.status === "loading" ? "Kanıt doğrulanıyor…" : "Salt-okur etkiyi önizle"}</button>
           </> : null}
           {["unsupported", "unavailable", "stale", "scope", "error"].includes(impactState.status)
             ? <p className={styles.impactFailure} role="alert"><strong>Önizleme kapalı.</strong> {"message" in impactState ? impactState.message : ""}</p> : null}
           {impactState.status === "ready" ? <div className={styles.impactResult} role="status">
             <strong>Exact draft ve frozen kapsam doğrulandı</strong>
-            <span>{impactState.result.binding.seriesRef} · {impactState.result.binding.ruleKind}</span>
+            <span>Kural ve frozen kapsam birlikte doğrulandı.</span>
             <span>{impactState.result.binding.evidenceRefs.length} kapsam kanıtı · {impactState.result.budgetPreview.proposal.alternatives.length} senaryo</span>
             <span>Kalıcı kayıt: yok · write operation: 0 · onay/execute/Meta write: kapalı</span>
-            <button className={styles.save} type="button" disabled={!impactCommand}
-              onClick={() => void saveAdvisoryDraft()}>Bu öneri taslağını kaydet</button>
-            <small>Bu işlem yalnız exact kural–bütçe önerisi bağını kayıt altına alır. Policy yayınlamaz, onay oluşturmaz ve Meta’da değişiklik yapmaz.</small>
+            <div className={styles.scenarioExplanation} aria-label="Açıklanabilir dry-run senaryoları">
+              {impactState.result.budgetPreview.proposal.alternatives.map((alternative, index) => alternative.status === "suppressed"
+                ? <div className={styles.scenarioCard} key={alternative.scenarioRef}><strong>Senaryo {index + 1} · çalıştırılmadı</strong><span>{explanation(alternative.reason)}</span><small>{alternative.mappingSuppressionReasons.length ? alternative.mappingSuppressionReasons.map(explanation).join(" · ") : "Eşleme kanıtı eksik; sonuç üretilmedi."}</small></div>
+                : <div className={styles.scenarioCard} key={alternative.scenarioRef}><strong>Senaryo {index + 1} · incelenebilir</strong><span>{money(alternative.result.before.totalAllocationMinor, alternative.result.currency)} → {money(alternative.result.after.totalAllocationMinor, alternative.result.currency)}</span><small>{explanation(alternative.result.reason)} Kısıt: {explanation(alternative.result.traceSummary.constraintReason)} · pacing: {explanation(alternative.result.traceSummary.pacingStatus)} · {alternative.result.traceSummary.stepCount} kanıt adımı.</small></div>) }
+            </div>
+            <small>Bu sonuç salt-okurdur. İsterseniz yalnız aynı exact kural ve frozen kanıtla advisory taslağı oluşturup insan onayına hazırlık aşamasına geçebilirsiniz; Meta write ve execute kapalıdır.</small>
+            <button className={styles.save} type="button" disabled={!impactCommand} onClick={() => void saveAdvisoryDraft()}>İnsan onayına hazırlık için taslağı kaydet</button>
           </div> : null}
-          {impactState.status === "saved" ? <div className={styles.impactResult} role="status">
-            <strong>Öneri taslağı ve kural kaynağı birlikte kaydedildi</strong>
-            <span>Proposal: {impactState.result.persistence} · provenance: {impactState.result.provenance}</span>
-            <span>Onay · action · otomasyon · Meta write: kapalı</span>
-          </div> : null}
-          <div className={styles.impactResult} aria-label="İnsan onay kuyruğu">
-            <strong>Seçilmiş senaryoyu insan onay kuyruğuna gönder</strong>
-            <span>Yalnız seçilmiş immutable allocation kullanılır; tutar, kampanya, policy veya Meta kimliği tarayıcıdan gönderilmez.</span>
-            {approvalQueue.status === "loading" ? <span>Seçilmiş senaryolar okunuyor…</span> : null}
-            {approvalQueue.status === "ready" && approvalQueue.selections.length === 0 ? <span>Onaya gönderilecek seçilmiş senaryo yok.</span> : null}
-            {approvalQueue.status === "ready" ? approvalQueue.selections.map((selection) => <div className={styles.row} key={selection.selectionRef}>
-              <span>Seçim: {selection.selectionRef.slice(0, 20)}… · {date(selection.selectedAt)}</span>
-              <button className={styles.save} type="button" onClick={() => void sendToApprovalQueue(selection)}>İnsan onay kuyruğuna gönder</button>
-            </div>) : null}
-            {approvalQueue.status === "queued" ? <span>Seçim onay kuyruğuna eklendi ({approvalQueue.persistence}). Onay, execute ve Meta write hâlâ kapalıdır.</span> : null}
-            {(approvalQueue.status === "unavailable" || approvalQueue.status === "error") ? <span role="alert">{approvalQueue.message}</span> : null}
-          </div>
+          {impactState.status === "saved" ? <div className={styles.impactResult} role="status"><strong>Advisory taslak kaydedildi</strong><span>Exact kural ve kanıt bağı: {impactState.result.persistence} · {impactState.result.provenance}. Meta write, execute ve policy oluşturma kapalı.</span><button className={styles.preview} type="button" disabled={selection.status === "loading"} onClick={() => void loadSelectionCandidates()}>İnsan onayına hazırlık adaylarını doğrula</button></div> : null}
+          {impactState.status === "saved" && selection.status === "ready" ? <section className={styles.preparation} aria-label="İnsan onayına hazırlık"><strong>İnsan onayına hazırlık</strong><span>Yalnız sunucunun exact advisory taslaktan türettiği, opaque aday seçilebilir. Tarayıcı tutar, kampanya UUID’si, context hash veya ham JSON göndermez.</span>{selection.candidates.length === 0 ? <span>Hazırlanabilecek aday yok; akış fail-closed kaldı.</span> : selection.candidates.map((candidate) => <div className={styles.row} key={candidate.candidateRef}><span>{candidate.scenarioLabel} · {money(candidate.beforeAmountMinor, candidate.currency)} → {money(candidate.afterAmountMinor, candidate.currency)}{candidate.blockReason ? ` · ${candidate.blockReason.replaceAll("_", " ")}` : ""}</span><button className={styles.save} type="button" disabled={candidate.status !== "selectable"} onClick={() => void selectScenario(candidate)}>{candidate.status === "selectable" ? "Bu senaryoyu onay için hazırla" : "Hazırlık kapalı"}</button></div>)}</section> : null}
+          {impactState.status === "saved" && selection.status === "selected" ? <section className={styles.preparation} aria-label="İnsan onayına hazırlık"><strong>İnsan onayına hazırlık</strong><span>Seçim kanonik olarak kaydedildi ({selection.persistence}). Bu işlem karar vermez, policy yaratmaz, execute etmez veya Meta’ya yazmaz.</span><button className={styles.save} type="button" disabled={preparation.status === "loading"} onClick={() => void prepareForHumanApproval()}>{preparation.status === "loading" ? "Hazırlık doğrulanıyor…" : "Onay kuyruğuna hazırla"}</button></section> : null}
+          {preparation.status === "prepared" ? <div className={styles.preparation} role="status"><strong>Onay kuyruğu handoff’u hazır</strong><span>İnsan onayı ayrı akışta açıldı ({preparation.persistence}). Meta write ve execute kapalıdır.</span></div> : null}
+          {(selection.status === "unavailable" || selection.status === "error") ? <p className={styles.impactFailure} role="alert">{selection.message}</p> : null}
+          {(preparation.status === "unavailable" || preparation.status === "error") ? <p className={styles.impactFailure} role="alert">{preparation.message}</p> : null}
+          <section className={styles.decisionJourney} aria-label="Karar izi"><strong>Karar izi</strong><span>Yalnız kanonik olarak bağlı kural, öneri ve insan kararları gösterilir; eksik bağ olay gibi sunulmaz.</span>{head ? <ol>{decisionJourney.map((step) => <li key={step.label} data-status={step.status}><b>{step.label}</b><span>{step.detail}</span></li>)}</ol> : <span>İzi görmek için bir kural seçin.</span>}<small>Salt-okunur · Meta write ve execute kapalı</small></section>
+          <section className={styles.preparation} aria-label="Bağlı insan kararları"><strong>Bağlı insan kararları</strong>{approvalRead.status === "loading" ? <span>Karar izi doğrulanıyor…</span> : null}{approvalRead.status === "unavailable" ? <span>Karar izi güvenli biçimde okunamadı; karar varsayılmadı.</span> : null}{approvalRead.status === "ready" && head && approvalRead.traces.filter((trace) => trace.ruleSeriesRef === head.seriesRef && trace.ruleRevision === head.revision).length === 0 ? <span>Bu kural revizyonuna kanonik bağlı insan kararı yok.</span> : null}{approvalRead.status === "ready" && head ? approvalRead.traces.filter((trace) => trace.ruleSeriesRef === head.seriesRef && trace.ruleRevision === head.revision).map((trace) => <div className={styles.row} key={trace.selectionRef}><span>Seçilmiş senaryo · {date(trace.selectedAt)}</span><span>Hazırlık: {trace.actionUnit.presence ? trace.actionUnit.status.replaceAll("_", " ") : "oluşturulmadı"}</span><span>İnsan kararları: {trace.decisionHistory.length ? trace.decisionHistory.map((event) => `${event.decision.replaceAll("_", " ")} · ${date(event.occurredAt)}`).join(" | ") : "henüz yok"}</span><span>Uygulama: kapalı · {trace.execution.closure === "admission_closed" ? "admission kapalı" : "uygulamaya alınmadı"}</span></div>) : null}</section>
           <div className={styles.impactResult} aria-label="Zamansal değerlendirme">
             <strong>Zamansal değerlendirme</strong>
             <span>Yalnız sunucunun güncel kural başı, frozen campaign context’i ve hazır L3 penceresinden türettiği adaylar değerlendirilir.</span>
@@ -655,7 +804,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
             {temporal.status === "ready" && temporal.result ? <span role="status">{temporal.result}</span> : null}
             {temporal.status === "ready" && temporal.candidates.length === 0 ? <span>Şu anda değerlendirilebilir, hazır bir zaman penceresi yok.</span> : null}
             {temporal.status === "ready" ? temporal.candidates.map((candidate) => <div className={styles.row} key={candidate.candidateRef}>
-              <span>{candidate.ruleSeriesRef} · {candidate.reviewCadence} · frozen pencere · {date(candidate.capturedAt)}</span>
+              <span>{candidate.reviewCadence} · frozen pencere · {date(candidate.capturedAt)}</span>
               <button className={styles.save} type="button" onClick={() => void evaluateTemporal(candidate)}>Salt-okur değerlendir</button>
             </div>) : null}
             {(temporal.status === "unavailable" || temporal.status === "error") ? <span role="alert">{temporal.message}</span> : null}
@@ -667,7 +816,7 @@ export function SliceRuleWorkspaceSurface(props: Readonly<{
   </div>;
 }
 
-export function SliceRuleWorkspacePanel() {
+export function SliceRuleWorkspacePanel({ onApprovalQueueHandoff, onOpenRuleSession, onOpenCategorySetup, onConnect, requestedScopeCampaignRef, selectedRuleRef, selectedRuleRevision, onOpenCanonicalRule }: Readonly<{ onApprovalQueueHandoff?(actionUnitRef: string): void; onOpenRuleSession?(seed: SliceRuleSessionSeed): void; onOpenCategorySetup?(): void; onConnect?(): Promise<boolean>; requestedScopeCampaignRef?: string | null; selectedRuleRef?: string | null; selectedRuleRevision?: number | null; onOpenCanonicalRule?(ruleRef: string, revision: number): void }>) {
   const [state, setState] = useState<State>({ status: "loading" });
   const load = useCallback(async () => {
     setState({ status: "loading" });
@@ -676,14 +825,14 @@ export function SliceRuleWorkspacePanel() {
         headers: { "X-ReklamZeka-Intent": "slice-rule-workspace-read" } });
       const payload = await response.json() as { error?: { message?: string } };
       if (!response.ok) {
-        setState({ status: response.status === 503 || response.status === 401 ? "unavailable" : "error",
+        setState({ status: response.status === 401 ? "session_required" : response.status === 503 ? "unavailable" : "error",
           message: payload.error?.message ?? "Slice Rule Workspace yanıtı alınamadı." }); return;
       }
       setState({ status: "ready", snapshot: parseSliceRuleWorkspaceSnapshot(payload) });
     } catch { setState({ status: "error", message: "Slice Rule Workspace bağlantısı kurulamadı." }); }
   }, []);
   useEffect(() => { void load(); }, [load]);
-  return <SliceRuleWorkspaceSurface state={state} onRetry={() => void load()} onSaved={load} />;
+  return <SliceRuleWorkspaceSurface state={state} onRetry={() => void load()} onSaved={load} onApprovalQueueHandoff={onApprovalQueueHandoff} onOpenRuleSession={onOpenRuleSession} onOpenCategorySetup={onOpenCategorySetup} onConnect={onConnect} requestedScopeCampaignRef={requestedScopeCampaignRef} selectedRuleRef={selectedRuleRef} selectedRuleRevision={selectedRuleRevision} onOpenCanonicalRule={onOpenCanonicalRule} />;
 }
 
 export { CLOSED as SLICE_RULE_CLOSED_AUTHORITY, EMPTY_FORM as EMPTY_SLICE_RULE_FORM };

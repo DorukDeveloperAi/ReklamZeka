@@ -9,6 +9,7 @@ import { DrizzleActionGuardrailPolicyRepository } from "@/connectors/actions/act
 import { DrizzleActionProposalQueueRepository } from "@/connectors/actions/action-proposal-queue-drizzle-repository";
 import { createDrizzleAuthenticAffectedGeoEvidenceAdapter } from "@/connectors/actions/authentic-affected-geo-evidence-adapter";
 import { createDrizzleAuthenticCategoryEvidenceAdapter } from "@/connectors/actions/authentic-category-evidence-adapter";
+import { appendActionPreparationGateSnapshot, evaluateUnifiedActionPreparationGate, UnifiedActionPreparationGateError } from "@/connectors/campaigns/unified-action-preparation-gate";
 import { buildActionPlan, type ActionValveContext, type BudgetDeltaLimits, type ProtectionContext } from "@/domain/actions/autonomy-valve";
 import { resolveProtection, type ActionGuardrailPolicyRevision, type ProtectionResolutionInput } from "@/domain/actions/action-guardrail-policy";
 import type { ApprovalPolicy } from "@/domain/actions/approval-lifecycle";
@@ -23,11 +24,16 @@ type WriterDatabase = Pick<Database, "select" | "insert" | "execute" | "transact
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const REF = /^[a-z][a-z0-9_.:-]{0,127}$/;
+const ACTION_UNIT_REF = /^action_unit_[a-f0-9]{20}$/;
 
 export class SliceRuleBudgetActionUnitMaterializerError extends Error {
-  constructor(readonly code: "invalid_input" | "membership_required" | "role_denied" | "source_missing" | "source_ambiguous" | "stale_source" | "delivery_hold" | "ad_set_owner_unsupported" | "budget_mismatch" | "policy_unavailable" | "guardrail_category_unavailable" | "guardrail_geo_unavailable" | "guardrail_rejected" | "queue_rejected" | "corrupt_store") {
+  constructor(readonly code: "invalid_input" | "membership_required" | "role_denied" | "source_missing" | "source_ambiguous" | "stale_source" | "scope_mismatch" | "market_boundary" | "delivery_hold" | "data_health_hold" | "ad_set_owner_unsupported" | "budget_mismatch" | "policy_unavailable" | "guardrail_category_unavailable" | "guardrail_geo_unavailable" | "guardrail_rejected" | "queue_rejected" | "corrupt_store") {
     super("Bütçe ActionUnit taslağı güvenli biçimde oluşturulamadı");
   }
+}
+
+export function assertActionDataHealthReady(dataHealthReady: boolean): void {
+  if (dataHealthReady !== true) throw new SliceRuleBudgetActionUnitMaterializerError("data_health_hold");
 }
 
 /** No amount, target entity, policy, approval, or Meta control may cross this boundary. */
@@ -39,6 +45,38 @@ type BudgetApprovalApplicability = Readonly<
   | { actionType: "budget_decrease"; risk: "K2" }
   | { actionType: "budget_increase"; risk: "K3" }
 >;
+
+/**
+ * The ActionUnit summary is the sole public-facing provenance surface.  It
+ * intentionally carries human labels only: source IDs, hashes, Meta IDs and
+ * policy payloads stay in the immutable server-side records that were already
+ * checked while materializing the unit.
+ */
+export function publicSliceRuleBudgetProvenance(input: Readonly<{
+  seriesRef: string;
+  revision: number;
+  proposalSeriesRef: string;
+  proposalRevision: number;
+  market: "domestic" | "international";
+  hasSameMarketPool: boolean;
+  approvalPolicyRevision: number;
+  hasPublishedGuardrail: boolean;
+}>) {
+  if (!REF.test(input.seriesRef) || !REF.test(input.proposalSeriesRef) || HASH.test(input.seriesRef) || HASH.test(input.proposalSeriesRef)
+    || !Number.isSafeInteger(input.revision) || input.revision < 1 || !Number.isSafeInteger(input.proposalRevision)
+    || input.proposalRevision < 1 || !Number.isSafeInteger(input.approvalPolicyRevision) || input.approvalPolicyRevision < 1) {
+    throw new SliceRuleBudgetActionUnitMaterializerError("corrupt_store");
+  }
+  const market = input.market === "domestic" ? "Yerli" : "Yabancı";
+  return Object.freeze([
+    Object.freeze({ evidenceRef: "selection_source", label: "İnsan seçimiyle sabitlenen bütçe senaryosu" }),
+    Object.freeze({ evidenceRef: "slice_rule_draft_source", label: `Kullanıcı kuralı · ${input.seriesRef} · revizyon ${input.revision}` }),
+    Object.freeze({ evidenceRef: "budget_proposal_source", label: `Bütçe önerisi · ${input.proposalSeriesRef} · revizyon ${input.proposalRevision}` }),
+    ...(input.hasSameMarketPool ? [Object.freeze({ evidenceRef: "budget_pool_source", label: `${market} bütçe havuzu · aynı pazar bağı doğrulandı` })] : []),
+    Object.freeze({ evidenceRef: "approval_policy_source", label: `Onay politikası · yayınlanmış · revizyon ${input.approvalPolicyRevision}` }),
+    ...(input.hasPublishedGuardrail ? [Object.freeze({ evidenceRef: "guardrail_policy_source", label: "Koruma kuralı · yayınlanmış bütçe limiti doğrulandı" })] : []),
+  ]);
+}
 
 /**
  * Resolves the persisted policy's authoritative workspace reference. A database UUID
@@ -147,17 +185,25 @@ export class DrizzleSliceRuleBudgetActionUnitMaterializer {
       if (member[0].role !== "owner") throw new SliceRuleBudgetActionUnitMaterializerError("role_denied");
       const existing = await tx.select().from(schema.sliceRuleBudgetActionUnitBindings).where(and(eq(schema.sliceRuleBudgetActionUnitBindings.workspaceId, input.workspaceId), eq(schema.sliceRuleBudgetActionUnitBindings.selectionId, input.selectionId))).limit(2);
       if (existing.length > 1) throw new SliceRuleBudgetActionUnitMaterializerError("source_ambiguous");
-      if (existing[0]) return Object.freeze({ outcome: "unchanged" as const, actionUnitId: existing[0].actionProposalUnitId });
+      if (existing[0]) {
+        const unit = await tx.select({ unitRef: schema.actionProposalUnits.unitRef }).from(schema.actionProposalUnits)
+          .where(and(eq(schema.actionProposalUnits.workspaceId, input.workspaceId), eq(schema.actionProposalUnits.id, existing[0].actionProposalUnitId))).limit(2);
+        if (unit.length !== 1 || !ACTION_UNIT_REF.test(unit[0]!.unitRef)) throw new SliceRuleBudgetActionUnitMaterializerError("corrupt_store");
+        return Object.freeze({ outcome: "unchanged" as const, actionUnitId: existing[0].actionProposalUnitId, actionUnitRef: unit[0]!.unitRef });
+      }
       const selection = await tx.select().from(schema.sliceRuleScenarioAllocationSelections).where(and(eq(schema.sliceRuleScenarioAllocationSelections.workspaceId, input.workspaceId), eq(schema.sliceRuleScenarioAllocationSelections.id, input.selectionId))).limit(2);
       if (selection.length !== 1) throw new SliceRuleBudgetActionUnitMaterializerError(selection.length ? "source_ambiguous" : "source_missing");
       const s = selection[0]!;
-      const [bindings, proposals, entityBindings] = await Promise.all([
+      const [bindings, proposals, entityBindings, drafts, poolBindings] = await Promise.all([
         tx.select().from(schema.sliceRuleBudgetProposalBindings).where(and(eq(schema.sliceRuleBudgetProposalBindings.workspaceId, input.workspaceId), eq(schema.sliceRuleBudgetProposalBindings.draftHash, s.draftHash), eq(schema.sliceRuleBudgetProposalBindings.proposalHash, s.proposalHash))).limit(2),
         tx.select().from(schema.budgetProposalVersions).where(and(eq(schema.budgetProposalVersions.workspaceId, input.workspaceId), eq(schema.budgetProposalVersions.proposalHash, s.proposalHash))).limit(2),
         tx.select().from(schema.sliceRuleAllocationEntityBindings).where(and(eq(schema.sliceRuleAllocationEntityBindings.workspaceId, input.workspaceId), eq(schema.sliceRuleAllocationEntityBindings.draftHash, s.draftHash), eq(schema.sliceRuleAllocationEntityBindings.allocationRef, s.allocationRef))).limit(2),
+        tx.select().from(schema.sliceRuleWorkspaceDrafts).where(and(eq(schema.sliceRuleWorkspaceDrafts.workspaceId, input.workspaceId), eq(schema.sliceRuleWorkspaceDrafts.draftHash, s.draftHash))).limit(2),
+        tx.select().from(schema.sliceRuleBudgetPoolBindings).where(and(eq(schema.sliceRuleBudgetPoolBindings.workspaceId, input.workspaceId), eq(schema.sliceRuleBudgetPoolBindings.draftHash, s.draftHash))).limit(2),
       ]);
-      if (bindings.length !== 1 || proposals.length !== 1 || entityBindings.length !== 1) throw new SliceRuleBudgetActionUnitMaterializerError([bindings, proposals, entityBindings].some((x) => x.length > 1) ? "source_ambiguous" : "source_missing");
+      if (bindings.length !== 1 || proposals.length !== 1 || entityBindings.length !== 1 || drafts.length !== 1 || poolBindings.length > 1) throw new SliceRuleBudgetActionUnitMaterializerError([bindings, proposals, entityBindings, drafts, poolBindings].some((x) => x.length > 1) ? "source_ambiguous" : "source_missing");
       const target = entityBindings[0]!;
+      const draft = drafts[0]!;
       if (target.budgetOwnerLevel !== "campaign") throw new SliceRuleBudgetActionUnitMaterializerError("ad_set_owner_unsupported");
       if (target.budgetKind !== "daily" || target.currentAmountMinor !== s.beforeAmountMinor || target.currency.length !== 3) throw new SliceRuleBudgetActionUnitMaterializerError("budget_mismatch");
       const campaign = await tx.select().from(schema.adCampaigns).where(and(eq(schema.adCampaigns.workspaceId, input.workspaceId), eq(schema.adCampaigns.id, target.campaignId), eq(schema.adCampaigns.adAccountId, target.adAccountId))).limit(2);
@@ -167,6 +213,19 @@ export class DrizzleSliceRuleBudgetActionUnitMaterializer {
       if (campaign.length !== 1 || account.length !== 1 || adSet.length !== 1 || contexts.length !== 1 || campaign[0]!.dailyBudgetMinor !== s.beforeAmountMinor || account[0]!.currency !== target.currency) throw new SliceRuleBudgetActionUnitMaterializerError("stale_source");
       const alertHeads = await tx.execute(sql`select 1 from delivery_health_alert_ledger_records h where h.workspace_id=${input.workspaceId}::uuid and h.account_ref=${contexts[0]!.accountRef} and h.status <> 'resolved' and not exists (select 1 from delivery_health_alert_ledger_records n where n.workspace_id=h.workspace_id and n.alert_ref=h.alert_ref and n.sequence>h.sequence) limit 1`);
       if ((alertHeads.rows as unknown[]).length) throw new SliceRuleBudgetActionUnitMaterializerError("delivery_hold");
+      let preparationGate;
+      try {
+        preparationGate = await evaluateUnifiedActionPreparationGate(tx, { workspaceId: input.workspaceId, draftHash: s.draftHash,
+          proposalHash: s.proposalHash, allocationRef: s.allocationRef, stage: "materialization", evaluatedAt: input.proposedAt });
+      } catch (error) {
+        if (error instanceof UnifiedActionPreparationGateError) throw new SliceRuleBudgetActionUnitMaterializerError(error.code);
+        throw error;
+      }
+      if (!preparationGate.dataHealthReady) {
+        await appendActionPreparationGateSnapshot(tx, { workspaceId: input.workspaceId, selectionId: s.id,
+          actionProposalUnitId: null, result: preparationGate, evaluatedAt: input.proposedAt });
+        assertActionDataHealthReady(preparationGate.dataHealthReady);
+      }
       const applicability = s.afterAmountMinor > s.beforeAmountMinor
         ? Object.freeze({ actionType: "budget_increase" as const, risk: "K3" as const })
         : Object.freeze({ actionType: "budget_decrease" as const, risk: "K2" as const });
@@ -213,13 +272,15 @@ export class DrizzleSliceRuleBudgetActionUnitMaterializer {
         frozenContextHash: contexts[0]!.contextHash, protection: guardrails.protection };
       const actionPlan = buildActionPlan(intent, valve);
       if (actionPlan.disposition !== "approval_required") throw new SliceRuleBudgetActionUnitMaterializerError("queue_rejected");
-      const staged = new ActionProposalStagingService(policy).stage({ plan: { planRef: `slice_rule_${s.draftHash.slice(0, 20)}`, revision: 1, planHash: digest({ draftHash: s.draftHash, proposalHash: s.proposalHash, selectionId: s.id }) }, workspaceRef, accountRef: contexts[0]!.accountRef, requester: { actorRef: `actor_${input.actorId.replaceAll("-", "")}`, role: "owner" }, proposedAt: input.proposedAt, expiresAt: input.expiresAt, units: [{ unitKey: `budget_${s.id.replaceAll("-", "")}`, plan: { planRef: `slice_rule_${s.draftHash.slice(0, 20)}`, revision: 1, planHash: digest({ draftHash: s.draftHash, proposalHash: s.proposalHash, selectionId: s.id }) }, actionPlan, workspaceRef, accountRef: contexts[0]!.accountRef, entityRef: campaign[0]!.externalCampaignId, actionType: actionPlan.actionType, risk: actionPlan.risk, actionHash: digest(actionPlan.action), dependencies: [], summary: { safety: "public_safe", before: { label: "Günlük bütçe", value: decimal(s.beforeAmountMinor) }, after: { label: "Günlük bütçe", value: decimal(s.afterAmountMinor) }, evidence: [{ evidenceRef: `selection_${s.id.replaceAll("-", "")}`, label: "Onaylı senaryo seçimi" }] } }] });
+      const staged = new ActionProposalStagingService(policy).stage({ plan: { planRef: `slice_rule_${s.draftHash.slice(0, 20)}`, revision: 1, planHash: digest({ draftHash: s.draftHash, proposalHash: s.proposalHash, selectionId: s.id }) }, workspaceRef, accountRef: contexts[0]!.accountRef, requester: { actorRef: `actor_${input.actorId.replaceAll("-", "")}`, role: "owner" }, proposedAt: input.proposedAt, expiresAt: input.expiresAt, units: [{ unitKey: `budget_${s.id.replaceAll("-", "")}`, plan: { planRef: `slice_rule_${s.draftHash.slice(0, 20)}`, revision: 1, planHash: digest({ draftHash: s.draftHash, proposalHash: s.proposalHash, selectionId: s.id }) }, actionPlan, workspaceRef, accountRef: contexts[0]!.accountRef, entityRef: campaign[0]!.externalCampaignId, actionType: actionPlan.actionType, risk: actionPlan.risk, actionHash: digest(actionPlan.action), dependencies: [], summary: { safety: "public_safe", before: { label: "Günlük bütçe", value: decimal(s.beforeAmountMinor) }, after: { label: "Günlük bütçe", value: decimal(s.afterAmountMinor) }, evidence: publicSliceRuleBudgetProvenance({ seriesRef: draft.seriesRef, revision: draft.revision, proposalSeriesRef: proposals[0]!.seriesRef, proposalRevision: proposals[0]!.revision, market: draft.market as "domestic" | "international", hasSameMarketPool: poolBindings[0]?.market === draft.market, approvalPolicyRevision: policy.revision, hasPublishedGuardrail: guardrails.protection.policyRefs.length > 0 }) } }] });
       try { await new DrizzleActionProposalQueueRepository(tx as Database, input.workspaceId).appendInitial(staged); } catch { throw new SliceRuleBudgetActionUnitMaterializerError("queue_rejected"); }
       const unit = await tx.select().from(schema.actionProposalUnits).where(and(eq(schema.actionProposalUnits.workspaceId, input.workspaceId), eq(schema.actionProposalUnits.unitRef, staged.summaries[0]!.unitRef))).limit(2);
-      if (unit.length !== 1) throw new SliceRuleBudgetActionUnitMaterializerError("corrupt_store");
+      if (unit.length !== 1 || !ACTION_UNIT_REF.test(unit[0]!.unitRef)) throw new SliceRuleBudgetActionUnitMaterializerError("corrupt_store");
       const core = { schemaVersion: "slice-rule-budget-action-unit-binding/1.0.0", selectionId: s.id, actionProposalUnitId: unit[0]!.id, selectionEvidenceHash: s.selectionEvidenceHash, actionPlanHash: staged.summaries[0]!.actionPlanHash, boundAt: input.proposedAt, authority: { canApprove: false, canExecute: false, canWriteMeta: false } };
       const bindingHash = digest(core); await tx.insert(schema.sliceRuleBudgetActionUnitBindings).values({ workspaceId: input.workspaceId, selectionId: s.id, actionProposalUnitId: unit[0]!.id, bindingHash, bindingPayload: { ...core, bindingHash }, boundByActorId: input.actorId, boundAt: new Date(input.proposedAt) });
-      return Object.freeze({ outcome: "inserted" as const, actionUnitId: unit[0]!.id });
+      await appendActionPreparationGateSnapshot(tx, { workspaceId: input.workspaceId, selectionId: null,
+        actionProposalUnitId: unit[0]!.id, result: preparationGate, evaluatedAt: input.proposedAt });
+      return Object.freeze({ outcome: "inserted" as const, actionUnitId: unit[0]!.id, actionUnitRef: unit[0]!.unitRef });
     });
   }
 }

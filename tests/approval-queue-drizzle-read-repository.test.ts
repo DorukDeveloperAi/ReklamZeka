@@ -40,6 +40,14 @@ function budgetPlan() {
   return buildActionPlan(action, context(action.entity));
 }
 
+function renamePlan() {
+  const action: TypedActionIntent = {
+    kind: "rename", entity: { level: "campaign", ref: "campaign_alpha" },
+    beforeName: "Prospecting | Eski", afterName: "Prospecting | Yeni", namingEvidenceRef: "naming_evidence_alpha",
+  };
+  return buildActionPlan(action, context(action.entity));
+}
+
 function summaryHashOf(summary: Record<string, unknown>) {
   return createHash("sha256").update(JSON.stringify({ after: summary.after, before: summary.before,
     evidence: summary.evidence, safety: summary.safety })).digest("hex");
@@ -114,6 +122,16 @@ describe("Approval Queue Drizzle read repository", () => {
     }
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(result[0]?.dependencies)).toBe(true);
+  });
+
+  it("maps a persisted K3 rename without leaking its private naming evidence ref", async () => {
+    const fixture = database([sourceRow({ risk: "K3", action_type: "campaign_rename", action_plan_payload: renamePlan() })]);
+    const repository = new DrizzleApprovalQueueReadRepository(fixture.db as never, workspaceId);
+    const result = await repository.list({ workspaceId, entityRef: null, campaignRef: null, before: null, limit: 26 });
+    expect(result).toEqual([expect.objectContaining({ actionType: "campaign_rename", risk: "K3",
+      beforeAfter: { field: "entity_name", before: "Prospecting | Eski", after: "Prospecting | Yeni" },
+      summaryCode: "approval.campaign_rename" })]);
+    expect(JSON.stringify(result)).not.toContain("naming_evidence_alpha");
   });
 
   it("enforces descending temporal keyset pagination in the tenant-scoped SQL", async () => {

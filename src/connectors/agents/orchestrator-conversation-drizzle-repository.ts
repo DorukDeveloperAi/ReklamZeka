@@ -6,7 +6,13 @@ import {
   type OrchestratorConversationSnapshot,
   type OrchestratorMessage,
   type OrchestratorPageGuide,
+  type OrchestratorTurnEvidence,
+  orchestratorInterviewKitSnapshotHash,
 } from "@/application/orchestrator-conversation";
+import { CORE_SKILL_MANIFESTS, coreSkillManifest, SKILL_CATALOG_VERSION } from "@/domain/orchestrator/skill-catalog";
+import { isOfficialGuidanceSourceUrl } from "@/domain/guidance/registry";
+import { orchestratorReadOnlyEvidenceContextHash } from "@/application/orchestrator-readonly-evidence-context";
+import { parseOrchestratorSkillRunReceipt } from "@/application/orchestrator-skill-run";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -15,6 +21,10 @@ type ConversationDatabase = Pick<Database, "execute" | "transaction">;
 
 type ConversationRow = Readonly<{ conversation_ref: string; created_at: Date | string }>;
 type TurnRow = Readonly<{ provider_thread_ref: string | null; page_guide: unknown }>;
+type EvidenceTurnRow = Readonly<{ turn_ref: string; page_guide: unknown; profile_snapshot: unknown;
+  manifest_snapshots: unknown; playbook_snapshots: unknown; skill_catalog_binding_hash: unknown; interview_kit_snapshots?: unknown; interview_kit_binding_hash?: unknown;
+  evidence_context_snapshot?: unknown; evidence_context_hash?: unknown;
+  skill_run_snapshot?: unknown; skill_run_hash?: unknown }>;
 type MessageRow = Readonly<{ message_ref: string; turn_ref: string; message_number: number;
   role: string; content: string; created_at: Date | string }>;
 
@@ -22,6 +32,13 @@ const CONVERSATION = /^conversation_[a-f0-9]{32}$/;
 const TURN = /^turn_[a-f0-9]{32}$/;
 const MESSAGE = /^message_[a-f0-9]{32}$/;
 const PROVIDER_THREAD = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PROFILE_REF = /^profile_[a-z0-9][a-z0-9_-]{0,86}$/;
+const PLAYBOOK_REF = /^playbook_[a-z0-9][a-z0-9_-]{0,86}$/;
+const INTERVIEW_KIT_REF = /^interview_kit_[a-f0-9]{32}$/;
+const SOURCE_REF = /^source_[a-z0-9_.:-]{1,127}$/;
+const HASH = /^[a-f0-9]{64}$/;
+const EVIDENCE_SCOPE = "page_guidance_and_verified_workspace_playbooks" as const;
+const UNCERTAINTY = "agent_inference_no_meta_or_action_authority" as const;
 
 export class OrchestratorConversationRepositoryError extends Error {
   constructor(readonly code: "invalid_input" | "corrupt_store" | "conversation_unavailable") {
@@ -54,13 +71,191 @@ function pageGuide(value: unknown): OrchestratorPageGuide {
   return canonical;
 }
 
-function message(row: MessageRow): OrchestratorMessage {
+function exact(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value as Record<string, unknown>).length === keys.length
+    && Object.keys(value as Record<string, unknown>).every((key) => keys.includes(key));
+}
+
+function unavailableEvidence(state: Exclude<OrchestratorTurnEvidence["state"], "bound">): OrchestratorTurnEvidence {
+  return Object.freeze({ state, pageGuide: null, profileLabel: null, skills: Object.freeze([]), playbooks: Object.freeze([]),
+    historicalSourceState: "not_applicable", evidenceScope: EVIDENCE_SCOPE, uncertainty: UNCERTAINTY,
+    readOnlyEvidence: Object.freeze({ state: "missing_or_invalid", performance: null, timeline: null }),
+    skillRun: Object.freeze({ state: "missing_or_invalid", receipt: null }),
+    interviewKits: Object.freeze({ state: "missing_or_invalid", kits: Object.freeze([]) }) });
+}
+
+function interviewKitEvidence(snapshot: unknown, hash: unknown): OrchestratorTurnEvidence["interviewKits"] {
+  if (snapshot === undefined && hash === undefined) return Object.freeze({ state: "legacy_not_recorded", kits: Object.freeze([]) });
+  if (Array.isArray(snapshot) && snapshot.length === 0 && hash === "LEGACY_NOT_RECORDED") return Object.freeze({ state: "legacy_not_recorded", kits: Object.freeze([]) });
+  if (Array.isArray(snapshot) && snapshot.length === 0 && hash === "UNAVAILABLE_NOT_BOUND") return Object.freeze({ state: "unavailable_not_bound", kits: Object.freeze([]) });
+  if (!Array.isArray(snapshot) || snapshot.length > 12 || typeof hash !== "string" || !HASH.test(hash)
+    || orchestratorInterviewKitSnapshotHash(snapshot as readonly Record<string, unknown>[]) !== hash) {
+    return Object.freeze({ state: "missing_or_invalid", kits: Object.freeze([]) });
+  }
+  try {
+    const kits = snapshot.map((kit) => {
+      if (!exact(kit, ["kitRef", "revision", "kitHash", "name", "source"])
+        || typeof kit.kitRef !== "string" || !INTERVIEW_KIT_REF.test(kit.kitRef)
+        || !Number.isSafeInteger(kit.revision) || (kit.revision as number) < 1
+        || typeof kit.kitHash !== "string" || !HASH.test(kit.kitHash)
+        || typeof kit.name !== "string" || !kit.name.trim() || kit.name.length > 160 || /[\u0000-\u001f\u007f]/.test(kit.name)
+        || !exact(kit.source, ["title", "url", "version", "recordHash", "reviewBy"])
+        || typeof kit.source.title !== "string" || !kit.source.title.trim() || kit.source.title.length > 160 || /[\u0000-\u001f\u007f]/.test(kit.source.title)
+        || typeof kit.source.url !== "string" || !isOfficialGuidanceSourceUrl(kit.source.url)
+        || !Number.isSafeInteger(kit.source.version) || (kit.source.version as number) < 1
+        || typeof kit.source.recordHash !== "string" || !HASH.test(kit.source.recordHash)
+        || typeof kit.source.reviewBy !== "string" || !Number.isFinite(Date.parse(kit.source.reviewBy))) throw new Error("invalid_interview_kit");
+      return Object.freeze({ kitRef: kit.kitRef, name: kit.name.trim(), revision: kit.revision as number,
+        source: Object.freeze({ title: kit.source.title.trim(), url: kit.source.url, version: kit.source.version as number,
+          reviewBy: new Date(kit.source.reviewBy).toISOString() }) });
+    }).sort((left, right) => left.kitRef.localeCompare(right.kitRef));
+    if (new Set(kits.map((kit) => kit.kitRef)).size !== kits.length) throw new Error("duplicate_interview_kit");
+    return Object.freeze({ state: "bound", kits: Object.freeze(kits.map(({ name, revision, source }) => Object.freeze({ name, revision, source }))) });
+  } catch { return Object.freeze({ state: "missing_or_invalid", kits: Object.freeze([]) }); }
+}
+
+function readOnlyEvidence(snapshot: unknown, hash: unknown): OrchestratorTurnEvidence["readOnlyEvidence"] {
+  if (snapshot === undefined && hash === undefined) return Object.freeze({ state: "legacy_not_recorded", performance: null, timeline: null });
+  if (typeof hash !== "string") throw new Error("invalid_evidence_context");
+  if (exact(snapshot, ["version"]) && snapshot.version === "legacy_not_recorded" && hash === "LEGACY_NOT_RECORDED") {
+    return Object.freeze({ state: "legacy_not_recorded", performance: null, timeline: null });
+  }
+  if (exact(snapshot, ["version"]) && snapshot.version === "unavailable_not_bound" && hash === "UNAVAILABLE_NOT_BOUND") {
+    return Object.freeze({ state: "unavailable_not_bound", performance: null, timeline: null });
+  }
+  if (!exact(snapshot, ["version", "performance", "timeline"]) || snapshot.version !== "orchestrator-readonly-evidence-context/1.0.0"
+    || !HASH.test(hash) || orchestratorReadOnlyEvidenceContextHash(snapshot as never) !== hash
+    || !exact(snapshot.performance, ["state", "accountCount", "campaignCount", "windows"])
+    || !["ready", "partial", "unavailable"].includes(snapshot.performance.state as string)
+    || !Number.isSafeInteger(snapshot.performance.accountCount) || !Number.isSafeInteger(snapshot.performance.campaignCount)
+    || (snapshot.performance.accountCount as number) < 0 || (snapshot.performance.accountCount as number) > 100
+    || (snapshot.performance.campaignCount as number) < 0 || (snapshot.performance.campaignCount as number) > 200_000
+    || !Array.isArray(snapshot.performance.windows) || snapshot.performance.windows.length !== 2
+    || !exact(snapshot.timeline, ["state", "eventCount", "latestOccurredAt", "kinds"])
+    || !["ready", "unavailable"].includes(snapshot.timeline.state as string)
+    || !Number.isSafeInteger(snapshot.timeline.eventCount) || (snapshot.timeline.eventCount as number) < 0 || (snapshot.timeline.eventCount as number) > 12
+    || !(snapshot.timeline.latestOccurredAt === null || typeof snapshot.timeline.latestOccurredAt === "string" && Number.isFinite(Date.parse(snapshot.timeline.latestOccurredAt)))
+    || !Array.isArray(snapshot.timeline.kinds) || snapshot.timeline.kinds.length > 8) throw new Error("invalid_evidence_context");
+  const windows = snapshot.performance.windows.map((window) => {
+    if (!exact(window, ["days", "readyCount", "partialCount", "unavailableCount", "latestFreshnessAt"])
+      || (window.days !== 7 && window.days !== 30) || !Number.isSafeInteger(window.readyCount) || !Number.isSafeInteger(window.partialCount)
+      || !Number.isSafeInteger(window.unavailableCount) || (window.readyCount as number) < 0 || (window.partialCount as number) < 0
+      || (window.unavailableCount as number) < 0 || !(window.latestFreshnessAt === null || typeof window.latestFreshnessAt === "string"
+        && Number.isFinite(Date.parse(window.latestFreshnessAt)))) throw new Error("invalid_evidence_context");
+    return window;
+  });
+  if (new Set(windows.map((window) => window.days)).size !== 2) throw new Error("invalid_evidence_context");
+  const kinds = snapshot.timeline.kinds.map((item) => {
+    if (!exact(item, ["kind", "count"]) || typeof item.kind !== "string" || !["slice_rule_draft", "budget_proposal", "budget_selection", "action_preparation", "delivery_alert", "approval_proposed", "approval_decision", "temporal_evaluation"].includes(item.kind)
+      || !Number.isSafeInteger(item.count) || (item.count as number) < 1 || (item.count as number) > 12) throw new Error("invalid_evidence_context");
+    return item;
+  });
+  if (new Set(kinds.map((item) => item.kind)).size !== kinds.length) throw new Error("invalid_evidence_context");
+  if (kinds.reduce((total, item) => total + (item.count as number), 0) !== snapshot.timeline.eventCount) throw new Error("invalid_evidence_context");
+  return Object.freeze({ state: "bound", performance: Object.freeze({ state: snapshot.performance.state as "ready" | "partial" | "unavailable",
+    accountCount: snapshot.performance.accountCount as number, campaignCount: snapshot.performance.campaignCount as number }),
+  timeline: Object.freeze({ state: snapshot.timeline.state as "ready" | "unavailable", eventCount: snapshot.timeline.eventCount as number,
+    latestOccurredAt: snapshot.timeline.latestOccurredAt as string | null }) });
+}
+
+function skillRunEvidence(snapshot: unknown, hash: unknown, evidenceContextHash: unknown): OrchestratorTurnEvidence["skillRun"] {
+  if (snapshot === undefined && hash === undefined) return Object.freeze({ state: "legacy_not_recorded", receipt: null });
+  if (exact(snapshot, ["version"]) && snapshot.version === "unavailable_not_bound" && hash === "UNAVAILABLE_NOT_BOUND") {
+    return Object.freeze({ state: "unavailable_not_bound", receipt: null });
+  }
+  const receipt = parseOrchestratorSkillRunReceipt(snapshot, hash);
+  if (!receipt || receipt.evidenceContextHash !== evidenceContextHash) return Object.freeze({ state: "missing_or_invalid", receipt: null });
+  const selectedSkills = receipt.selectedSkills.map((skill) => {
+    const manifest = coreSkillManifest(skill.ref, skill.version, skill.hash);
+    return Object.freeze({ name: manifest.name, version: manifest.version, outputContract: manifest.outputContract });
+  });
+  return Object.freeze({ state: "bound", receipt: Object.freeze({ receiptRef: receipt.receiptRef, receiptHash: receipt.receiptHash,
+    intent: receipt.intent, selectedSkills: Object.freeze(selectedSkills), evidenceAvailability: receipt.evidence.availability,
+    outputContract: receipt.handler.outputContract, authority: receipt.authority }) });
+}
+
+type HistoricalSourceCitation = Readonly<{ title: string; type: string; url: string | null;
+  freshness: "fresh" | "stale" | "not_scheduled" }>;
+function historicalSourceCitation(value: unknown): HistoricalSourceCitation {
+  if (!exact(value, ["sourceTitle", "sourceType", "sourceUrl", "freshness"])
+    || typeof value.sourceTitle !== "string" || !value.sourceTitle.trim() || value.sourceTitle.length > 160
+    || /[\u0000-\u001f\u007f]/.test(value.sourceTitle) || value.sourceType !== "official_meta_guidance"
+    || value.freshness !== "fresh" || typeof value.sourceUrl !== "string" || !isOfficialGuidanceSourceUrl(value.sourceUrl)) throw new Error("invalid_citation");
+  return Object.freeze({ title: value.sourceTitle.trim(), type: value.sourceType, url: value.sourceUrl, freshness: "fresh" });
+}
+
+/** Never joins mutable sources: this read projection reports only ledger-frozen evidence. */
+export function orchestratorTurnEvidenceFromLedger(row: EvidenceTurnRow): OrchestratorTurnEvidence {
+  if (!TURN.test(row.turn_ref)) return unavailableEvidence("missing_or_invalid");
+  const legacy = exact(row.profile_snapshot, ["version"]) && row.profile_snapshot.version === "legacy_not_recorded"
+    && Array.isArray(row.manifest_snapshots) && row.manifest_snapshots.length === 0
+    && Array.isArray(row.playbook_snapshots) && row.playbook_snapshots.length === 0
+    && row.skill_catalog_binding_hash === "LEGACY_NOT_BOUND";
+  if (legacy) return Object.freeze({ ...unavailableEvidence("legacy_not_recorded"), readOnlyEvidence: readOnlyEvidence(row.evidence_context_snapshot, row.evidence_context_hash),
+    skillRun: skillRunEvidence(row.skill_run_snapshot, row.skill_run_hash, row.evidence_context_hash), interviewKits: interviewKitEvidence(row.interview_kit_snapshots, row.interview_kit_binding_hash) });
+  const unavailable = exact(row.profile_snapshot, ["version"]) && row.profile_snapshot.version === "unavailable_not_bound"
+    && Array.isArray(row.manifest_snapshots) && row.manifest_snapshots.length === 0
+    && Array.isArray(row.playbook_snapshots) && row.playbook_snapshots.length === 0
+    && row.skill_catalog_binding_hash === "UNAVAILABLE_NOT_BOUND";
+  if (unavailable) return Object.freeze({ ...unavailableEvidence("unavailable_not_bound"), readOnlyEvidence: readOnlyEvidence(row.evidence_context_snapshot, row.evidence_context_hash),
+    skillRun: skillRunEvidence(row.skill_run_snapshot, row.skill_run_hash, row.evidence_context_hash), interviewKits: interviewKitEvidence(row.interview_kit_snapshots, row.interview_kit_binding_hash) });
+  try {
+    const guide = pageGuide(row.page_guide);
+    if (!exact(row.profile_snapshot, ["version", "profileRef", "revision", "profileHash"])
+      || row.profile_snapshot.version !== SKILL_CATALOG_VERSION || typeof row.profile_snapshot.profileRef !== "string"
+      || !PROFILE_REF.test(row.profile_snapshot.profileRef) || !Number.isSafeInteger(row.profile_snapshot.revision)
+      || (row.profile_snapshot.revision as number) < 1 || typeof row.profile_snapshot.profileHash !== "string"
+      || !HASH.test(row.profile_snapshot.profileHash) || !Array.isArray(row.manifest_snapshots)
+      || row.manifest_snapshots.length !== CORE_SKILL_MANIFESTS.length || !Array.isArray(row.playbook_snapshots)
+      || row.playbook_snapshots.length > 12 || typeof row.skill_catalog_binding_hash !== "string"
+      || !HASH.test(row.skill_catalog_binding_hash)) throw new Error("invalid_binding");
+    const manifests = row.manifest_snapshots.map((manifest) => {
+      if (!exact(manifest, ["ref", "version", "hash"]) || typeof manifest.ref !== "string"
+        || typeof manifest.version !== "string" || typeof manifest.hash !== "string") throw new Error("invalid_manifest");
+      const found = coreSkillManifest(manifest.ref, manifest.version, manifest.hash);
+      return Object.freeze({ ref: found.ref, version: found.version, hash: found.hash, name: found.name });
+    }).sort((left, right) => left.ref.localeCompare(right.ref));
+    if (new Set(manifests.map((manifest) => manifest.ref)).size !== CORE_SKILL_MANIFESTS.length) throw new Error("duplicate_manifest");
+    const sourceDetailRecorded = row.playbook_snapshots.every((playbook) => exact(playbook,
+      ["playbookRef", "revision", "playbookHash", "sourceRef", "citation"]));
+    const legacySourceDetail = row.playbook_snapshots.every((playbook) => exact(playbook,
+      ["playbookRef", "revision", "playbookHash", "sourceRef"]));
+    if (!sourceDetailRecorded && !legacySourceDetail) throw new Error("mixed_or_invalid_citations");
+    const playbooks = row.playbook_snapshots.map((playbook) => {
+      if (!exact(playbook, sourceDetailRecorded
+        ? ["playbookRef", "revision", "playbookHash", "sourceRef", "citation"]
+        : ["playbookRef", "revision", "playbookHash", "sourceRef"])
+        || typeof playbook.playbookRef !== "string" || !PLAYBOOK_REF.test(playbook.playbookRef)
+        || !Number.isSafeInteger(playbook.revision) || (playbook.revision as number) < 1
+        || typeof playbook.playbookHash !== "string" || !HASH.test(playbook.playbookHash)
+        || typeof playbook.sourceRef !== "string" || !SOURCE_REF.test(playbook.sourceRef)) throw new Error("invalid_playbook");
+      const citation = sourceDetailRecorded ? historicalSourceCitation(playbook.citation) : null;
+      return Object.freeze({ playbookRef: playbook.playbookRef, revision: playbook.revision as number,
+        playbookHash: playbook.playbookHash, sourceRef: playbook.sourceRef,
+        citation });
+    }).sort((left, right) => left.playbookRef.localeCompare(right.playbookRef));
+    if (new Set(playbooks.map((playbook) => playbook.playbookRef)).size !== playbooks.length) throw new Error("duplicate_playbook");
+    return Object.freeze({ state: "bound", pageGuide: Object.freeze({ pageLabel: guide.pageLabel, purpose: guide.purpose,
+      scope: guide.recordPath }), profileLabel: `Workspace skill profili · revizyon ${row.profile_snapshot.revision}`,
+    skills: Object.freeze(manifests.map(({ name, version }) => Object.freeze({ name, version }))),
+    playbooks: Object.freeze(playbooks.map((playbook) => Object.freeze({ label: `Doğrulanmış çalışma notu · revizyon ${playbook.revision}`,
+      source: playbook.citation }))), historicalSourceState: playbooks.length === 0 ? "not_applicable"
+      : sourceDetailRecorded ? "available" : "detail_not_recorded", evidenceScope: EVIDENCE_SCOPE, uncertainty: UNCERTAINTY,
+      readOnlyEvidence: readOnlyEvidence(row.evidence_context_snapshot, row.evidence_context_hash),
+      skillRun: skillRunEvidence(row.skill_run_snapshot, row.skill_run_hash, row.evidence_context_hash),
+      interviewKits: interviewKitEvidence(row.interview_kit_snapshots, row.interview_kit_binding_hash) });
+  } catch { return unavailableEvidence("missing_or_invalid"); }
+}
+
+function message(row: MessageRow, evidence: OrchestratorTurnEvidence | undefined): OrchestratorMessage {
   if (!MESSAGE.test(row.message_ref) || !TURN.test(row.turn_ref)
     || !Number.isSafeInteger(row.message_number) || row.message_number < 1 || row.message_number > 2_000_000
     || (row.role !== "user" && row.role !== "assistant")
     || typeof row.content !== "string" || row.content.length < 1 || row.content.length > 30_000) fail("corrupt_store");
   return Object.freeze({ messageRef: row.message_ref, turnRef: row.turn_ref, messageNumber: row.message_number,
-    role: row.role, content: row.content, createdAt: iso(row.created_at) });
+    role: row.role, content: row.content, createdAt: iso(row.created_at),
+    ...(row.role === "assistant" ? { evidence: evidence ?? unavailableEvidence("missing_or_invalid") } : {}) });
 }
 
 async function snapshot(executor: Executor, scope: Readonly<{ workspaceId: string; userId: string;
@@ -101,11 +296,28 @@ async function snapshot(executor: Executor, scope: Readonly<{ workspaceId: strin
     from orchestrator_conversation_messages
     where workspace_id = ${scope.workspaceId}::uuid and conversation_ref = ${scope.conversationRef}
     order by message_number asc limit 200
-  `)).map(message);
-  if (storedMessages.some((item, index) => item.messageNumber !== index + 1)) fail("corrupt_store");
+  `));
+  const evidenceRows = rows<EvidenceTurnRow>(await executor.execute(sql`
+    select turn.turn_ref, turn.page_guide, turn.profile_snapshot, turn.manifest_snapshots,
+      turn.playbook_snapshots, turn.skill_catalog_binding_hash, turn.interview_kit_snapshots, turn.interview_kit_binding_hash, turn.evidence_context_snapshot, turn.evidence_context_hash,
+      turn.skill_run_snapshot, turn.skill_run_hash
+    from orchestrator_conversation_turns turn
+    join orchestrator_conversations conversation on conversation.workspace_id = turn.workspace_id
+      and conversation.conversation_ref = turn.conversation_ref
+    where turn.workspace_id = ${scope.workspaceId}::uuid and turn.conversation_ref = ${scope.conversationRef}
+      and conversation.user_id = ${scope.userId}::uuid
+    order by turn.turn_number asc limit 100
+  `));
+  const evidenceByTurn = new Map<string, OrchestratorTurnEvidence>();
+  for (const row of evidenceRows) {
+    if (!TURN.test(row.turn_ref) || evidenceByTurn.has(row.turn_ref)) fail("corrupt_store");
+    evidenceByTurn.set(row.turn_ref, orchestratorTurnEvidenceFromLedger(row));
+  }
+  const publicMessages = storedMessages.map((stored) => message(stored, evidenceByTurn.get(stored.turn_ref)));
+  if (publicMessages.some((item, index) => item.messageNumber !== index + 1)) fail("corrupt_store");
   return Object.freeze({ conversationRef: conversation.conversation_ref, createdAt: iso(conversation.created_at),
     pageGuide: latest ? pageGuide(latest.page_guide) : null, providerThreadRef: latestCompleted,
-    messages: Object.freeze(storedMessages) });
+    messages: Object.freeze(publicMessages) });
 }
 
 export class DrizzleOrchestratorConversationRepository implements OrchestratorConversationRepository {
@@ -190,11 +402,16 @@ export class DrizzleOrchestratorConversationRepository implements OrchestratorCo
       await transaction.execute(sql`
         insert into orchestrator_conversation_turns (
           workspace_id, conversation_ref, turn_ref, turn_number, provider, provider_thread_ref,
-          outcome, failure_code, page_guide, created_at
+          outcome, failure_code, page_guide, profile_snapshot, manifest_snapshots, playbook_snapshots, skill_catalog_binding_hash, interview_kit_snapshots, interview_kit_binding_hash,
+          evidence_context_snapshot, evidence_context_hash, skill_run_snapshot, skill_run_hash, created_at
         ) values (
           ${input.workspaceId}::uuid, ${input.conversationRef}, ${input.turnRef}, ${counters.turn_number},
           'codex_cli', ${input.providerThreadRef}, ${input.outcome}, ${input.failureCode},
-          ${JSON.stringify(input.pageGuide)}::jsonb, ${input.createdAt}::timestamptz
+          ${JSON.stringify(input.pageGuide)}::jsonb, ${JSON.stringify(input.skillCatalogSnapshot.profile)}::jsonb,
+          ${JSON.stringify(input.skillCatalogSnapshot.manifests)}::jsonb,
+          ${JSON.stringify(input.skillCatalogSnapshot.playbooks)}::jsonb,
+          ${input.skillCatalogSnapshot.bindingHash}, ${JSON.stringify(input.interviewKitSnapshots)}::jsonb, ${input.interviewKitBindingHash}, ${JSON.stringify(input.evidenceContextSnapshot)}::jsonb,
+          ${input.evidenceContextHash}, ${JSON.stringify(input.skillRunSnapshot)}::jsonb, ${input.skillRunHash}, ${input.createdAt}::timestamptz
         )
       `);
       await transaction.execute(sql`

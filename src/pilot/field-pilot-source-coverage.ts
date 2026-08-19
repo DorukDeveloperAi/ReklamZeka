@@ -21,6 +21,10 @@ export type FieldPilotSourceCoverageInput = Readonly<{
   accountInventory: Readonly<{ workspaceCount: number; accountCount: number }>;
   freshSync: Readonly<{ workspaceCount: number; accountCount: number }>;
   feedback: Readonly<{ workspaceCount: number }>;
+  /** Present only when server-owned dashboard verification telemetry is available. */
+  activation?: Readonly<{ workspaceCount: number; accountCount: number }>;
+  /** Present only when the immutable critical-incident history is available. */
+  securityIncidents?: Readonly<{ workspaceCount: number; openCriticalIncidentCount: number }>;
 }>;
 
 export type FieldPilotSourceCensus = Readonly<{
@@ -47,19 +51,36 @@ export function evaluateFieldPilotSourceCoverage(input: FieldPilotSourceCoverage
   const freshWorkspaceCount = count(input.freshSync.workspaceCount);
   const freshAccountCount = count(input.freshSync.accountCount);
   const feedbackWorkspaceCount = count(input.feedback.workspaceCount);
+  const activationWorkspaceCount = count(input.activation?.workspaceCount ?? -1);
+  const activationAccountCount = count(input.activation?.accountCount ?? -1);
+  const securityWorkspaceCount = count(input.securityIncidents?.workspaceCount ?? -1);
+  const openCriticalIncidentCount = count(input.securityIncidents?.openCriticalIncidentCount ?? -1);
   const inventoryAvailable = workspaceCount >= 3 && accountCount >= 10;
   const freshnessAvailable = inventoryAvailable
     && freshWorkspaceCount === workspaceCount
     && freshAccountCount === accountCount;
   const feedbackAvailable = feedbackWorkspaceCount >= 3;
+  const activationAvailable = inventoryAvailable
+    && activationWorkspaceCount === workspaceCount
+    && activationAccountCount === accountCount;
+  const securityIncidentsAvailable = inventoryAvailable
+    && securityWorkspaceCount === workspaceCount
+    && openCriticalIncidentCount === 0;
+  const activationMissingReason = activationAvailable ? null
+    : input.activation === undefined ? "dashboard_verified_telemetry_not_persisted_in_postgres"
+      : "dashboard_verified_coverage_below_active_account_inventory";
+  const securityIncidentsMissingReason = securityIncidentsAvailable ? null
+    : input.securityIncidents === undefined ? "open_resolved_critical_incident_telemetry_not_persisted_in_postgres"
+      : openCriticalIncidentCount > 0 ? "open_critical_security_incidents_present"
+        : "critical_incident_coverage_below_active_workspace_inventory";
   const families: readonly FieldPilotSourceCoverage[] = [
     {
       family: "account_inventory", available: inventoryAvailable, workspaceCount, accountCount,
       missingReason: inventoryAvailable ? null : "real_active_meta_inventory_below_3_workspaces_10_accounts",
     },
     {
-      family: "activation", available: false, workspaceCount: 0, accountCount: 0,
-      missingReason: "dashboard_verified_telemetry_not_persisted_in_postgres",
+      family: "activation", available: activationAvailable, workspaceCount: activationWorkspaceCount, accountCount: activationAccountCount,
+      missingReason: activationMissingReason,
     },
     {
       family: "freshness", available: freshnessAvailable, workspaceCount: freshWorkspaceCount, accountCount: freshAccountCount,
@@ -70,15 +91,23 @@ export function evaluateFieldPilotSourceCoverage(input: FieldPilotSourceCoverage
       missingReason: feedbackAvailable ? null : "insight_feedback_coverage_below_3_workspaces",
     },
     {
-      family: "security_incidents", available: false, workspaceCount: 0, accountCount: 0,
-      missingReason: "open_resolved_critical_incident_telemetry_not_persisted_in_postgres",
+      family: "security_incidents", available: securityIncidentsAvailable, workspaceCount: securityWorkspaceCount, accountCount: 0,
+      missingReason: securityIncidentsMissingReason,
     },
     {
       family: "attestation", available: false, workspaceCount: 0, accountCount: 0,
       missingReason: "human_real_account_attestation_not_supplied",
     },
   ];
-  const sourceBackedCriteriaComplete = inventoryAvailable && freshnessAvailable && feedbackAvailable;
+  // A human attestation can only certify a source-complete pilot record. It
+  // must never be used to fill in missing activation or incident evidence.
+  // `attestation` itself remains unavailable here because it is supplied by a
+  // separate human ceremony and is intentionally not inferred from database rows.
+  const sourceBackedCriteriaComplete = inventoryAvailable
+    && activationAvailable
+    && freshnessAvailable
+    && feedbackAvailable
+    && securityIncidentsAvailable;
   return {
     requiredWorkspaceCount: 3,
     requiredAccountCount: 10,

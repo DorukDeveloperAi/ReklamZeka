@@ -28,16 +28,16 @@ function timestamp(value: string) {
 }
 
 function stateLabel(item: PracticeLabSummary) {
-  if (item.state === "standardized") return "Standardized";
-  if (item.state === "standardization_candidate") return "Standardization candidate";
-  if (item.state === "standardization_reviewed") return "Standardization review";
-  if (item.state === "trial") return "Trial";
-  if (item.state === "validated") return "Validated";
-  if (item.state === "conditional") return "Conditional";
-  if (item.state === "rejected") return "Rejected";
-  if (item.state === "retired") return "Retired";
-  if (item.state === "reviewed") return "Reviewed";
-  return "Candidate";
+  if (item.state === "standardized") return "Standartlaştırıldı";
+  if (item.state === "standardization_candidate") return "Standartlaştırma adayı";
+  if (item.state === "standardization_reviewed") return "Standartlaştırma incelemesi";
+  if (item.state === "trial") return "Denemede";
+  if (item.state === "validated") return "Doğrulandı";
+  if (item.state === "conditional") return "Koşullu";
+  if (item.state === "rejected") return "Reddedildi";
+  if (item.state === "retired") return "Kullanımdan kaldırıldı";
+  if (item.state === "reviewed") return "İncelendi";
+  return "Aday";
 }
 
 export function PracticeLabReadSurface(props: Readonly<{
@@ -51,15 +51,15 @@ export function PracticeLabReadSurface(props: Readonly<{
   const ready = props.state.status === "ready" ? props.state : null;
   return <>
     <section className={styles.pageHero}>
-      <div><span className={styles.kicker}>PRACTICE LAB · READ / HUMAN-GATED LIFECYCLE</span><h1>Şahsi yaklaşımınız, kanıtı ve yaşam döngüsüyle görünür.</h1><p>Owner anlatımı ve resmi Meta kaynakları birlikte okunur. Agent yalnız geçici görüşme taslağı hazırlayabilir; lifecycle standardization kaydı açık insan rolü ve onayı ister, guidance, policy, otomasyon veya eylem üretmez.</p></div>
-      <span className={styles.readOnlyBadge}>ADVISORY ONLY · GUARDED EVENTS</span>
+      <div><span className={styles.kicker}>ÖĞRENİM · SALT-OKUNUR VE İNSAN ONAYLI</span><h1>Yaklaşımlarınızı kanıtı ve yaşam döngüsüyle izleyin.</h1><p>Sahip anlatımı ve resmi Meta kaynakları birlikte okunur. Asistan yalnız geçici görüşme taslağı hazırlayabilir; standartlaştırma kaydı açık insan rolü ve onayı ister, rehber, politika, otomasyon veya eylem üretmez.</p></div>
+      <span className={styles.readOnlyBadge}>YALNIZ DANIŞMANLIK · KORUMALI KAYITLAR</span>
     </section>
 
-    {props.state.status === "loading" ? <section className={`${styles.panel} ${styles.practiceLabState}`} role="status"><span className={styles.liveDot} /><h2>Practice zincirleri doğrulanıyor</h2><p>Tenant kapsamı ve append-only lifecycle bütünlüğü sunucuda kontrol edilir.</p></section> : null}
-    {props.state.status === "session_required" ? <section className={`${styles.panel} ${styles.practiceLabState}`} role="alert"><strong>YEREL OTURUM GEREKLİ</strong><h2>Practice çalışma alanını bağlayın</h2><p>{props.state.message}</p>{props.onConnect ? <LocalSessionConnector title="Practice çalışma alanını bağlayın" onVerify={props.onConnect} /> : <button onClick={props.onRetry}>Tekrar dene</button>}</section> : null}
+    {props.state.status === "loading" ? <section className={`${styles.panel} ${styles.practiceLabState}`} role="status"><span className={styles.liveDot} /><h2>Öğrenim zincirleri doğrulanıyor</h2><p>Çalışma alanı kapsamı ve değiştirilemez yaşam döngüsü bütünlüğü sunucuda kontrol edilir.</p></section> : null}
+    {props.state.status === "session_required" ? <section className={`${styles.panel} ${styles.practiceLabState}`} role="alert"><strong>YEREL OTURUM GEREKLİ</strong><h2>Öğrenim çalışma alanını bağlayın</h2><p>{props.state.message}</p>{props.onConnect ? <LocalSessionConnector title="Öğrenim çalışma alanını bağlayın" onVerify={props.onConnect} /> : <button onClick={props.onRetry}>Tekrar dene</button>}</section> : null}
     {props.state.status === "unavailable" ? <section className={`${styles.panel} ${styles.practiceLabState}`} role="alert"><strong>Kaynak henüz bağlı değil</strong><h2>{props.state.message}</h2><p>Çalışma alanı kaynağı yapılandırılana kadar kayıt gösterilemez.</p><button onClick={props.onRetry}>Tekrar kontrol et</button></section> : null}
-    {props.state.status === "error" ? <section className={`${styles.panel} ${styles.practiceLabState}`} role="alert"><strong>Practice Lab okunamadı</strong><h2>{props.state.message}</h2><p>Güvensiz veya kapsam dışı kayıtlar kısmen gösterilmez; yüzey fail-closed davranır.</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
-    {ready && ready.result.items.length === 0 ? <section className={`${styles.panel} ${styles.practiceLabState}`}><strong>Kaynak bağlı · practice yok</strong><h2>Bu çalışma alanında henüz advised practice bulunmuyor.</h2><p>Kaynak başarıyla okundu; eklenmiş bir yaklaşım kaydı bulunamadı.</p></section> : null}
+    {props.state.status === "error" ? <section className={`${styles.panel} ${styles.practiceLabState}`} role="alert"><strong>Öğrenim kayıtları okunamadı</strong><h2>{props.state.message}</h2><p>Güvensiz veya kapsam dışı kayıtlar kısmen gösterilmez; alan güvenli biçimde kapalı kalır.</p><button onClick={props.onRetry}>Tekrar dene</button></section> : null}
+    {ready && ready.result.items.length === 0 ? <section className={`${styles.panel} ${styles.practiceLabState}`}><strong>Kaynak bağlı · yaklaşım kaydı yok</strong><h2>Bu çalışma alanında henüz öğrenilmiş yaklaşım bulunmuyor.</h2><p>Kaynak başarıyla okundu; eklenmiş bir yaklaşım kaydı bulunamadı.</p></section> : null}
     {ready && ready.result.items.length > 0 ? <div className={styles.practiceLabWorkspace}>
       <section className={`${styles.panel} ${styles.practiceLabIndex}`}>
         <header className={styles.panelHeader}><div><span className={styles.kicker}>ADVISED PRACTICES</span><h2>{ready.result.items.length} kayıt</h2></div><span>Public-safe projection</span></header>

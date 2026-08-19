@@ -29,6 +29,9 @@ export type ActionType =
   | "status_activate"
   | "budget_decrease"
   | "budget_increase"
+  | "campaign_rename"
+  | "adset_rename"
+  | "ad_rename"
   | "existing_post_promotion";
 
 export type ActionEntity = Readonly<{
@@ -53,6 +56,13 @@ export type TypedActionIntent =
     beforeDecimal: string;
     afterDecimal: string;
     budgetOwnerRef: string;
+  }>
+  | Readonly<{
+    kind: "rename";
+    entity: ActionEntity;
+    beforeName: string;
+    afterName: string;
+    namingEvidenceRef: string;
   }>
   | Readonly<{
     kind: "existing_post_promotion";
@@ -364,6 +374,22 @@ function classifyAction(value: unknown): ClassifiedAction {
       budgetAfter: after,
     };
   }
+  if (candidate.kind === "rename") {
+    exactKeys(value, ["kind", "entity", "beforeName", "afterName", "namingEvidenceRef"]);
+    const entity = validateEntity(candidate.entity);
+    const name = (input: unknown): string => {
+      if (typeof input !== "string" || input !== input.trim() || input.length < 1 || input.length > 255
+        || /[\u0000-\u001f\u007f]/.test(input)) fail("invalid_action");
+      return input;
+    };
+    const beforeName = name(candidate.beforeName); const afterName = name(candidate.afterName);
+    if (beforeName === afterName) fail("invalid_action");
+    const action = Object.freeze({ kind: "rename" as const, entity, beforeName, afterName,
+      namingEvidenceRef: reference(candidate.namingEvidenceRef) });
+    const actionType = `${entity.level === "adset" ? "adset" : entity.level}_rename` as
+      "campaign_rename" | "adset_rename" | "ad_rename";
+    return { action, actionType, risk: "K3", budgetDelta: null, budgetBefore: null, budgetAfter: null };
+  }
   if (candidate.kind === "existing_post_promotion") {
     const legacy = Object.hasOwn(candidate, "creativeBindingHash") && !Object.hasOwn(candidate, "sourceBinding");
     exactKeys(value, legacy ? [
@@ -429,7 +455,7 @@ function validateScope(value: unknown): AutonomyScope {
   }
   if (candidate.level === "action_type") {
     exactKeys(value, ["level", "actionType"]);
-    if (!["no_change", "internal_annotation", "status_pause", "status_activate", "budget_decrease", "budget_increase", "existing_post_promotion"].includes(candidate.actionType as string)) fail("invalid_scope");
+    if (!["no_change", "internal_annotation", "status_pause", "status_activate", "budget_decrease", "budget_increase", "campaign_rename", "adset_rename", "ad_rename", "existing_post_promotion"].includes(candidate.actionType as string)) fail("invalid_scope");
     return Object.freeze({ level: "action_type", actionType: candidate.actionType as ActionType });
   }
   fail("invalid_scope");

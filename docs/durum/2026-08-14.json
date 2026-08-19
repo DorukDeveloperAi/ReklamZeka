@@ -4,153 +4,157 @@
   "uzak": true,
   "isCommitleri": [
     {
-      "hash": "e709edff3",
+      "hash": "42f0364f0",
       "tarih": "2026-08-14",
-      "konu": "DURUM türevlerini de merge=ours ile beyan et (agent-ide emsali)",
-      "tur": "is",
-      "kapsam": []
-    },
-    {
-      "hash": "0b287b002",
-      "tarih": "2026-08-14",
-      "konu": "aide türevlerini merge=ours ile beyan et — boot'u öldüren çakışmanın kök nedeni",
-      "tur": "is",
-      "kapsam": []
-    },
-    {
-      "hash": "ac54d9c60",
-      "tarih": "2026-08-14",
-      "konu": "docs(local): describe manual dashboard approval flow",
+      "konu": "feat(agent): expose frozen turn evidence",
       "tur": "is",
       "kapsam": [
-        "docs"
+        "feat"
       ]
     },
     {
-      "hash": "972e72abb",
+      "hash": "a483e4e3b",
       "tarih": "2026-08-14",
-      "konu": "docs(state): record canonical insight bootstrap",
+      "konu": "feat(agent): bind workspace playbooks to turns",
       "tur": "is",
       "kapsam": [
-        "docs"
+        "feat"
       ]
     },
     {
-      "hash": "1046fc2ce",
+      "hash": "653f647a8",
       "tarih": "2026-08-14",
-      "konu": "test(approval): isolate verifier cleanup connection",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "de22424a1",
-      "tarih": "2026-08-14",
-      "konu": "test(approval): bound queue verifier transport",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "b9e55c672",
-      "tarih": "2026-08-14",
-      "konu": "test(approval): retry tombstone transport",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "ae91bcce6",
-      "tarih": "2026-08-14",
-      "konu": "test(approval): complete guardrail category context",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "4b8187658",
-      "tarih": "2026-08-14",
-      "konu": "test(approval): materialize active ad set evidence",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "4f9d5407e",
-      "tarih": "2026-08-14",
-      "konu": "test(approval): bind ad set category evidence",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "438d52f9d",
-      "tarih": "2026-08-14",
-      "konu": "test(approval): evaluate guardrails at command time",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "cddda92c0",
-      "tarih": "2026-08-14",
-      "konu": "test(approval): materialize complete guardrail evidence",
-      "tur": "is",
-      "kapsam": [
-        "test"
-      ]
-    },
-    {
-      "hash": "3377eee7b",
-      "tarih": "2026-08-14",
-      "konu": "fix(approval): bind geo evidence through hierarchy",
+      "konu": "fix(agent): enforce user-authored rule boundaries",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "294e5e398",
+      "hash": "40bcb182e",
       "tarih": "2026-08-14",
-      "konu": "fix(meta): label trust freshness in hours",
+      "konu": "feat(budget): guide pool hierarchy drafts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "ad6044644",
+      "tarih": "2026-08-14",
+      "konu": "feat(skills): revise user playbooks safely",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "3996b7e91",
+      "tarih": "2026-08-14",
+      "konu": "feat(slice-rules): show read-only decision trace",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "04d011008",
+      "tarih": "2026-08-14",
+      "konu": "fix(tombstone): retain operational audit coverage",
       "tur": "is",
       "kapsam": [
         "fix"
       ]
     },
     {
-      "hash": "2834bf3f7",
+      "hash": "92a7ddf3d",
       "tarih": "2026-08-14",
-      "konu": "fix(approval): enforce published budget guardrails",
+      "konu": "feat(actions): add unified preparation gate",
       "tur": "is",
       "kapsam": [
-        "fix"
+        "feat"
+      ]
+    },
+    {
+      "hash": "4fe3836ce",
+      "tarih": "2026-08-14",
+      "konu": "feat(dashboard): manage skill catalog in rules",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "3bd1ca607",
+      "tarih": "2026-08-14",
+      "konu": "feat(agent): show safe skill catalog context",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "d79562e58",
+      "tarih": "2026-08-14",
+      "konu": "feat(slice-rule): add guarded scenario selection",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c27504ecd",
+      "tarih": "2026-08-14",
+      "konu": "feat: add private skill catalog route acceptance",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "aed4290b8",
+      "tarih": "2026-08-14",
+      "konu": "feat: add skill catalog repository and panel",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "fba099714",
+      "tarih": "2026-08-14",
+      "konu": "feat: add read-only skill catalog context strip",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "dd816b584",
+      "tarih": "2026-08-14",
+      "konu": "feat: add skill catalog application service",
+      "tur": "is",
+      "kapsam": [
+        "feat"
       ]
     }
   ],
   "kapsamDagilimi": [
     {
-      "kapsam": "fix",
-      "adet": 17
-    },
-    {
       "kapsam": "feat",
-      "adet": 14
+      "adet": 23
     },
     {
-      "kapsam": "docs",
-      "adet": 13
+      "kapsam": "fix",
+      "adet": 14
     },
     {
       "kapsam": "test",
       "adet": 13
+    },
+    {
+      "kapsam": "docs",
+      "adet": 7
     },
     {
       "kapsam": "?",
@@ -161,7 +165,7 @@
       "adet": 1
     }
   ],
-  "isSayisi": 452,
+  "isSayisi": 471,
   "ilkIsTarihi": "2026-08-06",
   "sonIsTarihi": "2026-08-14",
   "planlar": [
@@ -182,5 +186,5 @@
       "siradaki": "01-temel-kapanis"
     }
   ],
-  "damga": "dca4cf2c2385"
+  "damga": "26197ef43b84"
 }

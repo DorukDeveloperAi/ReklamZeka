@@ -81,6 +81,7 @@ type InternalPlan = Readonly<{
   expectedGeneration: number;
   expiresAt: string;
   consumed: boolean;
+  resume: boolean;
 }>;
 
 export type WorkspaceTombstoneStore = Readonly<{
@@ -93,6 +94,7 @@ export type WorkspaceTombstoneStore = Readonly<{
     expectedGeneration: number;
     lifecycleActorId: string;
     occurredAt: string;
+    resume?: boolean;
   }>): Promise<Readonly<{
     purgedRowCount: number;
     membershipCount: number;
@@ -184,7 +186,7 @@ export class WorkspaceTombstoneService {
       expectedPurgeRevision: snapshot.purgeRevision,
       expectedGeneration: snapshot.generation,
       expiresAt,
-      consumed: false,
+      consumed: false, resume: false,
     }));
     return Object.freeze({
       policyVersion: META_DATA_LIFECYCLE_POLICY_VERSION,
@@ -197,6 +199,16 @@ export class WorkspaceTombstoneService {
       issuedAt: new Date(nowMs).toISOString(),
       expiresAt,
     });
+  }
+
+  /** Resumes only an already-authorized interrupted tombstone; it never reopens a workspace. */
+  async resumeTombstoning(workspaceId: string, expectedRevision: string, expectedCandidateCount: number, now: string): Promise<WorkspaceTombstonePreview> {
+    if (!workspaceId || !expectedRevision || !Number.isSafeInteger(expectedCandidateCount) || expectedCandidateCount < 0) throw new WorkspaceTombstoneError("invalid_input");
+    const nowMs = validTime(now); const snapshot = await this.store.inspect(workspaceId);
+    if (snapshot.state !== "tombstoning" || snapshot.generation < 1 || snapshot.revision !== expectedRevision || snapshot.candidateCount !== expectedCandidateCount) throw new WorkspaceTombstoneError("revision_changed");
+    const planRef=`tombstone_${randomUUID()}`, workspaceRef=publicRef("workspace",workspaceId), expiresAt=new Date(nowMs+this.planTtlMs).toISOString();
+    this.plans.set(planRef,Object.freeze({planRef,workspaceId,workspaceRef,expectedRevision:snapshot.revision,expectedPurgeRevision:snapshot.purgeRevision,expectedGeneration:snapshot.generation,expiresAt,consumed:false,resume:true}));
+    return Object.freeze({policyVersion:META_DATA_LIFECYCLE_POLICY_VERSION,mode:"dry_run",planRef,workspaceRef,revisionRef:publicRef("revision",snapshot.revision),candidateCount:snapshot.candidateCount,connectionCount:snapshot.connectionCount,issuedAt:new Date(nowMs).toISOString(),expiresAt});
   }
 
   async execute(input: Readonly<{
@@ -227,6 +239,7 @@ export class WorkspaceTombstoneService {
       expectedGeneration: plan.expectedGeneration,
       lifecycleActorId: this.lifecycleActorId,
       occurredAt: new Date(nowMs).toISOString(),
+      resume: plan.resume,
     });
     this.plans.set(plan.planRef, Object.freeze({ ...plan, consumed: true }));
     return Object.freeze({
@@ -259,18 +272,19 @@ export class DrizzleWorkspaceTombstoneStore implements WorkspaceTombstoneStore {
     expectedGeneration: number;
     lifecycleActorId: string;
     occurredAt: string;
+    resume?: boolean;
   }>) {
     return this.database.transaction(async (transaction) => {
       await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${input.workspaceId}, 0))`);
       await transaction.execute(sql`select id from workspaces where id = ${input.workspaceId}::uuid for update`);
       const current = await this.snapshot(transaction as unknown as DrizzleExecutor, input.workspaceId);
       if (
-        current.state !== "active"
+      (current.state !== "active" && !(input.resume === true && current.state === "tombstoning"))
         || current.generation !== input.expectedGeneration
         || current.revision !== input.expectedRevision
       ) throw new WorkspaceTombstoneError("revision_changed");
 
-      const transitioned = rows<{ id: string }>(await transaction.execute(sql`
+      const transitioned = input.resume === true ? [{ id: input.workspaceId }] : rows<{ id: string }>(await transaction.execute(sql`
         update workspaces set lifecycle_state = 'tombstoning'
         where id = ${input.workspaceId}::uuid
           and lifecycle_state = 'active'

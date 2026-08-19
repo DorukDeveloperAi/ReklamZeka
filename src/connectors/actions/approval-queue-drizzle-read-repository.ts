@@ -30,7 +30,9 @@ const DECIMAL = /^(0|[1-9]\d{0,29})(?:\.(\d{1,12}))?$/;
 const CODE = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const PRIVATE_REF = /^[a-z][a-z0-9]{0,31}_[a-z0-9][a-z0-9_.:-]{0,126}$/;
 const PUBLIC_ENTITY_REF = /^entity_[a-f0-9]{16}$/;
-const ACTION_TYPES: readonly ApprovalActionType[] = ["status_pause", "status_activate", "budget_decrease", "budget_increase"];
+const ACTION_TYPES: readonly ApprovalActionType[] = [
+  "status_pause", "status_activate", "budget_decrease", "budget_increase", "campaign_rename", "adset_rename", "ad_rename",
+];
 const UUID_TEXT = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i;
 const FULL_HASH_TEXT = /\b[a-f0-9]{64}\b/i;
 const META_ID_TEXT = /\b(?:act_|campaign_|adset_|ad_)\d{5,}\b/i;
@@ -184,6 +186,17 @@ function beforeAfter(actionType: ApprovalActionType, action: TypedActionIntent):
       || actionType === "status_activate" && action.toStatus !== "ACTIVE") fail("corrupt_store");
     return Object.freeze({ field: "configured_status", before: action.fromStatus, after: action.toStatus });
   }
+  if (actionType === "campaign_rename" || actionType === "adset_rename" || actionType === "ad_rename") {
+    exact(action, ["kind", "entity", "beforeName", "afterName", "namingEvidenceRef"]);
+    exact(action.entity, ["level", "ref"]);
+    const expectedLevel = actionType === "campaign_rename" ? "campaign" : actionType === "adset_rename" ? "adset" : "ad";
+    if (action.kind !== "rename" || action.entity.level !== expectedLevel || !PRIVATE_REF.test(action.entity.ref)
+      || typeof action.beforeName !== "string" || action.beforeName !== action.beforeName.trim() || action.beforeName.length < 1 || action.beforeName.length > 255
+      || typeof action.afterName !== "string" || action.afterName !== action.afterName.trim() || action.afterName.length < 1 || action.afterName.length > 255
+      || /[\u0000-\u001f\u007f]/.test(action.beforeName) || /[\u0000-\u001f\u007f]/.test(action.afterName)
+      || action.beforeName === action.afterName || typeof action.namingEvidenceRef !== "string" || !PRIVATE_REF.test(action.namingEvidenceRef)) fail("corrupt_store");
+    return Object.freeze({ field: "entity_name", before: action.beforeName, after: action.afterName });
+  }
   exact(action, ["kind", "entity", "budgetKind", "currency", "beforeDecimal", "afterDecimal", "budgetOwnerRef"]);
   exact(action.entity, ["level", "ref"]);
   if (action.kind !== "budget_change" || !CURRENCY.test(action.currency)
@@ -220,7 +233,7 @@ function dependencies(value: unknown): ApprovalQueueRecord["dependencies"] {
     exact(raw, ["unit_ref", "status"]);
     const dependency = raw as DependencySource;
     if (typeof dependency.unit_ref !== "string" || !UNIT_REF.test(dependency.unit_ref) || seen.has(dependency.unit_ref)
-      || !["awaiting_approval", "approved", "rejected", "changes_requested", "expired", "stale",
+      || !["awaiting_approval", "approved", "rejected", "deferred", "changes_requested", "expired", "stale",
         "superseded", "dependency_failed"].includes(dependency.status as string)) fail("corrupt_store");
     seen.add(dependency.unit_ref);
     return Object.freeze({ unitRef: dependency.unit_ref, status: dependency.status as ApprovalQueueRecord["status"] });
@@ -232,6 +245,7 @@ function currentStatus(eventType: unknown): ApprovalQueueRecord["status"] {
   const statuses: Readonly<Record<string, ApprovalQueueRecord["status"]>> = Object.freeze({
     unit_approved: "approved",
     unit_rejected: "rejected",
+    unit_deferred: "deferred",
     unit_changes_requested: "changes_requested",
     unit_expired: "expired",
     unit_stale: "stale",
@@ -324,8 +338,8 @@ function detailRow(row: SourceRow, workspaceId: string): ApprovalQueueDetailReco
   let previousAt = Date.parse(base.createdAt);
   const decisions = row.decision_timeline.map((candidate) => {
     exact(candidate, ["event_type", "occurred_at", "reason_code"]);
-    const kind: Record<string, "approved" | "rejected" | "changes_requested"> = {
-      unit_approved: "approved", unit_rejected: "rejected", unit_changes_requested: "changes_requested",
+    const kind: Record<string, "approved" | "rejected" | "deferred" | "changes_requested"> = {
+      unit_approved: "approved", unit_rejected: "rejected", unit_deferred: "deferred", unit_changes_requested: "changes_requested",
     };
     if (typeof candidate.event_type !== "string" || !Object.hasOwn(kind, candidate.event_type)
       || candidate.reason_code !== null && (typeof candidate.reason_code !== "string" || !CODE.test(candidate.reason_code))) fail("corrupt_store");
@@ -379,7 +393,7 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
         coalesce((
           select jsonb_agg(jsonb_build_object('unit_ref', edge.dependency_unit_ref, 'status',
             case dependency_event.event_type
-              when 'unit_approved' then 'approved' when 'unit_rejected' then 'rejected'
+              when 'unit_approved' then 'approved' when 'unit_rejected' then 'rejected' when 'unit_deferred' then 'deferred'
               when 'unit_changes_requested' then 'changes_requested' when 'unit_expired' then 'expired'
               when 'unit_stale' then 'stale' when 'unit_superseded' then 'superseded'
               when 'unit_dependency_failed' then 'dependency_failed' else dependency.initial_state end)
@@ -444,12 +458,12 @@ export class DrizzleApprovalQueueReadRepository implements ApprovalQueueReposito
           cross join lateral jsonb_array_elements(decision.event_payloads) event(value)
           where decision.workspace_id = unit.workspace_id and decision.bundle_id = unit.bundle_id
             and event.value ->> 'unitRef' = unit.unit_ref
-            and event.value ->> 'eventType' in ('unit_approved', 'unit_rejected', 'unit_changes_requested')
+            and event.value ->> 'eventType' in ('unit_approved', 'unit_rejected', 'unit_deferred', 'unit_changes_requested')
         ), '[]'::jsonb) as decision_timeline,
         coalesce((
           select jsonb_agg(jsonb_build_object('unit_ref', edge.dependency_unit_ref, 'status',
             case dependency_event.event_type
-              when 'unit_approved' then 'approved' when 'unit_rejected' then 'rejected'
+              when 'unit_approved' then 'approved' when 'unit_rejected' then 'rejected' when 'unit_deferred' then 'deferred'
               when 'unit_changes_requested' then 'changes_requested' when 'unit_expired' then 'expired'
               when 'unit_stale' then 'stale' when 'unit_superseded' then 'superseded'
               when 'unit_dependency_failed' then 'dependency_failed' else dependency.initial_state end)

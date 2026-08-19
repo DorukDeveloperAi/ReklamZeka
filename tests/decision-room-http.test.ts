@@ -34,6 +34,14 @@ describe("Decision Room HTTP boundary", () => {
     });
   });
 
+  it("accepts only a bounded public campaign alias for schedules and runs", async () => {
+    const api = handlers();
+    const response = await api.GET(new Request("http://localhost/api/decision-room?view=runs&campaignRef=campaign_0123456789abcdefabcd"));
+    expect(response.status).toBe(200);
+    expect(api.repository.listRuns).toHaveBeenCalledWith(expect.objectContaining({ campaignRef: "campaign_0123456789abcdefabcd" }));
+    expect((await api.GET(new Request("http://localhost/api/decision-room?view=inbox&campaignRef=campaign_0123456789abcdefabcd"))).status).toBe(400);
+  });
+
   it("never accepts workspace or reader identity from query/body", async () => {
     const api = handlers();
     const queryResponse = await api.GET(new Request(

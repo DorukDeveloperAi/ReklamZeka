@@ -90,7 +90,6 @@ describe("Meta versioned change snapshot", () => {
     expect(replay).toEqual(first);
     expect(first.changes.map(({ entityType, field, classification }) => ({ entityType, field, classification }))).toEqual([
       { entityType: "campaign", field: "budget_owner", classification: "internal_expected" },
-      { entityType: "campaign", field: "daily_budget_minor", classification: "internal_expected" },
       { entityType: "ad_set", field: "targeting_signature", classification: "external_change" },
       { entityType: "ad", field: "configured_status", classification: "internal_expected" },
     ]);
@@ -103,6 +102,59 @@ describe("Meta versioned change snapshot", () => {
       actionLedger: ledger.map((action) => ({ ...action, verificationStatus: "unverified" as const })),
     });
     expect(unverified.changes.every((change) => change.classification === "external_change")).toBe(true);
+  });
+
+  it("emits one canonical economic budget mutation: CBO campaign-only and ABO ad-set-only", () => {
+    const cboBefore = fixture();
+    const cboAfter = currentFixture();
+    const cboTimeline = diffMetaChangeSnapshots({
+      previous: normalizeMetaChangeSnapshot(cboBefore),
+      current: normalizeMetaChangeSnapshot(cboAfter),
+    });
+    expect(cboTimeline.changes.filter((change) => change.field === "budget_owner")).toHaveLength(1);
+    expect(cboTimeline.changes.filter((change) => change.field === "daily_budget_minor" || change.field === "lifetime_budget_minor")).toHaveLength(0);
+    expect(cboTimeline.changes.find((change) => change.field === "budget_owner")).toMatchObject({ entityType: "campaign" });
+
+    const aboBefore = fixture();
+    (aboBefore.campaigns[0]!.campaignBudgetOptimization as { state: "known"; value: boolean }).value = false;
+    (aboBefore.campaigns[0]!.dailyBudgetMinor as { state: "known"; value: number | null }).value = null;
+    (aboBefore.campaigns[0]!.lifetimeBudgetMinor as { state: "known"; value: number | null }).value = null;
+    (aboBefore.adSets[0]!.dailyBudgetMinor as { state: "known"; value: number | null }).value = 30_000;
+    const aboAfter = structuredClone(aboBefore);
+    (aboAfter as { capturedAt: string }).capturedAt = "2026-08-07T10:00:00.000Z";
+    (aboAfter.adSets[0]!.dailyBudgetMinor as { state: "known"; value: number | null }).value = 40_000;
+    const aboTimeline = diffMetaChangeSnapshots({
+      previous: normalizeMetaChangeSnapshot(aboBefore), current: normalizeMetaChangeSnapshot(aboAfter),
+    });
+    expect(aboTimeline.changes.filter((change) => change.field === "budget_owner")).toHaveLength(1);
+    expect(aboTimeline.changes.filter((change) => change.field === "daily_budget_minor" || change.field === "lifetime_budget_minor")).toHaveLength(0);
+    expect(aboTimeline.changes.find((change) => change.field === "budget_owner")).toMatchObject({ entityType: "ad_set" });
+  });
+
+  it("keeps known raw budget configuration deltas when owner evidence is unknown or null", () => {
+    const unknownBefore = fixture();
+    (unknownBefore.campaigns[0]!.campaignBudgetOptimization as { state: "known"; value: boolean }).value = true;
+    (unknownBefore.campaigns[0] as { campaignBudgetOptimization: unknown }).campaignBudgetOptimization = {
+      state: "unknown", reason: "cbo_not_observed",
+    };
+    const unknownAfter = structuredClone(unknownBefore);
+    (unknownAfter as { capturedAt: string }).capturedAt = "2026-08-07T10:00:00.000Z";
+    (unknownAfter.campaigns[0]!.dailyBudgetMinor as { state: "known"; value: number | null }).value = 120_000;
+    const unknownTimeline = diffMetaChangeSnapshots({
+      previous: normalizeMetaChangeSnapshot(unknownBefore), current: normalizeMetaChangeSnapshot(unknownAfter),
+    });
+    expect(unknownTimeline.changes).toContainEqual(expect.objectContaining({ entityType: "campaign", field: "daily_budget_minor" }));
+
+    const nullOwnerBefore = fixture();
+    const nullOwnerAfter = structuredClone(nullOwnerBefore);
+    (nullOwnerAfter as { capturedAt: string }).capturedAt = "2026-08-07T10:00:00.000Z";
+    // CBO owns the campaign; an ad-set raw value is a real anomalous config
+    // delta, not a duplicate of the campaign owner's economic mutation.
+    (nullOwnerAfter.adSets[0]!.dailyBudgetMinor as { state: "known"; value: number | null }).value = 12_345;
+    const nullOwnerTimeline = diffMetaChangeSnapshots({
+      previous: normalizeMetaChangeSnapshot(nullOwnerBefore), current: normalizeMetaChangeSnapshot(nullOwnerAfter),
+    });
+    expect(nullOwnerTimeline.changes).toContainEqual(expect.objectContaining({ entityType: "ad_set", field: "daily_budget_minor" }));
   });
 
   it("does not invent a change when either observation is unknown", () => {

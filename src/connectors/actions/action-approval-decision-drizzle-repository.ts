@@ -15,6 +15,7 @@ import {
   type ResolvedApprovalPolicy,
   type UnitFreshness,
 } from "@/domain/actions/approval-lifecycle";
+import { appendActionPreparationGateSnapshot, evaluateUnifiedActionPreparationGateForUnit, UnifiedActionPreparationGateError } from "@/connectors/campaigns/unified-action-preparation-gate";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -26,6 +27,7 @@ export class ActionApprovalDecisionRepositoryError extends Error {
     | "invalid_input"
     | "workspace_scope_mismatch"
     | "proposal_missing"
+    | "gate_blocked"
     | "idempotency_conflict"
     | "decision_conflict"
     | "corrupt_store") {
@@ -317,6 +319,25 @@ export class DrizzleActionApprovalDecisionRepository {
       if (locked.length === 0) throw new ActionApprovalDecisionRepositoryError("proposal_missing");
       if (locked.length !== 1) throw new ActionApprovalDecisionRepositoryError("corrupt_store");
       const { bundle_id: bundleId, unit_id: unitId } = locked[0]!;
+
+      const gateBindings = resultRows<{ selection_id: string }>(await transaction.execute(sql`
+        select selection_id from slice_rule_budget_action_unit_bindings
+        where workspace_id = ${this.workspaceId}::uuid and action_proposal_unit_id = ${unitId}::uuid limit 2
+      `));
+      if (gateBindings.length > 1) throw new ActionApprovalDecisionRepositoryError("corrupt_store");
+      if (gateBindings.length === 1) {
+        const evaluatedAt = new Date().toISOString();
+        try {
+          const gate = await evaluateUnifiedActionPreparationGateForUnit(transaction as never, {
+            workspaceId: this.workspaceId, actionProposalUnitId: unitId, stage: "approval", evaluatedAt,
+          });
+          await appendActionPreparationGateSnapshot(transaction as never, { workspaceId: this.workspaceId,
+            selectionId: null, actionProposalUnitId: unitId, result: gate, evaluatedAt });
+        } catch (error) {
+          if (error instanceof UnifiedActionPreparationGateError) throw new ActionApprovalDecisionRepositoryError("gate_blocked");
+          throw error;
+        }
+      }
 
       const loaded = await loadLifecycle(transaction, this.workspaceId, bundleId);
       const { lifecycle, decisions } = loaded;

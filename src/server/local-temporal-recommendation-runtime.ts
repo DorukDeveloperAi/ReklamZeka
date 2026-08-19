@@ -64,14 +64,21 @@ async function eligibleCandidates(database: Pick<Database, "execute">, workspace
       reviewCadence: row.review_cadence as CandidateTriple["reviewCadence"], capturedAt: row.captured_at.toISOString() });
   }));
 }
-const temporalItems = (ledger: DecisionLedger): readonly TemporalRecommendationReadItem[] => ledger.flatMap((record) => {
+const temporalItems = async (database: Pick<Database, "execute">, workspaceId: string, ledger: DecisionLedger): Promise<readonly TemporalRecommendationReadItem[]> => {
+  const ruleRows = rows<{ draft_hash: unknown; series_ref: unknown }>(await database.execute(sql`
+    select draft_hash, series_ref from slice_rule_workspace_drafts where workspace_id = ${workspaceId}::uuid
+  `));
+  const rules = new Map(ruleRows.flatMap((row) => typeof row.draft_hash === "string" && /^[a-f0-9]{64}$/.test(row.draft_hash)
+    && typeof row.series_ref === "string" && /^[a-z][a-z0-9_.:-]{0,127}$/.test(row.series_ref) ? [[row.draft_hash, row.series_ref] as const] : []));
+  return Object.freeze(ledger.flatMap((record) => {
   if (record.recordType !== "analysis" || record.analysisDefinitionRef !== "temporal-recommendation") return [];
   const frozen = record.frozenContext as Record<string, unknown>;
-  const evaluationRef = frozen.temporalEvaluationRef; const window = frozen.window as Record<string, unknown> | undefined;
+  const evaluationRef = frozen.temporalEvaluationRef; const ruleSeriesRef = typeof frozen.ruleDraftHash === "string" ? rules.get(frozen.ruleDraftHash) : undefined; const window = frozen.window as Record<string, unknown> | undefined;
   const decision = ledger.find((entry): entry is DecisionLedgerRecord => entry.recordType === "decision" && entry.analysisRecordRef === record.recordId);
-  if (typeof evaluationRef !== "string" || !window || typeof window.ref !== "string" || !decision || !decision.cadenceResultRef.startsWith("temporal:")) return [];
-  return [{ evaluationRef, occurredAt: record.occurredAt, outcome: decision.disposition === "act" ? "recommendation" as const : "no_change" as const, reason: decision.cadenceResultRef.slice("temporal:".length), windowRef: window.ref }];
-}).sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
+  if (typeof evaluationRef !== "string" || !ruleSeriesRef || !window || typeof window.ref !== "string" || !decision || !decision.cadenceResultRef.startsWith("temporal:")) return [];
+  return [{ evaluationRef, ruleSeriesRef, occurredAt: record.occurredAt, outcome: decision.disposition === "act" ? "recommendation" as const : "no_change" as const, reason: decision.cadenceResultRef.slice("temporal:".length), windowRef: window.ref }];
+}).sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)));
+};
 
 /** Resolves all temporal evidence from stored immutable artifacts; browser input is references only. */
 export function createLocalTemporalRecommendationHandlers(input: Readonly<{ database: Pick<Database, "select" | "insert" | "execute" | "transaction">; config: LocalDecisionRoomConfig }>) {
@@ -79,7 +86,7 @@ export function createLocalTemporalRecommendationHandlers(input: Readonly<{ data
     const bound = await resolveTrustedLocalReadPrincipal({ request, database: input.database, config: input.config, requiredScope: "approval_queue:read" });
     const ledgerRepository = new DrizzleDecisionLedgerRepository(input.database);
     const service = Object.freeze({
-      list: async () => temporalItems(await ledgerRepository.load(bound.principal.workspaceId)),
+      list: async () => temporalItems(input.database, bound.principal.workspaceId, await ledgerRepository.load(bound.principal.workspaceId)),
       listCandidates: async (): Promise<readonly TemporalRecommendationCandidate[]> => (await eligibleCandidates(input.database, bound.principal.workspaceId)).map((candidate) => Object.freeze({
         candidateRef: candidateRef(candidate), ruleSeriesRef: candidate.ruleSeriesRef, reviewCadence: candidate.reviewCadence,
         windowRef: candidate.windowRef, capturedAt: candidate.capturedAt,

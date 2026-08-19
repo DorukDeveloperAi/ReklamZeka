@@ -17,6 +17,13 @@ import { MetaCreativeContentRuntimePersistence } from "@/connectors/meta/sync/cr
 import { TransactionBackedMetaSyncPersistenceAdapter, DrizzleMetaSyncTransactionManager } from "@/connectors/meta/sync/persistence-adapter";
 import { planMetaReadSync } from "@/connectors/meta/sync/planner";
 import { MetaPartialReadSyncRuntime, type MetaSyncResult, type MetaSyncRuntimeOptions } from "@/connectors/meta/sync/runtime";
+import {
+  completedNormalInventoryEvidence,
+  DrizzleCanonicalBudgetHistoryMaterializer,
+  type CanonicalBudgetHistoryMaterializer,
+} from "@/connectors/meta/sync/canonical-budget-history-materializer";
+import { DrizzleCanonicalDataHealthPostSyncMaterializer, type CanonicalDataHealthPostSyncMaterializer } from "@/connectors/meta/data-health-post-sync-materializer";
+import { META_DATA_HEALTH_MAX_ACCOUNTS } from "@/domain/meta/data-health";
 import { planMetaInsightQuery } from "@/domain/meta/insights/capability-catalog";
 import * as schema from "@/db/schema";
 
@@ -80,6 +87,9 @@ export type ProductionMetaReadSyncResult = Readonly<{
   unchanged: number;
   writeNetworkCalls: 0;
   affectedGeoMaterialization?: "completed" | "deferred";
+  /** A completed GET sync stays usable if its derived history is retriable. */
+  postProcess: "completed" | "not_applicable" | "partial_result";
+  postProcessRetryable: boolean;
 }>;
 
 export class ProductionMetaReadSyncError extends Error {
@@ -105,6 +115,10 @@ type ProductionMetaReadSyncDependencies = Readonly<{
   fetchImpl?: MetaFetch;
   runtimeFactory?: RuntimeFactory;
   recoveryLane?: ServerOwnedMetaRecoveryLane;
+  /** Post-run canonical budget/config history; only normal full inventory may call it. */
+  budgetHistoryMaterializer?: CanonicalBudgetHistoryMaterializer;
+  /** Derived canonical health/finding ledger; normal full reads only, never recovery/bootstrap. */
+  dataHealthMaterializer?: CanonicalDataHealthPostSyncMaterializer;
   /**
    * Optional only for deterministic tests. The production composition installs
    * the fixed GET-only capability selector below; no request can provide it.
@@ -162,7 +176,11 @@ async function selectInsightBootstrapAccounts(input: Readonly<{
   return Object.freeze(selected);
 }
 
-function summarize(result: MetaSyncResult, affectedGeoMaterialization: "completed" | "deferred"): ProductionMetaReadSyncResult {
+function summarize(
+  result: MetaSyncResult,
+  affectedGeoMaterialization: "completed" | "deferred",
+  postProcess: ProductionMetaReadSyncResult["postProcess"] = "not_applicable",
+): ProductionMetaReadSyncResult {
   return Object.freeze({
     status: result.parentRun.status,
     streamCounts: Object.freeze({
@@ -175,7 +193,17 @@ function summarize(result: MetaSyncResult, affectedGeoMaterialization: "complete
     unchanged: result.unchanged,
     writeNetworkCalls: 0,
     affectedGeoMaterialization,
+    postProcess,
+    postProcessRetryable: postProcess === "partial_result",
   });
+}
+
+/** Uses only durable cursor timestamps, never request wall-clock time. */
+function durableHealthOccurredAt(result: MetaSyncResult): string | null {
+  const candidates = result.streamRuns.flatMap(run => Object.values(run.cursorBySlice).map(cursor => cursor.updatedAt))
+    .filter((value): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value)
+    .sort();
+  return candidates.at(-1) ?? null;
 }
 
 /**
@@ -259,7 +287,7 @@ export class ProductionMetaReadSyncService {
       }
 
       const accountIds = [...new Set(await this.dependencies.accounts.resolve(scope))].sort();
-      if (!accountIds.length || accountIds.length > 1_000 || accountIds.some((id) => !META_ACCOUNT.test(id))) {
+      if (!accountIds.length || accountIds.length > META_DATA_HEALTH_MAX_ACCOUNTS || accountIds.some((id) => !META_ACCOUNT.test(id))) {
         throw new ProductionMetaReadSyncError("account_scope_unavailable");
       }
       if (recoveryLane && !accountIds.includes(recoveryLane.accountId)) {
@@ -322,7 +350,41 @@ export class ProductionMetaReadSyncService {
         connectionId: scope.connectionId,
         plan,
       });
-      return summarize(result as MetaSyncResult, this.dependencies.affectedGeoMaterialization ?? "completed");
+      const metaResult = result as MetaSyncResult;
+      const inventoryEvidence = completedNormalInventoryEvidence({
+        result: metaResult,
+        plan,
+        mode,
+        recovery: recoveryLane !== null,
+      });
+      const shouldMaterializeDataHealth = mode === "normal" && recoveryLane === null && this.dependencies.dataHealthMaterializer !== undefined;
+      if ((inventoryEvidence && this.dependencies.budgetHistoryMaterializer) || shouldMaterializeDataHealth) {
+        try {
+          // Derived lanes are independent. A recoverable budget-history failure
+          // must not suppress the missing/stale health observation for this same
+          // normal full read.
+          let derivedFailure = false;
+          try { if (inventoryEvidence && this.dependencies.budgetHistoryMaterializer) await this.dependencies.budgetHistoryMaterializer.materialize(inventoryEvidence); } catch { derivedFailure = true; }
+          let healthOutcome: "materialized" | "partial_without_ledger" = "materialized";
+          try { if (shouldMaterializeDataHealth) healthOutcome = (await this.dependencies.dataHealthMaterializer!.materialize({
+            workspaceId: scope.workspaceId,
+            externalAccountIds: accountIds,
+            // A partial normal run is still valuable evidence: it produces
+            // current health alerts, but must not resolve accounts the run did
+            // not fully evaluate.  Recovery/bootstrap lanes never enter here.
+            resolveAbsent: inventoryEvidence !== null,
+            occurredAt: inventoryEvidence?.accounts.map(account => account.capturedAt).sort().at(-1) ?? durableHealthOccurredAt(metaResult),
+          })).outcome; } catch { derivedFailure = true; }
+          if (healthOutcome === "partial_without_ledger") derivedFailure = true;
+          if (!derivedFailure) return summarize(metaResult, this.dependencies.affectedGeoMaterialization ?? "completed", "completed");
+          // The source GET/mirror is complete. This derived timeline can be
+          // retried on the next normal inventory run and must never be turned
+          // into a non-retryable sync_failed response.
+          return summarize({ ...metaResult, parentRun: { ...metaResult.parentRun, status: "partial" } },
+            this.dependencies.affectedGeoMaterialization ?? "completed", "partial_result");
+        } catch { throw new ProductionMetaReadSyncError("sync_failed"); }
+      }
+      return summarize(metaResult, this.dependencies.affectedGeoMaterialization ?? "completed", "not_applicable");
     } catch (error) {
       if (error instanceof ProductionMetaReadSyncError) throw error;
       if (error instanceof ConnectorError && error.code === "authentication") {
@@ -350,7 +412,8 @@ export class DrizzleMetaSyncAccountScopeResolver implements MetaSyncAccountScope
         eq(schema.dataSources.metaConnectionId, scope.connectionId),
         eq(schema.dataSources.platform, "meta_ads"),
         isNull(schema.adAccounts.disappearedAt),
-      )).limit(1_001);
+      )).limit(META_DATA_HEALTH_MAX_ACCOUNTS + 1);
+    if (rows.length > META_DATA_HEALTH_MAX_ACCOUNTS) throw new ProductionMetaReadSyncError("account_scope_unavailable");
     return Object.freeze(rows.map((row) => row.externalAccountId));
   }
 }
@@ -408,5 +471,7 @@ export function createDrizzleProductionMetaReadSyncService(input: Readonly<{
     }, repositoryBackedMetaAssetContentRun(new DrizzleMetaAssetContentRepository(input.database))),
     fetchImpl: input.fetchImpl,
     recoveryLane,
+    budgetHistoryMaterializer: new DrizzleCanonicalBudgetHistoryMaterializer(input.database),
+    dataHealthMaterializer: new DrizzleCanonicalDataHealthPostSyncMaterializer(input.database),
   });
 }

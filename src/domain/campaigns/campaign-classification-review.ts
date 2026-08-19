@@ -1,4 +1,5 @@
 import { inspectEffectiveCategory, type CategoryAssignment, type CategoryDefinition, type CategoryDimension, type CategoryEntityPath } from "@/domain/categories/registry";
+import { buildSliceScopeCandidates } from "./slice-scope-candidates";
 
 export const CAMPAIGN_CLASSIFICATION_REVIEW_VERSION = "campaign-classification-review/1.0.0" as const;
 export type ClassificationFacet = "market" | "service" | "family" | "geo" | "audience" | "platform";
@@ -12,7 +13,7 @@ export type CampaignClassificationReviewSource = Readonly<{
 
 const FACETS: Readonly<Record<ClassificationFacet, readonly string[]>> = Object.freeze({
   market: ["market"], service: ["service_line"], family: ["campaign_family"],
-  geo: ["geo_market"], audience: ["audience_strategy"], platform: ["platform"],
+  geo: ["geo_market"], audience: ["audience_strategy"], platform: ["publisher_platform", "platform"],
 });
 const AUTHORITY = Object.freeze({ canAssign: false as const, canPublish: false as const, canAuthorizeAction: false as const, canWriteMeta: false as const });
 
@@ -35,13 +36,19 @@ function facet(facet: ClassificationFacet, dimensions: readonly CategoryDimensio
 
 /** Category registry evidence is inspected as-is. No name/content inference or assignment is performed here. */
 export function buildCampaignClassificationReview(source: CampaignClassificationReviewSource) {
+  // The candidate projection is deliberately reused here: a card can only say
+  // that its scope is ready when the exact same read-only rule-scope gate agrees.
+  const readySliceCampaignRefs = new Set(buildSliceScopeCandidates(source).candidates.map((candidate) => candidate.campaignRef));
   const entries = source.campaigns.map((campaign) => {
     const paths = source.paths.filter((path) => path.nodes[0]?.level === "campaign" && path.nodes[0]?.id === campaign.id);
     const facets = (Object.keys(FACETS) as ClassificationFacet[]).map((name) => facet(name, source.dimensions, source.definitions, source.assignments, paths));
     const reasons = [...new Set(facets.flatMap((item) => item.reasonCodes))].sort();
     return Object.freeze({ campaignRef: campaign.ref, name: campaign.name, accountName: campaign.accountName, fetchedAt: campaign.fetchedAt,
-      facets: Object.freeze(facets), reviewRequired: facets.some((item) => item.state !== "assigned"), reasonCodes: Object.freeze(reasons) });
+      facets: Object.freeze(facets), reviewRequired: facets.some((item) => item.state !== "assigned"),
+      sliceCandidate: readySliceCampaignRefs.has(campaign.ref) ? "ready" as const : "review_required" as const,
+      reasonCodes: Object.freeze(reasons) });
   }).sort((left, right) => Number(right.reviewRequired) - Number(left.reviewRequired) || left.name.localeCompare(right.name, "tr"));
   return Object.freeze({ version: CAMPAIGN_CLASSIFICATION_REVIEW_VERSION, entries: Object.freeze(entries),
-    summary: Object.freeze({ campaigns: entries.length, reviewRequired: entries.filter((item) => item.reviewRequired).length }), authority: AUTHORITY });
+    summary: Object.freeze({ campaigns: entries.length, reviewRequired: entries.filter((item) => item.reviewRequired).length,
+      sliceCandidates: entries.filter((item) => item.sliceCandidate === "ready").length }), authority: AUTHORITY });
 }

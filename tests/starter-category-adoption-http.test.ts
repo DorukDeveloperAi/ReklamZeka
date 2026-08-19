@@ -6,9 +6,9 @@ import { createStarterCategoryAdoptionHttpHandlers } from "@/server/starter-cate
 const principal = { actor: { userId: "22222222-2222-4222-8222-222222222222" },
   workspaceId: "11111111-1111-4111-8111-111111111111", workspaceRef: "workspace_starter",
   readerRef: "actor_starter" } as const;
-const plan = { contractVersion: "starter-category-adoption/1.1.0", catalogVersion: "starter-category-playbooks/1.1.0",
+const plan = { contractVersion: "starter-category-adoption/1.1.0", catalogVersion: "starter-category-playbooks/1.2.0",
   catalogHash: "a".repeat(64), registryHash: "b".repeat(64), profileRegistryHash: "c".repeat(64),
-  planHash: "d".repeat(64), status: "preview_only", summary: { canonicalDimensions: 14 },
+  planHash: "d".repeat(64), status: "preview_only", summary: { canonicalDimensions: 15 },
   dimensionCoverage: [], categoryCommands: [], profileProposals: [], profileDrafts: [], targetRefs: ["dimension_safe"],
   blockers: [], ownerConfirmationRequired: true, pendingOwnerConfigurationAcknowledgementRequired: true,
   confirmationLiteral: "adopt_starter_category_playbook", authority: { canPersist: true, canConfirm: true,
@@ -28,7 +28,7 @@ function harness(overrides: Record<string, unknown> = {}) {
     catalogVersion: plan.catalogVersion, catalogHash: plan.catalogHash, planHash: plan.planHash,
     status: "core_adopted_with_owner_configuration_pending", pendingOwnerConfiguration: ["starter_owner_pending"],
     result: { outcome: "inserted", registryHash: "e".repeat(64), profileRegistryHash: "f".repeat(64),
-      dimensionsCreated: 14, definitionsCreated: 7, profileDraftsCreated: 7, auditAppended: true,
+      dimensionsCreated: 15, definitionsCreated: 9, profileDraftsCreated: 9, auditAppended: true,
       categoryInvalidationsAppended: 0, profileInvalidationsAppended: 0 }, authority: plan.authority })), ...overrides };
   return { service, handlers: createStarterCategoryAdoptionHttpHandlers({ service: service as never,
     resolvePrincipal: vi.fn(async () => principal) }) };
@@ -40,7 +40,7 @@ describe("starter category adoption HTTP", () => {
     expect(response.status).toBe(200); expect(response.headers.get("cache-control")).toContain("no-store");
     expect(response.headers.get("x-reklamzeka-access-mode")).toBe("starter-category-owner-confirmed-core-batch");
     expect(response.headers.get("x-reklamzeka-meta-write")).toBe("disabled");
-    expect(payload).toMatchObject({ summary: { canonicalDimensions: 14 },
+    expect(payload).toMatchObject({ summary: { canonicalDimensions: 15 },
       authority: { canPersist: true, canAuthorizeAction: false } });
     expect(JSON.stringify(payload)).not.toContain(principal.workspaceId);
   });
@@ -52,7 +52,7 @@ describe("starter category adoption HTTP", () => {
     for (const invalid of [{ ...command, actorId: principal.actor.userId },
       { ...command, acknowledgedPendingOwnerConfiguration: false },
       { ...command, targetRefs: ["z_ref", "a_ref"] },
-      { ...command, targetRefs: Array.from({ length: 33 }, (_, index) => `dimension_${index}`) }]) {
+      { ...command, targetRefs: Array.from({ length: 49 }, (_, index) => `dimension_${index}`) }]) {
       expect((await handlers.POST(request("POST", invalid))).status).toBe(400);
     }
     expect((await handlers.POST(request("POST", command, { origin: "https://forged.invalid" }))).status).toBe(400);

@@ -6,17 +6,20 @@ import { resolve } from "node:path";
 
 const arguments_ = process.argv.slice(2);
 if (arguments_.includes("--help")) {
-  console.log("Usage: npm run local-session:configure -- [--apply]");
+  console.log("Usage: npm run local-session:configure -- [--apply] [--rotate-signing-key]");
   console.log("Default is a read-only preview. --apply updates only the local-session keys in .env.local.");
+  console.log("--rotate-signing-key requires --apply and replaces an invalid or intentionally rotated local signing key.");
   process.exit(0);
 }
-if (arguments_.some((argument) => argument !== "--apply")
-  || arguments_.filter((argument) => argument === "--apply").length > 1) {
+const apply = arguments_.includes("--apply");
+const rotateSigningKey = arguments_.includes("--rotate-signing-key");
+if (arguments_.some((argument) => argument !== "--apply" && argument !== "--rotate-signing-key")
+  || arguments_.filter((argument) => argument === "--apply").length > 1
+  || arguments_.filter((argument) => argument === "--rotate-signing-key").length > 1
+  || (rotateSigningKey && !apply)) {
   console.error("Unknown or repeated argument. Use --help.");
   process.exit(2);
 }
-
-const apply = arguments_.includes("--apply");
 const sourcePath = resolve(".reklamzeka/local-session-config");
 const targetPath = resolve(".env.local");
 const osUid = typeof process.getuid === "function" ? process.getuid() : -1;
@@ -67,7 +70,7 @@ try {
     if (!value || /[\r\n]/.test(value)) throw new Error("identity configuration incomplete");
   }
   const existingSigningKey = current.get(signingKeyName);
-  if (existingSigningKey !== undefined && !validSigningKey(existingSigningKey)) {
+  if (existingSigningKey !== undefined && !validSigningKey(existingSigningKey) && !rotateSigningKey) {
     throw new Error("existing signing key is invalid");
   }
   if (!apply) {
@@ -77,7 +80,7 @@ try {
 
   const values = new Map<string, string>();
   for (const key of identityKeys) values.set(key, source.get(key)!);
-  values.set(signingKeyName, existingSigningKey ?? randomBytes(32).toString("base64"));
+  values.set(signingKeyName, rotateSigningKey ? randomBytes(32).toString("base64") : existingSigningKey ?? randomBytes(32).toString("base64"));
   const retained = currentText.split(/\r?\n/).filter((line) => {
     const match = /^([A-Z][A-Z0-9_]*)=/.exec(line);
     return !match || !managedKeys.has(match[1]!);

@@ -673,6 +673,128 @@
       "when": 1786650739278,
       "tag": "20260813195219_frozen_diagnostic_evidence_server_policy",
       "breakpoints": true
-    }
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1786711069889,
+      "tag": "20260814123749_smiling_adam_warlock",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1786713199481,
+      "tag": "20260814131319_tense_lucky_pierre",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1786716074902,
+      "tag": "20260814140114_regular_steve_rogers",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1786716189897,
+      "tag": "20260814140309_mushy_boomerang",
+      "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1786718489783,
+      "tag": "20260814144129_orchestrator_readonly_evidence_context",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1786719473191,
+      "tag": "20260814145753_simple_masked_marvel",
+      "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1786722199959,
+      "tag": "20260814154319_lush_warbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1786722448158,
+      "tag": "20260814154728_plain_misty_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1786791892314,
+      "tag": "20260815110452_steady_scarlet_spider",
+      "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1786960912542,
+      "tag": "20260817100152_next_goblin_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1786963500000,
+      "tag": "20260817114500_meta_read_sync_six_hour_manual_fire",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1786963600000,
+      "tag": "20260817133000_canonical_slice_registry",
+      "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1786963700000,
+      "tag": "20260817134500_slice_registry_guard_fix",
+      "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1786977000000,
+      "tag": "20260817143000_canonical_guide_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1786978800000,
+      "tag": "20260817150000_workspace_tombstone_slice_head_release",
+      "breakpoints": true
+    },
+    {"idx":111,"version":"7","when":1786979400000,"tag":"20260817151000_guide_lifecycle_integrity_forward","breakpoints":true},
+    {"idx":112,"version":"7","when":1786980000000,"tag":"20260817160000_data_health_finding_development_log_ledger","breakpoints":true},
+    {"idx":113,"version":"7","when":1786981200000,"tag":"20260817162000_primary_result_binding_lifecycle","breakpoints":true},
+    {"idx":114,"version":"7","when":1786983600000,"tag":"20260817170000_guide_budget_contract_v2","breakpoints":true},
+    {"idx":115,"version":"7","when":1786987200000,"tag":"20260817180000_guide_run_persistence","breakpoints":true},
+    {"idx":116,"version":"7","when":1787000400000,"tag":"20260817210000_p06_action_bindings","breakpoints":true},
+    {"idx":117,"version":"7","when":1787011260000,"tag":"20260818000100_p06_agent_action_requester","breakpoints":true},
+    {"idx":118,"version":"7","when":1787011320000,"tag":"20260818000200_p06_approval_decision_defer","breakpoints":true},
+    {"idx":119,"version":"7","when":1787011380000,"tag":"20260818000300_p06_execution_persistence","breakpoints":true},
+    {"idx":120,"version":"7","when":1787011440000,"tag":"20260818000400_p04_budget_ceiling_policies","breakpoints":true},
+    {"idx":121,"version":"7","when":1787011500000,"tag":"20260818000500_p06_budget_execution_binding","breakpoints":true},
+    {"idx":122,"version":"7","when":1787011560000,"tag":"20260818000600_p06_limited_autonomy_admissions","breakpoints":true},
+    {"idx":123,"version":"7","when":1787011620000,"tag":"20260818000700_p06_limited_autonomy_execution","breakpoints":true},
+    {"idx":124,"version":"7","when":1787011680000,"tag":"20260818000800_scope_report_saved_reports","breakpoints":true},
+    {"idx":125,"version":"7","when":1787011740000,"tag":"20260818000900_naming_template_lifecycle","breakpoints":true},
+    {"idx":126,"version":"7","when":1787011800000,"tag":"20260818001000_p06_human_rename_foundation","breakpoints":true},
+    {"idx":127,"version":"7","when":1787011860000,"tag":"20260818001100_p06_human_rename_execution","breakpoints":true}
   ]
 }

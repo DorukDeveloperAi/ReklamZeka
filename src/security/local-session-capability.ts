@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 export const LOCAL_SESSION_COOKIE = "__Host-rzka_local_session" as const;
-export type LocalSessionScope = "approval_queue:decide" | "approval_queue:read" | "autonomy_rules:read" | "autonomy_rules:draft" | "category_registry:read" | "category_registry:publish" | "instruction_policy:read" | "instruction_policy:draft" | "instruction_policy:publish" | "guidance:read" | "guidance:draft" | "guidance:publish" | "policy_bundle:read" | "policy_bundle:draft" | "policy_bundle:publish" | "decision_cadence:publish" | "experiment_record:mutate" | "business_outcome:record" | "business_outcome:read" | "budget_lab:draft" | "budget_lab:read" | "decision_room:read" | "decision_room:mark_read" | "decision_room:dry_run" | "practice_lab:read" | "practice_lab:draft" | "practice_lab:standardize" | "promotion_catalog:read" | "promotion_preflight:read" | "promotion_proposal:draft" | "promotion_lifecycle:read" | "promotion_lifecycle:draft" | "promotion_lifecycle:publish" | "local_session:bootstrap";
+export type LocalSessionScope = "approval_queue:decide" | "approval_queue:read" | "autonomy_rules:read" | "autonomy_rules:draft" | "category_registry:read" | "category_registry:publish" | "instruction_policy:read" | "instruction_policy:draft" | "instruction_policy:publish" | "guidance:read" | "guidance:draft" | "guidance:publish" | "guide_lifecycle:read" | "guide_lifecycle:draft" | "guide_lifecycle:activate" | "guide_run:manual" | "policy_bundle:read" | "policy_bundle:draft" | "policy_bundle:publish" | "decision_cadence:publish" | "experiment_record:mutate" | "business_outcome:record" | "business_outcome:read" | "budget_lab:draft" | "budget_lab:read" | "decision_room:read" | "decision_room:mark_read" | "decision_room:dry_run" | "meta_sync:trigger" | "practice_lab:read" | "practice_lab:draft" | "practice_lab:standardize" | "promotion_catalog:read" | "promotion_preflight:read" | "promotion_proposal:draft" | "promotion_lifecycle:read" | "promotion_lifecycle:draft" | "promotion_lifecycle:publish" | "scope_report:read" | "scope_report:save" | "naming_template:read" | "naming_template:write" | "local_session:bootstrap";
 export type LocalSessionKind = "bootstrap" | "session";
 
 export type LocalSessionClaims = Readonly<{
@@ -29,10 +29,13 @@ export const LOCAL_SESSION_RUNTIME_SCOPES: readonly LocalSessionScope[] = Object
   "category_registry:publish", "category_registry:read",
   "instruction_policy:draft", "instruction_policy:publish", "instruction_policy:read",
   "guidance:draft", "guidance:publish", "guidance:read",
+  "guide_lifecycle:draft", "guide_lifecycle:activate", "guide_lifecycle:read", "guide_run:manual",
   "policy_bundle:draft", "policy_bundle:publish", "policy_bundle:read", "decision_cadence:publish", "experiment_record:mutate", "business_outcome:record", "business_outcome:read", "budget_lab:draft", "budget_lab:read",
-  "decision_room:mark_read", "decision_room:read", "decision_room:dry_run", "practice_lab:read", "practice_lab:draft", "practice_lab:standardize", "promotion_catalog:read",
+  "decision_room:mark_read", "decision_room:read", "decision_room:dry_run", "meta_sync:trigger", "practice_lab:read", "practice_lab:draft", "practice_lab:standardize", "promotion_catalog:read",
   "promotion_preflight:read", "promotion_proposal:draft",
   "promotion_lifecycle:read", "promotion_lifecycle:draft", "promotion_lifecycle:publish",
+  "scope_report:read", "scope_report:save",
+  "naming_template:read", "naming_template:write",
 ]);
 export const LOCAL_SESSION_SCOPES: readonly LocalSessionScope[] = Object.freeze([
   ...LOCAL_SESSION_RUNTIME_SCOPES, "local_session:bootstrap",

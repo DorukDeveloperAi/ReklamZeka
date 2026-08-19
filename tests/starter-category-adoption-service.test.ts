@@ -21,18 +21,18 @@ const memberships = [{ userId: ownerId, workspaceId, role: "owner" as const },
   { userId: viewerId, workspaceId, role: "viewer" as const },
   { userId: analystId, workspaceId, role: "analyst" as const }];
 const result = Object.freeze({ outcome: "inserted" as const, registryHash: "c".repeat(64),
-  profileRegistryHash: "d".repeat(64), dimensionsCreated: 14, definitionsCreated: 7,
-  profileDraftsCreated: 7, auditAppended: true, categoryInvalidationsAppended: 0,
+  profileRegistryHash: "d".repeat(64), dimensionsCreated: 15, definitionsCreated: 9,
+  profileDraftsCreated: 9, auditAppended: true, categoryInvalidationsAppended: 0,
   profileInvalidationsAppended: 0 });
 
 describe("starter category adoption plan", () => {
-  it("covers 14 dimensions, keeps 42 proposals and folds them into seven deterministic draft profiles", () => {
+  it("covers the strict market boundary and folds concrete starter values into deterministic draft profiles", () => {
     const first = buildStarterCategoryAdoptionPlan("workspace_starter", empty(), profiles);
     const second = buildStarterCategoryAdoptionPlan("workspace_starter", empty(), profiles);
     expect(second).toEqual(first);
-    expect(first.summary).toMatchObject({ canonicalDimensions: 14, dimensionsToCreate: 14,
-      definitionsToCreate: 7, profileProposals: 42, profileDraftsToCreate: 7, satisfied: 0, conflicts: 0 });
-    expect(first.profileDrafts).toHaveLength(7); expect(first.targetRefs).toHaveLength(28);
+    expect(first.summary).toMatchObject({ canonicalDimensions: 15, dimensionsToCreate: 15,
+      definitionsToCreate: 9, profileProposals: 54, profileDraftsToCreate: 9, satisfied: 0, conflicts: 0 });
+    expect(first.profileDrafts).toHaveLength(9); expect(first.targetRefs).toHaveLength(33);
     for (const draft of first.profileDrafts) {
       expect(draft).toMatchObject({ disposition: "create", proposalHashes: expect.any(Array),
         profileRef: expect.stringMatching(/^category_profile_starter_[a-f0-9]{24}$/) });
@@ -118,7 +118,7 @@ describe("starter category adoption plan", () => {
 
   it("retains all canonical dimensions in exact catalog order", () => {
     expect(STARTER_CATEGORY_PLAYBOOK_CATALOG.dimensions.map((item) => item.dimensionKey)).toEqual([
-      "service_line", "brand_clinic", "geo_market", "language", "campaign_role", "funnel_intent",
+      "market", "service_line", "brand_clinic", "geo_market", "language", "campaign_role", "funnel_intent",
       "audience_strategy", "destination", "budget_pool", "operating_mode", "lifecycle", "experiment",
       "protection_class", "custom",
     ]);

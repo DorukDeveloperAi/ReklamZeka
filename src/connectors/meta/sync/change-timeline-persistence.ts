@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "@/db/schema";
 import { assertHashOnlyMetaPersistence } from "@/domain/meta/data-lifecycle";
@@ -401,6 +401,7 @@ export class DrizzleMetaChangeTimelinePersistenceStore implements MetaChangeTime
             eq(schema.dataSources.workspaceId, scope.workspaceId),
             eq(schema.metaConnections.workspaceId, scope.workspaceId),
             eq(schema.metaConnections.id, scope.connectionId),
+            isNull(schema.adAccounts.disappearedAt),
           ));
         return rows.length === 1 ? rows[0]!.externalAccountId : null;
       },
@@ -512,6 +513,7 @@ export class DrizzleMetaChangeTimelinePersistenceStore implements MetaChangeTime
         eq(schema.metaChangeSnapshots.workspaceId, scope.workspaceId),
         eq(schema.metaChangeSnapshots.metaConnectionId, scope.connectionId),
         eq(schema.metaChangeSnapshots.adAccountId, scope.adAccountId),
+        isNull(schema.adAccounts.disappearedAt),
       ))
       .orderBy(
         desc(schema.metaChangeSnapshots.capturedAt),

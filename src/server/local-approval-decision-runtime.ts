@@ -13,6 +13,7 @@ import {
   resolveTrustedLocalApprovalDecisionPrincipal,
   type LocalDecisionRoomConfig,
 } from "@/server/local-decision-room-runtime";
+import { createP06StatusExecutionRuntime } from "@/server/p06-status-execution-runtime";
 
 type Database = NodePgDatabase<typeof schema>;
 type LocalDecisionDatabase = Pick<Database, "execute" | "transaction">;
@@ -23,7 +24,7 @@ export type TrustedHumanPresenceCeremony = Readonly<{
     workspaceId: string;
     actorRef: string;
     unitRef: string;
-    action: "approve" | "reject" | "request_changes";
+    action: "approve" | "reject" | "defer" | "request_changes";
   }>): Promise<boolean>;
 }>;
 
@@ -41,7 +42,14 @@ export function createLocalApprovalDecisionRouteHandlers(input: Readonly<{
 }>) {
   const store = input.challengeStore ?? new SingleUseHumanPresenceChallengeStore();
   const repository = new DrizzleActionApprovalDecisionRepository(input.database, input.config.workspaceId);
-  const service = new ApprovalDecisionService(repository, store);
+  const execution = createP06StatusExecutionRuntime({ database: input.database });
+  const service = new ApprovalDecisionService(
+    repository,
+    store,
+    undefined,
+    undefined,
+    execution.enabled ? execution.materializeApproved : undefined,
+  );
   const resolve = (request: Request, _requiredScope: "approval_queue:decide") =>
     resolveTrustedLocalApprovalDecisionPrincipal({ request, database: input.database, config: input.config });
   const challenge = createHumanPresenceChallengePostHandler({

@@ -92,6 +92,21 @@ describe("typed action risk classification", () => {
     });
   });
 
+  it("rename'i K3 ve yalnız human approval olarak tutar; create/raw hâlâ kapalıdır", () => {
+    const rename: TypedActionIntent = { kind: "rename", entity: { level: "campaign", ref: "campaign_leads_tr" },
+      beforeName: "Eski Kampanya", afterName: "Yeni Kampanya", namingEvidenceRef: "naming_evidence_main" };
+    const plan = buildActionPlan(rename, context({ rules: [rule({ mode: "policy_limited", maximumActionsPerRun: 1 }),
+      rule({ ruleRef: "autonomy_rename", scope: { level: "action_type", actionType: "campaign_rename" },
+        mode: "policy_limited", maximumActionsPerRun: 1 })] }));
+    expect(plan).toMatchObject({ actionType: "campaign_rename", risk: "K3", disposition: "approval_required",
+      effectiveAutonomy: "policy_limited", action: { kind: "rename", beforeName: "Eski Kampanya", afterName: "Yeni Kampanya" } });
+    expect(plan.reasonCodes).toContain("human_approval_mandatory_for_risk");
+    expect(() => buildActionPlan({ ...rename, afterName: "Eski Kampanya" } as never, context()))
+      .toThrowError(expect.objectContaining({ code: "invalid_action" }));
+    expect(() => buildActionPlan({ ...rename, entity: { level: "campaign", ref: "campaign_leads_tr" },
+      afterName: "x\nwrite" } as never, context())).toThrowError(expect.objectContaining({ code: "invalid_action" }));
+  });
+
   it("existing-post promotion'ı frozen typed placeholder olarak K4 ve daima approval yapar", () => {
     const action: TypedActionIntent = {
       kind: "existing_post_promotion", entity: { level: "adset", ref: "adset_promotion" }, placeholderOnly: true,
@@ -129,10 +144,12 @@ describe("typed action risk classification", () => {
       legacyContext)).toThrowError(expect.objectContaining({ code: "invalid_contract" }));
   });
 
-  it("ad-level budget ve raw Graph action biçimini şema sınırında reddeder", () => {
+  it("ad-level budget ile raw veya create action biçimlerini şema sınırında reddeder", () => {
     expect(() => buildActionPlan({ ...budget(), entity: { level: "ad", ref: "ad_one" } } as never, context({ entity: { level: "ad", ref: "ad_one" } })))
       .toThrowError(expect.objectContaining({ code: "invalid_action" }));
     expect(() => buildActionPlan({ kind: "raw_graph", path: "/act_x/campaigns", field: "daily_budget" } as never, context()))
+      .toThrowError(expect.objectContaining({ code: "invalid_action" }));
+    expect(() => buildActionPlan({ kind: "campaign_create", entity: { level: "campaign", ref: "campaign_new" }, name: "Yeni kampanya" } as never, context()))
       .toThrowError(expect.objectContaining({ code: "invalid_action" }));
     expect(() => buildActionPlan({ ...budget(), budgetOwnerRef: "campaign_other" } as never, context({ budgetLimits })))
       .toThrowError(expect.objectContaining({ code: "invalid_action" }));

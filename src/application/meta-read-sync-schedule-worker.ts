@@ -2,11 +2,14 @@ import { createHash } from "node:crypto";
 
 export const META_READ_SYNC_SCHEDULE_WORKER_VERSION = "meta-read-sync-schedule-worker/1.0.0" as const;
 
+/** `daily` is retained solely to verify immutable legacy run rows; no new schedule can emit it. */
+export type MetaReadSyncTriggerKind = "interval_6h" | "manual" | "daily";
+
 export type MetaReadSyncScheduleCandidate = Readonly<{
   workspaceId: string;
   connectionId: string;
   scopeRevision: number;
-  triggerKind: "daily";
+  triggerKind: MetaReadSyncTriggerKind;
   scheduledFor: string;
   dateStart: string;
   dateStop: string;
@@ -16,6 +19,12 @@ export interface MetaReadSyncScheduleRegistryPort {
   /** Returns only DB-derived active workspace + connection bindings. */
   listDue(now: string, limit: number): Promise<readonly MetaReadSyncScheduleCandidate[]>;
   /** Re-reads workspace and connection lifecycle immediately before sync. */
+  revalidate(candidate: MetaReadSyncScheduleCandidate): Promise<MetaReadSyncScheduleCandidate | null>;
+}
+
+/** A manual fire is resolved entirely by the server from the authenticated workspace. */
+export interface MetaReadSyncManualRegistryPort {
+  resolveManual(workspaceId: string, now: string): Promise<MetaReadSyncScheduleCandidate | null>;
   revalidate(candidate: MetaReadSyncScheduleCandidate): Promise<MetaReadSyncScheduleCandidate | null>;
 }
 
@@ -31,6 +40,10 @@ export interface MetaReadSyncLeasePort {
     workspaceId: string;
     connectionId: string;
     scopeRevision: number;
+    triggerKind: MetaReadSyncTriggerKind;
+    scheduledFor: string;
+    dateStart: string;
+    dateStop: string;
     now: string;
     leaseUntil: string;
   }>): Promise<MetaReadSyncLeaseClaim>;
@@ -173,7 +186,7 @@ function candidate(raw: unknown, now: string): MetaReadSyncScheduleCandidate {
   const dateStop = date(value.dateStop);
   if (!UUID.test(value.workspaceId) || !UUID.test(value.connectionId)
     || !Number.isSafeInteger(value.scopeRevision) || value.scopeRevision < 1
-    || value.triggerKind !== "daily" || scheduledFor > now || dateStart > dateStop) {
+    || !["interval_6h", "manual"].includes(value.triggerKind) || scheduledFor > now || dateStart > dateStop) {
     throw new MetaReadSyncScheduleWorkerError("registry_failure");
   }
   return Object.freeze({ ...value, scheduledFor, dateStart, dateStop });
@@ -194,7 +207,7 @@ function identity(value: MetaReadSyncScheduleCandidate): Readonly<{
     idempotencyKey: `syncfire_${fireHash}`,
     scopeKey: scopeHash,
     scopeRef: `syncscope_${scopeHash.slice(0, 20)}`,
-    parentRunRef: `sync_daily_${fireHash.slice(0, 32)}`,
+    parentRunRef: `sync_${value.triggerKind === "interval_6h" ? "6h" : "manual"}_${fireHash.slice(0, 32)}`,
   });
 }
 
@@ -342,6 +355,10 @@ export async function runMetaReadSyncScheduleWorker(
         workspaceId: due.workspaceId,
         connectionId: due.connectionId,
         scopeRevision: due.scopeRevision,
+        triggerKind: due.triggerKind,
+        scheduledFor: due.scheduledFor,
+        dateStart: due.dateStart,
+        dateStop: due.dateStop,
         now,
         leaseUntil: new Date(Date.parse(now) + leaseMs).toISOString(),
       });
@@ -438,5 +455,48 @@ export async function runMetaReadSyncScheduleWorker(
     items,
     actionAuthority: "none",
     writeNetworkCalls: 0,
+  });
+}
+
+/**
+ * A manually requested refresh deliberately reuses the identical worker,
+ * service factory and scope lease as a scheduled fire.  Its workspace is
+ * already server-derived by the HTTP boundary; connection selection remains
+ * inside the registry.  The manual fire never changes the scheduled cursor.
+ */
+export async function runMetaReadSyncManualWorker(
+  input: Readonly<{ now: string; workspaceId: string; leaseMs?: number }>,
+  ports: Readonly<{
+    registry: MetaReadSyncManualRegistryPort;
+    leases: MetaReadSyncLeasePort;
+    services: ScheduledMetaReadSyncServiceFactoryPort;
+    retryClassifier: MetaReadSyncRetryClassifierPort;
+  }>,
+): Promise<MetaReadSyncScheduleWorkerResult> {
+  if (!input || Object.keys(input).some((key) => !["now", "workspaceId", "leaseMs"].includes(key))
+    || typeof input.workspaceId !== "string" || !UUID.test(input.workspaceId)
+    || !ports?.registry?.resolveManual || !ports.registry.revalidate) {
+    throw new MetaReadSyncScheduleWorkerError("invalid_input");
+  }
+  const now = instant(input.now);
+  let resolved: MetaReadSyncScheduleCandidate | null;
+  try { resolved = await ports.registry.resolveManual(input.workspaceId, now); } catch {
+    throw new MetaReadSyncScheduleWorkerError("registry_failure");
+  }
+  if (resolved !== null) {
+    const checked = candidate(resolved, now);
+    if (checked.workspaceId !== input.workspaceId || checked.triggerKind !== "manual" || checked.scheduledFor !== now) {
+      throw new MetaReadSyncScheduleWorkerError("registry_failure");
+    }
+  }
+  return runMetaReadSyncScheduleWorker({ now, batchSize: 1, concurrency: 1, maxAttempts: 3,
+    ...(input.leaseMs === undefined ? {} : { leaseMs: input.leaseMs }) }, {
+    registry: {
+      listDue: async () => resolved === null ? Object.freeze([]) : Object.freeze([resolved]),
+      revalidate: ports.registry.revalidate.bind(ports.registry),
+    },
+    leases: ports.leases,
+    services: ports.services,
+    retryClassifier: ports.retryClassifier,
   });
 }

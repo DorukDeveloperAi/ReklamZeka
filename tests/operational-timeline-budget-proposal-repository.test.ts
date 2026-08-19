@@ -21,6 +21,18 @@ describe("operational timeline budget proposal source", () => {
     expect(source).toContain("uygulama yetkisi yok");
     expect(source).not.toContain("insert into");
   });
+  it("links a human allocation choice to its prepared ActionUnit without exposing selection IDs or granting execution", () => {
+    const source = readFileSync("src/connectors/decisions/operational-timeline-drizzle-repository.ts", "utf8");
+    expect(source).toContain("from public.slice_rule_scenario_allocation_selections selection");
+    expect(source).toContain("join public.slice_rule_allocation_entity_bindings target");
+    expect(source).toContain("'budget_selection'");
+    expect(source).toContain("from public.slice_rule_budget_action_unit_bindings binding");
+    expect(source).toContain("'action_preparation'");
+    expect(source).toContain("ActionUnit hazırlandı");
+    expect(source).toContain("Meta uygulaması kapalı");
+    expect(source).not.toContain("selection.id");
+    expect(source).not.toContain("insert into");
+  });
   it("uses a tenant-local opaque alias resolution and excludes campaign-ambiguous global sources", () => {
     const source = readFileSync("src/connectors/decisions/operational-timeline-drizzle-repository.ts", "utf8");
     expect(source).toContain("with scoped_campaign as");

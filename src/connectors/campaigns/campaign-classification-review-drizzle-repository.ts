@@ -8,7 +8,22 @@ type Database = NodePgDatabase<typeof schema>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function rows<T>(value: unknown): readonly T[] { if (!value || typeof value !== "object" || !("rows" in value) || !Array.isArray(value.rows)) throw new Error("classification review rejected: corrupt_store"); return value.rows as readonly T[]; }
 function text(value: unknown): string { if (typeof value !== "string" || !value.trim()) throw new Error("classification review rejected: corrupt_store"); return value; }
-function date(value: unknown): string { if (!(value instanceof Date) || Number.isNaN(value.valueOf())) throw new Error("classification review rejected: corrupt_store"); return value.toISOString(); }
+/**
+ * `pg` normally returns timestamptz as Date, but the local Drizzle path can
+ * return the canonical PostgreSQL text representation instead. Both are
+ * storage encodings of the same immutable mirror timestamp; neither permits
+ * caller-provided time input.
+ */
+export function normalizeClassificationReviewTimestamp(value: unknown): string {
+  if (value instanceof Date && !Number.isNaN(value.valueOf())) return value.toISOString();
+  if (typeof value === "string"
+    && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{1,6})?[+-]\d{2}(?::?\d{2})?$/.test(value)) {
+    const normalized = value.replace(" ", "T").replace(/([+-]\d{2})$/, "$1:00").replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
+    const parsed = new Date(normalized);
+    if (!Number.isNaN(parsed.valueOf())) return parsed.toISOString();
+  }
+  throw new Error("classification review rejected: corrupt_store");
+}
 /** Reads only canonical mirror and registry rows within a repeatable-read, read-only transaction. */
 export class DrizzleCampaignClassificationReviewRepository {
   constructor(private readonly database: Pick<Database, "transaction">) {}
@@ -25,7 +40,7 @@ export class DrizzleCampaignClassificationReviewRepository {
       return Object.freeze({ campaigns: Object.freeze(campaigns.map((r) => {
         const id = text(r.id);
         if (!UUID.test(id)) throw new Error("classification review rejected: corrupt_store");
-        return Object.freeze({ id, ref: categoryEntityPublicRef(workspaceId, "campaign", id), name: text(r.name), accountName: text(r.account_name), fetchedAt: date(r.fetched_at) });
+        return Object.freeze({ id, ref: categoryEntityPublicRef(workspaceId, "campaign", id), name: text(r.name), accountName: text(r.account_name), fetchedAt: normalizeClassificationReviewTimestamp(r.fetched_at) });
       })), dimensions: Object.freeze(dimensions), definitions: Object.freeze(definitions), assignments: Object.freeze(assignments), paths: Object.freeze(paths.map((r) => Object.freeze({ workspaceId, nodes: Object.freeze([{ level: "campaign" as const, id: text(r.campaign_id) }, ...(r.ad_set_id ? [{ level: "ad_set" as const, id: text(r.ad_set_id) }] : []), ...(r.ad_id ? [{ level: "ad" as const, id: text(r.ad_id) }] : []), ...(r.creative_id ? [{ level: "creative" as const, id: text(r.creative_id) }] : [])] satisfies CategoryEntityPath["nodes"])}))) });
     });
   }

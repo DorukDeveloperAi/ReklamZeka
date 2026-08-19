@@ -23,8 +23,8 @@ const workspaceRef = "workspace_starter_adoption_acceptance";
 async function verify(connectionString: string) {
   const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 30_000 });
   const database = drizzle(pool, { schema });
-  const evidence = { fourteenDimensionsCreated: false, sevenDefinitionsCreated: false,
-    sevenMergedProfilesCreated: false, exactSixObjectiveBindings: false, exactReplayIdempotent: false,
+  const evidence = { fifteenDimensionsCreated: false, nineDefinitionsCreated: false,
+    nineMergedProfilesCreated: false, exactSixObjectiveBindings: false, exactReplayIdempotent: false,
     membershipRechecked: false, stalePlanZeroWrite: false, auditExact: false, invalidationExact: false,
     atomicRollbackClean: false, rollbackClean: false };
   try {
@@ -50,12 +50,12 @@ async function verify(connectionString: string) {
         evidence.membershipRechecked = await repository.adopt({ ...mutation, actorId: ids.revoked })
           .then(() => false, (reason) => reason instanceof Error && "code" in reason && reason.code === "forbidden");
         const result = await repository.adopt(mutation);
-        evidence.fourteenDimensionsCreated = result.dimensionsCreated === 14;
-        evidence.sevenDefinitionsCreated = result.definitionsCreated === 7;
-        evidence.sevenMergedProfilesCreated = result.profileDraftsCreated === 7;
+        evidence.fifteenDimensionsCreated = result.dimensionsCreated === 15;
+        evidence.nineDefinitionsCreated = result.definitionsCreated === 9;
+        evidence.nineMergedProfilesCreated = result.profileDraftsCreated === 9;
         const after = await repository.inspect(ids.workspace, workspaceRef);
         const profiles = after.profiles.definitions.map((definition) => definition.currentProfile).filter(Boolean);
-        evidence.exactSixObjectiveBindings = profiles.length === 7 && profiles.every((profile) =>
+        evidence.exactSixObjectiveBindings = profiles.length === 9 && profiles.every((profile) =>
           profile?.status === "draft" && profile.version === 1 && profile.bindings.analysisPlaybookRefs.length === 6
           && new Set(profile.bindings.analysisPlaybookRefs).size === 6);
         const replay = await repository.adopt({ ...mutation, occurredAt: "2026-08-10T10:01:00.000Z" });
@@ -96,8 +96,8 @@ async function verify(connectionString: string) {
           .where(eq(schema.effectiveCampaignContextInvalidations.workspaceId, ids.workspace));
         evidence.invalidationExact = invalidations.length === 0
           && metadata?.categoryInvalidationsAppended === 0 && metadata?.profileInvalidationsAppended === 0;
-        evidence.atomicRollbackClean = [evidence.fourteenDimensionsCreated, evidence.sevenDefinitionsCreated,
-          evidence.sevenMergedProfilesCreated, evidence.exactSixObjectiveBindings,
+        evidence.atomicRollbackClean = [evidence.fifteenDimensionsCreated, evidence.nineDefinitionsCreated,
+          evidence.nineMergedProfilesCreated, evidence.exactSixObjectiveBindings,
           evidence.exactReplayIdempotent, evidence.membershipRechecked, evidence.stalePlanZeroWrite,
           evidence.auditExact, evidence.invalidationExact].every(Boolean);
         if (!evidence.atomicRollbackClean) throw new Error("Starter adoption PostgreSQL acceptance failed");

@@ -19,15 +19,75 @@ type InspectionRow = Readonly<{
 
 type DeleteCountRow = Readonly<{ count: number | string }>;
 
+const OPTIONAL_FORWARD_PURGE_TABLES = Object.freeze([
+  "p06_rollback_proposals",
+  "p06_execution_observations",
+  "p06_execution_gate_snapshots",
+  "p06_execution_heads",
+  "p06_execution_events",
+  "p06_execution_runs",
+  "guide_run_action_bindings",
+  "p06_limited_autonomy_admissions",
+  "budget_ceiling_policy_revisions",
+  "action_preparation_gate_snapshots",
+  "scope_report_saved_heads",
+  "scope_report_saved_revisions",
+  "naming_template_heads",
+  "naming_template_revisions",
+] as const);
+
+type OptionalForwardPurgeTable = (typeof OPTIONAL_FORWARD_PURGE_TABLES)[number];
+type OptionalTableAvailability = Readonly<Record<OptionalForwardPurgeTable, boolean>>;
+
+type AvailabilityRow = Readonly<{
+  rollback_proposals: boolean;
+  execution_observations: boolean;
+  execution_gate_snapshots: boolean;
+  execution_heads: boolean;
+  execution_events: boolean;
+  execution_runs: boolean;
+  action_bindings: boolean;
+  limited_admissions: boolean;
+  budget_ceiling_policies: boolean;
+  action_preparation_gates: boolean;
+  saved_report_heads: boolean;
+  saved_report_revisions: boolean;
+  naming_template_heads: boolean;
+  naming_template_revisions: boolean;
+}>;
+
 /**
  * Complete, explicit allowlist of workspace-owned rows that may be destroyed.
  * It intentionally excludes workspaces, audit_events, users and meta_connections.
  */
 export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
+  // P06 execution-v2 evidence is purged child-first before its Action binding.
+  "p06_rollback_proposals", "p06_execution_observations", "p06_execution_gate_snapshots",
+  "p06_execution_heads", "p06_execution_events", "p06_execution_runs",
+  "guide_run_action_bindings", "p06_limited_autonomy_admissions",
+  // P05 run children must be purged before their immutable run and Guide parents.
+  "guide_run_schedule_receipts", "guide_run_artifacts", "guide_run_heads", "guide_run_events", "guide_runs",
+  "scope_report_saved_heads", "scope_report_saved_revisions",
+  "naming_template_heads", "naming_template_revisions",
+  // P03 primary-result heads point at immutable user selections.
+  "primary_result_binding_heads", "primary_result_binding_revisions",
+  // P01 data-quality ledger heads must go before their immutable evidence.
+  "development_log_heads", "development_log_events", "finding_heads", "finding_lifecycle_events",
+  // P04 canonical Kılavuz immutable children, then P03 slice evidence.
+  "guide_activation_outbox", "guide_lifecycle_events", "guide_interpretation_acceptances",
+  "budget_ceiling_policy_revisions", "guide_revision_actions", "guide_revision_budget_refs", "guide_budget_contracts", "guide_heads", "guide_revisions", "guides",
+  "slice_resolution_snapshot_members", "slice_resolution_snapshots", "slice_revision_predicate_values",
+  "slice_revision_overrides", "slice_revision_predicates", "slice_revisions", "slices",
   "orchestrator_conversation_messages",
   "orchestrator_conversation_tombstones",
   "orchestrator_conversation_turns",
   "orchestrator_conversations",
+  "orchestrator_playbook_revisions",
+  "orchestrator_interview_kit_revisions",
+  "orchestrator_profile_revisions",
+  // Gate snapshots reference selection/action rows and must be removed before
+  // their immutable provenance parents during a tombstone-only purge.
+  "action_preparation_gate_snapshots",
   "slice_rule_workspace_drafts",
   "budget_pool_hierarchy_revisions",
   "slice_rule_budget_pool_bindings",
@@ -35,6 +95,9 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "slice_rule_scenario_allocation_selections",
   "slice_rule_budget_action_unit_bindings",
   "slice_rule_budget_proposal_bindings",
+  // Temporal links precede their Kurum Kampanyası and Meta/category parents.
+  "organization_campaign_meta_memberships",
+  "organization_campaigns",
   "delivery_health_alert_ledger_records",
   "local_agent_handoffs",
   "local_agent_sessions",
@@ -106,11 +169,12 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "budget_proposal_versions",
   "budget_proposal_alternatives",
   "action_approval_policy_snapshots",
-  "action_proposal_bundles",
-  "action_proposal_units",
+  // Every RESTRICT child of an ActionUnit must precede its queue parents.
   "action_proposal_unit_frozen_contexts",
   "action_proposal_dependencies",
   "action_proposal_initial_events",
+  "action_proposal_units",
+  "action_proposal_bundles",
   "action_approval_decision_events",
   "action_approval_evidence_grants",
   "action_execution_attempts",
@@ -133,7 +197,7 @@ export const WORKSPACE_TOMBSTONE_PURGE_TABLES = Object.freeze([
   "decision_room_inbox_reads",
   "meta_assets",
   "meta_posts",
-  "meta_change_snapshots",
+  "meta_complete_snapshot_receipts", "meta_change_snapshots",
   "meta_change_events",
   "meta_creatives",
   "meta_ads",
@@ -187,6 +251,71 @@ async function deleteCount(executor: DrizzleExecutor, statement: ReturnType<type
   return safeCount(row?.count);
 }
 
+async function optionalTableAvailability(executor: DrizzleExecutor): Promise<OptionalTableAvailability> {
+  const row = resultRows<AvailabilityRow>(await executor.execute(sql`
+    select
+      to_regclass('public.p06_rollback_proposals') is not null as rollback_proposals,
+      to_regclass('public.p06_execution_observations') is not null as execution_observations,
+      to_regclass('public.p06_execution_gate_snapshots') is not null as execution_gate_snapshots,
+      to_regclass('public.p06_execution_heads') is not null as execution_heads,
+      to_regclass('public.p06_execution_events') is not null as execution_events,
+      to_regclass('public.p06_execution_runs') is not null as execution_runs,
+      to_regclass('public.guide_run_action_bindings') is not null as action_bindings,
+      to_regclass('public.p06_limited_autonomy_admissions') is not null as limited_admissions,
+      to_regclass('public.budget_ceiling_policy_revisions') is not null as budget_ceiling_policies,
+      to_regclass('public.action_preparation_gate_snapshots') is not null as action_preparation_gates,
+      to_regclass('public.scope_report_saved_heads') is not null as saved_report_heads,
+      to_regclass('public.scope_report_saved_revisions') is not null as saved_report_revisions,
+      to_regclass('public.naming_template_heads') is not null as naming_template_heads,
+      to_regclass('public.naming_template_revisions') is not null as naming_template_revisions
+  `))[0];
+  if (!row) throw new WorkspaceTombstoneError("workspace_unavailable");
+  return Object.freeze({
+    p06_rollback_proposals: row.rollback_proposals === true,
+    p06_execution_observations: row.execution_observations === true,
+    p06_execution_gate_snapshots: row.execution_gate_snapshots === true,
+    p06_execution_heads: row.execution_heads === true,
+    p06_execution_events: row.execution_events === true,
+    p06_execution_runs: row.execution_runs === true,
+    guide_run_action_bindings: row.action_bindings === true,
+    p06_limited_autonomy_admissions: row.limited_admissions === true,
+    budget_ceiling_policy_revisions: row.budget_ceiling_policies === true,
+    action_preparation_gate_snapshots: row.action_preparation_gates === true,
+    scope_report_saved_heads: row.saved_report_heads === true,
+    scope_report_saved_revisions: row.saved_report_revisions === true,
+    naming_template_heads: row.naming_template_heads === true,
+    naming_template_revisions: row.naming_template_revisions === true,
+  });
+}
+
+async function inspectOptionalForwardTables(
+  executor: DrizzleExecutor,
+  workspaceId: string,
+  availability: OptionalTableAvailability,
+): Promise<readonly InspectionRow[]> {
+  const rows: InspectionRow[] = [];
+  const inspect = async (statement: ReturnType<typeof sql>) => {
+    const row = resultRows<InspectionRow>(await executor.execute(statement))[0];
+    if (!row) throw new WorkspaceTombstoneError("workspace_unavailable");
+    rows.push(row);
+  };
+  if (availability.p06_rollback_proposals) await inspect(sql`select 'p06_rollback_proposals' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_rollback_proposals where workspace_id = ${workspaceId}::uuid`);
+  if (availability.p06_execution_observations) await inspect(sql`select 'p06_execution_observations' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_execution_observations where workspace_id = ${workspaceId}::uuid`);
+  if (availability.p06_execution_gate_snapshots) await inspect(sql`select 'p06_execution_gate_snapshots' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_execution_gate_snapshots where workspace_id = ${workspaceId}::uuid`);
+  if (availability.p06_execution_heads) await inspect(sql`select 'p06_execution_heads' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_execution_heads where workspace_id = ${workspaceId}::uuid`);
+  if (availability.p06_execution_events) await inspect(sql`select 'p06_execution_events' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_execution_events where workspace_id = ${workspaceId}::uuid`);
+  if (availability.p06_execution_runs) await inspect(sql`select 'p06_execution_runs' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_execution_runs where workspace_id = ${workspaceId}::uuid`);
+  if (availability.guide_run_action_bindings) await inspect(sql`select 'guide_run_action_bindings' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from guide_run_action_bindings where workspace_id = ${workspaceId}::uuid`);
+  if (availability.p06_limited_autonomy_admissions) await inspect(sql`select 'p06_limited_autonomy_admissions' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from p06_limited_autonomy_admissions where workspace_id = ${workspaceId}::uuid`);
+  if (availability.budget_ceiling_policy_revisions) await inspect(sql`select 'budget_ceiling_policy_revisions' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from budget_ceiling_policy_revisions where workspace_id = ${workspaceId}::uuid`);
+  if (availability.action_preparation_gate_snapshots) await inspect(sql`select 'action_preparation_gate_snapshots' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from action_preparation_gate_snapshots where workspace_id = ${workspaceId}::uuid`);
+  if (availability.scope_report_saved_heads) await inspect(sql`select 'scope_report_saved_heads' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from scope_report_saved_heads where workspace_id = ${workspaceId}::uuid`);
+  if (availability.scope_report_saved_revisions) await inspect(sql`select 'scope_report_saved_revisions' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from scope_report_saved_revisions where workspace_id = ${workspaceId}::uuid`);
+  if (availability.naming_template_heads) await inspect(sql`select 'naming_template_heads' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from naming_template_heads where workspace_id = ${workspaceId}::uuid`);
+  if (availability.naming_template_revisions) await inspect(sql`select 'naming_template_revisions' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from naming_template_revisions where workspace_id = ${workspaceId}::uuid`);
+  return rows;
+}
+
 /**
  * Destructive implementation used only inside DrizzleWorkspaceTombstoneStore's
  * serializable, locked caller transaction. No table name is catalog-derived.
@@ -197,8 +326,40 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
   async inspect(executor: DrizzleExecutor, workspaceId: string): Promise<WorkspaceTombstonePurgeEvidence> {
     if (!workspaceId) throw new WorkspaceTombstoneError("invalid_input");
 
-    const inspected = resultRows<InspectionRow>(await executor.execute(sql`
-      select 'memberships' as table_name, count(*)::int as row_count,
+    const availability = await optionalTableAvailability(executor);
+
+    const baseInspected = resultRows<InspectionRow>(await executor.execute(sql`
+      select 'guide_run_schedule_receipts' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from guide_run_schedule_receipts where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_run_artifacts', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_run_artifacts where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_run_heads', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_run_heads where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_run_events', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_run_events where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_runs', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_runs where workspace_id = ${workspaceId}::uuid
+      union all
+      select 'primary_result_binding_heads' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from primary_result_binding_heads where workspace_id = ${workspaceId}::uuid
+      union all select 'primary_result_binding_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from primary_result_binding_revisions where workspace_id = ${workspaceId}::uuid
+      union all
+      select 'development_log_heads' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from development_log_heads where workspace_id = ${workspaceId}::uuid
+      union all select 'development_log_events', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from development_log_events where workspace_id = ${workspaceId}::uuid
+      union all select 'finding_heads', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from finding_heads where workspace_id = ${workspaceId}::uuid
+      union all select 'finding_lifecycle_events', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from finding_lifecycle_events where workspace_id = ${workspaceId}::uuid
+      union all
+      select 'guide_activation_outbox' as table_name, count(*)::int as row_count, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision from guide_activation_outbox where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_lifecycle_events', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_lifecycle_events where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_interpretation_acceptances', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_interpretation_acceptances where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_revision_actions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_revision_actions where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_revision_budget_refs', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_revision_budget_refs where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_budget_contracts', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_budget_contracts where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_heads', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_heads where workspace_id = ${workspaceId}::uuid
+      union all select 'guide_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guide_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'guides', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from guides where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_resolution_snapshot_members', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slice_resolution_snapshot_members where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_resolution_snapshots', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slice_resolution_snapshots where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_revision_predicate_values', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slice_revision_predicate_values where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_revision_overrides', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slice_revision_overrides where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_revision_predicates', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slice_revision_predicates where workspace_id = ${workspaceId}::uuid
+      union all select 'slice_revisions', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slice_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'slices', count(*)::int, coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) from slices where workspace_id = ${workspaceId}::uuid
+      union all select 'memberships' as table_name, count(*)::int as row_count,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5('')) as row_revision
       from memberships where workspace_id = ${workspaceId}::uuid
       union all select 'data_sources', count(*)::int,
@@ -443,6 +604,9 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'meta_posts', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from meta_posts where workspace_id = ${workspaceId}::uuid
+      union all select 'meta_complete_snapshot_receipts', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from meta_complete_snapshot_receipts where workspace_id = ${workspaceId}::uuid
       union all select 'meta_change_snapshots', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from meta_change_snapshots where workspace_id = ${workspaceId}::uuid
@@ -538,6 +702,15 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'orchestrator_conversations', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from orchestrator_conversations where workspace_id = ${workspaceId}::uuid
+      union all select 'orchestrator_playbook_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from orchestrator_playbook_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'orchestrator_interview_kit_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from orchestrator_interview_kit_revisions where workspace_id = ${workspaceId}::uuid
+      union all select 'orchestrator_profile_revisions', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from orchestrator_profile_revisions where workspace_id = ${workspaceId}::uuid
       union all select 'slice_rule_workspace_drafts', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from slice_rule_workspace_drafts where workspace_id = ${workspaceId}::uuid
@@ -565,14 +738,26 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       union all select 'operational_events', count(*)::int,
         coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
       from operational_events where workspace_id = ${workspaceId}::uuid
+      union all select 'organization_campaign_meta_memberships', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from organization_campaign_meta_memberships where workspace_id = ${workspaceId}::uuid
+      union all select 'organization_campaigns', count(*)::int,
+        coalesce(md5(string_agg(id::text || ':' || xmin::text || ':' || ctid::text, ',' order by id)), md5(''))
+      from organization_campaigns where workspace_id = ${workspaceId}::uuid
       order by table_name
     `));
 
-    if (inspected.length !== WORKSPACE_TOMBSTONE_PURGE_TABLES.length) {
+    const inspected = [...baseInspected, ...(await inspectOptionalForwardTables(executor, workspaceId, availability))]
+      .sort((left, right) => left.table_name.localeCompare(right.table_name));
+
+    const expectedTables = WORKSPACE_TOMBSTONE_PURGE_TABLES.filter(
+      (table) => !OPTIONAL_FORWARD_PURGE_TABLES.includes(table as OptionalForwardPurgeTable) || availability[table as OptionalForwardPurgeTable],
+    );
+    if (inspected.length !== expectedTables.length) {
       throw new WorkspaceTombstoneError("workspace_unavailable");
     }
     const names = new Set(inspected.map((row) => row.table_name));
-    if (WORKSPACE_TOMBSTONE_PURGE_TABLES.some((table) => !names.has(table))) {
+    if (expectedTables.some((table) => !names.has(table))) {
       throw new WorkspaceTombstoneError("workspace_unavailable");
     }
     return Object.freeze({
@@ -601,8 +786,31 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
       purgedRowCount += count;
       return count;
     };
+    const availability = await optionalTableAvailability(executor);
 
     // Children first. This ordering is stable to minimize lock-order deadlocks.
+    // P05 rows are immutable during normal operation. The P05 SQL guards allow
+    // these exact deletes only after WorkspaceTombstoneService marked the
+    // workspace tombstoning, so keep this five-table block contiguous.
+    if (availability.p06_rollback_proposals) await remove(sql`with removed as (delete from p06_rollback_proposals where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.p06_execution_observations) await remove(sql`with removed as (delete from p06_execution_observations where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.p06_execution_gate_snapshots) await remove(sql`with removed as (delete from p06_execution_gate_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.p06_execution_heads) await remove(sql`with removed as (delete from p06_execution_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.p06_execution_events) await remove(sql`with removed as (delete from p06_execution_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.p06_execution_runs) await remove(sql`with removed as (delete from p06_execution_runs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.guide_run_action_bindings) await remove(sql`with removed as (delete from guide_run_action_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.p06_limited_autonomy_admissions) await remove(sql`with removed as (delete from p06_limited_autonomy_admissions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.budget_ceiling_policy_revisions) await remove(sql`with removed as (delete from budget_ceiling_policy_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.action_preparation_gate_snapshots) await remove(sql`with removed as (delete from action_preparation_gate_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.scope_report_saved_heads) await remove(sql`with removed as (delete from scope_report_saved_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.scope_report_saved_revisions) await remove(sql`with removed as (delete from scope_report_saved_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.naming_template_heads) await remove(sql`with removed as (delete from naming_template_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    if (availability.naming_template_revisions) await remove(sql`with removed as (delete from naming_template_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_run_schedule_receipts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_run_artifacts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_run_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_run_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_runs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from candidate_preview_binding_invalidations where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from candidate_preview_binding_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from candidate_preview_binding_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
@@ -617,6 +825,9 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from action_execution_attempts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_approval_evidence_grants where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_approval_decision_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    // RESTRICT children of ActionUnits: these must precede the queue itself.
+    await remove(sql`with removed as (delete from action_proposal_unit_frozen_contexts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_rule_budget_action_unit_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_proposal_dependencies where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_proposal_initial_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from action_proposal_units where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
@@ -643,6 +854,8 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from meta_ads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_creatives where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_change_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    // Receipts pin immutable snapshots with RESTRICT; remove them first.
+    await remove(sql`with removed as (delete from meta_complete_snapshot_receipts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_change_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_posts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from meta_asset_edges where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
@@ -656,6 +869,9 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from connection_secrets where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from daily_ad_metrics where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from sync_runs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from orchestrator_interview_kit_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from orchestrator_playbook_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from orchestrator_profile_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guidance_campaign_selection_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guidance_campaign_selection_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from guidance_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
@@ -678,7 +894,6 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from business_outcome_batches where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from business_outcome_evidence_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from business_outcome_entity_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
-    await remove(sql`with removed as (delete from slice_rule_budget_action_unit_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from slice_rule_scenario_allocation_selections where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from slice_rule_budget_proposal_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from slice_rule_allocation_entity_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
@@ -686,7 +901,6 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from budget_proposal_versions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from analysis_template_definitions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from analysis_timeframe_definitions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
-    await remove(sql`with removed as (delete from action_proposal_unit_frozen_contexts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from policy_semantic_binding_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_topic_bindings where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from authority_topic_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
@@ -713,6 +927,53 @@ export class DrizzleWorkspaceTombstonePurgePort implements WorkspaceTombstonePur
     await remove(sql`with removed as (delete from effective_campaign_policy_compositions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_context_components where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from effective_campaign_contexts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    // P03 primary-result heads must be released before immutable revisions.
+    await remove(sql`with removed as (delete from primary_result_binding_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from primary_result_binding_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    // P01 derived heads are purged before their immutable observations.
+    await remove(sql`with removed as (delete from development_log_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from development_log_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from finding_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from finding_lifecycle_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    // P04 Guide evidence must be purged child-first. Revisions use a self
+    // RESTRICT source link, so delete only bounded newest leaves.
+    await remove(sql`with removed as (delete from guide_activation_outbox where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_lifecycle_events where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_interpretation_acceptances where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_revision_actions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_revision_budget_refs where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    // Contract FK is RESTRICT by design; it must leave before its revision.
+    await remove(sql`with removed as (delete from guide_budget_contracts where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from guide_heads where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    const deleteRevisionLeaves = async (removeLeaves: () => Promise<number>, remainingRows: () => Promise<number>) => {
+      const cap = before.candidateCount + 1;
+      for (let attempt = 0; attempt < cap; attempt += 1) {
+        const removed = await removeLeaves();
+        if (await remainingRows() === 0) return;
+        if (removed === 0) throw new WorkspaceTombstoneError("workspace_unavailable");
+      }
+      throw new WorkspaceTombstoneError("workspace_unavailable");
+    };
+    await deleteRevisionLeaves(
+      () => remove(sql`with removed as (delete from guide_revisions parent where parent.workspace_id=${input.workspaceId}::uuid and not exists (select 1 from guide_revisions child where child.workspace_id=parent.workspace_id and child.source_revision_id=parent.id) returning 1) select count(*)::int as count from removed`),
+      async () => safeCount(resultRows<{ count: number | string }>(await executor.execute(sql`select count(*)::int as count from guide_revisions where workspace_id=${input.workspaceId}::uuid`))[0]?.count),
+    );
+    await remove(sql`with removed as (delete from guides where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    // P03 Slice evidence and definition graph. The forward migration allows
+    // only a tombstoning workspace to clear the immutable published head.
+    await remove(sql`with removed as (delete from slice_resolution_snapshot_members where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_resolution_snapshots where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_revision_predicate_values where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_revision_overrides where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from slice_revision_predicates where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await executor.execute(sql`update slices set current_published_revision_id=null where workspace_id=${input.workspaceId}::uuid and current_published_revision_id is not null`);
+    await deleteRevisionLeaves(
+      () => remove(sql`with removed as (delete from slice_revisions parent where parent.workspace_id=${input.workspaceId}::uuid and not exists (select 1 from slice_revisions child where child.workspace_id=parent.workspace_id and child.source_revision_id=parent.id) returning 1) select count(*)::int as count from removed`),
+      async () => safeCount(resultRows<{ count: number | string }>(await executor.execute(sql`select count(*)::int as count from slice_revisions where workspace_id=${input.workspaceId}::uuid`))[0]?.count),
+    );
+    await remove(sql`with removed as (delete from slices where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from organization_campaign_meta_memberships where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
+    await remove(sql`with removed as (delete from organization_campaigns where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_assignments where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_profile_revisions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);
     await remove(sql`with removed as (delete from category_definitions where workspace_id = ${input.workspaceId}::uuid returning 1) select count(*)::int as count from removed`);

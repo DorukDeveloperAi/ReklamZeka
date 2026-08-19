@@ -15,7 +15,8 @@ describe("Meta trust/readiness HTTP boundary", () => {
     expect(response.status).toBe(200);
     expect(load).toHaveBeenCalledWith("workspace");
     expect(response.headers.get("X-ReklamZeka-Meta-Network")).toBe("disabled");
-    expect(await response.json()).toEqual(report);
+    expect(await response.json()).toMatchObject({ ...report, source: { kind: "derived_trust", state: "empty",
+      reasonCodes: ["trust_reports_empty"] } });
   });
 
   it("rejects query, mutation, and absent principal without loading evidence", async () => {
@@ -25,5 +26,15 @@ describe("Meta trust/readiness HTTP boundary", () => {
     expect((await handler(new Request("http://localhost/api/meta/trust-readiness", { method: "POST" }))).status).toBe(400);
     expect((await handler(request())).status).toBe(403);
     expect(load).not.toHaveBeenCalled();
+  });
+
+  it("marks an unreadable trust report unavailable instead of returning a degraded report", async () => {
+    const handler = createMetaTrustReadinessHttpHandler({ load: vi.fn().mockRejectedValue(new Error("private database text")),
+      workspaceId: vi.fn().mockResolvedValue("workspace") });
+    const response = await handler(request());
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: { code: "source_unavailable" }, source: {
+      kind: "derived_trust", state: "unavailable", reasonCodes: ["derived_trust_unavailable"],
+    } });
   });
 });

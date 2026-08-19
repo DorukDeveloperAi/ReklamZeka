@@ -19,7 +19,7 @@ function fact(overrides: Partial<MetaReadMirrorFact> = {}): MetaReadMirrorFact {
     campaignStatus: "ACTIVE", campaignObjective: "OUTCOME_LEADS", campaignDailyBudgetMinor: 100000,
     campaignLifetimeBudgetMinor: null, campaignFetchedAt: "2026-08-13T11:57:00.000Z",
     adSetId: "55555555-5555-4555-8555-555555555555", adSetName: "AR · Özel Hedefleme",
-    adSetStatus: "ACTIVE", optimizationGoal: "LEAD_GENERATION", targetingSummary: { geo: "AR" },
+    adSetStatus: "ACTIVE", optimizationGoal: "LEAD_GENERATION", targetingSummary: { geo: "AR" }, targetingSignature: null,
     adSetDailyBudgetMinor: null, adSetLifetimeBudgetMinor: null, adSetFetchedAt: "2026-08-13T11:57:00.000Z",
     adId: "66666666-6666-4666-8666-666666666666", adName: "WhatsApp FTR", adStatus: "ACTIVE",
     adFetchedAt: "2026-08-13T11:57:00.000Z", creativeId: "77777777-7777-4777-8777-777777777777",

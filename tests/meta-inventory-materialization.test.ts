@@ -91,7 +91,7 @@ describe("Meta canonical inventory parser", () => {
     expect(Object.isFrozen(row.unsupportedFields)).toBe(true);
   });
 
-  it("binds requested targeting into the raw hash without retaining it in the canonical AdSet projection", () => {
+  it("materializes requested targeting as bounded canonical evidence without retaining raw targeting structure", () => {
     const page = parse("ad_set", [{ id: "adset_1", name: "Ad Set", campaign_id: "campaign_1",
       status: "ACTIVE", effective_status: "ACTIVE", optimization_goal: "LINK_CLICKS",
       billing_event: "IMPRESSIONS", bid_strategy: "LOWEST_COST_WITHOUT_CAP", bid_amount: null,
@@ -99,9 +99,39 @@ describe("Meta canonical inventory parser", () => {
       targeting: { geo_locations: { countries: ["AA"], location_types: ["home"] } },
       updated_time: "2026-08-07T11:30:00Z" }]);
     const serialized = JSON.stringify(page);
-    expect(serialized).not.toMatch(/targeting|geo_locations|countries|"AA"/);
+    expect(page.records[0]).toMatchObject({
+      targetingSummary: { version: "meta-targeting-summary/1.0.0", state: "partial",
+        source: { fieldState: "present", unsupportedFields: [] },
+        geo: { state: "known", includedCountries: ["AA"], locationTypes: ["home"] } },
+      targetingSignature: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(serialized).not.toMatch(/must-never-persist/);
     expect(page.records[0]?.trace.rawPayloadHash).toMatch(/^[a-f0-9]{64}$/);
     expect(page.records[0]?.unsupportedFields).not.toContainEqual({ field: "targeting", reason: "unrequested_field" });
+  });
+
+  it("records absent and known-null targeting distinctly without treating either as an empty audience", () => {
+    const common = { id: "adset_1", name: "Ad Set", campaign_id: "campaign_1", status: "ACTIVE",
+      effective_status: "ACTIVE", optimization_goal: "LINK_CLICKS", billing_event: "IMPRESSIONS",
+      bid_strategy: "LOWEST_COST_WITHOUT_CAP", bid_amount: null, daily_budget: "1000", lifetime_budget: null,
+      attribution_spec: [], promoted_object: {}, updated_time: "2026-08-07T11:30:00Z" };
+    const absent = parse("ad_set", [common]).records[0]!;
+    const knownNull = parse("ad_set", [{ ...common, targeting: null }]).records[0]!;
+    expect(absent).toMatchObject({ targetingSummary: { state: "missing", source: { fieldState: "missing" } } });
+    expect(knownNull).toMatchObject({ targetingSummary: { state: "missing", source: { fieldState: "known_null" } } });
+    expect((absent as Extract<typeof absent, { level: "ad_set" }>).targetingSignature)
+      .not.toBe((knownNull as Extract<typeof knownNull, { level: "ad_set" }>).targetingSignature);
+  });
+
+  it("fails the whole page closed for malformed or oversized targeting", () => {
+    const common = { id: "adset_1", name: "Ad Set", campaign_id: "campaign_1", status: "ACTIVE",
+      effective_status: "ACTIVE", optimization_goal: "LINK_CLICKS", billing_event: "IMPRESSIONS",
+      bid_strategy: "LOWEST_COST_WITHOUT_CAP", bid_amount: null, daily_budget: "1000", lifetime_budget: null,
+      attribution_spec: [], promoted_object: {}, updated_time: "2026-08-07T11:30:00Z" };
+    expect(() => parse("ad_set", [{ ...common, targeting: { age_min: "18" } }]))
+      .toThrowError(expect.objectContaining({ code: "invalid_page" }));
+    expect(() => parse("ad_set", [{ ...common, targeting: { publisher_platforms: Array.from({ length: 251 }, (_, index) => `p_${index}`) } }]))
+      .toThrowError(expect.objectContaining({ code: "invalid_page" }));
   });
 
   it("preserves ad hierarchy and creative identity while explicitly leaving tracking unknown", () => {

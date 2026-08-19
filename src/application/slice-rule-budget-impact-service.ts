@@ -48,6 +48,10 @@ export interface BudgetImpactScopeEvidencePort {
     evidenceRefs: readonly string[];
   }>>;
 }
+/** A budget-affecting saved rule must be bound to an immutable same-market pool before any dry-run. */
+export interface SliceRuleBudgetPoolBindingEvidencePort {
+  hasExact(input: Readonly<{ workspaceId: string; draftHash: string; market: "domestic" | "international" }>): Promise<boolean>;
+}
 
 export type SliceRuleBudgetImpactResult = Readonly<{
   contractVersion: typeof SLICE_RULE_BUDGET_IMPACT_VERSION;
@@ -91,6 +95,7 @@ export class SliceRuleBudgetImpactError extends Error {
     | "scope_evidence_not_ready"
     | "market_boundary"
     | "scope_mismatch"
+    | "pool_binding_required"
     | "unsafe_budget_preview"
     | "provenance_unavailable") {
     super(`Slice Rule bütçe etki önizlemesi reddedildi: ${code}`);
@@ -143,6 +148,7 @@ export class SliceRuleBudgetImpactService {
     private readonly drafts: CurrentSliceRuleDraftPort,
     private readonly scopeEvidence: BudgetImpactScopeEvidencePort,
     private readonly budgetLab: Pick<BudgetLabDraftService, "dryRun"> & Partial<Pick<BudgetLabDraftService, "saveRuleLinkedDraft">>,
+    private readonly poolBindings?: SliceRuleBudgetPoolBindingEvidencePort,
   ) {}
 
   async preview(input: SliceRuleBudgetImpactInput): Promise<SliceRuleBudgetImpactResult> {
@@ -158,6 +164,9 @@ export class SliceRuleBudgetImpactService {
     if (draft.status !== "draft" || draft.operatingMode !== "recommendation_only"
       || Object.values(draft.authority).some((capability) => capability !== false)) {
       throw new SliceRuleBudgetImpactError("stale_draft");
+    }
+    if (this.poolBindings && !await this.poolBindings.hasExact({ workspaceId: input.workspaceId, draftHash: draft.draftHash, market: draft.scope.market })) {
+      throw new SliceRuleBudgetImpactError("pool_binding_required");
     }
 
     const evidence = await this.scopeEvidence.loadExact({ workspaceId: input.workspaceId,

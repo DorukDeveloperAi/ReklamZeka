@@ -175,12 +175,12 @@ export function assertTrustedLocalDecisionRoomRequest(
   ) && !["autonomy-rule-create-draft", "guidance-studio-create", "guidance-studio-revise",
     "guidance-set-create", "guidance-set-revise", "instruction-policy-mutate",
     "practice-lab-propose-standardization", "promotion-template-lifecycle-draft", "slice-rule-workspace-save", "slice-rule-budget-impact-save",
-    "slice-rule-budget-action-unit-materialize",
-    "progressive-formalization-mutate", "delivery-health-alert-transition"].includes(
+    "slice-rule-budget-action-unit-materialize", "slice-rule-scenario-select",
+    "progressive-formalization-mutate", "delivery-health-alert-transition", "meta-read-sync-manual", "guide-run-manual"].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
   if (operation === "decide" && ![
-    "approval-queue-confirm-human-presence", "approval-queue-approve", "approval-queue-reject", "approval-queue-request-changes",
+    "approval-queue-confirm-human-presence", "approval-queue-approve", "approval-queue-reject", "approval-queue-defer", "approval-queue-request-changes",
   ].includes(
     request.headers.get("x-reklamzeka-intent") ?? "",
   )) throw new LocalDecisionRoomBoundaryError("untrusted_request");
@@ -188,7 +188,7 @@ export function assertTrustedLocalDecisionRoomRequest(
     "policy-bundle-confirm-human-presence", "policy-bundle-publish-approval-policy",
     "policy-bundle-publish-guardrail-policy", "guidance-studio-publish", "guidance-studio-archive",
     "guidance-set-review", "guidance-set-archive",
-    "category-authoring-mutate", "category-profile-mutate", "starter-category-adoption-confirm",
+    "category-authoring-mutate", "category-profile-mutate", "starter-category-adoption-confirm", "organization-campaign-mutate",
     "instruction-policy-mutate", "practice-lab-standardize", "promotion-template-lifecycle-publish",
     "progressive-formalization-mutate", "decision-cadence-publish", "experiment-record-mutate", "business-outcome-record",
   ].includes(request.headers.get("x-reklamzeka-intent") ?? "")) throw new LocalDecisionRoomBoundaryError("untrusted_request");
@@ -259,6 +259,21 @@ async function bindPrincipal(database: Pick<Database, "execute">, config: LocalD
     }),
     membership: Object.freeze({ userId: config.userId, workspaceId: config.workspaceId, role: row.role }),
   });
+}
+
+/**
+ * Binds the one configured local workspace for passive canonical reads only.
+ * It deliberately cannot draft, decide, publish, trigger a sync, or grant a
+ * caller-selected scope; those paths continue to require a session capability.
+ */
+export async function resolveTrustedConfiguredLocalReadPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "read");
+  return bindPrincipal(input.database, input.config);
 }
 
 /** Shared, fail-closed local reader binding used by server-side read tools. */
@@ -355,6 +370,24 @@ export async function resolveTrustedLocalDecisionRoomDryRunPrincipal(input: Read
   verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
     now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
     requiredScope: "decision_room:dry_run", expected: input.config });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
+/** Cookie-only manual Meta read trigger. It can refresh a server-bound scope, never supply one. */
+export async function resolveTrustedLocalMetaReadSyncPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null
+    || input.request.headers.get("x-reklamzeka-intent") !== "meta-read-sync-manual") {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: "meta_sync:trigger", expected: input.config });
   assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", "cookie");
   return bindPrincipal(input.database, input.config);
 }
@@ -472,6 +505,40 @@ export async function resolveTrustedLocalGuidancePrincipal(input: Readonly<{
   return bindPrincipal(input.database, input.config);
 }
 
+/** Cookie-only canonical Guide lifecycle boundary; it never grants Meta execution authority. */
+export async function resolveTrustedLocalGuideLifecyclePrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+  requiredScope: Extract<LocalSessionScope, "guide_lifecycle:read" | "guide_lifecycle:draft" | "guide_lifecycle:activate">;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config", "requiredScope"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null) {
+    throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  }
+  verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: input.requiredScope, expected: input.config });
+  const operation = input.requiredScope === "guide_lifecycle:read" ? "read"
+    : input.requiredScope === "guide_lifecycle:draft" ? "draft" : "publish";
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, operation, "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
+/** Cookie-only manual Guide analysis. It grants neither approval nor Meta execution. */
+export async function resolveTrustedLocalGuideRunManualPrincipal(input: Readonly<{
+  request: Request; database: Pick<Database, "execute">; config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  if (bearerToken(input.request) !== null || cookieToken(input.request) === null
+    || input.request.headers.get("x-reklamzeka-intent") !== "guide-run-manual") throw new LocalDecisionRoomBoundaryError("untrusted_request");
+  verifyLocalSessionCapability({ token: cookieToken(input.request)!, key: input.config.signingKey,
+    now: Math.floor(Date.now() / 1000), osUid: typeof process.getuid === "function" ? process.getuid() : -1,
+    requiredScope: "guide_run:manual", expected: input.config });
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "draft", "cookie");
+  return bindPrincipal(input.database, input.config);
+}
+
 /** Cookie-only internal category registry visibility; it grants no mutation authority. */
 export async function resolveTrustedLocalCategoryRegistryPrincipal(input: Readonly<{
   request: Request;
@@ -562,13 +629,13 @@ export async function resolveTrustedLocalSliceRuleBudgetImpactPrincipal(input: R
   const token = cookieToken(input.request);
   const intent = input.request.headers.get("x-reklamzeka-intent");
   if (bearerToken(input.request) !== null || token === null
-    || !["slice-rule-budget-impact-preview", "slice-rule-budget-impact-save", "slice-rule-budget-action-unit-read",
-      "slice-rule-budget-action-unit-materialize"].includes(intent ?? "")) {
+    || !["slice-rule-budget-impact-preview", "slice-rule-budget-impact-save", "slice-rule-budget-impact-context-candidates-read", "slice-rule-budget-action-unit-read",
+      "slice-rule-budget-action-unit-materialize", "slice-rule-scenario-selection-read", "slice-rule-scenario-select"].includes(intent ?? "")) {
     throw new LocalDecisionRoomBoundaryError("untrusted_request");
   }
   const verification = { token, key: input.config.signingKey, now: Math.floor(Date.now() / 1000),
     osUid: typeof process.getuid === "function" ? process.getuid() : -1, expected: input.config };
-  const operation = intent === "slice-rule-budget-impact-save" || intent === "slice-rule-budget-action-unit-materialize"
+  const operation = intent === "slice-rule-budget-impact-save" || intent === "slice-rule-budget-action-unit-materialize" || intent === "slice-rule-scenario-select"
     ? "draft" : "read";
   verifyLocalSessionCapability({ ...verification, requiredScope: operation === "draft" ? "instruction_policy:draft" : "instruction_policy:read" });
   verifyLocalSessionCapability({ ...verification, requiredScope: operation === "draft" ? "budget_lab:draft" : "budget_lab:read" });

@@ -77,7 +77,7 @@ function atomicRepository(initial = lifecycle()): ApprovalDecisionRepository & {
   return repository;
 }
 
-function issued(store: SingleUseHumanPresenceChallengeStore, action: "approve" | "reject" | "request_changes" = "approve") {
+function issued(store: SingleUseHumanPresenceChallengeStore, action: "approve" | "reject" | "defer" | "request_changes" = "approve") {
   return store.issue({ workspaceId, actorRef: "actor_owner", unitRef, action, now: "2026-08-07T19:00:00.000Z" }).proof;
 }
 
@@ -90,6 +90,7 @@ describe("ApprovalDecisionService", () => {
   it.each([
     ["approve", "approved"],
     ["reject", "rejected"],
+    ["defer", "deferred"],
     ["request_changes", "changes_requested"],
   ] as const)("records exactly one %s decision without execution or Meta authority", async (kind, state) => {
     const repository = atomicRepository();
@@ -104,6 +105,76 @@ describe("ApprovalDecisionService", () => {
     });
     expect(repository.calls).toBe(1);
     expect(JSON.stringify(result)).not.toMatch(/grantRef|authorizationRef|unitHash|scopeHash/);
+  });
+
+  it("requires single-use human presence for defer without persisting approval authorization or a grant", async () => {
+    const initial = lifecycle();
+    const store = new SingleUseHumanPresenceChallengeStore();
+    let captured: unknown = null;
+    const repository: ApprovalDecisionRepository = {
+      loadForDecision: async () => ({ lifecycle: initial, freshness: freshness(initial) }),
+      decideAtomically: async (input) => {
+        captured = await input.buildCommand({ lifecycle: initial, freshness: freshness(initial) });
+        const transition = decideActionUnit(initial, captured as Parameters<typeof decideActionUnit>[1]);
+        return { outcome: "inserted", lifecycle: transition.lifecycle, executionAuthority: "none", executionPerformed: false };
+      },
+    };
+    await service(repository, store).decide({
+      principal, membership: owner, unitRef, kind: "defer", reasonCode: "human_deferred",
+      humanPresenceProof: issued(store, "defer"),
+    });
+    expect(captured).toMatchObject({ kind: "defer", actor: { role: "owner" } });
+    expect(captured).not.toHaveProperty("authorization");
+    expect(captured).not.toHaveProperty("grantRef");
+    await expect(service(repository, store).decide({
+      principal, membership: owner, unitRef, kind: "defer", reasonCode: "human_deferred",
+      humanPresenceProof: "presence_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    })).rejects.toEqual(expect.objectContaining({ code: "human_presence_rejected" }));
+  });
+
+  it("invokes the server-owned post-commit materializer without granting execution authority", async () => {
+    const repository = atomicRepository();
+    const store = new SingleUseHumanPresenceChallengeStore();
+    const onCommitted = vi.fn(async () => undefined);
+    const subject = new ApprovalDecisionService(
+      repository,
+      store,
+      () => "2026-08-07T19:00:01.000Z",
+      (prefix) => `${prefix}_materializer_test`,
+      onCommitted,
+    );
+
+    const result = await subject.decide({
+      principal,
+      membership: owner,
+      unitRef,
+      kind: "approve",
+      reasonCode: "human_reviewed",
+      humanPresenceProof: issued(store),
+    });
+
+    expect(result.authority).toEqual({
+      approvalRecorded: true,
+      canGrant: false,
+      canExecute: false,
+      canWriteMeta: false,
+    });
+    expect(onCommitted).toHaveBeenCalledWith({
+      workspaceId: principal.workspaceId,
+      unitRef,
+      kind: "approve",
+      decidedAt: "2026-08-07T19:00:01.000Z",
+    });
+  });
+
+  it.each(["campaign_create", "raw_graph"])("rejects unsupported %s decisions before repository or proof use", async (kind) => {
+    const repository = atomicRepository();
+    const store = new SingleUseHumanPresenceChallengeStore();
+    await expect(service(repository, store).decide({
+      principal, membership: owner, unitRef, kind, reasonCode: "unsupported_action",
+      humanPresenceProof: "presence_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    } as never)).rejects.toEqual(expect.objectContaining({ code: "invalid_input" }));
+    expect(repository.calls).toBe(0);
   });
 
   it("denies analyst/viewer and caller identity mismatches before reading or consuming proof", async () => {

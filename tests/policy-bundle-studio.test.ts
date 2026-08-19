@@ -87,6 +87,20 @@ describe("Policy Bundle Studio read + draft", () => {
     ]));
   });
 
+  it("creates exact K3 human-only rename policies without widening them to autonomy", async () => {
+    const api = harness("analyst");
+    for (const actionType of ["campaign_rename", "adset_rename", "ad_rename"] as const) {
+      await expect(api.service.createDraft(principal, { ...approvalRequest,
+        policyRef: `approval_policy_${actionType}`, applicability: { actionType, risk: "K3" } }))
+        .resolves.toMatchObject({ item: { applicability: { actionType, risk: "K3" }, approverRoles: ["admin", "owner"] } });
+    }
+    expect(api.approvals).toHaveLength(3);
+    expect(api.approvals).toEqual(expect.arrayContaining([
+      expect.objectContaining({ applicability: { actionType: "campaign_rename", risk: "K3" },
+        policy: expect.objectContaining({ autonomyMode: "approval_only", approverRoles: [{ risk: "K3", roles: ["admin", "owner"] }] }) }),
+    ]));
+  });
+
   it("rejects a malformed or applicability-changing revision instead of silently converting it to K4", async () => {
     const api = harness();
     await expect(api.service.createDraft(principal, { ...approvalRequest, policyRef: "approval_policy_bad",

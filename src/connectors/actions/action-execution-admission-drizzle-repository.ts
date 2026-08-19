@@ -9,6 +9,7 @@ import {
 } from "@/domain/actions/action-execution-admission";
 import { createMetaWriteSpec } from "@/domain/actions/meta-write-spec";
 import { assessMetaWriteEligibility, type MetaWriteEligibilitySnapshot } from "@/domain/actions/meta-write-eligibility";
+import { appendActionPreparationGateSnapshot, evaluateUnifiedActionPreparationGateForUnit, UnifiedActionPreparationGateError } from "@/connectors/campaigns/unified-action-preparation-gate";
 import * as schema from "@/db/schema";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -42,10 +43,13 @@ type SourceRow = Readonly<{
   ad_ref: string | null;
   campaign_configured_status: string | null;
   campaign_effective_status: string | null;
+  campaign_name: string | null;
   ad_set_configured_status: string | null;
   ad_set_effective_status: string | null;
+  ad_set_name: string | null;
   target_configured_status: string | null;
   target_effective_status: string | null;
+  target_name: string | null;
   campaign_budget_optimization: boolean | null;
   source_snapshot_hash: string | null;
   source_snapshot_captured_at: string | null;
@@ -106,16 +110,17 @@ function currentMirrorSnapshot(source: SourceRow, spec: ReturnType<typeof create
   if (!source.source_snapshot_hash || !HASH.test(source.source_snapshot_hash) || Date.parse(sourceCapturedAt) > Date.parse(capturedAt)
     || !REF.test(source.account_ref)) throw new ActionExecutionAdmissionRepositoryError("source_corrupt");
   const targetSource = spec.target.entityLevel === "campaign"
-    ? { ref: source.campaign_ref, configuredStatus: source.campaign_configured_status, effectiveStatus: source.campaign_effective_status }
+    ? { ref: source.campaign_ref, configuredStatus: source.campaign_configured_status, effectiveStatus: source.campaign_effective_status, name: source.campaign_name }
     : spec.target.entityLevel === "adset"
-      ? { ref: source.ad_set_ref, configuredStatus: source.ad_set_configured_status, effectiveStatus: source.ad_set_effective_status }
-      : { ref: source.ad_ref, configuredStatus: source.target_configured_status, effectiveStatus: source.target_effective_status };
-  if (targetSource.ref !== source.entity_ref) throw new ActionExecutionAdmissionRepositoryError("source_corrupt");
+      ? { ref: source.ad_set_ref, configuredStatus: source.ad_set_configured_status, effectiveStatus: source.ad_set_effective_status, name: source.ad_set_name }
+      : { ref: source.ad_ref, configuredStatus: source.target_configured_status, effectiveStatus: source.target_effective_status, name: source.target_name };
+  if (targetSource.ref !== source.entity_ref || typeof targetSource.name !== "string") throw new ActionExecutionAdmissionRepositoryError("source_corrupt");
   const target = Object.freeze({
     entityLevel: spec.target.entityLevel,
     entityRef: source.entity_ref,
     configuredStatus: status(targetSource.configuredStatus),
     effectiveStatus: status(targetSource.effectiveStatus),
+    currentName: targetSource.name,
     budgetOwnerRef: spec.target.entityLevel === "campaign"
       ? source.campaign_budget_optimization === true ? source.entity_ref : null
       : spec.target.entityLevel === "adset"
@@ -145,7 +150,7 @@ export class DrizzleActionExecutionAdmissionRepository {
   }
 
   async admit(input: Readonly<{ workspaceId: string; admission: ActionExecutionAdmission }>): Promise<Readonly<{
-    outcome: "inserted" | "unchanged";
+    outcome: "inserted" | "unchanged" | "blocked";
     executionRef: string;
     admissionHash: string;
     capabilities: Readonly<{ canExecute: false; canWriteMeta: false; canDispatchNetwork: false }>;
@@ -159,6 +164,7 @@ export class DrizzleActionExecutionAdmissionRepository {
           campaign.external_campaign_id as campaign_ref, ad_set.external_ad_set_id as ad_set_ref, ad.external_ad_id as ad_ref,
           ad.configured_status as target_configured_status, ad.effective_status as target_effective_status,
           campaign.configured_status as campaign_configured_status, campaign.effective_status as campaign_effective_status,
+          campaign.name as campaign_name, ad_set.name as ad_set_name, ad.name as target_name,
           ad_set.configured_status as ad_set_configured_status, ad_set.effective_status as ad_set_effective_status,
           campaign.campaign_budget_optimization, snapshot.snapshot_hash as source_snapshot_hash,
           to_char(snapshot.captured_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as source_snapshot_captured_at,
@@ -207,6 +213,29 @@ export class DrizzleActionExecutionAdmissionRepository {
         || input.admission.writeSpec.specHash !== expectedSpec.specHash
         || digest(input.admission.writeSpec) !== digest(expectedSpec)) {
         throw new ActionExecutionAdmissionRepositoryError("source_corrupt");
+      }
+      const gateBindings = rows<{ selection_id: string }>(await transaction.execute(sql`
+        select selection_id from slice_rule_budget_action_unit_bindings
+        where workspace_id = ${this.workspaceId}::uuid and action_proposal_unit_id = ${source.unit_id}::uuid limit 2
+      `));
+      if (gateBindings.length > 1) throw new ActionExecutionAdmissionRepositoryError("source_corrupt");
+      if (gateBindings.length === 1) {
+        const evaluatedAt = iso(source.database_now);
+        try {
+          const gate = await evaluateUnifiedActionPreparationGateForUnit(transaction as never, {
+            workspaceId: this.workspaceId, actionProposalUnitId: source.unit_id, stage: "admission", evaluatedAt,
+          });
+          await appendActionPreparationGateSnapshot(transaction as never, { workspaceId: this.workspaceId,
+            selectionId: null, actionProposalUnitId: source.unit_id, result: gate, evaluatedAt });
+          if (!gate.dataHealthReady || !gate.admissionEnabled) {
+            return Object.freeze({ outcome: "blocked" as const, executionRef: `action_execution_${"0".repeat(20)}`,
+              admissionHash: input.admission.admissionHash,
+              capabilities: Object.freeze({ canExecute: false as const, canWriteMeta: false as const, canDispatchNetwork: false as const }) });
+          }
+        } catch (error) {
+          if (error instanceof UnifiedActionPreparationGateError) throw new ActionExecutionAdmissionRepositoryError("source_missing");
+          throw error;
+        }
       }
       let mirrorEligibility;
       try {

@@ -1,0 +1,182 @@
+{
+  "proje": "ReklamZeka",
+  "dal": "main",
+  "uzak": true,
+  "isCommitleri": [
+    {
+      "hash": "14dc65fc8",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): add deferred approval decisions",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "7516f34ba",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): harden disabled execution contract",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "a0621d103",
+      "tarih": "2026-08-18",
+      "konu": "feat(p06): bind guide run status candidates",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "12c1da0cb",
+      "tarih": "2026-08-18",
+      "konu": "feat(reports): add accessible scope report interface",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "e0dfbe770",
+      "tarih": "2026-08-18",
+      "konu": "docs(reports): record xlsx and trusted context acceptance",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "ce6b86f7a",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): persist guide runs and bind execution contracts",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "c4ec16b17",
+      "tarih": "2026-08-17",
+      "konu": "docs(guides): record budget evidence acceptance",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    },
+    {
+      "hash": "70648005e",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): orchestrate recoverable guide runs",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "6f85dd8dd",
+      "tarih": "2026-08-17",
+      "konu": "feat(operations): persist primary result bindings",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "78b0a16eb",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): harden run scheduling chain",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "205f88c98",
+      "tarih": "2026-08-17",
+      "konu": "feat(guides): add safe budget dry run",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "53186edf9",
+      "tarih": "2026-08-17",
+      "konu": "feat(meta): persist data health lifecycle",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "25dfa99e6",
+      "tarih": "2026-08-17",
+      "konu": "feat(operations): trust canonical primary result catalog",
+      "tur": "is",
+      "kapsam": [
+        "feat"
+      ]
+    },
+    {
+      "hash": "4db71800e",
+      "tarih": "2026-08-17",
+      "konu": "test(dashboard): lock table-first information architecture",
+      "tur": "is",
+      "kapsam": [
+        "test"
+      ]
+    },
+    {
+      "hash": "6fb2817e0",
+      "tarih": "2026-08-17",
+      "konu": "docs(plan): record table-first browser checkpoint",
+      "tur": "is",
+      "kapsam": [
+        "docs"
+      ]
+    }
+  ],
+  "kapsamDagilimi": [
+    {
+      "kapsam": "feat",
+      "adet": 33
+    },
+    {
+      "kapsam": "docs",
+      "adet": 15
+    },
+    {
+      "kapsam": "fix",
+      "adet": 7
+    },
+    {
+      "kapsam": "test",
+      "adet": 5
+    }
+  ],
+  "isSayisi": 589,
+  "ilkIsTarihi": "2026-08-06",
+  "sonIsTarihi": "2026-08-18",
+  "planlar": [
+    {
+      "slug": "proje",
+      "v": 2,
+      "durum": "SÜRÜYOR",
+      "asamaKapali": 6,
+      "asamaToplam": 14,
+      "siradaki": null
+    },
+    {
+      "slug": "reklamzeka-sistemi",
+      "v": 2,
+      "durum": "AÇIK",
+      "asamaKapali": 0,
+      "asamaToplam": 10,
+      "siradaki": "01-temel-kapanis"
+    }
+  ],
+  "damga": "8bbff56cae39"
+}

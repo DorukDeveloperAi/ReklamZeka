@@ -40,7 +40,7 @@ export type ActionExecutionAdmissionSource = Readonly<{
 
 export type ActionExecutionAdmissionSink = Readonly<{
   admit(input: Readonly<{ workspaceId: string; admission: ActionExecutionAdmission }>): Promise<Readonly<{
-    outcome: "inserted" | "unchanged";
+    outcome: "inserted" | "unchanged" | "blocked";
     executionRef: string;
     admissionHash: string;
     capabilities: Readonly<{ canExecute: false; canWriteMeta: false; canDispatchNetwork: false }>;
@@ -132,6 +132,7 @@ export class ActionExecutionAdmissionService {
     let persisted: Awaited<ReturnType<ActionExecutionAdmissionSink["admit"]>>;
     try { persisted = await this.sink.admit({ workspaceId: principal.workspaceId, admission }); }
     catch { fail("conflict"); }
+    if (persisted?.outcome === "blocked") fail("stale");
     if (!persisted || !["inserted", "unchanged"].includes(persisted.outcome) || persisted.admissionHash !== admission.admissionHash
       || persisted.capabilities.canExecute !== false || persisted.capabilities.canWriteMeta !== false || persisted.capabilities.canDispatchNetwork !== false) fail("conflict");
     return Object.freeze({ version: ACTION_EXECUTION_ADMISSION_SERVICE_VERSION, executionRef: persisted.executionRef,

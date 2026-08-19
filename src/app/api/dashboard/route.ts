@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { dashboardStateView, parseDashboardState, type DashboardState } from "@/app/dashboard/fixture-state";
+import { dashboardStateView, type DashboardState } from "@/app/dashboard/fixture-state";
 import { buildPerformanceSnapshot, type PeriodDays } from "@/domain/ads/performance";
 
 export function dashboardResponse(period: PeriodDays = 7, state: DashboardState = "ready") {
@@ -8,11 +8,9 @@ export function dashboardResponse(period: PeriodDays = 7, state: DashboardState 
 }
 
 export function GET(request: Request) {
-  const url = new URL(request.url);
-  const value = Number(url.searchParams.get("period") ?? "7");
-  if (![7, 30, 90].includes(value)) return NextResponse.json({ error: "period 7, 30 veya 90 olmalıdır" }, { status: 400 });
-  const rawState = url.searchParams.get("state");
-  const state = parseDashboardState(rawState);
-  if (rawState && rawState !== state) return NextResponse.json({ error: "Geçersiz dashboard durumu" }, { status: 400 });
-  return NextResponse.json(dashboardResponse(value as PeriodDays, state));
+  void request;
+  return NextResponse.json({
+    error: "Bu legacy demo endpoint'i kullanımdan kaldırıldı. Gerçek kaynak için /dashboard kullanın.",
+    code: "legacy_demo_retired",
+  }, { status: 410, headers: { "Cache-Control": "no-store" } });
 }

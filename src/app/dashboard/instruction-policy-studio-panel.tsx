@@ -475,9 +475,9 @@ export function InstructionPolicyStudioPanel() {
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void reload(); }, [reload]);
-  if (loading) return <section className={styles.empty} aria-live="polite"><h1>Strict policy registry yükleniyor…</h1></section>;
-  if (error || !snapshot) return <section className={styles.error} role="alert"><h1>Strict policy Studio kullanılamıyor.</h1>
-    <p>{error ?? "Talimat politikası kaynağı güvenli biçimde bağlanamadı."}</p><p>Dependency impact: henüz hesaplanmadı.</p>
+  if (loading) return <section className={styles.empty} aria-live="polite"><h1>Bağlayıcı politika kayıtları yükleniyor…</h1></section>;
+  if (error || !snapshot) return <section className={styles.error} role="alert"><h1>Bağlayıcı politika alanı kullanılamıyor.</h1>
+    <p>{error ?? "Talimat politikası kaynağı güvenli biçimde bağlanamadı."}</p><p>Bağımlılık etkisi henüz hesaplanmadı.</p>
     {sessionRequired ? <LocalSessionConnector title="Bağlayıcı politika çalışma alanını bağlayın" onVerify={reload} />
       : <button className={styles.retry} type="button" onClick={() => void reload()}>Tekrar dene</button>}</section>;
   return <><InstructionPolicyStudioView snapshot={snapshot} onReload={async () => { await reload(); }} />

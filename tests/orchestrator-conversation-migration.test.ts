@@ -4,6 +4,13 @@ import { WORKSPACE_TOMBSTONE_PURGE_TABLES } from
   "@/connectors/meta/workspace-tombstone-purge-drizzle-adapter";
 
 const migration = readFileSync("drizzle/20260813123350_majestic_george_stacy.sql", "utf8");
+const catalogBindingMigration = readFileSync("drizzle/20260814140114_regular_steve_rogers.sql", "utf8");
+const catalogBindingHardeningMigration = readFileSync("drizzle/20260814140309_mushy_boomerang.sql", "utf8");
+const readOnlyEvidenceMigration = readFileSync("drizzle/20260814144129_orchestrator_readonly_evidence_context.sql", "utf8");
+const skillRunMigration = readFileSync("drizzle/20260814145753_simple_masked_marvel.sql", "utf8");
+const interviewKitMigration = readFileSync("drizzle/20260814154319_lush_warbird.sql", "utf8");
+const interviewKitTurnMigration = readFileSync("drizzle/20260814154728_plain_misty_knight.sql", "utf8");
+const repository = readFileSync("src/connectors/agents/orchestrator-conversation-drizzle-repository.ts", "utf8");
 
 describe("Orchestrator conversation ledger migration", () => {
   it("creates conversation/turn/message/tombstone storage with tenant-leftmost indexes", () => {
@@ -29,5 +36,51 @@ describe("Orchestrator conversation ledger migration", () => {
     expect(migration).toContain("orchestrator conversation ledger is append-only");
     expect(migration).toContain("SECURITY INVOKER SET search_path = ''");
     expect(migration).not.toMatch(/security definer/i);
+  });
+
+  it("extends the existing immutable turn ledger without backfilling legacy rows or exposing playbook text", () => {
+    expect(catalogBindingMigration).toContain('ADD COLUMN "playbook_snapshots" jsonb DEFAULT \'[]\'::jsonb NOT NULL');
+    expect(catalogBindingMigration).toContain("'LEGACY_NOT_RECORDED'");
+    expect(catalogBindingMigration).toContain("'UNAVAILABLE_NOT_BOUND'");
+    expect(catalogBindingHardeningMigration).toContain('"(body|content|prompt|token|secret|authorization)"');
+    expect(catalogBindingHardeningMigration).toContain("'skill_catalog_unavailable'");
+    expect(`${catalogBindingMigration}\n${catalogBindingHardeningMigration}`).not.toMatch(/grant\s+.*(?:anon|authenticated)|disable row level security/i);
+    expect(repository).toContain("JSON.stringify(input.skillCatalogSnapshot.playbooks)");
+    expect(repository).not.toContain("skillCatalogBinding");
+  });
+
+  it("adds an independent, fail-closed readonly evidence snapshot without weakening RLS or append-only storage", () => {
+    expect(readOnlyEvidenceMigration).toContain('ADD COLUMN "evidence_context_snapshot" jsonb');
+    expect(readOnlyEvidenceMigration).toContain('ADD COLUMN "evidence_context_hash" text');
+    expect(readOnlyEvidenceMigration).toContain("'LEGACY_NOT_RECORDED'");
+    expect(readOnlyEvidenceMigration).toContain("'UNAVAILABLE_NOT_BOUND'");
+    expect(readOnlyEvidenceMigration).toContain('"(name|campaignRef|accountRef|spend|outcome|cpa|title|detail|action|sql|token|secret|authorization)"');
+    expect(readOnlyEvidenceMigration).not.toMatch(/grant\s+.*(?:anon|authenticated)|disable row level security|drop trigger/i);
+  });
+
+  it("adds a selected-skill receipt independently of the mutable workspace catalog", () => {
+    expect(skillRunMigration).toContain('ADD COLUMN "skill_run_snapshot" jsonb');
+    expect(skillRunMigration).toContain('ADD COLUMN "skill_run_hash" text');
+    expect(skillRunMigration).toContain("'receiptRef', 'receiptHash', 'evidenceContextHash', 'intent', 'selectedSkills'");
+    expect(skillRunMigration).toContain('"(name|campaignRef|accountRef|spend|outcome|cpa|title|detail|action|sql|token|secret|authorization|prompt|policy|rule)"');
+    expect(skillRunMigration).not.toMatch(/grant\s+.*(?:anon|authenticated)|disable row level security|drop trigger/i);
+    expect(repository).toContain("JSON.stringify(input.skillRunSnapshot)");
+    expect(repository).not.toContain("loadActive(");
+  });
+
+  it("stores user-authored interview kits and per-turn kit snapshots as private immutable evidence", () => {
+    expect(interviewKitMigration).toContain('CREATE TABLE "orchestrator_interview_kit_revisions"');
+    expect(interviewKitMigration).toContain("ALTER TABLE orchestrator_interview_kit_revisions ENABLE ROW LEVEL SECURITY");
+    expect(interviewKitMigration).toContain("ALTER TABLE orchestrator_interview_kit_revisions FORCE ROW LEVEL SECURITY");
+    expect(interviewKitMigration).toContain("REVOKE ALL PRIVILEGES ON TABLE orchestrator_interview_kit_revisions FROM PUBLIC, anon, authenticated, service_role");
+    expect(interviewKitMigration).toContain("CREATE TRIGGER orchestrator_interview_kit_revisions_append_only");
+    expect(interviewKitMigration).toContain("'questions'");
+    expect(interviewKitMigration).not.toMatch(/grant\s+.*(?:anon|authenticated)|disable row level security/i);
+    expect(interviewKitTurnMigration).toContain('ADD COLUMN "interview_kit_snapshots" jsonb');
+    expect(interviewKitTurnMigration).toContain('ADD COLUMN "interview_kit_binding_hash" text');
+    expect(interviewKitTurnMigration).toContain("'LEGACY_NOT_RECORDED'");
+    expect(interviewKitTurnMigration).toContain("'UNAVAILABLE_NOT_BOUND'");
+    expect(interviewKitTurnMigration).not.toMatch(/grant\s+.*(?:anon|authenticated)|disable row level security|drop trigger/i);
+    expect(repository).toContain("JSON.stringify(input.interviewKitSnapshots)");
   });
 });

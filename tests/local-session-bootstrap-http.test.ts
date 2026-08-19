@@ -54,6 +54,24 @@ function zeroLengthStreamRequest(token: string, contentLength: string | null = "
   });
 }
 
+function streamedRequest(token: string, chunks: readonly Uint8Array[], close = true) {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(chunk);
+      if (close) controller.close();
+    },
+  });
+  return new Request("http://localhost:3000/api/local-session", {
+    method: "POST",
+    headers: {
+      Host: "localhost:3000", Origin: "http://localhost:3000", "Sec-Fetch-Site": "same-origin",
+      "X-ReklamZeka-Intent": "bootstrap-local-session", Authorization: `Bearer ${token}`,
+    },
+    body: stream,
+    duplex: "half",
+  } as RequestInit);
+}
+
 describe("local session bootstrap HTTP boundary", () => {
   it("consumes a short-lived proof and mints a hardened, scoped HttpOnly cookie", async () => {
     const consume = vi.fn(async () => undefined);
@@ -95,6 +113,16 @@ describe("local session bootstrap HTTP boundary", () => {
     expect((await handler(request(session))).status).toBe(403);
   });
 
+  it("classifies an authentic proof missing from this server's checkout without minting a cookie", async () => {
+    const response = await createLocalSessionBootstrapHandler({ config, clock: () => now + 1 })(request(bootstrapToken()));
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: {
+      code: "local_session_proof_not_registered",
+      message: expect.any(String),
+    } });
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
   it("accepts an explicitly zero-length body stream from a real route adapter", async () => {
     const consume = vi.fn(async () => undefined);
     const response = await createLocalSessionBootstrapHandler({ config, clock: () => now + 1, consume })(zeroLengthStreamRequest(bootstrapToken()));
@@ -102,10 +130,26 @@ describe("local session bootstrap HTTP boundary", () => {
     expect(consume).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps an unknown-length stream out of the bootstrap boundary", async () => {
+  it("accepts an empty unknown-length stream produced by the route adapter", async () => {
     const consume = vi.fn(async () => undefined);
     const response = await createLocalSessionBootstrapHandler({ config, clock: () => now + 1, consume })(zeroLengthStreamRequest(bootstrapToken(), null));
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(204);
+    expect(consume).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a payload in the first or a later unknown-length stream chunk", async () => {
+    const consume = vi.fn(async () => undefined);
+    const handler = createLocalSessionBootstrapHandler({ config, clock: () => now + 1, consume });
+    expect((await handler(streamedRequest(bootstrapToken(), [new Uint8Array([1])]))).status).toBe(403);
+    expect((await handler(streamedRequest(bootstrapToken(), [new Uint8Array(), new Uint8Array([1])]))).status).toBe(403);
+    expect(consume).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on too many empty chunks or an endless empty stream", async () => {
+    const consume = vi.fn(async () => undefined);
+    const handler = createLocalSessionBootstrapHandler({ config, clock: () => now + 1, consume });
+    expect((await handler(streamedRequest(bootstrapToken(), Array.from({ length: 9 }, () => new Uint8Array())))).status).toBe(403);
+    expect((await handler(streamedRequest(bootstrapToken(), [], false))).status).toBe(403);
     expect(consume).not.toHaveBeenCalled();
   });
 });

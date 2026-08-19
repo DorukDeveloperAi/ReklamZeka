@@ -30,6 +30,17 @@ describe("operational timeline read service", () => {
       detail: expect.stringContaining("kural kaynağı bağlı"),
     })] });
   });
+  it("admits selected allocations and prepared ActionUnits as separate closed-authority decision stages", async () => {
+    const service = new OperationalTimelineReadService({ list: async () => [
+      { kind: "action_preparation" as const, occurredAt: "2026-08-13T13:00:00.000Z", title: "Seçilen tahsis için ActionUnit hazırlandı",
+        detail: "budget increase · K3 · insan onayı bekliyor · Meta uygulaması kapalı" },
+      { kind: "budget_selection" as const, occurredAt: "2026-08-13T12:00:00.000Z", title: "Bütçe senaryosu için insan seçimi kaydedildi",
+        detail: "Artış önerisi · belirli tahsis seçildi · uygulama yetkisi yok" },
+    ] }, memberships);
+    await expect(service.list(principal)).resolves.toMatchObject({ items: [
+      expect.objectContaining({ kind: "action_preparation" }), expect.objectContaining({ kind: "budget_selection" }),
+    ], authority: { canApprove: false, canExecute: false, canWriteMeta: false } });
+  });
   it("admits only a public-safe temporal evaluation projection with no action authority", async () => {
     const service = new OperationalTimelineReadService({ list: async () => [{ kind: "temporal_evaluation" as const,
       occurredAt: "2026-08-13T12:00:00.000Z", title: "Zamansal kural değerlendirmesi kaydedildi",

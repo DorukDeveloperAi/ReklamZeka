@@ -6,5 +6,5 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     coverage: { reporter: ["text", "json-summary"] },
   },
-  resolve: { alias: { "@": new URL("./src", import.meta.url).pathname } },
+  resolve: { alias: { "@": new URL("./src", import.meta.url).pathname, "server-only": new URL("./src/testing/server-only.ts", import.meta.url).pathname } },
 });

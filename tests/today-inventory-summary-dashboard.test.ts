@@ -100,11 +100,11 @@ describe("Today inventory summary", () => {
 
   it("renders an honest loading state without demo decisions, brands or portfolio rows", () => {
     const html = renderToStaticMarkup(createElement(OperatingDashboard, { model }));
-    expect(html).toContain("OPERATING REVIEW · KANONİK KAYNAK");
-    expect(html).toContain("Kanonik ayna okunuyor");
-    expect(html).toContain("Kampanya sayısı kullanılamıyor");
-    expect(html).toContain("Eksik veri sıfır veya örnek değer olarak gösterilmez.");
-    expect(html).toContain("Canlı outcome metriği olmadan CPA gösterilmez.");
+    expect(html).toContain("OPERASYON · GENEL BAKIŞ");
+    expect(html).toContain("Kanonik kaynak kontrol ediliyor");
+    expect(html).toContain("Kampanya kaynağı okunuyor");
+    expect(html).toContain("Eksik veri sıfır veya örnek değer olarak gösterilmez");
+    expect(html).toContain("Kaynak doğrulanana kadar ekran örnek içerikle doldurulmaz");
     expect(html).not.toContain("Örnek karar biçimleri");
     expect(html).not.toContain("Planlama senaryoları");
     expect(html).not.toContain("Demo Marka");

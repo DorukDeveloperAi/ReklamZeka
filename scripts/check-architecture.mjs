@@ -58,6 +58,39 @@ export function checkArchitecture(rootInput = DEFAULT_ROOT) {
   for (const relative of ["src", "scripts"].flatMap((directory) => filesBelow(root, directory))) {
     if (relative.endsWith(".py")) failures.push(`TypeScript runtime dışında Python kaynak yasak: ${relative}`);
   }
+  for (const relative of filesBelow(root, "src/app/dashboard")) {
+    if (!relative.endsWith(".ts") && !relative.endsWith(".tsx")) continue;
+    const source = readFileSync(resolve(root, relative), "utf8");
+    if (source.includes("domain/operations/primary-result") || source.includes("trusted-primary-result-catalog")) {
+      failures.push(`dashboard server-only primary-result sınırını ihlal ediyor: ${relative}`);
+    }
+  }
+  const primaryResultDomain = resolve(root, "src/domain/operations/primary-result.ts");
+  const primaryResultAuthority = resolve(root, "src/domain/operations/internal/trusted-primary-result-catalog.ts");
+  const primaryResultAdapter = resolve(root, "src/connectors/operations/primary-result-action-catalog-drizzle-adapter.ts");
+  if (![primaryResultDomain, primaryResultAuthority, primaryResultAdapter].every(existsSync)) {
+    failures.push("primary-result kanonik katalog sınırı eksik");
+  } else {
+    const domain = readFileSync(primaryResultDomain, "utf8");
+    const authority = readFileSync(primaryResultAuthority, "utf8");
+    const adapter = readFileSync(primaryResultAdapter, "utf8");
+    if (/export\s+(function|const)\s+(registerCanonicalPrimaryResultCatalog|materializeTrustedPrimaryResultCatalog)/.test(domain)
+      || /export\s+(function|const)\s+materializeTrustedPrimaryResultCatalog/.test(authority)
+      || /CanonicalActionCatalogReadPort|loadTrustedPrimaryResultCatalog/.test(authority)) {
+      failures.push("primary-result yapısal katalog/registrar girişi yasak");
+    }
+    if (!authority.includes("new WeakSet<object>()") || !authority.includes("meta_daily_insights")
+      || !authority.includes("meta_daily_insight_metrics") || !authority.includes("metric.metric_key = 'actions'")
+      || !adapter.includes("DrizzlePrimaryResultActionCatalogAdapter")) {
+      failures.push("primary-result kanonik Meta katalog kanıtı eksik");
+    }
+    for (const relative of filesBelow(root, "src")) {
+      if (relative === "src/domain/operations/internal/trusted-primary-result-catalog.ts") continue;
+      if (readFileSync(resolve(root, relative), "utf8").includes("materializeTrustedPrimaryResultCatalog")) {
+        failures.push(`primary-result private materializer dışarı aktarılamaz: ${relative}`);
+      }
+    }
+  }
   const readmePath = resolve(root, "README.md");
   if (!existsSync(readmePath)) failures.push("README.md yok");
   else {

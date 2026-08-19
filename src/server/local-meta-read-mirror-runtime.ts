@@ -9,7 +9,7 @@ import {
 } from "@/server/meta-read-mirror-http";
 import {
   LocalDecisionRoomBoundaryError,
-  resolveTrustedLocalReadPrincipal,
+  resolveTrustedConfiguredLocalReadPrincipal,
   type LocalDecisionRoomConfig,
 } from "@/server/local-decision-room-runtime";
 import { LocalSessionCapabilityError } from "@/security/local-session-capability";
@@ -29,12 +29,7 @@ export function createLocalMetaReadMirrorRouteHandler(input: Readonly<{
 }>) {
   return async (request: Request) => {
     try {
-      const bound = await resolveTrustedLocalReadPrincipal({
-        request,
-        database: input.database,
-        config: input.config,
-        requiredScope: "decision_room:read",
-      });
+      const bound = await resolveTrustedConfiguredLocalReadPrincipal({ request, database: input.database, config: input.config });
       const repository = input.repository ?? new DrizzleMetaReadMirrorRepository(input.database as never);
       const service = new MetaReadMirrorReadService(repository);
       return createMetaReadMirrorHttpHandler({

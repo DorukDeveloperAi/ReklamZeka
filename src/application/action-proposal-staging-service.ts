@@ -106,6 +106,9 @@ const RISK_BY_ACTION: Readonly<Record<ActionType, ActionRisk>> = Object.freeze({
   status_activate: "K3",
   budget_decrease: "K2",
   budget_increase: "K3",
+  campaign_rename: "K3",
+  adset_rename: "K3",
+  ad_rename: "K3",
   existing_post_promotion: "K4",
 });
 
@@ -216,6 +219,9 @@ function validateActionShape(action: TypedActionIntent, actionType: ActionType):
     status_activate: "status_change",
     budget_decrease: "budget_change",
     budget_increase: "budget_change",
+    campaign_rename: "rename",
+    adset_rename: "rename",
+    ad_rename: "rename",
     existing_post_promotion: "existing_post_promotion",
   };
   if (!action || typeof action !== "object" || action.kind !== expectedKind[actionType]) fail("invalid_plan");
@@ -224,6 +230,7 @@ function validateActionShape(action: TypedActionIntent, actionType: ActionType):
     internal_annotation: ["kind", "entity", "annotationRef"],
     status_change: ["kind", "entity", "fromStatus", "toStatus"],
     budget_change: ["kind", "entity", "budgetKind", "currency", "beforeDecimal", "afterDecimal", "budgetOwnerRef"],
+    rename: ["kind", "entity", "beforeName", "afterName", "namingEvidenceRef"],
     existing_post_promotion: [
       "kind", "entity", "placeholderOnly", "postRef", "postContentHash", "actorRef",
       "sourceBinding", "promotionTemplateVersionRef", "audiencePresetVersionRef", "destinationRef",
@@ -252,6 +259,15 @@ function validateActionShape(action: TypedActionIntent, actionType: ActionType):
     if (!/^[A-Z]{3}$/.test(action.currency) || !/^(0|[1-9]\d{0,29})(?:\.\d{1,12})?$/.test(action.beforeDecimal)
       || !/^(0|[1-9]\d{0,29})(?:\.\d{1,12})?$/.test(action.afterDecimal)) fail("invalid_plan");
     ref(action.budgetOwnerRef);
+  }
+  if (action.kind === "rename") {
+    const expectedLevel = actionType === "campaign_rename" ? "campaign" : actionType === "adset_rename" ? "adset"
+      : actionType === "ad_rename" ? "ad" : null;
+    if (expectedLevel === null || action.entity.level !== expectedLevel || action.beforeName === action.afterName
+      || action.beforeName !== action.beforeName.trim() || action.afterName !== action.afterName.trim()
+      || action.beforeName.length < 1 || action.beforeName.length > 255 || action.afterName.length < 1
+      || action.afterName.length > 255 || /[\u0000-\u001f\u007f]/.test(action.beforeName + action.afterName)) fail("invalid_plan");
+    ref(action.namingEvidenceRef);
   }
   if (actionType === "existing_post_promotion") {
     if (action.kind !== "existing_post_promotion" || action.placeholderOnly !== true || action.entity.level !== "adset") fail("invalid_plan");
@@ -338,7 +354,7 @@ function validateActionPlan(value: ActionPlan): ActionPlan {
 
 function normalizeRequester(value: ActionActor): ActionActor {
   exact(value, ["actorRef", "role"]);
-  if (!["owner", "admin", "operator", "analyst"].includes(value.role)) fail("invalid_input");
+  if (!["owner", "admin", "operator", "analyst", "agent"].includes(value.role)) fail("invalid_input");
   return freeze({ actorRef: ref(value.actorRef), role: value.role });
 }
 

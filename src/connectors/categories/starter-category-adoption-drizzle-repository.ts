@@ -52,7 +52,7 @@ function validateCommand(command: StarterCategoryAdoptionCommand) {
   if (!HASH.test(command.planHash) || !HASH.test(command.expectedRegistryHash)
     || !HASH.test(command.expectedProfileRegistryHash) || command.confirmation !== "adopt_starter_category_playbook"
     || command.acknowledgedPendingOwnerConfiguration !== true || !Array.isArray(command.targetRefs)
-    || command.targetRefs.length < 1 || command.targetRefs.length > 32
+    || command.targetRefs.length < 1 || command.targetRefs.length > 48
     || command.targetRefs.some((ref) => typeof ref !== "string" || !/^[a-z][a-z0-9_.:-]{1,158}$/.test(ref))
     || new Set(command.targetRefs).size !== command.targetRefs.length
     || !exactTargets(command.targetRefs, [...command.targetRefs].sort())) {
@@ -218,7 +218,7 @@ export class DrizzleStarterCategoryAdoptionRepository implements StarterCategory
         `))[0]?.event_hash ?? "GENESIS");
         const proposalManifestHash = digest(plan.profileProposals);
         const profileDraftManifestHash = starterCategoryProfileDraftManifestDigest(plan.profileDrafts);
-        if (plan.profileProposals.length !== 42 || plan.profileDrafts.length !== 7) {
+        if (plan.profileProposals.length !== 54 || plan.profileDrafts.length !== 9) {
           throw new StarterCategoryAdoptionError("conflict");
         }
         const event = Object.freeze({ id: randomUUID(), workspaceId: input.workspaceId, actorId: input.actorId,

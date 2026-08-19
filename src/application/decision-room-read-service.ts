@@ -54,8 +54,8 @@ export type DecisionRoomInboxReadRow = Readonly<{
 type After = Readonly<{ ref: string; sortAt: string | null }>;
 
 export type DecisionRoomReadRepository = Readonly<{
-  listSchedules(input: Readonly<{ workspaceRef: string; after: After | null; limit: number }>): Promise<readonly DecisionRoomScheduleReadRow[]>;
-  listRuns(input: Readonly<{ workspaceRef: string; after: After | null; limit: number }>): Promise<readonly DecisionRoomRunReadRow[]>;
+  listSchedules(input: Readonly<{ workspaceRef: string; campaignRef?: string | null; after: After | null; limit: number }>): Promise<readonly DecisionRoomScheduleReadRow[]>;
+  listRuns(input: Readonly<{ workspaceRef: string; campaignRef?: string | null; after: After | null; limit: number }>): Promise<readonly DecisionRoomRunReadRow[]>;
   listInbox(input: Readonly<{
     workspaceRef: string;
     readerRef: string;
@@ -125,6 +125,13 @@ function ref(value: unknown, code: DecisionRoomReadError["code"] = "invalid_inpu
   if (typeof value !== "string" || !OPAQUE_REF.test(value)
     || /(token|secret|prompt|raw[_-]?(payload|request|response|json))/i.test(value)) {
     throw new DecisionRoomReadError(code);
+  }
+  return value;
+}
+
+function campaignRef(value: unknown): string {
+  if (typeof value !== "string" || !/^campaign_[a-f0-9]{20}$/.test(value)) {
+    throw new DecisionRoomReadError("invalid_input");
   }
   return value;
 }
@@ -254,20 +261,23 @@ export class DecisionRoomReadService {
     workspaceRef: string;
     view: "schedules" | "runs" | "inbox";
     readerRef?: string;
+    campaignRef?: string | null;
     limit?: number;
     cursor?: string | null;
   }>): Promise<DecisionRoomReadResult> {
-    exactKeys(input, ["workspaceRef", "view", "readerRef", "limit", "cursor"], "invalid_input");
+    exactKeys(input, ["workspaceRef", "view", "readerRef", "campaignRef", "limit", "cursor"], "invalid_input");
     assertSafe(input);
     const workspaceRef = ref(input.workspaceRef);
     if (!["schedules", "runs", "inbox"].includes(input.view)) throw new DecisionRoomReadError("invalid_input");
     const readerRef = input.view === "inbox" ? ref(input.readerRef) : null;
     if (input.view !== "inbox" && input.readerRef !== undefined) throw new DecisionRoomReadError("invalid_input");
+    const selectedCampaignRef = input.campaignRef === undefined || input.campaignRef === null ? null : campaignRef(input.campaignRef);
+    if (input.view === "inbox" && selectedCampaignRef !== null) throw new DecisionRoomReadError("invalid_input");
     const limit = boundedLimit(input.limit);
     const after = parseCursor(input.cursor, input.view);
     let rows: readonly (DecisionRoomScheduleReadRow | DecisionRoomRunReadRow | DecisionRoomInboxReadRow)[];
-    if (input.view === "schedules") rows = await this.repository.listSchedules({ workspaceRef, after, limit: limit + 1 });
-    else if (input.view === "runs") rows = await this.repository.listRuns({ workspaceRef, after, limit: limit + 1 });
+    if (input.view === "schedules") rows = await this.repository.listSchedules({ workspaceRef, campaignRef: selectedCampaignRef, after, limit: limit + 1 });
+    else if (input.view === "runs") rows = await this.repository.listRuns({ workspaceRef, campaignRef: selectedCampaignRef, after, limit: limit + 1 });
     else rows = await this.repository.listInbox({ workspaceRef, readerRef: readerRef!, after, limit: limit + 1 });
     if (!Array.isArray(rows) || rows.length > limit + 1) throw new DecisionRoomReadError("corrupt_source");
     assertSafe(rows);

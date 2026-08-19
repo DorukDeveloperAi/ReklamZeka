@@ -168,6 +168,21 @@ function applicability(value: unknown): ApprovalPolicyApplicability {
   if (value.actionType === "budget_increase" && value.risk === "K3") {
     return Object.freeze({ actionType: "budget_increase", risk: "K3" });
   }
+  if (value.actionType === "status_pause" && value.risk === "K2") {
+    return Object.freeze({ actionType: "status_pause", risk: "K2" });
+  }
+  if (value.actionType === "status_activate" && value.risk === "K3") {
+    return Object.freeze({ actionType: "status_activate", risk: "K3" });
+  }
+  if (value.actionType === "campaign_rename" && value.risk === "K3") {
+    return Object.freeze({ actionType: "campaign_rename", risk: "K3" });
+  }
+  if (value.actionType === "adset_rename" && value.risk === "K3") {
+    return Object.freeze({ actionType: "adset_rename", risk: "K3" });
+  }
+  if (value.actionType === "ad_rename" && value.risk === "K3") {
+    return Object.freeze({ actionType: "ad_rename", risk: "K3" });
+  }
   throw new PolicyBundleStudioError("invalid_input");
 }
 function sameApplicability(left: ApprovalPolicyApplicability, right: ApprovalPolicyApplicability): boolean {

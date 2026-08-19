@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   MetaReadSyncScheduleWorkerError,
+  runMetaReadSyncManualWorker,
   runMetaReadSyncScheduleWorker,
   type MetaReadSyncLeasePort,
   type MetaReadSyncScheduleCandidate,
@@ -19,7 +20,7 @@ function due(workspaceId = workspaceA, connectionId = connectionA): MetaReadSync
     workspaceId,
     connectionId,
     scopeRevision: 1,
-    triggerKind: "daily",
+    triggerKind: "interval_6h",
     scheduledFor: "2026-08-07T06:00:00.000Z",
     dateStart: "2026-08-06",
     dateStop: "2026-08-06",
@@ -95,6 +96,44 @@ function ports(input: Readonly<{
 }
 
 describe("bounded scheduled Meta read-sync orchestration", () => {
+  it("runs a server-resolved manual fire through the same lease without accepting a connection or cursor input", async () => {
+    const setup = ports();
+    const manual = { ...due(), triggerKind: "manual" as const, scheduledFor: now };
+    const result = await runMetaReadSyncManualWorker({ now, workspaceId: workspaceA }, {
+      registry: { resolveManual: vi.fn(async () => manual), revalidate: setup.value.registry.revalidate },
+      leases: setup.leases, services: setup.value.services, retryClassifier: setup.value.retryClassifier,
+    });
+    expect(result.items[0]).toMatchObject({ outcome: "completed", parentRunRef: expect.stringMatching(/^sync_manual_/) });
+    expect(setup.leases.claim).toHaveBeenCalledWith(expect.objectContaining({ triggerKind: "manual", scheduledFor: now }));
+    await expect(runMetaReadSyncManualWorker({ now, workspaceId: workspaceA, connectionId: connectionA } as never, {
+      registry: { resolveManual: vi.fn(), revalidate: vi.fn() }, leases: setup.leases, services: setup.value.services,
+      retryClassifier: setup.value.retryClassifier,
+    })).rejects.toEqual(new MetaReadSyncScheduleWorkerError("invalid_input"));
+  });
+
+  it("serializes simultaneous automatic and manual fires for one server-owned scope to one service invocation", async () => {
+    let owned = false; let calls = 0;
+    const sharedLeases: MetaReadSyncLeasePort = {
+      claim: vi.fn(async () => {
+        if (owned) return { status: "duplicate_in_progress" as const, attempt: 1 };
+        owned = true; return { status: "claimed" as const, leaseToken: "lease_shared", attempt: 1 };
+      }),
+      complete: vi.fn(async () => true), fail: vi.fn(async () => true),
+    };
+    const setup = ports({ leases: sharedLeases, run: async () => { calls += 1; return completed(); } });
+    const manual = { ...due(), triggerKind: "manual" as const, scheduledFor: now };
+    const [automatic, triggered] = await Promise.all([
+      runMetaReadSyncScheduleWorker({ now }, setup.value),
+      runMetaReadSyncManualWorker({ now, workspaceId: workspaceA }, {
+        registry: { resolveManual: async () => manual, revalidate: async (item) => item }, leases: sharedLeases,
+        services: setup.value.services, retryClassifier: setup.value.retryClassifier,
+      }),
+    ]);
+    expect(calls).toBe(1);
+    expect([...automatic.items, ...triggered.items].filter((item) => item.outcome === "completed")).toHaveLength(1);
+    expect([...automatic.items, ...triggered.items].filter((item) => item.outcome === "duplicate_in_progress")).toHaveLength(1);
+  });
+
   it("derives a stable logical fire and exposes only public-safe aggregate evidence", async () => {
     const setup = ports();
     const first = await runMetaReadSyncScheduleWorker({ now }, setup.value);
@@ -117,7 +156,7 @@ describe("bounded scheduled Meta read-sync orchestration", () => {
       expect(serialized).not.toContain(privateValue);
     }
     expect(setup.scopes).toEqual([{ workspaceId: workspaceA, connectionId: connectionA }]);
-    expect(setup.run.mock.calls[0]?.[0].parentRunId).toMatch(/^sync_daily_[a-f0-9]{32}$/);
+    expect(setup.run.mock.calls[0]?.[0].parentRunId).toMatch(/^sync_6h_[a-f0-9]{32}$/);
   });
 
   it("revalidates the exact DB-derived scope after claim and fails closed before service creation", async () => {

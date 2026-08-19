@@ -115,6 +115,8 @@ describe("Meta read-only inventory", () => {
       expect(body).toContain("mevcut token güvenlik incelemesinde");
       expect(body).toContain("normal salt-okunur sync");
       expect(body).not.toContain(token);
+      expect(JSON.parse(body)).toMatchObject({ source: { kind: "graph_capability", state: "unavailable",
+        reasonCodes: ["graph_capability_not_configured"] }, error: { code: "not_configured" } });
       expect(response.headers.get("cache-control")).toContain("no-store");
       expect(network).not.toHaveBeenCalled();
     } finally {

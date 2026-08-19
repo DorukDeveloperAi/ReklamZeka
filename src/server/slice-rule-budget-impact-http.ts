@@ -42,19 +42,26 @@ function requestShape(request: Request): void {
   }
 }
 
-async function body(request: Request): Promise<Omit<SliceRuleBudgetImpactInput, "workspaceId" | "actorId">> {
+async function candidateBody(request: Request): Promise<Readonly<{ seriesRef: string; candidateRef: string; budgetCommand: unknown }>> {
   const raw = await request.text();
   if (Buffer.byteLength(raw) > 64_000) throw new SliceRuleBudgetImpactError("invalid_input");
-  const value = JSON.parse(raw) as unknown;
-  exact(value, ["command"]);
-  exact(value.command, ["seriesRef", "expectedDraftRef", "expectedDraftHash", "expectedScope", "budgetCommand"]);
-  return value.command as Omit<SliceRuleBudgetImpactInput, "workspaceId" | "actorId">;
+  const value = JSON.parse(raw) as unknown; exact(value, ["command"]);
+  exact(value.command, ["seriesRef", "candidateRef", "budgetCommand"]);
+  const command = value.command as Record<string, unknown>;
+  if (typeof command.seriesRef !== "string" || typeof command.candidateRef !== "string" || !command.budgetCommand
+    || typeof command.budgetCommand !== "object" || Array.isArray(command.budgetCommand)) throw new SliceRuleBudgetImpactError("invalid_input");
+  const forbidden = /^(?:workspaceId|adAccountId|campaignId|contextHash)$/i;
+  const privateValue = /^(?:[a-f0-9]{64}|[0-9a-f]{8}-[0-9a-f-]{27,})$/i;
+  const inspect = (entry: unknown): boolean => typeof entry === "string" ? !privateValue.test(entry) : Array.isArray(entry) ? entry.every(inspect) : !entry || typeof entry !== "object" ? true
+    : Object.entries(entry as Record<string, unknown>).every(([key, child]) => !forbidden.test(key) && inspect(child));
+  if (!inspect(command)) throw new SliceRuleBudgetImpactError("invalid_input");
+  return command as Readonly<{ seriesRef: string; candidateRef: string; budgetCommand: unknown }>;
 }
 
 function failure(reason: unknown) {
   if (reason instanceof SliceRuleBudgetImpactError) {
     if (reason.code === "draft_missing") return error(reason.code, "Slice rule taslağı bulunamadı.", 404);
-    if (["stale_draft", "scope_evidence_not_ready", "market_boundary", "scope_mismatch"].includes(reason.code)) {
+    if (["stale_draft", "scope_evidence_not_ready", "market_boundary", "scope_mismatch", "pool_binding_required"].includes(reason.code)) {
       return error(reason.code, "Taslak veya kapsam kanıtı değişti; önizleme üretilmedi.", 409);
     }
     return error(reason.code, reason.code === "invalid_input" ? "Etki önizleme isteği geçersiz."
@@ -67,12 +74,16 @@ function failure(reason: unknown) {
 export function createSliceRuleBudgetImpactHttpHandler(input: Readonly<{
   service: Pick<SliceRuleBudgetImpactService, "preview" | "save">;
   resolvePrincipal(request: Request): Promise<TrustedDecisionRoomPrincipal>;
+  resolveCandidateCommand?(principal: TrustedDecisionRoomPrincipal, command: Readonly<{ seriesRef: string; candidateRef: string; budgetCommand: unknown }>): Promise<SliceRuleBudgetImpactInput>;
 }>) {
   return async (request: Request) => {
     try {
       requestShape(request);
-      const [command, principal] = await Promise.all([body(request), input.resolvePrincipal(request)]);
-      const scoped = { ...command, workspaceId: principal.workspaceId, actorId: principal.actor.userId };
+      const principal = await input.resolvePrincipal(request);
+      const candidate = await candidateBody(request);
+      const scoped = input.resolveCandidateCommand
+        ? await input.resolveCandidateCommand(principal, candidate)
+        : (() => { throw new SliceRuleBudgetImpactError("invalid_input"); })();
       const result = request.headers.get("x-reklamzeka-intent") === "slice-rule-budget-impact-save"
         ? await input.service.save(scoped, new Date().toISOString())
         : await input.service.preview(scoped);

@@ -1,17 +1,21 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  buildSliceRuleBudgetImpactCommand,
+  buildTypedBudgetImpactCommand,
   buildSliceRuleDraftCommand,
   classifySliceRuleBudgetImpactFailure,
   EMPTY_SLICE_RULE_FORM,
   parseSliceRuleBudgetImpactResult,
-  parseSliceRuleBudgetImpactSavedResult,
   parseSliceRuleWorkspaceSnapshot,
+  parseSliceRuleBudgetPoolBindingSnapshot,
   parseSliceScopeCandidates,
   parseSliceOperationalReadiness,
+  parseSliceRuleScenarioSelectionCandidates,
+  parseSliceRuleDecisionTrace,
+  decisionJourneyForRule,
   SliceRuleWorkspaceSurface,
 } from "@/app/dashboard/slice-rule-workspace-panel";
 
@@ -27,24 +31,102 @@ const snapshot = { contractVersion: "slice-rule-workspace-http/1.0.0", items: [i
   canSaveDraft: true, ...closed } } as const;
 
 describe("Slice Rule Workspace panel", () => {
+  it("accepts frozen same-market pool evidence but rejects opened authority", () => {
+    const value = parseSliceRuleBudgetPoolBindingSnapshot({ contractVersion: "slice-rule-budget-pool-binding-http/1.0.0", bindings: [{ draftHash: item.draftHash, hierarchyHash: "c".repeat(64), poolRef: "budget_pool_international", market: "international", boundAt: "2026-08-14T10:00:00.000Z", authority: closed }], hierarchy: { hierarchyHash: "c".repeat(64), nodes: [{ poolRef: "budget_pool_international", parentPoolRef: null, layer: "market", market: "international", currency: "TRY", hardCapDecimal: "100", effectiveFrom: "2026-08-01T00:00:00.000Z", effectiveTo: "2026-09-01T00:00:00.000Z" }], authority: closed }, authority: { canRead: true, canBind: true, ...closed } });
+    expect(value.bindings[0]).toMatchObject({ poolRef: "budget_pool_international", market: "international" });
+    expect(() => parseSliceRuleBudgetPoolBindingSnapshot({ ...value, authority: { ...value.authority, canExecute: true } })).toThrow("güvenli değil");
+  });
   it("renders mandatory/optional scope and makes the closed authority explicit", () => {
     const html = renderToStaticMarkup(createElement(SliceRuleWorkspaceSurface, { state: { status: "ready",
       snapshot: parseSliceRuleWorkspaceSnapshot(snapshot) }, onRetry: vi.fn(), onSaved: vi.fn(async () => undefined) }));
     for (const label of ["Pazar", "Hizmet referansı", "Kampanya ailesi referansı", "Ülke / bölge (opsiyonel)",
       "Hedefleme stratejisi (opsiyonel)", "Platform (opsiyonel)", "Sonuç rotası (opsiyonel)"]) expect(html).toContain(label);
-    expect(html).toContain("RECOMMENDATION ONLY · AUTHORITY NONE");
+    expect(html).toContain("SADECE ÖNERİ · UYGULAMA YETKİSİ YOK");
     expect(html).toContain("Policy yayınlama: kapalı");
     expect(html).toContain("Action/Meta write: kapalı");
     expect(html).toContain("Kayıtlı taslağın bütçe etkisi");
     expect(html).toContain("Kaydedilmemiş form kapsamı kullanılmaz");
     expect(html).toContain("Kanıtlı kapsam adayları");
     expect(html).toContain("Frozen context, bütçe etkisi, policy ve action yetkisi üretmez");
+    expect(html).toContain("Senaryoyu yalnız salt-okur inceleyin.");
+    expect(html).toContain("KURAL KÜTÜPHANESİ");
+    expect(html).toContain("Kullanıcı kuralı");
+    expect(html).toContain("Takip yaklaşımı");
+    expect(html).toContain("Kuralı aç");
+    expect(html).toContain("Kuralsız kanıtlı slice adayları");
+    expect(html).toContain("Kural otomatik oluşturulmaz.");
+    expect(html).toContain("tek kanonik kuralı");
+    expect(html).toContain("Kuralı aç");
+  });
+
+  it("keeps private pool, frozen-context and decision identifiers out of the operator surface", () => {
+    const source = readFileSync("src/app/dashboard/slice-rule-workspace-panel.tsx", "utf8");
+    expect(source).not.toContain("frozenPoolBinding.draftHash.slice");
+    expect(source).not.toContain("frozenPoolBinding.hierarchyHash.slice");
+    expect(source).not.toContain("candidate.campaignRef} · {candidate.currentBudgetDecimal");
+    expect(source).toContain("İnsan onayına hazırlık");
+    expect(source).toContain("slice-rule-scenario-select");
+    expect(source).toContain("slice-rule-budget-action-unit-materialize");
+    expect(source).toContain("Meta write ve execute kapalıdır");
+    expect(source).not.toContain("node.poolRef} · {node.layer}");
+    expect(source).toContain("Doğrulanmış bağlam {index + 1}");
+    expect(source).toContain("Kalıcı kayıt: yok");
+  });
+
+  it("accepts only opaque, authority-closed preparation candidates", () => {
+    const candidateRef = `selection_candidate_${"a".repeat(64)}`;
+    expect(parseSliceRuleScenarioSelectionCandidates({ contractVersion: "slice-rule-scenario-selection/1.0.0", candidates: [{ candidateRef,
+      scenarioLabel: "scenario.keep", beforeAmountMinor: 100, afterAmountMinor: 120, currency: "TRY", status: "blocked", blockReason: "delivery_hold" }],
+      authority: { canSelect: false, canApprove: false, canExecute: false, canWriteMeta: false, canEnableAutomation: false } })[0]).toMatchObject({ candidateRef, status: "blocked" });
+    expect(() => parseSliceRuleScenarioSelectionCandidates({ contractVersion: "slice-rule-scenario-selection/1.0.0", candidates: [{ candidateRef,
+      scenarioLabel: "scenario.keep", beforeAmountMinor: 100, afterAmountMinor: 120, currency: "TRY", status: "selectable", blockReason: null }],
+      authority: { canSelect: false, canApprove: true, canExecute: false, canWriteMeta: false, canEnableAutomation: false } })).toThrow("güvenli değil");
+  });
+
+  it("keeps canonical decision trace read-only and rejects an opened execution state", () => {
+    const trace = parseSliceRuleDecisionTrace({ decisionTrace: { contractVersion: "slice-rule-decision-trace/1.0.0", items: [{
+      ruleSeriesRef: item.seriesRef, ruleRevision: item.revision, selectionRef: `selection_${"a".repeat(64)}`, selectedAt: "2026-08-14T10:00:00.000Z",
+      actionUnit: { presence: true, status: "awaiting_approval" }, decisionHistory: [{ decision: "proposed", occurredAt: "2026-08-14T10:01:00.000Z", reasonCode: null }],
+      execution: { safetyState: "server_disabled", closure: "admission_closed" },
+    }] } });
+    expect(trace[0]?.execution.safetyState).toBe("server_disabled");
+    expect(() => parseSliceRuleDecisionTrace({ decisionTrace: { contractVersion: "slice-rule-decision-trace/1.0.0", items: [{ ...trace[0], execution: { safetyState: "enabled", closure: "admission_closed" } }] } })).toThrow("güvenli değil");
+    expect(decisionJourneyForRule(item, { status: "ready", candidates: [], evaluations: [], result: null }, { status: "ready", traces: trace })[3]).toMatchObject({ label: "İnsan onayı", status: "waiting" });
+  });
+
+  it("opens an editable Agent rule-session draft without creating or revising the rule", () => {
+    const html = renderToStaticMarkup(createElement(SliceRuleWorkspaceSurface, { state: { status: "ready",
+      snapshot: parseSliceRuleWorkspaceSnapshot(snapshot) }, onRetry: vi.fn(), onSaved: vi.fn(async () => undefined),
+      onOpenRuleSession: vi.fn() }));
+    const source = readFileSync("src/app/dashboard/slice-rule-workspace-panel.tsx", "utf8");
+    expect(source).toContain("Agent ile kuralı gözden geçir");
+    expect(source).toContain("Bu kuralı benim yerime yazmayın veya değiştirmeyin");
+    expect(source).toContain("onOpenRuleSession?(seed: SliceRuleSessionSeed)");
   });
 
   it("accepts candidates only as form-prefill data with frozen budget evidence still required", () => {
     const candidates = parseSliceScopeCandidates({ version: "slice-scope-candidates/1.0.0", candidates: [{ campaignRef: "campaign-1", scope: { market: "international", serviceRef: "service_physical_therapy", campaignFamilyRef: "campaign_family_intensive_ftr", platform: "instagram" }, requiresFrozenContext: true, budgetImpactReady: false }], authority: { canSave: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false } });
     expect(candidates[0]).toMatchObject({ requiresFrozenContext: true, budgetImpactReady: false });
     expect(() => parseSliceScopeCandidates({ version: "slice-scope-candidates/1.0.0", candidates: [{ campaignRef: "campaign-1", scope: { market: "international", serviceRef: "service_physical_therapy", campaignFamilyRef: "campaign_family_intensive_ftr" }, requiresFrozenContext: false, budgetImpactReady: true }], authority: { canSave: false, canPublish: false, canApprove: false, canExecute: false, canWriteMeta: false } })).toThrow("güvenli değil");
+  });
+
+  it("guides an empty canonical scope list to category review without inventing a slice", () => {
+    const source = readFileSync("src/app/dashboard/slice-rule-workspace-panel.tsx", "utf8");
+    expect(source).toContain("Henüz tekil ve tutarlı slice kapsamı yok");
+    expect(source).toContain("Kategori inceleme ve başlangıç planını aç");
+    expect(source).toContain("onOpenCategorySetup?(): void");
+    expect(source).toContain("Kategori kayıtları eksikse sistem kapsam veya kural tahmin etmez.");
+  });
+
+  it("keeps a session-required library empty and explains the safe recovery in place", () => {
+    const html = renderToStaticMarkup(createElement(SliceRuleWorkspaceSurface, {
+      state: { status: "session_required", message: "Yerel oturum gerekli." }, onRetry: vi.fn(),
+      onSaved: vi.fn(async () => undefined), onConnect: vi.fn(async () => true),
+    }));
+    expect(html).toContain("Yerel oturum gerekli");
+    expect(html).toContain("kural, slice veya karar kaydı gösterilmez");
+    expect(html).toContain("Kural Kütüphanesini bağlayın");
+    expect(html).not.toContain("slice_rule.ftr.ar");
   });
 
   it("renders only explanatory frozen-context readiness with no opened authority", () => {
@@ -91,21 +173,14 @@ describe("Slice Rule Workspace panel", () => {
       authority: { ...snapshot.authority, canWriteMeta: true } })).toThrow("güvenli sözleşmeyi");
   });
 
-  it("builds an impact request only from a saved exact supported draft", () => {
-    const budgetCommand = { scope: { adAccountId: "33333333-3333-4333-8333-333333333333",
-      campaignId: "44444444-4444-4444-8444-444444444444", contextHash: "c".repeat(64) },
-      seriesRef: "budget.preview", revision: 1, previousProposalHash: "GENESIS",
-      idempotencyKey: "budget.preview.r1", createdAt: "2026-08-13T10:01:00.000Z",
-      scenarios: [{ scenarioRef: "scenario.keep" }], outcomeProxy: null };
-    expect(buildSliceRuleBudgetImpactCommand(item, JSON.stringify(budgetCommand))).toMatchObject({
-      seriesRef: item.seriesRef, expectedDraftRef: item.draftRef, expectedDraftHash: item.draftHash,
-      expectedScope: item.scope, budgetCommand,
-    });
-    expect(buildSliceRuleBudgetImpactCommand(undefined, JSON.stringify(budgetCommand))).toBeNull();
-    expect(buildSliceRuleBudgetImpactCommand({ ...item, operatingRule: { ...item.operatingRule,
-      rule: { kind: "delivery_guardrail", condition: "delivery_interrupted", response: "needs_human_review" } } },
-    JSON.stringify(budgetCommand))).toBeNull();
-    expect(buildSliceRuleBudgetImpactCommand(item, JSON.stringify({ ...budgetCommand, canExecute: true }))).toBeNull();
+  it("builds a typed impact command without browser-visible frozen identifiers", () => {
+    const form = { label: "keep", mode: "keep" as const, requestedBudgetDecimal: "120.00", startDate: "2026-08-01", endDate: "2026-08-31" };
+    const command = buildTypedBudgetImpactCommand(item, form);
+    expect(command).toMatchObject({ label: "keep", requestedBudgetDecimal: "120.00" });
+    expect(JSON.stringify(command)).not.toMatch(/adAccountId|campaignId|contextHash/);
+    expect(buildTypedBudgetImpactCommand(undefined, form)).toBeNull();
+    expect(buildTypedBudgetImpactCommand({ ...item, operatingRule: { ...item.operatingRule,
+      rule: { kind: "delivery_guardrail", condition: "delivery_interrupted", response: "needs_human_review" } } }, form)).toBeNull();
   });
 
   it("accepts only an exact, non-persistent and authority-closed impact response", () => {
@@ -123,19 +198,6 @@ describe("Slice Rule Workspace panel", () => {
       binding: { ...result.binding, draftHash: "d".repeat(64) } }, item)).toThrow("güvenli sözleşmeyi");
     expect(() => parseSliceRuleBudgetImpactResult({ ...result,
       authority: { ...result.authority, canExecute: true } }, item)).toThrow("güvenli sözleşmeyi");
-  });
-
-  it("accepts a saved advisory draft only with the exact rule provenance and no action authority", () => {
-    const result = { contractVersion: "slice-rule-budget-impact/1.0.0", mode: "saved_advisory_draft",
-      binding: { seriesRef: item.seriesRef, draftRef: item.draftRef, draftHash: item.draftHash,
-        scope: item.scope, ruleKind: item.operatingRule.rule.kind, evidenceRefs: ["category_resolution_market_ftr_ar"] },
-      budgetProposal: { actionAuthority: "none", writeOperations: 0 }, persistence: "inserted", provenance: "inserted",
-      authority: { recommendationOnly: true, canPublish: false, canApprove: false, canCreateProposal: false,
-        canExecute: false, canWriteMeta: false } };
-    expect(parseSliceRuleBudgetImpactSavedResult(result, item)).toMatchObject({ mode: "saved_advisory_draft",
-      persistence: "inserted", provenance: "inserted" });
-    expect(() => parseSliceRuleBudgetImpactSavedResult({ ...result,
-      budgetProposal: { ...result.budgetProposal, actionAuthority: "approval_required" } }, item)).toThrow("güvenli sözleşmeyi");
   });
 
   it("keeps stale, scope and unavailable failures explicit and fail-closed", () => {

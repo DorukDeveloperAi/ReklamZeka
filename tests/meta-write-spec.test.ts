@@ -25,6 +25,11 @@ describe("typed Meta write spec", () => {
 
     const activateAd = createMetaWriteSpec({ ...unit, actionPlan: plan({ kind: "status_change", entity: { level: "ad", ref: "ad_one" }, fromStatus: "PAUSED", toStatus: "ACTIVE" }, { entity: { level: "ad", ref: "ad_one" } }) });
     expect(activateAd).toMatchObject({ actionType: "status_activate", target: { entityLevel: "ad", entityRef: "ad_one" }, mutation: { kind: "status", desiredStatus: "ACTIVE" } });
+
+    const rename = createMetaWriteSpec({ ...unit, actionPlan: plan({ kind: "rename", entity: { level: "campaign", ref: "campaign_main" },
+      beforeName: "Eski Kampanya", afterName: "Yeni Kampanya", namingEvidenceRef: "naming_evidence_main" }) });
+    expect(rename).toMatchObject({ actionType: "campaign_rename", mutation: { kind: "rename", previousName: "Eski Kampanya",
+      desiredName: "Yeni Kampanya", namingEvidenceRef: "naming_evidence_main" }, requiresSeparateExecutionGrant: true });
   });
 
   it("rejects K0/K1/K4, denied plans, forged hashes and raw Graph-shaped input", () => {

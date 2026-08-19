@@ -6,9 +6,9 @@ import styles from "./starter-category-adoption.module.css";
 type BlockerCode = "pending_owner_configuration" | "incompatible_existing_dimension"
   | "existing_category_profile_conflict";
 type Plan = Readonly<{ contractVersion: "starter-category-adoption/1.1.0";
-  catalogVersion: "starter-category-playbooks/1.1.0"; catalogHash: string;
+  catalogVersion: "starter-category-playbooks/1.2.0"; catalogHash: string;
   registryHash: string; profileRegistryHash: string; planHash: string; status: "preview_only";
-  summary: Readonly<{ canonicalDimensions: 14; dimensionsToCreate: number; definitionsToCreate: number;
+  summary: Readonly<{ canonicalDimensions: 15; dimensionsToCreate: number; definitionsToCreate: number;
     profileProposals: number; profileDraftsToCreate: number; profileDraftsSatisfied: number;
     satisfied: number; conflicts: number; ownerConfigurationRequired: number }>;
   dimensionCoverage: readonly Readonly<{ dimensionKey: string; disposition: "create" | "satisfied" | "conflict";
@@ -23,7 +23,7 @@ type Plan = Readonly<{ contractVersion: "starter-category-adoption/1.1.0";
 type AdoptionSuccess = Readonly<{ outcome: "inserted" | "unchanged"; dimensionsCreated: number;
   definitionsCreated: number; profileDraftsCreated: number }>;
 const HASH = /^[a-f0-9]{64}$/;
-const DIMENSIONS = ["service_line", "brand_clinic", "geo_market", "language", "campaign_role", "funnel_intent",
+const DIMENSIONS = ["market", "service_line", "brand_clinic", "geo_market", "language", "campaign_role", "funnel_intent",
   "audience_strategy", "destination", "budget_pool", "operating_mode", "lifecycle", "experiment",
   "protection_class", "custom"] as const;
 const OBJECTIVES = new Set(["awareness", "traffic", "engagement", "lead_generation", "app_growth", "sales"]);
@@ -48,7 +48,7 @@ function safeRef(value: unknown): value is string {
     && /^[a-z][a-z0-9_.:-]+$/.test(value);
 }
 function commands(value: unknown) {
-  return Array.isArray(value) && value.length <= 21 && value.every((command) => {
+  return Array.isArray(value) && value.length <= 24 && value.every((command) => {
     if (!object(command) || typeof command.operation !== "string") return false;
     if (command.operation === "create_dimension") return exact(command,
       ["operation", "key", "name", "description", "cardinality", "allowedEntityLevels"])
@@ -68,7 +68,7 @@ function commands(value: unknown) {
   });
 }
 function proposals(value: unknown) {
-  if (!Array.isArray(value) || value.length > 42) return false; const seen = new Set<string>();
+  if (!Array.isArray(value) || value.length > 54) return false; const seen = new Set<string>();
   return value.every((proposal) => {
     if (!exact(proposal, ["objective", "categoryTemplateRef", "proposalHash"])
       || typeof proposal.objective !== "string" || !OBJECTIVES.has(proposal.objective)
@@ -79,7 +79,7 @@ function proposals(value: unknown) {
   });
 }
 function profileDrafts(value: unknown) {
-  if (!Array.isArray(value) || value.length > 7) return false; const seen = new Set<string>();
+  if (!Array.isArray(value) || value.length > 9) return false; const seen = new Set<string>();
   return value.every((draft) => {
     if (!exact(draft, ["categoryTemplateRef", "categoryRef", "profileRef", "proposalHashes",
       "profileDraftHash", "expectedProfileHash", "material", "disposition"]) || !safeRef(draft.categoryTemplateRef)
@@ -110,20 +110,20 @@ export function parseStarterCategoryAdoptionPlan(value: unknown): Plan {
   const profileProposals = Array.isArray(plan.profileProposals) ? plan.profileProposals : [];
   const draftProfiles = Array.isArray(plan.profileDrafts) ? plan.profileDrafts : [];
   if (plan.contractVersion !== "starter-category-adoption/1.1.0"
-    || plan.catalogVersion !== "starter-category-playbooks/1.1.0"
+    || plan.catalogVersion !== "starter-category-playbooks/1.2.0"
     || typeof plan.catalogHash !== "string" || !HASH.test(plan.catalogHash)
     || typeof plan.registryHash !== "string" || !HASH.test(plan.registryHash)
     || typeof plan.profileRegistryHash !== "string" || !HASH.test(plan.profileRegistryHash)
     || typeof plan.planHash !== "string" || !HASH.test(plan.planHash) || plan.status !== "preview_only"
     || !exact(plan.summary, ["canonicalDimensions", "dimensionsToCreate", "definitionsToCreate", "profileProposals",
       "profileDraftsToCreate", "profileDraftsSatisfied", "satisfied", "conflicts", "ownerConfigurationRequired"])
-    || plan.summary.canonicalDimensions !== 14 || !integer(plan.summary.dimensionsToCreate, 14)
-    || !integer(plan.summary.definitionsToCreate, 21) || !integer(plan.summary.profileProposals, 42)
-    || !integer(plan.summary.profileDraftsToCreate, 7) || !integer(plan.summary.profileDraftsSatisfied, 7)
-    || !integer(plan.summary.satisfied, 14) || !integer(plan.summary.conflicts, 21)
+    || plan.summary.canonicalDimensions !== 15 || !integer(plan.summary.dimensionsToCreate, 15)
+    || !integer(plan.summary.definitionsToCreate, 24) || !integer(plan.summary.profileProposals, 54)
+    || !integer(plan.summary.profileDraftsToCreate, 9) || !integer(plan.summary.profileDraftsSatisfied, 9)
+    || !integer(plan.summary.satisfied, 15) || !integer(plan.summary.conflicts, 24)
     || !integer(plan.summary.ownerConfigurationRequired, 17)
-    || !Array.isArray(plan.dimensionCoverage) || plan.dimensionCoverage.length !== 14
-    || new Set(plan.dimensionCoverage.map((item) => object(item) ? item.dimensionKey : null)).size !== 14
+    || !Array.isArray(plan.dimensionCoverage) || plan.dimensionCoverage.length !== 15
+    || new Set(plan.dimensionCoverage.map((item) => object(item) ? item.dimensionKey : null)).size !== 15
     || plan.dimensionCoverage.some((item) => !exact(item, ["dimensionKey", "disposition", "reasonCode"])
       || typeof item.dimensionKey !== "string" || !DIMENSIONS.includes(item.dimensionKey as typeof DIMENSIONS[number])
       || ![["create", "missing"], ["satisfied", "already_present"],
@@ -143,7 +143,7 @@ export function parseStarterCategoryAdoptionPlan(value: unknown): Plan {
     || plan.summary.conflicts !== plan.dimensionCoverage.filter((item) => item.disposition === "conflict").length
       + draftProfiles.filter((item) => object(item) && item.disposition === "conflict").length
     || plan.summary.profileProposals !== draftProfiles.length * 6
-    || !Array.isArray(plan.targetRefs) || plan.targetRefs.length < 1 || plan.targetRefs.length > 32
+    || !Array.isArray(plan.targetRefs) || plan.targetRefs.length < 1 || plan.targetRefs.length > 48
     || new Set(plan.targetRefs).size !== plan.targetRefs.length || plan.targetRefs.some((ref) => !safeRef(ref))
     || JSON.stringify(plan.targetRefs) !== JSON.stringify([...plan.targetRefs].sort())
     || !Array.isArray(plan.blockers) || plan.blockers.length < 1 || plan.blockers.length > 3
@@ -156,7 +156,7 @@ export function parseStarterCategoryAdoptionPlan(value: unknown): Plan {
     || !plan.blockers.some((item) => item.code === "pending_owner_configuration" && item.blocking === false)
     || plan.summary.ownerConfigurationRequired !== plan.blockers.find((item) =>
       item.code === "pending_owner_configuration")?.refs.length
-    || plan.targetRefs.length !== 14 + draftProfiles.length * 2
+    || plan.targetRefs.length !== 15 + draftProfiles.length * 2
     || plan.ownerConfirmationRequired !== true || plan.pendingOwnerConfigurationAcknowledgementRequired !== true
     || plan.confirmationLiteral !== "adopt_starter_category_playbook"
     || !exact(plan.authority, ["canPersist", "canConfirm", "canAuthorizeAction", "canWriteMeta", "canPublishPolicy"])
@@ -182,8 +182,8 @@ export function parseStarterCategoryAdoptionSuccess(value: unknown, preview: Pla
       "profileInvalidationsAppended"]) || !["inserted", "unchanged"].includes(String(value.result.outcome))
     || typeof value.result.registryHash !== "string" || !HASH.test(value.result.registryHash)
     || typeof value.result.profileRegistryHash !== "string" || !HASH.test(value.result.profileRegistryHash)
-    || !integer(value.result.dimensionsCreated, 14) || !integer(value.result.definitionsCreated, 21)
-    || !integer(value.result.profileDraftsCreated, 7) || typeof value.result.auditAppended !== "boolean"
+    || !integer(value.result.dimensionsCreated, 15) || !integer(value.result.definitionsCreated, 24)
+    || !integer(value.result.profileDraftsCreated, 9) || typeof value.result.auditAppended !== "boolean"
     || !integer(value.result.categoryInvalidationsAppended, 10_000)
     || !integer(value.result.profileInvalidationsAppended, 10_000)
     || (value.result.outcome === "inserted" && (value.result.dimensionsCreated !== preview.summary.dimensionsToCreate
@@ -228,7 +228,7 @@ export function StarterCategoryAdoption() {
     finally { setBusy(false); }
   };
   return <section className={styles.panel} aria-label="Starter kategori adoption önizlemesi">
-    <header><div><span>14-DIMENSION STARTER PLAN</span><h2>Başlangıç kategori playbook’u</h2></div>
+    <header><div><span>15-BOYUTLU BAŞLANGIÇ PLANI</span><h2>Başlangıç kategori playbook’u</h2></div>
       <button type="button" onClick={() => void load()} disabled={busy}>Yenile</button></header>
     {error ? <p className={styles.error} role="alert">{error}</p> : !plan ? <p>Plan yükleniyor…</p> : <>
       <div className={styles.metrics}><article><strong>{plan.summary.canonicalDimensions}</strong><span>Kanonik boyut</span></article>

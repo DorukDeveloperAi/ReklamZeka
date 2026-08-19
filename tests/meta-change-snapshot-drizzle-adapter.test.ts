@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   MetaChangeSnapshotDrizzleAdapter,
   MetaChangeSnapshotScopeError,
+  META_CHANGE_SNAPSHOT_COLLECTION_CAPS,
+  assertMetaChangeSnapshotCollectionBound,
   metaChangeSnapshotInputFromStoredAccount,
   type MetaChangeSnapshotReadStore,
   type MetaChangeSnapshotScope,
@@ -90,6 +92,13 @@ class FixtureStore implements MetaChangeSnapshotReadStore {
 }
 
 describe("Meta change snapshot Drizzle read boundary", () => {
+  it("rejects collection overflow before an unbounded snapshot can be composed", () => {
+    expect(() => assertMetaChangeSnapshotCollectionBound("campaigns", META_CHANGE_SNAPSHOT_COLLECTION_CAPS.campaigns + 1))
+      .toThrowError(expect.objectContaining<Partial<MetaChangeSnapshotScopeError>>({ code: "collection_overflow" }));
+    expect(() => assertMetaChangeSnapshotCollectionBound("bindings", META_CHANGE_SNAPSHOT_COLLECTION_CAPS.bindings + 1))
+      .toThrowError(expect.objectContaining<Partial<MetaChangeSnapshotScopeError>>({ code: "collection_overflow" }));
+  });
+
   it("keeps an exact workspace/connection/account scope", async () => {
     const input = await new MetaChangeSnapshotDrizzleAdapter(new FixtureStore([stored()])).buildInput(scope);
     expect(input).toMatchObject({

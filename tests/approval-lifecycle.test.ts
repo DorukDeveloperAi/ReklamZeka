@@ -22,6 +22,7 @@ const plan = { planRef: "plan_daily", revision: 1, planHash: h("a") };
 const owner = { actorRef: "actor_owner", role: "owner" as const };
 const admin = { actorRef: "actor_admin", role: "admin" as const };
 const operator = { actorRef: "actor_operator", role: "operator" as const };
+const agent = { actorRef: "actor_agent", role: "agent" as const };
 
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -191,7 +192,7 @@ describe("ActionUnit approval lifecycle", () => {
       .toThrowError(expect.objectContaining({ code: "invalid_input" }));
   });
 
-  it("cascades rejected and changes-requested dependencies without affecting independent units", () => {
+  it("cascades rejected, deferred, and changes-requested dependencies without affecting independent units", () => {
     const initial = start();
     const rejected = decideActionUnit(initial, {
       kind: "reject", commandRef: "reject_parent", unitRef: "unit_parent", actor: admin,
@@ -210,6 +211,15 @@ describe("ActionUnit approval lifecycle", () => {
     });
     expect(changed.lifecycle.units.find((entry) => entry.unitRef === "unit_parent")?.state).toBe("changes_requested");
     expect(changed.lifecycle.units.find((entry) => entry.unitRef === "unit_child")?.state).toBe("dependency_failed");
+
+    const deferredInitial = start();
+    const deferred = decideActionUnit(deferredInitial, {
+      kind: "defer", commandRef: "defer_parent", unitRef: "unit_parent", actor: owner,
+      decidedAt: "2026-08-07T10:02:00Z", reasonCode: "human.deferred",
+      freshness: freshness(deferredInitial.bundle),
+    });
+    expect(deferred.lifecycle.units.find((entry) => entry.unitRef === "unit_parent")?.state).toBe("deferred");
+    expect(deferred.lifecycle.units.find((entry) => entry.unitRef === "unit_child")?.state).toBe("dependency_failed");
   });
 
   it("rejects bundle-wide approval and approve-plus-execute injection", () => {
@@ -224,6 +234,15 @@ describe("ActionUnit approval lifecycle", () => {
       decidedAt: "2026-08-07T10:02:00Z", reasonCode: "approve", freshness: freshness(lifecycle.bundle),
       authorization: auth(lifecycle, "unit_parent"), grantRef: "grant_execute", execute: true,
     } as unknown as ApprovalDecisionCommand)).toThrowError(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  it("never permits an agent to decide, including defer", () => {
+    const lifecycle = start();
+    expect(() => decideActionUnit(lifecycle, {
+      kind: "defer", commandRef: "defer_by_agent", unitRef: "unit_parent", actor: agent,
+      decidedAt: "2026-08-07T10:02:00Z", reasonCode: "human.deferred",
+      freshness: freshness(lifecycle.bundle),
+    })).toThrowError(expect.objectContaining({ code: "policy_denied" }));
   });
 
   it("fails stale source/context/spec, superseded revisions and expiry closed with downstream invalidation", () => {

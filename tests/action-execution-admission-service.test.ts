@@ -36,7 +36,7 @@ function source() {
   return Object.freeze({ lifecycle, freshness: [{ unitRef: unit.unitRef, planRevision: unit.plan.revision, planHash: unit.plan.planHash,
     sourceHash: unit.sourceHash, contextHash: unit.contextHash, specHash: unit.specHash }], actionPlan: plan,
   eligibilitySnapshot: { workspaceRef: "workspace_alpha", accountRef: "account_main", capturedAt: at,
-    target: { entityLevel: "campaign" as const, entityRef: "campaign_main", configuredStatus: "ACTIVE" as const, effectiveStatus: "ACTIVE" as const, budgetOwnerRef: "campaign_main" },
+    target: { entityLevel: "campaign" as const, entityRef: "campaign_main", configuredStatus: "ACTIVE" as const, effectiveStatus: "ACTIVE" as const, budgetOwnerRef: "campaign_main", currentName: "Campaign Main" },
     ancestors: [], sourceSnapshotHash: "4".repeat(64) } });
 }
 

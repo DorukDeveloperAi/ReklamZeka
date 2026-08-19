@@ -6,7 +6,7 @@
 > İçeriği YALNIZ iş commit'lerinin ve plan durumunun fonksiyonudur — "şu an" damgası,
 > HEAD hash'i ya da checkpoint sayısı BİLEREK yoktur (bkz. `durum-log.ts` → döngü yasağı).
 
-<!-- durum-damga: dca4cf2c2385 -->
+<!-- durum-damga: 4239d5f1feac -->
 
 ## Künye
 
@@ -14,37 +14,36 @@
 |---|---|
 | dal | `main` |
 | uzak | var |
-| iş commit'i (tüm geçmiş) | 452 |
-| ilk / son iş | 2026-08-06 / 2026-08-14 |
+| iş commit'i (tüm geçmiş) | 622 |
+| ilk / son iş | 2026-08-06 / 2026-08-18 |
 
 ## Son iş commit'leri
 
 | tarih | kapsam | ne | hash |
 |---|---|---|---|
-| 2026-08-14 | `—` | DURUM türevlerini de merge=ours ile beyan et (agent-ide emsali) | `e709edff3` |
-| 2026-08-14 | `—` | aide türevlerini merge=ours ile beyan et — boot'u öldüren çakışmanın kök nedeni | `0b287b002` |
-| 2026-08-14 | `docs` | describe manual dashboard approval flow | `ac54d9c60` |
-| 2026-08-14 | `docs` | record canonical insight bootstrap | `972e72abb` |
-| 2026-08-14 | `test` | isolate verifier cleanup connection | `1046fc2ce` |
-| 2026-08-14 | `test` | bound queue verifier transport | `de22424a1` |
-| 2026-08-14 | `test` | retry tombstone transport | `b9e55c672` |
-| 2026-08-14 | `test` | complete guardrail category context | `ae91bcce6` |
-| 2026-08-14 | `test` | materialize active ad set evidence | `4b8187658` |
-| 2026-08-14 | `test` | bind ad set category evidence | `4f9d5407e` |
-| 2026-08-14 | `test` | evaluate guardrails at command time | `438d52f9d` |
-| 2026-08-14 | `test` | materialize complete guardrail evidence | `cddda92c0` |
-| 2026-08-14 | `fix` | bind geo evidence through hierarchy | `3377eee7b` |
-| 2026-08-14 | `fix` | label trust freshness in hours | `294e5e398` |
-| 2026-08-14 | `fix` | enforce published budget guardrails | `2834bf3f7` |
+| 2026-08-18 | `fix` | accept renamed budget route guard in post verifier | `e80d1b663` |
+| 2026-08-18 | `fix` | recheck guide scheduler rollout on tick | `ade884e01` |
+| 2026-08-18 | `fix` | stop status scheduler when rollout closes | `11c57ef37` |
+| 2026-08-18 | `fix` | stop budget scheduler when rollout closes | `1dd3b341c` |
+| 2026-08-18 | `fix` | tolerate forward route catalog extensions | `59cf70624` |
+| 2026-08-18 | `feat` | gate human rename execution runtime | `8a62f6749` |
+| 2026-08-18 | `fix` | compare rename values in execution worker | `82e76ea43` |
+| 2026-08-18 | `feat` | persist human rename execution identity | `67bed7fb5` |
+| 2026-08-18 | `feat` | extend disabled executor contract for rename | `f6a6fd3b2` |
+| 2026-08-18 | `feat` | add human-only rename admission foundation | `7895988be` |
+| 2026-08-18 | `feat` | complete operation saved view controls | `e5350c745` |
+| 2026-08-18 | `docs` | record migration post acceptance | `103922ec7` |
+| 2026-08-18 | `chore` | journal naming template lifecycle | `ab9a212a1` |
+| 2026-08-18 | `test` | add naming template post verification | `149ddfc43` |
+| 2026-08-18 | `chore` | journal saved scope reports | `718ea01c2` |
 
 ## Nerede çalışılıyor (son 60 iş commit'i)
 
-- `fix         ` ████████████████████████ 17
-- `feat        ` ████████████████████ 14
-- `docs        ` ██████████████████ 13
-- `test        ` ██████████████████ 13
-- `?           ` ███ 2
-- `refactor    ` █ 1
+- `feat        ` ████████████████████████ 27
+- `fix         ` ███████████ 12
+- `test        ` ███████ 8
+- `chore       ` ██████ 7
+- `docs        ` █████ 6
 
 ## Planlar
 

@@ -71,6 +71,14 @@ describe("Slice Rule to Budget Lab impact bridge", () => {
     expect(h.budgetLab.dryRun).not.toHaveBeenCalled();
   });
 
+  it("fails closed before Budget Lab when a budget-affecting draft has no exact same-market pool binding", async () => {
+    const h = harness(); const poolBindings = { hasExact: vi.fn(async () => false) };
+    const service = new SliceRuleBudgetImpactService(h.drafts, h.scopeEvidence, h.budgetLab, poolBindings);
+    await expect(service.preview(request())).rejects.toMatchObject({ code: "pool_binding_required" });
+    expect(poolBindings.hasExact).toHaveBeenCalledWith({ workspaceId, draftHash: draft.draftHash, market: "international" });
+    expect(h.scopeEvidence.loadExact).not.toHaveBeenCalled(); expect(h.budgetLab.dryRun).not.toHaveBeenCalled();
+  });
+
   it("rejects missing, ambiguous or stale evidence without falling back to caller scope", async () => {
     for (const state of ["missing", "ambiguous", "stale"] as const) {
       const h = harness();

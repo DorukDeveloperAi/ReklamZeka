@@ -11,9 +11,10 @@ const workspaceId = "11111111-1111-4111-8111-111111111111";
 const connectionId = "22222222-2222-4222-8222-222222222222";
 const now = "2026-08-08T04:00:00.000Z";
 const due: MetaReadSyncScheduleCandidate = Object.freeze({ workspaceId, connectionId, scopeRevision: 3,
-  triggerKind: "daily", scheduledFor: "2026-08-08T03:00:00.000Z",
+  triggerKind: "interval_6h", scheduledFor: "2026-08-08T03:00:00.000Z",
   dateStart: "2026-08-07", dateStop: "2026-08-07" });
 const database = Object.freeze({ execute: vi.fn(), transaction: vi.fn() });
+const enabledEnvironment = Object.freeze({ META_READ_ENABLED: "true" });
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -25,7 +26,7 @@ describe("private production scheduled Meta read-sync tick", () => {
     const fetchImpl = vi.fn();
     const result = await runDrizzleMetaReadSyncScheduleTick({ now, batchSize: 4, concurrency: 2,
       maxAttempts: 3, leaseMs: 60_000 }, { database: database as never,
-      environment: { META_ACCESS_TOKEN: "PRIVATE_TOKEN" }, fetchImpl });
+      environment: { ...enabledEnvironment, META_ACCESS_TOKEN: "PRIVATE_TOKEN" }, fetchImpl });
     expect(listDue).toHaveBeenCalledWith(now, 4); expect(claim).not.toHaveBeenCalled();
     expect(create).not.toHaveBeenCalled(); expect(fetchImpl).not.toHaveBeenCalled();
     expect(result).toMatchObject({ dueCount: 0, actionAuthority: "none", writeNetworkCalls: 0 });
@@ -37,7 +38,7 @@ describe("private production scheduled Meta read-sync tick", () => {
     vi.spyOn(DrizzleMetaReadSyncLease.prototype, "claim").mockResolvedValue({ status: "duplicate_completed", attempt: 2 });
     const revalidate = vi.spyOn(DrizzleMetaReadSyncScheduleRegistry.prototype, "revalidate");
     const create = vi.spyOn(ServerDerivedMetaReadSyncServiceFactory.prototype, "create");
-    const result = await runDrizzleMetaReadSyncScheduleTick({ now }, { database: database as never });
+    const result = await runDrizzleMetaReadSyncScheduleTick({ now }, { database: database as never, environment: enabledEnvironment });
     expect(result.items[0]).toMatchObject({ outcome: "duplicate_completed", attempts: 2 });
     expect(revalidate).not.toHaveBeenCalled(); expect(create).not.toHaveBeenCalled();
     expect(JSON.stringify(result)).not.toContain(workspaceId); expect(JSON.stringify(result)).not.toContain(connectionId);
@@ -54,7 +55,7 @@ describe("private production scheduled Meta read-sync tick", () => {
       streamCounts: { completed: 1, partial: 1, failed: 0 }, inserted: 2, updated: 1, unchanged: 3,
       writeNetworkCalls: 0 as const }));
     vi.spyOn(ServerDerivedMetaReadSyncServiceFactory.prototype, "create").mockReturnValue({ run: serviceRun });
-    const result = await runDrizzleMetaReadSyncScheduleTick({ now, maxAttempts: 2 }, { database: database as never });
+    const result = await runDrizzleMetaReadSyncScheduleTick({ now, maxAttempts: 2 }, { database: database as never, environment: enabledEnvironment });
     expect(result.items[0]).toMatchObject({ outcome: "partial", reason: "partial_result", retryable: true,
       counts: { streams: 2, inserted: 2, updated: 1, unchanged: 3 } });
     expect(fail).toHaveBeenCalledWith(expect.objectContaining({ reason: "partial_result", retryable: true }));
@@ -67,7 +68,7 @@ describe("private production scheduled Meta read-sync tick", () => {
       { now, workspaceId }, { now, connectionId }, { now, accountIds: ["act_private"] },
       { now, accessToken: "PRIVATE_TOKEN" }, { now, registry: {} },
     ]) {
-      await expect(runDrizzleMetaReadSyncScheduleTick(injected as never, { database: database as never }))
+      await expect(runDrizzleMetaReadSyncScheduleTick(injected as never, { database: database as never, environment: enabledEnvironment }))
         .rejects.toMatchObject({ code: "lease_unavailable" });
     }
     expect(listDue).not.toHaveBeenCalled();
@@ -81,5 +82,12 @@ describe("private production scheduled Meta read-sync tick", () => {
       await expect(runDrizzleMetaReadSyncScheduleTick({ now }, injected as never))
         .rejects.toEqual(new DrizzleMetaReadSyncScheduleTickError("invalid_construction"));
     }
+  });
+
+  it("rejects a disabled rollout before any DB or service work", async () => {
+    const listDue = vi.spyOn(DrizzleMetaReadSyncScheduleRegistry.prototype, "listDue");
+    await expect(runDrizzleMetaReadSyncScheduleTick({ now }, { database: database as never }))
+      .rejects.toEqual(new DrizzleMetaReadSyncScheduleTickError("rollout_disabled"));
+    expect(listDue).not.toHaveBeenCalled();
   });
 });

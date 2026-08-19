@@ -319,6 +319,40 @@ function equalValue(left: MetaComparableValue, right: MetaComparableValue): bool
   return JSON.stringify(stableValue(left)) === JSON.stringify(stableValue(right));
 }
 
+/**
+ * Suppress a raw budget field only when the same entity's resolved owner event
+ * proves it is the exact same economic mutation. Unknown, null, unchanged, or
+ * differently-scoped owner observations deliberately retain the raw config
+ * delta; otherwise an anomalous Meta configuration change would disappear.
+ */
+function isOwnerRepresentedRawBudgetMutation(
+  previous: CanonicalTrackedEntity,
+  current: CanonicalTrackedEntity,
+  field: MetaChangeField,
+): boolean {
+  if (field !== "daily_budget_minor" && field !== "lifetime_budget_minor") return false;
+  const rawBefore = previous.fields[field];
+  const rawAfter = current.fields[field];
+  const ownerBefore = previous.fields.budget_owner;
+  const ownerAfter = current.fields.budget_owner;
+  if (
+    rawBefore?.state !== "known" || rawAfter?.state !== "known"
+    || typeof rawBefore.value !== "number" || typeof rawAfter.value !== "number"
+    || rawBefore.value === rawAfter.value
+    || ownerBefore?.state !== "known" || ownerAfter?.state !== "known"
+    || ownerBefore.value === null || ownerAfter.value === null
+    || typeof ownerBefore.value !== "object" || typeof ownerAfter.value !== "object"
+  ) return false;
+  const budgetType = field === "daily_budget_minor" ? "daily" : "lifetime";
+  return ownerBefore.value.budgetType === budgetType
+    && ownerAfter.value.budgetType === budgetType
+    && ownerBefore.value.model === ownerAfter.value.model
+    && ownerBefore.value.level === ownerAfter.value.level
+    && ownerBefore.value.amountMinor === rawBefore.value
+    && ownerAfter.value.amountMinor === rawAfter.value
+    && ownerBefore.value.amountMinor !== ownerAfter.value.amountMinor;
+}
+
 function opaqueRef(parts: readonly string[]): string {
   return `ref_${digest(parts).slice(0, 20)}`;
 }
@@ -370,6 +404,7 @@ export function diffMetaChangeSnapshots(input: Readonly<{
         continue;
       }
       if (equalValue(before.value, after.value)) continue;
+      if (isOwnerRepresentedRawBudgetMutation(previousEntity, currentEntity, field)) continue;
       const correlated = [...actions].reverse().find((action) =>
         action.verificationStatus === "verified"
         && action.entityType === currentEntity.entityType

@@ -20,6 +20,7 @@ export type DecisionRoomAgentCall =
     name: "decision_room_list";
     arguments: Readonly<{
       view: "schedules" | "runs" | "inbox";
+      campaignRef?: string | null;
       limit?: number;
       cursor?: string | null;
     }>;
@@ -74,12 +75,13 @@ export class DecisionRoomAgentContract {
       throw new DecisionRoomReadError("invalid_input");
     }
     exactKeys(call.arguments, call.name === "decision_room_list"
-      ? ["view", "limit", "cursor"] : ["notificationRef"]);
+      ? ["view", "campaignRef", "limit", "cursor"] : ["notificationRef"]);
 
     const result = call.name === "decision_room_list"
       ? await this.service.read({
         workspaceRef: principal.workspaceRef,
         readerRef: call.arguments.view === "inbox" ? principal.readerRef : undefined,
+        campaignRef: call.arguments.campaignRef,
         view: call.arguments.view,
         limit: call.arguments.limit,
         cursor: call.arguments.cursor,
@@ -106,6 +108,7 @@ export const DECISION_ROOM_AGENT_TOOLS = Object.freeze([
       type: "object", additionalProperties: false, required: ["view"],
       properties: Object.freeze({
         view: Object.freeze({ type: "string", enum: ["schedules", "runs", "inbox"] }),
+        campaignRef: Object.freeze({ type: ["string", "null"], pattern: "^campaign_[a-f0-9]{20}$" }),
         limit: Object.freeze({ type: "integer", minimum: 1, maximum: 100 }),
         cursor: Object.freeze({ type: ["string", "null"] }),
       }),

@@ -7,6 +7,7 @@ import {
   type MetaReadSyncFailureReason,
   type MetaReadSyncLeaseClaim,
   type MetaReadSyncLeasePort,
+  type MetaReadSyncTriggerKind,
   type MetaReadSyncScheduleCandidate,
   type MetaReadSyncScheduleRegistryPort,
 } from "@/application/meta-read-sync-schedule-worker";
@@ -42,7 +43,7 @@ type ScheduleRow = Readonly<{
   workspace_id: string;
   connection_id: string;
   revision: number;
-  trigger_kind: "daily";
+  trigger_kind: "interval_6h";
   timeframe_days: number;
   next_due_at: string | Date;
 }>;
@@ -95,15 +96,15 @@ function storedDate(value: unknown): string {
   return rendered;
 }
 function digest(value: unknown): string { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
-function candidate(row: ScheduleRow): MetaReadSyncScheduleCandidate {
+function candidate(row: ScheduleRow, kind: MetaReadSyncTriggerKind = "interval_6h", scheduledForOverride?: string): MetaReadSyncScheduleCandidate {
   if (!UUID.test(row.id) || !UUID.test(row.workspace_id) || !UUID.test(row.connection_id)
-    || !Number.isSafeInteger(row.revision) || row.revision < 1 || row.trigger_kind !== "daily"
+    || !Number.isSafeInteger(row.revision) || row.revision < 1 || row.trigger_kind !== "interval_6h"
     || !Number.isSafeInteger(row.timeframe_days) || row.timeframe_days < 1 || row.timeframe_days > 90) fail("corrupt_store");
-  const scheduledFor = storedInstant(row.next_due_at);
+  const scheduledFor = scheduledForOverride ?? storedInstant(row.next_due_at);
   const stop = new Date(Date.parse(scheduledFor)); stop.setUTCDate(stop.getUTCDate() - 1);
   const start = new Date(stop); start.setUTCDate(start.getUTCDate() - row.timeframe_days + 1);
   return Object.freeze({ workspaceId: row.workspace_id, connectionId: row.connection_id, scopeRevision: row.revision,
-    triggerKind: "daily", scheduledFor, dateStart: start.toISOString().slice(0, 10), dateStop: stop.toISOString().slice(0, 10) });
+    triggerKind: kind, scheduledFor, dateStart: start.toISOString().slice(0, 10), dateStop: stop.toISOString().slice(0, 10) });
 }
 function identity(value: MetaReadSyncScheduleCandidate) {
   const scopeKey = digest(["scope", value.workspaceId, value.connectionId]);
@@ -120,7 +121,8 @@ function validateCandidate(value: unknown): MetaReadSyncScheduleCandidate {
   if (!exact(value, ["workspaceId", "connectionId", "scopeRevision", "triggerKind", "scheduledFor", "dateStart", "dateStop"])
     || typeof value.workspaceId !== "string" || !UUID.test(value.workspaceId)
     || typeof value.connectionId !== "string" || !UUID.test(value.connectionId)
-    || !Number.isSafeInteger(value.scopeRevision) || (value.scopeRevision as number) < 1 || value.triggerKind !== "daily") fail("invalid_input");
+    || !Number.isSafeInteger(value.scopeRevision) || (value.scopeRevision as number) < 1
+    || !["interval_6h", "manual"].includes(value.triggerKind as string)) fail("invalid_input");
   const scheduledFor = instant(value.scheduledFor);
   if (typeof value.dateStart !== "string" || typeof value.dateStop !== "string"
     || !/^\d{4}-\d{2}-\d{2}$/.test(value.dateStart) || !/^\d{4}-\d{2}-\d{2}$/.test(value.dateStop)
@@ -128,7 +130,7 @@ function validateCandidate(value: unknown): MetaReadSyncScheduleCandidate {
   return { ...value, scheduledFor } as MetaReadSyncScheduleCandidate;
 }
 
-const ACTIVE_BINDING = sql.raw(`schedule.enabled = true and schedule.trigger_kind = 'daily'
+const ACTIVE_BINDING = sql.raw(`schedule.enabled = true and schedule.trigger_kind = 'interval_6h'
   and workspace.lifecycle_state = 'active'
   and workspace.lifecycle_generation = schedule.workspace_lifecycle_generation
   and connection.status = 'active' and connection.access_mode = 'read_only'
@@ -156,7 +158,7 @@ export class DrizzleMetaReadSyncScheduleRegistry implements MetaReadSyncSchedule
       limit ${limitValue}
     `));
     if (found.length > limitValue) fail("corrupt_store");
-    const values = found.map(candidate);
+    const values = found.map((row) => candidate(row));
     if (new Set(values.map((value) => identity(value).idempotencyKey)).size !== values.length) fail("corrupt_store");
     return Object.freeze(values);
   }
@@ -173,13 +175,31 @@ export class DrizzleMetaReadSyncScheduleRegistry implements MetaReadSyncSchedule
         and schedule.workspace_id = ${expected.workspaceId}::uuid
         and schedule.connection_id = ${expected.connectionId}::uuid
         and schedule.revision = ${expected.scopeRevision}
-        and schedule.next_due_at = ${expected.scheduledFor}::timestamptz
+        and (${expected.triggerKind} = 'manual' or schedule.next_due_at = ${expected.scheduledFor}::timestamptz)
       limit 2
     `));
     if (found.length === 0) return null;
     if (found.length > 1) fail("corrupt_store");
-    const checked = candidate(found[0]!);
+    const checked = candidate(found[0]!, expected.triggerKind,
+      expected.triggerKind === "manual" ? expected.scheduledFor : undefined);
     return same(expected, checked) ? checked : null;
+  }
+
+  async resolveManual(workspaceId: string, nowValue: string): Promise<MetaReadSyncScheduleCandidate | null> {
+    const now = instant(nowValue);
+    if (!UUID.test(workspaceId)) fail("invalid_input");
+    const found = rows<ScheduleRow>(await this.database.execute(sql`
+      select ${SCHEDULE_COLUMNS}
+      from meta_read_sync_schedules schedule
+      join workspaces workspace on workspace.id = schedule.workspace_id
+      join meta_connections connection
+        on connection.workspace_id = schedule.workspace_id and connection.id = schedule.connection_id
+      where ${ACTIVE_BINDING} and schedule.workspace_id = ${workspaceId}::uuid
+      limit 2
+    `));
+    if (found.length === 0) return null;
+    if (found.length > 1) fail("corrupt_store");
+    return candidate(found[0]!, "manual", now);
   }
 }
 
@@ -188,13 +208,18 @@ export class DrizzleMetaReadSyncLease implements MetaReadSyncLeasePort {
   constructor(private readonly database: AdapterDatabase) {}
 
   async claim(input: Parameters<MetaReadSyncLeasePort["claim"]>[0]): Promise<MetaReadSyncLeaseClaim> {
-    if (!exact(input, ["idempotencyKey", "scopeKey", "workspaceId", "connectionId", "scopeRevision", "now", "leaseUntil"])
+    if (!exact(input, ["idempotencyKey", "scopeKey", "workspaceId", "connectionId", "scopeRevision", "triggerKind", "scheduledFor", "dateStart", "dateStop", "now", "leaseUntil"])
       || typeof input.idempotencyKey !== "string" || !IDEMPOTENCY.test(input.idempotencyKey)
       || typeof input.scopeKey !== "string" || !HASH.test(input.scopeKey)
       || typeof input.workspaceId !== "string" || !UUID.test(input.workspaceId)
       || typeof input.connectionId !== "string" || !UUID.test(input.connectionId)
-      || !Number.isSafeInteger(input.scopeRevision) || input.scopeRevision < 1) fail("invalid_input");
+      || !Number.isSafeInteger(input.scopeRevision) || input.scopeRevision < 1
+      || !["interval_6h", "manual"].includes(input.triggerKind)
+      || typeof input.scheduledFor !== "string" || typeof input.dateStart !== "string" || typeof input.dateStop !== "string") fail("invalid_input");
     const now = instant(input.now); const leaseUntil = instant(input.leaseUntil);
+    const requested: MetaReadSyncScheduleCandidate = validateCandidate({ workspaceId: input.workspaceId,
+      connectionId: input.connectionId, scopeRevision: input.scopeRevision, triggerKind: input.triggerKind,
+      scheduledFor: input.scheduledFor, dateStart: input.dateStart, dateStop: input.dateStop });
     if (leaseUntil <= now) fail("invalid_input");
     return this.database.transaction(async (transaction) => {
       const schedules = rows<ScheduleRow>(await transaction.execute(sql`
@@ -209,7 +234,8 @@ export class DrizzleMetaReadSyncLease implements MetaReadSyncLeasePort {
         limit 2 for update of schedule
       `));
       if (schedules.length !== 1) fail(schedules.length === 0 ? "scope_revision_changed" : "corrupt_store");
-      const due = candidate(schedules[0]!);
+      const due = candidate(schedules[0]!, requested.triggerKind,
+        requested.triggerKind === "manual" ? requested.scheduledFor : undefined);
       const existingRows = rows<RunRow>(await transaction.execute(sql`
         select ${RUN_COLUMNS} from meta_read_sync_schedule_runs
         where idempotency_key = ${input.idempotencyKey}
@@ -219,19 +245,21 @@ export class DrizzleMetaReadSyncLease implements MetaReadSyncLeasePort {
       const existing = existingRows[0] ?? null;
       if (existing) {
         const storedCandidate: MetaReadSyncScheduleCandidate = Object.freeze({ workspaceId: existing.workspace_id,
-          connectionId: existing.connection_id, scopeRevision: existing.schedule_revision, triggerKind: "daily",
+          connectionId: existing.connection_id, scopeRevision: existing.schedule_revision,
+          triggerKind: existing.trigger_kind === "manual" ? "manual"
+            : existing.trigger_kind === "daily" ? "daily" : "interval_6h",
           scheduledFor: storedInstant(existing.scheduled_for), dateStart: storedDate(existing.date_start),
           dateStop: storedDate(existing.date_stop) });
         const storedIdentity = identity(storedCandidate);
         if (existing.workspace_id !== input.workspaceId || existing.schedule_id !== schedules[0]!.id
           || existing.connection_id !== input.connectionId || existing.schedule_revision !== input.scopeRevision
           || existing.idempotency_key !== input.idempotencyKey || existing.scope_key !== input.scopeKey
-          || existing.trigger_kind !== "daily" || storedIdentity.idempotencyKey !== input.idempotencyKey
+          || existing.trigger_kind !== requested.triggerKind || storedIdentity.idempotencyKey !== input.idempotencyKey
           || storedIdentity.scopeKey !== input.scopeKey || !Number.isSafeInteger(existing.attempt)
           || existing.attempt < 1 || existing.attempt > MAX_ATTEMPTS) fail("corrupt_store");
       }
       if (existing?.state === "completed") return Object.freeze({ status: "duplicate_completed" as const, attempt: existing.attempt });
-      const expected = identity(due);
+      const expected = identity(requested);
       if (due.scopeRevision !== input.scopeRevision || due.scheduledFor > now
         || expected.idempotencyKey !== input.idempotencyKey || expected.scopeKey !== input.scopeKey) fail("scope_revision_changed");
       if (existing?.state === "running" && existing.lease_until !== null && storedInstant(existing.lease_until) > now) {
@@ -240,6 +268,15 @@ export class DrizzleMetaReadSyncLease implements MetaReadSyncLeasePort {
       if (existing && (existing.attempt >= MAX_ATTEMPTS || existing.state === "failed" && existing.retryable !== true)) {
         return Object.freeze({ status: "duplicate_in_progress" as const, attempt: existing.attempt });
       }
+      const activeOther = rows<RunRow>(await transaction.execute(sql`
+        select ${RUN_COLUMNS} from meta_read_sync_schedule_runs
+        where workspace_id = ${input.workspaceId}::uuid and connection_id = ${input.connectionId}::uuid
+          and scope_key = ${input.scopeKey} and state = 'running'
+          and lease_until > ${now}::timestamptz and idempotency_key <> ${input.idempotencyKey}
+        limit 2 for update
+      `));
+      if (activeOther.length > 1) fail("corrupt_store");
+      if (activeOther.length === 1) return Object.freeze({ status: "duplicate_in_progress" as const, attempt: activeOther[0]!.attempt });
       const attempt = (existing?.attempt ?? 0) + 1;
       const leaseToken = `lease_${randomUUID().replaceAll("-", "")}`;
       if (existing) {
@@ -258,8 +295,8 @@ export class DrizzleMetaReadSyncLease implements MetaReadSyncLeasePort {
             scheduled_for, date_start, date_stop, state, lease_token, lease_until, attempt, started_at
           ) values (
             ${due.workspaceId}::uuid, ${schedules[0]!.id}::uuid, ${due.connectionId}::uuid, ${due.scopeRevision},
-            ${input.idempotencyKey}, ${input.scopeKey}, 'daily', ${due.scheduledFor}::timestamptz,
-            ${due.dateStart}::date, ${due.dateStop}::date, 'running', ${leaseToken}, ${leaseUntil}::timestamptz,
+            ${input.idempotencyKey}, ${input.scopeKey}, ${requested.triggerKind}, ${requested.scheduledFor}::timestamptz,
+            ${requested.dateStart}::date, ${requested.dateStop}::date, 'running', ${leaseToken}, ${leaseUntil}::timestamptz,
             ${attempt}, ${now}::timestamptz
           ) returning id
         `));
@@ -290,7 +327,7 @@ export class DrizzleMetaReadSyncLease implements MetaReadSyncLeasePort {
         where ${ACTIVE_BINDING} and schedule.workspace_id = ${run.workspace_id}::uuid
           and schedule.id = ${run.schedule_id}::uuid and schedule.connection_id = ${run.connection_id}::uuid
           and schedule.revision = ${run.schedule_revision}
-          and schedule.next_due_at = ${storedInstant(run.scheduled_for)}::timestamptz
+          and (schedule.next_due_at = ${storedInstant(run.scheduled_for)}::timestamptz or ${run.trigger_kind} = 'manual')
         limit 2 for update of schedule
       `));
       if (schedule.length !== 1) return false;
@@ -301,15 +338,17 @@ export class DrizzleMetaReadSyncLease implements MetaReadSyncLeasePort {
         limit 2 for update
       `));
       if (locked.length !== 1) return false;
-      const advanced = rows<{ id: string }>(await transaction.execute(sql`
-        update meta_read_sync_schedules set revision = revision + 1,
-          next_due_at = next_due_at + interval '1 day', updated_at = now()
-        where id = ${run.schedule_id}::uuid and workspace_id = ${run.workspace_id}::uuid
-          and connection_id = ${run.connection_id}::uuid and revision = ${run.schedule_revision}
-          and next_due_at = ${storedInstant(run.scheduled_for)}::timestamptz
-        returning id
-      `));
-      if (advanced.length !== 1) fail("lease_conflict");
+      if (run.trigger_kind === "interval_6h") {
+        const advanced = rows<{ id: string }>(await transaction.execute(sql`
+          update meta_read_sync_schedules set revision = revision + 1,
+            next_due_at = next_due_at + interval '6 hours', updated_at = now()
+          where id = ${run.schedule_id}::uuid and workspace_id = ${run.workspace_id}::uuid
+            and connection_id = ${run.connection_id}::uuid and revision = ${run.schedule_revision}
+            and next_due_at = ${storedInstant(run.scheduled_for)}::timestamptz
+          returning id
+        `));
+        if (advanced.length !== 1) fail("lease_conflict");
+      }
       const completed = rows<{ id: string }>(await transaction.execute(sql`
         update meta_read_sync_schedule_runs set state = 'completed', lease_token = null, lease_until = null,
           completed_at = ${completedAt}::timestamptz, failed_at = null, failure_reason = null, retryable = null,
@@ -347,10 +386,10 @@ export class DrizzleMetaReadSyncLease implements MetaReadSyncLeasePort {
           where ${ACTIVE_BINDING} and schedule.workspace_id = ${run.workspace_id}::uuid
             and schedule.id = ${run.schedule_id}::uuid and schedule.connection_id = ${run.connection_id}::uuid
             and schedule.revision = ${run.schedule_revision}
-            and schedule.next_due_at = ${storedInstant(run.scheduled_for)}::timestamptz
+            and (schedule.next_due_at = ${storedInstant(run.scheduled_for)}::timestamptz or ${run.trigger_kind} = 'manual')
           limit 2 for update of schedule
         `));
-        if (schedule.length === 1) {
+        if (schedule.length === 1 && run.trigger_kind === "interval_6h") {
           const locked = rows<RunRow>(await transaction.execute(sql`
             select ${RUN_COLUMNS} from meta_read_sync_schedule_runs
             where id = ${run.id}::uuid and state = 'running' and lease_token = ${input.leaseToken}
@@ -359,7 +398,7 @@ export class DrizzleMetaReadSyncLease implements MetaReadSyncLeasePort {
           if (locked.length !== 1) return false;
           const advanced = rows<{ id: string }>(await transaction.execute(sql`
             update meta_read_sync_schedules set revision = revision + 1,
-              next_due_at = next_due_at + interval '1 day', updated_at = now()
+              next_due_at = next_due_at + interval '6 hours', updated_at = now()
             where id = ${run.schedule_id}::uuid and workspace_id = ${run.workspace_id}::uuid
               and connection_id = ${run.connection_id}::uuid and revision = ${run.schedule_revision}
               and next_due_at = ${storedInstant(run.scheduled_for)}::timestamptz

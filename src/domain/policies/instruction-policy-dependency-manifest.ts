@@ -21,6 +21,9 @@ const policyContract = new Set([
   "candidate_preview_binding_revisions.payload",
   "decision_cadence_profile_revisions.profile_payload",
   "progressive_formalization_revisions.revision_payload",
+  // Human-published ceiling constraints are a closed policy contract. They
+  // carry no execution authority but must remain visible to policy impact.
+  "budget_ceiling_policy_revisions.policy_payload",
 ]);
 const policyProjection = new Set(["effective_campaign_contexts.context_payload"]);
 const opaquePolicyContext = new Set([
@@ -30,7 +33,29 @@ const opaquePolicyContext = new Set([
   "action_proposal_units.summary_payload",
   "action_execution_attempts.admission_payload",
   "action_execution_events.event_payload",
+  "p06_execution_runs.request_payload",
+  "p06_limited_autonomy_admissions.admission_payload",
+  "p06_execution_events.payload",
+  "p06_execution_observations.observed_value",
+  "p06_execution_gate_snapshots.payload",
+  "p06_rollback_proposals.payload",
+  // Append-only gate audit and skill-catalog snapshots are private historical
+  // context. Policy impact must not infer mutable authority from them.
+  "action_preparation_gate_snapshots.snapshot_payload",
+  "orchestrator_profile_revisions.payload",
+  "orchestrator_playbook_revisions.payload",
+  "orchestrator_interview_kit_revisions.payload",
+  "orchestrator_interview_kit_revisions.source_snapshot",
+  "orchestrator_conversation_turns.profile_snapshot",
+  "orchestrator_conversation_turns.manifest_snapshots",
+  "orchestrator_conversation_turns.playbook_snapshots",
+  "orchestrator_conversation_turns.interview_kit_snapshots",
+  // Immutable aggregate turn evidence is historical context only; it cannot
+  // become a policy authority dependency during impact evaluation.
+  "orchestrator_conversation_turns.evidence_context_snapshot",
+  "orchestrator_conversation_turns.skill_run_snapshot",
   "robust_cohort_diagnostic_assets.profile",
+  "robust_cohort_diagnostic_assets.equivalence_scope",
   "robust_cohort_diagnostic_assets.member_evidence_refs",
   "robust_cohort_diagnostic_assets.result_payload",
   "robust_cohort_diagnostic_assets.capabilities",
@@ -41,6 +66,17 @@ const opaquePolicyContext = new Set([
   "creative_fatigue_config_diagnostic_assets.result_payload",
   "creative_fatigue_config_diagnostic_assets.capabilities",
   "frozen_diagnostic_evidence.capabilities",
+  "finding_lifecycle_events.observation_payload",
+  "development_log_events.payload",
+  "guide_revisions.strict_payload",
+  "guide_revisions.schedule_payload",
+  "guide_budget_contracts.contract_payload",
+  "guide_lifecycle_events.payload",
+  "guide_runs.trigger_payload",
+  "guide_run_events.payload",
+  "guide_run_heads.run_payload",
+  "guide_run_artifacts.payload",
+  "guide_run_artifacts.authority",
 ]);
 
 const policyAuthorityJsonbColumns = Object.freeze([...policyContract]

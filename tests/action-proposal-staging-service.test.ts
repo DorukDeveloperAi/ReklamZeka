@@ -76,6 +76,12 @@ function budgetPlan(): ActionPlan {
   });
 }
 
+function renamePlan(): ActionPlan {
+  return buildActionPlan({ kind: "rename", entity: { level: "campaign", ref: "campaign_main" },
+    beforeName: "Eski Kampanya", afterName: "Yeni Kampanya", namingEvidenceRef: "naming_evidence_main" },
+  valveContext({ level: "campaign", ref: "campaign_main" }));
+}
+
 function stable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value as Record<string, unknown>)
@@ -142,6 +148,14 @@ describe("ActionProposalStagingService", () => {
     expect(Object.isFrozen(stagedPlan.action)).toBe(true);
     expect(() => { (stagedPlan as { risk: string }).risk = "K4"; }).toThrow();
     expect(stagedPlan.risk).toBe("K2");
+  });
+
+  it("rename'i yalnız K3 human-approval kuyruğuna alır ve typed isim kanıtını bağlar", () => {
+    const staged = new ActionProposalStagingService(policy).stage(input([unit("unit_rename", renamePlan())]));
+    expect(staged.bundle.units[0]).toMatchObject({ risk: "K3", scope: { actionType: "campaign_rename" } });
+    expect(staged.summaries[0]?.actionPlan).toMatchObject({ disposition: "approval_required", effectiveAutonomy: "approval_only",
+      action: { kind: "rename", beforeName: "Eski Kampanya", afterName: "Yeni Kampanya", namingEvidenceRef: "naming_evidence_main" } });
+    expect(staged.authority).toBe("none");
   });
 
   it("K0 no-write ve policy-limited candidate planlarını approval-only write queue'ya almaz", () => {
