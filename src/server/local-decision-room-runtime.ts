@@ -261,6 +261,21 @@ async function bindPrincipal(database: Pick<Database, "execute">, config: LocalD
   });
 }
 
+/**
+ * Binds the one configured local workspace for passive canonical reads only.
+ * It deliberately cannot draft, decide, publish, trigger a sync, or grant a
+ * caller-selected scope; those paths continue to require a session capability.
+ */
+export async function resolveTrustedConfiguredLocalReadPrincipal(input: Readonly<{
+  request: Request;
+  database: Pick<Database, "execute">;
+  config: LocalDecisionRoomConfig;
+}>): Promise<Readonly<{ principal: TrustedDecisionRoomPrincipal; membership: WorkspaceMembership }>> {
+  exactKeys(input, ["request", "database", "config"]);
+  assertTrustedLocalDecisionRoomRequest(input.request, input.config, "read");
+  return bindPrincipal(input.database, input.config);
+}
+
 /** Shared, fail-closed local reader binding used by server-side read tools. */
 export async function resolveTrustedLocalReadPrincipal(input: Readonly<{
   request: Request;

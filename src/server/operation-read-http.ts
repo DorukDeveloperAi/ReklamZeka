@@ -41,11 +41,13 @@ function isRejectedInput(reason: unknown): boolean {
 export function createOperationReadHttpHandler(input: Readonly<{
   service: OperationReadService;
   workspaceId(request: Request): Promise<string | null>;
+  /** The configured-loopback runtime already binds the sole workspace server-side. */
+  requiresSession?: boolean;
 }>) {
   return async (request: Request) => {
     const requestInput = operationReadRequestInput(request);
     if (!requestInput) return operationReadInvalidInput();
-    if (!request.headers.get("cookie")) return operationReadSessionRequired();
+    if (input.requiresSession !== false && !request.headers.get("cookie")) return operationReadSessionRequired();
     try {
       const workspaceId = await input.workspaceId(request);
       if (!workspaceId) return operationReadForbidden();

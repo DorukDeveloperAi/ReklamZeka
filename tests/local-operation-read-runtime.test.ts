@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLocalOperationReadHandler } from "@/server/local-operation-read-runtime";
 import { localDecisionRoomConfig } from "@/server/local-decision-room-runtime";
-import { LOCAL_SESSION_COOKIE, mintLocalSessionCapability } from "@/security/local-session-capability";
 
 const config = localDecisionRoomConfig({
   DATABASE_URL: "postgresql://server-only.invalid/database",
@@ -13,17 +12,6 @@ const config = localDecisionRoomConfig({
   REKLAMZEKA_LOCAL_READER_REF: "reader_local_owner",
   REKLAMZEKA_LOCAL_SESSION_SIGNING_KEY: Buffer.alloc(32, 7).toString("base64"),
 })!;
-const token = mintLocalSessionCapability({
-  kind: "session",
-  workspaceId: config.workspaceId,
-  workspaceRef: config.workspaceRef,
-  userId: config.userId,
-  readerRef: config.readerRef,
-  osUid: process.getuid?.() ?? 0,
-  issuedAt: Math.floor(Date.now() / 1000) - 1,
-  expiresAt: Math.floor(Date.now() / 1000) + 60,
-}, Buffer.alloc(32, 7)).token;
-
 function request(input: Readonly<{ cookie?: string; headers?: HeadersInit; path?: string }> = {}) {
   return new Request(`http://localhost:3000${input.path ?? "/api/operations"}`, {
     headers: {
@@ -37,26 +25,27 @@ function request(input: Readonly<{ cookie?: string; headers?: HeadersInit; path?
 }
 
 describe("local operation read runtime", () => {
-  it("returns a read-only local-session requirement before any database work", async () => {
-    const database = { execute: vi.fn(), transaction: vi.fn() };
+  it("reads the configured local workspace without a browser capability", async () => {
+    const database = { execute: vi.fn().mockResolvedValue({ rows: [{ workspace_id: config.workspaceId, user_id: config.userId,
+      role: "owner", lifecycle_state: "active" }] }), transaction: vi.fn().mockRejectedValue(new Error("database offline")) };
     const response = await createLocalOperationReadHandler({ database: database as never, config })(request());
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: { code: "local_session_required" } });
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe("source_unavailable");
     expect(response.headers.get("x-reklamzeka-access-mode")).toBe("read-only");
     expect(response.headers.get("x-reklamzeka-action-authority")).toBe("none");
     expect(response.headers.get("x-reklamzeka-meta-write")).toBe("disabled");
-    expect(database.execute).not.toHaveBeenCalled();
-    expect(database.transaction).not.toHaveBeenCalled();
+    expect(database.execute).toHaveBeenCalledTimes(1);
+    expect(database.transaction).toHaveBeenCalledTimes(1);
   });
 
-  it("treats invalid local capabilities as session requirements without exposing why", async () => {
-    const database = { execute: vi.fn(), transaction: vi.fn() };
+  it("does not let a stale browser cookie prevent configured passive reads", async () => {
+    const database = { execute: vi.fn().mockResolvedValue({ rows: [] }), transaction: vi.fn() };
     const response = await createLocalOperationReadHandler({ database: database as never, config })(
-      request({ cookie: `${LOCAL_SESSION_COOKIE}=not-a-capability` }),
+      request({ cookie: "reklamzeka_local_session=stale" }),
     );
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: { code: "local_session_required" } });
-    expect(database.execute).not.toHaveBeenCalled();
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: { code: "forbidden" } });
+    expect(database.execute).toHaveBeenCalledTimes(1);
   });
 
   it("keeps malformed method, query, and security headers as invalid input", async () => {
@@ -73,7 +62,7 @@ describe("local operation read runtime", () => {
   it("returns forbidden for a valid session that cannot bind a workspace principal", async () => {
     const database = { execute: vi.fn().mockResolvedValue({ rows: [] }), transaction: vi.fn() };
     const response = await createLocalOperationReadHandler({ database: database as never, config })(
-      request({ cookie: `${LOCAL_SESSION_COOKIE}=${token}` }),
+      request(),
     );
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: { code: "forbidden" } });
@@ -82,7 +71,7 @@ describe("local operation read runtime", () => {
   it("returns unavailable for an actual source failure after a valid request", async () => {
     const database = { execute: vi.fn().mockRejectedValue(new Error("database offline")), transaction: vi.fn() };
     const response = await createLocalOperationReadHandler({ database: database as never, config })(
-      request({ cookie: `${LOCAL_SESSION_COOKIE}=${token}` }),
+      request(),
     );
     expect(response.status).toBe(503);
     expect((await response.json()).error.code).toBe("source_unavailable");

@@ -12,7 +12,7 @@ import {
 } from "@/server/operation-read-http";
 import {
   hasTrustedFrameworkForwarding,
-  resolveTrustedLocalReadPrincipal,
+  resolveTrustedConfiguredLocalReadPrincipal,
   localDecisionRoomConfig,
   LocalDecisionRoomBoundaryError,
   type LocalDecisionRoomConfig,
@@ -48,13 +48,12 @@ export function createLocalOperationReadHandler(input: Readonly<{
 }>) {
   return async (request: Request) => {
     if (!trustedOperationReadShape(request, input.config)) return operationReadInvalidInput();
-    if (!request.headers.get("cookie")) return operationReadSessionRequired();
     try {
-      const bound = await resolveTrustedLocalReadPrincipal({ request, database: input.database as never,
-        config: input.config, requiredScope: "decision_room:read" });
+      const bound = await resolveTrustedConfiguredLocalReadPrincipal({ request, database: input.database as never, config: input.config });
       return createOperationReadHttpHandler({
         service: new OperationReadService(new DrizzleOperationReadRepository(input.database)),
         workspaceId: async () => bound.principal.workspaceId,
+        requiresSession: false,
       })(request);
     } catch (reason) {
       return localReadFailure(reason);
