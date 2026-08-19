@@ -83,6 +83,45 @@ function resolveRes(key, root = ROOT, resmap = RESMAP, cwd = process.cwd()) {
   return { type: "path", key: inRepo ? rel : abs };
 }
 
+/** HARİTA-DIŞI AD UYARISI — "korunduğunu sanmak" hâlinin panzehiri.
+ *
+ *  Haritada olmayan bir ad claim'lenebilir ve bu KASITLIDIR (ad-hoc koordinasyon kilitleri
+ *  meşrudur). Tehlike, adın haritadaki bir kaynağın KAPSADIĞI bir yol olmasıdır: sahip o adla
+ *  kilidi alır, kapı ise aynı yazımı BAŞKA bir anahtarla ölçer → kilit hiçbir şeyi engellemez
+ *  ve belirtisi YOKTUR.
+ *
+ *  Ölçüldü (2026-08-17, dorukcom06): üç session `design-source` adıyla kilit tutarken
+ *  `design-source/*.dc.html` yazımı `dc-html` sahibince serbestçe yapılabiliyordu. Uydurma bir
+ *  ad (`zzz-uydurma-kaynak-testi`) da sessizce kabul ediliyordu.
+ *
+ *  BLOKLAMAZ — meşru ad-hoc kilitleri kırardı. Görünür uyarır ve `onar:` satırıyla doğru
+ *  anahtarı SÖYLER (çaresi olmayan alarm, alarmı köreltir). */
+function haritaDisiUyar(resolved, raw) {
+  if (!resolved || resolved.type === "logical") return;
+  const claimed = String(resolved.key || raw || "").replace(/\/+$/, "");
+  if (!claimed) return;
+  const kapsayan = new Set();
+  for (const [k, r] of Object.entries(RESMAP || {})) {
+    for (const p of r?.paths || []) {
+      /* desenin LİTERAL öneki: "design-source/*.dc.html" → "design-source" */
+      const lit = String(p).split(/[*?]/)[0].replace(/\/+$/, "");
+      if (!lit) continue;
+      if (lit === claimed || lit.startsWith(claimed + "/") || claimed.startsWith(lit + "/")) {
+        kapsayan.add(k);
+        break;
+      }
+    }
+  }
+  if (!kapsayan.size) return;
+  const liste = [...kapsayan];
+  console.error(
+    `⚠ HARİTA-DIŞI AD: "${raw}" mantıksal kaynak haritasında YOK.\n` +
+      `  Bu yolu KAPSAYAN tanımlı kaynak: ${liste.join(", ")}\n` +
+      `  Kapı yazımı o anahtarla ölçer → bu adla tutulan kilit yazımı ENGELLEMEZ.\n` +
+      `  onar: --res ${liste[0]}`
+  );
+}
+
 const short = (s) => String(s || "").slice(0, 8);
 const dk = (iso) => {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -278,6 +317,7 @@ function cmdClaim() {
   const I = me();
   const raw = flag("res");
   const resource = resolveRes(raw);
+  haritaDisiUyar(resource, raw);
   const active = L.activeClaims(ROOT);
 
   /* 1. Aynı anahtar bende mi / başkasında mı? */
@@ -563,6 +603,7 @@ async function cmdWait() {
   const I = me();
   const raw = flag("res");
   const resource = resolveRes(raw);
+  haritaDisiUyar(resource, raw);   /* yanlış anahtarı BEKLEMEK de aynı yanılgıdır */
   const timeout = +(flag("timeout", 0) || 0);
   const acquire = !has("no-acquire");
   const t0 = Date.now();
