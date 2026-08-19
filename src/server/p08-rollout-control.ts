@@ -1,5 +1,3 @@
-import "server-only";
-
 export type P08RolloutEnvironment = Readonly<Record<string, string | undefined>>;
 
 export type P08RolloutControl = Readonly<{

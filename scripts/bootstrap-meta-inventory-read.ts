@@ -9,13 +9,14 @@ import { DrizzleMetaInventoryPagePersistence } from "../src/connectors/meta/sync
 import { planMetaReadSync } from "../src/connectors/meta/sync/planner";
 import { MetaPartialReadSyncRuntime } from "../src/connectors/meta/sync/runtime";
 import { DrizzleMetaSyncAccountScopeResolver } from "../src/server/meta-read-sync-runtime";
+import { metaTokenSecurityAllowsReadSync } from "../src/connectors/meta/bootstrap-preflight";
 import * as schema from "../src/db/schema";
 
 process.loadEnvFile(".env.local");
 
 const workspaceId = process.env.REKLAMZEKA_LOCAL_WORKSPACE_ID;
 const connectionId = "6d695103-4dc0-44ba-8a1b-67702449c4a1";
-if (!workspaceId || process.env.META_TOKEN_SECURITY_STATUS !== "rotated") {
+if (!workspaceId || !metaTokenSecurityAllowsReadSync(process.env.META_TOKEN_SECURITY_STATUS)) {
   throw new Error("read-only inventory bootstrap preflight rejected");
 }
 

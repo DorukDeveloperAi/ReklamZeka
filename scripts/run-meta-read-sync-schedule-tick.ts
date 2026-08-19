@@ -5,6 +5,7 @@ import { Pool } from "pg";
 
 import * as schema from "@/db/schema";
 import { runDrizzleMetaReadSyncScheduleTick } from "@/server/meta-read-sync-schedule-tick";
+import { metaTokenSecurityAllowsReadSync } from "@/connectors/meta/bootstrap-preflight";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 
@@ -15,10 +16,10 @@ if (existsSync(".env.local")) process.loadEnvFile(".env.local");
  */
 const enabled = process.env.REKLAMZEKA_META_SCHEDULE_RUNNER_ENABLED === "true";
 const rolloutEnabled = process.env.META_READ_ENABLED === "true";
-const rotated = process.env.META_TOKEN_SECURITY_STATUS === "rotated";
+const tokenSecurityAllowsReadSync = metaTokenSecurityAllowsReadSync(process.env.META_TOKEN_SECURITY_STATUS);
 const databaseUrl = process.env.DIRECT_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
 
-if (!enabled || !rolloutEnabled || !rotated || !databaseUrl) {
+if (!enabled || !rolloutEnabled || !tokenSecurityAllowsReadSync || !databaseUrl) {
   console.log(JSON.stringify({ status: "disabled", dueCount: 0, actionAuthority: "none",
     writeNetworkCalls: 0, metaWriteCalls: 0 }));
   process.exitCode = 2;

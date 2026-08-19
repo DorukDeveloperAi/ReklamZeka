@@ -4,7 +4,7 @@ import { AppendOnlyAuditLog } from "@/security/audit";
 import { InMemoryMetaConnectionRepository } from "@/connectors/meta/connection-repository";
 import { MetaConnectionLifecycleError, MetaConnectionService } from "@/connectors/meta/connection-service";
 import { InMemoryMetaSecretRepository } from "@/connectors/meta/secret-repository";
-import { inspectMetaBootstrapPreflight } from "@/connectors/meta/bootstrap-preflight";
+import { inspectMetaBootstrapPreflight, metaTokenSecurityAllowsReadSync } from "@/connectors/meta/bootstrap-preflight";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -40,6 +40,13 @@ describe("Meta bootstrap/doctor preflight", () => {
       .toMatchObject({ readiness: "blocked", blocker: "secret_binding_missing" });
     expect(inspectMetaBootstrapPreflight({}))
       .toMatchObject({ readiness: "blocked", blocker: "explicit_security_status_required" });
+  });
+
+  it("permits read-only repair for an explicit standard or rotated token status", () => {
+    expect(metaTokenSecurityAllowsReadSync("standard")).toBe(true);
+    expect(metaTokenSecurityAllowsReadSync("rotated")).toBe(true);
+    expect(metaTokenSecurityAllowsReadSync("temporary_exposed")).toBe(false);
+    expect(metaTokenSecurityAllowsReadSync(undefined)).toBe(false);
   });
 
   it("keeps the public status response redacted, non-cached and network-free", async () => {

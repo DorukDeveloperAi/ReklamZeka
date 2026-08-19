@@ -23,6 +23,15 @@ type MetaBootstrapEnvironment = Readonly<Record<string, string | undefined>>;
 
 const SECURE_STATUS_VALUES = new Set(["secure", "rotated", "standard"]);
 
+/**
+ * Read-only Graph access may use an already-proven standard token.  "rotated"
+ * remains useful operational evidence, but must not be forged merely to let a
+ * safe read repair run; temporary or unknown states stay closed.
+ */
+export function metaTokenSecurityAllowsReadSync(status: string | undefined): boolean {
+  return typeof status === "string" && SECURE_STATUS_VALUES.has(status.trim().toLowerCase());
+}
+
 function hasSecretBinding(environment: MetaBootstrapEnvironment): boolean {
   // Presence is intentionally checked without reading the secret value.
   return Object.prototype.hasOwnProperty.call(environment, "META_ACCESS_TOKEN");
