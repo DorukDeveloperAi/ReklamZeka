@@ -32,3 +32,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+<!-- BEGIN SHARED PROJECT COORDINATION v1 -->
+## Ortak proje yönetimi
+
+Codex–Claude ortak tahta: `ortak/TAHTA.md`. Proje yönetimi ve devir için `project-coordination` becerisini kullan; bulunamazsa bu tahtanın mevcut protokolüyle devam et. İkinci backlog veya otomasyon kurma; mevcut proje kuralları ve yetkiler korunur.
+<!-- END SHARED PROJECT COORDINATION v1 -->
