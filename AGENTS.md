@@ -10,3 +10,7 @@ Codex–Claude ortak tahta: `ortak/TAHTA.md`. Proje yönetimi ve devir için `pr
 
 Göreve başlarken [ortak proje tahtasını](</Users/ybg/dev/ReklamZeka/ortak/TAHTA.md>) ve [agent yönlendirme kuralını](</Users/ybg/Library/Mobile Documents/com~apple~CloudDocs/Projeler/Proje Merkezi/sistem/AGENT-KOORDINASYONU.md>) oku. Yeni analizden önce mevcut sonuç ve görev sahibini bul; gerekiyorsa kullanıcının yetkili kapsamında mevcut chate hedefli iş ilet. Sahipliği ve kanıtı aynı tahtaya yaz; merkez dizini için `python3 "/Users/ybg/Library/Mobile Documents/com~apple~CloudDocs/Projeler/Proje Merkezi/sistem/agentlar.py"` çalıştır. Projeye özgü koordinatör/claim kuralları korunur.
 <!-- END AGENT ROUTING 2026-10-07 -->
+
+<!-- BEGIN PROJECT GUIDE SET 2026-10-10 -->
+[Proje kılavuz seti](</Users/ybg/Library/Mobile Documents/com~apple~CloudDocs/Projeler/Proje Merkezi/sistem/PROJE-KILAVUZ-SETI.md>) — yeni iş/devirde kısa giriş, proje mantığı ve ayrıntı kaynakları. [Bu projenin kaynak haritası](</Users/ybg/dev/ReklamZeka/ortak/TAHTA.md>). Mevcut proje yetki ve kör görev istisnaları korunur.
+<!-- END PROJECT GUIDE SET 2026-10-10 -->

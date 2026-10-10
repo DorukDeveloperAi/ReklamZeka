@@ -92,3 +92,5 @@ Ham pilot girdisi repoya alınmaz. Şema ve attestation talimatı
 [`docs/pilot/README.md`](docs/pilot/README.md) içindedir.
 Önerilen telemetri yolu, anonim bağlantı/dashboard/sync/feedback/güvenlik olaylarını
 deterministik aggregate ölçülere dönüştürür; manuel aggregate şablonu yalnız fallback'tir.
+
+[Ortak proje kılavuzu](</Users/ybg/Library/Mobile Documents/com~apple~CloudDocs/Projeler/Proje Merkezi/sistem/PROJE-KILAVUZ-SETI.md>) · [Proje mantığı ve kaynak haritası](</Users/ybg/dev/ReklamZeka/ortak/TAHTA.md>) — yeni iş, bakım ve devir öncesi ilgili kaynağı seç.
