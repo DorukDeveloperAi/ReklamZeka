@@ -47,3 +47,8 @@ Bu bakım kaynakları görünür kılar; canlı işlem, ürün kabulü, yeni ür
 
 Yazan: Codex `01a1155f-e4ea-75d2-8a7d-38bcfc1d8d4f`; Berk-Mac-mini-2. Model/runtime değişmedi.
 <!-- END PROJECT GUIDE MAP 2026-10-10 -->
+
+
+## DP-MIMARI-20261020 kaynak birleşmesi
+
+20 Ekim 2026 · Kullanıcının eski ReklamZeka/Reklams kaynaklarını en güncel Claude ile ortak düzene bağlama talimatı. Güncel operasyon girişi [Dijital pazarlama ortak işletim yapısı](</Users/ybg/Library/Mobile Documents/com~apple~CloudDocs/Projeler/Diğer Projeler/Reklam Meta/Ortak/03-sistemler/DIJITAL-PAZARLAMA-MIMARISI.md>); mevcut ürün/kod kaynakları ve Git geçmişi bu kökte korunur. Bu değişiklik kaynak yönlendirmesidir; kod birleştirme/ürün kabulü/servis açılışı değildir. Kaynak sahipliği bu inceleme sohbeti01a158dd-1936-7390-9328-114ee743d93e; doküman bağlantıları yerel geri okumayla doğrulanacak. Sonraki ürün işi açıkça seçilmeden eski plan yürütülmez.

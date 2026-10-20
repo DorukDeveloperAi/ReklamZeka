@@ -14,3 +14,10 @@ Göreve başlarken [ortak proje tahtasını](</Users/ybg/dev/ReklamZeka/ortak/TA
 <!-- BEGIN PROJECT GUIDE SET 2026-10-10 -->
 [Proje kılavuz seti](</Users/ybg/Library/Mobile Documents/com~apple~CloudDocs/Projeler/Proje Merkezi/sistem/PROJE-KILAVUZ-SETI.md>) — yeni iş/devirde kısa giriş, proje mantığı ve ayrıntı kaynakları. [Bu projenin kaynak haritası](</Users/ybg/dev/ReklamZeka/ortak/TAHTA.md>). Mevcut proje yetki ve kör görev istisnaları korunur.
 <!-- END PROJECT GUIDE SET 2026-10-10 -->
+
+
+<!-- BEGIN DIGITAL MARKETING SOURCE ROUTING 2026-10-20 -->
+## Güncel ortak işletim kaynağı
+
+20 Ekim kullanıcı kararı: ReklamZeka ve Reklams eski kaynakları güncel Claude–Codex ortak işletimine [Dijital pazarlama ortak işletim yapısı](</Users/ybg/Library/Mobile Documents/com~apple~CloudDocs/Projeler/Diğer Projeler/Reklam Meta/Ortak/03-sistemler/DIJITAL-PAZARLAMA-MIMARISI.md>) üzerinden bağlanır. Operasyon işi için önce bu kaynaktan mevcut proje tahtası/rutin/sahibi seçilir; bu depodaki tarihî plan veya takip akışı kendiliğinden yeniden başlatılmaz. Kod ve Git geçmişi kendi kökünde korunur.
+<!-- END DIGITAL MARKETING SOURCE ROUTING 2026-10-20 -->

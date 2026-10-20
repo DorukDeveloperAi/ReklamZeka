@@ -1,5 +1,12 @@
 # ReklamZeka
 
+<!-- BEGIN DIGITAL MARKETING SOURCE ROUTING 2026-10-20 -->
+## Güncel ortak işletim kaynağı
+
+20 Ekim kullanıcı kararı: ReklamZeka ve Reklams eski kaynakları güncel Claude–Codex ortak işletimine [Dijital pazarlama ortak işletim yapısı](</Users/ybg/Library/Mobile Documents/com~apple~CloudDocs/Projeler/Diğer Projeler/Reklam Meta/Ortak/03-sistemler/DIJITAL-PAZARLAMA-MIMARISI.md>) üzerinden bağlanır. Operasyon işi için önce bu kaynaktan mevcut proje tahtası/rutin/sahibi seçilir; bu depodaki tarihî plan veya takip akışı kendiliğinden yeniden başlatılmaz. Kod ve Git geçmişi kendi kökünde korunur.
+<!-- END DIGITAL MARKETING SOURCE ROUTING 2026-10-20 -->
+
+
 ReklamZeka, Meta Ads ve Google Ads performansını ortak metriklerde birleştirmeyi,
 sapmaları açıklanabilir kanıtla göstermeyi ve sonraki aksiyonları insan onayında tutmayı
 hedefleyen çok kiracılı reklam karar destek ürünüdür.
