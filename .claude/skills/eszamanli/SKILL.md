@@ -73,7 +73,7 @@ node $S release --res dc-html           # İŞ BİTİNCE — unutma
 node $S release --all                   # tüm claim'lerini bırak (+ beklediklerinden vazgeç)
 node $S wait --res dc-html              # run_in_background: sıra sana gelince kilidi ALIR
 node $S free --res dc-html              # KİMLİKSİZ sonda: devralınabilir mi? (exit 0/1)
-node $S devret --res dc-html --gorev "…" # parça B'yi DEVRET (Maestro + kalıcı işaret — çift yol)
+node $S devret --res dc-html --gorev "…" # parça B'yi DEVRET (kalıcı devir işareti yazar)
 node $S devir list [--json]             # devralınmayı bekleyen devredilmiş işler
 node $S devir al --id <id>              # işi ATOMİK üstlen (tek kazanan; kaybeden koşmaz)
 node $S limit-devir [--kuru]            # BEN limitliyim → kilitlerimi devret
@@ -82,7 +82,7 @@ node $S gc                              # stale kilitleri biç
 
 Kaynak anahtarı üç türden biri: **mantıksal** (`dc-html`, `publish`, `db:media_slot` —
 `<repo>/.claude/claims-resources.json`'da tanımlı), **glob** (`scripts/.gorsel/**`),
-ya da **yol** (`scripts/_pw.cjs`, `~/.claude/pm/ayar.json`). Yol anahtarı kanonikleştirilir:
+ya da **yol** (`scripts/_pw.cjs`, `~/.claude/settings.json`). Yol anahtarı kanonikleştirilir:
 `./src/a.ts`, `src/a.ts` ve mutlak yazımı **aynı** kilittir (üç yazım üç ayrı kilit olsaydı
 koruma diye bir şey olmazdı).
 
@@ -135,17 +135,21 @@ Hex kimlik her oturumda değişir; **rol kararlıdır**. Kapalı küme (tanıms�
 | rol | tekil? | ne yapar |
 |---|---|---|
 | `orkestrator` | ✅ | repo içi koordinasyon — saha olaylarının TAMAMI buraya akar |
-| `altyapi` | ✅ | kit · boot · sync · kurulum · filing · vendor · seviye 0 |
-| `pm` | ✅ | projeler-arası üst hedef ve dağıtım |
+| `altyapi` | ✅ | kit · sync · kurulum · vendor · seviye 0 |
+| `pm` | ✅ | projeler-arası üst hedef ve dağıtım (aşağıdaki nota bak) |
 | `vizyon` · `plan` | ✅ | epizodik; sürekli açık olmaları beklenmez |
 | `worker` | ❌ **ÇOĞUL** | işi yapan oturum(lar) — slot tutmaz, **adreslenmez** |
 
 ```sh
-node $S rol kayit --rol altyapi --kapsam "kit·boot·sync"   # tekil rol: dolusa --devral ister
+node $S rol kayit --rol altyapi --kapsam "kit·sync"        # tekil rol: dolusa --devral ister
 node $S rol durum                                          # kadro tablosu
 node $S bildir --rol altyapi --mesaj "kit sapması var"     # role seslen
 node $S kutu                                               # gelen kutum (TÜKETMEZ)
 ```
+
+Not (2026-10-22): rol tablosu `claims-lib.mjs`'teki `ROLLER` sabitinden gelir ve kodda
+değişmedi. `pm` rolünü dolduran `/pm` skill'i ile `altyapi` tanımındaki boot ve filing
+katmanları 2026-10-22'de arşive gitti. Rolü elle kaydeden bir oturum yine kullanabilir.
 
 **ÇOĞUL role bildiri YASAK.** `--rol worker` reddedilir ve canlı adayları listeler: hangi
 worker olduğu ölçülemezken bir muhatap seçmek, haberin sessizce yanlış oturuma gitmesi
@@ -204,19 +208,20 @@ bloğunun sonunda bu komut **kopyalanabilir hâlde, gerçek bir kimlikle** bası
 değilse komut uyarır ama **yazar** — oturum dönerse okur; haberi düşürmek sessiz kayıptır.
 Ayrıcalık değildir: orkestratör olmayan da kullanabilir.
 
-**Orkestratör ≠ PM.** PM projeler-arası, agentic ve karar verir; orkestratör **repo içinde**,
-0 token ve yalnız **haber alır** — sahada elini işe sokmuş olan odur. **TEK SLOT:** canlı bir
+Orkestratör **repo içinde** çalışır, 0 token harcar ve yalnız **haber alır** — sahada elini
+işe sokmuş olan odur. **TEK SLOT:** canlı bir
 kayıt varken ikincisi sessizce kapamaz, `--devral` ister. Canlılık kilitlerdeki ölçütün
 aynısıdır (pid) — çökmüş orkestratör kimseyi bekletmez, oturum kapanınca kayıt kendiliğinden
 düşer. **Görünmez gözlemci yoktur:** sahadaki her oturum, turunun başında bu repoda bir
 orkestratör olduğunu ve olaylarının ona bildirildiğini okur.
 
 **KAPSAM REPO'DUR (ilanlı):** bu katman `~/.claude/claims/<repo>/` defterinde yaşar. Başka
-repoda da koordine edecekse orada AYRICA kayıt olur — projeler-arası eksen `/pm`'in işidir,
-burada ikinci bir küresel router yapılmaz.
+repoda da koordine edecekse orada AYRICA kayıt olur. Bu katman projeler-arası bir
+yönlendirici değildir; öyle bir katman toolkit'te yoktur (`/pm` 2026-10-22'de arşive gitti).
 
 **İLANLI SINIR:** bildiri bir **posta kutusudur, ZİL DEĞİL** — durmuş bir oturumu
-UYANDIRMAZ (uyandırmanın tek yolu enjeksiyondur = Maestro, ve o ayrı bir katmandır).
+UYANDIRMAZ. Durmuş oturuma metin enjekte eden katman (Maestro) 2026-10-22'de arşive gitti;
+toolkit'te durmuş bir oturumu uyandıran bir yol yoktur.
 Seviye 0 taşıyıcısı bu yüzden iki şeyi birden söyler: *bırakırken haber ver* (bu bölüm) ve
 *bekleyeceksen kendi uyanma yolunu kur* (`wait`, aşağıdaki PARÇALA bölümü). Biri ötekinin
 yerine geçmez. Kapanan oturum da haber verir: SessionEnd (`release_all`) aynı motoru koşar.
@@ -229,7 +234,7 @@ Kapı bir yazımı `ÇAKIŞMA KİLİDİ` ile reddettiğinde ya da `claim` `MEŞG
 
 1. **PARÇALA.** Bloke kaynağa dokunan adımları **parça B** olarak ayır; geri kalan her şey
    **parça A**'dır. B'yi `TodoWrite` ile `beklemede — <kaynak> (devralınınca)` işaretle
-   (madde kaybolmaz; kaptan panosunda da görünür — nabız = TodoWrite hook'u). Bölme çizgisi
+   (madde kaybolmaz; `goal-tracker` hook'u TodoWrite'ı oturum hedef defterine işler). Bölme çizgisi
    kaynaktır, iş sırası değil: B **kendi başına koşulabilir** olmalı (bağlamını içinde taşır),
    çünkü onu koşacak tur — hatta oturum — bu olmayabilir.
 2. **Parça A'yı ŞİMDİ yap.** O kaynağa dokunmayan her şey serbest: başka dosyalar, analiz,
@@ -240,7 +245,7 @@ Kapı bir yazımı `ÇAKIŞMA KİLİDİ` ile reddettiğinde ya da `claim` `MEŞG
    | yol | sıra | oturum | ne zaman |
    |---|---|---|---|
    | **`wait`** (canlı bekleyiş) | **tutar** (aktif bekleyici) | yaşamalı | varsayılan — B bu oturumda bitecekse |
-   | **`devret`** (Maestro devri) | tutmaz (işaret) | ölebilir | oturum kapanacak / B bağımsız koşabilir |
+   | **`devret`** (devir işareti) | tutmaz (işaret) | ölebilir | oturum kapanacak / B bağımsız koşabilir |
 
    **`wait`** — sırada yer tutmanın TEK yolu:
    ```
@@ -251,33 +256,35 @@ Kapı bir yazımı `ÇAKIŞMA KİLİDİ` ile reddettiğinde ya da `claim` `MEŞG
    kilidi senin adına alır) ve çıktı `--intent`'i geri söyler — ne için beklediğin uyanışta
    yazılıdır. Beklemedeki maddeyi bitir, bırak.
 
-   **`devret`** — bekleyiş süreçte değil iş kuyruğunda taşınır:
+   **`devret`** — bekleyiş süreçte değil kalıcı bir **devir işaretinde** taşınır:
    ```
    node ~/.claude/skills/eszamanli/scripts/claim.mjs devret --res "<kaynak>" --gorev "<parça B tarifi>"
    ```
-   Maestro'ya `when-shell` işi yazar (koşul = `free` sondası: kaynak serbest ∧ aktif bekleyen
-   yok — kimliksiz, deterministik, 0 token); kaynak devralınabilir olunca iş ateşlenir ve
-   ateşlenen session claim'i **kendisi alır** (önsözü komut yazar). Oturumun yaşaması
-   gerekmez — "part B kuyruktan gelince" sözünün oturum-ötesi hali. `--kuru` ile önce ne
-   yazacağını gör. Devir **ajan doğuracak** bir iş yazar (ateş anında, Maestro kaydında
-   görünür); `wait` ise 0 token'dır — canlıysan onu seç.
+   Komut bugün şunu yapar (betikteki sıra):
 
-   **Devir ÇİFT YOLLUDUR — Maestro ölüyken de iş kaybolmaz.** Eskiden tek taşıyıcı Maestro'ydu:
-   `aide` yoksa/kuyruk kapalıysa komut **exit 5** ile ölür, iş de onunla giderdi — yani metronom
-   KİLİTLİ olduğu dönemde (en çok gerektiği anda) devir hiç çalışmıyordu. Artık:
+   1. Devir işaretini yazar: `~/.claude/claims/<repo>/devir/<id>.json` (TTL'siz, süreçsiz,
+      kalıcı). İşaret yazılamazsa komut **exit 5** verir; bu tek gerçek hata dalıdır.
+   2. Kilidin sahibine "isteyen var" işaretini bırakır ve olay defterine `devir` olayı yazar.
+   3. *"DEVREDİLDİ"* basar ve **exit 0** verir. Devir işaretinin tek taşıyıcısı budur: eski
+      `aide zamanla add` denemesi, zamanla ve Maestro arşive gittiği için 2026-10-22'de kaldırıldı.
 
-   | yol | taşıyıcı | ömür | ne zaman devralınır |
-   |---|---|---|---|
-   | Maestro işi | `jobs/` kuyruğu (`when-shell` + `free` sondası) | kuyruk kadar | daemon ateşleyince |
-   | **devir işareti** | `~/.claude/claims/<repo>/devir/<id>.json` | **TTL'siz · süreçsiz · kalıcı** | `devir al --id` ile ELLE / açılış-devralmada |
+   İşi bir başka oturum devralır. Açılan her oturumda `claim-guard ctx` hook'u bekleyen devir
+   işaretlerini sayar ve `devir list` komutunu gösterir. Devralmak için:
+   ```
+   node ~/.claude/skills/eszamanli/scripts/claim.mjs devir list
+   node ~/.claude/skills/eszamanli/scripts/claim.mjs devir al --id <id>
+   ```
+   Oturumun yaşaması gerekmez; bedeli, işin kendiliğinden ateşlenmemesidir — bir oturumun
+   işareti görüp üstlenmesi gerekir. `--kuru` ile önce ne yazacağını gör. Canlıysan `wait`'i
+   seç: 0 token'dır ve sıra tutar.
 
-   İşaret **Maestro'dan ÖNCE** yazılır (yazılamayan işareti telafi edecek yol yoktur). Maestro
-   yazılamazsa komut artık **exit 0** verir ve ne olduğunu söyler: *"MAESTRO YAZILAMADI — devir
-   işareti kaldı"*. İşaret yazılamazsa **exit 5** (gerçekten kaybediyoruz — tek hata dalı).
+   **`--text` kaldırıldı.** `devret --text` canlı bir pane'e enjeksiyon yazmak içindi ve
+   yalnız arşivdeki `aide zamanla` ile çalışıyordu. Bugün açık bir hatayla **exit 5** verir ve
+   `--gorev` yoluna yönlendirir. Canlı bir oturuma haber bırakmak için `bildir` komutunu kullan.
 
-   **Aynı iş İKİ KEZ koşulmaz:** ateşlenen goal'ün İLK adımı `devir al --id <id>`'dir; üstlenme
-   `renameSync` ile atomiktir (POSIX: tek kazanan) ve **kaybeden işi KOŞMAZ** (exit 1 →
-   "Bu işi KOŞMA"). Dedup bir niyet beyanı değil, bir mekanizmadır.
+   **Aynı iş İKİ KEZ koşulmaz:** üstlenme `devir al --id <id>` ile yapılır ve `renameSync`
+   ile atomiktir (POSIX: tek kazanan). **Kaybeden işi KOŞMAZ** (exit 1 → "Bu işi KOŞMA").
+   Dedup bir niyet beyanı değil, bir mekanizmadır.
 4. **Kilidi bırak.** `release --res <kaynak>` — unutma. `status`unda bekleyen ya da
    devir işareti görünüyorsa elverişli ilk anda bırak (küçük iş önceliklidir). Bırakma aynı
    anda **haber vermedir**: sıradaki sessiz bekleyenlere bildiri tam burada düşer
@@ -293,8 +300,8 @@ Kuyruk artık **kaynağa** aittir (`<sha1>.q.json`), claim'e değil — kilit b�
 | **aktif** | canlı `wait` süreci dönüyor | **evet** — kilit boşalınca sıradakine gider |
 | **işaret** | kapıda DENY yedin, yoluna devam ettin — ya da `devret` iz bıraktı | hayır — bilgi sinyali (sahibe "isteyen var" der) |
 
-`devret` işareti sıra tutmaz çünkü devrin sırası **iş kuyruğundadır**: `free` sondası ancak
-aktif bekleyen kalmayınca 0 döner — canlı bekleyiş her zaman devirden önce alır.
+`devret` işareti sıra tutmaz: devralan oturum `claim` ile kilidi ister ve önünde aktif
+bekleyen varsa `claim` exit 4 verir. Canlı bekleyiş her zaman devirden önce alır.
 
 Boşalmış bir kaynağı önünde aktif bekleyen varken kapmaya çalışırsan `claim` **exit 4**
 ("sıra sende değil") verir. Ölçüt yine süre değil **süreç**: vazgeçip devam etmiş bir session
@@ -351,8 +358,8 @@ anda iki yönde de yanılır: fazla geniş (adı anan her komutu keser) ve fazla
 Çakışmanın ölçütü **anahtar eşitliği değildir**. Üç kaynaktan türer:
 
 1. **Aynı anahtar** — bariz.
-2. **Yol kesişimi** — farklı anahtarlar, aynı dosyalar. `pm:defter` ile
-   `~/.claude/pm/log.jsonl` farklı anahtarlardır ama aynı dosyayı sürer; eşitlik tek ölçüt
+2. **Yol kesişimi** — farklı anahtarlar, aynı dosyalar. `ayar` mantıksal kaynağı ile
+   `~/.claude/settings.json` yolu farklı anahtarlardır ama aynı dosyayı sürer; eşitlik tek ölçüt
    olsaydı ikisi de claim edilir, iki session da "sahibim" sanırdı. Kesişim mekanik ölçülür.
 3. **İlan edilmiş ilişki** (`conflictsWith`) — **yolların ifade EDEMEDİĞİ** şey: *"A bitmeden
    B anlamsızdır"* (öncül/precursor) ya da *"A koşarken B'nin çıktısı bozulur"*.
@@ -474,7 +481,7 @@ Beklerken karşı taraf limitliyse bunu **görürsün**: MEŞGUL/DENY/`ctx` meti
 
 Kapı şunları görür:
 - `Edit` · `Write` · `NotebookEdit` (`file_path`/`notebook_path`) — repo içi **ve** repo dışı
-  (`~/.claude/pm/…`) yollar. Bu sistemin koruduğu kaynakların çoğu repo dışındadır; kalıplar
+  (`~/.claude/…`) yollar. Bu sistemin koruduğu kaynakların çoğu repo dışındadır; kalıplar
   repo köküne göreli çözülürken hepsi sessizce eleniyordu (koruma ilan ediliyor ama yoktu).
 - `Bash` — yazar komutlar: haritadaki `bash` regex'leri **ve** komutun andığı yol-benzeri
   argümanlar (`sed -i … src/app.ts`, `echo x > src/app.ts` artık claim'li dosyayı ezemez).
@@ -487,8 +494,8 @@ Kapı şunları görür:
 - **Dizin seviyesi yazım:** `jobs/**` claim'liyken `rm -rf jobs` — token dizindir, kalıp
   altındaki dosyalarla eşleşmez.
 - **Cross-repo Bash:** `cd başka-repo && …` — kapı çağıran repo defterine bakar.
-- **MCP dosya-yazar araçları** ve **claude dışı yazarlar** (Maestro `shell` payload'ları,
-  daemon'lar): hook hiç ateşlemez, `CLAUDE_CODE_SESSION_ID` yoktur → protokole katılamazlar.
+- **MCP dosya-yazar araçları** ve **claude dışı yazarlar** (daemon'lar, cron işleri,
+  elle koşulan betikler): hook hiç ateşlemez, `CLAUDE_CODE_SESSION_ID` yoktur → protokole katılamazlar.
 - **Claim'lenmemiş kaynaklar** (tasarım gereği — claim zorunlu değil).
 - Aynı claude sürecindeki **subagent'lar** ebeveynin claim'ini paylaşır (sahiplik ata-pid
   köprüsüyle) — bu bilinçli: subagent'ı kendi ebeveyninin kilidi bloke etmemeli.
@@ -514,7 +521,7 @@ say (koruma tarafında kal). İki yön çelişince kazanan, telafisi olan yönd�
     "dc-html":  { "paths": ["design-source/*.dc.html"], "note": "tek kaynak dosya" },
     "publish":  { "paths": ["extracted-v2/**"], "bash": ["(^|[;&|(]\\s*)node\\s+\\S*extract-pages\\.js"],
                   "conflictsWith": ["dc-html"], "note": "yayın dc-html'den TÜRER — öncül" },
-    "kadran":   { "paths": ["~/.claude/pm/ayar.json"], "note": "repo dışı yol da korunur" },
+    "ayar":     { "paths": ["~/.claude/settings.json"], "note": "repo dışı yol da korunur" },
     "db:media_slot": { "bash": ["tbl_media_slot", "media\\.php.*op=(assign|delete)"] } } }
 ```
 

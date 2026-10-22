@@ -6,7 +6,7 @@
 >
 > **Doğrulama sütunu kanıta bağlanır (`kanit:<giriş-adı>`):** doğrulama mümkünse projenin
 > `.claude/kanit.json` tablosundaki bir girişe işaret eder (`kanit:hizli-test`, `kanit:tam` gibi;
-> hakem `aide rota kanit` ile bunu koşar). Böyle bir giriş YOKSA hücre "yeni — sınıf: hizli|tam|surus"
+> girişin komutunu aşamayı koşan /goal session'ı çalıştırır). Böyle bir giriş YOKSA hücre "yeni — sınıf: hizli|tam|surus"
 > yazar ve o girişi `.claude/kanit.json`'a eklemek planın bir TASK'ı olur. Çıplak serbest-metin
 > doğrulama ("testler geçer", "elle bakılır") YASAK — ölçülemeyen requirement kanıtsızdır.
 

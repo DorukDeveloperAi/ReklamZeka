@@ -21,7 +21,6 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import * as L from "./claims-lib.mjs";
 
 // KOŞUM DAMGASI (otonomi-merdiveni:02.3) — `aide otomasyon durum`un akıbet ekseni bunu okur.
@@ -79,64 +78,6 @@ const kis = (s, n) => {
  * İNSANA (`systemMessage`). Kutu tüketici okunduğu için ikinci bir okuyucu haberi yerdi —
  * bu yüzden alma ucu burada, gönderme ucu `mesaj-nabzi.mjs`te. Dönüş: `{ satirlar, ozet }`.
  */
-/* ── DEFTER BLOĞU (AIDE S · yonetim-katmani/v2:04) ─────────────────────────────
-   Üç akıbet zincirinin ctx ucu. Hedefi bu oturum/rolü olan AÇIK kayıtlar burada görünür.
-
-   İKİ SERT KURAL:
-   - YEŞİL = EMİR bloğu: "işle ya da GEREKÇELİ reddet" — sessiz düşürme yasak. `alindi`
-     damgasını hook MOTOR olarak yazar (LLM'e bırakılmaz; damga kesin olmalı).
-   - KIRMIZI = EMİR BASILMAZ: yalnız "🔴 onay bekliyor" İLANI. Valf insanındır
-     (`defter.mjs onayla <tid>`); jobs/'a tek bayt yazılmaz.
-
-   Teslim POSTA ile yapılır (defter ikinci kanal açmaz); bu blok yalnız GÖRÜNÜRLÜK. */
-function defterBloku(root, me) {
-  const bos = { satirlar: [], ozet: [] };
-  try {
-    if (!L.defterBana) return bos;
-    let roller = [];
-    try {
-      roller = (L.rolListe?.(root) || []).filter((r) => r.sahip?.sessionId === me).map((r) => r.ad);
-    } catch {
-      /* rol okunamadı — yalnız sid kutusuna bak */
-    }
-    const kayitlar = L.defterBana(root, { sid: me, roller });
-    if (!kayitlar.length) return bos;
-    const satirlar = [];
-    const ozet = [];
-    const yesil = kayitlar.filter((k) => k.sinif !== "kirmizi");
-    const kirmizi = kayitlar.filter((k) => k.sinif === "kirmizi");
-    if (yesil.length) {
-      satirlar.push(
-        `[EMİR] ${yesil.length} açık kayıt sana adresli — İŞLE ya da GEREKÇELİ REDDET (sessiz düşürme yasak):`,
-      );
-      for (const k of yesil.slice(0, 6)) {
-        satirlar.push(`  • ${k.tid} · ${k.tur} · "${String(k.metin).slice(0, 120)}" — kimden: ${k.kimden?.etiket ?? "?"}`);
-        try {
-          L.defterAkibet(root, k.tid, "alindi", { kim: me, yol: "ctx" });
-        } catch {
-          /* damga yazılamadı — kayıt açık kalır, akıbet kapısı görür */
-        }
-      }
-      satirlar.push(
-        `  kapat: node ~/.claude/skills/aide-s/scripts/defter.mjs kapat <tid> --sonuc "…"  ·  ` +
-          `reddet: … reddet <tid> --neden "…"`,
-      );
-      ozet.push(`✉ ${yesil.length} EMİR (defter)`);
-    }
-    if (kirmizi.length) {
-      satirlar.push(
-        `[🔴 ONAY BEKLİYOR] ${kirmizi.length} kayıt VALFTE — emir olarak işlenmez, yalnız İNSAN açar:`,
-      );
-      for (const k of kirmizi.slice(0, 4)) satirlar.push(`  • ${k.tid} · "${String(k.metin).slice(0, 100)}"`);
-      satirlar.push(`  onay: node ~/.claude/skills/aide-s/scripts/defter.mjs onayla <tid>`);
-      ozet.push(`🔴 ${kirmizi.length} onay bekliyor`);
-    }
-    return { satirlar, ozet };
-  } catch {
-    return bos;
-  }
-}
-
 function bildiriBloku(root, me) {
   const bos = { satirlar: [], ozet: [] };
   if (!me || !L.ledgerExists() || typeof L.bildiriOku !== "function") return bos;
@@ -509,7 +450,7 @@ function denyText(claim, repoRoot, cyc, me) {
      geçen süredir. Sahibin işi zaten AŞAĞIDA `niyet:` satırında ÖLÇÜLÜ duruyor; burada
      yalnız nabız olgusu basılır (kademe satırı da bayatlığı ayrıca söyler). */
   const who = s
-    ? `"${s.title || "(başlıksız)"}" (etiket) — ${s.dirName}, son nabız ${dk(s.updated)}${s.state === "generating" ? ", ŞU AN üretiyor" : ""}`
+    ? `${s.ad ? `"${s.ad}" (ad) · ` : ""}"${s.title || "(başlıksız)"}" (etiket) — ${s.dirName}, son nabız ${dk(s.updated)}${s.state === "generating" ? ", ŞU AN üretiyor" : ""}`
     : `session ${String(o.sessionId).slice(0, 8)}`;
   const devredildi = devredildiBlok(repoRoot, me);
   /* ÇEVRİM: beklemeye devam edersen DEADLOCK. Kuyruğa yazılmak çözmez → sıra SENDE.
@@ -747,31 +688,12 @@ function main() {
     return pass();
   }
 
-  /* ── YÖNETİM TABLOSU (Stop) — AIDE S ortak temeli (yonetim-katmani/v2:03) ───────
-     Tablo, durumun MODDAN bağımsız yaşadığı yerdir (T-İLKE): `aide l` ve `aide x` aynı
-     dosyayı okur-yazar. Bu dal onu her tur sonunda TAZELER ki uzaktan bakan (aide kurulu
-     olmayan) bir okur güncel resmi görsün.
-
-     ÜÇ SERT KURAL:
-     - DEBOUNCE: `yaz()` girdi damgasını diskten okur; damga eşse HİÇBİR ŞEY yazmaz (0 maliyet).
-     - HATA YUTULUR: tablo yazımı hedef işi ASLA bozmaz — tur her hâlükârda geçer.
-     - ÇIKTISIZ: Stop'u konuşturmak turu etkiler; sonuç dosyada görünür, ekranda değil. */
-  if (mode === "tablo") {
-    try {
-      const repo = L.repoRootOf(p.cwd || process.cwd());
-      // TAŞIYICI SEÇİMİ (ölçülmüş): motoru `node` ile import ETMEK ÇALIŞMAZ — Node'un TS
-      // desteği yalnız type-stripping'dir ve çekirdek zincirdeki `yazar-kilidi.ts`
-      // constructor parameter property kullanır (ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX).
-      // Yazımı `aide` CLI'sı yapar (bun ile koşar). Motor ya da aide yoksa (legacy proje)
-      // SESSİZCE geçilir — T5 adaptörü o durumu ayrıca ele alır.
-      if (existsSync(`${repo}/packages/core/src/yonetim-tablo.ts`)) {
-        spawnSync("aide", ["yonetim", "yaz", "--proje", repo], { timeout: 15000, stdio: "ignore" });
-      }
-    } catch {
-      /* yut — kapı ürünü asla kilitlemez */
-    }
-    return pass();
-  }
+  /* ── YÖNETİM TABLOSU (Stop) — SÖKÜLDÜ (toolkit-donusum v1 · aşama 02, 2026-10-22) ─────
+     AIDE S yönetim tablosu (`aide yonetim yaz`) arşive gidiyor. Mod NO-OP olarak kalır:
+     `settings.json`'daki eski `claim-guard.mjs tablo` kaydı kurulum katmanı additive olduğu
+     için kendiliğinden düşmez; kayıt duruyorken her Stop'ta hata değil sessiz geçiş olmalı.
+     Eski hâli: `git show toolkit-oncesi:packages/kit/templates/hooks/claim-guard.mjs`. */
+  if (mode === "tablo") return pass();
 
   /* ── GİDEN MESAJ (PostToolUse) — trafiğin İNSAN ucu ────────────────────────────
      Alma ucu `ctx` dalındaki `bildiriBloku.ozet`tir; bu dal onun eşi. İkisi de aynı şeyi
@@ -854,7 +776,6 @@ function main() {
     /* Saha beslemesi AYRI hesaplanır: posta kutusu bu oturuma ÖZEL haberleri, besleme ise
        koordinatörün gözünü taşır. Kişisel olan önce basılır — "sıra sana geldi" bilgisinin
        muhatabı sensin; saha bloğu ondan sonra gelir. */
-    const defter = defterBloku(root, me);
     const saha = sahaBloku(root, me);
     /* Commit kanalı — sahanın İKİNCİ kaynağı (git geçmişi); yalnız orkestratöre basılır.
        İki blok ayrı imleçlidir, tavanları bağımsızdır (MASTER Karar bekleyenler #6). */
@@ -884,16 +805,15 @@ function main() {
     /* Sarkık devir işareti TEK BAŞINA da haber değeridir (iş kaybolmasın); başka canlı
        session yoksa blok yalnız o satırı taşır. Üçü de yoksa TEK BAYT basılmaz. */
     if (!others.length) {
-      if (!devirSatir && !bildiri.satirlar.length && !defter.satirlar.length && !saha.length && !commitler.length && !orkSatir) return pass();
+      if (!devirSatir && !bildiri.satirlar.length && !saha.length && !commitler.length && !orkSatir) return pass();
       return out({
-        ...(bildiri.ozet.length || defter.ozet.length
-          ? { systemMessage: [...bildiri.ozet, ...defter.ozet].join("\n") }
+        ...(bildiri.ozet.length
+          ? { systemMessage: bildiri.ozet.join("\n") }
           : {}),
         hookSpecificOutput: {
           hookEventName: olay,
           additionalContext: [
             ...bildiri.satirlar,
-            ...defter.satirlar,
             ...saha,
             ...commitler,
             ...(orkSatir ? [`[eşzamanlılık] ${orkSatir}`] : []),
@@ -917,7 +837,7 @@ function main() {
       const ne = n.olculdu ? `${kis(n.metin, 92)}${kilit}` : "ölçülemedi (kilit yok · defterde iz yok)";
       return (
         `  • ${String(s.sessionId).slice(0, 8)} · ${s.dirName} · son mesaj ${dk(s.updated)}` +
-        `${s.state === "generating" ? " · ŞU AN üretiyor" : ""} · etiket: "${kis(s.title, 44) || "(başlıksız)"}"\n` +
+        `${s.state === "generating" ? " · ŞU AN üretiyor" : ""}${s.ad ? ` · ad: "${kis(s.ad, 48)}"` : ""} · etiket: "${kis(s.title, 44) || "(başlıksız)"}"\n` +
         `      ne yapıyor: ${ne}`
       );
     });
@@ -949,7 +869,7 @@ function main() {
         satir,
         /* `state` burada da ham basılmaz (yukarıdaki lines[] ile aynı gerekçe): "idle"
            kelimesi sahibi "boşta" sanmaya davettir — sahip kilidi TUTUYOR, boşta değil. */
-        `      sahip etiketi: "${kis(s?.title, 56) || "(başlıksız)"}"${s?.updated ? ` · son mesaj ${dk(s.updated)}` : ""}${s?.state === "generating" ? " · ŞU AN üretiyor" : ""}`,
+        `      sahip${s?.ad ? ` adı: "${kis(s.ad, 56)}" ·` : ""} etiketi: "${kis(s?.title, 56) || "(başlıksız)"}"${s?.updated ? ` · son mesaj ${dk(s.updated)}` : ""}${s?.state === "generating" ? " · ŞU AN üretiyor" : ""}`,
         ...(lim ? [`    ${lim.trim()}`] : []),
         `      sahip ne yapıyor: ${kis(c.intent, 96) || "(niyet belirtilmemiş)"}`,
       ].join("\n");

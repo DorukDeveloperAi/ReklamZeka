@@ -18,12 +18,14 @@
 | oturum kapanış hook'u | eşik ALTINDA dosya AÇMAZ · eşik ÜSTÜNDE açar + nabızdan tohumlar + `Durum: KAPALI` damgalar + roll-up & global kılavuz türetir · `plans/` olmayan klasörde HİÇBİR ŞEY yapmaz (exit 0) · izole `CLAUDE_CONFIG_DIR`de koşar (gerçek profile dokunmaz) |
 | devir notu (aşama-05) | not doğar + `devirDogrula` PASS + **TAM** session id · `siradakiAdim` deterministik zinciri (in_progress → ilk açık hedef → null) · **idempotens** (2. koşum bayt-özdeş, "aynı — yazılmadı") · transcript yokken **uydurmaz** (`olculemedi` ilanı), varken ilk/son ANLAMLI isteği çıkarır (`BOS_ISTEK` + `<system-reminder>` filtresi) · **sır eleği** (sahte `sk-ant-` token nota SIZMIYOR, `«sır elendi»` ilanı) · K9 devam önerisi yok→null / bozuk→null / geçerli→taşınır · **bozuk şema FAIL** (eksik alan · sürüm uyuşmazlığı · şema dışı çıpa · kısa-id-tek-başına), bilinmeyen alan SERBEST · defter yoksa **exit 2 + onar** ve `devir/` dizinini UYDURMAZ · **`release_all` yarışı**: kilit bırakıldıktan sonra da ARŞİVDEN `birakildi` olarak nota düşer · roll-up İLANI (`OTURUMLAR.md` + global `KILAVUZ.md`) · `devir/` dizini varken plan+oturum gate PASS, YETİM bulgusu yok · **SessionEnd zinciri** notu gerçekten yazar (`reason`→`--sebep`, `transcript_path`→`--transcript`, `kapat` önce koştuğu için `kapanis` dolu, `err.jsonl` boş) |
 | regresyon (ölçülmüş bug) | hedef parse'ı `\Z` tuzağına düşmüyor: JS'te `\Z` ankor DEĞİL, literal "Z"ye düşüp bölümü yorumdaki "YALNIZ"da kesiyordu → maddeler görünmez oluyordu (satır tarayıcıya çevrildi) |
-| kaptan köprüsü | `readPlans()` dolu · `buildModel()` projeye `plans` taşıyor · plans/ olmayan projede KIRILMAZ |
 
 Ayrıca elle doğrulanan (bu dosyaya not):
-- `model.mjs --write` → PM.json `projects[].plans` dolu, GORUNUM.md "🗺 PLANLAR" bölümü basılıyor.
-- Dashboard `/api/state` her iki dalda (tümü + `?project=` kapsamlı) `plans` alanını taşıyor;
-  PM sekmesinde `#pm-planlar` bölümü var. (Geçici port 4981'de curl ile ölçüldü.)
-- Maestro günlük işi kuyruğa yazıldı: "plan ağacı: türet+gate (dev projeleri)" (24h, shell).
 - İlk benimseme: dorukcom06 `plans/legacy.json` (3 girdi) + agent-ide `plans/legacy.json`
   (4 girdi, MASTER+SP-* yerinde) → iki projede de INDEX türetildi, gate PASS.
+
+## Tarihçe notu (2026-10-22)
+
+2026-07-29 koşusunda bir de **kaptan köprüsü** kümesi vardı (`readPlans()` · `buildModel()` ·
+PM.json · dashboard `plans` alanı · plan ağacını her gün türetip denetleyen Maestro işi). Kaptan,
+PM, dashboard ve Maestro 2026-10-22'de arşive gitti. Köprünün iki testi harness'tan çıkarıldı;
+yukarıdaki 52/52 sayısı o tarihin koşusudur. Güncel sayıyı harness'ı yeniden koşarak ölç.

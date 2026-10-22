@@ -26,20 +26,19 @@ ateşle-unut koşturur.
 isterse) sentetik kök **`~/.claude/plan-global/plans/<slug>/v<N>/`**.
 
 > `~/.claude/plans/` DEĞİL: orası OEM plan-modunun düz `.md` karalama alanıdır (governance'sız,
-> ad-uzayı çakışmalı) ve `readPlans()` proje kökü beklediği için oraya yazılan plan panoya
-> yapısal olarak giremez — yani governance'sız VE tüketicisiz doğardı. Sentetik kök üçünü de
-> çözer: `agac.mjs --proje ~/.claude/plan-global` değişmeden çalışır ve günlük gate işi onu tarar.
+> ad-uzayı çakışmalı). Sentetik kök proje kökü düzenindedir; bu yüzden
+> `agac.mjs --proje ~/.claude/plan-global` onu değişmeden türetir ve denetler.
 
-## Ekosistem (bu skill tek başına değil — kaptan/PM'in TOOL'udur)
+## Ekosistem (bu skill tek başına çalışmaz)
 
 | katman | rol | temas |
 |---|---|---|
 | **/plan-kur** (bu) | ÜRETİCİ: roadmap'i yazar (v'li klasör) | dosyaları yazar, sonra kaydeder ↓ |
 | **/plan-organizatoru** (`~/.claude/skills/plan-organizatoru/scripts/agac.mjs`) | ENDEKS + governance: `plans/INDEX.md` + `INDEX.json` TEK YAZARI; kategori/ağaç/damga/`--gate` | Faz D sonunda ve her revizyonda çağrılır |
-| **/planla-kos** (`~/.claude/skills/planla-kos/`) | ATEŞLEYİCİ: planla → gate → tek tur derinlik sorusu → sıradaki aşamayı Maestro üzerinden yeni tmux session'ında koşturur | bu skill'i ÇAĞIRIR; kullanıcı "planla ve koştur" derse giriş kapısı odur |
-| **kaptan / PM / görevler** | TÜKETİCİ: `INDEX.json` üzerinden planlar dashboard'da (Planlar bölümü, planRef); PM plan üretmek istediğinde /plan-kur'u çağırır, takip için `agac.mjs --durum` okur | plan-kur onların yerini almaz, onları besler |
+| **/goal** (`~/.claude/commands/goal.md`) | KOŞUCU: tek bir aşamayı bir oturumda yürütür, STATE ve CHECKLIST'i günceller | kullanıcı aşamanın `/goal` satırını yeni bir oturumda kendisi çalıştırır |
 
-Zincirin haritası (roller · değişmezler · veri akışı): `~/dev/agent-ide/docs/plan-katmani.md`
+Aşamayı kendiliğinden ateşleyen katman (`/planla-kos` + Maestro) ve planları panoda gösteren
+kaptan/PM katmanı 2026-10-22'de arşive gitti. Bugün aşamayı kullanıcı başlatır.
 
 Kurallar: `plans/INDEX.*` **ASLA elle yazılmaz** (tek yazar agac.mjs). MASTER.md üst bloğu
 planın **KÜNYESİNİ** taşımak ZORUNDA — governance kapısı (`agac.mjs --gate`) kategorisiz/
@@ -56,16 +55,16 @@ sorusunu tahmin değil künye yanıtlar. `Kritiklik` = olmazsa ne kırılır (ö
 `Aciliyet` = zaman baskısı · `Hacim` = iş büyüklüğü (slot/bütçe planlaması) · `Hedef` =
 tek cümlelik varış hali (BAŞARI'nın kısa yüzü; ölçülebilir tanım "Amaç ve başarı"da kalır).
 **`oncelik` (P0–P3) TÜREVDİR — MASTER'a ELLE YAZILMAZ:** `agac.mjs` hesaplar
-(`min(3, round((kritiklik+aciliyet)/2))`, Eisenhower ekseni) ve INDEX/graf/Rotacı/PM'e
-dağıtır. Tüketici kendi ölçütünü yazmaz, künyeyi okur (`agac.mjs --kunye [--json]`).
+(`min(3, round((kritiklik+aciliyet)/2))`, Eisenhower ekseni) ve INDEX ile `--graf`
+çıktısına yazar. Tüketici kendi ölçütünü yazmaz, künyeyi okur (`agac.mjs --kunye [--json]`).
 Künye **eksikse** ADVISORY (legacy plan koşar, sıranın sonuna düşer); **geçersizse** gate FAIL.
 Revizyonda künye de taşınır: değişiyorsa REVIZYON bloğunda gerekçesiyle, değişmiyorsa "aynen".
 STATE.md "Aşama durumları" tablosunun sütun düzeni (`# · aşama · durum · bağımlı · son dokunuş ·
 kanıt`) ve durum sözlüğü (`AÇIK · SÜRÜYOR · KAPALI · BLOKE`) agac.mjs parser sözleşmesidir —
 değiştirme. Sütunlar başlık SATIRINDAN eşlenir (ad sözleşmesi); `bağımlı` sütunu DAG modelidir:
 `00, 01` = VE (hepsi KAPALI olmalı) · `01/02` = VEYA (biri yeterli; ayraç `/` — `|` markdown
-tablo hücresini böler, YASAK) · `kalite-turu:03` = çapraz-plan gate · `—` = başlangıç düğümü
-(rota başı). YENİ plan üretirken bu sütunu MASTER
+tablo hücresini böler, YASAK) · `kalite-turu:03` = çapraz-plan gate · `—` = başlangıç düğümü.
+YENİ plan üretirken bu sütunu MASTER
 aşama tablosundaki `bağımlı` ile BİREBİR aynı yaz (uyumsuzluk governance FAIL'idir); eski plana
 sütunu elle değil `agac.mjs --bagimlilik-tohumla` ile ekle. agac.mjs bundan `hazir[]` (ready-set:
 paralel koşulabilir aşamalar), `bekleyen[]` ve `--graf` (plan ağı haritası) türetir; döngü ve
@@ -93,8 +92,8 @@ dosyalara döker**, kullanıcıya `/goal` komutlarını verir. Ana loop kendi ba
   **BAĞLANMA açık karardır (2026-08-14):** görev roadmap'in/ana planın bariz parçasıysa
   `Üst: proje` (ya da ilgili dal); açıkça tek-seferlik/koş-ve-bitir işiyse `Üst: —`
   (bağımsız); **gri alanda 1-tur soruya DAHİL ET** — sezgiyle master'a bağlama. Çağıran
-  akış (`/planla-kos`) `bağlanma=` kararı taşıyorsa sorgusuz onu uygula. Fark davranışsaldır:
-  bağlı plan rota/PM/INDEX önceliğine girer, bağımsız plan yalnız koşulur. Kritiklik
+  akış `bağlanma=` kararı taşıyorsa sorgusuz onu uygula. Fark davranışsaldır: bağlı plan
+  ağaçta ana planın dalı olarak görünür, bağımsız plan yalnız koşulur. Kritiklik
   ve aciliyet **kullanıcıya ait kararlardır** — koddan çıkarsanamaz; belirsizse 1-tur soruya
   DAHİL ET (mevcut sırayı `--kunye` ile göster ki kullanıcı yeni planı ona göre konumlasın).
   Hacim Faz B/C efor notlarından türer (küçük: tek aşama · orta: 2-4 · büyük: 5-8 · epik: 9+). **Yeni plan mı revizyon mu** şüphesi varsa /plan-organizatoru
@@ -162,7 +161,8 @@ Kurallar:
   "yapılacak" maddesi YASAK.
 - **Doğrulama kanıta bağlanır (`kanit.json`):** REQUIREMENTS'taki her doğrulama mümkünse
   `kanit:<giriş-adı>` olur (projenin `.claude/kanit.json` tablosundaki hizli/tam/surus girişi;
-  hakem `aide rota kanit` ile koşar). **Roadmap YENİ bir kanıt komutu icat ediyorsa** (yeni
+  girişin komutunu aşamayı koşan /goal session'ı kendisi çalıştırır — tabloyu otomatik koşan
+  `aide rota kanit` 2026-10-22'de arşive gitti). **Roadmap YENİ bir kanıt komutu icat ediyorsa** (yeni
   test/derleme/sürüş), o girişi `.claude/kanit.json`'a eklemek **PLANIN bir TASK'ıdır** —
   çıplak serbest-metin doğrulama ("testler geçer") YASAK, ölçülemez.
 - **`Kapatır:` satırı (genel TODO bağı):** plan, Faz A'da okuduğun genel-TODO maddelerinden
@@ -178,7 +178,6 @@ Kurallar:
 - **KAYDET (zorunlu son adım):** `/plan-organizatoru kaydet <slug>` intake'ini uygula —
   yeni-mi-revizyon-mu double-check + Kategori/Üst doğrulaması + INDEX türetimi (makine katmanı:
   proje kökünde `node ~/.claude/skills/plan-organizatoru/scripts/agac.mjs`, ardından `--gate` PASS).
-  Plan böylece kaptan/PM dashboard'una girer (INDEX.json → readPlans → PM.json "Planlar").
   Not: `Üst:` Faz A bağlanma kararından gelir — "çoğunlukla proje" varsayımı YOK (2026-08-14:
   /goal ile ateşle-unut koşulacak iş roadmap'e dikilmesin diye kaldırıldı); ana plan sonradan
   doğarsa mevcut planlar organizatör intake'iyle yeniden ebeveynlenir.
@@ -189,8 +188,8 @@ Kurallar:
 
 Her `asama-NN-*.md` başında opsiyonel `kosum:` frontmatter alanı vardır (şablon `tek-ajan`
 ile gelir). Bu alan aşamanın **nasıl koşulacağını PLAN YAZIMINDA beyan eder** — koşum anında
-LLM/heuristic karar VERMEZ (R1); `agac.mjs` değeri yalnız parse edip `hazir[]`'a taşır, köprü
-(aşama 03) oradan tüketir.
+LLM/heuristic karar VERMEZ (R1); `agac.mjs` değeri yalnız parse edip `hazir[]`'a taşır.
+Aşamayı koşan /goal session'ı beyanı okur ve `workflow` ise `/workflow` şablonunu kendisi koşar.
 
 Şema **kapalıdır, iki değer**:
 - **`kosum: tek-ajan`** — VARSAYILAN. Aşama tek bir /goal oturumunun (Opus ana loop) bir
@@ -224,27 +223,28 @@ Görev küçükse (tahminen ≤3 aşama), Faz B ve C **tek Fable ajanında** bir
    de değiştirir (kapsam daraldı → hacim düştü; borç büyüdü → aciliyet arttı). Değişiyorsa
    REVIZYON bloğunda gerekçesiyle yaz; değişmiyorsa "aynen" de.
 4. `REVIZYON.md`: **kümülatif defter — bu revizyonu tek blokla ekle, önceki blokları AYNEN taşı.**
-   Blok makine-okunur başlıkla açılır (Rotacı `fiili.revizyonlar` parser'ı bu satırdan revize/pivot
-   sayısını türetir; sayaç dosyası YOK): `## r<N> — tip: revize|pivot — <YYYY-MM-DDTHH:mmZ>`
-   (`revize` = aynı yaklaşım). Altında serbest gövde: neyin neden değiştiği, taşınan/yeniden kırılan
-   aşamalar. Başlık sözleşmesini bozma — parser eşleşmezse Rotacı revizyon sayısını YANLIŞ sayar.
+   Blok sabit biçimli başlıkla açılır: `## r<N> — tip: revize|pivot — <YYYY-MM-DDTHH:mmZ>`
+   (`revize` = aynı yaklaşım). Revize ve pivot sayısı bu başlıklardan sayılır; ayrı sayaç
+   dosyası YOK. Altında serbest gövde: neyin neden değiştiği, taşınan/yeniden kırılan aşamalar.
+   (Başlığı otomatik ayrıştıran Rotacı 2026-10-22'de arşive gitti; biçim sayımın tek kaynağı
+   olduğu için korunur.)
 5. KAYDET: `agac.mjs` yeniden koş (INDEX v(N+1)'i göstersin) + `--gate` PASS.
 
 ### `--pivot` modu (YAKLAŞIM DEĞİŞİKLİĞİ — TEK hak)
 
-`revize` aynı yaklaşımı yamar; **`--pivot` yaklaşımı DEĞİŞTİRİR.** Rotacı bunu yalnız hakem 2 kez
-EKSİK verdiğinde, `profil.pivot` açık ve kadran `tam` iken (en riskli otonom karar) ateşler; insan
-da doğrudan çağırabilir. Normal revizyon akışının üç FARKI:
+`revize` aynı yaklaşımı yamar; **`--pivot` yaklaşımı DEĞİŞTİRİR.** Pivotu kullanıcı çağırır:
+tipik tetik, aynı yaklaşımla yapılan iki revizyonun da hedefi tutturamamasıdır. (Pivotu
+otomatik ateşleyen Rotacı/hakem zinciri 2026-10-22'de arşive gitti.) Normal revizyon akışının üç FARKI:
 
 - **(a) v(N+1) MASTER'ında ZORUNLU `## Önceki yaklaşımın otopsisi`:** hangi yaklaşım 2 turda neden
   tutmadı; yeni yaklaşımın FARKI nedir. Cümlesi birebir: "AYNI yaklaşımın üçüncü denemesi YASAK."
   Otopsideki dersi tek-cümlelik kurala çevirip MASTER `## Riskler`e ekle (ders → kural).
-- **(b) REVIZYON bloğu `tip: pivot`:** `## r<N> — tip: pivot — <ts>` (parser bunu sayar; bir pivot
-  sonrası revize sayacı SIFIRLANIR, ikinci pivot mekanik olarak `pivot-tavani` → İNSAN).
+- **(b) REVIZYON bloğu `tip: pivot`:** `## r<N> — tip: pivot — <ts>`. Bir pivottan sonra revize
+  sayımı sıfırdan başlar.
 - **(c) kalan revize akışı (adım 1-5) aynen** uygulanır.
 
-Pivot bir planın **TEK hakkıdır**: v(N+1) de EKSİK gelirse Rotacı revize/pivot ATEŞLEMEZ → KESİN
-insan (2 revize + 1 pivot = 5 tur tavanı).
+Pivot bir planın **TEK hakkıdır**: v(N+1) de hedefi tutturamazsa ikinci pivot açılmaz; planın
+akıbetine kullanıcı karar verir (tavan: 2 revize + 1 pivot).
 
 ## Durum (`durum <slug>`)
 

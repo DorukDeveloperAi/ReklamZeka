@@ -110,12 +110,11 @@ function runCli(sessionId, args, envEk = null) {
   return { out: (r.stdout || "") + (r.stderr || ""), code: r.status };
 }
 
-/* ── aşama 08 fikstürleri: Maestro'nun İKİ hâli ──
-   Devir artık ÇİFT YOLLU: Maestro yazılabiliyorsa iş kuyruğa da düşer, yazılamıyorsa
-   kalıcı devir işareti tek başına taşır. İkisini ölçmenin tek dürüst yolu `aide`nin
-   VARLIĞINI kontrol etmek: sahte bir `aide` (canlı) ve `aide`siz bir PATH (ölü).
-   GERÇEK `aide` ASLA çağrılmaz — çağrılsaydı harness canlı Maestro kuyruğuna iş yazardı
-   (salt-okunurluk sözleşmesinin ihlali). */
+/* ── aşama 08 fikstürleri: PATH'te `aide` VAR ve YOK ──
+   2026-10-22'den beri devrin TEK taşıyıcısı kalıcı devir işaretidir; `aide zamanla`
+   denemesi kaldırıldı. Bunu ölçmenin dürüst yolu: PATH'e çağrıları kaydeden sahte bir
+   `aide` koymak ve devret'in onu HİÇ çağırmadığını görmek. `aide`siz PATH de korunur:
+   işaret iki ortamda da aynı yazılmalı. GERÇEK `aide` ASLA çağrılmaz. */
 const FAKEBIN = join(SB, "fakebin");
 const AIDE_LOG = join(SB, "aide-cagrilari.log");
 mkdirSync(FAKEBIN, { recursive: true });
@@ -821,50 +820,48 @@ console.log("\n⑰ PARÇALA: free sondası + devret (parça B kuyruktan gelince)
   ok("MEŞGUL raporu devir yolunu da SÖYLER", /devret --res/.test(m.out), m.out);
   runCli(C.sessionId, ["release", "--res", "dc-html"]);
 
-  /* devret --kuru: koşacağı işi BASAR, hiçbir yere YAZMAZ (Maestro'ya da kuyruğa da). */
+  /* devret --kuru: yazacağı devir işaretini BASAR, hiçbir yere YAZMAZ. */
   const d = runCli(C.sessionId, ["devret", "--res", "dc-html", "--gorev", "parça B: onChange düzelt", "--kuru"]);
-  ok("devret --kuru zamanla işini ÜRETİR (when-shell + free sondası)",
-     d.code === 0 && /zamanla add/.test(d.out) && /--when-shell/.test(d.out) && /free --res/.test(d.out), d.out);
-  ok("devir görevi claim ÖN KOŞULU taşır (ateşlenen session kaynağı kendisi alır)", /ÖN KOŞUL — kaynağı devral/.test(d.out), d.out);
+  ok("devret --kuru yazılacak işareti BASAR (görev + üstlenme komutu)",
+     d.code === 0 && /YAZILMADI/.test(d.out) && /onChange/.test(d.out) && /devir al --id/.test(d.out), d.out);
+  ok("devret --kuru arşivlenmiş zamanla işini ÜRETMEZ", !/zamanla/.test(d.out), d.out);
   ok("--kuru kuyruğa iz BIRAKMAZ", !queueOf("dc-html").some((x) => x.sessionId === C.sessionId));
+  ok("--kuru devir işareti YAZMAZ", devirListe().length === 0, JSON.stringify(devirListe()));
+
+  /* --text kaldırıldı: yalnız zamanla ile canlı pane'e enjeksiyon yapıyordu; artık
+     açık bir hata ve yönlendirme verir, iz bırakmaz. */
+  const t = runCli(C.sessionId, ["devret", "--res", "dc-html", "--text", "merhaba"]);
+  ok("devret --text reddedilir (exit 5) ve --gorev'e yönlendirir", t.code === 5 && /--gorev/.test(t.out), t.out);
+  ok("devret --text işaret YAZMAZ", devirListe().length === 0, JSON.stringify(devirListe()));
   runCli(B.sessionId, ["release", "--all"]);
 }
 
 /* ═══════════ AŞAMA 08 · KİLİT ÖMRÜ — sahip ölse/limitlense de kuyruk çözülür ═══════════ */
 
-console.log("\n⑱ DEVİR İŞARETİ: Maestro ölüyken de iş kaybolmaz (ÇİFT YOL)");
+console.log("\n⑱ DEVİR İŞARETİ: tek taşıyıcı — aide çağrılmaz, iş kaybolmaz");
 {
   for (const s of [B, C]) runCli(s.sessionId, ["release", "--all"]);
   runCli(B.sessionId, ["claim", "--res", "dc-html", "--intent", "B tutar"]);
 
-  /* Maestro ÖLÜ (aide PATH'te yok — metronom KİLİTLİ dönemin birebir hâli). Eskiden bu
-     yol exit 5'ti: iş Maestro'yla birlikte ölüyordu, yani devir en çok ihtiyaç duyulan
-     anda hiç çalışmıyordu. */
+  /* PATH'te aide YOK: devret işareti yazar ve exit 0 verir. */
   const d = runCli(C.sessionId, ["devret", "--res", "dc-html", "--gorev", "parça B: onChange düzelt"], ENV_MAESTRO_OLU);
   if (!AIDE_GERCEKTEN_OLU)
-    olculemedi("Maestro ölü senaryosu", "aide, node'un dizininde bulunuyor → 'ölü Maestro' PATH'i kurulamadı");
-  ok("Maestro ölü → devret exit 0 (eski sözleşme 5: iş kaybolurdu)", d.code === 0, d.out);
-  ok("çıktı NE OLDUĞUNU söyler (MAESTRO YAZILAMADI + işaret KALDI)",
-     /MAESTRO YAZILAMADI/.test(d.out) && /devir işareti KALDI/.test(d.out), d.out);
+    olculemedi("aide'siz PATH senaryosu", "aide, node'un dizininde bulunuyor → aide'siz PATH kurulamadı");
+  ok("aide yokken devret exit 0 + DEVREDİLDİ", d.code === 0 && /DEVREDİLDİ/.test(d.out), d.out);
   ok("çıktı iki ucu da SÖYLER (devir list · devir al --id)", /devir list/.test(d.out) && /devir al --id/.test(d.out), d.out);
+  ok("çıktı arşivlenmiş Maestro/zamanla'yı ANMAZ", !/MAESTRO|zamanla/.test(d.out), d.out);
   const l1 = devirListe();
   ok("devir işareti diskte — kalıcı · süreçsiz · TTL'siz",
      l1.length === 1 && l1[0]?.kaynak === "devret" && l1[0]?.keys?.[0] === "dc-html", JSON.stringify(l1));
   ok("işaret devredeni + görevi + şemayı taşır (v=1)",
      l1[0]?.v === 1 && l1[0]?.devreden?.sessionId === C.sessionId && /onChange/.test(l1[0]?.gorev || ""), JSON.stringify(l1[0]));
-  ok("GERÇEK aide HİÇ çağrılmadı (canlı Maestro kuyruğuna yazım YOK)", !existsSync(AIDE_LOG));
 
-  /* Maestro CANLI (sahte aide): iş kuyruğa YAZILIR **ve** işaret yine kalır — çift yol,
-     biri ölse öbürü taşır. Dedup'ı goal önsözünün İLK adımı sağlar. */
+  /* PATH'te (sahte) aide VAR: davranış AYNIDIR ve aide HİÇ çağrılmaz. */
   const d2 = runCli(C.sessionId, ["devret", "--res", "dc-html", "--gorev", "parça B2", "--title", "t2"], ENV_MAESTRO_CANLI);
-  ok("Maestro canlı → devret exit 0 + DEVREDİLDİ", d2.code === 0 && /DEVREDİLDİ/.test(d2.out), d2.out);
-  const log = existsSync(AIDE_LOG) ? readFileSync(AIDE_LOG, "utf8") : "";
-  ok("kuyruğa when-shell işi + kimliksiz free sondası yazıldı",
-     /zamanla add/.test(log) && /--when-shell/.test(log) && /free --res/.test(log), log);
-  ok("goal önsözünün İLK ADIMI `devir al --id` (aynı iş İKİ KEZ koşulamaz)",
-     /İLK ADIM — işi ÜSTLEN/.test(log) && /devir al --id/.test(log), log);
-  ok("Maestro canlıyken de işaret YAZILIR (tek yol değil, çift yol)", devirListe().length === 2, JSON.stringify(devirListe().map((x) => x.id)));
-  ok("Maestro damgası işarete işlendi (maestro.yazildi)", devirListe().some((x) => x.maestro?.yazildi === true), JSON.stringify(devirListe()));
+  ok("aide varken de devret exit 0 + DEVREDİLDİ", d2.code === 0 && /DEVREDİLDİ/.test(d2.out), d2.out);
+  ok("devret aide'yi HİÇ çağırmaz (zamanla denemesi kaldırıldı)", !existsSync(AIDE_LOG),
+     existsSync(AIDE_LOG) ? readFileSync(AIDE_LOG, "utf8") : "");
+  ok("ikinci devir de işarete yazıldı", devirListe().length === 2, JSON.stringify(devirListe().map((x) => x.id)));
 }
 
 console.log("\n⑱b ÜSTLENME ATOMİKTİR: iki oturum aynı devri birlikte koşamaz");

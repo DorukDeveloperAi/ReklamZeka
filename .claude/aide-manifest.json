@@ -36,7 +36,7 @@
   },
   "files": {
     ".claude/aide/docs/aide-capabilities.md": {
-      "hash": "8d19aa8593c540c2",
+      "hash": "312fe50d3d2415de",
       "pkg": "doc:aide-capabilities"
     },
     ".claude/skills/zamanla/SKILL.md": {
@@ -44,7 +44,7 @@
       "pkg": "skill:zamanla"
     },
     ".claude/skills/plan-kur/SKILL.md": {
-      "hash": "05cd0c5ffff79051",
+      "hash": "e02869caf28d70fc",
       "pkg": "skill:plan-kur"
     },
     ".claude/skills/plan-kur/sablonlar/MASTER.md": {
@@ -56,7 +56,7 @@
       "pkg": "skill:plan-kur"
     },
     ".claude/skills/plan-kur/sablonlar/REQUIREMENTS.md": {
-      "hash": "409b08fea815acd8",
+      "hash": "a242228f6a93bf16",
       "pkg": "skill:plan-kur"
     },
     ".claude/skills/plan-kur/sablonlar/STATE.md": {
@@ -64,7 +64,7 @@
       "pkg": "skill:plan-kur"
     },
     ".claude/skills/plan-kur/sablonlar/REVIZYON.md": {
-      "hash": "5ff1084148fba933",
+      "hash": "1411e74b1dd015ba",
       "pkg": "skill:plan-kur"
     },
     ".claude/skills/plan-kur/sablonlar/asama.md": {
@@ -72,11 +72,11 @@
       "pkg": "skill:plan-kur"
     },
     ".claude/skills/plan-organizatoru/SKILL.md": {
-      "hash": "5c516e24978bf9be",
+      "hash": "8bc9e7e3653cf685",
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/plan-organizatoru/scripts/agac.mjs": {
-      "hash": "b01d121d13aa93fa",
+      "hash": "57286b1b2538a124",
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/plan-organizatoru/scripts/harita.mjs": {
@@ -92,11 +92,11 @@
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/plan-organizatoru/proof/proof.mjs": {
-      "hash": "d6685a84efaa64ab",
+      "hash": "95696c5d3d7ad517",
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/plan-organizatoru/proof/SONUC.md": {
-      "hash": "e59da95903e846ec",
+      "hash": "4ea7882897b264d3",
       "pkg": "skill:plan-organizatoru"
     },
     ".claude/skills/planla-kos/SKILL.md": {
@@ -128,15 +128,15 @@
       "pkg": "agent:pm"
     },
     ".claude/agents/konfigurator.md": {
-      "hash": "0ac7938891a9dcdb",
+      "hash": "4496821b92dd2810",
       "pkg": "agent:konfigurator"
     },
     ".claude/agents/denetci.md": {
-      "hash": "4300a9572e9ab82a",
+      "hash": "8a75149812bdde1b",
       "pkg": "agent:denetci"
     },
     ".claude/agents/gunlukcu.md": {
-      "hash": "47c5303174a569ff",
+      "hash": "24b64a4a981db775",
       "pkg": "agent:gunlukcu"
     },
     ".claude/skills/kaptan/SKILL.md": {
@@ -232,11 +232,11 @@
       "pkg": "hook:goal-tracker"
     },
     ".claude/hooks/oturum-kapanis.mjs": {
-      "hash": "1e38a5a9ea2e1566",
+      "hash": "8eb7d781433e26df",
       "pkg": "hook:oturum-kapanis"
     },
     ".claude/docs/model-policy.md": {
-      "hash": "4ca800f5bc8fa1a1",
+      "hash": "2c5428545b7eedaa",
       "pkg": "doc:model-policy"
     },
     ".claude/agents/kaptan.md": {
@@ -248,19 +248,19 @@
       "pkg": "automation:kaptan-brifing"
     },
     ".claude/skills/eszamanli/SKILL.md": {
-      "hash": "34073a1a9e3717bb",
+      "hash": "01a703e3e5c43592",
       "pkg": "skill:eszamanli"
     },
     ".claude/skills/eszamanli/scripts/claim.mjs": {
-      "hash": "1057c6a72d7a3386",
+      "hash": "b8680de8aa86afa9",
       "pkg": "skill:eszamanli"
     },
     ".claude/skills/eszamanli/proof/proof.mjs": {
-      "hash": "ee1dc480aaef3956",
+      "hash": "c21942717cf05bc5",
       "pkg": "skill:eszamanli"
     },
     ".claude/skills/workflow/SKILL.md": {
-      "hash": "24d93da96ec82df2",
+      "hash": "d47779e26be335f6",
       "pkg": "skill:workflow"
     },
     ".claude/skills/workflow/sablonlar/uygula-dogrula.mjs": {
@@ -276,15 +276,15 @@
       "pkg": "skill:workflow"
     },
     ".claude/skills/workflow/scripts/wf-artefakt.mjs": {
-      "hash": "bf63f018dd16aab1",
+      "hash": "caad8fa087efb816",
       "pkg": "skill:workflow"
     },
     ".claude/skills/workflow/proof/proof.mjs": {
-      "hash": "e8210b47913218fd",
+      "hash": "821160ddc979b32e",
       "pkg": "skill:workflow"
     },
     ".claude/skills/soft-resume/SKILL.md": {
-      "hash": "303bd49167d50710",
+      "hash": "4e45499060455cef",
       "pkg": "skill:soft-resume"
     },
     ".claude/skills/soft-resume/scripts/topla.mjs": {
@@ -292,15 +292,15 @@
       "pkg": "skill:soft-resume"
     },
     ".claude/skills/soft-resume/scripts/kasa.mjs": {
-      "hash": "7ad8a2b827069c6d",
+      "hash": "a844504aaae971d2",
       "pkg": "skill:soft-resume"
     },
     ".claude/skills/soft-resume/proof/proof.mjs": {
-      "hash": "4547f4724d37a888",
+      "hash": "221655f647388b97",
       "pkg": "skill:soft-resume"
     },
     ".claude/skills/devam/SKILL.md": {
-      "hash": "ef31acfd6bdf6772",
+      "hash": "8d2ac91b7a374bc7",
       "pkg": "skill:devam"
     },
     ".claude/skills/devam/scripts/gecerlilik.mjs": {
@@ -312,11 +312,11 @@
       "pkg": "skill:devam"
     },
     ".claude/hooks/claims-lib.mjs": {
-      "hash": "0ca325856d138b31",
+      "hash": "8cafe136805ba9d4",
       "pkg": "hook:eszamanli-guard"
     },
     ".claude/hooks/claim-guard.mjs": {
-      "hash": "70c551aa54e4d07f",
+      "hash": "e0c198ab388aaa91",
       "pkg": "hook:eszamanli-guard"
     },
     ".claude/hooks/hook-nabiz.mjs": {
@@ -356,23 +356,23 @@
       "pkg": "doc:utopya-iskelet"
     },
     ".claude/hooks/model-policy-guard.mjs": {
-      "hash": "6ceaeaeea110d6eb",
+      "hash": "7797253c5267d2dd",
       "pkg": "hook:model-policy-guard"
     },
     ".claude/hooks/session-status.mjs": {
-      "hash": "38723213afd60243",
+      "hash": "4da759c1979db850",
       "pkg": "hook:session-status"
     },
     ".claude/aide/docs/terimler.md": {
-      "hash": "39553735129f9259",
+      "hash": "7ca817debb54fe46",
       "pkg": "doc:terimler"
     },
     ".claude/aide/docs/claude-md-sozlesmesi.md": {
-      "hash": "4c8081661bb8d219",
+      "hash": "eeeada12c51c24f6",
       "pkg": "doc:claude-md-sozlesmesi"
     },
     ".claude/aide/docs/commit-sozlesmesi.md": {
-      "hash": "6c1e12aa1c2b4c7b",
+      "hash": "8e8a9d71fdcdc9b3",
       "pkg": "doc:commit-sozlesmesi"
     },
     ".claude/agents/filing-teshis.md": {
@@ -380,7 +380,7 @@
       "pkg": "agent:filing-teshis"
     }
   },
-  "updatedAt": "2026-10-21T12:01:29.556Z",
+  "updatedAt": "2026-10-22T12:03:14.737Z",
   "yerelKazanir": [
     "utopya/KUZEY.md",
     "utopya/istek/alt-projeler.md",

@@ -164,10 +164,10 @@ function kilitleriAl(L, sessionId) {
   } catch { return []; }
 }
 
-/** YENİDEN BAŞLATMA — üç yol, hangisinin GEÇERLİ olduğu ölçülür, tahmin edilmez.
- *  hard  : session AKTİF depoda → `aide open` (kosum chokepoint'i; yüzey ayarına saygı duyar)
- *  ham   : aide yoksa doğrudan `claude --resume` (aynı hesap şartı yine geçerli)
- *  soft  : başka depo/hesap → resume ÇALIŞMAZ; taze oturum + bu kasa dosyası brif olarak okunur */
+/** YENİDEN BAŞLATMA — iki yol, hangisinin GEÇERLİ olduğu ölçülür, tahmin edilmez.
+ *  hard  : session AKTİF depoda → `cd <cwd> && claude --resume <id>` (aynı hesap şartı)
+ *  soft  : başka depo/hesap → resume ÇALIŞMAZ; taze oturum + bu kasa dosyası brif olarak okunur
+ *  (2026-10-22: eski `aide open` satırı arşive gitti; eski kayıtlar okunurken çevrilir.) */
 function baslatmaYollari(demet, sessionId, kisa) {
   const cwd = demet?.meta?.cwd || KOK;
   const brif = relative(KOK, join(KASA_DIR, `${kisa}.md`));
@@ -175,8 +175,8 @@ function baslatmaYollari(demet, sessionId, kisa) {
   const baskaDepo = demet?.meta?.depo ? resolve(demet.meta.depo) !== aktifDepo : false;
   return {
     baskaDepo,
-    hard: baskaDepo ? null : `aide open ${sessionId} --cwd ${cwd}`,
-    ham: baskaDepo ? null : `cd ${cwd} && claude --resume ${sessionId}`,
+    cwd,
+    hard: baskaDepo ? null : `cd ${cwd} && claude --resume ${sessionId}`,
     soft: `cd ${KOK} && claude "OTURUM KASASI devralması: ${brif} dosyasını OKU ve 'İLK İŞ' bölümünden başla."`,
     brif,
   };
@@ -252,10 +252,9 @@ function renderMd(k) {
   S.push("");
   S.push("```sh");
   if (k.yenidenBaslat.hard) {
-    S.push(`# aynı hesap → oturum kaldığı yerden açılır (koşum yüzeyi ayarına saygı duyar)`);
+    S.push(`# aynı hesap → oturum kaldığı yerden açılır`);
     S.push(k.yenidenBaslat.hard);
-    S.push(`# aide yoksa:`);
-    S.push(`# ${k.yenidenBaslat.ham}`);
+    S.push(`# hesap değiştiyse:`);
   } else {
     S.push(`# session BAŞKA depoda/hesapta — resume çalışmaz, taze oturum bu brifi okur:`);
   }
@@ -326,12 +325,21 @@ function kayitlar() {
     try {
       const j = JSON.parse(readFileSync(yol, "utf8"));
       if (j?.surum !== SURUM) continue;
-      out.push({ ...j, _yol: yol, _mtime: statSync(yol).mtimeMs });
+      out.push({ ...j, yenidenBaslat: eskiYolCevir(j), _yol: yol, _mtime: statSync(yol).mtimeMs });
     } catch { /* bozuk kayıt sayılmaz */ }
   }
   out.sort((a, b) => String(b.sonAktivite || "").localeCompare(String(a.sonAktivite || "")));
   return out;
 }
+/** 2026-10-22 öncesi kayıtlar `hard` alanında arşivlenmiş `aide open` satırını, `ham` alanında
+ *  `claude --resume` satırını taşır. Okurken çevrilir; dosya bir sonraki `yaz`da yeni biçime geçer. */
+function eskiYolCevir(j) {
+  const y = j?.yenidenBaslat || {};
+  if (!String(y.hard || "").startsWith("aide open")) return y;
+  const { ham, ...kalan } = y;
+  return { ...kalan, cwd: kalan.cwd || j.cwd || KOK, hard: ham || null };
+}
+
 const kayitBul = (anahtar) => {
   const a = String(anahtar || "").toLowerCase();
   return kayitlar().find((k) => k.kisa === a.slice(0, 8) || k.sessionId === anahtar) || null;
@@ -462,24 +470,25 @@ async function baslat() {
   const komut = y.hard || y.soft;
   if (!O.ates) {
     console.log(`# ${k.kisa} — ${k.baslik || "(başlıksız)"}`);
-    if (y.hard) { console.log(y.hard); console.log(`# aide yoksa: ${y.ham}`); }
+    if (y.hard) { console.log(y.hard); console.log(`# hesap değiştiyse:`); }
     else console.log(`# başka depo/hesap — resume çalışmaz, brifle taze oturum:`);
     console.log(y.soft);
-    console.log(`# brif: ${y.brif}   ·   ateşle: --ates`);
+    console.log(`# brif: ${y.brif}   ·   bu terminalde aç: --ates`);
     return;
   }
-  if (!y.hard) {
-    // Taze oturum AÇMAK kasa'nın işi değildir: spawn tek noktadan (kosum/Maestro) geçer,
-    // ikinci bir spawn yolu icat etmek koşum yüzeyi ayarını sessizce delerdi (İLANLI sınır).
-    console.error("ATEŞLENMEDİ: bu kayıt yalnız SOFT yolla açılır (başka hesap) — taze oturum açmak");
-    console.error("koşum yüzeyinin işidir. Komutu kendin çalıştır ya da /soft-resume ile ateşle:");
-    console.log(y.soft);
+  // --ates claude'u BU terminalde, ön planda açar. Arka plan spawn'ı yoktur (koşum katmanı
+  // arşivde). TTY yoksa (ör. bir ajanın Bash aracı) etkileşimli claude asılı kalırdı → reddedilir.
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.error("ATEŞLENMEDİ: --ates etkileşimli bir terminal ister (TTY yok). Komutu kendin çalıştır:");
+    console.log(komut);
     process.exit(3);
   }
-  const [bin, ...args] = komut.split(" ");
-  const r = spawnSync(bin, args, { stdio: "inherit" });
+  const [cwd, args] = y.hard
+    ? [y.cwd || k.cwd || KOK, ["--resume", k.sessionId]]
+    : [KOK, [`OTURUM KASASI devralması: ${y.brif} dosyasını OKU ve 'İLK İŞ' bölümünden başla.`]];
+  const r = spawnSync("claude", args, { cwd, stdio: "inherit" });
   if (r.error || r.status !== 0) {
-    console.error(`ATEŞLEME BAŞARISIZ (${r.error?.message || `exit ${r.status}`}) — elle: ${y.ham}`);
+    console.error(`ATEŞLEME BAŞARISIZ (${r.error?.message || `exit ${r.status}`}) — elle: ${komut}`);
     process.exit(2);
   }
 }

@@ -1,15 +1,14 @@
 ---
 name: plan-organizatoru
-description: /plan-kur'un governance/double-check tamamlayıcısı — planları kategorilendirir, proje plan AĞACINDA doğru dala yerleştirir, dosyalar/klasörler; "yeni plan mı revizyon mu" denetimi yapar (minor değişiklik → v(N+1), yeni plan DEĞİL); "proje planı tektir" kuralını korur; PM veya kullanıcı işe başladığında "nerede kalmıştık / ne düşünmüştük / ne planlamıştık" ağacını güncel gösterir. INDEX'i elle değil scripts/agac.mjs ile TÜRETİR; PM/kaptan bunun tüketicisidir (plan ağacı PM.json + aide kaptan panosuna akar). Kullanıcı "planı yerleştir/kaydet", "plan ağacı", "planları düzenle/organize et", "nerede kalmıştık planlarda", "plan governance/denetle", "bu yeni plan mı revizyon mu" dediğinde, /plan-kur bir plan yazdıktan sonra veya /plan-organizatoru çağrıldığında kullan.
+description: /plan-kur'un governance/double-check tamamlayıcısı — planları kategorilendirir, proje plan AĞACINDA doğru dala yerleştirir, dosyalar/klasörler; "yeni plan mı revizyon mu" denetimi yapar (minor değişiklik → v(N+1), yeni plan DEĞİL); "proje planı tektir" kuralını korur; kullanıcı işe başladığında "nerede kalmıştık / ne düşünmüştük / ne planlamıştık" ağacını güncel gösterir. INDEX'i elle değil scripts/agac.mjs ile TÜRETİR. Kullanıcı "planı yerleştir/kaydet", "plan ağacı", "planları düzenle/organize et", "nerede kalmıştık planlarda", "plan governance/denetle", "bu yeni plan mı revizyon mu" dediğinde, /plan-kur bir plan yazdıktan sonra veya /plan-organizatoru çağrıldığında kullan.
 rol: ajan
 ---
 
 # /plan-organizatoru — Plan ağacı governance katmanı
 
 `/plan-kur` planı ÜRETİR; bu skill planı **yerleştirir, denetler ve görünür kılar**.
-İkisi paralel değil tamamlayıcıdır; PM/kaptan'a paralel değil onların **aracıdır**:
-PM plan üretimini `/plan-kur` görevi olarak dağıtır, plan durumunu bu skill'in
-türettiği INDEX üzerinden izler (PM.json `plans` alanı + `aide kaptan` panosu).
+İkisi paralel değil tamamlayıcıdır. Plan durumunun okunacağı yer bu skill'in türettiği
+INDEX'tir (`plans/INDEX.md` + `plans/INDEX.json`).
 
 ## Rol sınırı — ben ne DEĞİLİM, ne zaman devret
 
@@ -18,17 +17,19 @@ sorusunun cevabı bende — ama yalnız plan ekseninde.
 
 | Değilim | O soru kimin |
 |---|---|
-| Genel durum panosu — "şu an ne oluyor" | **kaptan** (tek ön kapı) |
-| Karar merci — "hangi plan öncelikli" | **pm** |
-| Koşum hakemi — "aşama gerçekten bitti mi" | **rota** (reconciler + hakem; hüküm HUKUM.md'de) |
+| Karar merci — "hangi plan öncelikli" | **kullanıcı** (ben künyeden türeyen sırayı gösteririm) |
+| Aşamayı koşan — "aşamayı yürüt, kapat" | **/goal** session'ı (STATE'i o yazar) |
 | Plan üreticisi — içerik yazmak | **/plan-kur** (ben yerleştirir + denetlerim) |
+
+Genel durum panosu (kaptan), karar merci (pm) ve koşum hakemi (rota/hakem) rolleri
+2026-10-22'de arşive gitti; toolkit'te bu soruları yanıtlayan ayrı bir katman yoktur.
 
 ## Kanonik yapı (proje başına)
 
 ```
 <proje>/plans/
   INDEX.md + INDEX.json  ← ağacın kökü — ELLE YAZILMAZ; tek yazar scripts/agac.mjs
-  TODO-ELLE.md           ← genel TODO'nun ELLE kaynağı (çıpa `td:elle/<slug>`; insan/PM yazar)
+  TODO-ELLE.md           ← genel TODO'nun ELLE kaynağı (çıpa `td:elle/<slug>`; insan yazar)
   TODO.md                ← TÜREV — ELLE YAZILMAZ; tek yazar scripts/agac.mjs (INDEX.json→todo ile birlikte)
   legacy.json            ← taşınmamış plan parçalarının GEREKÇELİ ilanı (elle, kısa)
   oturumlar/<tarih>-<ad>.md  ← OTURUM defteri: o oturumun ELLE hedef beyanı (çıpa `ot:<tarih>/<ad>`)
@@ -53,8 +54,8 @@ planlara intake'te eklenir):
 |---|---|---|
 | Kategori | işin cinsi (ağaç grubu) | plan-kur / intake |
 | Üst | ağaçtaki dal | intake (bu skill) |
-| **Kritiklik** | **önem**: olmazsa ne kırılır | kullanıcı / PM |
-| **Aciliyet** | zaman baskısı | kullanıcı / PM |
+| **Kritiklik** | **önem**: olmazsa ne kırılır | kullanıcı |
+| **Aciliyet** | zaman baskısı | kullanıcı |
 | **Hacim** | iş büyüklüğü (slot·bütçe) | plan-kur (aşama sayısı/efor) |
 | **Hedef** | tek cümlelik varış hali | plan-kur |
 | **Oturum** | planı DOĞURAN oturum çıpası | planı yazan oturum (kendisi) |
@@ -74,7 +75,7 @@ node ~/.claude/skills/plan-organizatoru/scripts/agac.mjs --kunye --json   # tük
 - **Künye EKSİK** → ADVISORY: `--kunye`/`--denetle` alarm basar, `onar:` satırı verir, **gate
   KIRILMAZ**. Eski planlar bu hâldedir; künyesizlik yalanlamaz, yalnız sırasız bırakır.
 - **Künye GEÇERSİZ** (şema dışı değer) → **gate FAIL** (`GEÇERSİZ KÜNYE`). Gerekçe: yanlış künye
-  künyesizlikten beterdir — Rotacı/PM ona göre SIRALAR.
+  künyesizlikten beterdir — `agac.mjs` planları ona göre SIRALAR.
 - **`Kapatır` sorunu** (genel TODO bağı) → İKİ ALT SINIF: **biçimsiz** ref (şema dışı) **gate
   FAIL** eder (`GEÇERSİZ KAPATIR`) — sessizce bağsız kalırsa plan "kapatıyorum" der ama hiçbir
   madde kapanmaz; **şemalı ama karşılıksız** ref ise ADVISORY + `onar:`, **gate KIRILMAZ**.
@@ -83,7 +84,7 @@ node ~/.claude/skills/plan-organizatoru/scripts/agac.mjs --kunye --json   # tük
   sarkık ref'i büsbütün MUAFtır (`--todo` sayıyla ilan eder).
 
 Tüketiciler (kendi ölçütünü yazmaz, künyeyi okur): `INDEX.json → plans[].kunye` ·
-`--graf` plan düğümü · Rotacı E4 sıralaması · kaptan panosu · PM · VSCode planlar sekmesi.
+`--graf` plan düğümü · `--kunye` sırası.
 
 ## Çağrı biçimleri
 
@@ -102,7 +103,7 @@ uyuşmazlıkta FAIL basar → tek çare yeniden türetmek.
 
 **DAG modeli — DAVRANIŞ VALFİ (kullanıcı kararı 2026-07-16):**
 DAG *davranışı* projede `plans/.dag-aktif` işareti varken açılır; işaret yokken `--graf`/`hazir[]`
-hesaplanır (harita ve Rotacı çalışır) ama `siradaki`/`goal` seçimi eski lineer davranıştır ve DAG
+hesaplanır (harita çalışır) ama `siradaki`/`goal` seçimi eski lineer davranıştır ve DAG
 governance bulguları gate'i kırmaz (--denetle "pasif" listeler).
 STATE tablosunun opsiyonel `bağımlı` sütunu plan ağını kurar
 (`00, 01` VE · `01/02` VEYA, ayraç `/` — `|` tablo hücresini böler, yasak · `slug:NN`
@@ -131,7 +132,7 @@ Damga koşulludur: bir aşama `kosum:` beyan ediyorsa frontmatter bloğu içerik
 1. `plans/<slug>/` var mı, plan-kur formatında mı bak (`v<N>/MASTER.md`).
 2. **Yeni plan mı, revizyon mu (double-check):** INDEX'teki mevcut slug'ların
    başlık+kapsamıyla karşılaştır. Aynı işin devamı/minor değişikliği ise plan
-   YENİ SLUG ALMAZ → kullanıcıya/PM'e `/plan-kur revize <eski-slug>` öner ve dur.
+   YENİ SLUG ALMAZ → kullanıcıya `/plan-kur revize <eski-slug>` öner ve dur.
    Kararsızsan TEK soru sor (AskUserQuestion). Proje-genelini anlatan bir plansa
    ve `proje` slug'ı doluysa → `/plan-kur revize proje`ye yönlendir (**proje planı
    tektir**).
@@ -140,7 +141,7 @@ Damga koşulludur: bir aşama `kosum:` beyan ediyorsa frontmatter bloğu içerik
    sistem · süreç=işleyiş/protokol · araştırma=karar öncesi keşif. `Üst:` planın
    mantıksal ebeveyni — **BAĞLANMA açık karardır (2026-08-14, "çoğu plan proje" bias'ı
    kaldırıldı):** roadmap'in bariz parçası → `proje`/ilgili dal; tek-seferlik/koş-ve-bitir
-   (tipik /planla-kos çıktısı) → `—`; **gri alanda TEK soru sor** (AskUserQuestion —
+   → `—`; **gri alanda TEK soru sor** (AskUserQuestion —
    adım 2 emsali). Kaynak akış kararı zaten taşıyorsa (`bağlanma=…`) sorgusuz uygula.
 4. **`Kapatır` bağını doğrula (genel TODO):** MASTER `> Kapatır: td:…` satırı taşıyorsa her
    ref'i `agac.mjs --todo --json` çıktısına karşı kontrol et. Bilinmeyen/biçimsiz ref kaydı
@@ -148,8 +149,6 @@ Damga koşulludur: bir aşama `kosum:` beyan ediyorsa frontmatter bloğu içerik
    kullanıcıya bas. Satır YOKSA: `agac.mjs --kunye` plansız-madde raporunu göster — plan bir
    maddeyi kapatıyor da beyan unutulmuş olabilir (plansız madde = plan-üretim adayı).
 5. `agac.mjs` koş → INDEX + TODO türet. Governance bulguları çıktıysa kullanıcıya bas.
-6. Proje kaptan'a kayıtlıysa: ilgili proje hedefinde `planRef` bağlamayı öner
-   (hedef↔plan bağını PM kurar; sen sadece hatırlat — tek-yazar disiplini).
 
 ## Governance kuralları (denetle + gate'in ölçtükleri)
 
@@ -197,9 +196,8 @@ node $O backfill       # beyansız LEGACY planları git doğum tarihi kovasına 
   + hedefte `→ td:elle/<slug>` işareti gerekir). **Planlar istisnasız roadmap'e işler.**
 - **EKSİK oturum TODO'ya hedeflerini DÖKMEZ**, tek satır alarm düşürür — oturum listesi
   proje listesini boğmasın (`plans/OTURUMLAR.md` tam dökümün yeri).
-- **aide GEREKMEZ:** üretim yolu node + dosya sistemidir; `aide sistem kapat` bu boyutu
-  DURDURMAZ. Kapanış damgasını `hook:oturum-kapanis` (SessionEnd) atar; aide katmanı
-  yalnız pano/bekçi/kılavuz kalitesi ekler.
+- **aide GEREKMEZ:** üretim yolu node + dosya sistemidir. Kapanış damgasını
+  `hook:oturum-kapanis` (SessionEnd) atar.
 
 ## Devir notu — session ölümü NİYETİ diske bırakır (2026-07-29)
 
@@ -235,15 +233,16 @@ node $O devir [--transcript <jsonl>] [--sebep <kapanış cinsi>]   # defter yoks
 - **`siradakiAdim` DETERMİNİSTİKtir:** ilk `in_progress` todo ?? ilk açık hedef ?? `null`.
 - **İdempotent:** `kapanis` defterin `Bitiş` damgasından okunur (taze `new Date()` DEĞİL) →
   aynı girdiyle 2. koşum **bayt-özdeş**tir ve yazım atlanır ("aynı — yazılmadı").
-- **Sır eleği bu yolun TEK eleğidir:** filing'in sır kapısı `plans/` altını taramaz. Elenen
-  değer `«sır elendi»` ile İLAN edilir (sessiz kırpma yasak).
+- **Sır eleği bu yolun TEK eleğidir:** `plans/` altını tarayan başka bir sır kapısı yoktur
+  (filing katmanı 2026-10-22'de arşive gitti). Elenen değer `«sır elendi»` ile İLAN edilir
+  (sessiz kırpma yasak).
 - **Kilitler AKTİF ∪ ARŞİV okunur.** SessionEnd hook sırası garanti değildir; `claim-guard
   release_all` kilidi silmez, `_archive/`e taşır ve `owner.sessionId`i korur → yarış
   TASARIMLA kapalı, yalnız `durum` alanı `aktif`↔`birakildi` değişir.
 - **`DEVRALIS.md`yi İKAME ETMEZ:** o PROJE düzeyidir ve canlı session'ları özetler; bu
   SESSION düzeyidir ve kapanışta donar.
 - **TTL yok:** bayat devir notunu kimse otomatik silmez (ilanlı muafiyet); yaş ilanı ve
-  eskalasyon denetçi katmanının işidir.
+  eskalasyon `denetci` ajanının işidir.
 - **Roll-up yalnız İLAN eder:** `OTURUMLAR.md` ve global `KILAVUZ.md` notun yolunu +
   `siradakiAdim`ı basar; notu MODELE almak (içeriğinden karar üretmek) tüketicinin işidir.
 
@@ -284,7 +283,7 @@ node $O acilis [--ctx|--json] [--session <TAM id>]   # sinyal yoksa BOŞ çıkt�
 - Plan içeriği (MASTER/asama/STATE/CHECKLIST) → `/plan-kur` ve `/goal` session'ları
   yazar. Organizatör yalnız MASTER üst bloğundaki `Kategori:`/`Üst:` alanlarına dokunur.
 - `TODO.md` + `INDEX.json → todo` → yalnız `agac.mjs` yazar (INDEX kuralının aynısı).
-  `TODO-ELLE.md` → insan/PM ELLE yazar (çıpa sözleşmesiyle); agac.mjs oraya yalnız dosya hiç
+  `TODO-ELLE.md` → insan ELLE yazar (çıpa sözleşmesiyle); agac.mjs oraya yalnız dosya hiç
   yokken BİR KEZ tohum atar. `Kapatır:` satırının yazarı PLAN ÜRETİCİSİdir (`/plan-kur`);
   organizatör onu yalnız DOĞRULAR.
 - `plans/oturumlar/<tarih>-<ad>.md` → o oturum ELLE yazar (tek yazarı KENDİSİ; `tohumla`
@@ -293,8 +292,6 @@ node $O acilis [--ctx|--json] [--session <TAM id>]   # sinyal yoksa BOŞ çıkt�
 - `legacy.json` → elle, kısa, gerekçeli. Format: `{"entries":[{"ad","path","tur","not"}]}`
   (path proje köküne göre). Legacy dosyalar TAŞINMAZ — referans veren araçlar
   (runner, kapılar) kırılmasın diye yerinde endekslenir.
-- PM proje dosyasına doğrudan yazmaz → plan işlerini görev olarak dağıtır
-  (`/plan-kur …` dispatch), sonucu INDEX/PM.json'dan okur.
 
 ## Versiyonlama yönlendirmesi (özet)
 
@@ -303,17 +300,16 @@ node $O acilis [--ctx|--json] [--session <TAM id>]   # sinyal yoksa BOŞ çıkt�
 - Gerçekten yeni iş → yeni slug + `kaydet`.
 - Projenin tamamını anlatan plan → HER ZAMAN `proje` slug'ı (yoksa oluştur, varsa revize).
 
-## PM/kaptan köprüsü (bu skill'in tüketicileri)
+## Tüketiciler (bu skill'in çıktısını okuyanlar)
 
-- **`/planla-kos`** (`scripts/hazirla.mjs`): `--durum --json` çıktısındaki `goal` alanının
-  TÜKETİCİSİ — sıradaki aşamayı Maestro üzerinden yeni tmux session'ında ateşler. `/goal`
-  satırını asla yeniden üretmez; bu skill tek kaynaktır. Harita: `~/dev/agent-ide/docs/plan-katmani.md`
-- `kaptan/scripts/model.mjs → readPlans()` her projenin `plans/INDEX.json`'ını okur;
-  plan ağacı `model.json`/`PM.json`'a ve `aide kaptan` panosundaki "Planlar" bölümüne girer.
-- `kaptan/hedefler/<slug>.json` hedefleri opsiyonel `planRef` taşır; rollup plan
-  ilerlemesini hedef ilerlemesine katar.
-- Günlük Maestro işi her kayıtlı projede `agac.mjs && agac.mjs --gate` koşar
-  (türet + doğrula); FAIL → alert → PM brifingi.
+- **`/goal`**: `/plan-organizatoru durum` (`agac.mjs --durum --json`) sıradaki açık aşamanın hazır
+  `/goal` satırını basar. Kullanıcı o satırı yeni bir oturumda kendisi çalıştırır. `/goal`
+  satırını başka hiçbir araç yeniden üretmez; bu skill tek kaynaktır.
+- **`/soft-resume`** ve **`/devam`**: toplayıcıları (`topla.mjs`, `gecerlilik.mjs`) plan ağacını
+  `agac.mjs` üzerinden okur.
+- **Gate**: `agac.mjs && agac.mjs --gate` (türet + doğrula) elle ya da plan yazan oturumun
+  sonunda koşulur. Bu kapıyı her gün koşan zamanlı iş (Maestro) ve kaptan/PM köprüsü
+  2026-10-22'de arşive gitti.
 
 ## Model politikası
 

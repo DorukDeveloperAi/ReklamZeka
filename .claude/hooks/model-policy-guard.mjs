@@ -3,9 +3,9 @@
 // Model politikası bekçisi — politikayı KÂĞITTAN çıkarıp uygulanabilir kılan yer.
 //
 // Politika (tek kaynak: ~/.claude/model-policy.json ← ~/.config/agent-ide/config.json):
-//   ana      → Opus 4.8 (1M)  · interaktif oturum: uygulama, kodlama, test, yürütme
-//   plan     → Fable 5        · plan + kompleks analiz (DELEGE edilir, ana loop'a değil)
-//   kod/inceleme → Opus 4.8
+//   ana      → Opus 5 (1M)    · interaktif oturum: uygulama, kodlama, test, yürütme
+//   plan     → Fable 5        · plan + kompleks analiz (DELEGE edilir; kota biterse fallback Opus — 2026-09-13)
+//   kod/inceleme → Opus 5
 //
 // Neden hook: Claude Code policy dosyamızı okumaz ve bir hook oturum modelini DEĞİŞTİREMEZ.
 // İLKE (2026-07-16, kullanıcı kararı): bekçi DURDURMAZ, DEVREDER. Politikaya aykırı bir
@@ -68,6 +68,8 @@ function family(model) {
 const policy = readJSON(POLICY);
 const anaModel = policy?.tiers?.ana?.model ?? "claude-opus-5[1m]";
 const anaFam = family(anaModel) ?? "opus";
+// Ana oturumun meşru aileleri: ana.model ⊕ ana.izinli (2026-09-21: ana oturum Fable de olabilir).
+const anaFams = new Set([anaFam, ...(policy?.tiers?.ana?.izinli ?? []).map((a) => String(a).toLowerCase())]);
 
 /** Ajanın frontmatter `model:` pinini bul (global + proje kapsamı). Pin = policy'nin
  *  o ajan için türettiği model (aide projectAgentPins yazar). Yoksa null → ajan
@@ -179,12 +181,25 @@ process.stdin.on("end", () => {
 
     // Beklenen model: ajanın pini (policy türevi) → yoksa ana modeli (built-in ajan
     // oturumu devralır; onu ana ailesinden BAŞKA bir aileye zorlamak risktir).
-    const expected = pin ?? anaModel;
+    // Pinsiz ajan İZİNLİ ailedeki oturumu devralıyorsa beklenen = o oturum (devir yok).
+    const oturum = activeModel(hook.transcript_path);
+    const expected = pin ?? (!ti.model && anaFams.has(family(oturum)) ? oturum : anaModel);
     // Etkin model: açık parametre → pin → oturum modeli (miras).
     const effective = ti.model || pin || activeModel(hook.transcript_path) || anaModel;
 
     const effFam = family(effective);
     const expFam = family(expected);
+
+    // KOTA FALLBACK'İ (2026-09-13 kullanıcı kararı): beklenen ailenin tier'ı `fallback` taşıyorsa, o
+    // aileyle AÇIK çağrı meşrudur — Fable kotası bitince iş Opus'la sürer. Bu istisna olmasa bekçi
+    // `model:"opus"` ile yeniden koşulan çağrıyı Fable'a geri çevirip 429 döngüsüne sokardı (ölçüldü 2026-09-12).
+    const fallbackFams = new Set(
+      Object.values(policy?.tiers ?? {})
+        .filter((t) => family(t?.model) === expFam)
+        .map((t) => family(t?.fallback))
+        .filter(Boolean),
+    );
+    if (ti.model && fallbackFams.has(effFam)) pass();
 
     // Aileler biliniyor ve ÇELİŞİYORSA: DURDURMA, DEVRET (kullanıcı kararı 2026-07-16).
     // Çağrı doğru aileye updatedInput ile çevrilir; iş kesintisiz sürer. Parametresiz
@@ -203,7 +218,7 @@ process.stdin.on("end", () => {
           permissionDecisionReason:
             `MODEL POLİTİKASI (otomatik devir): "${ti.subagent_type}" ${expFam} ailesinde koşmalı; ` +
             `çağrı model:"${expFam}" ile düzeltilerek geçirildi. İş durdurulmaz. ` +
-            `Politika: plan + kompleks analiz Fable · uygulama/kodlama/test Opus (ana loop).`,
+            `Politika: plan + kompleks analiz Fable (kota biterse model:"opus" fallback geçer) · uygulama/kodlama/test Opus (ana loop).`,
           updatedInput: { ...ti, model: expFam },
         },
       });
@@ -215,7 +230,7 @@ process.stdin.on("end", () => {
     const active = activeModel(hook.transcript_path);
     const fam = family(active);
     // Model henüz bilinmiyorsa (yeni oturum, transcript boş) sessiz kal — gürültü yapma.
-    if (!fam || fam === anaFam) pass();
+    if (!fam || anaFams.has(fam)) pass();
     if (alreadyWarned(hook)) pass(); // oturum başına TEK uyarı — her turda tekrar akışı kilitliyordu
     context(
       event,

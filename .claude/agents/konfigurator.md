@@ -44,20 +44,23 @@ kanon tek yerdedir. Kurulu kopyada kalmış meşru bir geliştirme görürsen **
 (backport) + sync**; kalıcı bir istisna gerekiyorsa `aide sync --yerel <yol> --project <hedef>`
 ile İLAN et (sessiz muafiyet yoktur).
 
-**Kit'te ne var (2026-07-21 alet katmanı sonrası):** plan zinciri (`plan-kur`,
-`plan-organizatoru`, `planla-kos`), `kaptan`, `pm`, `eszamanli`, `zamanla` skill'leri;
-`analist`, `planlayici`, `pm`, `konfigurator`, `denetci`, `gunlukcu`, `hakem`, `kaptan`
-ajanları; `goal-tracker` + `eszamanli-guard` hook'ları; `aide-capabilities` +
-`model-policy` belgeleri. Bunlar `DEFAULT_SYNC_FEATURES` üzerinden HEM `~` HEM her `~/dev`
-projesine iner.
+**Kit'te ne var (2026-10-22 toolkit dönüşümü sonrası):** skill'ler `plan-kur`,
+`plan-organizatoru`, `eszamanli`, `workflow`, `soft-resume`, `devam`, `learnings`, `vizyoner`,
+`vizyon-damit`, `aide-saglik`; ajanlar `analist`, `planlayici`, `konfigurator`, `denetci`,
+`gunlukcu`, `vizyoner`; hook'lar `claim-guard`, `claims-lib`, `goal-tracker`, `kit-bootstrap`,
+`limit-nabzi`, `model-policy-guard`, `oturum-kapanis`, `session-status`, `statusline`; komutlar
+`goal`, `aide-durum`; belgeler `aide-capabilities`, `model-policy`, `terimler` ve sözleşmeler.
+Güncel tam liste `/Users/ybg/dev/agent-ide/packages/kit/kit.json`'dadır — bu paragrafa değil ona bak.
+Plan zincirinin ateşleyicisi (`planla-kos`), `kaptan`, `pm`, `zamanla` ve hakem zinciri
+2026-10-22'de arşive gitti (`/Users/ybg/dev/agent-ide/archive/`).
 
 **Yeni bir tanımı kit'e alma (backport) reçetesi:** ① şablonu
 `packages/kit/templates/{skills,agents,hooks,docs}/…` altına kopyala (mutlak yolları
 `/Users/ybg/dev/agent-ide` token'ına çevir — makineye çivili yol taşınabilirliği kırar) ② `kit.json`'a
-paket kaydı (çok dosyalıysa `files[]`↔`srcs[]` paralel dizileri, `skill:kaptan` deseni)
+paket kaydı (çok dosyalıysa `files[]`↔`srcs[]` paralel dizileri, `skill:plan-kur` deseni)
 ③ her projeye inmesi gerekiyorsa `sync.ts → DEFAULT_SYNC_FEATURES`'a ekle **ve mevcut
 registry kayıtlarını backfill et** (sabit yalnız YENİ kayda kopyalanır — atlanırsa "yeşil
-görünür ama inmez") ④ `aide sync` ⑤ `bun test packages/core/` (envanter bütünlüğü +
+görünür ama inmez") ④ `aide sync` ⑤ `bun test ./packages/core/` (envanter bütünlüğü +
 mutlak-yol taraması `kit-envanteri.test.ts`'te çivili).
 
 **PROJE-ÖZEL tanım kit'e GİRMEZ:** yalnız bir projeye ait bir skill/agent (ör. o projenin
@@ -72,32 +75,14 @@ görünür kılar ve hesap değişince kaybeder.
   düzenlenmiş dosya SİLİNMEZ, `yerel-override` olarak raporlanır (yerel emek korunur).
 - Kanonu (şablon + kit.json kaydı) silmek AYRI ve bilinçli bir iştir; git ile yapılır.
 
-## Tavan / throttle yönetimi (kullanıcı kararı 2026-07-20)
+## Tavan / throttle yönetimi
 
-Sistemdeki TÜM tavan/throttle/limit ayarları SENİN yetki alanındır — kullanıcı "tavanı
-kaldır/yükselt/resetle", "throttle ayarla", "bütçeyi değiştir" dediğinde buradan yönetirsin.
-KURAL: dosyaya ASLA elle yazma — her ayarın TEK YAZAR CLI'ı var, onu çağır:
+Bu bölüm eskiden PM kadranını, kapasite bütçelerini (`aide yuk-limit`), Rotacı eşiklerini,
+Maestro tavanlarını (`aide metronom tavan`) ve bildirim dedupe sabitlerini yönetiyordu. Bu
+katmanların hepsi 2026-10-22'de arşive gitti; toolkit'te ayarlanacak bir tavan ya da throttle
+yoktur. Kullanıcı böyle bir ayar isterse bunu söyle; arşivdeki CLI'ları çağırma.
 
-| Ayar | Tek yazar CLI | Not |
-|---|---|---|
-| PM kadranı: mod · frekans · paralel · **gunlukTavan** (Rotacı'nın da tavanı) | `node ~/.claude/skills/pm/scripts/ayar.mjs set [--mod] [--frekans] [--paralel] [--gunluk N] [--kaynak cli]` | frekans değiştiyse `--apply` ŞART; geçici değişiklikte geri-alım Maestro işi kur (`zamanla add --shell '…ayar.mjs set --gunluk 8…' --at 00:05`) |
-| Kapasite bütçeleri: 5h/haftalık token + reset anları | `aide yuk-limit set --mod 5h\|weekly --5h N --weekly N --reset5h ISO --reset-weekly ISO` · oto-kalibrasyon: `aide yuk-limit oto` | kaynak `~/.config/agent-ide/kapasite.json`; limit tarama `aide limit tara\|kaydet` |
-| Rotacı dispatch eşiği | `kapasite.json → dispatchEsik` (yuk-limit CLI'ı üzerinden) | reconcile K4 kapısı okur |
-| Rotacı **denetim-dağıtım eşiği (N)** — E7/E8 nöbetçisi (aşama-06) | `<proje>/.claude/rota-esik.json → esik` (İNSAN/konfiguratör-yazar; `esik.mjs` SALT-OKUR — durumu tek yazan `.esik-durum.json`) | varsayılan **10**; N dağıtım aşılınca bir rota tick uyandırır. **Reset:** `<proje>/.claude/.esik-durum.json` sil → baseline mevcut toplama iner (birikim boşalmaz). **Damga tetiği reset:** `<proje>/.claude/.damga-nobet.json` sil → damga baseline yeniden kurulur (bir sonraki değişimde tetikler) |
-| Maestro **busy park tavanı** — sonsuz-busy freni (R4/aşama-10) | `aide metronom tavan set busy_park_threshold <N>` · get/reset aynı aile · alias: `aide metronom busy-cap` (korundu) | N ardışık `busy` reddinden sonra iş parked + push (frensiz busy 14MB WAL üretmişti). Yazar `config.json → busy_park_threshold`; chokepoint metronom. varsayılan **1000** |
-| Maestro **deadman ateş tavanı** — saatlik global-pause freni (F6) | `aide metronom tavan set max_fires_per_hour <N>` · get/reset aynı aile | son savunma hattı; **GEVŞETME (artırma) 🔴 insan onayı** (manual+red iş onay kuyruğuna düşer → `aide zamanla run-now <id>`), **sıkılaştırma serbest**. Yazar `config.json → max_fires_per_hour`. varsayılan **60**, sınır [1,600] |
-| Maestro **busy alarm eşiği** — kronik-busy görünürlüğü (B2) | `aide metronom tavan set busy_alert_threshold <N>` | "görünür kıl" (park DEĞİL — o busy-park). Yazar `config.json → busy_alert_threshold`. varsayılan **50** |
-| Maestro **agent spawn dönüş tavanı** (B3) | `aide metronom tavan set agent_spawn_timeout_s <N>` | spawn'ın DÖNÜŞ süresi (iş bütçesi değil). Yazar `config.json → agent_spawn_timeout_s`. varsayılan **120**, sınır [10,900] |
-| Maestro **açılış-drain tavanı** — unpause/boot backlog freni (runtime-sertlesme aşama-02) | `aide metronom tavan set drain_max_per_tick <N>` | tick başına ateş tavanı; aşama-02'de canlanır. Yazar `config.json → drain_max_per_tick`. varsayılan **3**, sınır [1,999] |
-| **İLAN-SABİT** revizyon tavanı = **2** (E2 pivot/revize üst sınırı) | CLI YOK (kasıtlı) — `reconcile.mjs` | konfigüre edilebilirlik revizyon disiplinini deler; sabit tutulur |
-| **İLAN-SABİT** bildir dedupe: TTL (soru/onay/özet 24h · iş-başarısız 12h · dialog/draft 1h) · SAATLIK_TAVAN 6 · BUDAMA 14g | CLI YOK — çağrı-başı `--ttl` ezmesi var (`bildir.mjs`) | kalıcı yazar gereksiz; çağrı yerinden ayarlanır |
-| **İLAN-SABİT** Rotacı proaktif kapasite kapısı varsayılanı = **0.85** (`ESIK_VARSAYILAN`, `reconcile.mjs`) | yazar zaten var: `config.json → dispatchEsik` / `esik.mjs` (yukarıdaki "Rotacı dispatch eşiği" satırı) — İKİNCİ yazar açılmaz | varsayılan işaret |
-| **Vites eşikleri** (usage-aware throttle: tutumlu/kritik) — otonomi-kontrol aşama-00 | `aide yuk-limit vites set --tutumlu X --kritik Y` · get: `aide yuk-limit vites --json` · elle kilit: `aide yuk-limit vites zorla <mod>\|--temizle` | `yakilanYuzde ≥ kritik`→kritik (LLM-eylem durur), `≥ tutumlu`→tutumlu. Yazar `~/.config/agent-ide/kapasite.json → vitesEsikleri` (tek yazar kapasiteConfigYaz). Varsayılan **0.75/0.90**. `agresif` yalnız `zorla`. Fail-closed: bozuk→kritik, ayarsız→normal+İLAN. `dispatchEsik` okuma-yönlü→tutumlu göçer |
-| **İLAN-SABİT** onay yeniden-zil TTL = bildir dedupe TTL (soru/onay 24h · dialog/draft 1h) + SAATLIK_TAVAN 6 (otonomi-kontrol aşama-04) | CLI YOK — çağrı-başı `--ttl` (`bildir.mjs`) | bekleyen insan-onayı TTL doluşunda YENİDEN zil çalar (bekleyen kapanana dek, günde ≤1); kalıcı yazar gereksiz |
-
-Reset yolları: günlük ateş sayacı gece yarısı kendiliğinden sıfırlanır; kapasite reset
-anları `--reset5h/--reset-weekly` ile; "bugünlük kaldır" tarzı geçici istekler = yüksek
-değer + otomatik geri-alım işi (kalıcı politika değişikliğiyle karıştırma).
+## Model politikası
 
 **Model tier'ı:** agent frontmatter'ı opsiyonel `tier: plan|kod|inceleme|hizli`
 içerir — agent'ın birincil iş tipi. (`ana` bir agent tier'ı DEĞİLDİR: interaktif

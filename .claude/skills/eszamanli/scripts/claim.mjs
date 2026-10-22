@@ -12,7 +12,7 @@
  *   bildir  (--rol <ad> | --hedef <session>) --mesaj "..." [--res <kaynak>]  # roller arası haber
  *   wait    --res <kaynak> [--timeout <sn>] [--no-acquire] [--intent "..."]
  *   free    --res <kaynak> [--repo <yol>]        # KİMLİKSİZ sonda: devralınabilir mi? exit 0/1
- *   devret  --res <kaynak> --gorev "..." [--kuru]  # parça B'yi devret (Maestro + kalıcı işaret)
+ *   devret  --res <kaynak> --gorev "..." [--kuru]  # parça B'yi devret (kalıcı devir işareti)
  *   devir   list [--json] | al --id <id>         # devir işaretleri: gör · ATOMİK üstlen
  *   limit-devir [--kuru]                         # ben limitliyim → kilitlerimi devret
  *   gc                                           # stale claim/kuyruk kayıtlarını biç
@@ -48,18 +48,33 @@ const has = (n) => argv.includes(`--${n}`);
 const ROOT = L.repoRootOf(process.cwd());
 const RESMAP = L.loadResourceMap(ROOT);
 
-/** Kimlik: CLAUDE_CODE_SESSION_ID Bash ortamında VAR (ölçüldü) — süreç ağacına
+/** Kimlik: ortamdan (`L.envKimlik` — Claude ⊕ Codex) — süreç ağacına
  *  tırmanmaya gerek yok. pid, subagent köprüsü için yine de kaydedilir. */
 function me() {
-  const sid = process.env.CLAUDE_CODE_SESSION_ID || process.env.CLAUDE_SESSION_ID || null;
-  if (!sid) {
+  const k = L.envKimlik();
+  if (!k) {
     console.error(
-      "HATA: CLAUDE_CODE_SESSION_ID yok — bu komut bir Claude session'ının Bash aracından çalışmalı."
+      "HATA: oturum kimliği yok (CLAUDE_CODE_SESSION_ID / CODEX_THREAD_ID) — bu komut bir Claude ya da Codex oturumunun kabuk aracından çalışmalı."
     );
     process.exit(5);
   }
+  if (k.vendor === "codex") {
+    // Codex'te session-status'u hook yazmaz → kaydı burada kur; kayıtsız sahibin kilidi biçilir.
+    let o = null;
+    try {
+      o = L.codexKayit(k.sessionId, ROOT);
+    } catch (e) {
+      console.error(`HATA: Codex oturum kaydı yazılamadı (${e.code || e.message}) — sandbox ~/.claude/session-status yazımına izin vermiyor olabilir.`);
+      process.exit(5);
+    }
+    if (!o) {
+      console.error("HATA: Codex sahip süreci ÖLÇÜLEMEDİ (ps kapalı ya da `codex` atası yok) — kanıtsız kilit alınmaz.");
+      process.exit(5);
+    }
+    return { sessionId: k.sessionId, pid: o.pid, procStart: o.procStart };
+  }
   // Kimlik = session'ın kendi session-status kaydı (kapı da aynı yerden okur).
-  return L.identityOf(sid);
+  return L.identityOf(k.sessionId);
 }
 
 /**
@@ -190,7 +205,7 @@ function mesgul(cur, I, targetKey, why) {
   console.log(
     [
       `MEŞGUL: ${targetKey}${why && why !== "aynı kaynak" ? `  (çakışma: ${cur.resource.key} — ${why})` : ""}`,
-      `  sahip: ${s ? `"${s.title || "(başlıksız)"}" (${s.dirName}, ${s.state})` : short(cur.owner?.sessionId)}`,
+      `  sahip: ${s ? `"${L.adi(s) || "(başlıksız)"}" (${s.dirName}, ${s.state})` : short(cur.owner?.sessionId)}`,
       limitliSatir(cur.owner?.sessionId) || ``,
       `  niyet: ${cur.intent || "(belirtilmemiş)"}`,
       yer >= 0 ? `  kuyruktaki yerin: ${yer + 1}/${q.length}` : ``,
@@ -199,8 +214,8 @@ function mesgul(cur, I, targetKey, why) {
       `  a) bu oturumda bitecekse — uyanma kur (run_in_background; sıra sana gelince kilidi`,
       `     SENİN ADINA alır, uyandığında kaynak elinde olur):`,
       `       node ${process.argv[1]} wait --res "${cur.resource.key}" --intent "<devam eden iş>"`,
-      `  b) oturum kapanabilir / iş bağımsız koşabilirse — parçayı Maestro'ya DEVRET`,
-      `     (kaynak devralınabilir olunca ateşlenir; oturumun yaşaması gerekmez):`,
+      `  b) oturum kapanabilir / iş bağımsız koşabilirse — parçayı DEVRET (kalıcı devir`,
+      `     işareti; kaynağı bekleyen ya da açılan ilk oturum üstlenir):`,
       `       node ${process.argv[1]} devret --res "${cur.resource.key}" --gorev "<parça B tarifi>"`,
     ]
       .filter((x) => x !== ``)
@@ -294,7 +309,7 @@ function cycleRapor(cyc, targetKey) {
   L.yazOlay(ROOT, {
     tip: "cevrim",
     key: targetKey,
-    engellenen: (process.env.CLAUDE_CODE_SESSION_ID || process.env.CLAUDE_SESSION_ID || "").slice(0, 8) || null,
+    engellenen: (L.envKimlik()?.sessionId || "").slice(0, 8) || null,
     why: `zincir: ${cyc.chain.join(" → ")} → (ben) · tuttuklarım: ${cyc.release.join(", ")}`,
   });
   console.error(
@@ -359,7 +374,7 @@ function cmdClaim() {
     console.error(
       [
         `SIRA SENDE DEĞİL: ${resource.key}`,
-        `  önünde bekleyen: ${hs ? `"${hs.title || "(başlıksız)"}" (${hs.state})` : short(head.sessionId)} — ${head.intent || "(niyet belirtilmemiş)"}`,
+        `  önünde bekleyen: ${hs ? `"${L.adi(hs) || "(başlıksız)"}" (${hs.state})` : short(head.sessionId)} — ${head.intent || "(niyet belirtilmemiş)"}`,
         `  o session ${dk(head.since)} beri sırada ve kilidi alacak.`,
         ``,
         `Sıraya gir (sıra sana gelince kilit SENİN adına alınır):`,
@@ -507,7 +522,7 @@ function cmdStatus() {
   const live = L.liveSessionsIn(ROOT);
   /* Kendini sırada GÖR: `me()` burada kullanılamaz (session dışında exit 5 verir —
      status her yerden okunabilmeli), o yüzden kimlik YUMUŞAK okunur; yoksa işaret düşer. */
-  const benSid = process.env.CLAUDE_CODE_SESSION_ID || process.env.CLAUDE_SESSION_ID || null;
+  const benSid = L.envKimlik()?.sessionId || null;
   if (has("json")) {
     /* `ownerAlive`: sahibin süreci ÖLÇÜLMÜŞ canlılık hükmü (procAlive = pid ⊕ procStart,
        pid geri-dönüşüne karşı). Tüketici sistem grafı: kilit düğümünün `canli` alanı bu
@@ -535,21 +550,21 @@ function cmdStatus() {
         const s = L.sessionInfo(r.sahip.sessionId);
         console.log(
           `  ${r.ad.padEnd(11)} ${short(r.sahip.sessionId)}${r.sahip.sessionId === benSid ? " «SEN»" : ""}` +
-            `${s ? ` "${(s.title || "").slice(0, 36)}"` : ""}${r.sahip.kapsam ? ` · ${String(r.sahip.kapsam).slice(0, 44)}` : ""}`
+            `${s ? ` "${(L.adi(s) || "").slice(0, 36)}"` : ""}${r.sahip.kapsam ? ` · ${String(r.sahip.kapsam).slice(0, 44)}` : ""}`
         );
       }
     }
   }
   console.log(`canlı session: ${live.length}`);
   for (const s of live)
-    console.log(`  • ${short(s.sessionId)} "${s.title || "(başlıksız)"}" — ${s.dirName}, ${s.state}`);
+    console.log(`  • ${short(s.sessionId)} "${L.adi(s) || "(başlıksız)"}" — ${s.dirName}, ${s.state}`);
   console.log(`aktif kilit: ${claims.length}`);
   for (const c of claims) {
     const s = L.sessionInfo(c.owner?.sessionId);
     const q = L.queueOf(ROOT, c.resource.key);
     console.log(
       `  • ${c.resource.key}  ←  ${short(c.owner?.sessionId)}` +
-        `${s ? ` "${(s.title || "").slice(0, 40)}"` : ""} [${c.breadth}] ${dk(c.createdAt)}` +
+        `${s ? ` "${(L.adi(s) || "").slice(0, 40)}"` : ""} [${c.breadth}] ${dk(c.createdAt)}` +
         `${c.intent ? `\n      niyet: ${c.intent}` : ""}` +
         (q.length
           ? `\n      sıra: ${q
@@ -661,7 +676,7 @@ async function cmdWait() {
       console.log(
         [
           `BEKLİYOR: ${resource.key}`,
-          `  sahip: ${short(cur0.owner?.sessionId)}${s0 ? ` "${(s0.title || "(başlıksız)").slice(0, 56)}" (${s0.state})` : ""} — ${dk(cur0.createdAt)} tutuyor`,
+          `  sahip: ${short(cur0.owner?.sessionId)}${s0 ? ` "${(L.adi(s0) || "(başlıksız)").slice(0, 56)}" (${s0.state})` : ""} — ${dk(cur0.createdAt)} tutuyor`,
           `  sahip ne yapıyor: ${cur0.intent || "(niyet belirtilmemiş)"}`,
           `  sıra: ${yer >= 0 ? `${yer + 1}/${aktif.length}` : `${aktif.length} bekleyen`}`,
         ].join("\n")
@@ -844,8 +859,7 @@ function cmdResources() {
 
 /**
  * KİMLİKSİZ sonda: kaynak DEVRALINABİLİR mi? (deterministik, 0 token, session env
- * GEREKTİRMEZ — Maestro `when-shell` koşulu daemon ortamında koşar, orada
- * CLAUDE_CODE_SESSION_ID yoktur.)
+ * GEREKTİRMEZ — dış bir koşul denetleyicisi session ortamı olmadan da koşabilmeli.)
  *
  * Ölçüt üç parça: (1) aynı anahtar tutulmuyor, (2) GERÇEK çakışan kaynak tutulmuyor
  * (yol kesişimi ∨ conflictsWith — claim yolundaki ölçütün AYNISI), (3) önünde AKTİF
@@ -878,133 +892,86 @@ function cmdFree() {
 }
 
 /**
- * Bloke parçayı (parça B) Maestro kuyruğuna DEVRET: kaynak devralınabilir olunca
- * (`free` sondası exit 0) iş ateşlenir. `wait`ten farkı: bu oturumun YAŞAMASI
- * GEREKMEZ — bekleyiş süreçte değil iş kuyruğunda taşınır. Bedeli: sıra TUTMAZ
- * (aktif bekleyen her zaman önce alır; sıra istiyorsan wait kur, ikisi birlikte de
- * kurulabilir). Ateşlenen iş claim'i KENDİSİ alır — sonda ile ateş arasındaki yarışı
- * protokol çözer (MEŞGUL görürse wait kurar).
+ * Bloke parçayı (parça B) DEVRET: işi KALICI DEVİR İŞARETİNE yazar
+ * (`claims/<repo>/devir/`). `wait`ten farkı: bu oturumun YAŞAMASI GEREKMEZ — bekleyiş
+ * süreçte değil işarette taşınır. Bedeli: sıra TUTMAZ (aktif bekleyen her zaman önce alır;
+ * sıra istiyorsan wait kur, ikisi birlikte de kurulabilir). İşareti açılış-devralma ya da
+ * kaynağı bekleyen sıradaki oturum `devir al` ile üstlenir; claim'i üstlenen KENDİSİ alır.
  *
- *   devret --res <k> --gorev "<parça B tarifi>"   → yeni agentic session (goal)
- *   devret --res <k> --text "<metin>" [--session <sid>]  → canlı pane'e enjeksiyon
- *   --kuru  → kuyruğa YAZMAZ, koşacağı komutu basar (prova)
+ *   devret --res <k> --gorev "<parça B tarifi>"
+ *   --kuru  → işaret YAZMAZ, yazacağı kaydı basar (prova)
  *
- * Bu komut ajan DOĞURMAZ; işi Maestro'ya YAZAR (aide zamanla üzerinden — Maestro'yla
- * temas sözleşmesi). Doğacak ajanın maliyeti ateş anında, iş kaydında görünür.
+ * 2026-10-22 (toolkit dönüşümü): eskiden işaret ardından `aide zamanla add` ile Maestro
+ * kuyruğuna da yazılırdı; `--text` yolu da yalnız zamanla ile canlı pane'e enjeksiyon
+ * yapardı. Zamanla ve Maestro arşive gitti → zamanla denemesi kaldırıldı (exit 2 alıp
+ * işarete düşüyordu), `--text` reddedilir (her çağrıda exit 5 veriyordu, iz bırakmıyordu).
+ *
+ * Bu komut ajan DOĞURMAZ; yalnız kayıt yazar (deterministik, 0 token).
  */
 function cmdDevret() {
   const I = me();
   const raw = flag("res");
-  const resource = resolveRes(raw);
   const gorev = flag("gorev");
-  const text = flag("text");
-  if (!gorev && !text) {
-    console.error('HATA: --gorev "<parça B tarifi>" (agentic) ya da --text "<enjeksiyon>" gerekli.');
+  if (has("text")) {
+    console.error(
+      "HATA: devret --text kaldırıldı (canlı pane'e enjeksiyonu yapan zamanla/Maestro arşivde).\n" +
+        '  Parçayı devretmek için: devret --res <k> --gorev "<parça B tarifi>"\n' +
+        "  Canlı bir oturuma haber bırakmak için: bildir --hedef <sid> --mesaj \"…\""
+    );
     process.exit(5);
   }
-  const self = resolve(process.argv[1]);
-  const shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
-  const probe = `node ${shq(self)} free --res ${shq(resource.key)} --repo ${shq(ROOT)}`;
-  const title = flag("title") || `devir: ${resource.key}`;
-  /* Kimlik ÖNCE hesaplanır: kuru koşum ıslak koşumun BİREBİR metnini basmalı (yoksa
-     "önce bak" yolu gerçekte koşulacak komutu göstermez = kuru koşum yalanlar). */
-  const devirId = `${Date.now()}-${String(I.sessionId).slice(0, 8)}`;
-
-  const args = ["zamanla", "add", "--when-shell", probe, "--title", title];
-  if (gorev) {
-    // Goal önsözü: ateşlenen session ÖNCE işi ÜSTLENİR (dedup), SONRA kaynağı devralır —
-    // sonda "serbest" dedi diye kaynak onun değildir; arada başka session kapmış olabilir.
-    args.push(
-      "--goal",
-      [
-        `İLK ADIM — işi ÜSTLEN (dedup): node ${self} devir al --id ${devirId}`,
-        `ALINAMADI derse İŞ BİTTİ: bu devri başka bir oturum üstlenmiş, aynı işi İKİNCİ KEZ koşma.`,
-        `ÖN KOŞUL — kaynağı devral: node ${self} claim --res "${resource.key}" --intent "${title}"`,
-        `MEŞGUL derse: aynı komutun wait halini run_in_background ile kur, çıkınca kaynak sendedir.`,
-        `İş bitince: node ${self} release --res "${resource.key}"`,
-        `GÖREV: ${gorev}`,
-      ].join("\n"),
-      "--new-cwd",
-      ROOT
-    );
-  } else {
-    args.push("--text", text, "--session", flag("session") || I.sessionId, "--cwd", ROOT);
+  if (!gorev) {
+    console.error('HATA: --gorev "<parça B tarifi>" gerekli.');
+    process.exit(5);
   }
+  const resource = resolveRes(raw);
+  const self = resolve(process.argv[1]);
+  const title = flag("title") || `devir: ${resource.key}`;
+  const devirId = `${Date.now()}-${String(I.sessionId).slice(0, 8)}`;
+  const kayit = {
+    id: devirId,
+    keys: [resource.key],
+    gorev,
+    intent: title,
+    todo: flag("todo") || null,
+    breadth: flag("breadth") || null,
+    devreden: I,
+    kaynak: "devret",
+  };
 
   if (has("kuru")) {
     console.log(
-      `KURU KOŞUM — yazılacak iş:\n  aide ${args.map((a) => (/\s/.test(a) ? shq(a) : a)).join(" ")}` +
-        (gorev ? `\n  devir işareti: ${devirId} (kuru koşumda YAZILMAZ)` : "")
+      `KURU KOŞUM — yazılacak devir işareti (YAZILMADI):\n` +
+        `  id: ${devirId} · kaynak: ${resource.key}\n` +
+        `  görev: ${gorev}\n` +
+        `  üstlenme: node ${self} devir al --id ${devirId}`
     );
     return;
   }
 
-  /* ── ÇİFT YOL (aşama 08) ────────────────────────────────────────────────────
-     Eskiden devrin TEK taşıyıcısı Maestro'ydu: `aide` yoksa/kuyruk kapalıysa komut
-     exit 5 ile ölür, iş de onunla giderdi. Oysa bu planın koşulduğu dönemde metronom
-     KİLİTLİ (26 Tem'den beri süreç yok) — yani en çok ihtiyaç duyulan anda devir hiç
-     çalışmıyordu. İkinci taşıyıcı: KALICI DEVİR İŞARETİ. Sıra sözleşmedir — işaret
-     Maestro'dan ÖNCE yazılır, çünkü yazılamayan işareti telafi edecek bir yol yoktur. */
-  let isaret = null;
-  if (gorev) {
-    try {
-      isaret = L.writeDevir(ROOT, {
-        id: devirId,
-        keys: [resource.key],
-        gorev,
-        intent: title,
-        todo: flag("todo") || null,
-        breadth: flag("breadth") || null,
-        devreden: I,
-        kaynak: "devret",
-        maestro: { yazildi: false, jobRef: null },
-      });
-    } catch (e) {
-      // İŞARET DE yazılamadı → gerçekten kaybediyoruz; tek gerçek hata dalı.
-      console.error(
-        `DEVİR İŞARETİ YAZILAMADI (${e?.code || e?.message || "bilinmeyen"}) — devir KAYDEDİLMEDİ.\n` +
-          `  Kaynağı elle beklemek için: node ${self} wait --res "${resource.key}"`
-      );
-      process.exit(5);
-    }
-  }
-
-  const r = spawnSync("aide", args, { stdio: "inherit" });
-  const maestroOk = !r.error && r.status === 0;
-  if (!maestroOk && !isaret) {
-    // --text yolu: devredilecek bir İŞ yok (canlı pane'e enjeksiyon), işaret de yazılmadı
-    // → eski sözleşme aynen (ilanlı sınır: çift yol yalnız --gorev yolundadır).
+  try {
+    L.writeDevir(ROOT, kayit);
+  } catch (e) {
+    // İşaret yazılamadıysa devir YOKTUR; tek gerçek hata dalı.
     console.error(
-      `DEVİR YAZILAMADI (${r.error?.code || `exit ${r.status}`}) — komutu kendin koş:\n` +
-        `  aide ${args.map((a) => (/\s/.test(a) ? shq(a) : a)).join(" ")}`
+      `DEVİR İŞARETİ YAZILAMADI (${e?.code || e?.message || "bilinmeyen"}) — devir KAYDEDİLMEDİ.\n` +
+        `  Kaynağı elle beklemek için: node ${self} wait --res "${resource.key}"`
     );
     process.exit(5);
   }
-  if (isaret && maestroOk) {
-    try {
-      L.writeDevir(ROOT, {
-        ...JSON.parse(readFileSync(isaret.file, "utf8")),
-        maestro: { yazildi: true, jobRef: title },
-      });
-    } catch {
-      /* damga yazılamadı — iş yine iki yoldan da bulunur; hüküm değişmez */
-    }
-  }
 
   /* DEFTERE: devredilen iş, üstlenecek birini arayan İŞTİR — orkestratörün görmesi gereken
-     tam olarak budur (Maestro ölüyken işin tek bulucusu odur). `why` görevi ve devir id'sini
+     tam olarak budur (işin tek bulucusu odur). `why` görevi ve devir id'sini
      taşır: şema sabittir, olay başına yeni alan açılmaz. */
   L.yazOlay(ROOT, {
     tip: "devir",
     key: resource.key,
     engellenen: I.sessionId,
-    why: [gorev ? `görev: ${gorev}` : null, isaret ? `devir id: ${devirId}` : null]
-      .filter(Boolean)
-      .join(" · ") || "devret",
+    why: `görev: ${gorev} · devir id: ${devirId}`,
   });
 
   /* Kuyruk İŞARETİ (devir işaretinden AYRI şey): sahip status'ta "isteyen var" görsün,
-     elverişli ilk anda yol versin. Sıra TUTMAZ (pid yok) — devrin sırası iş kuyruğunda.
+     elverişli ilk anda yol versin. Sıra TUTMAZ (pid yok) — devir işaretinde taşınır.
      Sahibi olan bir kilit varsa haber de düşer: onu bekleyen artık bir DEVREDİLMİŞ iştir. */
   {
     const cur = findClaim(resource, raw);
@@ -1018,22 +985,10 @@ function cmdDevret() {
       });
   }
 
-  if (maestroOk) {
-    console.log(
-      `DEVREDİLDİ: ${resource.key} — kaynak devralınabilir olunca Maestro ateşler.\n` +
-        `  devir işareti: ${devirId} (Maestro ateşlenmezse de iş kayıtlı; üstlenen ilk oturum alır)\n` +
-        `  Bu oturum kapanabilir; iş oturumdan bağımsız koşacak. İzleme: aide zamanla list`
-    );
-    return;
-  }
-  /* Maestro ÖLÜ ama iş KAYITLI → bu bir hata değil, İKİNCİ YOL. exit 0 (sözleşme
-     değişikliği, İLANLI: eskiden 5). Kod tüketicisi yoktu (ölçüldü 2026-07-30:
-     `grep -rn devret packages/` → yalnız belge/SKILL/proof; `aide devret` BAŞKA komut). */
   console.log(
-    `MAESTRO YAZILAMADI (${r.error?.code || `exit ${r.status}`}) — devir işareti KALDI: ${devirId}\n` +
-      `  İş kaybolmadı: açılış-devralma (aşama 06) ya da bu kaynağı bekleyen sıradaki oturum devralır.\n` +
-      `  Görmek için: node ${self} devir list   ·   üstlenmek için: node ${self} devir al --id ${devirId}\n` +
-      `  Maestro'yu kendin sürmek istersen: aide ${args.map((a) => (/\s/.test(a) ? shq(a) : a)).join(" ")}`
+    `DEVREDİLDİ: ${resource.key} — devir işareti: ${devirId}\n` +
+      `  Bu oturum kapanabilir. Açılış-devralma ya da bu kaynağı bekleyen sıradaki oturum üstlenir.\n` +
+      `  Görmek için: node ${self} devir list   ·   üstlenmek için: node ${self} devir al --id ${devirId}`
   );
 }
 
@@ -1260,7 +1215,7 @@ function cmdOrkestrator() {
     if (!o) return console.log(`orkestratör: YOK (repo: ${ROOT})`);
     const s = L.sessionInfo(o.sessionId);
     console.log(
-      `orkestratör: ${short(o.sessionId)}${s ? ` "${(s.title || "(başlıksız)").slice(0, 56)}" (${s.state})` : ""}\n` +
+      `orkestratör: ${short(o.sessionId)}${s ? ` "${(L.adi(s) || "(başlıksız)").slice(0, 56)}" (${s.state})` : ""}\n` +
         `  ${dk(o.since)} kayıtlı${o.kapsam ? ` · kapsam: ${o.kapsam}` : ""}` +
         `${o.devralindi ? ` · devraldı: ${short(o.devralindi)}` : ""}`
     );
@@ -1283,7 +1238,7 @@ function cmdOrkestrator() {
   if (!r.ok) {
     const s = L.sessionInfo(r.mevcut?.sessionId);
     console.error(
-      `ORKESTRATÖR ZATEN VAR: ${short(r.mevcut?.sessionId)}${s ? ` "${(s.title || "").slice(0, 48)}" (${s.state})` : ""}\n` +
+      `ORKESTRATÖR ZATEN VAR: ${short(r.mevcut?.sessionId)}${s ? ` "${(L.adi(s) || "").slice(0, 48)}" (${s.state})` : ""}\n` +
         `  ${dk(r.mevcut?.since)} kayıtlı. Gerçekten sen devralacaksan: orkestrator kayit --devral`
     );
     process.exit(3);
@@ -1309,7 +1264,7 @@ function cmdOrkestrator() {
  * ve progress'leri görmeliyim" — tetikleyen sensin, kutu SORULUR.
  */
 function cmdKutu() {
-  const benSid = process.env.CLAUDE_CODE_SESSION_ID || process.env.CLAUDE_SESSION_ID || null;
+  const benSid = L.envKimlik()?.sessionId || null;
   if (!benSid) {
     console.error("HATA: kimlik yok — bu komut bir Claude oturumunun Bash aracından çalışmalı.");
     process.exit(5);
@@ -1368,7 +1323,7 @@ function cmdRol() {
   const alt = argv[1] || "durum";
   if (alt === "durum" || alt === "list") {
     const roller = L.rolListe(ROOT); // kimliksiz okunur: insan da bakabilmeli
-    const benSid = process.env.CLAUDE_CODE_SESSION_ID || process.env.CLAUDE_SESSION_ID || null;
+    const benSid = L.envKimlik()?.sessionId || null;
     for (const r of roller) {
       if (!r.tekil) {
         const canli = L.liveSessionsIn(ROOT);
@@ -1388,7 +1343,7 @@ function cmdRol() {
         `  ${r.ad.padEnd(11)} ${
           r.sahip
             ? `${short(r.sahip.sessionId)}${r.sahip.sessionId === benSid ? " «SEN»" : ""}` +
-              `${s ? ` "${(s.title || "").slice(0, 36)}"` : ""}${r.sahip.kapsam ? ` · ${String(r.sahip.kapsam).slice(0, 40)}` : ""}`
+              `${s ? ` "${(L.adi(s) || "").slice(0, 36)}"` : ""}${r.sahip.kapsam ? ` · ${String(r.sahip.kapsam).slice(0, 40)}` : ""}`
             : `— (boş) · ${r.ne}`
         }${kutuEk}`
       );
@@ -1428,7 +1383,7 @@ function cmdRol() {
     else {
       const s = L.sessionInfo(r.mevcut?.sessionId);
       console.error(
-        `ROL DOLU: ${ad} ← ${short(r.mevcut?.sessionId)}${s ? ` "${(s.title || "").slice(0, 44)}" (${s.state})` : ""}\n` +
+        `ROL DOLU: ${ad} ← ${short(r.mevcut?.sessionId)}${s ? ` "${(L.adi(s) || "").slice(0, 44)}" (${s.state})` : ""}\n` +
           `  ${dk(r.mevcut?.since)} kayıtlı. Gerçekten sen devralacaksan: rol kayit --rol ${ad} --devral`
       );
     }
@@ -1493,7 +1448,7 @@ function cmdBildir() {
             `  Muhatabı sen seç: node ${process.argv[1]} status  →  bildir --hedef <sessionId>` +
             (c.adaylar?.length
               ? `\n  canlı oturumlar:\n` +
-                c.adaylar.map((s) => `    ${short(s.sessionId)} "${(s.title || "").slice(0, 48)}" (${s.state})`).join("\n")
+                c.adaylar.map((s) => `    ${short(s.sessionId)} "${(L.adi(s) || "").slice(0, 48)}" (${s.state})`).join("\n")
               : "")
         );
       else
@@ -1514,7 +1469,7 @@ function cmdBildir() {
     tip: "elle",
     key,
     kimden: I.sessionId,
-    kimdenBaslik: L.sessionInfo(I.sessionId)?.title || null,
+    kimdenBaslik: L.adi(L.sessionInfo(I.sessionId)) || null,
     mesaj: String(mesaj),
   });
   if (!yazildi) {
@@ -1534,7 +1489,7 @@ function cmdBildir() {
   }
   console.log(
     [
-      `BİLDİRİ GÖNDERİLDİ → ${rolKutu ? `[rol:${rolKutu} kutusu] ` : ""}${short(hedef)}${s ? ` "${(s.title || "(başlıksız)").slice(0, 48)}" (${s.state})` : ""}`,
+      `BİLDİRİ GÖNDERİLDİ → ${rolKutu ? `[rol:${rolKutu} kutusu] ` : ""}${short(hedef)}${s ? ` "${(L.adi(s) || "(başlıksız)").slice(0, 48)}" (${s.state})` : ""}`,
       key ? `  kaynak: ${key}` : ``,
       oluUyari ? `  ⚠ ${oluUyari}` : ``,
       oluUyari

@@ -77,7 +77,7 @@ function truncate(s, n) {
  * (claims-lib.claudeAncestor) yaşar — ikinci bir motor yazılmaz. Dinamik import:
  * claims-lib yoksa/bozuksa session-status yine de çalışır (kayıt pid'siz kalır,
  * tüketici tarafta "canlılığı kanıtlanamaz" = ölü sayılır — kapalı-fail).
- * Yalnız session'ın İLK olayında koşar (sonra prev.pid'ten okunur).
+ * Session'ın İLK olayında ve kayıttaki sahip ÖLDÜĞÜNDE koşar (yoksa prev.pid'ten okunur).
  */
 async function claudeProc() {
   try {
@@ -86,6 +86,16 @@ async function claudeProc() {
     return a ? { pid: a.pid, procStart: a.start } : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/** Kayıttaki sahip hâlâ canlı mı (pid ⊕ procStart). claims-lib yoksa eski davranış: canlı say. */
+async function sahipCanli(p) {
+  try {
+    const L = await import("./claims-lib.mjs");
+    return L.procAlive(p.pid, p.procStart);
+  } catch {
+    return true;
   }
 }
 
@@ -117,7 +127,11 @@ async function main() {
   // Dosyanın VARLIĞI canlılık DEĞİLDİR — crash'te SessionEnd ateşlenmez ve kayıt
   // sonsuza dek "generating" kalır (ölçüldü: aylar öncesinden 100+ ölü kayıt).
   // pid TEK BAŞINA da yetmez: pid geri dönüşür → süreç başlama zamanıyla çift.
-  const owner = prev.pid ? { pid: prev.pid, procStart: prev.procStart } : await claudeProc();
+  // Kayıttaki sahip ÖLÜYSE yeniden çöz (2026-09-14): devam ettirilen oturum (resume · compaction)
+  // aynı sid'i YENİ süreçte taşır; eski pid kalırsa bu oturumun her kilidi anında "sahibi ölü"
+  // sayılıp temizlenir (ölçüldü: iki oturumun kaydı 10 Eyl'den kalma ölü pid taşıyordu).
+  const eski = prev.pid ? { pid: prev.pid, procStart: prev.procStart } : undefined;
+  const owner = eski && (await sahipCanli(eski)) ? eski : (await claudeProc()) || eski;
 
   const next = {
     sessionId,

@@ -809,8 +809,14 @@ function kaynakChk(ctx) {
   const out = [];
   for (const p of ctx.model.plans) {
     if (p.durum === 'KAPALI') continue;                  // kapalı plan sıraya girmez (kunyeMuaf emsali)
+    /* KAPALI AŞAMANIN MADDESİ SIRAYA GİRMEZ (2026-09-29, bakım yükü ölçümü): STATE aşamayı kapatmışken
+       CHECKLIST'te işaretlenmemiş kalan madde iş DEĞİL, kayıt eksiğidir — listeyi bayat maddeyle
+       doldurup gerçek işi gömüyordu (dorukcom06: 74 chk maddesinin büyük kısmı). Sayı İLAN edilir
+       (sessiz kırpma yasak) — `bulgular.kapaliAsamaMuaf`. */
+    const kapaliAsama = new Set((p.asamalar || []).filter((a) => a.durum === 'KAPALI').map((a) => String(a.no).padStart(2, '0')));
     const sayac = new Map();
     for (const m of p.checklist.maddeler || []) {
+      if (m.asama && kapaliAsama.has(String(m.asama).padStart(2, '0'))) { ctx.kapaliAsamaMuaf = (ctx.kapaliAsamaMuaf || 0) + 1; continue; }
       const anahtar = m.etiket ? trKey(m.etiket).replace(/–/g, '-') : 'h' + sha6(trKey(m.metin));
       const n = (sayac.get(anahtar) || 0) + 1; sayac.set(anahtar, n);
       const ref = `td:chk/${p.slug}/${anahtar}${n > 1 ? `-${n}` : ''}`;
@@ -913,9 +919,12 @@ function buildTodo(model) {
 
   const kaynakSayim = { chk: 0, elle: 0, hukum: 0, kunye: 0, oturum: 0 };
   for (const m of sirali) kaynakSayim[m.tur]++;
+  /* `acik` = İŞ maddesi (elle · hüküm · checklist). Künye/oturum UYARIDIR (advisory; kendi başlıklarında
+     durur) — "açık" sayısına karışınca panoda 142 görünüyordu, gerçek iş ~36'ydı (2026-09-29). */
+  const uyari = kaynakSayim.kunye + kaynakSayim.oturum;
   return {
-    acik: sirali.length, kaynak: kaynakSayim, muaf: TODO_MUAF, maddeler: sirali,
-    bulgular: { cift: elle.cift, cipasiz: elle.cipasiz, cozulemeyen, sarkikMuaf },
+    acik: sirali.length - uyari, uyari, toplam: sirali.length, kaynak: kaynakSayim, muaf: TODO_MUAF, maddeler: sirali,
+    bulgular: { cift: elle.cift, cipasiz: elle.cipasiz, cozulemeyen, sarkikMuaf, kapaliAsamaMuaf: ctx.kapaliAsamaMuaf || 0 },
   };
 }
 
@@ -936,7 +945,7 @@ function renderTodoMd(model) {
   L.push(`> Damga: \`${model.damga}\` · Kaynak: CHECKLIST(açık) · TODO-ELLE.md · HUKUM.md(EKSİK/STUCK) · künye-eksikleri · sarkık-oturum`);
   L.push(`> İLANLI MUAF (bu listeye GİRMEZ, her birinin kendi kanalı var): ${t.muaf.join(' · ')}`);
   L.push('');
-  L.push(`**${t.acik} açık madde** · plansız: ${plansiz.length} · chk: ${t.kaynak.chk} · elle: ${t.kaynak.elle} · hüküm: ${t.kaynak.hukum} · künye: ${t.kaynak.kunye} · oturum: ${t.kaynak.oturum}`);
+  L.push(`**${t.acik} açık iş** · plansız: ${plansiz.length} · chk: ${t.kaynak.chk} · elle: ${t.kaynak.elle} · hüküm: ${t.kaynak.hukum} — ayrıca **${t.uyari ?? 0} uyarı** (künye: ${t.kaynak.kunye} · oturum: ${t.kaynak.oturum}; en altta ayrı başlıklarda)`);
   L.push('');
 
   const blok = (baslik, list, ciz) => {
@@ -985,6 +994,7 @@ function renderTodoMd(model) {
     L.push('');
   }
   if (b.sarkikMuaf) L.push(`_MUAF: KAPALI planlardan ${b.sarkikMuaf} sarkık \`Kapatır\` ref'i — doğal yaşam döngüsü, alarm üretilmez._`);
+  if (b.kapaliAsamaMuaf) L.push(`_MUAF: STATE'te KAPALI aşamalardan ${b.kapaliAsamaMuaf} işaretlenmemiş CHECKLIST maddesi listeye alınmadı — iş değil kayıt eksiği (CHECKLIST'te [x] ile kapat)._`);
   return L.join('\n') + '\n';
 }
 

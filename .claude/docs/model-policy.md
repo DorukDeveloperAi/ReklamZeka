@@ -1,9 +1,10 @@
 # Model tier politikası — hangi iş hangi modelle koşar
 
 Tier→(model, effort) eşlemesi tek kaynaktan türer: **`~/.config/agent-ide/config.json` → `models`**;
-oradan **`~/.claude/model-policy.json`**'a türetilir (agent'lar ve maestro bunu okur) ve `ana` tier'ı
+oradan **`~/.claude/model-policy.json`**'a türetilir (agent'lar bunu okur) ve `ana` tier'ı
 **`~/.claude/settings.json` → `model`** alanına pinlenir (Claude Code'un okuduğu tek yer).
-Ayarı kullanıcı `aide` TUI'nın *Yapılandır → Modeller* sekmesinden yapar. Sen yalnız **okur**, uygularsın.
+Ayarı kullanıcı `aide model sec <tier> --model <id> --effort <e>` komutuyla yapar (`-` alanı siler).
+Sen yalnız **okur**, uygularsın.
 
 **Türev dosyaları ELLE DÜZENLEME** (`model-policy.json`, `settings.json → model`, vendor açıkken
 `~/.codex/config.toml → model`): `writeModelPolicy` üzerine yazar, değişikliğin sessizce kaybolur.
@@ -11,11 +12,16 @@ Değişiklik yalnız kaynaktan (`config.json → models`) yapılır; `tiers.<t>`
 
 ## Kanon — üç cümle
 
-- **Ana loop (interaktif oturum) = Opus 5 (1M).** Uygulama, kodlama, test, planın adımlarını yürütme.
+- **Ana loop (interaktif oturum) = Opus 5 (1M) — ya da Fable (2026-09-21 kullanıcı kararı, tüm projeler).**
+  `tiers.ana.model` yeni oturumun VARSAYILANIDIR; `tiers.ana.izinli: ["fable"]` ailesindeki kullanıcı
+  seçimi meşrudur: pin yazıcı ezmez, doctor FAIL basmaz, bekçi MODEL NOTU düşmez, pinsiz ajan oturumu devralır.
 - **Plan + kompleks analiz = Fable 5.** Ana loop'un modelini değiştirerek değil, **DELEGE ederek**:
-  `Agent(subagent_type: "planlayici"|"analist", model: "fable", …)`.
-- **Fable yürütmez, Opus planlamaz.** Plan üreten ajanların `Edit`/`Write` aracı yoktur; ürettikleri
-  adımları Opus ana loop uygular.
+  `Agent(subagent_type: "planlayici"|"analist", …)` — frontmatter pini (policy türevi) Fable'dır.
+- **Fable kotası biterse Opus devralır (2026-09-13 kullanıcı kararı):** limit/kota hatası (429) dönerse
+  iş DURMAZ — aynı çağrı `model: "opus"` ile yeniden koşulur; guard, tier'ın `fallback` ailesiyle açık
+  çağrıyı geri çevirmez. Sapma tek cümleyle ilan edilir; kota açılınca plan yine Fable'dadır.
+- **Plan-sınıfı AJAN yürütmez** (ana oturum Fable ise kendisi yürütür). Plan üreten ajanların `Edit`/`Write` aracı yoktur; ürettikleri
+  adımları ana loop uygular.
 
 ## Tier'lar — hangi iş hangi tier
 
@@ -56,8 +62,6 @@ yazılmayan alan global tier'dan devralınır.
 | dağıtım yolu | nasıl |
 |---|---|
 | Task/Agent tool | `model:` parametresi **OPSİYONEL** — ajanın frontmatter pini (policy türevi) geçerlidir. Etkin model yanlış ailedeyse `model-policy-guard` hook'u çağrıyı REDDETMEZ; `updatedInput` ile doğru aileye **otomatik devreder** (2026-07-16 kullanıcı kararı: iş DURMAZ, devir systemMessage ile görünür) |
-| `zamanla add --new-cmd 'claude --resume <sid>'` | komuta `--model <id> [--effort <e>]` ekle |
-| `zamanla add --agent <ref>` | `--tier <t>` geçir; **model/effort geçme** — launcher (`runAgent`) hedef agent'ın ezmesi dahil kendisi çözer |
 
 ## Üç sert kural
 
@@ -68,8 +72,8 @@ yazılmayan alan global tier'dan devralınır.
    **bayrak belirtme** ve görevi durdurma. Agent frontmatter'ındaki `model:` ya da
    harness varsayılanı geçerlidir. Politika okunamadı diye işi iptal etme.
 3. **Fallback:** bir tier `fallback` taşıyorsa koşuma `--fallback-model <id>` ekle.
-   Fable kapasite dışı kalabiliyor ("currently unavailable") — bayrak yoksa plan işi
-   sessizce düşer.
+   `plan` tier'ı `fallback: claude-opus-5[1m]` taşır — Fable kota/kapasite dışı kalınca bayrak yoksa plan
+   işi sessizce düşer. Agent tool yolunda bayrak yok: 429 dönerse aynı çağrı `model: "opus"` ile yeniden koşulur.
 
 ## Not — yalnız dağıtan agent policy okur
 

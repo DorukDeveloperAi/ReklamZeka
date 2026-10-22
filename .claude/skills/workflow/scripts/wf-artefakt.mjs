@@ -2,27 +2,26 @@
 // wf-artefakt.mjs — Dynamic Workflow koşumunun KANIT ARTEFAKTINI üreten MOTOR (deterministik, 0 token).
 //
 // SINIF: motor. Aynı girdi (aynı runId'nin session-run kaydı) → aynı çıktı. LLM DOĞURMAZ.
-// NEDEN VAR (04/R5): Rotacı evreninde "bitti" demenin tek yolu kanıt artefaktı + `aide rota kanit`
-// exit 0 + STATE satırıdır. Workflow koşumu bu zincirin DIŞINDA kalırsa Maestro "done" der ama
-// aşama açık kalır (a03 dersi). Bu motor workflow run kaydını okuyup:
-//   1. plans/<slug>/v<N>/kanit/asama-<NN>-workflow-<runId>.json  (+ insan-okur .txt özeti)
-//   2. `aide usage wf-yaz --dosya <o json>` çağrısı  (R7: usage.jsonl'a TEK YAZAR = usage-log.ts;
-//      bu motor deftere DOKUNMAZ, yalnız chokepoint CLI'ı çağırır)
-// üretir. İDEMPOTENT: aynı runId için artefakt byte-aynı yeniden yazılır; usage tarafı runId
-// dedupe'ına takılır (ikinci koşum satır EKLEMEZ).
+// NEDEN VAR (04/R5): bir aşamayı "bitti" saymanın dayanağı kanıt artefaktı + STATE satırıdır.
+// Workflow koşumu bu zincirin DIŞINDA kalırsa aşama açık kalır (a03 dersi). Bu motor workflow
+// run kaydını okuyup plans/<slug>/v<N>/kanit/asama-<NN>-workflow-<runId>.json (+ insan-okur .txt
+// özeti) üretir. İDEMPOTENT: aynı runId için artefakt byte-aynı yeniden yazılır.
+//
+// usage.jsonl (2026-10-22): eskiden artefakt ardından `aide usage wf-yaz` çağrılırdı. O komut
+// toolkit dönüşümünde arşive gitti; çağrı kaldırıldı. `--no-usage` / `--usage-file` geriye
+// uyum için kabul edilir ve etkisizdir.
 //
 // KAYNAK: <depot>/projects/<enc>/<sessionId>/workflows/<runId>.json — Workflow tool'un yazdığı
 // otoriter run kaydı (workflowProgress[] adım tablosu: label·model·state·cached). Yoksa aynı
 // dizindeki subagents/workflows/<runId>/journal.jsonl'a düşülür (model/cached bilinmez → İLAN).
 //
 // Girdi:  --run <runId> --proje <kök> --slug <s> --v <N> --asama <no> [--ad <ad>]
-//         [--kaynak sablon|elle] [--no-usage] [--usage-file <path>] [--json]
-// Çıktı:  artefakt json+txt yolu; --json ile {runId, json, txt, usage:{cagrildi,...}}.
+//         [--kaynak sablon|elle] [--json]
+// Çıktı:  artefakt json+txt yolu; --json ile {runId, json, txt}.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawnSync } from 'node:child_process';
 
 // ── argv (basit; execFile ile çağrılır, kabuk yok) ────────────────────────────────────────────
 const arg = (f) => { const i = process.argv.indexOf(f); return i > -1 ? process.argv[i + 1] : undefined; };
@@ -34,8 +33,6 @@ const v = arg('--v');
 const asamaNo = arg('--asama');
 const adArg = arg('--ad');
 const kaynak = arg('--kaynak') === 'elle' ? 'elle' : 'sablon';
-const noUsage = has('--no-usage');
-const usageFile = arg('--usage-file');
 const json = has('--json');
 
 function oldur(msg) { console.error(`wf-artefakt: ${msg}`); process.exit(1); }
@@ -153,35 +150,9 @@ const txt = [
 ].join('\n');
 fs.writeFileSync(txtYol, txt);
 
-// ── usage.jsonl'a düş (R7 chokepoint: aide usage wf-yaz; bu motor deftere DOKUNMAZ) ────────────
-let usage = { cagrildi: false, atlandi: noUsage ? 'no-usage' : null };
-if (!noUsage) {
-  const wfYazArgs = ['usage', 'wf-yaz', '--dosya', jsonYol, '--json'];
-  if (usageFile) wfYazArgs.push('--usage-file', usageFile);
-  // Öncelik: WF_ARTEFAKT_AIDE (test/override) → `aide` (PATH, kurulum katmanı) → bun cli fallback.
-  const override = process.env.WF_ARTEFAKT_AIDE;
-  let r;
-  if (override) r = spawnSync(override, wfYazArgs, { encoding: 'utf8', timeout: 30_000, shell: false });
-  else {
-    r = spawnSync('aide', wfYazArgs, { encoding: 'utf8', timeout: 30_000 });
-    if (r.error && r.error.code === 'ENOENT') {
-      const cli = '/Users/ybg/dev/agent-ide/packages/tui-v3/src/cli.ts';
-      r = spawnSync('bun', [cli, ...wfYazArgs], { encoding: 'utf8', timeout: 30_000 });
-    }
-  }
-  if (r.error) usage = { cagrildi: false, hata: String(r.error.message || r.error) };
-  else {
-    let parsed = null; try { parsed = JSON.parse((r.stdout || '').trim()); } catch { /* düz metin */ }
-    usage = { cagrildi: true, exit: r.status ?? null, yazildi: parsed?.yazildi ?? null, cikti: (r.stdout || '').trim() };
-  }
-}
-
 if (json) {
-  console.log(JSON.stringify({ runId, json: jsonYol, txt: txtYol, usage }, null, 2));
+  console.log(JSON.stringify({ runId, json: jsonYol, txt: txtYol }, null, 2));
 } else {
   console.log(`artefakt: ${jsonYol}`);
   console.log(`özet:     ${txtYol}`);
-  console.log(usage.cagrildi
-    ? `usage:    aide usage wf-yaz → ${usage.yazildi === false ? 'yazildi:false (dedupe)' : usage.yazildi === true ? 'yazildi:true' : `exit ${usage.exit}`}`
-    : `usage:    ATLANDI (${usage.atlandi || usage.hata || '—'})`);
 }

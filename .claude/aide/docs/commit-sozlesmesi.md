@@ -54,7 +54,7 @@ Ref:   <plan/aşama · alarm id · karar tarihi>   (varsa)
 
 **Konu satırı**
 
-- `<kapsam>:` zorunlu — bkz. §3. Birden çok kapsam virgülle: `core,vscode: …`
+- `<kapsam>:` zorunlu — bkz. §3. Birden çok kapsam virgülle: `core,cli: …`
 - Türkçe, **olgusal** ("teslim alma yönüne kendi palet girişi"), emir kipi şart değil.
 - ≤72 karakter. Sığmıyorsa değişiklik muhtemelen iki commit'tir.
 - Nokta ile bitmez. "güncelleme", "düzeltme", "iyileştirme" gibi **içeriksiz** kelimeler
@@ -81,8 +81,7 @@ checkpoint'lerle iş commit'leri aynı eksende toplanabilsin:
 
 | yol | kapsam |
 |---|---|
-| `packages/<ad>/**` | `<ad>` (ör. `core`, `vscode`, `maestro`) |
-| `.claude/filing/**` | `filing` |
+| `packages/<ad>/**` | `<ad>` (ör. `core`, `cli`, `kit`) |
 | `.claude/skills/**` · `.claude/agents/**` | `skill` · `agent` |
 | `.claude/**` (diğer) | `claude` |
 | `docs/gunluk/**` | `gunluk` |
@@ -150,17 +149,11 @@ Ref:   kullanıcı kararı 2026-07-26 (commit sözleşmesi + durum logu)
 
 ## 6. Bağlı yüzeyler
 
-- **`docs/DURUM.md`** — projenin anlık durumu. TÜREV, motor yazar (`aide durum`),
-  checkpoint'leri eler. Elle düzenleme sapmadır.
-- **`docs/durum/<YYYY-MM-DD>.json`** — makine-okunur arşiv. **Yalnız durumun değiştiği
-  gün** yazılır; yani klasörün kendisi bir etkinlik kaydıdır.
-- **`docs/gunluk/`** — günlük anlatı/kronik. **AGENTIC** (gunlukcu ajanı, token harcar) —
-  DURUM'un deterministik olduğu yerde bu yorum katmanıdır. İkisi karıştırılmaz.
+- **`docs/gunluk/`** — günlük anlatı/kronik. **AGENTIC** (gunlukcu ajanı, token harcar).
+- DURUM logu (`docs/DURUM.md` · `docs/durum/` · `aide durum`) 2026-10-22'de arşive gitti
+  (toolkit-donusum v1 aşama 04). İş commit'lerini görmek için:
 
 ```bash
-aide durum            # üret (değişmediyse HİÇBİR ŞEY yazmaz)
-aide durum --kuru     # ne yazardı?
-aide durum goster     # üretileni bas, diske dokunma
 git log --oneline --invert-grep --grep='^cp(' --grep='^auto: '   # yalnız İŞ commit'leri
 ```
 
@@ -170,6 +163,6 @@ git log --oneline --invert-grep --grep='^cp(' --grep='^auto: '   # yalnız İŞ 
 
 1. **Motor "neden" uydurmaz** — checkpoint ölçer, iş commit'i açıklar.
 2. **Diffin tekrarı yazılmaz** — commit kararı taşır, dosya listesini değil.
-3. **Kapsam zorunlu** — kapsamsız commit DURUM logunda `?` olarak birikir.
+3. **Kapsam zorunlu** — kapsamsız commit geçmişte aranamaz; `git log` kapsamla süzülür.
 4. **Şüphede İŞ** — sınıflandırılamayan commit checkpoint sayılmaz, geçmişten silinmez.
 5. **12 satır tavanı** — daha uzun gerekiyorsa yeri commit değil `docs/` ya da bir plandır.

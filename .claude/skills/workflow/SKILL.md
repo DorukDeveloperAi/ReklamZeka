@@ -7,7 +7,7 @@ rol: ajan
 # workflow — Dynamic Workflow şablon kütüphanesi + şema kapısı
 
 Bu skill **deterministiktir**: kanon şablon + kapı, **0 token**. LLM'i workflow'u KOŞAN oturum
-doğurur; koşum köprüsü ayrı katmandır (`kosum: workflow:` beyanı — plan katmanı aşama 03).
+doğurur. `kosum: workflow:` beyanını aşamayı koşan /goal oturumu okur ve şablonu kendisi koşar.
 
 ## 1. Ne zaman
 
@@ -39,10 +39,11 @@ Kanıt artefaktı (04 — koşum SONU, `plans/` bağlamında):
 node .claude/skills/workflow/scripts/wf-artefakt.mjs --run <runId> --proje <kök> --slug <s> --v <N> --asama <no>
 ```
 
-Motor (deterministik, 0 token): workflow run kaydından adım tablosu + model kırılımı çıkarır,
-`kanit/asama-NN-workflow-<runId>.json`+`.txt` yazar ve `aide usage wf-yaz` chokepoint'iyle
-`usage.jsonl`'a **workflow** satırını düşürür (runId dedupe → idempotent). Sonra
-`aide rota kanit --sinif hizli` exit 0 olmadan aşama "bitti" YAZILMAZ.
+Motor (deterministik, 0 token): workflow run kaydından adım tablosu + model kırılımı çıkarır ve
+`kanit/asama-NN-workflow-<runId>.json`+`.txt` yazar (runId aynıysa bayt-aynı → idempotent).
+Betik `usage.jsonl`'a yazmaz: eski `aide usage wf-yaz` çağrısı ve `aide rota kanit` 2026-10-22'de
+arşive gitti (`--no-usage` bayrağı artık etkisizdir). Aşamayı "bitti" saymadan önce kanıt
+komutunu aşamayı koşan oturum kendisi çalıştırır.
 
 ## 3. Kurallar (global requirements'ın skill'e inen hâli — kapı ZORLAR, niyete bırakmaz)
 
@@ -68,11 +69,11 @@ Motor (deterministik, 0 token): workflow run kaydından adım tablosu + model k�
 Bu skill **deterministiktir** — şablon + kapı, **0 token**. Kapı (`dogrula.mjs`) şablonu
 ÇALIŞTIRMAZ; metin-tabanlı statik analizle K1–K7'yi ölçer, hiçbir dosya yazmaz. Kanıt harness'ı:
 `node .claude/skills/workflow/proof/proof.mjs` → `PROOF 14/14`. LLM'i workflow'u **KOŞAN** oturum
-doğurur; koşum köprüsü ayrı katmandır.
+doğurur; koşumu da o oturum başlatır.
 
 ## 5. Muafiyet (İLAN)
 
-- Bu skill **koşum başlatmaz**: `kosum: workflow: <sablon-ref>` beyanının köprüye çevrilmesi
-  (`hazirla.mjs` entegrasyonu) aşama 03'ün işidir; bütçe/resume derinliği aşama 04.
+- Bu skill **koşum başlatmaz**: `kosum: workflow: <sablon-ref>` beyanını otomatik koşuma çeviren
+  köprü (`planla-kos/hazirla.mjs`) 2026-10-22'de arşive gitti. Şablonu aşamayı koşan oturum başlatır.
 - Kapı **kanon biçimi** zorlar, düşman kodunu değil: `agent`'ı dinamik ad arkasına saklayan
   (`const a = agent; a(...)`) şablonu göremez — şablondan türet, biçimi bozma.

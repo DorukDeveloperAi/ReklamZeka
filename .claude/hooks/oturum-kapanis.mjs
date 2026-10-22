@@ -11,9 +11,9 @@
  *
  *   argümansız     → SessionEnd  (kapanış zinciri: tohumla → kapat → devir → durum → global)
  *   `acilis`       → SessionStart (açılış özeti → `additionalContext`; devralma bloğu
- *                    ≤12 satır / ≤900 karakter · akış/slot bloğu AYRI ve aynı tavanda)
- *   `akis-tazele`  → HOOK OLAYI DEĞİL (aşama-08): açılışın ayrık tetiklediği tazeleyici.
- *                    `settings.json`da kaydı yoktur; ölçümü senkron yoldan uzak tutar.
+ *                    ≤12 satır / ≤900 karakter)
+ *   (AKIŞ/SLOT bacağı 2026-10-22'de söküldü: `aide akis` ve `planla-kos/slot.mjs` arşive gidiyor —
+ *    toolkit-donusum v1 aşama 02. Eski hâli: `git show toolkit-oncesi:<bu dosyanın yolu>`.)
  *
  * İki uç arasında ORTAK olan tek şey `projeKoku` + `OTURUM` yoludur; karar mantığı İKİSİNDE DE
  * hook'ta DEĞİL `oturum.mjs`tedir (tek yazar: oturum domain'i). Hook yalnız taşır.
@@ -53,9 +53,8 @@
 
 import {
   readFileSync, existsSync, appendFileSync, statSync, readdirSync, writeSync,
-  mkdirSync, writeFileSync, renameSync,
 } from 'node:fs';
-import { join, dirname, resolve } from 'node:path';
+import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { execFileSync, spawn } from 'node:child_process';
 
@@ -67,32 +66,8 @@ try { (await import("./hook-nabiz.mjs")).nabiz("oturum-kapanis", process.argv[2]
 const CLAUDE = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
 const OTURUM = join(CLAUDE, 'skills', 'plan-organizatoru', 'scripts', 'oturum.mjs');
 const KASA = join(CLAUDE, 'skills', 'soft-resume', 'scripts', 'kasa.mjs');
-const SLOT = join(CLAUDE, 'skills', 'planla-kos', 'scripts', 'slot.mjs');
 const ERR = join(CLAUDE, 'hooks', 'oturum-kapanis.err.jsonl');
 const ESIK = Number(process.env.AIDE_OTURUM_ESIK || 3);
-
-/* ═══════════ AKIŞ/SLOT bloğu — sabitler (otonomi-merdiveni:08) ═══════════
- *
- * SINIFI **DURUM**tur (Sınıf 2): makineye bağlı, türetilebilir, handover'da TAŞINMAZ. Bu
- * yüzden `~/.claude` altına DEĞİL `~/.config/agent-ide/` altına yazılır (emsal: `hook-nabiz`
- * → aynı dizin). Kararın bedeli ölçüldü: `~/.claude`a yeni bir yol açmak `aide filing kapsam`
- * için sınıflandırma borcu doğururdu; DURUM sınıfı bir defterde yaşamayı zaten hak etmiyor.
- */
-const AKIS_DEFTER_DIZIN = join(process.env.HOME || homedir(), '.config', 'agent-ide', 'acilis-akis');
-/** Defter bundan eskiyse ARKA PLANDA tazelenir (senkron yolda ölçüm YOK — aşağıdaki K2). */
-const AKIS_TAZE_MS = 10 * 60 * 1000;
-/** Defter bundan eskiyse BASILMAZ: bayat "sahipsiz iş" listesi insanı olmayan işe koşturur. */
-const AKIS_BAYAT_MS = 6 * 60 * 60 * 1000;
-/** FREN (08.2): AYNI parmak izi bu pencerede bir kez basılır. Parmak izi DEĞİŞİRSE pencere
- *  beklenmez — yeni bir tıkanma anında görünür. Yani fren zamanı değil TEKRARI bastırır. */
-const AKIS_FREN_MS = 30 * 60 * 1000;
-/** BÜTÇE (08.1) — bu bloğun KENDİ tavanı. Devralma bloğunun (≤12 satır / ≤900 karakter)
- *  tavanına EKLENMEZ, onunla YARIŞMAZ: ölçüldü 2026-08-04, devralma bloğu canlıda 8 satır /
- *  876 karakter ile kendi tavanının %97'sini zaten dolduruyordu. Tek bütçeye sıkıştırmak
- *  bu bloğu doğduğu gün susturur, ya da devralma satırlarını kırpardı — ikisi de sinyal
- *  kaybı. İLAN: açılış enjeksiyonunun en kötü hâli artık 12+12 satırdır. */
-const AKIS_TAVAN_SATIR = 12;
-const AKIS_TAVAN_KARAKTER = 900;
 
 const ilanEt = (asama, hata) => {
   try {
@@ -197,179 +172,6 @@ function main() {
   kasaKos(['yaz'], root, 90_000);
 }
 
-/* ═══════════ AKIŞ/SLOT bacağı (otonomi-merdiveni:08) ═══════════
- *
- * NE VERİR: "bu projede sahipsiz hazır iş var mı" bilgisi, oturum AÇILIŞINDA. `04` (slot
- * adayları) ve `07` (akış tıkanmaları) bunu ölçebiliyordu ama ikisi de ELLE çağrılan komuttu;
- * ölçülebilir ama görünmeyen bir bilgi, olmayan bilgidir.
- *
- * ── K1 (kullanıcı kararı): K0 OTOMATİK BASILIR, K1 ASLA OTOMATİK BAŞLAMAZ ───────────────
- * Bu blok bir MENÜ değil bir İŞARETtir: emir kipi yoktur, "almak istersen" der, komutu
- * basar ve orada durur. Hiçbir claim alınmaz, hiçbir koşum doğmaz (fan-out yasağı R4 burada
- * da geçerlidir — bu dosyada `zamanla`/`tmux`/`slot.mjs al` çağrısı YOKTUR).
- *
- * ── K2 · SENKRON YOLDA ÖLÇÜM YOKTUR — açılış dalının 2. sert kuralı KIRILMADI ────────────
- * Ölçüldü 2026-08-04: `aide akis durum --json` **2.0–2.5 sn**, `slot.mjs oner` **0.24 sn**.
- * İkisi de açılışın <200 ms hedefine sığmaz; `aide` çağrısı üstelik bu dosyanın künyesindeki
- * **"aide GEREKTİRMEZ"** sözünü de senkron yolda çiğnerdi. Çözüm KASA emsalidir (aynı
- * fonksiyonda, üç satır yukarıda): ölçüm AYRIK sürece iner, açılış yalnız DEFTERİ OKUR
- * (~1 ms). Bedeli ilan edilmiştir: ilk açılışta defter boştur → **0 bayt** basılır, blok
- * bir sonraki açılıştan itibaren konuşur. Soğuk başlangıçta sessizlik, yanlış bilgiden iyidir.
- *
- * ── DEGRADE ───────────────────────────────────────────────────────────────────────────
- * `aide` yoksa/çökerse akış bacağı boş kalır, **slot bacağı yaşamaya devam eder** (slot.mjs
- * da `aide GEREKTİRMEZ`). Tek bacak ölünce blok susmaz; iki bacak da ölürse 0 bayt.
- */
-
-/** Defter yolu — repo kökü başına bir dosya (bir makinede N repo, N defter). */
-function akisDefteri(root) {
-  return join(AKIS_DEFTER_DIZIN, `${String(root).replace(/[^A-Za-z0-9]/g, '-')}.json`);
-}
-
-/** İÇERİK parmak izi (08.2). **ZAMAN ALANI GİRMEZ** — girseydi her tazelemede yeni damga
- *  doğar, fren HİÇ tetiklenmezdi (emsal: DURUM logu döngü yasağı, `aide durum`). Kaynak
- *  yalnız basılacak satırlardır: aynı satırlar = aynı iz. Kriptografik güç gerekmez, bu bir
- *  eşitlik testidir; hash değil toplam kullanmak dosyayı bağımlılıksız tutar. */
-function parmakIzi(satirlar) {
-  const s = satirlar.join('\n');
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
-  return `${h.toString(16)}-${s.length}`;
-}
-
-/** TAZELEYİCİ — AYRIK süreçte koşar (`oturum-kapanis.mjs akis-tazele --proje <kök>`).
- *  Yeni bir hook KAYDI açmaz (aşama-08 §2 GİRMEZ): aynı dosyanın üçüncü modudur, tetikleyeni
- *  açılış dalının kendisidir. Ürünü SATIRLARdır — karar değil, metin. */
-function akisTazeleMain() {
-  const i = process.argv.indexOf('--proje');
-  // MUTLAKLAŞTIR: `projeKoku` göreli yolla ÇALIŞMAZ — `dirname('.') === '.'` olduğu için
-  // yukarı-yürüme döngüsü hiç dönmez ve null döner (ölçüldü 2026-08-04, tazeleyici sessizce
-  // hiçbir şey yapmıyordu). Açılış dalı mutlak `cwd` geçtiği için bu tuzağı görmüyordu.
-  const ham = i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : process.cwd();
-  const root = projeKoku(resolve(ham));
-  if (!root) return;
-
-  /* KİMLİKSİZ ÖLÇÜM — `CLAUDE_CODE_SESSION_ID` ÇOCUĞA GEÇMEZ. Ölçüldü 2026-08-04: geçtiğinde
-     `slot.mjs` "kendi claim'imi dolu sayma" kuralını uyguluyor ve tazeleyeni ÇAĞIRAN oturumun
-     kilitli planını ADAY olarak yazıyordu. Defter PAYLAŞIMLIDIR: onu bir sonraki açılışta
-     BAŞKA bir oturum okur ve sahipli işe yönlendirilirdi — akış kapısının tam da yasakladığı
-     yanlış-pozitif ("insanı olmayan işe koşturmak"). Kimliksiz ölçümde HER aktif claim
-     doludur; kilidi tutan oturuma kendi işi önerilmez — zaten üstünde olduğu için doğrusu bu. */
-  const ENV = { ...process.env };
-  delete ENV.CLAUDE_CODE_SESSION_ID;
-
-  const akisSatir = [];
-  const slotSatir = [];
-  let akmiyor = [];
-  let adaylar = [];
-
-  // (a) AKIŞ — `07`nin kapısı. `aide` YOKSA bu bacak sessizce boş kalır (künye sözü).
-  try {
-    const out = execFileSync('aide', ['akis', 'durum', '--json', '--proje', root],
-      { encoding: 'utf8', timeout: 20_000, stdio: ['ignore', 'pipe', 'ignore'], env: ENV });
-    const j = JSON.parse(out || '{}');
-    akmiyor = (Array.isArray(j.bulgular) ? j.bulgular : []).filter((b) => b?.tip === 'akmiyor');
-  } catch (e) {
-    // exit 1 = KAPI kırmızı (bulgu VAR) — `execFileSync` bunu da fırlatır; stdout'u kurtar.
-    try {
-      const j = JSON.parse(String(e?.stdout || '') || '{}');
-      akmiyor = (Array.isArray(j.bulgular) ? j.bulgular : []).filter((b) => b?.tip === 'akmiyor');
-    } catch { ilanEt('akis-tazele-akis', e); }
-  }
-
-  // (b) SLOT — `04`ün adayları. `--json` bu aşamada eklendi (insan metnini parse etmek yerine).
-  // Skill kurulu değilse sessiz (kit işi) — `main()`in OTURUM bekçisiyle aynı sözleşme;
-  // bekçisiz hâli planla-kos kurulmamış evde her kapanışta err defterine yazıyordu.
-  if (existsSync(SLOT)) try {
-    const out = execFileSync(process.execPath, [SLOT, 'oner', '--json', '--n', '2', '--proje', root],
-      { encoding: 'utf8', timeout: 20_000, stdio: ['ignore', 'pipe', 'ignore'], env: ENV });
-    adaylar = (JSON.parse(out || '{}').adaylar || []).slice(0, 2);
-  } catch (e) { ilanEt('akis-tazele-slot', e); }
-
-  // ── SATIRLAR ──────────────────────────────────────────────────────────────────────────
-  // Aday olarak ZATEN basılacak planı akış satırında TEKRAR anmayız: iki bacak aynı olguyu
-  // görür (hazır aşama + sahipsiz), tekrar bütçeyi yer ve bloğu gürültüye çevirir.
-  const adayPlan = new Set(adaylar.map((a) => String(a.slug)));
-  const artan = akmiyor.filter((b) => !adayPlan.has(String(b.slug)));
-  if (akmiyor.length) {
-    akisSatir.push(`[akış] ${akmiyor.length} plan akmıyor (hazır aşama var, koşan session/claim yok) — BİLGİ; alma kararı senin`);
-    for (const b of artan.slice(0, 2)) akisSatir.push(`  akmıyor: ${b.slug} · ${String(b.detay || '').slice(0, 120)}`);
-  }
-  for (const a of adaylar) {
-    slotSatir.push(`hazır: ${a.slug}:${a.no} ${a.ad || ''}`.trimEnd());
-    slotSatir.push(`  almak istersen: node ${SLOT} al --slug ${a.slug} --asama ${a.no}`);
-  }
-
-  /* BÜTÇE — iki tavan (satır ∧ karakter) AYNI ANDA tutmalı ve kırpma İLANI ile K1 cümlesi
-     kırpmadan SAĞ ÇIKMALI. Ölçüldü 2026-08-04: önce kırpıp sonra karakter tavanı için
-     sondan `pop()` etmek, ilanı ve K1 cümlesini kurbanlık seçiyordu — yani bütçe aşımı
-     sessiz kırpmaya, K1 beyanı da kayba dönüşüyordu (testin yakaladığı gerçek hata).
-     Doğrusu: GÖVDE kırpılır, iki değişmez satır her turda yeniden EKLENİR. */
-  const KAPANIS = 'K1 KAPALIDIR: bu blok iş başlatmaz, claim almaz — alma kararı senin, üstlenmek komutla olur.';
-  const govde = [...akisSatir, ...slotSatir];
-  let kirpildi = 0;
-  const olustur = () => {
-    const s = [...govde];
-    if (kirpildi) s.push(`  … +${kirpildi} satır kırpıldı (bütçe ${AKIS_TAVAN_SATIR}) — tamamı: aide akis durum`);
-    s.push(KAPANIS);
-    return s;
-  };
-  let satirlar = govde.length ? olustur() : [];
-  while (govde.length
-    && (satirlar.length > AKIS_TAVAN_SATIR || satirlar.join('\n').length > AKIS_TAVAN_KARAKTER)) {
-    govde.pop();
-    kirpildi++;
-    satirlar = olustur();
-  }
-
-  const defter = akisDefteri(root);
-  try {
-    mkdirSync(dirname(defter), { recursive: true });
-    let onceki = {};
-    try { onceki = JSON.parse(readFileSync(defter, 'utf8')); } catch { /* ilk yazım */ }
-    const gecici = `${defter}.${process.pid}.tmp`;
-    // `basildi` KORUNUR: tazeleme freni SIFIRLAMAZ. Sıfırlasaydı her tazeleme bloğu yeniden
-    // konuşturur, fren 10 dk'lık bir gecikmeye dönüşürdü — yani hiç olmazdı.
-    writeFileSync(gecici, JSON.stringify({
-      ts: Date.now(), fp: parmakIzi(satirlar), satirlar, basildi: onceki.basildi || null,
-    }));
-    renameSync(gecici, defter);                       // atomik: eşzamanlı okuyucu yarım dosya görmez
-  } catch (e) { ilanEt('akis-tazele-yazim', e); }
-}
-
-/** OKUYUCU — açılış dalının senkron yolu. ÖLÇMEZ, yalnız defteri okur ve freni uygular. */
-function akisSatirlari(root) {
-  const defter = akisDefteri(root);
-  let d = null;
-  try { d = JSON.parse(readFileSync(defter, 'utf8')); } catch { /* defter yok — 0 bayt */ }
-
-  const yas = d?.ts ? Date.now() - Number(d.ts) : Infinity;
-  // TAZELEME TETİĞİ — ayrık, beklenmez, tek bayt yazamaz (KASA emsali). Bayat defter de
-  // tazelenir: basılmayacak olması ölçümü gereksiz kılmaz, tam tersine.
-  if (yas > AKIS_TAZE_MS) {
-    try {
-      spawn(process.execPath, [process.argv[1], 'akis-tazele', '--proje', root],
-        { detached: true, stdio: 'ignore', env: { ...process.env } }).unref();
-    } catch (e) { ilanEt('akis-tazele-spawn', e); }
-  }
-
-  const satirlar = Array.isArray(d?.satirlar) ? d.satirlar : [];
-  if (!satirlar.length) return [];                    // sinyal yok → 0 bayt
-  if (yas > AKIS_BAYAT_MS) return [];                 // bayat veri sessizce doğru sanılmaz
-
-  // FREN (08.2): aynı parmak izi + pencere içinde basıldıysa TEKRAR BASMA.
-  const fp = parmakIzi(satirlar);
-  const b = d?.basildi;
-  if (b && b.fp === fp && Date.now() - Number(b.ts || 0) < AKIS_FREN_MS) return [];
-
-  try {                                               // basıldı damgası — fren bunun üstünde çalışır
-    const gecici = `${defter}.${process.pid}.bas.tmp`;
-    writeFileSync(gecici, JSON.stringify({ ...d, basildi: { fp, ts: Date.now() } }));
-    renameSync(gecici, defter);
-  } catch (e) { ilanEt('akis-basildi-yazim', e); }
-  return satirlar;
-}
-
 /* ═══════════ SessionStart ucu — açılış devralması (aşama-06) ═══════════
  *
  * NE YAPAR: `oturum.mjs acilis --ctx` çıktısını `additionalContext` olarak enjekte eder.
@@ -412,13 +214,6 @@ function acilisMain() {
 
   if (source === 'resume') return;                    // ilanlı muafiyet — hard resume sessizdir
 
-  /* AKIŞ/SLOT bloğu (aşama-08) — devralma bloğundan BAĞIMSIZ toplanır ve `OTURUM` kurulu
-     olmasa da yaşar: farklı SORUYU yanıtlar. Devralma "SEN nerede kalmıştın", akış/slot
-     "bu projede SAHİPSİZ ne var" der; birini ötekinin varlığına bağlamak, kurulmamış bir
-     skill yüzünden ilgisiz bir sinyali susturmak olurdu. Her hata yutulur (08.3). */
-  let akis = [];
-  try { akis = akisSatirlari(root); } catch (e) { ilanEt('akis-blok', e); }
-
   let ctx = '';
   if (existsSync(OTURUM)) {                           // skill kurulu değilse devralma bacağı atlanır (kit işi)
     try {
@@ -427,7 +222,7 @@ function acilisMain() {
         { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env } });
     } catch (e) { ilanEt('acilis', e); }
   }
-  const metin = [String(ctx || '').trim(), akis.join('\n').trim()].filter(Boolean).join('\n');
+  const metin = String(ctx || '').trim();
   if (!metin) return;                                 // sinyal yok — enjeksiyon YOK
 
   const cikti = JSON.stringify({
@@ -437,12 +232,9 @@ function acilisMain() {
 }
 
 // argümansız = SessionEnd (BYTE-BYTE eski davranış) · `acilis` = SessionStart
-// `akis-tazele` = AYRIK tazeleyici (aşama-08) — hook OLAYI değildir, `settings.json`da KAYDI
-// YOKTUR ve olmayacaktır; tek çağıranı `acilisSatirlari`nın detached spawn'ıdır.
 const MOD = (process.argv[2] || '').replace(/^--/, '');
 try {
   if (MOD === 'acilis') acilisMain();
-  else if (MOD === 'akis-tazele') akisTazeleMain();
   else main();
 } catch (e) { ilanEt(MOD || 'main', e); }
 process.exit(0);

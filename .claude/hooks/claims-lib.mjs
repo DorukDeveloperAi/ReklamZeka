@@ -198,16 +198,113 @@ export function claudeAncestor(startPid = process.pid) {
   return null;
 }
 
+/**
+ * Codex oturumunun sahip süreci = zincirdeki EN UZAK `codex` atası (app-server).
+ * En yakını DEĞİL: Codex kabuk komutunu kısa ömürlü bir `codex sandbox` sarmalayıcısında
+ * koşturabilir; ona bağlanan kilit komut biter bitmez "sahip ölü" diye biçilirdi.
+ */
+export function codexAncestor(startPid = process.pid) {
+  const ps = psSnapshot();
+  let pid = +startPid;
+  let son = null;
+  for (let i = 0; i < 30; i++) {
+    const p = ps.get(pid);
+    if (!p) break;
+    if (/(^|\/)codex$/.test(p.comm)) son = { pid, start: p.start };
+    if (!p.ppid || p.ppid === pid || p.ppid <= 1) break;
+    pid = p.ppid;
+  }
+  return son;
+}
+
+/**
+ * Ortamdan oturum kimliği — TEK okuyucu (claim.mjs üç yerde ayrı ayrı okuyordu).
+ * Claude: CLAUDE_CODE_SESSION_ID · Codex: CODEX_THREAD_ID (kabuk aracının ortamında).
+ */
+export function envKimlik(env = process.env) {
+  const c = env.CLAUDE_CODE_SESSION_ID || env.CLAUDE_SESSION_ID || null;
+  if (c) return { sessionId: c, vendor: "claude" };
+  const x = env.CODEX_THREAD_ID || null;
+  if (x) return { sessionId: x, vendor: "codex" };
+  return null;
+}
+
+/**
+ * Codex'in session-status kaydı. Claude'da bu kaydı hook yazar; Codex'te hook portu YOK
+ * (ilanlı kör nokta) → kaydı kimliği İSTEYEN araç yazar. Kayıt olmadan kilit alınamaz:
+ * `activeClaims` session-status'u olmayan sahibi "temiz bitti" diye biçer.
+ * İkinci defter DEĞİL — aynı defter, farklı yazar. Canlı kayıt varsa dokunulmaz.
+ * Dönüş: {pid, procStart} | null (sahip süreç ÖLÇÜLEMEDİ → çağıran kilit ALMAMALI).
+ */
+export function codexKayit(sessionId, cwd = process.cwd()) {
+  const s = sessionInfo(sessionId);
+  if (s?.pid && procAlive(s.pid, s.procStart) && _psOk) return { pid: s.pid, procStart: s.procStart || null };
+  const a = codexAncestor();
+  if (!a?.pid) return null;
+  const now = Date.now();
+  mkdirSync(STATUS_DIR, { recursive: true });
+  atomicWrite(join(STATUS_DIR, `${sessionId}.json`), {
+    sessionId,
+    vendor: "codex",
+    cwd,
+    dirName: cwd.split(sep).filter(Boolean).pop() || cwd,
+    state: "codex",
+    since: s?.since || now,
+    updated: now,
+    title: s?.title || "Codex oturumu",
+    pid: a.pid,
+    procStart: a.start || null,
+  });
+  return { pid: a.pid, procStart: a.start || null };
+}
+
 /* ───────────────────── session-status (Ders 2: ikinci defter YOK) ───────────────────── */
 
 /** Sahibin başlığı/durumu KOPYALANMAZ; okuma anında session-status'tan çözümlenir. */
 export function sessionInfo(sessionId) {
   try {
-    return JSON.parse(readFileSync(join(STATUS_DIR, `${sessionId}.json`), "utf8"));
+    const s = JSON.parse(readFileSync(join(STATUS_DIR, `${sessionId}.json`), "utf8"));
+    s.ad = sessionAd(sessionId, s.cwd);
+    return s;
   } catch {
     return null;
   }
 }
+
+/**
+ * Oturumun ADI (`/rename`) — session-status'ta YOKTUR: `title` alanı her prompt'ta son
+ * mesajın ilk 70 karakteriyle ezilir (etiket). Ad transcript'te yaşar:
+ *   ~/.claude/projects/<slug(cwd)>/<sid>.jsonl → {"type":"custom-title","customTitle":"…"}
+ * Son satır kazanır (yeniden adlandırma). Transcript yüz MB olabilir → dosya belleğe
+ * OKUNMAZ, `grep` ile süzülür; süreç içi memo transcript boyutuna anahtarlıdır.
+ * Adı olmayan oturumda null → tüketici etikete düşer ("başlıksız" DEĞİL).
+ */
+const _adMemo = new Map();
+export function sessionAd(sessionId, cwd) {
+  if (!sessionId || !cwd) return null;
+  const file = join(CLAUDE, "projects", slugOf(cwd), `${sessionId}.jsonl`);
+  let size;
+  try {
+    size = statSync(file).size;
+  } catch {
+    return null;
+  }
+  const m = _adMemo.get(sessionId);
+  if (m && m.size === size) return m.ad;
+  let ad = null;
+  try {
+    const r = spawnSync("grep", ["-o", '"customTitle":"[^"]*"', file], { encoding: "utf8", timeout: 3000 });
+    const last = String(r.stdout || "").trim().split("\n").filter(Boolean).pop();
+    if (last) ad = JSON.parse(`{${last}}`).customTitle || null;
+  } catch {
+    ad = null;
+  }
+  _adMemo.set(sessionId, { size, ad });
+  return ad;
+}
+
+/** Gösterim adı: ad varsa ad, yoksa etiket (son prompt). Çıplak hex yasak (CLAUDE.md). */
+export const adi = (s) => (s?.ad || s?.title || "");
 
 /**
  * Bir session'ın KİMLİĞİ = kendi session-status kaydı (pid + procStart oraya yazılır).
@@ -216,9 +313,13 @@ export function sessionInfo(sessionId) {
  */
 export function identityOf(sessionId, fallbackPid = process.pid) {
   const s = sessionId ? sessionInfo(sessionId) : null;
-  if (s?.pid) return { sessionId, pid: s.pid, procStart: s.procStart || null };
-  const a = claudeAncestor(fallbackPid);
-  return { sessionId, pid: a?.pid || null, procStart: a?.start || null };
+  if (s?.pid && procAlive(s.pid, s.procStart)) return { sessionId, pid: s.pid, procStart: s.procStart || null };
+  /* Kayıttaki pid ÖLÜYSE sahip canlı Claude atasıdır (2026-09-14): devam ettirilen oturum (resume ·
+     compaction) aynı sid'i YENİ bir süreçte taşır; eski pid'le yazılan kilit anında "sahibi ölü"
+     sayılıp temizleniyordu → uzun zincir kilitsiz koştu. Ata da yoksa eski davranış korunur. */
+  const a = claudeAncestor(fallbackPid) || codexAncestor(fallbackPid);
+  if (a?.pid) return { sessionId, pid: a.pid, procStart: a.start || null };
+  return { sessionId, pid: s?.pid || null, procStart: s?.procStart || null };
 }
 
 /**
@@ -245,6 +346,7 @@ export function liveSessionsIn(repoRoot) {
     if (!s?.cwd) continue;
     if (repoRootOf(s.cwd) !== repoRoot) continue;
     if (!procAlive(s.pid, s.procStart)) continue;
+    s.ad = sessionAd(s.sessionId, s.cwd);
     out.push(s);
   }
   return out;
@@ -2517,205 +2619,4 @@ export function bildirOrkestratore(repoRoot, olay = {}) {
   } catch {
     return null;
   }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════════════════
-   AKIBET DEFTERLERİ — AIDE S ortak temeli (yonetim-katmani/v2:04)
-
-   ÜÇ TÜR AKAR ve üçü de KAYBOLMAMALI:
-     talimat  = "şunu yap"      → hedef oturuma (koşum)      · K-YON2: EMİR, fren zinciri aynen
-     request  = "şu gerekli"    → karargâha (planlama)       · K-2D2: emir DEĞİL, kabule karargâh karar verir
-     learning = "şu öğrenildi"  → karargâha (aynı kanal)     · K-2D3: request'in ikinci sütunu
-     soru     = "cevap bekliyor"→ ÇİFT YÖN (kullanıcı ↔ sistem) · K-UZK2
-
-   TEK DİSİPLİN: append-only JSONL · imza dedupe · durum tid'in SON akıbet satırından TÜRER
-   (yerinde güncelleme YOK — eşzamanlı yazımda append çakışmasızdır).
-
-   TESLİM İKİNCİ KANAL AÇMAZ (K-YON1/Ö6): defter yalnız AKIBET tutar; teslimi mevcut POSTA
-   (`bildir`) yapar. İki teslim yolu = iki bayatlama yüzeyi.
-
-   jobs/ (Maestro kuyruğu) BİT-EŞİT kalır — bu blok oraya dokunmaz.
-   ═══════════════════════════════════════════════════════════════════════════════════════ */
-
-export const DEFTER_SURUM = 1;
-/** Kayıt türleri (girdi) — kapalı küme. */
-export const DEFTER_TURLERI = ["talimat", "request", "learning", "soru"];
-/** Akıbet satırı türleri — kapalı küme. `talimat` girdisi, gerisi akıbettir. */
-// `bekletildi` AYRI bir akıbettir ve kayıt AÇIK kalır (aide-l:02 D2): anayasayla çelişen ekleme
-// REDDEDİLMEZ, BEKLETİLİR — vizyon değişince çelişki kalkabilir, ret ise bilgi kaybıdır (K-2C7).
-export const AKIBET_TURLERI = ["alindi", "islendi", "reddedildi", "onay-bekliyor", "onay", "cevap", "bekletildi"];
-/** Sınıf: yeşil doğrudan işlenir; kırmızı VALFTE durur (yalnız insan açar). */
-export const DEFTER_SINIFLARI = ["yesil", "kirmizi"];
-/** Akıbetsizlik eşikleri (ms) — `--gate` bunları ölçer. */
-export const AKIBET_TTL = { bekliyor: 24 * 3600_000, alindi: 8 * 3600_000 };
-
-export const defterDirOf = (repoRoot) => join(ledgerDirOf(repoRoot), "defter");
-export const defterPath = (repoRoot) => join(defterDirOf(repoRoot), "defter.jsonl");
-
-/** İmza = hedef ⊕ tür ⊕ metin ⊕ kaynak (bildiriImza emsali). Açık aynı kayıt ikinci kez yazılmaz. */
-export function defterImza(kayit) {
-  return sha1(
-    [kayit?.tur, hedefKutuAdi(kayit?.hedef), mesajNormalize(kayit?.metin), kayit?.kaynak]
-      .map((x) => String(x ?? ""))
-      .join(""),
-  );
-}
-
-/** Hedef kapalı kümesi: {tip:"rol"|"sid"|"plan"|"karargah", ad} → kutu adı. */
-export function hedefKutuAdi(h) {
-  if (!h) return "karargah";
-  if (typeof h === "string") return h;
-  if (h.tip === "rol") return `rol:${h.ad}`;
-  if (h.tip === "sid") return `sid:${h.ad}`;
-  if (h.tip === "plan") return `plan:${h.ad}`;
-  return "karargah";
-}
-
-function defterSatirlari(repoRoot) {
-  try {
-    return readFileSync(defterPath(repoRoot), "utf8")
-      .split("\n")
-      .filter(Boolean)
-      .map((l) => {
-        try {
-          return JSON.parse(l);
-        } catch {
-          return null;
-        }
-      })
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-function defterYaz(repoRoot, satir) {
-  mkdirSync(defterDirOf(repoRoot), { recursive: true, mode: 0o700 });
-  appendFileSync(defterPath(repoRoot), JSON.stringify(satir) + "\n", { mode: 0o600 });
-  return satir;
-}
-
-/**
- * Kayıt ekle (talimat · request · learning · soru).
- *
- * TESLİM: yeşil sınıf ve adreslenebilir hedef varsa POSTA çağrılır (`bildir`) — defter
- * ikinci kanal AÇMAZ. Kırmızı sınıf teslim EDİLMEZ: `onay-bekliyor` durur, yalnız insan açar.
- * `plan:` hedefi çözümü: canlı sahip → yoksa `rol:orkestrator` → o da yoksa defterde bekler
- * (kaybolmaz; tabloda `acik` görünür).
- */
-export function defterEkle(repoRoot, kayit = {}) {
-  const tur = String(kayit.tur ?? "");
-  if (!DEFTER_TURLERI.includes(tur)) {
-    throw new Error(`tanınmayan tür: ${JSON.stringify(tur)} (kapalı küme: ${DEFTER_TURLERI.join(", ")})`);
-  }
-  const metin = String(kayit.metin ?? "").trim();
-  if (!metin) throw new Error("boş metin — kayıt anlamsız");
-  const etiket = String(kayit.etiket ?? "").trim();
-  if (!etiket) throw new Error("kimden.etiket zorunlu — kim yazdı izi olmadan kayıt kabul edilmez");
-  const sinif = kayit.sinif ?? "yesil";
-  if (!DEFTER_SINIFLARI.includes(sinif)) throw new Error(`tanınmayan sınıf: ${sinif}`);
-
-  const imza = defterImza({ tur, hedef: kayit.hedef, metin, kaynak: kayit.kaynak });
-  const acikAyni = defterOzet(repoRoot).kayitlar.find((k) => k.imza === imza && k.acik);
-  if (acikAyni) return { dedupe: true, tid: acikAyni.tid, imza };
-
-  const tid = `t-${imza.slice(0, 6)}`;
-  const satir = {
-    v: DEFTER_SURUM,
-    tur,
-    tid,
-    imza,
-    ts: new Date().toISOString(),
-    kimden: { sid: kayit.sid ?? null, etiket },
-    hedef: kayit.hedef ?? null,
-    sinif,
-    metin,
-    ...(kayit.kaynak ? { kaynak: kayit.kaynak } : {}),
-    // INPUT STACK sırası (aide-l:02 D3) — İKİSİ DE OPSİYONEL, uydurulmaz: künyesiz kayıt
-    // sıralamada en sona düşer (`stackSirala`), sahte öncelik ÜRETİLMEZ.
-    ...(Number.isInteger(kayit.oncelik) ? { oncelik: kayit.oncelik } : {}),
-    ...(kayit.elevate ? { elevate: true } : {}),
-  };
-  defterYaz(repoRoot, satir);
-
-  // TESLİM — tek kanal: posta. Kırmızı teslim edilmez (valf), önce insan onayı gerekir.
-  let teslim = null;
-  if (sinif === "yesil") {
-    const h = kayit.hedef;
-    try {
-      if (h?.tip === "sid") teslim = bildir(repoRoot, { hedef: h.ad, tip: tur, key: tid, kimden: etiket, mesaj: metin });
-      else if (h?.tip === "rol") teslim = bildir(repoRoot, { hedefRol: h.ad, tip: tur, key: tid, kimden: etiket, mesaj: metin });
-      else if (h?.tip === "plan") {
-        // plan → canlı sahip yoksa orkestratöre; o da yoksa defterde bekler (ilan tabloda).
-        teslim = bildirOrkestratore(repoRoot, { tip: tur, key: tid, kimden: etiket, mesaj: metin });
-      }
-    } catch {
-      /* teslim düşse bile KAYIT durur — akıbetsizlik kapısı onu görünür kılar */
-    }
-  } else {
-    defterYaz(repoRoot, { v: DEFTER_SURUM, tur: "onay-bekliyor", tid, ts: new Date().toISOString(), kim: "sistem" });
-  }
-  return { ...satir, teslim: teslim ? "posta" : null };
-}
-
-/** Akıbet satırı ekle — durum YERİNDE GÜNCELLENMEZ, zincire eklenir. */
-export function defterAkibet(repoRoot, tid, tur, ek = {}) {
-  if (!AKIBET_TURLERI.includes(tur)) {
-    throw new Error(`tanınmayan akıbet: ${JSON.stringify(tur)} (kapalı küme: ${AKIBET_TURLERI.join(", ")})`);
-  }
-  if (!tid) throw new Error("tid zorunlu");
-  return defterYaz(repoRoot, { v: DEFTER_SURUM, tur, tid, ts: new Date().toISOString(), ...ek });
-}
-
-/**
- * Defterin özeti: her tid için son akıbet → durum. Tablo bloğu ve `--gate` bunu okur.
- * `acik` = henüz kapanmamış (islendi/reddedildi/cevap değil).
- */
-export function defterOzet(repoRoot, { now = Date.now() } = {}) {
-  const satirlar = defterSatirlari(repoRoot);
-  const kayitMap = new Map();
-  for (const s of satirlar) {
-    if (DEFTER_TURLERI.includes(s.tur)) {
-      kayitMap.set(s.tid, { ...s, akibetler: [], durum: "bekliyor" });
-    }
-  }
-  for (const s of satirlar) {
-    if (!AKIBET_TURLERI.includes(s.tur)) continue;
-    const k = kayitMap.get(s.tid);
-    if (!k) continue;
-    k.akibetler.push(s);
-    k.durum = s.tur;
-  }
-  const kapali = new Set(["islendi", "reddedildi", "cevap"]);
-  const kayitlar = [...kayitMap.values()].map((k) => {
-    const yasSn = Math.max(0, Math.round((now - Date.parse(k.ts)) / 1000));
-    return { ...k, acik: !kapali.has(k.durum), yasSn };
-  });
-  const akibetsiz = kayitlar.filter((k) => {
-    if (!k.acik) return false;
-    const esik = k.durum === "alindi" ? AKIBET_TTL.alindi : AKIBET_TTL.bekliyor;
-    return k.yasSn * 1000 > esik;
-  });
-  const bol = (t) => kayitlar.filter((k) => k.tur === t);
-  return {
-    kayitlar,
-    talimat: bol("talimat"),
-    request: bol("request"),
-    learning: bol("learning"),
-    soru: bol("soru"),
-    akibetsiz,
-  };
-}
-
-/**
- * Hedefi bu oturum/rol olan AÇIK kayıtlar — ctx dalının ingest girdisi.
- * Kırmızı sınıf İLAN edilir ama EMİR olarak basılmaz (valf).
- */
-export function defterBana(repoRoot, { sid, roller = [] } = {}) {
-  const kutular = new Set([...(sid ? [`sid:${sid}`] : []), ...roller.map((r) => `rol:${r}`)]);
-  return defterOzet(repoRoot).kayitlar.filter((k) => {
-    if (!k.acik) return false;
-    if (k.durum === "alindi") return false; // çift işleme koruması
-    return kutular.has(hedefKutuAdi(k.hedef));
-  });
 }

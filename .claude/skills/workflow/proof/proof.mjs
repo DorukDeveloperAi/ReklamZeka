@@ -140,6 +140,14 @@ const kok = repoKok(SKILL);
   ok("14 sync.ts DEFAULT_SYNC_FEATURES 'skill:workflow' içeriyor", iyi, bilgi);
 }
 
+// ── 15: wf-artefakt arşivlenmiş `aide usage` komutunu ÇAĞIRMAZ (2026-10-22) ──
+{
+  const src = readFileSync(join(SKILL, "scripts", "wf-artefakt.mjs"), "utf8");
+  const kod = src.split("\n").filter((l) => !l.trimStart().startsWith("//")).join("\n");
+  const iyi = !/child_process/.test(kod) && !/['"]usage['"]/.test(kod) && !/tui-v3/.test(kod);
+  ok("15 wf-artefakt alt süreç doğurmaz (aide usage çağrısı yok)", iyi, iyi ? "" : "spawn/usage izi bulundu");
+}
+
 const toplam = pass + fail;
 console.log(`\nPROOF ${pass}/${toplam}`);
 process.exit(fail ? 1 : 0);

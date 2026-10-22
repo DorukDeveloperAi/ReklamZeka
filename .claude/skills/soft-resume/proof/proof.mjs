@@ -206,6 +206,19 @@ console.log("— kasa: açık sekmenin yeniden başlatılabilir yedeği —");
     kanit("CANLI oturumu başlatmak REDDEDİLİR (ikiz koruması)", b1.status === 1 && b1.stderr.includes("İKİZ"));
     const b2 = kasaKos(["baslat", KISA, "--zorla"]);
     kanit("--zorla ile başlatma komutu basılır", b2.status === 0 && b2.stdout.includes(`--resume ${KID}`));
+    kanit("başlatma satırı arşivlenmiş `aide open`'ı ANMAZ", !b2.stdout.includes("aide open") && !brif?.includes("aide open"));
+    const b3 = kasaKos(["baslat", KISA, "--zorla", "--ates"]);
+    kanit("--ates TTY yoksa açmaz: komutu basar, exit 3", b3.status === 3 && b3.stdout.includes(`claude --resume ${KID}`));
+
+    // 2026-10-22 öncesi kayıt: hard = `aide open …`, ham = `claude --resume …` → okurken çevrilir.
+    const kyol = join(PROJE, "plans", "oturumlar", "kasa", `${KISA}.json`);
+    const eski = JSON.parse(readFileSync(kyol, "utf8"));
+    eski.yenidenBaslat = { ...eski.yenidenBaslat, hard: `aide open ${KID} --cwd ${PROJE}`, ham: `cd ${PROJE} && claude --resume ${KID}` };
+    delete eski.yenidenBaslat.cwd;
+    writeFileSync(kyol, JSON.stringify(eski));
+    const b4 = kasaKos(["baslat", KISA, "--zorla"]);
+    kanit("eski kayıttaki `aide open` satırı `claude --resume`'a çevrilir",
+      b4.status === 0 && !b4.stdout.includes("aide open") && b4.stdout.includes(`cd ${PROJE} && claude --resume ${KID}`));
 
     const u = kasaKos(["unut", KISA]);
     kanit("unut: kayıt + brif silinir, index tazelenir", u.status === 0 && !oku(`${KISA}.json`) && !oku(`${KISA}.md`));

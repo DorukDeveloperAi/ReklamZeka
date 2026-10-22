@@ -383,24 +383,8 @@ T('dorukcom06: gate PASS + kalite-turu INDEX.json içinde', () => {
   const j = JSON.parse(fs.readFileSync(path.join(DORUK, 'plans/INDEX.json'), 'utf8'));
   assert(j.plans.some((p) => p.slug === 'kalite-turu'), 'kalite-turu yok');
 });
-T('kaptan köprüsü: readPlans + buildModel plan taşıyor', async () => {
-  // dinamik import senkron T ile uyumsuz olmasın diye execFile ile ölç
-  const out = execFileSync('node', ['-e', `
-    import(process.env.HOME + '/.claude/skills/kaptan/scripts/model.mjs').then(m => {
-      const plans = m.readPlans(process.env.HOME + '/dev/dorukcom06');
-      if (!plans.length) { console.log('BOS'); process.exit(0); }
-      const model = m.buildModel();
-      const p = model.projects.find(x => String(x.cwd || '').includes('dorukcom06'));
-      console.log(JSON.stringify({ readPlans: plans.length, modelPlans: (p?.plans || []).length }));
-    });`], { encoding: 'utf8' });
-  assert(/"readPlans":[1-9]/.test(out) && /"modelPlans":[1-9]/.test(out), out);
-});
-T('plans/ olmayan projede model KIRILMAZ (readPlans boş döner)', () => {
-  const out = execFileSync('node', ['-e', `
-    import(process.env.HOME + '/.claude/skills/kaptan/scripts/model.mjs')
-      .then(m => console.log(JSON.stringify(m.readPlans('/tmp/olmayan-proje-xyz'))));`], { encoding: 'utf8' });
-  assert(out.trim() === '[]', out);
-});
+// Kaptan köprüsü testleri (readPlans/buildModel) 2026-10-22'de çıktı: kaptan skill'i arşive gitti
+// (toolkit-donusum v1 aşama 03). Eski hâli: `git show toolkit-oncesi:packages/kit/templates/skills/plan-organizatoru/proof/proof.mjs`.
 
 // ── OTURUM boyutu (çift dikiş) ───────────────────────────────────────────────
 // Kural (Ders 17/18): KIRMIZI YANABİLEN kapı kanıttır — her denetimin bilerek bozulan bir vakası var.

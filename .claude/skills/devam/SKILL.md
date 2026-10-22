@@ -9,20 +9,19 @@ rol: ajan
 ## Neden ayrı bir alet
 
 `/soft-resume` kesintiye uğramış bir session'ı taze oturumda sürdürür — ama
-**hiç sormaz**: "bu iş hâlâ gerekli mi?" Topla → damıt → ateşle. Kesinti uzunsa
+**hiç sormaz**: "bu iş hâlâ gerekli mi?" Topla → damıt → sürdür. Kesinti uzunsa
 ya da gerçeklik altından kaydıysa, sürdürülen iş **bayat** olabilir: başkası
 bitirmiştir, plan aşaması kapanmıştır, hedef değişmiştir, aynı işi koşan bir
 session zaten vardır.
 
 `/devam` o soruyu sorar. `soft-resume`'un yerine geçmez — onu **motor olarak
-çağırır** (`topla.mjs` toplar, ateşleme onun yolundan gider) ve araya tek bir
+çağırır** (`topla.mjs` toplar, sürdürme onun Faz 4 yolundan gider) ve araya tek bir
 faz ekler: **GEÇERLİLİK**.
 
 **Sınıf ilanı (terimler sözleşmesi):** Faz 1–2 **motor, 0 token** · Faz 3
 **sapma varsa agentic** (sapma yoksa hiç doğmaz) · Faz 4 **insan onaylı**.
 
-**Rol sınırı — ben ne DEĞİLİM:** irtifam TEK İŞİN sürdürülmesidir. Genel
-"durum ne / nerede kaldık" → **kaptan**; projeler-arası karar → **pm**; plan
+**Rol sınırı — ben ne DEĞİLİM:** irtifam TEK İŞİN sürdürülmesidir. Plan
 ağacı → **plan-organizatoru**; salt taşıma (geçerlilik sorusu olmadan) →
 **soft-resume**. Ben yalnız "kesildi → hâlâ geçerli mi → sürdür" halkasıyım.
 
@@ -72,10 +71,10 @@ Sapma eksenlerini ve `yarimIs` listesini oku, üç hükümden birini ver:
 |---|---|---|
 | **GEÇERLİ** | sapmalar işi geçersiz kılmıyor (ör. alakasız dosyalar değişmiş) | brife "şunlar değişti ama işi etkilemiyor: …" satırı, aynen devam |
 | **REVİZE** | iş hâlâ gerekli ama girdisi değişmiş | brife **ZORUNLU İLK ADIM** olarak "önce şunu doğrula: …" yazılır; devam eder |
-| **DÜŞTÜ** | iş artık gerekli değil (bitmiş · hedef değişmiş · başkası koşuyor) | **DEVAM ETTİRME.** Gerekçeyi yaz, kullanıcıya bildir; istenirse PM gelen kutusuna düşür |
+| **DÜŞTÜ** | iş artık gerekli değil (bitmiş · hedef değişmiş · başkası koşuyor) | **DEVAM ETTİRME.** Gerekçeyi yaz, kullanıcıya bildir |
 
 **Kural — hüküm ≠ eylem:** hüküm brifi *işaretler*, tek başına iş ateşlemez.
-Ateşleme her hâlükârda Faz 4'ün insan onayından geçer.
+Sürdürme her hâlükârda Faz 4'ün insan onayından geçer.
 **Uydurma yasak:** hüküm yalnız `eksenler[]` kanıtına dayanır; ölçülmemiş bir
 şey hükümde gerekçe olamaz.
 
@@ -90,8 +89,8 @@ kararlar · yapılacak ilk iş) ve **başına hüküm bloğunu** koy:
 - ZORUNLU İLK ADIM (yalnız REVİZE): <doğrulanacak şey>
 ```
 
-Sonra `soft-resume`'un ateşleme yolunu kullan (Maestro üzerinden taze oturum,
-insan onaylı). Yeni yol açma — tek ateşleyici odur.
+Sonra `soft-resume`'un Faz 4 yolunu kullan: brifi taze oturumda açan komutu
+kullanıcıya ver, kullanıcı çalıştırır. Yeni yol açma — tek sürdürme yolu odur.
 
 **DÜŞTÜ hükmünde Faz 4 KOŞULMAZ.** Sessizce atlama: kullanıcıya "şu iş
 düştü, gerekçe şu" diye İLAN et.
@@ -101,7 +100,7 @@ düştü, gerekçe şu" diye İLAN et.
 - `soft-resume` kurulu olmalı (`topla.mjs`). Yoksa script `onar:` satırıyla
   exit 2 verir — kendi toplayıcısını YAZMAZ (çoğaltma yasak,
   `uy:ilke/tek-projeksiyon`).
-- Bu skill **hiçbir dosyaya yazmaz**; yalnız ölçer, hüküm üretir, ateşlemeyi
+- Bu skill **hiçbir dosyaya yazmaz**; yalnız ölçer, hüküm üretir, sürdürmeyi
   soft-resume'a devreder.
 - Eşik (`--esik-saat`) ürün tercihidir; varsayılan 24 sa. Kullanıcı başka bir
   değer söylerse ona uy, uydurma.

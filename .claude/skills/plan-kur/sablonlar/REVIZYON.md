@@ -1,12 +1,12 @@
 # REVIZYON defteri (kümülatif)
 
 > **Kümülatif defter:** v(N+1) dosyası önceki blokları da AYNEN taşır (tek dosya, tüm geçmiş).
-> Her revizyon TEK blokla açılır: makine-okunur başlık + serbest gövde. Rotacı parser'ı
-> (`fiili.revizyonlar`) bu başlıktan revize/pivot sayısını **TÜRETİR** — sayaç dosyası YOK.
+> Her revizyon TEK blokla açılır: sabit biçimli başlık + serbest gövde. Revize/pivot sayısı
+> bu başlıklardan **SAYILIR** — sayaç dosyası YOK.
 >
 > **Başlık sözleşmesi** (birebir; ayraç em-dash `—`, ISO ts boşluksuz):
 > `## r<N> — tip: revize|pivot — <YYYY-MM-DDTHH:mmZ>`
-> Regex (parser'la TEK kaynak): `^##\s+r(\d+)\s+—\s+tip:\s*(revize|pivot)\s+—\s+(\S+)\s*$`
+> Regex: `^##\s+r(\d+)\s+—\s+tip:\s*(revize|pivot)\s+—\s+(\S+)\s*$`
 >
 > - `<N>` = 1'den artan sıra numarası.
 > - `tip: revize` = AYNI yaklaşım (aşama ekle/kır, kapsam düzelt).
@@ -15,12 +15,12 @@
 >   otopsiden türeyen tek-cümlelik kural. **AYNI yaklaşımın üçüncü denemesi YASAK.**
 > - `<ts>` = revizyon anının UTC zaman damgası (boşluk içermez).
 >
-> **Sayaç aritmetiği** (Rotacı E2 kapısı): bir `pivot` bloğu revize sayacını SIFIRLAR; ikinci pivot
-> reconcile'da `pivot-tavani` ile İNSANA çıkar (`revize:2 + pivot:1` → 6. tur mekanik imkânsız).
+> **Sayaç aritmetiği:** bir `pivot` bloğu revize sayacını SIFIRLAR. İkinci pivot açılmaz; karar
+> kullanıcıya döner (tavan `revize:2 + pivot:1`). Bu aritmetiği otomatik uygulayan Rotacı
+> 2026-10-22'de arşive gitti.
 
-Örnek başlıklar (yer tutucular DOLDURULMUŞ — **şablon-parser bağ testi** bu satırları `fiili.revizyonlar`
-parser'ından geçirir; başlık biçimi bozulursa test kırılır). Aşağıdaki blok GERÇEK bir revizyonda
-SİLİNİR, iskeleti değil kendi bloklarınızı yazarsınız:
+Örnek başlıklar (yer tutucular DOLDURULMUŞ). Aşağıdaki blok GERÇEK bir revizyonda SİLİNİR,
+iskeleti değil kendi bloklarınızı yazarsınız:
 
 ```
 ## r1 — tip: revize — 2026-01-15T09:30Z

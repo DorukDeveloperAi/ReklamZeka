@@ -1,162 +1,97 @@
-# aide — bu projenin agentic altyapı envanteri
+# aide — bu projenin ajan toolkit envanteri
 
-> **ÇEKİRDEK envanter.** Her oturumun HER isteğine girer; yalnız *davranışı değiştiren*i taşır —
-> ayrıntı `Detay:` işaretçilerinde, **gerekince okunur.** Kurulum `aide sync` (§11).
-> Kod kanoniktir: `/Users/ybg/dev/agent-ide/docs/`.
+> **ÇEKİRDEK envanter.** Bu dosya her oturumun her isteğine girer; yalnız davranışı değiştiren
+> bilgiyi taşır. Ayrıntı `Detay:` işaretçisindedir ve gerekince okunur.
+> Kanon kaynağı `/Users/ybg/dev/agent-ide/packages/kit/`; `~/.claude` ve `<proje>/.claude` onun kopyasıdır.
 
-## Bu projede kullanılabilir yetenekler
+## Dağıtım ve kurulum
 
-### 1. `/zamanla` — zamanlı/tekrarlı/koşullu iş kuyruğu
-Maestro (metronom) kuyruğuna iş yazar; **Enter'a basmaz**, enjeksiyonu daemon yapar.
-Tetikler `at`·`every`·`after`·`when`·`manual`; payload `text`·`agent`·`shell`.
-`bun /Users/ybg/dev/agent-ide/packages/maestro/bin/zamanla.mjs add --text '/x' --at 09:00|list|cancel`
-Detay: `/Users/ybg/dev/agent-ide/docs/maestro.md`·`/Users/ybg/dev/agent-ide/docs/enjeksiyon.md`
+### 1. Kit dağıtımı — `aide sync`
+Toolkit dosyaları merkezî kit'ten gelir ve `.claude/aide-manifest.json` ile damgalanır.
+Kalıcı bir değişikliği `/Users/ybg/dev/agent-ide/packages/kit/templates/` altına yaz; kopyada yapılan değişiklik kaybolabilir.
+`aide sync --project <yol>` · `--kuru` (yazmadan rapor) · `--yerel <rel>` (yerel kopya kazanır) ·
+`--benimse <rel>` (takipsiz dosyayı izlemeye al; koruma değildir) · `--disla <yol>` (projeyi dağıtım dışı bırak).
+Üç-yol birleştirme (K5): yerel kopya saptıysa ve şablon kurulumdan beri değiştiyse şablon iner, eski
+hâl `~/.config/agent-ide/sync-yedek/` altına gider; şablon değişmediyse yerel kopya kalır.
+Detay: `/Users/ybg/dev/agent-ide/docs/kit.md` · `/Users/ybg/dev/agent-ide/docs/sync.md`
 
-### 2. `aide agent run <ref>` — agent koşum chokepoint'i
-Tanımlı agent'ı (`~/.claude/agents/`·`.claude/agents/`) yeni tmux penceresinde koşturur;
-instance↔session eşlemesi kayda geçer. `aide agent run global:kaptan --task "…"`·`list`·`ps`
-Detay: `/Users/ybg/dev/agent-ide/docs/agent-runtime.md`
+### 2. Kurulum — `aide kurulum`
+`aide sync` dosyayı dağıtır; `aide kurulum` onu Claude Code'a bağlar (hook kaydı · model zinciri · PATH).
+İkisi de gerekir: kaydı olmayan bir hook hiç koşmaz ve bunun belirtisi yoktur.
+`aide kurulum [--kuru]` · `aide kurulum --hepsi` (kayıtlı bütün projeler) · `aide kurulum doctor`.
+Kurulum yalnız ekler, idempotenttir ve yedek alır; bozuk bir `settings.json` dosyasını ezmez.
+Detay: `/Users/ybg/dev/agent-ide/docs/kurulum-katmani.md`
 
-### 3. `aide` dashboard — oturum/agent/otomasyon
-Terminalde `aide`: Oturumlar·Ajanlar·Otomasyon·Yapılandır.
-Detay: `/Users/ybg/dev/agent-ide/docs/tui-paneller.md`
+### 3. Otomatik dağıtım — `kit-bootstrap` hook'u
+SessionStart'ta koşar ve oturumu bekletmez. Projede iskelet yoksa iskeleti hemen kurar.
+İskelet varsa ve son tazeleme 24 saatten eskiyse `aide sync`'i arka planda başlatır; ev hedefi (`~`) dahil.
+Hata oturumu durdurmaz; `KURULAMADI:` satırı ve `~/.claude/hooks/kit-bootstrap.err.jsonl` kaydı bırakır.
+Detay: `~/.claude/hooks/kit-bootstrap.mjs` (baş yorumu)
 
-### 4. Kit dağıtımı — `aide sync`
-Aide dosyaları (`.claude/aide-manifest.json` damgalı) merkezi kit'ten gelir:
-`aide sync --project <hedef>` · paket `aide feature <anahtar> on|off`. `~/dev` altındaki
-her proje **otomatik keşfedilir** (`--auto`). Detay: `/Users/ybg/dev/agent-ide/docs/sync.md`
+### 4. Sağlık ölçümü — `/aide-saglik` · `/aide-durum`
+Tek salt-okur ölçüm bütün `~/dev`'i kapsar: bekleyen kit dosyası, kanona işlenmemiş yerel değişiklik,
+hook kaydı, vendor eşleşmesi ve registry dışı proje. 0 token harcar ve hiçbir şeyi düzeltmez.
+Son ölçüm 6 saatten tazeyse yeniden ölçmez; `/aide-durum` bu kapıyı `--zorla` ile deler.
+Çıkış kodu: 0 = tam · 1 = eksik · 2 = ölçüm koşamadı. Önerilen onarım `onar:` satırındadır.
+Detay: `~/.claude/skills/aide-saglik/SKILL.md`
 
-## Tamamlayıcı katmanlar
+## Oturum araçları
 
-### 5. `/kaptan` — görev modeli + projeler-arası router
-Her `TodoWrite` hook'la yakalanır (**NABIZ**) → `~/.claude/kaptan/goals/`; görev listesi
-oradan **TÜRETİLİR, elle tutulmaz**. Pano `aide kaptan`; detay `~/.claude/skills/kaptan/`
+### 5. `/eszamanli` — aynı repoda eşzamanlı oturum protokolü
+Uzun ya da yıkıcı bir yazımdan önce kaynağı claim'le, bitince bırak. Başkasının canlı kilidine
+yapılan yazımı `claim-guard` hook'u reddeder. `C=~/.claude/skills/eszamanli/scripts/claim.mjs`:
+`node $C status | claim --res <k> --intent "…" | release --res <k> | wait --res <k>`
+Reddedilince işi parçala: serbest parçayı şimdi yap, bloke parça için `wait`'i `run_in_background` ile koş;
+oturum kapanacaksa `devret --res <k> --gorev "…"` ile devir işareti bırak. Limit uyarısında `limit-devir` koş.
+`release` sıradaki bekleyene bildiri bırakır; bildiri durmuş bir oturumu uyandırmaz.
+Canlılık pid ile ölçülür; kilidi elle silme.
+Detay: `~/.claude/skills/eszamanli/SKILL.md` · `/Users/ybg/dev/agent-ide/docs/claim-anahtarlari.md`
 
-### 6. `/pm` — kaptan'ın üstündeki otonom proje yöneticisi
-Üst-hedef koyar, görevleri kendi kararıyla dağıtır, mutabakatla doğrular; geri-alınamaz
-adımlar üç kademeli valfe bağlı ve **🔴 kırmızı işi YALNIZ İNSAN onaylar** (`aide zamanla
-onay-list` → `run-now <id>`). Detay: `/Users/ybg/dev/agent-ide/docs/pm-otonom.md`
+### 6. Plan katmanı — `/plan-kur` · `/plan-organizatoru` · oturum defteri
+`/plan-kur` roadmap'i `plans/<slug>/v<N>/` altına yazar; aşamalar `/goal` ile koşulur.
+`/plan-organizatoru` planı ağaca yerleştirir. `plans/INDEX.*` ve `plans/TODO.md` dosyalarını elle yazma;
+tek yazarları `agac.mjs --durum|--gate|--todo|--kunye` betiğidir.
+Her plan künye taşır ve kaynak oturumunu beyan eder (`> Oturum: ot:<YYYY-MM-DD>/<slug>`).
+Oturum defteri: `oturum.mjs tohumla|bu|durum|devir|acilis|global` (betikler `~/.claude/skills/plan-organizatoru/scripts/` altında).
+(`/planla-kos` 2026-10-22'de arşive gitti.) Detay: `/Users/ybg/dev/agent-ide/docs/plan-katmani.md`
 
-### 7. Belge bekçisi — belge yalanlaşmasın diye
-`~/.claude/docs/_kanit.mjs` her gün **0 token**la doğrular: ölü yol/iş id'si · kit sapması ·
-gecikmiş/park iş · kurulu ama **referanssız** belge. Kapsam **türetilir** (`_kapsam.mjs`);
-tazelik mtime DEĞİL **içerik damgası** (`_damga.mjs`).
+### 7. `/workflow` — paralel ve çok adımlı işin orkestrasyonu
+İki kanon şablon sunar: uygula-doğrula (adversaryal doğrulamalı pipeline) ve fan-out-topla
+(şemalı paralel işçiler). Şema kapısı `scripts/dogrula.mjs` deterministiktir.
+Skill kendisi model doğurmaz; workflow'u koşan oturum doğurur.
+Detay: `/Users/ybg/dev/agent-ide/docs/workflow-katmani.md`
 
-### 8. `/eszamanli` — session çakışma protokolü
-Uzun/yıkıcı bir **yazımdan önce** kaynağı claim'le, bitince bırak; başkasının canlı kilidine
-yazımı `claim-guard` REDDEDER. `C=~/.claude/skills/eszamanli/scripts/claim.mjs` →
-`node $C status|claim|release --res <k>`
+### 8. `/soft-resume` · `/devam` — kesilmiş işi sürdürme
+`/soft-resume` kapalı ya da başka hesaba ait bir oturumu `claude --resume` olmadan sürdürür.
+Transcript, hedef ve plan ağacını `topla.mjs` ile toplar ve bir brif dosyasına damıtır.
+`/devam` önce işin hâlâ geçerli olup olmadığını ölçer (`gecerlilik.mjs`), sonra `/soft-resume`'u kullanır.
+Açık sekmelerin yedeği: `kasa.mjs yaz|list|baslat`; `baslat` `cd <cwd> && claude --resume <id>` satırını basar.
+Detay: `~/.claude/skills/soft-resume/SKILL.md` · `~/.claude/skills/devam/SKILL.md`
 
-- **DENY yiyince BEKLEME, İŞİ PARÇALA:** bloke adımlar B, kalanı A; A'yı şimdi yap, B için
-  `node $C wait --res <k>` (`run_in_background`) ya da oturum kapanıyorsa `devret --gorev "<B>"`.
-- **Limit uyarısında kilidini BIRAK/DEVRET** (`node $C limit-devir`) — askıdaki sahip kuyruğu dondurur.
-- **BIRAKAN HABER VERİR (2026-08-09):** `release` (ve SessionEnd), uyanma yolu OLMAYAN sıradaki
-  bekleyenlere **bildiri** bırakır; aktif `wait` süreci olana yazılmaz (o kendi uyanır). Okuma
-  `ctx` hook'unda, **tek sefer**. Posta kutusu — **ZİL DEĞİL:** durmuş oturumu uyandırmaz.
-- **ZİNCİRİN İKİ YÖNÜ:** bitirince İLERİ (sıradakine), kilit aşamasında bloke olunca GERİ
-  (kilidi TUTANA) haber gider — ikisi de yalnız YENİ bekleyende, yankı bildirilmez.
-- **ROLLER** (`rol kayit|durum|birak --rol <ad>`): kalıcı oturumların kararlı adı — kapalı küme
-  (`orkestrator`·`altyapi`·`pm`·`vizyon`·`plan` TEKİL · `worker` ÇOĞUL). `bildir --rol <ad>`
-  ile seslenilir; **çoğul/sahipsiz rolde adres ÜRETİLMEZ** (belirsiz adres yasak). Her rol
-  sahibi süzülmüş ilerleme beslemesi alır (imleçler ayrı); `kutu` istediğin an TÜKETMEDEN bakar.
-  Kaynak: `kit:dagitim` anahtarı altyapı rolünün yazımlarını kapıya bağlar.
-- **ORKESTRATÖR** (`orkestrator kayit|durum|birak`): sahadaki koordinatör oturum. Beslemesi
-  **`olay.jsonl`'ın projeksiyonudur** (imleç: `orkestrator/imlec.json`) — alindi·birakildi·
-  deny·bekleyis·kapanis·kapandi·devir·cevrim **yapısal olarak** akar, elle bağlanmaz; gürültü
-  katlanır (tavan 12 satır, >500 olayda yalnız sayaç). Eli: `bildir --hedef <sid> --mesaj "…"`.
-  Repo başına **tek slot** (`--devral`), canlılık pid'le, kapsam **repo** (projeler-arası eksen
-  `/pm`). PM karar verir, orkestratör **haber alır**. Beslemenin İKİNCİ kanalı commit'lerdir
-  (otonomi-merdiveni:16): İŞ satır satır · cp TEK satıra katlanır · imleç `orkestrator/commit-imlec.json`.
-- Canlılık **pid**'le ölçülür → kilidi **ELLE SİLME** · kapı **YAZIMI** ölçer, adı anmayı değil.
+### 9. `/learnings` — derslerin ham defteri
+Yol boyunca doğan dersleri kaydeder ve biriktirir; sisteme hiçbir şey işlemez.
+`learnings.mjs ekle --tur <tür> --metin "…" --neden "…"`; gerekçesiz kayıt kabul edilmez.
+Depo `docs/learnings/defter.jsonl` (kanon); `LEARNINGS.md` türevdir ve elle düzenlenmez.
+Detay: `~/.claude/skills/learnings/SKILL.md`
 
-Detay: `/Users/ybg/dev/agent-ide/docs/claim-anahtarlari.md`
+## Politika ve sözleşmeler
 
-### 9. Plan katmanı — `/plan-kur`·`/plan-organizatoru`·`/planla-kos`
-`/plan-kur` roadmap'i yazar (`plans/<slug>/v<N>/`); `/plan-organizatoru` ağaca yerleştirip
-`plans/INDEX.*`'ı **TÜRETİR**; `/planla-kos` sıradaki `/goal`'ü tüketip Maestro üzerinden
-ateşler. Yüzey (`~/.claude/skills/plan-organizatoru/scripts/`):
-`agac.mjs --durum|--gate|--todo|--kunye` · `oturum.mjs tohumla|bu|durum|devir|acilis|global`.
+### 10. Vendor katmanı — Codex
+Kanon ikinci bir ajan ürününe (Codex) deterministik olarak projekte edilir. Şalter varsayılan kapalıdır.
+Codex pilotu yalnız `vendors.codex.projeler` listesindeki projelere iner; pilotta ev hook kaydı ve model pini yazılmaz.
+`aide vendor durum | ac <ad> [--pilot <proje>] | kapat <ad> | doctor`.
+Detay: `/Users/ybg/dev/agent-ide/docs/vendor-katmani.md`
 
-- `plans/INDEX.*` + `plans/TODO.md` **ASLA elle yazılmaz** (tek yazar `agac.mjs`); `proje` slug'ı REZERVE.
-- **Her plan künye taşır** (`Kategori·Üst·Kritiklik·Aciliyet·Hacim·Hedef`) ve **kaynak oturumunu beyan
-  eder** (`> Oturum: ot:<YYYY-MM-DD>/<slug>`) — eksikse ADVISORY, **biçimi geçersizse gate FAIL**.
-- **Terfi asimetriktir:** oturum todo'su projeye kendiliğinden çıkmaz; planlar istisnasız roadmap'e işler.
-- **Oturum devri çift uçlu** (SessionEnd `devir` · SessionStart `acilis` — BİLGİ verir, DAYATMAZ);
-  üçüncü uç OTURUM KASASI (`soft-resume/scripts/kasa.mjs list|baslat`).
+### 11. Model politikası
+Tek kaynak `~/.config/agent-ide/config.json → models`; türev dosyaları elle düzenleme.
+Ayar: `aide model sec <tier> --model <id> --effort <e>` · denetim: `aide model doctor`.
+Detay: `~/.claude/docs/model-policy.md`
 
-Detay: `/Users/ybg/dev/agent-ide/docs/plan-katmani.md` (künye §4b · TODO §4c · oturum §4d)
+### 12. Commit sözleşmesi
+İŞ commit'ini insan ya da Claude yazar ve sözleşmeye uyar; checkpoint (`cp(...)`) commit'ini motor yazar.
+Şüphede commit İŞ sayılır. Detay: `.claude/aide/docs/commit-sozlesmesi.md`
 
-### 10. `aide rota` — Rotacı: planı kendi yürüten reconciler
-Her tick istenen ↔ fiili durumu karşılaştırır: **fark yoksa 0 token harcayıp çıkar**, fark
-varsa KAPALI bir tablodan tek eylem seçer, belirsizlikte seçmez — karar DETERMİNİSTİK KOD.
-`aide rota kuru --proje .` (ne yapardı; ateşlemez) · `durum`·`doctor`·`defter`. **Hüküm ≠
-eylem** (`hakem` ajanının `Edit`'i YOKTUR) · **fan-out yalnız Rotacı'da** · PM kadranı
-Rotacı'nın da TAVANIDIR. Detay: `/Users/ybg/dev/agent-ide/docs/rotaci.md`
-
-### 11. Alet katmanı — kit = taşınabilirlik
-Aletler **Claude'a değil PROJEYE** aittir: kanon repodadır (`/Users/ybg/dev/agent-ide/packages/kit/`),
-`~/.claude` ve `<proje>/.claude` **projeksiyondur**. **Kanonu ŞABLON taşır** — kalıcı değişikliği
-`packages/kit/templates/`'e işle. `aide sync --project ~` · `--kuru` · `--yerel <rel>` (yerel
-KAZANIR) · `--yerel-sil` · `--benimse`. K5/Model B: şablon kurulumdan beri DEĞİŞTİYSE kanon iner
-(eski hal `sync-yedek/`'e), DURDUYSA yerel kalır · **kapat ≠ sil**. Detay: `/Users/ybg/dev/agent-ide/docs/kit.md`
-
-### 12. Boot katmanı — makine ayaktayken koşan asgari çekirdek
-**BOOT** sistemin AYAKTA OLMASININ ön koşuludur — deterministik, tmux'suz, **sistem kapalıyken de
-koşar**; şalter AYRI: `aide boot durum|simdi|doctor|sinif|kapat|ac`. **K1:** `BOOT ⟺ (a) sistemin
-ayakta olması ona bağlı ∧ (b) deterministik ∧ (c) tmux gerektirmez`; biri düşerse iş MAESTRO'dur.
-Manifest **on adım, SIRA SÖZLEŞMEDİR** (`tasima-once → sync-auto → sync-ev → filing-donan →
-filing-yaz → oturum-kapat → kilit-nobet → claudemd-bekci → susturulmus-nabiz → tasima-sonra`;
-son üçü BEKÇİ — bulgu = ALARM). **Dağıtım İKİ adımdır:** `sync-auto` registry + `~/dev` keşfini,
-`sync-ev` **evi** (`~/.claude`) kapsar — ev hiçbir türetilmiş taramanın içinde değildir.
-**`aide sistem kapat` boot'u DURDURMAZ** · **borç bırakan her sonuç HATADIR**.
-Detay: `/Users/ybg/dev/agent-ide/docs/boot-katmani.md`
-
-### 13. Kurulum + FILING — dosyayı BAĞLAYAN ve bilgiyi TAŞIYAN halkalar
-`aide sync` DOSYA dağıtır; **`aide kurulum` onu sisteme BAĞLAR** (hook kayıtları · model
-zinciri · PATH) — kayıtsız hook **ölü metindir** ve belirtisi yoktur. **FILING** projenin
-kararlarını (hesaba bağlı `~/.claude`'dadırlar) `<proje>/.claude/filing/`'e git-izli
-yansıtır: **klasör kanondur, `~/.claude` çalışan kopya.**
-`aide kurulum [--kuru]|doctor|--hepsi` · `aide filing durum|<boş>=yaz|donan|kapsam|doktor|teshis`.
-**Fiiller kasten farklı:** `yaz` TAM AYNAdır (silme de yansır — YIKICI), `donan` eksiği doldurur ve
-**ASLA ezmez/silmez** · **SIRA sözleşmedir** (`filing-donan` ÖNCE) · **sır kapısı `yaz`ın içindedir**
-· kurulum ADDITIVE + idempotent + yedekli, bozuk `settings.json` EZİLMEZ.
-Detay: `/Users/ybg/dev/agent-ide/docs/kurulum-katmani.md` · `/Users/ybg/dev/agent-ide/docs/filing-katmani.md` ·
-`/Users/ybg/dev/agent-ide/docs/vscode-yuzeyi.md` · `/Users/ybg/dev/agent-ide/docs/proje-panosu.md`
-
-### 14. Commit sözleşmesi + DURUM logu — geçmişi araştırılabilir tutar
-**İki sınıf:** **İŞ** commit'ini insan/Claude yazar ("neden"i bilir → sözleşmeye tabi);
-**CHECKPOINT**'i motor yazar (`cp(<kapsam>): N dosya · +x/-y` — NE olduğunu diffden TÜRETİR,
-"neden" uydurmaz). **Şüphede İŞ.** `aide durum [--kuru|goster]` → `docs/DURUM.md` (TÜREV;
-elle düzenleme sapmadır). Diffin tekrarı YASAK · kapsam zorunlu · **12 satır tavanı**.
-Detay (zincir DIŞI — gerekince oku): `.claude/aide/docs/commit-sozlesmesi.md` ·
-`/Users/ybg/dev/agent-ide/docs/durum-logu.md`
-
-### 15. Vendor katmanı — tek kanon, ürüne özel çerçeve
-Kanon (`packages/kit/` + `hooks-registry.json` + `.claude/filing/`) ikinci bir ajan ürününe
-(**Codex**) **deterministik, 0-token** projekte edilir; artefaktı aynı filing'e geri akar.
-**Şalter varsayılan KAPALI** — kapalıyken tek bayt yazılmaz. Üç katman: **yol** (`vendorRel`,
-`kit.json` DEĞİŞMEZ) · **içerik** (projektör) · **kayıt** (`settings.json` ⊕ `hooks.json`).
-Bir hook ikinci ürüne ancak **açık beyanla** iner; **kayıtsız hook ölü metindir, DOSYASIZ kayıt
-ondan da kötüdür** → kapı ikisini birlikte ölçer.
-`aide vendor durum|ac|kapat|doctor`. Detay: `/Users/ybg/dev/agent-ide/docs/vendor-katmani.md`
-
-### 16. Seviye 0 — aide KAPALIYKEN de duran taban (envanter + kapı)
-Bu tabanı **aide taşımaz, DENETLER · ONARIR · İKAME ETMEZ**. Ne olduğu Seviye 0 maddesinde
-(yukarıda); burada **ölçeni** var: `aide seviye0` envanteri her yüzeyin **sınıfını · taşıyıcısını ·
-şalterini** ve `[kayıt][dosya]` rozetini basar — **kayıtsız hook ölü metindir ve BELİRTİSİ YOKTUR**
-(ölçüldü: bir üçüncü-taraf yazar `settings.json → hooks`tan `Stop`u silince dört seviye-0 kaydı
-sessizce öldü). `aide seviye0 --gate` exit 1 verirse çare TEK ve idempotenttir: **`aide kurulum`**.
-Detay: `/Users/ybg/dev/agent-ide/docs/seviye-0.md`
-
-## Terimler
-
-Kanon **`.claude/aide/docs/terimler.md`** (zincirde) — birinci kuralı orada.
-
-## Sözleşmeler
-- Maestro ile temas YALNIZ `/Users/ybg/dev/agent-ide/jobs/` şeması + `zamanla` CLI üzerinden; meşgul
-  pane'e asla enjeksiyon yapılmaz (ateş tavanı aşılırsa deadman global pause).
-- `sync` DAĞITIR, `kurulum` BAĞLAR — ikisi de gerekir; kit motoru `settings.json`'a ASLA
-  yazmaz, kaydı kurulum katmanı additive birleştirir.
-- **Bu dosya ÇEKİRDEKTİR:** yeni yetenek = 2-6 satır öz + tek `Detay:` işaretçisi; ayrıntı
-  kendi kanon belgesine gider. Tavan + seviye-0 rezervi (zincir DIŞI — gerekince oku):
-  `.claude/aide/docs/claude-md-sozlesmesi.md`.
+## Terimler ve tavan
+- Terim kanonu `.claude/aide/docs/terimler.md` dosyasıdır.
+- Bu dosya çekirdektir: yeni yetenek 2-6 satır öz ve tek `Detay:` işaretçisi taşır.
+  Tavan kuralı: `.claude/aide/docs/claude-md-sozlesmesi.md`.

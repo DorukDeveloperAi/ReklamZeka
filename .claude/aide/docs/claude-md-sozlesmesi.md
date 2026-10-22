@@ -6,7 +6,8 @@
 > ~12.600 token'ı **aynı metnin ikinci kopyasıydı**. Kimse kötü niyetle yazmadı; herkes
 > "şunu da bilsin" diye tek bir bölüm ekledi. Tavansız bir dosyada her ekleme makuldür.
 >
-> Sınıf: bu belge **kanondur**. Ölçen kapı: `aide claudemd` — **deterministik, 0 token**.
+> Sınıf: bu belge **kanondur**. Ölçen kapısı (`aide claudemd`) 2026-10-22'de arşive gitti; ölçüm
+> bugün elle yapılır (aşağıda § Ölçüm).
 
 ## Tek ölçüt
 
@@ -39,7 +40,7 @@ bitmesiyle yalanlaşmaz.
 
 | girmez | doğru yeri |
 |---|---|
-| **Tamamlananlar · yapılanlar · değişiklik kaydı** | `docs/DURUM.md` (türev) · `docs/gunluk/` · git geçmişi |
+| **Tamamlananlar · yapılanlar · değişiklik kaydı** | `docs/gunluk/` · git geçmişi · plan `STATE.md` |
 | **Nerede kaldık · aşama durumu** | `plans/<slug>/v<N>/STATE.md` |
 | **Yol haritası · roadmap · aşama listesi** | `plans/<slug>/v<N>/` |
 | **Mimari döküm · tasarım sistemi · API/şema kanonu** | `docs/MIMARI.md` · `docs/ADR.md` · ilgili kanon |
@@ -84,12 +85,13 @@ Atıf **tek satırdır**. "Özet olsun bari" diye eklenen üç paragraf, taşım
 
 ## Ölçüm
 
+`aide claudemd` kapısı (zincir tablosu · `--kuru` · `doctor`) toolkit dönüşümünde arşive gitti
+(toolkit-donusum v1 aşama 04). Ölçüm bugün elle yapılır:
+
 ```sh
-aide claudemd            # zincir tablosu: ne, kaç KB, kaç token, yineleme var mı
-aide claudemd --kuru     # ne taşınmalı — onar: satırlarıyla
-aide claudemd doctor     # KAPI: FAIL'de exit 1
+wc -c CLAUDE.md .claude/CLAUDE.md 2>/dev/null          # zincirin kökü
+grep -n '^@' CLAUDE.md .claude/CLAUDE.md 2>/dev/null   # @ ile çekilen belgeler — her biri her isteğe girer
 ```
 
-Kapı deterministiktir (LLM doğurmaz, 0 token). Ölçemediği şeyi **muaf ilan eder**:
-bir bölümün "talimat mı bilgi mi" olduğuna kapı karar veremez — onu yazan karar verir,
-kapı yalnız **boyutu, yinelenmeyi ve yasak başlık desenlerini** ölçer.
+Ölçülen üç şey değişmedi: **boyut**, **yineleme** (aynı metnin iki kopyası) ve **yasak başlık
+desenleri**. Bir bölümün "talimat mı bilgi mi" olduğuna ölçüm karar veremez — onu yazan karar verir.
